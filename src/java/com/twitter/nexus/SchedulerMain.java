@@ -1,9 +1,46 @@
 package com.twitter.nexus;
 
+import com.twitter.common.args.Option;
+import com.twitter.common.process.Process;
+import nexus.NexusSchedulerDriver;
+
 /**
- * To change this template use File | Settings | File Templates.
+ * Launcher for the twitter nexue scheduler.
  *
  * @author wfarner
  */
-public class SchedulerMain {
+public class SchedulerMain extends Process {
+
+  protected static class Options extends Process.Options {
+    @Option(name = "executor_path", required = true, usage = "Path to the executor launch script.")
+    private static String executorPath;
+
+    @Option(name = "master_address", required = true, usage = "Nexus address for the master node.")
+    private static String masterAddress;
+
+    @Option(name = "thrift_port", required = true, usage = "Port for thrift server to listen on.")
+    private static int thriftPort;
+  }
+  protected static Process.Options options = new Options();
+
+  @Override
+  protected void runProcess() {
+    TwitterScheduler sched = new TwitterScheduler(Options.executorPath, Options.thriftPort);
+    NexusSchedulerDriver driver = new NexusSchedulerDriver(sched, Options.masterAddress);
+    driver.run();
+  }
+
+  @Override
+  protected boolean checkOptions() {
+    return true;
+  }
+
+  @Override
+  protected Process.Options getOptions() {
+    return options;
+  }
+
+  public static void main(String[] args) {
+    new SchedulerMain().run(args);
+  }
 }
