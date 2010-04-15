@@ -61,10 +61,13 @@ public class SchedulerHub extends Scheduler {
   public void registered(SchedulerDriver driver, int frameworkId) {
     LOG.info("Registered with ID " + frameworkId);
     // TODO(wfarner): Register with ZooKeeper
+    schedulerCore.setFrameworkId(frameworkId);
   }
 
   @Override
   public void resourceOffer(SchedulerDriver driver, long offerId, SlaveOfferVector offers) {
+    schedulerCore.clearWorkQueue(driver);
+
     TaskDescriptionVector newlyScheduledTasks = new TaskDescriptionVector();
 
     for (int i = 0; i < offers.size(); i++) {
@@ -177,17 +180,20 @@ public class SchedulerHub extends Scheduler {
 
     @Override
     public KillResponse killJob(String jobName) throws TException {
-      return null;  //To change body of implemented methods use File | Settings | File Templates.
+      schedulerCore.killJob(jobName);
+      return new KillResponse().setResponseCode(ResponseCode.OK);
     }
 
     @Override
     public KillResponse killTasks(String jobName, Set<Integer> taskIds) throws TException {
-      return null;  //To change body of implemented methods use File | Settings | File Templates.
+      schedulerCore.killTasks(taskIds);
+      return new KillResponse().setResponseCode(ResponseCode.OK);
     }
 
     @Override
     public RestartResponse restartTasks(String jobName, Set<Integer> taskIds) throws TException {
-      return null;  //To change body of implemented methods use File | Settings | File Templates.
+      schedulerCore.restartTasks(taskIds);
+      return new RestartResponse().setResponseCode(ResponseCode.OK);
     }
 
     @Override

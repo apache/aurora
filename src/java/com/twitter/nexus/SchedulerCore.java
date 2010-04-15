@@ -1,15 +1,23 @@
 package com.twitter.nexus;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
+import com.twitter.common.base.Closure;
 import com.twitter.nexus.gen.ConcreteTaskDescription;
+import nexus.FrameworkMessage;
+import nexus.SchedulerDriver;
 import nexus.SlaveOffer;
 import nexus.StringMap;
 
+import java.util.Deque;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -31,11 +39,18 @@ class SchedulerCore {
 
   // Additional indices to serve the above map.
   private final Map<Integer, String> taskIdToJobName = Maps.newHashMap();
+  private final Map<Integer, Integer> taskIdToSlaveId = Maps.newHashMap();
   private final Multimap<String, Integer> jobToTaskIds = HashMultimap.create();
 
   // TODO(wfarner): Hopefully we can abolish (or at least mask) the concept of canonical task IDs
   // in favor of tasks being canonically named by job/taskIndex.
   private int nextTaskId = 0;
+
+  // The nexus framework ID of the scheduler, set to -1 until the framework is registered.
+  private final AtomicInteger frameworkId = new AtomicInteger(-1);
+
+  // Stores work to perform using the scheduler driver.
+  private Deque<Closure<SchedulerDriver>> workQueue = Lists.newLinkedList();
 
   public int pendingTaskCount() {
     return pendingTasks.size();
@@ -43,6 +58,10 @@ class SchedulerCore {
 
   public int scheduledTaskCount() {
     return scheduledTasks.size();
+  }
+
+  public void setFrameworkId(int frameworkId) {
+    this.frameworkId.set(frameworkId);
   }
 
   public boolean hasJob(String jobName) {
@@ -69,13 +88,13 @@ class SchedulerCore {
    *     tasks that are satisfied by the slave offer.
    */
   public synchronized nexus.TaskDescription schedulePendingTask(SlaveOffer slaveOffer) {
-      ConcreteTaskDescription offer;
-      try {
-        offer = ConfigurationManager.makeConcrete(slaveOffer);
-      } catch (ConfigurationManager.TaskDescriptionException e) {
-        LOG.log(Level.SEVERE, "Invalid slave offer", e);
-        return null;
-      }
+    ConcreteTaskDescription offer;
+    try {
+      offer = ConfigurationManager.makeConcrete(slaveOffer);
+    } catch (ConfigurationManager.TaskDescriptionException e) {
+      LOG.log(Level.SEVERE, "Invalid slave offer", e);
+      return null;
+    }
 
     Iterator<Map.Entry<String, ConcreteTaskDescription>> pendingIterator =
         pendingTasks.entries().iterator();
@@ -101,7 +120,7 @@ class SchedulerCore {
         // task requirement might be a fraction of the offer.
         pendingIterator.remove();
 
-        addScheduledTask(jobName, taskId, task);
+        addScheduledTask(jobName, taskId, slaveOffer.getSlaveId(), task);
 
         return new nexus.TaskDescription(taskId, slaveOffer.getSlaveId(),
                 jobName + "-" + taskId, params, new byte[0]);
@@ -111,9 +130,11 @@ class SchedulerCore {
     return null;
   }
 
-  private void addScheduledTask(String jobName, int taskId, ConcreteTaskDescription task) {
+  private void addScheduledTask(String jobName, int taskId, int slaveId,
+      ConcreteTaskDescription task) {
     if (scheduledTasks.put(taskId, task) != null) LOG.severe("Collision on task ID " + taskId);
     taskIdToJobName.put(taskId, jobName);
+    taskIdToSlaveId.put(taskId, slaveId);
     jobToTaskIds.put(jobName, taskId);
   }
 
@@ -125,5 +146,63 @@ class SchedulerCore {
     String jobName = taskIdToJobName.remove(taskId);
     jobToTaskIds.remove(jobName, taskId);
     return scheduledTasks.remove(taskId);
+  }
+
+  public synchronized void killJob(final String jobName) {
+    scheduleDriverWork(new Closure<SchedulerDriver>() {
+      @Override public void execute(SchedulerDriver driver) throws RuntimeException {
+        LOG.info("Killing job " + jobName);
+        pendingTasks.removeAll(jobName);
+
+        for (int taskId : jobToTaskIds.get(jobName)) {
+          driver.killTask(taskId);
+        }
+      }
+    });
+  }
+
+  public synchronized void killTasks(final Set<Integer> taskIds) {
+    scheduleDriverWork(new Closure<SchedulerDriver>() {
+      @Override public void execute(SchedulerDriver driver) throws RuntimeException {
+        LOG.info("Killing tasks " + taskIds);
+
+        for (int taskId : taskIds) {
+          driver.killTask(taskId);
+        }
+      }
+    });
+  }
+
+  public synchronized void restartTasks(final Set<Integer> taskIds) {
+    // TODO(wfarner): Probably need to do this in a cleaner way so that the entire job doesn't
+    // flip at once.
+    scheduleDriverWork(new Closure<SchedulerDriver>() {
+      @Override public void execute(SchedulerDriver driver) throws RuntimeException {
+        if (frameworkId.get() == -1) {
+          LOG.info("Unable to restart tasks, framework not registered.");
+          return;
+        }
+
+        LOG.info("Restarting tasks " + taskIds);
+
+        for (int taskId : taskIds) {
+          int slaveId = taskIdToSlaveId.get(taskId);
+          FrameworkMessage restartMessage = new FrameworkMessage(frameworkId.get(), slaveId,
+              new byte[0]);
+
+          driver.sendFrameworkMessage(restartMessage);
+        }
+      }
+    });
+  }
+
+  private void scheduleDriverWork(Closure<SchedulerDriver> work) {
+    workQueue.addLast(Preconditions.checkNotNull(work));
+  }
+
+  public synchronized void clearWorkQueue(SchedulerDriver driver) {
+    for (Closure<SchedulerDriver> work : workQueue) {
+      work.execute(driver);
+    }
   }
 }
