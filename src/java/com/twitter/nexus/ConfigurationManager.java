@@ -9,6 +9,7 @@ import nexus.SlaveOffer;
 import nexus.StringMap;
 
 import java.util.Map;
+import java.util.logging.Logger;
 
 /**
  * Manages translation from a string-mapped configuration to a concrete configuration type, and
@@ -17,6 +18,8 @@ import java.util.Map;
  * @author wfarner
  */
 public class ConfigurationManager {
+  private static Logger LOG = Logger.getLogger(ConfigurationManager.class.getName());
+
   private static final boolean DEFAULT_TO_DAEMON = false;
   private static final double DEFAULT_NUM_CPUS = 0.1;
   private static final long DEFAULT_RAM_BYTES = Amount.of(1, Data.GB).as(Data.BYTES);
@@ -31,6 +34,11 @@ public class ConfigurationManager {
     if (config == null) throw new TaskDescriptionException("Task configuration may not be null");
 
     return new ConcreteTaskDescription()
+      .setNumCpus(getValue(config, "cpus", DEFAULT_NUM_CPUS, Double.class))
+      .setRamBytes(getValue(config, "mem", DEFAULT_RAM_BYTES, Long.class));
+
+    /* TODO(wfarner): Make configuration more generic in nexus.
+    return new ConcreteTaskDescription()
       .setHdfsPath(getValue(config, "hdfs_path", String.class))
       .setCmdLineArgs(getValue(config, "cmd_line_args", String.class))
       .setIsDaemon(getValue(config, "is_daemon", DEFAULT_TO_DAEMON, Boolean.class))
@@ -38,17 +46,26 @@ public class ConfigurationManager {
       .setRamBytes(getValue(config, "ram_bytes", DEFAULT_RAM_BYTES, Long.class))
       .setRamBytes(getValue(config, "disk_bytes", DEFAULT_DISK_BYTES, Long.class))
       .setPriority(getValue(config, "priority", DEFAULT_PRIORITY, Integer.class));
+      */
   }
 
-  public static ConcreteTaskDescription makeConcrete(SlaveOffer offer) throws TaskDescriptionException {
+  public static ConcreteTaskDescription makeConcrete(SlaveOffer offer)
+      throws TaskDescriptionException {
     if (offer== null) throw new TaskDescriptionException("Task may not be null.");
 
     StringMap params = offer.getParams();
     if (params == null) throw new TaskDescriptionException("Task configuration may not be null");
+
+    return new ConcreteTaskDescription()
+      .setNumCpus(getValue(params, "cpus", Double.class))
+      .setRamBytes(getValue(params, "mem", Long.class));
+
+    /* TODO(wfarner): Make configuration more generic in nexus.
     return new ConcreteTaskDescription()
       .setNumCpus(getValue(params, "num_cpus", Double.class))
       .setRamBytes(getValue(params, "ram_bytes", Long.class))
       .setRamBytes(getValue(params, "disk_bytes", Long.class));
+     */
   }
 
   public static boolean satisfied(ConcreteTaskDescription request, ConcreteTaskDescription offer) {
@@ -86,6 +103,7 @@ public class ConfigurationManager {
   @SuppressWarnings("unchecked")
   private static <T> T getValue(StringMap params, String key, Class<T> type)
       throws TaskDescriptionException {
+    if (!params.has_key(key)) throw new TaskDescriptionException("Must specify value for " + key);
     try {
       return (T) ValueParser.REGISTRY.get(type).parse(params.get(key));
     } catch (ValueParser.ParseException e) {

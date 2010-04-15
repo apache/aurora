@@ -25,9 +25,11 @@ public class SchedulerMain extends Process {
 
   @Override
   protected void runProcess() {
-    TwitterScheduler sched = new TwitterScheduler(Options.executorPath, Options.thriftPort);
+    TwitterScheduler sched = new TwitterScheduler(Options.executorPath);
     NexusSchedulerDriver driver = new NexusSchedulerDriver(sched, Options.masterAddress);
     driver.run();
+
+    sched.startThriftServer(Options.thriftPort);
   }
 
   @Override

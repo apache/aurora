@@ -107,6 +107,7 @@ public interface ValueParser<T> {
         String.class, new StringParser(),
         Integer.class, new IntegerParser(),
         Long.class, new LongParser(),
-        Double.class, new DoubleParser()
+        Double.class, new DoubleParser(),
+        Boolean.class, new BooleanParser()
   );
 }
