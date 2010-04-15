@@ -10,7 +10,6 @@ import nexus.NexusSchedulerDriver;
  * @author wfarner
  */
 public class SchedulerMain extends Process {
-
   protected static class Options extends Process.Options {
     @Option(name = "executor_path", required = true, usage = "Path to the executor launch script.")
     private static String executorPath;
@@ -25,9 +24,9 @@ public class SchedulerMain extends Process {
 
   @Override
   protected void runProcess() {
-    TwitterScheduler sched = new TwitterScheduler(Options.executorPath);
+    SchedulerHub sched = new SchedulerHub(Options.executorPath);
     NexusSchedulerDriver driver = new NexusSchedulerDriver(sched, Options.masterAddress);
-    driver.run();
+    driver.start();
 
     sched.startThriftServer(Options.thriftPort);
   }

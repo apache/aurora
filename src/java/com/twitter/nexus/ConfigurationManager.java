@@ -1,6 +1,5 @@
 package com.twitter.nexus;
 
-import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.nexus.gen.ConcreteTaskDescription;
@@ -34,8 +33,8 @@ public class ConfigurationManager {
     if (config == null) throw new TaskDescriptionException("Task configuration may not be null");
 
     return new ConcreteTaskDescription()
-      .setNumCpus(getValue(config, "cpus", DEFAULT_NUM_CPUS, Double.class))
-      .setRamBytes(getValue(config, "mem", DEFAULT_RAM_BYTES, Long.class));
+      .setNumCpus(getValue(config, "num_cpus", DEFAULT_NUM_CPUS, Double.class))
+      .setRamBytes(getValue(config, "ram_bytes", DEFAULT_RAM_BYTES, Long.class));
 
     /* TODO(wfarner): Make configuration more generic in nexus.
     return new ConcreteTaskDescription()
