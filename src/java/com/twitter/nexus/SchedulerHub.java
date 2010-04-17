@@ -86,9 +86,7 @@ public class SchedulerHub extends Scheduler {
     LOG.info("Received status update for task " + status.getTaskId()
              + " in state " + status.getState());
 
-    ConcreteTaskDescription task = schedulerCore.getTask(status.getTaskId());
-
-    if (task == null) {
+    if (schedulerCore.getTask(status.getTaskId()) == null) {
       LOG.severe("Failed to find task id " + status.getTaskId());
     } else {
       boolean removeTask = false;
@@ -151,7 +149,7 @@ public class SchedulerHub extends Scheduler {
         }
       }
 
-      schedulerCore.addPendingTasks(jobName, concreteTasks);
+      schedulerCore.addTasks(jobName, concreteTasks);
 
       return new CreateJobResponse().setResponseCode(ResponseCode.OK)
           .setMessage(concreteTasks.size() + " tasks pending for job " + jobName);
@@ -159,7 +157,17 @@ public class SchedulerHub extends Scheduler {
 
     @Override
     public ScheduleStatusResponse getJobStatus(String jobName) throws TException {
-      return null;  //To change body of implemented methods use File | Settings | File Templates.
+      List<TrackedTask> tasks = Lists.newArrayList(schedulerCore.getTasks(jobName));
+
+      if (tasks.isEmpty()) {
+        return new ScheduleStatusResponse()
+            .setResponseCode(ResponseCode.INVALID_REQUEST)
+            .setMessage("Job not found: " + jobName);
+      }
+
+      return new ScheduleStatusResponse()
+          .setResponseCode(ResponseCode.OK)
+          .setTaskStatuses(tasks);
     }
 
     @Override
@@ -180,6 +188,12 @@ public class SchedulerHub extends Scheduler {
 
     @Override
     public KillResponse killJob(String jobName) throws TException {
+      if (!schedulerCore.hasJob(jobName)) {
+        return new KillResponse()
+            .setResponseCode(ResponseCode.INVALID_REQUEST)
+            .setMessage("Job not found: " + jobName);
+      }
+
       schedulerCore.killJob(jobName);
       return new KillResponse().setResponseCode(ResponseCode.OK);
     }

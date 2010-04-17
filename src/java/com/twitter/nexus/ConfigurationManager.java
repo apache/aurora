@@ -1,5 +1,6 @@
 package com.twitter.nexus;
 
+import com.google.common.base.Preconditions;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.nexus.gen.ConcreteTaskDescription;
@@ -25,6 +26,11 @@ public class ConfigurationManager {
   private static final long DEFAULT_DISK_BYTES = Amount.of(1, Data.GB).as(Data.BYTES);
   private static final int DEFAULT_PRIORITY = 0;
 
+  public static TaskDescription makeNonConcrete(ConcreteTaskDescription desc) {
+    Preconditions.checkNotNull(desc);
+    return new TaskDescription().setConfiguration(desc.getRawConfig().getConfiguration());
+  }
+
   public static ConcreteTaskDescription makeConcrete(TaskDescription desc)
       throws TaskDescriptionException {
     if (desc == null) throw new TaskDescriptionException("Task may not be null.");
@@ -34,7 +40,8 @@ public class ConfigurationManager {
 
     return new ConcreteTaskDescription()
       .setNumCpus(getValue(config, "num_cpus", DEFAULT_NUM_CPUS, Double.class))
-      .setRamBytes(getValue(config, "ram_bytes", DEFAULT_RAM_BYTES, Long.class));
+      .setRamBytes(getValue(config, "ram_bytes", DEFAULT_RAM_BYTES, Long.class))
+      .setRawConfig(desc);
 
     /* TODO(wfarner): Make configuration more generic in nexus.
     return new ConcreteTaskDescription()
