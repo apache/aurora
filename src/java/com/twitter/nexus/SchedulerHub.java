@@ -93,15 +93,21 @@ public class SchedulerHub extends Scheduler {
 
       switch (status.getState()) {
         case TASK_STARTING:
+          schedulerCore.setTaskStatus(status.getTaskId(), ScheduleStatus.STARTING);
           break;
         case TASK_RUNNING:
+          schedulerCore.setTaskStatus(status.getTaskId(), ScheduleStatus.RUNNING);
           break;
         case TASK_FINISHED:
           // TODO(wfarner): Some of these states will require the task to be rescheduled,
           // depending on the config (daemon, number of allowed failures, etc).
+          schedulerCore.setTaskStatus(status.getTaskId(), ScheduleStatus.FINISHED);
         case TASK_FAILED:
+          schedulerCore.setTaskStatus(status.getTaskId(), ScheduleStatus.FAILED);
         case TASK_KILLED:
+          schedulerCore.setTaskStatus(status.getTaskId(), ScheduleStatus.KILLED);
         case TASK_LOST:
+          schedulerCore.setTaskStatus(status.getTaskId(), ScheduleStatus.LOST);
           removeTask = true;
           break;
         default:

@@ -36,7 +36,6 @@ class SchedulerCore {
   private final Map<Integer, TrackedTask> tasks = Maps.newHashMap();
   private final Multimap<String, Integer> jobToTaskIds = HashMultimap.create();
 
-
   // TODO(wfarner): Hopefully we can abolish (or at least mask) the concept of canonical task IDs
   // in favor of tasks being canonically named by job/taskIndex.
   private int nextTaskId = 0;
@@ -53,10 +52,6 @@ class SchedulerCore {
 
   public boolean hasJob(String jobName) {
     return jobToTaskIds.containsKey(jobName);
-  }
-
-  public synchronized Iterable<Integer> getTaskIds(String jobName) {
-    return ImmutableList.copyOf(jobToTaskIds.get(Preconditions.checkNotNull(jobName)));
   }
 
   public synchronized Iterable<TrackedTask> getTasks(String jobName) {
@@ -127,7 +122,7 @@ class SchedulerCore {
 
         // TODO(wfarner): Need to 'consume' the resouce from the slave offer, since the
         // task requirement might be a fraction of the offer.
-        trackedTask.status = ScheduleStatus.BOOTSTRAPPING;
+        trackedTask.status = ScheduleStatus.STARTING;
         trackedTask.slaveId = slaveOffer.getSlaveId();
 
         return new nexus.TaskDescription(trackedTask.getTaskId(), slaveOffer.getSlaveId(),
@@ -140,6 +135,11 @@ class SchedulerCore {
 
   public synchronized TrackedTask getTask(int taskId) {
     return tasks.get(taskId);
+  }
+
+  public synchronized void setTaskStatus(int taskId, ScheduleStatus status) {
+    TrackedTask task = tasks.get(taskId);
+    if (task != null) task.setStatus(Preconditions.checkNotNull(status));
   }
 
   public synchronized TrackedTask removeTask(int taskId) {
