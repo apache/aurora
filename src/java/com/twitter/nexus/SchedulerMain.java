@@ -13,7 +13,7 @@ import nexus.NexusSchedulerDriver;
  */
 public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerOptions,Exception> {
   public static class TwitterSchedulerOptions extends GuicedProcessOptions {
-    @Option(name = "executor_path", required = true, usage = "Path to the executor launch script.")
+    @Option(name = "executor_path", required = true, usage = "Path to the executorHub launch script.")
     public String executorPath;
 
     @Option(name = "master_address", required = true, usage = "Nexus address for the master node.")

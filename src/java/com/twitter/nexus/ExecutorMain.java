@@ -19,7 +19,7 @@ public class ExecutorMain extends GuicedProcess<ExecutorMain.TwitterExecutorOpti
   }
 
   @Inject
-  TwitterExecutor executor;
+  ExecutorHub executorHub;
 
   protected ExecutorMain() {
     super(TwitterExecutorOptions.class);
@@ -27,7 +27,7 @@ public class ExecutorMain extends GuicedProcess<ExecutorMain.TwitterExecutorOpti
 
   @Override
   protected void runProcess() throws Exception {
-    new NexusExecutorDriver(executor).run();
+    new NexusExecutorDriver(executorHub).run();
   }
 
   public static void main(String[] args) throws Exception {

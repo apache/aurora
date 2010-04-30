@@ -5,7 +5,8 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.inject.Inject;
 import com.twitter.common.thrift.ThriftServer;
-import com.twitter.nexus.gen.ConcreteTaskDescription;
+import com.twitter.nexus.gen.TwitterTaskConfig;
+import com.twitter.nexus.gen.TwitterTaskInfo;
 import com.twitter.nexus.gen.CreateJobResponse;
 import com.twitter.nexus.gen.JobConfiguration;
 import com.twitter.nexus.gen.KillResponse;
@@ -14,7 +15,6 @@ import com.twitter.nexus.gen.ResponseCode;
 import com.twitter.nexus.gen.RestartResponse;
 import com.twitter.nexus.gen.ScheduleStatus;
 import com.twitter.nexus.gen.ScheduleStatusResponse;
-import com.twitter.nexus.gen.TaskDescription;
 import com.twitter.nexus.gen.TrackedTask;
 import com.twitter.nexus.gen.UpdateRequest;
 import com.twitter.nexus.gen.UpdateResponse;
@@ -51,12 +51,13 @@ public class SchedulerHub extends Scheduler {
     System.loadLibrary("nexus");
   }
 
-  private final SchedulerCore schedulerCore = new SchedulerCore();
-  private SchedulerMain.TwitterSchedulerOptions options;
+  private final SchedulerCore schedulerCore;
+  private final SchedulerMain.TwitterSchedulerOptions options;
 
   @Inject
-  public SchedulerHub(SchedulerMain.TwitterSchedulerOptions options) {
+  public SchedulerHub(SchedulerMain.TwitterSchedulerOptions options, SchedulerCore schedulerCore) {
     this.options = Preconditions.checkNotNull(options);
+    this.schedulerCore = Preconditions.checkNotNull(schedulerCore);
     isExecutorBinaryValid();
   }
 
@@ -189,10 +190,10 @@ public class SchedulerHub extends Scheduler {
             .setMessage("A job with the name " + jobName + " already exists.");
       }
 
-      List<ConcreteTaskDescription> concreteTasks = Lists.newArrayList();
-      for (TaskDescription task : jobDesc.getTaskDescriptions()) {
+      List<TwitterTaskInfo> taskInfos = Lists.newArrayList();
+      for (TwitterTaskConfig config : jobDesc.getTaskConfigs()) {
         try {
-          concreteTasks.add(ConfigurationManager.makeConcrete(task));
+          taskInfos.add(ConfigurationManager.parse(config));
         } catch (ConfigurationManager.TaskDescriptionException e) {
           return new CreateJobResponse()
               .setResponseCode(ResponseCode.INVALID_REQUEST)
@@ -200,10 +201,10 @@ public class SchedulerHub extends Scheduler {
         }
       }
 
-      schedulerCore.addTasks(jobName, concreteTasks);
+      schedulerCore.addTasks(jobName, taskInfos);
 
       return new CreateJobResponse().setResponseCode(ResponseCode.OK)
-          .setMessage(concreteTasks.size() + " tasks pending for job " + jobName);
+          .setMessage(taskInfos.size() + " tasks pending for job " + jobName);
     }
 
     @Override

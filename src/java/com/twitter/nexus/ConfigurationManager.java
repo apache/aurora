@@ -3,8 +3,8 @@ package com.twitter.nexus;
 import com.google.common.base.Preconditions;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
-import com.twitter.nexus.gen.ConcreteTaskDescription;
-import com.twitter.nexus.gen.TaskDescription;
+import com.twitter.nexus.gen.TwitterTaskConfig;
+import com.twitter.nexus.gen.TwitterTaskInfo;
 import nexus.SlaveOffer;
 import nexus.StringMap;
 
@@ -26,55 +26,55 @@ public class ConfigurationManager {
   private static final long DEFAULT_DISK_BYTES = Amount.of(1, Data.GB).as(Data.BYTES);
   private static final int DEFAULT_PRIORITY = 0;
 
-  public static TaskDescription makeNonConcrete(ConcreteTaskDescription desc) {
+  public static TwitterTaskConfig makeNonConcrete(TwitterTaskInfo desc) {
     Preconditions.checkNotNull(desc);
-    return new TaskDescription().setConfiguration(desc.getRawConfig().getConfiguration());
+    return new TwitterTaskConfig().setConfiguration(desc.getRawConfig().getConfiguration());
   }
 
-  public static ConcreteTaskDescription makeConcrete(TaskDescription desc)
+  public static TwitterTaskInfo parse(TwitterTaskConfig config)
       throws TaskDescriptionException {
-    if (desc == null) throw new TaskDescriptionException("Task may not be null.");
+    if ( config == null) throw new TaskDescriptionException("Task may not be null.");
 
-    Map<String, String> config = desc.getConfiguration();
-    if (config == null) throw new TaskDescriptionException("Task configuration may not be null");
+    Map<String, String> configMap =  config.getConfiguration();
+    if (configMap == null) throw new TaskDescriptionException("Task configuration may not be null");
 
-    return new ConcreteTaskDescription()
-      .setNumCpus(getValue(config, "num_cpus", DEFAULT_NUM_CPUS, Double.class))
-      .setRamBytes(getValue(config, "ram_bytes", DEFAULT_RAM_BYTES, Long.class))
-      .setRawConfig(desc);
+    return new TwitterTaskInfo()
+      .setNumCpus(getValue(configMap, "num_cpus", DEFAULT_NUM_CPUS, Double.class))
+      .setRamBytes(getValue(configMap, "ram_bytes", DEFAULT_RAM_BYTES, Long.class))
+      .setRawConfig( config);
 
     /* TODO(wfarner): Make configuration more generic in nexus.
-    return new ConcreteTaskDescription()
-      .setHdfsPath(getValue(config, "hdfs_path", String.class))
-      .setCmdLineArgs(getValue(config, "cmd_line_args", String.class))
-      .setIsDaemon(getValue(config, "is_daemon", DEFAULT_TO_DAEMON, Boolean.class))
-      .setNumCpus(getValue(config, "num_cpus", DEFAULT_NUM_CPUS, Double.class))
-      .setRamBytes(getValue(config, "ram_bytes", DEFAULT_RAM_BYTES, Long.class))
-      .setRamBytes(getValue(config, "disk_bytes", DEFAULT_DISK_BYTES, Long.class))
-      .setPriority(getValue(config, "priority", DEFAULT_PRIORITY, Integer.class));
+    return new TwitterTaskInfo()
+      .setHdfsPath(getValue(configMap, "hdfs_path", String.class))
+      .setCmdLineArgs(getValue(configMap, "cmd_line_args", String.class))
+      .setIsDaemon(getValue(configMap, "is_daemon", DEFAULT_TO_DAEMON, Boolean.class))
+      .setNumCpus(getValue(configMap, "num_cpus", DEFAULT_NUM_CPUS, Double.class))
+      .setRamBytes(getValue(configMap, "ram_bytes", DEFAULT_RAM_BYTES, Long.class))
+      .setRamBytes(getValue(configMap, "disk_bytes", DEFAULT_DISK_BYTES, Long.class))
+      .setPriority(getValue(configMap, "priority", DEFAULT_PRIORITY, Integer.class));
       */
   }
 
-  public static ConcreteTaskDescription makeConcrete(SlaveOffer offer)
+  public static TwitterTaskInfo makeConcrete(SlaveOffer offer)
       throws TaskDescriptionException {
     if (offer== null) throw new TaskDescriptionException("Task may not be null.");
 
     StringMap params = offer.getParams();
     if (params == null) throw new TaskDescriptionException("Task configuration may not be null");
 
-    return new ConcreteTaskDescription()
+    return new TwitterTaskInfo()
       .setNumCpus(getValue(params, "cpus", Double.class))
       .setRamBytes(getValue(params, "mem", Long.class));
 
     /* TODO(wfarner): Make configuration more generic in nexus.
-    return new ConcreteTaskDescription()
+    return new TwitterTaskInfo()
       .setNumCpus(getValue(params, "num_cpus", Double.class))
       .setRamBytes(getValue(params, "ram_bytes", Long.class))
       .setRamBytes(getValue(params, "disk_bytes", Long.class));
      */
   }
 
-  public static boolean satisfied(ConcreteTaskDescription request, ConcreteTaskDescription offer) {
+  public static boolean satisfied(TwitterTaskInfo request, TwitterTaskInfo offer) {
     return request.getNumCpus() <= offer.getNumCpus()
         && request.getRamBytes() <= offer.getRamBytes()
         && request.getDiskBytes() <= offer.getRamBytes();

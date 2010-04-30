@@ -9,7 +9,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.twitter.common.base.Closure;
-import com.twitter.nexus.gen.ConcreteTaskDescription;
+import com.twitter.nexus.gen.TwitterTaskInfo;
 import com.twitter.nexus.gen.ScheduleStatus;
 import com.twitter.nexus.gen.TrackedTask;
 import nexus.FrameworkMessage;
@@ -76,10 +76,10 @@ class SchedulerCore {
    * @param jobName Name of the job that the task is a part of.
    * @param newTasks The tasks to schedule.
    */
-  public synchronized void addTasks(String jobName, Iterable<ConcreteTaskDescription> newTasks) {
+  public synchronized void addTasks(String jobName, Iterable<TwitterTaskInfo> newTasks) {
     Preconditions.checkNotNull(jobName);
 
-    for (ConcreteTaskDescription task : Preconditions.checkNotNull(newTasks)) {
+    for (TwitterTaskInfo task : Preconditions.checkNotNull(newTasks)) {
       int taskId = generateTaskId();
       jobToTaskIds.put(jobName, taskId);
       tasks.put(taskId, new TrackedTask()
@@ -98,7 +98,7 @@ class SchedulerCore {
    *     tasks that are satisfied by the slave offer.
    */
   public synchronized nexus.TaskDescription schedulePendingTask(SlaveOffer slaveOffer) {
-    ConcreteTaskDescription offer;
+    TwitterTaskInfo offer;
     try {
       offer = ConfigurationManager.makeConcrete(slaveOffer);
     } catch (ConfigurationManager.TaskDescriptionException e) {
@@ -112,7 +112,7 @@ class SchedulerCore {
       if (trackedTask.status != ScheduleStatus.PENDING) continue;
 
       String jobName = trackedTask.jobName;
-      ConcreteTaskDescription concreteTaskDescription = trackedTask.getTask();
+      TwitterTaskInfo concreteTaskDescription = trackedTask.getTask();
       if (ConfigurationManager.satisfied(concreteTaskDescription, offer)) {
         LOG.info("Offer is being assigned to a concreteTaskDescription within " + jobName);
 
@@ -131,7 +131,7 @@ class SchedulerCore {
         try {
           taskInBytes = serializer.serialize(concreteTaskDescription);
         } catch (TException e) {
-           LOG.log(Level.SEVERE,"Error serializing Thrift ConcreteTaskDescription",e);
+           LOG.log(Level.SEVERE,"Error serializing Thrift TwitterTaskInfo",e);
           //todo(flo):maybe cleanup and exit cleanly
           throw new RuntimeException(e);
         }
@@ -210,7 +210,7 @@ class SchedulerCore {
         for (int taskId : taskIds) {
           TrackedTask task = tasks.get(taskId);
           if (task != null && task.status != ScheduleStatus.PENDING) {
-            // TODO(wfarner): Once scheduler -> executor communication is defined, replace the
+            // TODO(wfarner): Once scheduler -> executorHub communication is defined, replace the
             // empty byte array with a serialized message.
             driver.sendFrameworkMessage(new FrameworkMessage(frameworkId.get(), task.slaveId,
                 new byte[0]));
