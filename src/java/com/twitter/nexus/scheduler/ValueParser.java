@@ -1,9 +1,7 @@
-package com.twitter.nexus;
+package com.twitter.nexus.scheduler;
 
 import com.google.common.collect.ImmutableMap;
 import org.apache.commons.lang.StringUtils;
-
-import java.util.Map;
 
 /**
  * To change this template use File | Settings | File Templates.

@@ -1,4 +1,4 @@
-package com.twitter.nexus;
+package com.twitter.nexus.scheduler;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
@@ -9,6 +9,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.twitter.common.base.Closure;
+import com.twitter.nexus.scheduler.ConfigurationManager;
 import com.twitter.nexus.gen.TwitterTaskInfo;
 import com.twitter.nexus.gen.ScheduleStatus;
 import com.twitter.nexus.gen.TrackedTask;
@@ -32,7 +33,7 @@ import java.util.logging.Logger;
  *
  * @author wfarner
  */
-class SchedulerCore {
+public class SchedulerCore {
   private static Logger LOG = Logger.getLogger(SchedulerCore.class.getName());
 
   private final Map<Integer, TrackedTask> tasks = Maps.newHashMap();

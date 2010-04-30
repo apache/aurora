@@ -1,4 +1,4 @@
-package com.twitter.nexus;
+package com.twitter.nexus.scheduler;
 
 import com.google.common.base.Preconditions;
 import com.twitter.common.quantity.Amount;

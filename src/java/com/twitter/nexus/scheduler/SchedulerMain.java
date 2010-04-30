@@ -1,6 +1,8 @@
-package com.twitter.nexus;
+package com.twitter.nexus.scheduler;
 
+import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
+import com.google.inject.Module;
 import com.twitter.common.args.Option;
 import com.twitter.common.process.GuicedProcess;
 import com.twitter.common.process.GuicedProcessOptions;
@@ -31,14 +33,18 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
   }
 
   @Inject
-  SchedulerHub sched;
+  private SchedulerHub scheduler;
 
+  @Override
+  protected Iterable<Class<? extends Module>> getProcessModuleClasses() {
+    return ImmutableList.<Class<? extends Module>>of(SchedulerModule.class);
+  }
 
   @Override
   protected void runProcess() {
-    NexusSchedulerDriver driver = new NexusSchedulerDriver(sched, getOptions().masterAddress);
+    NexusSchedulerDriver driver = new NexusSchedulerDriver(scheduler, getOptions().masterAddress);
     driver.start();
-    sched.startThriftServer(getOptions().thriftPort);
+    scheduler.startThriftServer(getOptions().thriftPort);
   }
 
   protected boolean checkOptions() {

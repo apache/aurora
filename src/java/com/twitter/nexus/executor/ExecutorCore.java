@@ -1,21 +1,17 @@
-package com.twitter.nexus;
+package com.twitter.nexus.executor;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.inject.Inject;
 import com.twitter.nexus.gen.TwitterTaskInfo;
+import com.twitter.nexus.util.HdfsUtil;
 import nexus.ExecutorDriver;
 import nexus.TaskDescription;
 import nexus.TaskState;
 import nexus.TaskStatus;
-import org.apache.commons.io.IOUtils;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -37,19 +33,23 @@ public class ExecutorCore {
   private final ConcurrentHashMap<Integer, Process> processes = new ConcurrentHashMap<Integer, Process>();
   private final static byte[] EMPTY_BYTE_ARRAY = new byte[0];
   private final ExecutorMain.TwitterExecutorOptions options;
+  private final FileSystem hadoopFileSystem;
 
   @Inject
-  public ExecutorCore(ExecutorMain.TwitterExecutorOptions options) {
+  public ExecutorCore(ExecutorMain.TwitterExecutorOptions options, FileSystem hadoopFileSystem) {
     this.options = Preconditions.checkNotNull(options);
+    this.hadoopFileSystem = Preconditions.checkNotNull(hadoopFileSystem);
   }
 
-  public void executePendingTask(final ExecutorDriver driver, final TwitterTaskInfo concreteTaskDescription, final TaskDescription task) {
+  public void executePendingTask(final ExecutorDriver driver, final TwitterTaskInfo concreteTaskDescription,
+                                 final TaskDescription task) {
     final String localDirName = String
         .format("%s/%s", concreteTaskDescription.getLocalWorkingDirectory(), task.getName());
 
     try {
       // Pull down the executable.
-      File executorBinary = downloadFileFromHdfs(concreteTaskDescription.getHdfsPath(), localDirName);
+      File executorBinary = HdfsUtil
+          .downloadFileFromHdfs(hadoopFileSystem, concreteTaskDescription.getHdfsPath(), localDirName);
 
       List<String> commandLine = Lists.newArrayList(executorBinary.getAbsolutePath());
       commandLine.addAll(concreteTaskDescription.getCmdLineArgs());
@@ -82,24 +82,6 @@ public class ExecutorCore {
       LOG.log(Level.WARNING,
           "IOException occurred while trying to launch a task with task Descrtiption:" + task.toString(), e);
     }
-  }
-
-  private File downloadFileFromHdfs(final String executorBinaryUrl, final String localDirName) throws IOException {
-    Configuration conf = new Configuration(true);
-    conf.addResource(new Path(options.hdfsConfig));
-    conf.reloadConfiguration();
-    FileSystem hdfs = FileSystem.get(conf);
-    Path executorBinaryPath = new Path(executorBinaryUrl);
-    FSDataInputStream remoteStream = hdfs.open(executorBinaryPath);
-    File localFile = new File(localDirName + executorBinaryPath.getName());
-    FileOutputStream localStream = new FileOutputStream(localFile);
-    try {
-      IOUtils.copy(remoteStream, localStream);
-    } finally {
-      IOUtils.closeQuietly(remoteStream);
-      IOUtils.closeQuietly(localStream);
-    }
-    return localFile;
   }
 
   private void waitForProcess(final Process process) {

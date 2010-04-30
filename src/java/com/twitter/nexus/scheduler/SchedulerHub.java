@@ -1,12 +1,10 @@
-package com.twitter.nexus;
+package com.twitter.nexus.scheduler;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.inject.Inject;
 import com.twitter.common.thrift.ThriftServer;
-import com.twitter.nexus.gen.TwitterTaskConfig;
-import com.twitter.nexus.gen.TwitterTaskInfo;
 import com.twitter.nexus.gen.CreateJobResponse;
 import com.twitter.nexus.gen.JobConfiguration;
 import com.twitter.nexus.gen.KillResponse;
@@ -16,8 +14,11 @@ import com.twitter.nexus.gen.RestartResponse;
 import com.twitter.nexus.gen.ScheduleStatus;
 import com.twitter.nexus.gen.ScheduleStatusResponse;
 import com.twitter.nexus.gen.TrackedTask;
+import com.twitter.nexus.gen.TwitterTaskConfig;
+import com.twitter.nexus.gen.TwitterTaskInfo;
 import com.twitter.nexus.gen.UpdateRequest;
 import com.twitter.nexus.gen.UpdateResponse;
+import com.twitter.nexus.util.HdfsUtil;
 import nexus.ExecutorInfo;
 import nexus.Scheduler;
 import nexus.SchedulerDriver;
@@ -25,10 +26,7 @@ import nexus.SlaveOfferVector;
 import nexus.StringMap;
 import nexus.TaskDescriptionVector;
 import nexus.TaskStatus;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.apache.thrift.TException;
 
 import java.io.File;
@@ -53,20 +51,23 @@ public class SchedulerHub extends Scheduler {
 
   private final SchedulerCore schedulerCore;
   private final SchedulerMain.TwitterSchedulerOptions options;
+  private final FileSystem hadoopFileSystem;
 
   @Inject
-  public SchedulerHub(SchedulerMain.TwitterSchedulerOptions options, SchedulerCore schedulerCore) {
+  public SchedulerHub(FileSystem hadoopFileSystem, SchedulerMain.TwitterSchedulerOptions options,
+                      SchedulerCore schedulerCore) {
     this.options = Preconditions.checkNotNull(options);
     this.schedulerCore = Preconditions.checkNotNull(schedulerCore);
-    isExecutorBinaryValid();
+    this.hadoopFileSystem = Preconditions.checkNotNull(hadoopFileSystem);
+    assertExecutorBinaryValid();
   }
 
-  private void isExecutorBinaryValid() {
+  private void assertExecutorBinaryValid() {
     if (options.executorPath.startsWith("hdfs")) {
       Preconditions.checkArgument(options.hdfsConfig != null);
       checkHdfsExecutorBinary(options.executorPath);
-    } else if (options.executorPath.startsWith("http")||options.executorPath.startsWith("ftp")) {
-      throw new UnsupportedOperationException("Error, currently http/ftp handling isn't supported for Executor binaries.");
+    } else if (options.executorPath.startsWith("http") || options.executorPath.startsWith("ftp")) {
+      throw new IllegalArgumentException("Error, currently http/ftp handling isn't supported for executor binaries.");
     } else {
       Preconditions.checkArgument(new File(options.executorPath).canRead());
     }
@@ -74,16 +75,9 @@ public class SchedulerHub extends Scheduler {
 
   private void checkHdfsExecutorBinary(final String hdfsFileName) {
     try {
-    Configuration conf = new Configuration(true);
-    conf.addResource(new Path(options.hdfsConfig));
-    conf.reloadConfiguration();
-    FileSystem hdfs = FileSystem.get(conf);
-    FileStatus[] statuses = hdfs.listStatus(new Path(hdfsFileName));
-    Preconditions.checkArgument(statuses.length == 1);
-    Preconditions.checkArgument(!statuses[0].isDir());
-    Preconditions.checkArgument(statuses[0].getBlockSize() > 0L);
+      Preconditions.checkArgument(HdfsUtil.isValidFile(hadoopFileSystem, hdfsFileName));
     } catch (IOException e) {
-      LOG.severe("Error trying to verify Executor binary in HDFS:" + e.getMessage());
+      LOG.severe("Error trying to verify executor binary in HDFS:" + e.getMessage());
       throw new RuntimeException(e);
     }
   }

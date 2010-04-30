@@ -1,4 +1,4 @@
-package com.twitter.nexus;
+package com.twitter.nexus.executor;
 
 import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
