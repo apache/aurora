@@ -16,6 +16,8 @@ import nexus.FrameworkMessage;
 import nexus.SchedulerDriver;
 import nexus.SlaveOffer;
 import nexus.StringMap;
+import org.apache.thrift.TException;
+import org.apache.thrift.TSerializer;
 
 import java.util.Deque;
 import java.util.Map;
@@ -35,6 +37,7 @@ class SchedulerCore {
 
   private final Map<Integer, TrackedTask> tasks = Maps.newHashMap();
   private final Multimap<String, Integer> jobToTaskIds = HashMultimap.create();
+  private final TSerializer serializer = new TSerializer();
 
   // TODO(wfarner): Hopefully we can abolish (or at least mask) the concept of canonical task IDs
   // in favor of tasks being canonically named by job/taskIndex.
@@ -109,24 +112,32 @@ class SchedulerCore {
       if (trackedTask.status != ScheduleStatus.PENDING) continue;
 
       String jobName = trackedTask.jobName;
-      ConcreteTaskDescription task = trackedTask.getTask();
-      if (ConfigurationManager.satisfied(task, offer)) {
-        LOG.info("Offer is being assigned to a task within " + jobName);
+      ConcreteTaskDescription concreteTaskDescription = trackedTask.getTask();
+      if (ConfigurationManager.satisfied(concreteTaskDescription, offer)) {
+        LOG.info("Offer is being assigned to a concreteTaskDescription within " + jobName);
 
         // TODO(wfarner): Remove this hack once nexus core does not read parameters.
         StringMap params = new StringMap();
-        LOG.info("Consuming cpus: " + String.valueOf(task.getNumCpus()));
-        LOG.info("Consuming memory: " + String.valueOf(task.getRamBytes()));
-        params.set("cpus", String.valueOf((int) task.getNumCpus()));
-        params.set("mem", String.valueOf(task.getRamBytes()));
+        LOG.info("Consuming cpus: " + String.valueOf(concreteTaskDescription.getNumCpus()));
+        LOG.info("Consuming memory: " + String.valueOf(concreteTaskDescription.getRamBytes()));
+        params.set("cpus", String.valueOf((int) concreteTaskDescription.getNumCpus()));
+        params.set("mem", String.valueOf(concreteTaskDescription.getRamBytes()));
 
         // TODO(wfarner): Need to 'consume' the resouce from the slave offer, since the
-        // task requirement might be a fraction of the offer.
+        // concreteTaskDescription requirement might be a fraction of the offer.
         trackedTask.status = ScheduleStatus.STARTING;
         trackedTask.slaveId = slaveOffer.getSlaveId();
+        byte[] taskInBytes = null;
+        try {
+          taskInBytes = serializer.serialize(concreteTaskDescription);
+        } catch (TException e) {
+           LOG.log(Level.SEVERE,"Error serializing Thrift ConcreteTaskDescription",e);
+          //todo(flo):maybe cleanup and exit cleanly
+          throw new RuntimeException(e);
+        }
 
         return new nexus.TaskDescription(trackedTask.getTaskId(), slaveOffer.getSlaveId(),
-                jobName + "-" + trackedTask.getTaskId(), params, new byte[0]);
+                jobName + "-" + trackedTask.getTaskId(), params, taskInBytes);
       }
     }
 

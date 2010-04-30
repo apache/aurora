@@ -1,16 +1,23 @@
 package com.twitter.nexus;
 
-import java.io.File;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.logging.Logger;
-
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.inject.Inject;
 import com.twitter.common.thrift.ThriftServer;
-import com.twitter.nexus.gen.*;
+import com.twitter.nexus.gen.ConcreteTaskDescription;
+import com.twitter.nexus.gen.CreateJobResponse;
+import com.twitter.nexus.gen.JobConfiguration;
+import com.twitter.nexus.gen.KillResponse;
+import com.twitter.nexus.gen.NexusSchedulerManager;
+import com.twitter.nexus.gen.ResponseCode;
+import com.twitter.nexus.gen.RestartResponse;
+import com.twitter.nexus.gen.ScheduleStatus;
+import com.twitter.nexus.gen.ScheduleStatusResponse;
+import com.twitter.nexus.gen.TaskDescription;
+import com.twitter.nexus.gen.TrackedTask;
+import com.twitter.nexus.gen.UpdateRequest;
+import com.twitter.nexus.gen.UpdateResponse;
 import nexus.ExecutorInfo;
 import nexus.Scheduler;
 import nexus.SchedulerDriver;
@@ -18,11 +25,22 @@ import nexus.SlaveOfferVector;
 import nexus.StringMap;
 import nexus.TaskDescriptionVector;
 import nexus.TaskStatus;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.thrift.TException;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.logging.Logger;
+
 /**
- * Central location for communication with the scheduler core.  Handles interfacing with the nexus
- * core and scheduling clients via thrift.
+ * Central location for communication with the scheduler core.  Handles interfacing with the nexus core and scheduling
+ * clients via thrift.
  *
  * @author wfarner
  */
@@ -34,12 +52,39 @@ public class SchedulerHub extends Scheduler {
   }
 
   private final SchedulerCore schedulerCore = new SchedulerCore();
+  private SchedulerMain.TwitterSchedulerOptions options;
 
-  private final String executorPath;
+  @Inject
+  public SchedulerHub(SchedulerMain.TwitterSchedulerOptions options) {
+    this.options = Preconditions.checkNotNull(options);
+    isExecutorBinaryValid();
+  }
 
-  public SchedulerHub(String executorPath) {
-    this.executorPath = Preconditions.checkNotNull(executorPath);
-    Preconditions.checkArgument(new File(executorPath).canRead());
+  private void isExecutorBinaryValid() {
+    if (options.executorPath.startsWith("hdfs")) {
+      Preconditions.checkArgument(options.hdfsConfig != null);
+      checkHdfsExecutorBinary(options.executorPath);
+    } else if (options.executorPath.startsWith("http")||options.executorPath.startsWith("ftp")) {
+      throw new UnsupportedOperationException("Error, currently http/ftp handling isn't supported for Executor binaries.");
+    } else {
+      Preconditions.checkArgument(new File(options.executorPath).canRead());
+    }
+  }
+
+  private void checkHdfsExecutorBinary(final String hdfsFileName) {
+    try {
+    Configuration conf = new Configuration(true);
+    conf.addResource(new Path(options.hdfsConfig));
+    conf.reloadConfiguration();
+    FileSystem hdfs = FileSystem.get(conf);
+    FileStatus[] statuses = hdfs.listStatus(new Path(hdfsFileName));
+    Preconditions.checkArgument(statuses.length == 1);
+    Preconditions.checkArgument(!statuses[0].isDir());
+    Preconditions.checkArgument(statuses[0].getBlockSize() > 0L);
+    } catch (IOException e) {
+      LOG.severe("Error trying to verify Executor binary in HDFS:" + e.getMessage());
+      throw new RuntimeException(e);
+    }
   }
 
   public void startThriftServer(int port) {
@@ -54,7 +99,7 @@ public class SchedulerHub extends Scheduler {
 
   @Override
   public ExecutorInfo getExecutorInfo(SchedulerDriver driver) {
-    return new ExecutorInfo(executorPath, new byte[0]);
+    return new ExecutorInfo(options.executorPath, new byte[0]);
   }
 
   @Override
@@ -84,7 +129,7 @@ public class SchedulerHub extends Scheduler {
   @Override
   public void statusUpdate(SchedulerDriver driver, TaskStatus status) {
     LOG.info("Received status update for task " + status.getTaskId()
-             + " in state " + status.getState());
+        + " in state " + status.getState());
 
     if (schedulerCore.getTask(status.getTaskId()) == null) {
       LOG.severe("Failed to find task id " + status.getTaskId());
