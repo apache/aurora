@@ -35,11 +35,11 @@ public class ExecutorHub extends Executor {
 
     LOG.info("Running task " + task.getName() + " with ID " + task.getTaskId());
 
-    TwitterTaskInfo concreteTaskDescription = new TwitterTaskInfo();
+    TwitterTaskInfo taskInfo = new TwitterTaskInfo();
 
     try {
-      deserializer.deserialize(concreteTaskDescription, task.getArg());
-      executorCore.executePendingTask(driver, concreteTaskDescription, task);
+      deserializer.deserialize(taskInfo, task.getArg());
+      executorCore.executePendingTask(driver, taskInfo, task);
     } catch (TException e) {
       LOG.log(Level.SEVERE, "Error deserializing Thrift TwitterTaskInfo", e);
       driver.sendStatusUpdate(new TaskStatus(task.getTaskId(), TaskState.TASK_FAILED, EMPTY_BYTE_ARRAY));
