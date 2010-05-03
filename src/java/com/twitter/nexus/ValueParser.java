@@ -1,10 +1,10 @@
-package com.twitter.nexus.scheduler;
+package com.twitter.nexus;
 
 import com.google.common.collect.ImmutableMap;
 import org.apache.commons.lang.StringUtils;
 
 /**
- * To change this template use File | Settings | File Templates.
+ * A simple parser interface to handle value parsing and type casting.
  *
  * @author wfarner
  */

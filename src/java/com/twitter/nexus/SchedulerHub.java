@@ -1,24 +1,16 @@
-package com.twitter.nexus.scheduler;
+package com.twitter.nexus;
+
+import java.io.File;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.logging.Logger;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.inject.Inject;
 import com.twitter.common.thrift.ThriftServer;
-import com.twitter.nexus.gen.CreateJobResponse;
-import com.twitter.nexus.gen.JobConfiguration;
-import com.twitter.nexus.gen.KillResponse;
-import com.twitter.nexus.gen.NexusSchedulerManager;
-import com.twitter.nexus.gen.ResponseCode;
-import com.twitter.nexus.gen.RestartResponse;
-import com.twitter.nexus.gen.ScheduleStatus;
-import com.twitter.nexus.gen.ScheduleStatusResponse;
-import com.twitter.nexus.gen.TrackedTask;
-import com.twitter.nexus.gen.TwitterTaskConfig;
-import com.twitter.nexus.gen.TwitterTaskInfo;
-import com.twitter.nexus.gen.UpdateRequest;
-import com.twitter.nexus.gen.UpdateResponse;
-import com.twitter.nexus.util.HdfsUtil;
+import com.twitter.nexus.gen.*;
 import nexus.ExecutorInfo;
 import nexus.Scheduler;
 import nexus.SchedulerDriver;
@@ -26,19 +18,11 @@ import nexus.SlaveOfferVector;
 import nexus.StringMap;
 import nexus.TaskDescriptionVector;
 import nexus.TaskStatus;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.thrift.TException;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.logging.Logger;
-
 /**
- * Central location for communication with the scheduler core.  Handles interfacing with the nexus core and scheduling
- * clients via thrift.
+ * Central location for communication with the scheduler core.  Handles interfacing with the nexus
+ * core and scheduling clients via thrift.
  *
  * @author wfarner
  */
@@ -49,39 +33,30 @@ public class SchedulerHub extends Scheduler {
     System.loadLibrary("nexus");
   }
 
-  private final SchedulerCore schedulerCore;
-  private final SchedulerMain.TwitterSchedulerOptions options;
-  private final FileSystem hadoopFileSystem;
+  // Stores scheduler state and handles actual scheduling decisions.
+  private final SchedulerCore schedulerCore = new SchedulerCore();
 
-  @Inject
-  public SchedulerHub(FileSystem hadoopFileSystem, SchedulerMain.TwitterSchedulerOptions options,
-                      SchedulerCore schedulerCore) {
-    this.options = Preconditions.checkNotNull(options);
-    this.schedulerCore = Preconditions.checkNotNull(schedulerCore);
-    this.hadoopFileSystem = Preconditions.checkNotNull(hadoopFileSystem);
-    assertExecutorBinaryValid();
+  private final String executorPath;
+
+  /**
+   * Creates a new scheduler hub, which will use the executor at {@code executorPath}.
+   *
+   * @param executorPath Path to the executor script.
+   */
+  public SchedulerHub(String executorPath) {
+    this.executorPath = Preconditions.checkNotNull(executorPath);
+    Preconditions.checkArgument(new File(executorPath).canRead());
   }
 
-  private void assertExecutorBinaryValid() {
-    if (options.executorPath.startsWith("hdfs")) {
-      Preconditions.checkArgument(options.hdfsConfig != null);
-      checkHdfsExecutorBinary(options.executorPath);
-    } else if (options.executorPath.startsWith("http") || options.executorPath.startsWith("ftp")) {
-      throw new IllegalArgumentException("Error, currently http/ftp handling isn't supported for executor binaries.");
-    } else {
-      Preconditions.checkArgument(new File(options.executorPath).canRead());
-    }
-  }
-
-  private void checkHdfsExecutorBinary(final String hdfsFileName) {
-    try {
-      Preconditions.checkArgument(HdfsUtil.isValidFile(hadoopFileSystem, hdfsFileName));
-    } catch (IOException e) {
-      LOG.severe("Error trying to verify executor binary in HDFS:" + e.getMessage());
-      throw new RuntimeException(e);
-    }
-  }
-
+  /**
+   * Instructs the hub to start the thrift server for management of scheduled jobs.
+   *
+   * TODO(wfarner): The thrift server should automatically be taken down if/when the scheduler
+   * driver dies.
+   * TODO(wfarner): Launch on an ephemeral port and register with zookeeper.
+   *
+   * @param port Port that the thrift server should listen on.
+   */
   public void startThriftServer(int port) {
     SchedulerManager thriftServer = new SchedulerManager();
     thriftServer.start(port, new NexusSchedulerManager.Processor(thriftServer));
@@ -94,7 +69,7 @@ public class SchedulerHub extends Scheduler {
 
   @Override
   public ExecutorInfo getExecutorInfo(SchedulerDriver driver) {
-    return new ExecutorInfo(options.executorPath, new byte[0]);
+    return new ExecutorInfo(executorPath, new byte[0]);
   }
 
   @Override
@@ -124,7 +99,7 @@ public class SchedulerHub extends Scheduler {
   @Override
   public void statusUpdate(SchedulerDriver driver, TaskStatus status) {
     LOG.info("Received status update for task " + status.getTaskId()
-        + " in state " + status.getState());
+             + " in state " + status.getState());
 
     if (schedulerCore.getTask(status.getTaskId()) == null) {
       LOG.severe("Failed to find task id " + status.getTaskId());
@@ -155,6 +130,8 @@ public class SchedulerHub extends Scheduler {
           return;
       }
 
+      // TODO(wfarner): May want to add a fixed time delay on removing the task from tracking, to
+      // allow it to remain in a failed/killed/lost state long enough for someone to debug.
       if (removeTask) {
         schedulerCore.removeTask(status.getTaskId());
       }
@@ -167,7 +144,7 @@ public class SchedulerHub extends Scheduler {
   }
 
   /**
-   * Thrift server.
+   * Thrift server implementation.
    */
   private class SchedulerManager extends ThriftServer implements NexusSchedulerManager.Iface {
     public SchedulerManager() {
@@ -184,10 +161,10 @@ public class SchedulerHub extends Scheduler {
             .setMessage("A job with the name " + jobName + " already exists.");
       }
 
-      List<TwitterTaskInfo> taskInfos = Lists.newArrayList();
-      for (TwitterTaskConfig config : jobDesc.getTaskConfigs()) {
+      List<ConcreteTaskDescription> concreteTasks = Lists.newArrayList();
+      for (TaskDescription task : jobDesc.getTaskDescriptions()) {
         try {
-          taskInfos.add(ConfigurationManager.parse(config));
+          concreteTasks.add(ConfigurationManager.makeConcrete(task));
         } catch (ConfigurationManager.TaskDescriptionException e) {
           return new CreateJobResponse()
               .setResponseCode(ResponseCode.INVALID_REQUEST)
@@ -195,10 +172,10 @@ public class SchedulerHub extends Scheduler {
         }
       }
 
-      schedulerCore.addTasks(jobName, taskInfos);
+      schedulerCore.addTasks(jobName, concreteTasks);
 
       return new CreateJobResponse().setResponseCode(ResponseCode.OK)
-          .setMessage(taskInfos.size() + " tasks pending for job " + jobName);
+          .setMessage(concreteTasks.size() + " tasks pending for job " + jobName);
     }
 
     @Override

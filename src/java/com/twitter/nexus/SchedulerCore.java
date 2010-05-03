@@ -1,4 +1,4 @@
-package com.twitter.nexus.scheduler;
+package com.twitter.nexus;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
@@ -9,16 +9,13 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.twitter.common.base.Closure;
-import com.twitter.nexus.scheduler.ConfigurationManager;
-import com.twitter.nexus.gen.TwitterTaskInfo;
+import com.twitter.nexus.gen.ConcreteTaskDescription;
 import com.twitter.nexus.gen.ScheduleStatus;
 import com.twitter.nexus.gen.TrackedTask;
 import nexus.FrameworkMessage;
 import nexus.SchedulerDriver;
 import nexus.SlaveOffer;
 import nexus.StringMap;
-import org.apache.thrift.TException;
-import org.apache.thrift.TSerializer;
 
 import java.util.Deque;
 import java.util.Map;
@@ -33,12 +30,11 @@ import java.util.logging.Logger;
  *
  * @author wfarner
  */
-public class SchedulerCore {
+class SchedulerCore {
   private static Logger LOG = Logger.getLogger(SchedulerCore.class.getName());
 
   private final Map<Integer, TrackedTask> tasks = Maps.newHashMap();
   private final Multimap<String, Integer> jobToTaskIds = HashMultimap.create();
-  private final TSerializer serializer = new TSerializer();
 
   // TODO(wfarner): Hopefully we can abolish (or at least mask) the concept of canonical task IDs
   // in favor of tasks being canonically named by job/taskIndex.
@@ -50,6 +46,12 @@ public class SchedulerCore {
   // Stores work to perform using the scheduler driver.
   private Deque<Closure<SchedulerDriver>> workQueue = Lists.newLinkedList();
 
+  /**
+   * Assigns a framework ID to the scheduler, should be called when the scheduler implementation
+   * has received a successful registration signal.
+   *
+   * @param frameworkId Framework ID.
+   */
   public void setFrameworkId(int frameworkId) {
     this.frameworkId.set(frameworkId);
   }
@@ -58,6 +60,12 @@ public class SchedulerCore {
     return jobToTaskIds.containsKey(jobName);
   }
 
+  /**
+   * Fetches information about all registered tasks for a job.
+   *
+   * @param jobName The job to look up tasks for.
+   * @return An iterable of task objects.
+   */
   public synchronized Iterable<TrackedTask> getTasks(String jobName) {
     ImmutableList.Builder<TrackedTask> taskDescriptions = ImmutableList.builder();
     for (int taskId : jobToTaskIds.get(jobName)) {
@@ -71,16 +79,27 @@ public class SchedulerCore {
   }
 
   /**
+   * Fetches an individual task by ID.
+   *
+   * @param taskId The task to fetch.
+   * @return The task object associated with ID {@code taskId} or {@code null} if no such task
+   *   exists.
+   */
+  public synchronized TrackedTask getTask(int taskId) {
+    return tasks.get(taskId);
+  }
+
+  /**
    * Adds pending tasks, which will become candidates for scheduling the next time
    * {@link #schedulePendingTask(SlaveOffer)} is called.
    *
    * @param jobName Name of the job that the task is a part of.
    * @param newTasks The tasks to schedule.
    */
-  public synchronized void addTasks(String jobName, Iterable<TwitterTaskInfo> newTasks) {
+  public synchronized void addTasks(String jobName, Iterable<ConcreteTaskDescription> newTasks) {
     Preconditions.checkNotNull(jobName);
 
-    for (TwitterTaskInfo task : Preconditions.checkNotNull(newTasks)) {
+    for (ConcreteTaskDescription task : Preconditions.checkNotNull(newTasks)) {
       int taskId = generateTaskId();
       jobToTaskIds.put(jobName, taskId);
       tasks.put(taskId, new TrackedTask()
@@ -99,7 +118,7 @@ public class SchedulerCore {
    *     tasks that are satisfied by the slave offer.
    */
   public synchronized nexus.TaskDescription schedulePendingTask(SlaveOffer slaveOffer) {
-    TwitterTaskInfo offer;
+    ConcreteTaskDescription offer;
     try {
       offer = ConfigurationManager.makeConcrete(slaveOffer);
     } catch (ConfigurationManager.TaskDescriptionException e) {
@@ -113,47 +132,48 @@ public class SchedulerCore {
       if (trackedTask.status != ScheduleStatus.PENDING) continue;
 
       String jobName = trackedTask.jobName;
-      TwitterTaskInfo concreteTaskDescription = trackedTask.getTask();
-      if (ConfigurationManager.satisfied(concreteTaskDescription, offer)) {
-        LOG.info("Offer is being assigned to a concreteTaskDescription within " + jobName);
+      ConcreteTaskDescription task = trackedTask.getTask();
+      if (ConfigurationManager.satisfied(task, offer)) {
+        LOG.info("Offer is being assigned to a task within " + jobName);
 
         // TODO(wfarner): Remove this hack once nexus core does not read parameters.
         StringMap params = new StringMap();
-        LOG.info("Consuming cpus: " + String.valueOf(concreteTaskDescription.getNumCpus()));
-        LOG.info("Consuming memory: " + String.valueOf(concreteTaskDescription.getRamBytes()));
-        params.set("cpus", String.valueOf((int) concreteTaskDescription.getNumCpus()));
-        params.set("mem", String.valueOf(concreteTaskDescription.getRamBytes()));
+        LOG.info("Consuming cpus: " + String.valueOf(task.getNumCpus()));
+        LOG.info("Consuming memory: " + String.valueOf(task.getRamBytes()));
+        params.set("cpus", String.valueOf((int) task.getNumCpus()));
+        params.set("mem", String.valueOf(task.getRamBytes()));
 
         // TODO(wfarner): Need to 'consume' the resouce from the slave offer, since the
-        // concreteTaskDescription requirement might be a fraction of the offer.
+        // task requirement might be a fraction of the offer.
         trackedTask.status = ScheduleStatus.STARTING;
         trackedTask.slaveId = slaveOffer.getSlaveId();
-        byte[] taskInBytes = null;
-        try {
-          taskInBytes = serializer.serialize(concreteTaskDescription);
-        } catch (TException e) {
-           LOG.log(Level.SEVERE,"Error serializing Thrift TwitterTaskInfo",e);
-          //todo(flo):maybe cleanup and exit cleanly
-          throw new RuntimeException(e);
-        }
 
         return new nexus.TaskDescription(trackedTask.getTaskId(), slaveOffer.getSlaveId(),
-                jobName + "-" + trackedTask.getTaskId(), params, taskInBytes);
+                jobName + "-" + trackedTask.getTaskId(), params, new byte[0]);
       }
     }
 
     return null;
   }
 
-  public synchronized TrackedTask getTask(int taskId) {
-    return tasks.get(taskId);
-  }
-
+  /**
+   * Assigns a new state to a task.
+   *
+   * @param taskId ID of the task changing state.
+   * @param status The new state of the task.
+   */
   public synchronized void setTaskStatus(int taskId, ScheduleStatus status) {
     TrackedTask task = tasks.get(taskId);
     if (task != null) task.setStatus(Preconditions.checkNotNull(status));
   }
 
+  /**
+   * Removes a task from scheduler tracking.
+   * Note: This does not actually alter a running task, it simply removes it from tracking.
+   *
+   * @param taskId The task to remove.
+   * @return The task object that was removed, or {@code null} if no such task was found.
+   */
   public synchronized TrackedTask removeTask(int taskId) {
     TrackedTask task = tasks.remove(taskId);
     if (task != null) {
@@ -162,12 +182,20 @@ public class SchedulerCore {
     return task;
   }
 
+  /**
+   * Kills a running job and terminates all of its tasks.
+   *
+   *
+   * @param jobName The job to kill.
+   */
   public synchronized void killJob(final String jobName) {
+    Preconditions.checkNotNull(jobName);
+
     // Remove all pending tasks for the job.
     Iterables.removeIf(tasks.entrySet(), new Predicate<Map.Entry<Integer, TrackedTask>>() {
       @Override public boolean apply(Map.Entry<Integer, TrackedTask> entry) {
         TrackedTask task = entry.getValue();
-        boolean remove = task.status == ScheduleStatus.PENDING;
+        boolean remove = task.status == ScheduleStatus.PENDING && task.jobName.equals(jobName);
         if (remove) jobToTaskIds.remove(task.jobName, task.getTaskId());
 
         return remove;
@@ -185,7 +213,14 @@ public class SchedulerCore {
     });
   }
 
+  /**
+   * Kills a specific set of tasks.
+   *
+   * @param taskIds The tasks to kill.
+   */
   public synchronized void killTasks(final Set<Integer> taskIds) {
+    Preconditions.checkNotNull(taskIds);
+
     scheduleDriverWork(new Closure<SchedulerDriver>() {
       @Override public void execute(SchedulerDriver driver) throws RuntimeException {
         LOG.info("Killing tasks " + taskIds);
@@ -197,7 +232,14 @@ public class SchedulerCore {
     });
   }
 
+  /**
+   * Schedules a restart on a set of tasks.
+   *
+   * @param taskIds The tasks to restart.
+   */
   public synchronized void restartTasks(final Set<Integer> taskIds) {
+    Preconditions.checkNotNull(taskIds);
+
     // TODO(wfarner): Need to do this in a cleaner way so that the entire job doesn't flip at once.
     scheduleDriverWork(new Closure<SchedulerDriver>() {
       @Override public void execute(SchedulerDriver driver) throws RuntimeException {
@@ -211,7 +253,7 @@ public class SchedulerCore {
         for (int taskId : taskIds) {
           TrackedTask task = tasks.get(taskId);
           if (task != null && task.status != ScheduleStatus.PENDING) {
-            // TODO(wfarner): Once scheduler -> executorHub communication is defined, replace the
+            // TODO(wfarner): Once scheduler -> executor communication is defined, replace the
             // empty byte array with a serialized message.
             driver.sendFrameworkMessage(new FrameworkMessage(frameworkId.get(), task.slaveId,
                 new byte[0]));
