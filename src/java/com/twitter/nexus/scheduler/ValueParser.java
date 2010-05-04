@@ -1,4 +1,4 @@
-package com.twitter.nexus;
+package com.twitter.nexus.scheduler;
 
 import com.google.common.collect.ImmutableMap;
 import org.apache.commons.lang.StringUtils;
