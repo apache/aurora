@@ -15,7 +15,7 @@ import java.io.File;
  *
  * @author wfarner
  */
-public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerOptions,Exception> {
+public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerOptions, Exception> {
   public static class TwitterSchedulerOptions extends GuicedProcessOptions {
     @Option(name = "executor_path", required = true,
             usage = "Path to the executorHub launch script.")

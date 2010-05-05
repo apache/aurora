@@ -14,7 +14,6 @@ import com.twitter.nexus.gen.RestartResponse;
 import com.twitter.nexus.gen.ScheduleStatus;
 import com.twitter.nexus.gen.ScheduleStatusResponse;
 import com.twitter.nexus.gen.TrackedTask;
-import com.twitter.nexus.gen.TwitterTaskConfig;
 import com.twitter.nexus.gen.TwitterTaskInfo;
 import com.twitter.nexus.gen.UpdateRequest;
 import com.twitter.nexus.gen.UpdateResponse;
@@ -194,7 +193,7 @@ public class SchedulerHub extends Scheduler {
       }
 
       List<TwitterTaskInfo> taskInfos = Lists.newArrayList();
-      for (TwitterTaskConfig config : jobDesc.getTaskConfigs()) {
+      for (TwitterTaskInfo config : jobDesc.getTaskConfigs()) {
         try {
           taskInfos.add(ConfigurationManager.parse(config));
         } catch (ConfigurationManager.TaskDescriptionException e) {
