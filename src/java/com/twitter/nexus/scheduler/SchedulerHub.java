@@ -50,23 +50,23 @@ public class SchedulerHub extends Scheduler {
 
   // Stores scheduler state and handles actual scheduling decisions.
   private final SchedulerCore schedulerCore;
-  private final String executorPath;
+  private final SchedulerMain.TwitterSchedulerOptions options;
   private final FileSystem hadoopFileSystem;
 
   @Inject
-  public SchedulerHub(FileSystem hadoopFileSystem, String executorPath,
+  public SchedulerHub(FileSystem hadoopFileSystem, SchedulerMain.TwitterSchedulerOptions options,
       SchedulerCore schedulerCore) {
     this.hadoopFileSystem = Preconditions.checkNotNull(hadoopFileSystem);
-    this.executorPath = executorPath;
+    this.options = Preconditions.checkNotNull(options);
     this.schedulerCore = Preconditions.checkNotNull(schedulerCore);
     assertExecutorBinaryValid();
   }
 
   private void assertExecutorBinaryValid() {
-    if (executorPath.startsWith("hdfs")) {
-      checkHdfsExecutorBinary(executorPath);
+    if (options.executorPath.startsWith("hdfs")) {
+      checkHdfsExecutorBinary(options.executorPath);
     } else {
-      Preconditions.checkArgument(new File(executorPath).canRead());
+      Preconditions.checkArgument(new File(options.executorPath).canRead());
     }
   }
 
@@ -100,7 +100,7 @@ public class SchedulerHub extends Scheduler {
 
   @Override
   public ExecutorInfo getExecutorInfo(SchedulerDriver driver) {
-    return new ExecutorInfo(executorPath, new byte[0]);
+    return new ExecutorInfo(options.executorPath, new byte[0]);
   }
 
   @Override

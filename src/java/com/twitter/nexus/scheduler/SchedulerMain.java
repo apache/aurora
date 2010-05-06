@@ -27,7 +27,7 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
     @Option(name = "thrift_port", required = true, usage = "Port for thrift server to listen on.")
     public int thriftPort;
 
-    @Option(name = "hdfs_config", usage = "Hadoop configuration path")
+    @Option(name = "hdfs_config", required = true, usage = "Hadoop configuration path")
     public File hdfsConfig;
   }
 
@@ -55,7 +55,7 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
   }
 
   //TODO(flo): proper exception handling...
-  public static void main(String[] args) throws Exception{
+  public static void main(String[] args) throws Exception {
     new SchedulerMain().run(args);
   }
 }

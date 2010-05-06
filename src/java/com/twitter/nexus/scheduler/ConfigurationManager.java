@@ -33,8 +33,7 @@ public class ConfigurationManager {
 
     return config
       .setHdfsPath(getValue(configMap, "hdfs_path", String.class))
-      .setLocalWorkingDirectory(getValue(configMap,"local_working_dir",String.class))
-      .setCmdLineArgs(getValue(configMap, "cmd_line_args", String.class))
+      .setCmdLineArgs(getValue(configMap, "cmd_line_args", "", String.class))
       .setNumCpus(getValue(configMap, "num_cpus", DEFAULT_NUM_CPUS, Double.class))
       .setRamBytes(getValue(configMap, "ram_bytes", DEFAULT_RAM_BYTES, Long.class));
   }

@@ -14,11 +14,11 @@ import java.util.logging.Logger;
 
 public class SchedulerModule extends AbstractModule {
   private final static Logger LOG = Logger.getLogger(SchedulerModule.class.getName());
-  private File hdfsConfig;
+  private SchedulerMain.TwitterSchedulerOptions options;
 
   @Inject
-  public SchedulerModule(File hdfsConfig) {
-    this.hdfsConfig = Preconditions.checkNotNull(hdfsConfig);
+  public SchedulerModule(SchedulerMain.TwitterSchedulerOptions options) {
+    this.options = Preconditions.checkNotNull(options);
   }
 
   @Override
@@ -30,6 +30,7 @@ public class SchedulerModule extends AbstractModule {
   @Provides
   @Singleton
   public FileSystem provideFileSystem() throws IOException {
-   return HdfsUtil.getHdfsConfiguration(hdfsConfig.getAbsolutePath());
+    return HdfsUtil.getHdfsConfiguration(
+        Preconditions.checkNotNull(options.hdfsConfig).getAbsolutePath());
   }
 }
