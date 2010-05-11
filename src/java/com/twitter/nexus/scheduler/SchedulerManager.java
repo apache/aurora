@@ -1,5 +1,7 @@
 package com.twitter.nexus.scheduler;
 
+import com.google.common.base.Function;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.inject.Inject;
@@ -20,28 +22,27 @@ import java.util.logging.Logger;
  */
 class SchedulerManager extends ThriftServer implements NexusSchedulerManager.Iface {
   private static Logger LOG = Logger.getLogger(SchedulerManager.class.getName());
-  private final SchedulerCore schedulerCore;
 
   @Inject
-  public SchedulerManager(SchedulerCore schedulerCore) {
+  private SchedulerCore schedulerCore;
+
+  public SchedulerManager() {
     super("TwitterNexusScheduler", "1");
-    this.schedulerCore = schedulerCore;
   }
 
   @Override
   public CreateJobResponse createJob(JobConfiguration jobDesc) throws TException {
     LOG.info("Received createJob request: " + jobDesc);
     String jobName = jobDesc.getName();
-    if (schedulerCore.hasJob(jobName)) {
+    if (schedulerCore.hasJob(jobDesc.getOwner(), jobName)) {
       return new CreateJobResponse()
           .setResponseCode(ResponseCode.INVALID_REQUEST)
           .setMessage("A job with the name " + jobName + " already exists.");
     }
 
-    List<TwitterTaskInfo> taskInfos = Lists.newArrayList();
     for (TwitterTaskInfo config : jobDesc.getTaskConfigs()) {
       try {
-        taskInfos.add(ConfigurationManager.parse(config));
+        ConfigurationManager.populateFields(config);
       } catch (ConfigurationManager.TaskDescriptionException e) {
         return new CreateJobResponse()
             .setResponseCode(ResponseCode.INVALID_REQUEST)
@@ -49,15 +50,15 @@ class SchedulerManager extends ThriftServer implements NexusSchedulerManager.Ifa
       }
     }
 
-    schedulerCore.addTasks(jobName, taskInfos);
+    schedulerCore.addTasks(jobDesc);
 
     return new CreateJobResponse().setResponseCode(ResponseCode.OK)
-        .setMessage(taskInfos.size() + " tasks pending for job " + jobName);
+        .setMessage(jobDesc.getTaskConfigs().size() + " new tasks pending for job " + jobName);
   }
 
   @Override
-  public ScheduleStatusResponse getJobStatus(String jobName) throws TException {
-    List<TrackedTask> tasks = Lists.newArrayList(schedulerCore.getTasks(jobName));
+  public ScheduleStatusResponse getJobStatus(String owner, String jobName) throws TException {
+    List<TrackedTask> tasks = Lists.newArrayList(schedulerCore.getJobTasks(owner, jobName));
 
     if (tasks.isEmpty()) {
       return new ScheduleStatusResponse()
@@ -82,30 +83,33 @@ class SchedulerManager extends ThriftServer implements NexusSchedulerManager.Ifa
   }
 
   @Override
-  public UpdateResponse updateTasks(String jobName, UpdateRequest request) throws TException {
+  public UpdateResponse updateTasks(String owner, String jobName, UpdateRequest request)
+      throws TException {
     return null;  //To change body of implemented methods use File | Settings | File Templates.
   }
 
   @Override
-  public KillResponse killJob(String jobName) throws TException {
-    if (!schedulerCore.hasJob(jobName)) {
+  public KillResponse killJob(String owner, String jobName) throws TException {
+    if (!schedulerCore.hasJob(owner, jobName)) {
       return new KillResponse()
           .setResponseCode(ResponseCode.INVALID_REQUEST)
           .setMessage("Job not found: " + jobName);
     }
 
-    schedulerCore.killJob(jobName);
+    schedulerCore.killJob(owner, jobName);
     return new KillResponse().setResponseCode(ResponseCode.OK);
   }
 
   @Override
-  public KillResponse killTasks(String jobName, Set<Integer> taskIds) throws TException {
+  public KillResponse killTasks(String owner, String jobName, Set<Integer> taskIds)
+      throws TException {
     schedulerCore.killTasks(taskIds);
     return new KillResponse().setResponseCode(ResponseCode.OK);
   }
 
   @Override
-  public RestartResponse restartTasks(String jobName, Set<Integer> taskIds) throws TException {
+  public RestartResponse restartTasks(String owner, String jobName, Set<Integer> taskIds)
+      throws TException {
     schedulerCore.restartTasks(taskIds);
     return new RestartResponse().setResponseCode(ResponseCode.OK);
   }

@@ -17,7 +17,6 @@ import org.apache.thrift.transport.TTransportException;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.ServerSocket;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;

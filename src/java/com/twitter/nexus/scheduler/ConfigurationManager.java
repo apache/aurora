@@ -24,7 +24,7 @@ public class ConfigurationManager {
   private static final long DEFAULT_DISK_BYTES = Amount.of(1, Data.GB).as(Data.BYTES);
   private static final int DEFAULT_PRIORITY = 0;
 
-  public static TwitterTaskInfo parse(TwitterTaskInfo config)
+  public static TwitterTaskInfo populateFields(TwitterTaskInfo config)
       throws TaskDescriptionException {
     if (config == null) throw new TaskDescriptionException("Task may not be null.");
 
@@ -32,6 +32,7 @@ public class ConfigurationManager {
     if (configMap == null) throw new TaskDescriptionException("Task configuration may not be null");
 
     return config
+      .setConfigParsed(true)
       .setHdfsPath(getValue(configMap, "hdfs_path", String.class))
       .setCmdLineArgs(getValue(configMap, "cmd_line_args", "", String.class))
       .setNumCpus(getValue(configMap, "num_cpus", DEFAULT_NUM_CPUS, Double.class))

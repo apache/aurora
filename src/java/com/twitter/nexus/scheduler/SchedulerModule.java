@@ -6,10 +6,14 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
+import com.twitter.common.process.GuicedProcess;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.zookeeper.ServerSet;
 import com.twitter.common.zookeeper.ZooKeeperClient;
+import com.twitter.nexus.scheduler.httphandlers.SchedulerzHome;
+import com.twitter.nexus.scheduler.httphandlers.SchedulerzJob;
+import com.twitter.nexus.scheduler.httphandlers.SchedulerzUser;
 import org.apache.zookeeper.ZooDefs;
 
 import java.io.IOException;
@@ -26,8 +30,12 @@ public class SchedulerModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    bind(SchedulerCore.class);
-    bind(NexusSchedulerImpl.class);
+    bind(SchedulerCore.class).in(Singleton.class);
+    bind(NexusSchedulerImpl.class).in(Singleton.class);
+
+    GuicedProcess.registerServlet(binder(), "/schedulerz", SchedulerzHome.class, false);
+    GuicedProcess.registerServlet(binder(), "/schedulerz/user", SchedulerzUser.class, false);
+    GuicedProcess.registerServlet(binder(), "/schedulerz/job", SchedulerzJob.class, false);
   }
 
   @Provides

@@ -1,5 +1,6 @@
 package com.twitter.nexus.scheduler;
 
+import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.HashMultimap;
@@ -9,8 +10,9 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.Sets;
 import com.twitter.common.base.Closure;
-import com.twitter.nexus.scheduler.ConfigurationManager;
+import com.twitter.nexus.gen.JobConfiguration;
 import com.twitter.nexus.gen.TwitterTaskInfo;
 import com.twitter.nexus.gen.ScheduleStatus;
 import com.twitter.nexus.gen.TrackedTask;
@@ -22,6 +24,7 @@ import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
 
 import javax.annotation.Nullable;
+import java.util.Collection;
 import java.util.Deque;
 import java.util.Map;
 import java.util.Set;
@@ -38,8 +41,7 @@ import java.util.logging.Logger;
 public class SchedulerCore {
   private static Logger LOG = Logger.getLogger(SchedulerCore.class.getName());
 
-  private final Map<Integer, TrackedTask> tasks = Maps.newHashMap();
-  private final Multimap<String, Integer> jobToTaskIds = HashMultimap.create();
+  private final Multimap<JobConfiguration, TrackedTask> tasks = HashMultimap.create();
   private final TSerializer serializer = new TSerializer();
 
   // TODO(wfarner): Hopefully we can abolish (or at least mask) the concept of canonical task IDs
@@ -62,8 +64,9 @@ public class SchedulerCore {
     this.frameworkId.set(frameworkId);
   }
 
-  public boolean hasJob(String jobName) {
-    return jobToTaskIds.containsKey(jobName);
+  public boolean hasJob(final String owner, final String jobName) {
+    Preconditions.checkNotNull(jobName);
+    return Iterables.any(tasks.keySet(), jobMatcher(owner, jobName));
   }
 
   /**
@@ -72,12 +75,26 @@ public class SchedulerCore {
    * @param jobName The job to look up tasks for.
    * @return An iterable of task objects.
    */
-  public synchronized Iterable<TrackedTask> getTasks(String jobName) {
-    ImmutableList.Builder<TrackedTask> taskDescriptions = ImmutableList.builder();
-    for (int taskId : jobToTaskIds.get(jobName)) {
-      taskDescriptions.add(tasks.get(taskId));
+  public synchronized Iterable<TrackedTask> getJobTasks(final String owner, final String jobName) {
+    Preconditions.checkNotNull(jobName);
+    return tasks.get(Iterables.find(tasks.keySet(), jobMatcher(owner, jobName)));
+  }
+
+  public synchronized Iterable<String> getUsers() {
+    return Sets.newHashSet(Iterables.transform(tasks.values(), new Function<TrackedTask, String>() {
+      @Override public String apply(TrackedTask trackedTask) {
+        return trackedTask.getOwner();
+      }
+    }));
+  }
+
+  public synchronized Multimap<JobConfiguration, TrackedTask> getUserJobs(final String user) {
+    Multimap<JobConfiguration, TrackedTask> jobs = HashMultimap.create();
+    for (JobConfiguration job : tasks.keySet()) {
+      if (job.getOwner().equals(user)) jobs.putAll(job, tasks.get(job));
     }
-    return taskDescriptions.build();
+
+    return jobs;
   }
 
   private int generateTaskId() {
@@ -91,26 +108,25 @@ public class SchedulerCore {
    * @return The task object associated with ID {@code taskId} or {@code null} if no such task
    *   exists.
    */
-  public synchronized TrackedTask getTask(int taskId) {
-    return tasks.get(taskId);
+  public synchronized TrackedTask getTask(final int taskId) {
+    return Iterables.find(tasks.values(), taskMatcher(taskId));
   }
 
   /**
    * Adds pending tasks, which will become candidates for scheduling the next time
    * {@link #schedulePendingTask(SlaveOffer)} is called.
    *
-   * @param jobName Name of the job that the task is a part of.
-   * @param newTasks The tasks to schedule.
+   * @param job The configuration of the job to create tasks for.
    */
-  public synchronized void addTasks(String jobName, Iterable<TwitterTaskInfo> newTasks) {
-    Preconditions.checkNotNull(jobName);
+  public synchronized void addTasks(JobConfiguration job) {
+    Preconditions.checkNotNull(job);
 
-    for (TwitterTaskInfo task : Preconditions.checkNotNull(newTasks)) {
+    for (TwitterTaskInfo task : Preconditions.checkNotNull(job.getTaskConfigs())) {
       int taskId = generateTaskId();
-      jobToTaskIds.put(jobName, taskId);
-      tasks.put(taskId, new TrackedTask()
+      tasks.put(job, new TrackedTask()
           .setTaskId(taskId)
-          .setJobName(jobName)
+          .setJobName(job.getName())
+          .setOwner(job.getOwner())
           .setTask(task)
           .setStatus(ScheduleStatus.PENDING));
     }
@@ -133,26 +149,26 @@ public class SchedulerCore {
     }
 
     for (TrackedTask task
-        : Iterables.filter(tasks.values(), new TaskFilter(ScheduleStatus.PENDING))) {
+        : Iterables.filter(tasks.values(), taskStatusMatcher(ScheduleStatus.PENDING))) {
       String jobName = task.jobName;
-      TwitterTaskInfo concreteTaskDescription = task.getTask();
-      if (ConfigurationManager.satisfied(concreteTaskDescription, offer)) {
+      TwitterTaskInfo taskInfo = task.getTask();
+      if (ConfigurationManager.satisfied(taskInfo, offer)) {
         LOG.info("Offer is being assigned to a concreteTaskDescription within " + jobName);
 
         // TODO(wfarner): Remove this hack once nexus core does not read parameters.
         StringMap params = new StringMap();
-        LOG.info("Consuming cpus: " + String.valueOf(concreteTaskDescription.getNumCpus()));
-        LOG.info("Consuming memory: " + String.valueOf(concreteTaskDescription.getRamBytes()));
-        params.set("cpus", String.valueOf((int) concreteTaskDescription.getNumCpus()));
-        params.set("mem", String.valueOf(concreteTaskDescription.getRamBytes()));
+        LOG.info("Consuming cpus: " + String.valueOf(taskInfo.getNumCpus()));
+        LOG.info("Consuming memory: " + String.valueOf(taskInfo.getRamBytes()));
+        params.set("cpus", String.valueOf((int) taskInfo.getNumCpus()));
+        params.set("mem", String.valueOf(taskInfo.getRamBytes()));
 
         // TODO(wfarner): Need to 'consume' the resouce from the slave offer, since the
-        // concreteTaskDescription requirement might be a fraction of the offer.
+        // taskInfo requirement might be a fraction of the offer.
         task.status = ScheduleStatus.STARTING;
         task.slaveId = slaveOffer.getSlaveId();
         byte[] taskInBytes = null;
         try {
-          taskInBytes = serializer.serialize(concreteTaskDescription);
+          taskInBytes = serializer.serialize(taskInfo);
         } catch (TException e) {
            LOG.log(Level.SEVERE,"Error serializing Thrift TwitterTaskInfo",e);
           //todo(flo):maybe cleanup and exit cleanly
@@ -174,7 +190,7 @@ public class SchedulerCore {
    * @param status The new state of the task.
    */
   public synchronized void setTaskStatus(int taskId, ScheduleStatus status) {
-    TrackedTask task = tasks.get(taskId);
+    TrackedTask task = getTask(taskId);
     if (task != null) task.setStatus(Preconditions.checkNotNull(status));
   }
 
@@ -186,10 +202,12 @@ public class SchedulerCore {
    * @return The task object that was removed, or {@code null} if no such task was found.
    */
   public synchronized TrackedTask removeTask(int taskId) {
-    TrackedTask task = tasks.remove(taskId);
-    if (task != null) {
-      jobToTaskIds.remove(task.getJobName(), taskId);
+    TrackedTask task = null;
+    for (JobConfiguration job : tasks.keySet()) {
+      task = Iterables.find(tasks.get(job), taskMatcher(taskId));
+      tasks.remove(job, task);
     }
+
     return task;
   }
 
@@ -199,26 +217,19 @@ public class SchedulerCore {
    *
    * @param jobName The job to kill.
    */
-  public synchronized void killJob(final String jobName) {
+  public synchronized void killJob(final String owner, final String jobName) {
     Preconditions.checkNotNull(jobName);
 
     // Remove all pending tasks for the job.
-    Iterables.removeIf(tasks.entrySet(), new Predicate<Map.Entry<Integer, TrackedTask>>() {
-      @Override public boolean apply(Map.Entry<Integer, TrackedTask> entry) {
-        TrackedTask task = entry.getValue();
-        boolean remove = task.status == ScheduleStatus.PENDING && task.jobName.equals(jobName);
-        if (remove) jobToTaskIds.remove(task.jobName, task.getTaskId());
-
-        return remove;
-      }
-    });
+    Iterables.removeIf(tasks.get(Iterables.find(tasks.keySet(), jobMatcher(owner, jobName))),
+        taskStatusMatcher(ScheduleStatus.PENDING));
 
     scheduleDriverWork(new Closure<SchedulerDriver>() {
       @Override public void execute(SchedulerDriver driver) throws RuntimeException {
         LOG.info("Killing job " + jobName);
 
-        for (int taskId : jobToTaskIds.get(jobName)) {
-          driver.killTask(taskId);
+        for (TrackedTask task : getJobTasks(owner, jobName)) {
+          driver.killTask(task.getTaskId());
         }
       }
     });
@@ -262,7 +273,7 @@ public class SchedulerCore {
         LOG.info("Restarting tasks " + taskIds);
 
         for (int taskId : taskIds) {
-          TrackedTask task = tasks.get(taskId);
+          TrackedTask task = getTask(taskId);
           if (task != null && task.status != ScheduleStatus.PENDING) {
             // TODO(wfarner): Once scheduler -> executorHub communication is defined, replace the
             // empty byte array with a serialized message.
@@ -284,19 +295,28 @@ public class SchedulerCore {
     }
   }
 
-  /**
-   * A filter to return only tasks that are in a specific set of states.
-   */
-  private class TaskFilter implements Predicate<TrackedTask> {
-    private final Set<ScheduleStatus> statuses;
+  private static Predicate<TrackedTask> taskStatusMatcher(ScheduleStatus... statuses) {
+    final Set<ScheduleStatus> filterStatuses = Sets.newHashSet(statuses);
+    return new Predicate<TrackedTask>() {
+      @Override public boolean apply(TrackedTask job) {
+        return filterStatuses.contains(job.getStatus());
+      }
+    };
+  }
 
-    public TaskFilter(ScheduleStatus... statuses) {
-      this.statuses = ImmutableSet.copyOf(Preconditions.checkNotNull(statuses));
-    }
+  private static Predicate<JobConfiguration> jobMatcher(final String owner, final String jobName) {
+    return new Predicate<JobConfiguration>() {
+      @Override public boolean apply(JobConfiguration job) {
+        return job.getOwner().equals(owner) && job.getName().equals(jobName);
+      }
+    };
+  }
 
-    @Override
-    public boolean apply(TrackedTask trackedTask) {
-      return statuses.contains(trackedTask.getStatus());
-    }
+  private static Predicate<TrackedTask> taskMatcher(final int taskId) {
+    return new Predicate<TrackedTask>() {
+      @Override public boolean apply(TrackedTask task) {
+        return task.getTaskId() == taskId;
+      }
+    };
   }
 }
