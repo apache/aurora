@@ -26,7 +26,7 @@ public class ConfigurationManager {
 
   public static TwitterTaskInfo parse(TwitterTaskInfo config)
       throws TaskDescriptionException {
-    if ( config == null) throw new TaskDescriptionException("Task may not be null.");
+    if (config == null) throw new TaskDescriptionException("Task may not be null.");
 
     Map<String, String> configMap =  config.getConfiguration();
     if (configMap == null) throw new TaskDescriptionException("Task configuration may not be null");

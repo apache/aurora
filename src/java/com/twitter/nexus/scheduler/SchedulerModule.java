@@ -1,14 +1,17 @@
 package com.twitter.nexus.scheduler;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
-import com.twitter.nexus.util.HdfsUtil;
-import org.apache.hadoop.fs.FileSystem;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
+import com.twitter.common.zookeeper.ServerSet;
+import com.twitter.common.zookeeper.ZooKeeperClient;
+import org.apache.zookeeper.ZooDefs;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.logging.Logger;
 
@@ -24,13 +27,19 @@ public class SchedulerModule extends AbstractModule {
   @Override
   protected void configure() {
     bind(SchedulerCore.class);
-    bind(SchedulerHub.class);
+    bind(NexusSchedulerImpl.class);
   }
 
   @Provides
   @Singleton
-  public FileSystem provideFileSystem() throws IOException {
-    return HdfsUtil.getHdfsConfiguration(
-        Preconditions.checkNotNull(options.hdfsConfig).getAbsolutePath());
+  final ZooKeeperClient provideZooKeeperClient() {
+    return new ZooKeeperClient(Amount.of(options.zooKeeperSessionTimeoutSecs, Time.SECONDS),
+        ImmutableSet.copyOf(options.zooKeeperEndpoints));
+  }
+
+  @Provides
+  @Singleton
+  final ServerSet provideSchedulerServerSet(ZooKeeperClient zkClient) {
+    return new ServerSet(zkClient, ZooDefs.Ids.OPEN_ACL_UNSAFE, options.nexusSchedulerNameSpec);
   }
 }

@@ -4,6 +4,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -20,6 +21,7 @@ import nexus.StringMap;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
 
+import javax.annotation.Nullable;
 import java.util.Deque;
 import java.util.Map;
 import java.util.Set;
@@ -130,13 +132,10 @@ public class SchedulerCore {
       return null;
     }
 
-    for (Map.Entry<Integer, TrackedTask> taskEntry : tasks.entrySet()) {
-      TrackedTask trackedTask = taskEntry.getValue();
-
-      if (trackedTask.status != ScheduleStatus.PENDING) continue;
-
-      String jobName = trackedTask.jobName;
-      TwitterTaskInfo concreteTaskDescription = trackedTask.getTask();
+    for (TrackedTask task
+        : Iterables.filter(tasks.values(), new TaskFilter(ScheduleStatus.PENDING))) {
+      String jobName = task.jobName;
+      TwitterTaskInfo concreteTaskDescription = task.getTask();
       if (ConfigurationManager.satisfied(concreteTaskDescription, offer)) {
         LOG.info("Offer is being assigned to a concreteTaskDescription within " + jobName);
 
@@ -149,8 +148,8 @@ public class SchedulerCore {
 
         // TODO(wfarner): Need to 'consume' the resouce from the slave offer, since the
         // concreteTaskDescription requirement might be a fraction of the offer.
-        trackedTask.status = ScheduleStatus.STARTING;
-        trackedTask.slaveId = slaveOffer.getSlaveId();
+        task.status = ScheduleStatus.STARTING;
+        task.slaveId = slaveOffer.getSlaveId();
         byte[] taskInBytes = null;
         try {
           taskInBytes = serializer.serialize(concreteTaskDescription);
@@ -160,8 +159,8 @@ public class SchedulerCore {
           throw new RuntimeException(e);
         }
 
-        return new nexus.TaskDescription(trackedTask.getTaskId(), slaveOffer.getSlaveId(),
-                jobName + "-" + trackedTask.getTaskId(), params, taskInBytes);
+        return new nexus.TaskDescription(task.getTaskId(), slaveOffer.getSlaveId(),
+                jobName + "-" + task.getTaskId(), params, taskInBytes);
       }
     }
 
@@ -282,6 +281,22 @@ public class SchedulerCore {
   public synchronized void clearWorkQueue(SchedulerDriver driver) {
     for (Closure<SchedulerDriver> work : workQueue) {
       work.execute(driver);
+    }
+  }
+
+  /**
+   * A filter to return only tasks that are in a specific set of states.
+   */
+  private class TaskFilter implements Predicate<TrackedTask> {
+    private final Set<ScheduleStatus> statuses;
+
+    public TaskFilter(ScheduleStatus... statuses) {
+      this.statuses = ImmutableSet.copyOf(Preconditions.checkNotNull(statuses));
+    }
+
+    @Override
+    public boolean apply(TrackedTask trackedTask) {
+      return statuses.contains(trackedTask.getStatus());
     }
   }
 }
