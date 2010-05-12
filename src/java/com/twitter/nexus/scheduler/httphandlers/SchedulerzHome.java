@@ -1,13 +1,15 @@
 package com.twitter.nexus.scheduler.httphandlers;
 
-import com.google.common.base.Preconditions;
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.inject.Inject;
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
-import com.twitter.nexus.gen.JobConfiguration;
+import com.twitter.nexus.gen.TaskQuery;
 import com.twitter.nexus.gen.TrackedTask;
+import com.twitter.nexus.scheduler.CronJobScheduler;
 import com.twitter.nexus.scheduler.SchedulerCore;
 import org.antlr.stringtemplate.StringTemplate;
 
@@ -15,7 +17,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.List;
+import java.util.Map;
 
 /**
  * HTTP interface to serve as a HUD for the nexus scheduler.
@@ -27,6 +29,9 @@ public class SchedulerzHome extends StringTemplateServlet {
   private SchedulerCore scheduler;
 
   @Inject
+  private CronJobScheduler cronScheduler;
+
+  @Inject
   public SchedulerzHome(@CacheTemplates boolean cacheTemplates) {
     super("schedulerzhome", cacheTemplates);
   }
@@ -36,17 +41,27 @@ public class SchedulerzHome extends StringTemplateServlet {
       throws ServletException, IOException {
     writeTemplate(resp, new Closure<StringTemplate>() {
       @Override public void execute(StringTemplate template) {
-        List<User> users = Lists.newArrayList();
-        for (String user : scheduler.getUsers()) {
-          Multimap<JobConfiguration, TrackedTask> jobs = scheduler.getUserJobs(user);
-          User userObj = new User();
-          userObj.name = user;
-          userObj.jobCount = jobs.keySet().size();
-          userObj.taskCount = jobs.values().size();
-          users.add(userObj);
+        Map<String, User> users = Maps.newHashMap();
+        Multimap<String, String> userJobs = HashMultimap.create();
+
+        for (TrackedTask task : scheduler.getTasks(new TaskQuery())) {
+          User user = users.get(task.getOwner());
+          if (user == null) {
+            user = new User();
+            user.name = task.getOwner();
+            users.put(user.name, user);
+          }
+          user.taskCount++;
+          userJobs.put(user.name, task.getJobName());
         }
 
-        template.setAttribute("users", users);
+        for (User user : users.values()) {
+          user.jobCount = userJobs.get(user.name).size();
+        }
+
+        template.setAttribute("users", users.values());
+
+        template.setAttribute("cronJobs", Lists.newArrayList(cronScheduler.getJobs()));
       }
     });
   }

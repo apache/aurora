@@ -16,7 +16,6 @@ import com.twitter.nexus.scheduler.httphandlers.SchedulerzJob;
 import com.twitter.nexus.scheduler.httphandlers.SchedulerzUser;
 import org.apache.zookeeper.ZooDefs;
 
-import java.io.IOException;
 import java.util.logging.Logger;
 
 public class SchedulerModule extends AbstractModule {
@@ -30,12 +29,13 @@ public class SchedulerModule extends AbstractModule {
 
   @Override
   protected void configure() {
+    bind(CronJobScheduler.class).in(Singleton.class);
     bind(SchedulerCore.class).in(Singleton.class);
     bind(NexusSchedulerImpl.class).in(Singleton.class);
 
     GuicedProcess.registerServlet(binder(), "/schedulerz", SchedulerzHome.class, false);
-    GuicedProcess.registerServlet(binder(), "/schedulerz/user", SchedulerzUser.class, false);
-    GuicedProcess.registerServlet(binder(), "/schedulerz/job", SchedulerzJob.class, false);
+    GuicedProcess.registerServlet(binder(), "/schedulerz/user", SchedulerzUser.class, true);
+    GuicedProcess.registerServlet(binder(), "/schedulerz/job", SchedulerzJob.class, true);
   }
 
   @Provides
