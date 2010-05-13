@@ -1,5 +1,6 @@
 package com.twitter.nexus.scheduler.httphandlers;
 
+import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -12,6 +13,7 @@ import com.twitter.nexus.gen.TaskQuery;
 import com.twitter.nexus.gen.TrackedTask;
 import com.twitter.nexus.scheduler.CronJobScheduler;
 import com.twitter.nexus.scheduler.SchedulerCore;
+import it.sauronsoftware.cron4j.Predictor;
 import org.antlr.stringtemplate.StringTemplate;
 
 import javax.annotation.Nullable;
@@ -69,12 +71,26 @@ public class SchedulerzUser extends StringTemplateServlet {
         }
 
         template.setAttribute("jobs", jobs.values());
-        template.setAttribute("cronJobs", Lists.newArrayList(
-            Iterables.filter(cronScheduler.getJobs(), new Predicate<JobConfiguration>() {
+
+        Iterable<JobConfiguration> cronJobs = Iterables.filter(
+            cronScheduler.getJobs(), new Predicate<JobConfiguration>() {
               @Override public boolean apply(JobConfiguration job) {
                 return job.getOwner().equals(user);
               }
-            })));
+            });
+        Iterable<CronJob> cronJobObjs = Iterables.transform(cronJobs,
+            new Function<JobConfiguration, CronJob>() {
+              @Override public CronJob apply(JobConfiguration job) {
+                CronJob cronJob = new CronJob();
+                cronJob.name = job.getName();
+                cronJob.taskCount = job.getTaskConfigsSize();
+                cronJob.cronSchedule = job.getCronSchedule();
+                cronJob.nextRun = new Predictor(cronJob.cronSchedule).nextMatchingDate().toString();
+                return cronJob;
+              }
+        });
+
+        template.setAttribute("cronJobs", Lists.newArrayList(cronJobObjs));
       }
     });
   }
@@ -89,6 +105,19 @@ public class SchedulerzUser extends StringTemplateServlet {
 
     public int getTaskCount() {
       return taskCount;
+    }
+  }
+
+  class CronJob extends Job {
+    String cronSchedule;
+    String nextRun;
+
+    public String getCronSchedule() {
+      return cronSchedule;
+    }
+
+    public String getNextRun() {
+      return nextRun;
     }
   }
 }

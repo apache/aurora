@@ -247,14 +247,23 @@ public class SchedulerCore {
   public synchronized void killTasks(final TaskQuery query) {
     Preconditions.checkNotNull(query);
 
+    // First remove all pending tasks matching the query.
+    TaskQuery pendingQuery = new TaskQuery(query);
+    pendingQuery.addToStatuses(ScheduleStatus.PENDING);
+    tasks.removeAll(Lists.newArrayList(getTasks(pendingQuery)));
+
+    // If this looks like a query for all tasks in a job, instruct the scheduler modules to delete
+    // the job.
+    if (!StringUtils.isEmpty(query.getOwner()) && !StringUtils.isEmpty(query.getJobName())
+        && query.getTaskIdsSize() == 0) {
+      for (JobScheduler scheduler : jobSchedulers) {
+        scheduler.deleteJob(query.getOwner(), query.getJobName());
+      }
+    }
+
     scheduleDriverWork(new Closure<SchedulerDriver>() {
       @Override public void execute(SchedulerDriver driver) throws RuntimeException {
         LOG.info("Killing tasks matching " + query);
-
-        // First remove all pending tasks matching the query.
-        TaskQuery pendingQuery = new TaskQuery(query);
-        pendingQuery.addToStatuses(ScheduleStatus.PENDING);
-        tasks.removeAll(Lists.newArrayList(getTasks(pendingQuery)));
 
         for (TrackedTask task : getTasks(query)) {
           if (!task.isSetTaskId()) {
