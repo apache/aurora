@@ -247,7 +247,20 @@ public class SchedulerCore {
         ScheduleStatus.FAILED,
         ScheduleStatus.LOST,
         ScheduleStatus.NOT_FOUND));
-    tasks.removeAll(Lists.newArrayList(getTasks(completedQuery)));
+
+    // TODO(wfarner): More work is needed here.
+    List<TrackedTask> toRemove = Lists.newArrayList();
+    for (TrackedTask task : getTasks(completedQuery)) {
+      if (task.getTask().isIsDaemon()) {
+        LOG.info("Moving daemon task to PENDING state: "
+                 + task.getOwner() + "/" + task.getJobName());
+        task.setStatus(ScheduleStatus.PENDING);
+      } else {
+        toRemove.add(task);
+      }
+    }
+
+    tasks.removeAll(toRemove);
   }
 
   /**

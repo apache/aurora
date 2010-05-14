@@ -68,8 +68,6 @@ class NexusSchedulerImpl extends Scheduler {
       if (taskToSchedule != null) {
         newlyScheduledTasks.add(taskToSchedule);
       }
-
-      LOG.info("Accepting tasks: " + newlyScheduledTasks.size());
     }
     driver.replyToOffer(offerId, newlyScheduledTasks, new StringMap());
   }

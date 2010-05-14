@@ -1,12 +1,19 @@
 package com.twitter.nexus.scheduler;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.twitter.common.base.Closure;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.nexus.gen.TwitterTaskInfo;
 import nexus.SlaveOffer;
 import nexus.StringMap;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.logging.Logger;
 
 /**
@@ -36,7 +43,8 @@ public class ConfigurationManager {
       .setHdfsPath(getValue(configMap, "hdfs_path", String.class))
       .setCmdLineArgs(getValue(configMap, "cmd_line_args", "", String.class))
       .setNumCpus(getValue(configMap, "num_cpus", DEFAULT_NUM_CPUS, Double.class))
-      .setRamBytes(getValue(configMap, "ram_bytes", DEFAULT_RAM_BYTES, Long.class));
+      .setRamBytes(getValue(configMap, "ram_bytes", DEFAULT_RAM_BYTES, Long.class))
+      .setIsDaemon(getValue(configMap, "daemon", DEFAULT_TO_DAEMON, Boolean.class));
   }
 
   public static TwitterTaskInfo makeConcrete(SlaveOffer offer)
