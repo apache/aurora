@@ -43,7 +43,7 @@ class SchedulerManager extends ThriftServer implements NexusSchedulerManager.Ifa
     }
 
     try {
-      schedulerCore.addTasks(job);
+      schedulerCore.createJob(job);
     } catch (ScheduleException e) {
       return new CreateJobResponse()
           .setResponseCode(ResponseCode.INVALID_REQUEST)

@@ -56,13 +56,11 @@ class NexusSchedulerImpl extends Scheduler {
   public void registered(SchedulerDriver driver, int frameworkId) {
     LOG.info("Registered with ID " + frameworkId);
     // TODO(wfarner): Register with ZooKeeper
-    schedulerCore.setFrameworkId(frameworkId);
+    schedulerCore.registered(driver, frameworkId);
   }
 
   @Override
   public void resourceOffer(SchedulerDriver driver, long offerId, SlaveOfferVector offers) {
-    schedulerCore.clearWorkQueue(driver);
-
     TaskDescriptionVector newlyScheduledTasks = new TaskDescriptionVector();
 
     for (int i = 0; i < offers.size(); i++) {

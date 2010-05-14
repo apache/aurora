@@ -1,9 +1,11 @@
 package com.twitter.nexus.scheduler;
 
+import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import com.twitter.common.base.Closure;
 import com.twitter.nexus.gen.JobConfiguration;
@@ -21,9 +23,10 @@ import org.apache.thrift.TSerializer;
 
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Deque;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -57,13 +60,16 @@ public class SchedulerCore {
   // The nexus framework ID of the scheduler, set to -1 until the framework is registered.
   private final AtomicInteger frameworkId = new AtomicInteger(-1);
 
-  // Stores work to perform using the scheduler driver.
-  private Deque<Closure<SchedulerDriver>> workQueue = Lists.newLinkedList();
+  // Work queue that stores pending asynchronous tasks.
+  @Inject
+  private WorkQueue workQueue;
+
+  // Scheduler driver used for communication with other nodes in the cluster.
+  private final AtomicReference<SchedulerDriver> schedulerDriver =
+      new AtomicReference<SchedulerDriver>();
 
   @Inject
   public SchedulerCore(CronJobScheduler cronScheduler, ImmediateJobScheduler immediateScheduler) {
-    // The immediate scheduler will accept any job, so it's important that other schedulers are
-    // placed first.
     Closure<JobConfiguration> jobRunner = new Closure<JobConfiguration>() {
       @Override
       public void execute(JobConfiguration job) {
@@ -71,6 +77,9 @@ public class SchedulerCore {
         runJob(job);
       }
     };
+
+    // The immediate scheduler will accept any job, so it's important that other schedulers are
+    // placed first.
     jobSchedulers = Arrays.asList(cronScheduler.setJobRunner(jobRunner),
         immediateScheduler.setJobRunner(jobRunner));
   }
@@ -79,9 +88,11 @@ public class SchedulerCore {
    * Assigns a framework ID to the scheduler, should be called when the scheduler implementation
    * has received a successful registration signal.
    *
+   * @param driver The registered driver reference.
    * @param frameworkId Framework ID.
    */
-  public void setFrameworkId(int frameworkId) {
+  public void registered(SchedulerDriver driver, int frameworkId) {
+    this.schedulerDriver.set(driver);
     this.frameworkId.set(frameworkId);
   }
 
@@ -97,14 +108,14 @@ public class SchedulerCore {
   }
 
   /**
-   * Checks whether the scheduler has any tasks matching the given query.
+   * Checks whether the scheduler has an job matching the owner/jobName.
    *
    * @param owner The owner to look up.
    * @param jobName The job name to look up.
    * @return {@code true} if the scheduler has a job for the given owner and job name,
    *    {@code false} otherwise.
    */
-  private boolean hasJob(final String owner, final String jobName) {
+  private synchronized boolean hasJob(final String owner, final String jobName) {
     TaskQuery query = new TaskQuery().setOwner(owner).setJobName(jobName);
 
     return !Iterables.isEmpty(getTasks(query)) || Iterables.any(jobSchedulers,
@@ -120,13 +131,12 @@ public class SchedulerCore {
   }
 
   /**
-   * Adds pending tasks, which will become candidates for scheduling the next time
-   * {@link #offer(SlaveOffer)} is called.
+   * Creates a new job, whose tasks will become candidates for scheduling.
    *
    * @param job The configuration of the job to create tasks for.
    * @throws ScheduleException If there was an error scheduling a cron job.
    */
-  public synchronized void addTasks(JobConfiguration job) throws ScheduleException {
+  public synchronized void createJob(JobConfiguration job) throws ScheduleException {
     Preconditions.checkNotNull(job);
 
     if (hasJob(job.getOwner(), job.getName())) {
@@ -231,11 +241,12 @@ public class SchedulerCore {
     // allow it to remain in a failed/killed/lost state long enough for someone to debug.
     // This could be accomplished by using the work queue (possibly augmenting to use futures).
     TaskQuery completedQuery = new TaskQuery(query);
-    completedQuery.addToStatuses(ScheduleStatus.FINISHED);
-    completedQuery.addToStatuses(ScheduleStatus.KILLED);
-    completedQuery.addToStatuses(ScheduleStatus.FAILED);
-    completedQuery.addToStatuses(ScheduleStatus.LOST);
-    completedQuery.addToStatuses(ScheduleStatus.NOT_FOUND);
+    completedQuery.setStatuses(Sets.newHashSet(
+        ScheduleStatus.FINISHED,
+        ScheduleStatus.KILLED,
+        ScheduleStatus.FAILED,
+        ScheduleStatus.LOST,
+        ScheduleStatus.NOT_FOUND));
     tasks.removeAll(Lists.newArrayList(getTasks(completedQuery)));
   }
 
@@ -261,18 +272,42 @@ public class SchedulerCore {
       }
     }
 
-    scheduleDriverWork(new Closure<SchedulerDriver>() {
-      @Override public void execute(SchedulerDriver driver) throws RuntimeException {
-        LOG.info("Killing tasks matching " + query);
+    LOG.info("Killing tasks matching " + query);
 
-        for (TrackedTask task : getTasks(query)) {
-          if (!task.isSetTaskId()) {
-            // TODO(wfarner): These tasks should be removed from the tasks data structure.
-            LOG.severe("Attempted to kill a task that does not yet have a task id");
-          } else {
-            driver.killTask(task.getTaskId());
+    for (final TrackedTask task : getTasks(query)) {
+      if (!task.isSetTaskId()) {
+        // TODO(wfarner): These tasks should be removed from the tasks data structure.
+        LOG.severe("Attempted to kill a task that does not yet have a task id");
+      } else {
+        doWorkWithDriver(new Function<SchedulerDriver, Integer>() {
+          @Override public Integer apply(SchedulerDriver driver) {
+            return driver.killTask(task.getTaskId());
           }
+        });
+      }
+    }
+  }
+
+  /**
+   * Executes a unit of work that uses the scheduler driver.  This exists as a convenience function
+   * for any tasks that require use of the {@link SchedulerDriver}, for automatic retrying in the
+   * event that the driver is not available.
+   *
+   * @param work The work to execute.  Should return the status code provided by the driver
+   *    (0 denotes success, non-zero denotes a failure that should be retried).
+   */
+  private void doWorkWithDriver(final Function<SchedulerDriver, Integer> work) {
+    workQueue.doWork(new Callable<Boolean>() {
+      @Override public Boolean call() throws Exception {
+        if (frameworkId.get() == -1) {
+          LOG.info("Unable to restart tasks, framework not registered.");
+          return false;
         }
+
+        // TODO(wfarner): What happens when this fails?  Do we have to reconnect manually, or does
+        // the driver automatically try to reconnect when it sends a non-zero status code?
+        SchedulerDriver driver = schedulerDriver.get();
+        return driver != null && work.apply(driver) == 0;
       }
     });
   }
@@ -286,36 +321,20 @@ public class SchedulerCore {
     Preconditions.checkNotNull(query);
 
     // TODO(wfarner): Need to do this in a cleaner way so that the entire job doesn't flip at once.
-    scheduleDriverWork(new Closure<SchedulerDriver>() {
-      @Override public void execute(SchedulerDriver driver) throws RuntimeException {
-        if (frameworkId.get() == -1) {
-          LOG.info("Unable to restart tasks, framework not registered.");
-          return;
-        }
+    LOG.info("Restarting tasks " + query);
 
-        LOG.info("Restarting tasks " + query);
-
-        for (TrackedTask task : getTasks(query)) {
-          if (task != null && task.status != ScheduleStatus.PENDING) {
-            // TODO(wfarner): Once scheduler -> executorHub communication is defined, replace the
-            // empty byte array with a serialized message.
-            driver.sendFrameworkMessage(new FrameworkMessage(frameworkId.get(), task.slaveId,
-                new byte[0]));
+    for (final TrackedTask task : getTasks(query)) {
+      if (task != null && task.status != ScheduleStatus.PENDING) {
+        // TODO(wfarner): Once scheduler -> executorHub communication is defined, replace the
+        // empty byte array with a serialized message.
+        doWorkWithDriver(new Function<SchedulerDriver, Integer>() {
+          @Override public Integer apply(SchedulerDriver driver) {
+            return driver.sendFrameworkMessage(
+                new FrameworkMessage(frameworkId.get(), task.slaveId, new byte[0]));
           }
-        }
+        });
       }
-    });
-  }
-
-  private void scheduleDriverWork(Closure<SchedulerDriver> work) {
-    workQueue.addLast(Preconditions.checkNotNull(work));
-  }
-
-  public synchronized void clearWorkQueue(SchedulerDriver driver) {
-    for (Closure<SchedulerDriver> work : workQueue) {
-      work.execute(driver);
     }
-    workQueue.clear();
   }
 
   /**
