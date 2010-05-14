@@ -80,9 +80,10 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
     return true;
   }
 
-  private ServerSet.EndpointStatus startThriftServer()
-      throws IOException, TTransportException, Group.JoinException, InterruptedException {
-    schedulerThriftInterface.start(0, new NexusSchedulerManager.Processor(schedulerThriftInterface));
+  private ServerSet.EndpointStatus startThriftServer() throws IOException, TTransportException,
+      Group.JoinException, InterruptedException {
+    schedulerThriftInterface.start(0,
+        new NexusSchedulerManager.Processor(schedulerThriftInterface));
 
     addShutdownAction(new Command() {
       @Override public void execute() {
@@ -98,7 +99,6 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
         Status.STARTING);
   }
 
-  //TODO(flo): proper exception handling...
   public static void main(String[] args) throws Exception {
     new SchedulerMain().run(args);
   }
