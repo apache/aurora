@@ -44,6 +44,7 @@ public class ExecutorCore {
     this.hadoopFileSystem = Preconditions.checkNotNull(hadoopFileSystem);
   }
 
+  // TODO(flo): Handle loss of connection with the ExecutorDriver.
   public void executePendingTask(final ExecutorDriver driver, final TwitterTaskInfo taskInfo,
                                  final TaskDescription task) {
     // TODO(flo): Do not allow configuration to specify local working directory.
@@ -79,12 +80,16 @@ public class ExecutorCore {
       tasks.put(task.getTaskId(), task);
 
       // Launch a thread to reap dead processes.
+      // TODO(flo): Since you store the Process object, it would be cleaner to have a timer that
+      // periodically scans the processes map for terminated processes.
       new Thread() {
         public void run() {
           setDaemon(true);
           waitForProcess(process);
           // Make sure this process finished or failed, i.e., wasn't killed.
-          if (ExecutorCore.this.processes.remove(task.getTaskId(), process)) {
+          // TODO(flo): What if remove() returns false?  It's an unexpected state, and should
+          // at least be logged.
+          if (processes.remove(task.getTaskId(), process)) {
             tasks.remove(task.getTaskId(), task);
             // TODO(benh): Send process.exitValue() back to scheduler.
             ByteBuffer bb = ByteBuffer.allocate(Long.SIZE);
