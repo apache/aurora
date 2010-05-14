@@ -46,6 +46,7 @@ public class ExecutorCore {
 
   public void executePendingTask(final ExecutorDriver driver, final TwitterTaskInfo taskInfo,
                                  final TaskDescription task) {
+    // TODO(flo): Do not allow configuration to specify local working directory.
     final String localDirName = String
         .format("%s/%s/", taskInfo.getLocalWorkingDirectory(), task.getName());
 
@@ -68,6 +69,8 @@ public class ExecutorCore {
 
 
       final Process process = processBuilder.start();
+      // TODO(flo): This does not set up a pipe - you will need two threads to continually copy
+      // from one stream to the other.
       IOUtils.copy(process.getErrorStream(),new FileWriter(stdErr));
       IOUtils.copy(process.getInputStream(),new FileWriter(stdOut));
 

@@ -5,7 +5,6 @@ import com.google.inject.Inject;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.NumericVariable;
-import com.twitter.common.stats.TimeSeriesRepository;
 import com.twitter.common.stats.VariableRepository;
 import com.twitter.common.util.BackoffStrategy;
 import com.twitter.common.util.TruncatedBinaryBackoff;

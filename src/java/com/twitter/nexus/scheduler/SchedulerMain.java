@@ -58,7 +58,7 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
   private NexusSchedulerImpl scheduler;
 
   @Inject
-  private SchedulerManager schedulerManager;
+  private SchedulerThriftInterface schedulerThriftInterface;
 
   @Inject
   private ServerSet nexusSchedulerServerSet;
@@ -82,19 +82,19 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
 
   private ServerSet.EndpointStatus startThriftServer()
       throws IOException, TTransportException, Group.JoinException, InterruptedException {
-    schedulerManager.start(0, new NexusSchedulerManager.Processor(schedulerManager));
+    schedulerThriftInterface.start(0, new NexusSchedulerManager.Processor(schedulerThriftInterface));
 
     addShutdownAction(new Command() {
       @Override public void execute() {
         LOG.info("Stopping thrift server");
         try {
-          schedulerManager.shutdown();
+          schedulerThriftInterface.shutdown();
         } catch (TException e) {
           LOG.log(Level.WARNING, "Error while stopping thrift server.", e);
         }
       }
     });
-    return joinServerSet(nexusSchedulerServerSet, schedulerManager.getListeningPort(),
+    return joinServerSet(nexusSchedulerServerSet, schedulerThriftInterface.getListeningPort(),
         Status.STARTING);
   }
 

@@ -17,13 +17,13 @@ import java.util.logging.Logger;
  *
  * @author wfarner
  */
-class SchedulerManager extends ThriftServer implements NexusSchedulerManager.Iface {
-  private static Logger LOG = Logger.getLogger(SchedulerManager.class.getName());
+class SchedulerThriftInterface extends ThriftServer implements NexusSchedulerManager.Iface {
+  private static Logger LOG = Logger.getLogger(SchedulerThriftInterface.class.getName());
 
   @Inject
   private SchedulerCore schedulerCore;
 
-  public SchedulerManager() {
+  public SchedulerThriftInterface() {
     super("TwitterNexusScheduler", "1");
   }
 
@@ -42,31 +42,34 @@ class SchedulerManager extends ThriftServer implements NexusSchedulerManager.Ifa
       }
     }
 
+    CreateJobResponse response = new CreateJobResponse();
+
     try {
       schedulerCore.createJob(job);
+      response.setResponseCode(ResponseCode.OK)
+          .setMessage(job.getTaskConfigs().size() + " new tasks pending for job " + jobId);
     } catch (ScheduleException e) {
-      return new CreateJobResponse()
-          .setResponseCode(ResponseCode.INVALID_REQUEST)
+      response.setResponseCode(ResponseCode.INVALID_REQUEST)
           .setMessage("Failed to schedule job - " + e.getMessage());
     }
 
-    return new CreateJobResponse().setResponseCode(ResponseCode.OK)
-        .setMessage(job.getTaskConfigs().size() + " new tasks pending for job " + jobId);
+    return response;
   }
 
   @Override
   public ScheduleStatusResponse getTasksStatus(TaskQuery query) throws TException {
     List<TrackedTask> tasks = Lists.newArrayList(schedulerCore.getTasks(query));
 
+    ScheduleStatusResponse response = new ScheduleStatusResponse();
     if (tasks.isEmpty()) {
-      return new ScheduleStatusResponse()
-          .setResponseCode(ResponseCode.INVALID_REQUEST)
+      response.setResponseCode(ResponseCode.INVALID_REQUEST)
           .setMessage("No tasks found for query: " + query);
+    } else {
+      response.setResponseCode(ResponseCode.OK)
+        .setTaskStatuses(tasks);
     }
 
-    return new ScheduleStatusResponse()
-        .setResponseCode(ResponseCode.OK)
-        .setTaskStatuses(tasks);
+    return response;
   }
 
   @Override
