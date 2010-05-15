@@ -39,12 +39,14 @@ public class ConfigurationManager {
     if (configMap == null) throw new TaskDescriptionException("Task configuration may not be null");
 
     return config
-      .setConfigParsed(true)
-      .setHdfsPath(getValue(configMap, "hdfs_path", String.class))
-      .setCmdLineArgs(getValue(configMap, "cmd_line_args", "", String.class))
-      .setNumCpus(getValue(configMap, "num_cpus", DEFAULT_NUM_CPUS, Double.class))
-      .setRamBytes(getValue(configMap, "ram_bytes", DEFAULT_RAM_BYTES, Long.class))
-      .setIsDaemon(getValue(configMap, "daemon", DEFAULT_TO_DAEMON, Boolean.class));
+        .setConfigParsed(true)
+        .setHdfsPath(getValue(configMap, "hdfs_path", String.class))
+        .setCmdLineArgs(getValue(configMap, "cmd_line_args", "", String.class))
+        .setIsDaemon(getValue(configMap, "daemon", DEFAULT_TO_DAEMON, Boolean.class))
+        .setNumCpus(getValue(configMap, "num_cpus", DEFAULT_NUM_CPUS, Double.class))
+        .setRamBytes(getValue(configMap, "ram_bytes", DEFAULT_RAM_BYTES, Long.class))
+        .setDiskBytes(getValue(configMap, "disk_bytes", DEFAULT_DISK_BYTES, Long.class))
+        .setPriority(getValue(configMap, "priority", DEFAULT_PRIORITY, Integer.class));
   }
 
   public static TwitterTaskInfo makeConcrete(SlaveOffer offer)

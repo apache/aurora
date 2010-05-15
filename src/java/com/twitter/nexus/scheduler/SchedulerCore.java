@@ -3,6 +3,7 @@ package com.twitter.nexus.scheduler;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
+import com.google.common.base.Predicates;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -25,6 +26,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
@@ -63,6 +65,9 @@ public class SchedulerCore {
   // Work queue that stores pending asynchronous tasks.
   @Inject
   private WorkQueue workQueue;
+
+  // Amount of time to wait before discarding record of a lost/failed task.
+  private static final int TASK_REMOVE_DELAY_MINS = 1;
 
   // Scheduler driver used for communication with other nodes in the cluster.
   private final AtomicReference<SchedulerDriver> schedulerDriver =
@@ -115,8 +120,11 @@ public class SchedulerCore {
    * @return {@code true} if the scheduler has a job for the given owner and job name,
    *    {@code false} otherwise.
    */
-  private synchronized boolean hasJob(final String owner, final String jobName) {
+  private synchronized boolean hasActiveJob(final String owner, final String jobName) {
     TaskQuery query = new TaskQuery().setOwner(owner).setJobName(jobName);
+    for (ScheduleStatus status : ScheduleStatus.values()) {
+      if (status != ScheduleStatus.KILLED) query.addToStatuses(status);
+    }
 
     return !Iterables.isEmpty(getTasks(query)) || Iterables.any(jobSchedulers,
         new Predicate<JobScheduler>() {
@@ -139,7 +147,7 @@ public class SchedulerCore {
   public synchronized void createJob(JobConfiguration job) throws ScheduleException {
     Preconditions.checkNotNull(job);
 
-    if (hasJob(job.getOwner(), job.getName())) {
+    if (hasActiveJob(job.getOwner(), job.getName())) {
       throw new ScheduleException(String.format("Job already exists: %s/%s",
           job.getOwner(), job.getName()));
     }
@@ -237,9 +245,11 @@ public class SchedulerCore {
       task.setStatus(status);
     }
 
-    // TODO(wfarner): May want to add a fixed time delay on removing the task from tracking, to
+    // TODO(wfarner): Should add a fixed time delay on removing the task from tracking, to
     // allow it to remain in a failed/killed/lost state long enough for someone to debug.
     // This could be accomplished by using the work queue (possibly augmenting to use futures).
+
+    // Fetch all completed tasks.
     TaskQuery completedQuery = new TaskQuery(query);
     completedQuery.setStatuses(Sets.newHashSet(
         ScheduleStatus.FINISHED,
@@ -247,20 +257,42 @@ public class SchedulerCore {
         ScheduleStatus.FAILED,
         ScheduleStatus.LOST,
         ScheduleStatus.NOT_FOUND));
-
-    // TODO(wfarner): More work is needed here.
-    List<TrackedTask> toRemove = Lists.newArrayList();
-    for (TrackedTask task : getTasks(completedQuery)) {
-      if (task.getTask().isIsDaemon()) {
-        LOG.info("Moving daemon task to PENDING state: "
-                 + task.getOwner() + "/" + task.getJobName());
-        task.setStatus(ScheduleStatus.PENDING);
-      } else {
-        toRemove.add(task);
+    Iterable<TrackedTask> completedTasks = getTasks(completedQuery);
+    Predicate<TrackedTask> daemonTaskFinder = new Predicate<TrackedTask>() {
+      @Override public boolean apply(TrackedTask task) {
+        return task.getTask().isIsDaemon();
       }
+    };
+
+    // Non-daemon tasks are finished and may be removed.
+    for (TrackedTask task : Iterables.filter(completedTasks, Predicates.not(daemonTaskFinder))) {
+      removeWithDelay(task);
     }
 
-    tasks.removeAll(toRemove);
+    // Daemon tasks should be rescheduled.
+    for (TrackedTask task : Iterables.filter(completedTasks, daemonTaskFinder)) {
+      LOG.info("Moving daemon task to PENDING state: "
+               + task.getOwner() + "/" + task.getJobName());
+      task.setStatus(ScheduleStatus.PENDING);
+      task.setSlaveIdIsSet(false);
+      task.setSlaveId(-1);
+    }
+  }
+
+  /**
+   * Removes a task from tracking in the scheduler, after a fixed delay.
+   *
+   * @param task Task that are to be removed.
+   */
+  private void removeWithDelay(final TrackedTask task) {
+    LOG.info("Will be removing task: " + task);
+    workQueue.scheduleWork(new Callable<Boolean>() {
+      @Override public Boolean call() {
+        LOG.info("Removing completed task: " + task);
+        tasks.removeAll(Arrays.asList(task));
+        return true;
+      }
+    }, TASK_REMOVE_DELAY_MINS, TimeUnit.MINUTES);
   }
 
   /**
@@ -270,11 +302,7 @@ public class SchedulerCore {
    */
   public synchronized void killTasks(final TaskQuery query) {
     Preconditions.checkNotNull(query);
-
-    // First remove all pending tasks matching the query.
-    TaskQuery pendingQuery = new TaskQuery(query);
-    pendingQuery.addToStatuses(ScheduleStatus.PENDING);
-    tasks.removeAll(Lists.newArrayList(getTasks(pendingQuery)));
+    LOG.info("Killing tasks matching " + query);
 
     // If this looks like a query for all tasks in a job, instruct the scheduler modules to delete
     // the job.
@@ -285,13 +313,13 @@ public class SchedulerCore {
       }
     }
 
-    LOG.info("Killing tasks matching " + query);
-
     for (final TrackedTask task : getTasks(query)) {
       if (!task.isSetTaskId()) {
         // TODO(wfarner): These tasks should be removed from the tasks data structure.
         LOG.severe("Attempted to kill a task that does not yet have a task id");
-      } else {
+      } else if (task.getStatus() == ScheduleStatus.PENDING) {
+        removeWithDelay(task.setStatus(ScheduleStatus.KILLED));
+      } else if (task.getStatus() != ScheduleStatus.KILLED) {
         doWorkWithDriver(new Function<SchedulerDriver, Integer>() {
           @Override public Integer apply(SchedulerDriver driver) {
             return driver.killTask(task.getTaskId());
@@ -311,9 +339,9 @@ public class SchedulerCore {
    */
   private void doWorkWithDriver(final Function<SchedulerDriver, Integer> work) {
     workQueue.doWork(new Callable<Boolean>() {
-      @Override public Boolean call() throws Exception {
+      @Override public Boolean call() {
         if (frameworkId.get() == -1) {
-          LOG.info("Unable to restart tasks, framework not registered.");
+          LOG.info("Unable to send framework messages, framework not registered.");
           return false;
         }
 

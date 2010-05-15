@@ -1,5 +1,6 @@
 package com.twitter.nexus.scheduler;
 
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.inject.Inject;
@@ -81,8 +82,21 @@ class SchedulerThriftInterface extends ThriftServer implements NexusSchedulerMan
   @Override
   public KillResponse killTasks(TaskQuery query) throws TException {
     LOG.info("Received kill request for tasks: " + query);
-    schedulerCore.killTasks(query);
-    return new KillResponse().setResponseCode(ResponseCode.OK);
+    KillResponse response = new KillResponse();
+
+    Iterable<TrackedTask> tasks = schedulerCore.getTasks(query);
+
+    if (Iterables.isEmpty(tasks)) {
+      response.setResponseCode(ResponseCode.INVALID_REQUEST)
+          .setMessage("No matching tasks found.");
+    } else {
+      schedulerCore.killTasks(query);
+      response.setResponseCode(ResponseCode.OK)
+          .setMessage(String.format("%d tasks will be killed.", Iterables.size(tasks)));
+
+    }
+
+    return response;
   }
 
   @Override
