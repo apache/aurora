@@ -1,5 +1,6 @@
 package com.twitter.nexus.scheduler;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
@@ -97,7 +98,7 @@ public class SchedulerCore {
    * @param frameworkId Framework ID.
    */
   public void registered(SchedulerDriver driver, int frameworkId) {
-    this.schedulerDriver.set(driver);
+    this.schedulerDriver.set(Preconditions.checkNotNull(driver));
     this.frameworkId.set(frameworkId);
   }
 
@@ -120,7 +121,8 @@ public class SchedulerCore {
    * @return {@code true} if the scheduler has a job for the given owner and job name,
    *    {@code false} otherwise.
    */
-  private synchronized boolean hasActiveJob(final String owner, final String jobName) {
+  @VisibleForTesting
+  synchronized boolean hasActiveJob(final String owner, final String jobName) {
     TaskQuery query = new TaskQuery().setOwner(owner).setJobName(jobName);
     for (ScheduleStatus status : ScheduleStatus.values()) {
       if (status != ScheduleStatus.KILLED) query.addToStatuses(status);
@@ -258,6 +260,9 @@ public class SchedulerCore {
         ScheduleStatus.LOST,
         ScheduleStatus.NOT_FOUND));
     Iterable<TrackedTask> completedTasks = getTasks(completedQuery);
+
+    // TODO(wfarner): Add task failure tracking to TaskQuery and allow the configuration to
+    // specify the number of per-task failures before giving up.
     Predicate<TrackedTask> daemonTaskFinder = new Predicate<TrackedTask>() {
       @Override public boolean apply(TrackedTask task) {
         return task.getTask().isIsDaemon();
@@ -266,6 +271,8 @@ public class SchedulerCore {
 
     // Non-daemon tasks are finished and may be removed.
     for (TrackedTask task : Iterables.filter(completedTasks, Predicates.not(daemonTaskFinder))) {
+      // TODO(wfarner): May want to consider allowing the executor to handle this by retaining
+      // tasks for a period (forcibly removing them if the disk they consume is needed).
       removeWithDelay(task);
     }
 
@@ -314,10 +321,7 @@ public class SchedulerCore {
     }
 
     for (final TrackedTask task : getTasks(query)) {
-      if (!task.isSetTaskId()) {
-        // TODO(wfarner): These tasks should be removed from the tasks data structure.
-        LOG.severe("Attempted to kill a task that does not yet have a task id");
-      } else if (task.getStatus() == ScheduleStatus.PENDING) {
+      if (task.getStatus() == ScheduleStatus.PENDING) {
         removeWithDelay(task.setStatus(ScheduleStatus.KILLED));
       } else if (task.getStatus() != ScheduleStatus.KILLED) {
         doWorkWithDriver(new Function<SchedulerDriver, Integer>() {
