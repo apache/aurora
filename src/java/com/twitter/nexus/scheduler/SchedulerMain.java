@@ -1,5 +1,6 @@
 package com.twitter.nexus.scheduler;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
 import com.google.inject.Module;
@@ -15,6 +16,7 @@ import nexus.NexusSchedulerDriver;
 import org.apache.thrift.TException;
 import org.apache.thrift.transport.TTransportException;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.List;
@@ -32,9 +34,6 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
             usage = "Path to the executorHub launch script.")
     String executorPath;
 
-    @Option(name = "master_address", required = true, usage = "Nexus address for the master node.")
-    String masterAddress;
-
     @Option(name = "zk_endpoints", required = true,
             usage = "Endpoint specification for the ZooKeeper servers.")
     List<InetSocketAddress> zooKeeperEndpoints;
@@ -43,9 +42,29 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
             usage = "The ZooKeeper session timeout in seconds.")
     int zooKeeperSessionTimeoutSecs = 5;
 
+    @Option(name = "nexus_master_ns",
+            usage = "The name service name for the nexus master.")
+    String nexusMasterNameSpec;
+
     @Option(name = "nexus_scheduler_ns", required = true,
             usage = "The name service name for the nexus scheduler thrift server.")
     String nexusSchedulerNameSpec;
+
+    @Option(name = "nexus_master_address",
+            usage = "Nexus address for the master, overrides nexus_master_ns.")
+    String nexusMasterAddress;
+
+    @Option(name = "scheduler_persistence_zookeeper_path",
+            usage = "Path in ZooKeeper that scheduler will persist to/from (overrides local).")
+    String schedulerPersistenceZooKeeperPath;
+
+    @Option(name = "scheduler_persistence_zookeeper_version",
+            usage = "Version for scheduler persistence node in ZooKeeper.")
+    int schedulerPersistenceZooKeeperVersion = 1;
+
+    @Option(name = "scheduler_persistence_local_path",
+            usage = "Local file path that scheduler will persist to/from.")
+    File schedulerPersistenceLocalPath = new File("/tmp/nexus_scheduler_dump");
   }
 
   private static Logger LOG = Logger.getLogger(SchedulerMain.class.getName());
@@ -63,17 +82,41 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
   @Inject
   private ServerSet nexusSchedulerServerSet;
 
+  @Inject
+  private NexusSchedulerDriver driver;
+
   @Override
   protected Iterable<Class<? extends Module>> getProcessModuleClasses() {
     return ImmutableList.<Class<? extends Module>>of(SchedulerModule.class);
   }
 
   @Override
-  protected void runProcess() throws Exception {
-    NexusSchedulerDriver driver = new NexusSchedulerDriver(scheduler, getOptions().masterAddress);
+  protected void runProcess() {
+    Preconditions.checkNotNull(driver);
     driver.start();
-    ServerSet.EndpointStatus endpointStatus = startThriftServer();
-    endpointStatus.update(Status.ALIVE);
+
+    ServerSet.EndpointStatus endpointStatus = null;
+    try {
+      endpointStatus = startThriftServer();
+    } catch (IOException e) {
+      LOG.log(Level.SEVERE, "Failed to start thrift server.", e);
+    } catch (TTransportException e) {
+      LOG.log(Level.SEVERE, "Failed to start thrift server.", e);
+    } catch (Group.JoinException e) {
+      LOG.log(Level.SEVERE, "Failed to join nexus scheduler server set in ZooKeeper.", e);
+    } catch (InterruptedException e) {
+      LOG.log(Level.SEVERE, "Interrupted while starting thrift server.", e);
+    }
+
+    if (endpointStatus == null) return;
+    try {
+      endpointStatus.update(Status.ALIVE);
+    } catch (ServerSet.UpdateException e) {
+      LOG.log(Level.SEVERE, "Failed to update server status in ZooKeeper.", e);
+    } catch (InterruptedException e) {
+      LOG.log(Level.SEVERE, "Interrupted while updating server status in ZooKeeper.", e);
+    }
+
     waitForEver();
   }
 
@@ -96,6 +139,9 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
         }
       }
     });
+
+    LOG.info("Registering host in server set " + getOptions().nexusSchedulerNameSpec
+             + " as listeningon port " + schedulerThriftInterface.getListeningPort());
     return joinServerSet(nexusSchedulerServerSet, schedulerThriftInterface.getListeningPort(),
         Status.STARTING);
   }

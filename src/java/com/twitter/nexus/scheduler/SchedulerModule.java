@@ -9,13 +9,21 @@ import com.google.inject.Singleton;
 import com.twitter.common.process.GuicedProcess;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.common.zookeeper.Candidate;
+import com.twitter.common.zookeeper.Group;
 import com.twitter.common.zookeeper.ServerSet;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.nexus.scheduler.httphandlers.SchedulerzHome;
 import com.twitter.nexus.scheduler.httphandlers.SchedulerzJob;
 import com.twitter.nexus.scheduler.httphandlers.SchedulerzUser;
+import com.twitter.nexus.scheduler.persistence.FileSystemPersistence;
+import com.twitter.nexus.scheduler.persistence.PersistenceLayer;
+import com.twitter.nexus.scheduler.persistence.ZooKeeperPersistence;
+import nexus.NexusSchedulerDriver;
+import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooDefs;
 
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class SchedulerModule extends AbstractModule {
@@ -55,5 +63,41 @@ public class SchedulerModule extends AbstractModule {
   @Singleton
   final ServerSet provideSchedulerServerSet(ZooKeeperClient zkClient) {
     return new ServerSet(zkClient, ZooDefs.Ids.OPEN_ACL_UNSAFE, options.nexusSchedulerNameSpec);
+  }
+
+  @Provides
+  final PersistenceLayer providePersistenceLayer() {
+    if (options.schedulerPersistenceZooKeeperPath == null) {
+      return new FileSystemPersistence(options.schedulerPersistenceLocalPath);
+    } else {
+      return new ZooKeeperPersistence(options.schedulerPersistenceZooKeeperPath,
+          options.schedulerPersistenceZooKeeperVersion);
+    }
+  }
+
+  @Provides
+  @Singleton
+  final NexusSchedulerDriver provideNexusSchedulerDriver(NexusSchedulerImpl scheduler,
+      ZooKeeperClient zkClient) {
+    String nexusMaster = options.nexusMasterAddress;
+    if (nexusMaster == null) {
+      Group nexusMasterGroup =
+          new Group(zkClient, ZooDefs.Ids.OPEN_ACL_UNSAFE, options.nexusMasterNameSpec);
+
+      try {
+        nexusMaster = new Candidate(nexusMasterGroup).getLeaderId();
+      } catch (ZooKeeperClient.ZooKeeperConnectionException e) {
+        LOG.log(Level.SEVERE, "Failed to connect to zookeeper", e);
+        return null;
+      } catch (KeeperException e) {
+        LOG.log(Level.SEVERE, "ZooKeeper exception.", e);
+        return null;
+      } catch (InterruptedException e) {
+        LOG.log(Level.SEVERE, "Interrupted while fetching nexus master address from ZooKeeper.", e);
+        return null;
+      }
+    }
+
+    return new NexusSchedulerDriver(scheduler, nexusMaster);
   }
 }

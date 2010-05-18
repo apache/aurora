@@ -35,7 +35,7 @@ class SchedulerThriftInterface extends ThriftServer implements NexusSchedulerMan
 
     for (TwitterTaskInfo config : job.getTaskConfigs()) {
       try {
-        ConfigurationManager.populateFields(config);
+        ConfigurationManager.populateFields(job, config);
       } catch (ConfigurationManager.TaskDescriptionException e) {
         return new CreateJobResponse()
             .setResponseCode(ResponseCode.INVALID_REQUEST)

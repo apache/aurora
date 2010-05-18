@@ -1,19 +1,13 @@
 package com.twitter.nexus.scheduler;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
-import com.twitter.common.base.Closure;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
+import com.twitter.nexus.gen.JobConfiguration;
 import com.twitter.nexus.gen.TwitterTaskInfo;
 import nexus.SlaveOffer;
 import nexus.StringMap;
 
-import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Callable;
 import java.util.logging.Logger;
 
 /**
@@ -31,7 +25,7 @@ public class ConfigurationManager {
   private static final long DEFAULT_DISK_BYTES = Amount.of(1, Data.GB).as(Data.BYTES);
   private static final int DEFAULT_PRIORITY = 0;
 
-  public static TwitterTaskInfo populateFields(TwitterTaskInfo config)
+  public static TwitterTaskInfo populateFields(JobConfiguration job, TwitterTaskInfo config)
       throws TaskDescriptionException {
     if (config == null) throw new TaskDescriptionException("Task may not be null.");
 
@@ -40,6 +34,8 @@ public class ConfigurationManager {
 
     return config
         .setConfigParsed(true)
+        .setOwner(job.getOwner())
+        .setJobName(job.getName())
         .setHdfsPath(getValue(configMap, "hdfs_path", String.class))
         .setCmdLineArgs(getValue(configMap, "cmd_line_args", "", String.class))
         .setIsDaemon(getValue(configMap, "daemon", DEFAULT_TO_DAEMON, Boolean.class))

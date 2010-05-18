@@ -10,6 +10,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import com.twitter.common.base.Closure;
+import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.nexus.gen.JobConfiguration;
 import com.twitter.nexus.gen.TaskQuery;
 import com.twitter.nexus.gen.TwitterTaskInfo;
@@ -66,6 +67,9 @@ public class SchedulerCore {
   // Work queue that stores pending asynchronous tasks.
   @Inject
   private WorkQueue workQueue;
+
+  @Inject
+  private ZooKeeperClient zkClient;
 
   // Amount of time to wait before discarding record of a lost/failed task.
   private static final int TASK_REMOVE_DELAY_MINS = 1;
@@ -380,6 +384,10 @@ public class SchedulerCore {
         });
       }
     }
+  }
+
+  private void pushToZooKeeper() {
+
   }
 
   /**
