@@ -22,6 +22,12 @@ public class SchedulerModule extends AbstractModule {
   private final static Logger LOG = Logger.getLogger(SchedulerModule.class.getName());
   private SchedulerMain.TwitterSchedulerOptions options;
 
+  /**
+   * {@literal @Named} binding key for the puffin service backend.
+   */
+  static final String NEXUS_MASTER_SERVER_SET =
+      "com.twitter.nexus.scheduler.SchedulerModule.NEXUS_MASTER_SERVER_SET";
+
   @Inject
   public SchedulerModule(SchedulerMain.TwitterSchedulerOptions options) {
     this.options = Preconditions.checkNotNull(options);

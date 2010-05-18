@@ -72,7 +72,8 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
   protected void runProcess() throws Exception {
     NexusSchedulerDriver driver = new NexusSchedulerDriver(scheduler, getOptions().masterAddress);
     driver.start();
-    startThriftServer();
+    ServerSet.EndpointStatus endpointStatus = startThriftServer();
+    endpointStatus.update(Status.ALIVE);
     waitForEver();
   }
 
