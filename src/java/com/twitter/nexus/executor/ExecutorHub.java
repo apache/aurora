@@ -31,7 +31,6 @@ public class ExecutorHub extends Executor {
     LOG.info(String.format("Running task %s with ID %d.", task.getName(), task.getTaskId()));
 
     TwitterTaskInfo taskInfo = new TwitterTaskInfo();
-
     try {
       deserializer.deserialize(taskInfo, task.getArg());
     } catch (TException e) {

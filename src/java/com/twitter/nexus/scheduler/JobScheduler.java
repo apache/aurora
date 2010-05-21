@@ -1,8 +1,12 @@
 package com.twitter.nexus.scheduler;
 
 import com.google.common.base.Preconditions;
+import com.twitter.common.Pair;
 import com.twitter.common.base.Closure;
 import com.twitter.nexus.gen.JobConfiguration;
+
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * Interface for a job scheduler module.  A job scheduler is responsible for deciding whether to
@@ -28,6 +32,15 @@ public abstract class JobScheduler {
    * @throws ScheduleException If there is a problem with scheduling the job.
    */
   public abstract boolean receiveJob(JobConfiguration job) throws ScheduleException;
+
+  /**
+   * Fetches the configured jobs that this scheduler is storing.
+   *
+   * @return Jobs stored by this job scheduler.
+   */
+  public Iterable<JobConfiguration> getState() {
+    return Arrays.asList();
+  }
 
   /**
    * Checks whether this scheduler is storing a job owned by {@code owner} with the name

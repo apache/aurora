@@ -10,7 +10,9 @@ import it.sauronsoftware.cron4j.InvalidPatternException;
 import it.sauronsoftware.cron4j.Scheduler;
 import org.apache.commons.lang.StringUtils;
 
+import javax.annotation.Nullable;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
@@ -29,7 +31,7 @@ public class CronJobScheduler extends JobScheduler {
   // Cron manager.
   private final Scheduler scheduler = new Scheduler();
 
-  // Maps from the our uniqe job identifier (<owner>/<jobName>) to the unique identifier used
+  // Maps from the our unique job identifier (<owner>/<jobName>) to the unique identifier used
   // internally by the cron4j scheduler.
   private final Map<String, Pair<String, JobConfiguration>> scheduledJobs = Maps.newHashMap();
 
@@ -60,6 +62,16 @@ public class CronJobScheduler extends JobScheduler {
     }
 
     return true;
+  }
+
+  @Override
+  public Iterable<JobConfiguration> getState() {
+    return Iterables.transform(scheduledJobs.values(),
+        new Function<Pair<String, JobConfiguration>, JobConfiguration>() {
+      @Override public JobConfiguration apply(Pair<String, JobConfiguration> configPair) {
+        return configPair.getSecond();
+      }
+    });
   }
 
   @Override

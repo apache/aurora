@@ -1,6 +1,9 @@
 package com.twitter.nexus.scheduler;
 
 import com.google.common.collect.Iterables;
+import com.google.inject.AbstractModule;
+import com.google.inject.Guice;
+import com.google.inject.Provides;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.nexus.gen.JobConfiguration;
@@ -12,6 +15,8 @@ import com.twitter.nexus.scheduler.CronJobScheduler;
 import com.twitter.nexus.scheduler.ImmediateJobScheduler;
 import com.twitter.nexus.scheduler.ScheduleException;
 import com.twitter.nexus.scheduler.SchedulerCore;
+import com.twitter.nexus.scheduler.persistence.NoPersistence;
+import com.twitter.nexus.scheduler.persistence.PersistenceLayer;
 import nexus.SlaveOffer;
 import nexus.StringMap;
 import nexus.TaskDescription;
@@ -31,7 +36,6 @@ import static org.junit.Assert.fail;
  * @author wfarner
  */
 public class SchedulerCoreTest {
-
   private SchedulerCore scheduler;
 
   private static final String JOB_NAME = "Test_Job";
@@ -43,7 +47,8 @@ public class SchedulerCoreTest {
 
   @Before
   public void setUp() {
-    scheduler = new SchedulerCore(new CronJobScheduler(), new ImmediateJobScheduler());
+    scheduler = new SchedulerCore(new CronJobScheduler(), new ImmediateJobScheduler(),
+        new NoPersistence());
   }
 
   @Test

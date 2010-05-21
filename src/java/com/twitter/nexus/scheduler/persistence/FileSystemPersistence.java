@@ -35,8 +35,18 @@ public class FileSystemPersistence implements PersistenceLayer {
 
   @Override
   public void commit(byte[] data) throws PersistenceException {
+    if (!file.exists()) {
+      File parent = file.getParentFile();
+      if (!parent.exists() && !parent.mkdirs()) {
+        throw new PersistenceException("Failed to create persistence directory: "
+                                       + file.getParentFile().getAbsolutePath());
+      }
+    }
     try {
-      Files.write(data, file);
+      File tempFile = new File(file.getAbsolutePath() + ".tmp");
+      Files.write(data, tempFile);
+      Files.move(tempFile, file);
+      tempFile.delete();
     } catch (IOException e) {
       logAndThrow("Failed to write to file " + file.getAbsolutePath(), e);
     }

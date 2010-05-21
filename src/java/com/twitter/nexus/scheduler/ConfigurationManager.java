@@ -6,6 +6,7 @@ import com.twitter.nexus.gen.JobConfiguration;
 import com.twitter.nexus.gen.TwitterTaskInfo;
 import nexus.SlaveOffer;
 import nexus.StringMap;
+import org.apache.commons.lang.StringUtils;
 
 import java.util.Map;
 import java.util.logging.Logger;
@@ -32,7 +33,7 @@ public class ConfigurationManager {
     Map<String, String> configMap =  config.getConfiguration();
     if (configMap == null) throw new TaskDescriptionException("Task configuration may not be null");
 
-    return config
+    config
         .setConfigParsed(true)
         .setOwner(job.getOwner())
         .setJobName(job.getName())
@@ -43,10 +44,16 @@ public class ConfigurationManager {
         .setRamBytes(getValue(configMap, "ram_bytes", DEFAULT_RAM_BYTES, Long.class))
         .setDiskBytes(getValue(configMap, "disk_bytes", DEFAULT_DISK_BYTES, Long.class))
         .setPriority(getValue(configMap, "priority", DEFAULT_PRIORITY, Integer.class));
+
+    // Only one of [daemon=true, cron_schedule] may be set.
+    if (!StringUtils.isEmpty(job.getCronSchedule()) && config.isIsDaemon()) {
+      throw new TaskDescriptionException("A daemon task may not be run on a cron schedule.");
+    }
+
+    return config;
   }
 
-  public static TwitterTaskInfo makeConcrete(SlaveOffer offer)
-      throws TaskDescriptionException {
+  public static TwitterTaskInfo makeConcrete(SlaveOffer offer) throws TaskDescriptionException {
     if (offer== null) throw new TaskDescriptionException("Task may not be null.");
 
     StringMap params = offer.getParams();

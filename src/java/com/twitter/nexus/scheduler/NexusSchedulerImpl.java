@@ -63,12 +63,18 @@ class NexusSchedulerImpl extends Scheduler {
   public void resourceOffer(SchedulerDriver driver, long offerId, SlaveOfferVector offers) {
     TaskDescriptionVector newlyScheduledTasks = new TaskDescriptionVector();
 
-    for (int i = 0; i < offers.size(); i++) {
-      nexus.TaskDescription taskToSchedule = schedulerCore.offer(offers.get(i));
-      if (taskToSchedule != null) {
-        newlyScheduledTasks.add(taskToSchedule);
+    try {
+      for (int i = 0; i < offers.size(); i++) {
+        nexus.TaskDescription taskToSchedule = schedulerCore.offer(offers.get(i));
+        if (taskToSchedule != null) {
+          newlyScheduledTasks.add(taskToSchedule);
+        }
       }
+    } catch (ScheduleException e) {
+      LOG.log(Level.SEVERE, "Failed to schedule offer.", e);
+      return;
     }
+
     driver.replyToOffer(offerId, newlyScheduledTasks, new StringMap());
   }
 

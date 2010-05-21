@@ -4,15 +4,10 @@ import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.io.Files;
-import com.google.inject.AbstractModule;
-import com.google.inject.Guice;
-import com.google.inject.Provides;
 import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.common.io.FileUtils;
 import com.twitter.nexus.gen.TwitterTaskInfo;
 import nexus.TaskState;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -47,10 +42,7 @@ public class RunningTaskTest {
   @Before
   public void setUp() throws Exception {
     executorRoot = FileUtils.createTempDir();
-    System.out.println("Executor root: " + executorRoot.getAbsolutePath());
-
-    taskA = new RunningTask(executorRoot, TASK_ID_A, TASK_A);
-    Guice.createInjector(new TestModule()).injectMembers(taskA);
+    taskA = new RunningTask(executorRoot, TASK_ID_A, TASK_A, FILE_COPIER);
   }
 
   @After
@@ -62,9 +54,9 @@ public class RunningTaskTest {
   public void testStage() throws Exception {
     TASK_A.setStartCommand("touch a.txt");
     taskA.stage();
-    assertDirContents(executorRoot, "OWNER_A");
-    assertDirContents(new File(executorRoot, "OWNER_A"), "JOB_A");
-    assertDirContents(new File(executorRoot, "OWNER_A/JOB_A"), "1");
+    assertDirContents(executorRoot, TASK_A.getOwner());
+    assertDirContents(new File(executorRoot, TASK_A.getOwner()), TASK_A.getJobName());
+    assertThat(taskA.taskRoot.getParentFile().list().length, is(1));
   }
 
   @Test
@@ -73,8 +65,7 @@ public class RunningTaskTest {
     taskA.stage();
     taskA.launch();
     assertThat(taskA.waitFor(), is(TaskState.TASK_FINISHED));
-    assertDirContents(new File(executorRoot, "OWNER_A/JOB_A/1"),
-        "a.txt", "stderr", "stdout", "pidfile");
+    assertDirContents(taskA.taskRoot, "a.txt", "stderr", "stdout", "pidfile");
   }
 
   @Test
@@ -83,10 +74,9 @@ public class RunningTaskTest {
     taskA.stage();
     taskA.launch();
     assertThat(taskA.waitFor(), is(TaskState.TASK_FINISHED));
-    File jobDir = new File(executorRoot, "OWNER_A/JOB_A/1");
-    assertDirContents(jobDir, "stderr", "stdout", "pidfile");
+    assertDirContents(taskA.taskRoot, "stderr", "stdout", "pidfile");
 
-    assertThat(Files.readLines(new File(jobDir, "stdout"), Charsets.UTF_8),
+    assertThat(Files.readLines(new File(taskA.taskRoot, "stdout"), Charsets.UTF_8),
         is(Arrays.asList("hello world")));
   }
 
@@ -141,22 +131,10 @@ public class RunningTaskTest {
     assertThat(Sets.newHashSet(dir.list()), is(Sets.newHashSet(children)));
   }
 
-  private class TestModule extends AbstractModule {
-    @Override protected void configure() {
-      // Nothing to do here.
-    }
-
-    @Provides public FileSystem provideFileSystem() throws IOException {
-      return FileSystem.get(new Configuration());
-    }
-
-    @Provides public ExceptionalFunction<FileCopyRequest, File, IOException> provideFileCopier(
-        final FileSystem fileSystem) {
-      return new ExceptionalFunction<FileCopyRequest, File, IOException>() {
+  private static final ExceptionalFunction<FileCopyRequest, File, IOException> FILE_COPIER =
+      new ExceptionalFunction<FileCopyRequest, File, IOException>() {
         @Override public File apply(FileCopyRequest copy) throws IOException {
           return new File(copy.getDestPath());
         }
       };
-    }
-  }
 }

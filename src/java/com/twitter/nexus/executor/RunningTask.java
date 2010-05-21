@@ -1,5 +1,6 @@
 package com.twitter.nexus.executor;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
 import com.twitter.common.base.ExceptionalFunction;
@@ -25,44 +26,52 @@ public class RunningTask {
   private final File executorRoot;
   private final int taskId;
   private final TwitterTaskInfo task;
-  private final File taskRoot;
+
+  @VisibleForTesting
+  final File taskRoot;
+
   private Process process;
 
   private boolean running = false;
   private int exitCode = 0;
 
-  @Inject
-  private ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier;
+  private final ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier;
 
-  public RunningTask(File executorRoot, int taskId, TwitterTaskInfo task) {
+  public RunningTask(File executorRoot, int taskId, TwitterTaskInfo task,
+      ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier) {
     Preconditions.checkNotNull(executorRoot);
     Preconditions.checkState(executorRoot.exists() && executorRoot.isDirectory());
     this.executorRoot = executorRoot;
     this.taskId = taskId;
     this.task = Preconditions.checkNotNull(task);
-    taskRoot = new File(executorRoot,
-        String.format("%s/%s/%d", task.getOwner(), task.getJobName(), taskId));
+    taskRoot = new File(executorRoot, String.format(
+        "%s/%s/%d-%d", task.getOwner(), task.getJobName(), taskId, System.nanoTime()));
+    this.fileCopier = Preconditions.checkNotNull(fileCopier);
   }
 
   /**
    * Performs staging operations necessary to launch a task.
    * This will prepare the working directory for the task, and download the binary to run.
    *
-   * @throws com.twitter.nexus.executor.RunningTask.ProcessException If there was an error that caused staging to fail.
+   * @throws RunningTask.ProcessException If there was an error that caused staging to fail.
    */
   public void stage() throws ProcessException {
     LOG.info(String.format("Staging task for job %s/%s", task.getOwner(), task.getJobName()));
     Preconditions.checkState(!taskRoot.exists());
 
+    LOG.info("Building task directory hierarchy.");
     if (!taskRoot.mkdirs()) {
       throw new ProcessException(
           "Failed to create working directory: " + taskRoot.getAbsolutePath());
     }
 
-    // Pull down the executable.
+    LOG.info("Fetching payload.");
     File payload;
+    // TODO(wfarner): Remove this check when guice stuff is figured out.
+    LOG.info("File copier: " + fileCopier);
     try {
-      payload = fileCopier.apply(new FileCopyRequest(task.getHdfsPath(), taskRoot.getAbsolutePath()));
+      payload = fileCopier.apply(
+          new FileCopyRequest(task.getHdfsPath(), taskRoot.getAbsolutePath()));
     } catch (IOException e) {
       throw new ProcessException("Failed to fetch task binary.", e);
     }

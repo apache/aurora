@@ -5,6 +5,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
+import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.nexus.gen.TwitterTaskInfo;
 import nexus.ExecutorDriver;
 import nexus.TaskDescription;
@@ -13,6 +14,7 @@ import nexus.TaskStatus;
 import org.apache.hadoop.fs.FileSystem;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -40,7 +42,7 @@ public class ExecutorCore {
       new ThreadFactoryBuilder().setDaemon(true).setNameFormat("NexusExecutor-[%d]").build());
 
   @Inject
-  private FileSystem hadoopFileSystem;
+  private ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier;
 
   @Inject
   private ExecutorCore(ExecutorMain.TwitterExecutorOptions options) {
@@ -55,7 +57,8 @@ public class ExecutorCore {
   public void executePendingTask(final ExecutorDriver driver, final TwitterTaskInfo taskInfo,
                                  final TaskDescription task) {
     LOG.info("Received task for execution: " + taskInfo);
-    final RunningTask runningTask = new RunningTask(taskRootDir, task.getTaskId(), taskInfo);
+    final RunningTask runningTask = new RunningTask(
+        taskRootDir, task.getTaskId(), taskInfo, fileCopier);
 
     try {
       runningTask.stage();

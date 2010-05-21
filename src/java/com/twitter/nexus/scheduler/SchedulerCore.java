@@ -7,26 +7,32 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import com.twitter.common.base.Closure;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.nexus.gen.JobConfiguration;
+import com.twitter.nexus.gen.SchedulerState;
 import com.twitter.nexus.gen.TaskQuery;
 import com.twitter.nexus.gen.TwitterTaskInfo;
 import com.twitter.nexus.gen.ScheduleStatus;
 import com.twitter.nexus.gen.TrackedTask;
+import com.twitter.nexus.scheduler.persistence.PersistenceLayer;
 import nexus.FrameworkMessage;
 import nexus.SchedulerDriver;
 import nexus.SlaveOffer;
 import nexus.StringMap;
 import org.apache.commons.lang.StringUtils;
+import org.apache.thrift.TBase;
+import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
 
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -45,6 +51,13 @@ import java.util.logging.Logger;
  *
  * TODO(wfarner): Figure out how to handle permissions for modification of running tasks.  As it
  * stands it would be quite easy to accidentally modify something that does not belong to you.
+ *
+ * TODO(wfarner): Clean up persistence routine to ensure that persistence happens whenever state
+ * is modified.
+ *
+ * TODO(wfarner): Add support for machine drains via an administrator interface.  This would accept
+ * a machine host name (or slave ID) and a.) kill tasks running on the machine, b.) prevent tasks
+ * from being scheduled on the machine.
  *
  * @author wfarner
  */
@@ -71,6 +84,8 @@ public class SchedulerCore {
   @Inject
   private ZooKeeperClient zkClient;
 
+  private final PersistenceLayer persistenceLayer;
+
   // Amount of time to wait before discarding record of a lost/failed task.
   private static final int TASK_REMOVE_DELAY_MINS = 1;
 
@@ -79,7 +94,8 @@ public class SchedulerCore {
       new AtomicReference<SchedulerDriver>();
 
   @Inject
-  public SchedulerCore(CronJobScheduler cronScheduler, ImmediateJobScheduler immediateScheduler) {
+  public SchedulerCore(CronJobScheduler cronScheduler, ImmediateJobScheduler immediateScheduler,
+      PersistenceLayer persistenceLayer) {
     Closure<JobConfiguration> jobRunner = new Closure<JobConfiguration>() {
       @Override
       public void execute(JobConfiguration job) {
@@ -92,6 +108,11 @@ public class SchedulerCore {
     // placed first.
     jobSchedulers = Arrays.asList(cronScheduler.setJobRunner(jobRunner),
         immediateScheduler.setJobRunner(jobRunner));
+
+    this.persistenceLayer = Preconditions.checkNotNull(persistenceLayer);
+
+    // Attempt to recover from a persisted state.
+    restore();
   }
 
   /**
@@ -163,6 +184,7 @@ public class SchedulerCore {
       if (scheduler.receiveJob(job)) {
         accepted = true;
         LOG.info("Job accepted by scheduler: " + scheduler.getClass().getName());
+        persist();
         break;
       }
     }
@@ -184,6 +206,7 @@ public class SchedulerCore {
           .setTask(task)
           .setStatus(ScheduleStatus.PENDING));
     }
+    persist();
   }
 
   /**
@@ -194,7 +217,7 @@ public class SchedulerCore {
    * @return A task description that defines the task to run, or {@code null} if there are no
    *    pending tasks that are satisfied by the slave offer.
    */
-  public synchronized nexus.TaskDescription offer(SlaveOffer slaveOffer) {
+  public synchronized nexus.TaskDescription offer(SlaveOffer slaveOffer) throws ScheduleException {
     TwitterTaskInfo offer;
     try {
       offer = ConfigurationManager.makeConcrete(slaveOffer);
@@ -216,17 +239,16 @@ public class SchedulerCore {
 
         task.status = ScheduleStatus.STARTING;
         task.slaveId = slaveOffer.getSlaveId();
-        byte[] taskInBytes = null;
+        byte[] taskInBytes;
         try {
-          taskInBytes = new TSerializer().serialize(taskInfo);
-        } catch (TException e) {
-           LOG.log(Level.SEVERE,"Error serializing Thrift TwitterTaskInfo",e);
-          //todo(flo):maybe cleanup and exit cleanly
-          throw new RuntimeException(e);
+          taskInBytes = serialize(taskInfo);
+        } catch (SerializationException e) {
+          LOG.log(Level.SEVERE, "Unable to serialize task.", e);
+          throw new ScheduleException("Internal error.", e);
         }
 
-        LOG.info(String.format("Offer on slave %d is being assigned task for %s/%s.",
-            task.slaveId, task.getOwner(), task.getJobName()));
+        LOG.info(String.format("Offer on slave %s (id %d) is being assigned task for %s/%s.",
+            slaveOffer.getHost(), task.slaveId, task.getOwner(), task.getJobName()));
 
         return new nexus.TaskDescription(task.getTaskId(), slaveOffer.getSlaveId(),
                 task.jobName + "-" + task.getTaskId(), params, taskInBytes);
@@ -275,9 +297,7 @@ public class SchedulerCore {
 
     // Non-daemon tasks are finished and may be removed.
     for (TrackedTask task : Iterables.filter(completedTasks, Predicates.not(daemonTaskFinder))) {
-      // TODO(wfarner): May want to consider allowing the executor to handle this by retaining
-      // tasks for a period (forcibly removing them if the disk they consume is needed).
-      removeWithDelay(task);
+      removeTask(task);
     }
 
     // Daemon tasks should be rescheduled.
@@ -288,6 +308,8 @@ public class SchedulerCore {
       task.setSlaveIdIsSet(false);
       task.setSlaveId(-1);
     }
+
+    persist();
   }
 
   /**
@@ -295,15 +317,10 @@ public class SchedulerCore {
    *
    * @param task Task that are to be removed.
    */
-  private void removeWithDelay(final TrackedTask task) {
-    LOG.info("Will be removing task: " + task);
-    workQueue.scheduleWork(new Callable<Boolean>() {
-      @Override public Boolean call() {
-        LOG.info("Removing completed task: " + task);
-        tasks.removeAll(Arrays.asList(task));
-        return true;
-      }
-    }, TASK_REMOVE_DELAY_MINS, TimeUnit.MINUTES);
+  private void removeTask(final TrackedTask task) {
+    LOG.info("Removing completed task: " + task);
+    tasks.removeAll(Arrays.asList(task));
+    persist();
   }
 
   /**
@@ -326,7 +343,7 @@ public class SchedulerCore {
 
     for (final TrackedTask task : getTasks(query)) {
       if (task.getStatus() == ScheduleStatus.PENDING) {
-        removeWithDelay(task.setStatus(ScheduleStatus.KILLED));
+        removeTask(task.setStatus(ScheduleStatus.KILLED));
       } else if (task.getStatus() != ScheduleStatus.KILLED) {
         doWorkWithDriver(new Function<SchedulerDriver, Integer>() {
           @Override public Integer apply(SchedulerDriver driver) {
@@ -386,10 +403,6 @@ public class SchedulerCore {
     }
   }
 
-  private void pushToZooKeeper() {
-
-  }
-
   /**
    * Returns a predicate that will match tasks against the given {@code query}.
    *
@@ -414,5 +427,86 @@ public class SchedulerCore {
             && matches(query.getStatuses(), task.getStatus());
       }
     };
+  }
+
+  private void persist() {
+    // TODO(wfarner): Harden this - need to be careful for if/when scheduler dies while partially
+    // finished persisting.
+    SchedulerState state = new SchedulerState();
+    state.setConfiguredTasks(tasks);
+    Map<String, List<JobConfiguration>> moduleState = Maps.newHashMap();
+    for (JobScheduler scheduler : jobSchedulers) {
+      moduleState.put(scheduler.getClass().getCanonicalName(),
+          Lists.newArrayList(scheduler.getState()));
+    }
+    state.setModuleJobs(moduleState);
+
+    try {
+      persistenceLayer.commit(serialize(state));
+    } catch (SerializationException e) {
+      LOG.log(Level.SEVERE, "Failed to serialize scheduler state, unable to persist!", e);
+    } catch (PersistenceLayer.PersistenceException e) {
+      LOG.log(Level.SEVERE, "Failed to persist scheduler state.", e);
+    }
+  }
+
+  private void restore() {
+    SchedulerState state = new SchedulerState();
+    try {
+      byte[] data = persistenceLayer.fetch();
+      if (data == null) {
+        LOG.info("No persisted state found for restoration.");
+        return;
+      }
+
+      deserialize(state, data);
+    } catch (PersistenceLayer.PersistenceException e) {
+      LOG.log(Level.SEVERE, "Failed to fetch persisted state.", e);
+      return;
+    } catch (SerializationException e) {
+      LOG.log(Level.SEVERE, "Failed to deserialize persisted state.", e);
+      return;
+    }
+
+    tasks.addAll(state.getConfiguredTasks());
+    for (final Map.Entry<String, List<JobConfiguration>> entry : state.getModuleJobs().entrySet()) {
+      JobScheduler scheduler = Iterables.find(jobSchedulers, new Predicate<JobScheduler>() {
+        @Override public boolean apply(JobScheduler scheduler) {
+          return scheduler.getClass().getCanonicalName().equals(entry.getKey());
+        }
+      });
+
+      for (JobConfiguration job : entry.getValue()) {
+        try {
+          scheduler.receiveJob(job);
+        } catch (ScheduleException e) {
+          LOG.log(Level.SEVERE, "While trying to restore state, scheduler module failed.", e);
+        }
+      }
+    }
+  }
+
+  private byte[] serialize(TBase t) throws SerializationException {
+      try {
+        return new TSerializer().serialize(t);
+      } catch (TException e) {
+        throw new SerializationException("Failed to serialize: " + t, e);
+      }
+  }
+
+  private <T extends TBase> void deserialize(T t, byte[] data) throws SerializationException {
+    TwitterTaskInfo taskInfo = new TwitterTaskInfo();
+
+    try {
+      new TDeserializer().deserialize(t, data);
+    } catch (TException e) {
+      throw new SerializationException("Failed to deserialize thrift object.", e);
+    }
+  }
+
+  private class SerializationException extends Exception {
+    public SerializationException(String msg, Throwable t) {
+      super(msg, t);
+    }
   }
 }

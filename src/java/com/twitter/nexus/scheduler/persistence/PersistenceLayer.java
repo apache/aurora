@@ -14,5 +14,9 @@ public interface PersistenceLayer {
     public PersistenceException(String msg, Throwable t) {
       super(msg, t);
     }
+
+    public PersistenceException(String msg) {
+      super(msg);
+    }
   }
 }
