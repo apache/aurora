@@ -118,7 +118,7 @@ public class SchedulerCore {
   }
 
   /**
-   * Checks whether the scheduler has an job matching the owner/jobName.
+   * Checks whether the scheduler has a job matching the owner/jobName.
    *
    * @param owner The owner to look up.
    * @param jobName The job name to look up.
@@ -248,7 +248,7 @@ public class SchedulerCore {
   public synchronized void setTaskStatus(TaskQuery query, ScheduleStatus status) {
     Preconditions.checkNotNull(status);
     for (TrackedTask task : getTasks(query)) {
-      task.setStatus(status);
+      if (task.getStatus() != ScheduleStatus.KILLED) task.setStatus(status);
     }
 
     // TODO(wfarner): Should add a fixed time delay on removing the task from tracking, to

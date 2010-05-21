@@ -22,6 +22,7 @@ import com.twitter.nexus.scheduler.persistence.ZooKeeperPersistence;
 import nexus.NexusSchedulerDriver;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooDefs;
+import org.apache.zookeeper.data.Stat;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -81,23 +82,21 @@ public class SchedulerModule extends AbstractModule {
       ZooKeeperClient zkClient) {
     String nexusMaster = options.nexusMasterAddress;
     if (nexusMaster == null) {
-      Group nexusMasterGroup =
-          new Group(zkClient, ZooDefs.Ids.OPEN_ACL_UNSAFE, options.nexusMasterNameSpec);
-
       try {
-        nexusMaster = new Candidate(nexusMasterGroup).getLeaderId();
+        Stat stat = zkClient.get().exists(options.nexusMasterNameSpec, false);
+        nexusMaster = new String(zkClient.get().getData(options.nexusMasterNameSpec, false, stat));
       } catch (ZooKeeperClient.ZooKeeperConnectionException e) {
-        LOG.log(Level.SEVERE, "Failed to connect to zookeeper", e);
-        return null;
+        LOG.log(Level.SEVERE, "Failed to connect to ZooKeeper.", e);
       } catch (KeeperException e) {
-        LOG.log(Level.SEVERE, "ZooKeeper exception.", e);
-        return null;
+        LOG.log(Level.SEVERE, "Failed while reading from ZooKeeper.", e);
       } catch (InterruptedException e) {
-        LOG.log(Level.SEVERE, "Interrupted while fetching nexus master address from ZooKeeper.", e);
-        return null;
+        LOG.log(Level.SEVERE, "Interrupted while reading from ZooKeeper.", e);
       }
     }
 
+    if (nexusMaster == null) throw new RuntimeException("Unable to continue without nexus master.");
+
+    LOG.info("Connecting to nexus master: " + nexusMaster);
     return new NexusSchedulerDriver(scheduler, nexusMaster);
   }
 }

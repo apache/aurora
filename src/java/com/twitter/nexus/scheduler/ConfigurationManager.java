@@ -37,7 +37,7 @@ public class ConfigurationManager {
         .setOwner(job.getOwner())
         .setJobName(job.getName())
         .setHdfsPath(getValue(configMap, "hdfs_path", String.class))
-        .setCmdLineArgs(getValue(configMap, "cmd_line_args", "", String.class))
+        .setStartCommand(getValue(configMap, "start_command", "", String.class))
         .setIsDaemon(getValue(configMap, "daemon", DEFAULT_TO_DAEMON, Boolean.class))
         .setNumCpus(getValue(configMap, "num_cpus", DEFAULT_NUM_CPUS, Double.class))
         .setRamBytes(getValue(configMap, "ram_bytes", DEFAULT_RAM_BYTES, Long.class))

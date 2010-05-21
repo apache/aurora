@@ -1,6 +1,5 @@
 package com.twitter.nexus.executor;
 
-import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
 import com.twitter.nexus.gen.TwitterTaskInfo;
 import nexus.Executor;
@@ -23,27 +22,26 @@ public class ExecutorHub extends Executor {
   private static Logger LOG = Logger.getLogger(ExecutorHub.class.getName());
   private final TDeserializer deserializer = new TDeserializer();
   private final static byte[] EMPTY_BYTE_ARRAY = new byte[0];
-  private final ExecutorCore executorCore;
 
   @Inject
-  public ExecutorHub(ExecutorCore executorCore) {
-    this.executorCore = Preconditions.checkNotNull(executorCore);
-  }
+  private ExecutorCore executorCore;
 
   @Override
   public void launchTask(final ExecutorDriver driver, final TaskDescription task) {
-
-    LOG.info("Running task " + task.getName() + " with ID " + task.getTaskId());
+    LOG.info(String.format("Running task %s with ID %d.", task.getName(), task.getTaskId()));
 
     TwitterTaskInfo taskInfo = new TwitterTaskInfo();
 
     try {
       deserializer.deserialize(taskInfo, task.getArg());
-      executorCore.executePendingTask(driver, taskInfo, task);
     } catch (TException e) {
       LOG.log(Level.SEVERE, "Error deserializing Thrift TwitterTaskInfo", e);
-      driver.sendStatusUpdate(new TaskStatus(task.getTaskId(), TaskState.TASK_FAILED, EMPTY_BYTE_ARRAY));
+      driver.sendStatusUpdate(new TaskStatus(task.getTaskId(), TaskState.TASK_FAILED,
+          EMPTY_BYTE_ARRAY));
+      return;
     }
+
+    executorCore.executePendingTask(driver, taskInfo, task);
   }
 
   @Override
@@ -53,6 +51,7 @@ public class ExecutorHub extends Executor {
 
   @Override
   public void shutdown(ExecutorDriver driver) {
+    LOG.info("Received shutdown command, terminating...");
     executorCore.shutdownCore(driver);
   }
 
