@@ -86,7 +86,9 @@ public class RunningTask {
     List<String> commandLine = Arrays.asList(
         "bash",
         "-c",
-        String.format("echo $PPID > pidfile && %s >stdout 2>stderr", task.getStartCommand())
+        task.getStartCommand()
+        // TODO(wfarner): Re-enable after testing.
+        //String.format("echo $PPID > pidfile && %s >stdout 2>stderr", task.getStartCommand())
     );
 
     LOG.info("Executing shell command: " + commandLine);

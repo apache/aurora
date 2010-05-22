@@ -59,6 +59,8 @@ import java.util.logging.Logger;
  * a machine host name (or slave ID) and a.) kill tasks running on the machine, b.) prevent tasks
  * from being scheduled on the machine.
  *
+ * TODO(wfarner): Fix newly-introduced task killing bug (tasks do not disappear).
+ *
  * @author wfarner
  */
 public class SchedulerCore {
@@ -296,9 +298,7 @@ public class SchedulerCore {
     };
 
     // Non-daemon tasks are finished and may be removed.
-    for (TrackedTask task : Iterables.filter(completedTasks, Predicates.not(daemonTaskFinder))) {
-      removeTask(task);
-    }
+    removeTasks(Iterables.filter(completedTasks, Predicates.not(daemonTaskFinder)));
 
     // Daemon tasks should be rescheduled.
     for (TrackedTask task : Iterables.filter(completedTasks, daemonTaskFinder)) {
@@ -315,11 +315,11 @@ public class SchedulerCore {
   /**
    * Removes a task from tracking in the scheduler, after a fixed delay.
    *
-   * @param task Task that are to be removed.
+   * @param toRemove Tasks that are to be removed.
    */
-  private void removeTask(final TrackedTask task) {
-    LOG.info("Removing completed task: " + task);
-    tasks.removeAll(Arrays.asList(task));
+  private void removeTasks(Iterable<TrackedTask> toRemove) {
+    LOG.info("Removing completed tasks: " + toRemove);
+    tasks.removeAll(Lists.newArrayList(toRemove));
     persist();
   }
 
@@ -328,22 +328,31 @@ public class SchedulerCore {
    *
    * @param query The query to identify tasks
    */
-  public synchronized void killTasks(final TaskQuery query) {
+  public synchronized void killTasks(final TaskQuery query) throws ScheduleException {
     Preconditions.checkNotNull(query);
     LOG.info("Killing tasks matching " + query);
+
+    Iterable<TrackedTask> toKill = getTasks(query);
 
     // If this looks like a query for all tasks in a job, instruct the scheduler modules to delete
     // the job.
     if (!StringUtils.isEmpty(query.getOwner()) && !StringUtils.isEmpty(query.getJobName())
         && query.getTaskIdsSize() == 0) {
+      boolean matchingScheduler = false;
       for (JobScheduler scheduler : jobSchedulers) {
-        scheduler.deleteJob(query.getOwner(), query.getJobName());
+        if (scheduler.deleteJob(query.getOwner(), query.getJobName())) matchingScheduler = true;
       }
+
+      if (!matchingScheduler) throw new ScheduleException("No tasks matching query found.");
+
+    } else if (Iterables.isEmpty(toKill)) {
+      throw new ScheduleException("No tasks matching query found.");
     }
 
-    for (final TrackedTask task : getTasks(query)) {
+    List<TrackedTask> toRemove = Lists.newArrayList();
+    for (final TrackedTask task : toKill) {
       if (task.getStatus() == ScheduleStatus.PENDING) {
-        removeTask(task.setStatus(ScheduleStatus.KILLED));
+        toRemove.add(task);
       } else if (task.getStatus() != ScheduleStatus.KILLED) {
         doWorkWithDriver(new Function<SchedulerDriver, Integer>() {
           @Override public Integer apply(SchedulerDriver driver) {
@@ -352,6 +361,7 @@ public class SchedulerCore {
         });
       }
     }
+    removeTasks(toRemove);
   }
 
   /**

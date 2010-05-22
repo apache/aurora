@@ -57,6 +57,7 @@ class SchedulerThriftInterface extends ThriftServer implements NexusSchedulerMan
     return response;
   }
 
+  // TODO(wfarner): Provide status information about cron jobs here.
   @Override
   public ScheduleStatusResponse getTasksStatus(TaskQuery query) throws TException {
     List<TrackedTask> tasks = Lists.newArrayList(schedulerCore.getTasks(query));
@@ -84,16 +85,13 @@ class SchedulerThriftInterface extends ThriftServer implements NexusSchedulerMan
     LOG.info("Received kill request for tasks: " + query);
     KillResponse response = new KillResponse();
 
-    Iterable<TrackedTask> tasks = schedulerCore.getTasks(query);
-
-    if (Iterables.isEmpty(tasks)) {
-      response.setResponseCode(ResponseCode.INVALID_REQUEST)
-          .setMessage("No matching tasks found.");
-    } else {
+    try {
       schedulerCore.killTasks(query);
       response.setResponseCode(ResponseCode.OK)
-          .setMessage(String.format("%d tasks will be killed.", Iterables.size(tasks)));
-
+          .setMessage("Tasks will be killed.");
+    } catch (ScheduleException e) {
+      response.setResponseCode(ResponseCode.INVALID_REQUEST)
+          .setMessage(e.getMessage());
     }
 
     return response;

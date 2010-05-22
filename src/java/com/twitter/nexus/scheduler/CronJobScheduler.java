@@ -80,8 +80,8 @@ public class CronJobScheduler extends JobScheduler {
   }
 
   @Override
-  public void deleteJob(String owner, String job) {
-    if (!hasJob(owner, job)) return;
+  public boolean deleteJob(String owner, String job) {
+    if (!hasJob(owner, job)) return false;
 
     Pair<String, JobConfiguration> jobObj = scheduledJobs.remove(makeKey(owner, job));
 
@@ -89,6 +89,8 @@ public class CronJobScheduler extends JobScheduler {
       scheduler.deschedule(jobObj.getFirst());
       LOG.info("Successfully deleted cron job for " + makeKey(owner, job));
     }
+
+    return true;
   }
 
   public Iterable<JobConfiguration> getJobs() {

@@ -62,7 +62,8 @@ public abstract class JobScheduler {
    * @param owner The owner of the job to delete.
    * @param jobName The name of the job to delete.
    */
-  public void deleteJob(String owner, String jobName) {
+  public boolean deleteJob(String owner, String jobName) {
     // Optionally overridden by implementing class.
+    return false;
   }
 }
