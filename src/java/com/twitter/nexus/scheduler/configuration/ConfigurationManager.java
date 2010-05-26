@@ -1,4 +1,4 @@
-package com.twitter.nexus.scheduler;
+package com.twitter.nexus.scheduler.configuration;
 
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;

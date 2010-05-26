@@ -4,16 +4,15 @@ import com.google.common.base.Function;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.twitter.common.Pair;
-import com.twitter.common.base.Closure;
 import com.twitter.nexus.gen.JobConfiguration;
+import com.twitter.nexus.gen.TaskQuery;
 import it.sauronsoftware.cron4j.InvalidPatternException;
 import it.sauronsoftware.cron4j.Scheduler;
 import org.apache.commons.lang.StringUtils;
 
-import javax.annotation.Nullable;
 import java.util.Date;
-import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -25,8 +24,8 @@ import java.util.logging.Logger;
  *
  * @author wfarner
  */
-public class CronJobScheduler extends JobScheduler {
-  private static Logger LOG = Logger.getLogger(CronJobScheduler.class.getName());
+public class CronJobManager extends JobManager {
+  private static Logger LOG = Logger.getLogger(CronJobManager.class.getName());
 
   // Cron manager.
   private final Scheduler scheduler = new Scheduler();
@@ -35,24 +34,61 @@ public class CronJobScheduler extends JobScheduler {
   // internally by the cron4j scheduler.
   private final Map<String, Pair<String, JobConfiguration>> scheduledJobs = Maps.newHashMap();
 
-  public JobScheduler setJobRunner(Closure<JobConfiguration> jobRunner) {
-    scheduler.start();
-    return super.setJobRunner(jobRunner);
+  /**
+   * Triggers execution of a cron job, depending on the cron collision policy for the job.
+   *
+   * @param job Job triggered.
+   */
+  private void cronTriggered(JobConfiguration job) {
+    LOG.info(String.format("Cron triggered for %s/%s at %s",
+        job.getOwner(), job.getName(), new Date().toString()));
+
+    boolean runJob = false;
+
+    TaskQuery query = new TaskQuery().setOwner(job.getOwner()).setJobName(job.getName());
+    if (Iterables.isEmpty(schedulerCore.getTasks(query))) {
+      runJob = true;
+    } else {
+      switch (job.getCronCollisionPolicy()) {
+        case KILL_EXISTING:
+          LOG.info("Cron collision policy requires killing existing job.");
+          try {
+            schedulerCore.killTasks(query);
+            runJob = true;
+          } catch (ScheduleException e) {
+            LOG.log(Level.SEVERE, "Failed to kill job.", e);
+          }
+
+          break;
+        case CANCEL_NEW:
+          LOG.info("Cron collision policy prevented job from running.");
+          break;
+        case RUN_OVERLAP:
+          LOG.info("Cron collision policy permitting overlapping job run.");
+          runJob = true;
+          break;
+        default:
+          LOG.severe("Unrecognized cron collision policy: " + job.getCronCollisionPolicy());
+      }
+    }
+
+    if (runJob) schedulerCore.runJob(job);
   }
 
   @Override
   public boolean receiveJob(final JobConfiguration job) throws ScheduleException {
     if (StringUtils.isEmpty(job.getCronSchedule())) return false;
 
-    LOG.info("Scheduling cron job " + job.getName());
+    LOG.info(String.format("Scheduling cron job %s/%s: %s",
+        job.getOwner(), job.getName(), job.getCronSchedule()));
     try {
       scheduledJobs.put(makeKey(job),
           Pair.of(scheduler.schedule(job.getCronSchedule(),
             new Runnable() {
               @Override public void run() {
                 // TODO(wfarner): May want to record information about job runs.
-                LOG.info("Job executing @ " + new Date());
-                jobRunner.execute(job);
+                LOG.info("Cron job running.");
+                cronTriggered(job);
               }
             }),
             job)

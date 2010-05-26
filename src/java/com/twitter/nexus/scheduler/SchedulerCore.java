@@ -1,44 +1,14 @@
 package com.twitter.nexus.scheduler;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Function;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
-import com.google.inject.Inject;
-import com.twitter.common.base.Closure;
-import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.nexus.gen.JobConfiguration;
-import com.twitter.nexus.gen.SchedulerState;
 import com.twitter.nexus.gen.TaskQuery;
-import com.twitter.nexus.gen.TwitterTaskInfo;
 import com.twitter.nexus.gen.ScheduleStatus;
 import com.twitter.nexus.gen.TrackedTask;
-import com.twitter.nexus.scheduler.persistence.PersistenceLayer;
-import nexus.FrameworkMessage;
+import com.twitter.nexus.scheduler.configuration.ConfigurationManager;
 import nexus.SchedulerDriver;
 import nexus.SlaveOffer;
-import nexus.StringMap;
-import org.apache.commons.lang.StringUtils;
-import org.apache.thrift.TBase;
-import org.apache.thrift.TDeserializer;
-import org.apache.thrift.TException;
-import org.apache.thrift.TSerializer;
-
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Callable;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Scheduling core, stores scheduler state and makes decisions about which tasks to schedule when
@@ -59,64 +29,13 @@ import java.util.logging.Logger;
  * a machine host name (or slave ID) and a.) kill tasks running on the machine, b.) prevent tasks
  * from being scheduled on the machine.
  *
- * TODO(wfarner): Fix newly-introduced task killing bug (tasks do not disappear).
+ * TODO(wfarner): Change scheduler -> executor communication to periodically fetch task information
+ * from the executors.  This will allow the executors to make decisions about retaining dead task
+ * data.
  *
  * @author wfarner
  */
-public class SchedulerCore {
-  private static Logger LOG = Logger.getLogger(SchedulerCore.class.getName());
-
-  // The authoritative store for tasks that have been submited to the scheduler core.
-  private final List<TrackedTask> tasks = Lists.newArrayList();
-
-  // Schedulers that are responsible for triggering execution of jobs.
-  private final List<JobScheduler> jobSchedulers;
-
-  // TODO(wfarner): Hopefully we can abolish (or at least mask) the concept of canonical task IDs
-  // in favor of tasks being canonically named by job/taskIndex.
-  private int nextTaskId = 0;
-
-  // The nexus framework ID of the scheduler, set to -1 until the framework is registered.
-  private final AtomicInteger frameworkId = new AtomicInteger(-1);
-
-  // Work queue that stores pending asynchronous tasks.
-  @Inject
-  private WorkQueue workQueue;
-
-  @Inject
-  private ZooKeeperClient zkClient;
-
-  private final PersistenceLayer persistenceLayer;
-
-  // Amount of time to wait before discarding record of a lost/failed task.
-  private static final int TASK_REMOVE_DELAY_MINS = 1;
-
-  // Scheduler driver used for communication with other nodes in the cluster.
-  private final AtomicReference<SchedulerDriver> schedulerDriver =
-      new AtomicReference<SchedulerDriver>();
-
-  @Inject
-  public SchedulerCore(CronJobScheduler cronScheduler, ImmediateJobScheduler immediateScheduler,
-      PersistenceLayer persistenceLayer) {
-    Closure<JobConfiguration> jobRunner = new Closure<JobConfiguration>() {
-      @Override
-      public void execute(JobConfiguration job) {
-        LOG.info("Running job: " + job);
-        runJob(job);
-      }
-    };
-
-    // The immediate scheduler will accept any job, so it's important that other schedulers are
-    // placed first.
-    jobSchedulers = Arrays.asList(cronScheduler.setJobRunner(jobRunner),
-        immediateScheduler.setJobRunner(jobRunner));
-
-    this.persistenceLayer = Preconditions.checkNotNull(persistenceLayer);
-
-    // Attempt to recover from a persisted state.
-    restore();
-  }
-
+public interface SchedulerCore {
   /**
    * Assigns a framework ID to the scheduler, should be called when the scheduler implementation
    * has received a successful registration signal.
@@ -124,21 +43,16 @@ public class SchedulerCore {
    * @param driver The registered driver reference.
    * @param frameworkId Framework ID.
    */
-  public void registered(SchedulerDriver driver, int frameworkId) {
-    this.schedulerDriver.set(Preconditions.checkNotNull(driver));
-    this.frameworkId.set(frameworkId);
-  }
+  public void registered(SchedulerDriver driver, int frameworkId);
 
   /**
    * Fetches information about all registered tasks for a job.
    *
    * @param query The query to identify tasks.
+   * @param filters Additional filters to apply.
    * @return An iterable of task objects.
    */
-  public synchronized Iterable<TrackedTask> getTasks(final TaskQuery query) {
-    Preconditions.checkNotNull(query);
-    return Iterables.filter(tasks, taskMatcher(query));
-  }
+  public Iterable<TrackedTask> getTasks(final TaskQuery query, Predicate<TrackedTask>... filters);
 
   /**
    * Checks whether the scheduler has a job matching the owner/jobName.
@@ -148,68 +62,25 @@ public class SchedulerCore {
    * @return {@code true} if the scheduler has a job for the given owner and job name,
    *    {@code false} otherwise.
    */
-  @VisibleForTesting
-  synchronized boolean hasActiveJob(final String owner, final String jobName) {
-    TaskQuery query = new TaskQuery().setOwner(owner).setJobName(jobName);
-    for (ScheduleStatus status : ScheduleStatus.values()) {
-      if (status != ScheduleStatus.KILLED) query.addToStatuses(status);
-    }
-
-    return !Iterables.isEmpty(getTasks(query)) || Iterables.any(jobSchedulers,
-        new Predicate<JobScheduler>() {
-          @Override public boolean apply(JobScheduler scheduler) {
-            return scheduler.hasJob(owner, jobName);
-          }
-    });
-  }
-
-  private int generateTaskId() {
-    return nextTaskId++;
-  }
+  public boolean hasActiveJob(final String owner, final String jobName);
 
   /**
    * Creates a new job, whose tasks will become candidates for scheduling.
    *
    * @param job The configuration of the job to create tasks for.
    * @throws ScheduleException If there was an error scheduling a cron job.
+   * @throws ConfigurationManager.TaskDescriptionException If an invalid task description was given.
    */
-  public synchronized void createJob(JobConfiguration job) throws ScheduleException {
-    Preconditions.checkNotNull(job);
+  public void createJob(JobConfiguration job) throws ScheduleException,
+      ConfigurationManager.TaskDescriptionException;
 
-    if (hasActiveJob(job.getOwner(), job.getName())) {
-      throw new ScheduleException(String.format("Job already exists: %s/%s",
-          job.getOwner(), job.getName()));
-    }
 
-    boolean accepted = false;
-    for (JobScheduler scheduler : jobSchedulers) {
-      if (scheduler.receiveJob(job)) {
-        accepted = true;
-        LOG.info("Job accepted by scheduler: " + scheduler.getClass().getName());
-        persist();
-        break;
-      }
-    }
-
-    if (!accepted) {
-      LOG.severe("Job was not accepted by any of the configured schedulers, discarding.");
-      LOG.severe("Discarded job: " + job);
-      throw new ScheduleException("Job not accepted, discarding.");
-    }
-  }
-
-  private synchronized void runJob(JobConfiguration job) {
-    for (TwitterTaskInfo task : Preconditions.checkNotNull(job.getTaskConfigs())) {
-      int taskId = generateTaskId();
-      tasks.add(new TrackedTask()
-          .setTaskId(taskId)
-          .setJobName(job.getName())
-          .setOwner(job.getOwner())
-          .setTask(task)
-          .setStatus(ScheduleStatus.PENDING));
-    }
-    persist();
-  }
+  /**
+   * Triggers execution of a job.  This should only be called by job managers.
+   *
+   * @param job Job to run.
+   */
+  public void runJob(JobConfiguration job);
 
   /**
    * Offers resources to the scheduler.  If the scheduler has a pending task that is satisfied by
@@ -218,305 +89,31 @@ public class SchedulerCore {
    * @param slaveOffer The slave offer.
    * @return A task description that defines the task to run, or {@code null} if there are no
    *    pending tasks that are satisfied by the slave offer.
+   * @throws ScheduleException If an error occurs while attempting to schedule a task.
    */
-  public synchronized nexus.TaskDescription offer(SlaveOffer slaveOffer) throws ScheduleException {
-    TwitterTaskInfo offer;
-    try {
-      offer = ConfigurationManager.makeConcrete(slaveOffer);
-    } catch (ConfigurationManager.TaskDescriptionException e) {
-      LOG.log(Level.SEVERE, "Invalid slave offer", e);
-      return null;
-    }
-
-    TaskQuery query = new TaskQuery();
-    query.addToStatuses(ScheduleStatus.PENDING);
-
-    for (TrackedTask task : getTasks(query)) {
-      TwitterTaskInfo taskInfo = task.getTask();
-      if (ConfigurationManager.satisfied(taskInfo, offer)) {
-        // TODO(wfarner): Remove this hack once nexus core does not read parameters.
-        StringMap params = new StringMap();
-        params.set("cpus", String.valueOf((int) taskInfo.getNumCpus()));
-        params.set("mem", String.valueOf(taskInfo.getRamBytes()));
-
-        task.status = ScheduleStatus.STARTING;
-        task.slaveId = slaveOffer.getSlaveId();
-        byte[] taskInBytes;
-        try {
-          taskInBytes = serialize(taskInfo);
-        } catch (SerializationException e) {
-          LOG.log(Level.SEVERE, "Unable to serialize task.", e);
-          throw new ScheduleException("Internal error.", e);
-        }
-
-        LOG.info(String.format("Offer on slave %s (id %d) is being assigned task for %s/%s.",
-            slaveOffer.getHost(), task.slaveId, task.getOwner(), task.getJobName()));
-
-        return new nexus.TaskDescription(task.getTaskId(), slaveOffer.getSlaveId(),
-                task.jobName + "-" + task.getTaskId(), params, taskInBytes);
-      }
-    }
-
-    return null;
-  }
+  public nexus.TaskDescription offer(final SlaveOffer slaveOffer)
+      throws ScheduleException;
 
   /**
    * Assigns a new state to tasks.
    *
-   * TODO(wfarner): May want to specify contract on whether this can modify multiple tasks or must
-   * match only one.
-   *
    * @param query The query to identify tasks
    * @param status The new state of the tasks.
    */
-  public synchronized void setTaskStatus(TaskQuery query, ScheduleStatus status) {
-    Preconditions.checkNotNull(status);
-    for (TrackedTask task : getTasks(query)) {
-      if (task.getStatus() != ScheduleStatus.KILLED) task.setStatus(status);
-    }
-
-    // TODO(wfarner): Should add a fixed time delay on removing the task from tracking, to
-    // allow it to remain in a failed/killed/lost state long enough for someone to debug.
-    // This could be accomplished by using the work queue (possibly augmenting to use futures).
-
-    // Fetch all completed tasks.
-    TaskQuery completedQuery = new TaskQuery(query);
-    completedQuery.setStatuses(Sets.newHashSet(
-        ScheduleStatus.FINISHED,
-        ScheduleStatus.KILLED,
-        ScheduleStatus.FAILED,
-        ScheduleStatus.LOST,
-        ScheduleStatus.NOT_FOUND));
-    Iterable<TrackedTask> completedTasks = getTasks(completedQuery);
-
-    // TODO(wfarner): Add task failure tracking to TaskQuery and allow the configuration to
-    // specify the number of per-task failures before giving up.
-    Predicate<TrackedTask> daemonTaskFinder = new Predicate<TrackedTask>() {
-      @Override public boolean apply(TrackedTask task) {
-        return task.getTask().isIsDaemon();
-      }
-    };
-
-    // Non-daemon tasks are finished and may be removed.
-    removeTasks(Iterables.filter(completedTasks, Predicates.not(daemonTaskFinder)));
-
-    // Daemon tasks should be rescheduled.
-    for (TrackedTask task : Iterables.filter(completedTasks, daemonTaskFinder)) {
-      LOG.info("Moving daemon task to PENDING state: "
-               + task.getOwner() + "/" + task.getJobName());
-      task.setStatus(ScheduleStatus.PENDING);
-      task.setSlaveIdIsSet(false);
-      task.setSlaveId(-1);
-    }
-
-    persist();
-  }
-
-  /**
-   * Removes a task from tracking in the scheduler, after a fixed delay.
-   *
-   * @param toRemove Tasks that are to be removed.
-   */
-  private void removeTasks(Iterable<TrackedTask> toRemove) {
-    LOG.info("Removing completed tasks: " + toRemove);
-    tasks.removeAll(Lists.newArrayList(toRemove));
-    persist();
-  }
+  public void setTaskStatus(TaskQuery query, final ScheduleStatus status);
 
   /**
    * Kills a specific set of tasks.
    *
    * @param query The query to identify tasks
+   * @throws ScheduleException If a problem occurs with the kill request.
    */
-  public synchronized void killTasks(final TaskQuery query) throws ScheduleException {
-    Preconditions.checkNotNull(query);
-    LOG.info("Killing tasks matching " + query);
-
-    Iterable<TrackedTask> toKill = getTasks(query);
-
-    // If this looks like a query for all tasks in a job, instruct the scheduler modules to delete
-    // the job.
-    if (!StringUtils.isEmpty(query.getOwner()) && !StringUtils.isEmpty(query.getJobName())
-        && query.getTaskIdsSize() == 0) {
-      boolean matchingScheduler = false;
-      for (JobScheduler scheduler : jobSchedulers) {
-        if (scheduler.deleteJob(query.getOwner(), query.getJobName())) matchingScheduler = true;
-      }
-
-      if (!matchingScheduler) throw new ScheduleException("No tasks matching query found.");
-
-    } else if (Iterables.isEmpty(toKill)) {
-      throw new ScheduleException("No tasks matching query found.");
-    }
-
-    List<TrackedTask> toRemove = Lists.newArrayList();
-    for (final TrackedTask task : toKill) {
-      if (task.getStatus() == ScheduleStatus.PENDING) {
-        toRemove.add(task);
-      } else if (task.getStatus() != ScheduleStatus.KILLED) {
-        doWorkWithDriver(new Function<SchedulerDriver, Integer>() {
-          @Override public Integer apply(SchedulerDriver driver) {
-            return driver.killTask(task.getTaskId());
-          }
-        });
-      }
-    }
-    removeTasks(toRemove);
-  }
-
-  /**
-   * Executes a unit of work that uses the scheduler driver.  This exists as a convenience function
-   * for any tasks that require use of the {@link SchedulerDriver}, for automatic retrying in the
-   * event that the driver is not available.
-   *
-   * @param work The work to execute.  Should return the status code provided by the driver
-   *    (0 denotes success, non-zero denotes a failure that should be retried).
-   */
-  private void doWorkWithDriver(final Function<SchedulerDriver, Integer> work) {
-    workQueue.doWork(new Callable<Boolean>() {
-      @Override public Boolean call() {
-        if (frameworkId.get() == -1) {
-          LOG.info("Unable to send framework messages, framework not registered.");
-          return false;
-        }
-
-        // TODO(wfarner): What happens when this fails?  Do we have to reconnect manually, or does
-        // the driver automatically try to reconnect when it sends a non-zero status code?
-        SchedulerDriver driver = schedulerDriver.get();
-        return driver != null && work.apply(driver) == 0;
-      }
-    });
-  }
+  public void killTasks(final TaskQuery query) throws ScheduleException;
 
   /**
    * Schedules a restart on a set of tasks.
    *
    * @param query The query to identify tasks.
    */
-  public synchronized void restartTasks(final TaskQuery query) {
-    Preconditions.checkNotNull(query);
-
-    // TODO(wfarner): Need to do this in a cleaner way so that the entire job doesn't flip at once.
-    LOG.info("Restarting tasks " + query);
-
-    for (final TrackedTask task : getTasks(query)) {
-      if (task != null && task.status != ScheduleStatus.PENDING) {
-        // TODO(wfarner): Once scheduler -> executorHub communication is defined, replace the
-        // empty byte array with a serialized message.
-        doWorkWithDriver(new Function<SchedulerDriver, Integer>() {
-          @Override public Integer apply(SchedulerDriver driver) {
-            return driver.sendFrameworkMessage(
-                new FrameworkMessage(frameworkId.get(), task.slaveId, new byte[0]));
-          }
-        });
-      }
-    }
-  }
-
-  /**
-   * Returns a predicate that will match tasks against the given {@code query}.
-   *
-   * @param query The query to use for finding tasks.
-   * @return An iterable containing all matching tasks
-   */
-  private static Predicate<TrackedTask> taskMatcher(final TaskQuery query) {
-    Preconditions.checkNotNull(query);
-    return new Predicate<TrackedTask>() {
-      private boolean matches(String query, String value) {
-        return StringUtils.isEmpty(query) || value.matches(query);
-      }
-
-      private <T> boolean matches(Collection<T> collection, T item) {
-        return collection == null || collection.isEmpty() || collection.contains(item);
-      }
-
-      @Override public boolean apply(TrackedTask task) {
-        return matches(query.getOwner(), task.getOwner())
-            && matches(query.getJobName(), task.getJobName())
-            && matches(query.getTaskIds(), task.getTaskId())
-            && matches(query.getStatuses(), task.getStatus());
-      }
-    };
-  }
-
-  private void persist() {
-    // TODO(wfarner): Harden this - need to be careful for if/when scheduler dies while partially
-    // finished persisting.
-    SchedulerState state = new SchedulerState();
-    state.setConfiguredTasks(tasks);
-    Map<String, List<JobConfiguration>> moduleState = Maps.newHashMap();
-    for (JobScheduler scheduler : jobSchedulers) {
-      moduleState.put(scheduler.getClass().getCanonicalName(),
-          Lists.newArrayList(scheduler.getState()));
-    }
-    state.setModuleJobs(moduleState);
-
-    try {
-      persistenceLayer.commit(serialize(state));
-    } catch (SerializationException e) {
-      LOG.log(Level.SEVERE, "Failed to serialize scheduler state, unable to persist!", e);
-    } catch (PersistenceLayer.PersistenceException e) {
-      LOG.log(Level.SEVERE, "Failed to persist scheduler state.", e);
-    }
-  }
-
-  private void restore() {
-    SchedulerState state = new SchedulerState();
-    try {
-      byte[] data = persistenceLayer.fetch();
-      if (data == null) {
-        LOG.info("No persisted state found for restoration.");
-        return;
-      }
-
-      deserialize(state, data);
-    } catch (PersistenceLayer.PersistenceException e) {
-      LOG.log(Level.SEVERE, "Failed to fetch persisted state.", e);
-      return;
-    } catch (SerializationException e) {
-      LOG.log(Level.SEVERE, "Failed to deserialize persisted state.", e);
-      return;
-    }
-
-    tasks.addAll(state.getConfiguredTasks());
-    for (final Map.Entry<String, List<JobConfiguration>> entry : state.getModuleJobs().entrySet()) {
-      JobScheduler scheduler = Iterables.find(jobSchedulers, new Predicate<JobScheduler>() {
-        @Override public boolean apply(JobScheduler scheduler) {
-          return scheduler.getClass().getCanonicalName().equals(entry.getKey());
-        }
-      });
-
-      for (JobConfiguration job : entry.getValue()) {
-        try {
-          scheduler.receiveJob(job);
-        } catch (ScheduleException e) {
-          LOG.log(Level.SEVERE, "While trying to restore state, scheduler module failed.", e);
-        }
-      }
-    }
-  }
-
-  private byte[] serialize(TBase t) throws SerializationException {
-      try {
-        return new TSerializer().serialize(t);
-      } catch (TException e) {
-        throw new SerializationException("Failed to serialize: " + t, e);
-      }
-  }
-
-  private <T extends TBase> void deserialize(T t, byte[] data) throws SerializationException {
-    TwitterTaskInfo taskInfo = new TwitterTaskInfo();
-
-    try {
-      new TDeserializer().deserialize(t, data);
-    } catch (TException e) {
-      throw new SerializationException("Failed to deserialize thrift object.", e);
-    }
-  }
-
-  private class SerializationException extends Exception {
-    public SerializationException(String msg, Throwable t) {
-      super(msg, t);
-    }
-  }
+  public void restartTasks(final TaskQuery query);
 }

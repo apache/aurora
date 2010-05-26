@@ -9,7 +9,7 @@ import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.nexus.gen.TaskQuery;
 import com.twitter.nexus.gen.TrackedTask;
-import com.twitter.nexus.scheduler.CronJobScheduler;
+import com.twitter.nexus.scheduler.CronJobManager;
 import com.twitter.nexus.scheduler.SchedulerCore;
 import org.antlr.stringtemplate.StringTemplate;
 
@@ -29,7 +29,7 @@ public class SchedulerzHome extends StringTemplateServlet {
   private SchedulerCore scheduler;
 
   @Inject
-  private CronJobScheduler cronScheduler;
+  private CronJobManager cronScheduler;
 
   @Inject
   public SchedulerzHome(@CacheTemplates boolean cacheTemplates) {

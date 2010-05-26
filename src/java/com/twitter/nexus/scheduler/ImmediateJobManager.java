@@ -7,10 +7,10 @@ import com.twitter.nexus.gen.JobConfiguration;
  *
  * @author wfarner
  */
-public class ImmediateJobScheduler extends JobScheduler {
+public class ImmediateJobManager extends JobManager {
   @Override
   public boolean receiveJob(JobConfiguration job) {
-    jobRunner.execute(job);
+    schedulerCore.runJob(job);
     return true;
   }
 }

@@ -9,8 +9,6 @@ import com.google.inject.Singleton;
 import com.twitter.common.process.GuicedProcess;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
-import com.twitter.common.zookeeper.Candidate;
-import com.twitter.common.zookeeper.Group;
 import com.twitter.common.zookeeper.ServerSet;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.nexus.scheduler.httphandlers.SchedulerzHome;
@@ -44,8 +42,8 @@ public class SchedulerModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    bind(CronJobScheduler.class).in(Singleton.class);
-    bind(SchedulerCore.class).in(Singleton.class);
+    bind(CronJobManager.class).in(Singleton.class);
+    bind(SchedulerCore.class).to(SchedulerCoreImpl.class).in(Singleton.class);
     bind(NexusSchedulerImpl.class).in(Singleton.class);
 
     GuicedProcess.registerServlet(binder(), "/schedulerz", SchedulerzHome.class, false);

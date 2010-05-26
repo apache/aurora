@@ -11,12 +11,11 @@ import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.nexus.gen.JobConfiguration;
 import com.twitter.nexus.gen.TaskQuery;
 import com.twitter.nexus.gen.TrackedTask;
-import com.twitter.nexus.scheduler.CronJobScheduler;
+import com.twitter.nexus.scheduler.CronJobManager;
 import com.twitter.nexus.scheduler.SchedulerCore;
 import it.sauronsoftware.cron4j.Predictor;
 import org.antlr.stringtemplate.StringTemplate;
 
-import javax.annotation.Nullable;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -33,7 +32,7 @@ public class SchedulerzUser extends StringTemplateServlet {
   private SchedulerCore scheduler;
 
   @Inject
-  private CronJobScheduler cronScheduler;
+  private CronJobManager cronScheduler;
 
   private static final String USER_PARAM = "user";
 

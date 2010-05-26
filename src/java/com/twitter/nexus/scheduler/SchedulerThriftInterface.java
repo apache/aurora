@@ -1,11 +1,11 @@
 package com.twitter.nexus.scheduler;
 
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.inject.Inject;
 import com.twitter.common.thrift.ThriftServer;
 import com.twitter.nexus.gen.*;
+import com.twitter.nexus.scheduler.configuration.ConfigurationManager;
 import org.apache.thrift.TException;
 
 import java.util.List;
@@ -33,22 +33,16 @@ class SchedulerThriftInterface extends ThriftServer implements NexusSchedulerMan
     LOG.info("Received createJob request: " + job);
     String jobId = job.getOwner() + "/" + job.getName();
 
-    for (TwitterTaskInfo config : job.getTaskConfigs()) {
-      try {
-        ConfigurationManager.populateFields(job, config);
-      } catch (ConfigurationManager.TaskDescriptionException e) {
-        return new CreateJobResponse()
-            .setResponseCode(ResponseCode.INVALID_REQUEST)
-            .setMessage("Invalid configuration, error: " + e.getMessage());
-      }
-    }
-
     CreateJobResponse response = new CreateJobResponse();
 
     try {
       schedulerCore.createJob(job);
       response.setResponseCode(ResponseCode.OK)
-          .setMessage(job.getTaskConfigs().size() + " new tasks pending for job " + jobId);
+          .setMessage(String.format("%d new tasks pending for job %s/%s",
+              job.getTaskConfigs().size(), job.getOwner(), job.getName()));
+    } catch (ConfigurationManager.TaskDescriptionException e) {
+      response.setResponseCode(ResponseCode.INVALID_REQUEST)
+          .setMessage("Invalid task description: " + e.getMessage());
     } catch (ScheduleException e) {
       response.setResponseCode(ResponseCode.INVALID_REQUEST)
           .setMessage("Failed to schedule job - " + e.getMessage());
