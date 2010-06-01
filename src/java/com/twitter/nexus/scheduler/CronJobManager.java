@@ -4,6 +4,7 @@ import com.google.common.base.Function;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.twitter.common.Pair;
+import com.twitter.nexus.gen.CronCollisionPolicy;
 import com.twitter.nexus.gen.JobConfiguration;
 import com.twitter.nexus.gen.TaskQuery;
 import it.sauronsoftware.cron4j.InvalidPatternException;
@@ -34,6 +35,10 @@ public class CronJobManager extends JobManager {
   // internally by the cron4j scheduler.
   private final Map<String, Pair<String, JobConfiguration>> scheduledJobs = Maps.newHashMap();
 
+  public CronJobManager() {
+    scheduler.start();
+  }
+
   /**
    * Triggers execution of a cron job, depending on the cron collision policy for the job.
    *
@@ -49,10 +54,16 @@ public class CronJobManager extends JobManager {
     if (Iterables.isEmpty(schedulerCore.getTasks(query))) {
       runJob = true;
     } else {
+      // Assign a default collision policy.
+      if (job.getCronCollisionPolicy() == null) {
+        job.setCronCollisionPolicy(CronCollisionPolicy.KILL_EXISTING);
+      }
+
       switch (job.getCronCollisionPolicy()) {
         case KILL_EXISTING:
           LOG.info("Cron collision policy requires killing existing job.");
           try {
+            // TODO(wfarner): This kills the cron job itself, fix that.
             schedulerCore.killTasks(query);
             runJob = true;
           } catch (ScheduleException e) {
