@@ -289,6 +289,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     // the job.
     boolean matchingScheduler = false;
     if (!StringUtils.isEmpty(query.getOwner()) && !StringUtils.isEmpty(query.getJobName())
+        && query.getStatusesSize() == 0
         && query.getTaskIdsSize() == 0) {
       for (JobManager manager : jobManagers) {
         if (manager.deleteJob(query.getOwner(), query.getJobName())) matchingScheduler = true;

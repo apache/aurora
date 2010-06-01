@@ -1,11 +1,14 @@
 package com.twitter.nexus.scheduler;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.twitter.common.Pair;
 import com.twitter.nexus.gen.CronCollisionPolicy;
 import com.twitter.nexus.gen.JobConfiguration;
+import com.twitter.nexus.gen.ScheduleStatus;
 import com.twitter.nexus.gen.TaskQuery;
 import it.sauronsoftware.cron4j.InvalidPatternException;
 import it.sauronsoftware.cron4j.Scheduler;
@@ -44,13 +47,17 @@ public class CronJobManager extends JobManager {
    *
    * @param job Job triggered.
    */
-  private void cronTriggered(JobConfiguration job) {
+  @VisibleForTesting
+  void cronTriggered(JobConfiguration job) {
     LOG.info(String.format("Cron triggered for %s/%s at %s",
         job.getOwner(), job.getName(), new Date().toString()));
 
     boolean runJob = false;
 
-    TaskQuery query = new TaskQuery().setOwner(job.getOwner()).setJobName(job.getName());
+    TaskQuery query = new TaskQuery().setOwner(job.getOwner()).setJobName(job.getName())
+      .setStatuses(ImmutableSet.of(
+          ScheduleStatus.PENDING, ScheduleStatus.STARTING, ScheduleStatus.RUNNING));
+
     if (Iterables.isEmpty(schedulerCore.getTasks(query))) {
       runJob = true;
     } else {

@@ -6,6 +6,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
+import com.twitter.nexus.gen.CronCollisionPolicy;
 import com.twitter.nexus.gen.JobConfiguration;
 import com.twitter.nexus.gen.ScheduleStatus;
 import com.twitter.nexus.gen.TaskQuery;
@@ -30,6 +31,7 @@ import static org.junit.Assert.fail;
  */
 public class SchedulerCoreTest {
   private SchedulerCore scheduler;
+  private CronJobManager cron;
 
   private static final long ONE_GB = Amount.of(1L, Data.GB).getValue();
 
@@ -44,8 +46,10 @@ public class SchedulerCoreTest {
 
   @Before
   public void setUp() {
-    scheduler = new SchedulerCoreImpl(new CronJobManager(), new ImmediateJobManager(),
+    cron = new CronJobManager();
+    scheduler = new SchedulerCoreImpl(cron, new ImmediateJobManager(),
         new NoPersistence());
+    cron.schedulerCore = scheduler;
   }
 
   @Test
@@ -155,6 +159,39 @@ public class SchedulerCoreTest {
   @Test
   public void testCronJobLifeCycle() {
     // TODO(wfarner): Figure out how to test the lifecycle of a cron job.
+  }
+
+  @Test
+  public void testCronNoSuicide() throws Exception {
+    JobConfiguration job = makeJob(JOB_OWNER_A, JOB_NAME_A, TASK_A, 10);
+    job.setCronSchedule("1 1 1 1 1")
+        .setCronCollisionPolicy(CronCollisionPolicy.KILL_EXISTING);
+    scheduler.createJob(job);
+    assertTaskCount(0);
+
+    try {
+      scheduler.createJob(job);
+      fail();
+    } catch (ScheduleException e) {
+      // Expected.
+    }
+    assertThat(cron.hasJob(JOB_OWNER_A, JOB_NAME_A), is(true));
+
+    // Simulate a triggering of the cron job.
+    cron.cronTriggered(job);
+    assertTaskCount(10);
+
+    // Simulate a triggering of the cron job.
+    cron.cronTriggered(job);
+    assertTaskCount(10);
+
+    try {
+      scheduler.createJob(job);
+      fail();
+    } catch (ScheduleException e) {
+      // Expected.
+    }
+    assertThat(cron.hasJob(JOB_OWNER_A, JOB_NAME_A), is(true));
   }
 
   @Test
