@@ -108,7 +108,6 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
       LOG.log(Level.SEVERE, "Interrupted while starting thrift server.", e);
     }
 
-    /** TODO(wfarner): Re-enable.
     if (endpointStatus == null) return;
     try {
       endpointStatus.update(Status.ALIVE);
@@ -117,7 +116,6 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
     } catch (InterruptedException e) {
       LOG.log(Level.SEVERE, "Interrupted while updating server status in ZooKeeper.", e);
     }
-     */
 
     waitForEver();
   }
@@ -144,11 +142,9 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
 
     LOG.info("Registering host in server set " + getOptions().nexusSchedulerNameSpec
              + " as listening on port " + schedulerThriftInterface.getListeningPort());
-    /** TODO(wfarner) Re-enable
+
     return joinServerSet(nexusSchedulerServerSet, schedulerThriftInterface.getListeningPort(),
         Status.STARTING);
-     */
-    return null;
   }
 
   public static void main(String[] args) throws Exception {

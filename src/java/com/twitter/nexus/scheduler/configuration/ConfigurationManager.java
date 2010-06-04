@@ -47,7 +47,8 @@ public class ConfigurationManager {
 
     // Only one of [daemon=true, cron_schedule] may be set.
     if (!StringUtils.isEmpty(job.getCronSchedule()) && config.isIsDaemon()) {
-      throw new TaskDescriptionException("A daemon task may not be run on a cron schedule.");
+      throw new TaskDescriptionException(
+          "A daemon task may not be run on a cron schedule: " + config);
     }
 
     return config;

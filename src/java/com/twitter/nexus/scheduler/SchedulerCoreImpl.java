@@ -74,14 +74,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
   @Inject
   public SchedulerCoreImpl(CronJobManager cronScheduler, ImmediateJobManager immediateScheduler,
       PersistenceLayer persistenceLayer) {
-    Closure<JobConfiguration> jobRunner = new Closure<JobConfiguration>() {
-      @Override
-      public void execute(JobConfiguration job) {
-        LOG.info("Running job: " + job);
-        runJob(job);
-      }
-    };
-
     // The immediate scheduler will accept any job, so it's important that other schedulers are
     // placed first.
     jobManagers = Arrays.asList(cronScheduler, immediateScheduler);

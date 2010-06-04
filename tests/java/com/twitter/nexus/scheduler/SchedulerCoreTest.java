@@ -20,7 +20,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.CoreMatchers.not;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 
@@ -47,9 +46,11 @@ public class SchedulerCoreTest {
   @Before
   public void setUp() {
     cron = new CronJobManager();
-    scheduler = new SchedulerCoreImpl(cron, new ImmediateJobManager(),
+    ImmediateJobManager immediateJobManager = new ImmediateJobManager();
+    scheduler = new SchedulerCoreImpl(cron, immediateJobManager,
         new NoPersistence());
     cron.schedulerCore = scheduler;
+    immediateJobManager.schedulerCore = scheduler;
   }
 
   @Test
@@ -129,10 +130,10 @@ public class SchedulerCoreTest {
   public void testDaemonTasksRescheduled() throws Exception {
     // Schedule 5 daemon and 5 non-daemon tasks.
     scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, TASK_A, 5));
-    TwitterTaskInfo task = TASK_A;
+    TwitterTaskInfo task = new TwitterTaskInfo(TASK_A);
     task.setConfiguration(Maps.newHashMap(task.getConfiguration()));
     task.putToConfiguration("daemon", "true");
-    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A + "daemon", TASK_A, 5));
+    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A + "daemon", task, 5));
 
     assertThat(Iterables.size(scheduler.getTasks(
         new TaskQuery().setStatuses(Sets.newHashSet(ScheduleStatus.PENDING)))),

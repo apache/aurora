@@ -1,8 +1,6 @@
 package com.twitter.nexus.scheduler;
 
-import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
-import com.twitter.common.base.Closure;
 import com.twitter.nexus.gen.JobConfiguration;
 
 import java.util.Arrays;
