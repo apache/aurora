@@ -70,7 +70,7 @@ public class RunningTaskTest {
 
   @Test
   public void testLaunchCapturesStdout() throws Exception {
-    TASK_A.setStartCommand("echo 'hello world'");
+    TASK_A.setStartCommand("echo \"hello world\"");
     taskA.stage();
     taskA.launch();
     assertThat(taskA.waitFor(), is(TaskState.TASK_FINISHED));
