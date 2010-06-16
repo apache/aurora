@@ -22,6 +22,7 @@ import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.data.Stat;
 
+import javax.annotation.Nullable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -54,14 +55,18 @@ public class SchedulerModule extends AbstractModule {
   @Provides
   @Singleton
   final ZooKeeperClient provideZooKeeperClient() {
-    return new ZooKeeperClient(Amount.of(options.zooKeeperSessionTimeoutSecs, Time.SECONDS),
-        ImmutableSet.copyOf(options.zooKeeperEndpoints));
+    LOG.info("ZooKeeper endpoints not specified, ZooKeeper interaction disabled.");
+    return options.zooKeeperEndpoints == null ? null
+        : new ZooKeeperClient(Amount.of(options.zooKeeperSessionTimeoutSecs, Time.SECONDS),
+            ImmutableSet.copyOf(options.zooKeeperEndpoints));
   }
 
   @Provides
   @Singleton
-  final ServerSet provideSchedulerServerSet(ZooKeeperClient zkClient) {
-    return new ServerSet(zkClient, ZooDefs.Ids.OPEN_ACL_UNSAFE, options.nexusSchedulerNameSpec);
+  final ServerSet provideSchedulerServerSet(@Nullable ZooKeeperClient zkClient) {
+    LOG.info("No ZooKeeper client, service registration disabled.");
+    return zkClient == null ? null
+        : new ServerSet(zkClient, ZooDefs.Ids.OPEN_ACL_UNSAFE, options.nexusSchedulerNameSpec);
   }
 
   @Provides

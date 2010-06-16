@@ -2,8 +2,8 @@ package com.twitter.nexus.executor;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.inject.Inject;
 import com.twitter.common.base.ExceptionalFunction;
+import com.twitter.common.util.StateMachine;
 import com.twitter.nexus.gen.TwitterTaskInfo;
 import nexus.TaskState;
 import org.apache.commons.io.FileUtils;
@@ -23,6 +23,15 @@ import java.util.logging.Logger;
 public class RunningTask {
   private static final Logger LOG = Logger.getLogger(RunningTask.class.getName());
 
+  private final StateMachine<TaskState> stateMachine = StateMachine.<TaskState>builder()
+      .initialState(TaskState.TASK_STARTING)
+      .addState(TaskState.TASK_STARTING, TaskState.TASK_RUNNING)
+      .addState(TaskState.TASK_RUNNING, TaskState.TASK_FINISHED,
+                                        TaskState.TASK_FAILED,
+                                        TaskState.TASK_KILLED,
+                                        TaskState.TASK_LOST)
+      .build();
+
   private final File executorRoot;
   private final int taskId;
   private final TwitterTaskInfo task;
@@ -31,8 +40,6 @@ public class RunningTask {
   final File taskRoot;
 
   private Process process;
-
-  private boolean running = false;
   private int exitCode = 0;
 
   private final ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier;
@@ -67,7 +74,6 @@ public class RunningTask {
 
     LOG.info("Fetching payload.");
     File payload;
-    // TODO(wfarner): Remove this check when guice stuff is figured out.
     LOG.info("File copier: " + fileCopier);
     try {
       payload = fileCopier.apply(
@@ -86,9 +92,7 @@ public class RunningTask {
     List<String> commandLine = Arrays.asList(
         "bash",
         "-c",
-        task.getStartCommand()
-        // TODO(wfarner): Re-enable after testing.
-        //String.format("echo $PPID > pidfile && %s >stdout 2>stderr", task.getStartCommand())
+        String.format("echo $PPID > pidfile; %s >stdout 2>stderr", task.getStartCommand())
     );
 
     LOG.info("Executing shell command: " + commandLine);
@@ -98,8 +102,9 @@ public class RunningTask {
 
     try {
       process = processBuilder.start();
-      running = true;
+      stateMachine.transition(TaskState.TASK_RUNNING);
     } catch (IOException e) {
+      stateMachine.transition(TaskState.TASK_FAILED);
       throw new ProcessException("Failed to launch process.", e);
     }
   }
@@ -111,26 +116,28 @@ public class RunningTask {
    */
   public TaskState waitFor() {
     Preconditions.checkNotNull(process);
-    while (true) {
+    while (stateMachine.getState() == TaskState.TASK_RUNNING) {
       try {
         exitCode = process.waitFor();
-        if (exitCode == 0) {
-          return TaskState.TASK_FINISHED;
-        } else {
-          LOG.info("Process terminated with exit code: " + exitCode);
-          return TaskState.TASK_FAILED;
+        if (stateMachine.getState() != TaskState.TASK_KILLED) {
+          if (exitCode == 0) {
+            stateMachine.transition(TaskState.TASK_FINISHED);
+          } else {
+            LOG.info("Process terminated with exit code: " + exitCode);
+            stateMachine.transition(TaskState.TASK_FAILED);
+          }
         }
       } catch (InterruptedException e) {
         LOG.log(Level.WARNING,
             "Warning, Thread interrupted while waiting for process to finish.", e);
-      } finally {
-        running = false;
       }
     }
+
+    return stateMachine.getState();
   }
 
   public boolean isRunning() {
-    return running;
+    return stateMachine.getState() == TaskState.TASK_RUNNING;
   }
 
   public int getExitCode() {
@@ -149,6 +156,7 @@ public class RunningTask {
   public void kill() {
     Preconditions.checkNotNull(process);
     LOG.info("Killing task " + this);
+    stateMachine.transition(TaskState.TASK_KILLED);
     process.destroy();
     waitFor();
   }

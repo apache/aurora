@@ -16,6 +16,7 @@ import nexus.NexusSchedulerDriver;
 import org.apache.thrift.TException;
 import org.apache.thrift.transport.TTransportException;
 
+import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -34,8 +35,7 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
             usage = "Path to the executorHub launch script.")
     String executorPath;
 
-    @Option(name = "zk_endpoints", required = true,
-            usage = "Endpoint specification for the ZooKeeper servers.")
+    @Option(name = "zk_endpoints", usage = "Endpoint specification for the ZooKeeper servers.")
     List<InetSocketAddress> zooKeeperEndpoints;
 
     @Option(name = "zk_session_timeout_secs",
@@ -80,6 +80,7 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
   private SchedulerThriftInterface schedulerThriftInterface;
 
   @Inject
+  @Nullable
   private ServerSet nexusSchedulerServerSet;
 
   @Inject
@@ -108,13 +109,14 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
       LOG.log(Level.SEVERE, "Interrupted while starting thrift server.", e);
     }
 
-    if (endpointStatus == null) return;
-    try {
-      endpointStatus.update(Status.ALIVE);
-    } catch (ServerSet.UpdateException e) {
-      LOG.log(Level.SEVERE, "Failed to update server status in ZooKeeper.", e);
-    } catch (InterruptedException e) {
-      LOG.log(Level.SEVERE, "Interrupted while updating server status in ZooKeeper.", e);
+    if (endpointStatus != null) {
+      try {
+        endpointStatus.update(Status.ALIVE);
+      } catch (ServerSet.UpdateException e) {
+        LOG.log(Level.SEVERE, "Failed to update server status in ZooKeeper.", e);
+      } catch (InterruptedException e) {
+        LOG.log(Level.SEVERE, "Interrupted while updating server status in ZooKeeper.", e);
+      }
     }
 
     waitForEver();
@@ -140,11 +142,15 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
       }
     });
 
-    LOG.info("Registering host in server set " + getOptions().nexusSchedulerNameSpec
-             + " as listening on port " + schedulerThriftInterface.getListeningPort());
-
-    return joinServerSet(nexusSchedulerServerSet, schedulerThriftInterface.getListeningPort(),
-        Status.STARTING);
+    if (nexusSchedulerServerSet == null ) {
+      LOG.warning("Not registering server with ZooKeeper.");
+      return null;
+    } else {
+      LOG.info("Registering host in server set " + getOptions().nexusSchedulerNameSpec
+               + " as listening on port " + schedulerThriftInterface.getListeningPort());
+      return joinServerSet(nexusSchedulerServerSet, schedulerThriftInterface.getListeningPort(),
+          Status.STARTING);
+    }
   }
 
   public static void main(String[] args) throws Exception {

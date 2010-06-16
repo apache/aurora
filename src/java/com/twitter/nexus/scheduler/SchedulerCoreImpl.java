@@ -28,6 +28,7 @@ import nexus.StringMap;
 import nexus.TaskDescription;
 import org.apache.commons.lang.StringUtils;
 
+import javax.annotation.Nullable;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -61,9 +62,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
   // Work queue that stores pending asynchronous tasks.
   @Inject
   private WorkQueue workQueue;
-
-  @Inject
-  private ZooKeeperClient zkClient;
 
   private final PersistenceLayer persistenceLayer;
 
