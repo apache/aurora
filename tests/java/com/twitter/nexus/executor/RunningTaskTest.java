@@ -90,6 +90,8 @@ public class RunningTaskTest {
   }
 
   @Test
+  // TODO(wfarner): This test is flaky when running from the command line - figure out
+  // a better way to do this.
   public void testKill() throws Exception {
     TASK_A.setStartCommand("touch b.txt; sleep 10");
     taskA.stage();
