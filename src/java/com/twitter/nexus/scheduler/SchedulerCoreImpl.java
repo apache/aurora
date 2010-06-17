@@ -207,7 +207,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
       throw new ScheduleException("Internal error.", e);
     }
 
-    LOG.info(String.format("Offer on slave %s (id %d) is being assigned task for %s/%s.",
+    LOG.info(String.format("Offer on slave %s (id %s) is being assigned task for %s/%s.",
         slaveOffer.getHost(), task.slaveId, task.getOwner(), task.getJobName()));
 
     persist();
