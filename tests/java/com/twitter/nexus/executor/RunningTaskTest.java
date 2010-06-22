@@ -46,8 +46,12 @@ public class RunningTaskTest {
   }
 
   @After
-  public void tearDown() throws Exception {
-    org.apache.commons.io.FileUtils.deleteDirectory(executorRoot);
+  public void tearDown() {
+    try {
+      org.apache.commons.io.FileUtils.deleteDirectory(executorRoot);
+    } catch (IOException e) {
+      // TODO(wfarner): Figure out why this fails occasionally.
+    }
   }
 
   @Test
@@ -91,7 +95,6 @@ public class RunningTaskTest {
 
   @Test
   public void testKill() throws Exception {
-    /** TODO(wfarner): Fix this flaky test.
     TASK_A.setStartCommand("touch b.txt; sleep 10");
     taskA.stage();
     taskA.launch();
@@ -116,7 +119,6 @@ public class RunningTaskTest {
     assertThat(waitThread.isAlive(), is(false));
     assertThat(state.get(), is(TaskState.TASK_KILLED));
     assertDirContents(taskA.taskRoot, "b.txt", "stderr", "stdout", "pidfile");
-    */
   }
 
   @Test
