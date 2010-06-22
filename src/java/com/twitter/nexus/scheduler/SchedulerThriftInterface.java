@@ -71,12 +71,6 @@ class SchedulerThriftInterface extends ThriftServer implements NexusSchedulerMan
   @Override
   public UpdateResponse updateTasks(TaskQuery query, UpdateRequest request)
       throws TException {
-    // TODO(wfarner): Need a method to diff stored vs updated TwitterTaskInfo objects.
-    // TODO(wfarner): Need a method to determine whether diff requires task restarts.
-    // TODO(wfarner): Need to define health-checking mechanism (via named HTTP ports, /healthz),
-    //                default health-checking is that the process is alive.
-    // TODO(wfarner): JobConfiguration needs to define the update routine for its tasks.
-
     return null;  //To change body of implemented methods use File | Settings | File Templates.
   }
 

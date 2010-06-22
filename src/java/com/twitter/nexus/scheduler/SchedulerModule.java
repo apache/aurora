@@ -1,7 +1,6 @@
 package com.twitter.nexus.scheduler;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
@@ -10,8 +9,6 @@ import com.google.inject.Singleton;
 import com.twitter.common.process.GuicedProcess;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
-import com.twitter.common.zookeeper.Candidate;
-import com.twitter.common.zookeeper.Group;
 import com.twitter.common.zookeeper.ServerSet;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.nexus.scheduler.httphandlers.SchedulerzHome;
@@ -58,24 +55,18 @@ public class SchedulerModule extends AbstractModule {
   @Provides
   @Singleton
   final ZooKeeperClient provideZooKeeperClient() {
-    if (options.zooKeeperEndpoints == null) {
-      LOG.info("ZooKeeper endpoints not specified, ZooKeeper interaction disabled.");
-      return null;
-    } else {
-      return new ZooKeeperClient(Amount.of(options.zooKeeperSessionTimeoutSecs, Time.SECONDS),
-          ImmutableSet.copyOf(options.zooKeeperEndpoints));
-    }
+    LOG.info("ZooKeeper endpoints not specified, ZooKeeper interaction disabled.");
+    return options.zooKeeperEndpoints == null ? null
+        : new ZooKeeperClient(Amount.of(options.zooKeeperSessionTimeoutSecs, Time.SECONDS),
+            ImmutableSet.copyOf(options.zooKeeperEndpoints));
   }
 
   @Provides
   @Singleton
   final ServerSet provideSchedulerServerSet(@Nullable ZooKeeperClient zkClient) {
-    if (zkClient == null) {
-      LOG.info("No ZooKeeper client, service registration disabled.");
-      return null;
-    } else {
-      return new ServerSet(zkClient, ZooDefs.Ids.OPEN_ACL_UNSAFE, options.nexusSchedulerNameSpec);
-    }
+    LOG.info("No ZooKeeper client, service registration disabled.");
+    return zkClient == null ? null
+        : new ServerSet(zkClient, ZooDefs.Ids.OPEN_ACL_UNSAFE, options.nexusSchedulerNameSpec);
   }
 
   @Provides
@@ -95,28 +86,12 @@ public class SchedulerModule extends AbstractModule {
     String nexusMaster = options.nexusMasterAddress;
     if (nexusMaster == null) {
       try {
-        // TODO(wfarner): Make this more durable - should connect to new master if the
-        // candidacy changes.
-        LOG.info("Fetching elected nexus master.");
-        Group masterGroup = new Group(zkClient, ZooDefs.Ids.OPEN_ACL_UNSAFE,
-            options.nexusMasterNameSpec);
-        masterGroup.setGroupNodeNameFilter(Predicates.<String>alwaysTrue());
-
-        final Candidate masterCandidate = new Candidate(masterGroup);
-        masterCandidate.watchLeader(new Candidate.LeaderChangeListener() {
-          @Override public void onLeaderChange(String leaderId) {
-            LOG.info("Received notification of nexus master group change: " + leaderId);
-          }
-        });
-
-        nexusMaster = masterCandidate.getLeaderId();
-        LOG.info("Elected master id: " + nexusMaster);
+        Stat stat = zkClient.get().exists(options.nexusMasterNameSpec, false);
+        nexusMaster = new String(zkClient.get().getData(options.nexusMasterNameSpec, false, stat));
       } catch (ZooKeeperClient.ZooKeeperConnectionException e) {
         LOG.log(Level.SEVERE, "Failed to connect to ZooKeeper.", e);
       } catch (KeeperException e) {
         LOG.log(Level.SEVERE, "Failed while reading from ZooKeeper.", e);
-      } catch (Group.WatchException e) {
-        LOG.log(Level.SEVERE, "Failed to watch master server set for leader changes.", e);
       } catch (InterruptedException e) {
         LOG.log(Level.SEVERE, "Interrupted while reading from ZooKeeper.", e);
       }

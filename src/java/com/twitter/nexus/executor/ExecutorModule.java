@@ -57,15 +57,4 @@ public class ExecutorModule extends AbstractModule {
       }
     };
   }
-
-  @Provides
-  @Singleton
-  public SocketManager provideSocketManager() {
-    String[] portRange = options.managedPortRange.split("-");
-    if (portRange.length != 2) {
-      throw new IllegalArgumentException("Malformed managed port range value: " + options.managedPortRange);
-    }
-
-    return new SocketManager(Integer.parseInt(portRange[0]), Integer.parseInt(portRange[1]));
-  }
 }

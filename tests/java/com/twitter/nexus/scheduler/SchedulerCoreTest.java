@@ -41,7 +41,7 @@ public class SchedulerCoreTest {
   private static final String JOB_NAME_B = "Test_Job_B";
   private static final String JOB_OWNER_B = "Test_Owner_B";
 
-  private static final String SLAVE_ID = "SlaveId";
+  private static final int SLAVE_ID = 5;
 
   @Before
   public void setUp() {
@@ -244,7 +244,7 @@ public class SchedulerCoreTest {
         .build());
   }
 
-  private static SlaveOffer makeOffer(String slaveId, int cpus, long ramBytes) {
+  private static SlaveOffer makeOffer(int slaveId, int cpus, long ramBytes) {
     SlaveOffer offer = new SlaveOffer();
     offer.setSlaveId(slaveId);
     offer.setHost("Host_" + slaveId);
