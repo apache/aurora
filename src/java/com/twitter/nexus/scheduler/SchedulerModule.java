@@ -102,12 +102,21 @@ public class SchedulerModule extends AbstractModule {
             options.nexusMasterNameSpec);
         masterGroup.setGroupNodeNameFilter(Predicates.<String>alwaysTrue());
 
-        nexusMaster = new Candidate(masterGroup).getLeaderId();
+        final Candidate masterCandidate = new Candidate(masterGroup);
+        masterCandidate.watchLeader(new Candidate.LeaderChangeListener() {
+          @Override public void onLeaderChange(String leaderId) {
+            LOG.info("Received notification of nexus master group change: " + leaderId);
+          }
+        });
+
+        nexusMaster = masterCandidate.getLeaderId();
         LOG.info("Elected master id: " + nexusMaster);
       } catch (ZooKeeperClient.ZooKeeperConnectionException e) {
         LOG.log(Level.SEVERE, "Failed to connect to ZooKeeper.", e);
       } catch (KeeperException e) {
         LOG.log(Level.SEVERE, "Failed while reading from ZooKeeper.", e);
+      } catch (Group.WatchException e) {
+        LOG.log(Level.SEVERE, "Failed to watch master server set for leader changes.", e);
       } catch (InterruptedException e) {
         LOG.log(Level.SEVERE, "Interrupted while reading from ZooKeeper.", e);
       }
