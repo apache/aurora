@@ -19,7 +19,7 @@ public class ExecutorHub extends Executor {
     System.loadLibrary("nexus");
   }
 
-  private static final Logger LOG = Logger.getLogger(ExecutorHub.class.getName());
+  private static Logger LOG = Logger.getLogger(ExecutorHub.class.getName());
   private final TDeserializer deserializer = new TDeserializer();
   private final static byte[] EMPTY_BYTE_ARRAY = new byte[0];
 

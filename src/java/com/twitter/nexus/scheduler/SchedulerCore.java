@@ -43,7 +43,7 @@ public interface SchedulerCore {
    * @param driver The registered driver reference.
    * @param frameworkId Framework ID.
    */
-  public void registered(SchedulerDriver driver, String frameworkId);
+  public void registered(SchedulerDriver driver, int frameworkId);
 
   /**
    * Fetches information about all registered tasks for a job.

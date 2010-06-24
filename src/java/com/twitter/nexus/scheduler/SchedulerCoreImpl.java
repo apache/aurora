@@ -1,5 +1,6 @@
 package com.twitter.nexus.scheduler;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
@@ -9,7 +10,9 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
+import com.twitter.common.base.Closure;
 import com.twitter.common.base.ExceptionalClosure;
+import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.nexus.gen.JobConfiguration;
 import com.twitter.nexus.gen.ScheduleStatus;
 import com.twitter.nexus.gen.SchedulerState;
@@ -18,16 +21,19 @@ import com.twitter.nexus.gen.TrackedTask;
 import com.twitter.nexus.gen.TwitterTaskInfo;
 import com.twitter.nexus.scheduler.configuration.ConfigurationManager;
 import com.twitter.nexus.scheduler.persistence.PersistenceLayer;
+import nexus.FrameworkMessage;
 import nexus.SchedulerDriver;
 import nexus.SlaveOffer;
 import nexus.StringMap;
 import nexus.TaskDescription;
 import org.apache.commons.lang.StringUtils;
 
+import javax.annotation.Nullable;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -47,8 +53,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
   // in favor of tasks being canonically named by job/taskIndex.
   private int nextTaskId = 0;
 
-  // The nexus framework ID of the scheduler, set to null until the framework is registered.
-  private final AtomicReference<String> frameworkId = new AtomicReference<String>(null);
+  // The nexus framework ID of the scheduler, set to -1 until the framework is registered.
+  private final AtomicInteger frameworkId = new AtomicInteger(-1);
 
   // Stores the configured tasks.
   private TaskStore taskStore = new TaskStore();
@@ -77,9 +83,9 @@ public class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public void registered(SchedulerDriver driver, String frameworkId) {
+  public void registered(SchedulerDriver driver, int frameworkId) {
     this.schedulerDriver.set(Preconditions.checkNotNull(driver));
-    this.frameworkId.set(Preconditions.checkNotNull(frameworkId));
+    this.frameworkId.set(frameworkId);
   }
 
   @Override
@@ -207,7 +213,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
       throw new ScheduleException("Internal error.", e);
     }
 
-    LOG.info(String.format("Offer on slave %s (id %s) is being assigned task for %s/%s.",
+    LOG.info(String.format("Offer on slave %s (id %d) is being assigned task for %s/%s.",
         slaveOffer.getHost(), task.slaveId, task.getOwner(), task.getJobName()));
 
     persist();
@@ -255,7 +261,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
                  + mutable.getOwner() + "/" + mutable.getJobName());
         mutable.setStatus(ScheduleStatus.PENDING);
         mutable.setSlaveIdIsSet(false);
-        mutable.setSlaveId(null);
+        mutable.setSlaveId(-1);
       }
     });
 
@@ -312,13 +318,14 @@ public class SchedulerCoreImpl implements SchedulerCore {
   private void doWorkWithDriver(final Function<SchedulerDriver, Integer> work) {
     workQueue.doWork(new Callable<Boolean>() {
       @Override public Boolean call() {
-        if (frameworkId.get() == null) {
+        if (frameworkId.get() == -1) {
           LOG.info("Unable to send framework messages, framework not registered.");
           return false;
         }
 
         // TODO(wfarner): What happens when this fails?  Do we have to reconnect manually, or does
         // the driver automatically try to reconnect when it sends a non-zero status code?
+        // TODO(wfarner): This should queue requests that have non-zero status codes.
         SchedulerDriver driver = schedulerDriver.get();
         return driver != null && work.apply(driver) == 0;
       }
@@ -338,11 +345,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
         // empty byte array with a serialized message.
         doWorkWithDriver(new Function<SchedulerDriver, Integer>() {
           @Override public Integer apply(SchedulerDriver driver) {
-            // TODO(wfarner): slave IDs are now strings, but FrameworkMessage expects a slave to
-            //    be identified as an integer.
-            return null;
-            //return driver.sendFrameworkMessage(
-            //    new FrameworkMessage(frameworkId.get(), task.slaveId, new byte[0]));
+            return driver.sendFrameworkMessage(
+                new FrameworkMessage(frameworkId.get(), task.slaveId, new byte[0]));
           }
         });
       }
@@ -389,7 +393,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     // Clear fields associated with unknown state.
     List<TrackedTask> restoredTasks = state.getConfiguredTasks();
     for (TrackedTask task : restoredTasks) {
-      task.setSlaveId(null).setSlaveHost(null);
+      task.setSlaveId(-1).setSlaveHost(null);
       switch (task.getStatus()) {
         case RUNNING:
         case STARTING:
