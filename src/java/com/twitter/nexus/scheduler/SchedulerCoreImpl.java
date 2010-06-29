@@ -328,6 +328,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
         // TODO(wfarner): What happens when this fails?  Do we have to reconnect manually, or does
         // the driver automatically try to reconnect when it sends a non-zero status code?
+        // TODO(wfarner): This should queue requests that have non-zero status codes.
         SchedulerDriver driver = schedulerDriver.get();
         return driver != null && work.apply(driver) == 0;
       }
