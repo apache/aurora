@@ -41,7 +41,7 @@ public class SchedulerCoreTest {
   private static final String JOB_NAME_B = "Test_Job_B";
   private static final String JOB_OWNER_B = "Test_Owner_B";
 
-  private static final int SLAVE_ID = 5;
+  private static final String SLAVE_ID = "SlaveId";
 
   @Before
   public void setUp() {
@@ -238,13 +238,14 @@ public class SchedulerCoreTest {
 
   private static TwitterTaskInfo defaultTask() {
     return new TwitterTaskInfo().setConfiguration(ImmutableMap.<String, String>builder()
+        .put("start_command", "date")
         .put("cpus", "1.0")
         .put("ram_bytes", Long.toString(ONE_GB))
         .put("hdfs_path", "/fake/path")
         .build());
   }
 
-  private static SlaveOffer makeOffer(int slaveId, int cpus, long ramBytes) {
+  private static SlaveOffer makeOffer(String slaveId, int cpus, long ramBytes) {
     SlaveOffer offer = new SlaveOffer();
     offer.setSlaveId(slaveId);
     offer.setHost("Host_" + slaveId);

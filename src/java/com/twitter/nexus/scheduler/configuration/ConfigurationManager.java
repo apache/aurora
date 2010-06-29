@@ -15,6 +15,8 @@ import java.util.logging.Logger;
  * Manages translation from a string-mapped configuration to a concrete configuration type, and
  * defaults for optional values.
  *
+ * TODO(wfarner): Add input validation to all fields (strings not empty, positive ints, etc).
+ *
  * @author wfarner
  */
 public class ConfigurationManager {
@@ -25,6 +27,7 @@ public class ConfigurationManager {
   private static final long DEFAULT_RAM_BYTES = Amount.of(1, Data.GB).as(Data.BYTES);
   private static final long DEFAULT_DISK_BYTES = Amount.of(1, Data.GB).as(Data.BYTES);
   private static final int DEFAULT_PRIORITY = 0;
+  private static final int DEFAULT_HEALTH_CHECK_INTERVAL_SECS = 30;
 
   public static TwitterTaskInfo populateFields(JobConfiguration job, TwitterTaskInfo config)
       throws TaskDescriptionException {
@@ -38,12 +41,14 @@ public class ConfigurationManager {
         .setOwner(job.getOwner())
         .setJobName(job.getName())
         .setHdfsPath(getValue(configMap, "hdfs_path", String.class))
-        .setStartCommand(getValue(configMap, "start_command", "", String.class))
+        .setStartCommand(getValue(configMap, "start_command", String.class))
         .setIsDaemon(getValue(configMap, "daemon", DEFAULT_TO_DAEMON, Boolean.class))
         .setNumCpus(getValue(configMap, "num_cpus", DEFAULT_NUM_CPUS, Double.class))
         .setRamBytes(getValue(configMap, "ram_bytes", DEFAULT_RAM_BYTES, Long.class))
         .setDiskBytes(getValue(configMap, "disk_bytes", DEFAULT_DISK_BYTES, Long.class))
-        .setPriority(getValue(configMap, "priority", DEFAULT_PRIORITY, Integer.class));
+        .setPriority(getValue(configMap, "priority", DEFAULT_PRIORITY, Integer.class))
+        .setHealthCheckIntervalSecs(getValue(configMap, "health_check_interval_secs",
+            DEFAULT_HEALTH_CHECK_INTERVAL_SECS, Integer.class));
 
     // Only one of [daemon=true, cron_schedule] may be set.
     if (!StringUtils.isEmpty(job.getCronSchedule()) && config.isIsDaemon()) {

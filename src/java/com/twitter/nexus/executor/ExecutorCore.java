@@ -45,6 +45,9 @@ public class ExecutorCore {
   private ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier;
 
   @Inject
+  SocketManager socketManager;
+
+  @Inject
   private ExecutorCore(ExecutorMain.TwitterExecutorOptions options) {
     taskRootDir = Preconditions.checkNotNull(options.taskRootDir);
     if (!taskRootDir.exists()) {
@@ -57,7 +60,7 @@ public class ExecutorCore {
   public void executePendingTask(final ExecutorDriver driver, final TwitterTaskInfo taskInfo,
                                  final TaskDescription task) {
     LOG.info("Received task for execution: " + taskInfo);
-    final RunningTask runningTask = new RunningTask(
+    final RunningTask runningTask = new RunningTask(socketManager,
         taskRootDir, task.getTaskId(), taskInfo, fileCopier);
 
     try {
@@ -65,6 +68,10 @@ public class ExecutorCore {
       runningTask.launch();
     } catch (RunningTask.ProcessException e) {
       LOG.log(Level.SEVERE, "Failed to stage task " + task.getTaskId(), e);
+      sendStatusUpdate(driver, new TaskStatus(task.getTaskId(), TaskState.TASK_FAILED, EMPTY_MSG));
+      return;
+    } catch (Throwable t) {
+      LOG.log(Level.SEVERE, "Unhandled exception while launching task.", t);
       sendStatusUpdate(driver, new TaskStatus(task.getTaskId(), TaskState.TASK_FAILED, EMPTY_MSG));
       return;
     }
@@ -75,7 +82,7 @@ public class ExecutorCore {
       @Override public void run() {
         LOG.info("Waiting for process to complete...");
         TaskState state = runningTask.waitFor();
-        LOG.info("Process completed.");
+        LOG.info("Process completed in state " + state);
 
         tasks.remove(task.getTaskId());
         sendStatusUpdate(driver, new TaskStatus(task.getTaskId(), state, EMPTY_MSG));
@@ -88,14 +95,7 @@ public class ExecutorCore {
 
     if (task != null) {
       LOG.info("Killing task: " + task);
-      task.kill();
-
-      if (driver != null) {
-        sendStatusUpdate(driver, new TaskStatus(taskId, TaskState.TASK_KILLED, EMPTY_MSG));
-      } else {
-        // TODO(flo): Remove this once a driver reference is retained and auto-reconnects.
-        LOG.warning("No driver available, unable to send status signals.");
-      }
+      task.terminate(TaskState.TASK_KILLED);
     } else {
       LOG.severe("No such task found: " + taskId);
     }

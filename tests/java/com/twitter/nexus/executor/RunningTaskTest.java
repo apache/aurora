@@ -4,6 +4,7 @@ import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.io.Files;
+import com.twitter.common.Pair;
 import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.common.io.FileUtils;
 import com.twitter.nexus.gen.TwitterTaskInfo;
@@ -16,10 +17,10 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.Map;
 
 import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
+import static org.junit.Assert.*;
 
 /**
  * Tests for RunningTask.
@@ -37,35 +38,39 @@ public class RunningTaskTest {
       .setJobName("JOB_A")
       .setStartCommand("touch a.txt")
       .setHdfsPath("/fake/path");
-  private RunningTask taskA;
+  private TwitterTaskInfo taskObj;
+  private SocketManager socketManager;
 
   @Before
   public void setUp() throws Exception {
     executorRoot = FileUtils.createTempDir();
-    taskA = new RunningTask(executorRoot, TASK_ID_A, TASK_A, FILE_COPIER);
+    taskObj = new TwitterTaskInfo(TASK_A);
+    socketManager = new SocketManager(10000, 11000);
   }
 
   @After
-  public void tearDown() {
+  public void tearDown() throws Exception {
     try {
-      org.apache.commons.io.FileUtils.deleteDirectory(executorRoot);
-    } catch (IOException e) {
+      if (executorRoot.exists()) org.apache.commons.io.FileUtils.deleteDirectory(executorRoot);
+    } catch (Throwable t) {
       // TODO(wfarner): Figure out why this fails occasionally.
     }
   }
 
   @Test
   public void testStage() throws Exception {
-    TASK_A.setStartCommand("touch a.txt");
+    taskObj.setStartCommand("touch a.txt");
+    RunningTask taskA = new RunningTask(socketManager, executorRoot, TASK_ID_A, taskObj, COPIER);
     taskA.stage();
-    assertDirContents(executorRoot, TASK_A.getOwner());
-    assertDirContents(new File(executorRoot, TASK_A.getOwner()), TASK_A.getJobName());
+    assertDirContents(executorRoot, taskObj.getOwner());
+    assertDirContents(new File(executorRoot, taskObj.getOwner()), taskObj.getJobName());
     assertThat(taskA.taskRoot.getParentFile().list().length, is(1));
   }
 
   @Test
   public void testLaunchCreatesOutputFile() throws Exception {
-    TASK_A.setStartCommand("touch a.txt");
+    taskObj.setStartCommand("touch a.txt");
+    RunningTask taskA = new RunningTask(socketManager, executorRoot, TASK_ID_A, taskObj, COPIER);
     taskA.stage();
     taskA.launch();
     assertThat(taskA.waitFor(), is(TaskState.TASK_FINISHED));
@@ -74,7 +79,8 @@ public class RunningTaskTest {
 
   @Test
   public void testLaunchCapturesStdout() throws Exception {
-    TASK_A.setStartCommand("echo \"hello world\"");
+    taskObj.setStartCommand("echo \"hello world\"");
+    RunningTask taskA = new RunningTask(socketManager, executorRoot, TASK_ID_A, taskObj, COPIER);
     taskA.stage();
     taskA.launch();
     assertThat(taskA.waitFor(), is(TaskState.TASK_FINISHED));
@@ -86,7 +92,8 @@ public class RunningTaskTest {
 
   @Test
   public void testLaunchErrorCode() throws Exception {
-    TASK_A.setStartCommand("exit 2");
+    taskObj.setStartCommand("exit 2");
+    RunningTask taskA = new RunningTask(socketManager, executorRoot, TASK_ID_A, taskObj, COPIER);
     taskA.stage();
     taskA.launch();
     assertThat(taskA.waitFor(), is(TaskState.TASK_FAILED));
@@ -94,9 +101,11 @@ public class RunningTaskTest {
   }
 
   @Test
+  // TODO(wfarner): This test is flaky when running from the command line - figure out
+  // a better way to do this.
   public void testKill() throws Exception {
     /** TODO(wfarner): Fix this flaky test.
-    TASK_A.setStartCommand("touch b.txt; sleep 10");
+    taskObj.setStartCommand("touch b.txt; sleep 10");
     taskA.stage();
     taskA.launch();
 
@@ -124,12 +133,138 @@ public class RunningTaskTest {
   }
 
   @Test
+  public void testHealthCheckNoResponse() throws Exception {
+    // TODO(wfarner): Change this into something that can actually be run as a unit test.
+    /*
+    taskObj.setStartCommand("echo '%port:health%'; sleep 45");
+    taskA.socketManager = new SocketManager(10000, 11000);
+    taskA.stage();
+    taskA.launch();
+    assertThat(taskA.waitFor(), is(TaskState.TASK_FAILED));
+    assertThat(taskA.getExitCode(), is(2));
+    */
+  }
+
+  @Test
+  public void testReleasesPortsNormalShutdown() throws Exception {
+    taskObj.setStartCommand("echo '%port:myport%'");
+    SocketManager socketManager = new SocketManager(10000, 10001);
+    RunningTask taskA = new RunningTask(socketManager, executorRoot, TASK_ID_A, taskObj, COPIER);
+    taskA.stage();
+    taskA.launch();
+
+    // Lease the remaining socket.
+    socketManager.leaseSocket();
+
+    // Subsequent leases should fail.
+    try {
+      socketManager.leaseSocket();
+      fail();
+    } catch (SocketManager.SocketLeaseException e) {
+      // Expected.
+    }
+
+    assertThat(taskA.waitFor(), is(TaskState.TASK_FINISHED));
+
+    // Should be able to lease one socket, since one was freed when the task terminated.
+    socketManager.leaseSocket();
+  }
+
+  @Test
+  public void testReleasesPortsKill() throws Exception {
+    taskObj.setStartCommand("echo '%port:myport%'; sleep 10");
+    SocketManager socketManager = new SocketManager(10000, 10001);
+    RunningTask taskA = new RunningTask(socketManager, executorRoot, TASK_ID_A, taskObj, COPIER);
+    taskA.stage();
+    taskA.launch();
+
+    // Lease the remaining socket.
+    socketManager.leaseSocket();
+
+    // Subsequent leases should fail.
+    try {
+      socketManager.leaseSocket();
+      fail();
+    } catch (SocketManager.SocketLeaseException e) {
+      // Expected.
+    }
+
+    taskA.terminate(TaskState.TASK_KILLED);
+
+    // Should be able to lease one socket, since one was freed when the task was killed.
+    socketManager.leaseSocket();
+  }
+
+  @Test
+  public void testLeasePort() throws Exception {
+    taskObj.setStartCommand("echo '%port:http%'");
+    RunningTask taskA = new RunningTask(socketManager, executorRoot, TASK_ID_A, taskObj, COPIER);
+
+    Pair<String, Map<String, Integer>> expanded = taskA.expandCommandLine();
+
+    assertThat(expanded.getFirst().matches("echo '\\d+'"), is(true));
+    Map<String, Integer> assignedPorts = expanded.getSecond();
+    assertMappedValuesRange(assignedPorts, 10000, 11000, "http");
+  }
+
+  @Test
+  public void testLeasePorts() throws Exception {
+    taskObj.setStartCommand("echo '%port:http%'; echo '%port:thrift%'; echo '%port:mail%'");
+    RunningTask taskA = new RunningTask(socketManager, executorRoot, TASK_ID_A, taskObj, COPIER);
+
+    Pair<String, Map<String, Integer>> expanded = taskA.expandCommandLine();
+
+    assertThat(expanded.getFirst().matches("echo '\\d+'; echo '\\d+'; echo '\\d+'"), is(true));
+    Map<String, Integer> assignedPorts = expanded.getSecond();
+    assertMappedValuesRange(assignedPorts, 10000, 11000, "http", "thrift", "mail");
+  }
+
+  @Test
+  public void testLeasePortsDuplicateName() throws Exception {
+    taskObj.setStartCommand("echo '%port:http%'; echo '%port:http%'");
+    RunningTask taskA = new RunningTask(socketManager, executorRoot, TASK_ID_A, taskObj, COPIER);
+
+    try {
+      taskA.expandCommandLine();
+      fail();
+    } catch (RunningTask.ProcessException e) {
+      // Expected.
+    }
+  }
+
+  @Test
+  public void testLeasePortsNoneAvailable() throws Exception {
+    taskObj.setStartCommand("echo '%port:http%'; echo '%port:thrift%'; echo '%port:mail%'");
+    SocketManager socketManager = new SocketManager(10000, 10001);
+    RunningTask taskA = new RunningTask(socketManager, executorRoot, TASK_ID_A, taskObj, COPIER);
+
+    try {
+      taskA.expandCommandLine();
+      fail();
+    } catch (SocketManager.SocketLeaseException e) {
+      // Expected
+    }
+  }
+
+  @Test
   public void testTearDown() throws Exception {
+    RunningTask taskA = new RunningTask(socketManager, executorRoot, TASK_ID_A, taskObj, COPIER);
     taskA.stage();
     taskA.launch();
     taskA.tearDown();
 
     assertThat(Lists.newArrayList(executorRoot.list()), is(new ArrayList<String>()));
+  }
+
+  private void assertMappedValuesRange(Map<String, Integer> map, int min, int max, String... keys) {
+    assertThat(map.size(), is(keys.length));
+    for (String key : keys) {
+      assertThat(map.containsKey(key), is(true));
+      int value = map.get(key);
+      assertThat(value >= min, is(true));
+      assertThat(value <= max, is(true));
+    }
+    assertThat(Sets.newHashSet(map.values()).size(), is(keys.length));
   }
 
   private void assertDirContents(File dir, String... children) {
@@ -138,7 +273,7 @@ public class RunningTaskTest {
     assertThat(Sets.newHashSet(dir.list()), is(Sets.newHashSet(children)));
   }
 
-  private static final ExceptionalFunction<FileCopyRequest, File, IOException> FILE_COPIER =
+  private static final ExceptionalFunction<FileCopyRequest, File, IOException> COPIER =
       new ExceptionalFunction<FileCopyRequest, File, IOException>() {
         @Override public File apply(FileCopyRequest copy) throws IOException {
           return new File(copy.getDestPath());

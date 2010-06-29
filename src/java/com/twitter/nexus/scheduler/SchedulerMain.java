@@ -5,18 +5,19 @@ import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
 import com.google.inject.Module;
 import com.twitter.common.args.Option;
+import com.twitter.common.base.Closure;
 import com.twitter.common.base.Command;
+import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.process.GuicedProcess;
 import com.twitter.common.process.GuicedProcessOptions;
+import com.twitter.common.zookeeper.Candidate;
 import com.twitter.common.zookeeper.Group;
 import com.twitter.common.zookeeper.ServerSet;
 import com.twitter.nexus.gen.NexusSchedulerManager;
-import com.twitter.thrift.Status;
 import nexus.NexusSchedulerDriver;
 import org.apache.thrift.TException;
 import org.apache.thrift.transport.TTransportException;
 
-import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -74,14 +75,13 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
   }
 
   @Inject
-  private NexusSchedulerImpl scheduler;
+  private Group schedulerGroup;
+
+  @Inject
+  private ServerSet schedulerServerSet;
 
   @Inject
   private SchedulerThriftInterface schedulerThriftInterface;
-
-  @Inject
-  @Nullable
-  private ServerSet nexusSchedulerServerSet;
 
   @Inject
   private NexusSchedulerDriver driver;
@@ -92,13 +92,13 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
   }
 
   @Override
-  protected void runProcess() {
+  protected void runProcess() throws Exception {
     Preconditions.checkNotNull(driver);
     driver.start();
 
-    ServerSet.EndpointStatus endpointStatus = null;
+    int port = -1;
     try {
-      endpointStatus = startThriftServer();
+      port = startThriftServer();
     } catch (IOException e) {
       LOG.log(Level.SEVERE, "Failed to start thrift server.", e);
     } catch (TTransportException e) {
@@ -108,25 +108,20 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
     } catch (InterruptedException e) {
       LOG.log(Level.SEVERE, "Interrupted while starting thrift server.", e);
     }
+    if (port == -1) return;
 
-    if (endpointStatus != null) {
-      try {
-        endpointStatus.update(Status.ALIVE);
-      } catch (ServerSet.UpdateException e) {
-        LOG.log(Level.SEVERE, "Failed to update server status in ZooKeeper.", e);
-      } catch (InterruptedException e) {
-        LOG.log(Level.SEVERE, "Interrupted while updating server status in ZooKeeper.", e);
-      }
+    if (schedulerGroup != null && schedulerServerSet != null) {
+      leadServerGroup(schedulerGroup, port, new Runnable() {
+        @Override public void run() {
+          // TODO(wfarner): Connect to nexus master here once nexus-core supports reconnects.
+        }
+      });
     }
 
     waitForEver();
   }
 
-  protected boolean checkOptions() {
-    return true;
-  }
-
-  private ServerSet.EndpointStatus startThriftServer() throws IOException, TTransportException,
+  private int startThriftServer() throws IOException, TTransportException,
       Group.JoinException, InterruptedException {
     schedulerThriftInterface.start(0,
         new NexusSchedulerManager.Processor(schedulerThriftInterface));
@@ -142,15 +137,7 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
       }
     });
 
-    if (nexusSchedulerServerSet == null ) {
-      LOG.warning("Not registering server with ZooKeeper.");
-      return null;
-    } else {
-      LOG.info("Registering host in server set " + getOptions().nexusSchedulerNameSpec
-               + " as listening on port " + schedulerThriftInterface.getListeningPort());
-      return joinServerSet(nexusSchedulerServerSet, schedulerThriftInterface.getListeningPort(),
-          Status.STARTING);
-    }
+    return schedulerThriftInterface.getListeningPort();
   }
 
   public static void main(String[] args) throws Exception {

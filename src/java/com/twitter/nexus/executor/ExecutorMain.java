@@ -26,6 +26,10 @@ public class ExecutorMain extends InjectableMain<ExecutorMain.TwitterExecutorOpt
 
     @Option(name = "task_root_dir", required = true, usage = "Nexus task working directory root.")
     public File taskRootDir;
+
+    @Option(name = "managed_port_range",
+        usage = "Port range that the executor should manage, format: min-max")
+    public String managedPortRange = "50000-60000";
   }
 
   @Inject
