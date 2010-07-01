@@ -1,7 +1,6 @@
 package com.twitter.nexus.scheduler;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
@@ -10,20 +9,19 @@ import com.google.inject.Singleton;
 import com.twitter.common.process.GuicedProcess;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
-import com.twitter.common.zookeeper.Candidate;
-import com.twitter.common.zookeeper.Group;
-import com.twitter.common.zookeeper.ServerSet;
+import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
+import com.twitter.nexus.gen.SchedulerState;
 import com.twitter.nexus.scheduler.httphandlers.SchedulerzHome;
 import com.twitter.nexus.scheduler.httphandlers.SchedulerzJob;
 import com.twitter.nexus.scheduler.httphandlers.SchedulerzUser;
+import com.twitter.nexus.scheduler.persistence.Codec;
+import com.twitter.nexus.scheduler.persistence.EncodingPersistenceLayer;
 import com.twitter.nexus.scheduler.persistence.FileSystemPersistence;
 import com.twitter.nexus.scheduler.persistence.PersistenceLayer;
+import com.twitter.nexus.scheduler.persistence.ThriftBinaryCodec;
 import com.twitter.nexus.scheduler.persistence.ZooKeeperPersistence;
 import nexus.NexusSchedulerDriver;
-import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.ZooDefs;
-import org.apache.zookeeper.data.Stat;
 
 import javax.annotation.Nullable;
 import java.util.logging.Level;
@@ -70,72 +68,53 @@ public class SchedulerModule extends AbstractModule {
   @Provides
   @Nullable
   @Singleton
-  Group provideGroup(@Nullable ZooKeeperClient zkClient) {
+  SingletonService provideSingletonService(@Nullable ZooKeeperClient zkClient) {
     if (zkClient == null) {
       LOG.info("Leader election disabled since ZooKeeper integration is disabled.");
       return null;
     }
-    return new Group(zkClient, ZooDefs.Ids.OPEN_ACL_UNSAFE, options.nexusSchedulerNameSpec);
+
+    return new SingletonService(zkClient, options.nexusSchedulerNameSpec);
   }
 
   @Provides
-  @Singleton
-  final ServerSet provideSchedulerServerSet(@Nullable ZooKeeperClient zkClient) {
-    if (zkClient == null) {
-      LOG.info("No ZooKeeper client, service registration disabled.");
-      return null;
-    } else {
-      return new ServerSet(zkClient, ZooDefs.Ids.OPEN_ACL_UNSAFE, options.nexusSchedulerNameSpec);
-    }
-  }
+  final PersistenceLayer<SchedulerState> providePersistenceLayer(
+      @Nullable ZooKeeperClient zkClient) {
+    Codec<SchedulerState, byte[]> codec = new ThriftBinaryCodec<SchedulerState>() {
+      @Override public SchedulerState createInputInstance() {
+        return new SchedulerState();
+      }
+    };
 
-  @Provides
-  final PersistenceLayer providePersistenceLayer() {
+    PersistenceLayer<byte[]> binaryPersistence;
     if (options.schedulerPersistenceZooKeeperPath == null) {
-      return new FileSystemPersistence(options.schedulerPersistenceLocalPath);
+      binaryPersistence = new FileSystemPersistence(options.schedulerPersistenceLocalPath);
     } else {
-      return new ZooKeeperPersistence(options.schedulerPersistenceZooKeeperPath,
+      if (zkClient == null) {
+        throw new IllegalArgumentException(
+            "ZooKeeper client must be available for ZooKeeper persistence layer.");
+      }
+
+      binaryPersistence = new ZooKeeperPersistence(zkClient,
+          options.schedulerPersistenceZooKeeperPath,
           options.schedulerPersistenceZooKeeperVersion);
     }
+
+    return new EncodingPersistenceLayer<SchedulerState, byte[]>(binaryPersistence, codec);
   }
 
   @Provides
   @Singleton
   final NexusSchedulerDriver provideNexusSchedulerDriver(NexusSchedulerImpl scheduler,
-      ZooKeeperClient zkClient) {
-    String nexusMaster = options.nexusMasterAddress;
-    if (nexusMaster == null) {
-      try {
-        // TODO(wfarner): Make this more durable - should connect to new master if the
-        // candidacy changes.
-        LOG.info("Fetching elected nexus master.");
-        Group masterGroup = new Group(zkClient, ZooDefs.Ids.OPEN_ACL_UNSAFE,
-            options.nexusMasterNameSpec);
-        masterGroup.setGroupNodeNameFilter(Predicates.<String>alwaysTrue());
+      SchedulerCore schedulerCore) {
+    LOG.info("Connecting to nexus master: " + options.nexusMasterAddress);
 
-        final Candidate masterCandidate = new Candidate(masterGroup);
-        masterCandidate.watchLeader(new Candidate.LeaderChangeListener() {
-          @Override public void onLeaderChange(String leaderId) {
-            LOG.info("Received notification of nexus master group change: " + leaderId);
-          }
-        });
-
-        nexusMaster = masterCandidate.getLeaderId();
-        LOG.info("Elected master id: " + nexusMaster);
-      } catch (ZooKeeperClient.ZooKeeperConnectionException e) {
-        LOG.log(Level.SEVERE, "Failed to connect to ZooKeeper.", e);
-      } catch (KeeperException e) {
-        LOG.log(Level.SEVERE, "Failed while reading from ZooKeeper.", e);
-      } catch (Group.WatchException e) {
-        LOG.log(Level.SEVERE, "Failed to watch master server set for leader changes.", e);
-      } catch (InterruptedException e) {
-        LOG.log(Level.SEVERE, "Interrupted while reading from ZooKeeper.", e);
-      }
+    String frameworkId = schedulerCore.getFrameworkId();
+    if (frameworkId != null) {
+      LOG.info("Found persisted framework ID: " + frameworkId);
+      return new NexusSchedulerDriver(scheduler, options.nexusMasterAddress, frameworkId);
+    } else {
+      return new NexusSchedulerDriver(scheduler, options.nexusMasterAddress);
     }
-
-    if (nexusMaster == null) throw new RuntimeException("Unable to continue without nexus master.");
-
-    LOG.info("Connecting to nexus master: " + nexusMaster);
-    return new NexusSchedulerDriver(scheduler, nexusMaster);
   }
 }

@@ -11,12 +11,13 @@ import com.twitter.nexus.gen.TaskQuery;
 import com.twitter.nexus.gen.TrackedTask;
 import org.apache.commons.lang.StringUtils;
 
-import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.List;
 
 /**
  * Stores all tasks configured with the scheduler.
+ *
+ * TODO(wfarner): Make this the owner of SchedulerState, and persistence.
  *
  * @author wfarner
  */

@@ -2,6 +2,7 @@ package com.twitter.nexus.scheduler.persistence;
 
 import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
+import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
@@ -17,18 +18,18 @@ import java.util.logging.Logger;
  *
  * @author wfarner
  */
-public class ZooKeeperPersistence implements PersistenceLayer {
+public class ZooKeeperPersistence implements PersistenceLayer<byte[]> {
   private final static Logger LOG = Logger.getLogger(ZooKeeperPersistence.class.getName());
 
   private final String path;
   private final int version;
 
-  @Inject
-  private ZooKeeperClient zkClient;
+  private final ZooKeeperClient zkClient;
 
-  public ZooKeeperPersistence(String path, int version) {
+  public ZooKeeperPersistence(ZooKeeperClient zkClient, String path, int version) {
+    this.zkClient = Preconditions.checkNotNull(zkClient);
     this.version = version;
-    this.path = Preconditions.checkNotNull(path);
+    this.path = MorePreconditions.checkNotBlank(path);
   }
 
   @Override

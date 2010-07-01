@@ -5,10 +5,10 @@ package com.twitter.nexus.scheduler.persistence;
  *
  * @author wfarner
  */
-public interface PersistenceLayer {
-  public byte[] fetch() throws PersistenceException;
+public interface PersistenceLayer<T> {
+  public T fetch() throws PersistenceException;
 
-  public void commit(byte[] data) throws PersistenceException;
+  public void commit(T data) throws PersistenceException;
 
   class PersistenceException extends Exception {
     public PersistenceException(String msg, Throwable t) {

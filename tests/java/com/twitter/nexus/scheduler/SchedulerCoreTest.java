@@ -26,6 +26,12 @@ import static org.junit.Assert.fail;
 /**
  * Unit test for the SchedulerCore.
  *
+ * TODO(wfarner): Test all the different cases for setTaskStaus:
+ *    - Killed tasks get removed.
+ *    - Failed tasks have failed count incremented.
+ *    - Tasks above maxTaskFailures have _all_ tasks in the job removed.
+ *    - Daemon tasks are rescheduled.
+ *
  * @author wfarner
  */
 public class SchedulerCoreTest {
@@ -131,7 +137,6 @@ public class SchedulerCoreTest {
     // Schedule 5 daemon and 5 non-daemon tasks.
     scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, TASK_A, 5));
     TwitterTaskInfo task = new TwitterTaskInfo(TASK_A);
-    task.setConfiguration(Maps.newHashMap(task.getConfiguration()));
     task.putToConfiguration("daemon", "true");
     scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A + "daemon", task, 5));
 
@@ -155,6 +160,37 @@ public class SchedulerCoreTest {
         new TaskQuery().setStatuses(Sets.newHashSet(ScheduleStatus.PENDING)))),
         is(5));
     assertTaskCount(5);
+  }
+
+  @Test
+  public void testFailedTaskIncrementsFailureCount() throws Exception {
+    int maxFailures = 5;
+    TwitterTaskInfo task = new TwitterTaskInfo(TASK_A);
+    task.putToConfiguration("max_task_failures", String.valueOf(maxFailures));
+    JobConfiguration job = makeJob(JOB_OWNER_A, JOB_NAME_A, task, 1);
+    scheduler.createJob(job);
+    assertTaskCount(1);
+
+    Iterable<TrackedTask> tasks = scheduler.getTasks(
+        new TaskQuery().setOwner(JOB_OWNER_A).setJobName(JOB_NAME_A));
+    assertThat(Iterables.size(tasks), is(1));
+
+    int taskId = Iterables.get(tasks, 0).getTaskId();
+
+    TaskQuery query = new TaskQuery().setTaskIds(Sets.newHashSet(taskId));
+
+    for (int i = 0; i < maxFailures - 1; i++) {
+      scheduler.setTaskStatus(query, ScheduleStatus.RUNNING);
+      assertThat(Iterables.get(scheduler.getTasks(query), 0).getFailureCount(), is(i));
+      scheduler.setTaskStatus(query, ScheduleStatus.FAILED);
+      assertThat(Iterables.get(scheduler.getTasks(query), 0).getFailureCount(), is(i + 1));
+      assertThat(Iterables.get(scheduler.getTasks(query), 0).getStatus(),
+          is(ScheduleStatus.PENDING));
+      assertTaskCount(1);
+    }
+
+    scheduler.setTaskStatus(query, ScheduleStatus.FAILED);
+    assertTaskCount(0);
   }
 
   @Test
@@ -193,6 +229,46 @@ public class SchedulerCoreTest {
       // Expected.
     }
     assertThat(cron.hasJob(JOB_OWNER_A, JOB_NAME_A), is(true));
+  }
+
+  @Test
+  public void testKillTask() throws Exception {
+    JobConfiguration job = makeJob(JOB_OWNER_A, JOB_NAME_A, TASK_A, 1);
+    scheduler.createJob(job);
+    assertTaskCount(1);
+
+    Iterable<TrackedTask> tasks = scheduler.getTasks(
+        new TaskQuery().setOwner(JOB_OWNER_A).setJobName(JOB_NAME_A));
+    assertThat(Iterables.size(tasks), is(1));
+
+    int taskId = Iterables.get(tasks, 0).getTaskId();
+
+    scheduler.killTasks(new TaskQuery().setTaskIds(Sets.newHashSet(taskId)));
+    assertTaskCount(0);
+  }
+
+  @Test
+  public void testLostTaskRescheduled() throws Exception {
+    int maxFailures = 5;
+    TwitterTaskInfo task = new TwitterTaskInfo(TASK_A);
+    task.putToConfiguration("max_task_failures", String.valueOf(maxFailures));
+    JobConfiguration job = makeJob(JOB_OWNER_A, JOB_NAME_A, task, 1);
+    scheduler.createJob(job);
+    assertTaskCount(1);
+
+    Iterable<TrackedTask> tasks = scheduler.getTasks(
+        new TaskQuery().setOwner(JOB_OWNER_A).setJobName(JOB_NAME_A));
+    assertThat(Iterables.size(tasks), is(1));
+
+    int taskId = Iterables.get(tasks, 0).getTaskId();
+
+    TaskQuery query = new TaskQuery().setTaskIds(Sets.newHashSet(taskId));
+    scheduler.setTaskStatus(query, ScheduleStatus.LOST);
+    assertThat(Iterables.get(scheduler.getTasks(query), 0).getStatus(), is(ScheduleStatus.PENDING));
+    assertTaskCount(1);
+    scheduler.setTaskStatus(query, ScheduleStatus.LOST);
+    assertThat(Iterables.get(scheduler.getTasks(query), 0).getStatus(), is(ScheduleStatus.PENDING));
+    assertTaskCount(1);
   }
 
   @Test

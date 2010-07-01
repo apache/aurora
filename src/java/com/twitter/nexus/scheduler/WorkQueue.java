@@ -23,7 +23,7 @@ class WorkQueue {
   private ScheduledThreadPoolExecutor workQueue = new ScheduledThreadPoolExecutor(
       NUM_WORK_QUEUE_THREADS,
       new ThreadFactoryBuilder().setDaemon(true).setNameFormat("SchedulerWorkQueue-[%d]").build());
-  private static final int NUM_WORK_QUEUE_THREADS = 5;
+  private static final int NUM_WORK_QUEUE_THREADS = 1;
   private static final Amount<Long, Time> TASK_INITIAL_BACKOFF = Amount.of(1L, Time.SECONDS);
   private static final Amount<Long, Time> TASK_MAX_BACKOFF = Amount.of(64L, Time.SECONDS);
   private static final int TASK_MAX_RETRIES = 10;

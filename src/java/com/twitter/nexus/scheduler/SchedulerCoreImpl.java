@@ -13,11 +13,16 @@ import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.nexus.gen.JobConfiguration;
 import com.twitter.nexus.gen.ScheduleStatus;
 import com.twitter.nexus.gen.SchedulerState;
+import com.twitter.nexus.gen.SchedulingSignal;
+import com.twitter.nexus.gen.SignalType;
 import com.twitter.nexus.gen.TaskQuery;
 import com.twitter.nexus.gen.TrackedTask;
 import com.twitter.nexus.gen.TwitterTaskInfo;
 import com.twitter.nexus.scheduler.configuration.ConfigurationManager;
+import com.twitter.nexus.scheduler.persistence.Codec;
 import com.twitter.nexus.scheduler.persistence.PersistenceLayer;
+import com.twitter.nexus.scheduler.persistence.ThriftBinaryCodec;
+import nexus.FrameworkMessage;
 import nexus.SchedulerDriver;
 import nexus.SlaveOffer;
 import nexus.StringMap;
@@ -40,11 +45,23 @@ import java.util.logging.Logger;
 public class SchedulerCoreImpl implements SchedulerCore {
   private static Logger LOG = Logger.getLogger(SchedulerCore.class.getName());
 
+  private static final Codec<TwitterTaskInfo, byte[]> TASK_CODEC =
+      new ThriftBinaryCodec<TwitterTaskInfo>() {
+    @Override public TwitterTaskInfo createInputInstance() {
+      return new TwitterTaskInfo();
+    }
+  };
+
+  private static final Codec<SchedulingSignal, byte[]> SIGNAL_CODEC =
+      new ThriftBinaryCodec<SchedulingSignal>() {
+    @Override public SchedulingSignal createInputInstance() {
+      return new SchedulingSignal();
+    }
+  };
+
   // Schedulers that are responsible for triggering execution of jobs.
   private final List<JobManager> jobManagers;
 
-  // TODO(wfarner): Hopefully we can abolish (or at least mask) the concept of canonical task IDs
-  // in favor of tasks being canonically named by job/taskIndex.
   private int nextTaskId = 0;
 
   // The nexus framework ID of the scheduler, set to null until the framework is registered.
@@ -57,7 +74,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
   @Inject
   private WorkQueue workQueue;
 
-  private final PersistenceLayer persistenceLayer;
+  private final PersistenceLayer<SchedulerState> persistenceLayer;
 
   // Scheduler driver used for communication with other nodes in the cluster.
   private final AtomicReference<SchedulerDriver> schedulerDriver =
@@ -65,7 +82,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
   @Inject
   public SchedulerCoreImpl(CronJobManager cronScheduler, ImmediateJobManager immediateScheduler,
-      PersistenceLayer persistenceLayer) {
+      PersistenceLayer<SchedulerState> persistenceLayer) {
     // The immediate scheduler will accept any job, so it's important that other schedulers are
     // placed first.
     jobManagers = Arrays.asList(cronScheduler, immediateScheduler);
@@ -201,8 +218,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
     byte[] taskInBytes;
     try {
-      taskInBytes = Codec.serialize(task.getTask());
-    } catch (Codec.SerializationException e) {
+      taskInBytes = TASK_CODEC.encode(task.getTask());
+    } catch (Codec.CodingException e) {
       LOG.log(Level.SEVERE, "Unable to serialize task.", e);
       throw new ScheduleException("Internal error.", e);
     }
@@ -236,21 +253,36 @@ public class SchedulerCoreImpl implements SchedulerCore {
         ScheduleStatus.LOST,
         ScheduleStatus.NOT_FOUND));
 
-    // TODO(wfarner): Add task failure tracking to TaskQuery and allow the configuration to
-    // specify the number of per-task failures before giving up.
+    // Tasks that were killed should be removed.
+    taskStore.remove(getTasks(completedQuery, filter(ScheduleStatus.KILLED)));
+
+    // Increment the failure count on all failed tasks.
+    taskStore.mutate(getTasks(completedQuery, filter(ScheduleStatus.FAILED)),
+        new ExceptionalClosure<TrackedTask, RuntimeException>() {
+          @Override public void execute(TrackedTask mutable) throws RuntimeException {
+            mutable.setFailureCount(mutable.getFailureCount() + 1);
+          }
+        });
+
+    // Remove all tasks that have exceeded the failure limit.
+    // TODO(wfarner): The semantics here may need to change - it might be necessary to count
+    //    all failures in a job, and kill the associated job.
+    taskStore.remove(getTasks(completedQuery, new Predicate<TrackedTask>() {
+      @Override public boolean apply(TrackedTask task) {
+        return task.getFailureCount() >= task.getTask().getMaxTaskFailures();
+      }
+    }));
 
     // Non-daemon tasks are finished and may be removed.
-    taskStore.remove(getTasks(completedQuery, Predicates.not(DAEMON_TASKS)));
+    taskStore.remove(getTasks(completedQuery, Predicates.not(DAEMON_TASKS),
+        filter(ScheduleStatus.FINISHED)));
 
-    // Daemon tasks that were killed should be removed.
-    taskStore.remove(getTasks(completedQuery, DAEMON_TASKS, KILLED_TASKS));
-
-    // Re-run the completed query, this time finding daemon tasks that should be re-run.
-    taskStore.mutate(getTasks(completedQuery, DAEMON_TASKS),
+    // All remaining tasks should be rescheduled.
+    taskStore.mutate(getTasks(completedQuery),
         new ExceptionalClosure<TrackedTask, RuntimeException>() {
           @Override public void execute(TrackedTask mutable) {
-            LOG.info("Moving daemon task to PENDING state: "
-                     + mutable.getOwner() + "/" + mutable.getJobName());
+            LOG.info("Moving task back to PENDING state: " + mutable.getOwner() + "/"
+                     + mutable.getJobName());
             mutable.setStatus(ScheduleStatus.PENDING);
             mutable.setSlaveIdIsSet(false);
             mutable.setSlaveId(null);
@@ -260,14 +292,17 @@ public class SchedulerCoreImpl implements SchedulerCore {
     persist();
   }
 
+  private static Predicate<TrackedTask> filter(final ScheduleStatus status) {
+    return new Predicate<TrackedTask>() {
+      @Override public boolean apply(TrackedTask task) {
+        return task.getStatus() == status;
+      }
+    };
+  }
+
   private static final Predicate<TrackedTask> DAEMON_TASKS = new Predicate<TrackedTask>() {
       @Override public boolean apply(TrackedTask task) {
         return task.getTask().isIsDaemon();
-      }
-    };
-  private static final Predicate<TrackedTask> KILLED_TASKS = new Predicate<TrackedTask>() {
-      @Override public boolean apply(TrackedTask task) {
-        return task.getStatus() == ScheduleStatus.KILLED;
       }
     };
 
@@ -326,9 +361,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
           return false;
         }
 
-        // TODO(wfarner): What happens when this fails?  Do we have to reconnect manually, or does
-        // the driver automatically try to reconnect when it sends a non-zero status code?
-        // TODO(wfarner): This should queue requests that have non-zero status codes.
         SchedulerDriver driver = schedulerDriver.get();
         return driver != null && work.apply(driver) == 0;
       }
@@ -342,25 +374,33 @@ public class SchedulerCoreImpl implements SchedulerCore {
     // TODO(wfarner): Need to do this in a cleaner way so that the entire job doesn't flip at once.
     LOG.info("Restarting tasks " + query);
 
+    final SchedulingSignal signal = new SchedulingSignal().setSignal(SignalType.RESTART_TASK);
+
     for (final TrackedTask task : getTasks(query)) {
       if (task != null && task.status != ScheduleStatus.PENDING) {
-        // TODO(wfarner): Once scheduler -> executorHub communication is defined, replace the
-        // empty byte array with a serialized message.
         doWorkWithDriver(new Function<SchedulerDriver, Integer>() {
           @Override public Integer apply(SchedulerDriver driver) {
-            // TODO(wfarner): slave IDs are now strings, but FrameworkMessage expects a slave to
-            //    be identified as an integer.
-            return null;
-            //return driver.sendFrameworkMessage(
-            //    new FrameworkMessage(frameworkId.get(), task.slaveId, new byte[0]));
+            try {
+              return signalExecutor(driver, task.getSlaveId(), task.getTaskId(), signal);
+            } catch (Codec.CodingException e) {
+              LOG.log(Level.SEVERE, "Failed to encode scheduling signal.", e);
+              return 0;
+            }
           }
         });
       }
     }
   }
 
+  private int signalExecutor(SchedulerDriver driver, String slaveId, int taskId,
+      SchedulingSignal signal) throws Codec.CodingException {
+    return driver.sendFrameworkMessage(new FrameworkMessage(slaveId, taskId,
+        SIGNAL_CODEC.encode(signal)));
+  }
+
   private void persist() {
     SchedulerState state = new SchedulerState();
+    state.setFrameworkId(frameworkId.get());
     state.setConfiguredTasks(Lists.newArrayList(taskStore.fetch(new TaskQuery())));
     Map<String, List<JobConfiguration>> moduleState = Maps.newHashMap();
     for (JobManager manager : jobManagers) {
@@ -370,29 +410,27 @@ public class SchedulerCoreImpl implements SchedulerCore {
     state.setModuleJobs(moduleState);
 
     try {
-      persistenceLayer.commit(Codec.serialize(state));
-    } catch (Codec.SerializationException e) {
-      LOG.log(Level.SEVERE, "Failed to serialize scheduler state, unable to persist!", e);
+      persistenceLayer.commit(state);
     } catch (PersistenceLayer.PersistenceException e) {
       LOG.log(Level.SEVERE, "Failed to persist scheduler state.", e);
     }
   }
 
+  @Override
+  public String getFrameworkId() {
+    return frameworkId.get();
+  }
+
   private void restore() {
-    SchedulerState state = new SchedulerState();
+    SchedulerState state;
     try {
-      byte[] data = persistenceLayer.fetch();
-      if (data == null) {
+      state = persistenceLayer.fetch();
+      if (state == null) {
         LOG.info("No persisted state found for restoration.");
         return;
       }
-
-      Codec.deserialize(state, data);
     } catch (PersistenceLayer.PersistenceException e) {
       LOG.log(Level.SEVERE, "Failed to fetch persisted state.", e);
-      return;
-    } catch (Codec.SerializationException e) {
-      LOG.log(Level.SEVERE, "Failed to deserialize persisted state.", e);
       return;
     }
 

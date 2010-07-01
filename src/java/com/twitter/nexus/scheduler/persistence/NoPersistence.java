@@ -5,15 +5,15 @@ package com.twitter.nexus.scheduler.persistence;
  *
  * @author wfarner
  */
-public class NoPersistence implements PersistenceLayer {
+public class NoPersistence<T> implements PersistenceLayer<T> {
   @Override
-  public byte[] fetch() throws PersistenceException {
+  public T fetch() throws PersistenceException {
     // No-op.
     return null;
   }
 
   @Override
-  public void commit(byte[] data) throws PersistenceException {
+  public void commit(T data) throws PersistenceException {
     // No-op.
   }
 }

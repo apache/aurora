@@ -28,6 +28,7 @@ public class ConfigurationManager {
   private static final long DEFAULT_DISK_BYTES = Amount.of(1, Data.GB).as(Data.BYTES);
   private static final int DEFAULT_PRIORITY = 0;
   private static final int DEFAULT_HEALTH_CHECK_INTERVAL_SECS = 30;
+  private static final int DEFAULT_MAX_TASK_FAILURES = 1;
 
   public static TwitterTaskInfo populateFields(JobConfiguration job, TwitterTaskInfo config)
       throws TaskDescriptionException {
@@ -48,7 +49,9 @@ public class ConfigurationManager {
         .setDiskBytes(getValue(configMap, "disk_bytes", DEFAULT_DISK_BYTES, Long.class))
         .setPriority(getValue(configMap, "priority", DEFAULT_PRIORITY, Integer.class))
         .setHealthCheckIntervalSecs(getValue(configMap, "health_check_interval_secs",
-            DEFAULT_HEALTH_CHECK_INTERVAL_SECS, Integer.class));
+            DEFAULT_HEALTH_CHECK_INTERVAL_SECS, Integer.class))
+        .setMaxTaskFailures(getValue(configMap, "max_task_failures", DEFAULT_MAX_TASK_FAILURES,
+            Integer.class));
 
     // Only one of [daemon=true, cron_schedule] may be set.
     if (!StringUtils.isEmpty(job.getCronSchedule()) && config.isIsDaemon()) {

@@ -1,19 +1,18 @@
 package com.twitter.nexus.scheduler;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
 import com.google.inject.Module;
 import com.twitter.common.args.Option;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Command;
-import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.process.GuicedProcess;
 import com.twitter.common.process.GuicedProcessOptions;
-import com.twitter.common.zookeeper.Candidate;
 import com.twitter.common.zookeeper.Group;
 import com.twitter.common.zookeeper.ServerSet;
+import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.nexus.gen.NexusSchedulerManager;
+import com.twitter.thrift.Status;
 import nexus.NexusSchedulerDriver;
 import org.apache.thrift.TException;
 import org.apache.thrift.transport.TTransportException;
@@ -43,16 +42,12 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
             usage = "The ZooKeeper session timeout in seconds.")
     int zooKeeperSessionTimeoutSecs = 5;
 
-    @Option(name = "nexus_master_ns",
-            usage = "The name service name for the nexus master.")
-    String nexusMasterNameSpec;
-
     @Option(name = "nexus_scheduler_ns", required = true,
             usage = "The name service name for the nexus scheduler thrift server.")
     String nexusSchedulerNameSpec;
 
     @Option(name = "nexus_master_address",
-            usage = "Nexus address for the master, overrides nexus_master_ns.")
+            usage = "Nexus address for the master, can be a nexus address or zookeeper path.")
     String nexusMasterAddress;
 
     @Option(name = "scheduler_persistence_zookeeper_path",
@@ -75,10 +70,10 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
   }
 
   @Inject
-  private Group schedulerGroup;
+  private SchedulerCore schedulerCore;
 
   @Inject
-  private ServerSet schedulerServerSet;
+  private SingletonService schedulerService;
 
   @Inject
   private SchedulerThriftInterface schedulerThriftInterface;
@@ -93,9 +88,6 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
 
   @Override
   protected void runProcess() throws Exception {
-    Preconditions.checkNotNull(driver);
-    driver.start();
-
     int port = -1;
     try {
       port = startThriftServer();
@@ -110,15 +102,37 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
     }
     if (port == -1) return;
 
-    if (schedulerGroup != null && schedulerServerSet != null) {
-      leadServerGroup(schedulerGroup, port, new Runnable() {
-        @Override public void run() {
-          // TODO(wfarner): Connect to nexus master here once nexus-core supports reconnects.
+    if (schedulerService != null) {
+      Closure<ServerSet.EndpointStatus> onLeading = new Closure<ServerSet.EndpointStatus>() {
+        @Override public void execute(ServerSet.EndpointStatus status) {
+          LOG.info("Elected as leading scheduler!");
+          try {
+            status.update(Status.ALIVE);
+          } catch (ServerSet.UpdateException e) {
+            LOG.log(Level.SEVERE, "Failed to update endpoint status.", e);
+          } catch (InterruptedException e) {
+            LOG.log(Level.SEVERE, "Interrupted while updating endpoint status.", e);
+          }
         }
-      });
+      };
+
+      leadService(schedulerService, port, Status.STARTING, onLeading);
     }
 
-    waitForEver();
+    startNexusDriver();
+  }
+
+  private void startNexusDriver() {
+    // TODO(wfarner): Connect to nexus master here once nexus-core supports reconnects.
+    // TODO(wfarner): SchedulerCore will need to restore persisted state before the driver is
+    //    started, and
+
+    String frameworkId = schedulerCore.getFrameworkId();
+    LOG.info("Restored framework ID: " + frameworkId);
+
+    int result = driver.run();
+
+    LOG.info("Driver completed with exit code " + result);
   }
 
   private int startThriftServer() throws IOException, TTransportException,

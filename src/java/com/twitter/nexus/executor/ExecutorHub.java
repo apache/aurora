@@ -4,6 +4,7 @@ import com.google.inject.Inject;
 import com.twitter.nexus.gen.TwitterTaskInfo;
 import nexus.Executor;
 import nexus.ExecutorDriver;
+import nexus.FrameworkMessage;
 import nexus.TaskDescription;
 import nexus.TaskState;
 import nexus.TaskStatus;
@@ -58,5 +59,11 @@ public class ExecutorHub extends Executor {
   public void error(ExecutorDriver driver, int code, String message) {
     LOG.info("Error received with code: " + code + " and message: " + message);
     shutdown(driver);
+  }
+
+  @Override
+  public void frameworkMessage(ExecutorDriver driver, FrameworkMessage message) {
+    LOG.info("Received framework message.");
+    
   }
 }

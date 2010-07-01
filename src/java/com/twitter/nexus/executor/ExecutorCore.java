@@ -11,7 +11,6 @@ import nexus.ExecutorDriver;
 import nexus.TaskDescription;
 import nexus.TaskState;
 import nexus.TaskStatus;
-import org.apache.hadoop.fs.FileSystem;
 
 import java.io.File;
 import java.io.IOException;

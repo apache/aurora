@@ -1,10 +1,9 @@
 package com.twitter.nexus.scheduler;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Predicate;
 import com.twitter.nexus.gen.JobConfiguration;
-import com.twitter.nexus.gen.TaskQuery;
 import com.twitter.nexus.gen.ScheduleStatus;
+import com.twitter.nexus.gen.TaskQuery;
 import com.twitter.nexus.gen.TrackedTask;
 import com.twitter.nexus.scheduler.configuration.ConfigurationManager;
 import nexus.SchedulerDriver;
@@ -74,7 +73,6 @@ public interface SchedulerCore {
   public void createJob(JobConfiguration job) throws ScheduleException,
       ConfigurationManager.TaskDescriptionException;
 
-
   /**
    * Triggers execution of a job.  This should only be called by job managers.
    *
@@ -116,4 +114,12 @@ public interface SchedulerCore {
    * @param query The query to identify tasks.
    */
   public void restartTasks(final TaskQuery query);
+
+  /**
+   * Gets the framework ID that this scheduler is registered, or {@null} if the framework is not
+   * yet registered.
+   *
+   * @return The framework id.
+   */
+  public String getFrameworkId();
 }

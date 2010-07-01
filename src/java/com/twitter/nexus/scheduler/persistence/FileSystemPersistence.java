@@ -13,7 +13,7 @@ import java.util.logging.Logger;
  *
  * @author wfarner
  */
-public class FileSystemPersistence implements PersistenceLayer {
+public class FileSystemPersistence implements PersistenceLayer<byte[]> {
   private final static Logger LOG = Logger.getLogger(FileSystemPersistence.class.getName());
 
   private final File file;
