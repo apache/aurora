@@ -19,6 +19,10 @@ import java.util.logging.Logger;
 /**
  * Manages a range of TCP sockets that can be leased and returned.
  *
+ * TODO(wfarner): It may be useful in the future to have this be a service launched on a machine
+ *    to ensure there is only one manager per machine, and mitigate race conditions between checking
+ *    availability of and leasing ports.
+ *
  * @author wfarner
  */
 public class SocketManager {

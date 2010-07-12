@@ -55,8 +55,8 @@ public class CronJobManager extends JobManager {
     boolean runJob = false;
 
     TaskQuery query = new TaskQuery().setOwner(job.getOwner()).setJobName(job.getName())
-      .setStatuses(ImmutableSet.of(
-          ScheduleStatus.PENDING, ScheduleStatus.STARTING, ScheduleStatus.RUNNING));
+        .setStatuses(ImmutableSet.of(
+            ScheduleStatus.PENDING, ScheduleStatus.STARTING, ScheduleStatus.RUNNING));
 
     if (Iterables.isEmpty(schedulerCore.getTasks(query))) {
       runJob = true;

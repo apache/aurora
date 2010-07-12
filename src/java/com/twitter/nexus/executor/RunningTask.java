@@ -204,6 +204,7 @@ public class RunningTask {
       process = processBuilder.start();
 
       if (supportsHttpSignals()) {
+        // TODO(wfarner): Change to use ScheduledExecutorService, making sure to shut it down.
         new Timer(String.format("Task-%d-HealthCheck", taskId), true).scheduleAtFixedRate(
             new TimerTask() {
               @Override public void run() {
@@ -214,6 +215,8 @@ public class RunningTask {
               }
             },
             // Configure health check interval, allowing 2x configured time for startup.
+            // TODO(wfarner): Add a configuration option for the task start-up grace period
+            // before health checking begins.
             2 * Amount.of(task.getHealthCheckIntervalSecs(), Time.SECONDS).as(Time.MILLISECONDS),
             Amount.of(task.getHealthCheckIntervalSecs(), Time.SECONDS).as(Time.MILLISECONDS));
       }
@@ -300,6 +303,7 @@ public class RunningTask {
       touchUrl(PROCESS_TERM_ENDPOINT);
 
       try {
+        // TODO(wfarner): Make this configurable.
         Thread.sleep(2000);
       } catch (InterruptedException e) {
         LOG.warning("Interrupted while waiting beween TERM and KILL.");
@@ -310,7 +314,7 @@ public class RunningTask {
   }
 
   private List<String> touchUrl(final String endpoint) {
-    MorePreconditions.checkNotBlank(signalRootUrl);
+    Preconditions.checkState(supportsHttpSignals());
     LOG.info("Touching signal endpoint: " + endpoint);
 
     final URL signalUrl;

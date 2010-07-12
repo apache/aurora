@@ -35,6 +35,7 @@ import nexus.SlaveOffer;
  * @author wfarner
  */
 public interface SchedulerCore {
+
   /**
    * Assigns a framework ID to the scheduler, should be called when the scheduler implementation
    * has received a successful registration signal.
@@ -116,8 +117,8 @@ public interface SchedulerCore {
   public void restartTasks(final TaskQuery query);
 
   /**
-   * Gets the framework ID that this scheduler is registered, or {@null} if the framework is not
-   * yet registered.
+   * Gets the framework ID that this scheduler is registered with, or {@null} if the framework is
+   * not yet registered.
    *
    * @return The framework id.
    */

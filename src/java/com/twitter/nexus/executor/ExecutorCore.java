@@ -62,6 +62,8 @@ public class ExecutorCore {
     final RunningTask runningTask = new RunningTask(socketManager,
         taskRootDir, task.getTaskId(), taskInfo, fileCopier);
 
+    // TODO(wfarner): Tear down the running task to clean up file system.
+
     try {
       runningTask.stage();
       runningTask.launch();

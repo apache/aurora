@@ -9,7 +9,8 @@ import com.twitter.common.base.Command;
 import com.twitter.common.process.GuicedProcess;
 import com.twitter.common.process.GuicedProcessOptions;
 import com.twitter.common.zookeeper.Group;
-import com.twitter.common.zookeeper.ServerSet;
+import com.twitter.common.zookeeper.ServerSet.EndpointStatus;
+import com.twitter.common.zookeeper.ServerSet.UpdateException;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.nexus.gen.NexusSchedulerManager;
 import com.twitter.thrift.Status;
@@ -20,12 +21,15 @@ import org.apache.thrift.transport.TTransportException;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
  * Launcher for the twitter nexue scheduler.
+ *
+ * TODO(wfarner): Include information in /schedulerz about who is the current scheduler leader.
  *
  * @author wfarner
  */
@@ -65,6 +69,22 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
 
   private static Logger LOG = Logger.getLogger(SchedulerMain.class.getName());
 
+  // Closure to execute when the scheduler has been elected group leader.
+  private final Closure<EndpointStatus> onLeading =
+      new Closure<EndpointStatus>() {
+        @Override public void execute(EndpointStatus status) {
+          LOG.info("Elected as leading scheduler!");
+          try {
+            status.update(Status.ALIVE);
+            runNexusDriver();
+          } catch (UpdateException e) {
+            LOG.log(Level.SEVERE, "Failed to update endpoint status.", e);
+          } catch (InterruptedException e) {
+            LOG.log(Level.SEVERE, "Interrupted while updating endpoint status.", e);
+          }
+        }
+      };
+
   public SchedulerMain() {
     super(TwitterSchedulerOptions.class);
   }
@@ -87,7 +107,7 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
   }
 
   @Override
-  protected void runProcess() throws Exception {
+  protected void runProcess() {
     int port = -1;
     try {
       port = startThriftServer();
@@ -103,35 +123,26 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
     if (port == -1) return;
 
     if (schedulerService != null) {
-      Closure<ServerSet.EndpointStatus> onLeading = new Closure<ServerSet.EndpointStatus>() {
-        @Override public void execute(ServerSet.EndpointStatus status) {
-          LOG.info("Elected as leading scheduler!");
-          try {
-            status.update(Status.ALIVE);
-          } catch (ServerSet.UpdateException e) {
-            LOG.log(Level.SEVERE, "Failed to update endpoint status.", e);
-          } catch (InterruptedException e) {
-            LOG.log(Level.SEVERE, "Interrupted while updating endpoint status.", e);
-          }
-        }
-      };
-
-      leadService(schedulerService, port, Status.STARTING, onLeading);
+      try {
+        leadService(schedulerService, port, Status.STARTING, onLeading);
+      } catch (Group.WatchException e) {
+        LOG.log(Level.SEVERE, "Failed to watch group and lead service.", e);
+      } catch (Group.JoinException e) {
+        LOG.log(Level.SEVERE, "Failed to join scheduler service group.", e);
+      } catch (InterruptedException e) {
+        LOG.log(Level.SEVERE, "Interrupted while joining scheduler service group.", e);
+      } catch (UnknownHostException e) {
+        LOG.log(Level.SEVERE, "Failed to find self host name.", e);
+      }
+    } else {
+      runNexusDriver();
     }
 
-    startNexusDriver();
+    waitForEver();
   }
 
-  private void startNexusDriver() {
-    // TODO(wfarner): Connect to nexus master here once nexus-core supports reconnects.
-    // TODO(wfarner): SchedulerCore will need to restore persisted state before the driver is
-    //    started, and
-
-    String frameworkId = schedulerCore.getFrameworkId();
-    LOG.info("Restored framework ID: " + frameworkId);
-
+  private void runNexusDriver() {
     int result = driver.run();
-
     LOG.info("Driver completed with exit code " + result);
   }
 
@@ -142,7 +153,7 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
 
     addShutdownAction(new Command() {
       @Override public void execute() {
-        System.out.println("Stopping thrift server");
+        LOG.info("Stopping thrift server.");
         try {
           schedulerThriftInterface.shutdown();
         } catch (TException e) {

@@ -24,8 +24,11 @@ public class FileSystemPersistence implements PersistenceLayer<byte[]> {
 
   @Override
   public byte[] fetch() throws PersistenceException {
+    LOG.info("Fetching persisted state from " + file.getAbsolutePath());
     try {
-      return Files.toByteArray(file);
+      byte[] data = Files.toByteArray(file);
+      LOG.info("Fetched " + data.length + " bytes.");
+      return data;
     } catch (IOException e) {
       logAndThrow("Failed to read file " + file.getAbsolutePath(), e);
     }
@@ -35,6 +38,8 @@ public class FileSystemPersistence implements PersistenceLayer<byte[]> {
 
   @Override
   public void commit(byte[] data) throws PersistenceException {
+    LOG.info("Storing " + data.length + " bytes.");
+
     if (!file.exists()) {
       File parent = file.getParentFile();
       if (!parent.exists() && !parent.mkdirs()) {

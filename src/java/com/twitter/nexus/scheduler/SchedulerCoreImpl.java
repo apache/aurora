@@ -33,6 +33,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -46,23 +47,15 @@ public class SchedulerCoreImpl implements SchedulerCore {
   private static Logger LOG = Logger.getLogger(SchedulerCore.class.getName());
 
   private static final Codec<TwitterTaskInfo, byte[]> TASK_CODEC =
-      new ThriftBinaryCodec<TwitterTaskInfo>() {
-    @Override public TwitterTaskInfo createInputInstance() {
-      return new TwitterTaskInfo();
-    }
-  };
+      new ThriftBinaryCodec<TwitterTaskInfo>(TwitterTaskInfo.class);
 
   private static final Codec<SchedulingSignal, byte[]> SIGNAL_CODEC =
-      new ThriftBinaryCodec<SchedulingSignal>() {
-    @Override public SchedulingSignal createInputInstance() {
-      return new SchedulingSignal();
-    }
-  };
+      new ThriftBinaryCodec<SchedulingSignal>(SchedulingSignal.class);
 
   // Schedulers that are responsible for triggering execution of jobs.
   private final List<JobManager> jobManagers;
 
-  private int nextTaskId = 0;
+  private AtomicInteger nextTaskId = new AtomicInteger(0);
 
   // The nexus framework ID of the scheduler, set to null until the framework is registered.
   private final AtomicReference<String> frameworkId = new AtomicReference<String>(null);
@@ -86,10 +79,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
     // The immediate scheduler will accept any job, so it's important that other schedulers are
     // placed first.
     jobManagers = Arrays.asList(cronScheduler, immediateScheduler);
-
     this.persistenceLayer = Preconditions.checkNotNull(persistenceLayer);
 
-    // Attempt to recover from a persisted state.
     restore();
   }
 
@@ -97,6 +88,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
   public void registered(SchedulerDriver driver, String frameworkId) {
     this.schedulerDriver.set(Preconditions.checkNotNull(driver));
     this.frameworkId.set(Preconditions.checkNotNull(frameworkId));
+    persist();
   }
 
   @Override
@@ -121,7 +113,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
   }
 
   private int generateTaskId() {
-    return nextTaskId++;
+    return nextTaskId.incrementAndGet();
   }
 
   @Override
@@ -269,7 +261,11 @@ public class SchedulerCoreImpl implements SchedulerCore {
     //    all failures in a job, and kill the associated job.
     taskStore.remove(getTasks(completedQuery, new Predicate<TrackedTask>() {
       @Override public boolean apply(TrackedTask task) {
-        return task.getFailureCount() >= task.getTask().getMaxTaskFailures();
+        boolean remove = (task.getTask().getMaxTaskFailures() != -1)
+            && (task.getFailureCount() >= task.getTask().getMaxTaskFailures());
+        if (remove) LOG.info("Task exceeded max allowed failures: " + task);
+
+        return remove;
       }
     }));
 
@@ -399,11 +395,14 @@ public class SchedulerCoreImpl implements SchedulerCore {
   }
 
   private void persist() {
+    LOG.info("Saving scheduler state.");
     SchedulerState state = new SchedulerState();
     state.setFrameworkId(frameworkId.get());
+    state.setNextTaskId(nextTaskId.get());
     state.setConfiguredTasks(Lists.newArrayList(taskStore.fetch(new TaskQuery())));
     Map<String, List<JobConfiguration>> moduleState = Maps.newHashMap();
     for (JobManager manager : jobManagers) {
+      // TODO(wfarner): This is fragile - stored state will not survive a code refactor.
       moduleState.put(manager.getClass().getCanonicalName(),
           Lists.newArrayList(manager.getState()));
     }
@@ -422,6 +421,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
   }
 
   private void restore() {
+    LOG.info("Attempting to recover persisted state.");
+
     SchedulerState state;
     try {
       state = persistenceLayer.fetch();
@@ -434,17 +435,9 @@ public class SchedulerCoreImpl implements SchedulerCore {
       return;
     }
 
-    // Clear fields associated with unknown state.
-    List<TrackedTask> restoredTasks = state.getConfiguredTasks();
-    for (TrackedTask task : restoredTasks) {
-      task.setSlaveId(null).setSlaveHost(null);
-      switch (task.getStatus()) {
-        case RUNNING:
-        case STARTING:
-          task.setStatus(ScheduleStatus.PENDING);
-      }
-    }
-    taskStore.add(restoredTasks);
+    frameworkId.set(state.getFrameworkId());
+    nextTaskId.set((int) state.getNextTaskId());
+    taskStore.add(state.getConfiguredTasks());
 
     for (final Map.Entry<String, List<JobConfiguration>> entry : state.getModuleJobs().entrySet()) {
       JobManager manager = Iterables.find(jobManagers, new Predicate<JobManager>() {
@@ -461,5 +454,9 @@ public class SchedulerCoreImpl implements SchedulerCore {
         }
       }
     }
+
+    // TODO(wfarner): Should communicate with executors here to fetch state information about all
+    //    tasks and verify that slaves (and their tasks) all exist as expected in the recovered
+    //    state.
   }
 }

@@ -64,6 +64,5 @@ public class ExecutorHub extends Executor {
   @Override
   public void frameworkMessage(ExecutorDriver driver, FrameworkMessage message) {
     LOG.info("Received framework message.");
-    
   }
 }

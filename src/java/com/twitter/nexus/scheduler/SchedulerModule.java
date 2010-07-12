@@ -54,6 +54,7 @@ public class SchedulerModule extends AbstractModule {
   }
 
   @Provides
+  @Nullable
   @Singleton
   final ZooKeeperClient provideZooKeeperClient() {
     if (options.zooKeeperEndpoints == null) {
@@ -80,11 +81,8 @@ public class SchedulerModule extends AbstractModule {
   @Provides
   final PersistenceLayer<SchedulerState> providePersistenceLayer(
       @Nullable ZooKeeperClient zkClient) {
-    Codec<SchedulerState, byte[]> codec = new ThriftBinaryCodec<SchedulerState>() {
-      @Override public SchedulerState createInputInstance() {
-        return new SchedulerState();
-      }
-    };
+    Codec<SchedulerState, byte[]> codec =
+        new ThriftBinaryCodec<SchedulerState>(SchedulerState.class);
 
     PersistenceLayer<byte[]> binaryPersistence;
     if (options.schedulerPersistenceZooKeeperPath == null) {
@@ -114,6 +112,7 @@ public class SchedulerModule extends AbstractModule {
       LOG.info("Found persisted framework ID: " + frameworkId);
       return new NexusSchedulerDriver(scheduler, options.nexusMasterAddress, frameworkId);
     } else {
+      LOG.warning("Did not find a persisted framework ID, connecting as a new framework.");
       return new NexusSchedulerDriver(scheduler, options.nexusMasterAddress);
     }
   }
