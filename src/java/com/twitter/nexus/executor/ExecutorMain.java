@@ -59,6 +59,11 @@ public class ExecutorMain extends InjectableMain<ExecutorMain.TwitterExecutorOpt
       }
     });
 
+    // Fetch the killtree script.
+    LOG.info("Fetching killtree script.");
+    HdfsUtil.downloadFileFromHdfs(fileSystem, getOptions().killTreeHdfsPath,
+        getOptions().taskRootDir.getAbsolutePath());
+
     new NexusExecutorDriver(executorHub).run();
   }
 
