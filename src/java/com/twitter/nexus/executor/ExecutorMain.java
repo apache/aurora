@@ -7,7 +7,9 @@ import com.twitter.common.args.Option;
 import com.twitter.common.base.Command;
 import com.twitter.common.inject.process.InjectableMain;
 import com.twitter.common.process.GuicedProcessOptions;
+import com.twitter.nexus.util.HdfsUtil;
 import nexus.NexusExecutorDriver;
+import org.apache.hadoop.fs.FileSystem;
 
 import java.io.File;
 import java.util.logging.Logger;
@@ -24,6 +26,9 @@ public class ExecutorMain extends InjectableMain<ExecutorMain.TwitterExecutorOpt
     @Option(name = "hdfs_config", required = true, usage = "Hadoop configuration path")
     public String hdfsConfig;
 
+    @Option(name = "kill_tree_path", usage = "HDFS path to kill tree shell script")
+    public String killTreeHdfsPath;
+
     @Option(name = "task_root_dir", required = true, usage = "Nexus task working directory root.")
     public File taskRootDir;
 
@@ -37,6 +42,9 @@ public class ExecutorMain extends InjectableMain<ExecutorMain.TwitterExecutorOpt
 
   @Inject
   private ExecutorCore executorCore;
+
+  @Inject
+  private FileSystem fileSystem;
 
   protected ExecutorMain() {
     super(TwitterExecutorOptions.class);
