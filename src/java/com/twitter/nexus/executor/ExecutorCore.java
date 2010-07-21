@@ -5,7 +5,11 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
+import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
+import com.twitter.nexus.executor.HealthChecker.HealthCheckException;
+import com.twitter.nexus.executor.ProcessKiller.KillCommand;
+import com.twitter.nexus.executor.ProcessKiller.KillException;
 import com.twitter.nexus.gen.TwitterTaskInfo;
 import nexus.ExecutorDriver;
 import nexus.TaskDescription;
@@ -40,11 +44,11 @@ public class ExecutorCore {
   private final ExecutorService executorService = Executors.newCachedThreadPool(
       new ThreadFactoryBuilder().setDaemon(true).setNameFormat("NexusExecutor-[%d]").build());
 
-  @Inject
-  private ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier;
-
-  @Inject
-  SocketManager socketManager;
+  @Inject ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier;
+  @Inject SocketManagerImpl socketManager;
+  @Inject ExceptionalFunction<Integer, Boolean, HealthCheckException> healthChecker;
+  @Inject ExceptionalClosure<KillCommand, KillException> processKiller;
+  @Inject ExceptionalFunction<File, Integer, FileToInt.FetchException> pidFetcher;
 
   @Inject
   private ExecutorCore(ExecutorMain.TwitterExecutorOptions options) {
@@ -59,8 +63,8 @@ public class ExecutorCore {
   public void executePendingTask(final ExecutorDriver driver, final TwitterTaskInfo taskInfo,
                                  final TaskDescription task) {
     LOG.info("Received task for execution: " + taskInfo);
-    final RunningTask runningTask = new RunningTask(socketManager,
-        taskRootDir, task.getTaskId(), taskInfo, fileCopier);
+    final RunningTask runningTask = new RunningTask(socketManager, healthChecker, processKiller,
+        pidFetcher, taskRootDir, task.getTaskId(), taskInfo, fileCopier);
 
     // TODO(wfarner): Tear down the running task to clean up file system.
 

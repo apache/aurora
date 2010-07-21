@@ -35,6 +35,13 @@ public class ExecutorMain extends InjectableMain<ExecutorMain.TwitterExecutorOpt
     @Option(name = "managed_port_range",
         usage = "Port range that the executor should manage, format: min-max")
     public String managedPortRange = "50000-60000";
+
+    @Option(name = "http_signal_timeout_ms", usage = "Timeout for HTTP signals to tasks.")
+    public int httpSignalTimeoutMs = 1000;
+
+    @Option(name = "kill_escalation_delay_ms",
+        usage = "Time to wait before escalating between task kill procedures.")
+    public int killEscalationMs = 5000;
   }
 
   @Inject
@@ -58,11 +65,6 @@ public class ExecutorMain extends InjectableMain<ExecutorMain.TwitterExecutorOpt
         executorCore.shutdownCore(null);
       }
     });
-
-    // Fetch the killtree script.
-    LOG.info("Fetching killtree script.");
-    HdfsUtil.downloadFileFromHdfs(fileSystem, getOptions().killTreeHdfsPath,
-        getOptions().taskRootDir.getAbsolutePath());
 
     new NexusExecutorDriver(executorHub).run();
   }

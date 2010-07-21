@@ -1,38 +1,28 @@
 package com.twitter.nexus.executor;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Charsets;
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
-import com.google.common.io.Resources;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.twitter.common.Pair;
+import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
-import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.StateMachine;
+import com.twitter.nexus.executor.HealthChecker.HealthCheckException;
+import com.twitter.nexus.executor.ProcessKiller.KillCommand;
+import com.twitter.nexus.executor.ProcessKiller.KillException;
 import com.twitter.nexus.gen.TwitterTaskInfo;
 import nexus.TaskState;
 import org.apache.commons.io.FileUtils;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -49,22 +39,21 @@ public class RunningTask {
   private static final Pattern PORT_REQUEST_PATTERN = Pattern.compile("%port:(\\w+)%");
 
   private static final String HEALTH_CHECK_PORT_NAME = "health";
-  private static final Amount<Long, Time> URL_TIMEOUT = Amount.of(1L, Time.SECONDS);
-  private static final String PROCESS_TERM_ENDPOINT = "quitquitquit";
-  private static final String PROCESS_KILL_ENDPOINT = "abortabortabort";
-
-  private static final String HEALTH_CHECK_ENDPOINT = "healthz";
-  private static final String HEALTH_CHECK_OK_VALUE = "ok";
+  private static final Amount<Long, Time> LAUNCH_PIDFILE_GRACE_PERIOD = Amount.of(1L, Time.SECONDS);
 
   private final StateMachine<TaskState> stateMachine;
 
   private final SocketManager socketManager;
+  private final ExceptionalFunction<Integer, Boolean, HealthCheckException> healthChecker;
+  private final ExceptionalClosure<KillCommand, KillException> processKiller;
+  private final ExceptionalFunction<File, Integer, FileToInt.FetchException> pidFetcher;
+  private KillCommand killCommand;
+
   private final int taskId;
 
   private final TwitterTaskInfo task;
 
-  private String signalRootUrl = null;
-  private ExecutorService httpSignalExecutor = null;
+  private int healthCheckPort = -1;
 
   @VisibleForTesting
   final File taskRoot;
@@ -76,21 +65,26 @@ public class RunningTask {
   private int exitCode = 0;
   private final ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier;
 
-  public RunningTask(SocketManager socketManager, File executorRoot, int taskId,
+  public RunningTask(SocketManager socketManager,
+      ExceptionalFunction<Integer, Boolean, HealthCheckException> healthChecker,
+      ExceptionalClosure<KillCommand, KillException> processKiller,
+      ExceptionalFunction<File, Integer, FileToInt.FetchException> pidFetcher,
+      File executorRoot, int taskId,
       TwitterTaskInfo task,
       ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier) {
-    Preconditions.checkNotNull(socketManager);
+
+    this.socketManager = Preconditions.checkNotNull(socketManager);
+    this.healthChecker = Preconditions.checkNotNull(healthChecker);
+    this.processKiller = Preconditions.checkNotNull(processKiller);
+    this.pidFetcher = Preconditions.checkNotNull(pidFetcher);
+    this.taskId = taskId;
+    this.task = Preconditions.checkNotNull(task);
+
     Preconditions.checkNotNull(executorRoot);
     Preconditions.checkState(executorRoot.exists() && executorRoot.isDirectory());
-    Preconditions.checkNotNull(task);
-    Preconditions.checkNotNull(fileCopier);
-
-    this.socketManager = socketManager;
-    this.taskId = taskId;
-    this.task = task;
     taskRoot = new File(executorRoot, String.format(
         "%s/%s/%d-%d", task.getOwner(), task.getJobName(), taskId, System.nanoTime()));
-    this.fileCopier = fileCopier;
+    this.fileCopier = Preconditions.checkNotNull(fileCopier);
 
     stateMachine = StateMachine.<TaskState>builder(toString())
           .initialState(TaskState.TASK_STARTING)
@@ -143,7 +137,7 @@ public class RunningTask {
    */
   @VisibleForTesting
   protected Pair<String, Map<String, Integer>> expandCommandLine()
-      throws SocketManager.SocketLeaseException, ProcessException {
+      throws SocketManagerImpl.SocketLeaseException, ProcessException {
     Map<String, Integer> leasedPorts = Maps.newHashMap();
 
     LOG.info("Expanding command line " + task.getStartCommand());
@@ -173,7 +167,7 @@ public class RunningTask {
     Pair<String, Map<String, Integer>> expansion;
     try {
       expansion = expandCommandLine();
-    } catch (SocketManager.SocketLeaseException e) {
+    } catch (SocketManagerImpl.SocketLeaseException e) {
       LOG.info("Failed to get sockets!");
       throw new ProcessException("Failed to obtain requested sockets.", e);
     }
@@ -184,9 +178,7 @@ public class RunningTask {
     leasedPorts.putAll(expansion.getSecond());
 
     if (leasedPorts.containsKey(HEALTH_CHECK_PORT_NAME)) {
-      signalRootUrl = "http://localhost:" + leasedPorts.get(HEALTH_CHECK_PORT_NAME);
-      httpSignalExecutor = Executors.newCachedThreadPool(
-          new ThreadFactoryBuilder().setDaemon(true).setNameFormat(toString() + "-%d").build());
+      healthCheckPort = leasedPorts.get(HEALTH_CHECK_PORT_NAME);
     }
 
     List<String> commandLine = Arrays.asList(
@@ -221,6 +213,16 @@ public class RunningTask {
             Amount.of(task.getHealthCheckIntervalSecs(), Time.SECONDS).as(Time.MILLISECONDS));
       }
 
+      // TODO(wfarner): After a grace period, read the pidfile to get the parent PID and construct
+      //    the KillCommand
+      try {
+        Thread.currentThread().sleep(LAUNCH_PIDFILE_GRACE_PERIOD.as(Time.MILLISECONDS));
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new ProcessException("Interrupted while waiting for launch grace period.", e);
+      }
+      buildKillCommand(supportsHttpSignals() ? leasedPorts.get(HEALTH_CHECK_PORT_NAME) : -1);
+
       stateMachine.transition(TaskState.TASK_RUNNING);
     } catch (IOException e) {
       stateMachine.transition(TaskState.TASK_FAILED);
@@ -228,8 +230,20 @@ public class RunningTask {
     }
   }
 
+  private void buildKillCommand(int healthCheckPort) throws ProcessException {
+    int pid = 0;
+    try {
+      pid = pidFetcher.apply(new File(taskRoot, "pidfile"));
+    } catch (FileToInt.FetchException e) {
+      LOG.log(Level.WARNING, "Failed to read pidfile for " + this, e);
+      throw new ProcessException("Failed to read pidfile.", e);
+    }
+
+    killCommand = new ProcessKiller.KillCommand(pid, healthCheckPort);
+  }
+
   private boolean supportsHttpSignals() {
-    return signalRootUrl != null;
+    return healthCheckPort != -1;
   }
 
   /**
@@ -256,7 +270,7 @@ public class RunningTask {
 
     // Return leased ports.
     for (int port : leasedPorts.values()) {
-      socketManager.returnPort(port);
+      socketManager.returnSocket(port);
     }
     leasedPorts.clear();
 
@@ -283,10 +297,13 @@ public class RunningTask {
   public void terminate(TaskState terminalState) {
     Preconditions.checkNotNull(process);
     LOG.info("Terminating task " + this);
-    // TODO(wfarner): Fix this - the state transition makes waitFor() a no-op.
     stateMachine.transition(terminalState);
 
-    signalTaskKill();
+    try {
+      processKiller.execute(killCommand);
+    } catch (ProcessKiller.KillException e) {
+      LOG.log(Level.WARNING, "Failed to kill process " + this, e);
+    }
 
     process.destroy();
     waitFor();
@@ -294,58 +311,13 @@ public class RunningTask {
 
   private boolean isHealthy() {
     if (!supportsHttpSignals()) return true;
-    List<String> response = touchUrl(HEALTH_CHECK_ENDPOINT);
-    return response != null && Joiner.on("").join(response).equalsIgnoreCase(HEALTH_CHECK_OK_VALUE);
-  }
-
-  private void signalTaskKill() {
-    if (supportsHttpSignals()) {
-      touchUrl(PROCESS_TERM_ENDPOINT);
-
-      try {
-        // TODO(wfarner): Make this configurable.
-        Thread.sleep(2000);
-      } catch (InterruptedException e) {
-        LOG.warning("Interrupted while waiting beween TERM and KILL.");
-      }
-
-      touchUrl(PROCESS_KILL_ENDPOINT);
-    }
-  }
-
-  private List<String> touchUrl(final String endpoint) {
-    Preconditions.checkState(supportsHttpSignals());
-    LOG.info("Touching signal endpoint: " + endpoint);
-
-    final URL signalUrl;
     try {
-      signalUrl = new URL(signalRootUrl + "/" + endpoint);
-    } catch (MalformedURLException e) {
-      LOG.log(Level.SEVERE, "Malformed signal url.", e);
-      return null;
+      return healthChecker.apply(healthCheckPort);
+    } catch (HealthCheckException e) {
+      LOG.log(Level.INFO, String.format("Health check for %s on port %d failed.",
+          this, healthCheckPort), e);
+      return false;
     }
-
-    LOG.info("Signaling URL: " + signalUrl);
-    Future<List<String>> task = httpSignalExecutor.submit(new Callable<List<String>>() {
-      @Override public List<String> call() throws Exception {
-        return Resources.readLines(signalUrl, Charsets.UTF_8);
-      }
-    });
-
-    try {
-      List<String> reply = task.get(URL_TIMEOUT.as(Time.MILLISECONDS), TimeUnit.MILLISECONDS);
-      LOG.info(String.format("Signal to %s replied with %s", endpoint, reply));
-      return reply;
-    } catch (InterruptedException e) {
-      LOG.log(Level.WARNING, "Interrupted while requesting signal URL.", e);
-      task.cancel(true);
-    } catch (ExecutionException e) {
-      LOG.log(Level.WARNING, "Failed while requesting signal URL.", e);
-    } catch (TimeoutException e) {
-      LOG.info("Signal URL request timed out.");
-    }
-
-    return null;
   }
 
   public String toString() {

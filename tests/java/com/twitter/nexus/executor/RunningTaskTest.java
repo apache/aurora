@@ -1,14 +1,20 @@
 package com.twitter.nexus.executor;
 
 import com.google.common.base.Charsets;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.io.Files;
 import com.twitter.common.Pair;
+import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.common.io.FileUtils;
+import com.twitter.nexus.executor.HealthChecker.HealthCheckException;
+import com.twitter.nexus.executor.ProcessKiller.KillCommand;
+import com.twitter.nexus.executor.ProcessKiller.KillException;
 import com.twitter.nexus.gen.TwitterTaskInfo;
 import nexus.TaskState;
+import org.easymock.IMocksControl;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -19,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Map;
 
+import static org.easymock.EasyMock.*;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.*;
 
@@ -28,6 +35,9 @@ import static org.junit.Assert.*;
  * @author wfarner
  */
 public class RunningTaskTest {
+
+  private static final int PID = 12345;
+  private static final int HTTP_PORT = 6789;
 
   private File executorRoot;
 
@@ -39,13 +49,24 @@ public class RunningTaskTest {
       .setStartCommand("touch a.txt")
       .setHdfsPath("/fake/path");
   private TwitterTaskInfo taskObj;
+
+  private IMocksControl control;
   private SocketManager socketManager;
+  private ExceptionalFunction<Integer, Boolean, HealthCheckException> healthChecker;
+  private ExceptionalClosure<KillCommand, KillException> processKiller;
+  private ExceptionalFunction<File, Integer, FileToInt.FetchException> pidFetcher;
 
   @Before
+  @SuppressWarnings("unchecked")
   public void setUp() throws Exception {
+    control = createControl();
+    socketManager = control.createMock(SocketManager.class);
+    healthChecker = control.createMock(ExceptionalFunction.class);
+    processKiller = control.createMock(ExceptionalClosure.class);
+    pidFetcher = control.createMock(ExceptionalFunction.class);
+
     executorRoot = FileUtils.createTempDir();
     taskObj = new TwitterTaskInfo(TASK_A);
-    socketManager = new SocketManager(10000, 11000);
   }
 
   @After
@@ -60,7 +81,7 @@ public class RunningTaskTest {
   @Test
   public void testStage() throws Exception {
     taskObj.setStartCommand("touch a.txt");
-    RunningTask taskA = new RunningTask(socketManager, executorRoot, TASK_ID_A, taskObj, COPIER);
+    RunningTask taskA = makeTask(taskObj);
     taskA.stage();
     assertDirContents(executorRoot, taskObj.getOwner());
     assertDirContents(new File(executorRoot, taskObj.getOwner()), taskObj.getJobName());
@@ -69,8 +90,12 @@ public class RunningTaskTest {
 
   @Test
   public void testLaunchCreatesOutputFile() throws Exception {
+    expect(pidFetcher.apply((File) anyObject())).andReturn(PID);
+
+    control.replay();
+
     taskObj.setStartCommand("touch a.txt");
-    RunningTask taskA = new RunningTask(socketManager, executorRoot, TASK_ID_A, taskObj, COPIER);
+    RunningTask taskA = makeTask(taskObj);
     taskA.stage();
     taskA.launch();
     assertThat(taskA.waitFor(), is(TaskState.TASK_FINISHED));
@@ -79,8 +104,12 @@ public class RunningTaskTest {
 
   @Test
   public void testLaunchCapturesStdout() throws Exception {
+    expect(pidFetcher.apply((File) anyObject())).andReturn(PID);
+
+    control.replay();
+
     taskObj.setStartCommand("echo \"hello world\"");
-    RunningTask taskA = new RunningTask(socketManager, executorRoot, TASK_ID_A, taskObj, COPIER);
+    RunningTask taskA = makeTask(taskObj);
     taskA.stage();
     taskA.launch();
     assertThat(taskA.waitFor(), is(TaskState.TASK_FINISHED));
@@ -92,8 +121,12 @@ public class RunningTaskTest {
 
   @Test
   public void testLaunchErrorCode() throws Exception {
+    expect(pidFetcher.apply((File) anyObject())).andReturn(PID);
+
+    control.replay();
+
     taskObj.setStartCommand("exit 2");
-    RunningTask taskA = new RunningTask(socketManager, executorRoot, TASK_ID_A, taskObj, COPIER);
+    RunningTask taskA = makeTask(taskObj);
     taskA.stage();
     taskA.launch();
     assertThat(taskA.waitFor(), is(TaskState.TASK_FAILED));
@@ -147,108 +180,105 @@ public class RunningTaskTest {
 
   @Test
   public void testReleasesPortsNormalShutdown() throws Exception {
+    final int customPort = 4634;
+    expect(socketManager.leaseSocket()).andReturn(customPort);
+    expect(pidFetcher.apply((File) anyObject())).andReturn(PID);
+    socketManager.returnSocket(customPort);
+
+    control.replay();
+
     taskObj.setStartCommand("echo '%port:myport%'");
-    SocketManager socketManager = new SocketManager(10000, 10001);
-    RunningTask taskA = new RunningTask(socketManager, executorRoot, TASK_ID_A, taskObj, COPIER);
+    RunningTask taskA = makeTask(taskObj);
     taskA.stage();
     taskA.launch();
 
-    // Lease the remaining socket.
-    socketManager.leaseSocket();
-
-    // Subsequent leases should fail.
-    try {
-      socketManager.leaseSocket();
-      fail();
-    } catch (SocketManager.SocketLeaseException e) {
-      // Expected.
-    }
-
     assertThat(taskA.waitFor(), is(TaskState.TASK_FINISHED));
-
-    // Should be able to lease one socket, since one was freed when the task terminated.
-    socketManager.leaseSocket();
   }
 
   @Test
   public void testReleasesPortsKill() throws Exception {
+    final int customPort = 4634;
+    expect(socketManager.leaseSocket()).andReturn(customPort);
+    expect(pidFetcher.apply((File) anyObject())).andReturn(PID);
+    processKiller.execute(new KillCommand(PID));
+    socketManager.returnSocket(customPort);
+
+    control.replay();
+
     taskObj.setStartCommand("echo '%port:myport%'; sleep 10");
-    SocketManager socketManager = new SocketManager(10000, 10001);
-    RunningTask taskA = new RunningTask(socketManager, executorRoot, TASK_ID_A, taskObj, COPIER);
+    RunningTask taskA = makeTask(taskObj);
     taskA.stage();
     taskA.launch();
 
-    // Lease the remaining socket.
-    socketManager.leaseSocket();
-
-    // Subsequent leases should fail.
-    try {
-      socketManager.leaseSocket();
-      fail();
-    } catch (SocketManager.SocketLeaseException e) {
-      // Expected.
-    }
-
     taskA.terminate(TaskState.TASK_KILLED);
-
-    // Should be able to lease one socket, since one was freed when the task was killed.
-    socketManager.leaseSocket();
   }
 
   @Test
   public void testLeasePort() throws Exception {
+    expect(socketManager.leaseSocket()).andReturn(HTTP_PORT);
+
+    control.replay();
+
     taskObj.setStartCommand("echo '%port:http%'");
-    RunningTask taskA = new RunningTask(socketManager, executorRoot, TASK_ID_A, taskObj, COPIER);
+    RunningTask taskA = makeTask(taskObj);
 
     Pair<String, Map<String, Integer>> expanded = taskA.expandCommandLine();
 
     assertThat(expanded.getFirst().matches("echo '\\d+'"), is(true));
-    Map<String, Integer> assignedPorts = expanded.getSecond();
-    assertMappedValuesRange(assignedPorts, 10000, 11000, "http");
+
+    Map<String, Integer> expectedPorts = ImmutableMap.of("http", HTTP_PORT);
+    assertThat(expanded.getSecond(), is(expectedPorts));
   }
 
   @Test
   public void testLeasePorts() throws Exception {
+    final int thriftPort = 10000;
+    final int mailPort = 10001;
+
+    expect(socketManager.leaseSocket()).andReturn(HTTP_PORT);
+    expect(socketManager.leaseSocket()).andReturn(thriftPort);
+    expect(socketManager.leaseSocket()).andReturn(mailPort);
+
+    control.replay();
+
     taskObj.setStartCommand("echo '%port:http%'; echo '%port:thrift%'; echo '%port:mail%'");
-    RunningTask taskA = new RunningTask(socketManager, executorRoot, TASK_ID_A, taskObj, COPIER);
+    RunningTask taskA = makeTask(taskObj);
 
     Pair<String, Map<String, Integer>> expanded = taskA.expandCommandLine();
 
     assertThat(expanded.getFirst().matches("echo '\\d+'; echo '\\d+'; echo '\\d+'"), is(true));
-    Map<String, Integer> assignedPorts = expanded.getSecond();
-    assertMappedValuesRange(assignedPorts, 10000, 11000, "http", "thrift", "mail");
+    Map<String, Integer> expectedPorts = ImmutableMap.of(
+        "http", HTTP_PORT,
+        "thrift", thriftPort,
+        "mail", mailPort);
+    assertThat(expanded.getSecond(), is(expectedPorts));
   }
 
-  @Test
+  @Test(expected = RunningTask.ProcessException.class)
   public void testLeasePortsDuplicateName() throws Exception {
     taskObj.setStartCommand("echo '%port:http%'; echo '%port:http%'");
-    RunningTask taskA = new RunningTask(socketManager, executorRoot, TASK_ID_A, taskObj, COPIER);
-
-    try {
-      taskA.expandCommandLine();
-      fail();
-    } catch (RunningTask.ProcessException e) {
-      // Expected.
-    }
+    makeTask(taskObj).expandCommandLine();
   }
 
-  @Test
+  @Test(expected = SocketManager.SocketLeaseException.class)
   public void testLeasePortsNoneAvailable() throws Exception {
-    taskObj.setStartCommand("echo '%port:http%'; echo '%port:thrift%'; echo '%port:mail%'");
-    SocketManager socketManager = new SocketManager(10000, 10001);
-    RunningTask taskA = new RunningTask(socketManager, executorRoot, TASK_ID_A, taskObj, COPIER);
+    expect(socketManager.leaseSocket()).andReturn(HTTP_PORT);
+    expect(socketManager.leaseSocket()).andReturn(10);
+    expect(socketManager.leaseSocket()).andThrow(new SocketManager.SocketLeaseException("Empty"));
 
-    try {
-      taskA.expandCommandLine();
-      fail();
-    } catch (SocketManager.SocketLeaseException e) {
-      // Expected
-    }
+    control.replay();
+
+    taskObj.setStartCommand("echo '%port:http%'; echo '%port:thrift%'; echo '%port:mail%'");
+    makeTask(taskObj).expandCommandLine();
   }
 
   @Test
   public void testTearDown() throws Exception {
-    RunningTask taskA = new RunningTask(socketManager, executorRoot, TASK_ID_A, taskObj, COPIER);
+    expect(pidFetcher.apply((File) anyObject())).andReturn(PID);
+
+    control.replay();
+
+    RunningTask taskA = makeTask(taskObj);
     taskA.stage();
     taskA.launch();
     taskA.tearDown();
@@ -256,15 +286,9 @@ public class RunningTaskTest {
     assertThat(Lists.newArrayList(executorRoot.list()), is(new ArrayList<String>()));
   }
 
-  private void assertMappedValuesRange(Map<String, Integer> map, int min, int max, String... keys) {
-    assertThat(map.size(), is(keys.length));
-    for (String key : keys) {
-      assertThat(map.containsKey(key), is(true));
-      int value = map.get(key);
-      assertThat(value >= min, is(true));
-      assertThat(value <= max, is(true));
-    }
-    assertThat(Sets.newHashSet(map.values()).size(), is(keys.length));
+  private RunningTask makeTask(TwitterTaskInfo taskInfo) {
+    return new RunningTask(socketManager, healthChecker, processKiller, pidFetcher, executorRoot,
+        TASK_ID_A, taskInfo, COPIER);
   }
 
   private void assertDirContents(File dir, String... children) {

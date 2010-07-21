@@ -1,16 +1,28 @@
 package com.twitter.nexus.executor;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
+import com.google.inject.TypeLiteral;
 import com.google.inject.internal.Preconditions;
+import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
+import com.twitter.nexus.executor.HttpSignaler.SignalException;
+import com.twitter.nexus.executor.ProcessKiller.KillCommand;
+import com.twitter.nexus.executor.ProcessKiller.KillException;
 import com.twitter.nexus.util.HdfsUtil;
 import org.apache.hadoop.fs.FileSystem;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.logging.Logger;
 
 /**
@@ -32,6 +44,8 @@ public class ExecutorModule extends AbstractModule {
   protected void configure() {
     bind(ExecutorCore.class).in(Singleton.class);
     bind(ExecutorHub.class).in(Singleton.class);
+    bind(new TypeLiteral<ExceptionalFunction<File, Integer, FileToInt.FetchException>>() {})
+        .to(FileToInt.class);
   }
 
   @Provides
@@ -67,6 +81,33 @@ public class ExecutorModule extends AbstractModule {
                                          + options.managedPortRange);
     }
 
-    return new SocketManager(Integer.parseInt(portRange[0]), Integer.parseInt(portRange[1]));
+    return new SocketManagerImpl(Integer.parseInt(portRange[0]), Integer.parseInt(portRange[1]));
+  }
+
+  @Provides
+  public ExceptionalFunction<String, List<String>, SignalException> provideHttpSignaler() {
+    ThreadFactory threadFactory = new ThreadFactoryBuilder()
+        .setDaemon(true)
+        .setNameFormat("HTTP-signaler-%d")
+        .build();
+    ExecutorService executor = Executors.newSingleThreadExecutor(threadFactory);
+
+    return new HttpSignaler(executor,
+        Amount.of((long) options.httpSignalTimeoutMs, Time.MILLISECONDS));
+  }
+
+  @Provides
+  public ExceptionalClosure<KillCommand, KillException> provideProcessKiller(
+      ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier,
+      ExceptionalFunction<String, List<String>, SignalException> httpSignaler) throws IOException {
+    // TODO(wfarner): This should be handled by ProcessKiller - modules shouldn't be doing heavy
+    //    work like this.
+    // Fetch the killtree script.
+    LOG.info("Fetching killtree script.");
+    File killScript = fileCopier.apply(new FileCopyRequest(options.killTreeHdfsPath,
+        options.taskRootDir.getAbsolutePath()));
+
+    return new ProcessKiller(httpSignaler, killScript,
+        Amount.of((long) options.killEscalationMs, Time.MILLISECONDS));
   }
 }

@@ -3,8 +3,11 @@ package com.twitter.nexus.executor;
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.io.Resources;
+import com.twitter.common.base.ExceptionalFunction;
+import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.nexus.executor.HttpSignaler.SignalException;
 
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -22,16 +25,21 @@ import java.util.logging.Logger;
  *
  * @author wfarner
  */
-public class HttpSignaler {
+public class HttpSignaler implements ExceptionalFunction<String, List<String>, SignalException> {
   private static final Logger LOG = Logger.getLogger(HttpSignaler.class.getName());
 
   private final ExecutorService executor;
+  private final Amount<Long, Time> signalTimeout;
 
-  public HttpSignaler(ExecutorService executor) {
+  public HttpSignaler(ExecutorService executor, Amount<Long, Time> signalTimeout) {
     this.executor = Preconditions.checkNotNull(executor);
+    this.signalTimeout = Preconditions.checkNotNull(signalTimeout);
   }
 
-  public List<String> signal(String url, Amount<Long, Time> timeout) throws SignalException {
+  @Override
+  public List<String> apply(String url) throws SignalException {
+    MorePreconditions.checkNotBlank(url);
+
     final URL signalUrl;
     try {
       signalUrl = new URL(url);
@@ -47,7 +55,7 @@ public class HttpSignaler {
     });
 
     try {
-      return task.get(timeout.as(Time.MILLISECONDS), TimeUnit.MILLISECONDS);
+      return task.get(signalTimeout.as(Time.MILLISECONDS), TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
       throw new SignalException("Interrupted while requesting signal URL " + url, e);
     } catch (ExecutionException e) {
@@ -58,6 +66,9 @@ public class HttpSignaler {
   }
 
   public static class SignalException extends Exception {
+    public SignalException(String msg) {
+      super(msg);
+    }
     public SignalException(String msg, Throwable t) {
       super(msg, t);
     }
