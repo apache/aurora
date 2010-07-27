@@ -1,6 +1,7 @@
 package com.twitter.nexus.scheduler;
 
 import com.google.common.base.Predicate;
+import com.twitter.nexus.gen.ExecutorQueryResponse;
 import com.twitter.nexus.gen.JobConfiguration;
 import com.twitter.nexus.gen.ScheduleStatus;
 import com.twitter.nexus.gen.TaskQuery;
@@ -123,4 +124,6 @@ public interface SchedulerCore {
    * @return The framework id.
    */
   public String getFrameworkId();
+
+  public void executorQueryResponse(ExecutorQueryResponse response);
 }

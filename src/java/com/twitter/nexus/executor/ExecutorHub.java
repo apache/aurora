@@ -1,15 +1,17 @@
 package com.twitter.nexus.executor;
 
 import com.google.inject.Inject;
+import com.twitter.nexus.gen.ExecutorQuery;
+import com.twitter.nexus.gen.ExecutorQueryResponse;
 import com.twitter.nexus.gen.TwitterTaskInfo;
+import com.twitter.nexus.scheduler.persistence.Codec;
+import com.twitter.nexus.scheduler.persistence.ThriftBinaryCodec;
 import nexus.Executor;
 import nexus.ExecutorDriver;
 import nexus.FrameworkMessage;
 import nexus.TaskDescription;
 import nexus.TaskState;
 import nexus.TaskStatus;
-import org.apache.thrift.TDeserializer;
-import org.apache.thrift.TException;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -21,8 +23,14 @@ public class ExecutorHub extends Executor {
   }
 
   private static final Logger LOG = Logger.getLogger(ExecutorHub.class.getName());
-  private final TDeserializer deserializer = new TDeserializer();
+  private final Codec<TwitterTaskInfo, byte[]> taskCodec = new ThriftBinaryCodec<TwitterTaskInfo>(
+      TwitterTaskInfo.class);
   private final static byte[] EMPTY_BYTE_ARRAY = new byte[0];
+
+  private final Codec<ExecutorQuery, byte[]> queryCodec = new ThriftBinaryCodec<ExecutorQuery>(
+      ExecutorQuery.class);
+  private final Codec<ExecutorQueryResponse, byte[]> queryResponseCodec =
+      new ThriftBinaryCodec<ExecutorQueryResponse>(ExecutorQueryResponse.class);
 
   @Inject
   private ExecutorCore executorCore;
@@ -31,11 +39,11 @@ public class ExecutorHub extends Executor {
   public void launchTask(final ExecutorDriver driver, final TaskDescription task) {
     LOG.info(String.format("Running task %s with ID %d.", task.getName(), task.getTaskId()));
 
-    TwitterTaskInfo taskInfo = new TwitterTaskInfo();
+    TwitterTaskInfo taskInfo;
     try {
-      deserializer.deserialize(taskInfo, task.getArg());
-    } catch (TException e) {
-      LOG.log(Level.SEVERE, "Error deserializing Thrift TwitterTaskInfo", e);
+      taskInfo = taskCodec.decode(task.getArg());
+    } catch (Codec.CodingException e) {
+      LOG.log(Level.SEVERE, "Error deserializing task object.", e);
       driver.sendStatusUpdate(new TaskStatus(task.getTaskId(), TaskState.TASK_FAILED,
           EMPTY_BYTE_ARRAY));
       return;
@@ -63,6 +71,16 @@ public class ExecutorHub extends Executor {
 
   @Override
   public void frameworkMessage(ExecutorDriver driver, FrameworkMessage message) {
-    LOG.info("Received framework message.");
+    FrameworkMessage response;
+    try {
+      response = new FrameworkMessage();
+      response.setData(queryResponseCodec.encode(
+          executorCore.query(queryCodec.decode(message.getData()))));
+    } catch (Codec.CodingException e) {
+      LOG.log(Level.SEVERE, "Failed to decode executor query.", e);
+      return;
+    }
+
+    driver.sendFrameworkMessage(response);
   }
 }

@@ -54,56 +54,30 @@ public class ProcessKiller implements ExceptionalClosure<KillCommand, KillExcept
     if (command.httpSignalPort != -1) {
       signal(command.httpSignalPort, PROCESS_TERM_ENDPOINT);
       wait(escalationDelay);
-      if (!isRunning(command.pid)) return;
     }
 
     // Attempt to force shutdown by signaling.
     if (command.httpSignalPort != -1) {
       signal(command.httpSignalPort, PROCESS_KILL_ENDPOINT);
       wait(escalationDelay);
-      if (!isRunning(command.pid)) return;
     }
 
     killTree(command.pid);
   }
 
-  private void signal(int port, String endpoint) throws KillException {
+  private void signal(int port, String endpoint) {
     try {
       httpSignaler.apply(String.format(URL_FORMAT, port, endpoint));
     } catch (HttpSignaler.SignalException e) {
-      throw new KillException("HTTP signal failed.", e);
+      LOG.log(Level.INFO, "HTTP signal failed: " + endpoint, e);
     }
   }
 
-  private void wait(Amount<Long, Time> period) throws KillException {
+  private void wait(Amount<Long, Time> period) {
     try {
       Thread.sleep(period.as(Time.MILLISECONDS));
     } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new KillException("Interrupted while signaling.", e);
-    }
-  }
-
-  /**
-   * Checks if a process is running.
-   *
-   * This is done by pretending to send a zero signal to the process. UNIX kill will not actually
-   * send a zero signal to the process, but kill will set its return code based on whether it's
-   * possible to send a signal to the process.
-   *
-   * @param pid Process to check.
-   * @return {@code false} if the process is not running, or {@code true} if it may be running.
-   */
-  private boolean isRunning(int pid) {
-    ProcessBuilder builder = new ProcessBuilder("kill", "-0", String.valueOf(pid));
-    try {
-      return builder.start().waitFor() == 0;
-    } catch (IOException e) {
-      LOG.log(Level.INFO, "Failed to check if process was still alive.", e);
-      return true;
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      return true;
+      LOG.log(Level.INFO, "Interrupted while signaling.", e);
     }
   }
 

@@ -4,9 +4,14 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
+import com.twitter.nexus.gen.ExecutorQueryResponse;
+import com.twitter.nexus.gen.ResourceConsumption;
 import com.twitter.nexus.gen.ScheduleStatus;
 import com.twitter.nexus.gen.TaskQuery;
+import com.twitter.nexus.scheduler.persistence.Codec;
+import com.twitter.nexus.scheduler.persistence.ThriftBinaryCodec;
 import nexus.ExecutorInfo;
+import nexus.FrameworkMessage;
 import nexus.Scheduler;
 import nexus.SchedulerDriver;
 import nexus.SlaveOfferVector;
@@ -26,6 +31,9 @@ import java.util.logging.Logger;
  */
 class NexusSchedulerImpl extends Scheduler {
   private static Logger LOG = Logger.getLogger(NexusSchedulerImpl.class.getName());
+
+  private final Codec<ExecutorQueryResponse, byte[]> queryResponseCodec =
+      new ThriftBinaryCodec<ExecutorQueryResponse>(ExecutorQueryResponse.class);
 
   static {
     System.loadLibrary("nexus");
@@ -102,6 +110,31 @@ class NexusSchedulerImpl extends Scheduler {
   @Override
   public void error(SchedulerDriver driver, int code, String message) {
     LOG.severe("Received error message: " + message + " with code " + code);
+  }
+
+  @Override
+  public void frameworkMessage(SchedulerDriver driver, FrameworkMessage message) {
+    if (message.getData() == null) {
+      LOG.info("Received empty framework message.");
+      return;
+    }
+
+    try {
+      schedulerCore.executorQueryResponse(queryResponseCodec.decode(message.getData()));
+    } catch (Codec.CodingException e) {
+      LOG.log(Level.SEVERE, "Failed to decode query response message.", e);
+    }
+  }
+
+  public static void main(String[] args) throws Exception {
+    ExecutorQueryResponse response = new ExecutorQueryResponse();
+    response.putToTaskResources(10, new ResourceConsumption().setLeasedPorts(ImmutableMap.<String, Integer>of("health", 50001)));
+    System.out.println("Response: " + response);
+    final Codec<ExecutorQueryResponse, byte[]> queryResponseCodec =
+      new ThriftBinaryCodec<ExecutorQueryResponse>(ExecutorQueryResponse.class);
+    byte[] data = queryResponseCodec.encode(response);
+    ExecutorQueryResponse response1 = queryResponseCodec.decode(data);
+    System.out.println("REsponse1: " + response1);
   }
 
   // Maps from nexus state to scheduler interface state.

@@ -2,6 +2,7 @@ package com.twitter.nexus.executor;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.twitter.common.Pair;
 import com.twitter.common.base.ExceptionalClosure;
@@ -12,6 +13,7 @@ import com.twitter.common.util.StateMachine;
 import com.twitter.nexus.executor.HealthChecker.HealthCheckException;
 import com.twitter.nexus.executor.ProcessKiller.KillCommand;
 import com.twitter.nexus.executor.ProcessKiller.KillException;
+import com.twitter.nexus.gen.ResourceConsumption;
 import com.twitter.nexus.gen.TwitterTaskInfo;
 import nexus.TaskState;
 import org.apache.commons.io.FileUtils;
@@ -307,6 +309,11 @@ public class RunningTask {
 
     process.destroy();
     waitFor();
+  }
+
+  public ResourceConsumption getResourceConsumption() {
+    return new ResourceConsumption()
+        .setLeasedPorts(ImmutableMap.copyOf(leasedPorts));
   }
 
   private boolean isHealthy() {

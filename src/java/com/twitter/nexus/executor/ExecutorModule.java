@@ -46,6 +46,9 @@ public class ExecutorModule extends AbstractModule {
     bind(ExecutorHub.class).in(Singleton.class);
     bind(new TypeLiteral<ExceptionalFunction<File, Integer, FileToInt.FetchException>>() {})
         .to(FileToInt.class);
+    bind(new TypeLiteral<
+        ExceptionalFunction<Integer, Boolean, HealthChecker.HealthCheckException>>() {})
+        .to(HealthChecker.class);
   }
 
   @Provides
@@ -67,7 +70,7 @@ public class ExecutorModule extends AbstractModule {
         String dirWithSlash = copy.getDestPath();
         if (!dirWithSlash.endsWith("/")) dirWithSlash += "/";
 
-        return HdfsUtil.downloadFileFromHdfs(fileSystem, copy.getSourcePath(), dirWithSlash);
+        return HdfsUtil.downloadFileFromHdfs(fileSystem, copy.getSourcePath(), dirWithSlash, true);
       }
     };
   }
@@ -103,6 +106,7 @@ public class ExecutorModule extends AbstractModule {
     // TODO(wfarner): This should be handled by ProcessKiller - modules shouldn't be doing heavy
     //    work like this.
     // Fetch the killtree script.
+
     LOG.info("Fetching killtree script.");
     File killScript = fileCopier.apply(new FileCopyRequest(options.killTreeHdfsPath,
         options.taskRootDir.getAbsolutePath()));

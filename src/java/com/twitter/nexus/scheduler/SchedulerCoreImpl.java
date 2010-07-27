@@ -4,13 +4,19 @@ import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 import com.twitter.common.base.ExceptionalClosure;
+import com.twitter.nexus.gen.ExecutorQuery;
+import com.twitter.nexus.gen.ExecutorQueryResponse;
 import com.twitter.nexus.gen.JobConfiguration;
+import com.twitter.nexus.gen.ResourceConsumption;
+import com.twitter.nexus.gen.ResponseCode;
 import com.twitter.nexus.gen.ScheduleStatus;
 import com.twitter.nexus.gen.SchedulerState;
 import com.twitter.nexus.gen.SchedulingSignal;
@@ -33,6 +39,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
@@ -63,6 +72,9 @@ public class SchedulerCoreImpl implements SchedulerCore {
   // Stores the configured tasks.
   private TaskStore taskStore = new TaskStore();
 
+  private final Codec<ExecutorQuery, byte[]> queryCodec = new ThriftBinaryCodec<ExecutorQuery>(
+      ExecutorQuery.class);
+
   // Work queue that stores pending asynchronous tasks.
   @Inject
   private WorkQueue workQueue;
@@ -82,6 +94,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     this.persistenceLayer = Preconditions.checkNotNull(persistenceLayer);
 
     restore();
+    scheduleResourceInfoFetch();
   }
 
   @Override
@@ -89,6 +102,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     this.schedulerDriver.set(Preconditions.checkNotNull(driver));
     this.frameworkId.set(Preconditions.checkNotNull(frameworkId));
     persist();
+    scheduleResourceInfoFetch();
   }
 
   @Override
@@ -114,6 +128,70 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
   private int generateTaskId() {
     return nextTaskId.incrementAndGet();
+  }
+
+  private void scheduleResourceInfoFetch() {
+    ScheduledExecutorService executor = new ScheduledThreadPoolExecutor(1,
+        new ThreadFactoryBuilder().setDaemon(true).setNameFormat("ExecutorQuery-%d").build());
+
+    Runnable fetcher = new Runnable() {
+      @Override public void run() {
+        final ArrayListMultimap<String, Integer> slaveIdToTaskIds = ArrayListMultimap.create();
+
+        TaskQuery query = new TaskQuery();
+        query.addToStatuses(ScheduleStatus.RUNNING);
+
+        for (TrackedTask task : taskStore.fetch(query)) {
+          slaveIdToTaskIds.put(task.getSlaveId(), task.getTaskId());
+        }
+
+        if (slaveIdToTaskIds.isEmpty()) return;
+
+        doWorkWithDriver(new Function<SchedulerDriver, Integer>() {
+          @Override public Integer apply(SchedulerDriver driver) {
+            for (String slaveId : slaveIdToTaskIds.keySet()) {
+              FrameworkMessage message = new FrameworkMessage();
+              message.setSlaveId(slaveId);
+              try {
+                message.setData(queryCodec.encode(
+                    new ExecutorQuery().setTaskIds(slaveIdToTaskIds.get(slaveId))));
+              } catch (Codec.CodingException e) {
+                LOG.log(Level.SEVERE, "Failed to encode executor query.", e);
+                return -1;
+              }
+
+              int result = driver.sendFrameworkMessage(message);
+              if (result != 0) return result;
+            }
+
+            return 0;
+          }
+        });
+      }
+    };
+
+    // TODO(wfarner): Make configurable.
+    executor.scheduleAtFixedRate(fetcher, 10, 2, TimeUnit.SECONDS);
+  }
+
+  @Override
+  public void executorQueryResponse(ExecutorQueryResponse response) {
+    if (response.getResponseCode() != ResponseCode.OK) {
+      LOG.info("Executor query failed: " + response.getMessage());
+      return;
+    }
+
+    LOG.info("Received executor query response: " + response);
+
+    final Map<Integer, ResourceConsumption> resources = response.getTaskResources();
+    if (resources.isEmpty()) return;
+
+    Iterable<TrackedTask> tasks = taskStore.fetch(new TaskQuery().setTaskIds(resources.keySet()));
+    taskStore.mutate(tasks, new ExceptionalClosure<TrackedTask, RuntimeException>() {
+      @Override public void execute(TrackedTask task) {
+        task.setResources(resources.get(task.getTaskId()));
+      }
+    });
   }
 
   @Override

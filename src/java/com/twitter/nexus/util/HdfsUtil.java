@@ -14,7 +14,7 @@ import java.util.logging.Logger;
 
 /**
  * HdfsUtil - utility functions for dealing with Hadoop's file system
- * 
+ *
  * @author Florian Leibert
  */
 public class HdfsUtil {
@@ -24,15 +24,25 @@ public class HdfsUtil {
     Configuration conf = new Configuration(true);
     conf.addResource(new Path(hdfsConfigPath));
     conf.reloadConfiguration();
-    FileSystem hdfs = FileSystem.get(conf);
-    return hdfs;
+    return FileSystem.get(conf);
   }
 
   public static File downloadFileFromHdfs(final FileSystem hdfs, final String executorBinaryUrl,
                                           final String localDirName) throws IOException {
+    return downloadFileFromHdfs(hdfs, executorBinaryUrl, localDirName, false);
+  }
+
+  public static File downloadFileFromHdfs(final FileSystem hdfs, final String executorBinaryUrl,
+      final String localDirName, boolean overwrite) throws IOException {
     Path executorBinaryPath = new Path(executorBinaryUrl);
     FSDataInputStream remoteStream = hdfs.open(executorBinaryPath);
     File localFile = new File(localDirName + executorBinaryPath.getName());
+
+    if (overwrite && localFile.exists()) {
+      boolean success = localFile.delete();
+      if (!success) LOG.warning("Failed to delete file to be overwritten: " + localFile);
+    }
+
     FileOutputStream localStream = new FileOutputStream(localFile);
     try {
       IOUtils.copy(remoteStream, localStream);

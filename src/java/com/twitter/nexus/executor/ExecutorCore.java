@@ -10,6 +10,8 @@ import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.nexus.executor.HealthChecker.HealthCheckException;
 import com.twitter.nexus.executor.ProcessKiller.KillCommand;
 import com.twitter.nexus.executor.ProcessKiller.KillException;
+import com.twitter.nexus.gen.ExecutorQuery;
+import com.twitter.nexus.gen.ExecutorQueryResponse;
 import com.twitter.nexus.gen.TwitterTaskInfo;
 import nexus.ExecutorDriver;
 import nexus.TaskDescription;
@@ -45,7 +47,7 @@ public class ExecutorCore {
       new ThreadFactoryBuilder().setDaemon(true).setNameFormat("NexusExecutor-[%d]").build());
 
   @Inject ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier;
-  @Inject SocketManagerImpl socketManager;
+  @Inject SocketManager socketManager;
   @Inject ExceptionalFunction<Integer, Boolean, HealthCheckException> healthChecker;
   @Inject ExceptionalClosure<KillCommand, KillException> processKiller;
   @Inject ExceptionalFunction<File, Integer, FileToInt.FetchException> pidFetcher;
@@ -104,6 +106,23 @@ public class ExecutorCore {
     } else {
       LOG.severe("No such task found: " + taskId);
     }
+  }
+
+  public ExecutorQueryResponse query(ExecutorQuery query) {
+    Preconditions.checkNotNull(query);
+    ExecutorQueryResponse response = new ExecutorQueryResponse();
+
+    for (int taskId : query.getTaskIds()) {
+      RunningTask task = tasks.get(taskId);
+      if (task == null) {
+        LOG.info("Received query for unknown task id " + taskId);
+      } else {
+        response.putToTaskResources(taskId, task.getResourceConsumption());
+        LOG.info("Sending resource info: " + task.getResourceConsumption());
+      }
+    }
+
+    return response;
   }
 
   public void shutdownCore(ExecutorDriver driver) {

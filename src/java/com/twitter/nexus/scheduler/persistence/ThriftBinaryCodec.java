@@ -26,7 +26,7 @@ public class ThriftBinaryCodec<T extends TBase> implements Codec<T, byte[]>{
   public T decode(byte[] bytes) throws CodingException {
     if (bytes == null) return null;
 
-    T t = null;
+    T t;
     try {
       t = thriftClassType.newInstance();
     } catch (InstantiationException e) {
