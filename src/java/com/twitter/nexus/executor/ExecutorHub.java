@@ -32,8 +32,7 @@ public class ExecutorHub extends Executor {
   private final Codec<ExecutorQueryResponse, byte[]> queryResponseCodec =
       new ThriftBinaryCodec<ExecutorQueryResponse>(ExecutorQueryResponse.class);
 
-  @Inject
-  private ExecutorCore executorCore;
+  @Inject private ExecutorCore executorCore;
 
   @Override
   public void launchTask(final ExecutorDriver driver, final TaskDescription task) {

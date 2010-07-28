@@ -5,7 +5,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
 import com.twitter.nexus.gen.ExecutorQueryResponse;
-import com.twitter.nexus.gen.ResourceConsumption;
 import com.twitter.nexus.gen.ScheduleStatus;
 import com.twitter.nexus.gen.TaskQuery;
 import com.twitter.nexus.scheduler.persistence.Codec;
@@ -124,17 +123,6 @@ class NexusSchedulerImpl extends Scheduler {
     } catch (Codec.CodingException e) {
       LOG.log(Level.SEVERE, "Failed to decode query response message.", e);
     }
-  }
-
-  public static void main(String[] args) throws Exception {
-    ExecutorQueryResponse response = new ExecutorQueryResponse();
-    response.putToTaskResources(10, new ResourceConsumption().setLeasedPorts(ImmutableMap.<String, Integer>of("health", 50001)));
-    System.out.println("Response: " + response);
-    final Codec<ExecutorQueryResponse, byte[]> queryResponseCodec =
-      new ThriftBinaryCodec<ExecutorQueryResponse>(ExecutorQueryResponse.class);
-    byte[] data = queryResponseCodec.encode(response);
-    ExecutorQueryResponse response1 = queryResponseCodec.decode(data);
-    System.out.println("REsponse1: " + response1);
   }
 
   // Maps from nexus state to scheduler interface state.

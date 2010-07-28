@@ -76,8 +76,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
       ExecutorQuery.class);
 
   // Work queue that stores pending asynchronous tasks.
-  @Inject
-  private WorkQueue workQueue;
+  @Inject private WorkQueue workQueue;
 
   private final PersistenceLayer<SchedulerState> persistenceLayer;
 
@@ -176,12 +175,12 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
   @Override
   public void executorQueryResponse(ExecutorQueryResponse response) {
+    Preconditions.checkNotNull(response);
+
     if (response.getResponseCode() != ResponseCode.OK) {
       LOG.info("Executor query failed: " + response.getMessage());
       return;
     }
-
-    LOG.info("Received executor query response: " + response);
 
     final Map<Integer, ResourceConsumption> resources = response.getTaskResources();
     if (resources.isEmpty()) return;

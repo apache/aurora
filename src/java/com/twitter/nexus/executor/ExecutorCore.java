@@ -12,6 +12,7 @@ import com.twitter.nexus.executor.ProcessKiller.KillCommand;
 import com.twitter.nexus.executor.ProcessKiller.KillException;
 import com.twitter.nexus.gen.ExecutorQuery;
 import com.twitter.nexus.gen.ExecutorQueryResponse;
+import com.twitter.nexus.gen.ResponseCode;
 import com.twitter.nexus.gen.TwitterTaskInfo;
 import nexus.ExecutorDriver;
 import nexus.TaskDescription;
@@ -110,7 +111,8 @@ public class ExecutorCore {
 
   public ExecutorQueryResponse query(ExecutorQuery query) {
     Preconditions.checkNotNull(query);
-    ExecutorQueryResponse response = new ExecutorQueryResponse();
+    ExecutorQueryResponse response = new ExecutorQueryResponse()
+        .setResponseCode(ResponseCode.OK);
 
     for (int taskId : query.getTaskIds()) {
       RunningTask task = tasks.get(taskId);

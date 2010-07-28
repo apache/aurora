@@ -62,6 +62,7 @@ public class TaskStore {
       final ExceptionalClosure<TrackedTask, E> mutator) throws E {
     List<TrackedTask> copies = Lists.newArrayList();
     for (TrackedTask task : immutableCopies) {
+      // TODO(wfarner): This would be faster with something equivalent to an identity set.
       TrackedTask mutable = tasks.get(tasks.indexOf(task));
       mutator.execute(mutable);
       copies.add(new TrackedTask(mutable));
