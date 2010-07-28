@@ -1,9 +1,12 @@
 package com.twitter.nexus.executor;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import com.google.common.io.CharStreams;
+import com.google.common.io.Files;
 import com.twitter.common.Pair;
 import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
@@ -20,6 +23,7 @@ import org.apache.commons.io.FileUtils;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -33,10 +37,24 @@ import java.util.regex.Pattern;
 /**
  * Handles storing information and performing duties related to a running task.
  *
+ * This will create a directory to hold everything realted to a task, as well as a sandbox that the
+ * launch command has access to.  The following files will be created:
+ *
+ * $TASK_ROOT - root task directory.
+ * $TASK_ROOT/pidfile  - PID of the launched process.
+ * $TASK_ROOT/sandbox/  - Sandbox, working directory for the task.
+ * $TASK_ROOT/sandbox/run.sh - Configured run command, written to a shell script file.
+ * $TASK_ROOT/sandbox/$PAYLOAD  - Payload specified in task configuration (fetched from HDFS).
+ * $TASK_ROOT/sandbox/stderr  - Captures standard error stream.
+ * $TASK_ROOT/sandbox/stdout - Captures standard output stream.
+ *
  * @author wfarner
  */
 public class RunningTask {
   private static final Logger LOG = Logger.getLogger(RunningTask.class.getName());
+
+  private static final String SANDBOX_DIR_NAME = "sandbox";
+  private static final String RUN_SCRIPT_NAME = "run.sh";
 
   private static final Pattern PORT_REQUEST_PATTERN = Pattern.compile("%port:(\\w+)%");
 
@@ -57,11 +75,10 @@ public class RunningTask {
 
   private int healthCheckPort = -1;
 
-  @VisibleForTesting
-  final File taskRoot;
+  @VisibleForTesting final File taskRoot;
+  @VisibleForTesting final File sandbox;
 
-  @VisibleForTesting
-  protected final Map<String, Integer> leasedPorts = Maps.newHashMap();
+  @VisibleForTesting protected final Map<String, Integer> leasedPorts = Maps.newHashMap();
   private Process process;
 
   private int exitCode = 0;
@@ -86,6 +103,7 @@ public class RunningTask {
     Preconditions.checkState(executorRoot.exists() && executorRoot.isDirectory());
     taskRoot = new File(executorRoot, String.format(
         "%s/%s/%d-%d", task.getOwner(), task.getJobName(), taskId, System.nanoTime()));
+    sandbox = new File(taskRoot, SANDBOX_DIR_NAME);
     this.fileCopier = Preconditions.checkNotNull(fileCopier);
 
     stateMachine = StateMachine.<TaskState>builder(toString())
@@ -106,12 +124,12 @@ public class RunningTask {
    */
   public void stage() throws ProcessException {
     LOG.info(String.format("Staging task for job %s/%s", task.getOwner(), task.getJobName()));
-    Preconditions.checkState(!taskRoot.exists());
+    Preconditions.checkState(!sandbox.exists());
 
     LOG.info("Building task directory hierarchy.");
-    if (!taskRoot.mkdirs()) {
-      throw new ProcessException(
-          "Failed to create working directory: " + taskRoot.getAbsolutePath());
+    if (!sandbox.mkdirs()) {
+      LOG.severe("Failed to create sandbox directory " + sandbox);
+      throw new ProcessException("Failed to create sandbox directory.");
     }
 
     LOG.info("Fetching payload.");
@@ -119,13 +137,14 @@ public class RunningTask {
     LOG.info("File copier: " + fileCopier);
     try {
       payload = fileCopier.apply(
-          new FileCopyRequest(task.getHdfsPath(), taskRoot.getAbsolutePath()));
+          new FileCopyRequest(task.getHdfsPath(), sandbox.getAbsolutePath()));
     } catch (IOException e) {
       throw new ProcessException("Failed to fetch task binary.", e);
     }
 
     if (!payload.exists()) {
-      throw new ProcessException("Unexpected state - binary does not exist!");
+      throw new ProcessException(String.format(
+          "Unexpected state - payload does not exist: HDFS %s -> %s", task.getHdfsPath(), sandbox));
     }
   }
 
@@ -164,7 +183,7 @@ public class RunningTask {
   }
 
   public void launch() throws ProcessException {
-    LOG.info("Executing from working directory: " + taskRoot.getAbsolutePath());
+    LOG.info("Executing from working directory: " + sandbox);
 
     Pair<String, Map<String, Integer>> expansion;
     try {
@@ -174,7 +193,13 @@ public class RunningTask {
       throw new ProcessException("Failed to obtain requested sockets.", e);
     }
 
-    String startCommand = expansion.getFirst();
+    // Write the start command to a file.
+    try {
+      Files.write(expansion.getFirst(), new File(sandbox, RUN_SCRIPT_NAME), Charsets.US_ASCII);
+    } catch (IOException e) {
+      LOG.log(Level.SEVERE, "Failed to record run command.", e);
+      throw new ProcessException("Failed build staging directory.", e);
+    }
 
     LOG.info("Obtained leases on ports: " + expansion.getSecond());
     leasedPorts.putAll(expansion.getSecond());
@@ -184,15 +209,15 @@ public class RunningTask {
     }
 
     List<String> commandLine = Arrays.asList(
-        "bash",
-        "-c",
-        String.format("echo $$ > pidfile; %s >stdout 2>stderr", startCommand)
+        "bash", "-c",  // Read commands from the following string.
+        String.format("echo $$ > ../pidfile; bash --restricted %s >stdout 2>stderr",
+            RUN_SCRIPT_NAME)
     );
 
     LOG.info("Executing shell command: " + commandLine);
 
     ProcessBuilder processBuilder = new ProcessBuilder(commandLine);
-    processBuilder.directory(taskRoot);
+    processBuilder.directory(sandbox);
 
     try {
       process = processBuilder.start();

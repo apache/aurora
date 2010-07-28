@@ -99,7 +99,8 @@ public class RunningTaskTest {
     taskA.stage();
     taskA.launch();
     assertThat(taskA.waitFor(), is(TaskState.TASK_FINISHED));
-    assertDirContents(taskA.taskRoot, "a.txt", "stderr", "stdout", "pidfile");
+    assertDirContents(taskA.taskRoot, "sandbox", "pidfile");
+    assertDirContents(taskA.sandbox, "a.txt", "run.sh", "stderr", "stdout");
   }
 
   @Test
@@ -113,9 +114,10 @@ public class RunningTaskTest {
     taskA.stage();
     taskA.launch();
     assertThat(taskA.waitFor(), is(TaskState.TASK_FINISHED));
-    assertDirContents(taskA.taskRoot, "stderr", "stdout", "pidfile");
+    assertDirContents(taskA.taskRoot, "sandbox", "pidfile");
+    assertDirContents(taskA.sandbox, "run.sh", "stderr", "stdout");
 
-    assertThat(Files.readLines(new File(taskA.taskRoot, "stdout"), Charsets.UTF_8),
+    assertThat(Files.readLines(new File(taskA.sandbox, "stdout"), Charsets.UTF_8),
         is(Arrays.asList("hello world")));
   }
 
