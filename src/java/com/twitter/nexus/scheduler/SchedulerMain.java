@@ -89,17 +89,9 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
     super(TwitterSchedulerOptions.class);
   }
 
-  @Inject
-  private SchedulerCore schedulerCore;
-
-  @Inject
-  private SingletonService schedulerService;
-
-  @Inject
-  private SchedulerThriftInterface schedulerThriftInterface;
-
-  @Inject
-  private NexusSchedulerDriver driver;
+  @Inject private SingletonService schedulerService;
+  @Inject private SchedulerThriftInterface schedulerThriftInterface;
+  @Inject private NexusSchedulerDriver driver;
 
   @Override
   protected Iterable<Class<? extends Module>> getProcessModuleClasses() {

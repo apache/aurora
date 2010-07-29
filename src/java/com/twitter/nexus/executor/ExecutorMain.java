@@ -6,6 +6,7 @@ import com.google.inject.Module;
 import com.twitter.common.args.Option;
 import com.twitter.common.base.Command;
 import com.twitter.common.inject.process.InjectableMain;
+import com.twitter.common.process.GuicedProcess;
 import com.twitter.common.process.GuicedProcessOptions;
 import com.twitter.nexus.util.HdfsUtil;
 import nexus.NexusExecutorDriver;
@@ -19,7 +20,7 @@ import java.util.logging.Logger;
  *
  * @author Florian Leibert
  */
-public class ExecutorMain extends InjectableMain<ExecutorMain.TwitterExecutorOptions, Exception> {
+public class ExecutorMain extends GuicedProcess<ExecutorMain.TwitterExecutorOptions, Exception> {
   private static Logger LOG = Logger.getLogger(ExecutorMain.class.getName());
 
   public static class TwitterExecutorOptions extends GuicedProcessOptions {
@@ -44,23 +45,15 @@ public class ExecutorMain extends InjectableMain<ExecutorMain.TwitterExecutorOpt
     public int killEscalationMs = 5000;
   }
 
-  @Inject
-  private ExecutorHub executorHub;
-
-  @Inject
-  private ExecutorCore executorCore;
-
-  @Inject
-  private FileSystem fileSystem;
+  @Inject private ExecutorHub executorHub;
+  @Inject private ExecutorCore executorCore;
 
   protected ExecutorMain() {
     super(TwitterExecutorOptions.class);
   }
 
-
-
   @Override
-  public void execute() throws Exception {
+  public void runProcess() throws Exception {
     addShutdownAction(new Command() {
       @Override public void execute() {
         System.out.println("Shutting down the executor.");
@@ -72,7 +65,7 @@ public class ExecutorMain extends InjectableMain<ExecutorMain.TwitterExecutorOpt
   }
 
   @Override
-  protected Iterable<Class<? extends Module>> getModuleClasses() {
+  protected Iterable<Class<? extends Module>> getProcessModuleClasses() {
     return ImmutableList.<Class<? extends Module>>of(ExecutorModule.class);
   }
 

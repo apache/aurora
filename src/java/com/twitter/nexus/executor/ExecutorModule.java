@@ -9,11 +9,13 @@ import com.google.inject.TypeLiteral;
 import com.google.inject.internal.Preconditions;
 import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
+import com.twitter.common.process.GuicedProcess;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.nexus.executor.HttpSignaler.SignalException;
 import com.twitter.nexus.executor.ProcessKiller.KillCommand;
 import com.twitter.nexus.executor.ProcessKiller.KillException;
+import com.twitter.nexus.executor.httphandlers.TaskHome;
 import com.twitter.nexus.util.HdfsUtil;
 import org.apache.hadoop.fs.FileSystem;
 
@@ -49,6 +51,8 @@ public class ExecutorModule extends AbstractModule {
     bind(new TypeLiteral<
         ExceptionalFunction<Integer, Boolean, HealthChecker.HealthCheckException>>() {})
         .to(HealthChecker.class);
+
+    GuicedProcess.registerServlet(binder(), "/task", TaskHome.class, false);
   }
 
   @Provides

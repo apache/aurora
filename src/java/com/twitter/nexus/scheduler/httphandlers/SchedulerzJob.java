@@ -28,11 +28,11 @@ import java.util.List;
  * @author wfarner
  */
 public class SchedulerzJob extends StringTemplateServlet {
-  @Inject
-  private SchedulerCore scheduler;
 
   private static final String USER_PARAM = "user";
   private static final String JOB_PARAM = "job";
+
+  @Inject private SchedulerCore scheduler;
 
   @Inject
   public SchedulerzJob(@CacheTemplates boolean cacheTemplates) {

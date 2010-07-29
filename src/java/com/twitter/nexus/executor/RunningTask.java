@@ -148,6 +148,18 @@ public class RunningTask {
     }
   }
 
+  public TwitterTaskInfo getTask() {
+    return task;
+  }
+
+  public File getSandboxDir() {
+    return sandbox;
+  }
+
+  public Map<String, Integer> getLeasedPorts() {
+    return ImmutableMap.copyOf(leasedPorts);
+  }
+
   /**
    * Performs command-line expansion to assign managed port values where requested.
    *

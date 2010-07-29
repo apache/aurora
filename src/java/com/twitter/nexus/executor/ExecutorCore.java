@@ -109,6 +109,10 @@ public class ExecutorCore {
     }
   }
 
+  public RunningTask getTask(int taskId) {
+    return tasks.get(taskId);
+  }
+
   public ExecutorQueryResponse query(ExecutorQuery query) {
     Preconditions.checkNotNull(query);
     ExecutorQueryResponse response = new ExecutorQueryResponse()
@@ -120,7 +124,6 @@ public class ExecutorCore {
         LOG.info("Received query for unknown task id " + taskId);
       } else {
         response.putToTaskResources(taskId, task.getResourceConsumption());
-        LOG.info("Sending resource info: " + task.getResourceConsumption());
       }
     }
 
