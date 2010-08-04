@@ -1,0 +1,125 @@
+package com.twitter.nexus.scheduler.configuration;
+
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Data;
+import com.twitter.nexus.gen.JobConfiguration;
+import com.twitter.nexus.gen.TwitterTaskInfo;
+import nexus.SlaveOffer;
+import nexus.StringMap;
+import org.apache.commons.lang.StringUtils;
+
+import java.util.Map;
+import java.util.logging.Logger;
+
+/**
+ * Manages translation from a string-mapped configuration to a concrete configuration type, and
+ * defaults for optional values.
+ *
+ * TODO(wfarner): Add input validation to all fields (strings not empty, positive ints, etc).
+ *
+ * @author wfarner
+ */
+public class ConfigurationManager {
+  private static Logger LOG = Logger.getLogger(ConfigurationManager.class.getName());
+
+  private static final boolean DEFAULT_TO_DAEMON = false;
+  private static final double DEFAULT_NUM_CPUS = 0.1;
+  private static final long DEFAULT_RAM_BYTES = Amount.of(1, Data.GB).as(Data.BYTES);
+  private static final long DEFAULT_DISK_BYTES = Amount.of(1, Data.GB).as(Data.BYTES);
+  private static final int DEFAULT_PRIORITY = 0;
+  private static final int DEFAULT_HEALTH_CHECK_INTERVAL_SECS = 30;
+  private static final int DEFAULT_MAX_TASK_FAILURES = 1;
+
+  public static TwitterTaskInfo populateFields(JobConfiguration job, TwitterTaskInfo config)
+      throws TaskDescriptionException {
+    if (config == null) throw new TaskDescriptionException("Task may not be null.");
+
+    Map<String, String> configMap =  config.getConfiguration();
+    if (configMap == null) throw new TaskDescriptionException("Task configuration may not be null");
+
+    config
+        .setConfigParsed(true)
+        .setOwner(job.getOwner())
+        .setJobName(job.getName())
+        .setHdfsPath(getValue(configMap, "hdfs_path", String.class))
+        .setStartCommand(getValue(configMap, "start_command", String.class))
+        .setIsDaemon(getValue(configMap, "daemon", DEFAULT_TO_DAEMON, Boolean.class))
+        .setNumCpus(getValue(configMap, "num_cpus", DEFAULT_NUM_CPUS, Double.class))
+        .setRamBytes(getValue(configMap, "ram_bytes", DEFAULT_RAM_BYTES, Long.class))
+        .setDiskBytes(getValue(configMap, "disk_bytes", DEFAULT_DISK_BYTES, Long.class))
+        .setPriority(getValue(configMap, "priority", DEFAULT_PRIORITY, Integer.class))
+        .setHealthCheckIntervalSecs(getValue(configMap, "health_check_interval_secs",
+            DEFAULT_HEALTH_CHECK_INTERVAL_SECS, Integer.class))
+        .setMaxTaskFailures(getValue(configMap, "max_task_failures", DEFAULT_MAX_TASK_FAILURES,
+            Integer.class));
+
+    // Only one of [daemon=true, cron_schedule] may be set.
+    if (!StringUtils.isEmpty(job.getCronSchedule()) && config.isIsDaemon()) {
+      throw new TaskDescriptionException(
+          "A daemon task may not be run on a cron schedule: " + config);
+    }
+
+    return config;
+  }
+
+  public static TwitterTaskInfo makeConcrete(SlaveOffer offer) throws TaskDescriptionException {
+    if (offer== null) throw new TaskDescriptionException("Task may not be null.");
+
+    StringMap params = offer.getParams();
+    if (params == null) throw new TaskDescriptionException("Task configuration may not be null");
+
+    return new TwitterTaskInfo()
+      .setNumCpus(getValue(params, "cpus", Double.class))
+      .setRamBytes(getValue(params, "mem", Long.class));
+
+    /* TODO(wfarner): Make configuration more generic in nexus.
+    return new TwitterTaskInfo()
+      .setNumCpus(getValue(params, "num_cpus", Double.class))
+      .setRamBytes(getValue(params, "ram_bytes", Long.class))
+      .setRamBytes(getValue(params, "disk_bytes", Long.class));
+     */
+  }
+
+  public static boolean satisfied(TwitterTaskInfo request, TwitterTaskInfo offer) {
+    return request.getNumCpus() <= offer.getNumCpus()
+        && request.getRamBytes() <= offer.getRamBytes()
+        && request.getDiskBytes() <= offer.getRamBytes();
+  }
+
+  public static class TaskDescriptionException extends Exception {
+    public TaskDescriptionException(String msg) {
+      super(msg);
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T getValue(Map<String, String> config, String key, Class<T> type)
+      throws TaskDescriptionException {
+    try {
+      return (T) ValueParser.REGISTRY.get(type).parse(config.get(key));
+    } catch (ValueParser.ParseException e) {
+      throw new TaskDescriptionException("Invalid value for " + key + ": " + e.getMessage());
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T getValue(Map<String, String> config, String key, T defaultValue,
+      Class<T> type) throws TaskDescriptionException {
+    try {
+      return (T) ValueParser.REGISTRY.get(type).parseWithDefault(config.get(key), defaultValue);
+    } catch (ValueParser.ParseException e) {
+      throw new TaskDescriptionException("Invalid value for " + key + ": " + e.getMessage());
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T getValue(StringMap params, String key, Class<T> type)
+      throws TaskDescriptionException {
+    if (!params.has_key(key)) throw new TaskDescriptionException("Must specify value for " + key);
+    try {
+      return (T) ValueParser.REGISTRY.get(type).parse(params.get(key));
+    } catch (ValueParser.ParseException e) {
+      throw new TaskDescriptionException("Invalid value for " + key + ": " + e.getMessage());
+    }
+  }
+}
