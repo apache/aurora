@@ -6,8 +6,6 @@ import com.google.inject.Inject;
 import com.twitter.mesos.FrameworkMessageCodec;
 import com.twitter.mesos.StateTranslator;
 import com.twitter.mesos.codec.Codec;
-import com.twitter.mesos.codec.ThriftBinaryCodec;
-import com.twitter.mesos.gen.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.SchedulerMessage;
 import com.twitter.mesos.gen.TaskQuery;
@@ -31,11 +29,6 @@ import java.util.logging.Logger;
  */
 class MesosSchedulerImpl extends Scheduler {
   private static Logger LOG = Logger.getLogger(MesosSchedulerImpl.class.getName());
-
-  private final Codec<SchedulerMessage, byte[]> schedulerMessageCodec =
-      new ThriftBinaryCodec<SchedulerMessage>(SchedulerMessage.class);
-  private final Codec<RegisteredTaskUpdate, byte[]> registeredTaskUpdateCodec =
-      new ThriftBinaryCodec<RegisteredTaskUpdate>(RegisteredTaskUpdate.class);
 
   static {
     System.loadLibrary("nexus");

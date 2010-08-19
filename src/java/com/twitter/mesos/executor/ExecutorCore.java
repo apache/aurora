@@ -143,7 +143,7 @@ public class ExecutorCore {
     });
   }
 
-  public void stopRunningTask(ExecutorDriver driver, int taskId) {
+  public void stopRunningTask(int taskId) {
     RunningTask task = tasks.get(taskId);
 
     if (task != null) {
@@ -162,10 +162,10 @@ public class ExecutorCore {
     return tasks.values();
   }
 
-  public void shutdownCore(ExecutorDriver driver) {
+  public void shutdownCore() {
     for (Map.Entry<Integer, RunningTask> entry : tasks.entrySet()) {
       System.out.println("Killing task " + entry.getKey());
-      stopRunningTask(driver, entry.getKey());
+      stopRunningTask(entry.getKey());
     }
   }
 

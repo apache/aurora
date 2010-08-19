@@ -54,13 +54,14 @@ public class MesosExecutorImpl extends Executor {
 
   @Override
   public void killTask(ExecutorDriver driver, int taskId) {
-    executorCore.stopRunningTask(driver,taskId);
+    executorCore.stopRunningTask(taskId);
   }
 
   @Override
   public void shutdown(ExecutorDriver driver) {
     LOG.info("Received shutdown command, terminating...");
-    executorCore.shutdownCore(driver);
+    executorCore.shutdownCore();
+    driver.stop();
   }
 
   @Override
@@ -69,7 +70,7 @@ public class MesosExecutorImpl extends Executor {
     shutdown(driver);
   }
 
-  private final Codec<ExecutorMessage, FrameworkMessage> frameworkMessageCodec =
+  private static final Codec<ExecutorMessage, FrameworkMessage> FRAMEWORK_MESSAGE_CODEC =
       new FrameworkMessageCodec<ExecutorMessage>(ExecutorMessage.class);
 
   @Override
@@ -80,7 +81,7 @@ public class MesosExecutorImpl extends Executor {
     }
 
     try {
-      ExecutorMessage executorMsg = frameworkMessageCodec.decode(message);
+      ExecutorMessage executorMsg = FRAMEWORK_MESSAGE_CODEC.decode(message);
       if (!executorMsg.isSet()) {
         LOG.warning("Received empty executor message.");
         return;
@@ -92,6 +93,7 @@ public class MesosExecutorImpl extends Executor {
           break;
         case RESTART_EXECUTOR:
           LOG.info("Received executor restart request.");
+          shutdown(null);
           break;
         default:
           LOG.warning("Received unhandled executor message type: " + executorMsg.getSetField());

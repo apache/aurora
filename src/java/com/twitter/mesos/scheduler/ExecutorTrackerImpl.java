@@ -67,7 +67,10 @@ public class ExecutorTrackerImpl implements ExecutorTracker {
       @Override public void run() {
         if (restartQueue.isEmpty()) return;
 
-        restartCallback.execute(restartQueue.remove());
+
+        String slaveId = restartQueue.remove();
+        LOG.info("Requesting that slave be restarted: " + slaveId);
+        restartCallback.execute(slaveId);
       }
     };
 
@@ -93,12 +96,12 @@ public class ExecutorTrackerImpl implements ExecutorTracker {
 
     boolean restart = false;
     if (!localBuild.equals(executorBuild)) {
-      LOG.info(String.format("Executor %s has build %s, local build is %s...restarting executor.",
+      LOG.info(String.format("Executor %s has build %s, local build is %s...scheduling restart.",
           status.getSlaveId(), executorBuild, localBuild));
       restart = true;
     }
     if (!localBuildTime.equals(executorBuildTime)) {
-      LOG.info(String.format("Executor %s built at %s, local build %s...restarting executor.",
+      LOG.info(String.format("Executor %s built at %s, local build %s...scheduling restart.",
           status.getSlaveId(), executorBuildTime, localBuildTime));
       restart = true;
     }

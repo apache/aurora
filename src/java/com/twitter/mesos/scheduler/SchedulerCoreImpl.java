@@ -100,6 +100,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     executorTracker.start(new Closure<String>() {
       @Override public void execute(String slaveId) throws RuntimeException {
         try {
+          LOG.info("Sending restart request to executor " + slaveId);
           ExecutorMessage message = new ExecutorMessage();
           message.setRestartExecutor(new RestartExecutor());
 
@@ -111,6 +112,9 @@ public class SchedulerCoreImpl implements SchedulerCore {
     });
   }
 
+  private static final FrameworkMessageCodec<ExecutorMessage> FRAMEWORK_MESSAGE_CODEC =
+      new FrameworkMessageCodec<ExecutorMessage>(ExecutorMessage.class);
+
   private void sendExecutorMessage(String slaveId, ExecutorMessage message)
       throws Codec.CodingException {
     SchedulerDriver driverRef = schedulerDriver.get();
@@ -119,8 +123,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
       return;
     }
 
-    FrameworkMessage frameworkMessage = new FrameworkMessageCodec<ExecutorMessage>(
-        ExecutorMessage.class).encode(message);
+    FrameworkMessage frameworkMessage = FRAMEWORK_MESSAGE_CODEC.encode(message);
     frameworkMessage.setSlaveId(slaveId);
 
     int result = driverRef.sendFrameworkMessage(frameworkMessage);

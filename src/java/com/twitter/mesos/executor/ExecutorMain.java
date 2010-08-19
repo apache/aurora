@@ -54,7 +54,7 @@ public class ExecutorMain extends GuicedProcess<ExecutorMain.TwitterExecutorOpti
     addShutdownAction(new Command() {
       @Override public void execute() {
         System.out.println("Shutting down the executor.");
-        executorCore.shutdownCore(null);
+        executorCore.shutdownCore();
       }
     });
 
