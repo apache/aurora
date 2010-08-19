@@ -9,6 +9,7 @@ import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.Stat;
 
+import java.nio.ByteBuffer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -50,7 +51,8 @@ public class ZooKeeperPersistence implements PersistenceLayer<byte[]> {
   public void commit(byte[] data) throws PersistenceException {
     if (statFile() == null) {
       try {
-        getZooKeeper().create(path, data, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        getZooKeeper().create(path, data, ZooDefs.Ids.OPEN_ACL_UNSAFE,
+            CreateMode.PERSISTENT);
       } catch (KeeperException e) {
         logAndThrow(String.format("Failed to create persistence node (%s) in ZooKeeper.", path), e);
       } catch (InterruptedException e) {

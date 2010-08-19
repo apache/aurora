@@ -10,12 +10,10 @@ import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.ExceptionalClosure;
-import com.twitter.mesos.ExecutorMessageMux;
 import com.twitter.mesos.FrameworkMessageCodec;
 import com.twitter.mesos.codec.Codec;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.ExecutorMessage;
-import com.twitter.mesos.gen.ExecutorMessageType;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.LiveTaskInfo;
 import com.twitter.mesos.gen.RegisteredTaskUpdate;
@@ -102,8 +100,10 @@ public class SchedulerCoreImpl implements SchedulerCore {
     executorTracker.start(new Closure<String>() {
       @Override public void execute(String slaveId) throws RuntimeException {
         try {
-          sendExecutorMessage(slaveId, ExecutorMessageMux.mux(ExecutorMessageType.RESTART_EXECUTOR,
-              RestartExecutor.class, new RestartExecutor()));
+          ExecutorMessage message = new ExecutorMessage();
+          message.setRestartExecutor(new RestartExecutor());
+
+          sendExecutorMessage(slaveId, message);
         } catch (Codec.CodingException e) {
           LOG.log(Level.WARNING, "Failed to send executor status.", e);
         }
@@ -167,6 +167,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
       LOG.info(String.format("Slave %s reports records for tasks %s", update.getSlaveHost(),
           taskInfoMap.keySet()));
+
+      // TODO(wfarner): What do we do when the slave informs us of a task that we don't know about?
 
       // Update the resource information for the tasks that we currently have on record.
       taskStore.mutate(new TaskQuery().setTaskIds(taskInfoMap.keySet()),
@@ -298,10 +300,11 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
   private void scheduleTaskCopies(List<TrackedTask> tasks) {
     for (TrackedTask task : tasks) {
-      task.setSlaveId(null)
-          .setSlaveHost(null)
-          .setStatus(ScheduleStatus.PENDING)
-          .setTaskId(generateTaskId());
+      task.unsetSlaveId();
+      task.unsetSlaveHost();
+      task.unsetResources();
+      task.setTaskId(generateTaskId())
+          .setStatus(ScheduleStatus.PENDING);
     }
 
     LOG.info("Tasks being rescheduled: " + tasks);

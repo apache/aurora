@@ -13,10 +13,8 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
 import com.twitter.mesos.FrameworkMessageCodec;
-import com.twitter.mesos.SchedulerMessageMux;
 import com.twitter.mesos.StateTranslator;
 import com.twitter.mesos.codec.Codec;
-import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
 import com.twitter.mesos.executor.ProcessKiller.KillException;
@@ -25,7 +23,6 @@ import com.twitter.mesos.gen.LiveTaskInfo;
 import com.twitter.mesos.gen.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.SchedulerMessage;
-import com.twitter.mesos.gen.SchedulerMessageType;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import mesos.ExecutorDriver;
 import mesos.TaskDescription;
@@ -59,9 +56,6 @@ import java.util.logging.Logger;
  */
 public class ExecutorCore {
   private static final Logger LOG = Logger.getLogger(MesosExecutorImpl.class.getName());
-
-  private static final Codec<RegisteredTaskUpdate, byte[]> TASK_UPDATE_CODEC =
-      new ThriftBinaryCodec<RegisteredTaskUpdate>(RegisteredTaskUpdate.class);
 
   private final Map<Integer, RunningTask> tasks = Maps.newConcurrentMap();
 
@@ -276,9 +270,13 @@ public class ExecutorCore {
           LOG.log(Level.INFO, "Failed to get disk free space.", e);
         }
 
+        LOG.info("Sending executor status update: " + status);
+
+
+          SchedulerMessage message = new SchedulerMessage();
+          message.setExecutorStatus(status);
         try {
-          sendSchedulerMessage(SchedulerMessageMux.mux(SchedulerMessageType.EXECUTOR_STATUS,
-              ExecutorStatus.class, status));
+          sendSchedulerMessage(message);
         } catch (Codec.CodingException e) {
           LOG.log(Level.WARNING, "Failed to send executor status.", e);
         }
@@ -321,8 +319,10 @@ public class ExecutorCore {
         }
 
         try {
-          sendSchedulerMessage(SchedulerMessageMux.mux(SchedulerMessageType.REGISTERED_TASK_UPDATE,
-              RegisteredTaskUpdate.class, update));
+          SchedulerMessage message = new SchedulerMessage();
+          message.setTaskUpdate(update);
+
+          sendSchedulerMessage(message);
         } catch (Codec.CodingException e) {
           LOG.log(Level.WARNING, "Failed to send executor status.", e);
         }

@@ -1,20 +1,15 @@
 package com.twitter.mesos.scheduler;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
-import com.twitter.common.base.Closure;
 import com.twitter.mesos.FrameworkMessageCodec;
-import com.twitter.mesos.SchedulerMessageMux;
 import com.twitter.mesos.StateTranslator;
 import com.twitter.mesos.codec.Codec;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
-import com.twitter.mesos.gen.ExecutorStatus;
 import com.twitter.mesos.gen.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.SchedulerMessage;
-import com.twitter.mesos.gen.SchedulerMessageType;
 import com.twitter.mesos.gen.TaskQuery;
 import mesos.ExecutorInfo;
 import mesos.FrameworkMessage;
@@ -25,9 +20,7 @@ import mesos.StringMap;
 import mesos.TaskDescription;
 import mesos.TaskDescriptionVector;
 import mesos.TaskStatus;
-import org.apache.thrift.TBase;
 
-import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -122,20 +115,8 @@ class MesosSchedulerImpl extends Scheduler {
     LOG.severe("Received error message: " + message + " with code " + code);
   }
 
-  private final Map<SchedulerMessageType, Closure<TBase>> messageCallbacks = ImmutableMap.of(
-      SchedulerMessageType.EXECUTOR_STATUS, new Closure<TBase>() {
-        @Override public void execute(TBase item) throws RuntimeException {
-          ExecutorStatus status = (ExecutorStatus) item;
-          LOG.info("Received executor status update: " + status);
-          executorTracker.addStatus(status);
-        }
-      },
-      SchedulerMessageType.REGISTERED_TASK_UPDATE, new Closure<TBase>() {
-        @Override public void execute(TBase item) throws RuntimeException {
-          schedulerCore.updateRegisteredTasks((RegisteredTaskUpdate) item);
-        }
-      }
-  );
+  private final Codec<SchedulerMessage, FrameworkMessage> frameworkMessageCodec =
+      new FrameworkMessageCodec<SchedulerMessage>(SchedulerMessage.class);
 
   @Override
   public void frameworkMessage(SchedulerDriver driver, FrameworkMessage message) {
@@ -145,9 +126,23 @@ class MesosSchedulerImpl extends Scheduler {
     }
 
     try {
-      SchedulerMessageMux.demux(
-          new FrameworkMessageCodec<SchedulerMessage>(SchedulerMessage.class).decode(message),
-          messageCallbacks);
+      SchedulerMessage schedulerMsg = frameworkMessageCodec.decode(message);
+      if (!schedulerMsg.isSet()) {
+        LOG.warning("Received empty scheduler message.");
+        return;
+      }
+
+      switch (schedulerMsg.getSetField()) {
+        case TASK_UPDATE:
+          schedulerCore.updateRegisteredTasks(schedulerMsg.getTaskUpdate());
+          break;
+        case EXECUTOR_STATUS:
+          LOG.info("Received executor status update: " + schedulerMsg.getExecutorStatus());
+          executorTracker.addStatus(schedulerMsg.getExecutorStatus());
+          break;
+        default:
+          LOG.warning("Received unhandled scheduler message type: " + schedulerMsg.getSetField());
+      }
     } catch (Codec.CodingException e) {
       LOG.log(Level.SEVERE, "Failed to decode framework message.", e);
     }

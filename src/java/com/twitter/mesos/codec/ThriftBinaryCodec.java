@@ -23,8 +23,8 @@ public class ThriftBinaryCodec<T extends TBase> implements Codec<T, byte[]>{
 
   @Override
   @Nullable
-  public T decode(byte[] bytes) throws CodingException {
-    if (bytes == null) return null;
+  public T decode(byte[] buffer) throws CodingException {
+    if (buffer == null) return null;
 
     T t;
     try {
@@ -36,7 +36,7 @@ public class ThriftBinaryCodec<T extends TBase> implements Codec<T, byte[]>{
     }
 
     try {
-      new TDeserializer().deserialize(t, bytes);
+      new TDeserializer().deserialize(t, buffer);
       return t;
     } catch (TException e) {
       throw new CodingException("Failed to deserialize thrift object.", e);
