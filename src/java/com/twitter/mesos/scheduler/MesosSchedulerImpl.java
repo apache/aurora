@@ -31,7 +31,7 @@ class MesosSchedulerImpl extends Scheduler {
   private static Logger LOG = Logger.getLogger(MesosSchedulerImpl.class.getName());
 
   static {
-    System.loadLibrary("nexus");
+    System.loadLibrary("mesos");
   }
 
   // Stores scheduler state and handles actual scheduling decisions.

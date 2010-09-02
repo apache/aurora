@@ -20,7 +20,7 @@ import java.util.logging.Logger;
 public class MesosExecutorImpl extends Executor {
 
   static {
-    System.loadLibrary("nexus");
+    System.loadLibrary("mesos");
   }
 
   private static final Logger LOG = Logger.getLogger(MesosExecutorImpl.class.getName());
