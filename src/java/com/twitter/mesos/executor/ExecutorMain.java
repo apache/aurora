@@ -7,12 +7,7 @@ import com.twitter.common.args.Option;
 import com.twitter.common.base.Command;
 import com.twitter.common.process.GuicedProcess;
 import com.twitter.common.process.GuicedProcessOptions;
-<<<<<<< HEAD:src/java/com/twitter/mesos/executor/ExecutorMain.java
 import mesos.MesosExecutorDriver;
-=======
-import nexus.NexusExecutorDriver;
-import org.apache.hadoop.fs.FileSystem;
->>>>>>> 898d13b29e089d4c24b42b43ada5a976de3c0488:src/java/com/twitter/nexus/executor/ExecutorMain.java
 
 import java.io.File;
 import java.util.logging.Logger;
