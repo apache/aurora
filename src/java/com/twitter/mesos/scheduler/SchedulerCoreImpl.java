@@ -3,6 +3,7 @@ package com.twitter.mesos.scheduler;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -10,6 +11,7 @@ import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.ExceptionalClosure;
+import com.twitter.common.base.MorePreconditions;
 import com.twitter.mesos.FrameworkMessageCodec;
 import com.twitter.mesos.codec.Codec;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
@@ -30,7 +32,6 @@ import com.twitter.mesos.scheduler.persistence.PersistenceLayer;
 import mesos.FrameworkMessage;
 import mesos.SchedulerDriver;
 import mesos.SlaveOffer;
-import mesos.StringMap;
 import mesos.TaskDescription;
 import org.apache.commons.lang.StringUtils;
 
@@ -243,15 +244,22 @@ public class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public synchronized TaskDescription offer(final SlaveOffer slaveOffer)
-      throws ScheduleException {
+  public synchronized TaskDescription offer(final String slaveId, final String slaveHost,
+      Map<String, String> offerParams) throws ScheduleException {
+    MorePreconditions.checkNotBlank(slaveId);
+    MorePreconditions.checkNotBlank(slaveHost);
+    Preconditions.checkNotNull(offerParams);
+
+    LOG.info("Received offer with params: " + offerParams);
     final TwitterTaskInfo offer;
     try {
-      offer = ConfigurationManager.makeConcrete(slaveOffer);
+      offer = ConfigurationManager.makeConcrete(offerParams);
     } catch (ConfigurationManager.TaskDescriptionException e) {
       LOG.log(Level.SEVERE, "Invalid slave offer", e);
       return null;
     }
+
+    LOG.info("Received slave offer: " + offer);
 
     TaskQuery query = new TaskQuery();
     query.addToStatuses(ScheduleStatus.PENDING);
@@ -265,13 +273,15 @@ public class SchedulerCoreImpl implements SchedulerCore {
     Iterable<TrackedTask> candidates = taskStore.fetch(query, satisfiedFilter);
     if (Iterables.isEmpty(candidates)) return null;
 
+    LOG.info("Found " + Iterables.size(candidates) + " candidates for offer.");
+
     TrackedTask task = Iterables.get(candidates, 0);
     task = taskStore.mutate(task,
         new ExceptionalClosure<TrackedTask, RuntimeException>() {
       @Override public void execute(TrackedTask mutable) {
         mutable.setStatus(ScheduleStatus.STARTING)
-            .setSlaveId(slaveOffer.getSlaveId())
-            .setSlaveHost(slaveOffer.getHost());
+            .setSlaveId(slaveId)
+            .setSlaveHost(slaveHost);
       }
     });
 
@@ -281,9 +291,10 @@ public class SchedulerCoreImpl implements SchedulerCore {
     }
 
     // TODO(wfarner): Remove this hack once mesos core does not read parameters.
-    StringMap params = new StringMap();
-    params.set("cpus", String.valueOf((int) task.getTask().getNumCpus()));
-    params.set("mem", String.valueOf(task.getTask().getRamBytes()));
+    Map<String, String> params = ImmutableMap.of(
+      "cpus", String.valueOf((int) task.getTask().getNumCpus()),
+      "mem", String.valueOf(task.getTask().getRamMb())
+    );
 
     byte[] taskInBytes;
     try {
@@ -294,11 +305,11 @@ public class SchedulerCoreImpl implements SchedulerCore {
     }
 
     LOG.info(String.format("Offer on slave %s (id %s) is being assigned task for %s/%s.",
-        slaveOffer.getHost(), task.slaveId, task.getOwner(), task.getJobName()));
+        slaveHost, task.slaveId, task.getOwner(), task.getJobName()));
 
     persist();
-    return new TaskDescription(task.getTaskId(), slaveOffer.getSlaveId(),
-            task.jobName + "-" + task.getTaskId(), params, taskInBytes);
+    return new TaskDescription(task.getTaskId(), slaveId,
+        task.jobName + "-" + task.getTaskId(), params, taskInBytes);
   }
 
   private void scheduleTaskCopies(List<TrackedTask> tasks) {

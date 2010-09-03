@@ -4,8 +4,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import com.twitter.common.base.Closure;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Data;
 import com.twitter.mesos.gen.CronCollisionPolicy;
 import com.twitter.mesos.gen.ExecutorStatus;
 import com.twitter.mesos.gen.JobConfiguration;
@@ -17,12 +15,14 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.persistence.NoPersistence;
 import mesos.SlaveOffer;
-import mesos.StringMap;
+import mesos.TaskDescription;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.Map;
+
 import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
+import static org.junit.Assert.*;
 import static org.junit.Assert.fail;
 
 /**
@@ -42,8 +42,6 @@ public class SchedulerCoreImplTest {
   private SchedulerCore scheduler;
   private CronJobManager cron;
 
-  private static final long ONE_GB = Amount.of(1L, Data.GB).getValue();
-
   private static final String JOB_NAME_A = "Test_Job_A";
   private static final String JOB_OWNER_A = "Test_Owner_A";
   private static final TwitterTaskInfo TASK_A = defaultTask();
@@ -52,6 +50,7 @@ public class SchedulerCoreImplTest {
   private static final String JOB_OWNER_B = "Test_Owner_B";
 
   private static final String SLAVE_ID = "SlaveId";
+  private static final String SLAVE_HOST = "SlaveHost";
 
   @Before
   public void setUp() {
@@ -338,19 +337,8 @@ public class SchedulerCoreImplTest {
     return new TwitterTaskInfo().setConfiguration(ImmutableMap.<String, String>builder()
         .put("start_command", "date")
         .put("cpus", "1.0")
-        .put("ram_bytes", Long.toString(ONE_GB))
+        .put("ram_mb", "1024")
         .put("hdfs_path", "/fake/path")
         .build());
-  }
-
-  private static SlaveOffer makeOffer(String slaveId, int cpus, long ramBytes) {
-    SlaveOffer offer = new SlaveOffer();
-    offer.setSlaveId(slaveId);
-    offer.setHost("Host_" + slaveId);
-    StringMap params = new StringMap();
-    params.set("cpus", String.valueOf(cpus));
-    params.set("mem", String.valueOf(ramBytes));
-    offer.setParams(params);
-    return offer;
   }
 }

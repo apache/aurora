@@ -11,6 +11,8 @@ import mesos.SchedulerDriver;
 import mesos.SlaveOffer;
 import mesos.TaskDescription;
 
+import java.util.Map;
+
 /**
  * Scheduling core, stores scheduler state and makes decisions about which tasks to schedule when
  * a resource offer is made.
@@ -83,12 +85,15 @@ public interface SchedulerCore {
    * Offers resources to the scheduler.  If the scheduler has a pending task that is satisfied by
    * the offer, it will return the task description.
    *
-   * @param slaveOffer The slave offer.
+   * @param slaveId ID of the slave that resources are being offered on.
+   * @param slaveHost Hostname of the slave.
+   * @param offerParams Parameters of the available resources on the slave.
    * @return A task description that defines the task to run, or {@code null} if there are no
    *    pending tasks that are satisfied by the slave offer.
    * @throws ScheduleException If an error occurs while attempting to schedule a task.
    */
-  public TaskDescription offer(final SlaveOffer slaveOffer) throws ScheduleException;
+  public TaskDescription offer(String slaveId, String slaveHost,
+      Map<String, String> offerParams) throws ScheduleException;
 
   /**
    * Assigns a new state to tasks.

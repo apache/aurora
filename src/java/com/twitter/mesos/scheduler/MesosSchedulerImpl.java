@@ -2,6 +2,8 @@ package com.twitter.mesos.scheduler;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.inject.Inject;
 import com.twitter.mesos.FrameworkMessageCodec;
 import com.twitter.mesos.StateTranslator;
@@ -13,12 +15,11 @@ import mesos.ExecutorInfo;
 import mesos.FrameworkMessage;
 import mesos.Scheduler;
 import mesos.SchedulerDriver;
-import mesos.SlaveOfferVector;
-import mesos.StringMap;
+import mesos.SlaveOffer;
 import mesos.TaskDescription;
-import mesos.TaskDescriptionVector;
 import mesos.TaskStatus;
 
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -64,14 +65,15 @@ class MesosSchedulerImpl extends Scheduler {
   }
 
   @Override
-  public void resourceOffer(SchedulerDriver driver, String offerId, SlaveOfferVector offers) {
-    TaskDescriptionVector newlyScheduledTasks = new TaskDescriptionVector();
+  public void resourceOffer(SchedulerDriver driver, String offerId, List<SlaveOffer> slaveOffers) {
+    List<TaskDescription> scheduledTasks = Lists.newLinkedList();
 
     try {
-      for (int i = 0; i < offers.size(); i++) {
-        TaskDescription taskToSchedule = schedulerCore.offer(offers.get(i));
+      for (SlaveOffer offer : slaveOffers) {
+        TaskDescription taskToSchedule = schedulerCore.offer(offer.getSlaveId(), offer.getHost(),
+            offer.getParams());
         if (taskToSchedule != null) {
-          newlyScheduledTasks.add(taskToSchedule);
+          scheduledTasks.add(taskToSchedule);
         }
       }
     } catch (ScheduleException e) {
@@ -79,7 +81,7 @@ class MesosSchedulerImpl extends Scheduler {
       return;
     }
 
-    driver.replyToOffer(offerId, newlyScheduledTasks, new StringMap());
+    driver.replyToOffer(offerId, scheduledTasks, Maps.<String, String>newHashMap());
   }
 
   @Override
