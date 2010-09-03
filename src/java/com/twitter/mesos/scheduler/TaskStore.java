@@ -177,10 +177,10 @@ public class TaskStore {
   }
 
   private Iterable<TrackedTask> snapshot() {
-    return Iterables.transform(tasks, new Function<TrackedTask, TrackedTask>() {
+    return Lists.newLinkedList(Iterables.transform(tasks, new Function<TrackedTask, TrackedTask>() {
       @Override public TrackedTask apply(TrackedTask task) {
         return new TrackedTask(task);
       }
-    });
+    }));
   }
 }

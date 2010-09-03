@@ -14,12 +14,8 @@ import com.twitter.mesos.gen.TrackedTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.persistence.NoPersistence;
-import mesos.SlaveOffer;
-import mesos.TaskDescription;
 import org.junit.Before;
 import org.junit.Test;
-
-import java.util.Map;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.*;
@@ -263,6 +259,16 @@ public class SchedulerCoreImplTest {
 
     scheduler.killTasks(new TaskQuery().setTaskIds(Sets.newHashSet(taskId)));
     assertTaskCount(0);
+  }
+
+  @Test
+  public void testKillCronTask() throws Exception {
+    JobConfiguration job = makeJob(JOB_OWNER_A, JOB_NAME_A, TASK_A, 1);
+    job.setCronSchedule("1 1 1 1 1");
+    scheduler.createJob(job);
+
+    // This will fail if the cron task could not be found.
+    scheduler.killTasks(new TaskQuery().setOwner(JOB_OWNER_A).setJobName(JOB_NAME_A));
   }
 
   @Test

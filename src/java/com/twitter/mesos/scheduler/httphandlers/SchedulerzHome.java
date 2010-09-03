@@ -1,12 +1,16 @@
 package com.twitter.mesos.scheduler.httphandlers;
 
+import com.google.common.base.Predicate;
 import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
+import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TrackedTask;
 import com.twitter.mesos.scheduler.CronJobManager;
@@ -18,6 +22,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * HTTP interface to serve as a HUD for the mesos scheduler.
@@ -25,11 +30,9 @@ import java.util.Map;
  * @author wfarner
  */
 public class SchedulerzHome extends StringTemplateServlet {
-  @Inject
-  private SchedulerCore scheduler;
 
-  @Inject
-  private CronJobManager cronScheduler;
+  @Inject private SchedulerCore scheduler;
+  @Inject private CronJobManager cronScheduler;
 
   @Inject
   public SchedulerzHome(@CacheTemplates boolean cacheTemplates) {
@@ -42,9 +45,11 @@ public class SchedulerzHome extends StringTemplateServlet {
     writeTemplate(resp, new Closure<StringTemplate>() {
       @Override public void execute(StringTemplate template) {
         Map<String, User> users = Maps.newHashMap();
-        Multimap<String, String> userJobs = HashMultimap.create();
+        Multimap<String, TrackedTask> userJobs = HashMultimap.create();
 
-        for (TrackedTask task : scheduler.getTasks(new TaskQuery())) {
+        Iterable<TrackedTask> tasks = scheduler.getTasks(new TaskQuery());
+
+        for (TrackedTask task : tasks) {
           User user = users.get(task.getOwner());
           if (user == null) {
             user = new User();
@@ -52,11 +57,13 @@ public class SchedulerzHome extends StringTemplateServlet {
             users.put(user.name, user);
           }
           user.taskCount++;
-          userJobs.put(user.name, task.getJobName());
+          userJobs.put(user.name, task);
         }
 
         for (User user : users.values()) {
-          user.jobCount = userJobs.get(user.name).size();
+          Iterable<TrackedTask> activeUserTasks = Iterables.filter(userJobs.get(user.name),
+              SchedulerCore.ACTIVE_FILTER);
+          user.jobCount =  Iterables.size(activeUserTasks);
         }
 
         template.setAttribute("users", users.values());

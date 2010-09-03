@@ -412,31 +412,11 @@ public class SchedulerCoreImpl implements SchedulerCore {
     scheduleTaskCopies(newTasks);
   }
 
-  private static Predicate<TrackedTask> filter(final ScheduleStatus status) {
-    return new Predicate<TrackedTask>() {
-      @Override public boolean apply(TrackedTask task) {
-        return task.getStatus() == status;
-      }
-    };
-  }
-
-  private static final Predicate<TrackedTask> DAEMON_TASKS = new Predicate<TrackedTask>() {
-      @Override public boolean apply(TrackedTask task) {
-        return task.getTask().isIsDaemon();
-      }
-    };
-
   @Override
   public synchronized void killTasks(final TaskQuery query) throws ScheduleException {
     Preconditions.checkNotNull(query);
 
-    // KillTasks will not change state of terminated tasks.
-    query.setStatuses(Sets.newHashSet(
-        ScheduleStatus.PENDING, ScheduleStatus.STARTING, ScheduleStatus.RUNNING));
-
     LOG.info("Killing tasks matching " + query);
-
-    Iterable<TrackedTask> toKill = getTasks(query);
 
     // If this looks like a query for all tasks in a job, instruct the scheduler modules to delete
     // the job.
@@ -448,6 +428,12 @@ public class SchedulerCoreImpl implements SchedulerCore {
         if (manager.deleteJob(query.getOwner(), query.getJobName())) matchingScheduler = true;
       }
     }
+
+    // KillTasks will not change state of terminated tasks.
+    query.setStatuses(Sets.newHashSet(
+        ScheduleStatus.PENDING, ScheduleStatus.STARTING, ScheduleStatus.RUNNING));
+
+    Iterable<TrackedTask> toKill = getTasks(query);
 
     if (!matchingScheduler && Iterables.isEmpty(toKill)) {
       throw new ScheduleException("No tasks matching query found.");

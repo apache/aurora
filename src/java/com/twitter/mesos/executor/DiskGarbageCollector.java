@@ -22,7 +22,7 @@ import java.util.logging.Logger;
  *
  * @author wfarner
  */
-public class DiskGarbageCollector<T> implements Runnable {
+public class DiskGarbageCollector implements Runnable {
   private static final Logger LOG = Logger.getLogger(DiskGarbageCollector.class.getName());
 
   private final File scanDirectory;

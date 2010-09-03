@@ -17,6 +17,9 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -28,14 +31,6 @@ public class SchedulerzJob extends StringTemplateServlet {
 
   private static final String USER_PARAM = "user";
   private static final String JOB_PARAM = "job";
-
-  private static final Set<ScheduleStatus> ACTIVE_STATES = Sets.newHashSet(
-      ScheduleStatus.PENDING, ScheduleStatus.STARTING, ScheduleStatus.RUNNING);
-  private static final Predicate<TrackedTask> ACTIVE_FILTER = new Predicate<TrackedTask>() {
-      @Override public boolean apply(TrackedTask task) {
-        return ACTIVE_STATES.contains(task.getStatus());
-      }
-    };
 
   @Inject private SchedulerCore scheduler;
 
@@ -68,10 +63,18 @@ public class SchedulerzJob extends StringTemplateServlet {
             .setJobName(job);
 
         template.setAttribute("activeTasks",
-            Lists.newArrayList(scheduler.getTasks(query, ACTIVE_FILTER)));
+            Lists.newArrayList(scheduler.getTasks(query, SchedulerCore.ACTIVE_FILTER)));
 
-        template.setAttribute("completedTasks",
-            Lists.newArrayList(scheduler.getTasks(query, Predicates.not(ACTIVE_FILTER))));
+        List<TrackedTask> completedTasks = Lists.newArrayList(scheduler.getTasks(query,
+                Predicates.not(SchedulerCore.ACTIVE_FILTER)));
+        Collections.sort(completedTasks, new Comparator<TrackedTask>() {
+            @Override public int compare(TrackedTask taskA, TrackedTask taskB) {
+              // Sort in reverse order.
+              return taskB.getTaskId() - taskA.getTaskId();
+            }
+        });
+
+        template.setAttribute("completedTasks", completedTasks);
       }
     });
   }
