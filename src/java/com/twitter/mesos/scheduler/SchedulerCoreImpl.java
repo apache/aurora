@@ -24,6 +24,7 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.SchedulerState;
 import com.twitter.mesos.gen.SchedulingSignal;
 import com.twitter.mesos.gen.SignalType;
+import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TrackedTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
@@ -31,7 +32,6 @@ import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.persistence.PersistenceLayer;
 import mesos.FrameworkMessage;
 import mesos.SchedulerDriver;
-import mesos.SlaveOffer;
 import mesos.TaskDescription;
 import org.apache.commons.lang.StringUtils;
 
@@ -231,12 +231,13 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
     for (TwitterTaskInfo task : Preconditions.checkNotNull(job.getTaskConfigs())) {
       int taskId = generateTaskId();
-      newTasks.add(new TrackedTask()
+      TrackedTask trackedTask = changeTaskStatus(new TrackedTask()
           .setTaskId(taskId)
           .setJobName(job.getName())
           .setOwner(job.getOwner())
-          .setTask(task)
-          .setStatus(ScheduleStatus.PENDING));
+          .setTask(task), ScheduleStatus.PENDING);
+
+      newTasks.add(trackedTask);
     }
 
     taskStore.add(newTasks);
@@ -250,7 +251,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
     MorePreconditions.checkNotBlank(slaveHost);
     Preconditions.checkNotNull(offerParams);
 
-    LOG.info("Received offer with params: " + offerParams);
     final TwitterTaskInfo offer;
     try {
       offer = ConfigurationManager.makeConcrete(offerParams);
@@ -258,8 +258,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
       LOG.log(Level.SEVERE, "Invalid slave offer", e);
       return null;
     }
-
-    LOG.info("Received slave offer: " + offer);
 
     TaskQuery query = new TaskQuery();
     query.addToStatuses(ScheduleStatus.PENDING);
@@ -276,13 +274,11 @@ public class SchedulerCoreImpl implements SchedulerCore {
     LOG.info("Found " + Iterables.size(candidates) + " candidates for offer.");
 
     TrackedTask task = Iterables.get(candidates, 0);
-    task = taskStore.mutate(task,
-        new ExceptionalClosure<TrackedTask, RuntimeException>() {
-      @Override public void execute(TrackedTask mutable) {
-        mutable.setStatus(ScheduleStatus.STARTING)
-            .setSlaveId(slaveId)
-            .setSlaveHost(slaveHost);
-      }
+    task = taskStore.mutate(task, new ExceptionalClosure<TrackedTask, RuntimeException>() {
+        @Override public void execute(TrackedTask mutable) {
+          mutable.setSlaveId(slaveId).setSlaveHost(slaveHost);
+          changeTaskStatus(mutable, ScheduleStatus.STARTING);
+        }
     });
 
     if (task == null) {
@@ -317,13 +313,30 @@ public class SchedulerCoreImpl implements SchedulerCore {
       task.unsetSlaveId();
       task.unsetSlaveHost();
       task.unsetResources();
-      task.setTaskId(generateTaskId())
-          .setStatus(ScheduleStatus.PENDING);
+      task.unsetTaskEvents();
+      task.setTaskId(generateTaskId());
+      changeTaskStatus(task, ScheduleStatus.PENDING);
     }
 
     LOG.info("Tasks being rescheduled: " + tasks);
 
     taskStore.add(tasks);
+  }
+
+  /**
+   * Sets the current status for a task, and records the status change into the task events
+   * audit log.
+   *
+   * @param task Task whose status is changing.
+   * @param status New status for the task.
+   * @return A reference to the task.
+   */
+  private TrackedTask changeTaskStatus(TrackedTask task, ScheduleStatus status) {
+    task.setStatus(status);
+    task.addToTaskEvents(new TaskEvent()
+        .setTimestamp(System.currentTimeMillis())
+        .setStatus(status));
+    return task;
   }
 
   @Override
@@ -340,7 +353,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
         // Simply assign the new state.
         taskStore.mutate(getTasks(query), new ExceptionalClosure<TrackedTask, RuntimeException>() {
           @Override public void execute(TrackedTask mutable) {
-            mutable.setStatus(status);
+            changeTaskStatus(mutable, status);
           }
         });
 
@@ -355,7 +368,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
               newTasks.add(new TrackedTask(mutable));
             }
 
-            mutable.setStatus(ScheduleStatus.FINISHED);
+            changeTaskStatus(mutable, ScheduleStatus.FINISHED);
           }
         });
 
@@ -375,7 +388,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
               newTasks.add(new TrackedTask(mutable));
             }
 
-            mutable.setStatus(ScheduleStatus.FAILED);
+            changeTaskStatus(mutable, ScheduleStatus.FAILED);
           }
         });
 
@@ -385,7 +398,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
         // Move to killed state.
         taskStore.mutate(getTasks(query), new ExceptionalClosure<TrackedTask, RuntimeException>() {
           @Override public void execute(TrackedTask mutable) {
-            mutable.setStatus(ScheduleStatus.KILLED);
+            changeTaskStatus(mutable, ScheduleStatus.KILLED);
           }
         });
 
@@ -398,7 +411,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
           @Override public void execute(TrackedTask mutable) {
             LOG.info("Rescheduling " + status + " task: " + mutable.getTaskId());
             newTasks.add(new TrackedTask(mutable));
-            mutable.setStatus(status);
+            changeTaskStatus(mutable, status);
           }
         });
 

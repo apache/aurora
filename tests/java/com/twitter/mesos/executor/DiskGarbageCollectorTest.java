@@ -49,7 +49,7 @@ public class DiskGarbageCollectorTest {
     control = createControl();
     fileFilter = control.createMock(FileFilter.class);
     gcCallback = control.createMock(Closure.class);
-    gc = new DiskGarbageCollector(root, fileFilter, GC_THRESHOLD, gcCallback);
+    gc = new DiskGarbageCollector("Test", root, fileFilter, GC_THRESHOLD, gcCallback);
   }
 
   @After
