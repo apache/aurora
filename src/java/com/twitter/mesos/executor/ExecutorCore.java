@@ -334,8 +334,6 @@ public class ExecutorCore {
           update.addToTaskInfos(info);
         }
 
-        LOG.info("Informing scheduler of live tasks: " + update);
-
         try {
           SchedulerMessage message = new SchedulerMessage();
           message.setTaskUpdate(update);
