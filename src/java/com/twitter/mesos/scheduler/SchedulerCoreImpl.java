@@ -12,6 +12,8 @@ import com.google.inject.Inject;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.MorePreconditions;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
 import com.twitter.mesos.FrameworkMessageCodec;
 import com.twitter.mesos.codec.Codec;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
@@ -186,7 +188,13 @@ public class SchedulerCoreImpl implements SchedulerCore {
       taskStore.remove(taskStore.fetch(new TaskQuery().setSlaveHost(update.getSlaveHost()),
           new Predicate<TrackedTask>() {
             @Override public boolean apply(TrackedTask task) {
-              return !taskInfoMap.containsKey(task.getTaskId());
+              // Add a grace period to prevent race condition where newly-scheduled tasks are not
+              // yet reported by the slave.
+              long taskAgeMillis = System.currentTimeMillis()
+                  - Iterables.getLast(task.getTaskEvents()).getTimestamp();
+
+              return !taskInfoMap.containsKey(task.getTaskId())
+                  && taskAgeMillis > Amount.of(10, Time.MINUTES).as(Time.MILLISECONDS);
             }
           }));
     } catch (Throwable t) {
