@@ -10,6 +10,7 @@ import org.apache.commons.io.FileUtils;
 import org.easymock.IMocksControl;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -71,6 +72,7 @@ public class DiskGarbageCollectorTest {
   }
 
   @Test
+  @Ignore("// TODO(wfarner): Flakes when run on machines in the data center.")
   public void testSimpleGc() throws Exception {
     expect(fileFilter.accept(fileA)).andReturn(true);
     expect(fileFilter.accept(fileB)).andReturn(true);
