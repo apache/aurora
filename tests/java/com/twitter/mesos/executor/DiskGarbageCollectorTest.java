@@ -133,6 +133,7 @@ public class DiskGarbageCollectorTest {
   }
 
   @Test
+  @Ignore("// TODO(wfarner): Flakes when run on machines in the data center.")
   public void testRecursiveGc() throws Exception {
     File fileA1 = new File(fileA, "1");
     File fileA2 = new File(fileA, "2");
