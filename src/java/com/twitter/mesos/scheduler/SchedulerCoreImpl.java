@@ -402,16 +402,18 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
         break;
 
-      case KILLED:
+      case KILLED_BY_CLIENT:
         // Move to killed state.
         taskStore.mutate(getTasks(query), new ExceptionalClosure<TrackedTask, RuntimeException>() {
           @Override public void execute(TrackedTask mutable) {
-            changeTaskStatus(mutable, ScheduleStatus.KILLED);
+            changeTaskStatus(mutable, ScheduleStatus.KILLED_BY_CLIENT);
           }
         });
 
         break;
 
+      case KILLED_BY_FRAMEWORK:
+        // This can happen when the executor is killed, or the task process itself is killed.
       case LOST:
       case NOT_FOUND:
         // Move to pending state.
@@ -464,7 +466,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     for (final TrackedTask task : toKill) {
       if (task.getStatus() == ScheduleStatus.PENDING) {
         toRemove.add(task);
-      } else if (task.getStatus() != ScheduleStatus.KILLED) {
+      } else if (task.getStatus() != ScheduleStatus.KILLED_BY_CLIENT) {
         doWorkWithDriver(new Function<SchedulerDriver, Integer>() {
           @Override public Integer apply(SchedulerDriver driver) {
             return driver.killTask(task.getTaskId());
@@ -590,9 +592,5 @@ public class SchedulerCoreImpl implements SchedulerCore {
         }
       }
     }
-
-    // TODO(wfarner): Should communicate with executors here to fetch state information about all
-    //    tasks and verify that slaves (and their tasks) all exist as expected in the recovered
-    //    state.
   }
 }
