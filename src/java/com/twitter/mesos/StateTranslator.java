@@ -31,7 +31,7 @@ public class StateTranslator {
         .put(TaskState.TASK_RUNNING, ScheduleStatus.RUNNING)
         .put(TaskState.TASK_FINISHED, ScheduleStatus.FINISHED)
         .put(TaskState.TASK_FAILED, ScheduleStatus.FAILED)
-        .put(TaskState.TASK_KILLED, ScheduleStatus.KILLED_BY_FRAMEWORK)
+        .put(TaskState.TASK_KILLED, ScheduleStatus.KILLED)
         .put(TaskState.TASK_LOST, ScheduleStatus.LOST)
       .build();
 }

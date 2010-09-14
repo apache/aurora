@@ -107,38 +107,37 @@ public class ExecutorCore {
   // TODO(flo): Handle loss of connection with the ExecutorDriver.
   // TODO(flo): Do input validation on parameters.
   public void executePendingTask(final ExecutorDriver driver, final TwitterTaskInfo taskInfo,
-                                 final TaskDescription task) {
+                                 final int taskId) {
     this.driver.set(driver);
 
-    LOG.info(String.format("Received task for execution: %s/%s - %d",taskInfo.getOwner(),
-        taskInfo.getJobName(), task.getTaskId()));
+    LOG.info(String.format("Received task for execution: %s/%s - %d", taskInfo.getOwner(),
+        taskInfo.getJobName(), taskId));
     final RunningTask runningTask = new RunningTask(socketManager, healthChecker, processKiller,
-        pidFetcher, executorRootDir, task.getTaskId(), taskInfo, fileCopier);
+        pidFetcher, executorRootDir, taskId, taskInfo, fileCopier);
 
     try {
       runningTask.stage();
       runningTask.launch();
-      sendStatusUpdate(driver, new TaskStatus(task.getTaskId(), TaskState.TASK_RUNNING, EMPTY_MSG));
+      sendStatusUpdate(driver, new TaskStatus(taskId, TaskState.TASK_RUNNING, EMPTY_MSG));
     } catch (RunningTask.ProcessException e) {
-      LOG.log(Level.SEVERE, "Failed to stage task " + task.getTaskId(), e);
-      sendStatusUpdate(driver, new TaskStatus(task.getTaskId(), TaskState.TASK_FAILED, EMPTY_MSG));
+      LOG.log(Level.SEVERE, "Failed to stage task " + taskId, e);
+      sendStatusUpdate(driver, new TaskStatus(taskId, TaskState.TASK_FAILED, EMPTY_MSG));
       return;
     } catch (Throwable t) {
       LOG.log(Level.SEVERE, "Unhandled exception while launching task.", t);
-      sendStatusUpdate(driver, new TaskStatus(task.getTaskId(), TaskState.TASK_FAILED, EMPTY_MSG));
+      sendStatusUpdate(driver, new TaskStatus(taskId, TaskState.TASK_FAILED, EMPTY_MSG));
       return;
     }
 
-    tasks.put(task.getTaskId(), runningTask);
+    tasks.put(taskId, runningTask);
 
     executorService.execute(new Runnable() {
       @Override public void run() {
-        LOG.info("Waiting for process to complete...");
+        LOG.info("Waiting for task " + taskId + " to complete.");
         ScheduleStatus state = runningTask.waitFor();
-        LOG.info("Process completed in state " + state);
+        LOG.info("Task " + taskId + " completed in state " + state);
 
-        sendStatusUpdate(driver, new TaskStatus(task.getTaskId(), StateTranslator.get(state),
-            EMPTY_MSG));
+        sendStatusUpdate(driver, new TaskStatus(taskId, StateTranslator.get(state), EMPTY_MSG));
       }
     });
   }

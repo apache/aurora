@@ -49,7 +49,7 @@ public class MesosExecutorImpl extends Executor {
       return;
     }
 
-    executorCore.executePendingTask(driver, taskInfo, task);
+    executorCore.executePendingTask(driver, taskInfo, task.getTaskId());
   }
 
   @Override
