@@ -4,8 +4,8 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
-import com.twitter.common.stats.NumericVariable;
-import com.twitter.common.stats.VariableRepository;
+import com.twitter.common.stats.StatImpl;
+import com.twitter.common.stats.Stats;
 import com.twitter.common.util.BackoffStrategy;
 import com.twitter.common.util.TruncatedBinaryBackoff;
 import com.twitter.common.util.concurrent.BackingOffFutureTask;
@@ -31,8 +31,16 @@ class WorkQueue {
       new TruncatedBinaryBackoff(TASK_INITIAL_BACKOFF, TASK_MAX_BACKOFF);
 
   @Inject
-  public WorkQueue(VariableRepository variableRepository) {
-    exportVariables(variableRepository);
+  public WorkQueue() {
+    Stats.export(new StatImpl<Integer>("work_queue_active_thread_count") {
+      @Override public Integer read() { return workQueue.getActiveCount(); }
+    });
+    Stats.export(new StatImpl<Long>("work_queue_completed_count") {
+      @Override public Long read() { return workQueue.getCompletedTaskCount(); }
+    });
+    Stats.export(new StatImpl<Long>("work_task_count") {
+      @Override public Long read() { return workQueue.getTaskCount(); }
+    });
   }
 
   /**
@@ -56,25 +64,5 @@ class WorkQueue {
     workQueue.schedule(
         new BackingOffFutureTask(workQueue, work, TASK_MAX_RETRIES, TASK_BACKOFF_STRATEGY),
         executeDelay, delayUnit);
-  }
-
-  private void exportVariables(VariableRepository variableRepository) {
-    variableRepository.addVars(
-        new NumericVariable("work_queue_active_thread_count") {
-          @Override public double getNumericValue() {
-            return workQueue.getActiveCount();
-          }
-        },
-        new NumericVariable("work_queue_completed_count") {
-          @Override public double getNumericValue() {
-            return workQueue.getCompletedTaskCount();
-          }
-        },
-        new NumericVariable("work_task_count") {
-          @Override public double getNumericValue() {
-            return workQueue.getTaskCount();
-          }
-        }
-    );
   }
 }

@@ -12,10 +12,8 @@ import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TrackedTask;
 import org.apache.commons.lang.StringUtils;
 
-import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.logging.Logger;
@@ -42,10 +40,11 @@ public class TaskStore {
    */
   public void add(Iterable<TrackedTask> newTasks) {
     // Do a sanity check and make sure we're not adding a task with a duplicate task id.
-    Set<Integer> newTaskIds = Sets.newHashSet(Iterables.transform(newTasks, GET_TASK_ID));
-    Preconditions.checkArgument(newTaskIds.size() == Iterables.size(newTasks),
-        "Duplicate task IDs not allowed: " + newTasks);
-
+    Set<Integer> newTaskIds = Sets.newHashSet();
+    for (TrackedTask newTask : newTasks) {
+      newTaskIds.add(newTask.getTaskId());
+    }
+    Preconditions.checkArgument(newTaskIds.size() == Iterables.size(newTasks));
     for (TrackedTask task : tasks) {
       Preconditions.checkArgument(!newTaskIds.contains(task.getTaskId()));
     }
@@ -66,7 +65,10 @@ public class TaskStore {
   public void remove(Iterable<TrackedTask> removedTasks) {
     if (Iterables.isEmpty(removedTasks)) return;
 
-    Set<Integer> removedIds = Sets.newHashSet(Iterables.transform(removedTasks, GET_TASK_ID));
+    Set<Integer> removedIds = Sets.newHashSet();
+    for (TrackedTask task : removedTasks) {
+      removedIds.add(task.getTaskId());
+    }
     LOG.info("Removing tasks " + removedIds);
 
     int sizeBefore = tasks.size();
@@ -142,7 +144,7 @@ public class TaskStore {
    * @param query The query to use for finding tasks.
    * @return An iterable containing all matching tasks
    */
-  private static Predicate<TrackedTask> taskMatcher(final TaskQuery query) {
+  public static Predicate<TrackedTask> taskMatcher(final TaskQuery query) {
     Preconditions.checkNotNull(query);
     return new Predicate<TrackedTask>() {
       private boolean matches(String query, String value) {
@@ -165,8 +167,7 @@ public class TaskStore {
     };
   }
 
-  private static Predicate<TrackedTask> makeFilter(TaskQuery query,
-      Predicate<TrackedTask>... filters) {
+  private Predicate<TrackedTask> makeFilter(TaskQuery query, Predicate<TrackedTask>... filters) {
     Predicate<TrackedTask> filter = taskMatcher(Preconditions.checkNotNull(query));
     if (filters.length > 0) {
       filter = Predicates.and(filter, Predicates.and(filters));
@@ -182,18 +183,4 @@ public class TaskStore {
       }
     }));
   }
-
-  private static final Function<TrackedTask, Integer> GET_TASK_ID =
-      new Function<TrackedTask, Integer>() {
-        @Override public Integer apply(TrackedTask task) {
-          return task.getTaskId();
-        }
-      };
-
-  // TODO(wfarner): Use this comparator to keep tasks sorted by priority.
-  private static final Comparator<TrackedTask> PRIORITY_COMPARATOR = new Comparator<TrackedTask>() {
-    @Override public int compare(TrackedTask taskA, TrackedTask taskB) {
-      return taskA.getTask().getPriority() - taskB.getTask().getPriority();
-    }
-  };
 }

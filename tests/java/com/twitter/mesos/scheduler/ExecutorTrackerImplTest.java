@@ -1,6 +1,6 @@
 package com.twitter.mesos.scheduler;
 
-import com.twitter.common.BuildInfo;
+import com.twitter.common.util.BuildInfo;
 import com.twitter.mesos.gen.ExecutorStatus;
 import org.easymock.IMocksControl;
 import org.junit.Before;
@@ -9,7 +9,8 @@ import org.junit.Test;
 import java.util.Properties;
 import java.util.Queue;
 
-import static org.easymock.EasyMock.*;
+import static org.easymock.EasyMock.createControl;
+import static org.easymock.EasyMock.expect;
 
 /**
  * @author wfarner

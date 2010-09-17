@@ -24,7 +24,6 @@ import com.twitter.mesos.scheduler.persistence.ZooKeeperPersistence;
 import mesos.MesosSchedulerDriver;
 
 import javax.annotation.Nullable;
-import java.nio.ByteBuffer;
 import java.util.logging.Logger;
 
 public class SchedulerModule extends AbstractModule {
