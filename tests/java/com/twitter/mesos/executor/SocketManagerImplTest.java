@@ -1,8 +1,13 @@
 package com.twitter.mesos.executor;
 
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Sets;
 import org.junit.Test;
 
-import static org.junit.Assert.fail;
+import java.util.Set;
+
+import static org.hamcrest.CoreMatchers.is;
+import static org.junit.Assert.*;
 
 /**
  * @author wfarner

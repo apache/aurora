@@ -6,7 +6,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.io.Files;
-import com.twitter.common.collections.Pair;
+import com.twitter.common.Pair;
 import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.common.quantity.Amount;
@@ -65,6 +65,8 @@ public class RunningTask {
 
   private final StateMachine<ScheduleStatus> stateMachine;
 
+  private final ResourceConsumption resourceConsumption = new ResourceConsumption();
+
   private final SocketManager socketManager;
   private final ExceptionalFunction<Integer, Boolean, HealthCheckException> healthChecker;
   private final ExceptionalClosure<KillCommand, KillException> processKiller;
@@ -72,6 +74,7 @@ public class RunningTask {
   private KillCommand killCommand;
 
   private final int taskId;
+  private int pid = -1;
 
   private final TwitterTaskInfo task;
 
@@ -278,7 +281,6 @@ public class RunningTask {
   }
 
   private void buildKillCommand(int healthCheckPort) throws ProcessException {
-    int pid = 0;
     try {
       pid = pidFetcher.apply(new File(taskRoot, "pidfile"));
     } catch (FileToInt.FetchException e) {
@@ -328,6 +330,15 @@ public class RunningTask {
     return taskId;
   }
 
+  /**
+   * Gets the OS process ID.
+   *
+   * @return The process ID for this task, or -1 if the process ID is not yet known.
+   */
+  public int getProcessId() {
+    return pid;
+  }
+
   public boolean isRunning() {
     return stateMachine.getState() == ScheduleStatus.RUNNING;
   }
@@ -363,7 +374,7 @@ public class RunningTask {
   }
 
   public ResourceConsumption getResourceConsumption() {
-    return new ResourceConsumption()
+    return resourceConsumption
         .setLeasedPorts(ImmutableMap.copyOf(leasedPorts));
   }
 

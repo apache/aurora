@@ -3,7 +3,7 @@ package com.twitter.mesos.scheduler;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
-import com.twitter.common.util.BuildInfo;
+import com.twitter.common.BuildInfo;
 import com.twitter.common.base.Closure;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;

@@ -10,10 +10,9 @@ import org.junit.Test;
 import java.util.Arrays;
 import java.util.List;
 
-import static org.easymock.EasyMock.createControl;
-import static org.easymock.EasyMock.expect;
+import static org.easymock.EasyMock.*;
 import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
+import static org.junit.Assert.*;
 
 /**
  * @author wfarner

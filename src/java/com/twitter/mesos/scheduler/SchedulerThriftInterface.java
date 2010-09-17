@@ -4,17 +4,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.inject.Inject;
 import com.twitter.common.thrift.ThriftServer;
-import com.twitter.mesos.gen.CreateJobResponse;
-import com.twitter.mesos.gen.JobConfiguration;
-import com.twitter.mesos.gen.KillResponse;
-import com.twitter.mesos.gen.MesosSchedulerManager;
-import com.twitter.mesos.gen.ResponseCode;
-import com.twitter.mesos.gen.RestartResponse;
-import com.twitter.mesos.gen.ScheduleStatusResponse;
-import com.twitter.mesos.gen.TaskQuery;
-import com.twitter.mesos.gen.TrackedTask;
-import com.twitter.mesos.gen.UpdateRequest;
-import com.twitter.mesos.gen.UpdateResponse;
+import com.twitter.mesos.gen.*;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import org.apache.thrift.TException;
 

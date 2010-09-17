@@ -9,6 +9,7 @@ import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TrackedTask;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import mesos.SchedulerDriver;
+import mesos.SlaveOffer;
 import mesos.TaskDescription;
 
 import java.util.Map;
