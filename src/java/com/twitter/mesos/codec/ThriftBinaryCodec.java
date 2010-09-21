@@ -1,6 +1,6 @@
 package com.twitter.mesos.codec;
 
-import com.google.inject.internal.Preconditions;
+import com.google.common.base.Preconditions;
 import org.apache.thrift.TBase;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
