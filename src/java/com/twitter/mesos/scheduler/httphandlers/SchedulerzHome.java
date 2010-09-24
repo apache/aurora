@@ -5,11 +5,12 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.MapMaker;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
+import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TrackedTask;
 import com.twitter.mesos.scheduler.CronJobManager;
@@ -21,6 +22,9 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -86,17 +90,22 @@ public class SchedulerzHome extends StringTemplateServlet {
         for (User user : users.values()) {
           Iterable<TrackedTask> activeUserTasks = Iterables.filter(userJobs.get(user.name),
               SchedulerCore.ACTIVE_FILTER);
-          user.jobCount =  Iterables.size(activeUserTasks);
+          user.jobCount = Sets.newHashSet(Iterables.transform(activeUserTasks,
+              new Function<TrackedTask, String>() {
+                @Override public String apply(TrackedTask task) { return task.getJobName(); }
+              })).size();
         }
 
-        template.setAttribute("users", users.values());
+        template.setAttribute("users",
+            DisplayUtils.sort(users.values(), DisplayUtils.SORT_USERS_BY_NAME));
 
-        template.setAttribute("cronJobs", Lists.newArrayList(cronScheduler.getJobs()));
+        template.setAttribute("cronJobs",
+            DisplayUtils.sort(cronScheduler.getJobs(), DisplayUtils.SORT_JOB_CONFIG_BY_NAME));
       }
     });
   }
 
-  class User {
+  static class User {
     String name;
     int jobCount;
     private int pendingTaskCount = 0;

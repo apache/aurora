@@ -28,11 +28,9 @@ import java.util.Map;
  * @author wfarner
  */
 public class SchedulerzUser extends StringTemplateServlet {
-  @Inject
-  private SchedulerCore scheduler;
 
-  @Inject
-  private CronJobManager cronScheduler;
+  @Inject private SchedulerCore scheduler;
+  @Inject private CronJobManager cronScheduler;
 
   private static final String USER_PARAM = "user";
 
@@ -90,7 +88,8 @@ public class SchedulerzUser extends StringTemplateServlet {
           }
         }
 
-        template.setAttribute("jobs", jobs.values());
+        template.setAttribute("jobs",
+            DisplayUtils.sort(jobs.values(), DisplayUtils.SORT_JOB_BY_NAME));
 
         Iterable<JobConfiguration> cronJobs = Iterables.filter(
             cronScheduler.getJobs(), new Predicate<JobConfiguration>() {
@@ -98,6 +97,7 @@ public class SchedulerzUser extends StringTemplateServlet {
                 return job.getOwner().equals(user);
               }
             });
+        cronJobs = DisplayUtils.sort(cronJobs, DisplayUtils.SORT_JOB_CONFIG_BY_NAME);
         Iterable<CronJob> cronJobObjs = Iterables.transform(cronJobs,
             new Function<JobConfiguration, CronJob>() {
               @Override public CronJob apply(JobConfiguration job) {
@@ -115,7 +115,7 @@ public class SchedulerzUser extends StringTemplateServlet {
     });
   }
 
-  class Job {
+  static class Job {
     String name;
     int pendingTaskCount = 0;
     int activeTaskCount = 0;
