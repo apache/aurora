@@ -24,7 +24,7 @@ public class ResourceManager {
   private static final Logger LOG = Logger.getLogger(ResourceManager.class.getName());
 
   // TODO(wfarner): These need to be configurable.
-  private static final Amount<Long, Time> FILE_EXPIRATION_TIME = Amount.of(8L, Time.HOURS);
+  private static final Amount<Long, Time> FILE_EXPIRATION_TIME = Amount.of(1L, Time.DAYS);
   private static final Amount<Long, Data> MAX_DISK_SPACE = Amount.of(20L, Data.GB);
 
   private final File managedDir;
@@ -41,7 +41,8 @@ public class ResourceManager {
   }
 
   public void start() {
-    startResourceScanner();
+    // TODO(wfarner): Enable when this has been tested.
+    //startResourceScanner();
     startDiskGc();
   }
 

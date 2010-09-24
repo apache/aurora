@@ -66,7 +66,28 @@ public class SchedulerzUser extends StringTemplateServlet {
             jobs.put(job.name, job);
           }
 
-          job.taskCount++;
+          switch (task.getStatus()) {
+            case PENDING:
+              job.pendingTaskCount++;
+              break;
+
+            case STARTING:
+            case RUNNING:
+              job.activeTaskCount++;
+              break;
+
+            case KILLED:
+            case KILLED_BY_CLIENT:
+            case FINISHED:
+              job.finishedTaskCount++;
+              break;
+
+            case LOST:
+            case NOT_FOUND:
+            case FAILED:
+              job.failedTaskCount++;
+              break;
+          }
         }
 
         template.setAttribute("jobs", jobs.values());
@@ -82,7 +103,7 @@ public class SchedulerzUser extends StringTemplateServlet {
               @Override public CronJob apply(JobConfiguration job) {
                 CronJob cronJob = new CronJob();
                 cronJob.name = job.getName();
-                cronJob.taskCount = job.getTaskConfigsSize();
+                cronJob.pendingTaskCount = job.getTaskConfigsSize();
                 cronJob.cronSchedule = job.getCronSchedule();
                 cronJob.nextRun = new Predictor(cronJob.cronSchedule).nextMatchingDate().toString();
                 return cronJob;
@@ -96,14 +117,29 @@ public class SchedulerzUser extends StringTemplateServlet {
 
   class Job {
     String name;
-    int taskCount;
+    int pendingTaskCount = 0;
+    int activeTaskCount = 0;
+    int finishedTaskCount = 0;
+    int failedTaskCount = 0;
 
     public String getName() {
       return name;
     }
 
-    public int getTaskCount() {
-      return taskCount;
+    public int getPendingTaskCount() {
+      return pendingTaskCount;
+    }
+
+    public int getActiveTaskCount() {
+      return activeTaskCount;
+    }
+
+    public int getFinishedTaskCount() {
+      return finishedTaskCount;
+    }
+
+    public int getFailedTaskCount() {
+      return failedTaskCount;
     }
   }
 

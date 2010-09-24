@@ -27,6 +27,8 @@ public class SchedulerzJob extends StringTemplateServlet {
 
   private static final String USER_PARAM = "user";
   private static final String JOB_PARAM = "job";
+  // TODO(wfarner): Allow filtering by task status.
+  private static final String STATUS_FILTER_PARAM = "status";
 
   @Inject private SchedulerCore scheduler;
 

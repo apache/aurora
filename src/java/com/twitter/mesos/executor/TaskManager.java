@@ -1,9 +1,5 @@
 package com.twitter.mesos.executor;
 
-import com.twitter.common.Pair;
-
-import java.util.Map;
-
 /**
  * Defines a task manager that provides information about running tasks and minimal mutating
  * operations.

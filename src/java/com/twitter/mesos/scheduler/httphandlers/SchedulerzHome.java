@@ -1,8 +1,10 @@
 package com.twitter.mesos.scheduler.httphandlers;
 
+import com.google.common.base.Function;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.MapMaker;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.inject.Inject;
@@ -14,6 +16,7 @@ import com.twitter.mesos.scheduler.CronJobManager;
 import com.twitter.mesos.scheduler.SchedulerCore;
 import org.antlr.stringtemplate.StringTemplate;
 
+import javax.annotation.Nullable;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -40,19 +43,43 @@ public class SchedulerzHome extends StringTemplateServlet {
       throws ServletException, IOException {
     writeTemplate(resp, new Closure<StringTemplate>() {
       @Override public void execute(StringTemplate template) {
-        Map<String, User> users = Maps.newHashMap();
+        Map<String, User> users = new MapMaker().makeComputingMap(new Function<String, User>() {
+          @Override public User apply(String userName) {
+            User user = new User();
+            user.name = userName;
+            return user;
+          }
+        });
+
         Multimap<String, TrackedTask> userJobs = HashMultimap.create();
 
         Iterable<TrackedTask> tasks = scheduler.getTasks(new TaskQuery());
 
         for (TrackedTask task : tasks) {
           User user = users.get(task.getOwner());
-          if (user == null) {
-            user = new User();
-            user.name = task.getOwner();
-            users.put(user.name, user);
+          switch (task.getStatus()) {
+            case PENDING:
+              user.pendingTaskCount++;
+              break;
+
+            case STARTING:
+            case RUNNING:
+              user.activeTaskCount++;
+              break;
+
+            case KILLED:
+            case KILLED_BY_CLIENT:
+            case FINISHED:
+              user.finishedTaskCount++;
+              break;
+
+            case LOST:
+            case NOT_FOUND:
+            case FAILED:
+              user.failedTaskCount++;
+              break;
           }
-          user.taskCount++;
+
           userJobs.put(user.name, task);
         }
 
@@ -72,7 +99,10 @@ public class SchedulerzHome extends StringTemplateServlet {
   class User {
     String name;
     int jobCount;
-    int taskCount;
+    private int pendingTaskCount = 0;
+    private int activeTaskCount = 0;
+    private int finishedTaskCount = 0;
+    private int failedTaskCount = 0;
 
     public String getName() {
       return name;
@@ -82,8 +112,20 @@ public class SchedulerzHome extends StringTemplateServlet {
       return jobCount;
     }
 
-    public int getTaskCount() {
-      return taskCount;
+    public int getPendingTaskCount() {
+      return pendingTaskCount;
+    }
+
+    public int getActiveTaskCount() {
+      return activeTaskCount;
+    }
+
+    public int getFinishedTaskCount() {
+      return finishedTaskCount;
+    }
+
+    public int getFailedTaskCount() {
+      return failedTaskCount;
     }
   }
 }
