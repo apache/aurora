@@ -2,6 +2,7 @@ package com.twitter.mesos.scheduler;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
@@ -40,6 +41,18 @@ public class CronJobManager extends JobManager {
 
   public CronJobManager() {
     scheduler.start();
+  }
+
+  /**
+   * Triggers execution of a job.
+   *
+   * @param user Owner of the job.
+   * @param name Name of the job to start.
+   */
+  public void startJobNow(String user, String name) {
+    Preconditions.checkArgument(hasJob(user, name), "No such cron job " + user + "/" + name);
+
+    cronTriggered(scheduledJobs.get(makeKey(user, name)).getSecond());
   }
 
   /**

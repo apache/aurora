@@ -21,6 +21,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Map;
+import java.util.logging.Logger;
 
 /**
  * HTTP interface to provide information about jobs for a specific mesos user.
@@ -29,10 +30,13 @@ import java.util.Map;
  */
 public class SchedulerzUser extends StringTemplateServlet {
 
-  @Inject private SchedulerCore scheduler;
-  @Inject private CronJobManager cronScheduler;
+  private static Logger LOG = Logger.getLogger(SchedulerzUser.class.getName());
 
   private static final String USER_PARAM = "user";
+  private static final String START_CRON_PARAM = "start_cron";
+
+  @Inject private SchedulerCore scheduler;
+  @Inject private CronJobManager cronScheduler;
 
   @Inject
   public SchedulerzUser(@CacheTemplates boolean cacheTemplates) {
@@ -49,8 +53,18 @@ public class SchedulerzUser extends StringTemplateServlet {
           template.setAttribute("exception", "Please specify a user.");
           return;
         }
-
         template.setAttribute("user", user);
+
+        final String cronJobLaunched = req.getParameter(START_CRON_PARAM);
+        if (cronJobLaunched != null) {
+          if (!cronScheduler.hasJob(user, cronJobLaunched)) {
+            template.setAttribute("exception", "Unrecognized cron job " + cronJobLaunched);
+            return;
+          }
+
+          LOG.info("Received web request to launch cron job " + user + "/" + cronJobLaunched);
+          cronScheduler.startJobNow(user, cronJobLaunched);
+        }
 
         TaskQuery query = new TaskQuery().setOwner(user);
 

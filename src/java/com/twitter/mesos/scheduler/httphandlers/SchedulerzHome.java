@@ -3,28 +3,22 @@ package com.twitter.mesos.scheduler.httphandlers;
 import com.google.common.base.Function;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import com.google.common.collect.MapMaker;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
-import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TrackedTask;
 import com.twitter.mesos.scheduler.CronJobManager;
 import com.twitter.mesos.scheduler.SchedulerCore;
 import org.antlr.stringtemplate.StringTemplate;
 
-import javax.annotation.Nullable;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
 import java.util.Map;
 
 /**
