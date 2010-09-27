@@ -1,7 +1,6 @@
 package com.twitter.mesos.scheduler;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
 import com.google.inject.Provides;
@@ -62,7 +61,7 @@ public class SchedulerModule extends AbstractModule {
       return null;
     } else {
       return new ZooKeeperClient(Amount.of(options.zooKeeperSessionTimeoutSecs, Time.SECONDS),
-          ImmutableSet.copyOf(options.zooKeeperEndpoints));
+          options.zooKeeperEndpoints);
     }
   }
 

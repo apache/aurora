@@ -4,11 +4,9 @@ import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
-import com.google.inject.Key;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
-import com.google.inject.name.Names;
 import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.common.process.GuicedProcess;
@@ -39,8 +37,6 @@ public class ExecutorModule extends AbstractModule {
   private final static Logger LOG = Logger.getLogger(ExecutorModule.class.getName());
   private final ExecutorMain.TwitterExecutorOptions options;
 
-  // TODO(wfarner): Export the executor root dir with the @Named binding
-
   @Inject
   public ExecutorModule(ExecutorMain.TwitterExecutorOptions options) {
     this.options = Preconditions.checkNotNull(options);
@@ -55,9 +51,6 @@ public class ExecutorModule extends AbstractModule {
     bind(new TypeLiteral<
         ExceptionalFunction<Integer, Boolean, HealthChecker.HealthCheckException>>() {})
         .to(HealthChecker.class);
-
-    bind(Key.get(File.class, Names.named(ExecutorCore.EXECUTOR_ROOT_DIR)))
-        .toInstance(options.taskRootDir);
 
     GuicedProcess.registerServlet(binder(), "/task", TaskHome.class, false);
     GuicedProcess.registerServlet(binder(), "/executor", ExecutorHome.class, false);

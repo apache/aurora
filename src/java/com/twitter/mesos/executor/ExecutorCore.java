@@ -2,15 +2,16 @@ package com.twitter.mesos.executor;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
-import com.google.inject.name.Named;
 import com.twitter.common.util.BuildInfo;
+import com.twitter.common.base.Closure;
 import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Data;
+import com.twitter.common.quantity.Time;
 import com.twitter.mesos.FrameworkMessageCodec;
 import com.twitter.mesos.StateTranslator;
 import com.twitter.mesos.codec.Codec;
@@ -29,6 +30,7 @@ import mesos.TaskStatus;
 import org.apache.commons.io.FileSystemUtils;
 
 import java.io.File;
+import java.io.FileFilter;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -46,16 +48,13 @@ import java.util.logging.Logger;
 /**
  * ExecutorCore
  *
+ * TODO(wfarner): Allow the Scheduler to pass a message to the Executor that instructs it to drain
+ * itself of tasks.
+ *
  * @author wfarner
  */
-public class ExecutorCore implements TaskManager {
+public class ExecutorCore {
   private static final Logger LOG = Logger.getLogger(MesosExecutorImpl.class.getName());
-
-  /**
-   * {@literal @Named} binding key for the executor root directory.
-   */
-  static final String EXECUTOR_ROOT_DIR =
-      "com.twitter.mesos.executor.ExecutorCore.EXECUTOR_ROOT_DIR";
 
   private final Map<Integer, RunningTask> tasks = Maps.newConcurrentMap();
 
@@ -63,9 +62,11 @@ public class ExecutorCore implements TaskManager {
 
   private final File executorRootDir;
 
-  private final ResourceManager resourceManager;
-
   private final AtomicReference<ExecutorDriver> driver = new AtomicReference<ExecutorDriver>();
+
+  private final Amount<Long, Time> fileExpirationTime = Amount.of(8L, Time.HOURS);
+  // TODO(wfarner): This needs to be configurable.
+  private final Amount<Long, Data> maxDiskSpace = Amount.of(20L, Data.GB);
 
   private final ExecutorService executorService = Executors.newCachedThreadPool(
       new ThreadFactoryBuilder().setDaemon(true).setNameFormat("MesosExecutor-[%d]").build());
@@ -82,19 +83,18 @@ public class ExecutorCore implements TaskManager {
   private final AtomicReference<String> slaveId = new AtomicReference<String>();
   private final BuildInfo buildInfo;
 
-  // TODO(wfarner): Remove TwitterExecutorOptions from args, make a named File.
   @Inject
-  private ExecutorCore(@Named(EXECUTOR_ROOT_DIR) File taskRootDir, BuildInfo buildInfo) {
-    executorRootDir = Preconditions.checkNotNull(taskRootDir);
+  private ExecutorCore(ExecutorMain.TwitterExecutorOptions options, BuildInfo buildInfo) {
+    executorRootDir = Preconditions.checkNotNull(options.taskRootDir);
     if (!executorRootDir.exists()) {
       Preconditions.checkState(executorRootDir.mkdirs());
     }
 
     this.buildInfo = Preconditions.checkNotNull(buildInfo);
 
-    resourceManager = new ResourceManager(this, executorRootDir);
-    resourceManager.start();
-
+    // TODO(wfarner): This causes problems when multiple executors are running on the same machine.
+    //    Two options - prevent multiple executors, or bake the slave ID into the executorRootDir.
+    startGarbageCollector();
     startStateSync();
     startRegisteredTaskPusher();
   }
@@ -160,32 +160,6 @@ public class ExecutorCore implements TaskManager {
     return tasks.values();
   }
 
-  @Override
-  public Iterable<RunningTask> getRunningTasks() {
-    return Iterables.unmodifiableIterable(Iterables.filter(tasks.values(),
-        new Predicate<RunningTask>() {
-          @Override public boolean apply(RunningTask task) {
-            return task.isRunning();
-          }
-        }));
-  }
-
-  @Override
-  public boolean hasTask(int taskId) {
-    return tasks.containsKey(taskId);
-  }
-
-  @Override
-  public boolean isRunning(int taskId) {
-    return hasTask(taskId) && tasks.get(taskId).isRunning();
-  }
-
-  @Override
-  public void deleteCompletedTask(int taskId) {
-    Preconditions.checkArgument(!isRunning(taskId), "Task " + taskId + " is still running!");
-    tasks.remove(taskId);
-  }
-
   public void shutdownCore() {
     for (Map.Entry<Integer, RunningTask> entry : tasks.entrySet()) {
       System.out.println("Killing task " + entry.getKey());
@@ -202,6 +176,77 @@ public class ExecutorCore implements TaskManager {
     } else {
       LOG.severe("No executor driver available, unable to send signals.");
     }
+  }
+
+  private void startGarbageCollector() {
+    FileFilter expiredOrUnknown = new FileFilter() {
+        @Override public boolean accept(File file) {
+          if (!file.isDirectory()) return false;
+
+          String dirName = file.getName();
+          int taskId;
+          try {
+            taskId = Integer.parseInt(dirName);
+          } catch (NumberFormatException e) {
+            return true;
+          }
+
+          // Always delete unknown directories.
+          if (!tasks.containsKey(taskId)) return true;
+
+          // If the directory is for a known task, only delete when it has expired.
+          long timeSinceLastModify =
+              System.currentTimeMillis() - DiskGarbageCollector.recursiveLastModified(file);
+          return timeSinceLastModify > fileExpirationTime.as(Time.MILLISECONDS);
+        }
+      };
+
+    Closure<File> gcCallback = new Closure<File>() {
+      @Override public void execute(File file) throws RuntimeException {
+        String dirName = file.getName();
+        int taskId;
+        try {
+          taskId = Integer.parseInt(dirName);
+        } catch (NumberFormatException e) {
+          return; // No-op.
+        }
+
+        LOG.info("Removing record for garbage-collected task "  + taskId);
+        tasks.remove(taskId);
+      }
+    };
+
+    // The expired file GC always runs, and expunges all directories that are unknown or too old.
+    DiskGarbageCollector expiredDirGc = new DiskGarbageCollector("ExpiredOrUnknownDir",
+        executorRootDir, expiredOrUnknown, gcCallback);
+
+    FileFilter completedTaskFileFilter = new FileFilter() {
+        @Override public boolean accept(File file) {
+          if (!file.isDirectory()) return false;
+
+          String dirName = file.getName();
+          int taskId;
+          try {
+            taskId = Integer.parseInt(dirName);
+          } catch (NumberFormatException e) {
+            LOG.info("Unrecognized file found while garbage collecting: " + file);
+            return true;
+          }
+
+          return tasks.containsKey(taskId) && tasks.get(taskId).isCompleted();
+        }
+      };
+
+    // The completed task GC only runs when disk is exhausted, and removes directories for tasks
+    // that have completed.
+    DiskGarbageCollector completedTaskGc = new DiskGarbageCollector("CompletedTask",
+        executorRootDir, completedTaskFileFilter, maxDiskSpace, gcCallback);
+
+    // TODO(wfarner): Make GC intervals configurable.
+    ScheduledExecutorService gcExecutor = new ScheduledThreadPoolExecutor(2,
+        new ThreadFactoryBuilder().setDaemon(true).setNameFormat("Disk GC-%d").build());
+    gcExecutor.scheduleAtFixedRate(expiredDirGc, 1, 5, TimeUnit.MINUTES);
+    gcExecutor.scheduleAtFixedRate(completedTaskGc, 2, 1, TimeUnit.MINUTES);
   }
 
   private static String getHostName() {
