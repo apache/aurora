@@ -28,11 +28,9 @@ import java.util.Map;
  * @author wfarner
  */
 public class SchedulerzUser extends StringTemplateServlet {
-  @Inject
-  private SchedulerCore scheduler;
 
-  @Inject
-  private CronJobManager cronScheduler;
+  @Inject private SchedulerCore scheduler;
+  @Inject private CronJobManager cronScheduler;
 
   private static final String USER_PARAM = "user";
 
@@ -66,10 +64,32 @@ public class SchedulerzUser extends StringTemplateServlet {
             jobs.put(job.name, job);
           }
 
-          job.taskCount++;
+          switch (task.getStatus()) {
+            case PENDING:
+              job.pendingTaskCount++;
+              break;
+
+            case STARTING:
+            case RUNNING:
+              job.activeTaskCount++;
+              break;
+
+            case KILLED:
+            case KILLED_BY_CLIENT:
+            case FINISHED:
+              job.finishedTaskCount++;
+              break;
+
+            case LOST:
+            case NOT_FOUND:
+            case FAILED:
+              job.failedTaskCount++;
+              break;
+          }
         }
 
-        template.setAttribute("jobs", jobs.values());
+        template.setAttribute("jobs",
+            DisplayUtils.sort(jobs.values(), DisplayUtils.SORT_JOB_BY_NAME));
 
         Iterable<JobConfiguration> cronJobs = Iterables.filter(
             cronScheduler.getJobs(), new Predicate<JobConfiguration>() {
@@ -77,12 +97,13 @@ public class SchedulerzUser extends StringTemplateServlet {
                 return job.getOwner().equals(user);
               }
             });
+        cronJobs = DisplayUtils.sort(cronJobs, DisplayUtils.SORT_JOB_CONFIG_BY_NAME);
         Iterable<CronJob> cronJobObjs = Iterables.transform(cronJobs,
             new Function<JobConfiguration, CronJob>() {
               @Override public CronJob apply(JobConfiguration job) {
                 CronJob cronJob = new CronJob();
                 cronJob.name = job.getName();
-                cronJob.taskCount = job.getTaskConfigsSize();
+                cronJob.pendingTaskCount = job.getTaskConfigsSize();
                 cronJob.cronSchedule = job.getCronSchedule();
                 cronJob.nextRun = new Predictor(cronJob.cronSchedule).nextMatchingDate().toString();
                 return cronJob;
@@ -94,16 +115,31 @@ public class SchedulerzUser extends StringTemplateServlet {
     });
   }
 
-  class Job {
+  static class Job {
     String name;
-    int taskCount;
+    int pendingTaskCount = 0;
+    int activeTaskCount = 0;
+    int finishedTaskCount = 0;
+    int failedTaskCount = 0;
 
     public String getName() {
       return name;
     }
 
-    public int getTaskCount() {
-      return taskCount;
+    public int getPendingTaskCount() {
+      return pendingTaskCount;
+    }
+
+    public int getActiveTaskCount() {
+      return activeTaskCount;
+    }
+
+    public int getFinishedTaskCount() {
+      return finishedTaskCount;
+    }
+
+    public int getFailedTaskCount() {
+      return failedTaskCount;
     }
   }
 
