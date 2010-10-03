@@ -2,6 +2,7 @@ package com.twitter.mesos.executor;
 
 import com.google.common.base.Preconditions;
 import com.google.common.io.CharStreams;
+import com.google.common.io.Closeables;
 import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.common.quantity.Amount;
@@ -85,8 +86,9 @@ public class ProcessKiller implements ExceptionalClosure<KillCommand, KillExcept
 
     ProcessBuilder builder = new ProcessBuilder("sh", killTreeScript.getAbsolutePath(),
         "-p", String.valueOf(pid));
+    Process proc = null;
     try {
-      Process proc = builder.start();
+      proc = builder.start();
 
       if (builder.start().waitFor() != 0) {
         String stderr = CharStreams.toString(new InputStreamReader(proc.getErrorStream()));
@@ -99,6 +101,14 @@ public class ProcessKiller implements ExceptionalClosure<KillCommand, KillExcept
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new KillException("Interrupted while waiting for kill tree on " + pid, e);
+    } finally {
+      if (proc != null) {
+        // Java seems to leak these resources if you don't close them explicitly.
+        Closeables.closeQuietly(proc.getOutputStream());
+        Closeables.closeQuietly(proc.getInputStream());
+        Closeables.closeQuietly(proc.getErrorStream());
+        proc.destroy();
+      }
     }
   }
 

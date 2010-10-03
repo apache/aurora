@@ -5,6 +5,7 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import com.google.common.io.Closeables;
 import com.google.common.io.Files;
 import com.twitter.common.collections.Pair;
 import com.twitter.common.base.ExceptionalClosure;
@@ -295,6 +296,14 @@ public class RunningTask {
     return healthCheckPort != -1;
   }
 
+  private static void cleanUp(Process p) {
+    if (p == null) return;
+    Closeables.closeQuietly(p.getInputStream());
+    Closeables.closeQuietly(p.getOutputStream());
+    Closeables.closeQuietly(p.getErrorStream());
+    p.destroy();
+  }
+
   /**
    * Waits for the launched task to terminate.
    *
@@ -314,6 +323,8 @@ public class RunningTask {
       } catch (InterruptedException e) {
         LOG.log(Level.WARNING,
             "Warning, Thread interrupted while waiting for process to finish.", e);
+      } finally {
+        cleanUp(process);
       }
     }
 
@@ -359,7 +370,7 @@ public class RunningTask {
   }
 
   public void terminate(ScheduleStatus terminalState) {
-    Preconditions.checkNotNull(process);
+    if (process == null) return;
     LOG.info("Terminating task " + this);
     stateMachine.transition(terminalState);
 
@@ -367,9 +378,10 @@ public class RunningTask {
       processKiller.execute(killCommand);
     } catch (ProcessKiller.KillException e) {
       LOG.log(Level.WARNING, "Failed to kill process " + this, e);
+    } finally {
+      cleanUp(process);
     }
 
-    process.destroy();
     waitFor();
   }
 

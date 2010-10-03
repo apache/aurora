@@ -120,10 +120,12 @@ public class ExecutorCore implements TaskManager {
       sendStatusUpdate(driver, new TaskStatus(taskId, TaskState.TASK_RUNNING, EMPTY_MSG));
     } catch (RunningTask.ProcessException e) {
       LOG.log(Level.SEVERE, "Failed to stage task " + taskId, e);
+      runningTask.terminate(ScheduleStatus.FAILED);
       sendStatusUpdate(driver, new TaskStatus(taskId, TaskState.TASK_FAILED, EMPTY_MSG));
       return;
     } catch (Throwable t) {
       LOG.log(Level.SEVERE, "Unhandled exception while launching task.", t);
+      runningTask.terminate(ScheduleStatus.FAILED);
       sendStatusUpdate(driver, new TaskStatus(taskId, TaskState.TASK_FAILED, EMPTY_MSG));
       return;
     }
