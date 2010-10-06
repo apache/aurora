@@ -49,15 +49,20 @@ public class ResourceManager {
   private void startResourceScanner() {
     Runnable scanner = new Runnable() {
       @Override public void run() {
-        for (RunningTask task : taskManager.getRunningTasks()) {
+        for (Task task : taskManager.getRunningTasks()) {
           // TODO(wfarner): Need to track rate of jiffies to determine CPU usage.
-          ResourceScanner.ProcInfo procInfo =
-              resourceScanner.getResourceUsage(task.getProcessId(), task.getSandboxDir());
-          task.getResourceConsumption()
-              .setDiskUsedMb(procInfo.getDiskUsed().as(Data.MB).intValue())
-              .setMemUsedMb(procInfo.getVmSize().as(Data.MB).intValue());
+          // TODO(wfarner): Remove this hack once the mesos slave does its own resource tracking.
+          if (task instanceof RunningTask) {
+            RunningTask runningTask = (RunningTask) task;
+            ResourceScanner.ProcInfo procInfo =
+                resourceScanner.getResourceUsage(runningTask.getProcessId(), task.getRootDir());
+            task.getResourceConsumption()
+                .setDiskUsedMb(procInfo.getDiskUsed().as(Data.MB).intValue())
+                .setMemUsedMb(procInfo.getVmSize().as(Data.MB).intValue());
 
-          LOG.info("Resource usage for task " + task.getTaskId() + ": " + procInfo);
+            LOG.info("Resource usage for task " + task.getId() + ": " + procInfo);
+
+          }
         }
       }
     };

@@ -79,10 +79,10 @@ public class RunningTaskTest {
   @Test
   public void testStage() throws Exception {
     taskObj.setStartCommand("touch a.txt");
-    RunningTask taskA = makeTask(taskObj);
+    RunningTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
     assertDirContents(executorRoot, String.valueOf(TASK_ID_A));
-    assertDirContents(taskA.taskRoot, "sandbox", "task.dump");
+    assertDirContents(taskA.getRootDir(), "sandbox", "task.dump");
   }
 
   @Test
@@ -92,12 +92,12 @@ public class RunningTaskTest {
     control.replay();
 
     taskObj.setStartCommand("touch a.txt");
-    RunningTask taskA = makeTask(taskObj);
+    RunningTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
-    taskA.launch();
+    taskA.run();
     assertThat(taskA.waitFor(), is(ScheduleStatus.FINISHED));
-    assertDirContents(taskA.taskRoot, "sandbox", "pidfile", "task.dump");
-    assertDirContents(taskA.sandbox, "a.txt", "run.sh", "stderr", "stdout");
+    assertDirContents(taskA.getRootDir(), "sandbox", "pidfile", "task.dump", "task.status");
+    assertDirContents(taskA.sandboxDir, "a.txt", "run.sh", "stderr", "stdout");
   }
 
   @Test
@@ -107,14 +107,14 @@ public class RunningTaskTest {
     control.replay();
 
     taskObj.setStartCommand("echo \"hello world\"");
-    RunningTask taskA = makeTask(taskObj);
+    RunningTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
-    taskA.launch();
+    taskA.run();
     assertThat(taskA.waitFor(), is(ScheduleStatus.FINISHED));
-    assertDirContents(taskA.taskRoot, "sandbox", "pidfile", "task.dump");
-    assertDirContents(taskA.sandbox, "run.sh", "stderr", "stdout");
+    assertDirContents(taskA.getRootDir(), "sandbox", "pidfile", "task.dump", "task.status");
+    assertDirContents(taskA.sandboxDir, "run.sh", "stderr", "stdout");
 
-    assertThat(Files.readLines(new File(taskA.sandbox, "stdout"), Charsets.UTF_8),
+    assertThat(Files.readLines(new File(taskA.sandboxDir, "stdout"), Charsets.UTF_8),
         is(Arrays.asList("hello world")));
   }
 
@@ -125,9 +125,9 @@ public class RunningTaskTest {
     control.replay();
 
     taskObj.setStartCommand("exit 2");
-    RunningTask taskA = makeTask(taskObj);
+    RunningTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
-    taskA.launch();
+    taskA.run();
     assertThat(taskA.waitFor(), is(ScheduleStatus.FAILED));
     assertThat(taskA.getExitCode(), is(2));
   }
@@ -160,7 +160,7 @@ public class RunningTaskTest {
     waitThread.join(1000);
     assertThat(waitThread.isAlive(), is(false));
     assertThat(state.get(), is(TaskState.TASK_KILLED));
-    assertDirContents(taskA.taskRoot, "b.txt", "stderr", "stdout", "pidfile");
+    assertDirContents(taskA.getRootDir(), "b.txt", "stderr", "stdout", "pidfile");
     */
   }
 
@@ -187,9 +187,9 @@ public class RunningTaskTest {
     control.replay();
 
     taskObj.setStartCommand("echo '%port:myport%'");
-    RunningTask taskA = makeTask(taskObj);
+    RunningTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
-    taskA.launch();
+    taskA.run();
 
     assertThat(taskA.waitFor(), is(ScheduleStatus.FINISHED));
   }
@@ -205,9 +205,9 @@ public class RunningTaskTest {
     control.replay();
 
     taskObj.setStartCommand("echo '%port:myport%'; sleep 10");
-    RunningTask taskA = makeTask(taskObj);
+    RunningTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
-    taskA.launch();
+    taskA.run();
 
     taskA.terminate(ScheduleStatus.KILLED);
   }
@@ -219,7 +219,7 @@ public class RunningTaskTest {
     control.replay();
 
     taskObj.setStartCommand("echo '%port:http%'");
-    RunningTask taskA = makeTask(taskObj);
+    RunningTask taskA = makeTask(taskObj, TASK_ID_A);
 
     Pair<String, Map<String, Integer>> expanded = taskA.expandCommandLine();
 
@@ -241,7 +241,7 @@ public class RunningTaskTest {
     control.replay();
 
     taskObj.setStartCommand("echo '%port:http%'; echo '%port:thrift%'; echo '%port:mail%'");
-    RunningTask taskA = makeTask(taskObj);
+    RunningTask taskA = makeTask(taskObj, TASK_ID_A);
 
     Pair<String, Map<String, Integer>> expanded = taskA.expandCommandLine();
 
@@ -253,10 +253,10 @@ public class RunningTaskTest {
     assertThat(expanded.getSecond(), is(expectedPorts));
   }
 
-  @Test(expected = RunningTask.ProcessException.class)
+  @Test(expected = RunningTask.TaskRunException.class)
   public void testLeasePortsDuplicateName() throws Exception {
     taskObj.setStartCommand("echo '%port:http%'; echo '%port:http%'");
-    makeTask(taskObj).expandCommandLine();
+    makeTask(taskObj, TASK_ID_A).expandCommandLine();
   }
 
   @Test(expected = SocketManager.SocketLeaseException.class)
@@ -268,12 +268,12 @@ public class RunningTaskTest {
     control.replay();
 
     taskObj.setStartCommand("echo '%port:http%'; echo '%port:thrift%'; echo '%port:mail%'");
-    makeTask(taskObj).expandCommandLine();
+    makeTask(taskObj, TASK_ID_A).expandCommandLine();
   }
 
-  private RunningTask makeTask(TwitterTaskInfo taskInfo) {
-    return new RunningTask(socketManager, healthChecker, processKiller, pidFetcher, executorRoot,
-        TASK_ID_A, taskInfo, COPIER);
+  private RunningTask makeTask(TwitterTaskInfo taskInfo, int taskId) {
+    return new RunningTask(socketManager, healthChecker, processKiller, pidFetcher,
+        new File(executorRoot, String.valueOf(taskId)), TASK_ID_A, taskInfo, COPIER);
   }
 
   private void assertDirContents(File dir, String... children) {

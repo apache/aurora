@@ -1,7 +1,6 @@
 package com.twitter.mesos.scheduler;
 
 import com.google.common.base.Predicate;
-import com.google.common.collect.Sets;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.ScheduleStatus;
@@ -12,7 +11,6 @@ import mesos.SchedulerDriver;
 import mesos.TaskDescription;
 
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Scheduling core, stores scheduler state and makes decisions about which tasks to schedule when
@@ -36,21 +34,6 @@ import java.util.Set;
  * @author wfarner
  */
 public interface SchedulerCore {
-
-  /**
-   * Different states that an active task may be in.
-   */
-  public static final Set<ScheduleStatus> ACTIVE_STATES = Sets.newHashSet(
-      ScheduleStatus.PENDING, ScheduleStatus.STARTING, ScheduleStatus.RUNNING);
-
-  /**
-   * Filter that includes only active tasks.
-   */
-  public static final Predicate<TrackedTask> ACTIVE_FILTER = new Predicate<TrackedTask>() {
-      @Override public boolean apply(TrackedTask task) {
-        return SchedulerCore.ACTIVE_STATES.contains(task.getStatus());
-      }
-    };
 
   /**
    * Assigns a framework ID to the scheduler, should be called when the scheduler implementation

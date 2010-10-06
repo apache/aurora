@@ -19,7 +19,7 @@ public class FileToInt implements ExceptionalFunction<File, Integer, FetchExcept
   @Override
   public Integer apply(File file) throws FetchException {
     Preconditions.checkNotNull(file);
-    Preconditions.checkArgument(file.canRead());
+    Preconditions.checkArgument(file.canRead(), "No read permission for " + file);
 
     try {
       return Integer.parseInt(Joiner.on("").join(Files.readLines(file, Charsets.UTF_8)));

@@ -15,6 +15,7 @@ import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.mesos.FrameworkMessageCodec;
+import com.twitter.mesos.States;
 import com.twitter.mesos.codec.Codec;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.ExecutorMessage;
@@ -455,8 +456,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     }
 
     // KillTasks will not change state of terminated tasks.
-    query.setStatuses(Sets.newHashSet(
-        ScheduleStatus.PENDING, ScheduleStatus.STARTING, ScheduleStatus.RUNNING));
+    query.setStatuses(States.ACTIVE_STATES);
 
     Iterable<TrackedTask> toKill = getTasks(query);
 

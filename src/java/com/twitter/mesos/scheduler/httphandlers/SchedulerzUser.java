@@ -99,6 +99,9 @@ public class SchedulerzUser extends StringTemplateServlet {
             case FAILED:
               job.failedTaskCount++;
               break;
+
+            default:
+              throw new IllegalArgumentException("Unsupported status: " + task.getStatus());
           }
         }
 

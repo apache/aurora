@@ -5,6 +5,7 @@ import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.mesos.executor.ExecutorCore;
 import com.twitter.mesos.executor.RunningTask;
+import com.twitter.mesos.executor.Task;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import org.antlr.stringtemplate.StringTemplate;
 
@@ -48,19 +49,18 @@ public class TaskHome extends StringTemplateServlet {
           return;
         }
 
-        RunningTask task = executor.getTask(taskId);
+        Task task = executor.getTask(taskId);
         if (task == null) {
           template.setAttribute("exception", "Task not found.");
           return;
         }
 
-        template.setAttribute("taskState", task.getStatus());
+        template.setAttribute("taskState", task.getScheduleStatus());
 
-        TwitterTaskInfo taskInfo = task.getTask();
+        TwitterTaskInfo taskInfo = task.getTaskInfo();
         template.setAttribute("taskInfo", taskInfo);
-
-        template.setAttribute("leasedPorts", task.getLeasedPorts());
-        template.setAttribute("taskDir", task.getSandboxDir());
+        template.setAttribute("leasedPorts", task.getResourceConsumption().getLeasedPorts());
+        template.setAttribute("taskDir", task.getRootDir());
       }
     });
   }

@@ -29,6 +29,7 @@ import mesos.TaskStatus;
 import org.apache.commons.io.FileSystemUtils;
 
 import java.io.File;
+import java.io.FileFilter;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -46,6 +47,8 @@ import java.util.logging.Logger;
 /**
  * ExecutorCore
  *
+ * TODO(wfarner): When a RunningTask is terminated, should we replace its entry with a DeadTask?
+ *
  * @author wfarner
  */
 public class ExecutorCore implements TaskManager {
@@ -57,7 +60,7 @@ public class ExecutorCore implements TaskManager {
   static final String EXECUTOR_ROOT_DIR =
       "com.twitter.mesos.executor.ExecutorCore.EXECUTOR_ROOT_DIR";
 
-  private final Map<Integer, RunningTask> tasks = Maps.newConcurrentMap();
+  private final Map<Integer, Task> tasks = Maps.newConcurrentMap();
 
   private static final byte[] EMPTY_MSG = new byte[0];
 
@@ -82,12 +85,11 @@ public class ExecutorCore implements TaskManager {
   private final AtomicReference<String> slaveId = new AtomicReference<String>();
   private final BuildInfo buildInfo;
 
-  // TODO(wfarner): Remove TwitterExecutorOptions from args, make a named File.
   @Inject
   private ExecutorCore(@Named(EXECUTOR_ROOT_DIR) File taskRootDir, BuildInfo buildInfo) {
     executorRootDir = Preconditions.checkNotNull(taskRootDir);
     if (!executorRootDir.exists()) {
-      Preconditions.checkState(executorRootDir.mkdirs());
+      Preconditions.checkState(executorRootDir.mkdirs(), "Failed to create executor root dir.");
     }
 
     this.buildInfo = Preconditions.checkNotNull(buildInfo);
@@ -95,6 +97,7 @@ public class ExecutorCore implements TaskManager {
     resourceManager = new ResourceManager(this, executorRootDir);
     resourceManager.start();
 
+    loadDeadTasks();
     startStateSync();
     startRegisteredTaskPusher();
   }
@@ -112,13 +115,13 @@ public class ExecutorCore implements TaskManager {
     LOG.info(String.format("Received task for execution: %s/%s - %d", taskInfo.getOwner(),
         taskInfo.getJobName(), taskId));
     final RunningTask runningTask = new RunningTask(socketManager, healthChecker, processKiller,
-        pidFetcher, executorRootDir, taskId, taskInfo, fileCopier);
+        pidFetcher, getTaskRoot(taskId), taskId, taskInfo, fileCopier);
 
     try {
       runningTask.stage();
-      runningTask.launch();
+      runningTask.run();
       sendStatusUpdate(driver, new TaskStatus(taskId, TaskState.TASK_RUNNING, EMPTY_MSG));
-    } catch (RunningTask.ProcessException e) {
+    } catch (RunningTask.TaskRunException e) {
       LOG.log(Level.SEVERE, "Failed to stage task " + taskId, e);
       runningTask.terminate(ScheduleStatus.FAILED);
       sendStatusUpdate(driver, new TaskStatus(taskId, TaskState.TASK_FAILED, EMPTY_MSG));
@@ -143,8 +146,12 @@ public class ExecutorCore implements TaskManager {
     });
   }
 
+  private File getTaskRoot(int taskId) {
+    return new File(executorRootDir, String.valueOf(taskId));
+  }
+
   public void stopRunningTask(int taskId) {
-    RunningTask task = tasks.get(taskId);
+    Task task = tasks.get(taskId);
 
     if (task != null) {
       LOG.info("Killing task: " + task);
@@ -154,19 +161,19 @@ public class ExecutorCore implements TaskManager {
     }
   }
 
-  public RunningTask getTask(int taskId) {
+  public Task getTask(int taskId) {
     return tasks.get(taskId);
   }
 
-  public Iterable<RunningTask> getTasks() {
-    return tasks.values();
+  public Iterable<Task> getTasks() {
+    return Iterables.unmodifiableIterable(tasks.values());
   }
 
   @Override
-  public Iterable<RunningTask> getRunningTasks() {
+  public Iterable<Task> getRunningTasks() {
     return Iterables.unmodifiableIterable(Iterables.filter(tasks.values(),
-        new Predicate<RunningTask>() {
-          @Override public boolean apply(RunningTask task) {
+        new Predicate<Task>() {
+          @Override public boolean apply(Task task) {
             return task.isRunning();
           }
         }));
@@ -189,7 +196,7 @@ public class ExecutorCore implements TaskManager {
   }
 
   public void shutdownCore() {
-    for (Map.Entry<Integer, RunningTask> entry : tasks.entrySet()) {
+    for (Map.Entry<Integer, Task> entry : tasks.entrySet()) {
       System.out.println("Killing task " + entry.getKey());
       stopRunningTask(entry.getKey());
     }
@@ -212,6 +219,27 @@ public class ExecutorCore implements TaskManager {
     } catch (UnknownHostException e) {
       LOG.log(Level.SEVERE, "Failed to look up own hostname.", e);
       return null;
+    }
+  }
+
+  private static final FileFilter DIR_FILTER = new FileFilter() {
+    @Override public boolean accept(File file) {
+      return file.isDirectory();
+    }
+  };
+
+  private void loadDeadTasks() {
+    LOG.info("Attempting to recover information about dead tasks from " + executorRootDir);
+    for (File file : executorRootDir.listFiles(DIR_FILTER)) {
+      try {
+        DeadTask task = DeadTask.loadFrom(file);
+        TwitterTaskInfo taskInfo = task.getTaskInfo();
+        LOG.info("Recovered task " + task.getId() + " "
+                 + taskInfo.getOwner() + "/" + taskInfo.getJobName());
+        tasks.put(task.getId(), task);
+      } catch (DeadTask.DeadTaskLoadException e) {
+        LOG.log(Level.INFO, "Unable to restore task from " + file, e);
+      }
     }
   }
 
@@ -278,13 +306,13 @@ public class ExecutorCore implements TaskManager {
         RegisteredTaskUpdate update = new RegisteredTaskUpdate()
             .setSlaveHost(getHostName());
 
-        for (Map.Entry<Integer, RunningTask> task : tasks.entrySet()) {
+        for (Map.Entry<Integer, Task> task : tasks.entrySet()) {
           LiveTaskInfo info = new LiveTaskInfo();
           info.setTaskId(task.getKey());
-          RunningTask runningTask = task.getValue();
-          info.setTaskInfo(runningTask.getTask());
+          Task runningTask = task.getValue();
+          info.setTaskInfo(runningTask.getTaskInfo());
           info.setResources(runningTask.getResourceConsumption());
-          info.setStatus(runningTask.getStatus());
+          info.setStatus(runningTask.getScheduleStatus());
 
           update.addToTaskInfos(info);
         }
