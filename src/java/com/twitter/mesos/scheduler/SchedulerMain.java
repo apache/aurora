@@ -4,7 +4,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
 import com.google.inject.Module;
 import com.twitter.common.args.Option;
-import com.twitter.common.base.Closure;
 import com.twitter.common.base.Command;
 import com.twitter.common.process.GuicedProcess;
 import com.twitter.common.process.GuicedProcessOptions;
@@ -12,12 +11,14 @@ import com.twitter.common.zookeeper.Group;
 import com.twitter.common.zookeeper.ServerSet.EndpointStatus;
 import com.twitter.common.zookeeper.ServerSet.UpdateException;
 import com.twitter.common.zookeeper.SingletonService;
+import com.twitter.common.zookeeper.SingletonService.LeadershipListener;
 import com.twitter.mesos.gen.MesosSchedulerManager;
 import com.twitter.thrift.Status;
 import mesos.MesosSchedulerDriver;
 import org.apache.thrift.TException;
 import org.apache.thrift.transport.TTransportException;
 
+import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -69,21 +70,35 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
 
   private static Logger LOG = Logger.getLogger(SchedulerMain.class.getName());
 
-  // Closure to execute when the scheduler has been elected group leader.
-  private final Closure<EndpointStatus> onLeading =
-      new Closure<EndpointStatus>() {
-        @Override public void execute(EndpointStatus status) {
-          LOG.info("Elected as leading scheduler!");
-          try {
-            runMesosDriver();
-            status.update(Status.ALIVE);
-          } catch (UpdateException e) {
-            LOG.log(Level.SEVERE, "Failed to update endpoint status.", e);
-          } catch (InterruptedException e) {
-            LOG.log(Level.SEVERE, "Interrupted while updating endpoint status.", e);
-          }
-        }
-      };
+  private final LeadershipListener leadershipListener = new LeadershipListener() {
+    @Override
+    public void onLeading(EndpointStatus status) {
+      LOG.info("Elected as leading scheduler!");
+      try {
+        runMesosDriver();
+        status.update(Status.ALIVE);
+      } catch (UpdateException e) {
+        LOG.log(Level.SEVERE, "Failed to update endpoint status.", e);
+      } catch (InterruptedException e) {
+        LOG.log(Level.SEVERE, "Interrupted while updating endpoint status.", e);
+      }
+    }
+
+    @Override
+    public void onDefeated(@Nullable EndpointStatus status) {
+      LOG.info("Lost leadership, committing suicide.");
+
+      try {
+        if (status != null) status.update(Status.DEAD);
+      } catch (InterruptedException e) {
+        LOG.log(Level.WARNING, "Interrupted while leaving server set.", e);
+      } catch (UpdateException e) {
+        LOG.log(Level.WARNING, "Failed to leave server set.", e);
+      } finally {
+        destroy();
+      }
+    }
+  };
 
   public SchedulerMain() {
     super(TwitterSchedulerOptions.class);
@@ -114,16 +129,9 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
     }
     if (port == -1) return;
 
-    final Command onDefeated = new Command() {
-        @Override public void execute() {
-          LOG.info("Lost leadership, committing suicide.");
-          destroy();
-        }
-      };
-
     if (schedulerService != null) {
       try {
-        leadService(schedulerService, port, Status.STARTING, onLeading, onDefeated);
+        leadService(schedulerService, port, Status.STARTING, leadershipListener);
       } catch (Group.WatchException e) {
         LOG.log(Level.SEVERE, "Failed to watch group and lead service.", e);
       } catch (Group.JoinException e) {
