@@ -176,11 +176,13 @@ public class TaskStore {
   }
 
   private Iterable<TrackedTask> snapshot() {
-    return Lists.newLinkedList(Iterables.transform(tasks, new Function<TrackedTask, TrackedTask>() {
-      @Override public TrackedTask apply(TrackedTask task) {
-        return new TrackedTask(task);
-      }
-    }));
+    synchronized(tasks) {
+      return Lists.newLinkedList(Iterables.transform(tasks, new Function<TrackedTask, TrackedTask>() {
+        @Override public TrackedTask apply(TrackedTask task) {
+          return new TrackedTask(task);
+        }
+      }));
+    }
   }
 
   private static final Function<TrackedTask, Integer> GET_TASK_ID =
