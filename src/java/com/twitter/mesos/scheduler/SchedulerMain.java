@@ -75,8 +75,8 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
         @Override public void execute(EndpointStatus status) {
           LOG.info("Elected as leading scheduler!");
           try {
-            status.update(Status.ALIVE);
             runMesosDriver();
+            status.update(Status.ALIVE);
           } catch (UpdateException e) {
             LOG.log(Level.SEVERE, "Failed to update endpoint status.", e);
           } catch (InterruptedException e) {
@@ -114,9 +114,16 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
     }
     if (port == -1) return;
 
+    final Command onDefeated = new Command() {
+        @Override public void execute() {
+          LOG.info("Lost leadership, committing suicide.");
+          destroy();
+        }
+      };
+
     if (schedulerService != null) {
       try {
-        leadService(schedulerService, port, Status.STARTING, onLeading);
+        leadService(schedulerService, port, Status.STARTING, onLeading, onDefeated);
       } catch (Group.WatchException e) {
         LOG.log(Level.SEVERE, "Failed to watch group and lead service.", e);
       } catch (Group.JoinException e) {
