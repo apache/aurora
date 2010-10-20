@@ -9,7 +9,7 @@ import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
-import com.twitter.mesos.States;
+import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TrackedTask;
 import com.twitter.mesos.scheduler.CronJobManager;
@@ -87,7 +87,7 @@ public class SchedulerzHome extends StringTemplateServlet {
 
         for (User user : users.values()) {
           Iterable<TrackedTask> activeUserTasks = Iterables.filter(userJobs.get(user.name),
-              States.ACTIVE_FILTER);
+              Tasks.ACTIVE_FILTER);
           user.jobCount = Sets.newHashSet(Iterables.transform(activeUserTasks,
               new Function<TrackedTask, String>() {
                 @Override public String apply(TrackedTask task) { return task.getJobName(); }

@@ -7,7 +7,7 @@ import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
-import com.twitter.mesos.States;
+import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduleStatus;
 import static com.twitter.mesos.gen.ScheduleStatus.*;
 import com.twitter.mesos.gen.TaskQuery;
@@ -91,10 +91,10 @@ public class SchedulerzJob extends StringTemplateServlet {
               Lists.newArrayList(scheduler.getTasks(query)));
         } else {
           template.setAttribute("activeTasks",
-              Lists.newArrayList(scheduler.getTasks(query, States.ACTIVE_FILTER)));
+              Lists.newArrayList(scheduler.getTasks(query, Tasks.ACTIVE_FILTER)));
 
           List<TrackedTask> completedTasks = Lists.newArrayList(scheduler.getTasks(query,
-                  Predicates.not(States.ACTIVE_FILTER)));
+                  Predicates.not(Tasks.ACTIVE_FILTER)));
           Collections.sort(completedTasks, new Comparator<TrackedTask>() {
               @Override public int compare(TrackedTask taskA, TrackedTask taskB) {
                 // Sort in reverse chronological order.

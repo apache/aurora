@@ -16,7 +16,6 @@ import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.mesos.Message;
-import com.twitter.mesos.States;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.ExecutorMessage;
@@ -342,6 +341,9 @@ public class SchedulerCoreImpl implements SchedulerCore {
     Preconditions.checkNotNull(query);
     Preconditions.checkNotNull(status);
 
+    // Only allow state transition from non-terminal state.
+    Iterable<TrackedTask> modifiedTasks = getTasks(query, Predicates.not(Tasks.TERMINATED_FILTER));
+
     final List<TrackedTask> newTasks = Lists.newLinkedList();
 
     switch (status) {
@@ -349,7 +351,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
       case STARTING:
       case RUNNING:
         // Simply assign the new state.
-        taskStore.mutate(getTasks(query), new ExceptionalClosure<TrackedTask, RuntimeException>() {
+        taskStore.mutate(modifiedTasks, new ExceptionalClosure<TrackedTask, RuntimeException>() {
           @Override public void execute(TrackedTask mutable) {
             changeTaskStatus(mutable, status);
           }
@@ -359,7 +361,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
       case FINISHED:
         // Assign the FINISHED state to non-daemon tasks, move daemon tasks to PENDING.
-        taskStore.mutate(getTasks(query), new ExceptionalClosure<TrackedTask, RuntimeException>() {
+        taskStore.mutate(modifiedTasks, new ExceptionalClosure<TrackedTask, RuntimeException>() {
           @Override public void execute(TrackedTask mutable) {
             if (mutable.getTask().isIsDaemon()) {
               LOG.info("Rescheduling daemon task " + mutable.getTaskId());
@@ -374,7 +376,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
       case FAILED:
         // Increment failure count, move to pending state, unless failure limit has been reached.
-        taskStore.mutate(getTasks(query), new ExceptionalClosure<TrackedTask, RuntimeException>() {
+        taskStore.mutate(modifiedTasks, new ExceptionalClosure<TrackedTask, RuntimeException>() {
           @Override public void execute(TrackedTask mutable) {
             mutable.setFailureCount(mutable.getFailureCount() + 1);
 
@@ -393,14 +395,12 @@ public class SchedulerCoreImpl implements SchedulerCore {
         break;
 
       case KILLED:
-        taskStore.mutate(getTasks(query), new ExceptionalClosure<TrackedTask, RuntimeException>() {
+        taskStore.mutate(modifiedTasks, new ExceptionalClosure<TrackedTask, RuntimeException>() {
           @Override public void execute(TrackedTask mutable) {
-            if (mutable.getStatus() != ScheduleStatus.KILLED_BY_CLIENT) {
-              // This can happen when the executor is killed, or the task process itself is killed.
-              LOG.info("Rescheduling " + status + " task: " + mutable.getTaskId());
-              newTasks.add(new TrackedTask(mutable));
-              changeTaskStatus(mutable, status);
-            }
+            // This can happen when the executor is killed, or the task process itself is killed.
+            LOG.info("Rescheduling " + status + " task: " + mutable.getTaskId());
+            newTasks.add(new TrackedTask(mutable));
+            changeTaskStatus(mutable, status);
           }
         });
 
@@ -409,7 +409,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
       case LOST:
       case NOT_FOUND:
         // Move to pending state.
-        taskStore.mutate(getTasks(query), new ExceptionalClosure<TrackedTask, RuntimeException>() {
+        taskStore.mutate(modifiedTasks, new ExceptionalClosure<TrackedTask, RuntimeException>() {
           @Override public void execute(TrackedTask mutable) {
             LOG.info("Rescheduling " + status + " task: " + mutable.getTaskId());
             newTasks.add(new TrackedTask(mutable));
@@ -445,7 +445,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     }
 
     // KillTasks will not change state of terminated tasks.
-    query.setStatuses(States.ACTIVE_STATES);
+    query.setStatuses(Tasks.ACTIVE_STATES);
 
     Iterable<TrackedTask> toKill = getTasks(query);
 
@@ -511,9 +511,9 @@ public class SchedulerCoreImpl implements SchedulerCore {
       LOG.warning("Restart requested for unknown tasks " + unknownTasks);
     }
 
-    Iterable<TrackedTask> activeTasks = Iterables.filter(tasks, States.ACTIVE_FILTER);
+    Iterable<TrackedTask> activeTasks = Iterables.filter(tasks, Tasks.ACTIVE_FILTER);
     Iterable<TrackedTask> inactiveTasks = Iterables.filter(tasks,
-        Predicates.not(States.ACTIVE_FILTER));
+        Predicates.not(Tasks.ACTIVE_FILTER));
     if (!Iterables.isEmpty(inactiveTasks)) {
       LOG.warning("Restart request rejected for inactive tasks "
                   + Iterables.transform(inactiveTasks, Tasks.GET_TASK_ID));

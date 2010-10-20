@@ -3,7 +3,7 @@ package com.twitter.mesos.executor;
 import com.google.common.base.Preconditions;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
-import com.twitter.mesos.States;
+import com.twitter.mesos.Tasks;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.ResourceConsumption;
 import com.twitter.mesos.gen.ScheduleStatus;
@@ -38,7 +38,7 @@ public class DeadTask implements Task {
     this.taskId = taskId;
     this.task = Preconditions.checkNotNull(task);
     this.state = Preconditions.checkNotNull(state);
-    Preconditions.checkState(!States.isActive(state),
+    Preconditions.checkState(!Tasks.isActive(state),
         "A dead task may not be assigned an active state.");
   }
 
@@ -60,7 +60,7 @@ public class DeadTask implements Task {
     ScheduleStatus state = ScheduleStatus.KILLED;
     try {
       ScheduleStatus recoveredState = TaskUtils.getTaskStatus(taskRoot);
-      if (!States.isActive(recoveredState)) state = recoveredState;
+      if (!Tasks.isActive(recoveredState)) state = recoveredState;
     } catch (FileToInt.FetchException e) {
       LOG.log(Level.WARNING, "Failed to load task status from " + taskRoot, e);
     } catch (FileNotFoundException e) {
