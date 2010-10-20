@@ -538,6 +538,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
       }
     }
 
+    persist();
+
     return Sets.newHashSet(Iterables.transform(activeTasks, Tasks.GET_TASK_ID));
   }
 
