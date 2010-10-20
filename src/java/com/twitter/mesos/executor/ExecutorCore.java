@@ -156,7 +156,7 @@ public class ExecutorCore implements TaskManager {
   public void stopRunningTask(int taskId) {
     Task task = tasks.get(taskId);
 
-    if (task != null) {
+    if (task != null && task.isRunning()) {
       LOG.info("Killing task: " + task);
       task.terminate(ScheduleStatus.KILLED);
     } else {

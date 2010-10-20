@@ -7,6 +7,7 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.TrackedTask;
 
 
+import java.util.EnumSet;
 import java.util.Set;
 
 import static com.twitter.mesos.gen.ScheduleStatus.*;
@@ -28,13 +29,13 @@ public class Tasks {
   /**
    * Different states that an active task may be in.
    */
-  public static final Set<ScheduleStatus> ACTIVE_STATES = Sets.newHashSet(
+  public static final Set<ScheduleStatus> ACTIVE_STATES = EnumSet.of(
       PENDING, STARTING, RUNNING);
 
   /**
    * Terminal states, which a task should not move from.
    */
-  public static final Set<ScheduleStatus> TERMINAL_STATES = Sets.newHashSet(
+  public static final Set<ScheduleStatus> TERMINAL_STATES = EnumSet.of(
       FAILED, FINISHED, KILLED, KILLED_BY_CLIENT, LOST, NOT_FOUND
   );
 
