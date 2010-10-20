@@ -4,7 +4,7 @@ import com.google.common.base.Preconditions;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.mesos.States;
-import com.twitter.mesos.codec.Codec;
+import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.ResourceConsumption;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.TwitterTaskInfo;
@@ -72,7 +72,7 @@ public class DeadTask implements Task {
           state);
     } catch (IOException e) {
       throw new DeadTaskLoadException("Failed to read persisted task state from " + taskRoot);
-    } catch (Codec.CodingException e) {
+    } catch (ThriftBinaryCodec.CodingException e) {
       throw new DeadTaskLoadException("Failed to deserialize task information from " + taskRoot, e);
     }
   }

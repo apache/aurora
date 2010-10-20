@@ -7,10 +7,10 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TrackedTask;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
-import mesos.SchedulerDriver;
 import mesos.TaskDescription;
 
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Scheduling core, stores scheduler state and makes decisions about which tasks to schedule when
@@ -42,7 +42,15 @@ public interface SchedulerCore {
    * @param driver The registered driver reference.
    * @param frameworkId Framework ID.
    */
-  public void registered(SchedulerDriver driver, String frameworkId);
+  public void registered(Driver driver, String frameworkId);
+
+  /**
+   * Fetches information about all registered tasks for a job.
+   *
+   * @param query The query to identify tasks.
+   * @return An iterable of task objects.
+   */
+  public Iterable<TrackedTask> getTasks(final TaskQuery query);
 
   /**
    * Fetches information about all registered tasks for a job.
@@ -113,13 +121,15 @@ public interface SchedulerCore {
   /**
    * Schedules a restart on a set of tasks.
    *
-   * @param query The query to identify tasks.
+   * @param taskIds The tasks to restart.
+   * @return The set of task IDs for tasks that a restart was requested for.  A task that was
+   *    requested for restart may be rejected if it was not found, or was in a non-active state.
    */
-  public void restartTasks(final TaskQuery query);
+  public Set<Integer> restartTasks(Set<Integer> taskIds);
 
   /**
-   * Gets the framework ID that this scheduler is registered with, or {@null} if the framework is
-   * not yet registered.
+   * Gets the framework ID that this scheduler is registered with, or {@code null} if the framework
+   * is not yet registered.
    *
    * @return The framework id.
    */

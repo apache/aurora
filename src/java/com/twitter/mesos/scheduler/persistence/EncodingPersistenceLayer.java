@@ -1,36 +1,35 @@
 package com.twitter.mesos.scheduler.persistence;
 
 import com.google.common.base.Preconditions;
-import com.twitter.mesos.codec.Codec;
+import com.twitter.mesos.codec.ThriftBinaryCodec;
+import com.twitter.mesos.gen.SchedulerState;
 
 /**
  * A persistence layer that uses a codec to translate objects.
  *
  * @author wfarner
  */
-public class EncodingPersistenceLayer<T, U> implements PersistenceLayer<T> {
-  private final Codec<T, U> codec;
-  private final PersistenceLayer<U> wrapped;
+public class EncodingPersistenceLayer implements PersistenceLayer<SchedulerState> {
+  private final PersistenceLayer<byte[]> wrapped;
 
-  public EncodingPersistenceLayer(PersistenceLayer<U> wrapped, Codec<T, U> codec) {
+  public EncodingPersistenceLayer(PersistenceLayer<byte[]> wrapped) {
     this.wrapped = Preconditions.checkNotNull(wrapped);
-    this.codec = Preconditions.checkNotNull(codec);
   }
 
   @Override
-  public T fetch() throws PersistenceException {
+  public SchedulerState fetch() throws PersistenceException {
     try {
-      return codec.decode(wrapped.fetch());
-    } catch (Codec.CodingException e) {
+      return ThriftBinaryCodec.decode(SchedulerState.class, wrapped.fetch());
+    } catch (ThriftBinaryCodec.CodingException e) {
       throw new PersistenceException("Failed to decode data.", e);
     }
   }
 
   @Override
-  public void commit(T data) throws PersistenceException {
+  public void commit(SchedulerState data) throws PersistenceException {
     try {
-      wrapped.commit(codec.encode(data));
-    } catch (Codec.CodingException e) {
+      wrapped.commit(ThriftBinaryCodec.encode(data));
+    } catch (ThriftBinaryCodec.CodingException e) {
       throw new PersistenceException("Failed to encode data.", e);
     }
   }

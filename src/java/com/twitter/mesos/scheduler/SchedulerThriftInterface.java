@@ -2,6 +2,7 @@ package com.twitter.mesos.scheduler;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import com.twitter.common.thrift.ThriftServer;
 import com.twitter.mesos.gen.CreateJobResponse;
@@ -20,6 +21,7 @@ import org.apache.thrift.TException;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Logger;
 
 /**
@@ -31,8 +33,7 @@ import java.util.logging.Logger;
 class SchedulerThriftInterface extends ThriftServer implements MesosSchedulerManager.Iface {
   private static Logger LOG = Logger.getLogger(SchedulerThriftInterface.class.getName());
 
-  @Inject
-  private SchedulerCore schedulerCore;
+  @Inject private SchedulerCore schedulerCore;
 
   public SchedulerThriftInterface() {
     super("TwitterMesosScheduler", "1");
@@ -106,9 +107,17 @@ class SchedulerThriftInterface extends ThriftServer implements MesosSchedulerMan
   }
 
   @Override
-  public RestartResponse restartTasks(TaskQuery query) throws TException {
-    schedulerCore.restartTasks(query);
-    return new RestartResponse().setResponseCode(ResponseCode.OK);
+  public RestartResponse restartTasks(Set<Integer> taskIds) throws TException {
+    ResponseCode response = ResponseCode.OK;
+    String message = taskIds.size() + " tasks scheduled for restart.";
+
+    Set<Integer> tasksRestarting = schedulerCore.restartTasks(Sets.newHashSet(taskIds));
+    if (!taskIds.equals(tasksRestarting)) {
+      response = ResponseCode.WARNING;
+      message = "Unable to restart tasks: " + Sets.difference(taskIds, tasksRestarting);
+    }
+
+    return new RestartResponse(response, message, tasksRestarting);
   }
 
   @Override

@@ -10,8 +10,6 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
-import com.twitter.mesos.codec.Codec;
-import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.SchedulerState;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzHome;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzJob;
@@ -45,6 +43,7 @@ public class SchedulerModule extends AbstractModule {
     bind(CronJobManager.class).in(Singleton.class);
     bind(ExecutorTracker.class).to(ExecutorTrackerImpl.class).in(Singleton.class);
     bind(MesosSchedulerImpl.class).in(Singleton.class);
+    bind(WorkQueue.class).to(WorkQueueImpl.class).in(Singleton.class);
     bind(SchedulerCore.class).to(SchedulerCoreImpl.class).in(Singleton.class);
 
     GuicedProcess.registerServlet(binder(), "/schedulerz", SchedulerzHome.class, false);
@@ -80,8 +79,6 @@ public class SchedulerModule extends AbstractModule {
   @Provides
   final PersistenceLayer<SchedulerState> providePersistenceLayer(
       @Nullable ZooKeeperClient zkClient) {
-    Codec<SchedulerState, byte[]> codec =
-        new ThriftBinaryCodec<SchedulerState>(SchedulerState.class);
 
     PersistenceLayer<byte[]> binaryPersistence;
     if (options.schedulerPersistenceZooKeeperPath == null) {
@@ -97,7 +94,7 @@ public class SchedulerModule extends AbstractModule {
           options.schedulerPersistenceZooKeeperVersion);
     }
 
-    return new EncodingPersistenceLayer<SchedulerState, byte[]>(binaryPersistence, codec);
+    return new EncodingPersistenceLayer(binaryPersistence);
   }
 
   @Provides

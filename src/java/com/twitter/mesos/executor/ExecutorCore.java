@@ -11,9 +11,9 @@ import com.google.inject.name.Named;
 import com.twitter.common.util.BuildInfo;
 import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
-import com.twitter.mesos.FrameworkMessageCodec;
 import com.twitter.mesos.StateTranslator;
-import com.twitter.mesos.codec.Codec;
+import com.twitter.mesos.codec.ThriftBinaryCodec;
+import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
 import com.twitter.mesos.executor.ProcessKiller.KillException;
@@ -24,6 +24,7 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.SchedulerMessage;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import mesos.ExecutorDriver;
+import mesos.FrameworkMessage;
 import mesos.TaskState;
 import mesos.TaskStatus;
 import org.apache.commons.io.FileSystemUtils;
@@ -117,6 +118,8 @@ public class ExecutorCore implements TaskManager {
     final RunningTask runningTask = new RunningTask(socketManager, healthChecker, processKiller,
         pidFetcher, getTaskRoot(taskId), taskId, taskInfo, fileCopier);
 
+    tasks.put(taskId, runningTask);
+
     try {
       runningTask.stage();
       runningTask.run();
@@ -124,16 +127,16 @@ public class ExecutorCore implements TaskManager {
     } catch (RunningTask.TaskRunException e) {
       LOG.log(Level.SEVERE, "Failed to stage task " + taskId, e);
       runningTask.terminate(ScheduleStatus.FAILED);
+      deleteCompletedTask(taskId);
       sendStatusUpdate(driver, new TaskStatus(taskId, TaskState.TASK_FAILED, EMPTY_MSG));
       return;
     } catch (Throwable t) {
       LOG.log(Level.SEVERE, "Unhandled exception while launching task.", t);
       runningTask.terminate(ScheduleStatus.FAILED);
+      deleteCompletedTask(taskId);
       sendStatusUpdate(driver, new TaskStatus(taskId, TaskState.TASK_FAILED, EMPTY_MSG));
       return;
     }
-
-    tasks.put(taskId, runningTask);
 
     executorService.execute(new Runnable() {
       @Override public void run() {
@@ -276,7 +279,7 @@ public class ExecutorCore implements TaskManager {
           message.setExecutorStatus(status);
         try {
           sendSchedulerMessage(message);
-        } catch (Codec.CodingException e) {
+        } catch (CodingException e) {
           LOG.log(Level.WARNING, "Failed to send executor status.", e);
         }
       }
@@ -286,15 +289,17 @@ public class ExecutorCore implements TaskManager {
     syncExecutor.scheduleAtFixedRate(syncer, 30, 30, TimeUnit.SECONDS);
   }
 
-  private void sendSchedulerMessage(SchedulerMessage message) throws Codec.CodingException {
+  private void sendSchedulerMessage(SchedulerMessage message) throws CodingException {
     ExecutorDriver driverRef = driver.get();
     if (driverRef == null) {
       LOG.info("No driver available, unable to send executor status.");
       return;
     }
 
-    int result = driverRef.sendFrameworkMessage(
-        new FrameworkMessageCodec<SchedulerMessage>(SchedulerMessage.class).encode(message));
+    FrameworkMessage frameworkMessage = new FrameworkMessage();
+    frameworkMessage.setData(ThriftBinaryCodec.encode(message));
+
+    int result = driverRef.sendFrameworkMessage(frameworkMessage);
     if (result != 0) {
       LOG.warning("Scheduler message failed to send, return code " + result);
     }
@@ -322,7 +327,7 @@ public class ExecutorCore implements TaskManager {
           message.setTaskUpdate(update);
 
           sendSchedulerMessage(message);
-        } catch (Codec.CodingException e) {
+        } catch (CodingException e) {
           LOG.log(Level.WARNING, "Failed to send executor status.", e);
         }
       }

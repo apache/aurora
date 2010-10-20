@@ -13,7 +13,7 @@ import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.StateMachine;
-import com.twitter.mesos.codec.Codec;
+import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
 import com.twitter.mesos.executor.ProcessKiller.KillException;
@@ -136,7 +136,7 @@ public class RunningTask implements Task {
       TaskUtils.storeTask(taskRoot, task);
     } catch (IOException e) {
       LOG.log(Level.SEVERE, "Failed to record task state.", e);
-    } catch (Codec.CodingException e) {
+    } catch (ThriftBinaryCodec.CodingException e) {
       LOG.log(Level.SEVERE, "Failed to encode task state.", e);
     }
 
@@ -248,7 +248,7 @@ public class RunningTask implements Task {
 
     List<String> commandLine = Arrays.asList(
         "bash", "-c",  // Read commands from the following string.
-        String.format("echo $$ > ../%s; bash --restricted %s >stdout 2>stderr",
+        String.format("echo $$ > ../%s; bash %s >stdout 2>stderr",
             PIDFILE_NAME, RUN_SCRIPT_NAME)
     );
 

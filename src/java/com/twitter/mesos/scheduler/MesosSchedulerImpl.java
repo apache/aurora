@@ -5,9 +5,9 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.inject.Inject;
-import com.twitter.mesos.FrameworkMessageCodec;
+import com.twitter.mesos.Message;
 import com.twitter.mesos.StateTranslator;
-import com.twitter.mesos.codec.Codec;
+import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.SchedulerMessage;
 import com.twitter.mesos.gen.TaskQuery;
@@ -54,14 +54,38 @@ class MesosSchedulerImpl extends Scheduler {
   }
 
   @Override
+  public void slaveLost(SchedulerDriver schedulerDriver, String slaveId) {
+    LOG.info("Received notification of lost slave: " + slaveId);
+  }
+
+  @Override
   public ExecutorInfo getExecutorInfo(SchedulerDriver driver) {
     return new ExecutorInfo(options.executorPath, new byte[0]);
   }
 
   @Override
-  public void registered(SchedulerDriver driver, String s) {
+  public void registered(final SchedulerDriver driver, String s) {
     LOG.info("Registered with ID " + s);
-    schedulerCore.registered(driver, s);
+
+    schedulerCore.registered(new Driver() {
+      @Override public int sendMessage(Message message) {
+        FrameworkMessage frameworkMessage = new FrameworkMessage();
+        frameworkMessage.setSlaveId(message.getSlaveId());
+        try {
+          frameworkMessage.setData(ThriftBinaryCodec.encode(message.getMessage()));
+        } catch (ThriftBinaryCodec.CodingException e) {
+          LOG.log(Level.SEVERE, "Failed to encode message: " + message.getMessage()
+                                + " intended for slave " + message.getSlaveId());
+          return -1;
+        }
+
+        return driver.sendFrameworkMessage(frameworkMessage);
+      }
+
+      @Override public int killTask(int taskId) {
+        return driver.killTask(taskId);
+      }
+    }, s);
   }
 
   @Override
@@ -110,9 +134,6 @@ class MesosSchedulerImpl extends Scheduler {
     LOG.severe("Received error message: " + message + " with code " + code);
   }
 
-  private final Codec<SchedulerMessage, FrameworkMessage> frameworkMessageCodec =
-      new FrameworkMessageCodec<SchedulerMessage>(SchedulerMessage.class);
-
   @Override
   public void frameworkMessage(SchedulerDriver driver, FrameworkMessage message) {
     if (message.getData() == null) {
@@ -121,7 +142,8 @@ class MesosSchedulerImpl extends Scheduler {
     }
 
     try {
-      SchedulerMessage schedulerMsg = frameworkMessageCodec.decode(message);
+      SchedulerMessage schedulerMsg = ThriftBinaryCodec.decode(SchedulerMessage.class,
+          message.getData());
       if (!schedulerMsg.isSet()) {
         LOG.warning("Received empty scheduler message.");
         return;
@@ -138,7 +160,7 @@ class MesosSchedulerImpl extends Scheduler {
         default:
           LOG.warning("Received unhandled scheduler message type: " + schedulerMsg.getSetField());
       }
-    } catch (Codec.CodingException e) {
+    } catch (ThriftBinaryCodec.CodingException e) {
       LOG.log(Level.SEVERE, "Failed to decode framework message.", e);
     }
   }

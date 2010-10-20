@@ -3,6 +3,7 @@ package com.twitter.mesos.scheduler;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
+import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -14,9 +15,9 @@ import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
-import com.twitter.mesos.FrameworkMessageCodec;
+import com.twitter.mesos.Message;
 import com.twitter.mesos.States;
-import com.twitter.mesos.codec.Codec;
+import com.twitter.mesos.Tasks;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.ExecutorMessage;
 import com.twitter.mesos.gen.JobConfiguration;
@@ -25,22 +26,19 @@ import com.twitter.mesos.gen.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.RestartExecutor;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.SchedulerState;
-import com.twitter.mesos.gen.SchedulingSignal;
-import com.twitter.mesos.gen.SignalType;
 import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TrackedTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.persistence.PersistenceLayer;
-import mesos.FrameworkMessage;
-import mesos.SchedulerDriver;
 import mesos.TaskDescription;
 import org.apache.commons.lang.StringUtils;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -53,50 +51,44 @@ import java.util.logging.Logger;
  * @author wfarner
  */
 public class SchedulerCoreImpl implements SchedulerCore {
-  private static Logger LOG = Logger.getLogger(SchedulerCore.class.getName());
-
-  private static final Codec<TwitterTaskInfo, byte[]> TASK_CODEC =
-      new ThriftBinaryCodec<TwitterTaskInfo>(TwitterTaskInfo.class);
-
-  private static final Codec<SchedulingSignal, byte[]> SIGNAL_CODEC =
-      new ThriftBinaryCodec<SchedulingSignal>(SchedulingSignal.class);
+  private static final Logger LOG = Logger.getLogger(SchedulerCore.class.getName());
 
   // Schedulers that are responsible for triggering execution of jobs.
   private final List<JobManager> jobManagers;
 
-  private AtomicInteger nextTaskId = new AtomicInteger(0);
+  private final AtomicInteger nextTaskId = new AtomicInteger(0);
 
   // The mesos framework ID of the scheduler, set to null until the framework is registered.
   private final AtomicReference<String> frameworkId = new AtomicReference<String>(null);
 
   // Stores the configured tasks.
-  private TaskStore taskStore = new TaskStore();
+  private final TaskStore taskStore = new TaskStore();
 
   // Work queue that stores pending asynchronous tasks.
-  @Inject private WorkQueue workQueue;
+  private final WorkQueue workQueue;
 
   private final PersistenceLayer<SchedulerState> persistenceLayer;
   private final ExecutorTracker executorTracker;
 
   // Scheduler driver used for communication with other nodes in the cluster.
-  private final AtomicReference<SchedulerDriver> schedulerDriver =
-      new AtomicReference<SchedulerDriver>();
+  private final AtomicReference<Driver> schedulerDriver = new AtomicReference<Driver>();
 
   @Inject
   public SchedulerCoreImpl(CronJobManager cronScheduler, ImmediateJobManager immediateScheduler,
-      PersistenceLayer<SchedulerState> persistenceLayer,
-      ExecutorTracker executorTracker) {
+      PersistenceLayer<SchedulerState> persistenceLayer, ExecutorTracker executorTracker,
+      WorkQueue workQueue) {
     // The immediate scheduler will accept any job, so it's important that other schedulers are
     // placed first.
     jobManagers = Arrays.asList(cronScheduler, immediateScheduler);
     this.persistenceLayer = Preconditions.checkNotNull(persistenceLayer);
     this.executorTracker = Preconditions.checkNotNull(executorTracker);
+    this.workQueue = Preconditions.checkNotNull(workQueue);
 
     restore();
   }
 
   @Override
-  public void registered(SchedulerDriver driver, String frameworkId) {
+  public void registered(Driver driver, String frameworkId) {
     this.schedulerDriver.set(Preconditions.checkNotNull(driver));
     this.frameworkId.set(Preconditions.checkNotNull(frameworkId));
     persist();
@@ -109,31 +101,30 @@ public class SchedulerCoreImpl implements SchedulerCore {
           message.setRestartExecutor(new RestartExecutor());
 
           sendExecutorMessage(slaveId, message);
-        } catch (Codec.CodingException e) {
+        } catch (ThriftBinaryCodec.CodingException e) {
           LOG.log(Level.WARNING, "Failed to send executor status.", e);
         }
       }
     });
   }
 
-  private static final FrameworkMessageCodec<ExecutorMessage> FRAMEWORK_MESSAGE_CODEC =
-      new FrameworkMessageCodec<ExecutorMessage>(ExecutorMessage.class);
-
   private void sendExecutorMessage(String slaveId, ExecutorMessage message)
-      throws Codec.CodingException {
-    SchedulerDriver driverRef = schedulerDriver.get();
+      throws ThriftBinaryCodec.CodingException {
+    Driver driverRef = schedulerDriver.get();
     if (driverRef == null) {
       LOG.info("No driver available, unable to send executor status.");
       return;
     }
 
-    FrameworkMessage frameworkMessage = FRAMEWORK_MESSAGE_CODEC.encode(message);
-    frameworkMessage.setSlaveId(slaveId);
-
-    int result = driverRef.sendFrameworkMessage(frameworkMessage);
+    int result = driverRef.sendMessage(new Message(slaveId, message));
     if (result != 0) {
       LOG.warning("Executor message failed to send, return code " + result);
     }
+  }
+
+  @Override
+  public synchronized Iterable<TrackedTask> getTasks(final TaskQuery query) {
+    return getTasks(query, Predicates.<TrackedTask>alwaysTrue());
   }
 
   @Override
@@ -171,9 +162,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
       for (LiveTaskInfo taskInfo : update.getTaskInfos()) {
         taskInfoMap.put(taskInfo.getTaskId(), taskInfo);
       }
-
-      LOG.info(String.format("Slave %s reports records for tasks %s", update.getSlaveHost(),
-          taskInfoMap.keySet()));
 
       // TODO(wfarner): What do we do when the slave informs us of a task that we don't know about?
 
@@ -303,8 +291,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
     byte[] taskInBytes;
     try {
-      taskInBytes = TASK_CODEC.encode(task.getTask());
-    } catch (Codec.CodingException e) {
+      taskInBytes = ThriftBinaryCodec.encode(task.getTask());
+    } catch (ThriftBinaryCodec.CodingException e) {
       LOG.log(Level.SEVERE, "Unable to serialize task.", e);
       throw new ScheduleException("Internal error.", e);
     }
@@ -323,6 +311,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
       task.unsetSlaveHost();
       task.unsetResources();
       task.unsetTaskEvents();
+      task.setAncestorId(task.getTaskId());
       task.setTaskId(generateTaskId());
       changeTaskStatus(task, ScheduleStatus.PENDING);
     }
@@ -475,8 +464,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
           }
         });
 
-        doWorkWithDriver(new Function<SchedulerDriver, Integer>() {
-          @Override public Integer apply(SchedulerDriver driver) {
+        doWorkWithDriver(new Function<Driver, Integer>() {
+          @Override public Integer apply(Driver driver) {
             return driver.killTask(task.getTaskId());
           }
         });
@@ -489,13 +478,13 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
   /**
    * Executes a unit of work that uses the scheduler driver.  This exists as a convenience function
-   * for any tasks that require use of the {@link SchedulerDriver}, for automatic retrying in the
+   * for any tasks that require use of the {@link Driver}, for automatic retrying in the
    * event that the driver is not available.
    *
    * @param work The work to execute.  Should return the status code provided by the driver
    *    (0 denotes success, non-zero denotes a failure that should be retried).
    */
-  private void doWorkWithDriver(final Function<SchedulerDriver, Integer> work) {
+  private void doWorkWithDriver(final Function<Driver, Integer> work) {
     workQueue.doWork(new Callable<Boolean>() {
       @Override public Boolean call() {
         if (frameworkId.get() == null) {
@@ -503,41 +492,53 @@ public class SchedulerCoreImpl implements SchedulerCore {
           return false;
         }
 
-        SchedulerDriver driver = schedulerDriver.get();
+        Driver driver = schedulerDriver.get();
         return driver != null && work.apply(driver) == 0;
       }
     });
   }
 
   @Override
-  public synchronized void restartTasks(final TaskQuery query) {
-    Preconditions.checkNotNull(query);
+  public synchronized Set<Integer> restartTasks(Set<Integer> taskIds) {
+    MorePreconditions.checkNotBlank(taskIds);
+    LOG.info("Restart requested for tasks " + taskIds);
 
-    // TODO(wfarner): Need to do this in a cleaner way so that the entire job doesn't flip at once.
-    LOG.info("Restarting tasks " + query);
+    Iterable<TrackedTask> tasks = getTasks(new TaskQuery().setTaskIds(taskIds));
+    if (Iterables.size(tasks) != taskIds.size()) {
+      Set<Integer> unknownTasks = Sets.difference(taskIds,
+          Sets.newHashSet(Iterables.transform(tasks, Tasks.GET_TASK_ID)));
 
-    final SchedulingSignal signal = new SchedulingSignal().setSignal(SignalType.RESTART_TASK);
+      LOG.warning("Restart requested for unknown tasks " + unknownTasks);
+    }
 
-    for (final TrackedTask task : getTasks(query)) {
-      if (task != null && task.status != ScheduleStatus.PENDING) {
-        doWorkWithDriver(new Function<SchedulerDriver, Integer>() {
-          @Override public Integer apply(SchedulerDriver driver) {
-            try {
-              return signalExecutor(driver, task.getSlaveId(), task.getTaskId(), signal);
-            } catch (Codec.CodingException e) {
-              LOG.log(Level.SEVERE, "Failed to encode scheduling signal.", e);
-              return 0;
-            }
+    Iterable<TrackedTask> activeTasks = Iterables.filter(tasks, States.ACTIVE_FILTER);
+    Iterable<TrackedTask> inactiveTasks = Iterables.filter(tasks,
+        Predicates.not(States.ACTIVE_FILTER));
+    if (!Iterables.isEmpty(inactiveTasks)) {
+      LOG.warning("Restart request rejected for inactive tasks "
+                  + Iterables.transform(inactiveTasks, Tasks.GET_TASK_ID));
+    }
+
+    for (final TrackedTask task : activeTasks) {
+      TrackedTask copy = new TrackedTask(task);
+      taskStore.mutate(task, new Closure<TrackedTask>() {
+        @Override public void execute(TrackedTask mutable) {
+          changeTaskStatus(mutable, ScheduleStatus.KILLED_BY_CLIENT);
+        }
+      });
+
+      scheduleTaskCopies(Arrays.asList(copy));
+
+      if (task.status != ScheduleStatus.PENDING) {
+        doWorkWithDriver(new Function<Driver, Integer>() {
+          @Override public Integer apply(Driver driver) {
+            return driver.killTask(task.getTaskId());
           }
         });
       }
     }
-  }
 
-  private int signalExecutor(SchedulerDriver driver, String slaveId, int taskId,
-      SchedulingSignal signal) throws Codec.CodingException {
-    return driver.sendFrameworkMessage(new FrameworkMessage(slaveId, taskId,
-        SIGNAL_CODEC.encode(signal)));
+    return Sets.newHashSet(Iterables.transform(activeTasks, Tasks.GET_TASK_ID));
   }
 
   private void persist() {

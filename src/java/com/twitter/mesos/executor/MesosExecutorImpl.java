@@ -1,8 +1,6 @@
 package com.twitter.mesos.executor;
 
 import com.google.inject.Inject;
-import com.twitter.mesos.FrameworkMessageCodec;
-import com.twitter.mesos.codec.Codec;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.ExecutorMessage;
 import com.twitter.mesos.gen.TwitterTaskInfo;
@@ -24,8 +22,6 @@ public class MesosExecutorImpl extends Executor {
   }
 
   private static final Logger LOG = Logger.getLogger(MesosExecutorImpl.class.getName());
-  private static final Codec<TwitterTaskInfo, byte[]> TASK_CODEC =
-      new ThriftBinaryCodec<TwitterTaskInfo>(TwitterTaskInfo.class);
   private final static byte[] EMPTY_BYTE_ARRAY = new byte[0];
 
   @Inject private ExecutorCore executorCore;
@@ -41,8 +37,8 @@ public class MesosExecutorImpl extends Executor {
 
     TwitterTaskInfo taskInfo;
     try {
-      taskInfo = TASK_CODEC.decode(task.getArg());
-    } catch (Codec.CodingException e) {
+      taskInfo = ThriftBinaryCodec.decode(TwitterTaskInfo.class, task.getArg());
+    } catch (ThriftBinaryCodec.CodingException e) {
       LOG.log(Level.SEVERE, "Error deserializing task object.", e);
       driver.sendStatusUpdate(new TaskStatus(task.getTaskId(), TaskState.TASK_FAILED,
           EMPTY_BYTE_ARRAY));
@@ -70,9 +66,6 @@ public class MesosExecutorImpl extends Executor {
     shutdown(driver);
   }
 
-  private static final Codec<ExecutorMessage, FrameworkMessage> FRAMEWORK_MESSAGE_CODEC =
-      new FrameworkMessageCodec<ExecutorMessage>(ExecutorMessage.class);
-
   @Override
   public void frameworkMessage(ExecutorDriver driver, FrameworkMessage message) {
     if (message.getData() == null) {
@@ -81,7 +74,8 @@ public class MesosExecutorImpl extends Executor {
     }
 
     try {
-      ExecutorMessage executorMsg = FRAMEWORK_MESSAGE_CODEC.decode(message);
+      ExecutorMessage executorMsg = ThriftBinaryCodec.decode(ExecutorMessage.class,
+          message.getData());
       if (!executorMsg.isSet()) {
         LOG.warning("Received empty executor message.");
         return;
@@ -98,7 +92,7 @@ public class MesosExecutorImpl extends Executor {
         default:
           LOG.warning("Received unhandled executor message type: " + executorMsg.getSetField());
       }
-    } catch (Codec.CodingException e) {
+    } catch (ThriftBinaryCodec.CodingException e) {
       LOG.log(Level.SEVERE, "Failed to decode framework message.", e);
     }
   }

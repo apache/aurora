@@ -103,7 +103,7 @@ public class DiskGarbageCollector implements Runnable {
         List<File> files = Arrays.asList(scanDirectory.listFiles(fileFilter));
         Collections.sort(files, LAST_MODIFIED_COMPARATOR);
 
-        LOG.info(name + " GC candidates: " + files);
+        LOG.info(name + " found " + files.size() + " GC candidates.");
 
         long bytesReclaimed = 0;
         for (File file : files) {

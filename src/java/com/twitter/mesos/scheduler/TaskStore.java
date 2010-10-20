@@ -8,11 +8,11 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.twitter.common.base.ExceptionalClosure;
+import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TrackedTask;
 import org.apache.commons.lang.StringUtils;
 
-import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -42,7 +42,7 @@ public class TaskStore {
    */
   public void add(Iterable<TrackedTask> newTasks) {
     // Do a sanity check and make sure we're not adding a task with a duplicate task id.
-    Set<Integer> newTaskIds = Sets.newHashSet(Iterables.transform(newTasks, GET_TASK_ID));
+    Set<Integer> newTaskIds = Sets.newHashSet(Iterables.transform(newTasks, Tasks.GET_TASK_ID));
     Preconditions.checkArgument(newTaskIds.size() == Iterables.size(newTasks),
         "Duplicate task IDs not allowed: " + newTasks);
 
@@ -66,7 +66,7 @@ public class TaskStore {
   public void remove(Iterable<TrackedTask> removedTasks) {
     if (Iterables.isEmpty(removedTasks)) return;
 
-    Set<Integer> removedIds = Sets.newHashSet(Iterables.transform(removedTasks, GET_TASK_ID));
+    Set<Integer> removedIds = Sets.newHashSet(Iterables.transform(removedTasks, Tasks.GET_TASK_ID));
     LOG.info("Removing tasks " + removedIds);
 
     int sizeBefore = tasks.size();
@@ -132,8 +132,8 @@ public class TaskStore {
    * @param filters Additional filters to apply.
    * @return A read-only view of matching tasks.
    */
-  public Iterable<TrackedTask> fetch(TaskQuery query, Predicate<TrackedTask>... filters) {
-    return Iterables.filter(snapshot(), makeFilter(query, filters));
+  public Set<TrackedTask> fetch(TaskQuery query, Predicate<TrackedTask>... filters) {
+    return Sets.newHashSet(Iterables.filter(snapshot(), makeFilter(query, filters)));
   }
 
   /**
@@ -184,13 +184,6 @@ public class TaskStore {
       }));
     }
   }
-
-  private static final Function<TrackedTask, Integer> GET_TASK_ID =
-      new Function<TrackedTask, Integer>() {
-        @Override public Integer apply(TrackedTask task) {
-          return task.getTaskId();
-        }
-      };
 
   // TODO(wfarner): Use this comparator to keep tasks sorted by priority.
   private static final Comparator<TrackedTask> PRIORITY_COMPARATOR = new Comparator<TrackedTask>() {
