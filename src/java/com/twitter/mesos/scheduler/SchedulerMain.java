@@ -161,11 +161,7 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
     addShutdownAction(new Command() {
       @Override public void execute() {
         LOG.info("Stopping thrift server.");
-        try {
-          schedulerThriftInterface.shutdown();
-        } catch (TException e) {
-          LOG.log(Level.WARNING, "Error while stopping thrift server.", e);
-        }
+        schedulerThriftInterface.shutdown();
       }
     });
 
