@@ -19,7 +19,7 @@ public class ConfigurationManager {
   private static Logger LOG = Logger.getLogger(ConfigurationManager.class.getName());
 
   private static final boolean DEFAULT_TO_DAEMON = false;
-  private static final double DEFAULT_NUM_CPUS = 0.1;
+  private static final double DEFAULT_NUM_CPUS = 1.0;
   private static final long DEFAULT_RAM_MB = 1024;
   private static final long DEFAULT_DISK_MB = 1024;
   private static final int DEFAULT_PRIORITY = 0;

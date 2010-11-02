@@ -45,14 +45,6 @@ public class SchedulerzJob extends StringTemplateServlet {
         .put(FAILED, Sets.newHashSet(LOST, NOT_FOUND, FAILED))
       .build();
 
-  private static final Comparator<TrackedTask> REVERSE_CHRON_COMPARATOR =
-      new Comparator<TrackedTask>() {
-          @Override public int compare(TrackedTask taskA, TrackedTask taskB) {
-            // Sort in reverse chronological order.
-            return taskB.getTaskId() - taskA.getTaskId();
-          }
-      };
-
   @Inject private SchedulerCore scheduler;
 
   @Inject
@@ -93,19 +85,25 @@ public class SchedulerzJob extends StringTemplateServlet {
             .setOwner(user)
             .setJobName(job);
 
-        List<TrackedTask> activeTasks;
         if (statusFilter != null) {
           query.setStatuses(FILTER_MAP.get(statusFilter));
-          activeTasks = Lists.newArrayList(scheduler.getTasks(query));
+          template.setAttribute("activeTasks",
+              Lists.newArrayList(scheduler.getTasks(query)));
         } else {
-          activeTasks = Lists.newArrayList(scheduler.getTasks(query, Tasks.ACTIVE_FILTER));
+          template.setAttribute("activeTasks",
+              Lists.newArrayList(scheduler.getTasks(query, Tasks.ACTIVE_FILTER)));
+
           List<TrackedTask> completedTasks = Lists.newArrayList(scheduler.getTasks(query,
-              Predicates.not(Tasks.ACTIVE_FILTER)));
-          Collections.sort(completedTasks, REVERSE_CHRON_COMPARATOR);
+                  Predicates.not(Tasks.ACTIVE_FILTER)));
+          Collections.sort(completedTasks, new Comparator<TrackedTask>() {
+              @Override public int compare(TrackedTask taskA, TrackedTask taskB) {
+                // Sort in reverse chronological order.
+                return taskB.getTaskId() - taskA.getTaskId();
+              }
+          });
+
           template.setAttribute("completedTasks", completedTasks);
         }
-        Collections.sort(activeTasks, REVERSE_CHRON_COMPARATOR);
-        template.setAttribute("activeTasks", activeTasks);
       }
     });
   }
