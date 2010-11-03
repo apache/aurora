@@ -150,7 +150,7 @@ public class TaskStore {
       }
 
       private <T> boolean matches(Collection<T> collection, T item) {
-        return collection == null || collection.isEmpty() || collection.contains(item);
+        return collection == null || collection.contains(item);
       }
 
       @Override public boolean apply(TrackedTask task) {

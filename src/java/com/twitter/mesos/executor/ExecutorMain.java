@@ -24,8 +24,8 @@ public class ExecutorMain extends GuicedProcess<ExecutorMain.TwitterExecutorOpti
     @Option(name = "hdfs_config", required = true, usage = "Hadoop configuration path")
     public String hdfsConfig;
 
-    @Option(name = "kill_tree_path", usage = "HDFS path to kill tree shell script")
-    public String killTreeHdfsPath;
+    @Option(name = "kill_tree_path", usage = "Path to kill tree shell script")
+    public File killTreePath = new File("/usr/local/mesos/bin/killtree.sh");
 
     @Option(name = "task_root_dir", required = true, usage = "Mesos task working directory root.")
     public File taskRootDir;

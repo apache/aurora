@@ -56,7 +56,10 @@ public class MesosExecutorImpl extends Executor {
   @Override
   public void shutdown(ExecutorDriver driver) {
     LOG.info("Received shutdown command, terminating...");
-    executorCore.shutdownCore();
+    for (Task killedTask : executorCore.shutdownCore()) {
+      driver.sendStatusUpdate(new TaskStatus(killedTask.getId(), TaskState.TASK_KILLED,
+          EMPTY_BYTE_ARRAY));
+    }
     driver.stop();
   }
 

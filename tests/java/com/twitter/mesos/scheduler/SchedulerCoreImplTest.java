@@ -9,6 +9,8 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.CronCollisionPolicy;
 import com.twitter.mesos.gen.ExecutorStatus;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.LiveTaskInfo;
+import com.twitter.mesos.gen.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.SchedulerState;
 import com.twitter.mesos.gen.TaskQuery;
@@ -483,6 +485,42 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     for (TrackedTask task : scheduler.getTasks(new TaskQuery())) {
       assertThat(task.getJobName(), is(JOB_NAME_A));
     }
+  }
+
+  @Test
+  public void testSlaveAdjustsSchedulerTaskState() throws Exception {
+    // TODO(wfarner): Implement.
+    // Create task, move to RUNNING state, call updateRegisteredTasks to tell scheduler
+    // that slave is KILLED, make sure task changes state (and gets rescheduled).
+
+    control.replay();
+
+    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, TASK_A, 1));
+    assertTaskCount(1);
+
+    int taskId = getTask(queryByOwner(JOB_OWNER_A)).getTaskId();
+
+    changeStatus(queryByOwner(JOB_OWNER_A), ScheduleStatus.RUNNING);
+
+    // Simulate state update from the executor telling the scheduler that the task is dead.
+    // This can happen if the entire cluster goes down - the scheduler has persisted state
+    // listing the task as running, and the executor reads the task state in and marks it as KILLED.
+    LiveTaskInfo taskUpdate = new LiveTaskInfo()
+        .setTaskId(taskId)
+        .setStatus(ScheduleStatus.KILLED);
+    RegisteredTaskUpdate update = new RegisteredTaskUpdate()
+        .setSlaveHost(SLAVE_HOST);
+    update.addToTaskInfos(taskUpdate);
+    scheduler.updateRegisteredTasks(update);
+
+    // The expected outcome is that the task is rescheduled, and the old task is moved into the
+    // KILLED state.
+    assertTaskCount(2);
+    TrackedTask killedTask = getTask(queryByOwner(JOB_OWNER_A).setTaskIds(Sets.newHashSet(taskId)));
+    assertThat(killedTask.getStatus(), is(ScheduleStatus.KILLED));
+
+    TrackedTask rescheduled = Iterables.getOnlyElement(getTasksByStatus(ScheduleStatus.PENDING));
+    assertThat(rescheduled.getAncestorId(), is(taskId));
   }
 
   private void assertTaskCount(int numTasks) {

@@ -1,6 +1,7 @@
 package com.twitter.mesos.scheduler;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 import com.google.inject.Module;
 import com.twitter.common.args.Option;
@@ -149,8 +150,15 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
   }
 
   private void runMesosDriver() {
-    int result = driver.run();
-    LOG.info("Driver completed with exit code " + result);
+    new ThreadFactoryBuilder().setNameFormat("Driver-Runner-%d").setDaemon(true).build().newThread(
+        new Runnable() {
+          @Override public void run() {
+            int result = driver.run();
+            LOG.info("Driver completed with exit code " + result);
+            destroy();
+          }
+        }
+    ).start();
   }
 
   private int startThriftServer() throws IOException, TTransportException,

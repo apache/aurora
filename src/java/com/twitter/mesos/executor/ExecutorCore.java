@@ -159,7 +159,7 @@ public class ExecutorCore implements TaskManager {
     if (task != null && task.isRunning()) {
       LOG.info("Killing task: " + task);
       task.terminate(ScheduleStatus.KILLED);
-    } else {
+    } else if (task == null) {
       LOG.severe("No such task found: " + taskId);
     }
   }
@@ -198,11 +198,19 @@ public class ExecutorCore implements TaskManager {
     tasks.remove(taskId);
   }
 
-  public void shutdownCore() {
-    for (Map.Entry<Integer, Task> entry : tasks.entrySet()) {
-      System.out.println("Killing task " + entry.getKey());
-      stopRunningTask(entry.getKey());
+  /**
+   * Cleanly shuts down the executor.
+   *
+   * @return The active tasks that were killed as the executor shut down.
+   */
+  public Iterable<Task> shutdownCore() {
+    LOG.info("Shutting down executor core.");
+    Iterable<Task> runningTasks = getRunningTasks();
+    for (Task task : runningTasks) {
+      stopRunningTask(task.getId());
     }
+
+    return runningTasks;
   }
 
   @VisibleForTesting

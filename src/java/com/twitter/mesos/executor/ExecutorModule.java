@@ -113,17 +113,9 @@ public class ExecutorModule extends AbstractModule {
 
   @Provides
   public ExceptionalClosure<KillCommand, KillException> provideProcessKiller(
-      ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier,
       ExceptionalFunction<String, List<String>, SignalException> httpSignaler) throws IOException {
-    // TODO(wfarner): This should be handled by ProcessKiller - modules shouldn't be doing heavy
-    //    work like this.
-    // Fetch the killtree script.
 
-    LOG.info("Fetching killtree script.");
-    File killScript = fileCopier.apply(new FileCopyRequest(options.killTreeHdfsPath,
-        options.taskRootDir.getAbsolutePath()));
-
-    return new ProcessKiller(httpSignaler, killScript,
+    return new ProcessKiller(httpSignaler, options.killTreePath,
         Amount.of((long) options.killEscalationMs, Time.MILLISECONDS));
   }
 }

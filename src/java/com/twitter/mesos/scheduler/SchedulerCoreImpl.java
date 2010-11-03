@@ -34,6 +34,7 @@ import com.twitter.mesos.scheduler.persistence.PersistenceLayer;
 import mesos.TaskDescription;
 import org.apache.commons.lang.StringUtils;
 
+import javax.annotation.Nullable;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -135,8 +136,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
   @Override
   public synchronized boolean hasActiveJob(final String owner, final String jobName) {
     TaskQuery query = new TaskQuery().setOwner(owner).setJobName(jobName)
-        .setStatuses(Sets.newHashSet(ScheduleStatus.PENDING, ScheduleStatus.STARTING,
-            ScheduleStatus.RUNNING));
+        .setStatuses(Tasks.ACTIVE_STATES);
     return !Iterables.isEmpty(getTasks(query)) || Iterables.any(jobManagers,
         new Predicate<JobManager>() {
           @Override public boolean apply(JobManager manager) {
@@ -153,7 +153,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
   //    Figure out a solution that will work.  Might require mesos support for fetching the list
   //    of slaves.
   @Override
-  public void updateRegisteredTasks(RegisteredTaskUpdate update) {
+  public synchronized void updateRegisteredTasks(RegisteredTaskUpdate update) {
     Preconditions.checkNotNull(update);
 
     try {
@@ -162,32 +162,74 @@ public class SchedulerCoreImpl implements SchedulerCore {
         taskInfoMap.put(taskInfo.getTaskId(), taskInfo);
       }
 
-      // TODO(wfarner): What do we do when the slave informs us of a task that we don't know about?
+      // TODO(wfarner): Change taskStore to isolate storage of active and dead tasks, and only
+      //    allow slaves to report records for inactive tasks.  This will allow the scheduler to
+      //    discard records for inactive tasks.  Better yet, have the scheduler only retain
+      //    configurations for live jobs, and acquire all other state from slaves.
+
+      // Make sure that we recognize all of the reported tasks.
+      Set<Integer> recognizedTasks = Sets.newHashSet(Iterables.transform(
+          taskStore.fetch(new TaskQuery().setTaskIds(taskInfoMap.keySet())), Tasks.GET_TASK_ID));
+      Set<Integer> unknownTasks = Sets.difference(taskInfoMap.keySet(), recognizedTasks);
+      if (!unknownTasks.isEmpty()) {
+        LOG.severe("Received task info update from executor " + update.getSlaveHost()
+                   + " for unknown tasks " + unknownTasks);
+      }
 
       // Update the resource information for the tasks that we currently have on record.
       taskStore.mutate(new TaskQuery().setTaskIds(taskInfoMap.keySet()),
           new ExceptionalClosure<TrackedTask, RuntimeException>() {
         @Override public void execute(TrackedTask task) {
-          task.setResources(taskInfoMap.get(task.getTaskId()).getResources());
+          LiveTaskInfo update = taskInfoMap.get(task.getTaskId());
+          Preconditions.checkNotNull(update);
+          task.setResources(update.getResources());
         }
       });
 
-      // Remove records for tasks that the slave no longer reports.
-      taskStore.remove(taskStore.fetch(new TaskQuery().setSlaveHost(update.getSlaveHost()),
-          new Predicate<TrackedTask>() {
-            @Override public boolean apply(TrackedTask task) {
-              // Add a grace period to prevent race condition where newly-scheduled tasks are not
-              // yet reported by the slave.
-              long taskAgeMillis = System.currentTimeMillis()
-                  - Iterables.getLast(task.getTaskEvents()).getTimestamp();
+      Predicate<LiveTaskInfo> getKilledTasks = new Predicate<LiveTaskInfo>() {
+        @Override public boolean apply(LiveTaskInfo update) {
+          return update.getStatus() == ScheduleStatus.KILLED;
+        }
+      };
 
-              return !taskInfoMap.containsKey(task.getTaskId())
-                  && taskAgeMillis > Amount.of(10, Time.MINUTES).as(Time.MILLISECONDS);
-            }
-          }));
+      Function<LiveTaskInfo, Integer> getTaskId = new Function<LiveTaskInfo, Integer>() {
+        @Override public Integer apply(LiveTaskInfo update) {
+          return update.getTaskId();
+        }
+      };
+
+      // Find any tasks that we believe to be running, but the slave reports as dead.
+      Set<Integer> reportedDeadTasks = Sets.newHashSet(
+          Iterables.transform(Iterables.filter(update.getTaskInfos(), getKilledTasks), getTaskId));
+      Set<Integer> deadTasks = Sets.newHashSet(
+          Iterables.transform(
+              taskStore.fetch(new TaskQuery().setTaskIds(reportedDeadTasks)
+                  .setStatuses(Sets.newHashSet(ScheduleStatus.RUNNING))),
+              Tasks.GET_TASK_ID));
+      if (!deadTasks.isEmpty()) {
+        LOG.info("Found tasks that were recorded as RUNNING but slave " + update.getSlaveHost()
+                 + " reports as KILLED: " + deadTasks);
+        setTaskStatus(new TaskQuery().setTaskIds(deadTasks), ScheduleStatus.KILLED);
+
+        // Remove records for tasks that the slave no longer reports.
+        taskStore.remove(taskStore.fetch(new TaskQuery().setSlaveHost(update.getSlaveHost()),
+            new Predicate<TrackedTask>() {
+              @Override public boolean apply(TrackedTask task) {
+                // Add a grace period to prevent race condition where newly-scheduled tasks are not
+                // yet reported by the slave.
+                long taskAgeMillis = System.currentTimeMillis()
+                    - Iterables.getLast(task.getTaskEvents()).getTimestamp();
+
+                return !taskInfoMap.containsKey(task.getTaskId())
+                    && taskAgeMillis > Amount.of(10, Time.MINUTES).as(Time.MILLISECONDS);
+              }
+            }));
+      }
     } catch (Throwable t) {
       LOG.log(Level.WARNING, "Uncaught exception.", t);
     }
+
+    persist();
   }
 
   @Override
@@ -297,7 +339,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     }
 
     LOG.info(String.format("Offer on slave %s (id %s) is being assigned task for %s/%s.",
-        slaveHost, task.slaveId, task.getOwner(), task.getJobName()));
+        slaveHost, task.slaveId, task.getTask().getOwner(), task.getTask().getJobName()));
 
     persist();
     return new TaskDescription(task.getTaskId(), slaveId,
@@ -425,6 +467,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
     if (newTasks.isEmpty()) return;
     scheduleTaskCopies(newTasks);
+    persist();
   }
 
   @Override
