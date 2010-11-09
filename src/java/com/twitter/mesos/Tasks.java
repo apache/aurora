@@ -3,12 +3,10 @@ package com.twitter.mesos;
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Sets;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.TrackedTask;
 
-
-import javax.annotation.Nullable;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.Set;
 
@@ -72,9 +70,7 @@ public class Tasks {
   }
 
   public static Predicate<TrackedTask> makeStatusFilter(ScheduleStatus... statuses) {
-    ImmutableSet.Builder<ScheduleStatus> builder = ImmutableSet.builder();
-    for (ScheduleStatus status : statuses) builder.add(status);
-    final Set<ScheduleStatus> filter = builder.build();
+    final Set<ScheduleStatus> filter = EnumSet.copyOf(Arrays.asList(statuses));
 
     return new Predicate<TrackedTask>() {
       @Override public boolean apply(TrackedTask task) {

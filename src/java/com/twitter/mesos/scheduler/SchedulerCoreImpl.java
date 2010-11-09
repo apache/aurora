@@ -166,10 +166,9 @@ public class SchedulerCoreImpl implements SchedulerCore {
         taskInfoMap.put(taskInfo.getTaskId(), taskInfo);
       }
 
-      // TODO(wfarner): Change taskStore to isolate storage of active and dead tasks, and only
-      //    allow slaves to report records for inactive tasks.  This will allow the scheduler to
-      //    discard records for inactive tasks.  Better yet, have the scheduler only retain
-      //    configurations for live jobs, and acquire all other state from slaves.
+      // TODO(wfarner): Have the scheduler only retain configurations for live jobs,
+      //    and acquire all other state from slaves.
+      //    This will allow the scheduler to only persist active tasks.
 
       // Look for any tasks that we don't know about, or this slave should not be modifying.
       final Set<Integer> recognizedTasks = Sets.newHashSet(Iterables.transform(
@@ -183,7 +182,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
       }
 
       // Remove unknown tasks from the request to prevent badness later.
-      for (int unknownTask : unknownTasks) taskInfoMap.remove(unknownTask);
+      taskInfoMap.keySet().removeAll(unknownTasks);
 
       // Update the resource information for the tasks that we currently have on record.
       taskStore.mutate(new TaskQuery().setTaskIds(recognizedTasks),
