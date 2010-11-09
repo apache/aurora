@@ -2,11 +2,13 @@ package com.twitter.mesos;
 
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.TrackedTask;
 
 
+import javax.annotation.Nullable;
 import java.util.EnumSet;
 import java.util.Set;
 
@@ -67,5 +69,17 @@ public class Tasks {
 
   public static boolean isTerminated(ScheduleStatus status) {
     return TERMINAL_STATES.contains(status);
+  }
+
+  public static Predicate<TrackedTask> makeStatusFilter(ScheduleStatus... statuses) {
+    ImmutableSet.Builder<ScheduleStatus> builder = ImmutableSet.builder();
+    for (ScheduleStatus status : statuses) builder.add(status);
+    final Set<ScheduleStatus> filter = builder.build();
+
+    return new Predicate<TrackedTask>() {
+      @Override public boolean apply(TrackedTask task) {
+        return filter.contains(task.getStatus());
+      }
+    };
   }
 }

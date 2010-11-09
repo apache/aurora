@@ -1,13 +1,15 @@
 package com.twitter.mesos.scheduler;
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
+import com.twitter.common.base.MorePreconditions;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TrackedTask;
+import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
-import mesos.TaskDescription;
 
 import java.util.Map;
 import java.util.Set;
@@ -99,7 +101,7 @@ public interface SchedulerCore {
    *    pending tasks that are satisfied by the slave offer.
    * @throws ScheduleException If an error occurs while attempting to schedule a task.
    */
-  public TaskDescription offer(String slaveId, String slaveHost,
+  public TwitterTask offer(String slaveId, String slaveHost,
       Map<String, String> offerParams) throws ScheduleException;
 
   /**
@@ -136,4 +138,21 @@ public interface SchedulerCore {
   public String getFrameworkId();
 
   public void updateRegisteredTasks(RegisteredTaskUpdate update);
+
+  public static class TwitterTask {
+    public final int taskId;
+    public final String slaveId;
+    public final String taskName;
+    public final Map<String, String> params;
+    public final TwitterTaskInfo taskInfo;
+
+    public TwitterTask(int taskId, String slaveId, String taskName, Map<String, String> params,
+        TwitterTaskInfo taskInfo) {
+      this.taskId = taskId;
+      this.slaveId = MorePreconditions.checkNotBlank(slaveId);
+      this.taskName = MorePreconditions.checkNotBlank(taskName);
+      this.params = Preconditions.checkNotNull(params);
+      this.taskInfo = Preconditions.checkNotNull(taskInfo);
+    }
+  }
 }

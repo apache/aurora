@@ -128,6 +128,7 @@ public class ExecutorCore implements TaskManager {
       LOG.log(Level.SEVERE, "Failed to stage task " + taskId, e);
       runningTask.terminate(ScheduleStatus.FAILED);
       deleteCompletedTask(taskId);
+      // TODO(wfarner): Make sure the scheduler is notified of the task removal.
       sendStatusUpdate(driver, new TaskStatus(taskId, TaskState.TASK_FAILED, EMPTY_MSG));
       return;
     } catch (Throwable t) {

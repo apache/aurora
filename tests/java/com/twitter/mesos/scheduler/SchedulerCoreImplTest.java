@@ -1,5 +1,6 @@
 package com.twitter.mesos.scheduler;
 
+import com.google.common.base.Function;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
@@ -22,10 +23,13 @@ import org.easymock.Capture;
 import org.junit.Before;
 import org.junit.Test;
 
+import javax.annotation.Nullable;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 
+import static com.twitter.mesos.gen.ScheduleStatus.*;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
 import static org.hamcrest.CoreMatchers.is;
@@ -54,13 +58,14 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   private static final String JOB_NAME_A = "Test_Job_A";
   private static final String JOB_OWNER_A = "Test_Owner_A";
-  private static final TwitterTaskInfo TASK_A = defaultTask();
+  private static final TwitterTaskInfo DEFAULT_TASK = defaultTask();
 
   private static final String JOB_NAME_B = "Test_Job_B";
   private static final String JOB_OWNER_B = "Test_Owner_B";
 
   private static final String SLAVE_ID = "SlaveId";
-  private static final String SLAVE_HOST = "SlaveHost";
+  private static final String SLAVE_HOST_1 = "SlaveHost1";
+  private static final String SLAVE_HOST_2 = "SlaveHost2";
 
   @Before
   public void setUp() {
@@ -87,7 +92,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     control.replay();
 
     int numTasks = 10;
-    JobConfiguration job = makeJob(JOB_OWNER_A, JOB_NAME_A, TASK_A, numTasks);
+    JobConfiguration job = makeJob(JOB_OWNER_A, JOB_NAME_A, DEFAULT_TASK, numTasks);
     scheduler.createJob(job);
     assertTaskCount(numTasks);
 
@@ -95,10 +100,10 @@ public class SchedulerCoreImplTest extends EasyMockTest {
         queryByOwner(JOB_OWNER_A).setJobName(JOB_NAME_A));
     assertThat(Iterables.size(tasks), is(numTasks));
     for (TrackedTask task : tasks) {
-      assertThat(task.getStatus(), is(ScheduleStatus.PENDING));
+      assertThat(task.getStatus(), is(PENDING));
       assertThat(task.isSetTaskId(), is(true));
       assertThat(task.isSetSlaveId(), is(false));
-      assertThat(task.getTask(), is(ConfigurationManager.populateFields(job, TASK_A)));
+      assertThat(task.getTask(), is(ConfigurationManager.populateFields(job, DEFAULT_TASK)));
     }
   }
 
@@ -106,11 +111,11 @@ public class SchedulerCoreImplTest extends EasyMockTest {
   public void testCreateDuplicateJob() throws Exception {
     control.replay();
 
-    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, TASK_A, 1));
+    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, DEFAULT_TASK, 1));
     assertTaskCount(1);
 
     try {
-      scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, TASK_A, 1));
+      scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, DEFAULT_TASK, 1));
       fail();
     } catch (ScheduleException e) {
       // Expected
@@ -125,12 +130,12 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
     // Cron jobs are scheduled on a delay, so this job's tasks will not be scheduled immediately,
     // but duplicate jobs should still be rejected.
-    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, TASK_A, 1)
+    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, DEFAULT_TASK, 1)
         .setCronSchedule("* * * * *"));
     assertTaskCount(0);
 
     try {
-      scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, TASK_A, 1));
+      scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, DEFAULT_TASK, 1));
       fail();
     } catch (ScheduleException e) {
       // Expected
@@ -144,7 +149,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     control.replay();
 
     int numTasks = 10;
-    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, TASK_A, numTasks));
+    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, DEFAULT_TASK, numTasks));
 
     assertTaskCount(numTasks);
 
@@ -173,11 +178,11 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     control.replay();
 
     scheduler.registered(driver, "");
-    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, TASK_A, 1));
-    changeStatus(queryByOwner(JOB_OWNER_A), ScheduleStatus.STARTING);
-    changeStatus(queryByOwner(JOB_OWNER_A), ScheduleStatus.RUNNING);
+    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, DEFAULT_TASK, 1));
+    changeStatus(queryByOwner(JOB_OWNER_A), STARTING);
+    changeStatus(queryByOwner(JOB_OWNER_A), RUNNING);
 
-    int taskId = getTask(queryByOwner(JOB_OWNER_A)).getTaskId();
+    int taskId = getOnlyTask(queryByOwner(JOB_OWNER_A)).getTaskId();
 
     Set<Integer> restartRequest = Sets.newHashSet(taskId);
     Set<Integer> restarted = scheduler.restartTasks(restartRequest);
@@ -187,24 +192,24 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     workCapture.getValue().call();
 
     // Mimick the master notifying the scheduler of a task state change.
-    changeStatus(query(restartRequest), ScheduleStatus.KILLED);
+    changeStatus(query(restartRequest), KILLED);
 
     assertThat(Iterables.size(scheduler.getTasks(query(restartRequest)
-        .setStatuses(Sets.newHashSet(ScheduleStatus.KILLED_BY_CLIENT)))),
+        .setStatuses(Sets.newHashSet(KILLED_BY_CLIENT)))),
         is(1));
 
-    assertThat(Iterables.size(getTasksByStatus(ScheduleStatus.PENDING)), is(1));
+    assertThat(Iterables.size(getTasksByStatus(PENDING)), is(1));
   }
 
   @Test
   public void testRestartUnknownTask() throws Exception {
     control.replay();
 
-    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, TASK_A, 1));
-    changeStatus(queryByOwner(JOB_OWNER_A), ScheduleStatus.STARTING);
-    changeStatus(queryByOwner(JOB_OWNER_A), ScheduleStatus.RUNNING);
+    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, DEFAULT_TASK, 1));
+    changeStatus(queryByOwner(JOB_OWNER_A), STARTING);
+    changeStatus(queryByOwner(JOB_OWNER_A), RUNNING);
 
-    int taskId = getTask(queryByOwner(JOB_OWNER_A)).getTaskId();
+    int taskId = getOnlyTask(queryByOwner(JOB_OWNER_A)).getTaskId();
 
     Set<Integer> restartRequest = Sets.newHashSet(taskId + 1);
     Set<Integer> restarted = scheduler.restartTasks(restartRequest);
@@ -216,10 +221,10 @@ public class SchedulerCoreImplTest extends EasyMockTest {
   public void testRestartInactiveTask() throws Exception {
     control.replay();
 
-    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, TASK_A, 1));
-    changeStatus(queryByOwner(JOB_OWNER_A), ScheduleStatus.STARTING);
-    changeStatus(queryByOwner(JOB_OWNER_A), ScheduleStatus.RUNNING);
-    changeStatus(queryByOwner(JOB_OWNER_A), ScheduleStatus.FINISHED);
+    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, DEFAULT_TASK, 1));
+    changeStatus(queryByOwner(JOB_OWNER_A), STARTING);
+    changeStatus(queryByOwner(JOB_OWNER_A), RUNNING);
+    changeStatus(queryByOwner(JOB_OWNER_A), FINISHED);
 
     int taskId = Iterables.getOnlyElement(Iterables.transform(
         scheduler.getTasks(queryByOwner(JOB_OWNER_A)), Tasks.GET_TASK_ID));
@@ -240,17 +245,17 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     control.replay();
 
     scheduler.registered(driver, "");
-    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, TASK_A, 1));
-    scheduler.createJob(makeJob(JOB_OWNER_B, JOB_NAME_B, TASK_A, 1));
-    changeStatus(queryByOwner(JOB_OWNER_A), ScheduleStatus.STARTING);
-    changeStatus(queryByOwner(JOB_OWNER_A), ScheduleStatus.RUNNING);
+    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, DEFAULT_TASK, 1));
+    scheduler.createJob(makeJob(JOB_OWNER_B, JOB_NAME_B, DEFAULT_TASK, 1));
+    changeStatus(queryByOwner(JOB_OWNER_A), STARTING);
+    changeStatus(queryByOwner(JOB_OWNER_A), RUNNING);
 
-    changeStatus(queryByOwner(JOB_OWNER_B), ScheduleStatus.STARTING);
-    changeStatus(queryByOwner(JOB_OWNER_B), ScheduleStatus.RUNNING);
-    changeStatus(queryByOwner(JOB_OWNER_B), ScheduleStatus.FINISHED);
+    changeStatus(queryByOwner(JOB_OWNER_B), STARTING);
+    changeStatus(queryByOwner(JOB_OWNER_B), RUNNING);
+    changeStatus(queryByOwner(JOB_OWNER_B), FINISHED);
 
-    int activeTaskId = getTask(queryByOwner(JOB_OWNER_A)).getTaskId();
-    int inactiveTaskId = getTask(queryByOwner(JOB_OWNER_B)).getTaskId();
+    int activeTaskId = getOnlyTask(queryByOwner(JOB_OWNER_A)).getTaskId();
+    int inactiveTaskId = getOnlyTask(queryByOwner(JOB_OWNER_B)).getTaskId();
 
     Set<Integer> restartRequest = Sets.newHashSet(activeTaskId, inactiveTaskId, 100000);
     Set<Integer> restarted = scheduler.restartTasks(restartRequest);
@@ -262,14 +267,14 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     workCapture.getValue().call();
 
     // Mimick the master notifying the scheduler of a task state change.
-    changeStatus(query(expectedRestart), ScheduleStatus.KILLED);
+    changeStatus(query(expectedRestart), KILLED);
 
     assertThat(Iterables.size(scheduler.getTasks(query(expectedRestart)
-        .setStatuses(Sets.newHashSet(ScheduleStatus.KILLED_BY_CLIENT)))),
+        .setStatuses(Sets.newHashSet(KILLED_BY_CLIENT)))),
         is(1));
 
     assertThat(Iterables.size(scheduler.getTasks(queryByOwner(JOB_OWNER_A)
-        .setStatuses(Sets.newHashSet(ScheduleStatus.PENDING)))),
+        .setStatuses(Sets.newHashSet(PENDING)))),
         is(1));
   }
 
@@ -278,25 +283,25 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     control.replay();
 
     // Schedule 5 daemon and 5 non-daemon tasks.
-    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, TASK_A, 5));
-    TwitterTaskInfo task = new TwitterTaskInfo(TASK_A);
+    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, DEFAULT_TASK, 5));
+    TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
     task.putToConfiguration("daemon", "true");
     scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A + "daemon", task, 5));
 
     assertThat(Iterables.size(scheduler.getTasks(
-        new TaskQuery().setStatuses(Sets.newHashSet(ScheduleStatus.PENDING)))),
+        new TaskQuery().setStatuses(Sets.newHashSet(PENDING)))),
         is(10));
 
-    changeStatus(queryByOwner(JOB_OWNER_A), ScheduleStatus.STARTING);
-    assertThat(Iterables.size(getTasksByStatus(ScheduleStatus.STARTING)), is(10));
+    changeStatus(queryByOwner(JOB_OWNER_A), STARTING);
+    assertThat(Iterables.size(getTasksByStatus(STARTING)), is(10));
 
-    changeStatus(queryByOwner(JOB_OWNER_A), ScheduleStatus.RUNNING);
-    assertThat(Iterables.size(getTasksByStatus(ScheduleStatus.RUNNING)), is(10));
+    changeStatus(queryByOwner(JOB_OWNER_A), RUNNING);
+    assertThat(Iterables.size(getTasksByStatus(RUNNING)), is(10));
 
     // Daemon tasks will move back into PENDING state after finishing.
-    changeStatus(queryByOwner(JOB_OWNER_A), ScheduleStatus.FINISHED);
-    assertThat(Iterables.size(getTasksByStatus(ScheduleStatus.PENDING)), is(5));
-    assertThat(Iterables.size(getTasksByStatus(ScheduleStatus.FINISHED)), is(10));
+    changeStatus(queryByOwner(JOB_OWNER_A), FINISHED);
+    assertThat(Iterables.size(getTasksByStatus(PENDING)), is(5));
+    assertThat(Iterables.size(getTasksByStatus(FINISHED)), is(10));
   }
 
   @Test
@@ -309,18 +314,18 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     control.replay();
 
     scheduler.registered(driver, "");
-    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, TASK_A, 1));
-    changeStatus(queryByOwner(JOB_OWNER_A), ScheduleStatus.STARTING);
-    changeStatus(queryByOwner(JOB_OWNER_A), ScheduleStatus.RUNNING);
+    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, DEFAULT_TASK, 1));
+    changeStatus(queryByOwner(JOB_OWNER_A), STARTING);
+    changeStatus(queryByOwner(JOB_OWNER_A), RUNNING);
     scheduler.killTasks(queryByOwner(JOB_OWNER_A));
     workCapture.getValue().call();
 
-    int taskId = getTask(queryByOwner(JOB_OWNER_A)).getTaskId();
+    int taskId = getOnlyTask(queryByOwner(JOB_OWNER_A)).getTaskId();
 
     // This transition should be rejected.
-    changeStatus(queryByOwner(JOB_OWNER_A), ScheduleStatus.LOST);
+    changeStatus(queryByOwner(JOB_OWNER_A), LOST);
 
-    assertThat(getTask(taskId).getStatus(), is(ScheduleStatus.KILLED_BY_CLIENT));
+    assertThat(getTask(taskId).getStatus(), is(KILLED_BY_CLIENT));
   }
 
   @Test
@@ -328,7 +333,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     control.replay();
 
     int maxFailures = 5;
-    TwitterTaskInfo task = new TwitterTaskInfo(TASK_A);
+    TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
     task.putToConfiguration("max_task_failures", String.valueOf(maxFailures));
     JobConfiguration job = makeJob(JOB_OWNER_A, JOB_NAME_A, task, 1);
     scheduler.createJob(job);
@@ -341,22 +346,22 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     TaskQuery emptyQuery = new TaskQuery();
 
     for (int i = 0; i < maxFailures - 1; i++) {
-      TaskQuery taskQuery = query(Arrays.asList(i + 1));
-      changeStatus(taskQuery, ScheduleStatus.RUNNING);
-      assertThat(Iterables.get(scheduler.getTasks(taskQuery), 0).getFailureCount(), is(i));
-      changeStatus(taskQuery, ScheduleStatus.FAILED);
+      changeStatus(i + 1, RUNNING);
+      assertThat(Iterables.get(
+          scheduler.getTasks(query(Arrays.asList(i + 1))), 0).getFailureCount(), is(i));
+      changeStatus(i + 1, FAILED);
 
       assertTaskCount(i + 2);
 
-      TrackedTask rescheduled = getTask(emptyQuery.setStatuses(
-          Sets.newHashSet(ScheduleStatus.PENDING)));
+      TrackedTask rescheduled = getOnlyTask(emptyQuery.setStatuses(
+          Sets.newHashSet(PENDING)));
       assertThat(rescheduled.getFailureCount(), is(i + 1));
     }
 
-    changeStatus(new TaskQuery().setStatuses(Sets.newHashSet(ScheduleStatus.PENDING)),
-        ScheduleStatus.FAILED);
-    assertThat(Iterables.size(getTasksByStatus(ScheduleStatus.FAILED)), is(maxFailures));
-    assertThat(Iterables.size(getTasksByStatus(ScheduleStatus.PENDING)), is(0));
+    changeStatus(new TaskQuery().setStatuses(Sets.newHashSet(PENDING)),
+        FAILED);
+    assertThat(Iterables.size(getTasksByStatus(FAILED)), is(maxFailures));
+    assertThat(Iterables.size(getTasksByStatus(PENDING)), is(0));
   }
 
   @Test
@@ -370,7 +375,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
   public void testCronNoSuicide() throws Exception {
     control.replay();
 
-    JobConfiguration job = makeJob(JOB_OWNER_A, JOB_NAME_A, TASK_A, 10);
+    JobConfiguration job = makeJob(JOB_OWNER_A, JOB_NAME_A, DEFAULT_TASK, 10);
     job.setCronSchedule("1 1 1 1 1")
         .setCronCollisionPolicy(CronCollisionPolicy.KILL_EXISTING);
     scheduler.createJob(job);
@@ -405,7 +410,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
   public void testKillTask() throws Exception {
     control.replay();
 
-    JobConfiguration job = makeJob(JOB_OWNER_A, JOB_NAME_A, TASK_A, 1);
+    JobConfiguration job = makeJob(JOB_OWNER_A, JOB_NAME_A, DEFAULT_TASK, 1);
     scheduler.createJob(job);
     assertTaskCount(1);
 
@@ -423,7 +428,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
   public void testKillCronTask() throws Exception {
     control.replay();
 
-    JobConfiguration job = makeJob(JOB_OWNER_A, JOB_NAME_A, TASK_A, 1);
+    JobConfiguration job = makeJob(JOB_OWNER_A, JOB_NAME_A, DEFAULT_TASK, 1);
     job.setCronSchedule("1 1 1 1 1");
     scheduler.createJob(job);
 
@@ -436,7 +441,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     control.replay();
 
     int maxFailures = 5;
-    TwitterTaskInfo task = new TwitterTaskInfo(TASK_A);
+    TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
     task.putToConfiguration("max_task_failures", String.valueOf(maxFailures));
     JobConfiguration job = makeJob(JOB_OWNER_A, JOB_NAME_A, task, 1);
     scheduler.createJob(job);
@@ -446,14 +451,14 @@ public class SchedulerCoreImplTest extends EasyMockTest {
         queryByOwner(JOB_OWNER_A).setJobName(JOB_NAME_A));
     assertThat(Iterables.size(tasks), is(1));
 
-    TaskQuery pendingQuery = new TaskQuery().setStatuses(Sets.newHashSet(ScheduleStatus.PENDING));
-    changeStatus(pendingQuery, ScheduleStatus.LOST);
-    assertThat(getTask(pendingQuery).getStatus(), is(ScheduleStatus.PENDING));
+    TaskQuery pendingQuery = new TaskQuery().setStatuses(Sets.newHashSet(PENDING));
+    changeStatus(pendingQuery, LOST);
+    assertThat(getOnlyTask(pendingQuery).getStatus(), is(PENDING));
     assertTaskCount(2);
     assertThat(Iterables.size(scheduler.getTasks(pendingQuery)), is(1));
 
-    changeStatus(pendingQuery, ScheduleStatus.LOST);
-    assertThat(getTask(pendingQuery).getStatus(), is(ScheduleStatus.PENDING));
+    changeStatus(pendingQuery, LOST);
+    assertThat(getOnlyTask(pendingQuery).getStatus(), is(PENDING));
     assertTaskCount(3);
     assertThat(Iterables.size(scheduler.getTasks(pendingQuery)), is(1));
   }
@@ -462,7 +467,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
   public void testKillJob() throws Exception {
     control.replay();
 
-    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, TASK_A, 10));
+    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, DEFAULT_TASK, 10));
     assertTaskCount(10);
 
     scheduler.killTasks(queryByOwner(JOB_OWNER_A).setJobName(JOB_NAME_A));
@@ -473,10 +478,10 @@ public class SchedulerCoreImplTest extends EasyMockTest {
   public void testKillJob2() throws Exception {
     control.replay();
 
-    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, TASK_A, 10));
+    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, DEFAULT_TASK, 10));
     assertTaskCount(10);
 
-    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A + "2", TASK_A, 10));
+    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A + "2", DEFAULT_TASK, 10));
     assertTaskCount(20);
 
     scheduler.killTasks(queryByOwner(JOB_OWNER_A).setJobName(JOB_NAME_A + "2"));
@@ -489,38 +494,125 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testSlaveAdjustsSchedulerTaskState() throws Exception {
-    // TODO(wfarner): Implement.
-    // Create task, move to RUNNING state, call updateRegisteredTasks to tell scheduler
-    // that slave is KILLED, make sure task changes state (and gets rescheduled).
-
     control.replay();
 
-    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, TASK_A, 1));
-    assertTaskCount(1);
+    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, DEFAULT_TASK, 1));
 
-    int taskId = getTask(queryByOwner(JOB_OWNER_A)).getTaskId();
+    int taskId = getOnlyTask(queryByOwner(JOB_OWNER_A)).getTaskId();
 
-    changeStatus(queryByOwner(JOB_OWNER_A), ScheduleStatus.RUNNING);
+    changeStatus(taskId, RUNNING);
 
     // Simulate state update from the executor telling the scheduler that the task is dead.
     // This can happen if the entire cluster goes down - the scheduler has persisted state
     // listing the task as running, and the executor reads the task state in and marks it as KILLED.
-    LiveTaskInfo taskUpdate = new LiveTaskInfo()
-        .setTaskId(taskId)
-        .setStatus(ScheduleStatus.KILLED);
     RegisteredTaskUpdate update = new RegisteredTaskUpdate()
-        .setSlaveHost(SLAVE_HOST);
-    update.addToTaskInfos(taskUpdate);
+        .setSlaveHost(SLAVE_HOST_1);
+    update.addToTaskInfos(new LiveTaskInfo().setTaskId(taskId).setStatus(KILLED));
     scheduler.updateRegisteredTasks(update);
 
     // The expected outcome is that the task is rescheduled, and the old task is moved into the
     // KILLED state.
     assertTaskCount(2);
-    TrackedTask killedTask = getTask(queryByOwner(JOB_OWNER_A).setTaskIds(Sets.newHashSet(taskId)));
-    assertThat(killedTask.getStatus(), is(ScheduleStatus.KILLED));
+    TrackedTask killedTask = getOnlyTask(queryByOwner(JOB_OWNER_A).setTaskIds(Sets.newHashSet(taskId)));
+    assertThat(killedTask.getStatus(), is(KILLED));
 
-    TrackedTask rescheduled = Iterables.getOnlyElement(getTasksByStatus(ScheduleStatus.PENDING));
+    TrackedTask rescheduled = Iterables.getOnlyElement(getTasksByStatus(PENDING));
     assertThat(rescheduled.getAncestorId(), is(taskId));
+  }
+
+  @Test
+  public void testSlaveCannotModifyTasksForOtherSlave() throws Exception {
+    control.replay();
+
+    Map<String, String> slaveOffer = ImmutableMap.<String, String>builder()
+        .put("cpus", "4")
+        .put("mem", "4096")
+        .build();
+
+    // Offer resources for the scheduler to accept.
+    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, DEFAULT_TASK, 1));
+    scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer);
+
+    scheduler.createJob(makeJob(JOB_OWNER_B, JOB_NAME_B, DEFAULT_TASK, 1));
+    scheduler.offer(SLAVE_ID, SLAVE_HOST_2, slaveOffer);
+
+    int taskIdA = Iterables.get(getTasksOwnedBy(JOB_OWNER_A), 0).getTaskId();
+    int taskIdB = Iterables.get(getTasksOwnedBy(JOB_OWNER_B), 0).getTaskId();
+
+    changeStatus(taskIdA, RUNNING);
+    changeStatus(taskIdB, RUNNING);
+
+    assertThat(getTask(taskIdA).getSlaveHost(), is(SLAVE_HOST_1));
+
+    scheduler.updateRegisteredTasks(new RegisteredTaskUpdate().setSlaveHost(SLAVE_HOST_2)
+        .setTaskInfos(Arrays.asList(
+          new LiveTaskInfo().setTaskId(taskIdA).setStatus(FAILED),
+          new LiveTaskInfo().setTaskId(taskIdB).setStatus(RUNNING))));
+
+    assertThat(Iterables.size(getTasksByStatus(RUNNING)), is(2));
+    assertTaskCount(2);
+  }
+
+  @Test
+  public void testSlaveStopsReportingRunningTask() throws Exception {
+    control.replay();
+
+    Map<String, String> slaveOffer = ImmutableMap.<String, String>builder()
+        .put("cpus", "4")
+        .put("mem", "4096")
+        .build();
+
+    // Offer resources for the scheduler to accept.
+    TwitterTaskInfo daemonTask = new TwitterTaskInfo(DEFAULT_TASK);
+    daemonTask.putToConfiguration("daemon", "true");
+
+    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, daemonTask, 2));
+    scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer);
+    scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer);
+
+    scheduler.createJob(makeJob(JOB_OWNER_B, JOB_NAME_B, DEFAULT_TASK, 2));
+    scheduler.offer(SLAVE_ID, SLAVE_HOST_2, slaveOffer);
+    scheduler.offer(SLAVE_ID, SLAVE_HOST_2, slaveOffer);
+
+    int taskIdA = Iterables.get(getTasksOwnedBy(JOB_OWNER_A), 0).getTaskId();
+    int taskIdB = Iterables.get(getTasksOwnedBy(JOB_OWNER_A), 1).getTaskId();
+    int taskIdC = Iterables.get(getTasksOwnedBy(JOB_OWNER_B), 0).getTaskId();
+    int taskIdD = Iterables.get(getTasksOwnedBy(JOB_OWNER_B), 1).getTaskId();
+
+    changeStatus(taskIdA, RUNNING);
+    changeStatus(taskIdB, FINISHED);
+    assertThat(Iterables.size(
+        getTasks(queryByStatus(PENDING).setOwner(JOB_OWNER_A).setJobName(JOB_NAME_A))), is(1));
+
+    changeStatus(taskIdC, RUNNING);
+    changeStatus(taskIdD, FAILED);
+
+    // Since job A is a daemon, its forgotten RUNNING task should be rescheduled.
+    scheduler.updateRegisteredTasks(new RegisteredTaskUpdate().setSlaveHost(SLAVE_HOST_1)
+        .setTaskInfos(Arrays.<LiveTaskInfo>asList()));
+    Iterable<TrackedTask> rescheduledTasks =
+        getTasks(queryByStatus(PENDING).setOwner(JOB_OWNER_A).setJobName(JOB_NAME_A));
+    assertThat(Iterables.size(rescheduledTasks), is(2));
+    Set<Integer> rescheduledTaskAncestors = Sets.newHashSet(Iterables.transform(rescheduledTasks,
+        new Function<TrackedTask, Integer>() {
+          @Override public Integer apply(TrackedTask task) { return task.getAncestorId(); }
+        }));
+    assertThat(rescheduledTaskAncestors, is((Set<Integer>) Sets.newHashSet(taskIdA, taskIdB)));
+
+    // Send an update from host 2 that does not include the FAILED task.
+    scheduler.updateRegisteredTasks(new RegisteredTaskUpdate().setSlaveHost(SLAVE_HOST_2)
+        .setTaskInfos(Arrays.<LiveTaskInfo>asList()));
+    rescheduledTasks =
+        getTasks(queryByStatus(PENDING).setOwner(JOB_OWNER_B).setJobName(JOB_NAME_B));
+    assertThat(Iterables.size(rescheduledTasks), is(1));
+    rescheduledTaskAncestors = Sets.newHashSet(Iterables.transform(rescheduledTasks,
+        new Function<TrackedTask, Integer>() {
+          @Override public Integer apply(TrackedTask task) { return task.getAncestorId(); }
+        }));
+    assertThat(rescheduledTaskAncestors, is((Set<Integer>) Sets.newHashSet(taskIdC)));
+
+    // This task is not yet removed because we have not met the grace period.
+    assertThat(Iterables.isEmpty(getTasks(Arrays.asList(taskIdD))), is(false));
   }
 
   private void assertTaskCount(int numTasks) {
@@ -549,19 +641,27 @@ public class SchedulerCoreImplTest extends EasyMockTest {
   }
 
   private TrackedTask getTask(int taskId) {
-    return getTask(query(Arrays.asList(taskId)));
+    return getOnlyTask(query(Arrays.asList(taskId)));
   }
 
-  private TrackedTask getTask(TaskQuery query) {
+  private TrackedTask getOnlyTask(TaskQuery query) {
     return Iterables.getOnlyElement(scheduler.getTasks((query)));
+  }
+
+  private Iterable<TrackedTask> getTasks(TaskQuery query) {
+    return scheduler.getTasks(query);
   }
 
   private Iterable<TrackedTask> getTasks(Iterable<Integer> taskIds) {
     return scheduler.getTasks(query(taskIds));
   }
 
+  private TaskQuery queryByStatus(ScheduleStatus... statuses) {
+    return new TaskQuery().setStatuses(Sets.newHashSet(statuses));
+  }
+
   private Iterable<TrackedTask> getTasksByStatus(ScheduleStatus... statuses) {
-    return scheduler.getTasks(new TaskQuery().setStatuses(Sets.newHashSet(statuses)));
+    return scheduler.getTasks(queryByStatus(statuses));
   }
 
   private Iterable<TrackedTask> getTasksOwnedBy(String owner) {
@@ -587,5 +687,9 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   public void changeStatus(TaskQuery query, ScheduleStatus status) {
     scheduler.setTaskStatus(query, status);
+  }
+
+  public void changeStatus(int taskId, ScheduleStatus status) {
+    scheduler.setTaskStatus(query(Arrays.asList(taskId)), status);
   }
 }

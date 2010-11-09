@@ -94,10 +94,21 @@ class MesosSchedulerImpl extends Scheduler {
 
     try {
       for (SlaveOffer offer : slaveOffers) {
-        TaskDescription taskToSchedule = schedulerCore.offer(offer.getSlaveId(), offer.getHost(),
-            offer.getParams());
-        if (taskToSchedule != null) {
-          scheduledTasks.add(taskToSchedule);
+        SchedulerCore.TwitterTask task = schedulerCore.offer(
+            offer.getSlaveId(), offer.getHost(), offer.getParams());
+
+        if (task != null) {
+          byte[] taskInBytes;
+          try {
+            taskInBytes = ThriftBinaryCodec.encode(task.taskInfo);
+          } catch (ThriftBinaryCodec.CodingException e) {
+            LOG.log(Level.SEVERE, "Unable to serialize task.", e);
+            throw new ScheduleException("Internal error.", e);
+          }
+
+          scheduledTasks.add(
+              new TaskDescription(task.taskId, task.slaveId, task.taskName, task.params,
+                  taskInBytes));
         }
       }
     } catch (ScheduleException e) {

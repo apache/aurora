@@ -45,6 +45,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import static com.twitter.mesos.gen.ScheduleStatus.*;
+
 /**
  * Implementation of the scheduler core.
  *
@@ -155,9 +157,11 @@ public class SchedulerCoreImpl implements SchedulerCore {
   @Override
   public synchronized void updateRegisteredTasks(RegisteredTaskUpdate update) {
     Preconditions.checkNotNull(update);
+    Preconditions.checkNotNull(update.getTaskInfos());
 
     try {
       final Map<Integer, LiveTaskInfo> taskInfoMap = Maps.newHashMap();
+
       for (LiveTaskInfo taskInfo : update.getTaskInfos()) {
         taskInfoMap.put(taskInfo.getTaskId(), taskInfo);
       }
@@ -167,17 +171,22 @@ public class SchedulerCoreImpl implements SchedulerCore {
       //    discard records for inactive tasks.  Better yet, have the scheduler only retain
       //    configurations for live jobs, and acquire all other state from slaves.
 
-      // Make sure that we recognize all of the reported tasks.
-      Set<Integer> recognizedTasks = Sets.newHashSet(Iterables.transform(
-          taskStore.fetch(new TaskQuery().setTaskIds(taskInfoMap.keySet())), Tasks.GET_TASK_ID));
+      // Look for any tasks that we don't know about, or this slave should not be modifying.
+      final Set<Integer> recognizedTasks = Sets.newHashSet(Iterables.transform(
+          taskStore.fetch(
+              new TaskQuery().setTaskIds(taskInfoMap.keySet()).setSlaveHost(update.getSlaveHost())),
+          Tasks.GET_TASK_ID));
       Set<Integer> unknownTasks = Sets.difference(taskInfoMap.keySet(), recognizedTasks);
       if (!unknownTasks.isEmpty()) {
         LOG.severe("Received task info update from executor " + update.getSlaveHost()
-                   + " for unknown tasks " + unknownTasks);
+                   + " for tasks unknown or belonging to a different host: " + unknownTasks);
       }
 
+      // Remove unknown tasks from the request to prevent badness later.
+      for (int unknownTask : unknownTasks) taskInfoMap.remove(unknownTask);
+
       // Update the resource information for the tasks that we currently have on record.
-      taskStore.mutate(new TaskQuery().setTaskIds(taskInfoMap.keySet()),
+      taskStore.mutate(new TaskQuery().setTaskIds(recognizedTasks),
           new ExceptionalClosure<TrackedTask, RuntimeException>() {
         @Override public void execute(TrackedTask task) {
           LiveTaskInfo update = taskInfoMap.get(task.getTaskId());
@@ -188,7 +197,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
       Predicate<LiveTaskInfo> getKilledTasks = new Predicate<LiveTaskInfo>() {
         @Override public boolean apply(LiveTaskInfo update) {
-          return update.getStatus() == ScheduleStatus.KILLED;
+          return update.getStatus() == KILLED;
         }
       };
 
@@ -200,30 +209,54 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
       // Find any tasks that we believe to be running, but the slave reports as dead.
       Set<Integer> reportedDeadTasks = Sets.newHashSet(
-          Iterables.transform(Iterables.filter(update.getTaskInfos(), getKilledTasks), getTaskId));
+          Iterables.transform(Iterables.filter(taskInfoMap.values(), getKilledTasks), getTaskId));
       Set<Integer> deadTasks = Sets.newHashSet(
           Iterables.transform(
               taskStore.fetch(new TaskQuery().setTaskIds(reportedDeadTasks)
-                  .setStatuses(Sets.newHashSet(ScheduleStatus.RUNNING))),
+                  .setStatuses(Sets.newHashSet(RUNNING))),
               Tasks.GET_TASK_ID));
       if (!deadTasks.isEmpty()) {
         LOG.info("Found tasks that were recorded as RUNNING but slave " + update.getSlaveHost()
                  + " reports as KILLED: " + deadTasks);
-        setTaskStatus(new TaskQuery().setTaskIds(deadTasks), ScheduleStatus.KILLED);
+        setTaskStatus(new TaskQuery().setTaskIds(deadTasks), KILLED);
+      }
 
-        // Remove records for tasks that the slave no longer reports.
-        taskStore.remove(taskStore.fetch(new TaskQuery().setSlaveHost(update.getSlaveHost()),
-            new Predicate<TrackedTask>() {
-              @Override public boolean apply(TrackedTask task) {
-                // Add a grace period to prevent race condition where newly-scheduled tasks are not
-                // yet reported by the slave.
-                long taskAgeMillis = System.currentTimeMillis()
-                    - Iterables.getLast(task.getTaskEvents()).getTimestamp();
+      // Find any tasks assigned to this slave but the slave does not report.
+      Predicate<TrackedTask> isTaskReported = new Predicate<TrackedTask>() {
+        @Override public boolean apply(TrackedTask task) {
+          return recognizedTasks.contains(task.getTaskId());
+        }
+      };
+      Predicate<TrackedTask> lastEventBeyondGracePeriod = new Predicate<TrackedTask>() {
+        @Override public boolean apply(TrackedTask task) {
+          long taskAgeMillis = System.currentTimeMillis()
+              - Iterables.getLast(task.getTaskEvents()).getTimestamp();
+          return taskAgeMillis > Amount.of(10, Time.MINUTES).as(Time.MILLISECONDS);
+        }
+      };
 
-                return !taskInfoMap.containsKey(task.getTaskId())
-                    && taskAgeMillis > Amount.of(10, Time.MINUTES).as(Time.MILLISECONDS);
-              }
-            }));
+      TaskQuery slaveAssignedTaskQuery = new TaskQuery().setSlaveHost(update.getSlaveHost());
+      Set<TrackedTask> missingNotRunningTasks = Sets.newHashSet(
+          taskStore.fetch(slaveAssignedTaskQuery,
+              Predicates.not(isTaskReported),
+              Predicates.not(Tasks.makeStatusFilter(RUNNING)),
+              lastEventBeyondGracePeriod));
+      if (!missingNotRunningTasks.isEmpty()) {
+        LOG.info("Removing non-running tasks no longer reported by slave " + update.getSlaveHost()
+                 + ": " + Iterables.transform(missingNotRunningTasks, Tasks.GET_TASK_ID));
+        taskStore.remove(missingNotRunningTasks);
+      }
+
+      Set<TrackedTask> missingRunningTasks = Sets.newHashSet(
+          taskStore.fetch(slaveAssignedTaskQuery,
+              Predicates.not(isTaskReported),
+              Tasks.makeStatusFilter(RUNNING)));
+      if (!missingRunningTasks.isEmpty()) {
+        Set<Integer> missingIds = Sets.newHashSet(
+            Iterables.transform(missingRunningTasks, Tasks.GET_TASK_ID));
+        LOG.info("Slave " + update.getSlaveHost() + " no longer reports running tasks: "
+                 + missingIds + ", reporting as LOST.");
+        setTaskStatus(new TaskQuery().setTaskIds(missingIds), LOST);
       }
     } catch (Throwable t) {
       LOG.log(Level.WARNING, "Uncaught exception.", t);
@@ -273,7 +306,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
           .setTaskId(taskId)
           .setJobName(job.getName())
           .setOwner(job.getOwner())
-          .setTask(task), ScheduleStatus.PENDING);
+          .setTask(task), PENDING);
 
       newTasks.add(trackedTask);
     }
@@ -283,7 +316,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public synchronized TaskDescription offer(final String slaveId, final String slaveHost,
+  public synchronized TwitterTask offer(final String slaveId, final String slaveHost,
       Map<String, String> offerParams) throws ScheduleException {
     MorePreconditions.checkNotBlank(slaveId);
     MorePreconditions.checkNotBlank(slaveHost);
@@ -298,7 +331,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     }
 
     TaskQuery query = new TaskQuery();
-    query.addToStatuses(ScheduleStatus.PENDING);
+    query.addToStatuses(PENDING);
 
     Predicate<TrackedTask> satisfiedFilter = new Predicate<TrackedTask>() {
       @Override public boolean apply(TrackedTask task) {
@@ -315,7 +348,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     task = taskStore.mutate(task, new ExceptionalClosure<TrackedTask, RuntimeException>() {
         @Override public void execute(TrackedTask mutable) {
           mutable.setSlaveId(slaveId).setSlaveHost(slaveHost);
-          changeTaskStatus(mutable, ScheduleStatus.STARTING);
+          changeTaskStatus(mutable, STARTING);
         }
     });
 
@@ -330,20 +363,12 @@ public class SchedulerCoreImpl implements SchedulerCore {
       "mem", String.valueOf(task.getTask().getRamMb())
     );
 
-    byte[] taskInBytes;
-    try {
-      taskInBytes = ThriftBinaryCodec.encode(task.getTask());
-    } catch (ThriftBinaryCodec.CodingException e) {
-      LOG.log(Level.SEVERE, "Unable to serialize task.", e);
-      throw new ScheduleException("Internal error.", e);
-    }
-
     LOG.info(String.format("Offer on slave %s (id %s) is being assigned task for %s/%s.",
         slaveHost, task.slaveId, task.getTask().getOwner(), task.getTask().getJobName()));
 
     persist();
-    return new TaskDescription(task.getTaskId(), slaveId,
-        task.jobName + "-" + task.getTaskId(), params, taskInBytes);
+    return new TwitterTask(task.getTaskId(), slaveId, task.jobName + "-" + task.getTaskId(), params,
+        task.getTask());
   }
 
   private void scheduleTaskCopies(List<TrackedTask> tasks) {
@@ -354,7 +379,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
       task.unsetTaskEvents();
       task.setAncestorId(task.getTaskId());
       task.setTaskId(generateTaskId());
-      changeTaskStatus(task, ScheduleStatus.PENDING);
+      changeTaskStatus(task, PENDING);
     }
 
     LOG.info("Tasks being rescheduled: " + tasks);
@@ -410,7 +435,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
               newTasks.add(new TrackedTask(mutable));
             }
 
-            changeTaskStatus(mutable, ScheduleStatus.FINISHED);
+            changeTaskStatus(mutable, FINISHED);
           }
         });
 
@@ -430,7 +455,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
               newTasks.add(new TrackedTask(mutable));
             }
 
-            changeTaskStatus(mutable, ScheduleStatus.FAILED);
+            changeTaskStatus(mutable, FAILED);
           }
         });
 
@@ -498,12 +523,12 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
     List<TrackedTask> toRemove = Lists.newArrayList();
     for (final TrackedTask task : toKill) {
-      if (task.getStatus() == ScheduleStatus.PENDING) {
+      if (task.getStatus() == PENDING) {
         toRemove.add(task);
       } else {
         taskStore.mutate(task, new Closure<TrackedTask>() {
           @Override public void execute(TrackedTask mutable) {
-            changeTaskStatus(mutable, ScheduleStatus.KILLED_BY_CLIENT);
+            changeTaskStatus(mutable, KILLED_BY_CLIENT);
           }
         });
 
@@ -566,13 +591,13 @@ public class SchedulerCoreImpl implements SchedulerCore {
       TrackedTask copy = new TrackedTask(task);
       taskStore.mutate(task, new Closure<TrackedTask>() {
         @Override public void execute(TrackedTask mutable) {
-          changeTaskStatus(mutable, ScheduleStatus.KILLED_BY_CLIENT);
+          changeTaskStatus(mutable, KILLED_BY_CLIENT);
         }
       });
 
       scheduleTaskCopies(Arrays.asList(copy));
 
-      if (task.status != ScheduleStatus.PENDING) {
+      if (task.status != PENDING) {
         doWorkWithDriver(new Function<Driver, Integer>() {
           @Override public Integer apply(Driver driver) {
             return driver.killTask(task.getTaskId());
