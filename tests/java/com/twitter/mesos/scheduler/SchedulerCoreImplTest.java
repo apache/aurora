@@ -496,6 +496,11 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     control.replay();
 
     scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, DEFAULT_TASK, 1));
+    Map<String, String> slaveOffer = ImmutableMap.<String, String>builder()
+        .put("cpus", "4")
+        .put("mem", "4096")
+        .build();
+    scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer);
 
     int taskId = getOnlyTask(queryByOwner(JOB_OWNER_A)).getTaskId();
 
@@ -512,7 +517,8 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     // The expected outcome is that the task is rescheduled, and the old task is moved into the
     // KILLED state.
     assertTaskCount(2);
-    TrackedTask killedTask = getOnlyTask(queryByOwner(JOB_OWNER_A).setTaskIds(Sets.newHashSet(taskId)));
+    TrackedTask killedTask = getOnlyTask(queryByOwner(JOB_OWNER_A)
+        .setTaskIds(Sets.newHashSet(taskId)));
     assertThat(killedTask.getStatus(), is(KILLED));
 
     TrackedTask rescheduled = Iterables.getOnlyElement(getTasksByStatus(PENDING));
