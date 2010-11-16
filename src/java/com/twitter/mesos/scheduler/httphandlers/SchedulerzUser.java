@@ -9,8 +9,8 @@ import com.google.inject.Inject;
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
-import com.twitter.mesos.gen.TrackedTask;
 import com.twitter.mesos.scheduler.CronJobManager;
 import com.twitter.mesos.scheduler.SchedulerCore;
 import it.sauronsoftware.cron4j.Predictor;
@@ -70,11 +70,11 @@ public class SchedulerzUser extends StringTemplateServlet {
 
         Map<String, Job> jobs = Maps.newHashMap();
 
-        for (TrackedTask task : scheduler.getTasks(query)) {
-          Job job = jobs.get(task.getJobName());
+        for (ScheduledTask task : scheduler.getTasks(query)) {
+          Job job = jobs.get(task.getAssignedTask().getTask().getJobName());
           if (job == null) {
             job = new Job();
-            job.name = task.getJobName();
+            job.name = task.getAssignedTask().getTask().getJobName();
             jobs.put(job.name, job);
           }
 

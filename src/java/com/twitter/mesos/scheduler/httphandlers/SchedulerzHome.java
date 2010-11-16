@@ -10,8 +10,8 @@ import com.google.inject.Inject;
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.mesos.Tasks;
+import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
-import com.twitter.mesos.gen.TrackedTask;
 import com.twitter.mesos.scheduler.CronJobManager;
 import com.twitter.mesos.scheduler.SchedulerCore;
 import org.antlr.stringtemplate.StringTemplate;
@@ -50,12 +50,12 @@ public class SchedulerzHome extends StringTemplateServlet {
           }
         });
 
-        Multimap<String, TrackedTask> userJobs = HashMultimap.create();
+        Multimap<String, ScheduledTask> userJobs = HashMultimap.create();
 
-        Iterable<TrackedTask> tasks = scheduler.getTasks(new TaskQuery());
+        Iterable<ScheduledTask> tasks = scheduler.getTasks(new TaskQuery());
 
-        for (TrackedTask task : tasks) {
-          User user = users.get(task.getOwner());
+        for (ScheduledTask task : tasks) {
+          User user = users.get(task.getAssignedTask().getTask().getOwner());
           switch (task.getStatus()) {
             case PENDING:
               user.pendingTaskCount++;
@@ -86,11 +86,13 @@ public class SchedulerzHome extends StringTemplateServlet {
         }
 
         for (User user : users.values()) {
-          Iterable<TrackedTask> activeUserTasks = Iterables.filter(userJobs.get(user.name),
+          Iterable<ScheduledTask> activeUserTasks = Iterables.filter(userJobs.get(user.name),
               Tasks.ACTIVE_FILTER);
           user.jobCount = Sets.newHashSet(Iterables.transform(activeUserTasks,
-              new Function<TrackedTask, String>() {
-                @Override public String apply(TrackedTask task) { return task.getJobName(); }
+              new Function<ScheduledTask, String>() {
+                @Override public String apply(ScheduledTask task) {
+                  return task.getAssignedTask().getTask().getJobName();
+                }
               })).size();
         }
 

@@ -17,6 +17,7 @@ import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
 import com.twitter.mesos.executor.ProcessKiller.KillException;
+import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ExecutorStatus;
 import com.twitter.mesos.gen.LiveTaskInfo;
 import com.twitter.mesos.gen.RegisteredTaskUpdate;
@@ -77,27 +78,38 @@ public class ExecutorCore implements TaskManager {
   private final ScheduledExecutorService syncExecutor = new ScheduledThreadPoolExecutor(1,
         new ThreadFactoryBuilder().setDaemon(true).setNameFormat("ExecutorSync-%d").build());
 
-  @Inject ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier;
-  @Inject SocketManager socketManager;
-  @Inject ExceptionalFunction<Integer, Boolean, HealthCheckException> healthChecker;
-  @Inject ExceptionalClosure<KillCommand, KillException> processKiller;
-  @Inject ExceptionalFunction<File, Integer, FileToInt.FetchException> pidFetcher;
+  private final ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier;
+  private final SocketManager socketManager;
+  private final ExceptionalFunction<Integer, Boolean, HealthCheckException> healthChecker;
+  private final ExceptionalClosure<KillCommand, KillException> processKiller;
+  private final ExceptionalFunction<File, Integer, FileToInt.FetchException> pidFetcher;
 
   private final AtomicReference<String> slaveId = new AtomicReference<String>();
   private final BuildInfo buildInfo;
 
   @Inject
-  private ExecutorCore(@Named(EXECUTOR_ROOT_DIR) File taskRootDir, BuildInfo buildInfo) {
-    executorRootDir = Preconditions.checkNotNull(taskRootDir);
+  public ExecutorCore(@Named(EXECUTOR_ROOT_DIR) File executorRootDir, BuildInfo buildInfo,
+      ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier,
+      SocketManager socketManager,
+      ExceptionalFunction<Integer, Boolean, HealthCheckException> healthChecker,
+      ExceptionalClosure<KillCommand, KillException> processKiller,
+      ExceptionalFunction<File, Integer, FileToInt.FetchException> pidFetcher) {
+    this.executorRootDir = Preconditions.checkNotNull(executorRootDir);
     if (!executorRootDir.exists()) {
       Preconditions.checkState(executorRootDir.mkdirs(), "Failed to create executor root dir.");
     }
 
     this.buildInfo = Preconditions.checkNotNull(buildInfo);
+    this.fileCopier = Preconditions.checkNotNull(fileCopier);
+    this.socketManager = Preconditions.checkNotNull(socketManager);
+    this.healthChecker = Preconditions.checkNotNull(healthChecker);
+    this.processKiller = Preconditions.checkNotNull(processKiller);
+    this.pidFetcher = Preconditions.checkNotNull(pidFetcher);
 
     resourceManager = new ResourceManager(this, executorRootDir);
     resourceManager.start();
 
+    // TODO(wfarner): This constructor has gotten too heavyweight, fix.
     loadDeadTasks();
     startStateSync();
     startRegisteredTaskPusher();
@@ -109,21 +121,20 @@ public class ExecutorCore implements TaskManager {
 
   // TODO(flo): Handle loss of connection with the ExecutorDriver.
   // TODO(flo): Do input validation on parameters.
-  public void executePendingTask(final ExecutorDriver driver, final TwitterTaskInfo taskInfo,
+  public void executePendingTask(final ExecutorDriver driver, final AssignedTask task,
                                  final int taskId) {
     this.driver.set(driver);
 
-    LOG.info(String.format("Received task for execution: %s/%s - %d", taskInfo.getOwner(),
-        taskInfo.getJobName(), taskId));
+    LOG.info(String.format("Received task for execution: %s/%s - %d", task.getTask().getOwner(),
+        task.getTask().getJobName(), taskId));
     final RunningTask runningTask = new RunningTask(socketManager, healthChecker, processKiller,
-        pidFetcher, getTaskRoot(taskId), taskId, taskInfo, fileCopier);
+        pidFetcher, getTaskRoot(taskId), task, fileCopier);
 
     tasks.put(taskId, runningTask);
 
     try {
       runningTask.stage();
       runningTask.run();
-      sendStatusUpdate(driver, new TaskStatus(taskId, TaskState.TASK_RUNNING, EMPTY_MSG));
     } catch (RunningTask.TaskRunException e) {
       LOG.log(Level.SEVERE, "Failed to stage task " + taskId, e);
       runningTask.terminate(ScheduleStatus.FAILED);
@@ -244,11 +255,16 @@ public class ExecutorCore implements TaskManager {
     LOG.info("Attempting to recover information about dead tasks from " + executorRootDir);
     for (File file : executorRootDir.listFiles(DIR_FILTER)) {
       try {
+        LOG.info("Restoring task " + file);
         DeadTask task = DeadTask.loadFrom(file);
         TwitterTaskInfo taskInfo = task.getTaskInfo();
-        LOG.info("Recovered task " + task.getId() + " "
-                 + taskInfo.getOwner() + "/" + taskInfo.getJobName());
-        tasks.put(task.getId(), task);
+        if (taskInfo != null) {
+          LOG.info("Recovered task " + task.getId() + " "
+                   + taskInfo.getOwner() + "/" + taskInfo.getJobName());
+          tasks.put(task.getId(), task);
+        } else {
+          LOG.info("Failed to restore task from " + file);
+        }
       } catch (DeadTask.DeadTaskLoadException e) {
         LOG.log(Level.INFO, "Unable to restore task from " + file, e);
       }

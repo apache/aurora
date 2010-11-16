@@ -8,12 +8,12 @@ import com.twitter.common.thrift.ThriftServer;
 import com.twitter.mesos.gen.CreateJobResponse;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.KillResponse;
+import com.twitter.mesos.gen.LiveTask;
 import com.twitter.mesos.gen.MesosSchedulerManager;
 import com.twitter.mesos.gen.ResponseCode;
 import com.twitter.mesos.gen.RestartResponse;
 import com.twitter.mesos.gen.ScheduleStatusResponse;
 import com.twitter.mesos.gen.TaskQuery;
-import com.twitter.mesos.gen.TrackedTask;
 import com.twitter.mesos.gen.UpdateRequest;
 import com.twitter.mesos.gen.UpdateResponse;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
@@ -63,15 +63,14 @@ class SchedulerThriftInterface extends ThriftServer implements MesosSchedulerMan
   // TODO(wfarner): Provide status information about cron jobs here.
   @Override
   public ScheduleStatusResponse getTasksStatus(TaskQuery query) throws TException {
-    List<TrackedTask> tasks = Lists.newArrayList(schedulerCore.getTasks(query));
+    List<LiveTask> tasks = Lists.newArrayList(schedulerCore.getLiveTasks(query));
 
     ScheduleStatusResponse response = new ScheduleStatusResponse();
     if (tasks.isEmpty()) {
       response.setResponseCode(ResponseCode.INVALID_REQUEST)
           .setMessage("No tasks found for query: " + query);
     } else {
-      response.setResponseCode(ResponseCode.OK)
-        .setTaskStatuses(tasks);
+      response.setResponseCode(ResponseCode.OK).setTasks(tasks);
     }
 
     return response;

@@ -10,7 +10,7 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
-import com.twitter.mesos.gen.SchedulerState;
+import com.twitter.mesos.gen.NonVolatileSchedulerState;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzHome;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzJob;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzUser;
@@ -26,12 +26,6 @@ import java.util.logging.Logger;
 public class SchedulerModule extends AbstractModule {
   private final static Logger LOG = Logger.getLogger(SchedulerModule.class.getName());
   private SchedulerMain.TwitterSchedulerOptions options;
-
-  /**
-   * {@literal @Named} binding key for the puffin service backend.
-   */
-  static final String MESOS_MASTER_SERVER_SET =
-      "com.twitter.mesos.scheduler.SchedulerModule.MESOS_MASTER_SERVER_SET";
 
   @Inject
   public SchedulerModule(SchedulerMain.TwitterSchedulerOptions options) {
@@ -77,7 +71,7 @@ public class SchedulerModule extends AbstractModule {
   }
 
   @Provides
-  final PersistenceLayer<SchedulerState> providePersistenceLayer(
+  final PersistenceLayer<NonVolatileSchedulerState> providePersistenceLayer(
       @Nullable ZooKeeperClient zkClient) {
 
     PersistenceLayer<byte[]> binaryPersistence;

@@ -2,6 +2,7 @@ package com.twitter.mesos.executor;
 
 import com.google.inject.Inject;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
+import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ExecutorMessage;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import mesos.Executor;
@@ -35,9 +36,9 @@ public class MesosExecutorImpl extends Executor {
   public void launchTask(final ExecutorDriver driver, final TaskDescription task) {
     LOG.info(String.format("Running task %s with ID %d.", task.getName(), task.getTaskId()));
 
-    TwitterTaskInfo taskInfo;
+    AssignedTask assignedTask;
     try {
-      taskInfo = ThriftBinaryCodec.decode(TwitterTaskInfo.class, task.getArg());
+      assignedTask = ThriftBinaryCodec.decode(AssignedTask.class, task.getArg());
     } catch (ThriftBinaryCodec.CodingException e) {
       LOG.log(Level.SEVERE, "Error deserializing task object.", e);
       driver.sendStatusUpdate(new TaskStatus(task.getTaskId(), TaskState.TASK_FAILED,
@@ -45,7 +46,7 @@ public class MesosExecutorImpl extends Executor {
       return;
     }
 
-    executorCore.executePendingTask(driver, taskInfo, task.getTaskId());
+    executorCore.executePendingTask(driver, assignedTask, task.getTaskId());
   }
 
   @Override

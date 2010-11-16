@@ -6,17 +6,23 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.MapMaker;
 import com.google.common.collect.Sets;
+import com.twitter.common.base.Closure;
 import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.mesos.Tasks;
+import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.LiveTask;
+import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
-import com.twitter.mesos.gen.TrackedTask;
+import com.twitter.mesos.gen.TwitterTaskInfo;
 import org.apache.commons.lang.StringUtils;
 
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.logging.Logger;
 
@@ -30,8 +36,14 @@ import java.util.logging.Logger;
 public class TaskStore {
   private final static Logger LOG = Logger.getLogger(TaskStore.class.getName());
 
-  private final List<TrackedTask> tasks = Collections.synchronizedList(
-      Lists.<TrackedTask>newLinkedList());
+  private final List<ScheduledTask> tasks = Collections.synchronizedList(
+      Lists.<ScheduledTask>newLinkedList());
+  private final Map<Integer, VolatileTaskState> volatileTaskStates = new MapMaker()
+      .makeComputingMap(new Function<Integer, VolatileTaskState>() {
+        @Override public VolatileTaskState apply(Integer taskId) {
+          return new VolatileTaskState(taskId);
+        }
+      });
 
   /**
    * Adds tasks to the store.  Tasks are copied internally, meaning that the tasks are stored in the
@@ -40,20 +52,22 @@ public class TaskStore {
    *
    * @param newTasks Tasks to add.
    */
-  public void add(Iterable<TrackedTask> newTasks) {
+  public void add(Iterable<ScheduledTask> newTasks) {
     // Do a sanity check and make sure we're not adding a task with a duplicate task id.
     Set<Integer> newTaskIds = Sets.newHashSet(Iterables.transform(newTasks, Tasks.GET_TASK_ID));
     Preconditions.checkArgument(newTaskIds.size() == Iterables.size(newTasks),
         "Duplicate task IDs not allowed: " + newTasks);
 
-    for (TrackedTask task : tasks) {
-      Preconditions.checkArgument(!newTaskIds.contains(task.getTaskId()));
+    for (ScheduledTask task : tasks) {
+      Preconditions.checkNotNull(task.getAssignedTask());
+      Preconditions.checkNotNull(task.getAssignedTask().getTask());
+      Preconditions.checkArgument(!newTaskIds.contains(task.getAssignedTask().getTaskId()));
     }
 
     tasks.addAll(Lists.newArrayList(Iterables.transform(newTasks,
-        new Function<TrackedTask, TrackedTask>() {
-      @Override public TrackedTask apply(TrackedTask task) {
-        return new TrackedTask(task);
+        new Function<ScheduledTask, ScheduledTask>() {
+      @Override public ScheduledTask apply(ScheduledTask task) {
+        return new ScheduledTask(task);
       }
     })));
   }
@@ -63,7 +77,7 @@ public class TaskStore {
    *
    * @param removedTasks Tasks to remove.
    */
-  public void remove(Iterable<TrackedTask> removedTasks) {
+  public void remove(Iterable<ScheduledTask> removedTasks) {
     if (Iterables.isEmpty(removedTasks)) return;
 
     Set<Integer> removedIds = Sets.newHashSet(Iterables.transform(removedTasks, Tasks.GET_TASK_ID));
@@ -71,6 +85,7 @@ public class TaskStore {
 
     int sizeBefore = tasks.size();
     tasks.removeAll(Lists.newArrayList(removedTasks));
+    volatileTaskStates.keySet().removeAll(removedIds);
     int removed = sizeBefore - tasks.size();
     if (removed > 0) LOG.info(String.format("Removed %d tasks from task store.", removed));
   }
@@ -84,14 +99,15 @@ public class TaskStore {
    * @return Immutable copies of the mutated tasks.
    * @throws E An exception, specified by the mutator.
    */
-  public <E extends Exception> Iterable<TrackedTask> mutate(Iterable<TrackedTask> immutableCopies,
-      final ExceptionalClosure<TrackedTask, E> mutator) throws E {
-    List<TrackedTask> copies = Lists.newArrayList();
-    for (TrackedTask task : immutableCopies) {
+  public <E extends Exception> Iterable<ScheduledTask> mutate(
+      Iterable<ScheduledTask> immutableCopies, final ExceptionalClosure<ScheduledTask, E> mutator)
+      throws E {
+    List<ScheduledTask> copies = Lists.newArrayList();
+    for (ScheduledTask task : immutableCopies) {
       // TODO(wfarner): This would be faster with something equivalent to an identity set.
-      TrackedTask mutable = tasks.get(tasks.indexOf(task));
+      ScheduledTask mutable = tasks.get(tasks.indexOf(task));
       mutator.execute(mutable);
-      copies.add(new TrackedTask(mutable));
+      copies.add(new ScheduledTask(mutable));
     }
 
     return copies;
@@ -106,8 +122,8 @@ public class TaskStore {
    * @return Immutable copies of the mutated tasks.
    * @throws E An exception, specified by the mutator.
    */
-  public <E extends Exception> Iterable<TrackedTask> mutate(TaskQuery query,
-      final ExceptionalClosure<TrackedTask, E> mutator) throws E {
+  public <E extends Exception> Iterable<ScheduledTask> mutate(TaskQuery query,
+      final ExceptionalClosure<ScheduledTask, E> mutator) throws E {
     return mutate(fetch(query), mutator);
   }
 
@@ -120,8 +136,8 @@ public class TaskStore {
    * @return An immutable copy of the mutated task.
    * @throws E An exception, specified by the mutator.
    */
-  public <E extends Exception> TrackedTask mutate(TrackedTask immutableCopy,
-      final ExceptionalClosure<TrackedTask, E> mutator) throws E {
+  public <E extends Exception> ScheduledTask mutate(ScheduledTask immutableCopy,
+      final ExceptionalClosure<ScheduledTask, E> mutator) throws E {
     return Iterables.get(mutate(Lists.newArrayList(immutableCopy), mutator), 0);
   }
 
@@ -132,8 +148,25 @@ public class TaskStore {
    * @param filters Additional filters to apply.
    * @return A read-only view of matching tasks.
    */
-  public Set<TrackedTask> fetch(TaskQuery query, Predicate<TrackedTask>... filters) {
+  public Set<ScheduledTask> fetch(TaskQuery query, Predicate<ScheduledTask>... filters) {
     return Sets.newHashSet(Iterables.filter(snapshot(), makeFilter(query, filters)));
+  }
+
+  private final Function<ScheduledTask, LiveTask> getLiveTask =
+      new Function<ScheduledTask, LiveTask>() {
+          @Override public LiveTask apply(ScheduledTask task) {
+            VolatileTaskState volatileState = volatileTaskStates.get(
+                task.getAssignedTask().getTaskId());
+            return new LiveTask(task, volatileState.resources);
+          }
+        };
+
+  public Iterable<LiveTask> getLiveTasks(Iterable<ScheduledTask> scheduledTasks) {
+    return Iterables.transform(scheduledTasks, getLiveTask);
+  }
+
+  public void mutateVolatileState(int taskId, Closure<VolatileTaskState> mutator) {
+    mutator.execute(volatileTaskStates.get(taskId));
   }
 
   /**
@@ -142,9 +175,9 @@ public class TaskStore {
    * @param query The query to use for finding tasks.
    * @return An iterable containing all matching tasks
    */
-  private static Predicate<TrackedTask> taskMatcher(final TaskQuery query) {
+  private static Predicate<ScheduledTask> taskMatcher(final TaskQuery query) {
     Preconditions.checkNotNull(query);
-    return new Predicate<TrackedTask>() {
+    return new Predicate<ScheduledTask>() {
       private boolean matches(String query, String value) {
         return StringUtils.isEmpty(query) || (value != null && value.matches(query));
       }
@@ -153,21 +186,23 @@ public class TaskStore {
         return collection == null || collection.contains(item);
       }
 
-      @Override public boolean apply(TrackedTask task) {
-        return matches(query.getOwner(), task.getOwner())
-            && matches(query.getJobName(), task.getJobName())
-            && matches(query.getTaskIds(), task.getTaskId())
+      @Override public boolean apply(ScheduledTask task) {
+        AssignedTask assigned = Preconditions.checkNotNull(task.getAssignedTask());
+        TwitterTaskInfo t = Preconditions.checkNotNull(assigned.getTask());
+        return matches(query.getOwner(), t.getOwner())
+            && matches(query.getJobName(), t.getJobName())
+            && matches(query.getTaskIds(), assigned.getTaskId())
             && matches(query.getStatuses(), task.getStatus())
             // TODO(wfarner): Might have to be smarter here so as to not be burned by different
             //    host names for the same machine. i.e. machine1, machine1.prod.twitter.com
-            && matches(query.getSlaveHost(), task.getSlaveHost());
+            && matches(query.getSlaveHost(), assigned.getSlaveHost());
       }
     };
   }
 
-  private static Predicate<TrackedTask> makeFilter(TaskQuery query,
-      Predicate<TrackedTask>... filters) {
-    Predicate<TrackedTask> filter = taskMatcher(Preconditions.checkNotNull(query));
+  private static Predicate<ScheduledTask> makeFilter(TaskQuery query,
+      Predicate<ScheduledTask>... filters) {
+    Predicate<ScheduledTask> filter = taskMatcher(Preconditions.checkNotNull(query));
     if (filters.length > 0) {
       filter = Predicates.and(filter, Predicates.and(filters));
     }
@@ -175,20 +210,22 @@ public class TaskStore {
     return filter;
   }
 
-  private Iterable<TrackedTask> snapshot() {
+  private Iterable<ScheduledTask> snapshot() {
     synchronized(tasks) {
-      return Lists.newLinkedList(Iterables.transform(tasks, new Function<TrackedTask, TrackedTask>() {
-        @Override public TrackedTask apply(TrackedTask task) {
-          return new TrackedTask(task);
+      return Lists.newLinkedList(Iterables.transform(tasks, new Function<ScheduledTask, ScheduledTask>() {
+        @Override public ScheduledTask apply(ScheduledTask task) {
+          return new ScheduledTask(task);
         }
       }));
     }
   }
 
   // TODO(wfarner): Use this comparator to keep tasks sorted by priority.
-  private static final Comparator<TrackedTask> PRIORITY_COMPARATOR = new Comparator<TrackedTask>() {
-    @Override public int compare(TrackedTask taskA, TrackedTask taskB) {
-      return taskA.getTask().getPriority() - taskB.getTask().getPriority();
+  private static final Comparator<ScheduledTask> PRIORITY_COMPARATOR =
+      new Comparator<ScheduledTask>() {
+    @Override public int compare(ScheduledTask taskA, ScheduledTask taskB) {
+      return taskA.getAssignedTask().getTask().getPriority()
+             - taskB.getAssignedTask().getTask().getPriority();
     }
   };
 }

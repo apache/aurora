@@ -32,6 +32,8 @@ import java.util.logging.Logger;
 public class CronJobManager extends JobManager {
   private static Logger LOG = Logger.getLogger(CronJobManager.class.getName());
 
+  private static final String MANAGER_KEY = "CRON";
+
   // Cron manager.
   private final Scheduler scheduler = new Scheduler();
 
@@ -104,6 +106,11 @@ public class CronJobManager extends JobManager {
     }
 
     if (runJob) schedulerCore.runJob(job);
+  }
+
+  @Override
+  public String getUniqueKey() {
+    return MANAGER_KEY;
   }
 
   @Override

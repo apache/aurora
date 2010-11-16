@@ -39,8 +39,6 @@ public class ExecutorModule extends AbstractModule {
   private final static Logger LOG = Logger.getLogger(ExecutorModule.class.getName());
   private final ExecutorMain.TwitterExecutorOptions options;
 
-  // TODO(wfarner): Export the executor root dir with the @Named binding
-
   @Inject
   public ExecutorModule(ExecutorMain.TwitterExecutorOptions options) {
     this.options = Preconditions.checkNotNull(options);

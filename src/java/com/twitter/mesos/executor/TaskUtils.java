@@ -4,8 +4,8 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.io.Files;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
+import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduleStatus;
-import com.twitter.mesos.gen.TwitterTaskInfo;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -26,7 +26,7 @@ public class TaskUtils {
 
   private static final FileToInt STATUS_FETCHER = new FileToInt();
 
-  static void storeTask(File taskRoot, TwitterTaskInfo task) throws IOException,
+  static void storeTask(File taskRoot, AssignedTask task) throws IOException,
       ThriftBinaryCodec.CodingException {
     checkTaskRoot(taskRoot);
     Preconditions.checkNotNull(task);
@@ -34,7 +34,7 @@ public class TaskUtils {
     Files.write(ThriftBinaryCodec.encode(task), new File(taskRoot, TASK_DUMP_FILE));
   }
 
-  static TwitterTaskInfo fetchTask(File taskRoot) throws IOException,
+  static AssignedTask fetchTask(File taskRoot) throws IOException,
       ThriftBinaryCodec.CodingException {
     checkTaskRoot(taskRoot);
 
@@ -43,7 +43,7 @@ public class TaskUtils {
       throw new FileNotFoundException("Expected to find task dump file: " + serializedTask);
     }
 
-    return ThriftBinaryCodec.decode(TwitterTaskInfo.class, Files.toByteArray(serializedTask));
+    return ThriftBinaryCodec.decode(AssignedTask.class, Files.toByteArray(serializedTask));
   }
 
   static void saveTaskStatus(File taskRoot, ScheduleStatus status) throws IOException {
@@ -59,16 +59,6 @@ public class TaskUtils {
     }
 
     return ScheduleStatus.findByValue(STATUS_FETCHER.apply(statusFile));
-  }
-
-  static int getTaskId(File taskRoot) throws IllegalArgumentException {
-    checkTaskRoot(taskRoot);
-
-    try {
-      return Integer.parseInt(taskRoot.getName());
-    } catch (NumberFormatException e) {
-      throw new IllegalArgumentException("Not a task sandbox directory: " + taskRoot);
-    }
   }
 
   private static void checkTaskRoot(File taskRoot) {

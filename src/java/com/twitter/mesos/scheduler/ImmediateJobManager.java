@@ -8,6 +8,12 @@ import com.twitter.mesos.gen.JobConfiguration;
  * @author wfarner
  */
 public class ImmediateJobManager extends JobManager {
+
+  @Override
+  public String getUniqueKey() {
+    return "IMMEDIATE";
+  }
+
   @Override
   public boolean receiveJob(JobConfiguration job) {
     schedulerCore.runJob(job);

@@ -17,6 +17,13 @@ public abstract class JobManager {
   protected SchedulerCore schedulerCore;
 
   /**
+   * Gets a key that uniquely identifies this manager type, to distinguish from other schedulers.
+   *
+   * @return Job manager key.
+   */
+  public abstract String getUniqueKey();
+
+  /**
    * Submits a job to the manager.  The job may be submitted to the job runner before this method
    * returns or at any point in the future.  This method will return false if the manager will not
    * execute the job.

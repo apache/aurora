@@ -3,11 +3,13 @@ package com.twitter.mesos.scheduler;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.twitter.common.base.MorePreconditions;
+import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.LiveTask;
 import com.twitter.mesos.gen.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.ScheduleStatus;
+import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
-import com.twitter.mesos.gen.TrackedTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 
@@ -52,7 +54,7 @@ public interface SchedulerCore {
    * @param query The query to identify tasks.
    * @return An iterable of task objects.
    */
-  public Iterable<TrackedTask> getTasks(final TaskQuery query);
+  public Iterable<ScheduledTask> getTasks(final TaskQuery query);
 
   /**
    * Fetches information about all registered tasks for a job.
@@ -61,7 +63,17 @@ public interface SchedulerCore {
    * @param filters Additional filters to apply.
    * @return An iterable of task objects.
    */
-  public Iterable<TrackedTask> getTasks(final TaskQuery query, Predicate<TrackedTask>... filters);
+  public Iterable<ScheduledTask> getTasks(final TaskQuery query,
+      Predicate<ScheduledTask>... filters);
+
+  /**
+   * Like {@link #getTasks(TaskQuery)}, but composes the ScheduledTasks with volatile information
+   * about the tasks.
+   *
+   * @param query The query to identify tasks.
+   * @return An iterable of live task objects.
+   */
+  public Iterable<LiveTask> getLiveTasks(final TaskQuery query);
 
   /**
    * Checks whether the scheduler has a job matching the owner/jobName.
@@ -144,15 +156,15 @@ public interface SchedulerCore {
     public final String slaveId;
     public final String taskName;
     public final Map<String, String> params;
-    public final TwitterTaskInfo taskInfo;
+    public final AssignedTask task;
 
     public TwitterTask(int taskId, String slaveId, String taskName, Map<String, String> params,
-        TwitterTaskInfo taskInfo) {
+        AssignedTask task) {
       this.taskId = taskId;
       this.slaveId = MorePreconditions.checkNotBlank(slaveId);
       this.taskName = MorePreconditions.checkNotBlank(taskName);
       this.params = Preconditions.checkNotNull(params);
-      this.taskInfo = Preconditions.checkNotNull(taskInfo);
+      this.task = Preconditions.checkNotNull(task);
     }
   }
 }

@@ -11,6 +11,7 @@ import com.twitter.common.io.FileUtils;
 import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
 import com.twitter.mesos.executor.ProcessKiller.KillException;
+import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import org.easymock.IMocksControl;
@@ -41,12 +42,13 @@ public class RunningTaskTest {
 
   // Simple task to create a file.
   private static final int TASK_ID_A = 1;
+  private static final int SHARD_ID_A = 5;
   private static final TwitterTaskInfo TASK_A = new TwitterTaskInfo()
       .setOwner("OWNER_A")
       .setJobName("JOB_A")
       .setStartCommand("touch a.txt")
       .setHdfsPath("/fake/path");
-  private TwitterTaskInfo taskObj;
+  private AssignedTask taskObj;
 
   private IMocksControl control;
   private SocketManager socketManager;
@@ -64,7 +66,7 @@ public class RunningTaskTest {
     pidFetcher = control.createMock(ExceptionalFunction.class);
 
     executorRoot = FileUtils.createTempDir();
-    taskObj = new TwitterTaskInfo(TASK_A);
+    taskObj = new AssignedTask().setTask(TASK_A).setShardId(SHARD_ID_A);
   }
 
   @After
@@ -78,7 +80,7 @@ public class RunningTaskTest {
 
   @Test
   public void testStage() throws Exception {
-    taskObj.setStartCommand("touch a.txt");
+    taskObj.getTask().setStartCommand("touch a.txt");
     RunningTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
     assertDirContents(executorRoot, String.valueOf(TASK_ID_A));
@@ -91,7 +93,7 @@ public class RunningTaskTest {
 
     control.replay();
 
-    taskObj.setStartCommand("touch a.txt");
+    taskObj.getTask().setStartCommand("touch a.txt");
     RunningTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
     taskA.run();
@@ -106,7 +108,7 @@ public class RunningTaskTest {
 
     control.replay();
 
-    taskObj.setStartCommand("echo \"hello world\"");
+    taskObj.getTask().setStartCommand("echo \"hello world\"");
     RunningTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
     taskA.run();
@@ -124,7 +126,7 @@ public class RunningTaskTest {
 
     control.replay();
 
-    taskObj.setStartCommand("exit 2");
+    taskObj.getTask().setStartCommand("exit 2");
     RunningTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
     taskA.run();
@@ -137,7 +139,7 @@ public class RunningTaskTest {
   // a better way to do this.
   public void testKill() throws Exception {
     /** TODO(wfarner): Fix this flaky test.
-    taskObj.setStartCommand("touch b.txt; sleep 10");
+    taskObj.getTask().setStartCommand("touch b.txt; sleep 10");
     taskA.stage();
     taskA.launch();
 
@@ -168,7 +170,7 @@ public class RunningTaskTest {
   public void testHealthCheckNoResponse() throws Exception {
     // TODO(wfarner): Change this into something that can actually be run as a unit test.
     /*
-    taskObj.setStartCommand("echo '%port:health%'; sleep 45");
+    taskObj.getTask().setStartCommand("echo '%port:health%'; sleep 45");
     taskA.socketManager = new SocketManager(10000, 11000);
     taskA.stage();
     taskA.launch();
@@ -186,7 +188,7 @@ public class RunningTaskTest {
 
     control.replay();
 
-    taskObj.setStartCommand("echo '%port:myport%'");
+    taskObj.getTask().setStartCommand("echo '%port:myport%'");
     RunningTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
     taskA.run();
@@ -204,7 +206,7 @@ public class RunningTaskTest {
 
     control.replay();
 
-    taskObj.setStartCommand("echo '%port:myport%'; sleep 10");
+    taskObj.getTask().setStartCommand("echo '%port:myport%'; sleep 10");
     RunningTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
     taskA.run();
@@ -218,12 +220,30 @@ public class RunningTaskTest {
 
     control.replay();
 
-    taskObj.setStartCommand("echo '%port:http%'");
+    taskObj.getTask().setStartCommand("echo '%port:http%'");
     RunningTask taskA = makeTask(taskObj, TASK_ID_A);
 
     Pair<String, Map<String, Integer>> expanded = taskA.expandCommandLine();
 
-    assertThat(expanded.getFirst().matches("echo '\\d+'"), is(true));
+    assertThat(expanded.getFirst(), is(String.format("echo '%d'", HTTP_PORT)));
+
+    Map<String, Integer> expectedPorts = ImmutableMap.of("http", HTTP_PORT);
+    assertThat(expanded.getSecond(), is(expectedPorts));
+  }
+
+  @Test
+  public void testLeasePortDuplicate() throws Exception {
+    expect(socketManager.leaseSocket()).andReturn(HTTP_PORT);
+
+    control.replay();
+
+    taskObj.getTask().setStartCommand("echo '%port:http%'; echo '%port:http%';");
+    RunningTask taskA = makeTask(taskObj, TASK_ID_A);
+
+    Pair<String, Map<String, Integer>> expanded = taskA.expandCommandLine();
+
+    assertThat(expanded.getFirst(),
+        is(String.format("echo '%d'; echo '%d';", HTTP_PORT, HTTP_PORT)));
 
     Map<String, Integer> expectedPorts = ImmutableMap.of("http", HTTP_PORT);
     assertThat(expanded.getSecond(), is(expectedPorts));
@@ -240,12 +260,14 @@ public class RunningTaskTest {
 
     control.replay();
 
-    taskObj.setStartCommand("echo '%port:http%'; echo '%port:thrift%'; echo '%port:mail%'");
+    taskObj.getTask().setStartCommand(
+        "echo '%port:http%'; echo '%port:thrift%'; echo '%port:mail%'");
     RunningTask taskA = makeTask(taskObj, TASK_ID_A);
 
     Pair<String, Map<String, Integer>> expanded = taskA.expandCommandLine();
 
-    assertThat(expanded.getFirst().matches("echo '\\d+'; echo '\\d+'; echo '\\d+'"), is(true));
+    assertThat(expanded.getFirst(),
+        is(String.format("echo '%d'; echo '%d'; echo '%d'", HTTP_PORT, thriftPort, mailPort)));
     Map<String, Integer> expectedPorts = ImmutableMap.of(
         "http", HTTP_PORT,
         "thrift", thriftPort,
@@ -253,10 +275,33 @@ public class RunningTaskTest {
     assertThat(expanded.getSecond(), is(expectedPorts));
   }
 
-  @Test(expected = RunningTask.TaskRunException.class)
+  @Test
+  public void testGetShardId() throws Exception {
+    control.replay();
+
+    taskObj.getTask().setStartCommand("echo '%shard_id%'");
+    RunningTask taskA = makeTask(taskObj, TASK_ID_A);
+
+    String commandLine = taskA.expandCommandLine().getFirst();
+    assertThat(commandLine, is("echo '" + SHARD_ID_A + "'"));
+  }
+
+  @Test
   public void testLeasePortsDuplicateName() throws Exception {
-    taskObj.setStartCommand("echo '%port:http%'; echo '%port:http%'");
-    makeTask(taskObj, TASK_ID_A).expandCommandLine();
+    expect(socketManager.leaseSocket()).andReturn(HTTP_PORT);
+
+    control.replay();
+
+    taskObj.getTask().setStartCommand("echo '%port:http%'; echo '%port:http%'");
+    RunningTask taskA = makeTask(taskObj, TASK_ID_A);
+
+    Pair<String, Map<String, Integer>> expanded = taskA.expandCommandLine();
+
+    assertThat(expanded.getFirst(),
+        is(String.format("echo '%d'; echo '%d'", HTTP_PORT, HTTP_PORT)));
+
+    Map<String, Integer> expectedPorts = ImmutableMap.of("http", HTTP_PORT);
+    assertThat(expanded.getSecond(), is(expectedPorts));
   }
 
   @Test(expected = SocketManager.SocketLeaseException.class)
@@ -267,13 +312,14 @@ public class RunningTaskTest {
 
     control.replay();
 
-    taskObj.setStartCommand("echo '%port:http%'; echo '%port:thrift%'; echo '%port:mail%'");
+    taskObj.getTask().setStartCommand("echo '%port:http%'; echo '%port:thrift%'; echo '%port:mail%'");
     makeTask(taskObj, TASK_ID_A).expandCommandLine();
   }
 
-  private RunningTask makeTask(TwitterTaskInfo taskInfo, int taskId) {
+  private RunningTask makeTask(AssignedTask task, int taskId) {
+    task.setTaskId(taskId);
     return new RunningTask(socketManager, healthChecker, processKiller, pidFetcher,
-        new File(executorRoot, String.valueOf(taskId)), TASK_ID_A, taskInfo, COPIER);
+        new File(executorRoot, String.valueOf(task.getTaskId())), task, COPIER);
   }
 
   private void assertDirContents(File dir, String... children) {

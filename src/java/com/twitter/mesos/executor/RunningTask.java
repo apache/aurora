@@ -17,6 +17,7 @@ import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
 import com.twitter.mesos.executor.ProcessKiller.KillException;
+import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ResourceConsumption;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.TwitterTaskInfo;
@@ -57,6 +58,7 @@ public class RunningTask implements Task {
   private static final String RUN_SCRIPT_NAME = "run.sh";
 
   private static final Pattern PORT_REQUEST_PATTERN = Pattern.compile("%port:(\\w+)%");
+  private static final String SHARD_ID_REGEXP = "%shard_id%";
 
   private static final String HEALTH_CHECK_PORT_NAME = "health";
   private static final Amount<Long, Time> LAUNCH_PIDFILE_GRACE_PERIOD = Amount.of(1L, Time.SECONDS);
@@ -71,10 +73,9 @@ public class RunningTask implements Task {
   private final ExceptionalFunction<File, Integer, FileToInt.FetchException> pidFetcher;
   private KillCommand killCommand;
 
-  private final int taskId;
   private int pid = -1;
 
-  private final TwitterTaskInfo task;
+  private final AssignedTask task;
 
   private int healthCheckPort = -1;
 
@@ -92,14 +93,13 @@ public class RunningTask implements Task {
       ExceptionalFunction<Integer, Boolean, HealthCheckException> healthChecker,
       ExceptionalClosure<KillCommand, KillException> processKiller,
       ExceptionalFunction<File, Integer, FileToInt.FetchException> pidFetcher,
-      File taskRoot, int taskId, TwitterTaskInfo task,
+      File taskRoot, AssignedTask task,
       ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier) {
 
     this.socketManager = Preconditions.checkNotNull(socketManager);
     this.healthChecker = Preconditions.checkNotNull(healthChecker);
     this.processKiller = Preconditions.checkNotNull(processKiller);
     this.pidFetcher = Preconditions.checkNotNull(pidFetcher);
-    this.taskId = taskId;
     this.task = Preconditions.checkNotNull(task);
 
     this.taskRoot = Preconditions.checkNotNull(taskRoot);
@@ -123,7 +123,8 @@ public class RunningTask implements Task {
    * @throws TaskRunException If there was an error that caused staging to fail.
    */
   public void stage() throws TaskRunException {
-    LOG.info(String.format("Staging task for job %s/%s", task.getOwner(), task.getJobName()));
+    LOG.info(String.format("Staging task for job %s/%s", task.getTask().getOwner(),
+        task.getTask().getJobName()));
 
     LOG.info("Building task directory hierarchy.");
     if (!sandboxDir.mkdirs()) {
@@ -145,21 +146,21 @@ public class RunningTask implements Task {
     LOG.info("File copier: " + fileCopier);
     try {
       payload = fileCopier.apply(
-          new FileCopyRequest(task.getHdfsPath(), sandboxDir.getAbsolutePath()));
+          new FileCopyRequest(task.getTask().getHdfsPath(), sandboxDir.getAbsolutePath()));
     } catch (IOException e) {
       throw new TaskRunException("Failed to fetch task binary.", e);
     }
 
     if (!payload.exists()) {
       throw new TaskRunException(String.format(
-          "Unexpected state - payload does not exist: HDFS %s -> %s", task.getHdfsPath(),
+          "Unexpected state - payload does not exist: HDFS %s -> %s", task.getTask().getHdfsPath(),
           sandboxDir));
     }
   }
 
   @Override
   public int getId() {
-    return taskId;
+    return task.getTaskId();
   }
 
   @Override
@@ -174,7 +175,7 @@ public class RunningTask implements Task {
 
   @Override
   public TwitterTaskInfo getTaskInfo() {
-    return task;
+    return task.getTask();
   }
 
   public File getSandboxDir() {
@@ -195,28 +196,34 @@ public class RunningTask implements Task {
    */
   @VisibleForTesting
   protected Pair<String, Map<String, Integer>> expandCommandLine()
-      throws SocketManagerImpl.SocketLeaseException, TaskRunException {
-    Map<String, Integer> leasedPorts = Maps.newHashMap();
+      throws SocketManager.SocketLeaseException, TaskRunException {
+    String command = task.getTask().getStartCommand();
 
-    LOG.info("Expanding command line " + task.getStartCommand());
+    LOG.info("Expanding command line " + command);
+    return Pair.of(expandShardId(expandPortRequests(command)), leasedPorts);
+  }
 
-    Matcher m = PORT_REQUEST_PATTERN.matcher(task.getStartCommand());
+  private String expandPortRequests(String commandLine)
+      throws TaskRunException, SocketManager.SocketLeaseException {
+    Matcher m = PORT_REQUEST_PATTERN.matcher(commandLine);
 
     StringBuffer sb = new StringBuffer();
     while (m.find()) {
       String portName = m.group(1);
-      if (leasedPorts.containsKey(portName)) {
-        throw new TaskRunException(
-            String.format("Port with name [%s] requested multiple times.", portName));
-      }
+      if (portName.isEmpty()) throw new TaskRunException("Port name may not be empty.");
 
-      int portNumber = socketManager.leaseSocket();
+      int portNumber = leasedPorts.containsKey(portName) ? leasedPorts.get(portName)
+          : socketManager.leaseSocket();
+
       leasedPorts.put(portName, portNumber);
       m.appendReplacement(sb, String.valueOf(portNumber));
     }
     m.appendTail(sb);
+    return sb.toString();
+  }
 
-    return Pair.of(sb.toString(), leasedPorts);
+  private String expandShardId(String commandLine) {
+    return commandLine.replaceAll(SHARD_ID_REGEXP, String.valueOf(task.getShardId()));
   }
 
   @Override
@@ -262,7 +269,8 @@ public class RunningTask implements Task {
 
       if (supportsHttpSignals()) {
         // TODO(wfarner): Change to use ScheduledExecutorService, making sure to shut it down.
-        new Timer(String.format("Task-%d-HealthCheck", taskId), true).scheduleAtFixedRate(
+        int healthCheckInterval = task.getTask().getHealthCheckIntervalSecs();
+        new Timer(String.format("Task-%d-HealthCheck", task.getTaskId()), true).scheduleAtFixedRate(
             new TimerTask() {
               @Override public void run() {
                 if (!isHealthy()) {
@@ -274,8 +282,8 @@ public class RunningTask implements Task {
             // Configure health check interval, allowing 2x configured time for startup.
             // TODO(wfarner): Add a configuration option for the task start-up grace period
             // before health checking begins.
-            2 * Amount.of(task.getHealthCheckIntervalSecs(), Time.SECONDS).as(Time.MILLISECONDS),
-            Amount.of(task.getHealthCheckIntervalSecs(), Time.SECONDS).as(Time.MILLISECONDS));
+            2 * Amount.of(healthCheckInterval, Time.SECONDS).as(Time.MILLISECONDS),
+            Amount.of(healthCheckInterval, Time.SECONDS).as(Time.MILLISECONDS));
       }
 
       // TODO(wfarner): After a grace period, read the pidfile to get the parent PID and construct
@@ -353,7 +361,7 @@ public class RunningTask implements Task {
   }
 
   public int getTaskId() {
-    return taskId;
+    return task.getTaskId();
   }
 
   /**
@@ -419,8 +427,7 @@ public class RunningTask implements Task {
   }
 
   public String toString() {
-    return String.format("%s/%s/%d", task.getOwner(), task.getJobName(), taskId);
+    return String.format("%s/%s/%d", task.getTask().getOwner(), task.getTask().getJobName(),
+        task.getTaskId());
   }
-
-
 }

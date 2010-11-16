@@ -24,8 +24,7 @@ public class ExecutorHome extends StringTemplateServlet {
 
   private static final Logger LOG = Logger.getLogger(ExecutorHome.class.getName());
 
-  @Inject
-  private ExecutorCore executor;
+  @Inject private ExecutorCore executor;
 
   @Inject
   public ExecutorHome(@CacheTemplates boolean cacheTemplates) {

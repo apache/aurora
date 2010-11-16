@@ -5,6 +5,7 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
+import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ResourceConsumption;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.TwitterTaskInfo;
@@ -26,16 +27,14 @@ public class DeadTask implements Task {
   private static Logger LOG = Logger.getLogger(DeadTask.class.getName());
 
   private final File taskRoot;
-  private final int taskId;
-  private final TwitterTaskInfo task;
+  private final AssignedTask task;
   private final ScheduleStatus state;
 
   // Lazy-loaded fields.
   private Amount<Long, Data> diskConsumed = null;
 
-  DeadTask(File taskRoot, int taskId, TwitterTaskInfo task, ScheduleStatus state)  {
+  DeadTask(File taskRoot, AssignedTask task, ScheduleStatus state)  {
     this.taskRoot = Preconditions.checkNotNull(taskRoot);
-    this.taskId = taskId;
     this.task = Preconditions.checkNotNull(task);
     this.state = Preconditions.checkNotNull(state);
     Preconditions.checkState(!Tasks.isActive(state),
@@ -68,8 +67,7 @@ public class DeadTask implements Task {
     }
 
     try {
-      return new DeadTask(taskRoot, TaskUtils.getTaskId(taskRoot), TaskUtils.fetchTask(taskRoot),
-          state);
+      return new DeadTask(taskRoot, TaskUtils.fetchTask(taskRoot), state);
     } catch (IOException e) {
       throw new DeadTaskLoadException("Failed to read persisted task state from " + taskRoot);
     } catch (ThriftBinaryCodec.CodingException e) {
@@ -79,7 +77,7 @@ public class DeadTask implements Task {
 
   @Override
   public int getId() {
-    return taskId;
+    return task.getTaskId();
   }
 
   @Override
@@ -99,7 +97,7 @@ public class DeadTask implements Task {
 
   @Override
   public TwitterTaskInfo getTaskInfo() {
-    return task;
+    return task.getTask();
   }
 
   @Override

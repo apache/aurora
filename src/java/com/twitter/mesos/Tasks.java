@@ -1,10 +1,10 @@
 package com.twitter.mesos;
 
 import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
-import com.google.common.collect.ImmutableSet;
 import com.twitter.mesos.gen.ScheduleStatus;
-import com.twitter.mesos.gen.TrackedTask;
+import com.twitter.mesos.gen.ScheduledTask;
 
 import java.util.Arrays;
 import java.util.EnumSet;
@@ -19,10 +19,10 @@ import static com.twitter.mesos.gen.ScheduleStatus.*;
  */
 public class Tasks {
 
-  public static final Function<TrackedTask, Integer> GET_TASK_ID =
-      new Function<TrackedTask, Integer>() {
-        @Override public Integer apply(TrackedTask task) {
-          return task.getTaskId();
+  public static final Function<ScheduledTask, Integer> GET_TASK_ID =
+      new Function<ScheduledTask, Integer>() {
+        @Override public Integer apply(ScheduledTask task) {
+          return task.getAssignedTask().getTaskId();
         }
       };
 
@@ -42,8 +42,8 @@ public class Tasks {
   /**
    * Filter that includes only active tasks.
    */
-  public static final Predicate<TrackedTask> ACTIVE_FILTER = new Predicate<TrackedTask>() {
-      @Override public boolean apply(TrackedTask task) {
+  public static final Predicate<ScheduledTask> ACTIVE_FILTER = new Predicate<ScheduledTask>() {
+      @Override public boolean apply(ScheduledTask task) {
         return isActive(task.getStatus());
       }
     };
@@ -51,8 +51,8 @@ public class Tasks {
   /**
    * Filter that includes only terminal tasks.
    */
-  public static final Predicate<TrackedTask> TERMINATED_FILTER = new Predicate<TrackedTask>() {
-      @Override public boolean apply(TrackedTask task) {
+  public static final Predicate<ScheduledTask> TERMINATED_FILTER = new Predicate<ScheduledTask>() {
+      @Override public boolean apply(ScheduledTask task) {
         return isTerminated(task.getStatus());
       }
     };
@@ -69,11 +69,12 @@ public class Tasks {
     return TERMINAL_STATES.contains(status);
   }
 
-  public static Predicate<TrackedTask> makeStatusFilter(ScheduleStatus... statuses) {
+  public static Predicate<ScheduledTask> makeStatusFilter(ScheduleStatus... statuses) {
     final Set<ScheduleStatus> filter = EnumSet.copyOf(Arrays.asList(statuses));
 
-    return new Predicate<TrackedTask>() {
-      @Override public boolean apply(TrackedTask task) {
+    return new Predicate<ScheduledTask>() {
+      @Override public boolean apply(ScheduledTask task) {
+        Preconditions.checkNotNull(task);
         return filter.contains(task.getStatus());
       }
     };

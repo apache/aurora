@@ -100,7 +100,7 @@ class MesosSchedulerImpl extends Scheduler {
         if (task != null) {
           byte[] taskInBytes;
           try {
-            taskInBytes = ThriftBinaryCodec.encode(task.taskInfo);
+            taskInBytes = ThriftBinaryCodec.encode(task.task);
           } catch (ThriftBinaryCodec.CodingException e) {
             LOG.log(Level.SEVERE, "Unable to serialize task.", e);
             throw new ScheduleException("Internal error.", e);
