@@ -10,15 +10,13 @@ import com.google.inject.Inject;
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.mesos.Tasks;
-import com.twitter.mesos.gen.ScheduleStatus;
-import static com.twitter.mesos.gen.ScheduleStatus.*;
 import com.twitter.mesos.gen.LiveTask;
+import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.SchedulerCore;
 import org.antlr.stringtemplate.StringTemplate;
 
-import javax.annotation.Nullable;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -28,6 +26,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import static com.twitter.mesos.gen.ScheduleStatus.*;
 
 /**
  * HTTP interface to view information about a job in the mesos scheduler.
@@ -53,8 +53,9 @@ public class SchedulerzJob extends StringTemplateServlet {
       new Comparator<LiveTask>() {
           @Override public int compare(LiveTask taskA, LiveTask taskB) {
             // Sort in reverse chronological order.
-            return taskB.getScheduledTask().getAssignedTask().getTaskId()
-                   - taskA.getScheduledTask().getAssignedTask().getTaskId();
+            return (int) Math.signum(
+                Iterables.getLast(taskB.getScheduledTask().getTaskEvents()).getTimestamp()
+                - Iterables.getLast(taskA.getScheduledTask().getTaskEvents()).getTimestamp());
           }
       };
 

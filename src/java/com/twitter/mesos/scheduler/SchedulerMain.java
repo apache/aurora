@@ -16,7 +16,6 @@ import com.twitter.common.zookeeper.SingletonService.LeadershipListener;
 import com.twitter.mesos.gen.MesosSchedulerManager;
 import com.twitter.thrift.Status;
 import mesos.MesosSchedulerDriver;
-import org.apache.thrift.TException;
 import org.apache.thrift.transport.TTransportException;
 
 import javax.annotation.Nullable;
@@ -150,6 +149,18 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
   }
 
   private void runMesosDriver() {
+    addShutdownAction(new Command() {
+      @Override public void execute() {
+        if (driver != null) {
+          LOG.info("Stopping scheduler driver.");
+          int result = driver.stop();
+          if (result != 0) {
+            LOG.warning("Attempt to stop driver returned code " + result);
+          }
+        }
+      }
+    });
+
     new ThreadFactoryBuilder().setNameFormat("Driver-Runner-%d").setDaemon(true).build().newThread(
         new Runnable() {
           @Override public void run() {
