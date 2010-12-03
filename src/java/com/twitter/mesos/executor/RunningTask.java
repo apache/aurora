@@ -7,12 +7,13 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.io.Closeables;
 import com.google.common.io.Files;
-import com.twitter.common.collections.Pair;
 import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
+import com.twitter.common.collections.Pair;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.StateMachine;
+import com.twitter.mesos.Tasks;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
@@ -123,8 +124,7 @@ public class RunningTask implements Task {
    * @throws TaskRunException If there was an error that caused staging to fail.
    */
   public void stage() throws TaskRunException {
-    LOG.info(String.format("Staging task for job %s/%s", task.getTask().getOwner(),
-        task.getTask().getJobName()));
+    LOG.info(String.format("Staging task for job %s", Tasks.jobKey(task)));
 
     LOG.info("Building task directory hierarchy.");
     if (!sandboxDir.mkdirs()) {
@@ -427,7 +427,6 @@ public class RunningTask implements Task {
   }
 
   public String toString() {
-    return String.format("%s/%s/%d", task.getTask().getOwner(), task.getTask().getJobName(),
-        task.getTaskId());
+    return String.format("%s/%d", Tasks.jobKey(task), task.getTaskId());
   }
 }

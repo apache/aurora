@@ -72,23 +72,26 @@ public class SchedulerCoreImpl implements SchedulerCore {
   // Work queue that stores pending asynchronous tasks.
   private final WorkQueue workQueue;
 
-  private final PersistenceLayer<NonVolatileSchedulerState> persistenceLayer;
-  // TODO(wfarner): Remove this once the old state is overwritten.
-  private final ExecutorTracker executorTracker;
+  // Filter to determine whether a task should be scheduled.
+  private final SchedulingFilter schedulingFilter;
 
+  private final PersistenceLayer<NonVolatileSchedulerState> persistenceLayer;
+
+  private final ExecutorTracker executorTracker;
   // Scheduler driver used for communication with other nodes in the cluster.
   private final AtomicReference<Driver> schedulerDriver = new AtomicReference<Driver>();
 
   @Inject
   public SchedulerCoreImpl(CronJobManager cronScheduler, ImmediateJobManager immediateScheduler,
       PersistenceLayer<NonVolatileSchedulerState> persistenceLayer,
-      ExecutorTracker executorTracker, WorkQueue workQueue) {
+      ExecutorTracker executorTracker, WorkQueue workQueue, SchedulingFilter schedulingFilter) {
     // The immediate scheduler will accept any job, so it's important that other schedulers are
     // placed first.
     jobManagers = Arrays.asList(cronScheduler, immediateScheduler);
     this.persistenceLayer = Preconditions.checkNotNull(persistenceLayer);
     this.executorTracker = Preconditions.checkNotNull(executorTracker);
     this.workQueue = Preconditions.checkNotNull(workQueue);
+    this.schedulingFilter = Preconditions.checkNotNull(schedulingFilter);
 
     restore();
   }
@@ -288,8 +291,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     }
 
     if (hasActiveJob(job.getOwner(), job.getName())) {
-      throw new ScheduleException(String.format("Job already exists: %s/%s",
-          job.getOwner(), job.getName()));
+      throw new ScheduleException("Job already exists: " + Tasks.jobKey(job));
     }
 
     boolean accepted = false;
@@ -343,16 +345,11 @@ public class SchedulerCoreImpl implements SchedulerCore {
       return null;
     }
 
-    TaskQuery query = new TaskQuery();
-    query.addToStatuses(PENDING);
+    TaskQuery query = new TaskQuery().setStatuses(Sets.newHashSet(PENDING));
 
-    Predicate<ScheduledTask> satisfiedFilter = new Predicate<ScheduledTask>() {
-      @Override public boolean apply(ScheduledTask task) {
-        return ConfigurationManager.satisfied(task.getAssignedTask().getTask(), offer);
-      }
-    };
+    Iterable<ScheduledTask> candidates = taskStore.fetch(query,
+        schedulingFilter.makeFilter(offer, slaveHost));
 
-    Iterable<ScheduledTask> candidates = taskStore.fetch(query, satisfiedFilter);
     if (Iterables.isEmpty(candidates)) return null;
 
     LOG.info("Found " + Iterables.size(candidates) + " candidates for offer.");
@@ -377,9 +374,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
     );
 
     AssignedTask assignedTask = task.getAssignedTask();
-    LOG.info(String.format("Offer on slave %s (id %s) is being assigned task for %s/%s.",
-        slaveHost, assignedTask.getSlaveId(), assignedTask.getTask().getOwner(),
-        assignedTask.getTask().getJobName()));
+    LOG.info(String.format("Offer on slave %s (id %s) is being assigned task for %s.",
+        slaveHost, assignedTask.getSlaveId(), Tasks.jobKey(assignedTask)));
 
     persist();
     return new TwitterTask(assignedTask.getTaskId(), slaveId,

@@ -3,14 +3,18 @@ package com.twitter.mesos.scheduler;
 import com.google.common.base.Preconditions;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
+import com.google.inject.Key;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
+import com.google.inject.TypeLiteral;
+import com.google.inject.name.Names;
 import com.twitter.common.process.GuicedProcess;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.mesos.gen.NonVolatileSchedulerState;
+import com.twitter.mesos.scheduler.SchedulingFilter.SchedulingFilterImpl;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzHome;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzJob;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzUser;
@@ -21,6 +25,7 @@ import com.twitter.mesos.scheduler.persistence.ZooKeeperPersistence;
 import mesos.MesosSchedulerDriver;
 
 import javax.annotation.Nullable;
+import java.util.Map;
 import java.util.logging.Logger;
 
 public class SchedulerModule extends AbstractModule {
@@ -38,6 +43,10 @@ public class SchedulerModule extends AbstractModule {
     bind(ExecutorTracker.class).to(ExecutorTrackerImpl.class).in(Singleton.class);
     bind(MesosSchedulerImpl.class).in(Singleton.class);
     bind(WorkQueue.class).to(WorkQueueImpl.class).in(Singleton.class);
+    bind(Key.get(new TypeLiteral<Map<String, String>>() {},
+        Names.named(SchedulingFilterImpl.MACHINE_RESTRICTIONS)))
+        .toInstance(options.machineRestrictions);
+    bind(SchedulingFilter.class).to(SchedulingFilterImpl.class);
     bind(SchedulerCore.class).to(SchedulerCoreImpl.class).in(Singleton.class);
 
     GuicedProcess.registerServlet(binder(), "/schedulerz", SchedulerzHome.class, false);

@@ -3,8 +3,11 @@ package com.twitter.mesos;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
+import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TwitterTaskInfo;
 
 import java.util.Arrays;
 import java.util.EnumSet;
@@ -78,5 +81,25 @@ public class Tasks {
         return filter.contains(task.getStatus());
       }
     };
+  }
+
+  public static String jobKey(String owner, String jobName) {
+    return owner + "/" + jobName;
+  }
+
+  public static String jobKey(TwitterTaskInfo task) {
+    return jobKey(task.getOwner(), task.getJobName());
+  }
+
+  public static String jobKey(JobConfiguration job) {
+    return jobKey(job.getOwner(), job.getName());
+  }
+
+  public static String jobKey(AssignedTask task) {
+    return jobKey(task.getTask());
+  }
+
+  public static String jobKey(ScheduledTask task) {
+    return jobKey(task.getAssignedTask());
   }
 }

@@ -1,6 +1,7 @@
 package com.twitter.mesos.scheduler;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 import com.google.inject.Module;
@@ -24,6 +25,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -66,13 +68,17 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
     @Option(name = "scheduler_persistence_local_path",
             usage = "Local file path that scheduler will persist to/from.")
     File schedulerPersistenceLocalPath = new File("/tmp/mesos_scheduler_dump");
+
+    @Option(name = "machine_restrictions",
+        usage = "Map of machine hosts to job keys."
+                + "  If A maps to B, only B can run on A and B can only run on A.")
+    Map<String, String> machineRestrictions = Maps.newHashMap();
   }
 
   private static Logger LOG = Logger.getLogger(SchedulerMain.class.getName());
 
   private final LeadershipListener leadershipListener = new LeadershipListener() {
-    @Override
-    public void onLeading(EndpointStatus status) {
+    @Override public void onLeading(EndpointStatus status) {
       LOG.info("Elected as leading scheduler!");
       try {
         runMesosDriver();
@@ -84,8 +90,7 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
       }
     }
 
-    @Override
-    public void onDefeated(@Nullable EndpointStatus status) {
+    @Override public void onDefeated(@Nullable EndpointStatus status) {
       LOG.info("Lost leadership, committing suicide.");
 
       try {

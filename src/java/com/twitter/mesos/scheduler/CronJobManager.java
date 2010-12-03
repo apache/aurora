@@ -7,6 +7,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.twitter.common.collections.Pair;
+import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.CronCollisionPolicy;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
@@ -52,9 +53,9 @@ public class CronJobManager extends JobManager {
    * @param name Name of the job to start.
    */
   public void startJobNow(String user, String name) {
-    Preconditions.checkArgument(hasJob(user, name), "No such cron job " + user + "/" + name);
+    Preconditions.checkArgument(hasJob(user, name), "No such cron job " + Tasks.jobKey(user, name));
 
-    cronTriggered(scheduledJobs.get(makeKey(user, name)).getSecond());
+    cronTriggered(scheduledJobs.get(Tasks.jobKey(user, name)).getSecond());
   }
 
   /**
@@ -64,8 +65,7 @@ public class CronJobManager extends JobManager {
    */
   @VisibleForTesting
   void cronTriggered(JobConfiguration job) {
-    LOG.info(String.format("Cron triggered for %s/%s at %s",
-        job.getOwner(), job.getName(), new Date().toString()));
+    LOG.info(String.format("Cron triggered for %s at %s", Tasks.jobKey(job), new Date()));
 
     boolean runJob = false;
 
@@ -117,10 +117,9 @@ public class CronJobManager extends JobManager {
   public boolean receiveJob(final JobConfiguration job) throws ScheduleException {
     if (StringUtils.isEmpty(job.getCronSchedule())) return false;
 
-    LOG.info(String.format("Scheduling cron job %s/%s: %s",
-        job.getOwner(), job.getName(), job.getCronSchedule()));
+    LOG.info(String.format("Scheduling cron job %s: %s", Tasks.jobKey(job), job.getCronSchedule()));
     try {
-      scheduledJobs.put(makeKey(job),
+      scheduledJobs.put(Tasks.jobKey(job),
           Pair.of(scheduler.schedule(job.getCronSchedule(),
             new Runnable() {
               @Override public void run() {
@@ -150,18 +149,18 @@ public class CronJobManager extends JobManager {
 
   @Override
   public boolean hasJob(String owner, String job) {
-    return scheduledJobs.containsKey(makeKey(owner, job));
+    return scheduledJobs.containsKey(Tasks.jobKey(owner, job));
   }
 
   @Override
   public boolean deleteJob(String owner, String job) {
     if (!hasJob(owner, job)) return false;
 
-    Pair<String, JobConfiguration> jobObj = scheduledJobs.remove(makeKey(owner, job));
+    Pair<String, JobConfiguration> jobObj = scheduledJobs.remove(Tasks.jobKey(owner, job));
 
     if (jobObj!= null) {
       scheduler.deschedule(jobObj.getFirst());
-      LOG.info("Successfully deleted cron job for " + makeKey(owner, job));
+      LOG.info("Successfully deleted cron job for " + Tasks.jobKey(owner, job));
     }
 
     return true;
@@ -174,13 +173,5 @@ public class CronJobManager extends JobManager {
         return jobObj.getSecond();
       }
     });
-  }
-
-  private String makeKey(String owner, String job) {
-    return owner + "/" + job;
-  }
-
-  private String makeKey(JobConfiguration job) {
-    return makeKey(job.getOwner(), job.getName());
   }
 }

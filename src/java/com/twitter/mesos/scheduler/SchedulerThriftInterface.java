@@ -5,6 +5,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import com.twitter.common.thrift.ThriftServer;
+import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.CreateJobResponse;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.KillResponse;
@@ -47,8 +48,8 @@ class SchedulerThriftInterface extends ThriftServer implements MesosSchedulerMan
     try {
       schedulerCore.createJob(job);
       response.setResponseCode(ResponseCode.OK)
-          .setMessage(String.format("%d new tasks pending for job %s/%s",
-              job.getTaskConfigs().size(), job.getOwner(), job.getName()));
+          .setMessage(String.format("%d new tasks pending for job %s",
+              job.getTaskConfigs().size(), Tasks.jobKey(job)));
     } catch (ConfigurationManager.TaskDescriptionException e) {
       response.setResponseCode(ResponseCode.INVALID_REQUEST)
           .setMessage("Invalid task description: " + e.getMessage());

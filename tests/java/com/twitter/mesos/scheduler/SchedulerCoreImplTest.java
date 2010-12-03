@@ -1,6 +1,7 @@
 package com.twitter.mesos.scheduler;
 
 import com.google.common.base.Function;
+import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -32,12 +33,9 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 
 import static com.twitter.mesos.gen.ScheduleStatus.*;
-import static org.easymock.EasyMock.capture;
-import static org.easymock.EasyMock.expect;
+import static org.easymock.EasyMock.*;
 import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 /**
  * Unit test for the SchedulerCore.
@@ -55,6 +53,7 @@ import static org.junit.Assert.fail;
 public class SchedulerCoreImplTest extends EasyMockTest {
 
   private WorkQueue workQueue;
+  private SchedulingFilter schedulingFilter;
   private Driver driver;
   private SchedulerCore scheduler;
   private CronJobManager cron;
@@ -73,6 +72,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
   @Before
   public void setUp() {
     workQueue = createMock(WorkQueue.class);
+    schedulingFilter = createMock(SchedulingFilter.class);
     driver = createMock(Driver.class);
 
     cron = new CronJobManager();
@@ -85,7 +85,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
           @Override public void addStatus(ExecutorStatus status) {
             // No-op.
           }
-        }, workQueue);
+        }, workQueue, schedulingFilter);
     cron.schedulerCore = scheduler;
     immediateJobManager.schedulerCore = scheduler;
   }
@@ -140,27 +140,27 @@ public class SchedulerCoreImplTest extends EasyMockTest {
   }
 
   @Test
-  public void testJobLifeCycle() throws Exception {
+  public void testHonorsScheduleFilter() throws Exception {
+    expectOffer(false);
+    expectOffer(false);
+    expectOffer(false);
+
     control.replay();
 
-    int numTasks = 10;
-    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, DEFAULT_TASK, numTasks));
+    scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, DEFAULT_TASK, 10));
 
-    assertTaskCount(numTasks);
+    assertTaskCount(10);
 
-    /**
-     * TODO(wfarner): Complete this once constructing a SlaveOffer object doesn't require swig.
-    TaskDescription desc = scheduler.offer(
-        makeOffer(SLAVE_ID, 1, ONE_GB.as(Data.BYTES)));
-    assertThat(desc, is(not(null)));
-    assertThat(desc.getSlaveId(), is(SLAVE_ID));
+    Map<String, String> slaveOffer = ImmutableMap.<String, String>builder()
+        .put("cpus", "4")
+        .put("mem", "4096")
+        .build();
+    assertNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    assertNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    assertNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
 
-    TwitterTaskInfo taskInfo = new TwitterTaskInfo();
-    new TDeserializer().deserialize(taskInfo, desc.getArg());
-    assertThat(taskInfo, is(taskObj));
-     */
-
-    // TODO(wfarner): Complete.
+    // No tasks should have moved out of the pending state.
+    assertThat(Iterables.size(getTasksByStatus(PENDING)), is(10));
   }
 
   @Test
@@ -497,6 +497,8 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testResourceUpdate() throws Exception {
+    expectOffer(true);
+
     control.replay();
 
     scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, DEFAULT_TASK, 1));
@@ -532,6 +534,8 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testSlaveAdjustsSchedulerTaskState() throws Exception {
+    expectOffer(true);
+
     control.replay();
 
     scheduler.createJob(makeJob(JOB_OWNER_A, JOB_NAME_A, DEFAULT_TASK, 1));
@@ -566,6 +570,9 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testSlaveCannotModifyTasksForOtherSlave() throws Exception {
+    expectOffer(true);
+    expectOffer(true);
+
     control.replay();
 
     Map<String, String> slaveOffer = ImmutableMap.<String, String>builder()
@@ -599,6 +606,11 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testSlaveStopsReportingRunningTask() throws Exception {
+    expectOffer(true);
+    expectOffer(true);
+    expectOffer(true);
+    expectOffer(true);
+
     control.replay();
 
     Map<String, String> slaveOffer = ImmutableMap.<String, String>builder()
@@ -631,7 +643,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     changeStatus(taskIdC, RUNNING);
     changeStatus(taskIdD, FAILED);
 
-    // Since job A is a daemon, its forgotten RUNNING task should be rescheduled.
+    // Since job A is a daemon, its missing RUNNING task should be rescheduled.
     scheduler.updateRegisteredTasks(new RegisteredTaskUpdate().setSlaveHost(SLAVE_HOST_1)
         .setTaskInfos(Arrays.<LiveTaskInfo>asList()));
     Iterable<ScheduledTask> rescheduledTasks =
@@ -741,5 +753,11 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   public void changeStatus(int taskId, ScheduleStatus status) {
     scheduler.setTaskStatus(query(Arrays.asList(taskId)), status);
+  }
+
+  private void expectOffer(boolean passFilter) {
+    expect(schedulingFilter.makeFilter((TwitterTaskInfo) anyObject(), (String) anyObject()))
+        .andReturn(passFilter ? Predicates.<ScheduledTask>alwaysTrue()
+        : Predicates.<ScheduledTask>alwaysFalse());
   }
 }

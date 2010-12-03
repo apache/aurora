@@ -8,10 +8,11 @@ import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 import com.google.inject.name.Named;
-import com.twitter.common.util.BuildInfo;
 import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
+import com.twitter.common.util.BuildInfo;
 import com.twitter.mesos.StateTranslator;
+import com.twitter.mesos.Tasks;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
@@ -125,8 +126,7 @@ public class ExecutorCore implements TaskManager {
                                  final int taskId) {
     this.driver.set(driver);
 
-    LOG.info(String.format("Received task for execution: %s/%s - %d", task.getTask().getOwner(),
-        task.getTask().getJobName(), taskId));
+    LOG.info(String.format("Received task for execution: %s - %d", Tasks.jobKey(task), taskId));
     final RunningTask runningTask = new RunningTask(socketManager, healthChecker, processKiller,
         pidFetcher, getTaskRoot(taskId), task, fileCopier);
 
@@ -259,8 +259,7 @@ public class ExecutorCore implements TaskManager {
         DeadTask task = DeadTask.loadFrom(file);
         TwitterTaskInfo taskInfo = task.getTaskInfo();
         if (taskInfo != null) {
-          LOG.info("Recovered task " + task.getId() + " "
-                   + taskInfo.getOwner() + "/" + taskInfo.getJobName());
+          LOG.info("Recovered task " + task.getId() + " " + Tasks.jobKey(taskInfo));
           tasks.put(task.getId(), task);
         } else {
           LOG.info("Failed to restore task from " + file);
