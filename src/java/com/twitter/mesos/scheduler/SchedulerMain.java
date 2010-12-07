@@ -40,39 +40,39 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
   public static class TwitterSchedulerOptions extends GuicedProcessOptions {
     @Option(name = "executor_path", required = true,
             usage = "Path to the executorHub launch script.")
-    String executorPath;
+    public String executorPath;
 
     @Option(name = "zk_endpoints", usage = "Endpoint specification for the ZooKeeper servers.")
-    List<InetSocketAddress> zooKeeperEndpoints;
+    public List<InetSocketAddress> zooKeeperEndpoints;
 
     @Option(name = "zk_session_timeout_secs",
             usage = "The ZooKeeper session timeout in seconds.")
-    int zooKeeperSessionTimeoutSecs = 5;
+    public int zooKeeperSessionTimeoutSecs = 5;
 
     @Option(name = "mesos_scheduler_ns", required = true,
             usage = "The name service name for the mesos scheduler thrift server.")
-    String mesosSchedulerNameSpec;
+    public String mesosSchedulerNameSpec;
 
     @Option(name = "mesos_master_address",
             usage = "Mesos address for the master, can be a mesos address or zookeeper path.")
-    String mesosMasterAddress;
+    public String mesosMasterAddress;
 
     @Option(name = "scheduler_persistence_zookeeper_path",
             usage = "Path in ZooKeeper that scheduler will persist to/from (overrides local).")
-    String schedulerPersistenceZooKeeperPath;
+    public String schedulerPersistenceZooKeeperPath;
 
     @Option(name = "scheduler_persistence_zookeeper_version",
             usage = "Version for scheduler persistence node in ZooKeeper.")
-    int schedulerPersistenceZooKeeperVersion = 1;
+    public int schedulerPersistenceZooKeeperVersion = 1;
 
     @Option(name = "scheduler_persistence_local_path",
             usage = "Local file path that scheduler will persist to/from.")
-    File schedulerPersistenceLocalPath = new File("/tmp/mesos_scheduler_dump");
+    public File schedulerPersistenceLocalPath = new File("/tmp/mesos_scheduler_dump");
 
     @Option(name = "machine_restrictions",
         usage = "Map of machine hosts to job keys."
                 + "  If A maps to B, only B can run on A and B can only run on A.")
-    Map<String, String> machineRestrictions = Maps.newHashMap();
+    public Map<String, String> machineRestrictions = Maps.newHashMap();
   }
 
   private static Logger LOG = Logger.getLogger(SchedulerMain.class.getName());
