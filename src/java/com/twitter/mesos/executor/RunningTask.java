@@ -7,6 +7,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.io.Closeables;
 import com.google.common.io.Files;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.common.collections.Pair;
@@ -28,8 +29,11 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -75,6 +79,8 @@ public class RunningTask implements Task {
   private final ExceptionalClosure<KillCommand, KillException> processKiller;
   private final ExceptionalFunction<File, Integer, FileToInt.FetchException> pidFetcher;
   private KillCommand killCommand;
+
+  private ExecutorService healthCheckExecutor;
 
   private int pid = -1;
 
@@ -267,10 +273,15 @@ public class RunningTask implements Task {
       process = processBuilder.start();
 
       if (supportsHttpSignals()) {
-        // TODO(wfarner): Change to use ScheduledExecutorService, making sure to shut it down.
-        int healthCheckInterval = task.getTask().getHealthCheckIntervalSecs();
-        new Timer(String.format("Task-%d-HealthCheck", task.getTaskId()), true).scheduleAtFixedRate(
-            new TimerTask() {
+        ThreadFactory factory = new ThreadFactoryBuilder()
+            .setNameFormat(String.format("Task-%d-HealthCheck", task.getTaskId()))
+            .setDaemon(true)
+            .build();
+        ScheduledExecutorService executor = Executors.newScheduledThreadPool(1, factory);
+        healthCheckExecutor = executor;
+
+        executor.scheduleAtFixedRate(
+            new Runnable() {
               @Override public void run() {
                 if (!isHealthy()) {
                   LOG.info("Task not healthy!");
@@ -281,12 +292,12 @@ public class RunningTask implements Task {
             // Configure health check interval, allowing 2x configured time for startup.
             // TODO(wfarner): Add a configuration option for the task start-up grace period
             // before health checking begins.
-            2 * Amount.of(healthCheckInterval, Time.SECONDS).as(Time.MILLISECONDS),
-            Amount.of(healthCheckInterval, Time.SECONDS).as(Time.MILLISECONDS));
+            2 * task.getTask().getHealthCheckIntervalSecs(),
+            task.getTask().getHealthCheckIntervalSecs(),
+            TimeUnit.SECONDS
+        );
       }
 
-      // TODO(wfarner): After a grace period, read the pidfile to get the parent PID and construct
-      //    the KillCommand
       try {
         Thread.sleep(LAUNCH_PIDFILE_GRACE_PERIOD.as(Time.MILLISECONDS));
       } catch (InterruptedException e) {
@@ -394,6 +405,12 @@ public class RunningTask implements Task {
 
   public void terminate(ScheduleStatus terminalState) {
     if (process == null) return;
+    ScheduleStatus currentStatus = stateMachine.getState();
+    if (Tasks.isTerminated(currentStatus)) {
+      LOG.info("Task " + this + " is already terminated, not changing state to " + terminalState);
+      return;
+    }
+
     LOG.info("Terminating task " + this);
     stateMachine.transition(terminalState);
     recordStatus();
@@ -404,6 +421,17 @@ public class RunningTask implements Task {
       LOG.log(Level.WARNING, "Failed to kill process " + this, e);
     } finally {
       cleanUp(process);
+    }
+
+    if (healthCheckExecutor != null) {
+      try {
+        if (!healthCheckExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+          healthCheckExecutor.shutdownNow();
+        }
+      } catch (InterruptedException e) {
+        LOG.info("Interrupted while shutting down health check executor.");
+        Thread.currentThread().interrupt();
+      }
     }
 
     waitFor();
