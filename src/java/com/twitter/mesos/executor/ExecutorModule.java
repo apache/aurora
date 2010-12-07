@@ -25,7 +25,6 @@ import org.apache.hadoop.fs.FileSystem;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.logging.Logger;
@@ -103,9 +102,7 @@ public class ExecutorModule extends AbstractModule {
         .setDaemon(true)
         .setNameFormat("HTTP-signaler-%d")
         .build();
-    ExecutorService executor = Executors.newSingleThreadExecutor(threadFactory);
-
-    return new HttpSignaler(executor,
+    return new HttpSignaler(Executors.newCachedThreadPool(threadFactory),
         Amount.of((long) options.httpSignalTimeoutMs, Time.MILLISECONDS));
   }
 

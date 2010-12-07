@@ -4,9 +4,9 @@ import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import com.google.common.io.Files;
-import com.twitter.common.collections.Pair;
 import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
+import com.twitter.common.collections.Pair;
 import com.twitter.common.io.FileUtils;
 import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
@@ -167,16 +167,23 @@ public class RunningTaskTest {
   }
 
   @Test
-  public void testHealthCheckNoResponse() throws Exception {
-    // TODO(wfarner): Change this into something that can actually be run as a unit test.
-    /*
-    taskObj.getTask().setStartCommand("echo '%port:health%'; sleep 45");
-    taskA.socketManager = new SocketManager(10000, 11000);
+  public void testHealthCheckFailure() throws Exception {
+    final int customPort = 4634;
+    expect(socketManager.leaseSocket()).andReturn(customPort);
+    expect(pidFetcher.apply((File) anyObject())).andReturn(PID);
+    expect(healthChecker.apply(anyInt())).andThrow(new HealthCheckException("Timeout."))
+        .atLeastOnce();
+    socketManager.returnSocket(customPort);
+
+    control.replay();
+
+    taskObj.getTask().setHealthCheckIntervalSecs(1)
+        .setStartCommand("echo '%port:health%'; sleep 40");
+    RunningTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
-    taskA.launch();
-    assertThat(taskA.waitFor(), is(TaskState.TASK_FAILED));
-    assertThat(taskA.getExitCode(), is(2));
-    */
+    taskA.run();
+
+    assertThat(taskA.waitFor(), is(ScheduleStatus.FAILED));
   }
 
   @Test

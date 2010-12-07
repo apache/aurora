@@ -35,6 +35,8 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static com.twitter.mesos.gen.ScheduleStatus.*;
+
 /**
  * Handles storing information and performing duties related to a running task.
  *
@@ -108,12 +110,9 @@ public class RunningTask implements Task {
     this.fileCopier = Preconditions.checkNotNull(fileCopier);
 
     stateMachine = StateMachine.<ScheduleStatus>builder(toString())
-          .initialState(ScheduleStatus.STARTING)
-          .addState(ScheduleStatus.STARTING, ScheduleStatus.RUNNING, ScheduleStatus.FAILED)
-          .addState(ScheduleStatus.RUNNING, ScheduleStatus.FINISHED,
-                                            ScheduleStatus.FAILED,
-                                            ScheduleStatus.KILLED,
-                                            ScheduleStatus.LOST)
+          .initialState(STARTING)
+          .addState(STARTING, RUNNING, FAILED)
+          .addState(RUNNING, FINISHED, FAILED, KILLED, LOST)
           .build();
   }
 
@@ -275,7 +274,7 @@ public class RunningTask implements Task {
               @Override public void run() {
                 if (!isHealthy()) {
                   LOG.info("Task not healthy!");
-                  terminate(ScheduleStatus.FAILED);
+                  terminate(FAILED);
                 }
               }
             },
@@ -296,9 +295,9 @@ public class RunningTask implements Task {
       }
       buildKillCommand(supportsHttpSignals() ? leasedPorts.get(HEALTH_CHECK_PORT_NAME) : -1);
 
-      stateMachine.transition(ScheduleStatus.RUNNING);
+      stateMachine.transition(RUNNING);
     } catch (IOException e) {
-      stateMachine.transition(ScheduleStatus.FAILED);
+      stateMachine.transition(FAILED);
       throw new TaskRunException("Failed to launch process.", e);
     }
   }
@@ -334,13 +333,13 @@ public class RunningTask implements Task {
   public ScheduleStatus waitFor() {
     Preconditions.checkNotNull(process);
 
-    while (stateMachine.getState() == ScheduleStatus.RUNNING) {
+    while (stateMachine.getState() == RUNNING) {
       try {
         exitCode = process.waitFor();
         LOG.info("Process terminated with exit code: " + exitCode);
 
-        if (stateMachine.getState() != ScheduleStatus.KILLED) {
-          stateMachine.transition(exitCode == 0 ? ScheduleStatus.FINISHED : ScheduleStatus.FAILED);
+        if (stateMachine.getState() != KILLED && stateMachine.getState() != FAILED) {
+          stateMachine.transition(exitCode == 0 ? FINISHED : FAILED);
           recordStatus();
         }
       } catch (InterruptedException e) {
@@ -374,7 +373,7 @@ public class RunningTask implements Task {
   }
 
   public boolean isRunning() {
-    return stateMachine.getState() == ScheduleStatus.RUNNING;
+    return stateMachine.getState() == RUNNING;
   }
 
   public ScheduleStatus getStatus() {
@@ -416,6 +415,7 @@ public class RunningTask implements Task {
   }
 
   private boolean isHealthy() {
+    LOG.info("Checking task health.");
     if (!supportsHttpSignals()) return true;
     try {
       return healthChecker.apply(healthCheckPort);
