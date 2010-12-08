@@ -23,4 +23,18 @@ public class FileCopyRequest {
   public String getDestPath() {
     return destPath;
   }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (obj instanceof FileCopyRequest) {
+      FileCopyRequest that = (FileCopyRequest) obj;
+      return this.sourcePath.equals(that.sourcePath) && this.destPath.equals(that.destPath);
+    }
+    return false;
+  }
+
+  @Override
+  public String toString() {
+    return "Copy " +  sourcePath + " to " + destPath;
+  }
 }

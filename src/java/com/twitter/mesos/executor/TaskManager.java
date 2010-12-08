@@ -13,7 +13,7 @@ public interface TaskManager {
    *
    * @return Running tasks.
    */
-  public Iterable<Task> getRunningTasks();
+  public Iterable<Task> getLiveTasks();
 
   /**
    * Checks whether the manager has a task with the given id.

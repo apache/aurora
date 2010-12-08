@@ -1,18 +1,12 @@
 package com.twitter.mesos.executor;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.util.Set;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -28,9 +22,6 @@ public class SocketManagerImpl implements SocketManager {
   private static final int MIN_SOCKET_NUMBER = 1;
   private static final int MAX_SOCKET_NUMBER = 0xFFFF;
 
-  // Default interval on which to run a reaper thread to reclaim leased/unused sockets.
-  private static final Amount<Long, Time> DEFAULT_RECLAIM_INTERVAL = Amount.of(30L, Time.SECONDS);
-
   // Minimum socket number managed by this manager.
   private final int minSocket;
 
@@ -41,37 +32,18 @@ public class SocketManagerImpl implements SocketManager {
   private final Set<Integer> leasedSockets = Sets.newHashSet();
 
   /**
-   * Creates a new socket manager with a managed socket range and a socket reclaim interval.
-   *
-   * @param minSocket Minimum socket number to manage.
-   * @param maxSocket Maximum socket number to manage.
-   * @param reclaimInterval Interval on which to reclaim unused sockets.
-   */
-  public SocketManagerImpl(int minSocket, int maxSocket, Amount<Long, Time> reclaimInterval) {
-    Preconditions.checkArgument(minSocket > MIN_SOCKET_NUMBER);
-    Preconditions.checkArgument(maxSocket > minSocket);
-    Preconditions.checkArgument(maxSocket < MAX_SOCKET_NUMBER);
-    Preconditions.checkNotNull(reclaimInterval);
-
-    this.minSocket = minSocket;
-    this.maxSocket = maxSocket;
-
-    new Timer("SocketManagerReaper", true).scheduleAtFixedRate(new TimerTask() {
-      @Override public void run() {
-        reclaimUnusedSockets();
-      }
-    }, reclaimInterval.as(Time.MILLISECONDS), reclaimInterval.as(Time.MILLISECONDS));
-  }
-
-  /**
-   * Creates a new socket manager with a managed socket range and the default socket reclaim
-   * interval.
+   * Creates a new socket manager with a managed socket range.
    *
    * @param minSocket Minimum socket number to manage.
    * @param maxSocket Maximum socket number to manage.
    */
   public SocketManagerImpl(int minSocket, int maxSocket) {
-    this(minSocket, maxSocket, DEFAULT_RECLAIM_INTERVAL);
+    Preconditions.checkArgument(minSocket > MIN_SOCKET_NUMBER);
+    Preconditions.checkArgument(maxSocket > minSocket);
+    Preconditions.checkArgument(maxSocket < MAX_SOCKET_NUMBER);
+
+    this.minSocket = minSocket;
+    this.maxSocket = maxSocket;
   }
 
   /**
@@ -104,23 +76,6 @@ public class SocketManagerImpl implements SocketManager {
   }
 
   /**
-   * Looks through all leased sockets to find any that appear to be unused.  Unused socket are
-   * reclaimed and will be available again for leasing.
-   */
-  private synchronized void reclaimUnusedSockets() {
-    Iterables.removeIf(leasedSockets, new Predicate<Integer>() {
-      @Override public boolean apply(Integer socket) {
-        if (available(socket)) {
-          LOG.info("Reclaiming leased but unused socket " + socket);
-          return true;
-        }
-
-        return false;
-      }
-    });
-  }
-
-  /**
    * Tests whether a socket is available by opening it.
    *
    * @param socket The socket to test for availability.
@@ -150,5 +105,4 @@ public class SocketManagerImpl implements SocketManager {
 
     return false;
   }
-
 }

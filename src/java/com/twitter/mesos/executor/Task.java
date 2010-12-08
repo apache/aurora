@@ -1,8 +1,8 @@
 package com.twitter.mesos.executor;
 
+import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ResourceConsumption;
 import com.twitter.mesos.gen.ScheduleStatus;
-import com.twitter.mesos.gen.TwitterTaskInfo;
 
 import java.io.File;
 
@@ -13,7 +13,11 @@ public interface Task {
 
   public int getId();
 
+  public void stage() throws TaskRunException;
+
   public void run() throws TaskRunException;
+
+  public ScheduleStatus blockUntilTerminated();
 
   public boolean isRunning();
 
@@ -21,7 +25,7 @@ public interface Task {
 
   public File getRootDir();
 
-  public TwitterTaskInfo getTaskInfo();
+  public AssignedTask getAssignedTask();
 
   public ScheduleStatus getScheduleStatus();
 

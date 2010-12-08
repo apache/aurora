@@ -111,7 +111,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     persist();
 
     executorTracker.start(new Closure<String>() {
-      @Override public void execute(String slaveId) throws RuntimeException {
+      @Override public void execute(String slaveId) {
         try {
           LOG.info("Sending restart request to executor " + slaveId);
           ExecutorMessage message = new ExecutorMessage();

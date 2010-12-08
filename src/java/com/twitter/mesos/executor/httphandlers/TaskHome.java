@@ -4,7 +4,6 @@ import com.google.inject.Inject;
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.mesos.executor.ExecutorCore;
-import com.twitter.mesos.executor.RunningTask;
 import com.twitter.mesos.executor.Task;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import org.antlr.stringtemplate.StringTemplate;
@@ -57,7 +56,7 @@ public class TaskHome extends StringTemplateServlet {
 
         template.setAttribute("taskState", task.getScheduleStatus());
 
-        TwitterTaskInfo taskInfo = task.getTaskInfo();
+        TwitterTaskInfo taskInfo = task.getAssignedTask().getTask();
         template.setAttribute("taskInfo", taskInfo);
         template.setAttribute("leasedPorts", task.getResourceConsumption().getLeasedPorts());
         template.setAttribute("taskDir", task.getRootDir());

@@ -1,5 +1,7 @@
 package com.twitter.mesos.executor;
 
+import com.google.common.base.Preconditions;
+import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
 import com.google.inject.Module;
@@ -7,6 +9,8 @@ import com.twitter.common.args.Option;
 import com.twitter.common.base.Command;
 import com.twitter.common.process.GuicedProcess;
 import com.twitter.common.process.GuicedProcessOptions;
+import com.twitter.mesos.scheduler.ExecutorRootDir;
+import mesos.Executor;
 import mesos.MesosExecutorDriver;
 
 import java.io.File;
@@ -42,8 +46,10 @@ public class ExecutorMain extends GuicedProcess<ExecutorMain.TwitterExecutorOpti
     public int killEscalationMs = 5000;
   }
 
-  @Inject private MesosExecutorImpl mesosExecutor;
+  @Inject @ExecutorRootDir private File executorRootDir;
+  @Inject private Executor mesosExecutor;
   @Inject private ExecutorCore executorCore;
+  @Inject private Supplier<Iterable<Task>> deadTaskLoader;
 
   protected ExecutorMain() {
     super(TwitterExecutorOptions.class);
@@ -57,6 +63,13 @@ public class ExecutorMain extends GuicedProcess<ExecutorMain.TwitterExecutorOpti
         executorCore.shutdownCore();
       }
     });
+
+    if (!executorRootDir.exists()) {
+      Preconditions.checkState(executorRootDir.mkdirs(), "Failed to create executor root dir.");
+    }
+
+    executorCore.addDeadTasks(deadTaskLoader.get());
+    executorCore.startPeriodicTasks();
 
     new MesosExecutorDriver(mesosExecutor).run();
   }

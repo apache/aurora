@@ -29,7 +29,9 @@ public class ResourceManager {
 
   private final File managedDir;
   private final TaskManager taskManager;
-  private final ResourceScanner resourceScanner;
+  // TODO(wfarner): Enable this if we decide to use this instead of pushing it into the mesos
+  //    core.
+  //private final ResourceScanner resourceScanner;
 
   public ResourceManager(TaskManager taskManager, File managedDir) {
     this.managedDir = Preconditions.checkNotNull(managedDir);
@@ -37,25 +39,25 @@ public class ResourceManager {
         "Managed directory does not exist: " + managedDir);
 
     this.taskManager = Preconditions.checkNotNull(taskManager);
-    this.resourceScanner = new LinuxProcScraper();
+    //this.resourceScanner = new LinuxProcScraper();
   }
 
   public void start() {
-    // TODO(wfarner): Enable when this has been tested.
     //startResourceScanner();
     startDiskGc();
   }
 
+  /*
   private void startResourceScanner() {
     Runnable scanner = new Runnable() {
       @Override public void run() {
-        for (Task task : taskManager.getRunningTasks()) {
+        for (Task task : taskManager.getTaskRunners()) {
           // TODO(wfarner): Need to track rate of jiffies to determine CPU usage.
           // TODO(wfarner): Remove this hack once the mesos slave does its own resource tracking.
-          if (task instanceof RunningTask) {
-            RunningTask runningTask = (RunningTask) task;
+          if (task instanceof TaskRunner) {
+            TaskRunner taskRunner = (TaskRunner) task;
             ResourceScanner.ProcInfo procInfo =
-                resourceScanner.getResourceUsage(runningTask.getProcessId(), task.getRootDir());
+                resourceScanner.getResourceUsage(taskRunner.getProcessId(), task.getRootDir());
             task.getResourceConsumption()
                 .setDiskUsedMb(procInfo.getDiskUsed().as(Data.MB).intValue())
                 .setMemUsedMb(procInfo.getVmSize().as(Data.MB).intValue());
@@ -71,6 +73,7 @@ public class ResourceManager {
         new ThreadFactoryBuilder().setDaemon(true).setNameFormat("Proc-Scraper-%d").build());
     scannerExecutor.scheduleAtFixedRate(scanner, 10, 10, TimeUnit.SECONDS);
   }
+  */
 
   private void startDiskGc() {
     FileFilter expiredOrUnknown = new FileFilter() {
@@ -96,7 +99,7 @@ public class ResourceManager {
       };
 
     Closure<File> gcCallback = new Closure<File>() {
-      @Override public void execute(File file) throws RuntimeException {
+      @Override public void execute(File file) {
         String dirName = file.getName();
         int taskId;
         try {

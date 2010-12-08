@@ -5,6 +5,7 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import com.google.common.io.ByteStreams;
 import com.google.common.io.Closeables;
 import com.google.common.io.Files;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -15,17 +16,17 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.StateMachine;
 import com.twitter.mesos.Tasks;
-import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
 import com.twitter.mesos.executor.ProcessKiller.KillException;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ResourceConsumption;
 import com.twitter.mesos.gen.ScheduleStatus;
-import com.twitter.mesos.gen.TwitterTaskInfo;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -44,25 +45,27 @@ import static com.twitter.mesos.gen.ScheduleStatus.*;
 /**
  * Handles storing information and performing duties related to a running task.
  *
- * This will create a directory to hold everything realted to a task, as well as a sandbox that the
- * launch command has access to.  The following files will be created:
+ * This will create the task $TASK_ROOT, as well as a sandbox directory that the launch command
+ * has access to:
  *
  * $TASK_ROOT - root task directory.
  * $TASK_ROOT/pidfile  - PID of the launched process.
  * $TASK_ROOT/sandbox/  - Sandbox, working directory for the task.
  * $TASK_ROOT/sandbox/run.sh - Configured run command, written to a shell script file.
  * $TASK_ROOT/sandbox/$PAYLOAD  - Payload specified in task configuration (fetched from HDFS).
- * $TASK_ROOT/sandbox/stderr  - Captures standard error stream.
- * $TASK_ROOT/sandbox/stdout - Captures standard output stream.
+ * $TASK_ROOT/sandbox/stderr  - Captured standard error stream.
+ * $TASK_ROOT/sandbox/stdout - Captured standard output stream.
  *
  * @author wfarner
  */
-public class RunningTask implements Task {
-  private static final Logger LOG = Logger.getLogger(RunningTask.class.getName());
+public class LiveTask extends TaskOnDisk {
+  private static final Logger LOG = Logger.getLogger(LiveTask.class.getName());
 
-  private static final String PIDFILE_NAME = "pidfile";
-  private static final String SANDBOX_DIR_NAME = "sandbox";
-  private static final String RUN_SCRIPT_NAME = "run.sh";
+  @VisibleForTesting static final String PIDFILE_NAME = "pidfile";
+  @VisibleForTesting static final String SANDBOX_DIR_NAME = "sandbox";
+  @VisibleForTesting static final String RUN_SCRIPT_NAME = "run.sh";
+  @VisibleForTesting static final String STDERR_CAPTURE_FILE = "stderr";
+  @VisibleForTesting static final String STDOUT_CAPTURE_FILE = "stdout";
 
   private static final Pattern PORT_REQUEST_PATTERN = Pattern.compile("%port:(\\w+)%");
   private static final String SHARD_ID_REGEXP = "%shard_id%";
@@ -82,13 +85,10 @@ public class RunningTask implements Task {
 
   private ExecutorService healthCheckExecutor;
 
-  private int pid = -1;
-
   private final AssignedTask task;
 
   private int healthCheckPort = -1;
 
-  private final File taskRoot;
   @VisibleForTesting final File sandboxDir;
 
   @VisibleForTesting protected final Map<String, Integer> leasedPorts = Maps.newHashMap();
@@ -98,12 +98,13 @@ public class RunningTask implements Task {
   private int exitCode = 0;
   private final ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier;
 
-  public RunningTask(SocketManager socketManager,
+  public LiveTask(SocketManager socketManager,
       ExceptionalFunction<Integer, Boolean, HealthCheckException> healthChecker,
       ExceptionalClosure<KillCommand, KillException> processKiller,
       ExceptionalFunction<File, Integer, FileToInt.FetchException> pidFetcher,
       File taskRoot, AssignedTask task,
       ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier) {
+    super(taskRoot);
 
     this.socketManager = Preconditions.checkNotNull(socketManager);
     this.healthChecker = Preconditions.checkNotNull(healthChecker);
@@ -111,7 +112,6 @@ public class RunningTask implements Task {
     this.pidFetcher = Preconditions.checkNotNull(pidFetcher);
     this.task = Preconditions.checkNotNull(task);
 
-    this.taskRoot = Preconditions.checkNotNull(taskRoot);
     sandboxDir = new File(taskRoot, SANDBOX_DIR_NAME);
     this.fileCopier = Preconditions.checkNotNull(fileCopier);
 
@@ -128,6 +128,7 @@ public class RunningTask implements Task {
    *
    * @throws TaskRunException If there was an error that caused staging to fail.
    */
+  @Override
   public void stage() throws TaskRunException {
     LOG.info(String.format("Staging task for job %s", Tasks.jobKey(task)));
 
@@ -139,11 +140,9 @@ public class RunningTask implements Task {
 
     // Store the task information in the sandbox.
     try {
-      TaskUtils.storeTask(taskRoot, task);
-    } catch (IOException e) {
-      LOG.log(Level.SEVERE, "Failed to record task state.", e);
-    } catch (ThriftBinaryCodec.CodingException e) {
-      LOG.log(Level.SEVERE, "Failed to encode task state.", e);
+      recordTask();
+    } catch (TaskStorageException e) {
+      throw new TaskRunException("Failed to store task.", e);
     }
 
     LOG.info("Fetching payload.");
@@ -179,16 +178,8 @@ public class RunningTask implements Task {
   }
 
   @Override
-  public TwitterTaskInfo getTaskInfo() {
-    return task.getTask();
-  }
-
-  public File getSandboxDir() {
-    return sandboxDir;
-  }
-
-  public Map<String, Integer> getLeasedPorts() {
-    return ImmutableMap.copyOf(leasedPorts);
+  public AssignedTask getAssignedTask() {
+    return task.deepCopy();
   }
 
   /**
@@ -260,8 +251,7 @@ public class RunningTask implements Task {
 
     List<String> commandLine = Arrays.asList(
         "bash", "-c",  // Read commands from the following string.
-        String.format("echo $$ > ../%s; bash %s >stdout 2>stderr",
-            PIDFILE_NAME, RUN_SCRIPT_NAME)
+        String.format("echo $$ > ../%s; bash %s", PIDFILE_NAME, RUN_SCRIPT_NAME)
     );
 
     LOG.info("Executing shell command: " + commandLine);
@@ -271,6 +261,8 @@ public class RunningTask implements Task {
 
     try {
       process = processBuilder.start();
+
+      captureProcessOutput(process);
 
       if (supportsHttpSignals()) {
         ThreadFactory factory = new ThreadFactoryBuilder()
@@ -304,24 +296,51 @@ public class RunningTask implements Task {
         Thread.currentThread().interrupt();
         throw new TaskRunException("Interrupted while waiting for launch grace period.", e);
       }
-      buildKillCommand(supportsHttpSignals() ? leasedPorts.get(HEALTH_CHECK_PORT_NAME) : -1);
+      killCommand = buildKillCommand(
+          supportsHttpSignals() ? leasedPorts.get(HEALTH_CHECK_PORT_NAME) : -1);
 
-      stateMachine.transition(RUNNING);
+      setStatus(RUNNING);
     } catch (IOException e) {
-      stateMachine.transition(FAILED);
+      terminate(FAILED);
       throw new TaskRunException("Failed to launch process.", e);
     }
   }
 
-  private void buildKillCommand(int healthCheckPort) throws TaskRunException {
+  private void captureProcessOutput(final Process process) {
+      ThreadFactory captureFactory = new ThreadFactoryBuilder()
+          .setNameFormat(Tasks.jobKey(task) + "-OutputCapture-%d").setDaemon(true).build();
+      captureFactory.newThread(new Runnable() {
+        @Override public void run() {
+          File stdoutFile = new File(sandboxDir, STDOUT_CAPTURE_FILE);
+          LOG.info("Capturing stdout to " + stdoutFile);
+          captureStream(process.getInputStream(), stdoutFile);
+        }
+      }).start();
+      captureFactory.newThread(new Runnable() {
+        @Override public void run() {
+          File stderrFile = new File(sandboxDir, STDERR_CAPTURE_FILE);
+          LOG.info("Capturing stderr to " + stderrFile);
+          captureStream(process.getErrorStream(), stderrFile);
+        }
+      }).start();
+  }
+
+  private void captureStream(InputStream stream, File outputFile) {
     try {
-      pid = pidFetcher.apply(new File(taskRoot, PIDFILE_NAME));
+      ByteStreams.copy(stream, new FileOutputStream( outputFile));
+      LOG.info("Stream capture to " + outputFile + " completed.");
+    } catch (IOException e) {
+      LOG.log(Level.SEVERE, "Failed to capture stream.", e);
+    }
+  }
+
+  private KillCommand buildKillCommand(int healthCheckPort) throws TaskRunException {
+    try {
+      return new KillCommand(pidFetcher.apply(new File(taskRoot, PIDFILE_NAME)), healthCheckPort);
     } catch (FileToInt.FetchException e) {
       LOG.log(Level.WARNING, "Failed to read pidfile for " + this, e);
       throw new TaskRunException("Failed to read pidfile.", e);
     }
-
-    killCommand = new ProcessKiller.KillCommand(pid, healthCheckPort);
   }
 
   private boolean supportsHttpSignals() {
@@ -341,7 +360,8 @@ public class RunningTask implements Task {
    *
    * @return The state that the task was in upon termination.
    */
-  public ScheduleStatus waitFor() {
+  @Override
+  public ScheduleStatus blockUntilTerminated() {
     Preconditions.checkNotNull(process);
 
     while (stateMachine.getState() == RUNNING) {
@@ -350,8 +370,7 @@ public class RunningTask implements Task {
         LOG.info("Process terminated with exit code: " + exitCode);
 
         if (stateMachine.getState() != KILLED && stateMachine.getState() != FAILED) {
-          stateMachine.transition(exitCode == 0 ? FINISHED : FAILED);
-          recordStatus();
+          setStatus(exitCode == 0 ? FINISHED : FAILED);
         }
       } catch (InterruptedException e) {
         LOG.log(Level.WARNING,
@@ -374,15 +393,6 @@ public class RunningTask implements Task {
     return task.getTaskId();
   }
 
-  /**
-   * Gets the OS process ID.
-   *
-   * @return The process ID for this task, or -1 if the process ID is not yet known.
-   */
-  public int getProcessId() {
-    return pid;
-  }
-
   public boolean isRunning() {
     return stateMachine.getState() == RUNNING;
   }
@@ -395,10 +405,11 @@ public class RunningTask implements Task {
     return exitCode;
   }
 
-  private void recordStatus() {
+  private void setStatus(ScheduleStatus status) {
+    stateMachine.transition(status);
     try {
-      TaskUtils.saveTaskStatus(taskRoot, stateMachine.getState());
-    } catch (IOException e) {
+      recordStatus(stateMachine.getState());
+    } catch (TaskStorageException e) {
       LOG.log(Level.WARNING, "Failed to store task status.", e);
     }
   }
@@ -412,15 +423,16 @@ public class RunningTask implements Task {
     }
 
     LOG.info("Terminating task " + this);
-    stateMachine.transition(terminalState);
-    recordStatus();
+    setStatus(terminalState);
 
-    try {
-      processKiller.execute(killCommand);
-    } catch (ProcessKiller.KillException e) {
-      LOG.log(Level.WARNING, "Failed to kill process " + this, e);
-    } finally {
-      cleanUp(process);
+    if (killCommand != null) {
+      try {
+        processKiller.execute(killCommand);
+      } catch (ProcessKiller.KillException e) {
+        LOG.log(Level.WARNING, "Failed to kill process " + this, e);
+      } finally {
+        cleanUp(process);
+      }
     }
 
     if (healthCheckExecutor != null) {
@@ -434,12 +446,12 @@ public class RunningTask implements Task {
       }
     }
 
-    waitFor();
+    blockUntilTerminated();
   }
 
+  @Override
   public ResourceConsumption getResourceConsumption() {
-    return resourceConsumption
-        .setLeasedPorts(ImmutableMap.copyOf(leasedPorts));
+    return resourceConsumption.setLeasedPorts(ImmutableMap.copyOf(leasedPorts));
   }
 
   private boolean isHealthy() {

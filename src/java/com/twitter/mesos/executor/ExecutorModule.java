@@ -1,6 +1,9 @@
 package com.twitter.mesos.executor;
 
+import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Supplier;
+import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
@@ -14,19 +17,29 @@ import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.common.process.GuicedProcess;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.mesos.Message;
+import com.twitter.mesos.executor.Driver.MesosDriver;
+import com.twitter.mesos.executor.Driver.MesosDriverImpl;
+import com.twitter.mesos.executor.FileToInt.FetchException;
+import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
 import com.twitter.mesos.executor.HttpSignaler.SignalException;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
 import com.twitter.mesos.executor.ProcessKiller.KillException;
 import com.twitter.mesos.executor.httphandlers.ExecutorHome;
 import com.twitter.mesos.executor.httphandlers.TaskHome;
+import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.scheduler.ExecutorRootDir;
 import com.twitter.mesos.util.HdfsUtil;
+import mesos.Executor;
 import org.apache.hadoop.fs.FileSystem;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -45,65 +58,58 @@ public class ExecutorModule extends AbstractModule {
 
   @Override
   protected void configure() {
+
+    // Bindings needed for ExecutorMain.
+    bind(File.class).annotatedWith(ExecutorRootDir.class).toInstance(options.taskRootDir);
+    bind(Executor.class).to(MesosExecutorImpl.class).in(Singleton.class);
     bind(ExecutorCore.class).in(Singleton.class);
-    bind(MesosExecutorImpl.class).in(Singleton.class);
-    bind(new TypeLiteral<ExceptionalFunction<File, Integer, FileToInt.FetchException>>() {})
-        .to(FileToInt.class);
-    bind(new TypeLiteral<
-        ExceptionalFunction<Integer, Boolean, HealthChecker.HealthCheckException>>() {})
-        .to(HealthChecker.class);
+    bind(new TypeLiteral<Supplier<Iterable<Task>>>() {})
+        .to(DeadTaskLoader.class).in(Singleton.class);
 
-    bind(Key.get(File.class, Names.named(ExecutorCore.EXECUTOR_ROOT_DIR)))
-        .toInstance(options.taskRootDir);
+    // Bindings for MesosExecutorImpl.
+    bind(MesosDriver.class).to(MesosDriverImpl.class).in(Singleton.class);
 
-    GuicedProcess.registerServlet(binder(), "/task", TaskHome.class, false);
-    GuicedProcess.registerServlet(binder(), "/executor", ExecutorHome.class, false);
-  }
-
-  @Provides
-  @Singleton
-  public FileSystem provideFileSystem() throws IOException {
-    return HdfsUtil.getHdfsConfiguration(options.hdfsConfig);
-  }
-
-  @Provides
-  public ExceptionalFunction<FileCopyRequest, File, IOException> provideFileCopier(
-      final FileSystem fileSystem) {
-    return new ExceptionalFunction<FileCopyRequest, File, IOException>() {
-      @Override public File apply(FileCopyRequest copy) throws IOException {
-        LOG.info(String.format(
-            "HDFS file %s -> local file %s", copy.getSourcePath(), copy.getDestPath()));
-        // Thanks, Apache, for writing good code and just assuming that the path i give you has
-        // a trailing slash.  Of course it makes sense to blindly append a file name to the path
-        // i provide.
-        String dirWithSlash = copy.getDestPath();
-        if (!dirWithSlash.endsWith("/")) dirWithSlash += "/";
-
-        return HdfsUtil.downloadFileFromHdfs(fileSystem, copy.getSourcePath(), dirWithSlash, true);
-      }
-    };
-  }
-
-  @Provides
-  @Singleton
-  public SocketManager provideSocketManager() {
-    String[] portRange = options.managedPortRange.split("-");
-    if (portRange.length != 2) {
-      throw new IllegalArgumentException("Malformed managed port range value: "
-                                         + options.managedPortRange);
-    }
-
-    return new SocketManagerImpl(Integer.parseInt(portRange[0]), Integer.parseInt(portRange[1]));
-  }
-
-  @Provides
-  public ExceptionalFunction<String, List<String>, SignalException> provideHttpSignaler() {
+    // Bindings needed for ExecutorCore.
+    bind(new TypeLiteral<Function<AssignedTask, Task>>() {}).to(TaskFactory.class);
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
+        .setDaemon(true).setNameFormat("MesosExecutor-[%d]").build();
+    bind(Key.get(ExecutorService.class, Names.named(ExecutorCore.TASK_EXECUTOR)))
+        .toInstance(Executors.newCachedThreadPool(threadFactory));
+    bind(new TypeLiteral<Function<Message, Integer>>() {}).to(MesosDriverImpl.class)
+        .in(Singleton.class);
+
+    // Bindings needed for TaskFactory.
+    String[] portRange = options.managedPortRange.split("-");
+    Preconditions.checkArgument(portRange.length == 2, "Malformed managed port range value: "
+                                         + options.managedPortRange);
+    bind(SocketManager.class).to(SocketManagerImpl.class).in(Singleton.class);
+    bind(new TypeLiteral<ExceptionalFunction<Integer, Boolean, HealthCheckException>>() {})
+        .to(HealthChecker.class);
+    // processKiller handled in provider method.
+    bind(new TypeLiteral<ExceptionalFunction<File, Integer, FetchException>>() {})
+        .to(FileToInt.class);
+    bind(new TypeLiteral<ExceptionalFunction<FileCopyRequest, File, IOException>>() {})
+        .to(HdfsFileCopier.class).in(Singleton.class);
+
+    // Bindings needed for HealthChecker.
+    ThreadFactory httpSignalThreadFactory = new ThreadFactoryBuilder()
         .setDaemon(true)
         .setNameFormat("HTTP-signaler-%d")
         .build();
-    return new HttpSignaler(Executors.newCachedThreadPool(threadFactory),
-        Amount.of((long) options.httpSignalTimeoutMs, Time.MILLISECONDS));
+    bind(new TypeLiteral<ExceptionalFunction<String, List<String>, SignalException>>() {})
+        .toInstance(new HttpSignaler(Executors.newCachedThreadPool(httpSignalThreadFactory),
+        Amount.of((long) options.httpSignalTimeoutMs, Time.MILLISECONDS)));
+
+    // Bindings needed for HdfsFileCopier
+    try {
+      bind(FileSystem.class).toInstance(HdfsUtil.getHdfsConfiguration(options.hdfsConfig));
+    } catch (IOException e) {
+      LOG.log(Level.SEVERE, "Failed to create HDFS fileSystem.", e);
+      Throwables.propagate(e);
+    }
+
+    GuicedProcess.registerServlet(binder(), "/task", TaskHome.class, false);
+    GuicedProcess.registerServlet(binder(), "/executor", ExecutorHome.class, false);
   }
 
   @Provides

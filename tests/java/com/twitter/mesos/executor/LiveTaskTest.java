@@ -24,16 +24,18 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
 
+import static com.twitter.mesos.executor.LiveTask.*;
+import static com.twitter.mesos.executor.LiveTask.STDOUT_CAPTURE_FILE;
+import static com.twitter.mesos.executor.TaskOnDisk.TASK_DUMP_FILE;
+import static com.twitter.mesos.executor.TaskOnDisk.TASK_STATUS_FILE;
 import static org.easymock.EasyMock.*;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 
 /**
- * Tests for RunningTask.
- *
  * @author wfarner
  */
-public class RunningTaskTest {
+public class LiveTaskTest {
 
   private static final int PID = 12345;
   private static final int HTTP_PORT = 6789;
@@ -72,20 +74,22 @@ public class RunningTaskTest {
 
   @After
   public void tearDown() throws Exception {
+    /*
     try {
       if (executorRoot.exists()) org.apache.commons.io.FileUtils.deleteDirectory(executorRoot);
     } catch (Throwable t) {
       // TODO(wfarner): Figure out why this fails occasionally.
     }
+    */
   }
 
   @Test
   public void testStage() throws Exception {
     taskObj.getTask().setStartCommand("touch a.txt");
-    RunningTask taskA = makeTask(taskObj, TASK_ID_A);
+    LiveTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
     assertDirContents(executorRoot, String.valueOf(TASK_ID_A));
-    assertDirContents(taskA.getRootDir(), "sandbox", "task.dump");
+    assertDirContents(taskA.getRootDir(), SANDBOX_DIR_NAME, TASK_DUMP_FILE);
   }
 
   @Test
@@ -95,12 +99,14 @@ public class RunningTaskTest {
     control.replay();
 
     taskObj.getTask().setStartCommand("touch a.txt");
-    RunningTask taskA = makeTask(taskObj, TASK_ID_A);
+    LiveTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
     taskA.run();
-    assertThat(taskA.waitFor(), is(ScheduleStatus.FINISHED));
-    assertDirContents(taskA.getRootDir(), "sandbox", "pidfile", "task.dump", "task.status");
-    assertDirContents(taskA.sandboxDir, "a.txt", "run.sh", "stderr", "stdout");
+    assertThat(taskA.blockUntilTerminated(), is(ScheduleStatus.FINISHED));
+    assertDirContents(taskA.getRootDir(), SANDBOX_DIR_NAME, PIDFILE_NAME, TASK_DUMP_FILE,
+        TASK_STATUS_FILE);
+    assertDirContents(taskA.sandboxDir, "a.txt", RUN_SCRIPT_NAME, STDERR_CAPTURE_FILE,
+        STDOUT_CAPTURE_FILE);
   }
 
   @Test
@@ -110,14 +116,34 @@ public class RunningTaskTest {
     control.replay();
 
     taskObj.getTask().setStartCommand("echo \"hello world\"");
-    RunningTask taskA = makeTask(taskObj, TASK_ID_A);
+    LiveTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
     taskA.run();
-    assertThat(taskA.waitFor(), is(ScheduleStatus.FINISHED));
-    assertDirContents(taskA.getRootDir(), "sandbox", "pidfile", "task.dump", "task.status");
-    assertDirContents(taskA.sandboxDir, "run.sh", "stderr", "stdout");
+    assertThat(taskA.blockUntilTerminated(), is(ScheduleStatus.FINISHED));
+    assertDirContents(taskA.getRootDir(), SANDBOX_DIR_NAME, PIDFILE_NAME, TASK_DUMP_FILE,
+        TASK_STATUS_FILE);
+    assertDirContents(taskA.sandboxDir, RUN_SCRIPT_NAME, STDERR_CAPTURE_FILE, STDOUT_CAPTURE_FILE);
 
-    assertThat(Files.readLines(new File(taskA.sandboxDir, "stdout"), Charsets.UTF_8),
+    assertThat(Files.readLines(new File(taskA.sandboxDir, STDOUT_CAPTURE_FILE), Charsets.UTF_8),
+        is(Arrays.asList("hello world")));
+  }
+
+  @Test
+  public void testLaunchCapturesStderr() throws Exception {
+    expect(pidFetcher.apply((File) anyObject())).andReturn(PID);
+
+    control.replay();
+
+    taskObj.getTask().setStartCommand("echo \"hello world\" >&2");
+    LiveTask taskA = makeTask(taskObj, TASK_ID_A);
+    taskA.stage();
+    taskA.run();
+    assertThat(taskA.blockUntilTerminated(), is(ScheduleStatus.FINISHED));
+    assertDirContents(taskA.getRootDir(), SANDBOX_DIR_NAME, PIDFILE_NAME, TASK_DUMP_FILE,
+        TASK_STATUS_FILE);
+    assertDirContents(taskA.sandboxDir, RUN_SCRIPT_NAME, STDERR_CAPTURE_FILE, STDOUT_CAPTURE_FILE);
+
+    assertThat(Files.readLines(new File(taskA.sandboxDir, STDERR_CAPTURE_FILE), Charsets.UTF_8),
         is(Arrays.asList("hello world")));
   }
 
@@ -128,10 +154,10 @@ public class RunningTaskTest {
     control.replay();
 
     taskObj.getTask().setStartCommand("exit 2");
-    RunningTask taskA = makeTask(taskObj, TASK_ID_A);
+    LiveTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
     taskA.run();
-    assertThat(taskA.waitFor(), is(ScheduleStatus.FAILED));
+    assertThat(taskA.blockUntilTerminated(), is(ScheduleStatus.FAILED));
     assertThat(taskA.getExitCode(), is(2));
   }
 
@@ -146,7 +172,7 @@ public class RunningTaskTest {
 
     final AtomicReference<TaskState> state = new AtomicReference<TaskState>();
 
-    final RunningTask taskCopy = taskA;
+    final TaskRunner taskCopy = taskA;
     Thread waitThread = new Thread() {
       @Override public void run() {
         state.set(taskCopy.waitFor());
@@ -163,7 +189,8 @@ public class RunningTaskTest {
     waitThread.join(1000);
     assertThat(waitThread.isAlive(), is(false));
     assertThat(state.get(), is(TaskState.TASK_KILLED));
-    assertDirContents(taskA.getRootDir(), "b.txt", "stderr", "stdout", "pidfile");
+    assertDirContents(taskA.getRootDir(), "b.txt", STDERR_CAPTURE_FILE, STDOUT_CAPTURE_FILE,
+     PIDFILE_NAME);
     */
   }
 
@@ -180,11 +207,11 @@ public class RunningTaskTest {
 
     taskObj.getTask().setHealthCheckIntervalSecs(1)
         .setStartCommand("echo '%port:health%'; sleep 40");
-    RunningTask taskA = makeTask(taskObj, TASK_ID_A);
+    LiveTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
     taskA.run();
 
-    assertThat(taskA.waitFor(), is(ScheduleStatus.FAILED));
+    assertThat(taskA.blockUntilTerminated(), is(ScheduleStatus.FAILED));
   }
 
   @Test
@@ -197,11 +224,11 @@ public class RunningTaskTest {
     control.replay();
 
     taskObj.getTask().setStartCommand("echo '%port:myport%'");
-    RunningTask taskA = makeTask(taskObj, TASK_ID_A);
+    LiveTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
     taskA.run();
 
-    assertThat(taskA.waitFor(), is(ScheduleStatus.FINISHED));
+    assertThat(taskA.blockUntilTerminated(), is(ScheduleStatus.FINISHED));
   }
 
   @Test
@@ -215,7 +242,7 @@ public class RunningTaskTest {
     control.replay();
 
     taskObj.getTask().setStartCommand("echo '%port:myport%'; sleep 10");
-    RunningTask taskA = makeTask(taskObj, TASK_ID_A);
+    LiveTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
     taskA.run();
 
@@ -229,7 +256,7 @@ public class RunningTaskTest {
     control.replay();
 
     taskObj.getTask().setStartCommand("echo '%port:http%'");
-    RunningTask taskA = makeTask(taskObj, TASK_ID_A);
+    LiveTask taskA = makeTask(taskObj, TASK_ID_A);
 
     Pair<String, Map<String, Integer>> expanded = taskA.expandCommandLine();
 
@@ -246,7 +273,7 @@ public class RunningTaskTest {
     control.replay();
 
     taskObj.getTask().setStartCommand("echo '%port:http%'; echo '%port:http%';");
-    RunningTask taskA = makeTask(taskObj, TASK_ID_A);
+    LiveTask taskA = makeTask(taskObj, TASK_ID_A);
 
     Pair<String, Map<String, Integer>> expanded = taskA.expandCommandLine();
 
@@ -270,7 +297,7 @@ public class RunningTaskTest {
 
     taskObj.getTask().setStartCommand(
         "echo '%port:http%'; echo '%port:thrift%'; echo '%port:mail%'");
-    RunningTask taskA = makeTask(taskObj, TASK_ID_A);
+    LiveTask taskA = makeTask(taskObj, TASK_ID_A);
 
     Pair<String, Map<String, Integer>> expanded = taskA.expandCommandLine();
 
@@ -288,7 +315,7 @@ public class RunningTaskTest {
     control.replay();
 
     taskObj.getTask().setStartCommand("echo '%shard_id%'");
-    RunningTask taskA = makeTask(taskObj, TASK_ID_A);
+    LiveTask taskA = makeTask(taskObj, TASK_ID_A);
 
     String commandLine = taskA.expandCommandLine().getFirst();
     assertThat(commandLine, is("echo '" + SHARD_ID_A + "'"));
@@ -301,7 +328,7 @@ public class RunningTaskTest {
     control.replay();
 
     taskObj.getTask().setStartCommand("echo '%port:http%'; echo '%port:http%'");
-    RunningTask taskA = makeTask(taskObj, TASK_ID_A);
+    LiveTask taskA = makeTask(taskObj, TASK_ID_A);
 
     Pair<String, Map<String, Integer>> expanded = taskA.expandCommandLine();
 
@@ -320,13 +347,14 @@ public class RunningTaskTest {
 
     control.replay();
 
-    taskObj.getTask().setStartCommand("echo '%port:http%'; echo '%port:thrift%'; echo '%port:mail%'");
+    taskObj.getTask().setStartCommand(
+        "echo '%port:http%'; echo '%port:thrift%'; echo '%port:mail%'");
     makeTask(taskObj, TASK_ID_A).expandCommandLine();
   }
 
-  private RunningTask makeTask(AssignedTask task, int taskId) {
+  private LiveTask makeTask(AssignedTask task, int taskId) {
     task.setTaskId(taskId);
-    return new RunningTask(socketManager, healthChecker, processKiller, pidFetcher,
+    return new LiveTask(socketManager, healthChecker, processKiller, pidFetcher,
         new File(executorRoot, String.valueOf(task.getTaskId())), task, COPIER);
   }
 
