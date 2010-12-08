@@ -1,20 +1,19 @@
 package com.twitter.mesos.scheduler.httphandlers;
 
-import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.LiveTask;
 import com.twitter.mesos.gen.ScheduleStatus;
-import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
+import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerCore;
+import com.twitter.mesos.scheduler.TaskStore.TaskState;
 import org.antlr.stringtemplate.StringTemplate;
 
 import javax.servlet.ServletException;
@@ -23,6 +22,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -43,10 +43,10 @@ public class SchedulerzJob extends StringTemplateServlet {
 
   private static final Map<ScheduleStatus, Set<ScheduleStatus>> FILTER_MAP =
       ImmutableMap.<ScheduleStatus, Set<ScheduleStatus>>builder()
-        .put(PENDING, Sets.newHashSet(PENDING))
-        .put(RUNNING, Sets.newHashSet(STARTING, RUNNING))
-        .put(FINISHED, Sets.newHashSet(KILLED, KILLED_BY_CLIENT, FINISHED))
-        .put(FAILED, Sets.newHashSet(LOST, NOT_FOUND, FAILED))
+        .put(PENDING, EnumSet.of(PENDING))
+        .put(RUNNING, EnumSet.of(STARTING, RUNNING))
+        .put(FINISHED, EnumSet.of(KILLED, KILLED_BY_CLIENT, FINISHED))
+        .put(FAILED, EnumSet.of(LOST, NOT_FOUND, FAILED))
       .build();
 
   private static final Comparator<LiveTask> REVERSE_CHRON_COMPARATOR =
@@ -62,8 +62,8 @@ public class SchedulerzJob extends StringTemplateServlet {
   private static final Comparator<LiveTask> SHARD_ID_COMPARATOR =
       new Comparator<LiveTask>() {
         @Override public int compare(LiveTask taskA, LiveTask taskB) {
-          return taskA.getScheduledTask().getAssignedTask().getShardId()
-                 - taskB.getScheduledTask().getAssignedTask().getShardId();
+          return taskA.getScheduledTask().getAssignedTask().getTask().getShardId()
+                 - taskB.getScheduledTask().getAssignedTask().getTask().getShardId();
         }
       };
 
@@ -107,29 +107,25 @@ public class SchedulerzJob extends StringTemplateServlet {
             .setOwner(user)
             .setJobName(job);
 
-        List<LiveTask> activeTasks;
+        Set<TaskState> activeTasks;
         if (statusFilter != null) {
           query.setStatuses(FILTER_MAP.get(statusFilter));
-          activeTasks = Lists.newArrayList(scheduler.getLiveTasks(query));
+          activeTasks = scheduler.getTasks(new Query(query));
         } else {
-          activeTasks = getTasks(query, Tasks.ACTIVE_FILTER);
-          List<LiveTask> completedTasks = getTasks(query, Predicates.not(Tasks.ACTIVE_FILTER));
+          activeTasks = scheduler.getTasks(new Query(query, Tasks.ACTIVE_FILTER));
+          List<LiveTask> completedTasks = Lists.newArrayList(Iterables.transform(
+              scheduler.getTasks(new Query(query, Predicates.not(Tasks.ACTIVE_FILTER))),
+              Tasks.STATE_TO_LIVE));
           Collections.sort(completedTasks, REVERSE_CHRON_COMPARATOR);
           template.setAttribute("completedTasks", completedTasks);
         }
-        Collections.sort(activeTasks, SHARD_ID_COMPARATOR);
-        template.setAttribute("activeTasks", activeTasks);
+
+        List<LiveTask> liveTasks = Lists.newArrayList(Iterables.transform(activeTasks,
+            Tasks.STATE_TO_LIVE));
+
+        Collections.sort(liveTasks, SHARD_ID_COMPARATOR);
+        template.setAttribute("activeTasks", liveTasks);
       }
     });
-  }
-
-  private List<LiveTask> getTasks(TaskQuery query, final Predicate<ScheduledTask> filter) {
-    Iterable<LiveTask> liveTasks = scheduler.getLiveTasks(query);
-    return Lists.newArrayList(Iterables.filter(liveTasks,
-        new Predicate<LiveTask>() {
-          @Override public boolean apply(LiveTask task) {
-            return filter.apply(task.getScheduledTask());
-          }
-        }));
   }
 }

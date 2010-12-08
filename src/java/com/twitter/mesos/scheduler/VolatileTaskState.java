@@ -9,12 +9,17 @@ import javax.annotation.Nullable;
  *
  * @author wfarner
  */
-class VolatileTaskState {
-  final int taskId;
+public class VolatileTaskState {
+  public final int taskId;
   @Nullable
-  ResourceConsumption resources;
+  public ResourceConsumption resources;
 
   VolatileTaskState(int taskId) {
     this.taskId = taskId;
+  }
+
+  VolatileTaskState(VolatileTaskState toCopy) {
+    this.taskId = toCopy.taskId;
+    this.resources = toCopy.resources == null ? null : new ResourceConsumption(toCopy.resources);
   }
 }

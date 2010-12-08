@@ -8,6 +8,7 @@ import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.SchedulingFilter.SchedulingFilterImpl;
+import com.twitter.mesos.scheduler.TaskStore.TaskState;
 import org.junit.Test;
 
 import java.util.Map;
@@ -39,7 +40,7 @@ public class SchedulingFilterImplTest {
 
   @Test
   public void testMeetsOffer() {
-    Predicate<ScheduledTask> filter = DEFAULT_FILTER.makeFilter(DEFAULT_OFFER, HOST_A);
+    Predicate<TaskState> filter = DEFAULT_FILTER.makeFilter(DEFAULT_OFFER, HOST_A);
     assertThat(filter.apply(makeScheduledTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)), is(true));
     assertThat(filter.apply(makeScheduledTask(DEFAULT_CPUS - 1, DEFAULT_RAM - 1, DEFAULT_DISK - 1)),
         is(true));
@@ -47,7 +48,7 @@ public class SchedulingFilterImplTest {
 
   @Test
   public void testInsufficientResources() {
-    Predicate<ScheduledTask> filter = DEFAULT_FILTER.makeFilter(DEFAULT_OFFER, HOST_A);
+    Predicate<TaskState> filter = DEFAULT_FILTER.makeFilter(DEFAULT_OFFER, HOST_A);
     assertThat(filter.apply(makeScheduledTask(DEFAULT_CPUS + 1, DEFAULT_RAM + 1, DEFAULT_DISK + 1)),
         is(false));
     assertThat(filter.apply(makeScheduledTask(DEFAULT_CPUS + 1, DEFAULT_RAM, DEFAULT_DISK)),
@@ -96,14 +97,14 @@ public class SchedulingFilterImplTest {
         makeScheduledTask(OWNER_A, JOB_A, DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)), is(false));
   }
 
-  private static ScheduledTask makeScheduledTask(String owner, String jobName, int cpus,
+  private static TaskState makeScheduledTask(String owner, String jobName, int cpus,
       long ramMb, long diskMb) {
-    return new ScheduledTask().setAssignedTask(new AssignedTask().setTask(
+    return new TaskState(new ScheduledTask().setAssignedTask(new AssignedTask().setTask(
         new TwitterTaskInfo().setOwner(owner).setJobName(jobName).setNumCpus(cpus).setRamMb(ramMb)
-            .setDiskMb(diskMb)));
+            .setDiskMb(diskMb))));
   }
 
-  private static ScheduledTask makeScheduledTask(int cpus, long ramMb, long diskMb) {
+  private static TaskState makeScheduledTask(int cpus, long ramMb, long diskMb) {
     return makeScheduledTask(OWNER_A, JOB_A, cpus, ramMb, diskMb);
   }
 }

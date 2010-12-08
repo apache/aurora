@@ -1,17 +1,15 @@
 package com.twitter.mesos.scheduler;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
 import com.twitter.common.base.MorePreconditions;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.JobConfiguration;
-import com.twitter.mesos.gen.LiveTask;
 import com.twitter.mesos.gen.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.ScheduleStatus;
-import com.twitter.mesos.gen.ScheduledTask;
-import com.twitter.mesos.gen.TaskQuery;
-import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.JobManager.JobUpdateResult;
+import com.twitter.mesos.scheduler.TaskStore.TaskState;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
+import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 
 import java.util.Map;
 import java.util.Set;
@@ -52,38 +50,9 @@ public interface SchedulerCore {
    * Fetches information about all registered tasks for a job.
    *
    * @param query The query to identify tasks.
-   * @return An iterable of task objects.
+   * @return A set of task objects.
    */
-  public Iterable<ScheduledTask> getTasks(final TaskQuery query);
-
-  /**
-   * Fetches information about all registered tasks for a job.
-   *
-   * @param query The query to identify tasks.
-   * @param filters Additional filters to apply.
-   * @return An iterable of task objects.
-   */
-  public Iterable<ScheduledTask> getTasks(final TaskQuery query,
-      Predicate<ScheduledTask>... filters);
-
-  /**
-   * Like {@link #getTasks(TaskQuery)}, but composes the ScheduledTasks with volatile information
-   * about the tasks.
-   *
-   * @param query The query to identify tasks.
-   * @return An iterable of live task objects.
-   */
-  public Iterable<LiveTask> getLiveTasks(final TaskQuery query);
-
-  /**
-   * Checks whether the scheduler has a job matching the owner/jobName.
-   *
-   * @param owner The owner to look up.
-   * @param jobName The job name to look up.
-   * @return {@code true} if the scheduler has a job for the given owner and job name,
-   *    {@code false} otherwise.
-   */
-  public boolean hasActiveJob(final String owner, final String jobName);
+  public Set<TaskState> getTasks(Query query);
 
   /**
    * Creates a new job, whose tasks will become candidates for scheduling.
@@ -122,7 +91,7 @@ public interface SchedulerCore {
    * @param query The query to identify tasks
    * @param status The new state of the tasks.
    */
-  public void setTaskStatus(TaskQuery query, final ScheduleStatus status);
+  public void setTaskStatus(Query query, ScheduleStatus status);
 
   /**
    * Kills a specific set of tasks.
@@ -130,7 +99,7 @@ public interface SchedulerCore {
    * @param query The query to identify tasks
    * @throws ScheduleException If a problem occurs with the kill request.
    */
-  public void killTasks(final TaskQuery query) throws ScheduleException;
+  public void killTasks(Query query) throws ScheduleException;
 
   /**
    * Schedules a restart on a set of tasks.
@@ -140,6 +109,21 @@ public interface SchedulerCore {
    *    requested for restart may be rejected if it was not found, or was in a non-active state.
    */
   public Set<Integer> restartTasks(Set<Integer> taskIds);
+
+  /**
+   * Triggers an update to a job.
+   *
+   * @param updatedJob The updated job, which must correspond with an existing job.
+   * @return A description of the action that was or will be taken to update the job.
+   * @throws ScheduleException If the job could not be updated.
+   * @throws TaskDescriptionException If the updated job configuration was invalid.
+   */
+  public JobUpdateResult updateJob(JobConfiguration updatedJob) throws ScheduleException,
+      TaskDescriptionException;
+
+  // TODO(wfarner): This makes the interface look ugly, and shows how the encapsulation between
+  //    SchedulreCoreImpl and ImmediateJobManager is broken.
+  public JobUpdateResult doJobUpdate(JobConfiguration updatedJob) throws ScheduleException;
 
   /**
    * Gets the framework ID that this scheduler is registered with, or {@code null} if the framework

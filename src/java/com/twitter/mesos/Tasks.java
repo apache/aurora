@@ -1,13 +1,15 @@
 package com.twitter.mesos;
 
 import com.google.common.base.Function;
-import com.google.common.base.Preconditions;
+import com.google.common.base.Functions;
 import com.google.common.base.Predicate;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.LiveTask;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.TaskStore.TaskState;
 
 import java.util.Arrays;
 import java.util.EnumSet;
@@ -22,10 +24,57 @@ import static com.twitter.mesos.gen.ScheduleStatus.*;
  */
 public class Tasks {
 
-  public static final Function<ScheduledTask, Integer> GET_TASK_ID =
-      new Function<ScheduledTask, Integer>() {
-        @Override public Integer apply(ScheduledTask task) {
-          return task.getAssignedTask().getTaskId();
+  public static final Function<TaskState, ScheduledTask> STATE_TO_SCHEDULED =
+      new Function<TaskState, ScheduledTask>() {
+        @Override public ScheduledTask apply(TaskState state) {
+          return state.task;
+        }
+      };
+
+  public static final Function<ScheduledTask, AssignedTask> SCHEDULED_TO_ASSIGNED =
+      new Function<ScheduledTask, AssignedTask>() {
+        @Override public AssignedTask apply(ScheduledTask task) {
+          return task.getAssignedTask();
+        }
+      };
+
+  public static final Function<AssignedTask, TwitterTaskInfo> ASSIGNED_TO_INFO =
+      new Function<AssignedTask, TwitterTaskInfo>() {
+        @Override public TwitterTaskInfo apply(AssignedTask task) {
+          return task.getTask();
+        }
+      };
+
+  public static final Function<TaskState, AssignedTask> STATE_TO_ASSIGNED =
+      Functions.compose(SCHEDULED_TO_ASSIGNED, STATE_TO_SCHEDULED);
+
+  public static final Function<AssignedTask, Integer> ASSIGNED_TO_ID =
+      new Function<AssignedTask, Integer>() {
+        @Override public Integer apply(AssignedTask task) {
+          return task.getTaskId();
+        }
+      };
+
+  public static final Function<ScheduledTask, Integer> SCHEDULED_TO_ID =
+      Functions.compose(ASSIGNED_TO_ID, SCHEDULED_TO_ASSIGNED);
+
+  public static final Function<TaskState, Integer> STATE_TO_ID =
+      Functions.compose(SCHEDULED_TO_ID, STATE_TO_SCHEDULED);
+
+  public static final Function<TwitterTaskInfo, Integer> INFO_TO_SHARD_ID =
+      new Function<TwitterTaskInfo, Integer>() {
+        @Override public Integer apply(TwitterTaskInfo task) {
+          return task.getShardId();
+        }
+      };
+
+  public static final Function<AssignedTask, Integer> ASSIGNED_TO_SHARD_ID =
+      Functions.compose(INFO_TO_SHARD_ID, ASSIGNED_TO_INFO);
+
+  public static final Function<TaskState, LiveTask> STATE_TO_LIVE =
+      new Function<TaskState, LiveTask>() {
+        @Override public LiveTask apply(TaskState state) {
+          return new LiveTask(state.task, state.volatileState.resources);
         }
       };
 
@@ -45,18 +94,18 @@ public class Tasks {
   /**
    * Filter that includes only active tasks.
    */
-  public static final Predicate<ScheduledTask> ACTIVE_FILTER = new Predicate<ScheduledTask>() {
-      @Override public boolean apply(ScheduledTask task) {
-        return isActive(task.getStatus());
+  public static final Predicate<TaskState> ACTIVE_FILTER = new Predicate<TaskState>() {
+      @Override public boolean apply(TaskState state) {
+        return isActive(state.task.getStatus());
       }
     };
 
   /**
    * Filter that includes only terminal tasks.
    */
-  public static final Predicate<ScheduledTask> TERMINATED_FILTER = new Predicate<ScheduledTask>() {
-      @Override public boolean apply(ScheduledTask task) {
-        return isTerminated(task.getStatus());
+  public static final Predicate<TaskState> TERMINATED_FILTER = new Predicate<TaskState>() {
+      @Override public boolean apply(TaskState state) {
+        return isTerminated(state.task.getStatus());
       }
     };
 
@@ -72,13 +121,12 @@ public class Tasks {
     return TERMINAL_STATES.contains(status);
   }
 
-  public static Predicate<ScheduledTask> makeStatusFilter(ScheduleStatus... statuses) {
+  public static Predicate<TaskState> hasStatus(ScheduleStatus... statuses) {
     final Set<ScheduleStatus> filter = EnumSet.copyOf(Arrays.asList(statuses));
 
-    return new Predicate<ScheduledTask>() {
-      @Override public boolean apply(ScheduledTask task) {
-        Preconditions.checkNotNull(task);
-        return filter.contains(task.getStatus());
+    return new Predicate<TaskState>() {
+      @Override public boolean apply(TaskState state) {
+        return filter.contains(state.task.getStatus());
       }
     };
   }
@@ -101,5 +149,13 @@ public class Tasks {
 
   public static String jobKey(ScheduledTask task) {
     return jobKey(task.getAssignedTask());
+  }
+
+  public static int id(ScheduledTask task) {
+    return task.getAssignedTask().getTaskId();
+  }
+
+  public static int id(TaskState state) {
+    return id(state.task);
   }
 }

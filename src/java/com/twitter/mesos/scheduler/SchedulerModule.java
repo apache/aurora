@@ -14,6 +14,7 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.mesos.gen.NonVolatileSchedulerState;
+import com.twitter.mesos.scheduler.JobUpdateLauncher.JobUpdateLauncherImpl;
 import com.twitter.mesos.scheduler.SchedulingFilter.SchedulingFilterImpl;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzHome;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzJob;
@@ -47,6 +48,7 @@ public class SchedulerModule extends AbstractModule {
         Names.named(SchedulingFilterImpl.MACHINE_RESTRICTIONS)))
         .toInstance(options.machineRestrictions);
     bind(SchedulingFilter.class).to(SchedulingFilterImpl.class);
+    bind(JobUpdateLauncher.class).to(JobUpdateLauncherImpl.class);
     bind(SchedulerCore.class).to(SchedulerCoreImpl.class).in(Singleton.class);
 
     GuicedProcess.registerServlet(binder(), "/schedulerz", SchedulerzHome.class, false);

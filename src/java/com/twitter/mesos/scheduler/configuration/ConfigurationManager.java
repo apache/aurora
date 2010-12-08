@@ -33,6 +33,19 @@ public class ConfigurationManager {
     Map<String, String> configMap =  config.getConfiguration();
     if (configMap == null) throw new TaskDescriptionException("Task configuration may not be null");
 
+    // Check to make sure fields have not already been set.
+    if (config.isSetHdfsPath()
+        || config.isSetStartCommand()
+        || config.isSetIsDaemon()
+        || config.isSetNumCpus()
+        || config.isSetRamMb()
+        || config.isSetDiskMb()
+        || config.isSetPriority()
+        || config.isSetHealthCheckIntervalSecs()
+        || config.isSetMaxTaskFailures()) {
+      throw new TaskDescriptionException("Task config fields modified before parsing: " + config);
+    }
+
     config
         .setConfigParsed(true)
         .setOwner(job.getOwner())

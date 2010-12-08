@@ -1,7 +1,6 @@
 package com.twitter.mesos.scheduler;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.inject.Inject;
@@ -10,7 +9,6 @@ import com.twitter.mesos.StateTranslator;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.SchedulerMessage;
-import com.twitter.mesos.gen.TaskQuery;
 import mesos.ExecutorInfo;
 import mesos.FrameworkMessage;
 import mesos.Scheduler;
@@ -124,10 +122,9 @@ class MesosSchedulerImpl extends Scheduler {
     LOG.info("Received status update for task " + status.getTaskId()
         + " in state " + status.getState());
 
-    TaskQuery query = new TaskQuery();
-    query.addToTaskIds(status.getTaskId());
+    Query query = Query.byId(status.getTaskId());
 
-    if (Iterables.isEmpty(schedulerCore.getTasks(query))) {
+    if (schedulerCore.getTasks(query).isEmpty()) {
       LOG.severe("Failed to find task id " + status.getTaskId());
     } else {
       ScheduleStatus translatedState = StateTranslator.get(status.getState());

@@ -3,14 +3,12 @@ package com.twitter.mesos.scheduler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.twitter.common.collections.Pair;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.CronCollisionPolicy;
 import com.twitter.mesos.gen.JobConfiguration;
-import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.TaskQuery;
 import it.sauronsoftware.cron4j.InvalidPatternException;
 import it.sauronsoftware.cron4j.Scheduler;
@@ -35,6 +33,13 @@ public class CronJobManager extends JobManager {
 
   private static final String MANAGER_KEY = "CRON";
 
+  private static final Function<Pair<String, JobConfiguration>, JobConfiguration> GET_JOB_COPY =
+      new Function<Pair<String, JobConfiguration>, JobConfiguration>() {
+        @Override public JobConfiguration apply(Pair<String, JobConfiguration> input) {
+          return new JobConfiguration(input.getSecond());
+        }
+      };
+
   // Cron manager.
   private final Scheduler scheduler = new Scheduler();
 
@@ -49,31 +54,31 @@ public class CronJobManager extends JobManager {
   /**
    * Triggers execution of a job.
    *
-   * @param user Owner of the job.
-   * @param name Name of the job to start.
+   * @param jobKey Key of the job to start.
    */
-  public void startJobNow(String user, String name) {
-    Preconditions.checkArgument(hasJob(user, name), "No such cron job " + Tasks.jobKey(user, name));
+  public synchronized void startJobNow(String jobKey) {
+    Preconditions.checkArgument(hasJob(jobKey), "No such cron job " + jobKey);
 
-    cronTriggered(scheduledJobs.get(Tasks.jobKey(user, name)).getSecond());
+    cronTriggered(jobKey);
   }
 
   /**
    * Triggers execution of a cron job, depending on the cron collision policy for the job.
    *
-   * @param job Job triggered.
+   * @param jobKey Key for the job triggered.
    */
   @VisibleForTesting
-  void cronTriggered(JobConfiguration job) {
-    LOG.info(String.format("Cron triggered for %s at %s", Tasks.jobKey(job), new Date()));
+  synchronized void cronTriggered(String jobKey) {
+    LOG.info(String.format("Cron triggered for %s at %s", jobKey, new Date()));
+
+    JobConfiguration job = scheduledJobs.get(jobKey).getSecond();
 
     boolean runJob = false;
 
-    TaskQuery query = new TaskQuery().setOwner(job.getOwner()).setJobName(job.getName())
-        .setStatuses(ImmutableSet.of(
-            ScheduleStatus.PENDING, ScheduleStatus.STARTING, ScheduleStatus.RUNNING));
+    Query query = new Query(new TaskQuery().setOwner(job.getOwner()).setJobName(job.getName())
+        .setStatuses(Tasks.ACTIVE_STATES));
 
-    if (Iterables.isEmpty(schedulerCore.getTasks(query))) {
+    if (schedulerCore.getTasks(query).isEmpty()) {
       runJob = true;
     } else {
       // Assign a default collision policy.
@@ -114,7 +119,7 @@ public class CronJobManager extends JobManager {
   }
 
   @Override
-  public boolean receiveJob(final JobConfiguration job) throws ScheduleException {
+  public synchronized boolean receiveJob(final JobConfiguration job) throws ScheduleException {
     if (StringUtils.isEmpty(job.getCronSchedule())) return false;
 
     LOG.info(String.format("Scheduling cron job %s: %s", Tasks.jobKey(job), job.getCronSchedule()));
@@ -125,7 +130,7 @@ public class CronJobManager extends JobManager {
               @Override public void run() {
                 // TODO(wfarner): May want to record information about job runs.
                 LOG.info("Cron job running.");
-                cronTriggered(job);
+                cronTriggered(Tasks.jobKey(job));
               }
             }),
             job)
@@ -138,40 +143,40 @@ public class CronJobManager extends JobManager {
   }
 
   @Override
-  public Iterable<JobConfiguration> getState() {
-    return Iterables.transform(scheduledJobs.values(),
-        new Function<Pair<String, JobConfiguration>, JobConfiguration>() {
-      @Override public JobConfiguration apply(Pair<String, JobConfiguration> configPair) {
-        return configPair.getSecond();
-      }
-    });
+  public synchronized JobUpdateResult updateJob(JobConfiguration job) throws ScheduleException {
+    String jobKey = Tasks.jobKey(job);
+    Preconditions.checkState(hasJob(jobKey));
+
+    if (job.equals(scheduledJobs.get(jobKey).getSecond())) {
+      return JobUpdateResult.JOB_UNCHANGED;
+    }
+
+    deleteJob(jobKey);
+    Preconditions.checkState(receiveJob(job), "Cron job manager failed to create updated job");
+    return JobUpdateResult.COMPLETED;
   }
 
   @Override
-  public boolean hasJob(String owner, String job) {
-    return scheduledJobs.containsKey(Tasks.jobKey(owner, job));
+  public synchronized Iterable<JobConfiguration> getJobs() {
+    return Iterables.transform(scheduledJobs.values(), GET_JOB_COPY);
   }
 
   @Override
-  public boolean deleteJob(String owner, String job) {
-    if (!hasJob(owner, job)) return false;
+  public synchronized boolean hasJob(String jobKey) {
+    return scheduledJobs.containsKey(jobKey);
+  }
 
-    Pair<String, JobConfiguration> jobObj = scheduledJobs.remove(Tasks.jobKey(owner, job));
+  @Override
+  public synchronized boolean deleteJob(String jobKey) {
+    if (!hasJob(jobKey)) return false;
 
-    if (jobObj!= null) {
+    Pair<String, JobConfiguration> jobObj = scheduledJobs.remove(jobKey);
+
+    if (jobObj != null) {
       scheduler.deschedule(jobObj.getFirst());
-      LOG.info("Successfully deleted cron job for " + Tasks.jobKey(owner, job));
+      LOG.info("Successfully deleted cron job " + jobKey);
     }
 
     return true;
-  }
-
-  public Iterable<JobConfiguration> getJobs() {
-    return Iterables.transform(scheduledJobs.values(),
-        new Function<Pair<String, JobConfiguration>, JobConfiguration>() {
-      @Override public JobConfiguration apply(Pair<String, JobConfiguration> jobObj) {
-        return jobObj.getSecond();
-      }
-    });
   }
 }

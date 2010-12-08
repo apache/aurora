@@ -5,8 +5,8 @@ import com.google.common.base.Predicate;
 import com.google.inject.Inject;
 import com.google.inject.name.Named;
 import com.twitter.mesos.Tasks;
-import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.TaskStore.TaskState;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 
 import java.util.Map;
@@ -26,7 +26,7 @@ public interface SchedulingFilter {
    * @param slaveHost The slave host that the resource offer is associated with.
    * @return A new predicate that can be used to find tasks meeting the offer.
    */
-  public Predicate<ScheduledTask> makeFilter(TwitterTaskInfo resourceOffer, String slaveHost);
+  public Predicate<TaskState> makeFilter(TwitterTaskInfo resourceOffer, String slaveHost);
 
   /**
    * Implementation of the scheduling filter that ensures resource requirements of tasks are
@@ -95,17 +95,18 @@ public interface SchedulingFilter {
 
     // TODO(wfarner): Comparing strings as canonical host IDs could be problematic.  Consider
     //    an approach that would be robust when presented with an IP address as well.
-    @Override public Predicate<ScheduledTask> makeFilter(final TwitterTaskInfo resourceOffer,
+    @Override public Predicate<TaskState> makeFilter(final TwitterTaskInfo resourceOffer,
         final String slaveHost) {
-      return new Predicate<ScheduledTask>() {
-        @Override public boolean apply(ScheduledTask task) {
+      return new Predicate<TaskState>() {
+        @Override public boolean apply(TaskState state) {
           // First check if the offer actually satisfies the resources required for the task.
-          if (!ConfigurationManager.satisfied(task.getAssignedTask().getTask(), resourceOffer)) {
+          if (!ConfigurationManager.satisfied(
+              state.task.getAssignedTask().getTask(), resourceOffer)) {
             return false;
           }
 
           // Now check if the task may be run on the machine.
-          return isPairAllowed(slaveHost, Tasks.jobKey(task));
+          return isPairAllowed(slaveHost, Tasks.jobKey(state.task));
         }
       };
     }

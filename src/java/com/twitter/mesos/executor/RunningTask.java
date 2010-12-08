@@ -228,7 +228,7 @@ public class RunningTask implements Task {
   }
 
   private String expandShardId(String commandLine) {
-    return commandLine.replaceAll(SHARD_ID_REGEXP, String.valueOf(task.getShardId()));
+    return commandLine.replaceAll(SHARD_ID_REGEXP, String.valueOf(task.getTask().getShardId()));
   }
 
   @Override

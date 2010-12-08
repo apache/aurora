@@ -47,6 +47,7 @@ public class RunningTaskTest {
       .setOwner("OWNER_A")
       .setJobName("JOB_A")
       .setStartCommand("touch a.txt")
+      .setShardId(SHARD_ID_A)
       .setHdfsPath("/fake/path");
   private AssignedTask taskObj;
 
@@ -66,7 +67,7 @@ public class RunningTaskTest {
     pidFetcher = control.createMock(ExceptionalFunction.class);
 
     executorRoot = FileUtils.createTempDir();
-    taskObj = new AssignedTask().setTask(TASK_A).setShardId(SHARD_ID_A);
+    taskObj = new AssignedTask().setTask(TASK_A);
   }
 
   @After

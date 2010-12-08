@@ -8,11 +8,13 @@ import com.google.common.collect.Maps;
 import com.google.inject.Inject;
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
+import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.JobConfiguration;
-import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.CronJobManager;
+import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerCore;
+import com.twitter.mesos.scheduler.TaskStore.TaskState;
 import it.sauronsoftware.cron4j.Predictor;
 import org.antlr.stringtemplate.StringTemplate;
 
@@ -57,28 +59,26 @@ public class SchedulerzUser extends StringTemplateServlet {
 
         final String cronJobLaunched = req.getParameter(START_CRON_PARAM);
         if (cronJobLaunched != null) {
-          if (!cronScheduler.hasJob(user, cronJobLaunched)) {
+          if (!cronScheduler.hasJob(Tasks.jobKey(user, cronJobLaunched))) {
             template.setAttribute("exception", "Unrecognized cron job " + cronJobLaunched);
             return;
           }
 
           LOG.info("Received web request to launch cron job " + user + "/" + cronJobLaunched);
-          cronScheduler.startJobNow(user, cronJobLaunched);
+          cronScheduler.startJobNow(Tasks.jobKey(user, cronJobLaunched));
         }
-
-        TaskQuery query = new TaskQuery().setOwner(user);
 
         Map<String, Job> jobs = Maps.newHashMap();
 
-        for (ScheduledTask task : scheduler.getTasks(query)) {
-          Job job = jobs.get(task.getAssignedTask().getTask().getJobName());
+        for (TaskState state : scheduler.getTasks(new Query(new TaskQuery().setOwner(user)))) {
+          Job job = jobs.get(state.task.getAssignedTask().getTask().getJobName());
           if (job == null) {
             job = new Job();
-            job.name = task.getAssignedTask().getTask().getJobName();
+            job.name = state.task.getAssignedTask().getTask().getJobName();
             jobs.put(job.name, job);
           }
 
-          switch (task.getStatus()) {
+          switch (state.task.getStatus()) {
             case PENDING:
               job.pendingTaskCount++;
               break;
@@ -101,7 +101,7 @@ public class SchedulerzUser extends StringTemplateServlet {
               break;
 
             default:
-              throw new IllegalArgumentException("Unsupported status: " + task.getStatus());
+              throw new IllegalArgumentException("Unsupported status: " + state.task.getStatus());
           }
         }
 

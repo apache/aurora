@@ -10,10 +10,10 @@ import com.google.inject.Inject;
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.mesos.Tasks;
-import com.twitter.mesos.gen.ScheduledTask;
-import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.CronJobManager;
+import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerCore;
+import com.twitter.mesos.scheduler.TaskStore.TaskState;
 import org.antlr.stringtemplate.StringTemplate;
 
 import javax.servlet.ServletException;
@@ -21,6 +21,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * HTTP interface to serve as a HUD for the mesos scheduler.
@@ -50,13 +51,13 @@ public class SchedulerzHome extends StringTemplateServlet {
           }
         });
 
-        Multimap<String, ScheduledTask> userJobs = HashMultimap.create();
+        Multimap<String, TaskState> userJobs = HashMultimap.create();
 
-        Iterable<ScheduledTask> tasks = scheduler.getTasks(new TaskQuery());
+        Set<TaskState> tasks = scheduler.getTasks(Query.GET_ALL);
 
-        for (ScheduledTask task : tasks) {
-          User user = users.get(task.getAssignedTask().getTask().getOwner());
-          switch (task.getStatus()) {
+        for (TaskState state : tasks) {
+          User user = users.get(state.task.getAssignedTask().getTask().getOwner());
+          switch (state.task.getStatus()) {
             case PENDING:
               user.pendingTaskCount++;
               break;
@@ -79,21 +80,17 @@ public class SchedulerzHome extends StringTemplateServlet {
               break;
 
             default:
-              throw new IllegalArgumentException("Unsupported status: " + task.getStatus());
+              throw new IllegalArgumentException("Unsupported status: " + state.task.getStatus());
           }
 
-          userJobs.put(user.name, task);
+          userJobs.put(user.name, state);
         }
 
         for (User user : users.values()) {
-          Iterable<ScheduledTask> activeUserTasks = Iterables.filter(userJobs.get(user.name),
+          Iterable<TaskState> activeUserTasks = Iterables.filter(userJobs.get(user.name),
               Tasks.ACTIVE_FILTER);
-          user.jobCount = Sets.newHashSet(Iterables.transform(activeUserTasks,
-              new Function<ScheduledTask, String>() {
-                @Override public String apply(ScheduledTask task) {
-                  return task.getAssignedTask().getTask().getJobName();
-                }
-              })).size();
+          user.jobCount = Sets.newHashSet(Iterables.transform(
+              activeUserTasks, GET_JOB_NAME)).size();
         }
 
         template.setAttribute("users",
@@ -104,6 +101,13 @@ public class SchedulerzHome extends StringTemplateServlet {
       }
     });
   }
+
+  private static final Function<TaskState, String> GET_JOB_NAME =
+      new Function<TaskState, String>() {
+        @Override public String apply(TaskState state) {
+          return state.task.getAssignedTask().getTask().getJobName();
+        }
+      };
 
   static class User {
     String name;
