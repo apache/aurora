@@ -649,7 +649,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
       }
     };
 
-    taskStore.mutate(Query.and(query, Predicates.not(Tasks.hasStatus(PENDING))), mutate);
+    taskStore.mutate(Query.and(query, Tasks.ACTIVE_FILTER), mutate);
 
     persist();
   }
