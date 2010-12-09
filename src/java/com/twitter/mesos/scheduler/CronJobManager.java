@@ -14,6 +14,7 @@ import it.sauronsoftware.cron4j.InvalidPatternException;
 import it.sauronsoftware.cron4j.Scheduler;
 import org.apache.commons.lang.StringUtils;
 
+import java.util.Collections;
 import java.util.Date;
 import java.util.Map;
 import java.util.logging.Level;
@@ -45,7 +46,8 @@ public class CronJobManager extends JobManager {
 
   // Maps from the our unique job identifier (<owner>/<jobName>) to the unique identifier used
   // internally by the cron4j scheduler.
-  private final Map<String, Pair<String, JobConfiguration>> scheduledJobs = Maps.newHashMap();
+  private final Map<String, Pair<String, JobConfiguration>> scheduledJobs =
+      Collections.synchronizedMap(Maps.<String, Pair<String, JobConfiguration>>newHashMap());
 
   public CronJobManager() {
     scheduler.start();
@@ -56,7 +58,7 @@ public class CronJobManager extends JobManager {
    *
    * @param jobKey Key of the job to start.
    */
-  public synchronized void startJobNow(String jobKey) {
+  public void startJobNow(String jobKey) {
     Preconditions.checkArgument(hasJob(jobKey), "No such cron job " + jobKey);
 
     cronTriggered(jobKey);
@@ -68,7 +70,7 @@ public class CronJobManager extends JobManager {
    * @param jobKey Key for the job triggered.
    */
   @VisibleForTesting
-  synchronized void cronTriggered(String jobKey) {
+  void cronTriggered(String jobKey) {
     LOG.info(String.format("Cron triggered for %s at %s", jobKey, new Date()));
 
     JobConfiguration job = scheduledJobs.get(jobKey).getSecond();
@@ -119,7 +121,7 @@ public class CronJobManager extends JobManager {
   }
 
   @Override
-  public synchronized boolean receiveJob(final JobConfiguration job) throws ScheduleException {
+  public boolean receiveJob(final JobConfiguration job) throws ScheduleException {
     if (StringUtils.isEmpty(job.getCronSchedule())) return false;
 
     LOG.info(String.format("Scheduling cron job %s: %s", Tasks.jobKey(job), job.getCronSchedule()));
@@ -143,7 +145,7 @@ public class CronJobManager extends JobManager {
   }
 
   @Override
-  public synchronized JobUpdateResult updateJob(JobConfiguration job) throws ScheduleException {
+  public JobUpdateResult updateJob(JobConfiguration job) throws ScheduleException {
     String jobKey = Tasks.jobKey(job);
     Preconditions.checkState(hasJob(jobKey));
 
@@ -157,17 +159,17 @@ public class CronJobManager extends JobManager {
   }
 
   @Override
-  public synchronized Iterable<JobConfiguration> getJobs() {
+  public Iterable<JobConfiguration> getJobs() {
     return Iterables.transform(scheduledJobs.values(), GET_JOB_COPY);
   }
 
   @Override
-  public synchronized boolean hasJob(String jobKey) {
+  public boolean hasJob(String jobKey) {
     return scheduledJobs.containsKey(jobKey);
   }
 
   @Override
-  public synchronized boolean deleteJob(String jobKey) {
+  public boolean deleteJob(String jobKey) {
     if (!hasJob(jobKey)) return false;
 
     Pair<String, JobConfiguration> jobObj = scheduledJobs.remove(jobKey);
