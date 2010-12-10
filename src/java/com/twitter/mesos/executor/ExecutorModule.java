@@ -18,8 +18,7 @@ import com.twitter.common.process.GuicedProcess;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.mesos.Message;
-import com.twitter.mesos.executor.Driver.MesosDriver;
-import com.twitter.mesos.executor.Driver.MesosDriverImpl;
+import com.twitter.mesos.executor.Driver.DriverImpl;
 import com.twitter.mesos.executor.FileToInt.FetchException;
 import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
 import com.twitter.mesos.executor.HttpSignaler.SignalException;
@@ -67,7 +66,8 @@ public class ExecutorModule extends AbstractModule {
         .to(DeadTaskLoader.class).in(Singleton.class);
 
     // Bindings for MesosExecutorImpl.
-    bind(MesosDriver.class).to(MesosDriverImpl.class).in(Singleton.class);
+    bind(Driver.class).to(DriverImpl.class);
+    bind(DriverImpl.class).in(Singleton.class);
 
     // Bindings needed for ExecutorCore.
     bind(new TypeLiteral<Function<AssignedTask, Task>>() {}).to(TaskFactory.class);
@@ -75,8 +75,7 @@ public class ExecutorModule extends AbstractModule {
         .setDaemon(true).setNameFormat("MesosExecutor-[%d]").build();
     bind(Key.get(ExecutorService.class, Names.named(ExecutorCore.TASK_EXECUTOR)))
         .toInstance(Executors.newCachedThreadPool(threadFactory));
-    bind(new TypeLiteral<Function<Message, Integer>>() {}).to(MesosDriverImpl.class)
-        .in(Singleton.class);
+    bind(new TypeLiteral<Function<Message, Integer>>() {}).to(DriverImpl.class);
 
     // Bindings needed for TaskFactory.
     String[] portRange = options.managedPortRange.split("-");

@@ -152,7 +152,7 @@ class MesosSchedulerImpl extends Scheduler {
     try {
       SchedulerMessage schedulerMsg = ThriftBinaryCodec.decode(SchedulerMessage.class,
           message.getData());
-      if (!schedulerMsg.isSet()) {
+      if (schedulerMsg == null || !schedulerMsg.isSet()) {
         LOG.warning("Received empty scheduler message.");
         return;
       }

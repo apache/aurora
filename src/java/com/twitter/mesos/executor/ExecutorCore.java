@@ -243,7 +243,6 @@ public class ExecutorCore implements TaskManager {
           LOG.log(Level.INFO, "Failed to get disk free space.", e);
         }
 
-        LOG.info("Sending executor status update: " + status);
         SchedulerMessage message = new SchedulerMessage();
         message.setExecutorStatus(status);
         messageHandler.apply(new Message(message));

@@ -33,15 +33,15 @@ public interface Driver extends Function<Message, Integer> {
   public int sendStatusUpdate(int taskId, ScheduleStatus status);
 
   /**
-   * A driver with a settable reference for the mesos executor driver to use.
+   * Sets the underlying driver.
+   *
+   * @param driver Real driver.
    */
-  public static interface MesosDriver extends Driver {
-    public void setDriver(ExecutorDriver driver);
-  }
+  public void setDriver(ExecutorDriver driver);
 
-  public static class MesosDriverImpl implements MesosDriver {
+  public static class DriverImpl implements Driver {
 
-    private static final Logger LOG = Logger.getLogger(MesosDriverImpl.class.getName());
+    private static final Logger LOG = Logger.getLogger(DriverImpl.class.getName());
 
     private final AtomicReference<ExecutorDriver> driverRef = new AtomicReference<ExecutorDriver>();
 
@@ -65,8 +65,12 @@ public interface Driver extends Function<Message, Integer> {
         LOG.warning("Driver not available, message could not be sent.");
         return -1;
       }
-
-      return work.apply(driver);
+      try {
+        return work.apply(driver);
+      } catch (Throwable t) {
+        LOG.log(Level.SEVERE, "Uncaught exception.", t);
+        return -1;
+      }
     }
 
     @Override public Integer apply(final Message message) {
@@ -75,7 +79,7 @@ public interface Driver extends Function<Message, Integer> {
       return doWorkWithDriver(new Function<ExecutorDriver, Integer>() {
         @Override public Integer apply(ExecutorDriver driver) {
           FrameworkMessage frameworkMessage = new FrameworkMessage();
-          frameworkMessage.setSlaveId(message.getSlaveId());
+          if (message.getSlaveId() != null) frameworkMessage.setSlaveId(message.getSlaveId());
           try {
             frameworkMessage.setData(ThriftBinaryCodec.encode(message.getMessage()));
           } catch (CodingException e) {

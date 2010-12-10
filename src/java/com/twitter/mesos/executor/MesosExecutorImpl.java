@@ -4,7 +4,6 @@ import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
-import com.twitter.mesos.executor.Driver.MesosDriver;
 import com.twitter.mesos.executor.Task.TaskRunException;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ExecutorMessage;
@@ -32,23 +31,27 @@ public class MesosExecutorImpl extends Executor {
   private final static byte[] EMPTY_MSG = new byte[0];
 
   private final ExecutorCore executorCore;
-  private final MesosDriver driver;
+  private final Driver driver;
 
   @Inject
-  public MesosExecutorImpl(ExecutorCore executorCore, MesosDriver driver) {
+  public MesosExecutorImpl(ExecutorCore executorCore, Driver driver) {
     this.executorCore = Preconditions.checkNotNull(executorCore);
     this.driver = Preconditions.checkNotNull(driver);
   }
 
   @Override
   public void init(ExecutorDriver executorDriver, ExecutorArgs executorArgs) {
-    executorCore.setSlaveId(executorArgs.getSlaveId());
+    LOG.info("Initialized with driver " + executorDriver + " and args " + executorArgs);
     driver.setDriver(executorDriver);
+    executorCore.setSlaveId(executorArgs.getSlaveId());
   }
 
   @Override
   public void launchTask(final ExecutorDriver driverDoNotUse, final TaskDescription task) {
     LOG.info(String.format("Running task %s with ID %d.", task.getName(), task.getTaskId()));
+
+    // TODO(wfarner): Remove this if we find that init is called consistently.
+    driver.setDriver(driverDoNotUse);
 
     final AssignedTask assignedTask;
     try {
