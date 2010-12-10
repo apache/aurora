@@ -8,7 +8,6 @@ import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 import com.google.inject.name.Names;
-import com.twitter.common.process.GuicedProcess;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.zookeeper.SingletonService;
@@ -16,6 +15,7 @@ import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.mesos.gen.NonVolatileSchedulerState;
 import com.twitter.mesos.scheduler.JobUpdateLauncher.JobUpdateLauncherImpl;
 import com.twitter.mesos.scheduler.SchedulingFilter.SchedulingFilterImpl;
+import com.twitter.mesos.scheduler.httphandlers.Mname;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzHome;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzJob;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzUser;
@@ -28,6 +28,8 @@ import mesos.MesosSchedulerDriver;
 import javax.annotation.Nullable;
 import java.util.Map;
 import java.util.logging.Logger;
+
+import static com.twitter.common.process.GuicedProcess.registerServlet;
 
 public class SchedulerModule extends AbstractModule {
   private final static Logger LOG = Logger.getLogger(SchedulerModule.class.getName());
@@ -51,9 +53,10 @@ public class SchedulerModule extends AbstractModule {
     bind(JobUpdateLauncher.class).to(JobUpdateLauncherImpl.class);
     bind(SchedulerCore.class).to(SchedulerCoreImpl.class).in(Singleton.class);
 
-    GuicedProcess.registerServlet(binder(), "/schedulerz", SchedulerzHome.class, false);
-    GuicedProcess.registerServlet(binder(), "/schedulerz/user", SchedulerzUser.class, true);
-    GuicedProcess.registerServlet(binder(), "/schedulerz/job", SchedulerzJob.class, true);
+    registerServlet(binder(), "/schedulerz", SchedulerzHome.class, false);
+    registerServlet(binder(), "/schedulerz/user", SchedulerzUser.class, true);
+    registerServlet(binder(), "/schedulerz/job", SchedulerzJob.class, true);
+    registerServlet(binder(), "/mname", Mname.class, false);
   }
 
   @Provides

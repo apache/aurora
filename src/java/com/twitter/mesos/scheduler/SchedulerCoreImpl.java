@@ -38,7 +38,6 @@ import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescri
 import com.twitter.mesos.scheduler.persistence.PersistenceLayer;
 
 import java.util.Arrays;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -51,6 +50,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import static com.google.common.collect.Iterables.filter;
+import static com.google.common.collect.Iterables.transform;
 import static com.twitter.mesos.gen.ScheduleStatus.*;
 import static com.twitter.mesos.scheduler.JobManager.JobUpdateResult.*;
 
@@ -166,11 +167,9 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
     final AtomicBoolean mutated = new AtomicBoolean(false);
 
-    final Map<Integer, LiveTaskInfo> taskInfoMap = Maps.newHashMap();
-
-    for (LiveTaskInfo taskInfo : update.getTaskInfos()) {
-      taskInfoMap.put(taskInfo.getTaskId(), taskInfo);
-    }
+    // Wrap with a mutable map so we can modify later.
+    final Map<Integer, LiveTaskInfo> taskInfoMap = Maps.newHashMap(
+        Maps.uniqueIndex(update.getTaskInfos(), Tasks.LIVE_TO_ID));
 
     // TODO(wfarner): Have the scheduler only retain configurations for live jobs,
     //    and acquire all other state from slaves.
@@ -207,17 +206,11 @@ public class SchedulerCoreImpl implements SchedulerCore {
       }
     };
 
-    Function<LiveTaskInfo, Integer> getTaskId = new Function<LiveTaskInfo, Integer>() {
-      @Override public Integer apply(LiveTaskInfo update) {
-        return update.getTaskId();
-      }
-    };
-
     // Find any tasks that we believe to be running, but the slave reports as dead.
     Set<Integer> reportedDeadTasks = Sets.newHashSet(
-        Iterables.transform(Iterables.filter(taskInfoMap.values(), getKilledTasks), getTaskId));
+        transform(filter(taskInfoMap.values(), getKilledTasks), Tasks.LIVE_TO_ID));
     Set<Integer> deadTasks = taskStore.fetchIds(
-        new Query(new TaskQuery().setTaskIds(reportedDeadTasks).setStatuses(EnumSet.of(RUNNING))));
+        new Query(new TaskQuery().setTaskIds(reportedDeadTasks), Tasks.ACTIVE_FILTER));
     if (!deadTasks.isEmpty()) {
       LOG.info("Found tasks that were recorded as RUNNING but slave " + update.getSlaveHost()
                + " reports as KILLED: " + deadTasks);
@@ -310,7 +303,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     if (tasks.isEmpty()) return;
 
     LOG.info("Launching " + tasks.size() + " tasks.");
-    taskStore.add(ImmutableSet.copyOf(Iterables.transform(tasks, taskCreator)));
+    taskStore.add(ImmutableSet.copyOf(transform(tasks, taskCreator)));
     persist();
   }
 
@@ -319,7 +312,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     LOG.info("Updating job " + Tasks.jobKey(job));
 
     // First, get comparable views of the start and end states.  Mapped by shard IDs.
-    final Map<Integer, AssignedTask> existingTasks = Maps.uniqueIndex(Iterables.transform(
+    final Map<Integer, AssignedTask> existingTasks = Maps.uniqueIndex(transform(
         taskStore.fetch(Query.activeQuery(job)), Tasks.STATE_TO_ASSIGNED),
         Tasks.ASSIGNED_TO_SHARD_ID);
     final Map<Integer, TwitterTaskInfo> updatedTasks = Maps.uniqueIndex(job.getTaskConfigs(),
@@ -389,7 +382,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     }
 
     // First launch any new tasks.  Gets all updatedTasks whose shard ID was added.
-    launchTasks(Sets.newHashSet(Iterables.filter(updatedTasks.values(),
+    launchTasks(Sets.newHashSet(filter(updatedTasks.values(),
         Predicates.compose(Predicates.in(shardIdsAdded), Tasks.INFO_TO_SHARD_ID))));
 
     Function<Integer, Integer> shardToExistingTaskId = new Function<Integer, Integer>() {
@@ -400,13 +393,13 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
     // Then kill any removed tasks.
     if (!shardIdsRemoved.isEmpty()) {
-      killTasks(Query.byId(Iterables.transform(shardIdsRemoved, shardToExistingTaskId)));
+      killTasks(Query.byId(transform(shardIdsRemoved, shardToExistingTaskId)));
     }
 
     // Perform any in-place mutations.
     if (!shardIdsMutatedInPlace.isEmpty()) {
       Iterable<Integer> taskIds =
-          Iterables.transform(shardIdsMutatedInPlace, shardToExistingTaskId);
+          transform(shardIdsMutatedInPlace, shardToExistingTaskId);
       taskStore.mutate(Query.byId(taskIds),
           new Closure<TaskState>() {
             @Override public void execute(TaskState state) {
@@ -691,16 +684,16 @@ public class SchedulerCoreImpl implements SchedulerCore {
     Set<TaskState> tasks = taskStore.fetch(byId);
     if (tasks.size() != taskIds.size()) {
       Set<Integer> unknownTasks = Sets.difference(taskIds,
-          Sets.newHashSet(Iterables.transform(tasks, Tasks.STATE_TO_ID)));
+          Sets.newHashSet(transform(tasks, Tasks.STATE_TO_ID)));
 
       LOG.warning("Restart requested for unknown tasks " + unknownTasks);
     }
 
-    Iterable<TaskState> inactiveTasks = Iterables.filter(tasks,
+    Iterable<TaskState> inactiveTasks = filter(tasks,
         Predicates.not(Tasks.ACTIVE_FILTER));
     if (!Iterables.isEmpty(inactiveTasks)) {
       LOG.warning("Restart request ignored for inactive tasks "
-                  + Iterables.transform(inactiveTasks, Tasks.STATE_TO_ID));
+                  + transform(inactiveTasks, Tasks.STATE_TO_ID));
     }
 
     Query activeQuery = Query.and(byId, Tasks.ACTIVE_FILTER);
@@ -745,7 +738,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     state.setFrameworkId(frameworkId.get());
     state.setNextTaskId(nextTaskId.get());
     state.setTasks(Lists.newArrayList(
-        Iterables.transform(taskStore.fetch(Query.GET_ALL), Tasks.STATE_TO_SCHEDULED)));
+        transform(taskStore.fetch(Query.GET_ALL), Tasks.STATE_TO_SCHEDULED)));
     Map<String, List<JobConfiguration>> moduleState = Maps.newHashMap();
     for (JobManager manager : jobManagers) {
       moduleState.put(manager.getUniqueKey(), Lists.newArrayList(manager.getJobs()));

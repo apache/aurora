@@ -6,11 +6,13 @@ import com.google.common.base.Predicate;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.LiveTask;
+import com.twitter.mesos.gen.LiveTaskInfo;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.TaskStore.TaskState;
 
+import javax.annotation.Nullable;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.Set;
@@ -60,6 +62,11 @@ public class Tasks {
 
   public static final Function<TaskState, Integer> STATE_TO_ID =
       Functions.compose(SCHEDULED_TO_ID, STATE_TO_SCHEDULED);
+
+  public static final Function<LiveTaskInfo, Integer> LIVE_TO_ID =
+      new Function<LiveTaskInfo, Integer>() {
+        @Override public Integer apply(LiveTaskInfo info) { return info.getTaskId(); }
+      };
 
   public static final Function<TwitterTaskInfo, Integer> INFO_TO_SHARD_ID =
       new Function<TwitterTaskInfo, Integer>() {

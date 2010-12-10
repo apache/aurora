@@ -7,6 +7,7 @@ import com.google.inject.Inject;
 import com.twitter.mesos.Message;
 import com.twitter.mesos.StateTranslator;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
+import com.twitter.mesos.gen.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.SchedulerMessage;
 import mesos.ExecutorInfo;
@@ -159,7 +160,9 @@ class MesosSchedulerImpl extends Scheduler {
 
       switch (schedulerMsg.getSetField()) {
         case TASK_UPDATE:
-          schedulerCore.updateRegisteredTasks(schedulerMsg.getTaskUpdate());
+          RegisteredTaskUpdate update = schedulerMsg.getTaskUpdate();
+          LOG.info("Received registered task update from " + update.getSlaveHost());
+          schedulerCore.updateRegisteredTasks(update);
           break;
         case EXECUTOR_STATUS:
           LOG.info("Received executor status update: " + schedulerMsg.getExecutorStatus());

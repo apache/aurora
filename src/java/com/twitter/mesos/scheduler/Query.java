@@ -139,6 +139,11 @@ public class Query implements Predicate<TaskState> {
     return byId(ImmutableSet.of(taskId));
   }
 
+  public static Query liveShard(String jobKey, int shard) {
+    return new Query(new TaskQuery().setJobKey(jobKey).setShardIds(ImmutableSet.of(shard)),
+        Tasks.ACTIVE_FILTER);
+  }
+
   public static Query byStatus(ScheduleStatus... statuses) {
     return new Query(new TaskQuery().setStatuses(ImmutableSet.copyOf(statuses)));
   }
