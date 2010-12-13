@@ -30,12 +30,8 @@ public class HdfsFileCopier implements ExceptionalFunction<FileCopyRequest, File
   public File apply(FileCopyRequest copy) throws IOException {
     LOG.info(String.format(
         "HDFS file %s -> local file %s", copy.getSourcePath(), copy.getDestPath()));
-    // Thanks, Apache, for writing good code and just assuming that the path i give you has
-    // a trailing slash.  Of course it makes sense to blindly append a file name to the path
-    // i provide.
-    String dirWithSlash = copy.getDestPath();
-    if (!dirWithSlash.endsWith("/")) dirWithSlash += "/";
 
-    return HdfsUtil.downloadFileFromHdfs(fileSystem, copy.getSourcePath(), dirWithSlash, true);
+    return HdfsUtil.downloadFileFromHdfs(fileSystem,
+        copy.getSourcePath(), copy.getDestPath(), true);
   }
 }

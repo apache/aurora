@@ -36,7 +36,7 @@ public class HdfsUtil {
       final String localDirName, boolean overwrite) throws IOException {
     Path executorBinaryPath = new Path(executorBinaryUrl);
     FSDataInputStream remoteStream = hdfs.open(executorBinaryPath);
-    File localFile = new File(localDirName + executorBinaryPath.getName());
+    File localFile = new File(localDirName, executorBinaryPath.getName());
 
     if (overwrite && localFile.exists()) {
       boolean success = localFile.delete();
