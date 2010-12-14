@@ -2,14 +2,14 @@ package com.twitter.mesos.executor;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
+import com.google.protobuf.ByteString;
 import com.twitter.mesos.Message;
 import com.twitter.mesos.StateTranslator;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.ScheduleStatus;
 import mesos.ExecutorDriver;
-import mesos.FrameworkMessage;
-import mesos.TaskStatus;
+import mesos.Protos.*;
 
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
@@ -30,26 +30,27 @@ public interface Driver extends Function<Message, Integer> {
    * @return zero if the status was successfully sent (but not necessarily received), or non-zero
    *    if the status could not be sent.
    */
-  public int sendStatusUpdate(int taskId, ScheduleStatus status);
+  public int sendStatusUpdate(String taskId, ScheduleStatus status);
 
   /**
    * Sets the underlying driver.
    *
    * @param driver Real driver.
+   * @param frameworkId Mesos framework ID.
    */
-  public void setDriver(ExecutorDriver driver);
+  public void setDriver(ExecutorDriver driver, FrameworkID frameworkId);
 
   public static class DriverImpl implements Driver {
 
     private static final Logger LOG = Logger.getLogger(DriverImpl.class.getName());
 
     private final AtomicReference<ExecutorDriver> driverRef = new AtomicReference<ExecutorDriver>();
-
-    private final static byte[] EMPTY_MSG = new byte[0];
+    private final AtomicReference<FrameworkID> frameworkIdRef = new AtomicReference<FrameworkID>();
 
     @Override
-    public void setDriver(ExecutorDriver driver) {
+    public void setDriver(ExecutorDriver driver, FrameworkID frameworkId) {
       this.driverRef.set(driver);
+      this.frameworkIdRef.set(frameworkId);
     }
 
     /**
@@ -60,17 +61,19 @@ public interface Driver extends Function<Message, Integer> {
      */
     private int doWorkWithDriver(Function<ExecutorDriver, Integer> work) {
       ExecutorDriver driver = driverRef.get();
+      FrameworkID frameworkID = frameworkIdRef.get();
 
       if (driver == null) {
         LOG.warning("Driver not available, message could not be sent.");
         return -1;
       }
-      try {
-        return work.apply(driver);
-      } catch (Throwable t) {
-        LOG.log(Level.SEVERE, "Uncaught exception.", t);
+
+      if (frameworkID == null) {
+        LOG.warning("Framework ID not available, message could not be sent.");
         return -1;
       }
+
+      return work.apply(driver);
     }
 
     @Override public Integer apply(final Message message) {
@@ -78,17 +81,20 @@ public interface Driver extends Function<Message, Integer> {
 
       return doWorkWithDriver(new Function<ExecutorDriver, Integer>() {
         @Override public Integer apply(ExecutorDriver driver) {
-          FrameworkMessage frameworkMessage = new FrameworkMessage();
-          if (message.getSlaveId() != null) frameworkMessage.setSlaveId(message.getSlaveId());
+          FrameworkMessage.Builder messageBuilder = FrameworkMessage.newBuilder();
+          if (message.getSlaveId() != null) {
+            messageBuilder.setSlaveId(SlaveID.newBuilder().setValue(message.getSlaveId()));
+          }
           try {
-            frameworkMessage.setData(ThriftBinaryCodec.encode(message.getMessage()));
+            messageBuilder.setData(
+                ByteString.copyFrom(ThriftBinaryCodec.encode(message.getMessage())));
           } catch (CodingException e) {
             LOG.log(Level.SEVERE, "Failed to encode message: " + message.getMessage()
                                   + " intended for slave " + message.getSlaveId());
             return -1;
           }
 
-          int result = driver.sendFrameworkMessage(frameworkMessage);
+          int result = driver.sendFrameworkMessage(messageBuilder.build());
           if (result != 0) {
             LOG.warning(String.format("Attempt to send executor message returned code %d: %s",
                 result, message));
@@ -99,14 +105,17 @@ public interface Driver extends Function<Message, Integer> {
       });
     }
 
-    @Override public int sendStatusUpdate(final int taskId, final ScheduleStatus status) {
+    @Override public int sendStatusUpdate(final String taskId, final ScheduleStatus status) {
       Preconditions.checkNotNull(status);
 
       return doWorkWithDriver(new Function<ExecutorDriver, Integer>() {
         @Override public Integer apply(ExecutorDriver driver) {
           LOG.info("Notifying task " + taskId + " in state " + status);
           int result = driver.sendStatusUpdate(
-              new TaskStatus(taskId, StateTranslator.get(status), EMPTY_MSG));
+              TaskStatus.newBuilder()
+                  .setTaskId(TaskID.newBuilder().setValue(taskId))
+                  .setState(StateTranslator.get(status))
+                  .build());
           if (result != 0) {
             LOG.warning("Attempt to send executor message returned code " + result);
           }

@@ -54,22 +54,22 @@ public class Tasks {
   public static final Function<TaskState, TwitterTaskInfo> STATE_TO_INFO =
       Functions.compose(ASSIGNED_TO_INFO, STATE_TO_ASSIGNED);
 
-  public static final Function<AssignedTask, Integer> ASSIGNED_TO_ID =
-      new Function<AssignedTask, Integer>() {
-        @Override public Integer apply(AssignedTask task) {
+  public static final Function<AssignedTask, String> ASSIGNED_TO_ID =
+      new Function<AssignedTask, String>() {
+        @Override public String apply(AssignedTask task) {
           return task.getTaskId();
         }
       };
 
-  public static final Function<ScheduledTask, Integer> SCHEDULED_TO_ID =
+  public static final Function<ScheduledTask, String> SCHEDULED_TO_ID =
       Functions.compose(ASSIGNED_TO_ID, SCHEDULED_TO_ASSIGNED);
 
-  public static final Function<TaskState, Integer> STATE_TO_ID =
+  public static final Function<TaskState, String> STATE_TO_ID =
       Functions.compose(SCHEDULED_TO_ID, STATE_TO_SCHEDULED);
 
-  public static final Function<LiveTaskInfo, Integer> LIVE_TO_ID =
-      new Function<LiveTaskInfo, Integer>() {
-        @Override public Integer apply(LiveTaskInfo info) { return info.getTaskId(); }
+  public static final Function<LiveTaskInfo, String> LIVE_TO_ID =
+      new Function<LiveTaskInfo, String>() {
+        @Override public String apply(LiveTaskInfo info) { return info.getTaskId(); }
       };
 
   public static final Function<TwitterTaskInfo, Integer> INFO_TO_SHARD_ID =
@@ -185,15 +185,15 @@ public class Tasks {
     return jobKey(state.task);
   }
 
-  public static int id(ScheduledTask task) {
+  public static String id(ScheduledTask task) {
     return task.getAssignedTask().getTaskId();
   }
 
-  public static int id(TaskState state) {
+  public static String id(TaskState state) {
     return id(state.task);
   }
 
-  public static Map<Integer, TaskState> mapStateByTaskId(Iterable<TaskState> tasks) {
+  public static Map<String, TaskState> mapStateByTaskId(Iterable<TaskState> tasks) {
     return Maps.uniqueIndex(tasks, STATE_TO_ID);
   }
 

@@ -4,12 +4,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
+import com.google.common.collect.*;
 import com.google.inject.Inject;
 import com.twitter.common.base.Closure;
 import com.twitter.common.quantity.Amount;
@@ -19,34 +14,15 @@ import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
 import com.twitter.mesos.Message;
 import com.twitter.mesos.Tasks;
-import com.twitter.mesos.gen.AssignedTask;
-import com.twitter.mesos.gen.ExecutorMessage;
-import com.twitter.mesos.gen.JobConfiguration;
-import com.twitter.mesos.gen.LiveTaskInfo;
-import com.twitter.mesos.gen.NonVolatileSchedulerState;
-import com.twitter.mesos.gen.RegisteredTaskUpdate;
-import com.twitter.mesos.gen.ResourceConsumption;
-import com.twitter.mesos.gen.RestartExecutor;
-import com.twitter.mesos.gen.ScheduleStatus;
-import com.twitter.mesos.gen.ScheduledTask;
-import com.twitter.mesos.gen.TaskEvent;
-import com.twitter.mesos.gen.TaskQuery;
-import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.gen.*;
 import com.twitter.mesos.scheduler.JobManager.JobUpdateResult;
 import com.twitter.mesos.scheduler.TaskStore.TaskState;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import com.twitter.mesos.scheduler.persistence.PersistenceLayer;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Set;
-import java.util.SortedSet;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
@@ -72,8 +48,6 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
 
   // Schedulers that are responsible for triggering execution of jobs.
   private final List<JobManager> jobManagers;
-
-  private final AtomicInteger nextTaskId = new AtomicInteger(0);
 
   // The mesos framework ID of the scheduler, set to null until the framework is registered.
   private final AtomicReference<String> frameworkId = new AtomicReference<String>(null);
@@ -142,8 +116,23 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
     return !getTasks(Query.activeQuery(job)).isEmpty();
   }
 
-  private int generateTaskId() {
-    return nextTaskId.incrementAndGet();
+  /**
+   * Creates a new task ID that is permanently unique (not guaranteed, but highly confident),
+   * and by default sorts in chronological order.
+   *
+   * @param task Task that an ID is being generated for.
+   * @return New task ID.
+   */
+  private String generateTaskId(TwitterTaskInfo task) {
+    return new StringBuilder()
+        .append(System.currentTimeMillis())      // Allows chronological sorting.
+        .append("-")
+        .append(Tasks.jobKey(task))              // Identification and collision prevention.
+        .append("-")
+        .append(task.getShardId())               // Collision prevention within job.
+        .append("-")
+        .append(UUID.randomUUID())               // Just-in-case collision prevention.
+        .toString().replaceAll("[^\\w-]", "-");  // Constrain character set.
   }
 
   // TODO(wfarner): This is does not currently clear out tasks when a host is decommissioned.
@@ -157,7 +146,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
     final AtomicBoolean mutated = new AtomicBoolean(false);
 
     // Wrap with a mutable map so we can modify later.
-    final Map<Integer, LiveTaskInfo> taskInfoMap = Maps.newHashMap(
+    final Map<String, LiveTaskInfo> taskInfoMap = Maps.newHashMap(
         Maps.uniqueIndex(update.getTaskInfos(), Tasks.LIVE_TO_ID));
 
     // TODO(wfarner): Have the scheduler only retain configurations for live jobs,
@@ -167,8 +156,8 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
     // Look for any tasks that we don't know about, or this slave should not be modifying.
     Query tasksForHost = new Query(new TaskQuery().setTaskIds(taskInfoMap.keySet())
         .setSlaveHost(update.getSlaveHost()));
-    final Set<Integer> recognizedTasks = taskStore.fetchIds(tasksForHost);
-    Set<Integer> unknownTasks = ImmutableSet.copyOf(
+    final Set<String> recognizedTasks = taskStore.fetchIds(tasksForHost);
+    Set<String> unknownTasks = ImmutableSet.copyOf(
         Sets.difference(taskInfoMap.keySet(), recognizedTasks));
     if (!unknownTasks.isEmpty()) {
       LOG.severe("Received task info update from executor " + update.getSlaveHost()
@@ -195,10 +184,16 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
       }
     };
 
+    Function<LiveTaskInfo, String> getTaskId = new Function<LiveTaskInfo, String>() {
+      @Override public String apply(LiveTaskInfo update) {
+        return update.getTaskId();
+      }
+    };
+
     // Find any tasks that we believe to be running, but the slave reports as dead.
-    Set<Integer> reportedDeadTasks = ImmutableSet.copyOf(
-        transform(filter(taskInfoMap.values(), getKilledTasks), Tasks.LIVE_TO_ID));
-    Set<Integer> deadTasks = taskStore.fetchIds(
+    Set<String> reportedDeadTasks = ImmutableSet.copyOf(
+        Iterables.transform(Iterables.filter(taskInfoMap.values(), getKilledTasks), Tasks.LIVE_TO_ID));
+    Set<String> deadTasks = taskStore.fetchIds(
         new Query(new TaskQuery().setTaskIds(reportedDeadTasks), Tasks.ACTIVE_FILTER));
     if (!deadTasks.isEmpty()) {
       LOG.info("Found tasks that were recorded as RUNNING but slave " + update.getSlaveHost()
@@ -222,7 +217,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
     };
 
     TaskQuery slaveAssignedTaskQuery = new TaskQuery().setSlaveHost(update.getSlaveHost());
-    Set<Integer> missingNotRunningTasks = taskStore.fetchIds(new Query(slaveAssignedTaskQuery,
+    Set<String> missingNotRunningTasks = taskStore.fetchIds(new Query(slaveAssignedTaskQuery,
             Predicates.not(isTaskReported), Predicates.not(Tasks.hasStatus(RUNNING)),
             lastEventBeyondGracePeriod));
     if (!missingNotRunningTasks.isEmpty()) {
@@ -232,7 +227,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
       taskStore.remove(missingNotRunningTasks);
     }
 
-    Set<Integer> missingRunningTasks = taskStore.fetchIds(new Query(slaveAssignedTaskQuery,
+    Set<String> missingRunningTasks = taskStore.fetchIds(new Query(slaveAssignedTaskQuery,
             Predicates.not(isTaskReported), Tasks.hasStatus(RUNNING)));
     if (!missingRunningTasks.isEmpty()) {
       LOG.info("Slave " + update.getSlaveHost() + " no longer reports running tasks: "
@@ -286,7 +281,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
         @Override
         public ScheduledTask apply(TwitterTaskInfo task) {
           AssignedTask assigned = new AssignedTask()
-              .setTaskId(generateTaskId())
+              .setTaskId(generateTaskId(task))
               .setTask(task);
           return changeTaskStatus(new ScheduledTask().setAssignedTask(assigned), PENDING);
         }
@@ -298,7 +293,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
    * @param tasks Tasks to launch.
    * @return The task IDs of the new tasks.
    */
-  private Set<Integer> launchTasks(Set<TwitterTaskInfo> tasks) {
+  private Set<String> launchTasks(Set<TwitterTaskInfo> tasks) {
     if (tasks.isEmpty()) return ImmutableSet.of();
 
     LOG.info("Launching " + tasks.size() + " tasks.");
@@ -389,8 +384,8 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
       }
     }
 
-    Function<Integer, Integer> shardToExistingTaskId = new Function<Integer, Integer>() {
-      @Override public Integer apply(Integer shardId) {
+    Function<Integer, String> shardToExistingTaskId = new Function<Integer, String>() {
+      @Override public String apply(Integer shardId) {
         return existingTasks.get(shardId).getTaskId();
       }
     };
@@ -407,7 +402,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
 
     // Perform any in-place mutations.
     if (!shardIdsMutatedInPlace.isEmpty()) {
-      Iterable<Integer> taskIds =
+      Iterable<String> taskIds =
           transform(shardIdsMutatedInPlace, shardToExistingTaskId);
       taskStore.mutate(Query.byId(taskIds),
           new Closure<TaskState>() {
@@ -495,18 +490,19 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
    * @param tasks Copies of other tasks, to be scheduled.
    * @return Task IDs of the rescheduled tasks.
    */
-  private Set<Integer> scheduleTaskCopies(Iterable<ScheduledTask> tasks) {
+  private Set<String> scheduleTaskCopies(Iterable<ScheduledTask> tasks) {
     if (Iterables.isEmpty(tasks)) return ImmutableSet.of();
 
-    Set<Integer> newTaskIds = Sets.newHashSet();
+    Set<String> newTaskIds = Sets.newHashSet();
     for (ScheduledTask task : tasks) {
       // The shard ID in the assigned task is left unchanged.
       task.getAssignedTask().unsetSlaveId();
       task.getAssignedTask().unsetSlaveHost();
       task.unsetTaskEvents();
       task.setAncestorId(Tasks.id(task));
-      task.getAssignedTask().setTaskId(generateTaskId());
-      newTaskIds.add(Tasks.id(task));
+      String taskId = generateTaskId(task.getAssignedTask().getTask());
+      task.getAssignedTask().setTaskId(taskId);
+      newTaskIds.add(taskId);
       changeTaskStatus(task, PENDING);
     }
 
@@ -650,9 +646,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
     Closure<TaskState> mutate = new Closure<TaskState>() {
       @Override public void execute(final TaskState state) {
         changeTaskStatus(state.task, KILLED_BY_CLIENT);
-
-        final int idToKill = Tasks.id(state);
-        driver.killTask(idToKill);
+        driver.killTask(Tasks.id(state));
       }
     };
 
@@ -739,7 +733,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
   }
 
   @Override
-  public synchronized Set<Integer> updateShards(String updateToken,
+  public synchronized Set<String> updateShards(String updateToken,
       final Set<Integer> restartShards, boolean rollback) throws UpdateException {
     checkNotBlank(updateToken);
     checkNotBlank(restartShards);
@@ -768,7 +762,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
     Set<TaskState> tasks = taskStore.fetch(activeShardsQuery);
 
     // Mutate the stored task definitions.
-    Set<Integer> taskIds = ImmutableSet.copyOf(transform(tasks, Tasks.STATE_TO_ID));
+    Set<String> taskIds = ImmutableSet.copyOf(transform(tasks, Tasks.STATE_TO_ID));
     LOG.info("Modifying tasks " + taskIds + " for " + (rollback ? "rollback" : "update"));
     final Set<ScheduledTask> tasksToUpdate = Sets.newHashSet();
 
@@ -806,7 +800,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
         Sets.difference(restartShards, ImmutableSet.copyOf(
             transform(tasks, Tasks.STATE_TO_SHARD_ID))));
 
-    Set<Integer> newTaskIds = Sets.newHashSet();
+    Set<String> newTaskIds = Sets.newHashSet();
 
     // Add any tasks whose shards were inactive when the request was received.  A shard could end
     // up here if it is being added in the update, or if was dead when the request was received.
@@ -827,7 +821,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
   }
 
   @Override
-  public synchronized Set<Integer> restartTasks(Set<Integer> taskIds) throws RestartException {
+  public synchronized Set<String> restartTasks(Set<String> taskIds) throws RestartException {
     checkNotBlank(taskIds);
     LOG.info("Restart requested for tasks " + taskIds);
 
@@ -837,7 +831,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
     Query byId = Query.byId(taskIds);
     Set<TaskState> tasks = taskStore.fetch(byId);
     if (tasks.size() != taskIds.size()) {
-      Set<Integer> unknownTasks = Sets.difference(taskIds,
+      Set<String> unknownTasks = Sets.difference(taskIds,
           ImmutableSet.copyOf(transform(tasks, Tasks.STATE_TO_ID)));
 
       throw new RestartException("Restart requested for unknown tasks " + unknownTasks);
@@ -860,7 +854,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
     }
 
     Query activeQuery = Query.and(byId, Tasks.ACTIVE_FILTER);
-    Set<Integer> activeTaskIds = taskStore.fetchIds(activeQuery);
+    Set<String> activeTaskIds = taskStore.fetchIds(activeQuery);
     taskStore.mutate(activeQuery, new Closure<TaskState>() {
       @Override public void execute(final TaskState state) {
         ScheduleStatus originalStatus = state.task.getStatus();
@@ -892,11 +886,10 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
 
   private void persist() {
     LOG.info("Saving scheduler state.");
-    NonVolatileSchedulerState state = new NonVolatileSchedulerState();
-    state.setFrameworkId(frameworkId.get());
-    state.setNextTaskId(nextTaskId.get());
-    state.setTasks(Lists.newArrayList(
-        transform(taskStore.fetch(Query.GET_ALL), Tasks.STATE_TO_SCHEDULED)));
+    NonVolatileSchedulerState state = new NonVolatileSchedulerState()
+        .setFrameworkId(frameworkId.get())
+        .setTasks(ImmutableList.copyOf(
+            Iterables.transform(taskStore.fetch(Query.GET_ALL), Tasks.STATE_TO_SCHEDULED)));
     Map<String, List<JobConfiguration>> moduleState = Maps.newHashMap();
     for (JobManager manager : jobManagers) {
       moduleState.put(manager.getUniqueKey(), Lists.newArrayList(manager.getJobs()));
@@ -933,7 +926,6 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
     }
 
     frameworkId.set(state.getFrameworkId());
-    nextTaskId.set((int) state.getNextTaskId());
 
     // Apply defaults to backfill new fields.
     List<ScheduledTask> tasks = state.getTasks();

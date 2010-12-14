@@ -43,7 +43,7 @@ import static com.twitter.common.quantity.Time.SECONDS;
 public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerOptions, Exception> {
   public static class TwitterSchedulerOptions extends GuicedProcessOptions {
     @Option(name = "executor_path", required = true,
-            usage = "Path to the executorHub launch script.")
+            usage = "Path to the executor launch script.")
     public String executorPath;
 
     @Option(name = "zk_endpoints", usage = "Endpoint specification for the ZooKeeper servers.")

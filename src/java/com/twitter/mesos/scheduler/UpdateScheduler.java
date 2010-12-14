@@ -32,7 +32,7 @@ public interface UpdateScheduler {
     public UpdateException(String msg) { super(msg); }
   }
 
-  public Set<Integer> updateShards(String updateToken, Set<Integer> restartShards, boolean rollBack)
+  public Set<String> updateShards(String updateToken, Set<Integer> restartShards, boolean rollBack)
       throws UpdateException;
 
   public void updateFinished(String updateToken) throws UpdateException;

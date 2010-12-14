@@ -44,7 +44,7 @@ public class DeadTask extends TaskOnDisk {
   }
 
   @Override
-  public int getId() {
+  public String getId() {
     return task.getTaskId();
   }
 

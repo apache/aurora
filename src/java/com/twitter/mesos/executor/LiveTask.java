@@ -163,7 +163,7 @@ public class LiveTask extends TaskOnDisk {
   }
 
   @Override
-  public int getId() {
+  public String getId() {
     return task.getTaskId();
   }
 
@@ -266,7 +266,7 @@ public class LiveTask extends TaskOnDisk {
 
       if (supportsHttpSignals()) {
         ThreadFactory factory = new ThreadFactoryBuilder()
-            .setNameFormat(String.format("Task-%d-HealthCheck", task.getTaskId()))
+            .setNameFormat(String.format("Task-%s-HealthCheck", task.getTaskId()))
             .setDaemon(true)
             .build();
         ScheduledExecutorService executor = Executors.newScheduledThreadPool(1, factory);
@@ -393,7 +393,7 @@ public class LiveTask extends TaskOnDisk {
     return stateMachine.getState();
   }
 
-  public int getTaskId() {
+  public String getTaskId() {
     return task.getTaskId();
   }
 
@@ -471,6 +471,6 @@ public class LiveTask extends TaskOnDisk {
   }
 
   public String toString() {
-    return String.format("%s/%d", Tasks.jobKey(task), task.getTaskId());
+    return String.format("%s/%s", Tasks.jobKey(task), task.getTaskId());
   }
 }

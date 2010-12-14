@@ -50,10 +50,6 @@ public class TaskFactory implements Function<AssignedTask, Task> {
     Preconditions.checkNotNull(task);
 
     return new LiveTask(socketManager, healthChecker, processKiller,
-      pidFetcher, getTaskRoot(task.getTaskId()), task, fileCopier);
-  }
-
-  private File getTaskRoot(int taskId) {
-    return new File(executorRootDir, String.valueOf(taskId));
+      pidFetcher, new File(executorRootDir, task.getTaskId()), task, fileCopier);
   }
 }

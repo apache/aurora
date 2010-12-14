@@ -188,7 +188,8 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     return task;
   }
 
-  private static TaskState makeTask(String owner, String jobName, int cpus, long ramMb,
+  private int taskId = 1;
+  private TaskState makeTask(String owner, String jobName, int cpus, long ramMb,
       long diskMb) throws Exception {
     return new TaskState(new ScheduledTask().setAssignedTask(new AssignedTask().setTask(
         ConfigurationManager.applyDefaultsIfUnset(new TwitterTaskInfo()
@@ -197,10 +198,10 @@ public class SchedulingFilterImplTest extends EasyMockTest {
             .setNumCpus(cpus)
             .setRamMb(ramMb)
             .setDiskMb(diskMb)
-            .setMaxPerHost(1)))));
+            .setMaxPerHost(1))).setTaskId(String.valueOf(taskId++))));
   }
 
-  private static TaskState makeScheduledTask(int cpus, long ramMb, long diskMb) throws Exception {
+  private TaskState makeScheduledTask(int cpus, long ramMb, long diskMb) throws Exception {
     return makeTask(OWNER_A, JOB_A, cpus, ramMb, diskMb);
   }
 }

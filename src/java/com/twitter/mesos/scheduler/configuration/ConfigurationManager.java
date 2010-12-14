@@ -14,6 +14,7 @@ import org.apache.commons.lang.StringUtils;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Manages translation from a string-mapped configuration to a concrete configuration type, and
@@ -25,11 +26,26 @@ import java.util.Set;
  */
 public class ConfigurationManager {
 
+  private static final Pattern GOOD_IDENTIFIER_PATTERN = Pattern.compile("[\\w-]+");
+
+  private static boolean isGoodIdentifier(String identifier) {
+    return GOOD_IDENTIFIER_PATTERN.matcher(identifier).matches();
+  }
+
   public static JobConfiguration validateAndPopulate(JobConfiguration job)
       throws TaskDescriptionException {
     Preconditions.checkNotNull(job);
 
     JobConfiguration copy = job.deepCopy();
+
+    if (!isGoodIdentifier(job.getOwner())) {
+      throw new TaskDescriptionException("Job owner contains illegal characters: "
+                                         + job.getOwner());
+    }
+
+    if (!isGoodIdentifier(job.getName())) {
+      throw new TaskDescriptionException("Job name contains illegal characters: " + job.getName());
+    }
 
     if (copy.getTaskConfigsSize() == 0) throw new TaskDescriptionException("No tasks specified.");
 

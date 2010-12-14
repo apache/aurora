@@ -34,17 +34,9 @@ public class TaskHome extends StringTemplateServlet {
       throws ServletException, IOException {
     writeTemplate(resp, new Closure<StringTemplate>() {
       @Override public void execute(StringTemplate template) {
-        String taskIdStr = req.getParameter(TASK_ID_PARAM);
-        if (taskIdStr == null) {
+        String taskId = req.getParameter(TASK_ID_PARAM);
+        if (taskId == null) {
           template.setAttribute("exception", "Task ID must be specified.");
-          return;
-        }
-
-        int taskId;
-        try {
-          taskId = Integer.parseInt(taskIdStr);
-        } catch (NumberFormatException e) {
-          template.setAttribute("exception", "Invalid task id.");
           return;
         }
 

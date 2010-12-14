@@ -2,9 +2,12 @@ package com.twitter.mesos.scheduler;
 
 import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
+import com.google.protobuf.ByteString;
 import com.twitter.mesos.Message;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
-import mesos.FrameworkMessage;
+import mesos.Protos.FrameworkMessage;
+import mesos.Protos.SlaveID;
+import mesos.Protos.TaskID;
 import mesos.SchedulerDriver;
 
 import java.util.logging.Level;
@@ -19,7 +22,7 @@ public interface Driver {
 
   public int sendMessage(Message message);
 
-  public int killTask(int taskId);
+  public int killTask(String taskId);
 
   public static class MesosDriverImpl implements Driver {
 
@@ -33,17 +36,17 @@ public interface Driver {
     }
 
     @Override public int sendMessage(final Message message) {
-      FrameworkMessage frameworkMessage = new FrameworkMessage();
-      frameworkMessage.setSlaveId(message.getSlaveId());
+      FrameworkMessage.Builder messageBuilder = FrameworkMessage.newBuilder()
+          .setSlaveId(SlaveID.newBuilder().setValue(message.getSlaveId()));
       try {
-        frameworkMessage.setData(ThriftBinaryCodec.encode(message.getMessage()));
+        messageBuilder.setData(ByteString.copyFrom(ThriftBinaryCodec.encode(message.getMessage())));
       } catch (ThriftBinaryCodec.CodingException e) {
         LOG.log(Level.SEVERE, "Failed to encode message: " + message.getMessage()
                               + " intended for slave " + message.getSlaveId());
         return -1;
       }
 
-      int result = driver.sendFrameworkMessage(frameworkMessage);
+      int result = driver.sendFrameworkMessage(messageBuilder.build());
       if (result != 0) {
         LOG.severe(String.format("Attempt to send message failed with code %d [%s]",
             result, message));
@@ -51,8 +54,8 @@ public interface Driver {
       return result;
     }
 
-    @Override public int killTask(final int taskId) {
-      int result = driver.killTask(taskId);
+    @Override public int killTask(final String taskId) {
+      int result = driver.killTask(TaskID.newBuilder().setValue(taskId).build());
       if (result != 0) {
         LOG.severe(String.format("Attempt to kill task %d failed with code %d",
             taskId, result));

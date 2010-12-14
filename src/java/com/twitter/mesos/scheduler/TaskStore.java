@@ -36,7 +36,7 @@ public class TaskStore {
   private final static Logger LOG = Logger.getLogger(TaskStore.class.getName());
 
   // Maps tasks by their task IDs.
-  private final Map<Integer, TaskState> tasks = Maps.newHashMap();
+  private final Map<String, TaskState> tasks = Maps.newHashMap();
 
   public static class TaskState {
     public final ScheduledTask task;
@@ -110,7 +110,7 @@ public class TaskStore {
    * @param query The query whose matching tasks should be removed.
    */
   public synchronized void remove(Query query) {
-    Set<Integer> removedIds = ImmutableSet.copyOf(transform(query(query), Tasks.STATE_TO_ID));
+    Set<String> removedIds = ImmutableSet.copyOf(transform(query(query), Tasks.STATE_TO_ID));
 
     LOG.info("Removing tasks " + removedIds);
     vars.tasksRemoved.addAndGet(removedIds.size());
@@ -122,7 +122,7 @@ public class TaskStore {
    *
    * @param taskIds IDs of tasks to remove.
    */
-  public synchronized void remove(Set<Integer> taskIds) {
+  public synchronized void remove(Set<String> taskIds) {
     if (taskIds.isEmpty()) return;
 
     remove(Query.byId(taskIds));
@@ -180,8 +180,8 @@ public class TaskStore {
    * @param filters Additional filters to apply.
    * @return IDs of the matching tasks.
    */
-  public synchronized ImmutableSet<Integer> fetchIds(Query query, Predicate<TaskState>... filters) {
-    return ImmutableSet.copyOf(transform(fetch(query, filters), Tasks.STATE_TO_ID));
+  public synchronized Set<String> fetchIds(Query query, Predicate<TaskState>... filters) {
+    return ImmutableSet.copyOf(Iterables.transform(fetch(query, filters), Tasks.STATE_TO_ID));
   }
 
   /**
@@ -229,14 +229,14 @@ public class TaskStore {
     }
   }
 
-  private final Predicate<Integer> hasTaskId = new Predicate<Integer>() {
-    @Override public boolean apply(Integer taskId) {
+  private final Predicate<String> hasTaskId = new Predicate<String>() {
+    @Override public boolean apply(String taskId) {
       return tasks.containsKey(taskId);
     }
   };
 
-  private final Function<Integer, TaskState> getById = new Function<Integer, TaskState>() {
-    @Override public TaskState apply(Integer taskId) {
+  private final Function<String, TaskState> getById = new Function<String, TaskState>() {
+    @Override public TaskState apply(String taskId) {
       return tasks.get(taskId);
     }
   };
@@ -254,8 +254,9 @@ public class TaskStore {
    * @param taskIds IDs of tasks to look up.
    * @return Tasks found that match the given task IDs.
    */
-  private ImmutableSet<TaskState> getStateById(Set<Integer> taskIds) {
-    return ImmutableSet.copyOf(filter(transform(taskIds, getById), Predicates.notNull()));
+  private Set<TaskState> getStateById(Set<String> taskIds) {
+    return ImmutableSet.copyOf(Iterables.filter(Iterables.transform(taskIds, getById),
+        Predicates.notNull()));
   }
 
   private class Vars {

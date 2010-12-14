@@ -43,7 +43,7 @@ public class LiveTaskTest {
   private File executorRoot;
 
   // Simple task to create a file.
-  private static final int TASK_ID_A = 1;
+  private static final String TASK_ID_A = "my-fake-task-id";
   private static final int SHARD_ID_A = 5;
   private static final TwitterTaskInfo TASK_A = new TwitterTaskInfo()
       .setOwner("OWNER_A")
@@ -352,7 +352,7 @@ public class LiveTaskTest {
     makeTask(taskObj, TASK_ID_A).expandCommandLine();
   }
 
-  private LiveTask makeTask(AssignedTask task, int taskId) {
+  private LiveTask makeTask(AssignedTask task, String taskId) {
     task.setTaskId(taskId);
     return new LiveTask(socketManager, healthChecker, processKiller, pidFetcher,
         new File(executorRoot, String.valueOf(task.getTaskId())), task, COPIER);

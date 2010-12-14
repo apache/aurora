@@ -156,7 +156,7 @@ public class ExecutorCoreTest extends EasyMockTest {
         .setJobName(jobName);
 
     return new AssignedTask()
-        .setTaskId(new Random().nextInt(10000))
+        .setTaskId(String.valueOf(new Random().nextInt(10000)))
         .setTask(task);
   }
 }

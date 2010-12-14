@@ -54,7 +54,7 @@ public class ExecutorCore implements TaskManager {
   public static final String TASK_EXECUTOR =
       "com.twitter.mesos.executor.ExecutorCore.TASK_EXECUTOR";
 
-  private final Map<Integer, Task> tasks = Maps.newConcurrentMap();
+  private final Map<String, Task> tasks = Maps.newConcurrentMap();
 
   private final File executorRootDir;
 
@@ -119,9 +119,9 @@ public class ExecutorCore implements TaskManager {
       final Closure<ScheduleStatus> completedCallback) throws TaskRunException {
     Preconditions.checkNotNull(assignedTask);
 
-    final int taskId = assignedTask.getTaskId();
+    final String taskId = assignedTask.getTaskId();
 
-    LOG.info(String.format("Received task for execution: %s - %d",
+    LOG.info(String.format("Received task for execution: %s - %s",
         Tasks.jobKey(assignedTask), taskId));
 
     final Task task = taskFactory.apply(assignedTask);
@@ -148,7 +148,7 @@ public class ExecutorCore implements TaskManager {
     });
   }
 
-  public void stopLiveTask(int taskId) {
+  public void stopLiveTask(String taskId) {
     Task task = tasks.get(taskId);
 
     if (task != null && task.isRunning()) {
@@ -159,7 +159,7 @@ public class ExecutorCore implements TaskManager {
     }
   }
 
-  public Task getTask(int taskId) {
+  public Task getTask(String taskId) {
     return tasks.get(taskId);
   }
 
@@ -178,17 +178,17 @@ public class ExecutorCore implements TaskManager {
   }
 
   @Override
-  public boolean hasTask(int taskId) {
+  public boolean hasTask(String taskId) {
     return tasks.containsKey(taskId);
   }
 
   @Override
-  public boolean isRunning(int taskId) {
+  public boolean isRunning(String taskId) {
     return hasTask(taskId) && tasks.get(taskId).isRunning();
   }
 
   @Override
-  public void deleteCompletedTask(int taskId) {
+  public void deleteCompletedTask(String taskId) {
     Preconditions.checkState(!isRunning(taskId), "Task " + taskId + " is still running!");
     tasks.remove(taskId);
   }
@@ -258,7 +258,7 @@ public class ExecutorCore implements TaskManager {
       @Override public void run() {
         RegisteredTaskUpdate update = new RegisteredTaskUpdate().setSlaveHost(getHostName());
 
-        for (Map.Entry<Integer, Task> entry : tasks.entrySet()) {
+        for (Map.Entry<String, Task> entry : tasks.entrySet()) {
           Task task = entry.getValue();
 
           update.addToTaskInfos(new LiveTaskInfo()

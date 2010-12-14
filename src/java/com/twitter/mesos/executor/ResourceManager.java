@@ -80,16 +80,8 @@ public class ResourceManager {
         @Override public boolean accept(File file) {
           if (!file.isDirectory()) return false;
 
-          String dirName = file.getName();
-          int taskId;
-          try {
-            taskId = Integer.parseInt(dirName);
-          } catch (NumberFormatException e) {
-            return true;
-          }
-
           // Always delete unknown directories.
-          if (!taskManager.hasTask(taskId)) return true;
+          if (!taskManager.hasTask(file.getName())) return true;
 
           // If the directory is for a known task, only delete when it has expired.
           long timeSinceLastModify =
@@ -100,16 +92,8 @@ public class ResourceManager {
 
     Closure<File> gcCallback = new Closure<File>() {
       @Override public void execute(File file) {
-        String dirName = file.getName();
-        int taskId;
-        try {
-          taskId = Integer.parseInt(dirName);
-        } catch (NumberFormatException e) {
-          return; // No-op.
-        }
-
-        LOG.info("Removing record for garbage-collected task "  + taskId);
-        taskManager.deleteCompletedTask(taskId);
+        LOG.info("Removing record for garbage-collected task "  + file.getName());
+        taskManager.deleteCompletedTask(file.getName());
       }
     };
 
@@ -120,17 +104,7 @@ public class ResourceManager {
     FileFilter completedTaskFileFilter = new FileFilter() {
         @Override public boolean accept(File file) {
           if (!file.isDirectory()) return false;
-
-          String dirName = file.getName();
-          int taskId;
-          try {
-            taskId = Integer.parseInt(dirName);
-          } catch (NumberFormatException e) {
-            LOG.info("Unrecognized file found while garbage collecting: " + file);
-            return true;
-          }
-
-          return !taskManager.isRunning(taskId);
+          return !taskManager.isRunning(file.getName());
         }
       };
 

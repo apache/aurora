@@ -131,11 +131,11 @@ public class Query implements Predicate<TaskState> {
 
   public static final Query GET_ALL = new Query(new TaskQuery());
 
-  public static Query byId(Iterable<Integer> taskIds) {
+  public static Query byId(Iterable<String> taskIds) {
     return new Query(new TaskQuery().setTaskIds(ImmutableSet.copyOf(taskIds)));
   }
 
-  public static Query byId(int taskId) {
+  public static Query byId(String taskId) {
     return byId(ImmutableSet.of(taskId));
   }
 
@@ -204,7 +204,8 @@ public class Query implements Predicate<TaskState> {
 
   public static final Comparator<TaskState> SORT_BY_TASK_ID = new Comparator<TaskState>() {
     @Override public int compare(TaskState stateA, TaskState stateB) {
-      return stateA.task.getAssignedTask().getTaskId() - stateB.task.getAssignedTask().getTaskId();
+      return stateA.task.getAssignedTask().getTaskId().compareTo(
+          stateB.task.getAssignedTask().getTaskId());
     }
   };
 

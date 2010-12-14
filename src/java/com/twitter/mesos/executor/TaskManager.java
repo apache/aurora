@@ -21,7 +21,7 @@ public interface TaskManager {
    * @param taskId The task to check for.
    * @return {@code true} if the manager has a task wth the id, {@code false} otherwise.
    */
-  public boolean hasTask(int taskId);
+  public boolean hasTask(String taskId);
 
   /**
    * Checks if a task with {@code taskId} is running.
@@ -30,7 +30,7 @@ public interface TaskManager {
    * @return {@code true} if the manager has a task with the id that is currently in a runnable
    *     state, {@code false} otherwise.
    */
-  public boolean isRunning(int taskId);
+  public boolean isRunning(String taskId);
 
   /**
    * Deletes record of a completed task.  It is expected that the referenced task not be currently
@@ -38,5 +38,5 @@ public interface TaskManager {
    *
    * @param taskId Id of the task to delete.
    */
-  public void deleteCompletedTask(int taskId);
+  public void deleteCompletedTask(String taskId);
 }

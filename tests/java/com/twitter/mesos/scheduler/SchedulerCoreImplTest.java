@@ -120,13 +120,32 @@ public class SchedulerCoreImplTest extends EasyMockTest {
   }
 
   @Test
-  public void testIncrementingTaskIds() throws Exception {
+  public void testRejectsBadIdentifiers() throws Exception {
     control.replay();
 
-    for (int i = 0; i < 10; i++) {
-      scheduler.createJob(makeJob(OWNER_A + i, JOB_A, DEFAULT_TASK, 1));
-      assertThat(Iterables.getOnlyElement(
-          getTasksOwnedBy(OWNER_A + i)).task.getAssignedTask().getTaskId(), is(i + 1));
+    expectRejected("foo/bar", "bar/foo");
+    expectRejected("foo/bar", "bar/foo");
+    expectRejected("foo&bar", "bar/foo&");
+    expectRejected("foo", "");
+    expectRejected("", "bar");
+  }
+
+  private void expectRejected(String owner, String jobName) throws ScheduleException {
+    try {
+      scheduler.createJob(makeJob(owner, jobName, DEFAULT_TASK, 1));
+      fail("Job owner/name should have been rejected.");
+    } catch (TaskDescriptionException e) {
+      // Expected.
+    }
+  }
+
+  @Test
+  public void testSortableTaskIds() throws Exception {
+    control.replay();
+
+    int i = 0;
+    for (TaskState task : getTasks(Query.GET_ALL)) {
+      assertThat(task.task.getAssignedTask().getTask().getOwner(), is(OWNER_A + i));
     }
   }
 
@@ -214,7 +233,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testRestartTask() throws Exception {
-    expect(driver.killTask(1)).andReturn(0);
+    expect(driver.killTask((String) anyObject())).andReturn(0);
 
     control.replay();
 
@@ -223,10 +242,10 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     changeStatus(queryByOwner(OWNER_A), STARTING);
     changeStatus(queryByOwner(OWNER_A), RUNNING);
 
-    int taskId = getOnlyTask(queryByOwner(OWNER_A)).task.getAssignedTask().getTaskId();
+    String taskId = getOnlyTask(queryByOwner(OWNER_A)).task.getAssignedTask().getTaskId();
 
-    Set<Integer> restartRequest = Sets.newHashSet(taskId);
-    int restarted = Iterables.getOnlyElement(scheduler.restartTasks(restartRequest));
+    Set<String> restartRequest = Sets.newHashSet(taskId);
+    String restarted = Iterables.getOnlyElement(scheduler.restartTasks(restartRequest));
 
     assertThat(restarted, is(taskId));
 
@@ -250,9 +269,9 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     changeStatus(queryByOwner(OWNER_A), STARTING);
     changeStatus(queryByOwner(OWNER_A), RUNNING);
 
-    int taskId = getOnlyTask(queryByOwner(OWNER_A)).task.getAssignedTask().getTaskId();
+    String taskId = getOnlyTask(queryByOwner(OWNER_A)).task.getAssignedTask().getTaskId();
 
-    Set<Integer> restartRequest = Sets.newHashSet(taskId + 1);
+    Set<String> restartRequest = Sets.newHashSet(taskId + 1);
     scheduler.restartTasks(restartRequest);
   }
 
@@ -265,11 +284,11 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     changeStatus(queryByOwner(OWNER_A), RUNNING);
     changeStatus(queryByOwner(OWNER_A), FINISHED);
 
-    int taskId = Iterables.getOnlyElement(Iterables.transform(
+    String taskId = Iterables.getOnlyElement(Iterables.transform(
         scheduler.getTasks(queryByOwner(OWNER_A)), Tasks.STATE_TO_ID));
 
-    Set<Integer> restartRequest = Sets.newHashSet(taskId);
-    Set<Integer> restarted = scheduler.restartTasks(restartRequest);
+    Set<String> restartRequest = Sets.newHashSet(taskId);
+    Set<String> restarted = scheduler.restartTasks(restartRequest);
 
     assertThat(restarted.isEmpty(), is(true));
   }
@@ -306,7 +325,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testNoTransitionFromTerminalState() throws Exception {
-    expect(driver.killTask(1)).andReturn(0);
+    expect(driver.killTask((String) anyObject())).andReturn(0);
 
     control.replay();
 
@@ -316,7 +335,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     changeStatus(queryByOwner(OWNER_A), RUNNING);
     scheduler.killTasks(queryByOwner(OWNER_A));
 
-    int taskId = getOnlyTask(queryByOwner(OWNER_A)).task.getAssignedTask().getTaskId();
+    String taskId = getOnlyTask(queryByOwner(OWNER_A)).task.getAssignedTask().getTaskId();
 
     // This transition should be rejected.
     changeStatus(queryByOwner(OWNER_A), LOST);
@@ -339,9 +358,11 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     assertThat(tasks.size(), is(1));
 
     for (int i = 0; i < maxFailures - 1; i++) {
-      changeStatus(i + 1, RUNNING);
-      assertThat(getTask(i + 1).task.getFailureCount(), is(i));
-      changeStatus(i + 1, FAILED);
+      String taskId = Tasks.id(getOnlyTask(Query.activeQuery(OWNER_A, JOB_A)));
+
+      changeStatus(taskId, RUNNING);
+      assertThat(getTask(taskId).task.getFailureCount(), is(i));
+      changeStatus(taskId, FAILED);
 
       assertTaskCount(i + 2);
 
@@ -426,7 +447,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     Set<TaskState> tasks = scheduler.getTasks(queryJob(OWNER_A, JOB_A));
     assertThat(tasks.size(), is(1));
 
-    int taskId = Iterables.get(tasks, 0).task.getAssignedTask().getTaskId();
+    String taskId = Iterables.get(tasks, 0).task.getAssignedTask().getTaskId();
 
     scheduler.killTasks(Query.byId(taskId));
     assertTaskCount(0);
@@ -434,12 +455,12 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testKillRunningTask() throws Exception {
-    expect(driver.killTask(1)).andReturn(0);
+    expect(driver.killTask((String) anyObject())).andReturn(0);
 
     control.replay();
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
-    int taskId = getOnlyTask(queryByOwner(OWNER_A)).task.getAssignedTask().getTaskId();
+    String taskId = getOnlyTask(queryByOwner(OWNER_A)).task.getAssignedTask().getTaskId();
     changeStatus(query(taskId), STARTING);
     changeStatus(query(taskId), RUNNING);
     scheduler.killTasks(query(taskId));
@@ -527,7 +548,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
         .build();
     scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer);
 
-    int taskId = getOnlyTask(queryByOwner(OWNER_A)).task.getAssignedTask().getTaskId();
+    String taskId = getOnlyTask(queryByOwner(OWNER_A)).task.getAssignedTask().getTaskId();
 
     changeStatus(taskId, RUNNING);
 
@@ -564,7 +585,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
         .build();
     scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer);
 
-    int taskId = getOnlyTask(queryByOwner(OWNER_A)).task.getAssignedTask().getTaskId();
+    String taskId = getOnlyTask(queryByOwner(OWNER_A)).task.getAssignedTask().getTaskId();
 
     changeStatus(taskId, RUNNING);
 
@@ -606,8 +627,8 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(makeJob(OWNER_B, JOB_B, DEFAULT_TASK, 1));
     scheduler.offer(SLAVE_ID, SLAVE_HOST_2, slaveOffer);
 
-    int taskIdA = Iterables.get(getTasksOwnedBy(OWNER_A), 0).task.getAssignedTask().getTaskId();
-    int taskIdB = Iterables.get(getTasksOwnedBy(OWNER_B), 0).task.getAssignedTask().getTaskId();
+    String taskIdA = Iterables.get(getTasksOwnedBy(OWNER_A), 0).task.getAssignedTask().getTaskId();
+    String taskIdB = Iterables.get(getTasksOwnedBy(OWNER_B), 0).task.getAssignedTask().getTaskId();
 
     changeStatus(taskIdA, RUNNING);
     changeStatus(taskIdB, RUNNING);
@@ -649,10 +670,10 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     scheduler.offer(SLAVE_ID, SLAVE_HOST_2, slaveOffer);
     scheduler.offer(SLAVE_ID, SLAVE_HOST_2, slaveOffer);
 
-    int taskIdA = Iterables.get(getTasksOwnedBy(OWNER_A), 0).task.getAssignedTask().getTaskId();
-    int taskIdB = Iterables.get(getTasksOwnedBy(OWNER_A), 1).task.getAssignedTask().getTaskId();
-    int taskIdC = Iterables.get(getTasksOwnedBy(OWNER_B), 0).task.getAssignedTask().getTaskId();
-    int taskIdD = Iterables.get(getTasksOwnedBy(OWNER_B), 1).task.getAssignedTask().getTaskId();
+    String taskIdA = Iterables.get(getTasksOwnedBy(OWNER_A), 0).task.getAssignedTask().getTaskId();
+    String taskIdB = Iterables.get(getTasksOwnedBy(OWNER_A), 1).task.getAssignedTask().getTaskId();
+    String taskIdC = Iterables.get(getTasksOwnedBy(OWNER_B), 0).task.getAssignedTask().getTaskId();
+    String taskIdD = Iterables.get(getTasksOwnedBy(OWNER_B), 1).task.getAssignedTask().getTaskId();
 
     changeStatus(taskIdA, RUNNING);
     changeStatus(taskIdB, FINISHED);
@@ -663,8 +684,8 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     changeStatus(taskIdC, RUNNING);
     changeStatus(taskIdD, FAILED);
 
-    Function<TaskState, Integer> getAncestorId = new Function<TaskState, Integer>() {
-      @Override public Integer apply(TaskState state) { return state.task.getAncestorId(); }
+    Function<TaskState, String> getAncestorId = new Function<TaskState, String>() {
+      @Override public String apply(TaskState state) { return state.task.getAncestorId(); }
     };
 
     // Since job A is a daemon, its missing RUNNING task should be rescheduled.
@@ -673,9 +694,9 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     Set<TaskState> rescheduledTasks = getTasks(new Query(new TaskQuery()
         .setOwner(OWNER_A).setJobName(JOB_A).setStatuses(EnumSet.of(PENDING))));
     assertThat(rescheduledTasks.size(), is(2));
-    Set<Integer> rescheduledTaskAncestors = Sets.newHashSet(Iterables.transform(rescheduledTasks,
+    Set<String> rescheduledTaskAncestors = Sets.newHashSet(Iterables.transform(rescheduledTasks,
         getAncestorId));
-    assertThat(rescheduledTaskAncestors, is((Set<Integer>) Sets.newHashSet(taskIdA, taskIdB)));
+    assertThat(rescheduledTaskAncestors, is((Set<String>) Sets.newHashSet(taskIdA, taskIdB)));
 
     // Send an update from host 2 that does not include the FAILED task.
     scheduler.updateRegisteredTasks(new RegisteredTaskUpdate().setSlaveHost(SLAVE_HOST_2)
@@ -685,7 +706,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     assertThat(rescheduledTasks.size(), is(1));
     rescheduledTaskAncestors = Sets.newHashSet(Iterables.transform(rescheduledTasks,
         getAncestorId));
-    assertThat(rescheduledTaskAncestors, is((Set<Integer>) Sets.newHashSet(taskIdC)));
+    assertThat(rescheduledTaskAncestors, is((Set<String>) Sets.newHashSet(taskIdC)));
 
     // This task is not yet removed because we have not met the grace period.
     assertThat(Iterables.isEmpty(getTasks(taskIdD)), is(false));
@@ -735,7 +756,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1);
     scheduler.createJob(job);
 
-    int taskId = getOnlyTask(queryByOwner(OWNER_A)).task.getAssignedTask().getTaskId();
+    String taskId = getOnlyTask(queryByOwner(OWNER_A)).task.getAssignedTask().getTaskId();
 
     changeStatus(taskId, RUNNING);
 
@@ -765,8 +786,8 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testUpdateJobRemoveTasks() throws Exception {
-    expect(driver.killTask(anyInt())).andReturn(0);
-    expect(driver.killTask(anyInt())).andReturn(0);
+    expect(driver.killTask((String) anyObject())).andReturn(0);
+    expect(driver.killTask((String) anyObject())).andReturn(0);
 
     control.replay();
 
@@ -798,23 +819,23 @@ public class SchedulerCoreImplTest extends EasyMockTest {
             pending2, starting2, running2, finished2, killed2));
     scheduler.createJob(job);
 
-    int pendingId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(1)));
-    int startingId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(2)));
+    String pendingId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(1)));
+    String startingId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(2)));
     changeStatus(startingId1, STARTING);
-    int runningId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(3)));
+    String runningId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(3)));
     changeStatus(runningId1, RUNNING);
-    int finishedId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(4)));
+    String finishedId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(4)));
     changeStatus(finishedId1, FINISHED);
-    int killedId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(5)));
+    String killedId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(5)));
     scheduler.killTasks(Query.byId(killedId1));
-    int pendingId2 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(6)));
-    int startingId2 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(7)));
+    String pendingId2 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(6)));
+    String startingId2 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(7)));
     changeStatus(startingId2, STARTING);
-    int runningId2 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(8)));
+    String runningId2 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(8)));
     changeStatus(runningId2, RUNNING);
-    int finishedId2 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(9)));
+    String finishedId2 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(9)));
     changeStatus(finishedId2, FINISHED);
-    int killedId2 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(10)));
+    String killedId2 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(10)));
     scheduler.killTasks(Query.byId(killedId2));
 
     assertThat(scheduler.updateJob(makeJob(OWNER_A, JOB_A,
@@ -859,14 +880,14 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     JobConfiguration job = makeJob(OWNER_A, JOB_A, tasks);
     scheduler.createJob(job);
 
-    int pendingId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(1)));
-    int startingId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(2)));
+    String pendingId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(1)));
+    String startingId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(2)));
     changeStatus(startingId1, STARTING);
-    int runningId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(3)));
+    String runningId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(3)));
     changeStatus(runningId1, RUNNING);
-    int finishedId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(4)));
+    String finishedId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(4)));
     changeStatus(finishedId1, FINISHED);
-    int killedId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(5)));
+    String killedId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(5)));
     scheduler.killTasks(Query.byId(killedId1));
 
     List<TwitterTaskInfo> newTasks = Lists.newArrayList(pending2, pending2, pending2);
@@ -949,9 +970,9 @@ public class SchedulerCoreImplTest extends EasyMockTest {
   @Test
   public void testRollingUpdate() throws Exception {
     expectAcceptedOffers(6);
-    expect(driver.killTask(anyInt())).andReturn(0);
-    expect(driver.killTask(anyInt())).andReturn(0);
-    expect(driver.killTask(anyInt())).andReturn(0);
+    expect(driver.killTask((String) anyObject())).andReturn(0);
+    expect(driver.killTask((String) anyObject())).andReturn(0);
+    expect(driver.killTask((String) anyObject())).andReturn(0);
 
     control.replay();
 
@@ -1015,9 +1036,9 @@ public class SchedulerCoreImplTest extends EasyMockTest {
   @Test
   public void testRollingUpdateRollback() throws Exception {
     expectAcceptedOffers(10);
-    expect(driver.killTask(anyInt())).andReturn(0);
-    expect(driver.killTask(anyInt())).andReturn(0);
-    expect(driver.killTask(anyInt())).andReturn(0);
+    expect(driver.killTask((String) anyObject())).andReturn(0);
+    expect(driver.killTask((String) anyObject())).andReturn(0);
+    expect(driver.killTask((String) anyObject())).andReturn(0);
 
     control.replay();
 
@@ -1073,7 +1094,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     String token = scheduler.registerUpdate(updateFrom, updateTo);
 
     // We will roll back before these tasks are updated.
-    Set<Integer> untouchedShardTaskIds = ImmutableSet.copyOf(Iterables.transform(
+    Set<String> untouchedShardTaskIds = ImmutableSet.copyOf(Iterables.transform(
         getTasks(new Query(new TaskQuery().setShardIds(ImmutableSet.of(6, 7, 8, 9)))),
         Tasks.STATE_TO_ID));
 
@@ -1107,8 +1128,8 @@ public class SchedulerCoreImplTest extends EasyMockTest {
   @Test
   public void testRollingUpdateAddingShards() throws Exception {
     expectAcceptedOffers(2);
-    expect(driver.killTask(anyInt())).andReturn(0);
-    expect(driver.killTask(anyInt())).andReturn(0);
+    expect(driver.killTask((String) anyObject())).andReturn(0);
+    expect(driver.killTask((String) anyObject())).andReturn(0);
 
     control.replay();
 
@@ -1160,10 +1181,10 @@ public class SchedulerCoreImplTest extends EasyMockTest {
   @Test
   public void testRollingUpdateAddingShardsRollback() throws Exception {
     expectAcceptedOffers(4);
-    expect(driver.killTask(anyInt())).andReturn(0);
-    expect(driver.killTask(anyInt())).andReturn(0);
-    expect(driver.killTask(anyInt())).andReturn(0);
-    expect(driver.killTask(anyInt())).andReturn(0);
+    expect(driver.killTask((String) anyObject())).andReturn(0);
+    expect(driver.killTask((String) anyObject())).andReturn(0);
+    expect(driver.killTask((String) anyObject())).andReturn(0);
+    expect(driver.killTask((String) anyObject())).andReturn(0);
 
     control.replay();
 
@@ -1221,10 +1242,10 @@ public class SchedulerCoreImplTest extends EasyMockTest {
   @Test
   public void testRollingUpdateRemovingShards() throws Exception {
     expectAcceptedOffers(4);
-    expect(driver.killTask(anyInt())).andReturn(0);
-    expect(driver.killTask(anyInt())).andReturn(0);
-    expect(driver.killTask(anyInt())).andReturn(0);
-    expect(driver.killTask(anyInt())).andReturn(0);
+    expect(driver.killTask((String) anyObject())).andReturn(0);
+    expect(driver.killTask((String) anyObject())).andReturn(0);
+    expect(driver.killTask((String) anyObject())).andReturn(0);
+    expect(driver.killTask((String) anyObject())).andReturn(0);
 
     control.replay();
 
@@ -1280,10 +1301,10 @@ public class SchedulerCoreImplTest extends EasyMockTest {
   @Test
   public void testRollingUpdateRemovingShardsRollback() throws Exception {
     expectAcceptedOffers(4);
-    expect(driver.killTask(anyInt())).andReturn(0);
-    expect(driver.killTask(anyInt())).andReturn(0);
-    expect(driver.killTask(anyInt())).andReturn(0);
-    expect(driver.killTask(anyInt())).andReturn(0);
+    expect(driver.killTask((String) anyObject())).andReturn(0);
+    expect(driver.killTask((String) anyObject())).andReturn(0);
+    expect(driver.killTask((String) anyObject())).andReturn(0);
+    expect(driver.killTask((String) anyObject())).andReturn(0);
 
     control.replay();
 
@@ -1344,7 +1365,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
         }
       };
 
-  private void expectRestarted(Set<Integer> taskIds, String expectedCommand) {
+  private void expectRestarted(Set<String> taskIds, String expectedCommand) {
     Set<TaskState> tasks = getTasks(Query.byId(taskIds));
     Set<String> startCommands = ImmutableSet.copyOf(Iterables.transform(tasks, GET_START_COMMAND));
     Set<String> expectedCommands = ImmutableSet.of(expectedCommand);
@@ -1396,7 +1417,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
         .build());
   }
 
-  private TaskState getTask(int taskId) {
+  private TaskState getTask(String taskId) {
     return getOnlyTask(query(taskId));
   }
 
@@ -1413,7 +1434,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     return scheduler.getTasks(query);
   }
 
-  private Set<TaskState> getTasks(int... taskIds) {
+  private Set<TaskState> getTasks(String... taskIds) {
     return scheduler.getTasks(query(taskIds));
   }
 
@@ -1425,13 +1446,13 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     return scheduler.getTasks(query(owner, null, null));
   }
 
-  private Query query(Iterable<Integer> taskIds) {
+  private Query query(Iterable<String> taskIds) {
     return query(null, null, taskIds);
   }
 
-  private Query query(int... taskIds) {
-    List<Integer> ids = Lists.newArrayList();
-    for (int taskId : taskIds) ids.add(taskId);
+  private Query query(String... taskIds) {
+    List<String> ids = Lists.newArrayList();
+    for (String taskId : taskIds) ids.add(taskId);
     return query(null, null, ids);
   }
 
@@ -1443,7 +1464,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     return query(owner, jobName, null);
   }
 
-  private Query query(String owner, String jobName, Iterable<Integer> taskIds) {
+  private Query query(String owner, String jobName, Iterable<String> taskIds) {
     TaskQuery query = new TaskQuery();
     if (owner != null) query.setOwner(owner);
     if (jobName != null) query.setJobName(jobName);
@@ -1456,7 +1477,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     scheduler.setTaskStatus(query, status);
   }
 
-  public void changeStatus(int taskId, ScheduleStatus status) {
+  public void changeStatus(String taskId, ScheduleStatus status) {
     scheduler.setTaskStatus(query(Arrays.asList(taskId)), status);
   }
 

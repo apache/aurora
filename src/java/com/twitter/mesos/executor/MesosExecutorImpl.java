@@ -9,26 +9,22 @@ import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ExecutorMessage;
 import com.twitter.mesos.gen.ScheduleStatus;
 import mesos.Executor;
-import mesos.ExecutorArgs;
 import mesos.ExecutorDriver;
-import mesos.FrameworkMessage;
-import mesos.TaskDescription;
-import mesos.TaskState;
-import mesos.TaskStatus;
+import mesos.Protos.ExecutorArgs;
+import mesos.Protos.FrameworkMessage;
+import mesos.Protos.TaskDescription;
+import mesos.Protos.TaskID;
+import mesos.Protos.TaskState;
+import mesos.Protos.TaskStatus;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
 
-public class MesosExecutorImpl extends Executor {
-
-  static {
-    System.loadLibrary("mesos");
-  }
+public class MesosExecutorImpl implements Executor {
 
   private static final Logger LOG = Logger.getLogger(MesosExecutorImpl.class.getName());
-  private final static byte[] EMPTY_MSG = new byte[0];
 
   private final ExecutorCore executorCore;
   private final Driver driver;
@@ -42,27 +38,24 @@ public class MesosExecutorImpl extends Executor {
   @Override
   public void init(ExecutorDriver executorDriver, ExecutorArgs executorArgs) {
     LOG.info("Initialized with driver " + executorDriver + " and args " + executorArgs);
-    driver.setDriver(executorDriver);
-    executorCore.setSlaveId(executorArgs.getSlaveId());
+    executorCore.setSlaveId(executorArgs.getSlaveId().getValue());
+    driver.setDriver(executorDriver, executorArgs.getFrameworkId());
   }
 
   @Override
   public void launchTask(final ExecutorDriver driverDoNotUse, final TaskDescription task) {
-    LOG.info(String.format("Running task %s with ID %d.", task.getName(), task.getTaskId()));
-
-    // TODO(wfarner): Remove this if we find that init is called consistently.
-    driver.setDriver(driverDoNotUse);
+    LOG.info(String.format("Running task %s with ID %s.", task.getName(), task.getTaskId()));
 
     final AssignedTask assignedTask;
     try {
-      assignedTask = ThriftBinaryCodec.decode(AssignedTask.class, task.getArg());
+      assignedTask = ThriftBinaryCodec.decode(AssignedTask.class, task.getData().toByteArray());
     } catch (ThriftBinaryCodec.CodingException e) {
       LOG.log(Level.SEVERE, "Error deserializing task object.", e);
-      driver.sendStatusUpdate(task.getTaskId(), FAILED);
+      driver.sendStatusUpdate(task.getTaskId().getValue(), FAILED);
       return;
     }
 
-    Preconditions.checkArgument(task.getTaskId() == assignedTask.getTaskId(),
+    Preconditions.checkArgument(task.getTaskId().getValue().equals(assignedTask.getTaskId()),
         "Fatal - task IDs do not match: " + task.getTaskId() + ", " + assignedTask.getTaskId());
 
     try {
@@ -77,15 +70,18 @@ public class MesosExecutorImpl extends Executor {
   }
 
   @Override
-  public void killTask(ExecutorDriver driver, int taskId) {
-    executorCore.stopLiveTask(taskId);
+  public void killTask(ExecutorDriver executorDriver, TaskID taskID) {
+    executorCore.stopLiveTask(taskID.getValue());
   }
 
   @Override
   public void shutdown(ExecutorDriver driver) {
     LOG.info("Received shutdown command, terminating...");
     for (Task killedTask : executorCore.shutdownCore()) {
-      driver.sendStatusUpdate(new TaskStatus(killedTask.getId(), TaskState.TASK_KILLED, EMPTY_MSG));
+      driver.sendStatusUpdate(TaskStatus.newBuilder()
+          .setTaskId(TaskID.newBuilder().setValue(killedTask.getId()))
+          .setState(TaskState.TASK_KILLED)
+          .build());
     }
     driver.stop();
   }
@@ -105,7 +101,7 @@ public class MesosExecutorImpl extends Executor {
 
     try {
       ExecutorMessage executorMsg = ThriftBinaryCodec.decode(ExecutorMessage.class,
-          message.getData());
+          message.getData().toByteArray());
       if (!executorMsg.isSet()) {
         LOG.warning("Received empty executor message.");
         return;

@@ -25,6 +25,7 @@ import com.twitter.mesos.scheduler.persistence.FileSystemPersistence;
 import com.twitter.mesos.scheduler.persistence.PersistenceLayer;
 import com.twitter.mesos.scheduler.persistence.ZooKeeperPersistence;
 import mesos.MesosSchedulerDriver;
+import mesos.Protos.FrameworkID;
 import mesos.SchedulerDriver;
 
 import javax.annotation.Nullable;
@@ -111,7 +112,8 @@ public class SchedulerModule extends AbstractModule {
     String frameworkId = state.getFrameworkId();
     if (frameworkId != null) {
       LOG.info("Found persisted framework ID: " + frameworkId);
-      return new MesosSchedulerDriver(scheduler, options.mesosMasterAddress, frameworkId);
+      return new MesosSchedulerDriver(scheduler, options.mesosMasterAddress,
+          FrameworkID.newBuilder().setValue(frameworkId).build());
     } else {
       LOG.warning("Did not find a persisted framework ID, connecting as a new framework.");
       return new MesosSchedulerDriver(scheduler, options.mesosMasterAddress);

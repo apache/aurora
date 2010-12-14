@@ -146,11 +146,11 @@ class SchedulerThriftInterface extends ThriftServer implements MesosSchedulerMan
   }
 
   @Override
-  public RestartResponse restartTasks(Set<Integer> taskIds) {
+  public RestartResponse restartTasks(Set<String> taskIds) {
     ResponseCode response = OK;
     String message = taskIds.size() + " tasks scheduled for restart.";
 
-    Set<Integer> tasksRestarting = null;
+    Set<String> tasksRestarting = null;
     try {
       tasksRestarting = schedulerCore.restartTasks(Sets.newHashSet(taskIds));
     } catch (RestartException e) {
@@ -188,7 +188,7 @@ class SchedulerThriftInterface extends ThriftServer implements MesosSchedulerMan
 
     ResponseCode response = OK;
     String message = "Shards updated.";
-    Set<Integer> restartedTaskIds = null;
+    Set<String> restartedTaskIds = null;
 
     if (StringUtils.isBlank(request.getUpdateToken())) {
       response = INVALID_REQUEST;

@@ -11,7 +11,7 @@ import java.io.File;
  */
 public interface Task {
 
-  public int getId();
+  public String getId();
 
   public void stage() throws TaskRunException;
 

@@ -6,8 +6,10 @@ import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.ScheduleStatus;
+import com.twitter.mesos.scheduler.JobManager.JobUpdateResult;
 import com.twitter.mesos.scheduler.TaskStore.TaskState;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
+import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 
 import java.util.Map;
 import java.util.Set;
@@ -110,7 +112,22 @@ public interface SchedulerCore extends UpdateScheduler {
    *    requested for restart may be rejected if it was not found, or was in a non-active state.
    * @throws RestartException If the restart request could not be honored.
    */
-  public Set<Integer> restartTasks(Set<Integer> taskIds) throws RestartException;
+  public Set<String> restartTasks(Set<String> taskIds) throws RestartException;
+
+  /**
+   * Triggers an update to a job.
+   *
+   * @param updatedJob The updated job, which must correspond with an existing job.
+   * @return A description of the action that was or will be taken to update the job.
+   * @throws ScheduleException If the job could not be updated.
+   * @throws TaskDescriptionException If the updated job configuration was invalid.
+   */
+  public JobUpdateResult updateJob(JobConfiguration updatedJob) throws ScheduleException,
+      TaskDescriptionException;
+
+  // TODO(wfarner): This makes the interface look ugly, and shows how the encapsulation between
+  //    SchedulreCoreImpl and ImmediateJobManager is broken.
+  public JobUpdateResult doJobUpdate(JobConfiguration updatedJob) throws ScheduleException;
 
   /**
    * Gets the framework ID that this scheduler is registered with, or {@code null} if the framework
@@ -123,13 +140,13 @@ public interface SchedulerCore extends UpdateScheduler {
   public void updateRegisteredTasks(RegisteredTaskUpdate update);
 
   public static class TwitterTask {
-    public final int taskId;
+    public final String taskId;
     public final String slaveId;
     public final String taskName;
     public final Map<String, String> params;
     public final AssignedTask task;
 
-    public TwitterTask(int taskId, String slaveId, String taskName, Map<String, String> params,
+    public TwitterTask(String taskId, String slaveId, String taskName, Map<String, String> params,
         AssignedTask task) {
       this.taskId = taskId;
       this.slaveId = MorePreconditions.checkNotBlank(slaveId);
