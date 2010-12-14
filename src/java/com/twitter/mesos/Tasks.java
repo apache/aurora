@@ -12,7 +12,6 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.TaskStore.TaskState;
 
-import javax.annotation.Nullable;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.Set;
@@ -85,6 +84,13 @@ public class Tasks {
         }
       };
 
+  public static final Function<TaskState, String> STATE_TO_JOB_KEY =
+      new Function<TaskState, String>() {
+        @Override public String apply(TaskState state) {
+          return jobKey(state);
+        }
+      };
+
   /**
    * Different states that an active task may be in.
    */
@@ -108,7 +114,7 @@ public class Tasks {
     };
 
   /**
-   * Filter that includes only terminal tasks.
+   * Filter that includes only terminated tasks.
    */
   public static final Predicate<TaskState> TERMINATED_FILTER = new Predicate<TaskState>() {
       @Override public boolean apply(TaskState state) {
@@ -156,6 +162,10 @@ public class Tasks {
 
   public static String jobKey(ScheduledTask task) {
     return jobKey(task.getAssignedTask());
+  }
+
+  public static String jobKey(TaskState state) {
+    return jobKey(state.task);
   }
 
   public static int id(ScheduledTask task) {

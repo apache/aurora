@@ -22,19 +22,19 @@ public class DisplayUtils {
     return copy;
   }
 
-  public static Comparator<User> SORT_USERS_BY_NAME = new Comparator<User>() {
+  public static final Comparator<User> SORT_USERS_BY_NAME = new Comparator<User>() {
       @Override public int compare(User userA, User userB) {
         return userA.name.compareTo(userB.name);
       }
     };
 
-  public static Comparator<Job> SORT_JOB_BY_NAME = new Comparator<Job>() {
+  public static final Comparator<Job> SORT_JOB_BY_NAME = new Comparator<Job>() {
       @Override public int compare(Job jobA, Job jobB) {
         return jobA.getName().compareTo(jobB.getName());
       }
     };
 
-  public static Comparator<JobConfiguration> SORT_JOB_CONFIG_BY_NAME =
+  public static final Comparator<JobConfiguration> SORT_JOB_CONFIG_BY_NAME =
       new Comparator<JobConfiguration>() {
         @Override public int compare(JobConfiguration jobA, JobConfiguration jobB) {
           return jobA.getName().compareTo(jobB.getName());

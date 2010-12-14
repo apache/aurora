@@ -326,11 +326,15 @@ public class LiveTask extends TaskOnDisk {
   }
 
   private void captureStream(InputStream stream, File outputFile) {
+    FileOutputStream outputStream = null;
     try {
-      ByteStreams.copy(stream, new FileOutputStream( outputFile));
+      outputStream = new FileOutputStream(outputFile);
+      ByteStreams.copy(stream, outputStream);
       LOG.info("Stream capture to " + outputFile + " completed.");
     } catch (IOException e) {
       LOG.log(Level.SEVERE, "Failed to capture stream.", e);
+    } finally {
+      Closeables.closeQuietly(outputStream);
     }
   }
 

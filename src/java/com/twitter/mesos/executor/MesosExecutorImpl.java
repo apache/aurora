@@ -117,7 +117,7 @@ public class MesosExecutorImpl extends Executor {
           break;
         case RESTART_EXECUTOR:
           LOG.info("Received executor restart request.");
-          shutdown(null);
+          shutdown(driver);
           break;
         default:
           LOG.warning("Received unhandled executor message type: " + executorMsg.getSetField());

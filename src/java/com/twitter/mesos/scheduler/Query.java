@@ -129,7 +129,7 @@ public class Query implements Predicate<TaskState> {
     return result;
   }
 
-  public static Query GET_ALL = new Query(new TaskQuery());
+  public static final Query GET_ALL = new Query(new TaskQuery());
 
   public static Query byId(Iterable<Integer> taskIds) {
     return new Query(new TaskQuery().setTaskIds(ImmutableSet.copyOf(taskIds)));

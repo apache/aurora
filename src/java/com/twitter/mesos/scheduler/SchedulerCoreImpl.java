@@ -783,6 +783,12 @@ public class SchedulerCoreImpl implements SchedulerCore {
     frameworkId.set(state.getFrameworkId());
     nextTaskId.set((int) state.getNextTaskId());
 
+    // Apply defaults to backfill new fields.
+    List<ScheduledTask> tasks = state.getTasks();
+    for (ScheduledTask task : tasks) {
+      ConfigurationManager.applyDefaultsIfUnset(task.getAssignedTask().getTask());
+    }
+
     taskStore.add(state.getTasks());
 
     for (final Map.Entry<String, List<JobConfiguration>> entry : state.getModuleJobs().entrySet()) {
