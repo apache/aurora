@@ -105,8 +105,12 @@ public interface Driver extends Function<Message, Integer> {
       return doWorkWithDriver(new Function<ExecutorDriver, Integer>() {
         @Override public Integer apply(ExecutorDriver driver) {
           LOG.info("Notifying task " + taskId + " in state " + status);
-          return driver.sendStatusUpdate(
+          int result = driver.sendStatusUpdate(
               new TaskStatus(taskId, StateTranslator.get(status), EMPTY_MSG));
+          if (result != 0) {
+            LOG.warning("Attempt to send executor message returned code " + result);
+          }
+          return result;
         }
       });
     }

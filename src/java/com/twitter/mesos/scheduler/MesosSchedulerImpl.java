@@ -1,11 +1,9 @@
 package com.twitter.mesos.scheduler;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.inject.Inject;
 import com.twitter.common.stats.Stats;
-import com.twitter.mesos.Message;
 import com.twitter.mesos.StateTranslator;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.RegisteredTaskUpdate;
@@ -24,6 +22,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 /**
  * Location for communication with the mesos core.
  *
@@ -36,17 +36,18 @@ class MesosSchedulerImpl extends Scheduler {
     System.loadLibrary("mesos");
   }
 
-  // Stores scheduler state and handles actual scheduling decisions.
   private final SchedulerMain.TwitterSchedulerOptions options;
+
+  // Stores scheduler state and handles actual scheduling decisions.
   private final SchedulerCore schedulerCore;
   private final ExecutorTracker executorTracker;
 
   @Inject
   public MesosSchedulerImpl(SchedulerMain.TwitterSchedulerOptions options,
       SchedulerCore schedulerCore, ExecutorTracker executorTracker) {
-    this.options = Preconditions.checkNotNull(options);
-    this.schedulerCore = Preconditions.checkNotNull(schedulerCore);
-    this.executorTracker = Preconditions.checkNotNull(executorTracker);
+    this.options = checkNotNull(options);
+    this.schedulerCore = checkNotNull(schedulerCore);
+    this.executorTracker = checkNotNull(executorTracker);
   }
 
   @Override
@@ -67,26 +68,7 @@ class MesosSchedulerImpl extends Scheduler {
   @Override
   public void registered(final SchedulerDriver driver, String s) {
     LOG.info("Registered with ID " + s);
-
-    schedulerCore.registered(new Driver() {
-      @Override public int sendMessage(Message message) {
-        FrameworkMessage frameworkMessage = new FrameworkMessage();
-        frameworkMessage.setSlaveId(message.getSlaveId());
-        try {
-          frameworkMessage.setData(ThriftBinaryCodec.encode(message.getMessage()));
-        } catch (ThriftBinaryCodec.CodingException e) {
-          LOG.log(Level.SEVERE, "Failed to encode message: " + message.getMessage()
-                                + " intended for slave " + message.getSlaveId());
-          return -1;
-        }
-
-        return driver.sendFrameworkMessage(frameworkMessage);
-      }
-
-      @Override public int killTask(int taskId) {
-        return driver.killTask(taskId);
-      }
-    }, s);
+    schedulerCore.registered(s);
   }
 
   @Override

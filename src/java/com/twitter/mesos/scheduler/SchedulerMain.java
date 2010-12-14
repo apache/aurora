@@ -14,9 +14,10 @@ import com.twitter.common.zookeeper.ServerSet.EndpointStatus;
 import com.twitter.common.zookeeper.ServerSet.UpdateException;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.SingletonService.LeadershipListener;
+import com.twitter.common.zookeeper.ZooKeeperUtils;
 import com.twitter.mesos.gen.MesosSchedulerManager;
 import com.twitter.thrift.Status;
-import mesos.MesosSchedulerDriver;
+import mesos.SchedulerDriver;
 import org.apache.thrift.transport.TTransportException;
 
 import javax.annotation.Nullable;
@@ -28,6 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import static com.twitter.common.quantity.Time.SECONDS;
 
 /**
  * Launcher for the twitter nexue scheduler.
@@ -43,11 +46,12 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
     public String executorPath;
 
     @Option(name = "zk_endpoints", usage = "Endpoint specification for the ZooKeeper servers.")
-    public List<InetSocketAddress> zooKeeperEndpoints;
+    public List<InetSocketAddress> zooKeeperEndpoints =
+        ImmutableList.copyOf(ZooKeeperUtils.DEFAULT_ZK_ENDPOINTS);
 
     @Option(name = "zk_session_timeout_secs",
             usage = "The ZooKeeper session timeout in seconds.")
-    public int zooKeeperSessionTimeoutSecs = 5;
+    public int zooKeeperSessionTimeoutSecs = ZooKeeperUtils.DEFAULT_ZK_SESSION_TIMEOUT.as(SECONDS);
 
     @Option(name = "mesos_scheduler_ns", required = true,
             usage = "The name service name for the mesos scheduler thrift server.")
@@ -111,7 +115,7 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
 
   @Inject private SingletonService schedulerService;
   @Inject private SchedulerThriftInterface schedulerThriftInterface;
-  @Inject private MesosSchedulerDriver driver;
+  @Inject private SchedulerDriver driver;
 
   @Override
   protected Iterable<Class<? extends Module>> getProcessModuleClasses() {

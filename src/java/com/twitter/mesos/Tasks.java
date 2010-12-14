@@ -3,6 +3,7 @@ package com.twitter.mesos;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Predicate;
+import com.google.common.collect.Maps;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.LiveTask;
@@ -14,6 +15,7 @@ import com.twitter.mesos.scheduler.TaskStore.TaskState;
 
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.Map;
 import java.util.Set;
 
 import static com.twitter.mesos.gen.ScheduleStatus.*;
@@ -49,6 +51,9 @@ public class Tasks {
   public static final Function<TaskState, AssignedTask> STATE_TO_ASSIGNED =
       Functions.compose(SCHEDULED_TO_ASSIGNED, STATE_TO_SCHEDULED);
 
+  public static final Function<TaskState, TwitterTaskInfo> STATE_TO_INFO =
+      Functions.compose(ASSIGNED_TO_INFO, STATE_TO_ASSIGNED);
+
   public static final Function<AssignedTask, Integer> ASSIGNED_TO_ID =
       new Function<AssignedTask, Integer>() {
         @Override public Integer apply(AssignedTask task) {
@@ -74,6 +79,9 @@ public class Tasks {
         }
       };
 
+  public static final Function<TaskState, Integer> STATE_TO_SHARD_ID =
+      Functions.compose(INFO_TO_SHARD_ID, STATE_TO_INFO);
+
   public static final Function<AssignedTask, Integer> ASSIGNED_TO_SHARD_ID =
       Functions.compose(INFO_TO_SHARD_ID, ASSIGNED_TO_INFO);
 
@@ -84,12 +92,21 @@ public class Tasks {
         }
       };
 
-  public static final Function<TaskState, String> STATE_TO_JOB_KEY =
-      new Function<TaskState, String>() {
-        @Override public String apply(TaskState state) {
-          return jobKey(state);
+  public static final Function<TwitterTaskInfo, String> INFO_TO_JOB_KEY =
+      new Function<TwitterTaskInfo, String>() {
+        @Override public String apply(TwitterTaskInfo info) {
+          return jobKey(info);
         }
       };
+
+  public static final Function<AssignedTask, String> ASSIGNED_TO_JOB_KEY =
+      Functions.compose(INFO_TO_JOB_KEY, ASSIGNED_TO_INFO);
+
+  public static final Function<ScheduledTask, String> SCHEDULED_TO_JOB_KEY =
+      Functions.compose(ASSIGNED_TO_JOB_KEY, SCHEDULED_TO_ASSIGNED);
+
+  public static final Function<TaskState, String> STATE_TO_JOB_KEY =
+      Functions.compose(SCHEDULED_TO_JOB_KEY, STATE_TO_SCHEDULED);
 
   /**
    * Different states that an active task may be in.
@@ -174,5 +191,21 @@ public class Tasks {
 
   public static int id(TaskState state) {
     return id(state.task);
+  }
+
+  public static Map<Integer, TaskState> mapStateByTaskId(Iterable<TaskState> tasks) {
+    return Maps.uniqueIndex(tasks, STATE_TO_ID);
+  }
+
+  public static Map<Integer, TwitterTaskInfo> mapInfoByShardId(Iterable<TwitterTaskInfo> tasks) {
+    return Maps.uniqueIndex(tasks, INFO_TO_SHARD_ID);
+  }
+
+  public static Map<Integer, AssignedTask> mapAssignedByShardId(Iterable<AssignedTask> tasks) {
+    return Maps.uniqueIndex(tasks, ASSIGNED_TO_SHARD_ID);
+  }
+
+  public static Map<Integer, TaskState> mapStateByShardId(Iterable<TaskState> tasks) {
+    return Maps.uniqueIndex(tasks, STATE_TO_SHARD_ID);
   }
 }

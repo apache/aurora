@@ -1,6 +1,5 @@
 package com.twitter.mesos.scheduler;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -15,17 +14,25 @@ import com.twitter.mesos.gen.MesosSchedulerManager;
 import com.twitter.mesos.gen.ResponseCode;
 import com.twitter.mesos.gen.RestartResponse;
 import com.twitter.mesos.gen.ScheduleStatusResponse;
+import com.twitter.mesos.gen.ShardUpdateRequest;
+import com.twitter.mesos.gen.ShardUpdateResponse;
 import com.twitter.mesos.gen.TaskQuery;
+import com.twitter.mesos.gen.UpdateCompleteResponse;
 import com.twitter.mesos.gen.UpdateRequest;
 import com.twitter.mesos.gen.UpdateResponse;
+import com.twitter.mesos.scheduler.SchedulerCore.RestartException;
 import com.twitter.mesos.scheduler.TaskStore.TaskState;
+import com.twitter.mesos.scheduler.UpdateScheduler.UpdateException;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
+import org.apache.commons.lang.StringUtils;
 
 import java.util.Map;
 import java.util.Set;
 import java.util.logging.Logger;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.mesos.gen.ResponseCode.*;
 
 /**
@@ -84,8 +91,8 @@ class SchedulerThriftInterface extends ThriftServer implements MesosSchedulerMan
 
   @Override
   public UpdateResponse updateTasks(UpdateRequest request) {
-    Preconditions.checkNotNull(request, "Request may not be null.");
-    Preconditions.checkNotNull(request.getUpdatedJob(), "Job update may not be null.");
+    checkNotNull(request, "Request may not be null.");
+    checkNotNull(request.getUpdatedJob(), "Job update may not be null.");
 
     // TODO(wfarner): JobConfiguration needs to define the update routine for its tasks.
     // TODO(wfarner): This should spin off a new job that will communicate with the scheduler
@@ -143,13 +150,66 @@ class SchedulerThriftInterface extends ThriftServer implements MesosSchedulerMan
     ResponseCode response = OK;
     String message = taskIds.size() + " tasks scheduled for restart.";
 
-    Set<Integer> tasksRestarting = schedulerCore.restartTasks(Sets.newHashSet(taskIds));
+    Set<Integer> tasksRestarting = null;
+    try {
+      tasksRestarting = schedulerCore.restartTasks(Sets.newHashSet(taskIds));
+    } catch (RestartException e) {
+      response = INVALID_REQUEST;
+      message = e.getMessage();
+    }
     if (!taskIds.equals(tasksRestarting)) {
       response = WARNING;
       message = "Unable to restart tasks: " + Sets.difference(taskIds, tasksRestarting);
     }
 
     return new RestartResponse(response, message, tasksRestarting);
+  }
+
+  @Override
+  public UpdateCompleteResponse finishUpdate(String updateToken) {
+    checkNotBlank(updateToken);
+
+    ResponseCode response = OK;
+    String message = "Update finished.";
+
+    try {
+      schedulerCore.updateFinished(updateToken);
+    } catch (UpdateException e) {
+      response = INVALID_REQUEST;
+      message = e.getMessage();
+    }
+
+    return new UpdateCompleteResponse(response, message);
+  }
+
+  @Override
+  public ShardUpdateResponse updateShards(ShardUpdateRequest request) {
+    checkNotNull(request);
+
+    ResponseCode response = OK;
+    String message = "Shards updated.";
+    Set<Integer> restartedTaskIds = null;
+
+    if (StringUtils.isBlank(request.getUpdateToken())) {
+      response = INVALID_REQUEST;
+      message = "Update token must be specified.";
+    } else if (request.getRestartShards() == null) {
+      response = INVALID_REQUEST;
+      message = "Updates cannot be null.";
+    } else if (request.getRestartShards().isEmpty()) {
+      response = INVALID_REQUEST;
+      message = "No updates provided.";
+    } else {
+      try {
+        restartedTaskIds = schedulerCore.updateShards(request.getUpdateToken(),
+            request.getRestartShards(), request.isRollback());
+      } catch (UpdateException e) {
+        response = INVALID_REQUEST;
+        message = e.getMessage();
+      }
+    }
+
+    return new ShardUpdateResponse(response, message, restartedTaskIds);
   }
 
   @Override

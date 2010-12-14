@@ -30,4 +30,9 @@ public class Message {
   public TBase getMessage() {
     return message;
   }
+
+  @Override
+  public String toString() {
+    return "To " + slaveId + ": " + message;
+  }
 }

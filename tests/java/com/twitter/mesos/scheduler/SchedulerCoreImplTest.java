@@ -23,11 +23,12 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.JobManager.JobUpdateResult;
+import com.twitter.mesos.scheduler.SchedulerCore.RestartException;
 import com.twitter.mesos.scheduler.TaskStore.TaskState;
+import com.twitter.mesos.scheduler.UpdateScheduler.UpdateException;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import com.twitter.mesos.scheduler.persistence.NoPersistence;
-import org.easymock.Capture;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -36,7 +37,6 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Callable;
 
 import static com.twitter.mesos.gen.ScheduleStatus.*;
 import static org.easymock.EasyMock.*;
@@ -58,10 +58,9 @@ import static org.junit.Assert.*;
  */
 public class SchedulerCoreImplTest extends EasyMockTest {
 
-  private WorkQueue workQueue;
   private SchedulingFilter schedulingFilter;
   private Driver driver;
-  private SchedulerCore scheduler;
+  private SchedulerCoreImpl scheduler;
   private CronJobManager cron;
   private JobUpdateLauncher updateLauncher;
 
@@ -79,7 +78,6 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Before
   public void setUp() {
-    workQueue = createMock(WorkQueue.class);
     schedulingFilter = createMock(SchedulingFilter.class);
     driver = createMock(Driver.class);
     updateLauncher = createMock(JobUpdateLauncher.class);
@@ -94,7 +92,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
           @Override public void addStatus(ExecutorStatus status) {
             // No-op.
           }
-        }, workQueue, schedulingFilter, updateLauncher);
+        }, driver, schedulingFilter, updateLauncher);
     cron.schedulerCore = scheduler;
     immediateJobManager.schedulerCore = scheduler;
   }
@@ -116,7 +114,8 @@ public class SchedulerCoreImplTest extends EasyMockTest {
       assertThat(state.task.getAssignedTask().isSetSlaveId(), is(false));
       // Need to clear shard ID since that was assigned in our makeJob function.
       assertThat(state.task.getAssignedTask().getTask().setShardId(0),
-          is(ConfigurationManager.populateFields(job, new TwitterTaskInfo(DEFAULT_TASK))));
+          is(ConfigurationManager.populateFields(job,
+              new TwitterTaskInfo(DEFAULT_TASK).setShardId(0))));
     }
   }
 
@@ -215,14 +214,11 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testRestartTask() throws Exception {
-    Capture<Callable<Boolean>> workCapture = new Capture<Callable<Boolean>>();
-    workQueue.doWork(capture(workCapture));
-
     expect(driver.killTask(1)).andReturn(0);
 
     control.replay();
 
-    scheduler.registered(driver, "");
+    scheduler.registered("");
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
     changeStatus(queryByOwner(OWNER_A), STARTING);
     changeStatus(queryByOwner(OWNER_A), RUNNING);
@@ -233,8 +229,6 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     int restarted = Iterables.getOnlyElement(scheduler.restartTasks(restartRequest));
 
     assertThat(restarted, is(taskId));
-
-    workCapture.getValue().call();
 
     // Mimick the master notifying the scheduler of a task state change.
     changeStatus(query(restartRequest), KILLED);
@@ -248,7 +242,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
         is(restartedTask.task.getAssignedTask().getTask().getShardId()));
   }
 
-  @Test
+  @Test(expected = RestartException.class)
   public void testRestartUnknownTask() throws Exception {
     control.replay();
 
@@ -259,9 +253,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     int taskId = getOnlyTask(queryByOwner(OWNER_A)).task.getAssignedTask().getTaskId();
 
     Set<Integer> restartRequest = Sets.newHashSet(taskId + 1);
-    Set<Integer> restarted = scheduler.restartTasks(restartRequest);
-
-    assertThat(restarted.isEmpty(), is(true));
+    scheduler.restartTasks(restartRequest);
   }
 
   @Test
@@ -280,49 +272,6 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     Set<Integer> restarted = scheduler.restartTasks(restartRequest);
 
     assertThat(restarted.isEmpty(), is(true));
-  }
-
-  @Test
-  public void testRestartMixedTasks() throws Exception {
-    Capture<Callable<Boolean>> workCapture = new Capture<Callable<Boolean>>();
-    workQueue.doWork(capture(workCapture));
-
-    expect(driver.killTask(1)).andReturn(0);
-
-    control.replay();
-
-    scheduler.registered(driver, "");
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
-    scheduler.createJob(makeJob(OWNER_B, JOB_B, DEFAULT_TASK, 1));
-    changeStatus(queryByOwner(OWNER_A), STARTING);
-    changeStatus(queryByOwner(OWNER_A), RUNNING);
-
-    changeStatus(queryByOwner(OWNER_B), STARTING);
-    changeStatus(queryByOwner(OWNER_B), RUNNING);
-    changeStatus(queryByOwner(OWNER_B), FINISHED);
-
-    int activeTaskId = getOnlyTask(queryByOwner(OWNER_A)).task.getAssignedTask().getTaskId();
-    int inactiveTaskId = getOnlyTask(queryByOwner(OWNER_B)).task.getAssignedTask().getTaskId();
-
-    Set<Integer> restartRequest = Sets.newHashSet(activeTaskId, inactiveTaskId, 100000);
-    Set<Integer> restarted = scheduler.restartTasks(restartRequest);
-
-    Set<Integer> expectedRestart = Sets.newHashSet(activeTaskId);
-
-    assertThat(restarted, is(expectedRestart));
-
-    workCapture.getValue().call();
-
-    // Mimick the master notifying the scheduler of a task state change.
-    changeStatus(query(expectedRestart), KILLED);
-
-    assertThat(scheduler.getTasks(new Query(new TaskQuery().setTaskIds(expectedRestart)
-        .setStatuses(Sets.newHashSet(KILLED_BY_CLIENT)))).size(),
-        is(1));
-
-    assertThat(scheduler.getTasks(new Query(new TaskQuery().setOwner(OWNER_A)
-        .setStatuses(Sets.newHashSet(PENDING)))).size(),
-        is(1));
   }
 
   @Test
@@ -357,19 +306,15 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testNoTransitionFromTerminalState() throws Exception {
-    Capture<Callable<Boolean>> workCapture = new Capture<Callable<Boolean>>();
-    workQueue.doWork(capture(workCapture));
-
     expect(driver.killTask(1)).andReturn(0);
 
     control.replay();
 
-    scheduler.registered(driver, "");
+    scheduler.registered("");
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
     changeStatus(queryByOwner(OWNER_A), STARTING);
     changeStatus(queryByOwner(OWNER_A), RUNNING);
     scheduler.killTasks(queryByOwner(OWNER_A));
-    workCapture.getValue().call();
 
     int taskId = getOnlyTask(queryByOwner(OWNER_A)).task.getAssignedTask().getTaskId();
 
@@ -489,19 +434,15 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testKillRunningTask() throws Exception {
-    Capture<Callable<Boolean>> workCapture = new Capture<Callable<Boolean>>();
-    workQueue.doWork(capture(workCapture));
     expect(driver.killTask(1)).andReturn(0);
 
     control.replay();
 
-    scheduler.registered(driver, "");
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
     int taskId = getOnlyTask(queryByOwner(OWNER_A)).task.getAssignedTask().getTaskId();
     changeStatus(query(taskId), STARTING);
     changeStatus(query(taskId), RUNNING);
     scheduler.killTasks(query(taskId));
-    workCapture.getValue().call();
     assertThat(getTask(taskId).task.getStatus(), is(KILLED_BY_CLIENT));
     assertThat(getTasks(queryByOwner(OWNER_A)).size(), is(1));
   }
@@ -760,7 +701,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     updatedTask.putToConfiguration("start_command", "echo 'hi'");
     JobConfiguration updatedJob = makeJob(OWNER_A, JOB_A, updatedTask, 1);
 
-    updateLauncher.launchUpdater((JobConfiguration) anyObject());
+    updateLauncher.launchUpdater((String) anyObject());
 
     control.replay();
 
@@ -798,7 +739,8 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
     changeStatus(taskId, RUNNING);
 
-    TwitterTaskInfo updatedTask = new TwitterTaskInfo(DEFAULT_TASK);
+    TwitterTaskInfo updatedTask = new TwitterTaskInfo(DEFAULT_TASK)
+        .setShardId(0);
     updatedTask.putToConfiguration("priority", "100");
     assertThat(scheduler.updateJob(makeJob(OWNER_A, JOB_A, updatedTask, 1)),
         is(JobUpdateResult.COMPLETED));
@@ -823,17 +765,12 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testUpdateJobRemoveTasks() throws Exception {
-    Capture<Callable<Boolean>> workCapture1 = new Capture<Callable<Boolean>>();
-    Capture<Callable<Boolean>> workCapture2 = new Capture<Callable<Boolean>>();
-    workQueue.doWork(capture(workCapture1));
-    workQueue.doWork(capture(workCapture2));
-
     expect(driver.killTask(anyInt())).andReturn(0);
     expect(driver.killTask(anyInt())).andReturn(0);
 
     control.replay();
 
-    scheduler.registered(driver, "");
+    scheduler.registered("");
 
     TwitterTaskInfo pending1 = new TwitterTaskInfo(DEFAULT_TASK);
     pending1.putToConfiguration("priority", "1");
@@ -883,9 +820,6 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     assertThat(scheduler.updateJob(makeJob(OWNER_A, JOB_A,
         Arrays.asList(pending1, starting1, running1, finished1, killed1))),
         is(JobUpdateResult.COMPLETED));
-
-    workCapture1.getValue().call();
-    workCapture2.getValue().call();
 
     // Check that all the tasks ended up in the right states.
     assertThat(getTask(pendingId1).task.getStatus(), is(PENDING));
@@ -985,6 +919,441 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     assertThat(updatedJob, is(original));
   }
 
+  @Test(expected = UpdateException.class)
+  public void testUpdateShardsRejectsBadToken() throws Exception {
+    control.replay();
+    scheduler.updateShards("asdf", ImmutableSet.of(1, 2, 3), true);
+  }
+
+  @Test(expected = UpdateException.class)
+  public void testUpdateShardsPreventsUpdateConflict() throws Exception {
+    control.replay();
+
+    TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
+    task.putToConfiguration("start_command", "echo 'hello'");
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, task, 1);
+
+    TwitterTaskInfo updatedTask = new TwitterTaskInfo(DEFAULT_TASK);
+    updatedTask.putToConfiguration("start_command", "echo 'hi'");
+    JobConfiguration updatedJob = makeJob(OWNER_A, JOB_A, updatedTask, 1);
+
+    Map<Integer, TwitterTaskInfo> updateFrom = Tasks.mapInfoByShardId(job.getTaskConfigs());
+    Map<Integer, TwitterTaskInfo> updateTo = Tasks.mapInfoByShardId(updatedJob.getTaskConfigs());
+
+    scheduler.createJob(job);
+
+    scheduler.registerUpdate(updateFrom, updateTo);
+    scheduler.registerUpdate(updateFrom, updateTo);
+  }
+
+  @Test
+  public void testRollingUpdate() throws Exception {
+    expectAcceptedOffers(6);
+    expect(driver.killTask(anyInt())).andReturn(0);
+    expect(driver.killTask(anyInt())).andReturn(0);
+    expect(driver.killTask(anyInt())).andReturn(0);
+
+    control.replay();
+
+    TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
+    task.putToConfiguration("start_command", "echo 'hello'");
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, task, 10);
+
+    String newCommand = "echo 'hi'";
+    TwitterTaskInfo updatedTask = new TwitterTaskInfo(DEFAULT_TASK);
+    updatedTask.putToConfiguration("start_command", newCommand);
+    JobConfiguration updatedJob = ConfigurationManager.validateAndPopulate(
+        makeJob(OWNER_A, JOB_A, updatedTask, 10));
+
+    scheduler.createJob(job);
+
+    Map<Integer, TwitterTaskInfo> updateFrom = Tasks.mapInfoByShardId(
+        ConfigurationManager.validateAndPopulate(job).getTaskConfigs());
+    Map<Integer, TwitterTaskInfo> updateTo = Tasks.mapInfoByShardId(updatedJob.getTaskConfigs());
+
+    Map<String, String> slaveOffer = ImmutableMap.<String, String>builder()
+        .put("cpus", "4")
+        .put("mem", "4096")
+        .build();
+    // Allow several of the tasks to start.
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+
+    Set<TaskState> startingTasks = getTasks(Query.byStatus(STARTING));
+
+    // Move the tasks between states.
+    changeStatus(Tasks.STATE_TO_ID.apply(Iterables.get(startingTasks, 0)), RUNNING);
+    changeStatus(Tasks.STATE_TO_ID.apply(Iterables.get(startingTasks, 0)), FINISHED);
+    changeStatus(Tasks.STATE_TO_ID.apply(Iterables.get(startingTasks, 1)), RUNNING);
+    changeStatus(Tasks.STATE_TO_ID.apply(Iterables.get(startingTasks, 2)), RUNNING);
+    changeStatus(Tasks.STATE_TO_ID.apply(Iterables.get(startingTasks, 2)), FAILED);
+    // This one will be automatically rescheduled.
+    changeStatus(Tasks.STATE_TO_ID.apply(Iterables.get(startingTasks, 3)), KILLED);
+    changeStatus(Tasks.STATE_TO_ID.apply(Iterables.get(startingTasks, 4)), RUNNING);
+
+    String token = scheduler.registerUpdate(updateFrom, updateTo);
+
+    expectRestarted(scheduler.updateShards(token, ImmutableSet.of(0, 1), false), newCommand);
+    expectRestarted(scheduler.updateShards(token, ImmutableSet.of(2, 3), false), newCommand);
+    expectRestarted(scheduler.updateShards(token, ImmutableSet.of(4, 5), false), newCommand);
+    expectRestarted(scheduler.updateShards(token, ImmutableSet.of(6, 7), false), newCommand);
+    expectRestarted(scheduler.updateShards(token, ImmutableSet.of(8, 9), false), newCommand);
+
+    scheduler.updateFinished(token);
+
+    assertTaskCount(16);  // 10 pending, 3 killed during update, 3 otherwise dead.
+
+    assertThat(getTasksByStatus(PENDING).size(), is(10));
+    // Only 2 killed tasks because the rest were pending, or dead.
+    assertThat(getTasksByStatus(KILLED_BY_CLIENT).size(), is(3));
+  }
+
+  @Test
+  public void testRollingUpdateRollback() throws Exception {
+    expectAcceptedOffers(10);
+    expect(driver.killTask(anyInt())).andReturn(0);
+    expect(driver.killTask(anyInt())).andReturn(0);
+    expect(driver.killTask(anyInt())).andReturn(0);
+
+    control.replay();
+
+    String oldCommand = "echo 'hello'";
+    TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
+    task.putToConfiguration("start_command", oldCommand);
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, task, 10);
+
+    String newCommand = "echo 'hi'";
+    TwitterTaskInfo updatedTask = new TwitterTaskInfo(DEFAULT_TASK);
+    updatedTask.putToConfiguration("start_command", newCommand);
+    JobConfiguration updatedJob = ConfigurationManager.validateAndPopulate(
+        makeJob(OWNER_A, JOB_A, updatedTask, 10));
+
+    scheduler.createJob(job);
+
+    Map<Integer, TwitterTaskInfo> updateFrom = Tasks.mapInfoByShardId(
+        ConfigurationManager.validateAndPopulate(job).getTaskConfigs());
+    Map<Integer, TwitterTaskInfo> updateTo = Tasks.mapInfoByShardId(updatedJob.getTaskConfigs());
+
+    Map<String, String> slaveOffer = ImmutableMap.<String, String>builder()
+        .put("cpus", "4")
+        .put("mem", "4096")
+        .build();
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+
+    Map<Integer, TaskState> startingShards = Tasks.mapStateByShardId(
+        getTasks(Query.byStatus(STARTING)));
+
+    // Move the tasks between states.
+    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(0)), RUNNING);
+    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(0)), FINISHED);
+    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(1)), RUNNING);
+    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(2)), RUNNING);
+    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(2)), FAILED);
+    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(3)), FINISHED);
+    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(4)), RUNNING);
+    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(5)), RUNNING);
+    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(6)), RUNNING);
+    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(7)), RUNNING);
+    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(8)), RUNNING);
+    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(9)), RUNNING);
+
+    String token = scheduler.registerUpdate(updateFrom, updateTo);
+
+    // We will roll back before these tasks are updated.
+    Set<Integer> untouchedShardTaskIds = ImmutableSet.copyOf(Iterables.transform(
+        getTasks(new Query(new TaskQuery().setShardIds(ImmutableSet.of(6, 7, 8, 9)))),
+        Tasks.STATE_TO_ID));
+
+    expectRestarted(scheduler.updateShards(token, ImmutableSet.of(0, 1), false), newCommand);
+    expectRestarted(scheduler.updateShards(token, ImmutableSet.of(2, 3), false), newCommand);
+    expectRestarted(scheduler.updateShards(token, ImmutableSet.of(4, 5), false), newCommand);
+
+    assertThat(getActiveShard(0).task.getStatus(), is(PENDING));
+    assertThat(getActiveShard(1).task.getStatus(), is(PENDING));
+    assertThat(getActiveShard(2).task.getStatus(), is(PENDING));
+    assertThat(getActiveShard(3).task.getStatus(), is(PENDING));
+    assertThat(getActiveShard(4).task.getStatus(), is(PENDING));
+    assertThat(getActiveShard(5).task.getStatus(), is(PENDING));
+
+    // Rollback.
+    expectRestarted(scheduler.updateShards(token, ImmutableSet.of(0, 1), true), oldCommand);
+    expectRestarted(scheduler.updateShards(token, ImmutableSet.of(2, 3), true), oldCommand);
+    expectRestarted(scheduler.updateShards(token, ImmutableSet.of(4, 5), true), oldCommand);
+
+    scheduler.updateFinished(token);
+
+    Set<TaskState> untouchedTasks = getTasks(Query.byId(untouchedShardTaskIds));
+    assertThat(untouchedTasks.size(), is(untouchedShardTaskIds.size()));
+    for (TaskState state : untouchedTasks) {
+      assertThat(state.task.getStatus(), is(RUNNING));
+    }
+
+    assertThat(getTasks(Query.activeQuery(OWNER_A, JOB_A)).size(), is(10));
+  }
+
+  @Test
+  public void testRollingUpdateAddingShards() throws Exception {
+    expectAcceptedOffers(2);
+    expect(driver.killTask(anyInt())).andReturn(0);
+    expect(driver.killTask(anyInt())).andReturn(0);
+
+    control.replay();
+
+    String oldCommand = "echo 'hello'";
+    TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
+    task.putToConfiguration("start_command", oldCommand);
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, task, 2);
+
+    String newCommand = "echo 'hi'";
+    TwitterTaskInfo updatedTask = new TwitterTaskInfo(DEFAULT_TASK);
+    updatedTask.putToConfiguration("start_command", newCommand);
+    JobConfiguration updatedJob = ConfigurationManager.validateAndPopulate(
+        makeJob(OWNER_A, JOB_A, updatedTask, 4));
+
+    scheduler.createJob(job);
+
+    Map<Integer, TwitterTaskInfo> updateFrom = Tasks.mapInfoByShardId(
+        ConfigurationManager.validateAndPopulate(job).getTaskConfigs());
+    Map<Integer, TwitterTaskInfo> updateTo = Tasks.mapInfoByShardId(updatedJob.getTaskConfigs());
+
+    Map<String, String> slaveOffer = ImmutableMap.<String, String>builder()
+        .put("cpus", "4")
+        .put("mem", "4096")
+        .build();
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+
+    Map<Integer, TaskState> startingShards = Tasks.mapStateByShardId(
+        getTasks(Query.byStatus(STARTING)));
+
+    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(0)), RUNNING);
+    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(1)), RUNNING);
+
+    String token = scheduler.registerUpdate(updateFrom, updateTo);
+
+    expectRestarted(scheduler.updateShards(token, ImmutableSet.of(0, 1), false), newCommand);
+    expectRestarted(scheduler.updateShards(token, ImmutableSet.of(2, 3), false), newCommand);
+
+    assertThat(getActiveShard(0).task.getStatus(), is(PENDING));
+    assertThat(getActiveShard(1).task.getStatus(), is(PENDING));
+    assertThat(getActiveShard(2).task.getStatus(), is(PENDING));
+    assertThat(getActiveShard(3).task.getStatus(), is(PENDING));
+
+    scheduler.updateFinished(token);
+
+    assertThat(getTasks(Query.activeQuery(OWNER_A, JOB_A)).size(), is(4));
+  }
+
+  @Test
+  public void testRollingUpdateAddingShardsRollback() throws Exception {
+    expectAcceptedOffers(4);
+    expect(driver.killTask(anyInt())).andReturn(0);
+    expect(driver.killTask(anyInt())).andReturn(0);
+    expect(driver.killTask(anyInt())).andReturn(0);
+    expect(driver.killTask(anyInt())).andReturn(0);
+
+    control.replay();
+
+    String oldCommand = "echo 'hello'";
+    TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
+    task.putToConfiguration("start_command", oldCommand);
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, task, 2);
+
+    String newCommand = "echo 'hi'";
+    TwitterTaskInfo updatedTask = new TwitterTaskInfo(DEFAULT_TASK);
+    updatedTask.putToConfiguration("start_command", newCommand);
+    JobConfiguration updatedJob = ConfigurationManager.validateAndPopulate(
+        makeJob(OWNER_A, JOB_A, updatedTask, 4));
+
+    scheduler.createJob(job);
+
+    Map<Integer, TwitterTaskInfo> updateFrom = Tasks.mapInfoByShardId(
+        ConfigurationManager.validateAndPopulate(job).getTaskConfigs());
+    Map<Integer, TwitterTaskInfo> updateTo = Tasks.mapInfoByShardId(updatedJob.getTaskConfigs());
+
+    Map<String, String> slaveOffer = ImmutableMap.<String, String>builder()
+        .put("cpus", "4")
+        .put("mem", "4096")
+        .build();
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+
+    Map<Integer, TaskState> startingShards = Tasks.mapStateByShardId(
+        getTasks(Query.byStatus(STARTING)));
+
+    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(0)), RUNNING);
+    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(1)), RUNNING);
+
+    String token = scheduler.registerUpdate(updateFrom, updateTo);
+
+    expectRestarted(scheduler.updateShards(token, ImmutableSet.of(2, 3), false), newCommand);
+
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+
+    expectRestarted(scheduler.updateShards(token, ImmutableSet.of(0, 1), false), newCommand);
+    expectRestarted(scheduler.updateShards(token, ImmutableSet.of(0, 1), true), oldCommand);
+    // It is the responsibility of the updater to remove tasks.
+    scheduler.killTasks(new Query(new TaskQuery().setShardIds(ImmutableSet.of(2, 3)),
+        Tasks.ACTIVE_FILTER));
+
+    assertThat(getActiveShard(0).task.getStatus(), is(PENDING));
+    assertThat(getActiveShard(1).task.getStatus(), is(PENDING));
+
+    scheduler.updateFinished(token);
+
+    assertThat(getTasks(Query.activeQuery(OWNER_A, JOB_A)).size(), is(2));
+  }
+
+  @Test
+  public void testRollingUpdateRemovingShards() throws Exception {
+    expectAcceptedOffers(4);
+    expect(driver.killTask(anyInt())).andReturn(0);
+    expect(driver.killTask(anyInt())).andReturn(0);
+    expect(driver.killTask(anyInt())).andReturn(0);
+    expect(driver.killTask(anyInt())).andReturn(0);
+
+    control.replay();
+
+    String oldCommand = "echo 'hello'";
+    TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
+    task.putToConfiguration("start_command", oldCommand);
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, task, 4);
+
+    String newCommand = "echo 'hi'";
+    TwitterTaskInfo updatedTask = new TwitterTaskInfo(DEFAULT_TASK);
+    updatedTask.putToConfiguration("start_command", newCommand);
+    JobConfiguration updatedJob = ConfigurationManager.validateAndPopulate(
+        makeJob(OWNER_A, JOB_A, updatedTask, 2));
+
+    scheduler.createJob(job);
+
+    Map<Integer, TwitterTaskInfo> updateFrom = Tasks.mapInfoByShardId(
+        ConfigurationManager.validateAndPopulate(job).getTaskConfigs());
+    Map<Integer, TwitterTaskInfo> updateTo = Tasks.mapInfoByShardId(updatedJob.getTaskConfigs());
+
+    Map<String, String> slaveOffer = ImmutableMap.<String, String>builder()
+        .put("cpus", "4")
+        .put("mem", "4096")
+        .build();
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+
+    Map<Integer, TaskState> startingShards = Tasks.mapStateByShardId(
+        getTasks(Query.byStatus(STARTING)));
+
+    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(0)), RUNNING);
+    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(1)), RUNNING);
+    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(2)), RUNNING);
+    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(3)), RUNNING);
+
+    String token = scheduler.registerUpdate(updateFrom, updateTo);
+
+    expectRestarted(scheduler.updateShards(token, ImmutableSet.of(0, 1), false), newCommand);
+    // It is the responsibility of the updater to remove tasks.
+    scheduler.killTasks(new Query(new TaskQuery().setShardIds(ImmutableSet.of(2, 3)),
+        Tasks.ACTIVE_FILTER));
+
+    assertThat(getActiveShard(0).task.getStatus(), is(PENDING));
+    assertThat(getActiveShard(1).task.getStatus(), is(PENDING));
+
+    scheduler.updateFinished(token);
+
+    assertThat(getTasks(Query.activeQuery(OWNER_A, JOB_A)).size(), is(2));
+  }
+
+  @Test
+  public void testRollingUpdateRemovingShardsRollback() throws Exception {
+    expectAcceptedOffers(4);
+    expect(driver.killTask(anyInt())).andReturn(0);
+    expect(driver.killTask(anyInt())).andReturn(0);
+    expect(driver.killTask(anyInt())).andReturn(0);
+    expect(driver.killTask(anyInt())).andReturn(0);
+
+    control.replay();
+
+    String oldCommand = "echo 'hello'";
+    TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
+    task.putToConfiguration("start_command", oldCommand);
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, task, 4);
+
+    String newCommand = "echo 'hi'";
+    TwitterTaskInfo updatedTask = new TwitterTaskInfo(DEFAULT_TASK);
+    updatedTask.putToConfiguration("start_command", newCommand);
+    JobConfiguration updatedJob = ConfigurationManager.validateAndPopulate(
+        makeJob(OWNER_A, JOB_A, updatedTask, 2));
+
+    scheduler.createJob(job);
+
+    Map<Integer, TwitterTaskInfo> updateFrom = Tasks.mapInfoByShardId(
+        ConfigurationManager.validateAndPopulate(job).getTaskConfigs());
+    Map<Integer, TwitterTaskInfo> updateTo = Tasks.mapInfoByShardId(updatedJob.getTaskConfigs());
+
+    Map<String, String> slaveOffer = ImmutableMap.<String, String>builder()
+        .put("cpus", "4")
+        .put("mem", "4096")
+        .build();
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+
+    Map<Integer, TaskState> startingShards = Tasks.mapStateByShardId(
+        getTasks(Query.byStatus(STARTING)));
+
+    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(0)), RUNNING);
+    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(1)), RUNNING);
+
+    String token = scheduler.registerUpdate(updateFrom, updateTo);
+
+    scheduler.killTasks(new Query(new TaskQuery().setShardIds(ImmutableSet.of(2, 3)),
+        Tasks.ACTIVE_FILTER));
+    expectRestarted(scheduler.updateShards(token, ImmutableSet.of(0, 1), false), newCommand);
+    expectRestarted(scheduler.updateShards(token, ImmutableSet.of(0, 1), true), oldCommand);
+    expectRestarted(scheduler.updateShards(token, ImmutableSet.of(2, 3), true), oldCommand);
+
+    assertThat(getActiveShard(0).task.getStatus(), is(PENDING));
+    assertThat(getActiveShard(1).task.getStatus(), is(PENDING));
+    assertThat(getActiveShard(2).task.getStatus(), is(PENDING));
+    assertThat(getActiveShard(3).task.getStatus(), is(PENDING));
+
+    scheduler.updateFinished(token);
+
+    assertThat(getTasks(Query.activeQuery(OWNER_A, JOB_A)).size(), is(4));
+  }
+
+  private static final Function<TaskState, String> GET_START_COMMAND =
+      new Function<TaskState, String>() {
+        @Override public String apply(TaskState state) {
+          return state.task.getAssignedTask().getTask().getStartCommand();
+        }
+      };
+
+  private void expectRestarted(Set<Integer> taskIds, String expectedCommand) {
+    Set<TaskState> tasks = getTasks(Query.byId(taskIds));
+    Set<String> startCommands = ImmutableSet.copyOf(Iterables.transform(tasks, GET_START_COMMAND));
+    Set<String> expectedCommands = ImmutableSet.of(expectedCommand);
+    assertThat(startCommands, is(expectedCommands));
+    for (TaskState task : tasks) {
+      assertThat(task.task.getStatus(), is(PENDING));
+    }
+  }
+
   private void assertTaskCount(int numTasks) {
     assertThat(scheduler.getTasks(Query.GET_ALL).size(), is(numTasks));
   }
@@ -1000,13 +1369,21 @@ public class SchedulerCoreImplTest extends EasyMockTest {
   private static JobConfiguration makeJob(String owner, String jobName,
       Iterable<TwitterTaskInfo> tasks) {
     JobConfiguration job = new JobConfiguration();
-    job.setOwner(owner)
-        .setName(jobName);
+    job.setOwner(owner).setName(jobName);
     int i = 0;
     for (TwitterTaskInfo task : tasks) {
-      job.addToTaskConfigs(new TwitterTaskInfo(task).setShardId(i++));
+      job.addToTaskConfigs( new TwitterTaskInfo(task).setShardId(i++));
     }
 
+    return job;
+  }
+
+  private static JobConfiguration makeJobApplyingDefaults(String owner, String jobName,
+      Iterable<TwitterTaskInfo> tasks) {
+    JobConfiguration job = makeJob(owner, jobName, tasks);
+    for (TwitterTaskInfo task : job.getTaskConfigs()) {
+      ConfigurationManager.applyDefaultsIfUnset(task);
+    }
     return job;
   }
 
@@ -1021,6 +1398,11 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   private TaskState getTask(int taskId) {
     return getOnlyTask(query(taskId));
+  }
+
+  private TaskState getActiveShard(int shardId) {
+    return getOnlyTask(new Query(new TaskQuery()
+        .setShardIds(ImmutableSet.of(shardId)), Tasks.ACTIVE_FILTER));
   }
 
   private TaskState getOnlyTask(Query query) {
@@ -1076,6 +1458,10 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   public void changeStatus(int taskId, ScheduleStatus status) {
     scheduler.setTaskStatus(query(Arrays.asList(taskId)), status);
+  }
+
+  private void expectAcceptedOffers(int count) {
+    for (int i = 0; i < count; i++) expectOffer(true);
   }
 
   private void expectOffer(boolean passFilter) {

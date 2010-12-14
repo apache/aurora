@@ -1,8 +1,11 @@
 package com.twitter.mesos.scheduler.configuration;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.configuration.ValueParser.ParseException;
@@ -22,12 +25,50 @@ import java.util.Set;
  */
 public class ConfigurationManager {
 
+  public static JobConfiguration validateAndPopulate(JobConfiguration job)
+      throws TaskDescriptionException {
+    Preconditions.checkNotNull(job);
+
+    JobConfiguration copy = job.deepCopy();
+
+    if (copy.getTaskConfigsSize() == 0) throw new TaskDescriptionException("No tasks specified.");
+
+    Set<Integer> shardIds = Sets.newHashSet();
+
+    List<TwitterTaskInfo> configsCopy = Lists.newArrayList(copy.getTaskConfigs());
+    for (TwitterTaskInfo config : configsCopy) {
+      populateFields(copy, config);
+      if (!shardIds.add(config.getShardId())) {
+        throw new TaskDescriptionException("Duplicate shard ID " + config.getShardId());
+      }
+    }
+
+    Set<TwitterTaskInfo> modifiedConfigs = ImmutableSet.copyOf(configsCopy);
+    Preconditions.checkState(modifiedConfigs.size() == configsCopy.size(),
+        "Task count changed after populating fields.");
+
+    // The configs were mutated, so we need to refresh the Set.
+    copy.setTaskConfigs(modifiedConfigs);
+
+    for (int i = 0; i < copy.getTaskConfigsSize(); i++) {
+      if (!shardIds.contains(i)) {
+        throw new TaskDescriptionException("Shard ID " + i + " is missing.");
+      }
+    }
+
+    return copy;
+  }
+
   public static TwitterTaskInfo populateFields(JobConfiguration job, TwitterTaskInfo config)
       throws TaskDescriptionException {
     if (config == null) throw new TaskDescriptionException("Task may not be null.");
 
     Map<String, String> configMap =  config.getConfiguration();
     if (configMap == null) throw new TaskDescriptionException("Task configuration may not be null");
+
+    if (!config.isSetShardId()) {
+      throw new TaskDescriptionException("Tasks must have a shard ID.");
+    }
 
     config.setOwner(job.getOwner()).setJobName(job.getName());
 
@@ -257,16 +298,6 @@ public class ConfigurationManager {
     }
     try {
       return (T) ValueParser.REGISTRY.get(type).parse(config.get(key));
-    } catch (ValueParser.ParseException e) {
-      throw new TaskDescriptionException("Invalid value for " + key + ": " + e.getMessage());
-    }
-  }
-
-  @SuppressWarnings("unchecked")
-  private static <T> T getValue(Map<String, String> config, String key, T defaultValue,
-      Class<T> type) throws TaskDescriptionException {
-    try {
-      return (T) ValueParser.REGISTRY.get(type).parseWithDefault(config.get(key), defaultValue);
     } catch (ValueParser.ParseException e) {
       throw new TaskDescriptionException("Invalid value for " + key + ": " + e.getMessage());
     }

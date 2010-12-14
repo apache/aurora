@@ -1,7 +1,7 @@
 package com.twitter.mesos.scheduler;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableMap;
@@ -12,7 +12,6 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import com.twitter.common.base.Closure;
-import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.RequestStats;
@@ -20,7 +19,6 @@ import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
 import com.twitter.mesos.Message;
 import com.twitter.mesos.Tasks;
-import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ExecutorMessage;
 import com.twitter.mesos.gen.JobConfiguration;
@@ -46,7 +44,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.SortedSet;
-import java.util.concurrent.Callable;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -54,8 +52,13 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.filter;
 import static com.google.common.collect.Iterables.transform;
+import static com.twitter.common.base.MorePreconditions.checkNotBlank;
+import static com.twitter.mesos.Tasks.INFO_TO_SHARD_ID;
+import static com.twitter.mesos.Tasks.jobKey;
 import static com.twitter.mesos.gen.ScheduleStatus.*;
 import static com.twitter.mesos.scheduler.JobManager.JobUpdateResult.*;
 
@@ -64,7 +67,7 @@ import static com.twitter.mesos.scheduler.JobManager.JobUpdateResult.*;
  *
  * @author wfarner
  */
-public class SchedulerCoreImpl implements SchedulerCore {
+public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
   private static final Logger LOG = Logger.getLogger(SchedulerCore.class.getName());
 
   // Schedulers that are responsible for triggering execution of jobs.
@@ -78,8 +81,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
   // Stores the configured tasks.
   private final TaskStore taskStore = new TaskStore();
 
-  // Work queue that stores pending asynchronous tasks.
-  private final WorkQueue workQueue;
+  // Handles communication with the rest of the mesos cluster.
+  private final Driver driver;
 
   // Filter to determine whether a task should be scheduled.
   private final SchedulingFilter schedulingFilter;
@@ -87,61 +90,43 @@ public class SchedulerCoreImpl implements SchedulerCore {
   // Handles job updates that require a restart.
   private final JobUpdateLauncher jobUpdater;
 
+  // Tracks updates that are in-progress, mapping from update token to update spec.
+  private final Map<String, JobUpdate> updatesInProgress = Maps.newHashMap();
+
   private final PersistenceLayer<NonVolatileSchedulerState> persistenceLayer;
   private final ExecutorTracker executorTracker;
-  // Scheduler driver used for communication with other nodes in the cluster.
-  private final AtomicReference<Driver> schedulerDriver = new AtomicReference<Driver>();
 
   @Inject
   public SchedulerCoreImpl(CronJobManager cronScheduler, ImmediateJobManager immediateScheduler,
       PersistenceLayer<NonVolatileSchedulerState> persistenceLayer,
-      ExecutorTracker executorTracker, WorkQueue workQueue, SchedulingFilter schedulingFilter,
+      ExecutorTracker executorTracker, Driver driver, SchedulingFilter schedulingFilter,
       JobUpdateLauncher jobUpdater) {
     // The immediate scheduler will accept any job, so it's important that other schedulers are
     // placed first.
     jobManagers = Arrays.asList(cronScheduler, immediateScheduler);
-    this.persistenceLayer = Preconditions.checkNotNull(persistenceLayer);
-    this.executorTracker = Preconditions.checkNotNull(executorTracker);
-    this.workQueue = Preconditions.checkNotNull(workQueue);
-    this.schedulingFilter = Preconditions.checkNotNull(schedulingFilter);
-    this.jobUpdater = Preconditions.checkNotNull(jobUpdater);
+    this.persistenceLayer = checkNotNull(persistenceLayer);
+    this.executorTracker = checkNotNull(executorTracker);
+    this.driver = checkNotNull(driver);
+    this.schedulingFilter = checkNotNull(schedulingFilter);
+    this.jobUpdater = checkNotNull(jobUpdater);
 
     restore();
   }
 
   @Override
-  public void registered(Driver driver, String frameworkId) {
-    this.schedulerDriver.set(Preconditions.checkNotNull(driver));
-    this.frameworkId.set(Preconditions.checkNotNull(frameworkId));
+  public void registered(String frameworkId) {
+    this.frameworkId.set(checkNotNull(frameworkId));
     persist();
 
     executorTracker.start(new Closure<String>() {
       @Override public void execute(String slaveId) {
-        try {
-          LOG.info("Sending restart request to executor " + slaveId);
-          ExecutorMessage message = new ExecutorMessage();
-          message.setRestartExecutor(new RestartExecutor());
+        LOG.info("Sending restart request to executor " + slaveId);
+        ExecutorMessage message = new ExecutorMessage();
+        message.setRestartExecutor(new RestartExecutor());
 
-          sendExecutorMessage(slaveId, message);
-        } catch (ThriftBinaryCodec.CodingException e) {
-          LOG.log(Level.WARNING, "Failed to send executor status.", e);
-        }
+        driver.sendMessage(new Message(slaveId, message));
       }
     });
-  }
-
-  private void sendExecutorMessage(String slaveId, ExecutorMessage message)
-      throws ThriftBinaryCodec.CodingException {
-    Driver driverRef = schedulerDriver.get();
-    if (driverRef == null) {
-      LOG.info("No driver available, unable to send executor status.");
-      return;
-    }
-
-    int result = driverRef.sendMessage(new Message(slaveId, message));
-    if (result != 0) {
-      LOG.warning("Executor message failed to send, return code " + result);
-    }
   }
 
   @Override
@@ -166,8 +151,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
   //    of slaves.
   @Override
   public synchronized void updateRegisteredTasks(RegisteredTaskUpdate update) {
-    Preconditions.checkNotNull(update);
-    Preconditions.checkNotNull(update.getTaskInfos());
+    checkNotNull(update);
+    checkNotNull(update.getTaskInfos());
 
     final AtomicBoolean mutated = new AtomicBoolean(false);
 
@@ -211,7 +196,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     };
 
     // Find any tasks that we believe to be running, but the slave reports as dead.
-    Set<Integer> reportedDeadTasks = Sets.newHashSet(
+    Set<Integer> reportedDeadTasks = ImmutableSet.copyOf(
         transform(filter(taskInfoMap.values(), getKilledTasks), Tasks.LIVE_TO_ID));
     Set<Integer> deadTasks = taskStore.fetchIds(
         new Query(new TaskQuery().setTaskIds(reportedDeadTasks), Tasks.ACTIVE_FILTER));
@@ -225,7 +210,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     // Find any tasks assigned to this slave but the slave does not report.
     Predicate<TaskState> isTaskReported = new Predicate<TaskState>() {
       @Override public boolean apply(TaskState state) {
-        return recognizedTasks.contains(Tasks.id(state.task));
+        return recognizedTasks.contains(Tasks.id(state));
       }
     };
     Predicate<TaskState> lastEventBeyondGracePeriod = new Predicate<TaskState>() {
@@ -262,10 +247,13 @@ public class SchedulerCoreImpl implements SchedulerCore {
   @Override
   public synchronized void createJob(JobConfiguration job) throws ScheduleException,
       ConfigurationManager.TaskDescriptionException {
-    JobConfiguration populated = populateAndVerify(job);
+    JobConfiguration populated = ConfigurationManager.validateAndPopulate(job);
+
+    // TODO(wfarner): Add a check to make sure the job name cannot conflict with the name format
+    //    used for the updater (ending with ".updater")
 
     if (hasActiveJob(populated)) {
-      throw new ScheduleException("Job already exists: " + Tasks.jobKey(populated));
+      throw new ScheduleException("Job already exists: " + jobKey(populated));
     }
 
     boolean accepted = false;
@@ -287,11 +275,12 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
   @Override
   public synchronized void runJob(JobConfiguration job) {
-    Preconditions.checkState(!hasRunningTasks(job));
+    checkState(!hasRunningTasks(job));
 
-    launchTasks(Preconditions.checkNotNull(job.getTaskConfigs()));
+    launchTasks(checkNotNull(job.getTaskConfigs()));
   }
 
+  // TODO(wfarner): Kill function with side effects, it _will_ cause bugs.
   private Function<TwitterTaskInfo, ScheduledTask> taskCreator =
       new Function<TwitterTaskInfo, ScheduledTask>() {
         @Override
@@ -303,24 +292,31 @@ public class SchedulerCoreImpl implements SchedulerCore {
         }
       };
 
-  private void launchTasks(Set<TwitterTaskInfo> tasks) {
-    if (tasks.isEmpty()) return;
+  /**
+   * Launches tasks.
+   *
+   * @param tasks Tasks to launch.
+   * @return The task IDs of the new tasks.
+   */
+  private Set<Integer> launchTasks(Set<TwitterTaskInfo> tasks) {
+    if (tasks.isEmpty()) return ImmutableSet.of();
 
     LOG.info("Launching " + tasks.size() + " tasks.");
-    taskStore.add(ImmutableSet.copyOf(transform(tasks, taskCreator)));
+    Set<ScheduledTask> scheduledTasks = ImmutableSet.copyOf(transform(tasks, taskCreator));
+    taskStore.add(scheduledTasks);
     persist();
+
+    return ImmutableSet.copyOf(transform(scheduledTasks, Tasks.SCHEDULED_TO_ID));
   }
 
   @Override
-  public JobUpdateResult doJobUpdate(JobConfiguration job) throws ScheduleException {
-    LOG.info("Updating job " + Tasks.jobKey(job));
+  public synchronized JobUpdateResult doJobUpdate(JobConfiguration job) throws ScheduleException {
+    LOG.info("Updating job " + jobKey(job));
 
     // First, get comparable views of the start and end states.  Mapped by shard IDs.
-    final Map<Integer, AssignedTask> existingTasks = Maps.uniqueIndex(transform(
-        taskStore.fetch(Query.activeQuery(job)), Tasks.STATE_TO_ASSIGNED),
-        Tasks.ASSIGNED_TO_SHARD_ID);
-    final Map<Integer, TwitterTaskInfo> updatedTasks = Maps.uniqueIndex(job.getTaskConfigs(),
-        Tasks.INFO_TO_SHARD_ID);
+    final Map<Integer, AssignedTask> existingTasks = Tasks.mapAssignedByShardId(
+        transform(taskStore.fetch(Query.activeQuery(job)), Tasks.STATE_TO_ASSIGNED));
+    final Map<Integer, TwitterTaskInfo> updatedTasks = Tasks.mapInfoByShardId(job.getTaskConfigs());
 
     // Tasks that are unchanged.
     Set<TwitterTaskInfo> unmodifiedTasks = Sets.newHashSet();
@@ -331,7 +327,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     // Tasks that we have to restart in order for the change to take effect.
     Set<TwitterTaskInfo> tasksRequiringRestart = Sets.newHashSet();
 
-    // Inspect each task and decide how to ahndle it.
+    // Inspect each task and decide how to handle it.
     for (Map.Entry<Integer, TwitterTaskInfo> updatedTask : updatedTasks.entrySet()) {
       int shardId = updatedTask.getKey();
 
@@ -374,20 +370,24 @@ public class SchedulerCoreImpl implements SchedulerCore {
       return JOB_UNCHANGED;
     }
 
-    Preconditions.checkState((unmodifiedTasks.size()
-                             + shardIdsAdded.size()
-                             + shardIdsMutatedInPlace.size()
-                             + tasksRequiringRestart.size()) == updatedTasks.size(),
+    checkState((unmodifiedTasks.size()
+                + shardIdsAdded.size()
+                + shardIdsMutatedInPlace.size()
+                + tasksRequiringRestart.size()) == updatedTasks.size(),
         "Consistency check failed - incorrect number of modified tasks after update.");
 
     if (!tasksRequiringRestart.isEmpty()) {
-      jobUpdater.launchUpdater(job);
-      return UPDATER_LAUNCHED;
-    }
+      Map<Integer, TwitterTaskInfo> updateFrom = Tasks.mapInfoByShardId(
+          Iterables.transform(existingTasks.values(), Tasks.ASSIGNED_TO_INFO));
 
-    // First launch any new tasks.  Gets all updatedTasks whose shard ID was added.
-    launchTasks(Sets.newHashSet(filter(updatedTasks.values(),
-        Predicates.compose(Predicates.in(shardIdsAdded), Tasks.INFO_TO_SHARD_ID))));
+      try {
+        jobUpdater.launchUpdater(registerUpdate(updateFrom, updatedTasks));
+        return UPDATER_LAUNCHED;
+      } catch (UpdateException e) {
+        LOG.log(Level.WARNING, "Failed to register update for " + jobKey(job), e);
+        throw new ScheduleException("Failed to register update, internal error.", e);
+      }
+    }
 
     Function<Integer, Integer> shardToExistingTaskId = new Function<Integer, Integer>() {
       @Override public Integer apply(Integer shardId) {
@@ -395,10 +395,15 @@ public class SchedulerCoreImpl implements SchedulerCore {
       }
     };
 
-    // Then kill any removed tasks.
+    // First kill any removed tasks.
     if (!shardIdsRemoved.isEmpty()) {
       killTasks(Query.byId(transform(shardIdsRemoved, shardToExistingTaskId)));
     }
+
+    // Launch any new tasks.  Gets all updatedTasks whose shard ID was added.
+    LOG.info("Launching tasks for shard IDs being added by this update: " + shardIdsAdded);
+    launchTasks(ImmutableSet.copyOf(Iterables.filter(updatedTasks.values(),
+        Predicates.compose(Predicates.in(shardIdsAdded), INFO_TO_SHARD_ID))));
 
     // Perform any in-place mutations.
     if (!shardIdsMutatedInPlace.isEmpty()) {
@@ -425,7 +430,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
   private static Predicate<JobManager> managerHasJob(final JobConfiguration job) {
     return new Predicate<JobManager>() {
       @Override public boolean apply(JobManager manager) {
-        return manager.hasJob(Tasks.jobKey(job));
+        return manager.hasJob(jobKey(job));
       }
     };
   }
@@ -442,9 +447,9 @@ public class SchedulerCoreImpl implements SchedulerCore {
   @Override
   public synchronized TwitterTask offer(final String slaveId, final String slaveHost,
       Map<String, String> offerParams) throws ScheduleException {
-    MorePreconditions.checkNotBlank(slaveId);
-    MorePreconditions.checkNotBlank(slaveHost);
-    Preconditions.checkNotNull(offerParams);
+    checkNotBlank(slaveId);
+    checkNotBlank(slaveHost);
+    checkNotNull(offerParams);
 
     vars.resourceOffers.incrementAndGet();
 
@@ -475,7 +480,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
     AssignedTask assignedTask = task.getAssignedTask();
     LOG.info(String.format("Offer on slave %s (id %s) is being assigned task for %s.",
-        slaveHost, assignedTask.getSlaveId(), Tasks.jobKey(assignedTask)));
+        slaveHost, assignedTask.getSlaveId(), jobKey(assignedTask)));
 
     persist();
     return new TwitterTask(assignedTask.getTaskId(), slaveId,
@@ -488,8 +493,12 @@ public class SchedulerCoreImpl implements SchedulerCore {
    * will be modified.
    *
    * @param tasks Copies of other tasks, to be scheduled.
+   * @return Task IDs of the rescheduled tasks.
    */
-  private void scheduleTaskCopies(List<ScheduledTask> tasks) {
+  private Set<Integer> scheduleTaskCopies(Iterable<ScheduledTask> tasks) {
+    if (Iterables.isEmpty(tasks)) return ImmutableSet.of();
+
+    Set<Integer> newTaskIds = Sets.newHashSet();
     for (ScheduledTask task : tasks) {
       // The shard ID in the assigned task is left unchanged.
       task.getAssignedTask().unsetSlaveId();
@@ -497,12 +506,15 @@ public class SchedulerCoreImpl implements SchedulerCore {
       task.unsetTaskEvents();
       task.setAncestorId(Tasks.id(task));
       task.getAssignedTask().setTaskId(generateTaskId());
+      newTaskIds.add(Tasks.id(task));
       changeTaskStatus(task, PENDING);
     }
 
     LOG.info("Tasks being rescheduled: " + tasks);
 
     taskStore.add(tasks);
+
+    return newTaskIds;
   }
 
   /**
@@ -523,8 +535,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
   @Override
   public synchronized void setTaskStatus(Query rawQuery, final ScheduleStatus status) {
-    Preconditions.checkNotNull(rawQuery);
-    Preconditions.checkNotNull(status);
+    checkNotNull(rawQuery);
+    checkNotNull(status);
 
     // Only allow state transition from non-terminal state.
     Query query = Query.and(rawQuery, Predicates.not(Tasks.TERMINATED_FILTER));
@@ -551,7 +563,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
         mutateOperation = new Closure<TaskState>() {
           @Override public void execute(TaskState state) {
             if (state.task.getAssignedTask().getTask().isIsDaemon()) {
-              LOG.info("Rescheduling daemon task " + Tasks.id(state.task));
+              LOG.info("Rescheduling daemon task " + Tasks.id(state));
               newTasks.add(new ScheduledTask(state.task));
             }
 
@@ -573,7 +585,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
                     >= state.task.getAssignedTask().getTask().getMaxTaskFailures());
 
             if (!failureLimitReached) {
-              LOG.info("Rescheduling failed task below failure limit: " + Tasks.id(state.task));
+              LOG.info("Rescheduling failed task below failure limit: " + Tasks.id(state));
               newTasks.add(new ScheduledTask(state.task));
             }
 
@@ -589,7 +601,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
         // Move to pending state.
         mutateOperation = new Closure<TaskState>() {
           @Override public void execute(TaskState state) {
-            LOG.info("Rescheduling " + status + " task: " + Tasks.id(state.task));
+            LOG.info("Rescheduling " + status + " task: " + Tasks.id(state));
             newTasks.add(new ScheduledTask(state.task));
             changeTaskStatus(state.task, status);
           }
@@ -611,7 +623,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
   @Override
   public synchronized void killTasks(final Query query) throws ScheduleException {
-    Preconditions.checkNotNull(query);
+    checkNotNull(query);
 
     LOG.info("Killing tasks matching " + query);
 
@@ -639,12 +651,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
       @Override public void execute(final TaskState state) {
         changeTaskStatus(state.task, KILLED_BY_CLIENT);
 
-        final int idToKill = Tasks.id(state.task);
-        doWorkWithDriver(new Function<Driver, Integer>() {
-          @Override public Integer apply(Driver driver) {
-            return driver.killTask(idToKill);
-          }
-        });
+        final int idToKill = Tasks.id(state);
+        driver.killTask(idToKill);
       }
     };
 
@@ -653,46 +661,195 @@ public class SchedulerCoreImpl implements SchedulerCore {
     persist();
   }
 
-  /**
-   * Executes a unit of work that uses the scheduler driver.  This exists as a convenience function
-   * for any tasks that require use of the {@link Driver}, for automatic retrying in the
-   * event that the driver is not available.
-   *
-   * @param work The work to execute.  Should return the status code provided by the driver
-   *    (0 denotes success, non-zero denotes a failure that should be retried).
-   */
-  private void doWorkWithDriver(final Function<Driver, Integer> work) {
-    workQueue.doWork(new Callable<Boolean>() {
-      @Override public Boolean call() {
-        if (frameworkId.get() == null) {
-          LOG.severe("Unable to send framework messages, framework not registered.");
-          return false;
-        }
+  private static class JobUpdate {
+    final String jobKey;
+    final Map<Integer, TwitterTaskInfo> updateFromByShard;
+    final Map<Integer, TwitterTaskInfo> updateToByShard;
 
-        Driver driver = schedulerDriver.get();
+    JobUpdate(String jobKey, Map<Integer, TwitterTaskInfo> updateFromByShard,
+        Map<Integer, TwitterTaskInfo> updateToByShard) {
+      this.jobKey = jobKey;
+      this.updateFromByShard = updateFromByShard;
+      this.updateToByShard = updateToByShard;
+    }
 
-        if (driver == null) {
-          LOG.warning("Driver requested but not available.");
-          return false;
-        } else {
-          return work.apply(driver) == 0;
-        }
-      }
-    });
+    Map<Integer, TwitterTaskInfo> getFrom(boolean rollback) {
+      return rollback ? updateToByShard : updateFromByShard;
+    }
+
+    Map<Integer, TwitterTaskInfo> getTo(boolean rollback) {
+      return rollback ? updateFromByShard :updateToByShard;
+    }
+  }
+
+  private final Function<JobUpdate, String> getUpdateJobKey = new Function<JobUpdate, String>() {
+    @Override public String apply(JobUpdate update) {
+      return update.jobKey;
+    }
+  };
+
+  @VisibleForTesting String registerUpdate(Map<Integer, TwitterTaskInfo> updateFromByShard,
+      Map<Integer, TwitterTaskInfo> updateToByShard) throws UpdateException {
+    checkNotNull(updateFromByShard);
+    checkNotNull(updateToByShard);
+
+    String oldJobKey = Iterables.getOnlyElement(ImmutableSet.copyOf(
+        Iterables.transform(updateFromByShard.values(), Tasks.INFO_TO_JOB_KEY)));
+    String jobKey = Iterables.getOnlyElement(ImmutableSet.copyOf(
+        Iterables.transform(updateFromByShard.values(), Tasks.INFO_TO_JOB_KEY)));
+
+    if (!oldJobKey.equals(jobKey)) {
+      throw new UpdateException("An update cannot change a job key.");
+    }
+    if (updateToByShard.isEmpty()) {
+      throw new UpdateException("Updated job must have at least one task.");
+    }
+
+    // Check if there is already an in-progress update for this job.
+    if (isJobUpdating(jobKey)) {
+      throw new UpdateException(String.format(
+          "Existing update for job %s must be canceled before doing another update.", jobKey));
+    }
+
+    String updateToken = new StringBuilder()
+        .append(jobKey)
+        .append("-")
+        .append(System.currentTimeMillis())
+        .append("-")
+        .append((UUID.randomUUID()))
+        .toString();
+
+    updatesInProgress.put(updateToken, new JobUpdate(jobKey, updateFromByShard, updateToByShard));
+
+    return updateToken;
   }
 
   @Override
-  public synchronized Set<Integer> restartTasks(Set<Integer> taskIds) {
-    MorePreconditions.checkNotBlank(taskIds);
+  public synchronized void updateFinished(String updateToken) throws UpdateException {
+    checkNotBlank(updateToken);
+
+    if (updatesInProgress.remove(updateToken) == null) {
+      throw new UpdateException("Update token not recognized " + updateToken);
+    }
+  }
+
+  private boolean isJobUpdating(String jobKey) {
+    return Iterables.any(transform(updatesInProgress.values(), getUpdateJobKey),
+        Predicates.equalTo(jobKey));
+  }
+
+  @Override
+  public synchronized Set<Integer> updateShards(String updateToken,
+      final Set<Integer> restartShards, boolean rollback) throws UpdateException {
+    checkNotBlank(updateToken);
+    checkNotBlank(restartShards);
+
+    LOG.info("Shard update requested with token " + updateToken + " for shards " + restartShards);
+    JobUpdate update = updatesInProgress.get(updateToken);
+    if (update == null) {
+      throw new UpdateException("Update token not recognized: " + updateToken);
+    }
+
+    // Break down what we are updating to, an from what, based on rollback.
+    final Map<Integer, TwitterTaskInfo> updateToByShard = update.getTo(rollback);
+    final Map<Integer, TwitterTaskInfo> updateFromByShard = update.getFrom(rollback);
+
+    if (!updateToByShard.keySet().containsAll(restartShards)) {
+      throw new UpdateException(
+          String.format("%s requested for shards, but not found in %s job: %s",
+              rollback ? "Rollback" : "Update",
+              rollback ? "old" : "new",
+              Sets.difference(restartShards, updateToByShard.keySet())));
+    }
+
+    // Get the shards that a restart is being requested for.
+    Query activeShardsQuery = new Query(new TaskQuery().setShardIds(restartShards),
+        Tasks.ACTIVE_FILTER);
+    Set<TaskState> tasks = taskStore.fetch(activeShardsQuery);
+
+    // Mutate the stored task definitions.
+    Set<Integer> taskIds = ImmutableSet.copyOf(transform(tasks, Tasks.STATE_TO_ID));
+    LOG.info("Modifying tasks " + taskIds + " for " + (rollback ? "rollback" : "update"));
+    final Set<ScheduledTask> tasksToUpdate = Sets.newHashSet();
+
+    taskStore.mutate(Query.byId(taskIds), new Closure<TaskState>() {
+      @Override public void execute(TaskState state) {
+        ScheduleStatus originalStatus = state.task.getStatus();
+
+        int shardId = Tasks.STATE_TO_SHARD_ID.apply(state);
+        TwitterTaskInfo updatedTask = updateToByShard.get(shardId);
+
+        ScheduledTask newTask = state.task.deepCopy();
+        newTask.getAssignedTask().setTask(updatedTask);
+
+        tasksToUpdate.add(newTask);
+
+        changeTaskStatus(state.task, KILLED_BY_CLIENT);
+
+        if (originalStatus != PENDING) {
+          driver.killTask(Tasks.id(state));
+        }
+      }
+    });
+
+    // Delete the pending tasks that were updated.
+    taskStore.remove(ImmutableSet.copyOf(transform(
+        Iterables.filter(tasks, Tasks.hasStatus(PENDING)), Tasks.STATE_TO_ID)));
+
+    // Shard IDs that are being added in this update.  This will happen during a forward update
+    // when tasks are being added as a part of the update, or during a rollback when tasks were
+    // removed in the original update.
+    final Set<Integer> shardIdsAdded = ImmutableSet.copyOf(
+        Sets.difference(updateToByShard.keySet(), updateFromByShard.keySet()));
+
+    final Set<Integer> shardIdsAddedOrInactive = Sets.union(shardIdsAdded,
+        Sets.difference(restartShards, ImmutableSet.copyOf(
+            transform(tasks, Tasks.STATE_TO_SHARD_ID))));
+
+    Set<Integer> newTaskIds = Sets.newHashSet();
+
+    // Add any tasks whose shards were inactive when the request was received.  A shard could end
+    // up here if it is being added in the update, or if was dead when the request was received.
+    Set<Integer> newTaskShardIds = Sets.intersection(restartShards, shardIdsAddedOrInactive);
+    if (!newTaskShardIds.isEmpty()) {
+      LOG.info("Launching tasks for shard IDs added in this update: " + newTaskShardIds);
+      newTaskIds.addAll(launchTasks(ImmutableSet.copyOf(transform(newTaskShardIds,
+          new Function<Integer, TwitterTaskInfo>() {
+            @Override public TwitterTaskInfo apply(Integer shardId) {
+              return updateToByShard.get(shardId);
+            }
+          }))));
+    }
+
+    newTaskIds.addAll(scheduleTaskCopies(tasksToUpdate));
+
+    return newTaskIds;
+  }
+
+  @Override
+  public synchronized Set<Integer> restartTasks(Set<Integer> taskIds) throws RestartException {
+    checkNotBlank(taskIds);
     LOG.info("Restart requested for tasks " + taskIds);
+
+    // TODO(wfarner): Change this (and the thrift interface) to query by shard ID in the context
+    //    of a job instead of task ID.
 
     Query byId = Query.byId(taskIds);
     Set<TaskState> tasks = taskStore.fetch(byId);
     if (tasks.size() != taskIds.size()) {
       Set<Integer> unknownTasks = Sets.difference(taskIds,
-          Sets.newHashSet(transform(tasks, Tasks.STATE_TO_ID)));
+          ImmutableSet.copyOf(transform(tasks, Tasks.STATE_TO_ID)));
 
-      LOG.warning("Restart requested for unknown tasks " + unknownTasks);
+      throw new RestartException("Restart requested for unknown tasks " + unknownTasks);
+    }
+
+    Set<String> jobKeys = ImmutableSet.copyOf(transform(tasks, Tasks.STATE_TO_JOB_KEY));
+    if (jobKeys.size() != 1) {
+      throw new RestartException("Task restart request cannot span multiple jobs: " + jobKeys);
+    }
+    if (isJobUpdating(Iterables.getOnlyElement(jobKeys))) {
+      throw new RestartException(
+          "Job update must complete or be canceled before restarting tasks.");
     }
 
     Iterable<TaskState> inactiveTasks = filter(tasks,
@@ -711,12 +868,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
         scheduleTaskCopies(Arrays.asList(new ScheduledTask(state.task)));
 
         if (originalStatus != PENDING) {
-          final int killTaskId = Tasks.id(state.task);
-          doWorkWithDriver(new Function<Driver, Integer>() {
-            @Override public Integer apply(Driver driver) {
-              return driver.killTask(killTaskId);
-            }
-          });
+          driver.killTask(Tasks.id(state));
         }
       }
     });
@@ -729,12 +881,12 @@ public class SchedulerCoreImpl implements SchedulerCore {
   @Override
   public synchronized JobUpdateResult updateJob(JobConfiguration updatedJob)
       throws ScheduleException, TaskDescriptionException {
-    JobConfiguration populated = populateAndVerify(updatedJob);
+    JobConfiguration populated = ConfigurationManager.validateAndPopulate(updatedJob);
 
     try {
       return Iterables.find(jobManagers, managerHasJob(populated)).updateJob(populated);
     } catch (NoSuchElementException e) {
-      throw new ScheduleException("Job not found: " + Tasks.jobKey(populated));
+      throw new ScheduleException("Job not found: " + jobKey(populated));
     }
   }
 
@@ -806,39 +958,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
         }
       }
     }
-  }
-
-   private JobConfiguration populateAndVerify(JobConfiguration job)
-       throws TaskDescriptionException {
-     JobConfiguration copy = new JobConfiguration(job);
-
-     Set<Integer> shardIds = Sets.newHashSet();
-
-     if (copy.getTaskConfigsSize() == 0) throw new TaskDescriptionException("No tasks specified.");
-
-     List<TwitterTaskInfo> configsCopy = Lists.newArrayList(copy.getTaskConfigs());
-     for (TwitterTaskInfo config : configsCopy) {
-       if (!config.isSetShardId()) {
-         throw new TaskDescriptionException("Tasks must have a shard ID.");
-       }
-
-       if (!shardIds.add(config.getShardId())) {
-         throw new TaskDescriptionException("Duplicate shard ID " + config.getShardId());
-       }
-
-       ConfigurationManager.populateFields(copy, config);
-     }
-
-     // The configs were mutated, so we need to refresh the Set.
-     copy.setTaskConfigs(Sets.newHashSet(configsCopy));
-
-     for (int i = 0; i < copy.getTaskConfigsSize(); i++) {
-       if (!shardIds.contains(i)) {
-         throw new TaskDescriptionException("Shard ID " + i + " is missing.");
-       }
-     }
-
-     return copy;
   }
 
   private final class Vars {

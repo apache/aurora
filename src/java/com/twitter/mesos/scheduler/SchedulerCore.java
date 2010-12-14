@@ -6,10 +6,8 @@ import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.ScheduleStatus;
-import com.twitter.mesos.scheduler.JobManager.JobUpdateResult;
 import com.twitter.mesos.scheduler.TaskStore.TaskState;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
-import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 
 import java.util.Map;
 import java.util.Set;
@@ -35,16 +33,15 @@ import java.util.Set;
  *
  * @author wfarner
  */
-public interface SchedulerCore {
+public interface SchedulerCore extends UpdateScheduler {
 
   /**
    * Assigns a framework ID to the scheduler, should be called when the scheduler implementation
    * has received a successful registration signal.
    *
-   * @param driver The registered driver reference.
    * @param frameworkId Framework ID.
    */
-  public void registered(Driver driver, String frameworkId);
+  public void registered(String frameworkId);
 
   /**
    * Fetches information about all registered tasks for a job.
@@ -101,29 +98,19 @@ public interface SchedulerCore {
    */
   public void killTasks(Query query) throws ScheduleException;
 
+  public static class RestartException extends Exception {
+    public RestartException(String msg) { super(msg); }
+  }
+
   /**
    * Schedules a restart on a set of tasks.
    *
    * @param taskIds The tasks to restart.
    * @return The set of task IDs for tasks that a restart was requested for.  A task that was
    *    requested for restart may be rejected if it was not found, or was in a non-active state.
+   * @throws RestartException If the restart request could not be honored.
    */
-  public Set<Integer> restartTasks(Set<Integer> taskIds);
-
-  /**
-   * Triggers an update to a job.
-   *
-   * @param updatedJob The updated job, which must correspond with an existing job.
-   * @return A description of the action that was or will be taken to update the job.
-   * @throws ScheduleException If the job could not be updated.
-   * @throws TaskDescriptionException If the updated job configuration was invalid.
-   */
-  public JobUpdateResult updateJob(JobConfiguration updatedJob) throws ScheduleException,
-      TaskDescriptionException;
-
-  // TODO(wfarner): This makes the interface look ugly, and shows how the encapsulation between
-  //    SchedulreCoreImpl and ImmediateJobManager is broken.
-  public JobUpdateResult doJobUpdate(JobConfiguration updatedJob) throws ScheduleException;
+  public Set<Integer> restartTasks(Set<Integer> taskIds) throws RestartException;
 
   /**
    * Gets the framework ID that this scheduler is registered with, or {@code null} if the framework

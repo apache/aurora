@@ -13,6 +13,7 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.mesos.gen.NonVolatileSchedulerState;
+import com.twitter.mesos.scheduler.Driver.MesosDriverImpl;
 import com.twitter.mesos.scheduler.JobUpdateLauncher.JobUpdateLauncherImpl;
 import com.twitter.mesos.scheduler.SchedulingFilter.SchedulingFilterImpl;
 import com.twitter.mesos.scheduler.httphandlers.Mname;
@@ -24,6 +25,7 @@ import com.twitter.mesos.scheduler.persistence.FileSystemPersistence;
 import com.twitter.mesos.scheduler.persistence.PersistenceLayer;
 import com.twitter.mesos.scheduler.persistence.ZooKeeperPersistence;
 import mesos.MesosSchedulerDriver;
+import mesos.SchedulerDriver;
 
 import javax.annotation.Nullable;
 import java.util.Map;
@@ -42,46 +44,37 @@ public class SchedulerModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    bind(CronJobManager.class).in(Singleton.class);
+    // Bindings for SchedulerMain.
+    ZooKeeperClient zkClient = new ZooKeeperClient(
+        Amount.of(options.zooKeeperSessionTimeoutSecs, Time.SECONDS), options.zooKeeperEndpoints);
+    bind(ZooKeeperClient.class).toInstance(zkClient);
+    bind(SingletonService.class).toInstance(
+        new SingletonService(zkClient, options.mesosSchedulerNameSpec));
+    // MesosSchedulerDriver handled in provider.
+
+    // Bindings for MesosSchedulerImpl.
+    bind(SchedulerCore.class).to(SchedulerCoreImpl.class).in(Singleton.class);
     bind(ExecutorTracker.class).to(ExecutorTrackerImpl.class).in(Singleton.class);
-    bind(MesosSchedulerImpl.class).in(Singleton.class);
-    bind(WorkQueue.class).to(WorkQueueImpl.class).in(Singleton.class);
+
+    // Bindings for SchedulerCoreImpl.
+    bind(CronJobManager.class).in(Singleton.class);
+    bind(ImmediateJobManager.class).in(Singleton.class);
+    // PersistenceLayer handled in provider.
+    bind(Driver.class).to(MesosDriverImpl.class).in(Singleton.class);
+    bind(SchedulingFilter.class).to(SchedulingFilterImpl.class);
+    bind(JobUpdateLauncher.class).to(JobUpdateLauncherImpl.class).in(Singleton.class);
+
+    // Bindings for SchedulingFilterImpl.
     bind(Key.get(new TypeLiteral<Map<String, String>>() {},
         Names.named(SchedulingFilterImpl.MACHINE_RESTRICTIONS)))
         .toInstance(options.machineRestrictions);
-    bind(SchedulingFilter.class).to(SchedulingFilterImpl.class);
-    bind(JobUpdateLauncher.class).to(JobUpdateLauncherImpl.class);
-    bind(SchedulerCore.class).to(SchedulerCoreImpl.class).in(Singleton.class);
+
+    bind(MesosSchedulerImpl.class).in(Singleton.class);
 
     registerServlet(binder(), "/schedulerz", SchedulerzHome.class, false);
     registerServlet(binder(), "/schedulerz/user", SchedulerzUser.class, true);
     registerServlet(binder(), "/schedulerz/job", SchedulerzJob.class, true);
     registerServlet(binder(), "/mname", Mname.class, false);
-  }
-
-  @Provides
-  @Nullable
-  @Singleton
-  final ZooKeeperClient provideZooKeeperClient() {
-    if (options.zooKeeperEndpoints == null) {
-      LOG.info("ZooKeeper endpoints not specified, ZooKeeper interaction disabled.");
-      return null;
-    } else {
-      return new ZooKeeperClient(Amount.of(options.zooKeeperSessionTimeoutSecs, Time.SECONDS),
-          options.zooKeeperEndpoints);
-    }
-  }
-
-  @Provides
-  @Nullable
-  @Singleton
-  SingletonService provideSingletonService(@Nullable ZooKeeperClient zkClient) {
-    if (zkClient == null) {
-      LOG.info("Leader election disabled since ZooKeeper integration is disabled.");
-      return null;
-    }
-
-    return new SingletonService(zkClient, options.mesosSchedulerNameSpec);
   }
 
   @Provides
@@ -107,7 +100,7 @@ public class SchedulerModule extends AbstractModule {
 
   @Provides
   @Singleton
-  final MesosSchedulerDriver provideMesosSchedulerDriver(MesosSchedulerImpl scheduler,
+  final SchedulerDriver provideMesosSchedulerDriver(MesosSchedulerImpl scheduler,
       SchedulerCore schedulerCore) {
     LOG.info("Connecting to mesos master: " + options.mesosMasterAddress);
 
