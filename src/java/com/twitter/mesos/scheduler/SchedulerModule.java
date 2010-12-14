@@ -101,10 +101,14 @@ public class SchedulerModule extends AbstractModule {
   @Provides
   @Singleton
   final SchedulerDriver provideMesosSchedulerDriver(MesosSchedulerImpl scheduler,
-      SchedulerCore schedulerCore) {
+      PersistenceLayer<NonVolatileSchedulerState> persistence)
+      throws PersistenceLayer.PersistenceException {
     LOG.info("Connecting to mesos master: " + options.mesosMasterAddress);
 
-    String frameworkId = schedulerCore.getFrameworkId();
+    // TODO(wfarner): This was a fix to unweave a circular guice dependency.  Fix.
+    NonVolatileSchedulerState state = persistence.fetch();
+
+    String frameworkId = state.getFrameworkId();
     if (frameworkId != null) {
       LOG.info("Found persisted framework ID: " + frameworkId);
       return new MesosSchedulerDriver(scheduler, options.mesosMasterAddress, frameworkId);

@@ -1,6 +1,7 @@
 package com.twitter.mesos.scheduler;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
@@ -47,7 +48,7 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
 
     @Option(name = "zk_endpoints", usage = "Endpoint specification for the ZooKeeper servers.")
     public List<InetSocketAddress> zooKeeperEndpoints =
-        ImmutableList.copyOf(ZooKeeperUtils.DEFAULT_ZK_ENDPOINTS);
+        Lists.newArrayList(ZooKeeperUtils.DEFAULT_ZK_ENDPOINTS);
 
     @Option(name = "zk_session_timeout_secs",
             usage = "The ZooKeeper session timeout in seconds.")
