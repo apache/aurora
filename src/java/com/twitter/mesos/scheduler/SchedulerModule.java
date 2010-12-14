@@ -1,12 +1,7 @@
 package com.twitter.mesos.scheduler;
 
 import com.google.common.base.Preconditions;
-import com.google.inject.AbstractModule;
-import com.google.inject.Inject;
-import com.google.inject.Key;
-import com.google.inject.Provides;
-import com.google.inject.Singleton;
-import com.google.inject.TypeLiteral;
+import com.google.inject.*;
 import com.google.inject.name.Names;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -23,6 +18,7 @@ import com.twitter.mesos.scheduler.httphandlers.SchedulerzUser;
 import com.twitter.mesos.scheduler.persistence.EncodingPersistenceLayer;
 import com.twitter.mesos.scheduler.persistence.FileSystemPersistence;
 import com.twitter.mesos.scheduler.persistence.PersistenceLayer;
+import com.twitter.mesos.scheduler.persistence.PersistenceLayer.PersistenceException;
 import com.twitter.mesos.scheduler.persistence.ZooKeeperPersistence;
 import mesos.MesosSchedulerDriver;
 import mesos.Protos.FrameworkID;
@@ -30,6 +26,7 @@ import mesos.SchedulerDriver;
 
 import javax.annotation.Nullable;
 import java.util.Map;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import static com.twitter.common.process.GuicedProcess.registerServlet;
@@ -102,14 +99,17 @@ public class SchedulerModule extends AbstractModule {
   @Provides
   @Singleton
   final SchedulerDriver provideMesosSchedulerDriver(MesosSchedulerImpl scheduler,
-      PersistenceLayer<NonVolatileSchedulerState> persistence)
-      throws PersistenceLayer.PersistenceException {
+      PersistenceLayer<NonVolatileSchedulerState> persistence) {
     LOG.info("Connecting to mesos master: " + options.mesosMasterAddress);
 
     // TODO(wfarner): This was a fix to unweave a circular guice dependency.  Fix.
-    NonVolatileSchedulerState state = persistence.fetch();
+    String frameworkId = null;
+    try {
+      frameworkId = persistence.fetch().getFrameworkId();
+    } catch (PersistenceException e) {
+      LOG.log(Level.SEVERE, "Failed to recover persisted state.", e);
+    }
 
-    String frameworkId = state.getFrameworkId();
     if (frameworkId != null) {
       LOG.info("Found persisted framework ID: " + frameworkId);
       return new MesosSchedulerDriver(scheduler, options.mesosMasterAddress,

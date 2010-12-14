@@ -11,6 +11,7 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.executor.TaskOnDisk.TaskStorageException;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.ExecutorRootDir;
+import org.apache.commons.lang.StringUtils;
 
 import java.io.File;
 import java.io.FileFilter;
@@ -52,6 +53,11 @@ public class DeadTaskLoader implements Supplier<Iterable<Task>> {
         DeadTask task = new DeadTask(taskDir);
         TwitterTaskInfo taskInfo = task.getAssignedTask().getTask();
         if (taskInfo != null) {
+          if (StringUtils.isEmpty(task.getId())) {
+            LOG.warning("Restored task, but task ID was empty: " + taskDir);
+            return null;
+          }
+
           LOG.info("Recovered task " + task.getId() + " " + Tasks.jobKey(taskInfo));
           return task;
         } else {
