@@ -197,7 +197,7 @@ public class Query implements Predicate<TaskState> {
     };
   }
 
-  public static SortedSet<TaskState> sortTasks(Iterable<TaskState> tasks,
+  public static ImmutableSortedSet<TaskState> sortTasks(Iterable<TaskState> tasks,
       Comparator<TaskState> comparator) {
     return ImmutableSortedSet.copyOf(comparator, tasks);
   }

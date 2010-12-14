@@ -5,10 +5,13 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.twitter.common.base.ExceptionalClosure;
+import com.twitter.common.stats.StatImpl;
+import com.twitter.common.stats.Stats;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
@@ -16,8 +19,11 @@ import com.twitter.mesos.gen.TaskQuery;
 import java.util.Comparator;
 import java.util.Map;
 import java.util.Set;
-import java.util.SortedSet;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
+
+import static com.google.common.collect.Iterables.filter;
+import static com.google.common.collect.Iterables.transform;
 
 /**
  * Stores all tasks configured with the scheduler.
@@ -69,7 +75,7 @@ public class TaskStore {
         Predicates.compose(hasTaskId, Tasks.SCHEDULED_TO_ID)),
         "Proposed new tasks would create task ID collision.");
     Preconditions.checkArgument(
-        Sets.newHashSet(Iterables.transform(newTasks, Tasks.SCHEDULED_TO_ID)).size() == newTasks.size(),
+        Sets.newHashSet(transform(newTasks, Tasks.SCHEDULED_TO_ID)).size() == newTasks.size(),
         "Proposed new tasks would create task ID collision.");
 
     // Do a first pass to make sure all of the values are good.
@@ -77,6 +83,8 @@ public class TaskStore {
       Preconditions.checkNotNull(task.getAssignedTask(), "Assigned task may not be null.");
       Preconditions.checkNotNull(task.getAssignedTask().getTask(), "Task info may not be null.");
     }
+
+    vars.tasksAdded.addAndGet(newTasks.size());
 
     for (ScheduledTask task : newTasks) {
       tasks.put(task.getAssignedTask().getTaskId(), new TaskState(task));
@@ -102,10 +110,10 @@ public class TaskStore {
    * @param query The query whose matching tasks should be removed.
    */
   public synchronized void remove(Query query) {
-    Set<Integer> removedIds = ImmutableSet.copyOf(
-        Iterables.transform(query(query), Tasks.STATE_TO_ID));
+    Set<Integer> removedIds = ImmutableSet.copyOf(transform(query(query), Tasks.STATE_TO_ID));
 
     LOG.info("Removing tasks " + removedIds);
+    vars.tasksRemoved.addAndGet(removedIds.size());
     tasks.keySet().removeAll(removedIds);
   }
 
@@ -130,13 +138,13 @@ public class TaskStore {
    * @return Immutable copies of the mutated tasks.
    * @throws E An exception, specified by the mutator.
    */
-  public synchronized <E extends Exception> Set<TaskState> mutate(Query query,
+  public synchronized <E extends Exception> ImmutableSet<TaskState> mutate(Query query,
       final ExceptionalClosure<TaskState, E> mutator) throws E {
     Iterable<TaskState> mutables = mutableQuery(query);
     for (TaskState mutable : mutables) {
       mutator.execute(mutable);
     }
-    return Sets.newHashSet(mutables);
+    return ImmutableSet.copyOf(transform(mutables, STATE_COPY));
   }
 
   /**
@@ -147,7 +155,8 @@ public class TaskStore {
    * @param filters Additional filters to apply.
    * @return A read-only view of matching tasks.
    */
-  public synchronized SortedSet<TaskState> fetch(Query query, Predicate<TaskState>... filters) {
+  public synchronized ImmutableSortedSet<TaskState> fetch(Query query,
+      Predicate<TaskState>... filters) {
     return fetch(query, Query.SORT_BY_TASK_ID, filters);
   }
 
@@ -159,9 +168,9 @@ public class TaskStore {
    * @param filters Additional filters to apply.
    * @return A read-only view of matching tasks, sorted according to the provided sort order.
    */
-  public synchronized SortedSet<TaskState> fetch(Query query,
+  public synchronized ImmutableSortedSet<TaskState> fetch(Query query,
       Comparator<TaskState> sortOrder, Predicate<TaskState>... filters) {
-    return Query.sortTasks(Iterables.filter(query(query), Predicates.and(filters)), sortOrder);
+    return Query.sortTasks(filter(query(query), Predicates.and(filters)), sortOrder);
   }
 
   /**
@@ -171,8 +180,8 @@ public class TaskStore {
    * @param filters Additional filters to apply.
    * @return IDs of the matching tasks.
    */
-  public synchronized Set<Integer> fetchIds(Query query, Predicate<TaskState>... filters) {
-    return Sets.newHashSet(Iterables.transform(fetch(query, filters), Tasks.STATE_TO_ID));
+  public synchronized ImmutableSet<Integer> fetchIds(Query query, Predicate<TaskState>... filters) {
+    return ImmutableSet.copyOf(transform(fetch(query, filters), Tasks.STATE_TO_ID));
   }
 
   /**
@@ -182,10 +191,13 @@ public class TaskStore {
    * @param query The query to execute.
    * @return A copy of all the task states matching the query.
    */
-  private Set<TaskState> query(Query query) {
+  private ImmutableSet<TaskState> query(Query query) {
     // Copy before filtering, so that client code does not access mutable state.
-    return Sets.newHashSet(Iterables.filter(
-        Iterables.transform(getIntermediateResults(query.base()), STATE_COPY), query));
+    vars.queries.incrementAndGet();
+    ImmutableSet<TaskState> results = ImmutableSet.copyOf(filter(
+        transform(getIntermediateResults(query.base()), STATE_COPY), query));
+    vars.queryResults.incrementAndGet();
+    return results;
   }
 
   /**
@@ -194,8 +206,12 @@ public class TaskStore {
    * @param query The query to execute.
    * @return A copy of all the task states matching the query.
    */
-  private Set<TaskState> mutableQuery(Query query) {
-    return Sets.newHashSet(Iterables.filter(getIntermediateResults(query.base()), query));
+  private ImmutableSet<TaskState> mutableQuery(Query query) {
+    vars.mutableQueries.incrementAndGet();
+    ImmutableSet<TaskState> results =
+        ImmutableSet.copyOf(filter(getIntermediateResults(query.base()), query));
+    vars.mutableResults.addAndGet(results.size());
+    return results;
   }
 
   /**
@@ -205,7 +221,12 @@ public class TaskStore {
    * @return Intermediate results for the query.
    */
   private Iterable<TaskState> getIntermediateResults(TaskQuery query) {
-    return query.getTaskIdsSize() > 0 ? getStateById(query.getTaskIds()) : tasks.values();
+    if (query.getTaskIdsSize() > 0) {
+      return getStateById(query.getTaskIds());
+    } else {
+      vars.fullScanQueries.incrementAndGet();
+      return tasks.values();
+    }
   }
 
   private final Predicate<Integer> hasTaskId = new Predicate<Integer>() {
@@ -233,8 +254,24 @@ public class TaskStore {
    * @param taskIds IDs of tasks to look up.
    * @return Tasks found that match the given task IDs.
    */
-  private Set<TaskState> getStateById(Set<Integer> taskIds) {
-    return Sets.newHashSet(Iterables.filter(Iterables.transform(taskIds, getById),
-        Predicates.notNull()));
+  private ImmutableSet<TaskState> getStateById(Set<Integer> taskIds) {
+    return ImmutableSet.copyOf(filter(transform(taskIds, getById), Predicates.notNull()));
   }
+
+  private class Vars {
+    private final AtomicLong queries = Stats.exportLong("task_store_queries");
+    private final AtomicLong queryResults = Stats.exportLong("task_store_query_results");
+    private final AtomicLong mutableQueries = Stats.exportLong("task_store_mutable_queries");
+    private final AtomicLong mutableResults = Stats.exportLong("task_store_mutable_query_results");
+    private final AtomicLong fullScanQueries = Stats.exportLong("task_store_full_scan_queries");
+    private final AtomicLong tasksAdded = Stats.exportLong("task_store_tasks_added");
+    private final AtomicLong tasksRemoved = Stats.exportLong("task_store_tasks_removed");
+
+    Vars() {
+      Stats.export(new StatImpl<Integer>("task_store_size") {
+          @Override public Integer read() { return tasks.size(); }
+      });
+    }
+  }
+  private final Vars vars = new Vars();
 }

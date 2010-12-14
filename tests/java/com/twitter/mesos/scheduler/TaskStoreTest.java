@@ -15,8 +15,8 @@ import com.twitter.mesos.scheduler.TaskStore.TaskState;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 
 import static com.twitter.mesos.gen.ScheduleStatus.*;
 import static org.hamcrest.CoreMatchers.is;
@@ -97,7 +97,7 @@ public class TaskStoreTest {
   public void testSortOrder() {
     int id = 1;
     int priority = 100;
-    List<ScheduledTask> tasks = Arrays.asList(
+    ArrayList<ScheduledTask> tasks = Lists.newArrayList(
         makeTask(id++, priority--).setStatus(PENDING),
         makeTask(id++, priority--).setStatus(PENDING),
         makeTask(id++, priority--).setStatus(KILLED),
@@ -109,21 +109,22 @@ public class TaskStoreTest {
 
     taskStore.add(tasks);
 
-    assertThat(Lists.newArrayList(Iterables.transform(taskStore.fetch(Query.GET_ALL),
-        Tasks.STATE_TO_SCHEDULED)), is(tasks));
-    assertThat(Lists.newArrayList(Iterables.transform(
-        taskStore.fetch(Query.GET_ALL, Query.SORT_BY_TASK_ID), Tasks.STATE_TO_SCHEDULED)),
+    assertThat(Lists.newArrayList(Iterables.transform(taskStore
+        .fetch(Query.GET_ALL), Tasks.STATE_TO_SCHEDULED)), is(tasks));
+    assertThat(Lists.newArrayList(Iterables.transform(taskStore
+        .fetch(Query.GET_ALL, Query.SORT_BY_TASK_ID), Tasks.STATE_TO_SCHEDULED)),
         is(tasks));
-    assertThat(Lists.newArrayList(Iterables.transform(
-        taskStore.fetch(Query.GET_ALL, Query.SORT_BY_PRIORITY), Tasks.STATE_TO_SCHEDULED)),
-        is(Lists.reverse(tasks)));
-    assertThat(Lists.newArrayList(Iterables.transform(
-        taskStore.fetch(Query.byStatus(PENDING)), Tasks.STATE_TO_SCHEDULED)),
-        is(Arrays.asList(tasks.get(0), tasks.get(1), tasks.get(4))));
-    assertThat(Lists.newArrayList(Iterables.transform(
-        taskStore.fetch(Query.byStatus(Tasks.ACTIVE_STATES),
-            Query.SORT_BY_PRIORITY, Tasks.ACTIVE_FILTER), Tasks.STATE_TO_SCHEDULED)),
-        is(Arrays.asList(tasks.get(6), tasks.get(4), tasks.get(3), tasks.get(1), tasks.get(0))));
+    assertThat(Lists.newArrayList(Iterables.transform(taskStore
+        .fetch(Query.GET_ALL, Query.SORT_BY_PRIORITY), Tasks.STATE_TO_SCHEDULED)),
+        is(Lists.newArrayList(Lists.reverse(tasks))));
+    assertThat(Lists.newArrayList(Iterables.transform(taskStore
+        .fetch(Query.byStatus(PENDING)), Tasks.STATE_TO_SCHEDULED)),
+        is(Lists.newArrayList(tasks.get(0), tasks.get(1), tasks.get(4))));
+    assertThat(Lists.newArrayList(Iterables.transform(taskStore.fetch(Query
+        .byStatus(Tasks.ACTIVE_STATES), Query.SORT_BY_PRIORITY, Tasks.ACTIVE_FILTER),
+        Tasks.STATE_TO_SCHEDULED)),
+        is(Lists.newArrayList(
+            tasks.get(6), tasks.get(4), tasks.get(3), tasks.get(1), tasks.get(0))));
   }
 
   @Test

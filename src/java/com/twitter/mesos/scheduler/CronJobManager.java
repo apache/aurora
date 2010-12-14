@@ -6,6 +6,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.twitter.common.collections.Pair;
+import com.twitter.common.stats.Stats;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.CronCollisionPolicy;
 import com.twitter.mesos.gen.JobConfiguration;
@@ -17,6 +18,7 @@ import org.apache.commons.lang.StringUtils;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -43,6 +45,8 @@ public class CronJobManager extends JobManager {
 
   // Cron manager.
   private final Scheduler scheduler = new Scheduler();
+
+  private final AtomicLong cronJobsTriggered = Stats.exportLong("cron_jobs_triggered");
 
   // Maps from the our unique job identifier (<owner>/<jobName>) to the unique identifier used
   // internally by the cron4j scheduler.
@@ -72,6 +76,7 @@ public class CronJobManager extends JobManager {
   @VisibleForTesting
   void cronTriggered(String jobKey) {
     LOG.info(String.format("Cron triggered for %s at %s", jobKey, new Date()));
+    cronJobsTriggered.incrementAndGet();
 
     JobConfiguration job = scheduledJobs.get(jobKey).getSecond();
 

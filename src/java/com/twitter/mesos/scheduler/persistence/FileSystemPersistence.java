@@ -2,9 +2,11 @@ package com.twitter.mesos.scheduler.persistence;
 
 import com.google.common.base.Preconditions;
 import com.google.common.io.Files;
+import com.twitter.common.stats.Stats;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -17,6 +19,7 @@ public class FileSystemPersistence implements PersistenceLayer<byte[]> {
   private final static Logger LOG = Logger.getLogger(FileSystemPersistence.class.getName());
 
   private final File file;
+  final AtomicLong persistedStateBytes = Stats.exportLong("persisted_state_bytes");
 
   public FileSystemPersistence(File file) {
     this.file = Preconditions.checkNotNull(file);
@@ -51,6 +54,7 @@ public class FileSystemPersistence implements PersistenceLayer<byte[]> {
       File tempFile = new File(file.getAbsolutePath() + ".tmp");
       Files.write(data, tempFile);
       Files.move(tempFile, file);
+      persistedStateBytes.set(data.length);
       tempFile.delete();
     } catch (IOException e) {
       logAndThrow("Failed to write to file " + file.getAbsolutePath(), e);

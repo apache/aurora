@@ -3,6 +3,7 @@ package com.twitter.mesos.scheduler;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
+import com.twitter.common.stats.Stats;
 import com.twitter.common.util.BuildInfo;
 import com.twitter.common.base.Closure;
 import com.twitter.common.quantity.Amount;
@@ -15,6 +16,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
 /**
@@ -106,7 +108,13 @@ public class ExecutorTrackerImpl implements ExecutorTracker {
     }
 
     if (restart && !restartQueue.contains(status.getSlaveId())) {
+      vars.executorRestartsRequested.incrementAndGet();
       restartQueue.add(status.getSlaveId());
     }
   }
+
+  private class Vars {
+    final AtomicLong executorRestartsRequested = Stats.exportLong("executor_restarts_requested");
+  }
+  private Vars vars = new Vars();
 }

@@ -15,6 +15,9 @@ import com.twitter.common.base.Closure;
 import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.common.stats.RequestStats;
+import com.twitter.common.stats.StatImpl;
+import com.twitter.common.stats.Stats;
 import com.twitter.mesos.Message;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
@@ -46,6 +49,7 @@ import java.util.SortedSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -442,6 +446,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
     MorePreconditions.checkNotBlank(slaveHost);
     Preconditions.checkNotNull(offerParams);
 
+    vars.resourceOffers.incrementAndGet();
+
     final TwitterTaskInfo offer;
     try {
       offer = ConfigurationManager.makeConcrete(offerParams);
@@ -746,7 +752,9 @@ public class SchedulerCoreImpl implements SchedulerCore {
     state.setModuleJobs(moduleState);
 
     try {
+      long startNanos = System.nanoTime();
       persistenceLayer.commit(state);
+      vars.persistLatency.requestComplete((System.nanoTime() - startNanos) / 1000);
     } catch (PersistenceLayer.PersistenceException e) {
       LOG.log(Level.SEVERE, "Failed to persist scheduler state.", e);
     }
@@ -826,4 +834,20 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
      return copy;
   }
+
+  private final class Vars {
+    final RequestStats persistLatency = new RequestStats("scheduler_persist");
+    final AtomicLong resourceOffers = Stats.exportLong("scheduler_resource_offers");
+
+    Vars() {
+      for (final ScheduleStatus status : ScheduleStatus.values()) {
+        Stats.export(new StatImpl<Integer>("task_store_" + status) {
+          @Override public Integer read() {
+            return taskStore.fetch(Query.byStatus(status)).size();
+          }
+        });
+      }
+    }
+  }
+  private final Vars vars = new Vars();
 }

@@ -4,6 +4,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.inject.Inject;
+import com.twitter.common.stats.Stats;
 import com.twitter.mesos.Message;
 import com.twitter.mesos.StateTranslator;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
@@ -19,6 +20,7 @@ import mesos.TaskDescription;
 import mesos.TaskStatus;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -161,11 +163,13 @@ class MesosSchedulerImpl extends Scheduler {
       switch (schedulerMsg.getSetField()) {
         case TASK_UPDATE:
           RegisteredTaskUpdate update = schedulerMsg.getTaskUpdate();
+          vars.registeredTaskUpdates.incrementAndGet();
           LOG.info("Received registered task update from " + update.getSlaveHost());
           schedulerCore.updateRegisteredTasks(update);
           break;
         case EXECUTOR_STATUS:
           LOG.info("Received executor status update: " + schedulerMsg.getExecutorStatus());
+          vars.executorStatusUpdates.incrementAndGet();
           executorTracker.addStatus(schedulerMsg.getExecutorStatus());
           break;
         default:
@@ -175,4 +179,10 @@ class MesosSchedulerImpl extends Scheduler {
       LOG.log(Level.SEVERE, "Failed to decode framework message.", e);
     }
   }
+
+  private class Vars {
+    final AtomicLong executorStatusUpdates = Stats.exportLong("executor_status_updates");
+    final AtomicLong registeredTaskUpdates = Stats.exportLong("executor_registered_task_updates");
+  }
+  private Vars vars = new Vars();
 }
