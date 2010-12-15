@@ -178,28 +178,34 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
           }
         });
 
-    Predicate<LiveTaskInfo> getKilledTasks = new Predicate<LiveTaskInfo>() {
+    Predicate<LiveTaskInfo> getTerminatedTasks = new Predicate<LiveTaskInfo>() {
       @Override public boolean apply(LiveTaskInfo update) {
-        return update.getStatus() == KILLED;
-      }
-    };
-
-    Function<LiveTaskInfo, String> getTaskId = new Function<LiveTaskInfo, String>() {
-      @Override public String apply(LiveTaskInfo update) {
-        return update.getTaskId();
+        return !Tasks.isActive(update.getStatus());
       }
     };
 
     // Find any tasks that we believe to be running, but the slave reports as dead.
     Set<String> reportedDeadTasks = ImmutableSet.copyOf(
-        Iterables.transform(Iterables.filter(taskInfoMap.values(), getKilledTasks), Tasks.LIVE_TO_ID));
+        transform(filter(taskInfoMap.values(), getTerminatedTasks), Tasks.LIVE_TO_ID));
     Set<String> deadTasks = taskStore.fetchIds(
         new Query(new TaskQuery().setTaskIds(reportedDeadTasks), Tasks.ACTIVE_FILTER));
     if (!deadTasks.isEmpty()) {
       LOG.info("Found tasks that were recorded as RUNNING but slave " + update.getSlaveHost()
                + " reports as KILLED: " + deadTasks);
       mutated.set(true);
-      setTaskStatus(Query.byId(deadTasks), KILLED);
+
+      for (String deadTask : deadTasks) {
+        final ScheduleStatus status = taskInfoMap.get(deadTask).getStatus();
+        if (status == KILLED) {
+          setTaskStatus(Query.byId(deadTask), KILLED);
+        } else {
+          taskStore.mutate(Query.byId(deadTask), new Closure<TaskState>() {
+            @Override public void execute(TaskState item) {
+              changeTaskStatus(item.task, status);
+            }
+          });
+        }
+      }
     }
 
     // Find any tasks assigned to this slave but the slave does not report.
@@ -373,7 +379,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
 
     if (!tasksRequiringRestart.isEmpty()) {
       Map<Integer, TwitterTaskInfo> updateFrom = Tasks.mapInfoByShardId(
-          Iterables.transform(existingTasks.values(), Tasks.ASSIGNED_TO_INFO));
+          transform(existingTasks.values(), Tasks.ASSIGNED_TO_INFO));
 
       try {
         jobUpdater.launchUpdater(registerUpdate(updateFrom, updatedTasks));
@@ -397,7 +403,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
 
     // Launch any new tasks.  Gets all updatedTasks whose shard ID was added.
     LOG.info("Launching tasks for shard IDs being added by this update: " + shardIdsAdded);
-    launchTasks(ImmutableSet.copyOf(Iterables.filter(updatedTasks.values(),
+    launchTasks(ImmutableSet.copyOf(filter(updatedTasks.values(),
         Predicates.compose(Predicates.in(shardIdsAdded), INFO_TO_SHARD_ID))));
 
     // Perform any in-place mutations.
@@ -688,9 +694,9 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
     checkNotNull(updateToByShard);
 
     String oldJobKey = Iterables.getOnlyElement(ImmutableSet.copyOf(
-        Iterables.transform(updateFromByShard.values(), Tasks.INFO_TO_JOB_KEY)));
+        transform(updateFromByShard.values(), Tasks.INFO_TO_JOB_KEY)));
     String jobKey = Iterables.getOnlyElement(ImmutableSet.copyOf(
-        Iterables.transform(updateFromByShard.values(), Tasks.INFO_TO_JOB_KEY)));
+        transform(updateFromByShard.values(), Tasks.INFO_TO_JOB_KEY)));
 
     if (!oldJobKey.equals(jobKey)) {
       throw new UpdateException("An update cannot change a job key.");
@@ -788,7 +794,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
 
     // Delete the pending tasks that were updated.
     taskStore.remove(ImmutableSet.copyOf(transform(
-        Iterables.filter(tasks, Tasks.hasStatus(PENDING)), Tasks.STATE_TO_ID)));
+        filter(tasks, Tasks.hasStatus(PENDING)), Tasks.STATE_TO_ID)));
 
     // Shard IDs that are being added in this update.  This will happen during a forward update
     // when tasks are being added as a part of the update, or during a rollback when tasks were
@@ -889,7 +895,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
     NonVolatileSchedulerState state = new NonVolatileSchedulerState()
         .setFrameworkId(frameworkId.get())
         .setTasks(ImmutableList.copyOf(
-            Iterables.transform(taskStore.fetch(Query.GET_ALL), Tasks.STATE_TO_SCHEDULED)));
+            transform(taskStore.fetch(Query.GET_ALL), Tasks.STATE_TO_SCHEDULED)));
     Map<String, List<JobConfiguration>> moduleState = Maps.newHashMap();
     for (JobManager manager : jobManagers) {
       moduleState.put(manager.getUniqueKey(), Lists.newArrayList(manager.getJobs()));

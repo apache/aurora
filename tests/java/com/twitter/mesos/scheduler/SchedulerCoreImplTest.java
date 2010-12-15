@@ -575,37 +575,43 @@ public class SchedulerCoreImplTest extends EasyMockTest {
   @Test
   public void testSlaveAdjustsSchedulerTaskState() throws Exception {
     expectOffer(true);
+    expectOffer(true);
 
     control.replay();
 
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 2));
     Map<String, String> slaveOffer = ImmutableMap.<String, String>builder()
         .put("cpus", "4")
         .put("mem", "4096")
         .build();
     scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer);
+    scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer);
 
-    String taskId = getOnlyTask(queryByOwner(OWNER_A)).task.getAssignedTask().getTaskId();
+    String taskId1 = Iterables.get(getTasks(queryByOwner(OWNER_A)), 0)
+        .task.getAssignedTask().getTaskId();
+    String taskId2 = Iterables.get(getTasks(queryByOwner(OWNER_A)), 1)
+        .task.getAssignedTask().getTaskId();
 
-    changeStatus(taskId, RUNNING);
+    changeStatus(taskId1, RUNNING);
+    changeStatus(taskId2, RUNNING);
 
     // Simulate state update from the executor telling the scheduler that the task is dead.
     // This can happen if the entire cluster goes down - the scheduler has persisted state
     // listing the task as running, and the executor reads the task state in and marks it as KILLED.
     RegisteredTaskUpdate update = new RegisteredTaskUpdate()
         .setSlaveHost(SLAVE_HOST_1);
-    update.addToTaskInfos(new LiveTaskInfo().setTaskId(taskId).setStatus(KILLED));
+    update.addToTaskInfos(new LiveTaskInfo().setTaskId(taskId1).setStatus(KILLED));
+    update.addToTaskInfos(new LiveTaskInfo().setTaskId(taskId2).setStatus(FINISHED));
     scheduler.updateRegisteredTasks(update);
 
-    // The expected outcome is that the task is rescheduled, and the old task is moved into the
-    // KILLED state.
-    assertTaskCount(2);
-    TaskState killedTask = getOnlyTask(new Query(new TaskQuery().setOwner(OWNER_A)
-        .setTaskIds(Sets.newHashSet(taskId))));
-    assertThat(killedTask.task.getStatus(), is(KILLED));
+    // The expected outcome is that one task is rescheduled, and the old task is moved into the
+    // KILLED state.  The FINISHED task's state is updated on the scheduler.
+    assertTaskCount(3);
+    assertThat(getOnlyTask(Query.byId(taskId1)).task.getStatus(), is(KILLED));
+    assertThat(getOnlyTask(Query.byId(taskId2)).task.getStatus(), is(FINISHED));
 
     TaskState rescheduled = Iterables.getOnlyElement(getTasksByStatus(PENDING));
-    assertThat(rescheduled.task.getAncestorId(), is(taskId));
+    assertThat(rescheduled.task.getAncestorId(), is(taskId1));
   }
 
   @Test
