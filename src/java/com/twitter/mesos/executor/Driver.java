@@ -49,6 +49,7 @@ public interface Driver extends Function<Message, Integer> {
 
     @Override
     public void setDriver(ExecutorDriver driver, FrameworkID frameworkId) {
+      LOG.info("Driver assigned " + driver + ", and framework " + frameworkId);
       this.driverRef.set(driver);
       this.frameworkIdRef.set(frameworkId);
     }

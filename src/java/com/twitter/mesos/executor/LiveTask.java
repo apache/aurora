@@ -419,6 +419,7 @@ public class LiveTask extends TaskOnDisk {
   }
 
   public void terminate(ScheduleStatus terminalState) {
+    LOG.info("Terminating " + this + " with status " + terminalState);
     if (process == null) return;
     ScheduleStatus currentStatus = stateMachine.getState();
     if (Tasks.isTerminated(currentStatus)) {

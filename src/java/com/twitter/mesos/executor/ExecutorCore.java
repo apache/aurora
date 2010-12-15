@@ -156,6 +156,8 @@ public class ExecutorCore implements TaskManager {
       task.terminate(ScheduleStatus.KILLED);
     } else if (task == null) {
       LOG.severe("No such task found: " + taskId);
+    } else {
+      LOG.info("Kill request for task in state " + task.getScheduleStatus() + " ignored.");
     }
   }
 
