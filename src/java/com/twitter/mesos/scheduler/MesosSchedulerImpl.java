@@ -189,7 +189,6 @@ class MesosSchedulerImpl implements Scheduler {
         case TASK_UPDATE:
           RegisteredTaskUpdate update = schedulerMsg.getTaskUpdate();
           vars.registeredTaskUpdates.incrementAndGet();
-          LOG.info("Received registered task update from " + update.getSlaveHost());
           schedulerCore.updateRegisteredTasks(update);
           break;
         case EXECUTOR_STATUS:

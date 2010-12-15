@@ -196,15 +196,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
 
       for (String deadTask : deadTasks) {
         final ScheduleStatus status = taskInfoMap.get(deadTask).getStatus();
-        if (status == KILLED) {
-          setTaskStatus(Query.byId(deadTask), KILLED);
-        } else {
-          taskStore.mutate(Query.byId(deadTask), new Closure<TaskState>() {
-            @Override public void execute(TaskState item) {
-              changeTaskStatus(item.task, status);
-            }
-          });
-        }
+        setTaskStatus(Query.byId(deadTask), status);
       }
     }
 
