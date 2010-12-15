@@ -10,12 +10,7 @@ import com.twitter.mesos.gen.ExecutorMessage;
 import com.twitter.mesos.gen.ScheduleStatus;
 import mesos.Executor;
 import mesos.ExecutorDriver;
-import mesos.Protos.ExecutorArgs;
-import mesos.Protos.FrameworkMessage;
-import mesos.Protos.TaskDescription;
-import mesos.Protos.TaskID;
-import mesos.Protos.TaskState;
-import mesos.Protos.TaskStatus;
+import mesos.Protos.*;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -28,6 +23,7 @@ public class MesosExecutorImpl implements Executor {
 
   private final ExecutorCore executorCore;
   private final Driver driver;
+  private SlaveID slaveId;
 
   @Inject
   public MesosExecutorImpl(ExecutorCore executorCore, Driver driver) {
@@ -39,7 +35,8 @@ public class MesosExecutorImpl implements Executor {
   public void init(ExecutorDriver executorDriver, ExecutorArgs executorArgs) {
     LOG.info("Initialized with driver " + executorDriver + " and args " + executorArgs);
     executorCore.setSlaveId(executorArgs.getSlaveId().getValue());
-    driver.setDriver(executorDriver, executorArgs.getFrameworkId());
+    driver.init(executorDriver, executorArgs);
+    slaveId = executorArgs.getSlaveId();
   }
 
   @Override
@@ -80,9 +77,8 @@ public class MesosExecutorImpl implements Executor {
     LOG.info("Received shutdown command, terminating...");
     for (Task killedTask : executorCore.shutdownCore()) {
       driver.sendStatusUpdate(TaskStatus.newBuilder()
-          .setTaskId(TaskID.newBuilder().setValue(killedTask.getId()))
-          .setState(TaskState.TASK_KILLED)
-          .build());
+          .setTaskId(TaskID.newBuilder().setValue(killedTask.getId())).setSlaveId(slaveId)
+          .setState(TaskState.TASK_KILLED).build());
     }
     driver.stop();
   }

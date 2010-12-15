@@ -36,22 +36,22 @@ public interface Driver extends Function<Message, Integer> {
    * Sets the underlying driver.
    *
    * @param driver Real driver.
-   * @param frameworkId Mesos framework ID.
+   * @param executorArgs executor args.
    */
-  public void setDriver(ExecutorDriver driver, FrameworkID frameworkId);
+  public void init(ExecutorDriver driver, ExecutorArgs executorArgs);
 
   public static class DriverImpl implements Driver {
 
     private static final Logger LOG = Logger.getLogger(DriverImpl.class.getName());
 
     private final AtomicReference<ExecutorDriver> driverRef = new AtomicReference<ExecutorDriver>();
-    private final AtomicReference<FrameworkID> frameworkIdRef = new AtomicReference<FrameworkID>();
+    private final AtomicReference<ExecutorArgs> executorArgs = new AtomicReference<ExecutorArgs>();
 
     @Override
-    public void setDriver(ExecutorDriver driver, FrameworkID frameworkId) {
-      LOG.info("Driver assigned " + driver + ", and framework " + frameworkId);
+    public void init(ExecutorDriver driver, ExecutorArgs executorArgs) {
+      LOG.info("Driver assigned " + driver + ", and args " + executorArgs);
       this.driverRef.set(driver);
-      this.frameworkIdRef.set(frameworkId);
+      this.executorArgs.set(executorArgs);
     }
 
     /**
@@ -62,15 +62,9 @@ public interface Driver extends Function<Message, Integer> {
      */
     private int doWorkWithDriver(Function<ExecutorDriver, Integer> work) {
       ExecutorDriver driver = driverRef.get();
-      FrameworkID frameworkID = frameworkIdRef.get();
 
       if (driver == null) {
         LOG.warning("Driver not available, message could not be sent.");
-        return -1;
-      }
-
-      if (frameworkID == null) {
-        LOG.warning("Framework ID not available, message could not be sent.");
         return -1;
       }
 
@@ -79,13 +73,12 @@ public interface Driver extends Function<Message, Integer> {
 
     @Override public Integer apply(final Message message) {
       Preconditions.checkNotNull(message);
+      LOG.info("Sending message to scheduler.");
 
-      return doWorkWithDriver(new Function<ExecutorDriver, Integer>() {
+      int result = doWorkWithDriver(new Function<ExecutorDriver, Integer>() {
         @Override public Integer apply(ExecutorDriver driver) {
-          FrameworkMessage.Builder messageBuilder = FrameworkMessage.newBuilder();
-          if (message.getSlaveId() != null) {
-            messageBuilder.setSlaveId(SlaveID.newBuilder().setValue(message.getSlaveId()));
-          }
+          FrameworkMessage.Builder messageBuilder = FrameworkMessage.newBuilder()
+              .setSlaveId(executorArgs.get().getSlaveId());
           try {
             messageBuilder.setData(
                 ByteString.copyFrom(ThriftBinaryCodec.encode(message.getMessage())));
@@ -104,6 +97,12 @@ public interface Driver extends Function<Message, Integer> {
           return result;
         }
       });
+
+      if (result != 0) {
+        LOG.warning("Attempt to send message failed with code " + result);
+      }
+
+      return result;
     }
 
     @Override public int sendStatusUpdate(final String taskId, final ScheduleStatus status) {
@@ -115,6 +114,7 @@ public interface Driver extends Function<Message, Integer> {
           int result = driver.sendStatusUpdate(
               TaskStatus.newBuilder()
                   .setTaskId(TaskID.newBuilder().setValue(taskId))
+                  .setSlaveId(executorArgs.get().getSlaveId())
                   .setState(StateTranslator.get(status))
                   .build());
           if (result != 0) {
