@@ -89,12 +89,13 @@ public class ProcessKiller implements ExceptionalClosure<KillCommand, KillExcept
     Process proc = null;
     try {
       proc = builder.start();
+      String stderr = CharStreams.toString(new InputStreamReader(proc.getErrorStream()));
+      String stdout = CharStreams.toString(new InputStreamReader(proc.getInputStream()));
+
+      LOG.info("Killtree script gave stderr: " + stderr + " and stdout " + stdout);
 
       if (builder.start().waitFor() != 0) {
-        String stderr = CharStreams.toString(new InputStreamReader(proc.getErrorStream()));
-        String stdout = CharStreams.toString(new InputStreamReader(proc.getInputStream()));
-
-        LOG.info("Killtree script failed, stderr:\n" + stderr + "\nstdout:\n" + stdout);
+        LOG.severe("Killtree script failed!");
       }
     } catch (IOException e) {
       throw new KillException("Failed to kill tree on " + pid, e);
