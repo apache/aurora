@@ -57,7 +57,7 @@ public interface Driver {
     @Override public int killTask(final String taskId) {
       int result = driver.killTask(TaskID.newBuilder().setValue(taskId).build());
       if (result != 0) {
-        LOG.severe(String.format("Attempt to kill task %d failed with code %d",
+        LOG.severe(String.format("Attempt to kill task %s failed with code %d",
             taskId, result));
       }
       return result;
