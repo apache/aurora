@@ -55,7 +55,10 @@ public class HttpSignaler implements ExceptionalFunction<String, List<String>, S
     });
 
     try {
-      return task.get(signalTimeout.as(Time.MILLISECONDS), TimeUnit.MILLISECONDS);
+      long startNanos = System.nanoTime();
+      List<String> result = task.get(signalTimeout.as(Time.MILLISECONDS), TimeUnit.MILLISECONDS);
+      LOG.info(signalUrl + " resopnded in " + (System.nanoTime() - startNanos) + " ns.");
+      return result;
     } catch (InterruptedException e) {
       throw new SignalException("Interrupted while requesting signal URL " + url, e);
     } catch (ExecutionException e) {
