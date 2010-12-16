@@ -73,7 +73,6 @@ public interface Driver extends Function<Message, Integer> {
 
     @Override public Integer apply(final Message message) {
       Preconditions.checkNotNull(message);
-      LOG.info("Sending message to scheduler.");
 
       int result = doWorkWithDriver(new Function<ExecutorDriver, Integer>() {
         @Override public Integer apply(ExecutorDriver driver) {
