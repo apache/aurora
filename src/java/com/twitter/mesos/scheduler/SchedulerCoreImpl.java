@@ -141,13 +141,17 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
   @Override
   public synchronized void updateRegisteredTasks(RegisteredTaskUpdate update) {
     checkNotNull(update);
+    checkNotBlank(update.getSlaveHost());
     checkNotNull(update.getTaskInfos());
+
+    List<LiveTaskInfo> taskInfos = update.isSetTaskInfos() ? update.getTaskInfos()
+        : Arrays.<LiveTaskInfo>asList();
 
     final AtomicBoolean mutated = new AtomicBoolean(false);
 
     // Wrap with a mutable map so we can modify later.
     final Map<String, LiveTaskInfo> taskInfoMap = Maps.newHashMap(
-        Maps.uniqueIndex(update.getTaskInfos(), Tasks.LIVE_TO_ID));
+        Maps.uniqueIndex(taskInfos, Tasks.LIVE_TO_ID));
 
     // TODO(wfarner): Have the scheduler only retain configurations for live jobs,
     //    and acquire all other state from slaves.

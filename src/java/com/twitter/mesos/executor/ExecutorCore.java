@@ -4,6 +4,7 @@ import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
@@ -259,6 +260,7 @@ public class ExecutorCore implements TaskManager {
     Runnable pusher = new Runnable() {
       @Override public void run() {
         RegisteredTaskUpdate update = new RegisteredTaskUpdate().setSlaveHost(getHostName());
+        update.setTaskInfos(Lists.<LiveTaskInfo>newArrayList());
 
         for (Map.Entry<String, Task> entry : tasks.entrySet()) {
           Task task = entry.getValue();
