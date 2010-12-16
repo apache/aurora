@@ -85,7 +85,8 @@ public class ProcessKiller implements ExceptionalClosure<KillCommand, KillExcept
     LOG.info("Mercilessly killing process " + pid);
 
     ProcessBuilder builder = new ProcessBuilder("sh", killTreeScript.getAbsolutePath(),
-        "-p", String.valueOf(pid));
+        "-p", String.valueOf(pid), "-s", "9");
+    LOG.info("Executing kill command " + builder.command());
     Process proc = null;
     try {
       proc = builder.start();
