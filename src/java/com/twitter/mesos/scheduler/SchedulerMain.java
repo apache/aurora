@@ -105,7 +105,11 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
       } catch (UpdateException e) {
         LOG.log(Level.WARNING, "Failed to leave server set.", e);
       } finally {
+        halt();
         destroy();
+        // TODO(wfarner): This seems necessary to break out of the blocking driver run.
+        // TODO(wfarner): This should really notify the SchedulerCoreImpl and cleanly shut down
+        System.exit(1);
       }
     }
   };
@@ -117,10 +121,15 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
   @Inject private SingletonService schedulerService;
   @Inject private SchedulerThriftInterface schedulerThriftInterface;
   @Inject private SchedulerDriver driver;
+  @Inject private SchedulerCore scheduler;
 
   @Override
   protected Iterable<Class<? extends Module>> getProcessModuleClasses() {
     return ImmutableList.<Class<? extends Module>>of(SchedulerModule.class);
+  }
+
+  private void halt() {
+    scheduler.stop();
   }
 
   @Override
@@ -159,18 +168,6 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
   }
 
   private void runMesosDriver() {
-    addShutdownAction(new Command() {
-      @Override public void execute() {
-        if (driver != null) {
-          LOG.info("Stopping scheduler driver.");
-          int result = driver.stop();
-          if (result != 0) {
-            LOG.warning("Attempt to stop driver returned code " + result);
-          }
-        }
-      }
-    });
-
     new ThreadFactoryBuilder().setNameFormat("Driver-Runner-%d").setDaemon(true).build().newThread(
         new Runnable() {
           @Override public void run() {

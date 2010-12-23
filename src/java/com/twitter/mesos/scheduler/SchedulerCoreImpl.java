@@ -886,7 +886,18 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
     }
   }
 
+  // TODO(wfarner): Clean this up.
+  private boolean stopped = false;
+  @Override public synchronized void stop() {
+    stopped = true;
+  }
+
   private void persist() {
+    if (stopped) {
+      LOG.severe("Scheduler was stopped, ignoring persist request.");
+      return;
+    }
+
     LOG.info("Saving scheduler state.");
     NonVolatileSchedulerState state = new NonVolatileSchedulerState()
         .setFrameworkId(frameworkId.get())

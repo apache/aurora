@@ -137,6 +137,8 @@ public interface SchedulerCore extends UpdateScheduler {
    */
   public String getFrameworkId();
 
+  public void stop();
+
   public void updateRegisteredTasks(RegisteredTaskUpdate update);
 
   public static class TwitterTask {
