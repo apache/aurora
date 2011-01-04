@@ -9,7 +9,6 @@ import com.twitter.common.args.Option;
 import com.twitter.common.base.Command;
 import com.twitter.common.process.GuicedProcess;
 import com.twitter.common.process.GuicedProcessOptions;
-import com.twitter.mesos.scheduler.ExecutorRootDir;
 import mesos.Executor;
 import mesos.MesosExecutorDriver;
 

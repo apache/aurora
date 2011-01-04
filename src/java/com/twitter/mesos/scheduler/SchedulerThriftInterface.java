@@ -18,6 +18,7 @@ import com.twitter.mesos.gen.ShardUpdateRequest;
 import com.twitter.mesos.gen.ShardUpdateResponse;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.UpdateCompleteResponse;
+import com.twitter.mesos.gen.UpdateConfigResponse;
 import com.twitter.mesos.gen.UpdateRequest;
 import com.twitter.mesos.gen.UpdateResponse;
 import com.twitter.mesos.scheduler.SchedulerCore.RestartException;
@@ -163,6 +164,17 @@ class SchedulerThriftInterface extends ThriftServer implements MesosSchedulerMan
     }
 
     return new RestartResponse(response, message, tasksRestarting);
+  }
+
+  @Override public UpdateConfigResponse getUpdateConfig(String updateToken) {
+    checkNotBlank(updateToken);
+
+    try {
+      return schedulerCore.getUpdateConfig(updateToken)
+          .setMessage("Configuration found.").setResponseCode(OK);
+    } catch (UpdateException e) {
+      return new UpdateConfigResponse().setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
+    }
   }
 
   @Override

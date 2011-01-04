@@ -8,11 +8,9 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import com.twitter.common.base.Closure;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.CronCollisionPolicy;
-import com.twitter.mesos.gen.ExecutorStatus;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.LiveTaskInfo;
 import com.twitter.mesos.gen.NonVolatileSchedulerState;
@@ -22,13 +20,16 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.gen.UpdateConfig;
 import com.twitter.mesos.scheduler.JobManager.JobUpdateResult;
 import com.twitter.mesos.scheduler.SchedulerCore.RestartException;
 import com.twitter.mesos.scheduler.TaskStore.TaskState;
 import com.twitter.mesos.scheduler.UpdateScheduler.UpdateException;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
-import com.twitter.mesos.scheduler.persistence.NoPersistence;
+import com.twitter.mesos.scheduler.persistence.PersistenceLayer;
+import org.easymock.Capture;
+import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -59,10 +60,11 @@ import static org.junit.Assert.*;
 public class SchedulerCoreImplTest extends EasyMockTest {
 
   private SchedulingFilter schedulingFilter;
+  private PersistenceLayer<NonVolatileSchedulerState> persistenceLayer;
   private Driver driver;
   private SchedulerCoreImpl scheduler;
   private CronJobManager cron;
-  private JobUpdateLauncher updateLauncher;
+  private Function<String, TwitterTaskInfo> updateTaskBuilder;
 
   private static final String OWNER_A = "Test_Owner_A";
   private static final String JOB_A = "Test_Job_A";
@@ -77,29 +79,31 @@ public class SchedulerCoreImplTest extends EasyMockTest {
   private static final String SLAVE_HOST_2 = "SlaveHost2";
 
   @Before
+  @SuppressWarnings("unchecked")
   public void setUp() {
     schedulingFilter = createMock(SchedulingFilter.class);
+    persistenceLayer = createMock(PersistenceLayer.class);
     driver = createMock(Driver.class);
-    updateLauncher = createMock(JobUpdateLauncher.class);
+    updateTaskBuilder = createMock(Function.class);
+  }
 
+  private void buildScheduler() {
+    ImmediateJobManager immediateManager = new ImmediateJobManager();
     cron = new CronJobManager();
-    ImmediateJobManager immediateJobManager = new ImmediateJobManager();
-    scheduler = new SchedulerCoreImpl(cron, immediateJobManager,
-        new NoPersistence<NonVolatileSchedulerState>(), new ExecutorTracker() {
-          @Override public void start(Closure<String> restartCallback) {
-            // No op.
-          }
-          @Override public void addStatus(ExecutorStatus status) {
-            // No-op.
-          }
-        }, driver, schedulingFilter, updateLauncher);
+    scheduler = new SchedulerCoreImpl(cron, immediateManager,
+        persistenceLayer, driver, schedulingFilter,
+        updateTaskBuilder);
     cron.schedulerCore = scheduler;
-    immediateJobManager.schedulerCore = scheduler;
+    immediateManager.schedulerCore = scheduler;
   }
 
   @Test
   public void testCreateJob() throws Exception {
+    expectRestore();
+    expectPersists(2);  // TODO(wfarner): Refactor jobmanagers so the double persist doesn't happen.
+
     control.replay();
+    buildScheduler();
 
     int numTasks = 10;
     JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, numTasks);
@@ -121,7 +125,10 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testRejectsBadIdentifiers() throws Exception {
+    expectRestore();
+
     control.replay();
+    buildScheduler();
 
     expectRejected("foo/bar", "bar/foo");
     expectRejected("foo/bar", "bar/foo");
@@ -141,7 +148,10 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testSortableTaskIds() throws Exception {
+    expectRestore();
+
     control.replay();
+    buildScheduler();
 
     int i = 0;
     for (TaskState task : getTasks(Query.GET_ALL)) {
@@ -151,7 +161,12 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test(expected = ScheduleException.class)
   public void testCreateDuplicateJob() throws Exception {
+    expectRestore();
+    expectPersists(2);
+
     control.replay();
+    buildScheduler();
+
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
     assertTaskCount(1);
@@ -161,7 +176,11 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test(expected = ScheduleException.class)
   public void testCreateDuplicateCronJob() throws Exception {
+    expectRestore();
+    expectPersists(1);
+
     control.replay();
+    buildScheduler();
 
     // Cron jobs are scheduled on a delay, so this job's tasks will not be scheduled immediately,
     // but duplicate jobs should still be rejected.
@@ -174,14 +193,20 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test(expected = TaskDescriptionException.class)
   public void testCreateEmptyJob() throws Exception {
+    expectRestore();
+
     control.replay();
+    buildScheduler();
 
     scheduler.createJob(new JobConfiguration().setOwner(OWNER_A).setName(JOB_A));
   }
 
   @Test(expected = TaskDescriptionException.class)
   public void testCreateJobMissingShardIds() throws Exception {
+    expectRestore();
+
     control.replay();
+    buildScheduler();
 
     scheduler.createJob(new JobConfiguration().setOwner(OWNER_A).setName(JOB_A).setTaskConfigs(
         ImmutableSet.of(new TwitterTaskInfo(DEFAULT_TASK))));
@@ -189,7 +214,10 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test(expected = TaskDescriptionException.class)
   public void testCreateJobDuplicateShardIds() throws Exception {
+    expectRestore();
+
     control.replay();
+    buildScheduler();
 
     scheduler.createJob(new JobConfiguration().setOwner(OWNER_A).setName(JOB_A).setTaskConfigs(
         ImmutableSet.of(
@@ -199,7 +227,10 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test(expected = TaskDescriptionException.class)
   public void testCreateJobShardIdHole() throws Exception {
+    expectRestore();
+
     control.replay();
+    buildScheduler();
 
     scheduler.createJob(new JobConfiguration().setOwner(OWNER_A).setName(JOB_A).setTaskConfigs(
         ImmutableSet.of(
@@ -209,11 +240,15 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testHonorsScheduleFilter() throws Exception {
+    expectRestore();
+    expectPersists(2);
     expectOffer(false);
     expectOffer(false);
     expectOffer(false);
 
+
     control.replay();
+    buildScheduler();
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 10));
 
@@ -233,9 +268,12 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testRestartTask() throws Exception {
+    expectRestore();
+    expectPersists(7);
     expect(driver.killTask((String) anyObject())).andReturn(0);
 
     control.replay();
+    buildScheduler();
 
     scheduler.registered("");
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
@@ -263,7 +301,11 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test(expected = RestartException.class)
   public void testRestartUnknownTask() throws Exception {
+    expectRestore();
+    expectPersists(4);
+
     control.replay();
+    buildScheduler();
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
     changeStatus(queryByOwner(OWNER_A), STARTING);
@@ -277,7 +319,11 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testRestartInactiveTask() throws Exception {
+    expectRestore();
+    expectPersists(6);
+
     control.replay();
+    buildScheduler();
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
     changeStatus(queryByOwner(OWNER_A), STARTING);
@@ -295,7 +341,11 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testDaemonTasksRescheduled() throws Exception {
+    expectRestore();
+    expectPersists(7);
+
     control.replay();
+    buildScheduler();
 
     // Schedule 5 daemon and 5 non-daemon tasks.
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 5));
@@ -325,9 +375,13 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testNoTransitionFromTerminalState() throws Exception {
+    expectRestore();
+    expectPersists(7);
+
     expect(driver.killTask((String) anyObject())).andReturn(0);
 
     control.replay();
+    buildScheduler();
 
     scheduler.registered("");
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
@@ -345,9 +399,13 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testFailedTaskIncrementsFailureCount() throws Exception {
-    control.replay();
-
     int maxFailures = 5;
+    expectRestore();
+    expectPersists(11);
+
+    control.replay();
+    buildScheduler();
+
     TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
     task.putToConfiguration("max_task_failures", String.valueOf(maxFailures));
     JobConfiguration job = makeJob(OWNER_A, JOB_A, task, 1);
@@ -377,7 +435,11 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testCronJobLifeCycle() throws Exception {
+    expectRestore();
+    expectPersists(5);
+
     control.replay();
+    buildScheduler();
 
     JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 10);
     job.setCronSchedule("1 1 1 1 1");
@@ -403,7 +465,11 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testCronNoSuicide() throws Exception {
+    expectRestore();
+    expectPersists(4);
+
     control.replay();
+    buildScheduler();
 
     JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 10);
     job.setCronSchedule("1 1 1 1 1")
@@ -438,7 +504,11 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testKillPendingTask() throws Exception {
+    expectRestore();
+    expectPersists(3);
+
     control.replay();
+    buildScheduler();
 
     JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1);
     scheduler.createJob(job);
@@ -455,9 +525,13 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testKillRunningTask() throws Exception {
+    expectRestore();
+    expectPersists(5);
+
     expect(driver.killTask((String) anyObject())).andReturn(0);
 
     control.replay();
+    buildScheduler();
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
     String taskId = getOnlyTask(queryByOwner(OWNER_A)).task.getAssignedTask().getTaskId();
@@ -470,7 +544,11 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testKillCronTask() throws Exception {
+    expectRestore();
+    expectPersists(2);
+
     control.replay();
+    buildScheduler();
 
     JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1);
     job.setCronSchedule("1 1 1 1 1");
@@ -482,7 +560,11 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testLostTaskRescheduled() throws Exception {
+    expectRestore();
+    expectPersists(4);
+
     control.replay();
+    buildScheduler();
 
     int maxFailures = 5;
     TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
@@ -508,7 +590,11 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testKillJob() throws Exception {
+    expectRestore();
+    expectPersists(3);
+
     control.replay();
+    buildScheduler();
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 10));
     assertTaskCount(10);
@@ -519,7 +605,11 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testKillJob2() throws Exception {
+    expectRestore();
+    expectPersists(5);
+
     control.replay();
+    buildScheduler();
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 10));
     assertTaskCount(10);
@@ -537,9 +627,13 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testResourceUpdate() throws Exception {
+    expectRestore();
+    expectPersists(4);
     expectOffer(true);
 
+
     control.replay();
+    buildScheduler();
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
     Map<String, String> slaveOffer = ImmutableMap.<String, String>builder()
@@ -574,10 +668,13 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testSlaveAdjustsSchedulerTaskState() throws Exception {
+    expectRestore();
+    expectPersists(8);
     expectOffer(true);
     expectOffer(true);
 
     control.replay();
+    buildScheduler();
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 2));
     Map<String, String> slaveOffer = ImmutableMap.<String, String>builder()
@@ -616,10 +713,13 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testSlaveCannotModifyTasksForOtherSlave() throws Exception {
+    expectRestore();
+    expectPersists(8);
     expectOffer(true);
     expectOffer(true);
 
     control.replay();
+    buildScheduler();
 
     Map<String, String> slaveOffer = ImmutableMap.<String, String>builder()
         .put("cpus", "4")
@@ -652,12 +752,15 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testSlaveStopsReportingRunningTask() throws Exception {
+    expectRestore();
+    expectPersists(16);
     expectOffer(true);
     expectOffer(true);
     expectOffer(true);
     expectOffer(true);
 
     control.replay();
+    buildScheduler();
 
     Map<String, String> slaveOffer = ImmutableMap.<String, String>builder()
         .put("cpus", "4")
@@ -720,6 +823,8 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testUpdateJob() throws Exception {
+    expectRestore();
+    expectPersists(3);
     TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
     task.putToConfiguration("start_command", "echo 'hello'");
     JobConfiguration job = makeJob(OWNER_A, JOB_A, task, 1);
@@ -728,18 +833,43 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     updatedTask.putToConfiguration("start_command", "echo 'hi'");
     JobConfiguration updatedJob = makeJob(OWNER_A, JOB_A, updatedTask, 1);
 
-    updateLauncher.launchUpdater((String) anyObject());
+    String updaterHdfsPath = "/fake/updater/hdfs/path";
+    String updaterStartCommand = "/bin/do_the_update --token=";
+    Capture<String> tokenCapture = new Capture<String>();
+    updateTaskBuilder.apply(capture(tokenCapture));
+    expectLastCall().andReturn(new TwitterTaskInfo()
+        .setShardId(0)
+        .setHdfsPath(updaterHdfsPath).setStartCommand(updaterStartCommand));
 
     control.replay();
+    buildScheduler();
 
     scheduler.createJob(job);
 
+    final String taskId = Tasks.id(getOnlyTask(queryByOwner(OWNER_A)));
+
     assertThat(scheduler.updateJob(updatedJob), is(JobUpdateResult.UPDATER_LAUNCHED));
+    assertTaskCount(2);
+    TaskState updaterTask = getOnlyTask(new Query(new TaskQuery(), new Predicate<TaskState>() {
+      @Override public boolean apply(TaskState state) {
+        return !Tasks.id(state).equals(taskId);
+      }
+    }));
+    assertThat(Tasks.jobKey(updaterTask), is(Tasks.jobKey(OWNER_A, JOB_A + ".updater")));
+    TwitterTaskInfo jobUpdater = Tasks.STATE_TO_INFO.apply(updaterTask);
+    assertThat(jobUpdater.getHdfsPath(), is(updaterHdfsPath));
+    String updateToken = tokenCapture.getValue();
+    assertThat(Iterables.getOnlyElement(scheduler.updatesInProgress.keySet()), is(updateToken));
+    assertThat(jobUpdater.getStartCommand(), is(updaterStartCommand));
   }
 
   @Test
   public void testUpdateJobUnchanged() throws Exception {
+    expectRestore();
+    expectPersists(2);
+
     control.replay();
+    buildScheduler();
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
 
@@ -749,7 +879,11 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test(expected = ScheduleException.class)
   public void testUpdateNonExistentJob() throws Exception {
+    expectRestore();
+    expectPersists(2);
+
     control.replay();
+    buildScheduler();
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
     scheduler.updateJob(makeJob(OWNER_B, JOB_A, DEFAULT_TASK, 1));
@@ -757,7 +891,11 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testUpdateJobChangePriority() throws Exception {
+    expectRestore();
+    expectPersists(3);
+
     control.replay();
+    buildScheduler();
 
     JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1);
     scheduler.createJob(job);
@@ -792,10 +930,13 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testUpdateJobRemoveTasks() throws Exception {
+    expectRestore();
+    expectPersists(13);
     expect(driver.killTask((String) anyObject())).andReturn(0);
     expect(driver.killTask((String) anyObject())).andReturn(0);
 
     control.replay();
+    buildScheduler();
 
     scheduler.registered("");
 
@@ -867,7 +1008,11 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void tetUpdateJobAddTasks() throws Exception {
+    expectRestore();
+    expectPersists(7);
+
     control.replay();
+    buildScheduler();
 
     TwitterTaskInfo pending1 = new TwitterTaskInfo(DEFAULT_TASK);
     pending1.putToConfiguration("priority", "1");
@@ -914,7 +1059,11 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testUpdateCronJob() throws Exception {
+    expectRestore();
+    expectPersists(1);
+
     control.replay();
+    buildScheduler();
 
     String oldCronSchedule = "1 1 1 1 1";
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1).setCronSchedule(oldCronSchedule));
@@ -933,7 +1082,11 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testUpdateCronJobUnchanged() throws Exception {
+    expectRestore();
+    expectPersists(1);
+
     control.replay();
+    buildScheduler();
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1).setCronSchedule("1 1 1 1 1"));
 
@@ -948,13 +1101,20 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test(expected = UpdateException.class)
   public void testUpdateShardsRejectsBadToken() throws Exception {
+    expectRestore();
+
     control.replay();
+    buildScheduler();
     scheduler.updateShards("asdf", ImmutableSet.of(1, 2, 3), true);
   }
 
   @Test(expected = UpdateException.class)
   public void testUpdateShardsPreventsUpdateConflict() throws Exception {
+    expectRestore();
+    expectPersists(2);
+
     control.replay();
+    buildScheduler();
 
     TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
     task.putToConfiguration("start_command", "echo 'hello'");
@@ -969,18 +1129,22 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
     scheduler.createJob(job);
 
-    scheduler.registerUpdate(updateFrom, updateTo);
-    scheduler.registerUpdate(updateFrom, updateTo);
+    scheduler.registerUpdate(new UpdateConfig(), updateFrom, updateTo);
+    scheduler.registerUpdate(new UpdateConfig(), updateFrom, updateTo);
   }
 
   @Test
   public void testRollingUpdate() throws Exception {
+    expectRestore();
+    expectPersists(17);
     expectAcceptedOffers(6);
     expect(driver.killTask((String) anyObject())).andReturn(0);
     expect(driver.killTask((String) anyObject())).andReturn(0);
     expect(driver.killTask((String) anyObject())).andReturn(0);
 
+
     control.replay();
+    buildScheduler();
 
     TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
     task.putToConfiguration("start_command", "echo 'hello'");
@@ -1022,7 +1186,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     changeStatus(Tasks.STATE_TO_ID.apply(Iterables.get(startingTasks, 3)), KILLED);
     changeStatus(Tasks.STATE_TO_ID.apply(Iterables.get(startingTasks, 4)), RUNNING);
 
-    String token = scheduler.registerUpdate(updateFrom, updateTo);
+    String token = scheduler.registerUpdate(new UpdateConfig(), updateFrom, updateTo);
 
     expectRestarted(scheduler.updateShards(token, ImmutableSet.of(0, 1), false), newCommand);
     expectRestarted(scheduler.updateShards(token, ImmutableSet.of(2, 3), false), newCommand);
@@ -1041,12 +1205,16 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testRollingUpdateRollback() throws Exception {
+    expectRestore();
+    expectPersists(26);
     expectAcceptedOffers(10);
     expect(driver.killTask((String) anyObject())).andReturn(0);
     expect(driver.killTask((String) anyObject())).andReturn(0);
     expect(driver.killTask((String) anyObject())).andReturn(0);
 
+
     control.replay();
+    buildScheduler();
 
     String oldCommand = "echo 'hello'";
     TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
@@ -1097,7 +1265,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(8)), RUNNING);
     changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(9)), RUNNING);
 
-    String token = scheduler.registerUpdate(updateFrom, updateTo);
+    String token = scheduler.registerUpdate(new UpdateConfig(), updateFrom, updateTo);
 
     // We will roll back before these tasks are updated.
     Set<String> untouchedShardTaskIds = ImmutableSet.copyOf(Iterables.transform(
@@ -1133,11 +1301,15 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testRollingUpdateAddingShards() throws Exception {
+    expectRestore();
+    expectPersists(7);
     expectAcceptedOffers(2);
     expect(driver.killTask((String) anyObject())).andReturn(0);
     expect(driver.killTask((String) anyObject())).andReturn(0);
 
+
     control.replay();
+    buildScheduler();
 
     String oldCommand = "echo 'hello'";
     TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
@@ -1169,7 +1341,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(0)), RUNNING);
     changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(1)), RUNNING);
 
-    String token = scheduler.registerUpdate(updateFrom, updateTo);
+    String token = scheduler.registerUpdate(new UpdateConfig(), updateFrom, updateTo);
 
     expectRestarted(scheduler.updateShards(token, ImmutableSet.of(0, 1), false), newCommand);
     expectRestarted(scheduler.updateShards(token, ImmutableSet.of(2, 3), false), newCommand);
@@ -1186,13 +1358,17 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testRollingUpdateAddingShardsRollback() throws Exception {
+    expectRestore();
+    expectPersists(10);
     expectAcceptedOffers(4);
     expect(driver.killTask((String) anyObject())).andReturn(0);
     expect(driver.killTask((String) anyObject())).andReturn(0);
     expect(driver.killTask((String) anyObject())).andReturn(0);
     expect(driver.killTask((String) anyObject())).andReturn(0);
 
+
     control.replay();
+    buildScheduler();
 
     String oldCommand = "echo 'hello'";
     TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
@@ -1224,7 +1400,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(0)), RUNNING);
     changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(1)), RUNNING);
 
-    String token = scheduler.registerUpdate(updateFrom, updateTo);
+    String token = scheduler.registerUpdate(new UpdateConfig(), updateFrom, updateTo);
 
     expectRestarted(scheduler.updateShards(token, ImmutableSet.of(2, 3), false), newCommand);
 
@@ -1247,13 +1423,17 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testRollingUpdateRemovingShards() throws Exception {
+    expectRestore();
+    expectPersists(11);
     expectAcceptedOffers(4);
     expect(driver.killTask((String) anyObject())).andReturn(0);
     expect(driver.killTask((String) anyObject())).andReturn(0);
     expect(driver.killTask((String) anyObject())).andReturn(0);
     expect(driver.killTask((String) anyObject())).andReturn(0);
 
+
     control.replay();
+    buildScheduler();
 
     String oldCommand = "echo 'hello'";
     TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
@@ -1289,7 +1469,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(2)), RUNNING);
     changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(3)), RUNNING);
 
-    String token = scheduler.registerUpdate(updateFrom, updateTo);
+    String token = scheduler.registerUpdate(new UpdateConfig(), updateFrom, updateTo);
 
     expectRestarted(scheduler.updateShards(token, ImmutableSet.of(0, 1), false), newCommand);
     // It is the responsibility of the updater to remove tasks.
@@ -1306,13 +1486,17 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testRollingUpdateRemovingShardsRollback() throws Exception {
+    expectRestore();
+    expectPersists(10);
     expectAcceptedOffers(4);
     expect(driver.killTask((String) anyObject())).andReturn(0);
     expect(driver.killTask((String) anyObject())).andReturn(0);
     expect(driver.killTask((String) anyObject())).andReturn(0);
     expect(driver.killTask((String) anyObject())).andReturn(0);
 
+
     control.replay();
+    buildScheduler();
 
     String oldCommand = "echo 'hello'";
     TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
@@ -1346,7 +1530,7 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(0)), RUNNING);
     changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(1)), RUNNING);
 
-    String token = scheduler.registerUpdate(updateFrom, updateTo);
+    String token = scheduler.registerUpdate(new UpdateConfig(), updateFrom, updateTo);
 
     scheduler.killTasks(new Query(new TaskQuery().setShardIds(ImmutableSet.of(2, 3)),
         Tasks.ACTIVE_FILTER));
@@ -1485,6 +1669,15 @@ public class SchedulerCoreImplTest extends EasyMockTest {
 
   public void changeStatus(String taskId, ScheduleStatus status) {
     scheduler.setTaskStatus(query(Arrays.asList(taskId)), status);
+  }
+
+  private void expectRestore() throws Exception {
+    expect(persistenceLayer.fetch()).andReturn(null);
+  }
+
+  private void expectPersists(int count) throws Exception {
+    persistenceLayer.commit((NonVolatileSchedulerState) anyObject());
+    expectLastCall().times(count);
   }
 
   private void expectAcceptedOffers(int count) {

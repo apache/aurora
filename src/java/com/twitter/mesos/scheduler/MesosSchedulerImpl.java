@@ -8,10 +8,14 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.inject.Inject;
 import com.google.protobuf.ByteString;
+import com.twitter.common.base.Closure;
 import com.twitter.common.stats.Stats;
+import com.twitter.mesos.Message;
 import com.twitter.mesos.StateTranslator;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
+import com.twitter.mesos.gen.ExecutorMessage;
 import com.twitter.mesos.gen.RegisteredTaskUpdate;
+import com.twitter.mesos.gen.RestartExecutor;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.SchedulerMessage;
 import mesos.Protos.ExecutorInfo;
@@ -51,13 +55,15 @@ class MesosSchedulerImpl implements Scheduler {
   private final SchedulerCore schedulerCore;
   private final ExecutorTracker executorTracker;
   private FrameworkID frameworkID;
+  private final Driver driver;
 
   @Inject
   public MesosSchedulerImpl(SchedulerMain.TwitterSchedulerOptions options,
-      SchedulerCore schedulerCore, ExecutorTracker executorTracker) {
+      SchedulerCore schedulerCore, ExecutorTracker executorTracker, Driver driver) {
     this.options = checkNotNull(options);
     this.schedulerCore = checkNotNull(schedulerCore);
     this.executorTracker = checkNotNull(executorTracker);
+    this.driver = checkNotNull(driver);
   }
 
   @Override
@@ -98,6 +104,16 @@ class MesosSchedulerImpl implements Scheduler {
     LOG.info("Registered with ID " + frameworkID);
     this.frameworkID = frameworkID;
     schedulerCore.registered(frameworkID.getValue());
+
+    executorTracker.start(new Closure<String>() {
+      @Override public void execute(String slaveId) {
+        LOG.info("Sending restart request to executor " + slaveId);
+        ExecutorMessage message = new ExecutorMessage();
+        message.setRestartExecutor(new RestartExecutor());
+
+        driver.sendMessage(new Message(slaveId, message));
+      }
+    });
   }
 
   @Override

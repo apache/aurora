@@ -10,7 +10,6 @@ import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
 import com.twitter.mesos.executor.ProcessKiller.KillException;
 import com.twitter.mesos.gen.AssignedTask;
-import com.twitter.mesos.scheduler.ExecutorRootDir;
 
 import java.io.File;
 import java.io.IOException;

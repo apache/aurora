@@ -20,7 +20,6 @@ import com.twitter.mesos.gen.LiveTaskInfo;
 import com.twitter.mesos.gen.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.SchedulerMessage;
-import com.twitter.mesos.scheduler.ExecutorRootDir;
 import org.apache.commons.io.FileSystemUtils;
 
 import java.io.File;

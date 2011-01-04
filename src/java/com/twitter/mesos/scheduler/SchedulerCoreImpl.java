@@ -2,9 +2,16 @@ package com.twitter.mesos.scheduler;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
-import com.google.common.collect.*;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import com.twitter.common.base.Closure;
 import com.twitter.common.quantity.Amount;
@@ -12,16 +19,33 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.RequestStats;
 import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
-import com.twitter.mesos.Message;
 import com.twitter.mesos.Tasks;
-import com.twitter.mesos.gen.*;
+import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.LiveTaskInfo;
+import com.twitter.mesos.gen.NonVolatileSchedulerState;
+import com.twitter.mesos.gen.RegisteredTaskUpdate;
+import com.twitter.mesos.gen.ResourceConsumption;
+import com.twitter.mesos.gen.ScheduleStatus;
+import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TaskEvent;
+import com.twitter.mesos.gen.TaskQuery;
+import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.gen.UpdateConfig;
+import com.twitter.mesos.gen.UpdateConfigResponse;
 import com.twitter.mesos.scheduler.JobManager.JobUpdateResult;
 import com.twitter.mesos.scheduler.TaskStore.TaskState;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import com.twitter.mesos.scheduler.persistence.PersistenceLayer;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -61,28 +85,27 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
   // Filter to determine whether a task should be scheduled.
   private final SchedulingFilter schedulingFilter;
 
-  // Handles job updates that require a restart.
-  private final JobUpdateLauncher jobUpdater;
-
   // Tracks updates that are in-progress, mapping from update token to update spec.
-  private final Map<String, JobUpdate> updatesInProgress = Maps.newHashMap();
+  @VisibleForTesting final Map<String, JobUpdate> updatesInProgress = Maps.newHashMap();
 
   private final PersistenceLayer<NonVolatileSchedulerState> persistenceLayer;
-  private final ExecutorTracker executorTracker;
+
+  private final Function<String, TwitterTaskInfo> updaterTaskBuilder;
 
   @Inject
-  public SchedulerCoreImpl(CronJobManager cronScheduler, ImmediateJobManager immediateScheduler,
+  public SchedulerCoreImpl(CronJobManager cronScheduler,
+      ImmediateJobManager immediateScheduler,
       PersistenceLayer<NonVolatileSchedulerState> persistenceLayer,
-      ExecutorTracker executorTracker, Driver driver, SchedulingFilter schedulingFilter,
-      JobUpdateLauncher jobUpdater) {
+      Driver driver,
+      SchedulingFilter schedulingFilter,
+      Function<String, TwitterTaskInfo> updaterTaskBuilder) {
     // The immediate scheduler will accept any job, so it's important that other schedulers are
     // placed first.
-    jobManagers = Arrays.asList(cronScheduler, immediateScheduler);
+    this.jobManagers = Arrays.asList(checkNotNull(cronScheduler), checkNotNull(immediateScheduler));
     this.persistenceLayer = checkNotNull(persistenceLayer);
-    this.executorTracker = checkNotNull(executorTracker);
     this.driver = checkNotNull(driver);
     this.schedulingFilter = checkNotNull(schedulingFilter);
-    this.jobUpdater = checkNotNull(jobUpdater);
+    this.updaterTaskBuilder = checkNotNull(updaterTaskBuilder);
 
     restore();
   }
@@ -91,16 +114,6 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
   public void registered(String frameworkId) {
     this.frameworkId.set(checkNotNull(frameworkId));
     persist();
-
-    executorTracker.start(new Closure<String>() {
-      @Override public void execute(String slaveId) {
-        LOG.info("Sending restart request to executor " + slaveId);
-        ExecutorMessage message = new ExecutorMessage();
-        message.setRestartExecutor(new RestartExecutor());
-
-        driver.sendMessage(new Message(slaveId, message));
-      }
-    });
   }
 
   @Override
@@ -127,7 +140,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
     return new StringBuilder()
         .append(System.currentTimeMillis())      // Allows chronological sorting.
         .append("-")
-        .append(Tasks.jobKey(task))              // Identification and collision prevention.
+        .append(jobKey(task))              // Identification and collision prevention.
         .append("-")
         .append(task.getShardId())               // Collision prevention within job.
         .append("-")
@@ -196,7 +209,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
     if (!deadTasks.isEmpty()) {
       LOG.info("Found tasks that were recorded as RUNNING but slave " + update.getSlaveHost()
                + " reports as KILLED: " + deadTasks);
-      mutated.set(true);
+      // We don't set mutated here, since it is implicit in changing task state.
 
       for (String deadTask : deadTasks) {
         final ScheduleStatus status = taskInfoMap.get(deadTask).getStatus();
@@ -378,7 +391,8 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
           transform(existingTasks.values(), Tasks.ASSIGNED_TO_INFO));
 
       try {
-        jobUpdater.launchUpdater(registerUpdate(updateFrom, updatedTasks));
+        launchUpdater(job.getOwner(), job.getName(),
+            registerUpdate(job.getUpdateConfig(), updateFrom, updatedTasks));
         return UPDATER_LAUNCHED;
       } catch (UpdateException e) {
         LOG.log(Level.WARNING, "Failed to register update for " + jobKey(job), e);
@@ -416,6 +430,18 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
     }
 
     return COMPLETED;
+  }
+
+  private void launchUpdater(String owner, String updatingJobName, String updateToken) {
+    TwitterTaskInfo baseUpdaterTask = updaterTaskBuilder.apply(updateToken);
+    Preconditions.checkNotNull(baseUpdaterTask, "Unable to get updater task.");
+
+    TwitterTaskInfo updaterTask = baseUpdaterTask.deepCopy()
+        .setOwner(owner)
+        .setJobName(updatingJobName + ".updater");
+    ConfigurationManager.applyDefaultsIfUnset(updaterTask);
+
+    launchTasks(ImmutableSet.of(updaterTask));
   }
 
   /**
@@ -471,9 +497,8 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
 
     // TODO(wfarner): Remove this hack once mesos core does not read parameters.
     Map<String, String> params = ImmutableMap.of(
-      "cpus", String.valueOf((int) task.getAssignedTask().getTask().getNumCpus()),
-      "mem", String.valueOf(task.getAssignedTask().getTask().getRamMb())
-    );
+        "cpus", String.valueOf((int) task.getAssignedTask().getTask().getNumCpus()),
+        "mem", String.valueOf(task.getAssignedTask().getTask().getRamMb()));
 
     AssignedTask assignedTask = task.getAssignedTask();
     LOG.info(String.format("Offer on slave %s (id %s) is being assigned task for %s.",
@@ -614,8 +639,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
 
     taskStore.mutate(query, mutateOperation);
 
-    if (newTasks.isEmpty()) return;
-    scheduleTaskCopies(newTasks);
+    if (!newTasks.isEmpty()) scheduleTaskCopies(newTasks);
     persist();
   }
 
@@ -659,12 +683,15 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
 
   private static class JobUpdate {
     final String jobKey;
+    private final UpdateConfig updateConfig;
     final Map<Integer, TwitterTaskInfo> updateFromByShard;
     final Map<Integer, TwitterTaskInfo> updateToByShard;
 
-    JobUpdate(String jobKey, Map<Integer, TwitterTaskInfo> updateFromByShard,
+    JobUpdate(String jobKey, UpdateConfig updateConfig,
+        Map<Integer, TwitterTaskInfo> updateFromByShard,
         Map<Integer, TwitterTaskInfo> updateToByShard) {
       this.jobKey = jobKey;
+      this.updateConfig = updateConfig;
       this.updateFromByShard = updateFromByShard;
       this.updateToByShard = updateToByShard;
     }
@@ -684,7 +711,8 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
     }
   };
 
-  @VisibleForTesting String registerUpdate(Map<Integer, TwitterTaskInfo> updateFromByShard,
+  @VisibleForTesting synchronized String registerUpdate(UpdateConfig updateConfig,
+      Map<Integer, TwitterTaskInfo> updateFromByShard,
       Map<Integer, TwitterTaskInfo> updateToByShard) throws UpdateException {
     checkNotNull(updateFromByShard);
     checkNotNull(updateToByShard);
@@ -715,9 +743,25 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
         .append((UUID.randomUUID()))
         .toString();
 
-    updatesInProgress.put(updateToken, new JobUpdate(jobKey, updateFromByShard, updateToByShard));
+    updatesInProgress.put(updateToken,
+        new JobUpdate(jobKey, updateConfig, updateFromByShard, updateToByShard));
 
     return updateToken;
+  }
+
+  @Override
+  public synchronized UpdateConfigResponse getUpdateConfig(String updateToken)
+      throws UpdateException {
+    checkNotBlank(updateToken);
+
+    JobUpdate update = updatesInProgress.get(updateToken);
+    if (update == null) {
+      throw new UpdateException("Update token not recognized " + updateToken);
+    }
+
+    return new UpdateConfigResponse().setConfig(update.updateConfig)
+        .setOldShards(update.updateFromByShard.keySet())
+        .setNewShards(update.updateToByShard.keySet());
   }
 
   @Override

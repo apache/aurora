@@ -27,7 +27,6 @@ import com.twitter.mesos.executor.ProcessKiller.KillException;
 import com.twitter.mesos.executor.httphandlers.ExecutorHome;
 import com.twitter.mesos.executor.httphandlers.TaskHome;
 import com.twitter.mesos.gen.AssignedTask;
-import com.twitter.mesos.scheduler.ExecutorRootDir;
 import com.twitter.mesos.util.HdfsUtil;
 import mesos.Executor;
 import org.apache.hadoop.fs.FileSystem;

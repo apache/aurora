@@ -28,6 +28,7 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -78,6 +79,9 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
         usage = "Map of machine hosts to job keys."
                 + "  If A maps to B, only B can run on A and B can only run on A.")
     public Map<String, String> machineRestrictions = Maps.newHashMap();
+
+    @Option(name = "job_updater_hdfs_path", usage = "HDFS path to the job updater package.")
+    public String jobUpdaterHdfsPath = "/user/mesos/bin/mesos-updater.zip";
   }
 
   private static Logger LOG = Logger.getLogger(SchedulerMain.class.getName());
@@ -105,10 +109,9 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
       } catch (UpdateException e) {
         LOG.log(Level.WARNING, "Failed to leave server set.", e);
       } finally {
-        halt();
+        scheduler.stop();
         destroy();
         // TODO(wfarner): This seems necessary to break out of the blocking driver run.
-        // TODO(wfarner): This should really notify the SchedulerCoreImpl and cleanly shut down
         System.exit(1);
       }
     }
@@ -121,15 +124,12 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
   @Inject private SingletonService schedulerService;
   @Inject private SchedulerThriftInterface schedulerThriftInterface;
   @Inject private SchedulerDriver driver;
+  @Inject private AtomicReference<InetSocketAddress> schedulerThriftPort;
   @Inject private SchedulerCore scheduler;
 
   @Override
   protected Iterable<Class<? extends Module>> getProcessModuleClasses() {
     return ImmutableList.<Class<? extends Module>>of(SchedulerModule.class);
-  }
-
-  private void halt() {
-    scheduler.stop();
   }
 
   @Override
@@ -147,6 +147,9 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
       LOG.log(Level.SEVERE, "Interrupted while starting thrift server.", e);
     }
     if (port == -1) return;
+
+    // TODO(wfarner): This is a bit of a hack, clean it up, maybe by exposing the thrift interface.
+    schedulerThriftPort.set(new InetSocketAddress(port));
 
     if (schedulerService != null) {
       try {

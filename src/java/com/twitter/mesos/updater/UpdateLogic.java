@@ -1,24 +1,23 @@
 package com.twitter.mesos.updater;
 
-import com.google.common.base.Function;
-import com.google.common.base.Predicates;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
+import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.common.util.StateMachine;
 import com.twitter.mesos.gen.UpdateConfig;
-import com.twitter.mesos.updater.ConfigParser.UpdateConfigException;
 
-import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
+import static com.twitter.mesos.updater.UpdateCommand.Type.ROLLBACK_TASK;
+import static com.twitter.mesos.updater.UpdateCommand.Type.UPDATE_TASK;
 import static com.twitter.mesos.updater.UpdateLogic.State.*;
-import static com.twitter.mesos.updater.UpdateLogic.UpdateCommand.Type.ROLLBACK_TASK;
-import static com.twitter.mesos.updater.UpdateLogic.UpdateCommand.Type.UPDATE_TASK;
 
 /**
  * Abstract logic for the mesos updater.
@@ -29,40 +28,10 @@ public class UpdateLogic {
 
   private static final Logger LOG = Logger.getLogger(UpdateLogic.class.getName());
 
-  private final Function<UpdateCommand, Map<Integer, Boolean>> commandRunner;
-  private final Set<Integer> updateTasks;
+  private final ExceptionalFunction<UpdateCommand, Integer, UpdateException> commandRunner;
+  private final Set<Integer> newShards;
   private final UpdateConfig config;
-
-  static class UpdateCommand {
-    static enum Type {
-      UPDATE_TASK,
-      ROLLBACK_TASK
-    }
-
-    final Type type;
-    final Set<Integer> ids;
-    final int updateWatchSecs;
-
-    UpdateCommand(Type type, Set<Integer> ids, int updateWatchSecs) {
-      this.type = type;
-      this.ids = ids;
-      this.updateWatchSecs = updateWatchSecs;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (!(o instanceof UpdateCommand)) return false;
-      UpdateCommand that = (UpdateCommand) o;
-      return this.type == that.type && this.ids.equals(that.ids)
-             && this.updateWatchSecs == that.updateWatchSecs;
-    }
-
-    @Override
-    public String toString() {
-      return "UpdateCommand{" + "type=" + type + ", ids=" + ids + ", updateWatchSecs="
-             + updateWatchSecs + '}';
-    }
-  }
+  private final Set<Integer> oldShards;
 
   /**
    * Creates a new update logic.
@@ -73,13 +42,21 @@ public class UpdateLogic {
    * TODO(wfarner): Need to make sure to issue a kill command to shards that are being removed.
    *
    */
-  public UpdateLogic(Set<Integer> updateTasks, UpdateConfig config,
-      Function<UpdateCommand, Map<Integer, Boolean>> commandRunner) throws UpdateConfigException {
-    ConfigParser.parseAndVerify(config);
-
-    this.updateTasks = checkNotBlank(updateTasks);
+  public UpdateLogic(Set<Integer> oldShards, Set<Integer> newShards, UpdateConfig config,
+      ExceptionalFunction<UpdateCommand, Integer, UpdateException> commandRunner) {
+    this.oldShards = checkNotBlank(oldShards);
+    this.newShards = checkNotBlank(newShards);
     this.config = checkNotNull(config);
     this.commandRunner = checkNotNull(commandRunner);
+  }
+
+  public static class UpdateException extends Exception {
+    public UpdateException(String msg) {
+      super(msg);
+    }
+    public UpdateException(String msg, Throwable cause) {
+      super(msg, cause);
+    }
   }
 
   /**
@@ -98,84 +75,93 @@ public class UpdateLogic {
     return stateMachine.getState() == COMPLETE_SUCCESS;
   }
 
-  // An iterable that will consume from a queue of tasks being operated on in the current stage.
+  // An iterable that will consume from a queue of shards being operated on in the current stage.
   // Be careful when reading from this, since the objects are removed.
   Iterable<Integer> consumingIds;
 
   int totalFailures = 0;
 
   private void step(StateMachine<State> stateMachine) throws InterruptedException {
-    switch (stateMachine.getState()) {
-      case INIT:
-        LOG.info("Initiating update.");
-        consumingIds = Iterables.consumingIterable(new PriorityQueue<Integer>(updateTasks));
-        stateMachine.transition(CANARY);
-        break;
+    try {
+      switch (stateMachine.getState()) {
+        case INIT:
+          LOG.info("Initiating update.");
+          consumingIds = Iterables.consumingIterable(new PriorityQueue<Integer>(newShards));
+          stateMachine.transition(CANARY);
+          break;
 
-      case CANARY:
-        int failures = restartTasks(UPDATE_TASK, config.getCanaryTaskCount(),
-            config.getCanaryWatchDurationSecs());
-        if (failures > config.getToleratedCanaryFailures()) {
-          stateMachine.transition(PREPARE_ROLLBACK);
-        } else {
-          stateMachine.transition(UPDATE_BATCH);
-        }
-        break;
-
-      case UPDATE_BATCH:
-        if (Iterables.isEmpty(consumingIds)) {
-          stateMachine.transition(COMPLETE_SUCCESS);
-        } else {
-          restartTasks(UPDATE_TASK, config.getUpdateBatchSize(),
-              config.getUpdateWatchDurationSecs());
-          if (totalFailures > config.getToleratedUpdateFailures()) {
+        case CANARY:
+          int failures = restartShards(UPDATE_TASK, config.getCanaryTaskCount(),
+              config.getToleratedCanaryFailures() - totalFailures,
+                config.getCanaryWatchDurationSecs());
+          if (failures > config.getToleratedCanaryFailures()) {
             stateMachine.transition(PREPARE_ROLLBACK);
+          } else {
+            stateMachine.transition(UPDATE_BATCH);
           }
-        }
-        break;
+          break;
 
-      case PREPARE_ROLLBACK:
-        LOG.info("Preparing for rollback.");
-        consumingIds = Iterables.consumingIterable(new PriorityQueue<Integer>(
-            Sets.difference(updateTasks, ImmutableSet.copyOf(consumingIds))));
-        stateMachine.transition(ROLLBACK_BATCH);
-        break;
+        case UPDATE_BATCH:
+          if (Iterables.isEmpty(consumingIds)) {
+            stateMachine.transition(COMPLETE_SUCCESS);
+          } else {
+            restartShards(UPDATE_TASK, config.getUpdateBatchSize(),
+                config.getToleratedUpdateFailures() - totalFailures,
+                config.getUpdateWatchDurationSecs());
+            if (totalFailures > config.getToleratedUpdateFailures()) {
+              stateMachine.transition(PREPARE_ROLLBACK);
+            }
+          }
+          break;
 
-      case ROLLBACK_BATCH:
-        if (Iterables.isEmpty(consumingIds)) {
-          stateMachine.transition(COMPLETE_FAILED);
-        } else {
-          // TODO(wfarner): Can/should we do anything if this fails?
-          restartTasks(ROLLBACK_TASK, config.getUpdateBatchSize(),
-              config.getUpdateWatchDurationSecs());
-        }
-        break;
+        case PREPARE_ROLLBACK:
+          LOG.info("Preparing for rollback.");
+          consumingIds = Iterables.consumingIterable(new PriorityQueue<Integer>(
+              Sets.difference(oldShards, ImmutableSet.copyOf(consumingIds))));
+          stateMachine.transition(ROLLBACK_BATCH);
+          break;
 
-      default:
-        throw new RuntimeException("Unhandled state " + stateMachine.getState());
+        case ROLLBACK_BATCH:
+          if (Iterables.isEmpty(consumingIds)) {
+            stateMachine.transition(COMPLETE_FAILED);
+          } else {
+            // TODO(wfarner): Can/should we do anything if this fails?
+            restartShards(ROLLBACK_TASK, config.getUpdateBatchSize(), Integer.MAX_VALUE,
+                config.getUpdateWatchDurationSecs());
+          }
+          break;
+
+        default:
+          throw new IllegalStateException("Unhandled state " + stateMachine.getState());
+      }
+    } catch (UpdateException e) {
+      LOG.log(Level.SEVERE, "Update failed.", e);
     }
   }
 
   /**
-   * Performs a restart on a batch of tasks, and updates the total failure count.
+   * Performs a restart on a batch of shards, and updates the total failure count.
    *
    * @param type The type of update to issue.
-   * @param numTasks Number of tasks to pull from the queue.
-   * @param updateWatchSecs Duration that the task must survive to be considered a success.
-   * @return The number of tasks that did not survive the watch period.
+   * @param numShards Number of shards to pull from the queue.
+   * @param toleratedFailures The number of tolerated failures in this batch.
+   * @param updateWatchDurationSecs The number of seconds that new tasks must survive to be
+   *    considered successfully updated.
+   * @return The number of shards that did not survive the watch period.
+   * @throws UpdateException If the restart attempt failed.
    */
-  private int restartTasks(UpdateCommand.Type type, int numTasks, int updateWatchSecs) {
-    Set<Integer> ids = ImmutableSet.copyOf(Iterables.limit(consumingIds, numTasks));
-    LOG.info(String.format("Issuing %s on tasks %s", type, ids));
+  private int restartShards(UpdateCommand.Type type, int numShards, int toleratedFailures,
+      int updateWatchDurationSecs) throws UpdateException {
+    Preconditions.checkArgument(numShards > 0, "Restart of zero shards does not make sense.");
 
-    // TODO(wfarner): Also supply the number of remaining tolerated failures so that a batch of
-    // 10 can fail quickly if only one tolerated failure remains.
-    Map<Integer, Boolean> results = commandRunner.apply(
-        new UpdateCommand(type, ids, updateWatchSecs));
+    Set<Integer> ids = ImmutableSet.copyOf(Iterables.limit(consumingIds, numShards));
+    LOG.info(String.format("Issuing %s on shards %s", type, ids));
 
-    int failures = Iterables.size(Iterables.filter(results.values(), Predicates.equalTo(false)));
-    totalFailures += failures;
-    return failures;
+    int newFailures = commandRunner.apply(new UpdateCommand(type, ids,
+        config.getRestartTimeoutSecs(), updateWatchDurationSecs, toleratedFailures));
+
+    totalFailures += newFailures;
+    return newFailures;
   }
 
   static enum State {

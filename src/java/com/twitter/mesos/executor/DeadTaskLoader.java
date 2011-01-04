@@ -10,7 +10,6 @@ import com.google.inject.Inject;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.executor.TaskOnDisk.TaskStorageException;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.ExecutorRootDir;
 import org.apache.commons.lang.StringUtils;
 
 import java.io.File;

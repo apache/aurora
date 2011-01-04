@@ -1,6 +1,7 @@
 package com.twitter.mesos.scheduler;
 
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.UpdateConfigResponse;
 import com.twitter.mesos.scheduler.JobManager.JobUpdateResult;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 
@@ -12,6 +13,8 @@ import java.util.Set;
  * @author wfarner
  */
 public interface UpdateScheduler {
+
+  public UpdateConfigResponse getUpdateConfig(String updateToken) throws UpdateException;
 
   /**
    * Triggers an update to a job.

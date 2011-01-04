@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
  */
 public class ConfigurationManager {
 
-  private static final Pattern GOOD_IDENTIFIER_PATTERN = Pattern.compile("[\\w-]+");
+  private static final Pattern GOOD_IDENTIFIER_PATTERN = Pattern.compile("[\\w\\-\\.]+");
 
   private static boolean isGoodIdentifier(String identifier) {
     return GOOD_IDENTIFIER_PATTERN.matcher(identifier).matches();

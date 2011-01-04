@@ -45,6 +45,10 @@ public class ConfigParser {
         new Field("update_watch_secs", 30, POSITIVE) {
           @Override void set(int value) { config.setUpdateWatchDurationSecs(value); }
           @Override boolean isAlreadySet() { return config.isSetUpdateWatchDurationSecs(); }
+        },
+        new Field("restart_timeout_secs", 30, POSITIVE) {
+          @Override void set(int value) { config.setRestartTimeoutSecs(value); }
+          @Override boolean isAlreadySet() { return config.isSetRestartTimeoutSecs(); }
         }
     );
 

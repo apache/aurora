@@ -1,15 +1,22 @@
 package com.twitter.mesos.scheduler;
 
+import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
-import com.google.inject.*;
+import com.google.common.base.Supplier;
+import com.google.inject.AbstractModule;
+import com.google.inject.Inject;
+import com.google.inject.Key;
+import com.google.inject.Provides;
+import com.google.inject.Singleton;
+import com.google.inject.TypeLiteral;
 import com.google.inject.name.Names;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.mesos.gen.NonVolatileSchedulerState;
+import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.Driver.MesosDriverImpl;
-import com.twitter.mesos.scheduler.JobUpdateLauncher.JobUpdateLauncherImpl;
 import com.twitter.mesos.scheduler.SchedulingFilter.SchedulingFilterImpl;
 import com.twitter.mesos.scheduler.httphandlers.Mname;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzHome;
@@ -25,7 +32,9 @@ import mesos.Protos.FrameworkID;
 import mesos.SchedulerDriver;
 
 import javax.annotation.Nullable;
+import java.net.InetSocketAddress;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -49,6 +58,8 @@ public class SchedulerModule extends AbstractModule {
     bind(SingletonService.class).toInstance(
         new SingletonService(zkClient, options.mesosSchedulerNameSpec));
     // MesosSchedulerDriver handled in provider.
+    bind(new TypeLiteral<AtomicReference<AtomicReference<InetSocketAddress>>>() {})
+        .in(Singleton.class);
 
     // Bindings for MesosSchedulerImpl.
     bind(SchedulerCore.class).to(SchedulerCoreImpl.class).in(Singleton.class);
@@ -60,7 +71,7 @@ public class SchedulerModule extends AbstractModule {
     // PersistenceLayer handled in provider.
     bind(Driver.class).to(MesosDriverImpl.class).in(Singleton.class);
     bind(SchedulingFilter.class).to(SchedulingFilterImpl.class);
-    bind(JobUpdateLauncher.class).to(JobUpdateLauncherImpl.class).in(Singleton.class);
+    // updaterTaskProvider handled in provider.
 
     // Bindings for SchedulingFilterImpl.
     bind(Key.get(new TypeLiteral<Map<String, String>>() {},
@@ -73,6 +84,27 @@ public class SchedulerModule extends AbstractModule {
     registerServlet(binder(), "/schedulerz/user", SchedulerzUser.class, true);
     registerServlet(binder(), "/schedulerz/job", SchedulerzJob.class, true);
     registerServlet(binder(), "/mname", Mname.class, false);
+  }
+
+  @Provides
+  Function<String, TwitterTaskInfo> provideUpdateTaskSupplier(
+      final AtomicReference<InetSocketAddress> schedulerThriftPort) {
+    return new Function<String, TwitterTaskInfo>() {
+      @Override public TwitterTaskInfo apply(String updateToken) {
+        InetSocketAddress thriftPort = schedulerThriftPort.get();
+        if (thriftPort == null) return null;
+
+        String schedulerAddress = thriftPort.getHostName() + ":" + thriftPort.getPort();
+
+        return new TwitterTaskInfo()
+            .setHdfsPath(options.jobUpdaterHdfsPath)
+            .setShardId(0)
+            .setStartCommand(
+                "unzip mesos-updater.zip;"
+                + " java -cp dist/mesos-updater.jar:target/mesos-updater/lib/*.jar"
+                + " --scheduler_address=" + schedulerAddress + " --update_token=" + updateToken);
+      }
+    };
   }
 
   @Provides
