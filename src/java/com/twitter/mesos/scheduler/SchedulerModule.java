@@ -58,8 +58,7 @@ public class SchedulerModule extends AbstractModule {
     bind(SingletonService.class).toInstance(
         new SingletonService(zkClient, options.mesosSchedulerNameSpec));
     // MesosSchedulerDriver handled in provider.
-    bind(new TypeLiteral<AtomicReference<AtomicReference<InetSocketAddress>>>() {})
-        .in(Singleton.class);
+    bind(new TypeLiteral<AtomicReference<InetSocketAddress>>() {}).in(Singleton.class);
 
     // Bindings for MesosSchedulerImpl.
     bind(SchedulerCore.class).to(SchedulerCoreImpl.class).in(Singleton.class);
@@ -92,7 +91,10 @@ public class SchedulerModule extends AbstractModule {
     return new Function<String, TwitterTaskInfo>() {
       @Override public TwitterTaskInfo apply(String updateToken) {
         InetSocketAddress thriftPort = schedulerThriftPort.get();
-        if (thriftPort == null) return null;
+        if (thriftPort == null) {
+          LOG.severe("Scheduler thrift port requested for updater before it was set!");
+          return null;
+        }
 
         String schedulerAddress = thriftPort.getHostName() + ":" + thriftPort.getPort();
 
