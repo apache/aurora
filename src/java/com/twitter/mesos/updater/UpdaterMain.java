@@ -54,7 +54,7 @@ public class UpdaterMain extends GuicedProcess<Options, RuntimeException> {
     return ImmutableList.<Class<? extends Module>>of(UpdaterModule.class);
   }
 
-  class UpdaterModule extends AbstractModule {
+  static class UpdaterModule extends AbstractModule {
     private final Options options;
 
     @Inject UpdaterModule(Options options) {
