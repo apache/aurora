@@ -16,7 +16,6 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.thrift.ThriftFactory;
 import com.twitter.mesos.gen.MesosSchedulerManager.Iface;
-import com.twitter.mesos.scheduler.SchedulerModule;
 import com.twitter.mesos.updater.UpdaterMain.Options;
 
 /**
