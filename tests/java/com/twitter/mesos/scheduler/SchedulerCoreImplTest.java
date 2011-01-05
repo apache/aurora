@@ -1,5 +1,11 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
@@ -28,16 +34,10 @@ import com.twitter.mesos.scheduler.UpdateScheduler.UpdateException;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import com.twitter.mesos.scheduler.persistence.PersistenceLayer;
+
 import org.easymock.Capture;
-import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
-
-import java.util.Arrays;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 import static com.twitter.mesos.gen.ScheduleStatus.*;
 import static org.easymock.EasyMock.*;
@@ -1134,6 +1134,44 @@ public class SchedulerCoreImplTest extends EasyMockTest {
   }
 
   @Test
+  public void testFinishUpdate() throws Exception {
+    expectRestore();
+
+    control.replay();
+    buildScheduler();
+
+    TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
+    task.putToConfiguration("start_command", "echo 'hello'");
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, task, 1);
+
+    String newCommand = "echo 'hi'";
+    TwitterTaskInfo updatedTask = new TwitterTaskInfo(DEFAULT_TASK);
+    updatedTask.putToConfiguration("start_command", newCommand);
+    JobConfiguration updatedJob = ConfigurationManager.validateAndPopulate(
+        makeJob(OWNER_A, JOB_A, updatedTask, 10));
+
+    Map<Integer, TwitterTaskInfo> updateFrom = Tasks.mapInfoByShardId(
+        ConfigurationManager.validateAndPopulate(job).getTaskConfigs());
+    Map<Integer, TwitterTaskInfo> updateTo = Tasks.mapInfoByShardId(updatedJob.getTaskConfigs());
+
+    scheduler.registerUpdate(new UpdateConfig(), updateFrom, updateTo);
+    scheduler.updateFinished(OWNER_A, JOB_A);
+
+    // Register the update again.  If the previous update was not removed, this will fail.
+    scheduler.registerUpdate(new UpdateConfig(), updateFrom, updateTo);
+  }
+
+  @Test(expected = UpdateException.class)
+  public void testFinishUnrecognizedUpdate() throws Exception {
+    expectRestore();
+
+    control.replay();
+    buildScheduler();
+
+    scheduler.updateFinished(OWNER_A, JOB_A);
+  }
+
+  @Test
   public void testRollingUpdate() throws Exception {
     expectRestore();
     expectPersists(17);
@@ -1141,7 +1179,6 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     expect(driver.killTask((String) anyObject())).andReturn(0);
     expect(driver.killTask((String) anyObject())).andReturn(0);
     expect(driver.killTask((String) anyObject())).andReturn(0);
-
 
     control.replay();
     buildScheduler();
@@ -1211,7 +1248,6 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     expect(driver.killTask((String) anyObject())).andReturn(0);
     expect(driver.killTask((String) anyObject())).andReturn(0);
     expect(driver.killTask((String) anyObject())).andReturn(0);
-
 
     control.replay();
     buildScheduler();
@@ -1307,7 +1343,6 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     expect(driver.killTask((String) anyObject())).andReturn(0);
     expect(driver.killTask((String) anyObject())).andReturn(0);
 
-
     control.replay();
     buildScheduler();
 
@@ -1365,7 +1400,6 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     expect(driver.killTask((String) anyObject())).andReturn(0);
     expect(driver.killTask((String) anyObject())).andReturn(0);
     expect(driver.killTask((String) anyObject())).andReturn(0);
-
 
     control.replay();
     buildScheduler();
@@ -1431,7 +1465,6 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     expect(driver.killTask((String) anyObject())).andReturn(0);
     expect(driver.killTask((String) anyObject())).andReturn(0);
 
-
     control.replay();
     buildScheduler();
 
@@ -1493,7 +1526,6 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     expect(driver.killTask((String) anyObject())).andReturn(0);
     expect(driver.killTask((String) anyObject())).andReturn(0);
     expect(driver.killTask((String) anyObject())).andReturn(0);
-
 
     control.replay();
     buildScheduler();

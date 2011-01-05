@@ -1,5 +1,9 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Map;
+import java.util.Set;
+import java.util.logging.Logger;
+
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -26,11 +30,8 @@ import com.twitter.mesos.scheduler.TaskStore.TaskState;
 import com.twitter.mesos.scheduler.UpdateScheduler.UpdateException;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
-import org.apache.commons.lang.StringUtils;
 
-import java.util.Map;
-import java.util.Set;
-import java.util.logging.Logger;
+import org.apache.commons.lang.StringUtils;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
@@ -186,6 +187,24 @@ class SchedulerThriftInterface extends ThriftServer implements MesosSchedulerMan
 
     try {
       schedulerCore.updateFinished(updateToken);
+    } catch (UpdateException e) {
+      response = INVALID_REQUEST;
+      message = e.getMessage();
+    }
+
+    return new UpdateCompleteResponse(response, message);
+  }
+
+  @Override
+  public UpdateCompleteResponse cancelUpdate(String owner, String jobName) {
+    checkNotBlank(owner, "Owner cannot be blank.");
+    checkNotBlank(jobName, "Job name cannot be blank.");
+
+    ResponseCode response = OK;
+    String message = "Update canceled.";
+
+    try {
+      schedulerCore.updateFinished(owner, jobName);
     } catch (UpdateException e) {
       response = INVALID_REQUEST;
       message = e.getMessage();

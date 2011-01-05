@@ -1,11 +1,11 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Set;
+
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.UpdateConfigResponse;
 import com.twitter.mesos.scheduler.JobManager.JobUpdateResult;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
-
-import java.util.Set;
 
 /**
  * Handles duties related to updating a job and receiving rolling updates.
@@ -38,5 +38,20 @@ public interface UpdateScheduler {
   public Set<String> updateShards(String updateToken, Set<Integer> restartShards, boolean rollBack)
       throws UpdateException;
 
+  /**
+   * Cancels an update by token.
+   *
+   * @param updateToken The token of the job update to cancel.
+   * @throws UpdateException If an update was not found matching the token.
+   */
   public void updateFinished(String updateToken) throws UpdateException;
+
+  /**
+   * Identical to {@link #updateFinished(String)}, but allows canceling by owner and job name.
+   *
+   * @param owner The owner of the job to cancel an update for.
+   * @param jobName The name of the job to cancel an update for.
+   * @throws UpdateException If an update was not found for the job spec.
+   */
+  public void updateFinished(String owner, String jobName) throws UpdateException;
 }

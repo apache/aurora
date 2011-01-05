@@ -1,5 +1,18 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
@@ -38,19 +51,6 @@ import com.twitter.mesos.scheduler.TaskStore.TaskState;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import com.twitter.mesos.scheduler.persistence.PersistenceLayer;
-
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Set;
-import java.util.SortedSet;
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -770,6 +770,16 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
 
     if (updatesInProgress.remove(updateToken) == null) {
       throw new UpdateException("Update token not recognized " + updateToken);
+    }
+  }
+
+  @Override public void updateFinished(String owner, String jobName) throws UpdateException {
+    checkNotBlank(owner);
+    checkNotBlank(jobName);
+
+    if (!Iterables.removeIf(transform(updatesInProgress.values(), getUpdateJobKey),
+        Predicates.equalTo(jobKey(owner, jobName)))) {
+      throw new UpdateException("No update in progress for job " + jobKey(owner, jobName));
     }
   }
 
