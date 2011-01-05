@@ -816,6 +816,8 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
     Query activeShardsQuery = new Query(
         new TaskQuery().setShardIds(restartShards).setJobKey(update.jobKey), Tasks.ACTIVE_FILTER);
     Set<TaskState> tasks = taskStore.fetch(activeShardsQuery);
+    Preconditions.checkState(tasks.size() <= restartShards.size(),
+        "Sanity check failed - too many tasks would be restarted.");
 
     // Mutate the stored task definitions.
     Set<String> taskIds = ImmutableSet.copyOf(transform(tasks, Tasks.STATE_TO_ID));
