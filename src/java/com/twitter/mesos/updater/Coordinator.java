@@ -130,6 +130,8 @@ public class Coordinator {
         throw new UpdateException("Failed to get status of " + restartedTaskIds, e);
       }
 
+      LOG.info("Latest task events: " + latestEvents);
+
       int failures = 0;
 
       int missingTasks = Sets.difference(restartedTaskIds, latestEvents.keySet()).size();

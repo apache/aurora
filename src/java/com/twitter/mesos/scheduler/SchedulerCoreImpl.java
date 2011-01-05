@@ -813,8 +813,8 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
     }
 
     // Get the shards that a restart is being requested for.
-    Query activeShardsQuery = new Query(new TaskQuery().setShardIds(restartShards),
-        Tasks.ACTIVE_FILTER);
+    Query activeShardsQuery = new Query(
+        new TaskQuery().setShardIds(restartShards).setJobKey(update.jobKey), Tasks.ACTIVE_FILTER);
     Set<TaskState> tasks = taskStore.fetch(activeShardsQuery);
 
     // Mutate the stored task definitions.
