@@ -1,5 +1,18 @@
 package com.twitter.mesos.scheduler;
 
+import java.io.File;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import javax.annotation.Nullable;
+
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -8,6 +21,7 @@ import com.google.inject.Inject;
 import com.google.inject.Module;
 import com.twitter.common.args.Option;
 import com.twitter.common.base.Command;
+import com.twitter.common.net.InetSocketAddressHelper;
 import com.twitter.common.process.GuicedProcess;
 import com.twitter.common.process.GuicedProcessOptions;
 import com.twitter.common.zookeeper.Group;
@@ -18,19 +32,10 @@ import com.twitter.common.zookeeper.SingletonService.LeadershipListener;
 import com.twitter.common.zookeeper.ZooKeeperUtils;
 import com.twitter.mesos.gen.MesosSchedulerManager;
 import com.twitter.thrift.Status;
-import mesos.SchedulerDriver;
+
 import org.apache.thrift.transport.TTransportException;
 
-import javax.annotation.Nullable;
-import java.io.File;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import mesos.SchedulerDriver;
 
 import static com.twitter.common.quantity.Time.SECONDS;
 
@@ -149,7 +154,12 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
     if (port == -1) return;
 
     // TODO(wfarner): This is a bit of a hack, clean it up, maybe by exposing the thrift interface.
-    schedulerThriftPort.set(new InetSocketAddress(port));
+    try {
+      schedulerThriftPort.set(InetSocketAddressHelper.getLocalAddress(port));
+    } catch (UnknownHostException e) {
+      LOG.severe("Unable to get local host address.");
+      Throwables.propagate(e);
+    }
 
     if (schedulerService != null) {
       try {

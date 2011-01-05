@@ -1,8 +1,14 @@
 package com.twitter.mesos.updater;
 
+import java.net.InetSocketAddress;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
+import com.google.inject.Module;
 import com.twitter.common.args.Option;
 import com.twitter.common.process.GuicedProcess;
 import com.twitter.common.process.GuicedProcessOptions;
@@ -10,11 +16,8 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.thrift.ThriftFactory;
 import com.twitter.mesos.gen.MesosSchedulerManager.Iface;
+import com.twitter.mesos.scheduler.SchedulerModule;
 import com.twitter.mesos.updater.UpdaterMain.Options;
-
-import java.net.InetSocketAddress;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Mesos updater, coordinates rolling restarts of tasks in a job.
@@ -46,6 +49,10 @@ public class UpdaterMain extends GuicedProcess<Options, RuntimeException> {
     } catch (Exception e) {
       LOG.log(Level.SEVERE, "Update failed.", e);
     }
+  }
+
+  @Override protected Iterable<Class<? extends Module>> getProcessModuleClasses() {
+    return ImmutableList.<Class<? extends Module>>of(UpdaterModule.class);
   }
 
   class UpdaterModule extends AbstractModule {

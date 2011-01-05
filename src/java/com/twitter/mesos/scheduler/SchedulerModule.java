@@ -1,8 +1,15 @@
 package com.twitter.mesos.scheduler;
 
+import java.net.InetSocketAddress;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import javax.annotation.Nullable;
+
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Supplier;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
 import com.google.inject.Key;
@@ -27,16 +34,10 @@ import com.twitter.mesos.scheduler.persistence.FileSystemPersistence;
 import com.twitter.mesos.scheduler.persistence.PersistenceLayer;
 import com.twitter.mesos.scheduler.persistence.PersistenceLayer.PersistenceException;
 import com.twitter.mesos.scheduler.persistence.ZooKeeperPersistence;
+
 import mesos.MesosSchedulerDriver;
 import mesos.Protos.FrameworkID;
 import mesos.SchedulerDriver;
-
-import javax.annotation.Nullable;
-import java.net.InetSocketAddress;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import static com.twitter.common.process.GuicedProcess.registerServlet;
 
@@ -103,8 +104,9 @@ public class SchedulerModule extends AbstractModule {
             .setShardId(0)
             .setStartCommand(
                 "unzip mesos-updater.zip;"
-                + " java -cp dist/mesos-updater.jar:target/mesos-updater/lib/*.jar"
-                + " --scheduler_address=" + schedulerAddress + " --update_token=" + updateToken);
+                + " java -cp mesos-updater.jar:libs/*.jar"
+                + " com.twitter.mesos.updater.UpdaterMain"
+                + " -scheduler_address=" + schedulerAddress + " -update_token=" + updateToken);
       }
     };
   }
