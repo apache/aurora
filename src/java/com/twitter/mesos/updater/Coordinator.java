@@ -1,5 +1,11 @@
 package com.twitter.mesos.updater;
 
+import java.util.EnumSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -22,13 +28,8 @@ import com.twitter.mesos.gen.UpdateConfig;
 import com.twitter.mesos.gen.UpdateConfigResponse;
 import com.twitter.mesos.updater.ConfigParser.UpdateConfigException;
 import com.twitter.mesos.updater.UpdateLogic.UpdateException;
-import org.apache.thrift.TException;
 
-import java.util.EnumSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.apache.thrift.TException;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
@@ -63,7 +64,8 @@ public class Coordinator {
 
       LOG.info("Fetched update configuration from scheduler: " + response);
 
-      UpdateConfig config = checkNotNull(response.getConfig());
+      UpdateConfig config = response.getConfig();
+      config = config == null ? new UpdateConfig() : config;
       ConfigParser.parseAndVerify(config);
       Set<Integer> oldShards = checkNotBlank(response.getOldShards());
       Set<Integer> newShards = checkNotBlank(response.getNewShards());
