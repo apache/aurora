@@ -420,6 +420,18 @@ public class LiveTask extends TaskOnDisk {
 
   public void terminate(ScheduleStatus terminalState) {
     LOG.info("Terminating " + this + " with status " + terminalState);
+
+    if (healthCheckExecutor != null) {
+      try {
+        if (!healthCheckExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+          healthCheckExecutor.shutdownNow();
+        }
+      } catch (InterruptedException e) {
+        LOG.info("Interrupted while shutting down health check executor.");
+        Thread.currentThread().interrupt();
+      }
+    }
+
     if (process == null) return;
     ScheduleStatus currentStatus = stateMachine.getState();
     if (Tasks.isTerminated(currentStatus)) {
@@ -437,17 +449,6 @@ public class LiveTask extends TaskOnDisk {
         LOG.log(Level.WARNING, "Failed to kill process " + this, e);
       } finally {
         cleanUp(process);
-      }
-    }
-
-    if (healthCheckExecutor != null) {
-      try {
-        if (!healthCheckExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
-          healthCheckExecutor.shutdownNow();
-        }
-      } catch (InterruptedException e) {
-        LOG.info("Interrupted while shutting down health check executor.");
-        Thread.currentThread().interrupt();
       }
     }
 
