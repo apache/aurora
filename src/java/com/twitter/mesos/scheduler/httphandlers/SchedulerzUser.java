@@ -1,5 +1,14 @@
 package com.twitter.mesos.scheduler.httphandlers;
 
+import java.io.IOException;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Logger;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
@@ -15,15 +24,11 @@ import com.twitter.mesos.scheduler.CronJobManager;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerCore;
 import com.twitter.mesos.scheduler.TaskStore.TaskState;
-import it.sauronsoftware.cron4j.Predictor;
-import org.antlr.stringtemplate.StringTemplate;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.util.Map;
-import java.util.logging.Logger;
+import org.antlr.stringtemplate.StringTemplate;
+import org.apache.hadoop.mapreduce.Job;
+
+import it.sauronsoftware.cron4j.Predictor;
 
 /**
  * HTTP interface to provide information about jobs for a specific mesos user.
@@ -46,26 +51,35 @@ public class SchedulerzUser extends StringTemplateServlet {
   }
 
   @Override
-  protected void doGet(final HttpServletRequest req, HttpServletResponse resp)
+  protected void doGet(final HttpServletRequest req, final HttpServletResponse resp)
       throws ServletException, IOException {
+
+    final String user = req.getParameter(USER_PARAM);
+    final String cronJobLaunched = req.getParameter(START_CRON_PARAM);
+    final AtomicReference<String> cronLaunchException = new AtomicReference<String>();
+    if (cronJobLaunched != null) {
+      if (!cronScheduler.hasJob(Tasks.jobKey(user, cronJobLaunched))) {
+        cronLaunchException.set("Unrecognized cron job " + cronJobLaunched);
+      } else {
+        LOG.info("Received web request to launch cron job " + user + "/" + cronJobLaunched);
+        cronScheduler.startJobNow(Tasks.jobKey(user, cronJobLaunched));
+        resp.sendRedirect("/schedulerz/user?user=" + user);
+      }
+    }
+
     writeTemplate(resp, new Closure<StringTemplate>() {
-      @Override public void execute(StringTemplate template) {
-        final String user = req.getParameter(USER_PARAM);
+      @Override
+      public void execute(StringTemplate template) {
+
         if (user == null) {
           template.setAttribute("exception", "Please specify a user.");
           return;
         }
         template.setAttribute("user", user);
 
-        final String cronJobLaunched = req.getParameter(START_CRON_PARAM);
-        if (cronJobLaunched != null) {
-          if (!cronScheduler.hasJob(Tasks.jobKey(user, cronJobLaunched))) {
-            template.setAttribute("exception", "Unrecognized cron job " + cronJobLaunched);
-            return;
-          }
-
-          LOG.info("Received web request to launch cron job " + user + "/" + cronJobLaunched);
-          cronScheduler.startJobNow(Tasks.jobKey(user, cronJobLaunched));
+        if (cronLaunchException.get() != null) {
+          template.setAttribute("exception", cronLaunchException);
+          return;
         }
 
         Map<String, Job> jobs = Maps.newHashMap();
@@ -125,7 +139,7 @@ public class SchedulerzUser extends StringTemplateServlet {
                 cronJob.nextRun = new Predictor(cronJob.cronSchedule).nextMatchingDate().toString();
                 return cronJob;
               }
-        });
+            });
 
         template.setAttribute("cronJobs", Lists.newArrayList(cronJobObjs));
       }
