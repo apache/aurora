@@ -46,7 +46,7 @@ public class LiveTaskTest {
   private static final String TASK_ID_A = "my-fake-task-id";
   private static final int SHARD_ID_A = 5;
   private static final TwitterTaskInfo TASK_A = new TwitterTaskInfo()
-      .setOwner("OWNER_A")
+      .setOwner(System.getProperty("user.name"))
       .setJobName("JOB_A")
       .setStartCommand("touch a.txt")
       .setShardId(SHARD_ID_A)
@@ -354,8 +354,10 @@ public class LiveTaskTest {
 
   private LiveTask makeTask(AssignedTask task, String taskId) {
     task.setTaskId(taskId);
-    return new LiveTask(socketManager, healthChecker, processKiller, pidFetcher,
+    LiveTask liveTask = new LiveTask(socketManager, healthChecker, processKiller, pidFetcher,
         new File(executorRoot, String.valueOf(task.getTaskId())), task, COPIER);
+    liveTask.disableMultiUser();
+    return liveTask;
   }
 
   private void assertDirContents(File dir, String... children) {

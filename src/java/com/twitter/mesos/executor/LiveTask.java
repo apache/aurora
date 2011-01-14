@@ -2,8 +2,10 @@ package com.twitter.mesos.executor;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Charsets;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Closeables;
@@ -222,6 +224,11 @@ public class LiveTask extends TaskOnDisk {
     return commandLine.replaceAll(SHARD_ID_REGEXP, String.valueOf(task.getTask().getShardId()));
   }
 
+  private boolean multiUser = true;
+  @VisibleForTesting void disableMultiUser() {
+    multiUser = false;
+  }
+
   @Override
   public void run() throws TaskRunException {
     LOG.info("Executing from working directory: " + sandboxDir);
@@ -249,9 +256,26 @@ public class LiveTask extends TaskOnDisk {
       healthCheckPort = leasedPorts.get(HEALTH_CHECK_PORT_NAME);
     }
 
+    List<String> commands = Lists.newArrayList();
+
+    // Create the pidfile.
+    commands.add("echo $$ > ../" + PIDFILE_NAME);
+
+    if (multiUser) {
+      String owner = task.getTask().getOwner();
+      LOG.info("Launching as user " + owner);
+      // chown the sandbox.
+      commands.add(String.format("chown -R %s .", owner));
+      // Run as the user.
+      commands.add(String.format("su %s -c \"bash %s\"", owner, RUN_SCRIPT_NAME));
+    } else {
+      // Execute the laucn script containing the user shell code.
+      commands.add("bash " + RUN_SCRIPT_NAME);
+    }
+
     List<String> commandLine = Arrays.asList(
         "bash", "-c",  // Read commands from the following string.
-        String.format("echo $$ > ../%s; bash %s", PIDFILE_NAME, RUN_SCRIPT_NAME)
+        Joiner.on("; ").join(commands)
     );
 
     LOG.info("Executing shell command: " + commandLine);
