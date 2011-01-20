@@ -89,7 +89,7 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
     public String jobUpdaterHdfsPath = "/user/mesos/bin/mesos-updater.zip";
   }
 
-  private static Logger LOG = Logger.getLogger(SchedulerMain.class.getName());
+  private static final Logger LOG = Logger.getLogger(SchedulerMain.class.getName());
 
   private final LeadershipListener leadershipListener = new LeadershipListener() {
     @Override public void onLeading(EndpointStatus status) {

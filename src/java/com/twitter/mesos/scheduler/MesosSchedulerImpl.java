@@ -184,6 +184,8 @@ class MesosSchedulerImpl implements Scheduler {
   @Override
   public void error(SchedulerDriver driver, int code, String message) {
     LOG.severe("Received error message: " + message + " with code " + code);
+    // TODO(wfarner): Exit cleanly.
+    System.exit(1);
   }
 
   @Override
