@@ -51,7 +51,7 @@ public class TaskHome extends StringTemplateServlet {
         TwitterTaskInfo taskInfo = task.getAssignedTask().getTask();
         template.setAttribute("taskInfo", taskInfo);
         template.setAttribute("leasedPorts", task.getResourceConsumption().getLeasedPorts());
-        template.setAttribute("taskDir", task.getRootDir());
+        template.setAttribute("taskDir", task.getSandboxDir());
       }
     });
   }
