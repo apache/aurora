@@ -90,7 +90,7 @@ public class LiveTaskTest {
     LiveTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
     assertDirContents(executorRoot, String.valueOf(TASK_ID_A));
-    assertDirContents(taskA.getRootDir(), SANDBOX_DIR_NAME, TASK_DUMP_FILE);
+    assertDirContents(taskA.taskRoot, SANDBOX_DIR_NAME, TASK_DUMP_FILE);
   }
 
   @Test
@@ -104,7 +104,7 @@ public class LiveTaskTest {
     taskA.stage();
     taskA.run();
     assertThat(taskA.blockUntilTerminated(), is(ScheduleStatus.FINISHED));
-    assertDirContents(taskA.getRootDir(), SANDBOX_DIR_NAME, PIDFILE_NAME, TASK_DUMP_FILE,
+    assertDirContents(taskA.taskRoot, SANDBOX_DIR_NAME, PIDFILE_NAME, TASK_DUMP_FILE,
         TASK_STATUS_FILE);
     assertDirContents(taskA.sandboxDir, "a.txt", RUN_SCRIPT_NAME, STDERR_CAPTURE_FILE,
         STDOUT_CAPTURE_FILE);
@@ -121,7 +121,7 @@ public class LiveTaskTest {
     taskA.stage();
     taskA.run();
     assertThat(taskA.blockUntilTerminated(), is(ScheduleStatus.FINISHED));
-    assertDirContents(taskA.getRootDir(), SANDBOX_DIR_NAME, PIDFILE_NAME, TASK_DUMP_FILE,
+    assertDirContents(taskA.taskRoot, SANDBOX_DIR_NAME, PIDFILE_NAME, TASK_DUMP_FILE,
         TASK_STATUS_FILE);
     assertDirContents(taskA.sandboxDir, RUN_SCRIPT_NAME, STDERR_CAPTURE_FILE, STDOUT_CAPTURE_FILE);
 
@@ -140,7 +140,7 @@ public class LiveTaskTest {
     taskA.stage();
     taskA.run();
     assertThat(taskA.blockUntilTerminated(), is(ScheduleStatus.FINISHED));
-    assertDirContents(taskA.getRootDir(), SANDBOX_DIR_NAME, PIDFILE_NAME, TASK_DUMP_FILE,
+    assertDirContents(taskA.taskRoot, SANDBOX_DIR_NAME, PIDFILE_NAME, TASK_DUMP_FILE,
         TASK_STATUS_FILE);
     assertDirContents(taskA.sandboxDir, RUN_SCRIPT_NAME, STDERR_CAPTURE_FILE, STDOUT_CAPTURE_FILE);
 

@@ -64,7 +64,6 @@ public class LiveTask extends TaskOnDisk {
   private static final Logger LOG = Logger.getLogger(LiveTask.class.getName());
 
   @VisibleForTesting static final String PIDFILE_NAME = "pidfile";
-  @VisibleForTesting static final String SANDBOX_DIR_NAME = "sandbox";
   @VisibleForTesting static final String RUN_SCRIPT_NAME = "run.sh";
   @VisibleForTesting static final String STDERR_CAPTURE_FILE = "stderr";
   @VisibleForTesting static final String STDOUT_CAPTURE_FILE = "stdout";
@@ -91,8 +90,6 @@ public class LiveTask extends TaskOnDisk {
 
   private int healthCheckPort = -1;
 
-  @VisibleForTesting final File sandboxDir;
-
   @VisibleForTesting protected final Map<String, Integer> leasedPorts = Maps.newHashMap();
 
   private Process process;
@@ -114,7 +111,6 @@ public class LiveTask extends TaskOnDisk {
     this.pidFetcher = Preconditions.checkNotNull(pidFetcher);
     this.task = Preconditions.checkNotNull(task);
 
-    sandboxDir = new File(taskRoot, SANDBOX_DIR_NAME);
     this.fileCopier = Preconditions.checkNotNull(fileCopier);
 
     stateMachine = StateMachine.<ScheduleStatus>builder(toString())
@@ -167,11 +163,6 @@ public class LiveTask extends TaskOnDisk {
   @Override
   public String getId() {
     return task.getTaskId();
-  }
-
-  @Override
-  public File getRootDir() {
-    return taskRoot;
   }
 
   @Override

@@ -49,11 +49,6 @@ public class DeadTask extends TaskOnDisk {
   }
 
   @Override
-  public File getRootDir() {
-    return taskRoot;
-  }
-
-  @Override
   public boolean isRunning() {
     return false;
   }
