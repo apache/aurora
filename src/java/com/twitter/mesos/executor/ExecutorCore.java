@@ -234,10 +234,11 @@ public class ExecutorCore implements TaskManager {
 
     Runnable syncer = new Runnable() {
       @Override public void run() {
-        if (slaveId.get() == null) return;
+        if (slaveId.get() == null) {
+          return;
+        }
 
-        ExecutorStatus status = new ExecutorStatus(baseStatus)
-            .setSlaveId(slaveId.get());
+        ExecutorStatus status = new ExecutorStatus(baseStatus).setSlaveId(slaveId.get());
 
         try {
           status.setDiskFreeKb(FileSystemUtils.freeSpaceKb(executorRootDir.getAbsolutePath()));

@@ -87,6 +87,7 @@ public interface Driver extends Function<Message, Integer> {
             return -1;
           }
 
+          LOG.info("Sending message to scheduler.");
           int result = driver.sendFrameworkMessage(messageBuilder.build());
           if (result != 0) {
             LOG.warning(String.format("Attempt to send executor message returned code %d: %s",

@@ -3,6 +3,7 @@ package com.twitter.mesos.executor.httphandlers;
 import com.google.inject.Inject;
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
+import com.twitter.common.thrift.Util;
 import com.twitter.mesos.executor.ExecutorCore;
 import com.twitter.mesos.executor.Task;
 import com.twitter.mesos.gen.TwitterTaskInfo;
@@ -22,11 +23,12 @@ public class TaskHome extends StringTemplateServlet {
 
   private static final String TASK_ID_PARAM = "task";
 
-  @Inject private ExecutorCore executor;
+  private final ExecutorCore executor;
 
   @Inject
-  public TaskHome(@CacheTemplates boolean cacheTemplates) {
+  public TaskHome(ExecutorCore executor, @CacheTemplates boolean cacheTemplates) {
     super("taskhome", cacheTemplates);
+    this.executor = executor;
   }
 
   @Override
@@ -45,13 +47,12 @@ public class TaskHome extends StringTemplateServlet {
           template.setAttribute("exception", "Task not found.");
           return;
         }
-
-        template.setAttribute("taskState", task.getScheduleStatus());
-
-        TwitterTaskInfo taskInfo = task.getAssignedTask().getTask();
-        template.setAttribute("taskInfo", taskInfo);
-        template.setAttribute("leasedPorts", task.getResourceConsumption().getLeasedPorts());
-        template.setAttribute("taskDir", task.getSandboxDir());
+        template.setAttribute("id", task.getId());
+        template.setAttribute("taskDir", task.getRootDir());
+        template.setAttribute("status", task.getScheduleStatus());
+        template.setAttribute("resourceConsumption",
+            Util.prettyPrint(task.getResourceConsumption()));
+        template.setAttribute("taskPretty", Util.prettyPrint(task.getAssignedTask()));
       }
     });
   }

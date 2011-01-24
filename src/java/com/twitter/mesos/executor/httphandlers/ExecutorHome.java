@@ -1,5 +1,7 @@
 package com.twitter.mesos.executor.httphandlers;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 import com.google.inject.Inject;
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
@@ -24,11 +26,12 @@ public class ExecutorHome extends StringTemplateServlet {
 
   private static final Logger LOG = Logger.getLogger(ExecutorHome.class.getName());
 
-  @Inject private ExecutorCore executor;
+  private final ExecutorCore executor;
 
   @Inject
-  public ExecutorHome(@CacheTemplates boolean cacheTemplates) {
+  public ExecutorHome(ExecutorCore executor, @CacheTemplates boolean cacheTemplates) {
     super("executorhome", cacheTemplates);
+    this.executor = executor;
   }
 
   @Override
@@ -42,7 +45,7 @@ public class ExecutorHome extends StringTemplateServlet {
           LOG.log(Level.SEVERE, "Failed to look up self hostname.", e);
         }
 
-        template.setAttribute("tasks", executor.getTasks());
+        template.setAttribute("tasks", ImmutableList.copyOf(executor.getTasks()));
       }
     });
   }

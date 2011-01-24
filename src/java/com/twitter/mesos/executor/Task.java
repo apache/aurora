@@ -23,7 +23,7 @@ public interface Task {
 
   public void terminate(ScheduleStatus terminalState);
 
-  public File getSandboxDir();
+  public File getRootDir();
 
   public AssignedTask getAssignedTask();
 

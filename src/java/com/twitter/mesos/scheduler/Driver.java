@@ -46,10 +46,13 @@ public interface Driver {
         return -1;
       }
 
+      LOG.info("Attempting to send message from scheduler to " + message.getSlaveId() + " - " + message.getMessage());
       int result = driver.sendFrameworkMessage(messageBuilder.build());
       if (result != 0) {
         LOG.severe(String.format("Attempt to send message failed with code %d [%s]",
             result, message));
+      } else {
+        LOG.info("Message successfully sent");
       }
       return result;
     }

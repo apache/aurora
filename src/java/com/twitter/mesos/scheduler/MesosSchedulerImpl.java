@@ -47,7 +47,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * @author wfarner
  */
 class MesosSchedulerImpl implements Scheduler {
-  private static Logger LOG = Logger.getLogger(MesosSchedulerImpl.class.getName());
+  private static final Logger LOG = Logger.getLogger(MesosSchedulerImpl.class.getName());
 
   private final SchedulerMain.TwitterSchedulerOptions options;
 
@@ -221,9 +221,9 @@ class MesosSchedulerImpl implements Scheduler {
     }
   }
 
-  private class Vars {
+  private static class Vars {
     final AtomicLong executorStatusUpdates = Stats.exportLong("executor_status_updates");
     final AtomicLong registeredTaskUpdates = Stats.exportLong("executor_registered_task_updates");
   }
-  private Vars vars = new Vars();
+  private final Vars vars = new Vars();
 }

@@ -8,6 +8,7 @@ import com.twitter.common.base.Closure;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.*;
 import com.twitter.mesos.scheduler.TaskStore.TaskState;
+
 import org.junit.Before;
 import org.junit.Test;
 

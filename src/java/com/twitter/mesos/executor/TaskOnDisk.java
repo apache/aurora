@@ -41,17 +41,13 @@ public abstract class TaskOnDisk implements Task {
   // Path to file for the serialized task status.
   @VisibleForTesting static final String TASK_STATUS_FILE = "task.status";
 
-  @VisibleForTesting static final String SANDBOX_DIR_NAME = "sandbox";
-
   // Reads the status value from a file.
   private static final FileToInt STATUS_FETCHER = new FileToInt();
 
-  @VisibleForTesting protected final File taskRoot;
-  @VisibleForTesting protected final File sandboxDir;
+  protected final File taskRoot;
 
   public TaskOnDisk(File taskRoot) {
     this.taskRoot = checkNotNull(taskRoot);
-    this.sandboxDir = new File(taskRoot, SANDBOX_DIR_NAME);
   }
 
   /**
@@ -137,11 +133,6 @@ public abstract class TaskOnDisk implements Task {
     }
 
     return state;
-  }
-
-  @Override
-  public File getSandboxDir() {
-    return sandboxDir;
   }
 
   public static class TaskStorageException extends Exception {
