@@ -17,10 +17,12 @@ import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 import com.google.inject.name.Names;
+
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
+import com.twitter.mesos.HttpResources;
 import com.twitter.mesos.gen.NonVolatileSchedulerState;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.Driver.MesosDriverImpl;
@@ -42,8 +44,8 @@ import mesos.SchedulerDriver;
 import static com.twitter.common.process.GuicedProcess.registerServlet;
 
 public class SchedulerModule extends AbstractModule {
-  private final static Logger LOG = Logger.getLogger(SchedulerModule.class.getName());
-  private SchedulerMain.TwitterSchedulerOptions options;
+  private static final Logger LOG = Logger.getLogger(SchedulerModule.class.getName());
+  private final SchedulerMain.TwitterSchedulerOptions options;
 
   @Inject
   public SchedulerModule(SchedulerMain.TwitterSchedulerOptions options) {
@@ -80,9 +82,10 @@ public class SchedulerModule extends AbstractModule {
 
     bind(MesosSchedulerImpl.class).in(Singleton.class);
 
-    registerServlet(binder(), "/schedulerz", SchedulerzHome.class, false);
-    registerServlet(binder(), "/schedulerz/user", SchedulerzUser.class, true);
-    registerServlet(binder(), "/schedulerz/job", SchedulerzJob.class, true);
+    HttpResources.register(binder());
+    registerServlet(binder(), "/scheduler", SchedulerzHome.class, false);
+    registerServlet(binder(), "/scheduler/user", SchedulerzUser.class, true);
+    registerServlet(binder(), "/scheduler/job", SchedulerzJob.class, true);
     registerServlet(binder(), "/mname", Mname.class, false);
   }
 
