@@ -70,9 +70,13 @@ public class SchedulerModule extends AbstractModule {
     // Bindings for SchedulerCoreImpl.
     bind(CronJobManager.class).in(Singleton.class);
     bind(ImmediateJobManager.class).in(Singleton.class);
+
     // PersistenceLayer handled in provider.
+    bind(TaskStore.class).to(MapTaskStore.class).in(Singleton.class);
+
     bind(Driver.class).to(MesosDriverImpl.class).in(Singleton.class);
     bind(SchedulingFilter.class).to(SchedulingFilterImpl.class);
+
     // updaterTaskProvider handled in provider.
 
     // Bindings for SchedulingFilterImpl.

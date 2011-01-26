@@ -6,18 +6,12 @@ import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
 import com.twitter.mesos.Tasks;
-import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.TaskQuery;
-import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.TaskStore.TaskState;
-import org.apache.commons.lang.StringUtils;
 
-import java.util.Collection;
 import java.util.Comparator;
-import java.util.Set;
-import java.util.SortedSet;
 
 import static org.apache.commons.lang.StringUtils.isEmpty;
 
@@ -26,10 +20,11 @@ import static org.apache.commons.lang.StringUtils.isEmpty;
  *
  * @author wfarner
  */
-public class Query implements Predicate<TaskState> {
+public class Query {
+  private static final Predicate<TaskState> NO_POST_FILTER = Predicates.alwaysTrue();
+
   private final TaskQuery baseQuery;
   private final Predicate<TaskState> filter;
-  private final Predicate<TaskState> fullFilter;
 
   /**
    * Creates a new query with the given base query and optional filters.
@@ -42,11 +37,9 @@ public class Query implements Predicate<TaskState> {
 
     this.baseQuery = Preconditions.checkNotNull(baseQuery);
     if (filters.length == 0) {
-      this.filter = null;
-      this.fullFilter = taskMatcher(baseQuery);
+      this.filter = NO_POST_FILTER;
     } else {
       this.filter = Predicates.and(filters);
-      this.fullFilter = Predicates.and(taskMatcher(baseQuery), filter);
     }
   }
 
@@ -60,24 +53,7 @@ public class Query implements Predicate<TaskState> {
   public static Query and(Query query, Predicate<TaskState> filter) {
     Preconditions.checkNotNull(query);
     Preconditions.checkNotNull(filter);
-    return new Query(query.base(), query.filter == null
-        ? filter : Predicates.<TaskState>and(query.filter, filter));
-  }
-
-  /**
-   * Creates a new query that composes an existing query with another task query.
-   *
-   * @param query Query to compose with another query.
-   * @param additionalQuery Query to add.
-   * @return A new query that will match the intersection of the provided queries.
-   */
-  public static Query and(Query query, TaskQuery additionalQuery) {
-    return and(query, taskMatcher(additionalQuery));
-  }
-
-  @Override
-  public boolean apply(TaskState task) {
-    return fullFilter.apply(task);
+    return new Query(query.base(), Predicates.<TaskState>and(query.filter, filter));
   }
 
   /**
@@ -87,6 +63,10 @@ public class Query implements Predicate<TaskState> {
    */
   public TaskQuery base() {
     return baseQuery;
+  }
+
+  public Predicate<TaskState> postFilter() {
+    return filter;
   }
 
   /**
@@ -105,7 +85,7 @@ public class Query implements Predicate<TaskState> {
    * @return {@code true} If the only filtering in this query is by job, {@code false} otherwise.
    */
   public boolean specifiesJobOnly() {
-    return specifiesJob() && (filter == null)
+    return specifiesJob() && (filter == NO_POST_FILTER)
            && (base().getStatusesSize() == 0) && (base().getTaskIdsSize() == 0);
   }
 
@@ -144,12 +124,8 @@ public class Query implements Predicate<TaskState> {
         Tasks.ACTIVE_FILTER);
   }
 
-  public static Query byStatus(ScheduleStatus... statuses) {
-    return new Query(new TaskQuery().setStatuses(ImmutableSet.copyOf(statuses)));
-  }
-
-  public static Query byStatus(Set<ScheduleStatus> statuses) {
-    return new Query(new TaskQuery().setStatuses(ImmutableSet.copyOf(statuses)));
+  public static Query byStatus(ScheduleStatus status) {
+    return new Query(new TaskQuery().setStatuses(ImmutableSet.of(status)));
   }
 
   public static Query activeQuery(String jobKey) {
@@ -164,39 +140,6 @@ public class Query implements Predicate<TaskState> {
     return activeQuery(job.getOwner(), job.getName());
   }
 
-  /**
-   * Returns a predicate that will match tasks against the given {@code query}.
-   *
-   * @param query The query to use for finding tasks.
-   * @return A predicate that will match tasks meeting the criteria in the query.
-   */
-  private static Predicate<TaskState> taskMatcher(final TaskQuery query) {
-    Preconditions.checkNotNull(query);
-    return new Predicate<TaskState>() {
-      private boolean matches(String query, String value) {
-        return StringUtils.isEmpty(query) || (value != null && value.matches(query));
-      }
-
-      private <T> boolean matches(Collection<T> collection, T item) {
-        return collection == null || collection.contains(item);
-      }
-
-      @Override public boolean apply(TaskState state) {
-        AssignedTask assigned = Preconditions.checkNotNull(state.task.getAssignedTask());
-        TwitterTaskInfo t = Preconditions.checkNotNull(assigned.getTask());
-        return matches(query.getOwner(), t.getOwner())
-            && matches(query.getJobName(), t.getJobName())
-            && matches(query.getJobKey(), Tasks.jobKey(t))
-            && matches(query.getTaskIds(), assigned.getTaskId())
-            && matches(query.getShardIds(), assigned.getTask().getShardId())
-            && matches(query.getStatuses(), state.task.getStatus())
-            // TODO(wfarner): Might have to be smarter here so as to not be burned by different
-            //    host names for the same machine. i.e. machine1, machine1.prod.twitter.com
-            && matches(query.getSlaveHost(), assigned.getSlaveHost());
-      }
-    };
-  }
-
   public static ImmutableSortedSet<TaskState> sortTasks(Iterable<TaskState> tasks,
       Comparator<TaskState> comparator) {
     return ImmutableSortedSet.copyOf(comparator, tasks);
@@ -206,13 +149,6 @@ public class Query implements Predicate<TaskState> {
     @Override public int compare(TaskState stateA, TaskState stateB) {
       return stateA.task.getAssignedTask().getTaskId().compareTo(
           stateB.task.getAssignedTask().getTaskId());
-    }
-  };
-
-  public static final Comparator<TaskState> SORT_BY_PRIORITY = new Comparator<TaskState>() {
-    @Override public int compare(TaskState stateA, TaskState stateB) {
-      return stateA.task.getAssignedTask().getTask().getPriority()
-             - stateB.task.getAssignedTask().getTask().getPriority();
     }
   };
 }

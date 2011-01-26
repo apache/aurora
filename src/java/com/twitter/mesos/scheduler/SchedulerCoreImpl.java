@@ -59,8 +59,16 @@ import static com.google.common.collect.Iterables.transform;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.mesos.Tasks.INFO_TO_SHARD_ID;
 import static com.twitter.mesos.Tasks.jobKey;
-import static com.twitter.mesos.gen.ScheduleStatus.*;
-import static com.twitter.mesos.scheduler.JobManager.JobUpdateResult.*;
+import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
+import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
+import static com.twitter.mesos.gen.ScheduleStatus.KILLED_BY_CLIENT;
+import static com.twitter.mesos.gen.ScheduleStatus.LOST;
+import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
+import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
+import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
+import static com.twitter.mesos.scheduler.JobManager.JobUpdateResult.COMPLETED;
+import static com.twitter.mesos.scheduler.JobManager.JobUpdateResult.JOB_UNCHANGED;
+import static com.twitter.mesos.scheduler.JobManager.JobUpdateResult.UPDATER_LAUNCHED;
 
 /**
  * Implementation of the scheduler core.
@@ -77,7 +85,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
   private final AtomicReference<String> frameworkId = new AtomicReference<String>(null);
 
   // Stores the configured tasks.
-  private final TaskStore taskStore = new TaskStore();
+  private final TaskStore taskStore;
 
   // Handles communication with the rest of the mesos cluster.
   private final Driver driver;
@@ -96,6 +104,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
   public SchedulerCoreImpl(CronJobManager cronScheduler,
       ImmediateJobManager immediateScheduler,
       PersistenceLayer<NonVolatileSchedulerState> persistenceLayer,
+      TaskStore taskStore,
       Driver driver,
       SchedulingFilter schedulingFilter,
       Function<String, TwitterTaskInfo> updaterTaskBuilder) {
@@ -103,6 +112,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
     // placed first.
     this.jobManagers = Arrays.asList(checkNotNull(cronScheduler), checkNotNull(immediateScheduler));
     this.persistenceLayer = checkNotNull(persistenceLayer);
+    this.taskStore = checkNotNull(taskStore);
     this.driver = checkNotNull(driver);
     this.schedulingFilter = checkNotNull(schedulingFilter);
     this.updaterTaskBuilder = checkNotNull(updaterTaskBuilder);
@@ -484,8 +494,8 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
       return null;
     }
 
-    SortedSet<TaskState> candidates = taskStore.fetch(Query.byStatus(PENDING),
-        schedulingFilter.makeFilter(offer, slaveHost));
+    SortedSet<TaskState> candidates = taskStore.fetch(Query.and(Query.byStatus(PENDING),
+        schedulingFilter.makeFilter(offer, slaveHost)));
 
     if (candidates.isEmpty()) return null;
 
@@ -535,7 +545,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
 
     LOG.info("Tasks being rescheduled: " + tasks);
 
-    taskStore.add(tasks);
+    taskStore.add(ImmutableSet.copyOf(tasks));
 
     return newTaskIds;
   }
@@ -1002,7 +1012,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
       ConfigurationManager.applyDefaultsIfUnset(task.getAssignedTask().getTask());
     }
 
-    taskStore.add(state.getTasks());
+    taskStore.add(ImmutableSet.copyOf(state.getTasks()));
 
     for (final Map.Entry<String, List<JobConfiguration>> entry : state.getModuleJobs().entrySet()) {
       JobManager manager = Iterables.find(jobManagers, new Predicate<JobManager>() {

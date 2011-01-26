@@ -90,9 +90,8 @@ public class SchedulerCoreImplTest extends EasyMockTest {
   private void buildScheduler() {
     ImmediateJobManager immediateManager = new ImmediateJobManager();
     cron = new CronJobManager();
-    scheduler = new SchedulerCoreImpl(cron, immediateManager,
-        persistenceLayer, driver, schedulingFilter,
-        updateTaskBuilder);
+    scheduler = new SchedulerCoreImpl(cron, immediateManager, persistenceLayer, new MapTaskStore(),
+        driver, schedulingFilter, updateTaskBuilder);
     cron.schedulerCore = scheduler;
     immediateManager.schedulerCore = scheduler;
   }
@@ -1660,8 +1659,8 @@ public class SchedulerCoreImplTest extends EasyMockTest {
     return scheduler.getTasks(query(taskIds));
   }
 
-  private Set<TaskState> getTasksByStatus(ScheduleStatus... statuses) {
-    return scheduler.getTasks(Query.byStatus(statuses));
+  private Set<TaskState> getTasksByStatus(ScheduleStatus status) {
+    return scheduler.getTasks(Query.byStatus(status));
   }
 
   private Set<TaskState> getTasksOwnedBy(String owner) {

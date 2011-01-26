@@ -1,6 +1,7 @@
 package com.twitter.mesos.scheduler;
 
 import com.google.common.base.Predicate;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -12,7 +13,6 @@ import com.twitter.mesos.scheduler.TaskStore.TaskState;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 
 import static com.twitter.mesos.gen.ScheduleStatus.*;
@@ -38,7 +38,7 @@ public class TaskStoreTest {
 
   @Before
   public void setUp() throws Exception {
-    taskStore = new TaskStore();
+    taskStore = new MapTaskStore();
     taskA = new TaskState(makeTask(TASK_A_ID).setStatus(TASK_A_STATUS));
     taskB = new TaskState(makeTask(TASK_B_ID).setStatus(TASK_B_STATUS));
     tasks = Lists.transform(Arrays.asList(taskA, taskB), Tasks.STATE_TO_SCHEDULED);
@@ -46,7 +46,7 @@ public class TaskStoreTest {
 
   @Test
   public void testAddAndFetchTasks() {
-    taskStore.add(tasks);
+    store(tasks);
 
     assertThat(Iterables.getOnlyElement(taskStore.fetch(Query.byId(TASK_A_ID))), is(taskA));
 
@@ -62,25 +62,20 @@ public class TaskStoreTest {
 
   @Test(expected = IllegalArgumentException.class)
   public void testRejectsTaskIdCollision() {
-    taskStore.add(tasks);
-    taskStore.add(Arrays.asList(makeTask(TASK_A_ID).setStatus(FAILED)));
-  }
-
-  @Test(expected = IllegalArgumentException.class)
-  public void testRejectsDuplicateTasks() {
-    taskStore.add(Arrays.asList(makeTask("asdf"), makeTask("asdf")));
+    store(tasks);
+    store(Arrays.asList(makeTask(TASK_A_ID).setStatus(FAILED)));
   }
 
   @Test(expected = IllegalArgumentException.class)
   public void testRejectsDuplicateTaskIds() {
-    taskStore.add(Arrays.asList(makeTask("asdf").setAssignedTask(new AssignedTask()
+    store(Arrays.asList(makeTask("asdf").setAssignedTask(new AssignedTask()
         .setTask(new TwitterTaskInfo().setOwner("A"))), makeTask("asdf")
         .setAssignedTask(new AssignedTask().setTask(new TwitterTaskInfo().setOwner("B")))));
   }
 
   @Test
   public void testImmutable() {
-    taskStore.add(tasks);
+    store(tasks);
 
     taskA.task.setStatus(RUNNING);
 
@@ -89,40 +84,8 @@ public class TaskStoreTest {
   }
 
   @Test
-  public void testSortOrder() {
-    int id = 1;
-    int priority = 100;
-    ArrayList<ScheduledTask> tasks = Lists.newArrayList(makeTask(String.valueOf(id++), priority--)
-        .setStatus(PENDING), makeTask(String.valueOf(id++), priority--)
-        .setStatus(PENDING), makeTask(String.valueOf(id++), priority--)
-        .setStatus(KILLED), makeTask(String.valueOf(id++), priority--)
-        .setStatus(RUNNING), makeTask(String.valueOf(id++), priority--)
-        .setStatus(PENDING), makeTask(String.valueOf(id++), priority--)
-        .setStatus(KILLED), makeTask(String.valueOf(id++), priority--).setStatus(STARTING));
-
-    taskStore.add(tasks);
-
-    assertThat(Lists.newArrayList(Iterables.transform(taskStore.fetch(Query.GET_ALL),
-        Tasks.STATE_TO_SCHEDULED)), is(tasks));
-    assertThat(Lists.newArrayList(Iterables.transform(
-        taskStore.fetch(Query.GET_ALL, Query.SORT_BY_TASK_ID), Tasks.STATE_TO_SCHEDULED)),
-        is(tasks));
-    assertThat(Lists.newArrayList(Iterables.transform(
-        taskStore.fetch(Query.GET_ALL, Query.SORT_BY_PRIORITY), Tasks.STATE_TO_SCHEDULED)),
-        is(Lists.newArrayList(Lists.reverse(tasks))));
-    assertThat(Lists.newArrayList(Iterables.transform(
-        taskStore.fetch(Query.byStatus(PENDING)), Tasks.STATE_TO_SCHEDULED)),
-        is(Lists.newArrayList(Arrays.asList(tasks.get(0), tasks.get(1), tasks.get(4)))));
-    assertThat(Lists.newArrayList(Iterables.transform(
-        taskStore.fetch(Query.byStatus(Tasks.ACTIVE_STATES),
-            Query.SORT_BY_PRIORITY, Tasks.ACTIVE_FILTER), Tasks.STATE_TO_SCHEDULED)),
-        is(Lists.newArrayList(
-            tasks.get(6), tasks.get(4), tasks.get(3), tasks.get(1), tasks.get(0))));
-  }
-
-  @Test
   public void testMutate() {
-    taskStore.add(tasks);
+    store(tasks);
 
     // Mutate by query.
     taskStore.mutate(Query.byId(TASK_A_ID), new Closure<TaskState>() {
@@ -144,20 +107,17 @@ public class TaskStoreTest {
 
   @Test
   public void testRemove() {
-    taskStore.add(tasks);
+    store(tasks);
     taskStore.remove(Sets.newHashSet(taskA.task.getAssignedTask().getTaskId()));
     assertThat(Iterables.getOnlyElement(taskStore.fetch(Query.GET_ALL)), is(taskB));
+  }
+
+  private void store(Iterable<ScheduledTask> tasks) {
+    taskStore.add(ImmutableSet.copyOf(tasks));
   }
 
   private static ScheduledTask makeTask(String taskId) {
     return new ScheduledTask().setAssignedTask(
         new AssignedTask().setTaskId(taskId).setTask(new TwitterTaskInfo()));
-  }
-
-  private static ScheduledTask makeTask(String taskId, int priority) {
-    ScheduledTask task = new ScheduledTask().setAssignedTask(
-        new AssignedTask().setTaskId(taskId).setTask(new TwitterTaskInfo()));
-    task.getAssignedTask().getTask().setPriority(priority);
-    return task;
   }
 }

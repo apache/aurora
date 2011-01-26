@@ -12,7 +12,7 @@ import javax.annotation.Nullable;
  *
  * @author wfarner
  */
-public class ThriftBinaryCodec{
+public class ThriftBinaryCodec {
 
   @Nullable
   public static <T extends TBase> T decode(Class<T> clazz, byte[] buffer) throws CodingException {
