@@ -9,7 +9,7 @@ import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.twitter.common.base.ExceptionalClosure;
+import com.twitter.common.base.Closure;
 import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
 import com.twitter.mesos.Tasks;
@@ -49,11 +49,11 @@ public class MapTaskStore implements TaskStore {
    * @param newTasks Tasks to add.
    */
   @Override
-  public synchronized void add(Set<ScheduledTask> newTasks) {
-    Preconditions.checkArgument(!Iterables.any(newTasks,
+  public synchronized void add(Set<ScheduledTask> newTasks) throws IllegalStateException {
+    Preconditions.checkState(!Iterables.any(newTasks,
         Predicates.compose(hasTaskId, Tasks.SCHEDULED_TO_ID)),
         "Proposed new tasks would create task ID collision.");
-    Preconditions.checkArgument(
+    Preconditions.checkState(
         Sets.newHashSet(transform(newTasks, Tasks.SCHEDULED_TO_ID)).size() == newTasks.size(),
         "Proposed new tasks would create task ID collision.");
 
@@ -102,13 +102,10 @@ public class MapTaskStore implements TaskStore {
    *
    * @param query Query to match tasks against.
    * @param mutator The mutate operation.
-   * @param <E> Type of exception that the mutator may throw.
    * @return Immutable copies of the mutated tasks.
-   * @throws E An exception, specified by the mutator.
    */
   @Override
-  public synchronized <E extends Exception> ImmutableSet<TaskState> mutate(Query query,
-      final ExceptionalClosure<TaskState, E> mutator) throws E {
+  public synchronized ImmutableSet<TaskState> mutate(Query query, Closure<TaskState> mutator) {
     Iterable<TaskState> mutables = mutableQuery(query);
     for (TaskState mutable : mutables) {
       mutator.execute(mutable);

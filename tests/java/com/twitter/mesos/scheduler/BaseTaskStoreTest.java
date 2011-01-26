@@ -5,26 +5,35 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.google.common.testing.junit4.TearDownTestCase;
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.Tasks;
-import com.twitter.mesos.gen.*;
+import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.ScheduleStatus;
+import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TaskQuery;
+import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.TaskStore.TaskState;
-
 import org.junit.Before;
 import org.junit.Test;
 
 import java.util.Arrays;
 
-import static com.twitter.mesos.gen.ScheduleStatus.*;
+import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
+import static com.twitter.mesos.gen.ScheduleStatus.LOST;
+import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
+import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 
 /**
+ * A basic test that verifies a {@link TaskStore} implementation conforms to expected behavior.
+ *
  * @author wfarner
  */
-public class TaskStoreTest {
+public abstract class BaseTaskStoreTest<T extends TaskStore> extends TearDownTestCase {
 
-  private TaskStore taskStore;
+  protected T taskStore;
 
   private static final String TASK_A_ID = "fake-task-id-a";
   private static final ScheduleStatus TASK_A_STATUS = PENDING;
@@ -38,11 +47,20 @@ public class TaskStoreTest {
 
   @Before
   public void setUp() throws Exception {
-    taskStore = new MapTaskStore();
+    taskStore = createTaskStore();
     taskA = new TaskState(makeTask(TASK_A_ID).setStatus(TASK_A_STATUS));
     taskB = new TaskState(makeTask(TASK_B_ID).setStatus(TASK_B_STATUS));
     tasks = Lists.transform(Arrays.asList(taskA, taskB), Tasks.STATE_TO_SCHEDULED);
   }
+
+  /**
+   * Subclasses should create the {@code TaskStore} implementation to exercise in tests.  This
+   * method will be called as part of each test method's set up.
+   *
+   * @return the {@code TaskStore} to test
+   * @throws Exception if there is a problem creating the task store
+   */
+  protected abstract T createTaskStore() throws Exception;
 
   @Test
   public void testAddAndFetchTasks() {
@@ -60,17 +78,21 @@ public class TaskStoreTest {
         .getOnlyElement(taskStore.fetch(new Query(new TaskQuery(), taskIdFilter))), is(taskA));
   }
 
-  @Test(expected = IllegalArgumentException.class)
+  @Test(expected = IllegalStateException.class)
   public void testRejectsTaskIdCollision() {
     store(tasks);
     store(Arrays.asList(makeTask(TASK_A_ID).setStatus(FAILED)));
   }
 
-  @Test(expected = IllegalArgumentException.class)
+  @Test(expected = IllegalStateException.class)
   public void testRejectsDuplicateTaskIds() {
-    store(Arrays.asList(makeTask("asdf").setAssignedTask(new AssignedTask()
-        .setTask(new TwitterTaskInfo().setOwner("A"))), makeTask("asdf")
-        .setAssignedTask(new AssignedTask().setTask(new TwitterTaskInfo().setOwner("B")))));
+    ScheduledTask first = makeTask("asdf");
+    first.getAssignedTask().getTask().setOwner("A");
+
+    ScheduledTask second = makeTask("asdf");
+    second.getAssignedTask().getTask().setOwner("B");
+
+    store(Arrays.asList(first, second));
   }
 
   @Test
@@ -112,12 +134,15 @@ public class TaskStoreTest {
     assertThat(Iterables.getOnlyElement(taskStore.fetch(Query.GET_ALL)), is(taskB));
   }
 
-  private void store(Iterable<ScheduledTask> tasks) {
+  protected void store(Iterable<ScheduledTask> tasks) {
     taskStore.add(ImmutableSet.copyOf(tasks));
   }
 
-  private static ScheduledTask makeTask(String taskId) {
-    return new ScheduledTask().setAssignedTask(
-        new AssignedTask().setTaskId(taskId).setTask(new TwitterTaskInfo()));
+  protected static ScheduledTask makeTask(String taskId) {
+    TwitterTaskInfo taskInfo =
+        new TwitterTaskInfo().setOwner("jake").setJobName("spin").setShardId(42);
+    AssignedTask assignedTask =
+        new AssignedTask().setTaskId(taskId).setTask(taskInfo).setSlaveHost("localhost");
+    return new ScheduledTask().setAssignedTask(assignedTask).setStatus(ScheduleStatus.STARTING);
   }
 }

@@ -2,7 +2,7 @@ package com.twitter.mesos.scheduler;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
-import com.twitter.common.base.ExceptionalClosure;
+import com.twitter.common.base.Closure;
 import com.twitter.mesos.gen.ScheduledTask;
 
 import java.util.Set;
@@ -20,8 +20,9 @@ public interface TaskStore {
    * the tasks.
    *
    * @param newTasks Tasks to add.
+   * @throws IllegalStateException if any of the tasks were already in the store
    */
-  void add(Set<ScheduledTask> newTasks);
+  void add(Set<ScheduledTask> newTasks) throws IllegalStateException;
 
   /**
    * Removes tasks from the store.
@@ -43,12 +44,9 @@ public interface TaskStore {
    *
    * @param query Query to match tasks against.
    * @param mutator The mutate operation.
-   * @param <E> Type of exception that the mutator may throw.
    * @return Immutable copies of the mutated tasks.
-   * @throws E An exception, specified by the mutator.
    */
-  <E extends Exception> ImmutableSet<TaskState> mutate(Query query,
-      ExceptionalClosure<TaskState, E> mutator) throws E;
+  ImmutableSet<TaskState> mutate(Query query, Closure<TaskState> mutator);
 
   /**
    * Fetches a read-only view of tasks matching a query and filters.  The result will be sorted by

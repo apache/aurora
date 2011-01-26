@@ -9,20 +9,20 @@ import com.twitter.common.process.GuicedProcess;
  *
  * @author wfarner
  */
-public class HttpAssets {
+public class HttpResources {
 
   public static void register(Binder binder) {
-    GuicedProcess.registerHttpAsset(binder, "/js/mootools-core.js", HttpAssets.class,
+    GuicedProcess.registerHttpResource(binder, "/js/mootools-core.js", HttpResources.class,
         "js/mootools-core.js", "application/javascript", true);
-    GuicedProcess.registerHttpAsset(binder, "/js/mootools-more.js", HttpAssets.class,
+    GuicedProcess.registerHttpResource(binder, "/js/mootools-more.js", HttpResources.class,
         "js/mootools-more.js", "application/javascript", true);
-    GuicedProcess.registerHttpAsset(binder, "/js/tit.js", HttpAssets.class,
+    GuicedProcess.registerHttpResource(binder, "/js/tit.js", HttpResources.class,
         "js/tit.js", "application/javascript", true);
-    GuicedProcess.registerHttpAsset(binder, "/css/global.css", HttpAssets.class,
+    GuicedProcess.registerHttpResource(binder, "/css/global.css", HttpResources.class,
         "css/global.css", "text/css", true);
   }
 
-  private HttpAssets() {
+  private HttpResources() {
     // Utility.
   }
 }

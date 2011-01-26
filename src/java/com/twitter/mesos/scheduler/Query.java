@@ -85,8 +85,18 @@ public class Query {
    * @return {@code true} If the only filtering in this query is by job, {@code false} otherwise.
    */
   public boolean specifiesJobOnly() {
-    return specifiesJob() && (filter == NO_POST_FILTER)
+    return specifiesJob() && !hasPostFilter()
            && (base().getStatusesSize() == 0) && (base().getTaskIdsSize() == 0);
+  }
+
+  /**
+   * Determines whether this query relies on a post filter predicate in addition to its
+   * {@link TaskQuery}.
+   *
+   * @return {@code true} if the query uses a post filter predicate
+   */
+  public boolean hasPostFilter() {
+    return filter != NO_POST_FILTER;
   }
 
   /**

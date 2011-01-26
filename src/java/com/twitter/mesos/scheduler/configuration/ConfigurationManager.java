@@ -1,11 +1,11 @@
 package com.twitter.mesos.scheduler.configuration;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import com.google.common.base.Splitter;
-import com.google.common.collect.ImmutableList;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.configuration.ValueParser.ParseException;
@@ -27,9 +27,11 @@ import java.util.regex.Pattern;
 public class ConfigurationManager {
 
   private static final Pattern GOOD_IDENTIFIER_PATTERN = Pattern.compile("[\\w\\-\\.]+");
+  private static final int MAX_IDENTIFIED_LENGTH = 255;
 
   private static boolean isGoodIdentifier(String identifier) {
-    return GOOD_IDENTIFIER_PATTERN.matcher(identifier).matches();
+    return GOOD_IDENTIFIER_PATTERN.matcher(identifier).matches()
+           && (identifier.length() <= MAX_IDENTIFIED_LENGTH);
   }
 
   public static JobConfiguration validateAndPopulate(JobConfiguration job)
