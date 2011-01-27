@@ -43,8 +43,8 @@ import static com.twitter.mesos.gen.ResponseCode.*;
  *
  * @author wfarner
  */
-class SchedulerThriftInterface extends ThriftServer implements MesosSchedulerManager.Iface {
-  private static Logger LOG = Logger.getLogger(SchedulerThriftInterface.class.getName());
+public class SchedulerThriftInterface extends ThriftServer implements MesosSchedulerManager.Iface {
+  private static final Logger LOG = Logger.getLogger(SchedulerThriftInterface.class.getName());
 
   private final SchedulerCore schedulerCore;
 

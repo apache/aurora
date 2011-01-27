@@ -49,7 +49,9 @@ public class ConfigurationManager {
       throw new TaskDescriptionException("Job name contains illegal characters: " + job.getName());
     }
 
-    if (copy.getTaskConfigsSize() == 0) throw new TaskDescriptionException("No tasks specified.");
+    if (copy.getTaskConfigsSize() == 0) {
+      throw new TaskDescriptionException("No tasks specified.");
+    }
 
     Set<Integer> shardIds = Sets.newHashSet();
 
@@ -327,7 +329,7 @@ public class ConfigurationManager {
   private static <T> Set<T> getSet(String value, Class<T> type)
     throws ParseException {
     ImmutableSet.Builder<T> builder = ImmutableSet.builder();
-    if (value != null) {
+    if (!StringUtils.isEmpty(value)) {
       for (String item : MULTI_VALUE_SPLITTER.split(value)) {
         builder.add((T) ValueParser.REGISTRY.get(type).parse(item));
       }

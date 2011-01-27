@@ -63,7 +63,7 @@ public class SchedulerzUser extends StringTemplateServlet {
       } else {
         LOG.info("Received web request to launch cron job " + user + "/" + cronJobLaunched);
         cronScheduler.startJobNow(Tasks.jobKey(user, cronJobLaunched));
-        resp.sendRedirect("/schedulerz/user?user=" + user);
+        resp.sendRedirect("/scheduler/user?user=" + user);
       }
     }
 

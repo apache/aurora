@@ -26,6 +26,7 @@ import com.twitter.mesos.gen.NonVolatileSchedulerState;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.Driver.MesosDriverImpl;
 import com.twitter.mesos.scheduler.SchedulingFilter.SchedulingFilterImpl;
+import com.twitter.mesos.scheduler.httphandlers.CreateJob;
 import com.twitter.mesos.scheduler.httphandlers.Mname;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzHome;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzJob;
@@ -92,6 +93,7 @@ public class SchedulerModule extends AbstractModule {
     registerServlet(binder(), "/scheduler/user", SchedulerzUser.class, true);
     registerServlet(binder(), "/scheduler/job", SchedulerzJob.class, true);
     registerServlet(binder(), "/mname", Mname.class, false);
+    registerServlet(binder(), "/create_job", CreateJob.class, false);
   }
 
   @Provides
