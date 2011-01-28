@@ -42,6 +42,8 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.lang.StringUtils;
+
 import static com.twitter.mesos.gen.ScheduleStatus.*;
 
 /**
@@ -128,7 +130,7 @@ public class LiveTask extends TaskOnDisk {
    */
   @Override
   public void stage() throws TaskRunException {
-    LOG.info(String.format("Staging task for job %s", Tasks.jobKey(task)));
+    LOG.info(String.format("Staging task %s", task.getTaskId()));
 
     LOG.info("Building task directory hierarchy.");
     if (!sandboxDir.mkdirs()) {
@@ -143,20 +145,24 @@ public class LiveTask extends TaskOnDisk {
       throw new TaskRunException("Failed to store task.", e);
     }
 
-    LOG.info("Fetching payload.");
-    File payload;
-    LOG.info("File copier: " + fileCopier);
-    try {
-      payload = fileCopier.apply(
-          new FileCopyRequest(task.getTask().getHdfsPath(), sandboxDir.getAbsolutePath()));
-    } catch (IOException e) {
-      throw new TaskRunException("Failed to fetch task binary.", e);
-    }
+    if (!StringUtils.isBlank(task.getTask().getHdfsPath())) {
+      LOG.info("Fetching payload.");
+      File payload;
+      LOG.info("File copier: " + fileCopier);
+      try {
+        payload = fileCopier.apply(
+            new FileCopyRequest(task.getTask().getHdfsPath(), sandboxDir.getAbsolutePath()));
+      } catch (IOException e) {
+        throw new TaskRunException("Failed to fetch task binary.", e);
+      }
 
-    if (!payload.exists()) {
-      throw new TaskRunException(String.format(
-          "Unexpected state - payload does not exist: HDFS %s -> %s", task.getTask().getHdfsPath(),
-          sandboxDir));
+      if (!payload.exists()) {
+        throw new TaskRunException(String.format(
+            "Unexpected state - payload does not exist: HDFS %s -> %s", task.getTask().getHdfsPath(),
+            sandboxDir));
+      }
+    } else {
+      LOG.info("No payload specified in " + task.getTaskId());
     }
   }
 

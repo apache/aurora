@@ -21,13 +21,17 @@ public interface ValueParser<T> {
   public static class StringParser implements ValueParser<String> {
     @Override
     public String parse(String s) throws ParseException {
-      if (StringUtils.isEmpty(s)) throw new ParseException("value must not be empty.");
+      if (StringUtils.isEmpty(s)) {
+        throw new ParseException("value must not be empty.");
+      }
       return s;
     }
 
     @Override
     public String parseWithDefault(String s, String defaultValue) {
-      if (StringUtils.isEmpty(s)) return defaultValue;
+      if (StringUtils.isEmpty(s)) {
+        return defaultValue;
+      }
       return s;
     }
   }
@@ -44,7 +48,9 @@ public interface ValueParser<T> {
 
     @Override
     public Integer parseWithDefault(String s, Integer defaultValue) throws ParseException {
-      if (StringUtils.isEmpty(s)) return defaultValue;
+      if (StringUtils.isEmpty(s)) {
+        return defaultValue;
+      }
       return parse(s);
     }
   }
@@ -61,8 +67,7 @@ public interface ValueParser<T> {
 
     @Override
     public Long parseWithDefault(String s, Long defaultValue) throws ParseException {
-      if (StringUtils.isEmpty(s)) return defaultValue;
-      return parse(s);
+      return StringUtils.isEmpty(s) ? defaultValue : parse(s);
     }
   }
 
@@ -78,8 +83,7 @@ public interface ValueParser<T> {
 
     @Override
     public Double parseWithDefault(String s, Double defaultValue) throws ParseException {
-      if (StringUtils.isEmpty(s)) return defaultValue;
-      return parse(s);
+      return StringUtils.isEmpty(s) ? defaultValue : parse(s);
     }
   }
 
@@ -95,17 +99,23 @@ public interface ValueParser<T> {
 
     @Override
     public Boolean parseWithDefault(String s, Boolean defaultValue) throws ParseException {
-      if (StringUtils.isEmpty(s)) return defaultValue;
-      return parse(s);
+      return StringUtils.isEmpty(s) ? defaultValue : parse(s);
     }
   }
 
-  public static final ImmutableMap<Class, ValueParser> REGISTRY =
-      ImmutableMap.<Class, ValueParser>of(
-        String.class, new StringParser(),
-        Integer.class, new IntegerParser(),
-        Long.class, new LongParser(),
-        Double.class, new DoubleParser(),
-        Boolean.class, new BooleanParser()
-  );
+  public static class Registry {
+    private static final ImmutableMap<Class, ValueParser> REGISTRY =
+        ImmutableMap.<Class, ValueParser>of(
+          String.class, new StringParser(),
+          Integer.class, new IntegerParser(),
+          Long.class, new LongParser(),
+          Double.class, new DoubleParser(),
+          Boolean.class, new BooleanParser()
+    );
+
+    @SuppressWarnings("unchecked")
+    public static <T> ValueParser<T> getParser(Class<T> type) {
+      return REGISTRY.get(type);
+    }
+  }
 }

@@ -108,7 +108,9 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
       LOG.info("Lost leadership, committing suicide.");
 
       try {
-        if (status != null) status.update(Status.DEAD);
+        if (status != null) {
+          status.update(Status.DEAD);
+        }
       } catch (InterruptedException e) {
         LOG.log(Level.WARNING, "Interrupted while leaving server set.", e);
       } catch (UpdateException e) {
@@ -151,7 +153,9 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
     } catch (InterruptedException e) {
       LOG.log(Level.SEVERE, "Interrupted while starting thrift server.", e);
     }
-    if (port == -1) return;
+    if (port == -1) {
+      return;
+    }
 
     // TODO(wfarner): This is a bit of a hack, clean it up, maybe by exposing the thrift interface.
     try {

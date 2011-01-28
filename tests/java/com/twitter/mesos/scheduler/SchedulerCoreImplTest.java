@@ -123,6 +123,37 @@ public class SchedulerCoreImplTest extends EasyMockTest {
   }
 
   @Test
+  public void testCreateJobNoHdfs() throws Exception {
+    expectRestore();
+    expectPersists(4);  // TODO(wfarner): Refactor jobmanagers so the double persist doesn't happen.
+
+    control.replay();
+    buildScheduler();
+
+    TwitterTaskInfo task = new TwitterTaskInfo().setConfiguration(
+        ImmutableMap.<String, String>builder()
+        .put("start_command", "date")
+        .put("cpus", "1.0")
+        .put("ram_mb", "1024")
+        .build());
+
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, task, 1);
+    scheduler.createJob(job);
+    assertTaskCount(1);
+
+    TwitterTaskInfo task2 = new TwitterTaskInfo().setConfiguration(
+        ImmutableMap.<String, String>builder()
+        .put("start_command", "date")
+        .put("hdfs_path", "")
+        .put("cpus", "1.0")
+        .put("ram_mb", "1024")
+        .build());
+    JobConfiguration job2 = makeJob(OWNER_A, JOB_B, task2, 1);
+    scheduler.createJob(job2);
+    assertTaskCount(2);
+  }
+
+  @Test
   public void testRejectsBadIdentifiers() throws Exception {
     expectRestore();
 

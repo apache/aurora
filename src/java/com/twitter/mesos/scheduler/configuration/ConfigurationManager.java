@@ -81,10 +81,14 @@ public class ConfigurationManager {
 
   public static TwitterTaskInfo populateFields(JobConfiguration job, TwitterTaskInfo config)
       throws TaskDescriptionException {
-    if (config == null) throw new TaskDescriptionException("Task may not be null.");
+    if (config == null) {
+      throw new TaskDescriptionException("Task may not be null.");
+    }
 
     Map<String, String> configMap =  config.getConfiguration();
-    if (configMap == null) throw new TaskDescriptionException("Task configuration may not be null");
+    if (configMap == null) {
+      throw new TaskDescriptionException("Task configuration may not be null");
+    }
 
     if (!config.isSetShardId()) {
       throw new TaskDescriptionException("Tasks must have a shard ID.");
@@ -106,15 +110,21 @@ public class ConfigurationManager {
     return config;
   }
 
-  private static abstract class Field<T> {
+  private abstract static class Field<T> {
     final String key;
     final T defaultValue;
     final boolean required;
 
+    Field(String key) {
+      this.key = key;
+      this.defaultValue = null;
+      this.required = true;
+    }
+
     Field(String key, T defaultValue) {
       this.key = key;
       this.defaultValue = defaultValue;
-      required = defaultValue == null;
+      this.required = false;
     }
 
     abstract boolean isSet(TwitterTaskInfo task);
@@ -142,29 +152,29 @@ public class ConfigurationManager {
     }
   }
 
-  private static abstract class TypedField<T> extends Field<T> {
+  private abstract static class TypedField<T> extends Field<T> {
     final Class<T> type;
     final ValueParser<T> parser;
 
     TypedField(Class<T> type, String key) {
-      this(type, key, null);
+      super(key);
+      this.type = type;
+      this.parser = ValueParser.Registry.getParser(type);
     }
 
-    @SuppressWarnings("unchecked")
     TypedField(Class<T> type, String key, T defaultValue) {
       super(key, defaultValue);
       this.type = type;
-      parser = ValueParser.REGISTRY.get(type);
+      this.parser = ValueParser.Registry.getParser(type);
     }
 
-    @Override
-    public T parse(String raw) throws ParseException {
-      return parser.parse(raw);
+    @Override public T parse(String raw) throws ParseException {
+      return required ? parser.parse(raw) : parser.parseWithDefault(raw, defaultValue);
     }
   }
 
-  private static List<Field<?>> FIELDS = ImmutableList.of(
-      new TypedField<String>(String.class, "hdfs_path") {
+  private static final List<Field<?>> FIELDS = ImmutableList.of(
+      new TypedField<String>(String.class, "hdfs_path", null) {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetHdfsPath(); }
 
         @Override void apply(TwitterTaskInfo task, String value) throws TaskDescriptionException {
@@ -290,7 +300,9 @@ public class ConfigurationManager {
 
   public static TwitterTaskInfo makeConcrete(Map<String, String> params)
       throws TaskDescriptionException {
-    if (params == null) throw new TaskDescriptionException("Task configuration may not be null");
+    if (params == null) {
+      throw new TaskDescriptionException("Task configuration may not be null");
+    }
 
     return new TwitterTaskInfo()
       .setNumCpus(getValue(params, "cpus", Double.class))
@@ -317,7 +329,7 @@ public class ConfigurationManager {
       throw new TaskDescriptionException("Must specify value for " + key);
     }
     try {
-      return (T) ValueParser.REGISTRY.get(type).parse(config.get(key));
+      return (T) ValueParser.Registry.getParser(type).parse(config.get(key));
     } catch (ValueParser.ParseException e) {
       throw new TaskDescriptionException("Invalid value for " + key + ": " + e.getMessage());
     }
@@ -331,7 +343,7 @@ public class ConfigurationManager {
     ImmutableSet.Builder<T> builder = ImmutableSet.builder();
     if (!StringUtils.isEmpty(value)) {
       for (String item : MULTI_VALUE_SPLITTER.split(value)) {
-        builder.add((T) ValueParser.REGISTRY.get(type).parse(item));
+        builder.add((T) ValueParser.Registry.getParser(type).parse(item));
       }
     }
     return builder.build();
