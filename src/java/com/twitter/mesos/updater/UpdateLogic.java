@@ -8,6 +8,7 @@ import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.common.util.StateMachine;
 import com.twitter.mesos.gen.UpdateConfig;
 
+import java.util.Collection;
 import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.logging.Level;
@@ -17,7 +18,13 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.mesos.updater.UpdateCommand.Type.ROLLBACK_TASK;
 import static com.twitter.mesos.updater.UpdateCommand.Type.UPDATE_TASK;
-import static com.twitter.mesos.updater.UpdateLogic.State.*;
+import static com.twitter.mesos.updater.UpdateLogic.State.CANARY;
+import static com.twitter.mesos.updater.UpdateLogic.State.COMPLETE_FAILED;
+import static com.twitter.mesos.updater.UpdateLogic.State.COMPLETE_SUCCESS;
+import static com.twitter.mesos.updater.UpdateLogic.State.INIT;
+import static com.twitter.mesos.updater.UpdateLogic.State.PREPARE_ROLLBACK;
+import static com.twitter.mesos.updater.UpdateLogic.State.ROLLBACK_BATCH;
+import static com.twitter.mesos.updater.UpdateLogic.State.UPDATE_BATCH;
 
 /**
  * Abstract logic for the mesos updater.
@@ -75,9 +82,38 @@ public class UpdateLogic {
     return stateMachine.getState() == COMPLETE_SUCCESS;
   }
 
+
+  private static class ConsumableSortedIds {
+    private final Collection<Integer> sortedIds;
+    private final Iterable<Integer> consumingIds;
+
+    private ConsumableSortedIds(final Set<Integer> ids) {
+      sortedIds = new PriorityQueue<Integer>(ids);
+      consumingIds = Iterables.consumingIterable(sortedIds);
+    }
+
+    /**
+     * Returns an iterable over sorted ids that will consume ids as they are iterated over.  When
+     * all ids have been iterated over once, {@link #isEmpty()} will return {@code true}.
+     *
+     * @return an consuming {@code Iterable} over the sorted shard ids
+     */
+    public Iterable<Integer> get() {
+      return consumingIds;
+    }
+
+    /**
+     * @return {@code true} iff the Iterable returned by {@link #get()} has been fully iterated.
+     */
+    public boolean isEmpty() {
+      return sortedIds.isEmpty();
+    }
+  }
+
+
   // An iterable that will consume from a queue of shards being operated on in the current stage.
   // Be careful when reading from this, since the objects are removed.
-  Iterable<Integer> consumingIds;
+  private ConsumableSortedIds consumingIds;
 
   int totalFailures = 0;
 
@@ -86,7 +122,7 @@ public class UpdateLogic {
       switch (stateMachine.getState()) {
         case INIT:
           LOG.info("Initiating update.");
-          consumingIds = Iterables.consumingIterable(new PriorityQueue<Integer>(newShards));
+          consumingIds = new ConsumableSortedIds(newShards);
           stateMachine.transition(CANARY);
           break;
 
@@ -102,7 +138,7 @@ public class UpdateLogic {
           break;
 
         case UPDATE_BATCH:
-          if (Iterables.isEmpty(consumingIds)) {
+          if (consumingIds.isEmpty()) {
             stateMachine.transition(COMPLETE_SUCCESS);
           } else {
             restartShards(UPDATE_TASK, config.getUpdateBatchSize(),
@@ -116,13 +152,13 @@ public class UpdateLogic {
 
         case PREPARE_ROLLBACK:
           LOG.info("Preparing for rollback.");
-          consumingIds = Iterables.consumingIterable(new PriorityQueue<Integer>(
-              Sets.difference(oldShards, ImmutableSet.copyOf(consumingIds))));
+          consumingIds = new ConsumableSortedIds(Sets.difference(oldShards,
+              ImmutableSet.copyOf(consumingIds.get())));
           stateMachine.transition(ROLLBACK_BATCH);
           break;
 
         case ROLLBACK_BATCH:
-          if (Iterables.isEmpty(consumingIds)) {
+          if (consumingIds.isEmpty()) {
             stateMachine.transition(COMPLETE_FAILED);
           } else {
             // TODO(wfarner): Can/should we do anything if this fails?
@@ -154,7 +190,7 @@ public class UpdateLogic {
       int updateWatchDurationSecs) throws UpdateException {
     Preconditions.checkArgument(numShards > 0, "Restart of zero shards does not make sense.");
 
-    Set<Integer> ids = ImmutableSet.copyOf(Iterables.limit(consumingIds, numShards));
+    Set<Integer> ids = ImmutableSet.copyOf(Iterables.limit(consumingIds.get(), numShards));
     LOG.info(String.format("Issuing %s on shards %s", type, ids));
 
     int newFailures = commandRunner.apply(new UpdateCommand(type, ids,
