@@ -99,8 +99,6 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
         status.update(Status.ALIVE);
       } catch (UpdateException e) {
         LOG.log(Level.SEVERE, "Failed to update endpoint status.", e);
-      } catch (InterruptedException e) {
-        LOG.log(Level.SEVERE, "Interrupted while updating endpoint status.", e);
       }
     }
 
@@ -111,8 +109,6 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
         if (status != null) {
           status.update(Status.DEAD);
         }
-      } catch (InterruptedException e) {
-        LOG.log(Level.WARNING, "Interrupted while leaving server set.", e);
       } catch (UpdateException e) {
         LOG.log(Level.WARNING, "Failed to leave server set.", e);
       } finally {
