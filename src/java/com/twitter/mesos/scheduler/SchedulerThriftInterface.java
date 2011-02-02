@@ -26,7 +26,7 @@ import com.twitter.mesos.gen.UpdateConfigResponse;
 import com.twitter.mesos.gen.UpdateRequest;
 import com.twitter.mesos.gen.UpdateResponse;
 import com.twitter.mesos.scheduler.SchedulerCore.RestartException;
-import com.twitter.mesos.scheduler.TaskStore.TaskState;
+import com.twitter.mesos.scheduler.SchedulerCore.TaskState;
 import com.twitter.mesos.scheduler.UpdateScheduler.UpdateException;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;

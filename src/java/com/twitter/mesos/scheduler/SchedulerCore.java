@@ -6,8 +6,8 @@ import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.ScheduleStatus;
+import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.scheduler.JobManager.JobUpdateResult;
-import com.twitter.mesos.scheduler.TaskStore.TaskState;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 
@@ -43,7 +43,7 @@ public interface SchedulerCore extends UpdateScheduler {
    *
    * @param frameworkId Framework ID.
    */
-  public void registered(String frameworkId);
+  void registered(String frameworkId);
 
   /**
    * Fetches information about all registered tasks for a job.
@@ -51,7 +51,7 @@ public interface SchedulerCore extends UpdateScheduler {
    * @param query The query to identify tasks.
    * @return A set of task objects.
    */
-  public Set<TaskState> getTasks(Query query);
+  Set<TaskState> getTasks(Query query);
 
   /**
    * Creates a new job, whose tasks will become candidates for scheduling.
@@ -60,7 +60,7 @@ public interface SchedulerCore extends UpdateScheduler {
    * @throws ScheduleException If there was an error scheduling a cron job.
    * @throws ConfigurationManager.TaskDescriptionException If an invalid task description was given.
    */
-  public void createJob(JobConfiguration job) throws ScheduleException,
+  void createJob(JobConfiguration job) throws ScheduleException,
       ConfigurationManager.TaskDescriptionException;
 
   /**
@@ -68,7 +68,7 @@ public interface SchedulerCore extends UpdateScheduler {
    *
    * @param job Job to run.
    */
-  public void runJob(JobConfiguration job);
+  void runJob(JobConfiguration job);
 
   /**
    * Offers resources to the scheduler.  If the scheduler has a pending task that is satisfied by
@@ -81,7 +81,7 @@ public interface SchedulerCore extends UpdateScheduler {
    *    pending tasks that are satisfied by the slave offer.
    * @throws ScheduleException If an error occurs while attempting to schedule a task.
    */
-  public TwitterTask offer(String slaveId, String slaveHost,
+  TwitterTask offer(String slaveId, String slaveHost,
       Map<String, String> offerParams) throws ScheduleException;
 
   /**
@@ -90,7 +90,7 @@ public interface SchedulerCore extends UpdateScheduler {
    * @param query The query to identify tasks
    * @param status The new state of the tasks.
    */
-  public void setTaskStatus(Query query, ScheduleStatus status);
+  void setTaskStatus(Query query, ScheduleStatus status);
 
   /**
    * Kills a specific set of tasks.
@@ -98,10 +98,10 @@ public interface SchedulerCore extends UpdateScheduler {
    * @param query The query to identify tasks
    * @throws ScheduleException If a problem occurs with the kill request.
    */
-  public void killTasks(Query query) throws ScheduleException;
+  void killTasks(Query query) throws ScheduleException;
 
-  public static class RestartException extends Exception {
-    public RestartException(String msg) { super(msg); }
+  class RestartException extends Exception {
+    RestartException(String msg) { super(msg); }
   }
 
   /**
@@ -112,7 +112,7 @@ public interface SchedulerCore extends UpdateScheduler {
    *    requested for restart may be rejected if it was not found, or was in a non-active state.
    * @throws RestartException If the restart request could not be honored.
    */
-  public Set<String> restartTasks(Set<String> taskIds) throws RestartException;
+  Set<String> restartTasks(Set<String> taskIds) throws RestartException;
 
   /**
    * Triggers an update to a job.
@@ -122,26 +122,18 @@ public interface SchedulerCore extends UpdateScheduler {
    * @throws ScheduleException If the job could not be updated.
    * @throws TaskDescriptionException If the updated job configuration was invalid.
    */
-  public JobUpdateResult updateJob(JobConfiguration updatedJob) throws ScheduleException,
+  JobUpdateResult updateJob(JobConfiguration updatedJob) throws ScheduleException,
       TaskDescriptionException;
 
   // TODO(wfarner): This makes the interface look ugly, and shows how the encapsulation between
   //    SchedulreCoreImpl and ImmediateJobManager is broken.
-  public JobUpdateResult doJobUpdate(JobConfiguration updatedJob) throws ScheduleException;
+  JobUpdateResult doJobUpdate(JobConfiguration updatedJob) throws ScheduleException;
 
-  /**
-   * Gets the framework ID that this scheduler is registered with, or {@code null} if the framework
-   * is not yet registered.
-   *
-   * @return The framework id.
-   */
-  public String getFrameworkId();
+  void stop();
 
-  public void stop();
+  void updateRegisteredTasks(RegisteredTaskUpdate update);
 
-  public void updateRegisteredTasks(RegisteredTaskUpdate update);
-
-  public static class TwitterTask {
+  class TwitterTask {
     public final String taskId;
     public final String slaveId;
     public final String taskName;
@@ -155,6 +147,31 @@ public interface SchedulerCore extends UpdateScheduler {
       this.taskName = MorePreconditions.checkNotBlank(taskName);
       this.params = Preconditions.checkNotNull(params);
       this.task = Preconditions.checkNotNull(task);
+    }
+  }
+
+  class TaskState {
+    public final ScheduledTask task;
+    public final VolatileTaskState volatileState;
+
+    public TaskState(ScheduledTask task, VolatileTaskState volatileTaskState) {
+      this.task = new ScheduledTask(task);
+      this.volatileState = new VolatileTaskState(volatileTaskState);
+    }
+
+    public TaskState(TaskState toCopy) {
+      this.task = new ScheduledTask(toCopy.task);
+      this.volatileState = new VolatileTaskState(toCopy.volatileState);
+    }
+
+    @Override
+    public int hashCode() {
+      return task.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object that) {
+      return that instanceof TaskState && ((TaskState) that).task.equals(this.task);
     }
   }
 }

@@ -9,9 +9,10 @@ import com.google.common.collect.Multimaps;
 import com.google.inject.Inject;
 import com.google.inject.name.Named;
 import com.twitter.mesos.Tasks;
+import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.TaskStore.TaskState;
+import com.twitter.mesos.scheduler.SchedulerCore.TaskState;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 
 import java.util.Collection;
@@ -35,7 +36,7 @@ public interface SchedulingFilter {
    * @param slaveHost The slave host that the resource offer is associated with.
    * @return A new predicate that can be used to find tasks meeting the offer.
    */
-  public Predicate<TaskState> makeFilter(TwitterTaskInfo resourceOffer, String slaveHost);
+  public Predicate<ScheduledTask> makeFilter(TwitterTaskInfo resourceOffer, String slaveHost);
 
   /**
    * Implementation of the scheduling filter that ensures resource requirements of tasks are
@@ -101,18 +102,18 @@ public interface SchedulingFilter {
       return !foundJobRestriction;
     }
 
-    private Predicate<TaskState> meetsMachineReservation(final String slaveHost) {
-      return new Predicate<TaskState>() {
-        @Override public boolean apply(TaskState state) {
-          String jobKey = Tasks.jobKey(state);
+    private Predicate<ScheduledTask> meetsMachineReservation(final String slaveHost) {
+      return new Predicate<ScheduledTask>() {
+        @Override public boolean apply(ScheduledTask task) {
+          String jobKey = Tasks.jobKey(task);
           return machineCanRunJob(slaveHost, jobKey) && jobCanRunOnMachine(slaveHost, jobKey);
         }
       };
     }
 
-    private static Set<String> getAvoidJobs(TaskState state) {
-      TwitterTaskInfo task = state.task.getAssignedTask().getTask();
-      return task.getAvoidJobsSize() > 0 ? task.getAvoidJobs() : ImmutableSet.<String>of();
+    private static Set<String> getAvoidJobs(ScheduledTask task) {
+      TwitterTaskInfo taskInfo = task.getAssignedTask().getTask();
+      return taskInfo.getAvoidJobsSize() > 0 ? taskInfo.getAvoidJobs() : ImmutableSet.<String>of();
     }
 
     /**
@@ -121,11 +122,11 @@ public interface SchedulingFilter {
      * @param taskA Task to find compatible tasks for.
      * @return A filte to find tasks compatible with {@code taskA}.
      */
-    private static Predicate<TaskState> canRunWith(final TaskState taskA) {
+    private static Predicate<ScheduledTask> canRunWith(final ScheduledTask taskA) {
       final Set<String> taskAAvoids = getAvoidJobs(taskA);
 
-      return new Predicate<TaskState>() {
-        @Override public boolean apply(TaskState taskB) {
+      return new Predicate<ScheduledTask>() {
+        @Override public boolean apply(ScheduledTask taskB) {
           Set<String> taskBAvoids = getAvoidJobs(taskB);
 
           return !taskAAvoids.contains(Tasks.jobKey(taskB))
@@ -134,43 +135,45 @@ public interface SchedulingFilter {
       };
     }
 
-    private Predicate<TaskState> isTaskAllowedWithResidents(String slaveHost) {
-      final Multimap<String, TaskState> tasksOnHostByJob = Multimaps.index(scheduler.getTasks(
-          new Query(new TaskQuery().setSlaveHost(slaveHost), Tasks.ACTIVE_FILTER)),
-          Tasks.STATE_TO_JOB_KEY);
+    private Predicate<ScheduledTask> isTaskAllowedWithResidents(String slaveHost) {
+      Set<TaskState> tasks = scheduler.getTasks(
+          new Query(new TaskQuery().setSlaveHost(slaveHost), Tasks.ACTIVE_FILTER));
+      final Multimap<String, ScheduledTask> tasksOnHostByJob =
+          Multimaps.index(Iterables.transform(tasks, Tasks.STATE_TO_SCHEDULED),
+              Tasks.SCHEDULED_TO_JOB_KEY);
 
-      return new Predicate<TaskState>() {
-        @Override public boolean apply(TaskState state) {
-          Collection<TaskState> tasks = tasksOnHostByJob.get(Tasks.jobKey(state));
+      return new Predicate<ScheduledTask>() {
+        @Override public boolean apply(ScheduledTask task) {
+          Collection<ScheduledTask> tasks = tasksOnHostByJob.get(Tasks.jobKey(task));
 
-          int maxPerHost = !state.task.getAssignedTask().getTask().isSetMaxPerHost() ? 1
-              : state.task.getAssignedTask().getTask().getMaxPerHost();
+          int maxPerHost = !task.getAssignedTask().getTask().isSetMaxPerHost() ? 1
+              : task.getAssignedTask().getTask().getMaxPerHost();
 
           return (tasks != null) && (tasks.size() < maxPerHost)
-                 && Iterables.all(tasksOnHostByJob.values(), canRunWith(state));
+                 && Iterables.all(tasksOnHostByJob.values(), canRunWith(task));
         }
       };
     }
 
-    private Predicate<TaskState> offerSatisfiesTask(final TwitterTaskInfo offer) {
-      return new Predicate<TaskState>() {
-        @Override public boolean apply(TaskState state) {
-          return ConfigurationManager.satisfied(state.task.getAssignedTask().getTask(), offer);
+    private Predicate<ScheduledTask> offerSatisfiesTask(final TwitterTaskInfo offer) {
+      return new Predicate<ScheduledTask>() {
+        @Override public boolean apply(ScheduledTask task) {
+          return ConfigurationManager.satisfied(task.getAssignedTask().getTask(), offer);
         }
       };
     }
 
     // TODO(wfarner): Comparing strings as canonical host IDs could be problematic.  Consider
     //    an approach that would be robust when presented with an IP address as well.
-    @Override public Predicate<TaskState> makeFilter(final TwitterTaskInfo resourceOffer,
+    @Override public Predicate<ScheduledTask> makeFilter(final TwitterTaskInfo resourceOffer,
         final String slaveHost) {
-      final Predicate<TaskState> offerSatisfiesTask = offerSatisfiesTask(resourceOffer);
-      final Predicate<TaskState> isTaskAllowedWith = isTaskAllowedWithResidents(slaveHost);
-      final Predicate<TaskState> isPairAllowed = meetsMachineReservation(slaveHost);
+      final Predicate<ScheduledTask> offerSatisfiesTask = offerSatisfiesTask(resourceOffer);
+      final Predicate<ScheduledTask> isTaskAllowedWith = isTaskAllowedWithResidents(slaveHost);
+      final Predicate<ScheduledTask> isPairAllowed = meetsMachineReservation(slaveHost);
 
-      return new Predicate<TaskState>() {
-        @Override public boolean apply(TaskState state) {
-          return Predicates.and(offerSatisfiesTask, isTaskAllowedWith, isPairAllowed).apply(state);
+      return new Predicate<ScheduledTask>() {
+        @Override public boolean apply(ScheduledTask task) {
+          return Predicates.and(offerSatisfiesTask, isTaskAllowedWith, isPairAllowed).apply(task);
         }
       };
     }

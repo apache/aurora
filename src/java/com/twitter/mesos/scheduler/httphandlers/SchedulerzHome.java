@@ -10,10 +10,11 @@ import com.google.inject.Inject;
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.mesos.Tasks;
+import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.scheduler.CronJobManager;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerCore;
-import com.twitter.mesos.scheduler.TaskStore.TaskState;
+import com.twitter.mesos.scheduler.SchedulerCore.TaskState;
 import org.antlr.stringtemplate.StringTemplate;
 
 import javax.servlet.ServletException;
@@ -87,7 +88,8 @@ public class SchedulerzHome extends StringTemplateServlet {
         }
 
         for (User user : users.values()) {
-          Iterable<TaskState> activeUserTasks = Iterables.filter(userJobs.get(user.name),
+          Iterable<ScheduledTask> activeUserTasks = Iterables.filter(
+              Iterables.transform(userJobs.get(user.name), Tasks.STATE_TO_SCHEDULED),
               Tasks.ACTIVE_FILTER);
           user.jobCount = Sets.newHashSet(Iterables.transform(
               activeUserTasks, GET_JOB_NAME)).size();
@@ -102,10 +104,10 @@ public class SchedulerzHome extends StringTemplateServlet {
     });
   }
 
-  private static final Function<TaskState, String> GET_JOB_NAME =
-      new Function<TaskState, String>() {
-        @Override public String apply(TaskState state) {
-          return state.task.getAssignedTask().getTask().getJobName();
+  private static final Function<ScheduledTask, String> GET_JOB_NAME =
+      new Function<ScheduledTask, String>() {
+        @Override public String apply(ScheduledTask task) {
+          return task.getAssignedTask().getTask().getJobName();
         }
       };
 

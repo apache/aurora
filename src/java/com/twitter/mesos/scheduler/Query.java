@@ -8,8 +8,9 @@ import com.google.common.collect.ImmutableSortedSet;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
+import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
-import com.twitter.mesos.scheduler.TaskStore.TaskState;
+import com.twitter.mesos.scheduler.SchedulerCore.TaskState;
 
 import java.util.Comparator;
 
@@ -21,10 +22,10 @@ import static org.apache.commons.lang.StringUtils.isEmpty;
  * @author wfarner
  */
 public class Query {
-  private static final Predicate<TaskState> NO_POST_FILTER = Predicates.alwaysTrue();
+  private static final Predicate<ScheduledTask> NO_POST_FILTER = Predicates.alwaysTrue();
 
   private final TaskQuery baseQuery;
-  private final Predicate<TaskState> filter;
+  private final Predicate<ScheduledTask> filter;
 
   /**
    * Creates a new query with the given base query and optional filters.
@@ -32,7 +33,7 @@ public class Query {
    * @param baseQuery Base query.
    * @param filters Filters to apply.
    */
-  public Query(TaskQuery baseQuery, Predicate<TaskState>... filters) {
+  public Query(TaskQuery baseQuery, Predicate<ScheduledTask>... filters) {
     Preconditions.checkNotNull(baseQuery);
 
     this.baseQuery = Preconditions.checkNotNull(baseQuery);
@@ -50,10 +51,10 @@ public class Query {
    * @param filter Filter to add to {@code query}.
    * @return A new query with an additional filter.
    */
-  public static Query and(Query query, Predicate<TaskState> filter) {
+  public static Query and(Query query, Predicate<ScheduledTask> filter) {
     Preconditions.checkNotNull(query);
     Preconditions.checkNotNull(filter);
-    return new Query(query.base(), Predicates.<TaskState>and(query.filter, filter));
+    return new Query(query.base(), Predicates.<ScheduledTask>and(query.filter, filter));
   }
 
   /**
@@ -65,7 +66,7 @@ public class Query {
     return baseQuery;
   }
 
-  public Predicate<TaskState> postFilter() {
+  public Predicate<ScheduledTask> postFilter() {
     return filter;
   }
 
@@ -150,15 +151,14 @@ public class Query {
     return activeQuery(job.getOwner(), job.getName());
   }
 
-  public static ImmutableSortedSet<TaskState> sortTasks(Iterable<TaskState> tasks,
-      Comparator<TaskState> comparator) {
+  public static ImmutableSortedSet<ScheduledTask> sortTasks(Iterable<ScheduledTask> tasks,
+      Comparator<ScheduledTask> comparator) {
     return ImmutableSortedSet.copyOf(comparator, tasks);
   }
 
-  public static final Comparator<TaskState> SORT_BY_TASK_ID = new Comparator<TaskState>() {
-    @Override public int compare(TaskState stateA, TaskState stateB) {
-      return stateA.task.getAssignedTask().getTaskId().compareTo(
-          stateB.task.getAssignedTask().getTaskId());
+  public static final Comparator<ScheduledTask> SORT_BY_TASK_ID = new Comparator<ScheduledTask>() {
+    @Override public int compare(ScheduledTask taskA, ScheduledTask taskB) {
+      return taskA.getAssignedTask().getTaskId().compareTo(taskB.getAssignedTask().getTaskId());
     }
   };
 }

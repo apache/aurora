@@ -11,7 +11,7 @@ import com.twitter.mesos.gen.LiveTaskInfo;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.TaskStore.TaskState;
+import com.twitter.mesos.scheduler.SchedulerCore.TaskState;
 
 import java.util.Arrays;
 import java.util.EnumSet;
@@ -51,6 +51,9 @@ public class Tasks {
   public static final Function<TaskState, AssignedTask> STATE_TO_ASSIGNED =
       Functions.compose(SCHEDULED_TO_ASSIGNED, STATE_TO_SCHEDULED);
 
+  public static final Function<ScheduledTask, TwitterTaskInfo> SCHEDULED_TO_INFO =
+      Functions.compose(ASSIGNED_TO_INFO, SCHEDULED_TO_ASSIGNED);
+
   public static final Function<TaskState, TwitterTaskInfo> STATE_TO_INFO =
       Functions.compose(ASSIGNED_TO_INFO, STATE_TO_ASSIGNED);
 
@@ -82,6 +85,9 @@ public class Tasks {
   public static final Function<TaskState, Integer> STATE_TO_SHARD_ID =
       Functions.compose(INFO_TO_SHARD_ID, STATE_TO_INFO);
 
+  public static final Function<ScheduledTask, Integer> SCHEDULED_TO_SHARD_ID =
+      Functions.compose(INFO_TO_SHARD_ID, SCHEDULED_TO_INFO);
+
   public static final Function<AssignedTask, Integer> ASSIGNED_TO_SHARD_ID =
       Functions.compose(INFO_TO_SHARD_ID, ASSIGNED_TO_INFO);
 
@@ -105,9 +111,6 @@ public class Tasks {
   public static final Function<ScheduledTask, String> SCHEDULED_TO_JOB_KEY =
       Functions.compose(ASSIGNED_TO_JOB_KEY, SCHEDULED_TO_ASSIGNED);
 
-  public static final Function<TaskState, String> STATE_TO_JOB_KEY =
-      Functions.compose(SCHEDULED_TO_JOB_KEY, STATE_TO_SCHEDULED);
-
   /**
    * Different states that an active task may be in.
    */
@@ -124,18 +127,18 @@ public class Tasks {
   /**
    * Filter that includes only active tasks.
    */
-  public static final Predicate<TaskState> ACTIVE_FILTER = new Predicate<TaskState>() {
-      @Override public boolean apply(TaskState state) {
-        return isActive(state.task.getStatus());
+  public static final Predicate<ScheduledTask> ACTIVE_FILTER = new Predicate<ScheduledTask>() {
+      @Override public boolean apply(ScheduledTask task) {
+        return isActive(task.getStatus());
       }
     };
 
   /**
    * Filter that includes only terminated tasks.
    */
-  public static final Predicate<TaskState> TERMINATED_FILTER = new Predicate<TaskState>() {
-      @Override public boolean apply(TaskState state) {
-        return isTerminated(state.task.getStatus());
+  public static final Predicate<ScheduledTask> TERMINATED_FILTER = new Predicate<ScheduledTask>() {
+      @Override public boolean apply(ScheduledTask task) {
+        return isTerminated(task.getStatus());
       }
     };
 
@@ -151,12 +154,12 @@ public class Tasks {
     return TERMINAL_STATES.contains(status);
   }
 
-  public static Predicate<TaskState> hasStatus(ScheduleStatus... statuses) {
+  public static Predicate<ScheduledTask> hasStatus(ScheduleStatus... statuses) {
     final Set<ScheduleStatus> filter = EnumSet.copyOf(Arrays.asList(statuses));
 
-    return new Predicate<TaskState>() {
-      @Override public boolean apply(TaskState state) {
-        return filter.contains(state.task.getStatus());
+    return new Predicate<ScheduledTask>() {
+      @Override public boolean apply(ScheduledTask task) {
+        return filter.contains(task.getStatus());
       }
     };
   }
@@ -191,10 +194,6 @@ public class Tasks {
 
   public static String id(TaskState state) {
     return id(state.task);
-  }
-
-  public static Map<String, TaskState> mapStateByTaskId(Iterable<TaskState> tasks) {
-    return Maps.uniqueIndex(tasks, STATE_TO_ID);
   }
 
   public static Map<Integer, TwitterTaskInfo> mapInfoByShardId(Iterable<TwitterTaskInfo> tasks) {

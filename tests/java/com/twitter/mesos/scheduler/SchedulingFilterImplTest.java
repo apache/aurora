@@ -1,16 +1,19 @@
 package com.twitter.mesos.scheduler;
 
+import com.google.common.base.Function;
 import com.google.common.base.Predicate;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.SchedulerCore.TaskState;
 import com.twitter.mesos.scheduler.SchedulingFilter.SchedulingFilterImpl;
-import com.twitter.mesos.scheduler.TaskStore.TaskState;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import org.junit.Before;
 import org.junit.Test;
@@ -58,7 +61,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     expectGetTasks();
     control.replay();
 
-    Predicate<TaskState> filter = defaultFilter.makeFilter(DEFAULT_OFFER, HOST_A);
+    Predicate<ScheduledTask> filter = defaultFilter.makeFilter(DEFAULT_OFFER, HOST_A);
     assertThat(filter.apply(makeScheduledTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)), is(true));
     assertThat(filter.apply(makeScheduledTask(DEFAULT_CPUS - 1, DEFAULT_RAM - 1, DEFAULT_DISK - 1)),
         is(true));
@@ -69,7 +72,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     expectGetTasks();
     control.replay();
 
-    Predicate<TaskState> filter = defaultFilter.makeFilter(DEFAULT_OFFER, HOST_A);
+    Predicate<ScheduledTask> filter = defaultFilter.makeFilter(DEFAULT_OFFER, HOST_A);
     assertThat(filter.apply(makeScheduledTask(DEFAULT_CPUS + 1, DEFAULT_RAM + 1, DEFAULT_DISK + 1)),
         is(false));
     assertThat(filter.apply(makeScheduledTask(DEFAULT_CPUS + 1, DEFAULT_RAM, DEFAULT_DISK)),
@@ -163,13 +166,19 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         makeTask(0, "sue", "jobC", ImmutableSet.<String>of())), is(false));
   }
 
-  private void expectGetTasks(TaskState... tasks) {
-    expect(scheduler.getTasks((Query) anyObject())).andReturn(ImmutableSet.copyOf(tasks));
+  private void expectGetTasks(ScheduledTask... tasks) {
+    ImmutableSet<TaskState> states = ImmutableSet.copyOf(Iterables
+        .transform(ImmutableList.copyOf(tasks), new Function<ScheduledTask, TaskState>() {
+          @Override public TaskState apply(ScheduledTask task) {
+            return new TaskState(task, new VolatileTaskState(Tasks.id(task)));
+          }
+        }));
+    expect(scheduler.getTasks((Query) anyObject())).andReturn(states);
   }
 
-  private TaskState makeTask(int shard, int maxPerHost) throws Exception {
-    TaskState task = makeTask(OWNER_A, JOB_A, DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK);
-    task.task.getAssignedTask().getTask()
+  private ScheduledTask makeTask(int shard, int maxPerHost) throws Exception {
+    ScheduledTask task = makeTask(OWNER_A, JOB_A, DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK);
+    task.getAssignedTask().getTask()
         .setOwner(OWNER_A)
         .setJobName(JOB_A)
         .setShardId(shard)
@@ -177,10 +186,10 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     return task;
   }
 
-  private TaskState makeTask(int shard, String owner, String jobName, Set<String> avoidJobs)
+  private ScheduledTask makeTask(int shard, String owner, String jobName, Set<String> avoidJobs)
       throws Exception {
-    TaskState task = makeTask(owner, jobName, DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK);
-    task.task.getAssignedTask().getTask()
+    ScheduledTask task = makeTask(owner, jobName, DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK);
+    task.getAssignedTask().getTask()
         .setOwner(owner)
         .setJobName(jobName)
         .setShardId(shard)
@@ -189,19 +198,19 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   }
 
   private int taskId = 1;
-  private TaskState makeTask(String owner, String jobName, int cpus, long ramMb,
+  private ScheduledTask makeTask(String owner, String jobName, int cpus, long ramMb,
       long diskMb) throws Exception {
-    return new TaskState(new ScheduledTask().setAssignedTask(new AssignedTask().setTask(
+    return new ScheduledTask().setAssignedTask(new AssignedTask().setTask(
         ConfigurationManager.applyDefaultsIfUnset(new TwitterTaskInfo()
             .setOwner(owner)
             .setJobName(jobName)
             .setNumCpus(cpus)
             .setRamMb(ramMb)
             .setDiskMb(diskMb)
-            .setMaxPerHost(1))).setTaskId(String.valueOf(taskId++))));
+            .setMaxPerHost(1))).setTaskId(String.valueOf(taskId++)));
   }
 
-  private TaskState makeScheduledTask(int cpus, long ramMb, long diskMb) throws Exception {
+  private ScheduledTask makeScheduledTask(int cpus, long ramMb, long diskMb) throws Exception {
     return makeTask(OWNER_A, JOB_A, cpus, ramMb, diskMb);
   }
 }

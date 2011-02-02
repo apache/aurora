@@ -1,13 +1,5 @@
 package com.twitter.mesos.scheduler;
 
-import java.net.InetSocketAddress;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
-import javax.annotation.Nullable;
-
 import com.google.common.base.Function;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
@@ -15,8 +7,9 @@ import com.google.inject.Key;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
+import com.google.inject.multibindings.Multibinder;
 import com.google.inject.name.Names;
-
+import com.twitter.common.inject.TimedInterceptor;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.zookeeper.SingletonService;
@@ -26,6 +19,7 @@ import com.twitter.mesos.gen.NonVolatileSchedulerState;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.Driver.MesosDriverImpl;
 import com.twitter.mesos.scheduler.SchedulingFilter.SchedulingFilterImpl;
+import com.twitter.mesos.scheduler.Storage.Work;
 import com.twitter.mesos.scheduler.httphandlers.CreateJob;
 import com.twitter.mesos.scheduler.httphandlers.Mname;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzHome;
@@ -34,12 +28,16 @@ import com.twitter.mesos.scheduler.httphandlers.SchedulerzUser;
 import com.twitter.mesos.scheduler.persistence.EncodingPersistenceLayer;
 import com.twitter.mesos.scheduler.persistence.FileSystemPersistence;
 import com.twitter.mesos.scheduler.persistence.PersistenceLayer;
-import com.twitter.mesos.scheduler.persistence.PersistenceLayer.PersistenceException;
 import com.twitter.mesos.scheduler.persistence.ZooKeeperPersistence;
-
 import mesos.MesosSchedulerDriver;
 import mesos.Protos.FrameworkID;
 import mesos.SchedulerDriver;
+
+import javax.annotation.Nullable;
+import java.net.InetSocketAddress;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Logger;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.process.GuicedProcess.registerServlet;
@@ -56,6 +54,9 @@ public class SchedulerModule extends AbstractModule {
 
   @Override
   protected void configure() {
+    // Enable intercepted method timings
+    TimedInterceptor.bind(binder());
+
     // Bindings for SchedulerMain.
     ZooKeeperClient zkClient = new ZooKeeperClient(
         Amount.of(options.zooKeeperSessionTimeoutSecs, Time.SECONDS), options.zooKeeperEndpoints);
@@ -73,8 +74,13 @@ public class SchedulerModule extends AbstractModule {
     bind(CronJobManager.class).in(Singleton.class);
     bind(ImmediateJobManager.class).in(Singleton.class);
 
+    Multibinder<JobManager> jobManagerMultibinder =
+        Multibinder.newSetBinder(binder(), JobManager.class);
+    jobManagerMultibinder.addBinding().to(CronJobManager.class);
+    jobManagerMultibinder.addBinding().to(ImmediateJobManager.class);
+
     // PersistenceLayer handled in provider.
-    bind(TaskStore.class).to(MapTaskStore.class).in(Singleton.class);
+    bind(Storage.class).to(MapStorage.class).in(Singleton.class);
 
     bind(Driver.class).to(MesosDriverImpl.class).in(Singleton.class);
     bind(SchedulingFilter.class).to(SchedulingFilterImpl.class);
@@ -144,17 +150,16 @@ public class SchedulerModule extends AbstractModule {
 
   @Provides
   @Singleton
-  final SchedulerDriver provideMesosSchedulerDriver(MesosSchedulerImpl scheduler,
-      PersistenceLayer<NonVolatileSchedulerState> persistence) {
+  final SchedulerDriver provideMesosSchedulerDriver(MesosSchedulerImpl scheduler, Storage storage) {
     LOG.info("Connecting to mesos master: " + options.mesosMasterAddress);
 
     // TODO(wfarner): This was a fix to unweave a circular guice dependency.  Fix.
-    String frameworkId = null;
-    try {
-      frameworkId = persistence.fetch().getFrameworkId();
-    } catch (PersistenceException e) {
-      LOG.log(Level.SEVERE, "Failed to recover persisted state.", e);
-    }
+    String frameworkId = storage.doInTransaction(new Work<String, RuntimeException>() {
+      @Override public String apply(SchedulerStore schedulerStore, JobStore jobStore,
+          TaskStore taskStore) throws RuntimeException {
+        return schedulerStore.fetchFrameworkId();
+      }
+    });
 
     if (frameworkId != null) {
       LOG.info("Found persisted framework ID: " + frameworkId);

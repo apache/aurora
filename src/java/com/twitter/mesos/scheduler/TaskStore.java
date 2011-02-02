@@ -46,7 +46,7 @@ public interface TaskStore {
    * @param mutator The mutate operation.
    * @return Immutable copies of the mutated tasks.
    */
-  ImmutableSet<TaskState> mutate(Query query, Closure<TaskState> mutator);
+  ImmutableSet<ScheduledTask> mutate(Query query, Closure<ScheduledTask> mutator);
 
   /**
    * Fetches a read-only view of tasks matching a query and filters.  The result will be sorted by
@@ -55,7 +55,7 @@ public interface TaskStore {
    * @param query Query to identify tasks with.
    * @return A read-only view of matching tasks.
    */
-  ImmutableSortedSet<TaskState> fetch(Query query);
+  ImmutableSortedSet<ScheduledTask> fetch(Query query);
 
   /**
    * Convenience method to execute a query and only retrieve the IDs of the matching tasks.
@@ -64,29 +64,4 @@ public interface TaskStore {
    * @return IDs of the matching tasks.
    */
   Set<String> fetchIds(Query query);
-
-  static class TaskState {
-    public final ScheduledTask task;
-    public final VolatileTaskState volatileState;
-
-    public TaskState(ScheduledTask task) {
-      this.task = new ScheduledTask(task);
-      this.volatileState = new VolatileTaskState(task.getAssignedTask().getTaskId());
-    }
-
-    public TaskState(TaskState toCopy) {
-      this.task = new ScheduledTask(toCopy.task);
-      this.volatileState = new VolatileTaskState(toCopy.volatileState);
-    }
-
-    @Override
-    public int hashCode() {
-      return task.hashCode();
-    }
-
-    @Override
-    public boolean equals(Object that) {
-      return that instanceof TaskState && ((TaskState) that).task.equals(this.task);
-    }
-  }
 }

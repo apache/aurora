@@ -5,7 +5,7 @@ import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerCore;
-import com.twitter.mesos.scheduler.TaskStore.TaskState;
+import com.twitter.mesos.scheduler.SchedulerCore.TaskState;
 import org.apache.commons.lang.StringUtils;
 
 import javax.servlet.http.HttpServlet;
