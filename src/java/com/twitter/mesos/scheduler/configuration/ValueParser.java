@@ -93,7 +93,7 @@ public interface ValueParser<T> {
       try {
         return Boolean.parseBoolean(s);
       } catch (NumberFormatException e) {
-        throw new ParseException("Invalid double value: " + e.getMessage());
+        throw new ParseException("Invalid boolean value: " + e.getMessage());
       }
     }
 
