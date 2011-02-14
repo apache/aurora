@@ -4,10 +4,11 @@ import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
 import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.mesos.util.HdfsUtil;
-import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.conf.Configuration;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -19,19 +20,22 @@ public class HdfsFileCopier implements ExceptionalFunction<FileCopyRequest, File
 
   private final static Logger LOG = Logger.getLogger(HdfsFileCopier.class.getName());
 
-  private final FileSystem fileSystem;
+  private final Configuration conf;
 
   @Inject
-  public HdfsFileCopier(FileSystem fileSystem) {
-    this.fileSystem = Preconditions.checkNotNull(fileSystem);
+  public HdfsFileCopier(Configuration conf) {
+    this.conf = Preconditions.checkNotNull(conf);
   }
 
   @Override
   public File apply(FileCopyRequest copy) throws IOException {
     LOG.info(String.format(
         "HDFS file %s -> local file %s", copy.getSourcePath(), copy.getDestPath()));
-
-    return HdfsUtil.downloadFileFromHdfs(fileSystem,
-        copy.getSourcePath(), copy.getDestPath(), true);
+    try {
+      return HdfsUtil.downloadFileFromHdfs(conf, copy.getSourcePath(), copy.getDestPath(), true);
+    } catch (IOException e) {
+      LOG.log(Level.SEVERE, "Failed to download file from HDFS", e);
+      throw e;
+    }
   }
 }

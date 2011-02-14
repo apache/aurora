@@ -29,7 +29,7 @@ import com.twitter.mesos.executor.httphandlers.TaskHome;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.util.HdfsUtil;
 import mesos.Executor;
-import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.conf.Configuration;
 
 import java.io.File;
 import java.io.IOException;
@@ -102,7 +102,7 @@ public class ExecutorModule extends AbstractModule {
 
     // Bindings needed for HdfsFileCopier
     try {
-      bind(FileSystem.class).toInstance(HdfsUtil.getHdfsConfiguration(options.hdfsConfig));
+      bind(Configuration.class).toInstance(HdfsUtil.getHdfsConfiguration(options.hdfsConfig));
     } catch (IOException e) {
       LOG.log(Level.SEVERE, "Failed to create HDFS fileSystem.", e);
       Throwables.propagate(e);
