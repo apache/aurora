@@ -80,7 +80,7 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
     public Map<String, String> machineRestrictions = Maps.newHashMap();
 
     @Option(name = "job_updater_hdfs_path", usage = "HDFS path to the job updater package.")
-    public String jobUpdaterHdfsPath = "/user/mesos/bin/mesos-updater.zip";
+    public String jobUpdaterHdfsPath = "/mesos/pkg/mesos/bin/mesos-updater.zip";
 
     @Option(name = "scheduler_upgrade_storage",
             usage = "True to upgrade storage from a legacy system to a new primary system.")
