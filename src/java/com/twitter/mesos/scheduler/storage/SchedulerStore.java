@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.storage;
 
 import javax.annotation.Nullable;
 

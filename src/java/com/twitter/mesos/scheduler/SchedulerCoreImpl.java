@@ -20,6 +20,7 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
+import com.twitter.common.util.StateMachine;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.JobConfiguration;
@@ -34,9 +35,15 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateConfig;
 import com.twitter.mesos.gen.UpdateConfigResponse;
 import com.twitter.mesos.scheduler.JobManager.JobUpdateResult;
-import com.twitter.mesos.scheduler.Storage.Work;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
+import com.twitter.mesos.scheduler.storage.JobStore;
+import com.twitter.mesos.scheduler.storage.SchedulerStore;
+import com.twitter.mesos.scheduler.storage.Storage;
+import com.twitter.mesos.scheduler.storage.Storage.Work;
+import com.twitter.mesos.scheduler.storage.StorageRole;
+import com.twitter.mesos.scheduler.storage.StorageRole.Role;
+import com.twitter.mesos.scheduler.storage.TaskStore;
 
 import java.util.Arrays;
 import java.util.List;
@@ -66,6 +73,10 @@ import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 import static com.twitter.mesos.scheduler.JobManager.JobUpdateResult.COMPLETED;
 import static com.twitter.mesos.scheduler.JobManager.JobUpdateResult.JOB_UNCHANGED;
 import static com.twitter.mesos.scheduler.JobManager.JobUpdateResult.UPDATER_LAUNCHED;
+import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.CONSTRUCTED;
+import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.INITIALIZED;
+import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.STARTED;
+import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.STOPPED;
 
 /**
  * Implementation of the scheduler core.
@@ -89,8 +100,8 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
   // Handles all scheduler persistence
   private final Storage storage;
 
-  // Handles communication with the rest of the mesos cluster.
-  private final Driver driver;
+  // Kills the task with the id passed into execute.
+  private Closure<String> killTask;
 
   // Filter to determine whether a task should be scheduled.
   private final SchedulingFilter schedulingFilter;
@@ -102,11 +113,19 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
 
   private final Function<String, TwitterTaskInfo> updaterTaskBuilder;
 
+  enum State {
+    CONSTRUCTED,
+    INITIALIZED,
+    STARTED,
+    STOPPED
+  }
+
+  private final StateMachine<State> stateMachine;
+
   @Inject
   public SchedulerCoreImpl(CronJobManager cronScheduler,
       ImmediateJobManager immediateScheduler,
-      Storage storage,
-      Driver driver,
+      @StorageRole(Role.Primary) Storage storage,
       SchedulingFilter schedulingFilter,
       Function<String, TwitterTaskInfo> updaterTaskBuilder) {
 
@@ -116,15 +135,26 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
         ImmutableList.of(checkNotNull(cronScheduler), checkNotNull(immediateScheduler));
 
     this.storage = checkNotNull(storage);
-    this.driver = checkNotNull(driver);
     this.schedulingFilter = checkNotNull(schedulingFilter);
     this.updaterTaskBuilder = checkNotNull(updaterTaskBuilder);
 
-    initialize();
+   // TODO(jsirois): Add a method to StateMachine or write a wrapper that allows for a read-locked
+   // do-in-state assertion around a block of work.  Transition would then need to grab the write
+   // lock.  Another approach is to force these transitions with:
+   // SchedulerCoreFactory -> SchedulerCoreRunner -> SchedulerCore which remove all state sensitive
+   // methods out of schedulerCore save for stop.
+   stateMachine = StateMachine.<State>builder("scheduler-core")
+       .initialState(CONSTRUCTED)
+       .addState(CONSTRUCTED, INITIALIZED)
+       .addState(INITIALIZED, STARTED)
+       .addState(STARTED, STOPPED)
+       .build();
   }
 
-  private void initialize() {
-    storage.doInTransaction(new Work.NoResult<RuntimeException>() {
+  @Override
+  public String initialize() {
+    checkLifecycleState(CONSTRUCTED);
+    storage.start(new Work.NoResult.Quiet() {
       @Override protected void execute(SchedulerStore schedulerStore, JobStore jobStore,
           TaskStore taskStore) {
 
@@ -147,10 +177,31 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
         }
       }
     });
+
+    String frameworkId = getFrameworkId();
+    stateMachine.transition(INITIALIZED);
+    return frameworkId;
+  }
+
+  private String getFrameworkId() {
+    return storage.doInTransaction(new Work<String, RuntimeException>() {
+      @Override public String apply(SchedulerStore schedulerStore, JobStore jobStore,
+          TaskStore taskStore) throws RuntimeException {
+        return schedulerStore.fetchFrameworkId();
+      }
+    });
+  }
+
+  @Override
+  public void start(Closure<String> killTask) {
+    checkLifecycleState(INITIALIZED);
+    this.killTask = Preconditions.checkNotNull(killTask);
+    stateMachine.transition(STARTED);
   }
 
   @Override
   public void registered(final String frameworkId) {
+    checkStarted();
     storage.doInTransaction(new Work.NoResult.Quiet() {
       @Override protected void execute(SchedulerStore schedulerStore, JobStore jobStore,
           TaskStore taskStore) {
@@ -161,16 +212,18 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
 
   @Override
   public synchronized Set<TaskState> getTasks(final Query query) {
+    checkStarted();
     return storage.doInTransaction(new Work.Quiet<Set<TaskState>>() {
       @Override public Set<TaskState> apply(SchedulerStore schedulerStore, JobStore jobStore,
           TaskStore taskStore) {
         ImmutableSortedSet<ScheduledTask> tasks = taskStore.fetch(query);
-        return ImmutableSet.copyOf(Iterables.transform(tasks, new Function<ScheduledTask, TaskState>() {
-          @Override public TaskState apply(ScheduledTask task) {
-            VolatileTaskState volatileTaskState = taskStateById.get(Tasks.id(task));
-            return new TaskState(task, volatileTaskState);
-          }
-        }));
+        return ImmutableSet.copyOf(Iterables.transform(tasks,
+            new Function<ScheduledTask, TaskState>() {
+              @Override public TaskState apply(ScheduledTask task) {
+                VolatileTaskState volatileTaskState = taskStateById.get(Tasks.id(task));
+                return new TaskState(task, volatileTaskState);
+              }
+            }));
       }
     });
   }
@@ -207,6 +260,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
   //    of slaves.
   @Override
   public synchronized void updateRegisteredTasks(final RegisteredTaskUpdate update) {
+    checkStarted();
     checkNotNull(update);
     checkNotBlank(update.getSlaveHost());
     checkNotNull(update.getTaskInfos());
@@ -278,7 +332,6 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
           for (String deadTask : deadTasks) {
             final ScheduleStatus status = taskInfoMap.get(deadTask).getStatus();
 
-            // TODO(jsirois): XXX looks like this needs a mutate
             setTaskStatus(Query.byId(deadTask), status);
           }
         }
@@ -313,7 +366,6 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
           LOG.info("Slave " + update.getSlaveHost() + " no longer reports running tasks: "
                    + missingRunningTasks + ", reporting as LOST.");
 
-          // TODO(jsirois): XXX looks like this needs a mutate
           setTaskStatus(Query.byId(missingRunningTasks), LOST);
         }
       }
@@ -323,6 +375,8 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
   @Override
   public synchronized void createJob(JobConfiguration job) throws ScheduleException,
       ConfigurationManager.TaskDescriptionException {
+    checkStarted();
+
     final JobConfiguration populated = ConfigurationManager.validateAndPopulate(job);
 
     // TODO(wfarner): Add a check to make sure the job name cannot conflict with the name format
@@ -357,6 +411,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
 
   @Override
   public synchronized void runJob(JobConfiguration job) {
+    checkStarted();
     checkState(!hasRunningTasks(job));
 
     launchTasks(checkNotNull(job.getTaskConfigs()));
@@ -399,6 +454,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
   @Override
   public synchronized JobUpdateResult doJobUpdate(final JobConfiguration job)
       throws ScheduleException {
+    checkStarted();
 
     LOG.info("Updating job " + jobKey(job));
 
@@ -554,6 +610,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
   @Override
   public synchronized TwitterTask offer(final String slaveId, final String slaveHost,
       Map<String, String> offerParams) throws ScheduleException {
+    checkStarted();
     checkNotBlank(slaveId);
     checkNotBlank(slaveHost);
     checkNotNull(offerParams);
@@ -653,6 +710,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
 
   @Override
   public synchronized void setTaskStatus(Query rawQuery, final ScheduleStatus status) {
+    checkStarted();
     checkNotNull(rawQuery);
     checkNotNull(status);
 
@@ -747,6 +805,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
 
   @Override
   public synchronized void killTasks(final Query query) throws ScheduleException {
+    checkStarted();
     checkNotNull(query);
 
     LOG.info("Killing tasks matching " + query);
@@ -782,7 +841,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
         Closure<ScheduledTask> mutate = new Closure<ScheduledTask>() {
           @Override public void execute(ScheduledTask task) {
             changeTaskStatus(task, KILLED_BY_CLIENT);
-            driver.killTask(Tasks.id(task));
+            killTask.execute(Tasks.id(task));
           }
         };
 
@@ -821,9 +880,11 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
     }
   };
 
-  @VisibleForTesting synchronized String registerUpdate(UpdateConfig updateConfig,
+  @VisibleForTesting
+  synchronized String registerUpdate(UpdateConfig updateConfig,
       Map<Integer, TwitterTaskInfo> updateFromByShard,
       Map<Integer, TwitterTaskInfo> updateToByShard) throws UpdateException {
+    checkStarted();
     checkNotNull(updateFromByShard);
     checkNotNull(updateToByShard);
 
@@ -862,6 +923,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
   @Override
   public synchronized UpdateConfigResponse getUpdateConfig(String updateToken)
       throws UpdateException {
+    checkStarted();
     checkNotBlank(updateToken);
 
     JobUpdate update = updatesInProgress.get(updateToken);
@@ -876,6 +938,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
 
   @Override
   public synchronized void updateFinished(String updateToken) throws UpdateException {
+    checkStarted();
     checkNotBlank(updateToken);
 
     if (updatesInProgress.remove(updateToken) == null) {
@@ -883,7 +946,9 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
     }
   }
 
-  @Override public void updateFinished(String owner, String jobName) throws UpdateException {
+  @Override
+  public void updateFinished(String owner, String jobName) throws UpdateException {
+    checkStarted();
     checkNotBlank(owner);
     checkNotBlank(jobName);
 
@@ -901,6 +966,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
   @Override
   public synchronized Set<String> updateShards(String updateToken,
       final Set<Integer> restartShards, final boolean rollback) throws UpdateException {
+    checkStarted();
     checkNotBlank(updateToken);
     checkNotBlank(restartShards);
 
@@ -954,7 +1020,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
             changeTaskStatus(task, KILLED_BY_CLIENT);
 
             if (originalStatus != PENDING) {
-              driver.killTask(Tasks.id(task));
+              killTask.execute(Tasks.id(task));
             }
           }
         });
@@ -998,7 +1064,9 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
 
   @Override
   public synchronized Set<String> restartTasks(final Set<String> taskIds) throws RestartException {
+    checkStarted();
     checkNotBlank(taskIds);
+
     LOG.info("Restart requested for tasks " + taskIds);
 
     // TODO(wfarner): Change this (and the thrift interface) to query by shard ID in the context
@@ -1011,9 +1079,8 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
         Query byId = Query.byId(taskIds);
         Set<ScheduledTask> tasks = taskStore.fetch(byId);
         if (tasks.size() != taskIds.size()) {
-          Set<String> unknownTasks =
-              Sets.difference(taskIds,
-                  ImmutableSet.copyOf(transform(tasks, Tasks.SCHEDULED_TO_ID)));
+          Set<String> unknownTasks = Sets.difference(taskIds, ImmutableSet
+              .copyOf(transform(tasks, Tasks.SCHEDULED_TO_ID)));
 
           throw new RestartException("Restart requested for unknown tasks " + unknownTasks);
         }
@@ -1023,8 +1090,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
           throw new RestartException("Task restart request cannot span multiple jobs: " + jobKeys);
         }
         if (isJobUpdating(Iterables.getOnlyElement(jobKeys))) {
-          throw new RestartException(
-              "Job update must complete or be canceled before restarting tasks.");
+          throw new RestartException("Job update must complete or be canceled before restarting tasks.");
         }
 
         Iterable<ScheduledTask> inactiveTasks = filter(tasks, Predicates.not(Tasks.ACTIVE_FILTER));
@@ -1042,7 +1108,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
             scheduleTaskCopies(Arrays.asList(new ScheduledTask(task)), taskStore);
 
             if (originalStatus != PENDING) {
-              driver.killTask(Tasks.id(task));
+              killTask.execute(Tasks.id(task));
             }
           }
         });
@@ -1055,6 +1121,8 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
   @Override
   public synchronized JobUpdateResult updateJob(JobConfiguration updatedJob)
       throws ScheduleException, TaskDescriptionException {
+    checkStarted();
+
     JobConfiguration populated = ConfigurationManager.validateAndPopulate(updatedJob);
 
     try {
@@ -1066,7 +1134,17 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
 
   @Override
   public void stop() {
+    checkStarted();
     storage.stop();
+    stateMachine.transition(STOPPED);
+  }
+
+  private void checkStarted() {
+    checkLifecycleState(STARTED);
+  }
+
+  private void checkLifecycleState(State state) {
+    Preconditions.checkState(stateMachine.getState() == state);
   }
 
   private final class Vars {

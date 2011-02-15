@@ -4,6 +4,8 @@ import org.apache.thrift.TBase;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
+import org.apache.thrift.protocol.TBinaryProtocol;
+import org.apache.thrift.protocol.TProtocolFactory;
 
 import javax.annotation.Nullable;
 
@@ -13,6 +15,11 @@ import javax.annotation.Nullable;
  * @author wfarner
  */
 public class ThriftBinaryCodec {
+
+  /**
+   * Protocol factory used for all thrift encoding and decoding.
+   */
+  public static final TProtocolFactory PROTOCOL_FACTORY = new TBinaryProtocol.Factory();
 
   @Nullable
   public static <T extends TBase> T decode(Class<T> clazz, byte[] buffer) throws CodingException {
@@ -28,7 +35,7 @@ public class ThriftBinaryCodec {
     }
 
     try {
-      new TDeserializer().deserialize(t, buffer);
+      new TDeserializer(PROTOCOL_FACTORY).deserialize(t, buffer);
       return t;
     } catch (TException e) {
       throw new CodingException("Failed to deserialize thrift object.", e);
@@ -40,7 +47,7 @@ public class ThriftBinaryCodec {
     if (tBase == null) return null;
 
     try {
-      return new TSerializer().serialize(tBase);
+      return new TSerializer(PROTOCOL_FACTORY).serialize(tBase);
     } catch (TException e) {
       throw new CodingException("Failed to serialize: " + tBase, e);
     }

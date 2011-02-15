@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.storage.db;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
@@ -14,6 +14,8 @@ import com.google.common.primitives.Ints;
 import com.google.inject.Inject;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.ExceptionTransporter;
+import com.twitter.common.base.ExceptionalClosure;
+import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.stats.StatImpl;
@@ -21,12 +23,27 @@ import com.twitter.common.stats.Stats;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
+import com.twitter.mesos.gen.ConfiguratonKey;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.StorageMigrationResult;
+import com.twitter.mesos.gen.StorageMigrationResults;
+import com.twitter.mesos.gen.StorageMigrationStatus;
+import com.twitter.mesos.gen.StorageSystemId;
 import com.twitter.mesos.gen.TaskQuery;
+import com.twitter.mesos.scheduler.Query;
+import com.twitter.mesos.scheduler.storage.JobStore;
+import com.twitter.mesos.scheduler.storage.MigrationUtils;
+import com.twitter.mesos.scheduler.storage.SchedulerStore;
+import com.twitter.mesos.scheduler.storage.Storage;
+import com.twitter.mesos.scheduler.storage.TaskStore;
 import org.apache.commons.lang.StringUtils;
 import org.apache.thrift.TBase;
+import org.apache.thrift.TException;
+import org.apache.thrift.protocol.TProtocol;
+import org.apache.thrift.transport.TIOStreamTransport;
+import org.springframework.core.io.ClassRelativeResourceLoader;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -36,7 +53,10 @@ import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionCallbackWithoutResult;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import javax.annotation.Nullable;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.net.URL;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -48,6 +68,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 
 import static com.google.common.collect.Iterables.transform;
 
@@ -61,47 +82,86 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
   private static final Logger LOG = Logger.getLogger(DbStorage.class.getName());
 
   /**
-   * Allows customization of {@link DbStorage} behavior.  A new Configuration object will supply
-   * sensible defaults and only the tweaks desired need be applied.
+   * The {@link com.twitter.mesos.gen.StorageSystemId#getType() type} identifier for
+   * {@code DbStorage}.
    */
-  public static class Configuration {
-    private static final int DEFAULT_MAX_FRAMEWORK_ID_HISTORY = 100;
+  public static final String STORAGE_SYSTEM_TYPE = "EMBEDDED_H2_DB";
 
-    private int maxFrameworkIdHistory = DEFAULT_MAX_FRAMEWORK_ID_HISTORY;
+  /**
+   * The version of this {@code DbStorage}.  Should be bumped when any combination of database
+   * implementation change and/or schema change requires a data migration.
+   */
+  static final int STORAGE_SYSTEM_VERSION = 0;
 
-    /**
-     * Sets the maximum number of framework id mutations to retain in the audit log.
-     *
-     * <p>TODO(jsirois): consider refactoring storage of framework id - in practice it should be
-     * constant and so an audit log is overkill / not needed.
-     *
-     * @param maxFrameworkIdHistory The maximum number of entries to retain, must be larger than 0
-     * @return this {@code Configuration} object for chaining
-     */
-    public Configuration setMaxFrameworkIdHistory(int maxFrameworkIdHistory) {
-      Preconditions.checkArgument(maxFrameworkIdHistory > 0);
-      this.maxFrameworkIdHistory = maxFrameworkIdHistory;
-      return this;
-    }
-  }
+  private static final StorageSystemId ID =
+      new StorageSystemId(STORAGE_SYSTEM_TYPE, STORAGE_SYSTEM_VERSION);
 
   @VisibleForTesting final JdbcTemplate jdbcTemplate;
   private final TransactionTemplate transactionTemplate;
-  private final Configuration configuration;
 
   /**
    * @param jdbcTemplate The {@code JdbcTemplate} object to execute database operation against.
    * @param transactionTemplate The {@code TransactionTemplate} object that provides transaction
    *     scope for database operations.
-   * @param configuration The {@code Configuration} object specifying operational customizations to
-   *     this {@code DbStorage} component.
    */
   @Inject
-  public DbStorage(JdbcTemplate jdbcTemplate, TransactionTemplate transactionTemplate,
-      Configuration configuration) {
+  public DbStorage(JdbcTemplate jdbcTemplate, TransactionTemplate transactionTemplate) {
     this.jdbcTemplate = Preconditions.checkNotNull(jdbcTemplate);
     this.transactionTemplate = Preconditions.checkNotNull(transactionTemplate);
-    this.configuration = Preconditions.checkNotNull(configuration);
+  }
+
+  @Override
+  public StorageSystemId id() {
+    return ID;
+  }
+
+  @Override
+  public void start(final Work.NoResult.Quiet initilizationLogic) {
+    doInTransaction(new Work.NoResult.Quiet() {
+      @Override protected void execute(SchedulerStore schedulerStore, JobStore jobStore,
+          TaskStore taskStore) throws RuntimeException {
+
+        ClassRelativeResourceLoader resourceLoader = new ClassRelativeResourceLoader(getClass());
+        URL schemaUrl;
+        try {
+          schemaUrl = resourceLoader.getResource("db-task-store-schema.sql").getURL();
+        } catch (IOException e) {
+          throw new IllegalStateException("Could not find schema on classpath", e);
+        }
+        jdbcTemplate.execute(String.format("RUNSCRIPT FROM '%s'", schemaUrl));
+
+        initilizationLogic.apply(schedulerStore, jobStore, taskStore);
+      }
+    });
+  }
+
+  @Timed("db_storage_mark_migration")
+  @Override
+  public void markMigration(final StorageMigrationResult result) {
+    Preconditions.checkNotNull(result);
+
+    updateSchedulerState(ConfiguratonKey.MIGRATION_RESULTS, new StorageMigrationResults(),
+        new Closure<StorageMigrationResults>() {
+          @Override public void execute(StorageMigrationResults fetched) {
+            fetched.putToResult(result.getPath(), result);
+          }
+        });
+  }
+
+  @Timed("db_storage_has_migrated")
+  @Override
+  public boolean hasMigrated(Storage from) {
+    Preconditions.checkNotNull(from);
+
+    StorageMigrationResults fetched =
+        fetchSchedulerState(ConfiguratonKey.MIGRATION_RESULTS, new StorageMigrationResults());
+
+    if (!fetched.isSetResult()) {
+      return false;
+    }
+
+    StorageMigrationResult result = fetched.result.get(MigrationUtils.migrationPath(from, this));
+    return (result != null) && (result.status == StorageMigrationStatus.SUCCESS);
   }
 
   @Override
@@ -137,28 +197,88 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
   public void saveFrameworkId(final String frameworkId) {
     MorePreconditions.checkNotBlank(frameworkId);
 
-    transactionTemplate.execute(new TransactionCallbackWithoutResult() {
-      @Override protected void doInTransactionWithoutResult(TransactionStatus transactionStatus) {
-        jdbcTemplate.update(
-            "INSERT INTO scheduler_state (framework_id, updated_at) VALUES (?, now())",
-            frameworkId);
-
-        jdbcTemplate.update("DELETE FROM scheduler_state WHERE id <= ("
-                            + "SELECT id from scheduler_state ORDER BY id DESC LIMIT 1 OFFSET ?)",
-            configuration.maxFrameworkIdHistory);
-      }
-    });
+    updateSchedulerState(com.twitter.mesos.gen.ConfiguratonKey.FRAMEWORK_ID,
+        new ExceptionalClosure<TProtocol, TException>() {
+          @Override public void execute(TProtocol stream) throws TException {
+            stream.writeString(frameworkId);
+          }
+        });
   }
 
   @Timed("db_storage_fetch_framework_id")
   @Override
   @Nullable
   public String fetchFrameworkId() {
-    return transactionTemplate.execute(new TransactionCallback<String>() {
-      @Override public String doInTransaction(TransactionStatus transactionStatus) {
-        List<String> results = jdbcTemplate.queryForList(
-            "SELECT framework_id FROM scheduler_state ORDER BY id DESC LIMIT 1", String.class);
-        return Iterables.getOnlyElement(results, null);
+    return fetchSchedulerState(com.twitter.mesos.gen.ConfiguratonKey.FRAMEWORK_ID,
+        new ExceptionalFunction<TProtocol, String, TException>() {
+          @Override public String apply(TProtocol data) throws TException {
+            return data.readString();
+          }
+        }, null);
+  }
+
+  private <T extends TBase<?, ?>> void updateSchedulerState(final ConfiguratonKey key,
+      final T blank, final Closure<T> mutator) {
+
+    transactionTemplate.execute(new TransactionCallbackWithoutResult() {
+      @Override protected void doInTransactionWithoutResult(TransactionStatus transactionStatus) {
+        final T state = fetchSchedulerState(key, blank);
+        mutator.execute(state);
+        updateSchedulerState(key, new ExceptionalClosure<TProtocol, TException>() {
+          @Override public void execute(TProtocol data) throws TException {
+            state.write(data);
+          }
+        });
+      }
+    });
+  }
+
+  private void updateSchedulerState(final ConfiguratonKey key,
+      final ExceptionalClosure<TProtocol, TException> serializationOp) {
+
+    transactionTemplate.execute(new TransactionCallbackWithoutResult() {
+      @Override protected void doInTransactionWithoutResult(TransactionStatus transactionStatus) {
+        ByteArrayOutputStream data = new ByteArrayOutputStream();
+        TIOStreamTransport transport = new TIOStreamTransport(data);
+        try {
+          serializationOp.execute(ThriftBinaryCodec.PROTOCOL_FACTORY.getProtocol(transport));
+        } catch (TException e) {
+          throw new IllegalStateException("Failed to serialize thrift data", e);
+        }
+        jdbcTemplate.update("MERGE INTO scheduler_state (key, value) KEY(key) VALUES(?, ?)",
+            key.getValue(), data.toByteArray());
+      }
+    });
+  }
+
+  private <T extends TBase<?, ?>> T fetchSchedulerState(ConfiguratonKey key, final T blank) {
+    return fetchSchedulerState(key, new ExceptionalFunction<TProtocol, T, TException>() {
+      @Override public T apply(TProtocol data) throws TException {
+        blank.read(data);
+        return blank;
+      }
+    }, blank);
+  }
+
+  private <T> T fetchSchedulerState(final ConfiguratonKey key,
+      final ExceptionalFunction<TProtocol, T, TException> decoder, @Nullable final T defaultValue) {
+
+    return transactionTemplate.execute(new TransactionCallback<T>() {
+      @Override public T doInTransaction(TransactionStatus transactionStatus) {
+        List<T> results = jdbcTemplate.query("SELECT value FROM scheduler_state WHERE key = ?",
+            new RowMapper<T>() {
+              @Override public T mapRow(ResultSet resultSet, int rowIndex) throws SQLException {
+                byte[] data = resultSet.getBytes(1);
+                TIOStreamTransport transport =
+                    new TIOStreamTransport(new ByteArrayInputStream(data));
+                try {
+                  return decoder.apply(ThriftBinaryCodec.PROTOCOL_FACTORY.getProtocol(transport));
+                } catch (TException e) {
+                  throw new IllegalStateException("Failed to deserialize thrift data", e);
+                }
+              }
+            }, key.getValue());
+        return Iterables.getOnlyElement(results, defaultValue);
       }
     });
   }

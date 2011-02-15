@@ -9,35 +9,46 @@ import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 import com.google.inject.multibindings.Multibinder;
 import com.google.inject.name.Names;
+import com.twitter.common.base.Closure;
+import com.twitter.common.base.Command;
+import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.inject.TimedInterceptor;
+import com.twitter.common.io.FileUtils;
+import com.twitter.common.process.ShutdownRegistry;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.mesos.HttpAssets;
-import com.twitter.mesos.gen.NonVolatileSchedulerState;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.Driver.MesosDriverImpl;
 import com.twitter.mesos.scheduler.SchedulingFilter.SchedulingFilterImpl;
-import com.twitter.mesos.scheduler.Storage.Work;
 import com.twitter.mesos.scheduler.httphandlers.CreateJob;
 import com.twitter.mesos.scheduler.httphandlers.Mname;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzHome;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzJob;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzUser;
-import com.twitter.mesos.scheduler.persistence.EncodingPersistenceLayer;
-import com.twitter.mesos.scheduler.persistence.FileSystemPersistence;
-import com.twitter.mesos.scheduler.persistence.PersistenceLayer;
-import com.twitter.mesos.scheduler.persistence.ZooKeeperPersistence;
+import com.twitter.mesos.scheduler.storage.Migrator;
+import com.twitter.mesos.scheduler.storage.StorageRole;
+import com.twitter.mesos.scheduler.storage.db.DbStorageModule;
+import com.twitter.mesos.scheduler.storage.stream.StreamStorageModule;
 import mesos.MesosSchedulerDriver;
 import mesos.Protos.FrameworkID;
+import mesos.Protos.TaskID;
+import mesos.Scheduler;
 import mesos.SchedulerDriver;
+import org.apache.zookeeper.server.NIOServerCnxn;
+import org.apache.zookeeper.server.ZooKeeperServer;
+import org.apache.zookeeper.server.ZooKeeperServer.BasicDataTreeBuilder;
+import org.apache.zookeeper.server.persistence.FileTxnSnapLog;
 
-import javax.annotation.Nullable;
+import java.io.File;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Logger;
+
+import javax.annotation.Nullable;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.process.GuicedProcess.registerServlet;
@@ -45,10 +56,13 @@ import static com.twitter.common.process.GuicedProcess.registerServlet;
 public class SchedulerModule extends AbstractModule {
   private static final Logger LOG = Logger.getLogger(SchedulerModule.class.getName());
 
+  private final ShutdownRegistry shutdownRegistry;
   private final SchedulerMain.TwitterSchedulerOptions options;
 
   @Inject
-  public SchedulerModule(SchedulerMain.TwitterSchedulerOptions options) {
+  public SchedulerModule(ShutdownRegistry shutdownRegistry,
+      SchedulerMain.TwitterSchedulerOptions options) {
+    this.shutdownRegistry = checkNotNull(shutdownRegistry);
     this.options = checkNotNull(options);
   }
 
@@ -58,8 +72,7 @@ public class SchedulerModule extends AbstractModule {
     TimedInterceptor.bind(binder());
 
     // Bindings for SchedulerMain.
-    ZooKeeperClient zkClient = new ZooKeeperClient(
-        Amount.of(options.zooKeeperSessionTimeoutSecs, Time.SECONDS), options.zooKeeperEndpoints);
+    ZooKeeperClient zkClient = createZooKeeperClient();
     bind(ZooKeeperClient.class).toInstance(zkClient);
     bind(SingletonService.class).toInstance(
         new SingletonService(zkClient, options.mesosSchedulerNameSpec));
@@ -74,15 +87,18 @@ public class SchedulerModule extends AbstractModule {
     bind(CronJobManager.class).in(Singleton.class);
     bind(ImmediateJobManager.class).in(Singleton.class);
 
-    Multibinder<JobManager> jobManagerMultibinder =
-        Multibinder.newSetBinder(binder(), JobManager.class);
-    jobManagerMultibinder.addBinding().to(CronJobManager.class);
-    jobManagerMultibinder.addBinding().to(ImmediateJobManager.class);
+    install(new DbStorageModule(options, StorageRole.Role.Primary));
+    if (options.upgradeStorage) {
+      // Both StreamStorageModule and the Migrator need a binding for the Set of installed job
+      // managers
+      Multibinder<JobManager> jobManagers = Multibinder.newSetBinder(binder(), JobManager.class);
+      jobManagers.addBinding().to(CronJobManager.class);
+      jobManagers.addBinding().to(ImmediateJobManager.class);
 
-    // PersistenceLayer handled in provider.
-    bind(Storage.class).to(MapStorage.class).in(Singleton.class);
+      install(new StreamStorageModule(StorageRole.Role.Legacy));
+      Migrator.bind(binder());
+    }
 
-    bind(Driver.class).to(MesosDriverImpl.class).in(Singleton.class);
     bind(SchedulingFilter.class).to(SchedulingFilterImpl.class);
 
     // updaterTaskProvider handled in provider.
@@ -92,7 +108,7 @@ public class SchedulerModule extends AbstractModule {
         Names.named(SchedulingFilterImpl.MACHINE_RESTRICTIONS)))
         .toInstance(options.machineRestrictions);
 
-    bind(MesosSchedulerImpl.class).in(Singleton.class);
+    bind(Scheduler.class).to(MesosSchedulerImpl.class).in(Singleton.class);
 
     HttpAssets.register(binder());
     registerServlet(binder(), "/scheduler", SchedulerzHome.class, false);
@@ -128,39 +144,25 @@ public class SchedulerModule extends AbstractModule {
   }
 
   @Provides
-  final PersistenceLayer<NonVolatileSchedulerState> providePersistenceLayer(
-      @Nullable ZooKeeperClient zkClient) {
-
-    PersistenceLayer<byte[]> binaryPersistence;
-    if (options.schedulerPersistenceZooKeeperPath == null) {
-      binaryPersistence = new FileSystemPersistence(options.schedulerPersistenceLocalPath);
-    } else {
-      if (zkClient == null) {
-        throw new IllegalArgumentException(
-            "ZooKeeper client must be available for ZooKeeper persistence layer.");
-      }
-
-      binaryPersistence = new ZooKeeperPersistence(zkClient,
-          options.schedulerPersistenceZooKeeperPath,
-          options.schedulerPersistenceZooKeeperVersion);
-    }
-
-    return new EncodingPersistenceLayer(binaryPersistence);
-  }
-
-  @Provides
   @Singleton
-  final SchedulerDriver provideMesosSchedulerDriver(MesosSchedulerImpl scheduler, Storage storage) {
+  SchedulerDriver provideMesosSchedulerDriver(Scheduler scheduler, SchedulerCore schedulerCore) {
     LOG.info("Connecting to mesos master: " + options.mesosMasterAddress);
 
-    // TODO(wfarner): This was a fix to unweave a circular guice dependency.  Fix.
-    String frameworkId = storage.doInTransaction(new Work<String, RuntimeException>() {
-      @Override public String apply(SchedulerStore schedulerStore, JobStore jobStore,
-          TaskStore taskStore) throws RuntimeException {
-        return schedulerStore.fetchFrameworkId();
+    String frameworkId = schedulerCore.initialize();
+    final SchedulerDriver schedulerDriver = createDriver(scheduler, frameworkId);
+    schedulerCore.start(new Closure<String>() {
+      @Override public void execute(String taskId) throws RuntimeException {
+        int result = schedulerDriver.killTask(TaskID.newBuilder().setValue(taskId).build());
+        if (result != 0) {
+          LOG.severe(String.format("Attempt to kill task %s failed with code %d",
+              taskId, result));
+        }
       }
     });
+    return schedulerDriver;
+  }
 
+  private SchedulerDriver createDriver(Scheduler scheduler, @Nullable String frameworkId) {
     if (frameworkId != null) {
       LOG.info("Found persisted framework ID: " + frameworkId);
       return new MesosSchedulerDriver(scheduler, options.mesosMasterAddress,
@@ -169,5 +171,52 @@ public class SchedulerModule extends AbstractModule {
       LOG.warning("Did not find a persisted framework ID, connecting as a new framework.");
       return new MesosSchedulerDriver(scheduler, options.mesosMasterAddress);
     }
+  }
+
+  private ZooKeeperClient createZooKeeperClient() {
+    Amount<Integer, Time> timeout = Amount.of(options.zooKeeperSessionTimeoutSecs, Time.SECONDS);
+    if (options.zooKeeperInProcess) {
+      try {
+        return startLocalZookeeper(timeout);
+      } catch (IOException e) {
+        throw new RuntimeException("Unable to start local zookeeper", e);
+      } catch (InterruptedException e) {
+        throw new RuntimeException("Unable to start local zookeeper", e);
+      }
+    } else {
+      return new ZooKeeperClient(timeout, options.zooKeeperEndpoints);
+    }
+  }
+
+  private ZooKeeperClient startLocalZookeeper(Amount<Integer, Time> sessionTimeout)
+      throws IOException, InterruptedException {
+    ZooKeeperServer zooKeeperServer =
+        new ZooKeeperServer(new FileTxnSnapLog(createTempDir(), createTempDir()),
+            new BasicDataTreeBuilder());
+
+    final NIOServerCnxn.Factory connectionFactory =
+        new NIOServerCnxn.Factory(new InetSocketAddress(0));
+    connectionFactory.startup(zooKeeperServer);
+    shutdownRegistry.addShutdownAction(new Command() {
+      @Override public void execute() throws RuntimeException {
+        if (connectionFactory.isAlive()) {
+          connectionFactory.shutdown();
+        }
+      }
+    });
+    int zkPort = zooKeeperServer.getClientPort();
+    LOG.info("Embedded zookeeper cluster started on port " + zkPort);
+    return new ZooKeeperClient(sessionTimeout,
+        InetSocketAddress.createUnresolved("localhost", zkPort));
+  }
+
+  private File createTempDir() {
+    final File tempDir = FileUtils.createTempDir();
+    shutdownRegistry.addShutdownAction(new ExceptionalCommand<IOException>() {
+      @Override public void execute() throws IOException {
+        org.apache.commons.io.FileUtils.deleteDirectory(tempDir);
+      }
+    });
+    return tempDir;
   }
 }

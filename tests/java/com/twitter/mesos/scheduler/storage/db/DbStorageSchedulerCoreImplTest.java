@@ -1,6 +1,8 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.storage.db;
 
-import com.twitter.mesos.scheduler.DbStorage.Configuration;
+import com.twitter.mesos.scheduler.BaseSchedulerCoreImplTest;
+import com.twitter.mesos.scheduler.JobManager;
+import com.twitter.mesos.scheduler.storage.Storage;
 
 import java.sql.SQLException;
 import java.util.Set;
@@ -12,7 +14,7 @@ public class DbStorageSchedulerCoreImplTest extends BaseSchedulerCoreImplTest {
 
   @Override
   protected Storage createStorage(Set<JobManager> jobManagers) throws SQLException {
-    return DbStorageTestUtil.setupStorage(this, new Configuration());
+    return DbStorageTestUtil.setupStorage(this);
   }
 
   @Override

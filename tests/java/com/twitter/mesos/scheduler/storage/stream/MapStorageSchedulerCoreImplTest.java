@@ -1,7 +1,10 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.storage.stream;
 
 import com.twitter.mesos.gen.NonVolatileSchedulerState;
+import com.twitter.mesos.scheduler.BaseSchedulerCoreImplTest;
+import com.twitter.mesos.scheduler.JobManager;
 import com.twitter.mesos.scheduler.persistence.PersistenceLayer;
+import com.twitter.mesos.scheduler.storage.Storage;
 import org.junit.Before;
 
 import java.util.Set;
@@ -29,7 +32,7 @@ public class MapStorageSchedulerCoreImplTest extends BaseSchedulerCoreImplTest {
 
   @Override
   protected void expectRestore() throws Exception {
-    expect(persistenceLayer.fetch()).andReturn(null);
+    expect(persistenceLayer.fetch()).andReturn(null).times(2);
   }
 
   @Override

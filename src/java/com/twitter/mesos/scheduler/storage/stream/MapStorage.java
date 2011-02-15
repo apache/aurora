@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.storage.stream;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
@@ -24,9 +24,17 @@ import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.NonVolatileSchedulerState;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.StorageMigrationResult;
+import com.twitter.mesos.gen.StorageSystemId;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.JobManager;
+import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.persistence.PersistenceLayer;
+import com.twitter.mesos.scheduler.storage.JobStore;
+import com.twitter.mesos.scheduler.storage.SchedulerStore;
+import com.twitter.mesos.scheduler.storage.Storage;
+import com.twitter.mesos.scheduler.storage.TaskStore;
 import org.apache.commons.lang.StringUtils;
 
 import java.util.Collection;
@@ -51,6 +59,14 @@ import static com.google.common.collect.Iterables.transform;
  */
 public class MapStorage implements Storage {
   private final static Logger LOG = Logger.getLogger(MapStorage.class.getName());
+
+  /**
+   * The {@link com.twitter.mesos.gen.StorageSystemId#getType() type} identifier for
+   * {@code MapStorage}.
+   */
+  public static final String STORAGE_SYSTEM_TYPE = "MAP";
+
+  private static final StorageSystemId ID = new StorageSystemId(STORAGE_SYSTEM_TYPE, 0);
 
   // The mesos framework ID of the scheduler, set to null until the framework is registered.
   private final AtomicReference<String> frameworkId = new AtomicReference<String>(null);
@@ -77,11 +93,39 @@ public class MapStorage implements Storage {
     restore();
   }
 
+  @Override
+  public void start(final Work.NoResult.Quiet initilizationLogic) {
+    doInTransaction(new Work.NoResult.Quiet() {
+      @Override protected void execute(SchedulerStore schedulerStore, JobStore jobStore,
+          TaskStore taskStore) throws RuntimeException {
+
+        restore();
+
+        initilizationLogic.apply(schedulerStore, jobStore, taskStore);
+      }
+    });
+  }
+
   // Tracks whether the current transaction needs to persist to disk
   private final AtomicBoolean persist = new AtomicBoolean(false);
 
   // Tracks whether we're in the root transaction or a nested one
   private final AtomicBoolean rootTransaction = new AtomicBoolean(true);
+
+  @Override
+  public StorageSystemId id() {
+    return ID;
+  }
+
+  @Override
+  public void markMigration(StorageMigrationResult result) {
+    throw new UnsupportedOperationException("MapStorage cannot be migrated to.");
+  }
+
+  @Override
+  public boolean hasMigrated(Storage from) {
+    throw new UnsupportedOperationException("MapStorage cannot be migrated to.");
+  }
 
   @Override
   public synchronized <T, E extends Exception> T doInTransaction(Work<T, E> work) throws E {

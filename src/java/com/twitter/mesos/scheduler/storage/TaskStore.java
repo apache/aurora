@@ -1,9 +1,10 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.storage;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.scheduler.Query;
 
 import java.util.Set;
 

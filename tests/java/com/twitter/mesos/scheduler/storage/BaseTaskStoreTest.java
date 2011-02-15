@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.storage;
 
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
@@ -12,6 +12,7 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.Query;
 import org.junit.Before;
 import org.junit.Test;
 

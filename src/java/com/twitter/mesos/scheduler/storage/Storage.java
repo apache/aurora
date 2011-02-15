@@ -1,4 +1,7 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.storage;
+
+import com.twitter.mesos.gen.StorageMigrationResult;
+import com.twitter.mesos.gen.StorageSystemId;
 
 /**
  * Manages scheduler storage operations providing an interface to perform atomic changes.
@@ -67,11 +70,44 @@ public interface Storage {
        * A convenient typedef for Work with no result that throws no checked exceptions - it runs
        * quitely.
        */
-      static abstract class Quiet extends Work.NoResult<RuntimeException> {
+      public static abstract class Quiet extends Work.NoResult<RuntimeException> {
         // typedef
       }
     }
   }
+
+  /**
+   * Returns an identifier for the storage implementation.  The version should be changed to
+   * indicate that either storage semantics or format have changed in such a way that migration
+   * between storage formats is required.
+   *
+   * @return the id number of this {@code Storage} implementation
+   */
+  StorageSystemId id();
+
+  /**
+   * Prepares the underlying storage for serving traffic.
+   *
+   * @param initilizationLogic work to perform after this storage system is ready but before
+   *     allowing general use of {@link #doInTransaction}.
+   */
+  void start(Work.NoResult.Quiet initilizationLogic);
+
+  /**
+   * Records a successful migration result.
+   *
+   * @param result The result to record.
+   */
+  void markMigration(StorageMigrationResult result);
+
+  /**
+   * Determines if this storage system has completed migration from the specified storage system
+   * already.
+   *
+   * @param from The storage system to migrate from.
+   * @return {@code true} if this storage system has already migrated its data from {@code from}
+   */
+  boolean hasMigrated(Storage from);
 
   /**
    * Executes the unit of {@code work} in a transaction such that any storage write operations

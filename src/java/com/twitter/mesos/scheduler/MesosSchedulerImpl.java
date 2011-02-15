@@ -10,9 +10,9 @@ import com.google.inject.Inject;
 import com.google.protobuf.ByteString;
 import com.twitter.common.base.Closure;
 import com.twitter.common.stats.Stats;
-import com.twitter.mesos.Message;
 import com.twitter.mesos.StateTranslator;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
+import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.ExecutorMessage;
 import com.twitter.mesos.gen.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.RestartExecutor;
@@ -55,15 +55,13 @@ class MesosSchedulerImpl implements Scheduler {
   private final SchedulerCore schedulerCore;
   private final ExecutorTracker executorTracker;
   private FrameworkID frameworkID;
-  private final Driver driver;
 
   @Inject
   public MesosSchedulerImpl(SchedulerMain.TwitterSchedulerOptions options,
-      SchedulerCore schedulerCore, ExecutorTracker executorTracker, Driver driver) {
+      SchedulerCore schedulerCore, ExecutorTracker executorTracker) {
     this.options = checkNotNull(options);
     this.schedulerCore = checkNotNull(schedulerCore);
     this.executorTracker = checkNotNull(executorTracker);
-    this.driver = checkNotNull(driver);
   }
 
   @Override
@@ -100,7 +98,8 @@ class MesosSchedulerImpl implements Scheduler {
     return map;
   }
 
-  @Override public void registered(SchedulerDriver schedulerDriver, FrameworkID frameworkID) {
+  @Override
+  public void registered(final SchedulerDriver driver, FrameworkID frameworkID) {
     LOG.info("Registered with ID " + frameworkID);
     this.frameworkID = frameworkID;
     schedulerCore.registered(frameworkID.getValue());
@@ -111,7 +110,26 @@ class MesosSchedulerImpl implements Scheduler {
         ExecutorMessage message = new ExecutorMessage();
         message.setRestartExecutor(new RestartExecutor());
 
-        driver.sendMessage(new Message(slaveId, message));
+        byte[] data;
+        try {
+          data = ThriftBinaryCodec.encode(message);
+        } catch (CodingException e) {
+          LOG.log(Level.SEVERE, "Failed to send restart request.", e);
+          return;
+        }
+
+        FrameworkMessage.Builder messageBuilder = FrameworkMessage.newBuilder()
+              .setSlaveId(SlaveID.newBuilder().setValue(slaveId))
+              .setData(ByteString.copyFrom(data));
+
+        LOG.info("Attempting to send message from scheduler to " + slaveId + " - " + message);
+        int result = driver.sendFrameworkMessage(messageBuilder.build());
+        if (result != 0) {
+          LOG.severe(String.format("Attempt to send message failed with code %d [%s]",
+              result, message));
+        } else {
+          LOG.info("Message successfully sent");
+        }
       }
     });
   }

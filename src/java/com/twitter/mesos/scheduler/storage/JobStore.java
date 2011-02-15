@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.storage;
 
 import com.twitter.mesos.gen.JobConfiguration;
 
@@ -10,10 +10,12 @@ import com.twitter.mesos.gen.JobConfiguration;
 public interface JobStore {
 
   /**
-   * Fetches all {@code JobConfiguration}s for jobs owned th the {@link JobManager} identified by
-   * {@code managerId}; if there are none then an empty set is returned.
+   * Fetches all {@code JobConfiguration}s for jobs owned by the
+   * {@link com.twitter.mesos.scheduler.JobManager} identified by {@code managerId}; if there are
+   * none then an empty set is returned.
    *
-   * @param managerId The unique identifier of the {@link JobManager} to find registered jobs for.
+   * @param managerId The unique identifier of the {@link com.twitter.mesos.scheduler.JobManager} to
+   *     find registered jobs for.
    * @return the set of job configurations owned by the specififed job manager
    */
   Iterable<JobConfiguration> fetchJobs(String managerId);
@@ -21,7 +23,8 @@ public interface JobStore {
   /**
    * Saves the job configuration for a job that has been accepted by the scheduler.
    *
-   * @param managerId The unique id of the {@link JobManager} that accepted the job.
+   * @param managerId The unique id of the {@link com.twitter.mesos.scheduler.JobManager} that
+   *     accepted the job.
    * @param jobConfig The configuration of the accepted job.
    */
   void saveAcceptedJob(String managerId, JobConfiguration jobConfig);

@@ -1,9 +1,8 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.storage.db;
 
 import com.google.common.base.Preconditions;
 import com.google.common.testing.TearDown;
 import com.google.common.testing.TearDownAccepter;
-import com.twitter.mesos.scheduler.DbStorage.Configuration;
 import org.h2.tools.Server;
 import org.springframework.core.io.ClassRelativeResourceLoader;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -28,15 +27,12 @@ final class DbStorageTestUtil {
    * jdbc:h2:mem:testdb.
    *
    * @param tearDownAccepter The {@code TearDownAccepter} for the test
-   * @param configuration The DbStorage configuration to use
    * @return A new DbStorage coupled to a fresh in-memory database
    * @throws SQLException if there is a problem setting up the fresh in-memory database
    */
-  public static DbStorage setupStorage(TearDownAccepter tearDownAccepter,
-      Configuration configuration) throws SQLException {
+  public static DbStorage setupStorage(TearDownAccepter tearDownAccepter) throws SQLException {
 
     Preconditions.checkNotNull(tearDownAccepter);
-    Preconditions.checkNotNull(configuration);
 
     // Prop up a web console at: http://localhost:8082, allows connections to jdbc:h2:mem:testdb
     final Server webServer = Server.createWebServer("-webAllowOthers").start();
@@ -47,9 +43,8 @@ final class DbStorageTestUtil {
     });
 
     final EmbeddedDatabase embeddedDatabase =
-        new EmbeddedDatabaseBuilder(new ClassRelativeResourceLoader(DbStorage.class))
+        new EmbeddedDatabaseBuilder()
             .setType(EmbeddedDatabaseType.H2)
-            .addScript("db-task-store-schema.sql")
             .build();
     tearDownAccepter.addTearDown(new TearDown() {
       @Override public void tearDown() throws Exception {
@@ -60,7 +55,7 @@ final class DbStorageTestUtil {
     JdbcTemplate jdbcTemplate = new JdbcTemplate(embeddedDatabase);
     TransactionTemplate transactionTemplate =
         new TransactionTemplate(new DataSourceTransactionManager(embeddedDatabase));
-    return new DbStorage(jdbcTemplate, transactionTemplate, configuration);
+    return new DbStorage(jdbcTemplate, transactionTemplate);
   }
 
   private DbStorageTestUtil() {

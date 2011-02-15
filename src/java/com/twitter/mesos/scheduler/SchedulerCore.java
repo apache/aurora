@@ -1,6 +1,7 @@
 package com.twitter.mesos.scheduler;
 
 import com.google.common.base.Preconditions;
+import com.twitter.common.base.Closure;
 import com.twitter.common.base.MorePreconditions;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.JobConfiguration;
@@ -13,6 +14,7 @@ import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescri
 
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 
 /**
  * Scheduling core, stores scheduler state and makes decisions about which tasks to schedule when
@@ -22,6 +24,15 @@ import java.util.Set;
  * the job to all configured scheduler modules, which are responsible for triggering execution of
  * the job.  Until a job is triggered by a scheduler module, it is retained in the scheduler core
  * in the PENDING state.
+ *
+ * This interface imposes the following lifecycle:
+ * <ol>
+ * <li>[construct]
+ * <li>{@link #initialize()}
+ * <li>{@link #start(com.twitter.common.base.Closure)}
+ * <li>serve clients via other methods (normal usage)
+ * <li>{@link #stop()}
+ * </ol>
  *
  * TODO(wfarner): Figure out how to handle permissions for modification of running tasks.  As it
  * stands it would be quite easy to accidentally modify something that does not belong to you.
@@ -36,6 +47,23 @@ import java.util.Set;
  * @author wfarner
  */
 public interface SchedulerCore extends UpdateScheduler {
+
+
+  /**
+   * Initializes the scheduler's storage system and returns the last framework ID assigned to this
+   * scheduler.
+   *
+   * @return The last assigned framework ID or {@code null} if none has been assigned yet.
+   */
+  @Nullable
+  String initialize();
+
+  /**
+   * Prepares the scheduler for serving traffic.
+   *
+   * @param killTask A closure that will kill the task with the id passed to its execute method.
+   */
+  void start(Closure<String> killTask);
 
   /**
    * Assigns a framework ID to the scheduler, should be called when the scheduler implementation
@@ -129,9 +157,12 @@ public interface SchedulerCore extends UpdateScheduler {
   //    SchedulreCoreImpl and ImmediateJobManager is broken.
   JobUpdateResult doJobUpdate(JobConfiguration updatedJob) throws ScheduleException;
 
-  void stop();
-
   void updateRegisteredTasks(RegisteredTaskUpdate update);
+
+  /**
+   * Should be called to allow the scheduler to gracefully shut down.
+   */
+  void stop();
 
   class TwitterTask {
     public final String taskId;

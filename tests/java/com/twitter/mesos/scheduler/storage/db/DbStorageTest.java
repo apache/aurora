@@ -1,10 +1,14 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.storage.db;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.JobConfiguration;
-import com.twitter.mesos.scheduler.DbStorage.Configuration;
+import com.twitter.mesos.scheduler.storage.BaseTaskStoreTest;
+import com.twitter.mesos.scheduler.storage.JobStore;
+import com.twitter.mesos.scheduler.storage.SchedulerStore;
+import com.twitter.mesos.scheduler.storage.Storage.Work;
+import com.twitter.mesos.scheduler.storage.TaskStore;
 import org.junit.Test;
 
 import java.sql.SQLException;
@@ -20,7 +24,14 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
 
   @Override
   protected DbStorage createTaskStore() throws SQLException {
-    return DbStorageTestUtil.setupStorage(this, new Configuration().setMaxFrameworkIdHistory(2));
+    DbStorage dbStorage = DbStorageTestUtil.setupStorage(this);
+    dbStorage.start(new Work.NoResult.Quiet() {
+      @Override protected void execute(SchedulerStore schedulerStore, JobStore jobStore,
+          TaskStore taskStore) throws RuntimeException {
+        // noop
+      }
+    });
+    return dbStorage;
   }
 
   @Test
@@ -37,9 +48,6 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
     store.saveFrameworkId("jeff");
     store.saveFrameworkId("bob");
     assertEquals("bob", store.fetchFrameworkId());
-
-    assertEquals(ImmutableList.of("jeff", "bob"),
-        store.jdbcTemplate.queryForList("SELECT framework_id FROM scheduler_state", String.class));
   }
 
   @Test
