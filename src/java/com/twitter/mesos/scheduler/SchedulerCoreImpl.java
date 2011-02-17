@@ -165,16 +165,6 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
             ConfigurationManager.applyDefaultsIfUnset(task.getAssignedTask().getTask());
           }
         });
-
-        for (JobManager jobManager : jobManagers) {
-          for (JobConfiguration job : jobStore.fetchJobs(jobManager.getUniqueKey())) {
-            try {
-              jobManager.receiveJob(job);
-            } catch (ScheduleException e) {
-              LOG.log(Level.SEVERE, "While trying to restore state, scheduler module failed.", e);
-            }
-          }
-        }
       }
     });
 
@@ -197,6 +187,22 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
     checkLifecycleState(INITIALIZED);
     this.killTask = Preconditions.checkNotNull(killTask);
     stateMachine.transition(STARTED);
+
+    storage.doInTransaction(new Work.NoResult.Quiet() {
+      @Override protected void execute(SchedulerStore schedulerStore, JobStore jobStore,
+          TaskStore taskStore) throws RuntimeException {
+
+        for (JobManager jobManager : jobManagers) {
+          for (JobConfiguration job : jobStore.fetchJobs(jobManager.getUniqueKey())) {
+            try {
+              jobManager.receiveJob(job);
+            } catch (ScheduleException e) {
+              LOG.log(Level.SEVERE, "While trying to restore state, scheduler module failed.", e);
+            }
+          }
+        }
+      }
+    });
   }
 
   @Override
@@ -386,21 +392,14 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
       throw new ScheduleException("Job already exists: " + jobKey(populated));
     }
 
-    boolean accepted = storage.doInTransaction(new Work<Boolean, ScheduleException>() {
-      @Override public Boolean apply(SchedulerStore schedulerStore, JobStore jobStore,
-          TaskStore taskStore) throws ScheduleException {
-        for (final JobManager manager : jobManagers) {
-          if (manager.receiveJob(populated)) {
-            LOG.info("Job accepted by manager: " + manager.getUniqueKey());
-            // TODO(jsirois): Consider having JobManager own its storage, this 1-2 is non-atomic
-            // by design
-            jobStore.saveAcceptedJob(manager.getUniqueKey(), populated);
-            return true;
-          }
-        }
-        return false;
+    boolean accepted = false;
+    for (final JobManager manager : jobManagers) {
+      if (manager.receiveJob(populated)) {
+        LOG.info("Job accepted by manager: " + manager.getUniqueKey());
+        accepted = true;
+        break;
       }
-    });
+    }
 
     if (!accepted) {
       LOG.severe("Job was not accepted by any of the configured schedulers, discarding.");
@@ -436,7 +435,9 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
    * @return The task IDs of the new tasks.
    */
   private Set<String> launchTasks(Set<TwitterTaskInfo> tasks) {
-    if (tasks.isEmpty()) return ImmutableSet.of();
+    if (tasks.isEmpty()) {
+      return ImmutableSet.of();
+    }
 
     LOG.info("Launching " + tasks.size() + " tasks.");
     final Set<ScheduledTask> scheduledTasks = ImmutableSet.copyOf(transform(tasks, taskCreator));
@@ -823,7 +824,6 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
 
           for (JobManager manager : jobManagers) {
             if (manager.deleteJob(jobKey)) {
-              jobStore.deleteJob(jobKey);
               matchingScheduler = true;
             }
           }

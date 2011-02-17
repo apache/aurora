@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.storage.BaseTaskStoreTest;
 import com.twitter.mesos.scheduler.storage.JobStore;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
@@ -68,5 +69,24 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
     store.deleteJob(Tasks.jobKey(jobConfig1));
     assertEquals(ImmutableList.of(jobConfig2), store.fetchJobs("CRON"));
     assertEquals(ImmutableList.of(jobConfig3), store.fetchJobs("IMMEDIATE"));
+
+    assertNull(store.fetchJob("IMMEDIATE", Tasks.jobKey(jobConfig2)));
+
+    JobConfiguration actual = store.fetchJob("CRON", Tasks.jobKey(jobConfig2));
+    assertEquals(jobConfig2, actual);
+  }
+
+  @Test
+  public void testGetTaskStoreSize() {
+    assertEquals(0, store.getTaskStoreSize());
+
+    store(ImmutableList.of(makeTask("task1")));
+    assertEquals(1, store.getTaskStoreSize());
+
+    store(ImmutableList.of(makeTask("task2"), makeTask("task3")));
+    assertEquals(3, store.getTaskStoreSize());
+
+    store.remove(Query.GET_ALL);
+    assertEquals(0, store.getTaskStoreSize());
   }
 }

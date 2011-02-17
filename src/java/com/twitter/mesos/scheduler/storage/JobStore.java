@@ -2,6 +2,8 @@ package com.twitter.mesos.scheduler.storage;
 
 import com.twitter.mesos.gen.JobConfiguration;
 
+import javax.annotation.Nullable;
+
 /**
  * Stores job configuration data.
  *
@@ -19,6 +21,18 @@ public interface JobStore {
    * @return the set of job configurations owned by the specififed job manager
    */
   Iterable<JobConfiguration> fetchJobs(String managerId);
+
+  /**
+   * Fetches the {@code JobConfiguration} for the specified {@code jobKey}; if there is none then
+   * {@code null} is returned.
+   *
+   * @param managerId The unique identifier of the {@link com.twitter.mesos.scheduler.JobManager}
+   *     that accepted the job
+   * @param jobKey The jobKey identifying the job to be fetched.
+   * @return the job configuration for the given {@code jobKey} or else {@code null} if none is
+   *     found
+   */
+  @Nullable JobConfiguration fetchJob(String managerId, String jobKey);
 
   /**
    * Saves the job configuration for a job that has been accepted by the scheduler.

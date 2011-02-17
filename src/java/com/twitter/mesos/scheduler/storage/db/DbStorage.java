@@ -299,19 +299,44 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
     return fetched;
   }
 
+  @Timed("db_storage_fetch_job")
+  @Override
+  public JobConfiguration fetchJob(final String managerId, final String jobKey) {
+    MorePreconditions.checkNotBlank(managerId);
+    MorePreconditions.checkNotBlank(jobKey);
+
+    return transactionTemplate.execute(new TransactionCallback<JobConfiguration>() {
+      @Override public JobConfiguration doInTransaction(TransactionStatus transactionStatus) {
+        return queryJob(managerId, jobKey);
+      }
+    });
+  }
+
+  private static final RowMapper<JobConfiguration> JOB_CONFIGURATION_ROW_MAPPER =
+      new RowMapper<JobConfiguration>() {
+        @Override public JobConfiguration mapRow(ResultSet resultSet, int rowIndex)
+            throws SQLException {
+
+          try {
+            return ThriftBinaryCodec.decode(JobConfiguration.class, resultSet.getBytes(1));
+          } catch (CodingException e) {
+            throw new SQLException("Problem decoding JobConfiguration", e);
+          }
+        }
+      };
+
   private List<JobConfiguration> queryJobs(String managerId) {
     return jdbcTemplate.query("SELECT job_configuration FROM job_state WHERE manager_id = ?",
-        new RowMapper<JobConfiguration>() {
-          @Override public JobConfiguration mapRow(ResultSet resultSet, int rowIndex)
-              throws SQLException {
+        JOB_CONFIGURATION_ROW_MAPPER, managerId);
+  }
 
-            try {
-              return ThriftBinaryCodec.decode(JobConfiguration.class, resultSet.getBytes(1));
-            } catch (CodingException e) {
-              throw new SQLException("Problem decoding JobConfiguration", e);
-            }
-          }
-        }, managerId);
+  @Nullable
+  private JobConfiguration queryJob(String managerId, String jobKey) {
+    List<JobConfiguration> results =
+        jdbcTemplate.query(
+            "SELECT job_configuration FROM job_state WHERE manager_id = ? AND job_key = ?",
+            JOB_CONFIGURATION_ROW_MAPPER, managerId, jobKey);
+    return Iterables.getOnlyElement(results, null);
   }
 
   @Timed("db_storage_save_accepted_job")
@@ -692,15 +717,20 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
     Vars() {
       Stats.export(new StatImpl<Integer>("task_store_size") {
         @Override public Integer read() {
-          return transactionTemplate.execute(new TransactionCallback<Integer>() {
-            @Override public Integer doInTransaction(TransactionStatus transactionStatus) {
-              return jdbcTemplate.queryForInt("SELECT COUNT(task_id) IN task_store");
-            }
-          });
+          return getTaskStoreSize();
         }
       });
     }
   }
 
   private final Vars vars = new Vars();
+
+  @VisibleForTesting
+  int getTaskStoreSize() {
+    return transactionTemplate.execute(new TransactionCallback<Integer>() {
+      @Override public Integer doInTransaction(TransactionStatus transactionStatus) {
+        return jdbcTemplate.queryForInt("SELECT COUNT(task_id) FROM task_state");
+      }
+    });
+  }
 }

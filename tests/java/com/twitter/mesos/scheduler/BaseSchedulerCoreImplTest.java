@@ -102,12 +102,10 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
    * Subclasses should create the {@code Storage} implementation to be used by the
    * {@link SchedulerCoreImpl} under test.
    *
-   * @param jobManagers The job managers the will be used by the {@code SchedulerCoreImpl} under
-   *     test.
    * @return the {@code Storage} to for the SchedulerCoreImpl to use under tests
    * @throws Exception if there is a problem creating the storage implementation
    */
-  protected abstract Storage createStorage(Set<JobManager> jobManagers) throws Exception;
+  protected abstract Storage createStorage() throws Exception;
 
   /**
    * Called by the test when 1 restore operation is expected from the underlying {@link Storage}.
@@ -126,10 +124,11 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   protected abstract void expectPersists(int count) throws Exception;
 
   private void buildScheduler() throws Exception {
-    ImmediateJobManager immediateManager = new ImmediateJobManager();
-    cron = new CronJobManager();
+    Storage storage = createStorage();
 
-    Storage storage = createStorage(ImmutableSet.of(immediateManager, cron));
+    ImmediateJobManager immediateManager = new ImmediateJobManager();
+    cron = new CronJobManager(storage);
+
     scheduler = new SchedulerCoreImpl(cron, immediateManager, storage, schedulingFilter,
         updateTaskBuilder);
     cron.schedulerCore = scheduler;
@@ -519,7 +518,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     assertThat(cron.hasJob(JOB_A_KEY), is(true));
 
     // Simulate a triggering of the cron job.
-    cron.cronTriggered(JOB_A_KEY);
+    cron.cronTriggered(job);
     assertTaskCount(10);
     assertThat(getTasks(new Query(new TaskQuery()
         .setOwner(OWNER_A).setJobName(JOB_A).setStatuses(Sets.newHashSet(PENDING)))).size(),
@@ -557,11 +556,11 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     assertThat(cron.hasJob(JOB_A_KEY), is(true));
 
     // Simulate a triggering of the cron job.
-    cron.cronTriggered(JOB_A_KEY);
+    cron.cronTriggered(job);
     assertTaskCount(10);
 
     // Simulate a triggering of the cron job.
-    cron.cronTriggered(JOB_A_KEY);
+    cron.cronTriggered(job);
     assertTaskCount(10);
 
     try {
@@ -1128,7 +1127,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   @Test
   public void testUpdateCronJob() throws Exception {
     expectRestore();
-    expectPersists(1);
+    expectPersists(2);
 
     control.replay();
     buildScheduler();
@@ -1664,7 +1663,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       int numTasks) {
     List<TwitterTaskInfo> tasks = Lists.newArrayList();
     for (int i = 0; i < numTasks; i++) {
-      tasks.add(new TwitterTaskInfo(task));
+      tasks.add(new TwitterTaskInfo(task).setOwner(owner).setJobName(jobName));
     }
     return makeJob(owner, jobName, tasks);
   }

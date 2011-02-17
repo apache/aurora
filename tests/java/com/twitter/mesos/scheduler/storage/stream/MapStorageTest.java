@@ -1,10 +1,8 @@
 package com.twitter.mesos.scheduler.storage.stream;
 
-import com.google.common.collect.ImmutableSet;
 import com.twitter.common.base.Commands;
 import com.twitter.common.testing.EasyMockTest.Clazz;
 import com.twitter.mesos.gen.NonVolatileSchedulerState;
-import com.twitter.mesos.scheduler.JobManager;
 import com.twitter.mesos.scheduler.persistence.PersistenceLayer;
 import com.twitter.mesos.scheduler.storage.BaseTaskStoreTest;
 import com.twitter.mesos.scheduler.storage.TaskStore;
@@ -18,7 +16,7 @@ public class MapStorageTest extends BaseTaskStoreTest<TaskStore> {
     PersistenceLayer<NonVolatileSchedulerState> persistenceLayer =
         new Clazz<PersistenceLayer<NonVolatileSchedulerState>>() {}.createMock();
 
-    MapStorage store = new MapStorage(persistenceLayer, ImmutableSet.<JobManager>of());
+    MapStorage store = new MapStorage(persistenceLayer);
     return store.asTaskStore(Commands.NOOP);
   }
 }

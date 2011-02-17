@@ -6,10 +6,11 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.LinkedListMultimap;
+import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -28,7 +29,6 @@ import com.twitter.mesos.gen.StorageMigrationResult;
 import com.twitter.mesos.gen.StorageSystemId;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.JobManager;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.persistence.PersistenceLayer;
 import com.twitter.mesos.scheduler.storage.JobStore;
@@ -38,6 +38,7 @@ import com.twitter.mesos.scheduler.storage.TaskStore;
 import org.apache.commons.lang.StringUtils;
 
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -76,19 +77,11 @@ public class MapStorage implements Storage {
 
   private final PersistenceLayer<NonVolatileSchedulerState> persistenceLayer;
 
-  // Schedulers that are responsible for triggering execution of jobs.
-  private final ImmutableMap<String, JobManager> jobManagers;
+  private final ListMultimap<String, JobConfiguration> jobs = LinkedListMultimap.create();
 
   @Inject
-  public MapStorage(PersistenceLayer<NonVolatileSchedulerState> persistenceLayer,
-      Set<JobManager> jobManagers) {
-
+  public MapStorage(PersistenceLayer<NonVolatileSchedulerState> persistenceLayer) {
     this.persistenceLayer = Preconditions.checkNotNull(persistenceLayer);
-    this.jobManagers = Maps.uniqueIndex(jobManagers, new Function<JobManager, String>() {
-      @Override public String apply(JobManager jobManager) {
-        return jobManager.getUniqueKey();
-      }
-    });
 
     restore();
   }
@@ -145,13 +138,29 @@ public class MapStorage implements Storage {
 
       JobStore jobStore = new JobStore() {
         @Override public Iterable<JobConfiguration> fetchJobs(String managerId) {
-          return jobManagers.get(managerId).getJobs();
+          return jobs.get(checkNotNull(managerId));
         }
-
+        @Override public JobConfiguration fetchJob(String managerId, final String jobKey) {
+          checkNotNull(managerId);
+          checkNotNull(jobKey);
+          return Iterables.find(jobs.get(managerId), new Predicate<JobConfiguration>() {
+            @Override public boolean apply(JobConfiguration jobConfiguration) {
+              return jobKey.equals(Tasks.jobKey(jobConfiguration));
+            }
+          }, null);
+        }
         @Override public void saveAcceptedJob(String managerId, JobConfiguration jobConfig) {
+          jobs.put(checkNotNull(managerId), checkNotNull(jobConfig));
           persist.set(true);
         }
         @Override public void deleteJob(String jobKey) {
+          checkNotNull(jobKey);
+          for (Iterator<JobConfiguration> it = jobs.values().iterator(); it.hasNext(); ) {
+            JobConfiguration jobConfiguration = it.next();
+            if (jobKey.equals(Tasks.jobKey(jobConfiguration))) {
+              it.remove();
+            }
+          }
           persist.set(true);
         }
       };
@@ -292,8 +301,8 @@ public class MapStorage implements Storage {
         .setFrameworkId(frameworkId.get())
         .setTasks(ImmutableList.copyOf(fetch(Query.GET_ALL)));
     Map<String, List<JobConfiguration>> moduleState = Maps.newHashMap();
-    for (Entry<String, JobManager> entry : jobManagers.entrySet()) {
-      moduleState.put(entry.getKey(), Lists.newArrayList(entry.getValue().getJobs()));
+    for (Entry<String, Collection<JobConfiguration>> entry : jobs.asMap().entrySet()) {
+      moduleState.put(entry.getKey(), Lists.newArrayList(entry.getValue()));
     }
     state.setModuleJobs(moduleState);
 
@@ -323,6 +332,9 @@ public class MapStorage implements Storage {
 
     frameworkId.set(state.getFrameworkId());
     add(ImmutableSet.copyOf(state.getTasks()));
+    for (Entry<String, List<JobConfiguration>> jobs : state.getModuleJobs().entrySet()) {
+      this.jobs.putAll(jobs.getKey(), jobs.getValue());
+    }
   }
 
   /**

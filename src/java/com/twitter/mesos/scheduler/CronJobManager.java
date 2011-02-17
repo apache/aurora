@@ -1,18 +1,24 @@
 package com.twitter.mesos.scheduler;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
-import com.twitter.common.collections.Pair;
+import com.google.inject.Inject;
 import com.twitter.common.stats.Stats;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.CronCollisionPolicy;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.TaskQuery;
+import com.twitter.mesos.scheduler.storage.JobStore;
+import com.twitter.mesos.scheduler.storage.SchedulerStore;
+import com.twitter.mesos.scheduler.storage.Storage;
+import com.twitter.mesos.scheduler.storage.Storage.Work;
+import com.twitter.mesos.scheduler.storage.StorageRole;
+import com.twitter.mesos.scheduler.storage.StorageRole.Role;
+import com.twitter.mesos.scheduler.storage.TaskStore;
 import it.sauronsoftware.cron4j.InvalidPatternException;
 import it.sauronsoftware.cron4j.Scheduler;
+import it.sauronsoftware.cron4j.SchedulingPattern;
 import org.apache.commons.lang.StringUtils;
 
 import java.util.Collections;
@@ -36,13 +42,6 @@ public class CronJobManager extends JobManager {
 
   private static final String MANAGER_KEY = "CRON";
 
-  private static final Function<Pair<String, JobConfiguration>, JobConfiguration> GET_JOB_COPY =
-      new Function<Pair<String, JobConfiguration>, JobConfiguration>() {
-        @Override public JobConfiguration apply(Pair<String, JobConfiguration> input) {
-          return new JobConfiguration(input.getSecond());
-        }
-      };
-
   // Cron manager.
   private final Scheduler scheduler = new Scheduler();
 
@@ -50,10 +49,15 @@ public class CronJobManager extends JobManager {
 
   // Maps from the our unique job identifier (<owner>/<jobName>) to the unique identifier used
   // internally by the cron4j scheduler.
-  private final Map<String, Pair<String, JobConfiguration>> scheduledJobs =
-      Collections.synchronizedMap(Maps.<String, Pair<String, JobConfiguration>>newHashMap());
+  private final Map<String, String> scheduledJobs =
+      Collections.synchronizedMap(Maps.<String, String>newHashMap());
 
-  public CronJobManager() {
+  private final Storage storage;
+
+  @Inject
+  public CronJobManager(@StorageRole(Role.Primary) Storage storage) {
+    this.storage = Preconditions.checkNotNull(storage);
+
     scheduler.start();
   }
 
@@ -62,23 +66,24 @@ public class CronJobManager extends JobManager {
    *
    * @param jobKey Key of the job to start.
    */
-  public void startJobNow(String jobKey) {
-    Preconditions.checkArgument(hasJob(jobKey), "No such cron job " + jobKey);
+  public void startJobNow(final String jobKey) {
+    Preconditions.checkNotNull(jobKey);
 
-    cronTriggered(jobKey);
+    JobConfiguration job = fetchJob(jobKey);
+    Preconditions.checkArgument(job != null, "No such cron job " + jobKey);
+
+    cronTriggered(job);
   }
 
   /**
    * Triggers execution of a cron job, depending on the cron collision policy for the job.
    *
-   * @param jobKey Key for the job triggered.
+   * @param job The config of the job to be triggered.
    */
   @VisibleForTesting
-  void cronTriggered(String jobKey) {
-    LOG.info(String.format("Cron triggered for %s at %s", jobKey, new Date()));
+  void cronTriggered(JobConfiguration job) {
+    LOG.info(String.format("Cron triggered for %s at %s", Tasks.jobKey(job), new Date()));
     cronJobsTriggered.incrementAndGet();
-
-    JobConfiguration job = scheduledJobs.get(jobKey).getSecond();
 
     boolean runJob = false;
 
@@ -117,7 +122,9 @@ public class CronJobManager extends JobManager {
       }
     }
 
-    if (runJob) schedulerCore.runJob(job);
+    if (runJob) {
+      schedulerCore.runJob(job);
+    }
   }
 
   @Override
@@ -127,63 +134,124 @@ public class CronJobManager extends JobManager {
 
   @Override
   public boolean receiveJob(final JobConfiguration job) throws ScheduleException {
-    if (StringUtils.isEmpty(job.getCronSchedule())) return false;
+    Preconditions.checkNotNull(job);
 
-    LOG.info(String.format("Scheduling cron job %s: %s", Tasks.jobKey(job), job.getCronSchedule()));
-    try {
-      scheduledJobs.put(Tasks.jobKey(job),
-          Pair.of(scheduler.schedule(job.getCronSchedule(),
-            new Runnable() {
-              @Override public void run() {
-                // TODO(wfarner): May want to record information about job runs.
-                LOG.info("Cron job running.");
-                cronTriggered(Tasks.jobKey(job));
-              }
-            }),
-            job)
-      );
-    } catch (InvalidPatternException e) {
-      throw new ScheduleException("Failed to schedule cron job.", e);
+    if (StringUtils.isEmpty(job.getCronSchedule())) {
+      return false;
     }
+
+    if (!validateSchedule(job.getCronSchedule())) {
+      throw new ScheduleException("Invalid cron schedule: " + job.getCronSchedule());
+    }
+
+    String scheduledJobKey = scheduleJob(job);
+
+    storage.doInTransaction(new Work.NoResult.Quiet() {
+      @Override protected void execute(SchedulerStore schedulerStore, JobStore jobStore,
+          TaskStore taskStore) {
+
+        jobStore.saveAcceptedJob(MANAGER_KEY, job);
+      }
+    });
+    scheduledJobs.put(Tasks.jobKey(job), scheduledJobKey);
 
     return true;
   }
 
-  @Override
-  public JobUpdateResult updateJob(JobConfiguration job) throws ScheduleException {
-    String jobKey = Tasks.jobKey(job);
-    Preconditions.checkState(hasJob(jobKey));
+  private String scheduleJob(final JobConfiguration job) throws ScheduleException {
+    LOG.info(String.format("Scheduling cron job %s: %s", Tasks.jobKey(job), job.getCronSchedule()));
+    try {
+      return scheduler.schedule(job.getCronSchedule(), new Runnable() {
+        @Override public void run() {
+          // TODO(wfarner): May want to record information about job runs.
+          LOG.info("Running cron job: " + Tasks.jobKey(job));
+          cronTriggered(job);
+        }
+      });
+    } catch (InvalidPatternException e) {
+      throw new ScheduleException("Failed to schedule cron job.", e);
+    }
+  }
 
-    if (job.equals(scheduledJobs.get(jobKey).getSecond())) {
-      return JobUpdateResult.JOB_UNCHANGED;
+  @Override
+  public JobUpdateResult updateJob(final JobConfiguration job) throws ScheduleException {
+    Preconditions.checkNotNull(job);
+
+    if (StringUtils.isEmpty(job.getCronSchedule()) || !validateSchedule(job.getCronSchedule())) {
+      throw new ScheduleException("Invalid cron schedule: " + job.getCronSchedule());
     }
 
-    deleteJob(jobKey);
-    Preconditions.checkState(receiveJob(job), "Cron job manager failed to create updated job");
-    return JobUpdateResult.COMPLETED;
+    final String jobKey = Tasks.jobKey(job);
+    return storage.doInTransaction(new Work<JobUpdateResult, ScheduleException>() {
+      @Override public JobUpdateResult apply(SchedulerStore schedulerStore, JobStore jobStore,
+          TaskStore taskStore) throws ScheduleException {
+
+        JobConfiguration existingJobConfig = jobStore.fetchJob(MANAGER_KEY, jobKey);
+        Preconditions.checkState(existingJobConfig != null);
+
+        if (job.equals(existingJobConfig)) {
+          return JobUpdateResult.JOB_UNCHANGED;
+        }
+
+        deleteJob(jobKey);
+        Preconditions.checkState(receiveJob(job), "Cron job manager failed to create updated job");
+        return JobUpdateResult.COMPLETED;
+      }
+    });
+  }
+
+  private boolean validateSchedule(String cronSchedule) {
+    return SchedulingPattern.validate(cronSchedule);
   }
 
   @Override
   public Iterable<JobConfiguration> getJobs() {
-    return Iterables.transform(scheduledJobs.values(), GET_JOB_COPY);
+    return storage.doInTransaction(new Work.Quiet<Iterable<JobConfiguration>>() {
+      @Override public Iterable<JobConfiguration> apply(SchedulerStore schedulerStore,
+          JobStore jobStore, TaskStore taskStore) throws RuntimeException {
+
+        return jobStore.fetchJobs(MANAGER_KEY);
+      }
+    });
   }
 
   @Override
-  public boolean hasJob(String jobKey) {
-    return scheduledJobs.containsKey(jobKey);
+  public boolean hasJob(final String jobKey) {
+    Preconditions.checkNotNull(jobKey);
+
+    return fetchJob(jobKey) != null;
+  }
+
+  private JobConfiguration fetchJob(final String jobKey) {
+    return storage.doInTransaction(new Work.Quiet<JobConfiguration>() {
+      @Override public JobConfiguration apply(SchedulerStore schedulerStore, JobStore jobStore,
+          TaskStore taskStore) throws RuntimeException {
+
+        return jobStore.fetchJob(MANAGER_KEY, jobKey);
+      }
+    });
   }
 
   @Override
-  public boolean deleteJob(String jobKey) {
-    if (!hasJob(jobKey)) return false;
+  public boolean deleteJob(final String jobKey) {
+    Preconditions.checkNotNull(jobKey);
 
-    Pair<String, JobConfiguration> jobObj = scheduledJobs.remove(jobKey);
-
-    if (jobObj != null) {
-      scheduler.deschedule(jobObj.getFirst());
-      LOG.info("Successfully deleted cron job " + jobKey);
+    if (!hasJob(jobKey)) {
+      return false;
     }
 
+    String scheduledJobKey = scheduledJobs.remove(jobKey);
+    if (scheduledJobKey != null) {
+      scheduler.deschedule(scheduledJobKey);
+      storage.doInTransaction(new Work.NoResult.Quiet() {
+        @Override protected void execute(SchedulerStore schedulerStore, JobStore jobStore,
+            TaskStore taskStore) throws RuntimeException {
+
+          jobStore.deleteJob(jobKey);
+        }
+      });
+      LOG.info("Successfully deleted cron job " + jobKey);
+    }
     return true;
   }
 }
