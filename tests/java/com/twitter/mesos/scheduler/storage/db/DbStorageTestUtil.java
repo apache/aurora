@@ -13,6 +13,7 @@ import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.sql.SQLException;
+import java.util.logging.Logger;
 
 /**
  * Provides utility methods for testing against H2 databases.
@@ -20,6 +21,8 @@ import java.sql.SQLException;
  * @author jsirois
  */
 final class DbStorageTestUtil {
+
+  private static final Logger LOG = Logger.getLogger(DbStorageTestUtil.class.getName());
 
   /**
    * Sets up a DbStorage against a new in-memory database with empty tables.  Also props up the H2
@@ -34,13 +37,14 @@ final class DbStorageTestUtil {
 
     Preconditions.checkNotNull(tearDownAccepter);
 
-    // Prop up a web console at: http://localhost:8082, allows connections to jdbc:h2:mem:testdb
-    final Server webServer = Server.createWebServer("-webAllowOthers").start();
+    // Prop up a web console at: http://localhost:XXX, allows connections to jdbc:h2:mem:testdb
+    final Server webServer = Server.createWebServer("-webAllowOthers", "-webPort", "0").start();
     tearDownAccepter.addTearDown(new TearDown() {
       @Override public void tearDown() {
         webServer.stop();
       }
     });
+    LOG.info("Test db console for jdbc:h2:mem:testdb available at: " + webServer.getURL());
 
     final EmbeddedDatabase embeddedDatabase =
         new EmbeddedDatabaseBuilder()
