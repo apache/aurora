@@ -355,10 +355,8 @@ public class LiveTaskTest {
 
   private LiveTask makeTask(AssignedTask task, String taskId) {
     task.setTaskId(taskId);
-    LiveTask liveTask = new LiveTask(socketManager, healthChecker, processKiller, pidFetcher,
-        new File(executorRoot, String.valueOf(task.getTaskId())), task, COPIER);
-    liveTask.disableMultiUser();
-    return liveTask;
+    return new LiveTask(socketManager, healthChecker, processKiller, pidFetcher,
+        new File(executorRoot, String.valueOf(task.getTaskId())), task, COPIER, false);
   }
 
   private void assertDirContents(File dir, String... children) {

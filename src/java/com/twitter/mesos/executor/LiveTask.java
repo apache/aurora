@@ -98,13 +98,15 @@ public class LiveTask extends TaskOnDisk {
 
   private int exitCode = 0;
   private final ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier;
+  private final boolean multiUser;
 
   public LiveTask(SocketManager socketManager,
       ExceptionalFunction<Integer, Boolean, HealthCheckException> healthChecker,
       ExceptionalClosure<KillCommand, KillException> processKiller,
       ExceptionalFunction<File, Integer, FileToInt.FetchException> pidFetcher,
       File taskRoot, AssignedTask task,
-      ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier) {
+      ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier,
+      boolean multiUser) {
     super(taskRoot);
 
     this.socketManager = Preconditions.checkNotNull(socketManager);
@@ -114,6 +116,7 @@ public class LiveTask extends TaskOnDisk {
     this.task = Preconditions.checkNotNull(task);
 
     this.fileCopier = Preconditions.checkNotNull(fileCopier);
+    this.multiUser = multiUser;
 
     stateMachine = StateMachine.<ScheduleStatus>builder(toString())
           .initialState(STARTING)
@@ -219,11 +222,6 @@ public class LiveTask extends TaskOnDisk {
 
   private String expandShardId(String commandLine) {
     return commandLine.replaceAll(SHARD_ID_REGEXP, String.valueOf(task.getTask().getShardId()));
-  }
-
-  private boolean multiUser = true;
-  @VisibleForTesting void disableMultiUser() {
-    multiUser = false;
   }
 
   @Override

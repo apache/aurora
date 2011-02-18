@@ -13,7 +13,6 @@ import mesos.Executor;
 import mesos.MesosExecutorDriver;
 
 import java.io.File;
-import java.util.logging.Logger;
 
 /**
  * ExecutorMain
@@ -21,9 +20,11 @@ import java.util.logging.Logger;
  * @author Florian Leibert
  */
 public class ExecutorMain extends GuicedProcess<ExecutorMain.TwitterExecutorOptions, Exception> {
-  private static Logger LOG = Logger.getLogger(ExecutorMain.class.getName());
 
   public static class TwitterExecutorOptions extends GuicedProcessOptions {
+    @Option(name = "multi_user", usage = "True to execute tasks as the job owner")
+    public boolean multiUserMode = true;
+
     @Option(name = "hdfs_config", required = true, usage = "Hadoop configuration path")
     public String hdfsConfig;
 

@@ -27,6 +27,7 @@ public class TaskFactory implements Function<AssignedTask, Task> {
   private final ExceptionalFunction<File, Integer, FetchException> pidFetcher;
   private final ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier;
   private final File executorRootDir;
+  private final boolean multiUser;
 
   @Inject
   public TaskFactory(@ExecutorRootDir File executorRootDir,
@@ -34,7 +35,8 @@ public class TaskFactory implements Function<AssignedTask, Task> {
       ExceptionalFunction<Integer, Boolean, HealthCheckException> healthChecker,
       ExceptionalClosure<KillCommand, KillException> processKiller,
       ExceptionalFunction<File, Integer, FileToInt.FetchException> pidFetcher,
-      ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier) {
+      ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier,
+      @MultiUserMode boolean multiUser) {
 
     this.executorRootDir = Preconditions.checkNotNull(executorRootDir);
     this.socketManager = Preconditions.checkNotNull(socketManager);
@@ -42,6 +44,7 @@ public class TaskFactory implements Function<AssignedTask, Task> {
     this.processKiller = Preconditions.checkNotNull(processKiller);
     this.pidFetcher = Preconditions.checkNotNull(pidFetcher);
     this.fileCopier = Preconditions.checkNotNull(fileCopier);
+    this.multiUser = multiUser;
   }
 
   @Override
@@ -49,6 +52,6 @@ public class TaskFactory implements Function<AssignedTask, Task> {
     Preconditions.checkNotNull(task);
 
     return new LiveTask(socketManager, healthChecker, processKiller,
-      pidFetcher, new File(executorRootDir, task.getTaskId()), task, fileCopier);
+      pidFetcher, new File(executorRootDir, task.getTaskId()), task, fileCopier, multiUser);
   }
 }

@@ -90,6 +90,7 @@ public class ExecutorModule extends AbstractModule {
         .to(FileToInt.class);
     bind(new TypeLiteral<ExceptionalFunction<FileCopyRequest, File, IOException>>() {})
         .to(HdfsFileCopier.class).in(Singleton.class);
+    bind(Key.get(boolean.class, MultiUserMode.class)).toInstance(options.multiUserMode);
 
     // Bindings needed for HealthChecker.
     ThreadFactory httpSignalThreadFactory = new ThreadFactoryBuilder()
