@@ -1,18 +1,21 @@
 package com.twitter.mesos.executor;
 
+import mesos.Executor;
+import mesos.MesosExecutorDriver;
+
+import java.io.File;
+import java.util.logging.Logger;
+
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
 import com.google.inject.Module;
+
 import com.twitter.common.args.Option;
 import com.twitter.common.base.Command;
 import com.twitter.common.process.GuicedProcess;
 import com.twitter.common.process.GuicedProcessOptions;
-import mesos.Executor;
-import mesos.MesosExecutorDriver;
-
-import java.io.File;
 
 /**
  * ExecutorMain
@@ -46,6 +49,8 @@ public class ExecutorMain extends GuicedProcess<ExecutorMain.TwitterExecutorOpti
     public int killEscalationMs = 5000;
   }
 
+  private static final Logger LOG = Logger.getLogger(ExecutorMain.class.getName());
+
   @Inject @ExecutorRootDir private File executorRootDir;
   @Inject private Executor mesosExecutor;
   @Inject private ExecutorCore executorCore;
@@ -59,7 +64,7 @@ public class ExecutorMain extends GuicedProcess<ExecutorMain.TwitterExecutorOpti
   public void runProcess() throws Exception {
     addShutdownAction(new Command() {
       @Override public void execute() {
-        System.out.println("Shutting down the executor.");
+        LOG.info("Shutting down the executor.");
         executorCore.shutdownCore();
       }
     });
