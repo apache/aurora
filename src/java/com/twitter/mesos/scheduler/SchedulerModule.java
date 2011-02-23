@@ -14,7 +14,7 @@ import com.twitter.common.base.Command;
 import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.inject.TimedInterceptor;
 import com.twitter.common.io.FileUtils;
-import com.twitter.common.process.ShutdownRegistry;
+import com.twitter.common.process.ActionRegistry;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.zookeeper.SingletonService;
@@ -56,11 +56,11 @@ import static com.twitter.common.process.GuicedProcess.registerServlet;
 public class SchedulerModule extends AbstractModule {
   private static final Logger LOG = Logger.getLogger(SchedulerModule.class.getName());
 
-  private final ShutdownRegistry shutdownRegistry;
+  private final ActionRegistry shutdownRegistry;
   private final SchedulerMain.TwitterSchedulerOptions options;
 
   @Inject
-  public SchedulerModule(ShutdownRegistry shutdownRegistry,
+  public SchedulerModule(ActionRegistry shutdownRegistry,
       SchedulerMain.TwitterSchedulerOptions options) {
     this.shutdownRegistry = checkNotNull(shutdownRegistry);
     this.options = checkNotNull(options);
@@ -197,7 +197,7 @@ public class SchedulerModule extends AbstractModule {
     final NIOServerCnxn.Factory connectionFactory =
         new NIOServerCnxn.Factory(new InetSocketAddress(0));
     connectionFactory.startup(zooKeeperServer);
-    shutdownRegistry.addShutdownAction(new Command() {
+    shutdownRegistry.addAction(new Command() {
       @Override public void execute() throws RuntimeException {
         if (connectionFactory.isAlive()) {
           connectionFactory.shutdown();
@@ -212,7 +212,7 @@ public class SchedulerModule extends AbstractModule {
 
   private File createTempDir() {
     final File tempDir = FileUtils.createTempDir();
-    shutdownRegistry.addShutdownAction(new ExceptionalCommand<IOException>() {
+    shutdownRegistry.addAction(new ExceptionalCommand<IOException>() {
       @Override public void execute() throws IOException {
         org.apache.commons.io.FileUtils.deleteDirectory(tempDir);
       }
