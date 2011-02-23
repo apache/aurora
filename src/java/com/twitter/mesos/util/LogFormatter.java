@@ -12,6 +12,7 @@ import java.util.logging.LogRecord;
 
 import org.apache.commons.lang.StringUtils;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 
@@ -26,7 +27,7 @@ public class LogFormatter extends Formatter {
 
   private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormat.forPattern(
     "MMdd kk:mm:ss.SSS"
-  );
+  ).withZone(DateTimeZone.UTC);
 
   /**
    * Build a level 'label' by taking the first character of the level name and making uppercase.

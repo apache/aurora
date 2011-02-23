@@ -18,7 +18,7 @@ public class LogFormatterTest {
 
   private static final int THREAD_ID = 105;
   private static final long TIME_MILLIS = 1298065054839L;
-  private static final String TIME_STRING = "0218 13:37:34.839";
+  private static final String TIME_STRING = "0218 21:37:34.839";
 
   private LogFormatter formatter;
 
