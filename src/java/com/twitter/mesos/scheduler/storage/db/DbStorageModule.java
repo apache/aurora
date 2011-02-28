@@ -8,8 +8,9 @@ import com.google.inject.Inject;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import com.mchange.v2.c3p0.ComboPooledDataSource;
-import com.twitter.common.process.GuicedProcess;
-import com.twitter.common.process.GuicedProcess.HttpServletConfig;
+
+import com.twitter.common.application.http.HttpServletConfig;
+import com.twitter.common.application.http.Registration;
 import com.twitter.common.quantity.Data;
 import com.twitter.mesos.scheduler.SchedulerMain.TwitterSchedulerOptions;
 import com.twitter.mesos.scheduler.storage.Storage;
@@ -48,7 +49,7 @@ public class DbStorageModule extends AbstractModule {
 
     // TODO(jsirois): reconsider exposing the db in this way - obvious danger here
     ImmutableMap<String, String> initParams = ImmutableMap.of("webAllowOthers", "true");
-    GuicedProcess.registerServlet(binder(),
+    Registration.registerServlet(binder(),
         new HttpServletConfig("/scheduler/storage", WebServlet.class, initParams, true));
   }
 

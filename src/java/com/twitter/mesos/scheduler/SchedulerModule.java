@@ -9,12 +9,14 @@ import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 import com.google.inject.multibindings.Multibinder;
 import com.google.inject.name.Names;
+
+import com.twitter.common.application.ActionRegistry;
+import com.twitter.common.application.http.Registration;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Command;
 import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.inject.TimedInterceptor;
 import com.twitter.common.io.FileUtils;
-import com.twitter.common.process.ActionRegistry;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.zookeeper.SingletonService;
@@ -51,7 +53,6 @@ import java.util.logging.Logger;
 import javax.annotation.Nullable;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.twitter.common.process.GuicedProcess.registerServlet;
 
 public class SchedulerModule extends AbstractModule {
   private static final Logger LOG = Logger.getLogger(SchedulerModule.class.getName());
@@ -111,11 +112,11 @@ public class SchedulerModule extends AbstractModule {
     bind(Scheduler.class).to(MesosSchedulerImpl.class).in(Singleton.class);
 
     HttpAssets.register(binder());
-    registerServlet(binder(), "/scheduler", SchedulerzHome.class, false);
-    registerServlet(binder(), "/scheduler/user", SchedulerzUser.class, true);
-    registerServlet(binder(), "/scheduler/job", SchedulerzJob.class, true);
-    registerServlet(binder(), "/mname", Mname.class, false);
-    registerServlet(binder(), "/create_job", CreateJob.class, false);
+    Registration.registerServlet(binder(), "/scheduler", SchedulerzHome.class, false);
+    Registration.registerServlet(binder(), "/scheduler/user", SchedulerzUser.class, true);
+    Registration.registerServlet(binder(), "/scheduler/job", SchedulerzJob.class, true);
+    Registration.registerServlet(binder(), "/mname", Mname.class, false);
+    Registration.registerServlet(binder(), "/create_job", CreateJob.class, false);
   }
 
   @Provides

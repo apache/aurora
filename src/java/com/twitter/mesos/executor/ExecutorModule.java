@@ -12,9 +12,10 @@ import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 import com.google.inject.name.Names;
+
+import com.twitter.common.application.http.Registration;
 import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
-import com.twitter.common.process.GuicedProcess;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.mesos.Message;
@@ -109,8 +110,8 @@ public class ExecutorModule extends AbstractModule {
       Throwables.propagate(e);
     }
 
-    GuicedProcess.registerServlet(binder(), "/task", TaskHome.class, false);
-    GuicedProcess.registerServlet(binder(), "/executor", ExecutorHome.class, false);
+    Registration.registerServlet(binder(), "/task", TaskHome.class, false);
+    Registration.registerServlet(binder(), "/executor", ExecutorHome.class, false);
   }
 
   @Provides

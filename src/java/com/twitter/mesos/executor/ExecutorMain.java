@@ -12,10 +12,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
 import com.google.inject.Module;
 
-import com.twitter.common.args.Option;
+import com.twitter.common_internal.args.Option;
 import com.twitter.common.base.Command;
-import com.twitter.common.process.GuicedProcess;
-import com.twitter.common.process.GuicedProcessOptions;
+import com.twitter.common_internal.process.GuicedProcess;
+import com.twitter.common_internal.process.GuicedProcessOptions;
 
 /**
  * ExecutorMain
