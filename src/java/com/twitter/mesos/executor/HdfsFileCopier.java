@@ -14,7 +14,7 @@ import java.util.logging.Logger;
 /**
  * A file copier that will manage copies of files from HDFS to the local file system.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class HdfsFileCopier implements ExceptionalFunction<FileCopyRequest, File, IOException> {
 

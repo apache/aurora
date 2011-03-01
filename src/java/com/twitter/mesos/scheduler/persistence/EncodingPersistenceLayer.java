@@ -7,7 +7,7 @@ import com.twitter.mesos.gen.NonVolatileSchedulerState;
 /**
  * A persistence layer that uses a codec to translate objects.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class EncodingPersistenceLayer implements PersistenceLayer<NonVolatileSchedulerState> {
   private final PersistenceLayer<byte[]> wrapped;

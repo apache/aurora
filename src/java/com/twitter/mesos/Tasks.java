@@ -23,7 +23,7 @@ import static com.twitter.mesos.gen.ScheduleStatus.*;
 /**
  * Utility class providing convenience functions relating to tasks.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class Tasks {
 

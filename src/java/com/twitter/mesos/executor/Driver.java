@@ -18,7 +18,7 @@ import java.util.logging.Logger;
 /**
  * Abstraction away from the mesos executor driver.
  *
- * @author wfarner
+ * @author William Farner
  */
 public interface Driver extends Function<Message, Integer> {
 

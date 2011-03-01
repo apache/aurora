@@ -8,7 +8,7 @@ import mesos.Protos.TaskState;
 /**
  * Translates between mesos {@link TaskState} and the internal {@link ScheduleStatus}.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class StateTranslator {
 

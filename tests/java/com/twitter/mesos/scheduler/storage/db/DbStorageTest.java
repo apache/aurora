@@ -19,7 +19,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * @author jsirois
+ * @author John Sirois
  */
 public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
 

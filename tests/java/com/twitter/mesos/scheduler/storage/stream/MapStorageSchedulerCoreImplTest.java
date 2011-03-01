@@ -11,7 +11,7 @@ import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 
 /**
- * @author jsirois
+ * @author John Sirois
  */
 public class MapStorageSchedulerCoreImplTest extends BaseSchedulerCoreImplTest {
 

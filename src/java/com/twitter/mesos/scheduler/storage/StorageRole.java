@@ -13,7 +13,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 /**
  * A {@literal @BindingAnnotation} for the scheduler {@link Storage} service.
  *
- * @author jsirois
+ * @author John Sirois
  */
 @BindingAnnotation
 @Target({FIELD, PARAMETER, METHOD})

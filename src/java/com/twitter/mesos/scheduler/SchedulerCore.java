@@ -34,17 +34,17 @@ import javax.annotation.Nullable;
  * <li>{@link #stop()}
  * </ol>
  *
- * TODO(wfarner): Figure out how to handle permissions for modification of running tasks.  As it
+ * TODO(William Farner): Figure out how to handle permissions for modification of running tasks.  As it
  * stands it would be quite easy to accidentally modify something that does not belong to you.
  *
- * TODO(wfarner): Clean up persistence routine to ensure that persistence happens whenever state
+ * TODO(William Farner): Clean up persistence routine to ensure that persistence happens whenever state
  * is modified.
  *
- * TODO(wfarner): Add support for machine drains via an administrator interface.  This would accept
+ * TODO(William Farner): Add support for machine drains via an administrator interface.  This would accept
  * a machine host name (or slave ID) and a.) kill tasks running on the machine, b.) prevent tasks
  * from being scheduled on the machine.
  *
- * @author wfarner
+ * @author William Farner
  */
 public interface SchedulerCore extends UpdateScheduler {
 
@@ -153,7 +153,7 @@ public interface SchedulerCore extends UpdateScheduler {
   JobUpdateResult updateJob(JobConfiguration updatedJob) throws ScheduleException,
       TaskDescriptionException;
 
-  // TODO(wfarner): This makes the interface look ugly, and shows how the encapsulation between
+  // TODO(William Farner): This makes the interface look ugly, and shows how the encapsulation between
   //    SchedulreCoreImpl and ImmediateJobManager is broken.
   JobUpdateResult doJobUpdate(JobConfiguration updatedJob) throws ScheduleException;
 

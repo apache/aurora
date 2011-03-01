@@ -29,7 +29,7 @@ import static org.junit.Assert.assertThat;
 /**
  * A basic test that verifies a {@link TaskStore} implementation conforms to expected behavior.
  *
- * @author wfarner
+ * @author William Farner
  */
 public abstract class BaseTaskStoreTest<T extends TaskStore> extends TearDownTestCase {
 

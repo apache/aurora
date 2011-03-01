@@ -60,7 +60,7 @@ import static com.twitter.mesos.gen.ScheduleStatus.*;
  * $TASK_ROOT/sandbox/stderr  - Captured standard error stream.
  * $TASK_ROOT/sandbox/stdout - Captured standard output stream.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class LiveTask extends TaskOnDisk {
   private static final Logger LOG = Logger.getLogger(LiveTask.class.getName());
@@ -301,7 +301,7 @@ public class LiveTask extends TaskOnDisk {
               }
             },
             // Configure health check interval, allowing 2x configured time for startup.
-            // TODO(wfarner): Add a configuration option for the task start-up grace period
+            // TODO(William Farner): Add a configuration option for the task start-up grace period
             // before health checking begins.
             2 * task.getTask().getHealthCheckIntervalSecs(),
             task.getTask().getHealthCheckIntervalSecs(),

@@ -5,7 +5,7 @@ import org.junit.Test;
 import static org.junit.Assert.fail;
 
 /**
- * @author wfarner
+ * @author William Farner
  */
 public class SocketManagerImplTest {
 
@@ -33,7 +33,7 @@ public class SocketManagerImplTest {
     }
   }
 
-  /* TODO(wfarner): These are flaky when run in the datacenter (nest1, at least).  Disabling until
+  /* TODO(William Farner): These are flaky when run in the datacenter (nest1, at least).  Disabling until
         flakiness is diagnosed/fixed.
   @Test
   public void testLeaseSocket() throws Exception {

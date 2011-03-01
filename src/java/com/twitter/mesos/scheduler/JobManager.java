@@ -9,7 +9,7 @@ import java.util.Arrays;
  * Interface for a job manager.  A job manager is responsible for deciding whether and when to
  * trigger execution of a job.
  *
- * @author wfarner
+ * @author William Farner
  */
 public abstract class JobManager {
 
@@ -48,7 +48,7 @@ public abstract class JobManager {
    * @throws ScheduleException If the update could not be performed.
    * @return A description of the action that was or will be taken to update the job.
    */
-  // TODO(wfarner): Add more visibility into the updater launched so that the caller may track
+  // TODO(William Farner): Add more visibility into the updater launched so that the caller may track
   //    the updater.
   public abstract JobUpdateResult updateJob(JobConfiguration job) throws ScheduleException;
 

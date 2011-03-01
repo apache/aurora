@@ -12,7 +12,7 @@ import javax.annotation.Nullable;
 /**
  * Codec that works for thrift objects.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class ThriftBinaryCodec {
 

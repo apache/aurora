@@ -41,9 +41,9 @@ import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
 /**
  * ExecutorCore
  *
- * TODO(wfarner): When a LiveTask is terminated, should we replace its entry with a DeadTask?
+ * TODO(William Farner): When a LiveTask is terminated, should we replace its entry with a DeadTask?
  *
- * @author wfarner
+ * @author William Farner
  */
 public class ExecutorCore implements TaskManager {
   private static final Logger LOG = Logger.getLogger(MesosExecutorImpl.class.getName());
@@ -97,7 +97,7 @@ public class ExecutorCore implements TaskManager {
    * Initiates periodic tasks that the executor performs (state sync, resource monitoring, etc).
    */
   void startPeriodicTasks() {
-    // TODO(wfarner): Apply a shutdown registry here to cleanly halt these tasks.
+    // TODO(William Farner): Apply a shutdown registry here to cleanly halt these tasks.
     new ResourceManager(this, executorRootDir).start();
     startStateSync();
     startRegisteredTaskPusher();
@@ -252,7 +252,7 @@ public class ExecutorCore implements TaskManager {
       }
     };
 
-    // TODO(wfarner): Make sync interval configurable.
+    // TODO(William Farner): Make sync interval configurable.
     syncExecutor.scheduleAtFixedRate(syncer, 30, 30, TimeUnit.SECONDS);
   }
 
@@ -278,7 +278,7 @@ public class ExecutorCore implements TaskManager {
       }
     };
 
-    // TODO(wfarner): Make push interval configurable.
+    // TODO(William Farner): Make push interval configurable.
     syncExecutor.scheduleAtFixedRate(pusher, 5, 5, TimeUnit.SECONDS);
   }
 }

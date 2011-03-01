@@ -13,7 +13,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 /**
  * Binding annotation for the executor root directory.
  *
- * @author wfarner
+ * @author William Farner
  */
 @BindingAnnotation @Target({FIELD, PARAMETER, METHOD}) @Retention(RUNTIME)
 public @interface ExecutorRootDir {}

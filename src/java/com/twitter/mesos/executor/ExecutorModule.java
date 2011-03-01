@@ -81,7 +81,7 @@ public class ExecutorModule extends AbstractModule {
     String[] portRange = options.managedPortRange.split("-");
     Preconditions.checkArgument(portRange.length == 2, "Malformed managed port range value: "
                                          + options.managedPortRange);
-    // TODO(wfarner): Clean this up, inject.
+    // TODO(William Farner): Clean this up, inject.
     bind(SocketManager.class).toInstance(new SocketManagerImpl(Integer.parseInt(portRange[0]),
         Integer.parseInt(portRange[1])));
     bind(new TypeLiteral<ExceptionalFunction<Integer, Boolean, HealthCheckException>>() {})

@@ -6,7 +6,7 @@ import com.twitter.mesos.scheduler.storage.Storage;
 import java.sql.SQLException;
 
 /**
- * @author jsirois
+ * @author John Sirois
  */
 public class DbStorageSchedulerCoreImplTest extends BaseSchedulerCoreImplTest {
 

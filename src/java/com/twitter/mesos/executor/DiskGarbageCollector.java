@@ -21,7 +21,7 @@ import java.util.logging.Logger;
 /**
  * Garbage collector to reclaim disk space consumed by unused files.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class DiskGarbageCollector implements Runnable {
   private static final Logger LOG = Logger.getLogger(DiskGarbageCollector.class.getName());

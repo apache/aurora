@@ -33,7 +33,7 @@ import it.sauronsoftware.cron4j.Predictor;
 /**
  * HTTP interface to provide information about jobs for a specific mesos user.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class SchedulerzUser extends StringTemplateServlet {
 

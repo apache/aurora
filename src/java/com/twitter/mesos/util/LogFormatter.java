@@ -21,7 +21,7 @@ import org.joda.time.format.DateTimeFormatter;
  *
  * I0218 17:36:47.460234 (source) (message)
  *
- * @author bill
+ * @author William Farner
  */
 public class LogFormatter extends Formatter {
 

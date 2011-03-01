@@ -19,7 +19,7 @@ import static org.apache.commons.lang.StringUtils.isEmpty;
 /**
  * A query that can be used to find tasks in the task store.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class Query {
   private static final Predicate<ScheduledTask> NO_POST_FILTER = Predicates.alwaysTrue();

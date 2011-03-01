@@ -29,7 +29,7 @@ import javax.sql.DataSource;
 /**
  * Provides bindings for db based scheduler storage.
  *
- * @author jsirois
+ * @author John Sirois
  */
 public class DbStorageModule extends AbstractModule {
 
@@ -47,7 +47,7 @@ public class DbStorageModule extends AbstractModule {
     bind(Storage.class).annotatedWith(StorageRoles.forRole(storageRole))
         .to(DbStorage.class).in(Singleton.class);
 
-    // TODO(jsirois): reconsider exposing the db in this way - obvious danger here
+    // TODO(John Sirois): reconsider exposing the db in this way - obvious danger here
     ImmutableMap<String, String> initParams = ImmutableMap.of("webAllowOthers", "true");
     Registration.registerServlet(binder(),
         new HttpServletConfig("/scheduler/storage", WebServlet.class, initParams, true));

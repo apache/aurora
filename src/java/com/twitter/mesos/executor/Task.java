@@ -7,7 +7,7 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import java.io.File;
 
 /**
- * @author wfarner
+ * @author William Farner
  */
 public interface Task {
 

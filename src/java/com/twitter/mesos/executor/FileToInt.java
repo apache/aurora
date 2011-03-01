@@ -13,7 +13,7 @@ import java.io.IOException;
 /**
  * A function to read a file and interpret its contents as an integer.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class FileToInt implements ExceptionalFunction<File, Integer, FetchException> {
   @Override

@@ -24,7 +24,7 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 
 /**
- * @author wfarner
+ * @author William Farner
  */
 public class DiskGarbageCollectorTest {
 
@@ -73,7 +73,7 @@ public class DiskGarbageCollectorTest {
   }
 
   @Test
-  @Ignore("// TODO(wfarner): Flakes when run on machines in the data center.")
+  @Ignore("// TODO(William Farner): Flakes when run on machines in the data center.")
   public void testSimpleGc() throws Exception {
     expect(fileFilter.accept(fileA)).andReturn(true);
     expect(fileFilter.accept(fileB)).andReturn(true);
@@ -134,7 +134,7 @@ public class DiskGarbageCollectorTest {
   }
 
   @Test
-  @Ignore("// TODO(wfarner): Flakes when run on machines in the data center.")
+  @Ignore("// TODO(William Farner): Flakes when run on machines in the data center.")
   public void testRecursiveGc() throws Exception {
     File fileA1 = new File(fileA, "1");
     File fileA2 = new File(fileA, "2");

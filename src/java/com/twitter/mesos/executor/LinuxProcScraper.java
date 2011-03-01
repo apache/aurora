@@ -18,7 +18,7 @@ import java.util.logging.Logger;
  * A wrapper class to interact with the /proc filesystem in linux and gather information about a
  * process.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class LinuxProcScraper implements ResourceScanner {
 

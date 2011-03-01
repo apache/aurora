@@ -19,7 +19,7 @@ import java.util.concurrent.TimeoutException;
 import static org.easymock.EasyMock.*;
 
 /**
- * @author wfarner
+ * @author William Farner
  */
 public class HttpSignalerTest {
 

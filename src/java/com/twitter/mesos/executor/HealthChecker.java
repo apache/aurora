@@ -12,7 +12,7 @@ import java.util.List;
 /**
  * Function that checks the health of a process via HTTP signaling.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class HealthChecker implements ExceptionalFunction<Integer, Boolean, HealthCheckException> {
 

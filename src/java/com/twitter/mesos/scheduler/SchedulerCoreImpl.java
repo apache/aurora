@@ -81,7 +81,7 @@ import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.STOPPED;
 /**
  * Implementation of the scheduler core.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
 
@@ -106,7 +106,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
   // Filter to determine whether a task should be scheduled.
   private final SchedulingFilter schedulingFilter;
 
-  // TODO(jsirois): currently purely in-mem, persist this so that updates started by 1 scheduler
+  // TODO(John Sirois): currently purely in-mem, persist this so that updates started by 1 scheduler
   // can be managed to completion by a replacement
   // Tracks updates that are in-progress, mapping from update token to update spec.
   @VisibleForTesting final Map<String, JobUpdate> updatesInProgress = Maps.newHashMap();
@@ -138,7 +138,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
     this.schedulingFilter = checkNotNull(schedulingFilter);
     this.updaterTaskBuilder = checkNotNull(updaterTaskBuilder);
 
-   // TODO(jsirois): Add a method to StateMachine or write a wrapper that allows for a read-locked
+   // TODO(John Sirois): Add a method to StateMachine or write a wrapper that allows for a read-locked
    // do-in-state assertion around a block of work.  Transition would then need to grab the write
    // lock.  Another approach is to force these transitions with:
    // SchedulerCoreFactory -> SchedulerCoreRunner -> SchedulerCore which remove all state sensitive
@@ -160,7 +160,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
 
         taskStore.mutate(Query.GET_ALL, new Closure<ScheduledTask>() {
           @Override public void execute(ScheduledTask task) {
-            // TODO(jsirois): implement change detection in DbStorage mutate to make this more
+            // TODO(John Sirois): implement change detection in DbStorage mutate to make this more
             // efficient or else re-jigger where unset defaults get applied/handled
             ConfigurationManager.applyDefaultsIfUnset(task.getAssignedTask().getTask());
           }
@@ -261,7 +261,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
         .toString().replaceAll("[^\\w-]", "-");  // Constrain character set.
   }
 
-  // TODO(wfarner): This is does not currently clear out tasks when a host is decommissioned.
+  // TODO(William Farner): This is does not currently clear out tasks when a host is decommissioned.
   //    Figure out a solution that will work.  Might require mesos support for fetching the list
   //    of slaves.
   @Override
@@ -278,7 +278,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
     final Map<String, LiveTaskInfo> taskInfoMap = Maps.newHashMap(
         Maps.uniqueIndex(taskInfos, Tasks.LIVE_TO_ID));
 
-    // TODO(wfarner): Have the scheduler only retain configurations for live jobs,
+    // TODO(William Farner): Have the scheduler only retain configurations for live jobs,
     //    and acquire all other state from slaves.
     //    This will allow the scheduler to only persist active tasks.
 
@@ -385,7 +385,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
 
     final JobConfiguration populated = ConfigurationManager.validateAndPopulate(job);
 
-    // TODO(wfarner): Add a check to make sure the job name cannot conflict with the name format
+    // TODO(William Farner): Add a check to make sure the job name cannot conflict with the name format
     //    used for the updater (ending with ".updater")
 
     if (hasActiveJob(populated)) {
@@ -416,7 +416,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
     launchTasks(checkNotNull(job.getTaskConfigs()));
   }
 
-  // TODO(wfarner): Kill function with side effects, it _will_ cause bugs.
+  // TODO(William Farner): Kill function with side effects, it _will_ cause bugs.
   private Function<TwitterTaskInfo, ScheduledTask> taskCreator =
       new Function<TwitterTaskInfo, ScheduledTask>() {
         @Override
@@ -650,7 +650,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
       return null;
     }
 
-    // TODO(wfarner): Remove this hack once mesos core does not read parameters.
+    // TODO(William Farner): Remove this hack once mesos core does not read parameters.
     Map<String, String> params = ImmutableMap.of(
         "cpus", String.valueOf((int) task.getAssignedTask().getTask().getNumCpus()),
         "mem", String.valueOf(task.getAssignedTask().getTask().getRamMb()));
@@ -1069,7 +1069,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
 
     LOG.info("Restart requested for tasks " + taskIds);
 
-    // TODO(wfarner): Change this (and the thrift interface) to query by shard ID in the context
+    // TODO(William Farner): Change this (and the thrift interface) to query by shard ID in the context
     //    of a job instead of task ID.
 
     return storage.doInTransaction(new Work<Set<String>, RestartException>() {
@@ -1158,7 +1158,7 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
               @Override public Integer apply(SchedulerStore schedulerStore, JobStore jobStore,
                   TaskStore taskStore) {
 
-                // TODO(jsirois): optimize this for DbStorage, currently burdened by un-needed
+                // TODO(John Sirois): optimize this for DbStorage, currently burdened by un-needed
                 // deserialization of ScheduledTask data - just need a select count
                 return taskStore.fetch(Query.byStatus(status)).size();
               }

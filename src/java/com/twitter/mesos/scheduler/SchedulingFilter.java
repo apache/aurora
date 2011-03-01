@@ -24,7 +24,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * Determines whether a proposed scheduling assignment should be allowed.
  *
- * @author wfarner
+ * @author William Farner
  */
 public interface SchedulingFilter {
 
@@ -163,7 +163,7 @@ public interface SchedulingFilter {
       };
     }
 
-    // TODO(wfarner): Comparing strings as canonical host IDs could be problematic.  Consider
+    // TODO(William Farner): Comparing strings as canonical host IDs could be problematic.  Consider
     //    an approach that would be robust when presented with an IP address as well.
     @Override public Predicate<ScheduledTask> makeFilter(final TwitterTaskInfo resourceOffer,
         final String slaveHost) {

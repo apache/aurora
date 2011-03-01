@@ -29,7 +29,7 @@ import static com.twitter.mesos.updater.UpdateLogic.State.UPDATE_BATCH;
 /**
  * Abstract logic for the mesos updater.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class UpdateLogic {
 
@@ -43,10 +43,10 @@ public class UpdateLogic {
   /**
    * Creates a new update logic.
    *
-   * TODO(wfarner): During a rollback, need to get the updated set of shard IDs since the update
+   * TODO(William Farner): During a rollback, need to get the updated set of shard IDs since the update
    *    may have added shard IDs.
    *
-   * TODO(wfarner): Need to make sure to issue a kill command to shards that are being removed.
+   * TODO(William Farner): Need to make sure to issue a kill command to shards that are being removed.
    *
    */
   public UpdateLogic(Set<Integer> oldShards, Set<Integer> newShards, UpdateConfig config,
@@ -161,7 +161,7 @@ public class UpdateLogic {
           if (consumingIds.isEmpty()) {
             stateMachine.transition(COMPLETE_FAILED);
           } else {
-            // TODO(wfarner): Can/should we do anything if this fails?
+            // TODO(William Farner): Can/should we do anything if this fails?
             restartShards(ROLLBACK_TASK, config.getUpdateBatchSize(), Integer.MAX_VALUE,
                 config.getUpdateWatchDurationSecs());
           }

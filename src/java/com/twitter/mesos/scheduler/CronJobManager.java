@@ -31,11 +31,11 @@ import java.util.logging.Logger;
 /**
  * A job scheduler that receives jobs that should be run periodically on a cron schedule.
  *
- * TODO(wfarner): Some more work might be required here.  For example, when the cron job is
+ * TODO(William Farner): Some more work might be required here.  For example, when the cron job is
  * triggered, we may want to see if the same job is still running and allow the configuration to
  * specify the policy for when that occurs (i.e. overlap or kill the existing job).
  *
- * @author wfarner
+ * @author William Farner
  */
 public class CronJobManager extends JobManager {
   private static Logger LOG = Logger.getLogger(CronJobManager.class.getName());
@@ -102,7 +102,7 @@ public class CronJobManager extends JobManager {
         case KILL_EXISTING:
           LOG.info("Cron collision policy requires killing existing job.");
           try {
-            // TODO(wfarner): This kills the cron job itself, fix that.
+            // TODO(William Farner): This kills the cron job itself, fix that.
             schedulerCore.killTasks(query);
             runJob = true;
           } catch (ScheduleException e) {
@@ -163,7 +163,7 @@ public class CronJobManager extends JobManager {
     try {
       return scheduler.schedule(job.getCronSchedule(), new Runnable() {
         @Override public void run() {
-          // TODO(wfarner): May want to record information about job runs.
+          // TODO(William Farner): May want to record information about job runs.
           LOG.info("Running cron job: " + Tasks.jobKey(job));
           cronTriggered(job);
         }

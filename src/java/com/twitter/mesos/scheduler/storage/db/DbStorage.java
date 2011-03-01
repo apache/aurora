@@ -75,7 +75,7 @@ import static com.google.common.collect.Iterables.transform;
 /**
  * A task store that saves data to a database with a JDBC driver.
  *
- * @author jsirois
+ * @author John Sirois
  */
 public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
 
@@ -347,7 +347,7 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
 
     transactionTemplate.execute(new TransactionCallbackWithoutResult() {
       @Override protected void doInTransactionWithoutResult(TransactionStatus transactionStatus) {
-        // TODO(wfarner): consider adding a checksum column to verify job_configuration bytes
+        // TODO(William Farner): consider adding a checksum column to verify job_configuration bytes
         jdbcTemplate.update(
             "INSERT INTO job_state (job_key, manager_id, job_configuration) VALUES (?, ?, ?)",
             Tasks.jobKey(jobConfig), managerId, getBytes(jobConfig));
@@ -497,7 +497,7 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
           }
         });
 
-    // TODO(jsirois): detect real mutations, some or all of these may have been noops
+    // TODO(John Sirois): detect real mutations, some or all of these may have been noops
     vars.tasksMutated.addAndGet(taskStates.size());
 
     return taskStates;
@@ -610,7 +610,7 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
   }
 
   private WhereClauseBuilder createWhereClause(Query query) {
-    // TODO(jsirois): investigate using:
+    // TODO(John Sirois): investigate using:
     // org.springframework.jdbc.core.namedparam.MapSqlParameterSource
     WhereClauseBuilder whereClauseBuilder = new WhereClauseBuilder();
 

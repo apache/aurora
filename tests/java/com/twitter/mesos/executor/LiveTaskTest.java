@@ -34,7 +34,7 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 
 /**
- * @author wfarner
+ * @author William Farner
  */
 public class LiveTaskTest {
 
@@ -79,7 +79,7 @@ public class LiveTaskTest {
     try {
       if (executorRoot.exists()) org.apache.commons.io.FileUtils.deleteDirectory(executorRoot);
     } catch (Throwable t) {
-      // TODO(wfarner): Figure out why this fails occasionally.
+      // TODO(William Farner): Figure out why this fails occasionally.
     }
     */
   }
@@ -163,10 +163,10 @@ public class LiveTaskTest {
   }
 
   @Test
-  // TODO(wfarner): This test is flaky when running from the command line - figure out
+  // TODO(William Farner): This test is flaky when running from the command line - figure out
   // a better way to do this.
   public void testKill() throws Exception {
-    /** TODO(wfarner): Fix this flaky test.
+    /** TODO(William Farner): Fix this flaky test.
     taskObj.getTask().setStartCommand("touch b.txt; sleep 10");
     taskA.stage();
     taskA.launch();

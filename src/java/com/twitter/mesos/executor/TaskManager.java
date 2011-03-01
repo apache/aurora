@@ -4,7 +4,7 @@ package com.twitter.mesos.executor;
  * Defines a task manager that provides information about running tasks and minimal mutating
  * operations.
  *
- * @author wfarner
+ * @author William Farner
  */
 public interface TaskManager {
 

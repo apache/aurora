@@ -14,7 +14,7 @@ import java.io.File;
 /**
  * A task that has completed execution.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class DeadTask extends TaskOnDisk {
 

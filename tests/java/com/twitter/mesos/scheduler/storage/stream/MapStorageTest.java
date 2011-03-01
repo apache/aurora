@@ -8,7 +8,7 @@ import com.twitter.mesos.scheduler.storage.BaseTaskStoreTest;
 import com.twitter.mesos.scheduler.storage.TaskStore;
 
 /**
- * @author jsirois
+ * @author John Sirois
  */
 public class MapStorageTest extends BaseTaskStoreTest<TaskStore> {
   @Override

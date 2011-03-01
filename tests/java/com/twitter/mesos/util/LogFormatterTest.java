@@ -12,7 +12,7 @@ import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertThat;
 
 /**
- * @author bill
+ * @author William Farner
  */
 public class LogFormatterTest {
 

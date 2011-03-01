@@ -17,7 +17,7 @@ import java.io.IOException;
 /**
  * A factory that will create new tasks that can be run.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class TaskFactory implements Function<AssignedTask, Task> {
 

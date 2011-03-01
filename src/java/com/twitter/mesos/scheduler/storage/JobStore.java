@@ -7,7 +7,7 @@ import javax.annotation.Nullable;
 /**
  * Stores job configuration data.
  *
- * @author jsirois
+ * @author John Sirois
  */
 public interface JobStore {
 

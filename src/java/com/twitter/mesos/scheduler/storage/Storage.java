@@ -6,7 +6,7 @@ import com.twitter.mesos.gen.StorageSystemId;
 /**
  * Manages scheduler storage operations providing an interface to perform atomic changes.
  *
- * @author jsirois
+ * @author John Sirois
  */
 public interface Storage {
 

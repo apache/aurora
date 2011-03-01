@@ -56,7 +56,7 @@ import static com.google.common.collect.Iterables.transform;
 /**
  * Stores all tasks configured with the scheduler.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class MapStorage implements Storage {
   private final static Logger LOG = Logger.getLogger(MapStorage.class.getName());
@@ -274,7 +274,7 @@ public class MapStorage implements Storage {
     return ImmutableSet.copyOf(Iterables.transform(fetch(query), Tasks.SCHEDULED_TO_ID));
   }
 
-  // TODO(jsirois): XXX verify reads are behind barriers
+  // TODO(John Sirois): XXX verify reads are behind barriers
   private boolean stopped = false;
 
   @Override
@@ -442,7 +442,7 @@ public class MapStorage implements Storage {
             && matches(query.getTaskIds(), assigned.getTaskId())
             && matches(query.getShardIds(), assigned.getTask().getShardId())
             && matches(query.getStatuses(), task.getStatus())
-            // TODO(wfarner): Might have to be smarter here so as to not be burned by different
+            // TODO(William Farner): Might have to be smarter here so as to not be burned by different
             //    host names for the same machine. i.e. machine1, machine1.prod.twitter.com
             && matches(query.getSlaveHost(), assigned.getSlaveHost());
       }

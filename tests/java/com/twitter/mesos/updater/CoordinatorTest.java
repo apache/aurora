@@ -20,7 +20,7 @@ import static org.junit.Assert.fail;
 /**
  * To change this template use File | Settings | File Templates.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class CoordinatorTest extends EasyMockTest {
 

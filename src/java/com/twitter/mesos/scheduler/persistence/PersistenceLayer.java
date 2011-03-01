@@ -3,7 +3,7 @@ package com.twitter.mesos.scheduler.persistence;
 /**
  * Interface that defines the methods required for scheduler state persistence.
  *
- * @author wfarner
+ * @author William Farner
  */
 public interface PersistenceLayer<T> {
   public T fetch() throws PersistenceException;

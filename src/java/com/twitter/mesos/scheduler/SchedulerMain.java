@@ -44,9 +44,9 @@ import static com.twitter.common.quantity.Time.SECONDS;
 /**
  * Launcher for the twitter mesos scheduler.
  *
- * TODO(wfarner): Include information in /schedulerz about who is the current scheduler leader.
+ * TODO(William Farner): Include information in /schedulerz about who is the current scheduler leader.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerOptions, Exception> {
   public static class TwitterSchedulerOptions extends GuicedProcessOptions {
@@ -100,7 +100,7 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
     public File schedulerPersistenceLocalPath = new File("/tmp/mesos_scheduler_dump");
 
     // Db storage
-    // TODO(jsirois): get a mesos data dir setup in puppet and move the db files there
+    // TODO(John Sirois): get a mesos data dir setup in puppet and move the db files there
     @Option(name = "scheduler_db_file_path",
             usage = "The path of the H2 db files.")
     public File dbFilePath = new File("/tmp/mesos_scheduler_db");
@@ -135,7 +135,7 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
       } finally {
         scheduler.stop();
         destroy();
-        // TODO(wfarner): This seems necessary to break out of the blocking driver run.
+        // TODO(William Farner): This seems necessary to break out of the blocking driver run.
         System.exit(1);
       }
     }
@@ -200,7 +200,7 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
       return;
     }
 
-    // TODO(wfarner): This is a bit of a hack, clean it up, maybe by exposing the thrift interface.
+    // TODO(William Farner): This is a bit of a hack, clean it up, maybe by exposing the thrift interface.
     try {
       schedulerThriftPort.set(InetSocketAddressHelper.getLocalAddress(port));
     } catch (UnknownHostException e) {

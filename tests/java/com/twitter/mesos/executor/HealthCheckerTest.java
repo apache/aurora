@@ -16,7 +16,7 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 
 /**
- * @author wfarner
+ * @author William Farner
  */
 public class HealthCheckerTest {
 

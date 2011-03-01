@@ -15,7 +15,7 @@ import java.util.logging.Logger;
 /**
  * Persistence layer that stores data in ZooKeeper.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class ZooKeeperPersistence implements PersistenceLayer<byte[]> {
   private final static Logger LOG = Logger.getLogger(ZooKeeperPersistence.class.getName());

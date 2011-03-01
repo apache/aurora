@@ -13,7 +13,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 /**
  * Binding annotation for the executor multi user mode.
  *
- * @author jsirois
+ * @author John Sirois
  */
 @BindingAnnotation @Target({FIELD, PARAMETER, METHOD}) @Retention(RUNTIME)
 public @interface MultiUserMode {}

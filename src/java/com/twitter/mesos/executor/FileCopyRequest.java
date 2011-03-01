@@ -5,7 +5,7 @@ import com.twitter.common.base.MorePreconditions;
 /**
  * A bean to contain the state necessary to complete a file copy.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class FileCopyRequest {
   private final String sourcePath;

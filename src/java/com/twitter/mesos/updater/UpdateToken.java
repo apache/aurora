@@ -13,7 +13,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 /**
  * Binding annotation for the update token.
  *
- * @author wfarner
+ * @author William Farner
  */
 @BindingAnnotation
 @Target({FIELD, PARAMETER, METHOD}) @Retention(RUNTIME)

@@ -7,7 +7,7 @@ import java.util.Set;
 /**
  * Configuration options for a phase in an update flow.
  *
- * @author wfarner
+ * @author William Farner
  */
 class UpdateCommand {
   static enum Type {

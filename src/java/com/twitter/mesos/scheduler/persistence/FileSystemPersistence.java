@@ -13,7 +13,7 @@ import java.util.logging.Logger;
 /**
  * Persistence layer that stores data on the local file system.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class FileSystemPersistence implements PersistenceLayer<byte[]> {
   private final static Logger LOG = Logger.getLogger(FileSystemPersistence.class.getName());

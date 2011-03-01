@@ -12,7 +12,7 @@ import java.util.List;
 /**
  * Utility class to hold common display helper functions.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class DisplayUtils {
 

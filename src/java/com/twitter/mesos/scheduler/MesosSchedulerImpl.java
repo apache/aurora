@@ -44,7 +44,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * Location for communication with the mesos core.
  *
- * @author wfarner
+ * @author William Farner
  */
 class MesosSchedulerImpl implements Scheduler {
   private static final Logger LOG = Logger.getLogger(MesosSchedulerImpl.class.getName());
@@ -202,7 +202,7 @@ class MesosSchedulerImpl implements Scheduler {
   @Override
   public void error(SchedulerDriver driver, int code, String message) {
     LOG.severe("Received error message: " + message + " with code " + code);
-    // TODO(wfarner): Exit cleanly.
+    // TODO(William Farner): Exit cleanly.
     System.exit(1);
   }
 

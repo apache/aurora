@@ -9,7 +9,7 @@ import java.lang.annotation.Annotation;
 /**
  * Utility methods for working with {@literal StorageRole}s.
  *
- * @author jsirois
+ * @author John Sirois
  */
 public class StorageRoles {
 

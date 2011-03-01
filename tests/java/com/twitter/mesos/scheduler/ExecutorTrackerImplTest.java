@@ -13,7 +13,7 @@ import static org.easymock.EasyMock.createControl;
 import static org.easymock.EasyMock.expect;
 
 /**
- * @author wfarner
+ * @author William Farner
  */
 public class ExecutorTrackerImplTest {
 

@@ -7,7 +7,7 @@ import com.twitter.mesos.gen.ExecutorStatus;
  * Receives executor status messages, and may trigger a callback to suggest that an executor
  * should be restarted.
  *
- * @author wfarner
+ * @author William Farner
  */
 public interface ExecutorTracker {
 

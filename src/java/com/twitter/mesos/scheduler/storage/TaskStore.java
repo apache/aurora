@@ -11,7 +11,7 @@ import java.util.Set;
 /**
  * Stores all tasks configured with the scheduler.
  *
- * @author jsirois
+ * @author John Sirois
  */
 public interface TaskStore {
 

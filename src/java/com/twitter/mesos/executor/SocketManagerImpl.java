@@ -13,7 +13,7 @@ import java.util.logging.Logger;
 /**
  * Implementation of a {@link SocketManager}.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class SocketManagerImpl implements SocketManager {
   private static Logger LOG = Logger.getLogger(SocketManagerImpl.class.getName());

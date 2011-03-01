@@ -21,7 +21,7 @@ import com.twitter.mesos.updater.UpdaterMain.Options;
 /**
  * Mesos updater, coordinates rolling restarts of tasks in a job.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class UpdaterMain extends GuicedProcess<Options, RuntimeException> {
 

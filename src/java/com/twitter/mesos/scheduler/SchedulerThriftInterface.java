@@ -41,7 +41,7 @@ import static com.twitter.mesos.gen.ResponseCode.*;
  * Mesos scheduler thrift server implementation.
  * Interfaces between mesos users and the scheduler core to perform cluster administration tasks.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class SchedulerThriftInterface extends ThriftServer implements MesosSchedulerManager.Iface {
   private static final Logger LOG = Logger.getLogger(SchedulerThriftInterface.class.getName());
@@ -75,7 +75,7 @@ public class SchedulerThriftInterface extends ThriftServer implements MesosSched
     return response;
   }
 
-  // TODO(wfarner): Provide status information about cron jobs here.
+  // TODO(William Farner): Provide status information about cron jobs here.
   @Override
   public ScheduleStatusResponse getTasksStatus(TaskQuery query) {
     Set<TaskState> tasks = schedulerCore.getTasks(new Query(query));
@@ -96,8 +96,8 @@ public class SchedulerThriftInterface extends ThriftServer implements MesosSched
     checkNotNull(request, "Request may not be null.");
     checkNotNull(request.getUpdatedJob(), "Job update may not be null.");
 
-    // TODO(wfarner): JobConfiguration needs to define the update routine for its tasks.
-    // TODO(wfarner): This should spin off a new job that will communicate with the scheduler
+    // TODO(William Farner): JobConfiguration needs to define the update routine for its tasks.
+    // TODO(William Farner): This should spin off a new job that will communicate with the scheduler
     //    to fetch the status of tasks, and restart them per the configured update routine.
 
     JobConfiguration updatedJob = request.getUpdatedJob();
@@ -245,41 +245,41 @@ public class SchedulerThriftInterface extends ThriftServer implements MesosSched
 
   @Override
   protected void tryShutdown() throws Exception {
-    // TODO(wfarner): Implement.
+    // TODO(William Farner): Implement.
   }
 
   @Override
   public String getStatusDetails() {
-    // TODO(wfarner): Return something useful here.
+    // TODO(William Farner): Return something useful here.
     return "Not implemented";
   }
 
   @Override
   public Map<String, Long> getCounters() {
-    // TODO(wfarner): Return something useful here.
+    // TODO(William Farner): Return something useful here.
     return Maps.newHashMap();
   }
 
   @Override
   public long getCounter(String key) {
-    // TODO(wfarner): Return something useful here.
+    // TODO(William Farner): Return something useful here.
     return 0;
   }
 
   @Override
   public void setOption(String key, String value) {
-    // TODO(wfarner): Implement.
+    // TODO(William Farner): Implement.
   }
 
   @Override
   public String getOption(String key) {
-    // TODO(wfarner): Return something useful here.
+    // TODO(William Farner): Return something useful here.
     return "Not implemented";
   }
 
   @Override
   public Map<String, String> getOptions() {
-    // TODO(wfarner): Return something useful here.
+    // TODO(William Farner): Return something useful here.
     return Maps.newHashMap();
   }
 }

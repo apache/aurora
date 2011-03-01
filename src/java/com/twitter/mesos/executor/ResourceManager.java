@@ -18,18 +18,18 @@ import java.util.logging.Logger;
  * Manages system resources and periodically gathers information about resource consumption by
  * tasks.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class ResourceManager {
   private static final Logger LOG = Logger.getLogger(ResourceManager.class.getName());
 
-  // TODO(wfarner): These need to be configurable.
+  // TODO(William Farner): These need to be configurable.
   private static final Amount<Long, Time> FILE_EXPIRATION_TIME = Amount.of(1L, Time.DAYS);
   private static final Amount<Long, Data> MAX_DISK_SPACE = Amount.of(20L, Data.GB);
 
   private final File managedDir;
   private final TaskManager taskManager;
-  // TODO(wfarner): Enable this if we decide to use this instead of pushing it into the mesos
+  // TODO(William Farner): Enable this if we decide to use this instead of pushing it into the mesos
   //    core.
   //private final ResourceScanner resourceScanner;
 
@@ -52,8 +52,8 @@ public class ResourceManager {
     Runnable scanner = new Runnable() {
       @Override public void run() {
         for (Task task : taskManager.getTaskRunners()) {
-          // TODO(wfarner): Need to track rate of jiffies to determine CPU usage.
-          // TODO(wfarner): Remove this hack once the mesos slave does its own resource tracking.
+          // TODO(William Farner): Need to track rate of jiffies to determine CPU usage.
+          // TODO(William Farner): Remove this hack once the mesos slave does its own resource tracking.
           if (task instanceof TaskRunner) {
             TaskRunner taskRunner = (TaskRunner) task;
             ResourceScanner.ProcInfo procInfo =
@@ -113,7 +113,7 @@ public class ResourceManager {
     DiskGarbageCollector completedTaskGc = new DiskGarbageCollector("CompletedTask",
         managedDir, completedTaskFileFilter, MAX_DISK_SPACE, gcCallback);
 
-    // TODO(wfarner): Make GC intervals configurable.
+    // TODO(William Farner): Make GC intervals configurable.
     ScheduledExecutorService gcExecutor = new ScheduledThreadPoolExecutor(2,
         new ThreadFactoryBuilder().setDaemon(true).setNameFormat("Disk GC-%d").build());
     gcExecutor.scheduleAtFixedRate(expiredDirGc, 1, 5, TimeUnit.MINUTES);

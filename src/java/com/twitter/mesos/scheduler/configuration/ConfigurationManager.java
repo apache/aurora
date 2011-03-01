@@ -20,9 +20,9 @@ import java.util.regex.Pattern;
  * Manages translation from a string-mapped configuration to a concrete configuration type, and
  * defaults for optional values.
  *
- * TODO(wfarner): Add input validation to all fields (strings not empty, positive ints, etc).
+ * TODO(William Farner): Add input validation to all fields (strings not empty, positive ints, etc).
  *
- * @author wfarner
+ * @author William Farner
  */
 public class ConfigurationManager {
 
@@ -307,7 +307,7 @@ public class ConfigurationManager {
     return new TwitterTaskInfo()
       .setNumCpus(getValue(params, "cpus", Double.class))
       .setRamMb(getValue(params, "mem", Long.class))
-      .setDiskMb(100 * 1024); // TODO(wfarner): Get this included in offers when mesos supports it.
+      .setDiskMb(100 * 1024); // TODO(William Farner): Get this included in offers when mesos supports it.
   }
 
   public static boolean satisfied(TwitterTaskInfo request, TwitterTaskInfo offer) {

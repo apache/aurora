@@ -5,7 +5,7 @@ import javax.annotation.Nullable;
 /**
  * Stores data specific to the scheduler itself.
  *
- * @author jsirois
+ * @author John Sirois
  */
 public interface SchedulerStore {
 

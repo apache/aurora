@@ -20,7 +20,7 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 
 /**
- * @author wfarner
+ * @author William Farner
  */
 public class UpdateLogicTest extends EasyMockTest {
 

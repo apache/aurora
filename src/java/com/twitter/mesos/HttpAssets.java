@@ -7,7 +7,7 @@ import com.twitter.common.application.http.Registration;
 /**
  * Utility class to register HTTP resources for mesos dashboards.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class HttpAssets {
 

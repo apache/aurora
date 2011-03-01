@@ -22,7 +22,7 @@ import java.util.logging.Logger;
 /**
  * Handles escalated killing of a process.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class ProcessKiller implements ExceptionalClosure<KillCommand, KillException> {
   private static final Logger LOG = Logger.getLogger(ProcessKiller.class.getName());

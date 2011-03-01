@@ -23,7 +23,7 @@ import java.util.logging.Logger;
 /**
  * Handles HTTP signaling to a process.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class HttpSignaler implements ExceptionalFunction<String, List<String>, SignalException> {
   private static final Logger LOG = Logger.getLogger(HttpSignaler.class.getName());

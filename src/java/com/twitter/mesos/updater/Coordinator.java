@@ -38,7 +38,7 @@ import static com.twitter.mesos.gen.ScheduleStatus.*;
 /**
  * Coordinates between the scheduler and the update logic to perform an update.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class Coordinator {
 

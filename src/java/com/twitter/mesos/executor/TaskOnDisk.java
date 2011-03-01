@@ -29,7 +29,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  *
  * The implementing task may create other files, as long as they do not interfere with the above.
  *
- * @author wfarner
+ * @author William Farner
  */
 public abstract class TaskOnDisk implements Task {
 

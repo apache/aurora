@@ -41,7 +41,7 @@ import java.util.Set;
 /**
  * Migrates from one {@link Storage} system to another and provides detailed results.
  *
- * @author jsirois
+ * @author John Sirois
  */
 public class Migrator {
 
@@ -121,7 +121,7 @@ public class Migrator {
    * @return The result encoding the migration status.
    */
   public StorageMigrationResult migrate() {
-    // TODO(jsirois): reconsider the current migration scheme of Migrator having all migration
+    // TODO(John Sirois): reconsider the current migration scheme of Migrator having all migration
     // control - its not clear this will always work.  For instance, when the migration is between
     // different versions of the same storage type, it may make sense for the storage system itself
     // to handle the lion's share of the migration (it may need to rely on non-Storage interface

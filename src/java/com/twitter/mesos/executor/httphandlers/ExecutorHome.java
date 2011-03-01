@@ -20,7 +20,7 @@ import java.util.logging.Logger;
 /**
  * HTTP interface for the executor.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class ExecutorHome extends StringTemplateServlet {
 

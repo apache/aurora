@@ -7,7 +7,7 @@ import com.twitter.mesos.gen.StorageSystemId;
 /**
  * Utilities for dealing with storage migration.
  *
- * @author jsirois
+ * @author John Sirois
  */
 public final class MigrationUtils {
 

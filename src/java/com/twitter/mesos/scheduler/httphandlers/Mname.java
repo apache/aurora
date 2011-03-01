@@ -27,7 +27,7 @@ import static javax.servlet.http.HttpServletResponse.SC_NOT_FOUND;
 /**
  * Simple redirector from the canonical name of a task to its configured HTTP port.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class Mname extends HttpServlet {
 

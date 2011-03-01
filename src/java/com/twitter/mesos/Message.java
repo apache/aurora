@@ -8,7 +8,7 @@ import javax.annotation.Nullable;
 /**
  * A message in the mesos system, between a scheduler and executor.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class Message {
   private final String slaveId;

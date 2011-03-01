@@ -22,7 +22,7 @@ import java.util.logging.Logger;
 /**
  * Handles loading of dead tasks that were previously persisted.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class DeadTaskLoader implements Supplier<Iterable<Task>> {
   private static final Logger LOG = Logger.getLogger(DeadTaskLoader.class.getName());

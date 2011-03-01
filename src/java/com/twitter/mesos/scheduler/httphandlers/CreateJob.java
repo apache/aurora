@@ -32,7 +32,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * Servlet to support job creation through the web interface.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class CreateJob extends StringTemplateServlet {
 

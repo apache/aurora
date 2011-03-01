@@ -27,7 +27,7 @@ import java.util.Set;
 /**
  * HTTP interface to serve as a HUD for the mesos scheduler.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class SchedulerzHome extends StringTemplateServlet {
 

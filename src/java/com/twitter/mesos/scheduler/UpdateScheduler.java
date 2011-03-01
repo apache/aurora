@@ -10,7 +10,7 @@ import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescri
 /**
  * Handles duties related to updating a job and receiving rolling updates.
  *
- * @author wfarner
+ * @author William Farner
  */
 public interface UpdateScheduler {
 
@@ -27,7 +27,7 @@ public interface UpdateScheduler {
   public JobUpdateResult updateJob(JobConfiguration updatedJob) throws ScheduleException,
       TaskDescriptionException;
 
-  // TODO(wfarner): This makes the interface look ugly, and shows how the encapsulation between
+  // TODO(William Farner): This makes the interface look ugly, and shows how the encapsulation between
   //    SchedulreCoreImpl and ImmediateJobManager is broken.
   public JobUpdateResult doJobUpdate(JobConfiguration updatedJob) throws ScheduleException;
 

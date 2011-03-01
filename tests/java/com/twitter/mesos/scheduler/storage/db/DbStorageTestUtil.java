@@ -18,7 +18,7 @@ import java.util.logging.Logger;
 /**
  * Provides utility methods for testing against H2 databases.
  *
- * @author jsirois
+ * @author John Sirois
  */
 final class DbStorageTestUtil {
 

@@ -14,7 +14,7 @@ import static com.twitter.mesos.updater.ConfigParser.Type.POSITIVE;
 /**
  * Handles parsing of the update config map and populating a config object.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class ConfigParser {
 

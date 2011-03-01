@@ -9,7 +9,7 @@ import java.io.File;
 /**
  * Determines the amount of different consumable resources that are being used by a process.
  *
- * @author wfarner
+ * @author William Farner
  */
 public interface ResourceScanner {
 

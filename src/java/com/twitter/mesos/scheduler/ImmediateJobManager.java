@@ -5,7 +5,7 @@ import com.twitter.mesos.gen.JobConfiguration;
 /**
  * Job scheduler that accepts any job and executes it immediately.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class ImmediateJobManager extends JobManager {
 

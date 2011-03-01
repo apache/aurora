@@ -22,7 +22,7 @@ import java.util.logging.Logger;
 /**
  * Tracks the status of executors, and manages restarts when build mismatches are found.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class ExecutorTrackerImpl implements ExecutorTracker {
 

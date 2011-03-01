@@ -25,7 +25,7 @@ import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.fail;
 
 /**
- * @author wfarner
+ * @author William Farner
  */
 public class ExecutorCoreTest extends EasyMockTest {
 

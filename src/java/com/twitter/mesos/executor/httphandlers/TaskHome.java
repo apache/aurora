@@ -17,7 +17,7 @@ import java.io.IOException;
 /**
  * HTTP interface to view information about a task.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class TaskHome extends StringTemplateServlet {
 

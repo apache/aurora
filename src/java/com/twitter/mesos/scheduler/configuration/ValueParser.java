@@ -6,7 +6,7 @@ import org.apache.commons.lang.StringUtils;
 /**
  * A simple parser interface to handle value parsing and type casting.
  *
- * @author wfarner
+ * @author William Farner
  */
 public interface ValueParser<T> {
   public T parse(String s) throws ParseException;

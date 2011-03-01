@@ -24,7 +24,7 @@ import javax.annotation.Nullable;
 /**
  * Provides bindings for stream based scheduler storage.
  *
- * @author jsirois
+ * @author John Sirois
  */
 public class StreamStorageModule extends AbstractModule {
 

@@ -9,7 +9,7 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 /**
  * Information about a task that should not be persisted.
  *
- * @author wfarner
+ * @author William Farner
  */
 public class VolatileTaskState {
   public final String taskId;

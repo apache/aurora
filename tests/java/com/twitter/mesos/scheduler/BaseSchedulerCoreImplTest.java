@@ -61,13 +61,13 @@ import static org.junit.Assert.fail;
  * Base integration test for the SchedulerCoreImpl, subclasses should supply a concrete Storage
  * system.
  *
- * TODO(wfarner): Test all the different cases for setTaskStaus:
+ * TODO(William Farner): Test all the different cases for setTaskStaus:
  *    - Killed tasks get removed.
  *    - Failed tasks have failed count incremented.
  *    - Tasks above maxTaskFailures have _all_ tasks in the job removed.
  *    - Daemon tasks are rescheduled.
  *
- * @author wfarner
+ * @author William Farner
  */
 public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
