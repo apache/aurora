@@ -21,6 +21,7 @@ import com.twitter.common.zookeeper.ServerSet.UpdateException;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.SingletonService.LeadershipListener;
 import com.twitter.common.zookeeper.ZooKeeperUtils;
+import com.twitter.common_internal.zookeeper.TwitterZk;
 import com.twitter.mesos.gen.MesosSchedulerManager;
 import com.twitter.mesos.gen.StorageMigrationResult;
 import com.twitter.mesos.scheduler.storage.Migrator;
@@ -60,7 +61,7 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
 
     @Option(name = "zk_endpoints", usage = "Endpoint specification for the ZooKeeper servers.")
     public List<InetSocketAddress> zooKeeperEndpoints =
-        Lists.newArrayList(ZooKeeperUtils.DEFAULT_ZK_ENDPOINTS);
+        Lists.newArrayList(TwitterZk.DEFAULT_ZK_ENDPOINTS);
 
     @Option(name = "zk_session_timeout_secs",
             usage = "The ZooKeeper session timeout in seconds.")
