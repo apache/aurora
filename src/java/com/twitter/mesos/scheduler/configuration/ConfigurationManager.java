@@ -196,7 +196,7 @@ public class ConfigurationManager {
         }
       },
       new TypedField<Double>(Double.class, "num_cpus", 1.0) {
-        @Override boolean isSet(TwitterTaskInfo task) { return task.isSetRamMb(); }
+        @Override boolean isSet(TwitterTaskInfo task) { return task.isSetNumCpus(); }
 
         @Override void apply(TwitterTaskInfo task, Double value) throws TaskDescriptionException {
           task.setNumCpus(value);
