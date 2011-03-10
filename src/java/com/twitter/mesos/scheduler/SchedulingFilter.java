@@ -2,6 +2,7 @@ package com.twitter.mesos.scheduler;
 
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
@@ -173,7 +174,12 @@ public interface SchedulingFilter {
 
       return new Predicate<ScheduledTask>() {
         @Override public boolean apply(ScheduledTask task) {
-          return Predicates.and(offerSatisfiesTask, isTaskAllowedWith, isPairAllowed).apply(task);
+          return Predicates.and(ImmutableList.<Predicate<ScheduledTask>>builder()
+              .add(offerSatisfiesTask)
+              .add(isTaskAllowedWith)
+              .add(isPairAllowed)
+              .build())
+              .apply(task);
         }
       };
     }

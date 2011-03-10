@@ -1,12 +1,22 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Iterables;
@@ -15,6 +25,10 @@ import com.google.common.collect.MapMaker;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
+
+import org.apache.mesos.Protos.Resource;
+import org.apache.mesos.Protos.SlaveOffer;
+
 import com.twitter.common.base.Closure;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -45,17 +59,6 @@ import com.twitter.mesos.scheduler.storage.StorageRole;
 import com.twitter.mesos.scheduler.storage.StorageRole.Role;
 import com.twitter.mesos.scheduler.storage.TaskStore;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Set;
-import java.util.SortedSet;
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.filter;
@@ -83,7 +86,7 @@ import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.STOPPED;
  *
  * @author William Farner
  */
-public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
+public class SchedulerCoreImpl implements SchedulerCore {
 
   private final Map<String, VolatileTaskState> taskStateById =
       new MapMaker().makeComputingMap(new Function<String, VolatileTaskState>() {
@@ -358,8 +361,11 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
 
         TaskQuery slaveAssignedTaskQuery = new TaskQuery().setSlaveHost(update.getSlaveHost());
         Set<String> missingNotRunningTasks = taskStore.fetchIds(new Query(slaveAssignedTaskQuery,
-                Predicates.not(isTaskReported), Predicates.not(Tasks.hasStatus(RUNNING)),
-                lastEventBeyondGracePeriod));
+            ImmutableList.<Predicate<ScheduledTask>>builder()
+              .add(Predicates.not(isTaskReported))
+              .add(Predicates.not(Tasks.hasStatus(RUNNING)))
+              .add(lastEventBeyondGracePeriod)
+              .build()));
         if (!missingNotRunningTasks.isEmpty()) {
           LOG.info("Removing non-running tasks no longer reported by slave " + update.getSlaveHost()
                    + ": " + missingNotRunningTasks);
@@ -367,7 +373,9 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
         }
 
         Set<String> missingRunningTasks = taskStore.fetchIds(new Query(slaveAssignedTaskQuery,
-                Predicates.not(isTaskReported), Tasks.hasStatus(RUNNING)));
+            Predicates.<ScheduledTask>and(
+                Predicates.not(isTaskReported),
+                Tasks.hasStatus(RUNNING))));
         if (!missingRunningTasks.isEmpty()) {
           LOG.info("Slave " + update.getSlaveHost() + " no longer reports running tasks: "
                    + missingRunningTasks + ", reporting as LOST.");
@@ -609,18 +617,15 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
   }
 
   @Override
-  public synchronized TwitterTask offer(final String slaveId, final String slaveHost,
-      Map<String, String> offerParams) throws ScheduleException {
+  public synchronized TwitterTask offer(final SlaveOffer slaveOffer) throws ScheduleException {
     checkStarted();
-    checkNotBlank(slaveId);
-    checkNotBlank(slaveHost);
-    checkNotNull(offerParams);
+    checkNotNull(slaveOffer);
 
     vars.resourceOffers.incrementAndGet();
 
     final TwitterTaskInfo offer;
     try {
-      offer = ConfigurationManager.makeConcrete(offerParams);
+      offer = ConfigurationManager.makeConcrete(slaveOffer);
     } catch (ConfigurationManager.TaskDescriptionException e) {
       LOG.log(Level.SEVERE, "Invalid slave offer", e);
       return null;
@@ -630,8 +635,9 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
       @Override public ScheduledTask apply(SchedulerStore schedulerStore, JobStore jobStore,
           TaskStore taskStore) {
 
-        SortedSet<ScheduledTask> candidates = taskStore.fetch(Query
-            .and(Query.byStatus(PENDING), schedulingFilter.makeFilter(offer, slaveHost)));
+        SortedSet<ScheduledTask> candidates = taskStore.fetch(
+            Query.and(Query.byStatus(PENDING),
+                schedulingFilter.makeFilter(offer, slaveOffer.getHostname())));
 
         if (candidates.isEmpty()) {
           return null;
@@ -640,8 +646,9 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
         LOG.info("Found " + candidates.size() + " candidates for offer.");
 
         // Choose the first (top) candidate and launch it.
-        return Iterables.getOnlyElement(taskStore.mutate(Query
-            .byId(Tasks.id(Iterables.get(candidates, 0))), taskLauncher(slaveId, slaveHost)));
+        return Iterables.getOnlyElement(taskStore.mutate(
+            Query.byId(Tasks.id(Iterables.get(candidates, 0))),
+            taskLauncher(slaveOffer.getSlaveId().getValue(), slaveOffer.getHostname())));
       }
     });
 
@@ -650,17 +657,17 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
       return null;
     }
 
-    // TODO(William Farner): Remove this hack once mesos core does not read parameters.
-    Map<String, String> params = ImmutableMap.of(
-        "cpus", String.valueOf((int) task.getAssignedTask().getTask().getNumCpus()),
-        "mem", String.valueOf(task.getAssignedTask().getTask().getRamMb()));
-
     AssignedTask assignedTask = task.getAssignedTask();
     LOG.info(String.format("Offer on slave %s (id %s) is being assigned task for %s.",
-        slaveHost, assignedTask.getSlaveId(), jobKey(assignedTask)));
+        slaveOffer.getHostname(), assignedTask.getSlaveId(), jobKey(assignedTask)));
 
-    return new TwitterTask(assignedTask.getTaskId(), slaveId,
-        assignedTask.getTask().getJobName() + "-" + assignedTask.getTaskId(), params,
+    List<Resource> resources = ImmutableList.of(
+        Resources.makeResource(Resources.CPUS, task.getAssignedTask().getTask().getNumCpus()),
+        Resources.makeResource(Resources.RAM_MB, task.getAssignedTask().getTask().getRamMb())
+    );
+
+    return new TwitterTask(assignedTask.getTaskId(), slaveOffer.getSlaveId().getValue(),
+        assignedTask.getTask().getJobName() + "-" + assignedTask.getTaskId(), resources,
         assignedTask);
   }
 
@@ -669,10 +676,13 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
    * will be modified.
    *
    * @param tasks Copies of other tasks, to be scheduled.
+   * @param taskStore The store to write the task copies to.
    * @return Task IDs of the rescheduled tasks.
    */
   private Set<String> scheduleTaskCopies(Iterable<ScheduledTask> tasks, TaskStore taskStore) {
-    if (Iterables.isEmpty(tasks)) return ImmutableSet.of();
+    if (Iterables.isEmpty(tasks)) {
+      return ImmutableSet.of();
+    }
 
     Set<String> newTaskIds = Sets.newHashSet();
     for (ScheduledTask task : tasks) {
@@ -920,7 +930,6 @@ public class SchedulerCoreImpl implements SchedulerCore, UpdateScheduler {
     return updateToken;
   }
 
-  @Override
   public synchronized UpdateConfigResponse getUpdateConfig(String updateToken)
       throws UpdateException {
     checkStarted();

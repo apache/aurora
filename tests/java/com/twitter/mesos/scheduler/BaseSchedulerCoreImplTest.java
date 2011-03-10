@@ -25,10 +25,16 @@ import com.twitter.mesos.gen.UpdateConfig;
 import com.twitter.mesos.scheduler.JobManager.JobUpdateResult;
 import com.twitter.mesos.scheduler.SchedulerCore.RestartException;
 import com.twitter.mesos.scheduler.SchedulerCore.TaskState;
-import com.twitter.mesos.scheduler.UpdateScheduler.UpdateException;
+import com.twitter.mesos.scheduler.SchedulerCore.UpdateException;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import com.twitter.mesos.scheduler.storage.Storage;
+
+import org.apache.mesos.Protos.Resource;
+import org.apache.mesos.Protos.Resource.Scalar;
+import org.apache.mesos.Protos.Resource.Type;
+import org.apache.mesos.Protos.SlaveID;
+import org.apache.mesos.Protos.SlaveOffer;
 import org.easymock.Capture;
 import org.junit.Before;
 import org.junit.Test;
@@ -81,7 +87,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private static final String OWNER_B = "Test_Owner_B";
   private static final String JOB_B = "Test_Job_B";
 
-  private static final String SLAVE_ID = "SlaveId";
+  private static final SlaveID SLAVE_ID = SlaveID.newBuilder().setValue("SlaveId").build();
   private static final String SLAVE_HOST_1 = "SlaveHost1";
   private static final String SLAVE_HOST_2 = "SlaveHost2";
 
@@ -316,7 +322,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     expectOffer(false);
     expectOffer(false);
 
-
     control.replay();
     buildScheduler();
 
@@ -324,13 +329,11 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     assertTaskCount(10);
 
-    Map<String, String> slaveOffer = ImmutableMap.<String, String>builder()
-        .put("cpus", "4")
-        .put("mem", "4096")
-        .build();
-    assertNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
-    assertNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
-    assertNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    SlaveOffer slaveOffer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
+
+    assertNull(scheduler.offer(slaveOffer));
+    assertNull(scheduler.offer(slaveOffer));
+    assertNull(scheduler.offer(slaveOffer));
 
     // No tasks should have moved out of the pending state.
     assertThat(getTasksByStatus(PENDING).size(), is(10));
@@ -705,11 +708,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     buildScheduler();
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
-    Map<String, String> slaveOffer = ImmutableMap.<String, String>builder()
-        .put("cpus", "4")
-        .put("mem", "4096")
-        .build();
-    scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer);
+    SlaveOffer slaveOffer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
+    scheduler.offer(slaveOffer);
 
     String taskId = getOnlyTask(queryByOwner(OWNER_A)).task.getAssignedTask().getTaskId();
 
@@ -746,12 +746,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     buildScheduler();
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 2));
-    Map<String, String> slaveOffer = ImmutableMap.<String, String>builder()
-        .put("cpus", "4")
-        .put("mem", "4096")
-        .build();
-    scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer);
-    scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer);
+    SlaveOffer slaveOffer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
+    scheduler.offer(slaveOffer);
+    scheduler.offer(slaveOffer);
 
     String taskId1 = Iterables.get(getTasks(queryByOwner(OWNER_A)), 0)
         .task.getAssignedTask().getTaskId();
@@ -790,17 +787,15 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    Map<String, String> slaveOffer = ImmutableMap.<String, String>builder()
-        .put("cpus", "4")
-        .put("mem", "4096")
-        .build();
+    SlaveOffer slaveOffer1 = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
+    SlaveOffer slaveOffer2 = createSlaveOffer(SLAVE_ID, SLAVE_HOST_2, 4, 4096);
 
     // Offer resources for the scheduler to accept.
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
-    scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer);
+    scheduler.offer(slaveOffer1);
 
     scheduler.createJob(makeJob(OWNER_B, JOB_B, DEFAULT_TASK, 1));
-    scheduler.offer(SLAVE_ID, SLAVE_HOST_2, slaveOffer);
+    scheduler.offer(slaveOffer2);
 
     String taskIdA = Iterables.get(getTasksOwnedBy(OWNER_A), 0).task.getAssignedTask().getTaskId();
     String taskIdB = Iterables.get(getTasksOwnedBy(OWNER_B), 0).task.getAssignedTask().getTaskId();
@@ -831,22 +826,20 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    Map<String, String> slaveOffer = ImmutableMap.<String, String>builder()
-        .put("cpus", "4")
-        .put("mem", "4096")
-        .build();
+    SlaveOffer slaveOffer1 = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
+    SlaveOffer slaveOffer2 = createSlaveOffer(SLAVE_ID, SLAVE_HOST_2, 4, 4096);
 
     // Offer resources for the scheduler to accept.
     TwitterTaskInfo daemonTask = new TwitterTaskInfo(DEFAULT_TASK);
     daemonTask.putToConfiguration("daemon", "true");
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, daemonTask, 2));
-    scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer);
-    scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer);
+    scheduler.offer(slaveOffer1);
+    scheduler.offer(slaveOffer1);
 
     scheduler.createJob(makeJob(OWNER_B, JOB_B, DEFAULT_TASK, 2));
-    scheduler.offer(SLAVE_ID, SLAVE_HOST_2, slaveOffer);
-    scheduler.offer(SLAVE_ID, SLAVE_HOST_2, slaveOffer);
+    scheduler.offer(slaveOffer2);
+    scheduler.offer(slaveOffer2);
 
     String taskIdA = Iterables.get(getTasksOwnedBy(OWNER_A), 0).task.getAssignedTask().getTaskId();
     String taskIdB = Iterables.get(getTasksOwnedBy(OWNER_A), 1).task.getAssignedTask().getTaskId();
@@ -1264,17 +1257,15 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         ConfigurationManager.validateAndPopulate(job).getTaskConfigs());
     Map<Integer, TwitterTaskInfo> updateTo = Tasks.mapInfoByShardId(updatedJob.getTaskConfigs());
 
-    Map<String, String> slaveOffer = ImmutableMap.<String, String>builder()
-        .put("cpus", "4")
-        .put("mem", "4096")
-        .build();
+    SlaveOffer slaveOffer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
+
     // Allow several of the tasks to start.
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    assertNotNull(scheduler.offer(slaveOffer));
+    assertNotNull(scheduler.offer(slaveOffer));
+    assertNotNull(scheduler.offer(slaveOffer));
+    assertNotNull(scheduler.offer(slaveOffer));
+    assertNotNull(scheduler.offer(slaveOffer));
+    assertNotNull(scheduler.offer(slaveOffer));
 
     Set<TaskState> startingTasks = getTasks(Query.byStatus(STARTING));
 
@@ -1332,20 +1323,17 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         ConfigurationManager.validateAndPopulate(job).getTaskConfigs());
     Map<Integer, TwitterTaskInfo> updateTo = Tasks.mapInfoByShardId(updatedJob.getTaskConfigs());
 
-    Map<String, String> slaveOffer = ImmutableMap.<String, String>builder()
-        .put("cpus", "4")
-        .put("mem", "4096")
-        .build();
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    SlaveOffer slaveOffer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
+    assertNotNull(scheduler.offer(slaveOffer));
+    assertNotNull(scheduler.offer(slaveOffer));
+    assertNotNull(scheduler.offer(slaveOffer));
+    assertNotNull(scheduler.offer(slaveOffer));
+    assertNotNull(scheduler.offer(slaveOffer));
+    assertNotNull(scheduler.offer(slaveOffer));
+    assertNotNull(scheduler.offer(slaveOffer));
+    assertNotNull(scheduler.offer(slaveOffer));
+    assertNotNull(scheduler.offer(slaveOffer));
+    assertNotNull(scheduler.offer(slaveOffer));
 
     Map<Integer, TaskState> startingShards = Tasks.mapStateByShardId(
         getTasks(Query.byStatus(STARTING)));
@@ -1425,12 +1413,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         ConfigurationManager.validateAndPopulate(job).getTaskConfigs());
     Map<Integer, TwitterTaskInfo> updateTo = Tasks.mapInfoByShardId(updatedJob.getTaskConfigs());
 
-    Map<String, String> slaveOffer = ImmutableMap.<String, String>builder()
-        .put("cpus", "4")
-        .put("mem", "4096")
-        .build();
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    SlaveOffer slaveOffer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
+    assertNotNull(scheduler.offer(slaveOffer));
+    assertNotNull(scheduler.offer(slaveOffer));
 
     Map<Integer, TaskState> startingShards = Tasks.mapStateByShardId(
         getTasks(Query.byStatus(STARTING)));
@@ -1480,12 +1465,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         ConfigurationManager.validateAndPopulate(job).getTaskConfigs());
     Map<Integer, TwitterTaskInfo> updateTo = Tasks.mapInfoByShardId(updatedJob.getTaskConfigs());
 
-    Map<String, String> slaveOffer = ImmutableMap.<String, String>builder()
-        .put("cpus", "4")
-        .put("mem", "4096")
-        .build();
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    SlaveOffer slaveOffer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
+    assertNotNull(scheduler.offer(slaveOffer));
+    assertNotNull(scheduler.offer(slaveOffer));
 
     Map<Integer, TaskState> startingShards = Tasks.mapStateByShardId(
         getTasks(Query.byStatus(STARTING)));
@@ -1497,8 +1479,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     expectRestarted(scheduler.updateShards(token, ImmutableSet.of(2, 3), false), newCommand);
 
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    assertNotNull(scheduler.offer(slaveOffer));
+    assertNotNull(scheduler.offer(slaveOffer));
 
     expectRestarted(scheduler.updateShards(token, ImmutableSet.of(0, 1), false), newCommand);
     expectRestarted(scheduler.updateShards(token, ImmutableSet.of(0, 1), true), oldCommand);
@@ -1541,14 +1523,11 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         ConfigurationManager.validateAndPopulate(job).getTaskConfigs());
     Map<Integer, TwitterTaskInfo> updateTo = Tasks.mapInfoByShardId(updatedJob.getTaskConfigs());
 
-    Map<String, String> slaveOffer = ImmutableMap.<String, String>builder()
-        .put("cpus", "4")
-        .put("mem", "4096")
-        .build();
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    SlaveOffer slaveOffer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
+    assertNotNull(scheduler.offer(slaveOffer));
+    assertNotNull(scheduler.offer(slaveOffer));
+    assertNotNull(scheduler.offer(slaveOffer));
+    assertNotNull(scheduler.offer(slaveOffer));
 
     Map<Integer, TaskState> startingShards = Tasks.mapStateByShardId(
         getTasks(Query.byStatus(STARTING)));
@@ -1600,14 +1579,11 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         ConfigurationManager.validateAndPopulate(job).getTaskConfigs());
     Map<Integer, TwitterTaskInfo> updateTo = Tasks.mapInfoByShardId(updatedJob.getTaskConfigs());
 
-    Map<String, String> slaveOffer = ImmutableMap.<String, String>builder()
-        .put("cpus", "4")
-        .put("mem", "4096")
-        .build();
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
-    assertNotNull(scheduler.offer(SLAVE_ID, SLAVE_HOST_1, slaveOffer));
+    SlaveOffer slaveOffer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
+    assertNotNull(scheduler.offer(slaveOffer));
+    assertNotNull(scheduler.offer(slaveOffer));
+    assertNotNull(scheduler.offer(slaveOffer));
+    assertNotNull(scheduler.offer(slaveOffer));
 
     Map<Integer, TaskState> startingShards = Tasks.mapStateByShardId(
         getTasks(Query.byStatus(STARTING)));
@@ -1677,6 +1653,18 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       job.addToTaskConfigs(new TwitterTaskInfo(task).setShardId(i++));
     }
     return job;
+  }
+
+  private static SlaveOffer createSlaveOffer(SlaveID slave, String slaveHost, double cpu,
+      double ramMb) {
+    return SlaveOffer.newBuilder()
+        .addResources(Resource.newBuilder().setType(Type.SCALAR).setName(Resources.CPUS)
+            .setScalar(Scalar.newBuilder().setValue(cpu)))
+        .addResources(Resource.newBuilder().setType(Type.SCALAR).setName(Resources.RAM_MB)
+            .setScalar(Scalar.newBuilder().setValue(ramMb)))
+        .setSlaveId(slave)
+        .setHostname(slaveHost)
+        .build();
   }
 
   private static TwitterTaskInfo defaultTask() {

@@ -1,5 +1,14 @@
 package com.twitter.mesos.scheduler;
 
+import java.io.File;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Logger;
+
+import javax.annotation.Nullable;
+
 import com.google.common.base.Function;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
@@ -9,6 +18,16 @@ import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 import com.google.inject.multibindings.Multibinder;
 import com.google.inject.name.Names;
+
+import org.apache.mesos.MesosSchedulerDriver;
+import org.apache.mesos.Protos.FrameworkID;
+import org.apache.mesos.Protos.TaskID;
+import org.apache.mesos.Scheduler;
+import org.apache.mesos.SchedulerDriver;
+import org.apache.zookeeper.server.NIOServerCnxn;
+import org.apache.zookeeper.server.ZooKeeperServer;
+import org.apache.zookeeper.server.ZooKeeperServer.BasicDataTreeBuilder;
+import org.apache.zookeeper.server.persistence.FileTxnSnapLog;
 
 import com.twitter.common.application.ActionRegistry;
 import com.twitter.common.application.http.Registration;
@@ -33,24 +52,6 @@ import com.twitter.mesos.scheduler.storage.Migrator;
 import com.twitter.mesos.scheduler.storage.StorageRole;
 import com.twitter.mesos.scheduler.storage.db.DbStorageModule;
 import com.twitter.mesos.scheduler.storage.stream.StreamStorageModule;
-import mesos.MesosSchedulerDriver;
-import mesos.Protos.FrameworkID;
-import mesos.Protos.TaskID;
-import mesos.Scheduler;
-import mesos.SchedulerDriver;
-import org.apache.zookeeper.server.NIOServerCnxn;
-import org.apache.zookeeper.server.ZooKeeperServer;
-import org.apache.zookeeper.server.ZooKeeperServer.BasicDataTreeBuilder;
-import org.apache.zookeeper.server.persistence.FileTxnSnapLog;
-
-import java.io.File;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Logger;
-
-import javax.annotation.Nullable;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 

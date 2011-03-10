@@ -29,8 +29,8 @@ import com.twitter.mesos.executor.httphandlers.ExecutorHome;
 import com.twitter.mesos.executor.httphandlers.TaskHome;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.util.HdfsUtil;
-import mesos.Executor;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.mesos.Executor;
 
 import java.io.File;
 import java.io.IOException;

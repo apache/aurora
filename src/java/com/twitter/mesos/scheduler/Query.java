@@ -1,19 +1,19 @@
 package com.twitter.mesos.scheduler;
 
-import com.google.common.base.Preconditions;
+import java.util.Comparator;
+
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
+
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
-import com.twitter.mesos.scheduler.SchedulerCore.TaskState;
 
-import java.util.Comparator;
-
+import static com.google.common.base.Preconditions.checkNotNull;
 import static org.apache.commons.lang.StringUtils.isEmpty;
 
 /**
@@ -27,21 +27,33 @@ public class Query {
   private final TaskQuery baseQuery;
   private final Predicate<ScheduledTask> filter;
 
+  public Query(TaskQuery query) {
+    this(query, Predicates.<ScheduledTask>alwaysTrue());
+  }
+
   /**
-   * Creates a new query with the given base query and optional filters.
+   * Creates a new query with the given base query a filter.
    *
    * @param baseQuery Base query.
-   * @param filters Filters to apply.
+   * @param filter Filter to apply.
    */
-  public Query(TaskQuery baseQuery, Predicate<ScheduledTask>... filters) {
-    Preconditions.checkNotNull(baseQuery);
+  public Query(TaskQuery baseQuery, Predicate<ScheduledTask> filter) {
+    checkNotNull(baseQuery);
+    checkNotNull(filter);
 
-    this.baseQuery = Preconditions.checkNotNull(baseQuery);
-    if (filters.length == 0) {
-      this.filter = NO_POST_FILTER;
-    } else {
-      this.filter = Predicates.and(filters);
-    }
+    this.baseQuery = checkNotNull(baseQuery);
+    this.filter = filter;
+  }
+
+  /**
+   * Creates a new query with the given base query and an iterable of filter.  The provided filters
+   * will be combined with an AND.
+   *
+   * @param baseQuery Base query.
+   * @param filters Filters to combine and apply.
+   */
+  public Query(TaskQuery baseQuery, Iterable<Predicate<ScheduledTask>> filters) {
+    this(baseQuery, Predicates.<ScheduledTask>and(filters));
   }
 
   /**
@@ -52,8 +64,8 @@ public class Query {
    * @return A new query with an additional filter.
    */
   public static Query and(Query query, Predicate<ScheduledTask> filter) {
-    Preconditions.checkNotNull(query);
-    Preconditions.checkNotNull(filter);
+    checkNotNull(query);
+    checkNotNull(filter);
     return new Query(query.base(), Predicates.<ScheduledTask>and(query.filter, filter));
   }
 

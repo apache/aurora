@@ -1,13 +1,28 @@
 package com.twitter.mesos.scheduler;
 
-import com.google.common.base.Function;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.inject.Inject;
 import com.google.protobuf.ByteString;
+
+import org.apache.mesos.Protos.ExecutorID;
+import org.apache.mesos.Protos.ExecutorInfo;
+import org.apache.mesos.Protos.FrameworkID;
+import org.apache.mesos.Protos.FrameworkMessage;
+import org.apache.mesos.Protos.OfferID;
+import org.apache.mesos.Protos.SlaveID;
+import org.apache.mesos.Protos.SlaveOffer;
+import org.apache.mesos.Protos.TaskDescription;
+import org.apache.mesos.Protos.TaskID;
+import org.apache.mesos.Protos.TaskStatus;
+import org.apache.mesos.Scheduler;
+import org.apache.mesos.SchedulerDriver;
+
 import com.twitter.common.base.Closure;
 import com.twitter.common.stats.Stats;
 import com.twitter.mesos.StateTranslator;
@@ -18,26 +33,6 @@ import com.twitter.mesos.gen.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.RestartExecutor;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.SchedulerMessage;
-import mesos.Protos.ExecutorInfo;
-import mesos.Protos.FrameworkID;
-import mesos.Protos.FrameworkMessage;
-import mesos.Protos.OfferID;
-import mesos.Protos.Param;
-import mesos.Protos.Params;
-import mesos.Protos.SlaveID;
-import mesos.Protos.SlaveOffer;
-import mesos.Protos.TaskDescription;
-import mesos.Protos.TaskID;
-import mesos.Protos.TaskStatus;
-import mesos.Scheduler;
-import mesos.SchedulerDriver;
-
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -76,26 +71,10 @@ class MesosSchedulerImpl implements Scheduler {
 
   @Override
   public ExecutorInfo getExecutorInfo(SchedulerDriver driver) {
-    return ExecutorInfo.newBuilder().setUri(options.executorPath).build();
-  }
 
-  private static final Function<Entry<String, String>, Param> MAP_TO_PARAM =
-      new Function<Entry<String, String>, Param>() {
-    @Override public Param apply(Entry<String, String> param) {
-      return Param.newBuilder().setKey(param.getKey()).setValue(param.getValue()).build();
-    }
-  };
-
-  private static Map<String, String> asMap(Params params) {
-    Map<String, String> map = Maps.newHashMap();
-    for (Param param : params.getParamList()) {
-      String existing = map.put(param.getKey(), param.getValue());
-      if (existing != null) {
-        LOG.severe("Params key collision on " + param.getKey() + ", lost value " + existing);
-      }
-    }
-
-    return map;
+    return ExecutorInfo.newBuilder().setUri(options.executorPath)
+        .setExecutorId(ExecutorID.newBuilder().setValue("twitter"))
+        .build();
   }
 
   @Override
@@ -142,8 +121,7 @@ class MesosSchedulerImpl implements Scheduler {
 
     try {
       for (SlaveOffer offer : slaveOffers) {
-        SchedulerCore.TwitterTask task = schedulerCore.offer(
-            offer.getSlaveId().getValue(), offer.getHostname(), asMap(offer.getParams()));
+        SchedulerCore.TwitterTask task = schedulerCore.offer(offer);
 
         if (task != null) {
           byte[] taskInBytes;
@@ -154,14 +132,11 @@ class MesosSchedulerImpl implements Scheduler {
             throw new ScheduleException("Internal error.", e);
           }
 
-          List<Param> params = ImmutableList.copyOf(Iterables.transform(task.params.entrySet(),
-              MAP_TO_PARAM));
-
           scheduledTasks.add(TaskDescription.newBuilder()
               .setName(task.taskName)
               .setTaskId(TaskID.newBuilder().setValue(task.taskId))
               .setSlaveId(SlaveID.newBuilder().setValue(task.slaveId))
-              .setParams(Params.newBuilder().addAllParam(params).build())
+              .addAllResources(task.resources)
               .setData(ByteString.copyFrom(taskInBytes))
               .build());
         }

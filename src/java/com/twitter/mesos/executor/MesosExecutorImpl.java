@@ -8,12 +8,19 @@ import com.twitter.mesos.executor.Task.TaskRunException;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ExecutorMessage;
 import com.twitter.mesos.gen.ScheduleStatus;
-import mesos.Executor;
-import mesos.ExecutorDriver;
-import mesos.Protos.*;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import org.apache.mesos.Executor;
+import org.apache.mesos.ExecutorDriver;
+import org.apache.mesos.Protos.ExecutorArgs;
+import org.apache.mesos.Protos.FrameworkMessage;
+import org.apache.mesos.Protos.SlaveID;
+import org.apache.mesos.Protos.TaskDescription;
+import org.apache.mesos.Protos.TaskID;
+import org.apache.mesos.Protos.TaskState;
+import org.apache.mesos.Protos.TaskStatus;
 
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
 

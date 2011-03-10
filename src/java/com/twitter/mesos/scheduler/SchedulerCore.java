@@ -1,20 +1,26 @@
 package com.twitter.mesos.scheduler;
 
-import com.google.common.base.Preconditions;
+import java.util.List;
+import java.util.Set;
+
+import javax.annotation.Nullable;
+
+import org.apache.mesos.Protos.Resource;
+import org.apache.mesos.Protos.SlaveOffer;
+
 import com.twitter.common.base.Closure;
-import com.twitter.common.base.MorePreconditions;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.UpdateConfigResponse;
 import com.twitter.mesos.scheduler.JobManager.JobUpdateResult;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 
-import java.util.Map;
-import java.util.Set;
-import javax.annotation.Nullable;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**
  * Scheduling core, stores scheduler state and makes decisions about which tasks to schedule when
@@ -46,7 +52,7 @@ import javax.annotation.Nullable;
  *
  * @author William Farner
  */
-public interface SchedulerCore extends UpdateScheduler {
+public interface SchedulerCore {
 
 
   /**
@@ -102,15 +108,12 @@ public interface SchedulerCore extends UpdateScheduler {
    * Offers resources to the scheduler.  If the scheduler has a pending task that is satisfied by
    * the offer, it will return the task description.
    *
-   * @param slaveId ID of the slave that resources are being offered on.
-   * @param slaveHost Hostname of the slave.
-   * @param offerParams Parameters of the available resources on the slave.
+   * @param offer Resource offer received from the slave.
    * @return A task description that defines the task to run, or {@code null} if there are no
    *    pending tasks that are satisfied by the slave offer.
    * @throws ScheduleException If an error occurs while attempting to schedule a task.
    */
-  TwitterTask offer(String slaveId, String slaveHost,
-      Map<String, String> offerParams) throws ScheduleException;
+  TwitterTask offer(SlaveOffer offer) throws ScheduleException;
 
   /**
    * Assigns a new state to tasks.
@@ -127,6 +130,28 @@ public interface SchedulerCore extends UpdateScheduler {
    * @throws ScheduleException If a problem occurs with the kill request.
    */
   void killTasks(Query query) throws ScheduleException;
+
+  UpdateConfigResponse getUpdateConfig(String updateToken) throws SchedulerCoreImpl.UpdateException;
+
+  Set<String> updateShards(String updateToken, Set<Integer> restartShards, boolean rollBack)
+      throws SchedulerCoreImpl.UpdateException;
+
+  /**
+   * Cancels an update by token.
+   *
+   * @param updateToken The token of the job update to cancel.
+   * @throws com.twitter.mesos.scheduler.SchedulerCoreImpl.UpdateException If an update was not found matching the token.
+   */
+  void updateFinished(String updateToken) throws SchedulerCoreImpl.UpdateException;
+
+  /**
+   * Identical to {@link #updateFinished(String)}, but allows canceling by owner and job name.
+   *
+   * @param owner The owner of the job to cancel an update for.
+   * @param jobName The name of the job to cancel an update for.
+   * @throws com.twitter.mesos.scheduler.SchedulerCoreImpl.UpdateException If an update was not found for the job spec.
+   */
+  void updateFinished(String owner, String jobName) throws SchedulerCoreImpl.UpdateException;
 
   class RestartException extends Exception {
     RestartException(String msg) { super(msg); }
@@ -168,16 +193,16 @@ public interface SchedulerCore extends UpdateScheduler {
     public final String taskId;
     public final String slaveId;
     public final String taskName;
-    public final Map<String, String> params;
+    public final List<Resource> resources;
     public final AssignedTask task;
 
-    public TwitterTask(String taskId, String slaveId, String taskName, Map<String, String> params,
+    public TwitterTask(String taskId, String slaveId, String taskName, List<Resource> resources,
         AssignedTask task) {
       this.taskId = taskId;
-      this.slaveId = MorePreconditions.checkNotBlank(slaveId);
-      this.taskName = MorePreconditions.checkNotBlank(taskName);
-      this.params = Preconditions.checkNotNull(params);
-      this.task = Preconditions.checkNotNull(task);
+      this.slaveId = checkNotBlank(slaveId);
+      this.taskName = checkNotBlank(taskName);
+      this.resources = checkNotBlank(resources);
+      this.task = checkNotNull(task);
     }
   }
 
@@ -204,5 +229,9 @@ public interface SchedulerCore extends UpdateScheduler {
     public boolean equals(Object that) {
       return that instanceof TaskState && ((TaskState) that).task.equals(this.task);
     }
+  }
+
+  public static class UpdateException extends Exception {
+    public UpdateException(String msg) { super(msg); }
   }
 }

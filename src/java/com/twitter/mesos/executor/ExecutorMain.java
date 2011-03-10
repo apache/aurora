@@ -1,8 +1,5 @@
 package com.twitter.mesos.executor;
 
-import mesos.Executor;
-import mesos.MesosExecutorDriver;
-
 import java.io.File;
 import java.util.logging.Logger;
 
@@ -11,6 +8,9 @@ import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
 import com.google.inject.Module;
+
+import org.apache.mesos.Executor;
+import org.apache.mesos.MesosExecutorDriver;
 
 import com.twitter.common_internal.args.Option;
 import com.twitter.common.base.Command;

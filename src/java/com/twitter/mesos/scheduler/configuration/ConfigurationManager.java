@@ -1,20 +1,27 @@
 package com.twitter.mesos.scheduler.configuration;
 
-import com.google.common.base.Preconditions;
-import com.google.common.base.Splitter;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
-import com.twitter.mesos.gen.JobConfiguration;
-import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.configuration.ValueParser.ParseException;
-import org.apache.commons.lang.StringUtils;
-
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+
+import com.google.common.base.Preconditions;
+import com.google.common.base.Predicate;
+import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
+
+import org.apache.commons.lang.StringUtils;
+import org.apache.mesos.Protos.Resource;
+import org.apache.mesos.Protos.SlaveOffer;
+
+import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.Resources;
+import com.twitter.mesos.scheduler.configuration.ValueParser.ParseException;
 
 /**
  * Manages translation from a string-mapped configuration to a concrete configuration type, and
@@ -298,15 +305,15 @@ public class ConfigurationManager {
     return task;
   }
 
-  public static TwitterTaskInfo makeConcrete(Map<String, String> params)
+  public static TwitterTaskInfo makeConcrete(SlaveOffer slaveOffer)
       throws TaskDescriptionException {
-    if (params == null) {
+    if (slaveOffer == null) {
       throw new TaskDescriptionException("Task configuration may not be null");
     }
 
     return new TwitterTaskInfo()
-      .setNumCpus(getValue(params, "cpus", Double.class))
-      .setRamMb(getValue(params, "mem", Long.class))
+      .setNumCpus(getValue(slaveOffer, Resources.CPUS))
+      .setRamMb((long) getValue(slaveOffer, Resources.RAM_MB))
       .setDiskMb(100 * 1024); // TODO(William Farner): Get this included in offers when mesos supports it.
   }
 
@@ -322,17 +329,22 @@ public class ConfigurationManager {
     }
   }
 
-  @SuppressWarnings("unchecked")
-  private static <T> T getValue(Map<String, String> config, String key, Class<T> type)
+  private static double getValue(SlaveOffer slaveOffer, String key)
       throws TaskDescriptionException {
-    if (!config.containsKey(key)) {
+    Resource resource = Iterables.find(slaveOffer.getResourcesList(), withName(key), null);
+    if (resource == null) {
       throw new TaskDescriptionException("Must specify value for " + key);
     }
-    try {
-      return (T) ValueParser.Registry.getParser(type).parse(config.get(key));
-    } catch (ValueParser.ParseException e) {
-      throw new TaskDescriptionException("Invalid value for " + key + ": " + e.getMessage());
-    }
+
+    return resource.getScalar().getValue();
+  }
+
+  private static Predicate<Resource> withName(final String name) {
+    return new Predicate<Resource>() {
+      @Override public boolean apply(Resource resource) {
+        return resource.getName().equals(name);
+      }
+    };
   }
 
   private static final Splitter MULTI_VALUE_SPLITTER = Splitter.on(",");
@@ -343,7 +355,7 @@ public class ConfigurationManager {
     ImmutableSet.Builder<T> builder = ImmutableSet.builder();
     if (!StringUtils.isEmpty(value)) {
       for (String item : MULTI_VALUE_SPLITTER.split(value)) {
-        builder.add((T) ValueParser.Registry.getParser(type).parse(item));
+        builder.add(ValueParser.Registry.getParser(type).parse(item));
       }
     }
     return builder.build();

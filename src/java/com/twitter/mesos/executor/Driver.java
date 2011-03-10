@@ -8,8 +8,11 @@ import com.twitter.mesos.StateTranslator;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.ScheduleStatus;
-import mesos.ExecutorDriver;
-import mesos.Protos.*;
+import org.apache.mesos.ExecutorDriver;
+import org.apache.mesos.Protos.ExecutorArgs;
+import org.apache.mesos.Protos.FrameworkMessage;
+import org.apache.mesos.Protos.TaskID;
+import org.apache.mesos.Protos.TaskStatus;
 
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;

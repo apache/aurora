@@ -26,7 +26,8 @@ import com.twitter.mesos.gen.MesosSchedulerManager;
 import com.twitter.mesos.gen.StorageMigrationResult;
 import com.twitter.mesos.scheduler.storage.Migrator;
 import com.twitter.thrift.Status;
-import mesos.SchedulerDriver;
+
+import org.apache.mesos.SchedulerDriver;
 import org.apache.thrift.transport.TTransportException;
 
 import java.io.File;
