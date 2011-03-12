@@ -24,7 +24,6 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateConfig;
 import com.twitter.mesos.scheduler.JobManager.JobUpdateResult;
 import com.twitter.mesos.scheduler.SchedulerCore.RestartException;
-import com.twitter.mesos.scheduler.SchedulerCore.TaskState;
 import com.twitter.mesos.scheduler.SchedulerCore.UpdateException;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
@@ -404,7 +403,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     changeStatus(queryByOwner(OWNER_A), FINISHED);
 
     String taskId = Iterables.getOnlyElement(Iterables.transform(
-        scheduler.getTasks(queryByOwner(OWNER_A)), Tasks.STATE_TO_ID));
+        scheduler.getTasks(queryByOwner(OWNER_A)), TaskState.STATE_TO_ID));
 
     Set<String> restartRequest = Sets.newHashSet(taskId);
     Set<String> restarted = scheduler.restartTasks(restartRequest);
@@ -489,7 +488,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     assertThat(tasks.size(), is(1));
 
     for (int i = 0; i < maxFailures - 1; i++) {
-      String taskId = Tasks.id(getOnlyTask(Query.activeQuery(OWNER_A, JOB_A)));
+      String taskId = TaskState.id(getOnlyTask(Query.activeQuery(OWNER_A, JOB_A)));
 
       changeStatus(taskId, RUNNING);
       assertThat(getTask(taskId).task.getFailureCount(), is(i));
@@ -908,7 +907,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     scheduler.createJob(job);
 
-    final String taskId = Tasks.id(getOnlyTask(queryByOwner(OWNER_A)));
+    final String taskId = TaskState.id(getOnlyTask(queryByOwner(OWNER_A)));
 
     assertThat(scheduler.updateJob(updatedJob), is(JobUpdateResult.UPDATER_LAUNCHED));
     assertTaskCount(2);
@@ -917,8 +916,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         return !Tasks.id(task).equals(taskId);
       }
     }));
-    assertThat(Tasks.jobKey(updaterTask), is(Tasks.jobKey(OWNER_A, JOB_A + ".updater")));
-    TwitterTaskInfo jobUpdater = Tasks.STATE_TO_INFO.apply(updaterTask);
+    assertThat(TaskState.jobKey(updaterTask), is(Tasks.jobKey(OWNER_A, JOB_A + ".updater")));
+    TwitterTaskInfo jobUpdater = TaskState.STATE_TO_INFO.apply(updaterTask);
     assertThat(jobUpdater.getHdfsPath(), is(updaterHdfsPath));
     String updateToken = tokenCapture.getValue();
     assertThat(Iterables.getOnlyElement(scheduler.updatesInProgress.keySet()), is(updateToken));
@@ -1026,23 +1025,23 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
             pending2, starting2, running2, finished2, killed2));
     scheduler.createJob(job);
 
-    String pendingId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(1)));
-    String startingId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(2)));
+    String pendingId1 = TaskState.STATE_TO_ID.apply(getOnlyTask(byPriority(1)));
+    String startingId1 = TaskState.STATE_TO_ID.apply(getOnlyTask(byPriority(2)));
     changeStatus(startingId1, STARTING);
-    String runningId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(3)));
+    String runningId1 = TaskState.STATE_TO_ID.apply(getOnlyTask(byPriority(3)));
     changeStatus(runningId1, RUNNING);
-    String finishedId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(4)));
+    String finishedId1 = TaskState.STATE_TO_ID.apply(getOnlyTask(byPriority(4)));
     changeStatus(finishedId1, FINISHED);
-    String killedId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(5)));
+    String killedId1 = TaskState.STATE_TO_ID.apply(getOnlyTask(byPriority(5)));
     scheduler.killTasks(Query.byId(killedId1));
-    String pendingId2 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(6)));
-    String startingId2 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(7)));
+    String pendingId2 = TaskState.STATE_TO_ID.apply(getOnlyTask(byPriority(6)));
+    String startingId2 = TaskState.STATE_TO_ID.apply(getOnlyTask(byPriority(7)));
     changeStatus(startingId2, STARTING);
-    String runningId2 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(8)));
+    String runningId2 = TaskState.STATE_TO_ID.apply(getOnlyTask(byPriority(8)));
     changeStatus(runningId2, RUNNING);
-    String finishedId2 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(9)));
+    String finishedId2 = TaskState.STATE_TO_ID.apply(getOnlyTask(byPriority(9)));
     changeStatus(finishedId2, FINISHED);
-    String killedId2 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(10)));
+    String killedId2 = TaskState.STATE_TO_ID.apply(getOnlyTask(byPriority(10)));
     scheduler.killTasks(Query.byId(killedId2));
 
     assertThat(scheduler.updateJob(makeJob(OWNER_A, JOB_A,
@@ -1091,14 +1090,14 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     JobConfiguration job = makeJob(OWNER_A, JOB_A, tasks);
     scheduler.createJob(job);
 
-    String pendingId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(1)));
-    String startingId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(2)));
+    String pendingId1 = TaskState.STATE_TO_ID.apply(getOnlyTask(byPriority(1)));
+    String startingId1 = TaskState.STATE_TO_ID.apply(getOnlyTask(byPriority(2)));
     changeStatus(startingId1, STARTING);
-    String runningId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(3)));
+    String runningId1 = TaskState.STATE_TO_ID.apply(getOnlyTask(byPriority(3)));
     changeStatus(runningId1, RUNNING);
-    String finishedId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(4)));
+    String finishedId1 = TaskState.STATE_TO_ID.apply(getOnlyTask(byPriority(4)));
     changeStatus(finishedId1, FINISHED);
-    String killedId1 = Tasks.STATE_TO_ID.apply(getOnlyTask(byPriority(5)));
+    String killedId1 = TaskState.STATE_TO_ID.apply(getOnlyTask(byPriority(5)));
     scheduler.killTasks(Query.byId(killedId1));
 
     List<TwitterTaskInfo> newTasks = Lists.newArrayList(pending2, pending2, pending2);
@@ -1270,14 +1269,14 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     Set<TaskState> startingTasks = getTasks(Query.byStatus(STARTING));
 
     // Move the tasks between states.
-    changeStatus(Tasks.STATE_TO_ID.apply(Iterables.get(startingTasks, 0)), RUNNING);
-    changeStatus(Tasks.STATE_TO_ID.apply(Iterables.get(startingTasks, 0)), FINISHED);
-    changeStatus(Tasks.STATE_TO_ID.apply(Iterables.get(startingTasks, 1)), RUNNING);
-    changeStatus(Tasks.STATE_TO_ID.apply(Iterables.get(startingTasks, 2)), RUNNING);
-    changeStatus(Tasks.STATE_TO_ID.apply(Iterables.get(startingTasks, 2)), FAILED);
+    changeStatus(TaskState.STATE_TO_ID.apply(Iterables.get(startingTasks, 0)), RUNNING);
+    changeStatus(TaskState.STATE_TO_ID.apply(Iterables.get(startingTasks, 0)), FINISHED);
+    changeStatus(TaskState.STATE_TO_ID.apply(Iterables.get(startingTasks, 1)), RUNNING);
+    changeStatus(TaskState.STATE_TO_ID.apply(Iterables.get(startingTasks, 2)), RUNNING);
+    changeStatus(TaskState.STATE_TO_ID.apply(Iterables.get(startingTasks, 2)), FAILED);
     // This one will be automatically rescheduled.
-    changeStatus(Tasks.STATE_TO_ID.apply(Iterables.get(startingTasks, 3)), KILLED);
-    changeStatus(Tasks.STATE_TO_ID.apply(Iterables.get(startingTasks, 4)), RUNNING);
+    changeStatus(TaskState.STATE_TO_ID.apply(Iterables.get(startingTasks, 3)), KILLED);
+    changeStatus(TaskState.STATE_TO_ID.apply(Iterables.get(startingTasks, 4)), RUNNING);
 
     String token = scheduler.registerUpdate(new UpdateConfig(), updateFrom, updateTo);
 
@@ -1335,29 +1334,29 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     assertNotNull(scheduler.offer(slaveOffer));
     assertNotNull(scheduler.offer(slaveOffer));
 
-    Map<Integer, TaskState> startingShards = Tasks.mapStateByShardId(
+    Map<Integer, TaskState> startingShards = TaskState.mapStateByShardId(
         getTasks(Query.byStatus(STARTING)));
 
     // Move the tasks between states.
-    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(0)), RUNNING);
-    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(0)), FINISHED);
-    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(1)), RUNNING);
-    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(2)), RUNNING);
-    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(2)), FAILED);
-    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(3)), FINISHED);
-    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(4)), RUNNING);
-    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(5)), RUNNING);
-    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(6)), RUNNING);
-    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(7)), RUNNING);
-    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(8)), RUNNING);
-    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(9)), RUNNING);
+    changeStatus(TaskState.STATE_TO_ID.apply(startingShards.get(0)), RUNNING);
+    changeStatus(TaskState.STATE_TO_ID.apply(startingShards.get(0)), FINISHED);
+    changeStatus(TaskState.STATE_TO_ID.apply(startingShards.get(1)), RUNNING);
+    changeStatus(TaskState.STATE_TO_ID.apply(startingShards.get(2)), RUNNING);
+    changeStatus(TaskState.STATE_TO_ID.apply(startingShards.get(2)), FAILED);
+    changeStatus(TaskState.STATE_TO_ID.apply(startingShards.get(3)), FINISHED);
+    changeStatus(TaskState.STATE_TO_ID.apply(startingShards.get(4)), RUNNING);
+    changeStatus(TaskState.STATE_TO_ID.apply(startingShards.get(5)), RUNNING);
+    changeStatus(TaskState.STATE_TO_ID.apply(startingShards.get(6)), RUNNING);
+    changeStatus(TaskState.STATE_TO_ID.apply(startingShards.get(7)), RUNNING);
+    changeStatus(TaskState.STATE_TO_ID.apply(startingShards.get(8)), RUNNING);
+    changeStatus(TaskState.STATE_TO_ID.apply(startingShards.get(9)), RUNNING);
 
     String token = scheduler.registerUpdate(new UpdateConfig(), updateFrom, updateTo);
 
     // We will roll back before these tasks are updated.
     Set<String> untouchedShardTaskIds = ImmutableSet.copyOf(Iterables.transform(
         getTasks(new Query(new TaskQuery().setShardIds(ImmutableSet.of(6, 7, 8, 9)))),
-        Tasks.STATE_TO_ID));
+        TaskState.STATE_TO_ID));
 
     expectRestarted(scheduler.updateShards(token, ImmutableSet.of(0, 1), false), newCommand);
     expectRestarted(scheduler.updateShards(token, ImmutableSet.of(2, 3), false), newCommand);
@@ -1417,11 +1416,11 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     assertNotNull(scheduler.offer(slaveOffer));
     assertNotNull(scheduler.offer(slaveOffer));
 
-    Map<Integer, TaskState> startingShards = Tasks.mapStateByShardId(
+    Map<Integer, TaskState> startingShards = TaskState.mapStateByShardId(
         getTasks(Query.byStatus(STARTING)));
 
-    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(0)), RUNNING);
-    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(1)), RUNNING);
+    changeStatus(TaskState.STATE_TO_ID.apply(startingShards.get(0)), RUNNING);
+    changeStatus(TaskState.STATE_TO_ID.apply(startingShards.get(1)), RUNNING);
 
     String token = scheduler.registerUpdate(new UpdateConfig(), updateFrom, updateTo);
 
@@ -1469,11 +1468,11 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     assertNotNull(scheduler.offer(slaveOffer));
     assertNotNull(scheduler.offer(slaveOffer));
 
-    Map<Integer, TaskState> startingShards = Tasks.mapStateByShardId(
+    Map<Integer, TaskState> startingShards = TaskState.mapStateByShardId(
         getTasks(Query.byStatus(STARTING)));
 
-    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(0)), RUNNING);
-    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(1)), RUNNING);
+    changeStatus(TaskState.STATE_TO_ID.apply(startingShards.get(0)), RUNNING);
+    changeStatus(TaskState.STATE_TO_ID.apply(startingShards.get(1)), RUNNING);
 
     String token = scheduler.registerUpdate(new UpdateConfig(), updateFrom, updateTo);
 
@@ -1529,13 +1528,13 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     assertNotNull(scheduler.offer(slaveOffer));
     assertNotNull(scheduler.offer(slaveOffer));
 
-    Map<Integer, TaskState> startingShards = Tasks.mapStateByShardId(
+    Map<Integer, TaskState> startingShards = TaskState.mapStateByShardId(
         getTasks(Query.byStatus(STARTING)));
 
-    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(0)), RUNNING);
-    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(1)), RUNNING);
-    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(2)), RUNNING);
-    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(3)), RUNNING);
+    changeStatus(TaskState.STATE_TO_ID.apply(startingShards.get(0)), RUNNING);
+    changeStatus(TaskState.STATE_TO_ID.apply(startingShards.get(1)), RUNNING);
+    changeStatus(TaskState.STATE_TO_ID.apply(startingShards.get(2)), RUNNING);
+    changeStatus(TaskState.STATE_TO_ID.apply(startingShards.get(3)), RUNNING);
 
     String token = scheduler.registerUpdate(new UpdateConfig(), updateFrom, updateTo);
 
@@ -1585,11 +1584,11 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     assertNotNull(scheduler.offer(slaveOffer));
     assertNotNull(scheduler.offer(slaveOffer));
 
-    Map<Integer, TaskState> startingShards = Tasks.mapStateByShardId(
+    Map<Integer, TaskState> startingShards = TaskState.mapStateByShardId(
         getTasks(Query.byStatus(STARTING)));
 
-    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(0)), RUNNING);
-    changeStatus(Tasks.STATE_TO_ID.apply(startingShards.get(1)), RUNNING);
+    changeStatus(TaskState.STATE_TO_ID.apply(startingShards.get(0)), RUNNING);
+    changeStatus(TaskState.STATE_TO_ID.apply(startingShards.get(1)), RUNNING);
 
     String token = scheduler.registerUpdate(new UpdateConfig(), updateFrom, updateTo);
 

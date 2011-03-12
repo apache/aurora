@@ -1,12 +1,12 @@
 package com.twitter.mesos.util;
 
-import org.junit.Before;
-import org.junit.Test;
-
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
 
 import com.google.common.base.Throwables;
+
+import org.junit.Before;
+import org.junit.Test;
 
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertThat;

@@ -1,14 +1,13 @@
 package com.twitter.mesos.util;
 
-import com.google.common.base.Function;
-import com.google.common.base.Throwables;
-import com.google.common.collect.MapMaker;
-
-import java.util.Calendar;
 import java.util.Map;
 import java.util.logging.Formatter;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
+
+import com.google.common.base.Function;
+import com.google.common.base.Throwables;
+import com.google.common.collect.MapMaker;
 
 import org.apache.commons.lang.StringUtils;
 import org.joda.time.DateTime;

@@ -1,48 +1,52 @@
 package com.twitter.mesos.updater;
 
 import java.net.InetSocketAddress;
+import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
 import com.google.inject.Module;
-import com.twitter.common_internal.args.Option;
-import com.twitter.common_internal.process.GuicedProcess;
-import com.twitter.common_internal.process.GuicedProcessOptions;
+
+import com.twitter.common.application.AbstractApplication;
+import com.twitter.common.application.modules.HttpModule;
+import com.twitter.common.application.modules.LogModule;
+import com.twitter.common.application.modules.StatsModule;
+import com.twitter.common.args.Arg;
+import com.twitter.common.args.CmdLine;
+import com.twitter.common.args.constraints.NotNull;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.thrift.ThriftFactory;
 import com.twitter.mesos.gen.MesosSchedulerManager.Iface;
-import com.twitter.mesos.updater.UpdaterMain.Options;
 
 /**
  * Mesos updater, coordinates rolling restarts of tasks in a job.
  *
  * @author William Farner
  */
-public class UpdaterMain extends GuicedProcess<Options, RuntimeException> {
+public class UpdaterMain extends AbstractApplication {
 
   private static final Logger LOG = Logger.getLogger(UpdaterMain.class.getName());
 
-  public static class Options extends GuicedProcessOptions {
-    @Option(name = "scheduler_address", required = true,
-        usage = "Thrift service address for the scheduler.")
-    public InetSocketAddress schedulerAddress;
+  @NotNull
+  @CmdLine(name = "scheduler_address", help = "Thrift service address for the scheduler.")
+  private static final Arg<InetSocketAddress> schedulerAddress = Arg.create();
 
-    @Option(name = "update_token", required = true, usage = "Unique update token.")
-    public String updateToken;
+  @NotNull
+  @CmdLine(name = "update_token", help = "Unique update token.")
+  private static final Arg<String> updateToken = Arg.create();
 
-    @Option(name = "thrift_timeout", usage = "Scheduler thrift request timeout.")
-    public Amount<Long, Time> thriftTimeout = Amount.of(1L, Time.SECONDS);
-  }
+  @CmdLine(name = "thrift_timeout", help = "Scheduler thrift request timeout.")
+  private static final Arg<Amount<Long, Time>> thriftTimeout =
+      Arg.create(Amount.of(1L, Time.SECONDS));
 
   @Inject Coordinator updateCoordinator;
 
   @Override
-  protected void runProcess() {
+  public void run() {
     try {
       updateCoordinator.run();
     } catch (Exception e) {
@@ -50,36 +54,28 @@ public class UpdaterMain extends GuicedProcess<Options, RuntimeException> {
     }
   }
 
-  @Override protected Iterable<Class<? extends Module>> getProcessModuleClasses() {
-    return ImmutableList.<Class<? extends Module>>of(UpdaterModule.class);
+  @Override
+  public Iterable<Module> getModules() {
+    return Arrays.<Module>asList(
+        new LogModule(),
+        new HttpModule(),
+        new StatsModule(),
+        new UpdaterModule()
+    );
   }
 
   static class UpdaterModule extends AbstractModule {
-    private final Options options;
-
-    @Inject UpdaterModule(Options options) {
-      this.options = options;
-    }
-
     @Override protected void configure() {
       Iface scheduler = ThriftFactory.create(Iface.class)
           .withMaxConnectionsPerEndpoint(5)
-          .build(ImmutableSet.of(options.schedulerAddress))
+          .build(ImmutableSet.of(schedulerAddress.get()))
           .builder()
           .noRetries()
-          .withRequestTimeout(options.thriftTimeout)
+          .withRequestTimeout(thriftTimeout.get())
           .create();
 
       bind(Iface.class).toInstance(scheduler);
-      bind(String.class).annotatedWith(UpdateToken.class).toInstance(options.updateToken);
+      bind(String.class).annotatedWith(UpdateToken.class).toInstance(updateToken.get());
     }
-  }
-
-  public UpdaterMain() {
-    super(Options.class);
-  }
-
-  public static void main(String[] args) {
-    new UpdaterMain().run(args);
   }
 }

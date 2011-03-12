@@ -13,7 +13,6 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.SchedulerCore.TaskState;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 
 import java.util.Collection;
@@ -140,7 +139,7 @@ public interface SchedulingFilter {
       Set<TaskState> tasks = scheduler.getTasks(
           new Query(new TaskQuery().setSlaveHost(slaveHost), Tasks.ACTIVE_FILTER));
       final Multimap<String, ScheduledTask> tasksOnHostByJob =
-          Multimaps.index(Iterables.transform(tasks, Tasks.STATE_TO_SCHEDULED),
+          Multimaps.index(Iterables.transform(tasks, TaskState.STATE_TO_SCHEDULED),
               Tasks.SCHEDULED_TO_JOB_KEY);
 
       return new Predicate<ScheduledTask>() {

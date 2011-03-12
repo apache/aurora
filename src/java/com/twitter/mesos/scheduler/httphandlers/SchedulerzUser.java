@@ -23,10 +23,9 @@ import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.CronJobManager;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerCore;
-import com.twitter.mesos.scheduler.SchedulerCore.TaskState;
+import com.twitter.mesos.scheduler.TaskState;
 
 import org.antlr.stringtemplate.StringTemplate;
-import org.apache.hadoop.mapreduce.Job;
 
 import it.sauronsoftware.cron4j.Predictor;
 

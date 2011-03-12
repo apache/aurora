@@ -1,24 +1,31 @@
 package com.twitter.mesos;
 
-import com.google.common.base.Function;
-import com.google.common.base.Functions;
-import com.google.common.base.Predicate;
-import com.google.common.collect.Maps;
-import com.twitter.mesos.gen.AssignedTask;
-import com.twitter.mesos.gen.JobConfiguration;
-import com.twitter.mesos.gen.LiveTask;
-import com.twitter.mesos.gen.LiveTaskInfo;
-import com.twitter.mesos.gen.ScheduleStatus;
-import com.twitter.mesos.gen.ScheduledTask;
-import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.SchedulerCore.TaskState;
-
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
 
-import static com.twitter.mesos.gen.ScheduleStatus.*;
+import com.google.common.base.Function;
+import com.google.common.base.Functions;
+import com.google.common.base.Predicate;
+import com.google.common.collect.Maps;
+
+import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.LiveTaskInfo;
+import com.twitter.mesos.gen.ScheduleStatus;
+import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TwitterTaskInfo;
+
+import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
+import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
+import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
+import static com.twitter.mesos.gen.ScheduleStatus.KILLED_BY_CLIENT;
+import static com.twitter.mesos.gen.ScheduleStatus.LOST;
+import static com.twitter.mesos.gen.ScheduleStatus.NOT_FOUND;
+import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
+import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
+import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 
 /**
  * Utility class providing convenience functions relating to tasks.
@@ -26,13 +33,6 @@ import static com.twitter.mesos.gen.ScheduleStatus.*;
  * @author William Farner
  */
 public class Tasks {
-
-  public static final Function<TaskState, ScheduledTask> STATE_TO_SCHEDULED =
-      new Function<TaskState, ScheduledTask>() {
-        @Override public ScheduledTask apply(TaskState state) {
-          return state.task;
-        }
-      };
 
   public static final Function<ScheduledTask, AssignedTask> SCHEDULED_TO_ASSIGNED =
       new Function<ScheduledTask, AssignedTask>() {
@@ -48,14 +48,8 @@ public class Tasks {
         }
       };
 
-  public static final Function<TaskState, AssignedTask> STATE_TO_ASSIGNED =
-      Functions.compose(SCHEDULED_TO_ASSIGNED, STATE_TO_SCHEDULED);
-
   public static final Function<ScheduledTask, TwitterTaskInfo> SCHEDULED_TO_INFO =
       Functions.compose(ASSIGNED_TO_INFO, SCHEDULED_TO_ASSIGNED);
-
-  public static final Function<TaskState, TwitterTaskInfo> STATE_TO_INFO =
-      Functions.compose(ASSIGNED_TO_INFO, STATE_TO_ASSIGNED);
 
   public static final Function<AssignedTask, String> ASSIGNED_TO_ID =
       new Function<AssignedTask, String>() {
@@ -66,9 +60,6 @@ public class Tasks {
 
   public static final Function<ScheduledTask, String> SCHEDULED_TO_ID =
       Functions.compose(ASSIGNED_TO_ID, SCHEDULED_TO_ASSIGNED);
-
-  public static final Function<TaskState, String> STATE_TO_ID =
-      Functions.compose(SCHEDULED_TO_ID, STATE_TO_SCHEDULED);
 
   public static final Function<LiveTaskInfo, String> LIVE_TO_ID =
       new Function<LiveTaskInfo, String>() {
@@ -82,21 +73,11 @@ public class Tasks {
         }
       };
 
-  public static final Function<TaskState, Integer> STATE_TO_SHARD_ID =
-      Functions.compose(INFO_TO_SHARD_ID, STATE_TO_INFO);
-
   public static final Function<ScheduledTask, Integer> SCHEDULED_TO_SHARD_ID =
       Functions.compose(INFO_TO_SHARD_ID, SCHEDULED_TO_INFO);
 
   public static final Function<AssignedTask, Integer> ASSIGNED_TO_SHARD_ID =
       Functions.compose(INFO_TO_SHARD_ID, ASSIGNED_TO_INFO);
-
-  public static final Function<TaskState, LiveTask> STATE_TO_LIVE =
-      new Function<TaskState, LiveTask>() {
-        @Override public LiveTask apply(TaskState state) {
-          return new LiveTask(state.task, state.volatileState.resources);
-        }
-      };
 
   public static final Function<TwitterTaskInfo, String> INFO_TO_JOB_KEY =
       new Function<TwitterTaskInfo, String>() {
@@ -184,16 +165,8 @@ public class Tasks {
     return jobKey(task.getAssignedTask());
   }
 
-  public static String jobKey(TaskState state) {
-    return jobKey(state.task);
-  }
-
   public static String id(ScheduledTask task) {
     return task.getAssignedTask().getTaskId();
-  }
-
-  public static String id(TaskState state) {
-    return id(state.task);
   }
 
   public static Map<Integer, TwitterTaskInfo> mapInfoByShardId(Iterable<TwitterTaskInfo> tasks) {
@@ -202,9 +175,5 @@ public class Tasks {
 
   public static Map<Integer, AssignedTask> mapAssignedByShardId(Iterable<AssignedTask> tasks) {
     return Maps.uniqueIndex(tasks, ASSIGNED_TO_SHARD_ID);
-  }
-
-  public static Map<Integer, TaskState> mapStateByShardId(Iterable<TaskState> tasks) {
-    return Maps.uniqueIndex(tasks, STATE_TO_SHARD_ID);
   }
 }

@@ -1,35 +1,42 @@
 package com.twitter.mesos.executor;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Map;
+
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import com.google.common.io.Files;
+
+import org.easymock.IMocksControl;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+
 import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.common.collections.Pair;
 import com.twitter.common.io.FileUtils;
-import com.twitter.common.thrift.Util;
 import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
 import com.twitter.mesos.executor.ProcessKiller.KillException;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import org.easymock.IMocksControl;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Map;
-
-import static com.twitter.mesos.executor.LiveTask.*;
+import static com.twitter.mesos.executor.LiveTask.PIDFILE_NAME;
+import static com.twitter.mesos.executor.LiveTask.RUN_SCRIPT_NAME;
+import static com.twitter.mesos.executor.LiveTask.SANDBOX_DIR_NAME;
+import static com.twitter.mesos.executor.LiveTask.STDERR_CAPTURE_FILE;
 import static com.twitter.mesos.executor.LiveTask.STDOUT_CAPTURE_FILE;
 import static com.twitter.mesos.executor.TaskOnDisk.TASK_DUMP_FILE;
 import static com.twitter.mesos.executor.TaskOnDisk.TASK_STATUS_FILE;
-import static org.easymock.EasyMock.*;
+import static org.easymock.EasyMock.anyInt;
+import static org.easymock.EasyMock.anyObject;
+import static org.easymock.EasyMock.createControl;
+import static org.easymock.EasyMock.expect;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 

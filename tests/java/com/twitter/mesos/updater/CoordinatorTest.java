@@ -1,6 +1,13 @@
 package com.twitter.mesos.updater;
 
+import java.util.Map;
+
 import com.google.common.collect.ImmutableMap;
+
+import org.easymock.IExpectationSetters;
+import org.junit.Before;
+import org.junit.Test;
+
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.gen.MesosSchedulerManager.Iface;
 import com.twitter.mesos.gen.ResponseCode;
@@ -8,11 +15,6 @@ import com.twitter.mesos.gen.UpdateCompleteResponse;
 import com.twitter.mesos.gen.UpdateConfig;
 import com.twitter.mesos.gen.UpdateConfigResponse;
 import com.twitter.mesos.updater.ConfigParser.UpdateConfigException;
-import org.easymock.IExpectationSetters;
-import org.junit.Before;
-import org.junit.Test;
-
-import java.util.Map;
 
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.fail;

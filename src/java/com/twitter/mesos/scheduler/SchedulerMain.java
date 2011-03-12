@@ -1,47 +1,45 @@
 package com.twitter.mesos.scheduler;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import javax.annotation.Nullable;
+
 import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 import com.google.inject.Module;
-import com.twitter.common_internal.args.Option;
+
+import org.apache.mesos.SchedulerDriver;
+import org.apache.thrift.transport.TTransportException;
+
+import com.twitter.common.application.AbstractApplication;
+import com.twitter.common.application.ActionRegistry;
+import com.twitter.common.application.Lifecycle;
+import com.twitter.common.application.ShutdownStage;
+import com.twitter.common.application.modules.HttpModule;
+import com.twitter.common.application.modules.LogModule;
+import com.twitter.common.application.modules.StatsModule;
 import com.twitter.common.base.Command;
 import com.twitter.common.net.InetSocketAddressHelper;
-import com.twitter.common_internal.process.GuicedProcess;
-import com.twitter.common_internal.process.GuicedProcessOptions;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Data;
 import com.twitter.common.thrift.Util;
 import com.twitter.common.zookeeper.Group;
 import com.twitter.common.zookeeper.ServerSet.EndpointStatus;
 import com.twitter.common.zookeeper.ServerSet.UpdateException;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.SingletonService.LeadershipListener;
-import com.twitter.common.zookeeper.ZooKeeperUtils;
-import com.twitter.common_internal.zookeeper.TwitterZk;
 import com.twitter.mesos.gen.MesosSchedulerManager;
 import com.twitter.mesos.gen.StorageMigrationResult;
 import com.twitter.mesos.scheduler.storage.Migrator;
+import com.twitter.mesos.scheduler.storage.StorageRole;
+import com.twitter.mesos.scheduler.storage.db.DbStorageModule;
 import com.twitter.thrift.Status;
-
-import org.apache.mesos.SchedulerDriver;
-import org.apache.thrift.transport.TTransportException;
-
-import java.io.File;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import javax.annotation.Nullable;
-
-import static com.twitter.common.quantity.Time.SECONDS;
 
 /**
  * Launcher for the twitter mesos scheduler.
@@ -50,69 +48,17 @@ import static com.twitter.common.quantity.Time.SECONDS;
  *
  * @author William Farner
  */
-public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerOptions, Exception> {
-  public static class TwitterSchedulerOptions extends GuicedProcessOptions {
-    @Option(name = "executor_path", required = true,
-            usage = "Path to the executor launch script.")
-    public String executorPath;
-
-    @Option(name = "zk_in_proc",
-            usage = "Launches an embedded zookeeper server for local testing")
-    public boolean zooKeeperInProcess = false;
-
-    @Option(name = "zk_endpoints", usage = "Endpoint specification for the ZooKeeper servers.")
-    public List<InetSocketAddress> zooKeeperEndpoints =
-        Lists.newArrayList(TwitterZk.DEFAULT_ZK_ENDPOINTS);
-
-    @Option(name = "zk_session_timeout_secs",
-            usage = "The ZooKeeper session timeout in seconds.")
-    public int zooKeeperSessionTimeoutSecs = ZooKeeperUtils.DEFAULT_ZK_SESSION_TIMEOUT.as(SECONDS);
-
-    @Option(name = "mesos_scheduler_ns", required = true,
-            usage = "The name service name for the mesos scheduler thrift server.")
-    public String mesosSchedulerNameSpec;
-
-    @Option(name = "mesos_master_address",
-            usage = "Mesos address for the master, can be a mesos address or zookeeper path.")
-    public String mesosMasterAddress;
-
-    @Option(name = "machine_restrictions",
-        usage = "Map of machine hosts to job keys."
-                + "  If A maps to B, only B can run on A and B can only run on A.")
-    public Map<String, String> machineRestrictions = Maps.newHashMap();
-
-    @Option(name = "job_updater_hdfs_path", usage = "HDFS path to the job updater package.")
-    public String jobUpdaterHdfsPath = "/mesos/pkg/mesos/bin/mesos-updater.zip";
-
-    @Option(name = "scheduler_upgrade_storage",
-            usage = "True to upgrade storage from a legacy system to a new primary system.")
-    public boolean upgradeStorage = true;
-
-    // Stream storage
-    @Option(name = "scheduler_persistence_zookeeper_path",
-            usage = "Path in ZooKeeper that scheduler will persist to/from (overrides local).")
-    public String schedulerPersistenceZooKeeperPath;
-
-    @Option(name = "scheduler_persistence_zookeeper_version",
-            usage = "Version for scheduler persistence node in ZooKeeper.")
-    public int schedulerPersistenceZooKeeperVersion = 1;
-
-    @Option(name = "scheduler_persistence_local_path",
-            usage = "Local file path that scheduler will persist to/from.")
-    public File schedulerPersistenceLocalPath = new File("/tmp/mesos_scheduler_dump");
-
-    // Db storage
-    // TODO(John Sirois): get a mesos data dir setup in puppet and move the db files there
-    @Option(name = "scheduler_db_file_path",
-            usage = "The path of the H2 db files.")
-    public File dbFilePath = new File("/tmp/mesos_scheduler_db");
-
-    @Option(name = "scheduler_db_cache_size",
-            usage = "The size to use for the H2 in-memory db cache.")
-    public Amount<Long, Data> dbCacheSize = Amount.of(128L, Data.Mb);
-  }
+public class SchedulerMain extends AbstractApplication {
 
   private static final Logger LOG = Logger.getLogger(SchedulerMain.class.getName());
+
+  @Inject private SingletonService schedulerService;
+  @Inject private SchedulerThriftInterface schedulerThriftInterface;
+  @Inject private SchedulerDriver driver;
+  @Inject private AtomicReference<InetSocketAddress> schedulerThriftPort;
+  @Inject private SchedulerCore scheduler;
+  @Inject private Lifecycle lifecycle;
+  @Inject @ShutdownStage ActionRegistry shutdownRegistry;
 
   private final LeadershipListener leadershipListener = new LeadershipListener() {
     @Override public void onLeading(EndpointStatus status) {
@@ -136,22 +82,12 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
         LOG.log(Level.WARNING, "Failed to leave server set.", e);
       } finally {
         scheduler.stop();
-        destroy();
+        lifecycle.shutdown();
         // TODO(William Farner): This seems necessary to break out of the blocking driver run.
         System.exit(1);
       }
     }
   };
-
-  public SchedulerMain() {
-    super(TwitterSchedulerOptions.class);
-  }
-
-  @Inject private SingletonService schedulerService;
-  @Inject private SchedulerThriftInterface schedulerThriftInterface;
-  @Inject private SchedulerDriver driver;
-  @Inject private AtomicReference<InetSocketAddress> schedulerThriftPort;
-  @Inject private SchedulerCore scheduler;
 
   @Nullable private Migrator migrator;
 
@@ -161,12 +97,18 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
   }
 
   @Override
-  protected Iterable<Class<? extends Module>> getProcessModuleClasses() {
-    return ImmutableList.<Class<? extends Module>>of(SchedulerModule.class);
+  public Iterable<Module> getModules() {
+    return Arrays.<Module>asList(
+        new DbStorageModule(StorageRole.Role.Primary),
+        new HttpModule(),
+        new LogModule(),
+        new SchedulerModule(),
+        new StatsModule()
+    );
   }
 
   @Override
-  protected void runProcess() {
+  public void run() {
     if (migrator != null) {
       LOG.info("Attempting storage migration for: "
                + Util.prettyPrint(migrator.getMigrationPath()));
@@ -202,7 +144,8 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
       return;
     }
 
-    // TODO(William Farner): This is a bit of a hack, clean it up, maybe by exposing the thrift interface.
+    // TODO(William Farner): This is a bit of a hack, clean it up, maybe by exposing the thrift
+    //     interface.
     try {
       schedulerThriftPort.set(InetSocketAddressHelper.getLocalAddress(port));
     } catch (UnknownHostException e) {
@@ -212,7 +155,8 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
 
     if (schedulerService != null) {
       try {
-        leadService(schedulerService, port, Status.STARTING, leadershipListener);
+        schedulerService.lead(InetSocketAddressHelper.getLocalAddress(port),
+            Collections.<String, InetSocketAddress>emptyMap(), Status.STARTING, leadershipListener);
       } catch (Group.WatchException e) {
         LOG.log(Level.SEVERE, "Failed to watch group and lead service.", e);
       } catch (Group.JoinException e) {
@@ -226,7 +170,7 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
       runMesosDriver();
     }
 
-    waitForEver();
+    lifecycle.awaitShutdown();
   }
 
   private void runMesosDriver() {
@@ -235,7 +179,7 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
           @Override public void run() {
             int result = driver.run();
             LOG.info("Driver completed with exit code " + result);
-            destroy();
+            lifecycle.shutdown();
           }
         }
     ).start();
@@ -246,17 +190,14 @@ public class SchedulerMain extends GuicedProcess<SchedulerMain.TwitterSchedulerO
     schedulerThriftInterface.start(0,
         new MesosSchedulerManager.Processor(schedulerThriftInterface));
 
-    addShutdownAction(new Command() {
-      @Override public void execute() {
+    shutdownRegistry.addAction(new Command() {
+      @Override
+      public void execute() {
         LOG.info("Stopping thrift server.");
         schedulerThriftInterface.shutdown();
       }
     });
 
     return schedulerThriftInterface.getListeningPort();
-  }
-
-  public static void main(String[] args) throws Exception {
-    new SchedulerMain().run(args);
   }
 }

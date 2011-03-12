@@ -13,7 +13,7 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerCore;
-import com.twitter.mesos.scheduler.SchedulerCore.TaskState;
+import com.twitter.mesos.scheduler.TaskState;
 import org.antlr.stringtemplate.StringTemplate;
 
 import javax.servlet.ServletException;
@@ -115,13 +115,13 @@ public class SchedulerzJob extends StringTemplateServlet {
           activeTasks = scheduler.getTasks(new Query(query, Tasks.ACTIVE_FILTER));
           List<LiveTask> completedTasks = Lists.newArrayList(Iterables.transform(
               scheduler.getTasks(new Query(query, Predicates.not(Tasks.ACTIVE_FILTER))),
-              Tasks.STATE_TO_LIVE));
+              TaskState.STATE_TO_LIVE));
           Collections.sort(completedTasks, REVERSE_CHRON_COMPARATOR);
           template.setAttribute("completedTasks", completedTasks);
         }
 
         List<LiveTask> liveTasks = Lists.newArrayList(Iterables.transform(activeTasks,
-            Tasks.STATE_TO_LIVE));
+            TaskState.STATE_TO_LIVE));
 
         Collections.sort(liveTasks, SHARD_ID_COMPARATOR);
         template.setAttribute("activeTasks", liveTasks);

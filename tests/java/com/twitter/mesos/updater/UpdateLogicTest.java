@@ -1,17 +1,19 @@
 package com.twitter.mesos.updater;
 
+import java.util.Set;
+
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
+
+import org.easymock.IExpectationSetters;
+import org.junit.Before;
+import org.junit.Test;
+
 import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.gen.UpdateConfig;
 import com.twitter.mesos.updater.ConfigParser.UpdateConfigException;
 import com.twitter.mesos.updater.UpdateLogic.UpdateException;
-import org.easymock.IExpectationSetters;
-import org.junit.Before;
-import org.junit.Test;
-
-import java.util.Set;
 
 import static com.twitter.mesos.updater.UpdateCommand.Type.ROLLBACK_TASK;
 import static com.twitter.mesos.updater.UpdateCommand.Type.UPDATE_TASK;

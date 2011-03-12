@@ -13,7 +13,6 @@ import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.ScheduleStatus;
-import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.UpdateConfigResponse;
 import com.twitter.mesos.scheduler.JobManager.JobUpdateResult;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
@@ -203,31 +202,6 @@ public interface SchedulerCore {
       this.taskName = checkNotBlank(taskName);
       this.resources = checkNotBlank(resources);
       this.task = checkNotNull(task);
-    }
-  }
-
-  class TaskState {
-    public final ScheduledTask task;
-    public final VolatileTaskState volatileState;
-
-    public TaskState(ScheduledTask task, VolatileTaskState volatileTaskState) {
-      this.task = new ScheduledTask(task);
-      this.volatileState = new VolatileTaskState(volatileTaskState);
-    }
-
-    public TaskState(TaskState toCopy) {
-      this.task = new ScheduledTask(toCopy.task);
-      this.volatileState = new VolatileTaskState(toCopy.volatileState);
-    }
-
-    @Override
-    public int hashCode() {
-      return task.hashCode();
-    }
-
-    @Override
-    public boolean equals(Object that) {
-      return that instanceof TaskState && ((TaskState) that).task.equals(this.task);
     }
   }
 

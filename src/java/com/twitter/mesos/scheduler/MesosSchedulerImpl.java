@@ -1,5 +1,7 @@
 package com.twitter.mesos.scheduler;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -7,6 +9,7 @@ import java.util.logging.Logger;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
 import com.google.protobuf.ByteString;
 
@@ -35,6 +38,11 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.SchedulerMessage;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.twitter.common.base.MorePreconditions.checkNotBlank;
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Location for communication with the mesos core.
@@ -43,20 +51,26 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 class MesosSchedulerImpl implements Scheduler {
   private static final Logger LOG = Logger.getLogger(MesosSchedulerImpl.class.getName());
-
-  private final SchedulerMain.TwitterSchedulerOptions options;
+  /**
+   * Binding annotation for the path to the executor binary.
+   */
+  @BindingAnnotation
+  @Target({FIELD, PARAMETER, METHOD}) @Retention(RUNTIME)
+  public @interface ExecutorPath {}
 
   // Stores scheduler state and handles actual scheduling decisions.
   private final SchedulerCore schedulerCore;
+
   private final ExecutorTracker executorTracker;
   private FrameworkID frameworkID;
+  private final String executorPath;
 
   @Inject
-  public MesosSchedulerImpl(SchedulerMain.TwitterSchedulerOptions options,
-      SchedulerCore schedulerCore, ExecutorTracker executorTracker) {
-    this.options = checkNotNull(options);
+  public MesosSchedulerImpl(SchedulerCore schedulerCore, ExecutorTracker executorTracker,
+      @ExecutorPath String executorPath) {
     this.schedulerCore = checkNotNull(schedulerCore);
     this.executorTracker = checkNotNull(executorTracker);
+    this.executorPath = checkNotBlank(executorPath);
   }
 
   @Override
@@ -72,7 +86,7 @@ class MesosSchedulerImpl implements Scheduler {
   @Override
   public ExecutorInfo getExecutorInfo(SchedulerDriver driver) {
 
-    return ExecutorInfo.newBuilder().setUri(options.executorPath)
+    return ExecutorInfo.newBuilder().setUri(executorPath)
         .setExecutorId(ExecutorID.newBuilder().setValue("twitter"))
         .build();
   }

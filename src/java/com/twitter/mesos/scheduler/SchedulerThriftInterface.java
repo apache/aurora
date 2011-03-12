@@ -26,7 +26,6 @@ import com.twitter.mesos.gen.UpdateConfigResponse;
 import com.twitter.mesos.gen.UpdateRequest;
 import com.twitter.mesos.gen.UpdateResponse;
 import com.twitter.mesos.scheduler.SchedulerCore.RestartException;
-import com.twitter.mesos.scheduler.SchedulerCore.TaskState;
 import com.twitter.mesos.scheduler.SchedulerCore.UpdateException;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
@@ -85,7 +84,7 @@ public class SchedulerThriftInterface extends ThriftServer implements MesosSched
       response.setResponseCode(INVALID_REQUEST).setMessage("No tasks found for query: " + query);
     } else {
       response.setResponseCode(OK)
-          .setTasks(Lists.newArrayList(Iterables.transform(tasks, Tasks.STATE_TO_LIVE)));
+          .setTasks(Lists.newArrayList(Iterables.transform(tasks, TaskState.STATE_TO_LIVE)));
     }
 
     return response;

@@ -1,5 +1,11 @@
 package com.twitter.mesos.scheduler.storage.db;
 
+import java.beans.PropertyVetoException;
+import java.io.File;
+import java.io.IOException;
+
+import javax.sql.DataSource;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Files;
@@ -9,22 +15,20 @@ import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import com.mchange.v2.c3p0.ComboPooledDataSource;
 
-import com.twitter.common.application.http.HttpServletConfig;
-import com.twitter.common.application.http.Registration;
-import com.twitter.common.quantity.Data;
-import com.twitter.mesos.scheduler.SchedulerMain.TwitterSchedulerOptions;
-import com.twitter.mesos.scheduler.storage.Storage;
-import com.twitter.mesos.scheduler.storage.StorageRole.Role;
-import com.twitter.mesos.scheduler.storage.StorageRoles;
 import org.h2.server.web.WebServlet;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.beans.PropertyVetoException;
-import java.io.File;
-import java.io.IOException;
-import javax.sql.DataSource;
+import com.twitter.common.application.http.HttpServletConfig;
+import com.twitter.common.application.http.Registration;
+import com.twitter.common.args.Arg;
+import com.twitter.common.args.CmdLine;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Data;
+import com.twitter.mesos.scheduler.storage.Storage;
+import com.twitter.mesos.scheduler.storage.StorageRole.Role;
+import com.twitter.mesos.scheduler.storage.StorageRoles;
 
 /**
  * Provides bindings for db based scheduler storage.
@@ -33,12 +37,20 @@ import javax.sql.DataSource;
  */
 public class DbStorageModule extends AbstractModule {
 
-  private final TwitterSchedulerOptions options;
+  // Db storage
+  // TODO(John Sirois): get a mesos data dir setup in puppet and move the db files there
+  @CmdLine(name = "scheduler_db_file_path",
+          help ="The path of the H2 db files.")
+  private static final Arg<File> dbFilePath = Arg.create(new File("/tmp/mesos_scheduler_db"));
+
+  @CmdLine(name = "scheduler_db_cache_size",
+          help ="The size to use for the H2 in-memory db cache.")
+  private static final Arg<Amount<Long, Data>> dbCacheSize = Arg.create(Amount.of(128L, Data.Mb));
+
   private final Role storageRole;
 
   @Inject
-  public DbStorageModule(TwitterSchedulerOptions options, Role storageRole) {
-    this.options = Preconditions.checkNotNull(options);
+  public DbStorageModule(Role storageRole) {
     this.storageRole = Preconditions.checkNotNull(storageRole);
   }
 
@@ -56,14 +68,14 @@ public class DbStorageModule extends AbstractModule {
   @Provides
   @Singleton
   DataSource provideDataSource() throws PropertyVetoException, IOException {
-    File dbFilePath = new File(options.dbFilePath,
+    File dbFilePath = new File(DbStorageModule.dbFilePath.get(),
         String.format("h2-v%d", DbStorage.STORAGE_SYSTEM_VERSION));
     Files.createParentDirs(dbFilePath);
 
     ComboPooledDataSource dataSource = new ComboPooledDataSource();
     dataSource.setDriverClass(org.h2.Driver.class.getName());
     dataSource.setJdbcUrl(String.format("jdbc:h2:file:%s;AUTO_SERVER=TRUE;CACHE_SIZE=%d",
-        dbFilePath.getPath(), options.dbCacheSize.as(Data.Kb)));
+        dbFilePath.getPath(), dbCacheSize.get().as(Data.Kb)));
 
     // We're exposing the H2 web ui, so at least make the user/pass non-default.
     dataSource.setUser("scheduler");
