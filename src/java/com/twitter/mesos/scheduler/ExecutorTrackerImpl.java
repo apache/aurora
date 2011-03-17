@@ -47,10 +47,6 @@ public class ExecutorTrackerImpl implements ExecutorTracker {
       LOG.severe(BuildInfo.Key.GIT_REVISION.value + " missing from build properties,"
                  + "unable to compare executor revisions for auto build sync!");
       enableSync = false;
-    } else if (!buildProperties.containsKey(BuildInfo.Key.TIMESTAMP.value)) {
-      LOG.severe(BuildInfo.Key.TIMESTAMP.value + " missing from build properties,"
-                 + "unable to compare executor revisions for auto build sync!");
-      enableSync = false;
     } else {
       enableSync = true;
     }
@@ -67,8 +63,9 @@ public class ExecutorTrackerImpl implements ExecutorTracker {
 
     Runnable updater = new Runnable() {
       @Override public void run() {
-        if (restartQueue.isEmpty()) return;
-
+        if (restartQueue.isEmpty()) {
+          return;
+        }
 
         String slaveId = restartQueue.remove();
         LOG.info("Requesting that slave be restarted: " + slaveId);
@@ -90,20 +87,13 @@ public class ExecutorTrackerImpl implements ExecutorTracker {
     Preconditions.checkNotNull(status);
     Preconditions.checkNotNull(status.getSlaveId());
 
-
     String localBuild = buildProperties.getProperty(BuildInfo.Key.GIT_REVISION.value);
-    String localBuildTime = buildProperties.getProperty(BuildInfo.Key.TIMESTAMP.value);
     String executorBuild = status.getBuildGitRevision();
-    String executorBuildTime = status.getBuildTimestamp();
 
     boolean restart = false;
     if (!localBuild.equals(executorBuild)) {
       LOG.info(String.format("Executor %s has build %s, local build is %s...scheduling restart.",
           status.getSlaveId(), executorBuild, localBuild));
-      restart = true;
-    } else if (!localBuildTime.equals(executorBuildTime)) {
-      LOG.info(String.format("Executor %s built at %s, local build %s...scheduling restart.",
-          status.getSlaveId(), executorBuildTime, localBuildTime));
       restart = true;
     }
 
