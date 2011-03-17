@@ -1,4 +1,4 @@
-package com.twitter.mesos;
+package com.twitter.mesos.scheduler.httphandlers;
 
 import com.google.inject.Binder;
 

@@ -48,7 +48,7 @@ import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.common.zookeeper.ZooKeeperUtils;
 import com.twitter.common_internal.zookeeper.TwitterZk;
-import com.twitter.mesos.HttpAssets;
+import com.twitter.mesos.scheduler.httphandlers.HttpAssets;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.ExecutorPath;
 import com.twitter.mesos.scheduler.SchedulingFilter.SchedulingFilterImpl;

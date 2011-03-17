@@ -10,6 +10,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.annotation.Nullable;
+
 /**
  * Persistence layer that stores data on the local file system.
  *
@@ -26,8 +28,12 @@ public class FileSystemPersistence implements PersistenceLayer<byte[]> {
   }
 
   @Override
+  @Nullable
   public byte[] fetch() throws PersistenceException {
     LOG.info("Fetching persisted state from " + file.getAbsolutePath());
+    if (!file.exists()) {
+      return null;
+    }
     try {
       byte[] data = Files.toByteArray(file);
       LOG.info("Fetched " + data.length + " bytes.");

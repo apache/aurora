@@ -12,6 +12,8 @@ import org.apache.zookeeper.data.Stat;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.annotation.Nullable;
+
 /**
  * Persistence layer that stores data in ZooKeeper.
  *
@@ -32,6 +34,7 @@ public class ZooKeeperPersistence implements PersistenceLayer<byte[]> {
   }
 
   @Override
+  @Nullable
   public byte[] fetch() throws PersistenceException {
     Stat stat = statFile();
 

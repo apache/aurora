@@ -1,5 +1,7 @@
 package com.twitter.mesos.scheduler.persistence;
 
+import javax.annotation.Nullable;
+
 import com.google.common.base.Preconditions;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.NonVolatileSchedulerState;
@@ -17,6 +19,7 @@ public class EncodingPersistenceLayer implements PersistenceLayer<NonVolatileSch
   }
 
   @Override
+  @Nullable
   public NonVolatileSchedulerState fetch() throws PersistenceException {
     try {
       return ThriftBinaryCodec.decode(NonVolatileSchedulerState.class, wrapped.fetch());
