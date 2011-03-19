@@ -3,6 +3,7 @@ package com.twitter.mesos.scheduler.storage.db;
 import java.beans.PropertyVetoException;
 import java.io.File;
 import java.io.IOException;
+import java.util.logging.Logger;
 
 import javax.sql.DataSource;
 
@@ -24,6 +25,10 @@ import com.twitter.common.application.http.HttpServletConfig;
 import com.twitter.common.application.http.Registration;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
+import com.twitter.common.args.constraints.CanRead;
+import com.twitter.common.args.constraints.CanWrite;
+import com.twitter.common.args.constraints.Exists;
+import com.twitter.common.args.constraints.IsDirectory;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.mesos.scheduler.storage.Storage;
@@ -37,8 +42,12 @@ import com.twitter.mesos.scheduler.storage.StorageRoles;
  */
 public class DbStorageModule extends AbstractModule {
 
-  // Db storage
-  // TODO(John Sirois): get a mesos data dir setup in puppet and move the db files there
+  private static final Logger LOG = Logger.getLogger(DbStorageModule.class.getName());
+
+  @Exists
+  @CanRead
+  @CanWrite
+  @IsDirectory
   @CmdLine(name = "scheduler_db_file_path",
           help ="The path of the H2 db files.")
   private static final Arg<File> dbFilePath = Arg.create(new File("/tmp/mesos_scheduler_db"));
@@ -71,6 +80,7 @@ public class DbStorageModule extends AbstractModule {
     File dbFilePath = new File(DbStorageModule.dbFilePath.get(),
         String.format("h2-v%d", DbStorage.STORAGE_SYSTEM_VERSION));
     Files.createParentDirs(dbFilePath);
+    LOG.info("Using db storage path: " + dbFilePath);
 
     ComboPooledDataSource dataSource = new ComboPooledDataSource();
     dataSource.setDriverClass(org.h2.Driver.class.getName());
