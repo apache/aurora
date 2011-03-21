@@ -37,6 +37,9 @@ import com.twitter.mesos.scheduler.storage.stream.MapStorage;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Logger;
+
+import javax.annotation.Nullable;
 
 /**
  * Migrates from one {@link Storage} system to another and provides detailed results.
@@ -44,6 +47,8 @@ import java.util.Set;
  * @author John Sirois
  */
 public class Migrator {
+
+  private static final Logger LOG = Logger.getLogger(Migrator.class.getName());
 
   /**
    * {@literal @Named} binding key for the Migrator's job manager ids.
@@ -156,10 +161,18 @@ public class Migrator {
           JobStore fromJobStore, TaskStore fromTaskStore) {
 
         StorageMigrationResult migrationResult =
-            new StorageMigrationResult(StorageMigrationStatus.SUCCESS, migrationPath)
-                .setTaskResult(migrateTaskStore(fromTaskStore, toTaskStore))
-                .setJobManagerResult(migrateJobStore(fromJobStore, toJobStore))
-                .setSchedulerResult(migrateSchedulerStore(fromSchedulerStore, toSchedulerStore));
+            new StorageMigrationResult(StorageMigrationStatus.SUCCESS, migrationPath);
+
+        SchedulerMigrationResult schedulerResult =
+            migrateSchedulerStore(fromSchedulerStore, toSchedulerStore);
+        if (schedulerResult == null) {
+          LOG.info("From store contained no data: " + from.id());
+          return migrationResult;
+        }
+
+        migrationResult.setTaskResult(migrateTaskStore(fromTaskStore, toTaskStore))
+            .setJobManagerResult(migrateJobStore(fromJobStore, toJobStore))
+            .setSchedulerResult(schedulerResult);
 
         to.markMigration(migrationResult);
 
@@ -209,15 +222,18 @@ public class Migrator {
     return jobManagerMigrationResultBuilder.build();
   }
 
+  @Nullable
   private SchedulerMigrationResult migrateSchedulerStore(SchedulerStore fromSchedulerStore,
       SchedulerStore toSchedulerStore) {
 
-    SchedulerMigrationResult schedulerMigrationResult = new SchedulerMigrationResult();
+    SchedulerMigrationResult schedulerMigrationResult = null;
     try {
       String frameworkId = fromSchedulerStore.fetchFrameworkId();
-      if (frameworkId != null) {
-        toSchedulerStore.saveFrameworkId(frameworkId);
+      if (frameworkId == null) {
+        return schedulerMigrationResult;
       }
+      toSchedulerStore.saveFrameworkId(frameworkId);
+      schedulerMigrationResult = new SchedulerMigrationResult();
       schedulerMigrationResult.setMigratedFameworkId(frameworkId);
     } catch (RuntimeException e) {
       schedulerMigrationResult.setFailureMessage(Throwables.getStackTraceAsString(e));
