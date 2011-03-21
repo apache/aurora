@@ -30,8 +30,10 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -208,7 +210,9 @@ public class LiveTask extends TaskOnDisk {
     StringBuffer sb = new StringBuffer();
     while (m.find()) {
       String portName = m.group(1);
-      if (portName.isEmpty()) throw new TaskRunException("Port name may not be empty.");
+      if (portName.isEmpty()) {
+        throw new TaskRunException("Port name may not be empty.");
+      }
 
       int portNumber = leasedPorts.containsKey(portName) ? leasedPorts.get(portName)
           : socketManager.leaseSocket();
@@ -344,7 +348,7 @@ public class LiveTask extends TaskOnDisk {
       }).start();
   }
 
-  private void captureStream(InputStream stream, File outputFile) {
+  private static void captureStream(InputStream stream, File outputFile) {
     FileOutputStream outputStream = null;
     try {
       outputStream = new FileOutputStream(outputFile);
@@ -371,7 +375,9 @@ public class LiveTask extends TaskOnDisk {
   }
 
   private static void cleanUp(Process p) {
-    if (p == null) return;
+    if (p == null) {
+      return;
+    }
     Closeables.closeQuietly(p.getInputStream());
     Closeables.closeQuietly(p.getOutputStream());
     Closeables.closeQuietly(p.getErrorStream());
@@ -416,8 +422,11 @@ public class LiveTask extends TaskOnDisk {
     return task.getTaskId();
   }
 
+  private static final Set<ScheduleStatus> RUNNING_STATES = EnumSet.of(STARTING, RUNNING);
+
+  @Override
   public boolean isRunning() {
-    return stateMachine.getState() == RUNNING;
+    return RUNNING_STATES.contains(stateMachine.getState());
   }
 
   public ScheduleStatus getStatus() {
@@ -437,6 +446,7 @@ public class LiveTask extends TaskOnDisk {
     }
   }
 
+  @Override
   public void terminate(ScheduleStatus terminalState) {
     LOG.info("Terminating " + this + " with status " + terminalState);
 
@@ -451,7 +461,9 @@ public class LiveTask extends TaskOnDisk {
       }
     }
 
-    if (process == null) return;
+    if (process == null) {
+      return;
+    }
     ScheduleStatus currentStatus = stateMachine.getState();
     if (Tasks.isTerminated(currentStatus)) {
       LOG.info("Task " + this + " is already terminated, not changing state to " + terminalState);
@@ -481,7 +493,9 @@ public class LiveTask extends TaskOnDisk {
 
   private boolean isHealthy() {
     LOG.info("Checking task health.");
-    if (!supportsHttpSignals()) return true;
+    if (!supportsHttpSignals()) {
+      return true;
+    }
     try {
       return healthChecker.apply(healthCheckPort);
     } catch (HealthCheckException e) {

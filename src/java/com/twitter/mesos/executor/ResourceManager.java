@@ -78,10 +78,17 @@ public class ResourceManager {
   private void startDiskGc() {
     FileFilter expiredOrUnknown = new FileFilter() {
         @Override public boolean accept(File file) {
-          if (!file.isDirectory()) return false;
+          if (!file.isDirectory()) {
+            return false;
+          }
 
-          // Always delete unknown directories.
-          if (!taskManager.hasTask(file.getName())) return true;
+          if (!taskManager.hasTask(file.getName())) {
+            // Always delete unknown directories.
+            return true;
+          } else if (taskManager.isRunning(file.getName())) {
+            // Don't delete files for running tasks.
+            return false;
+          }
 
           // If the directory is for a known task, only delete when it has expired.
           long timeSinceLastModify =

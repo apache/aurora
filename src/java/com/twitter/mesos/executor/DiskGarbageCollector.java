@@ -107,7 +107,9 @@ public class DiskGarbageCollector implements Runnable {
 
         long bytesReclaimed = 0;
         for (File file : files) {
-          if (bytesReclaimed >= bytesToReclaim) break;
+          if (bytesReclaimed >= bytesToReclaim) {
+            break;
+          }
 
           long fileSize = fileSize(file);
 
