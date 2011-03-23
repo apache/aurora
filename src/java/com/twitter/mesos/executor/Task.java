@@ -21,7 +21,7 @@ public interface Task {
 
   public boolean isRunning();
 
-  public void terminate(ScheduleStatus terminalState);
+  public void terminate(ScheduleStatus terminalState, String reason);
 
   public File getSandboxDir();
 
@@ -32,6 +32,10 @@ public interface Task {
   public ResourceConsumption getResourceConsumption();
 
   public static class TaskRunException extends Exception {
+
+    // TODO(William Farner): Attach a GUID here (probably via UUID) to allow for automatic stack
+    //    trace linking between disparate parts of the system.
+
     public TaskRunException(String msg, Throwable t) {
       super(msg, t);
     }

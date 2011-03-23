@@ -18,6 +18,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.annotation.Nullable;
+
 /**
  * Abstraction away from the mesos executor driver.
  *
@@ -30,10 +32,12 @@ public interface Driver extends Function<Message, Integer> {
    *
    * @param taskId Task to update the status for.
    * @param status New status of thet task.
+   * @param reason The reason for the state change, or {@code null} if there is no information
+   *    relevant to the state transition.
    * @return zero if the status was successfully sent (but not necessarily received), or non-zero
    *    if the status could not be sent.
    */
-  public int sendStatusUpdate(String taskId, ScheduleStatus status);
+  public int sendStatusUpdate(String taskId, ScheduleStatus status, @Nullable String reason);
 
   /**
    * Sets the underlying driver.
@@ -108,18 +112,22 @@ public interface Driver extends Function<Message, Integer> {
       return result;
     }
 
-    @Override public int sendStatusUpdate(final String taskId, final ScheduleStatus status) {
+    @Override public int sendStatusUpdate(final String taskId, final ScheduleStatus status,
+        final String reason) {
       Preconditions.checkNotNull(status);
 
       return doWorkWithDriver(new Function<ExecutorDriver, Integer>() {
         @Override public Integer apply(ExecutorDriver driver) {
           LOG.info("Notifying task " + taskId + " in state " + status);
-          int result = driver.sendStatusUpdate(
-              TaskStatus.newBuilder()
-                  .setTaskId(TaskID.newBuilder().setValue(taskId))
-                  .setSlaveId(executorArgs.get().getSlaveId())
-                  .setState(StateTranslator.get(status))
-                  .build());
+          TaskStatus.Builder msg = TaskStatus.newBuilder()
+              .setTaskId(TaskID.newBuilder().setValue(taskId))
+              .setSlaveId(executorArgs.get().getSlaveId())
+              .setState(StateTranslator.get(status));
+          if (reason != null) {
+            msg.setData(ByteString.copyFromUtf8(reason));
+          }
+
+          int result = driver.sendStatusUpdate(msg.build());
           if (result != 0) {
             LOG.warning("Attempt to send executor message returned code " + result);
           }

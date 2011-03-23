@@ -11,6 +11,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.annotation.Nullable;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
@@ -341,7 +343,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
           for (String deadTask : deadTasks) {
             final ScheduleStatus status = taskInfoMap.get(deadTask).getStatus();
 
-            setTaskStatus(Query.byId(deadTask), status);
+            setTaskStatus(Query.byId(deadTask), status, "Slave reported as dead.");
           }
         }
 
@@ -380,7 +382,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
           LOG.info("Slave " + update.getSlaveHost() + " no longer reports running tasks: "
                    + missingRunningTasks + ", reporting as LOST.");
 
-          setTaskStatus(Query.byId(missingRunningTasks), LOST);
+          setTaskStatus(Query.byId(missingRunningTasks), LOST, "Slave stopped reporting.");
         }
       }
     });
@@ -432,7 +434,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
           AssignedTask assigned = new AssignedTask()
               .setTaskId(generateTaskId(task))
               .setTask(task);
-          return changeTaskStatus(new ScheduledTask().setAssignedTask(assigned), PENDING);
+          return changeTaskStatus(new ScheduledTask().setAssignedTask(assigned), PENDING, null);
         }
       };
 
@@ -611,7 +613,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     return new Closure<ScheduledTask>() {
       @Override public void execute(ScheduledTask task) {
         task.getAssignedTask().setSlaveId(slaveId).setSlaveHost(slaveHost);
-        changeTaskStatus(task, STARTING);
+        changeTaskStatus(task, STARTING, null);
       }
     };
   }
@@ -694,7 +696,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
       String taskId = generateTaskId(task.getAssignedTask().getTask());
       task.getAssignedTask().setTaskId(taskId);
       newTaskIds.add(taskId);
-      changeTaskStatus(task, PENDING);
+      changeTaskStatus(task, PENDING, "Rescheduled");
     }
 
     LOG.info("Tasks being rescheduled: " + tasks);
@@ -710,17 +712,20 @@ public class SchedulerCoreImpl implements SchedulerCore {
    *
    * @param task Task whose status is changing.
    * @param status New status for the task.
+   * @param message Optional message to add to the status change.
    * @return A reference to the task.
    */
-  private ScheduledTask changeTaskStatus(ScheduledTask task, ScheduleStatus status) {
+  private static ScheduledTask changeTaskStatus(ScheduledTask task, ScheduleStatus status,
+      @Nullable String message) {
     task.setStatus(status);
-    task.addToTaskEvents(
-        new TaskEvent().setTimestamp(System.currentTimeMillis()).setStatus(status));
+    task.addToTaskEvents(new TaskEvent()
+        .setTimestamp(System.currentTimeMillis()).setStatus(status).setMessage(message));
     return task;
   }
 
   @Override
-  public synchronized void setTaskStatus(Query rawQuery, final ScheduleStatus status) {
+  public synchronized void setTaskStatus(Query rawQuery, final ScheduleStatus status,
+      @Nullable final String message) {
     checkStarted();
     checkNotNull(rawQuery);
     checkNotNull(status);
@@ -739,7 +744,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
         // Simply assign the new state.
         mutateOperation = new Closure<ScheduledTask>() {
           @Override public void execute(ScheduledTask task) {
-            changeTaskStatus(task, status);
+            changeTaskStatus(task, status, message);
           }
         };
 
@@ -754,7 +759,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
               newTasks.add(new ScheduledTask(task));
             }
 
-            changeTaskStatus(task, FINISHED);
+            changeTaskStatus(task, FINISHED, message);
           }
         };
 
@@ -776,7 +781,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
               newTasks.add(new ScheduledTask(task));
             }
 
-            changeTaskStatus(task, FAILED);
+            changeTaskStatus(task, FAILED, message);
           }
         };
 
@@ -790,7 +795,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
           @Override public void execute(ScheduledTask task) {
             LOG.info("Rescheduling " + status + " task: " + Tasks.id(task));
             newTasks.add(new ScheduledTask(task));
-            changeTaskStatus(task, status);
+            changeTaskStatus(task, status, message);
           }
         };
 
@@ -850,7 +855,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
         Closure<ScheduledTask> mutate = new Closure<ScheduledTask>() {
           @Override public void execute(ScheduledTask task) {
-            changeTaskStatus(task, KILLED_BY_CLIENT);
+            changeTaskStatus(task, KILLED_BY_CLIENT, "Manually killed by client.");
             killTask.execute(Tasks.id(task));
           }
         };
@@ -1026,7 +1031,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
             tasksToUpdate.add(newTask);
 
-            changeTaskStatus(task, KILLED_BY_CLIENT);
+            changeTaskStatus(task, KILLED_BY_CLIENT, "Killed for rolling update.");
 
             if (originalStatus != PENDING) {
               killTask.execute(Tasks.id(task));
@@ -1113,7 +1118,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
         taskStore.mutate(activeQuery, new Closure<ScheduledTask>() {
           @Override public void execute(ScheduledTask task) {
             ScheduleStatus originalStatus = task.getStatus();
-            changeTaskStatus(task, KILLED_BY_CLIENT);
+            changeTaskStatus(task, KILLED_BY_CLIENT, "Restarted by client.");
             scheduleTaskCopies(Arrays.asList(new ScheduledTask(task)), taskStore);
 
             if (originalStatus != PENDING) {

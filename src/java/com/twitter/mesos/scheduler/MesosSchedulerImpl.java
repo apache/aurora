@@ -170,8 +170,10 @@ class MesosSchedulerImpl implements Scheduler {
 
   @Override
   public void statusUpdate(SchedulerDriver driver, TaskStatus status) {
+    String info = status.hasData() ? status.getData().toStringUtf8() : null;
+    String infoMsg = info != null ? " with info " + info : "";
     LOG.info("Received status update for task " + status.getTaskId()
-        + " in state " + status.getState());
+        + " in state " + status.getState() + infoMsg);
 
     Query query = Query.byId(status.getTaskId().getValue());
 
@@ -184,7 +186,7 @@ class MesosSchedulerImpl implements Scheduler {
         return;
       }
 
-      schedulerCore.setTaskStatus(query, translatedState);
+      schedulerCore.setTaskStatus(query, translatedState, info);
     }
   }
 

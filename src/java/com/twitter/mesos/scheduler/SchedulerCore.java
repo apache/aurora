@@ -119,8 +119,9 @@ public interface SchedulerCore {
    *
    * @param query The query to identify tasks
    * @param status The new state of the tasks.
+   * @param message Additional information about the state transition.
    */
-  void setTaskStatus(Query query, ScheduleStatus status);
+  void setTaskStatus(Query query, ScheduleStatus status, @Nullable String message);
 
   /**
    * Kills a specific set of tasks.

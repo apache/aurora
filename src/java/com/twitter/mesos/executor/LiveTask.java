@@ -147,7 +147,7 @@ public class LiveTask extends TaskOnDisk {
     try {
       recordTask();
     } catch (TaskStorageException e) {
-      throw new TaskRunException("Failed to store task.", e);
+      throw new TaskRunException("Failed to store task on disk.", e);
     }
 
     if (!StringUtils.isBlank(task.getTask().getHdfsPath())) {
@@ -158,7 +158,8 @@ public class LiveTask extends TaskOnDisk {
         payload = fileCopier.apply(
             new FileCopyRequest(task.getTask().getHdfsPath(), sandboxDir.getAbsolutePath()));
       } catch (IOException e) {
-        throw new TaskRunException("Failed to fetch task binary.", e);
+        throw new TaskRunException("Failed to fetch task binary from "
+            + task.getTask().getHdfsPath(), e);
       }
 
       if (!payload.exists()) {
@@ -284,49 +285,49 @@ public class LiveTask extends TaskOnDisk {
 
     try {
       process = processBuilder.start();
-
-      captureProcessOutput(process);
-
-      if (supportsHttpSignals()) {
-        ThreadFactory factory = new ThreadFactoryBuilder()
-            .setNameFormat(String.format("Task-%s-HealthCheck", task.getTaskId()))
-            .setDaemon(true)
-            .build();
-        ScheduledExecutorService executor = Executors.newScheduledThreadPool(1, factory);
-        healthCheckExecutor = executor;
-
-        executor.scheduleAtFixedRate(
-            new Runnable() {
-              @Override public void run() {
-                if (!isHealthy()) {
-                  LOG.info("Task not healthy!");
-                  terminate(FAILED);
-                }
-              }
-            },
-            // Configure health check interval, allowing 2x configured time for startup.
-            // TODO(William Farner): Add a configuration option for the task start-up grace period
-            // before health checking begins.
-            2 * task.getTask().getHealthCheckIntervalSecs(),
-            task.getTask().getHealthCheckIntervalSecs(),
-            TimeUnit.SECONDS
-        );
-      }
-
-      try {
-        Thread.sleep(LAUNCH_PIDFILE_GRACE_PERIOD.as(Time.MILLISECONDS));
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new TaskRunException("Interrupted while waiting for launch grace period.", e);
-      }
-      killCommand = buildKillCommand(
-          supportsHttpSignals() ? leasedPorts.get(HEALTH_CHECK_PORT_NAME) : -1);
-
-      setStatus(RUNNING);
     } catch (IOException e) {
-      terminate(FAILED);
+      terminate(FAILED, "Failed to launch process.");
       throw new TaskRunException("Failed to launch process.", e);
     }
+
+    captureProcessOutput(process);
+
+    if (supportsHttpSignals()) {
+      ThreadFactory factory = new ThreadFactoryBuilder()
+          .setNameFormat(String.format("Task-%s-HealthCheck", task.getTaskId()))
+          .setDaemon(true)
+          .build();
+      ScheduledExecutorService executor = Executors.newScheduledThreadPool(1, factory);
+      healthCheckExecutor = executor;
+
+      executor.scheduleAtFixedRate(
+          new Runnable() {
+            @Override public void run() {
+              if (!isHealthy()) {
+                LOG.info("Task not healthy!");
+                terminate(FAILED, "HTTP health check failed.");
+              }
+            }
+          },
+          // Configure health check interval, allowing 2x configured time for startup.
+          // TODO(William Farner): Add a configuration option for the task start-up grace period
+          // before health checking begins.
+          2 * task.getTask().getHealthCheckIntervalSecs(),
+          task.getTask().getHealthCheckIntervalSecs(),
+          TimeUnit.SECONDS
+      );
+    }
+
+    try {
+      Thread.sleep(LAUNCH_PIDFILE_GRACE_PERIOD.as(Time.MILLISECONDS));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new TaskRunException("Interrupted while waiting for launch grace period.", e);
+    }
+    killCommand = buildKillCommand(
+        supportsHttpSignals() ? leasedPorts.get(HEALTH_CHECK_PORT_NAME) : -1);
+
+    setStatus(RUNNING);
   }
 
   private void captureProcessOutput(final Process process) {
@@ -447,7 +448,7 @@ public class LiveTask extends TaskOnDisk {
   }
 
   @Override
-  public void terminate(ScheduleStatus terminalState) {
+  public void terminate(ScheduleStatus terminalState, String reason) {
     LOG.info("Terminating " + this + " with status " + terminalState);
 
     if (healthCheckExecutor != null) {

@@ -47,7 +47,7 @@ public class MesosExecutorImpl implements Executor {
   }
 
   @Override
-  public void launchTask(final ExecutorDriver driverDoNotUse, final TaskDescription task) {
+  public void launchTask(ExecutorDriver driverDoNotUse, TaskDescription task) {
     LOG.info(String.format("Running task %s with ID %s.", task.getName(), task.getTaskId()));
 
     final AssignedTask assignedTask;
@@ -55,7 +55,8 @@ public class MesosExecutorImpl implements Executor {
       assignedTask = ThriftBinaryCodec.decode(AssignedTask.class, task.getData().toByteArray());
     } catch (ThriftBinaryCodec.CodingException e) {
       LOG.log(Level.SEVERE, "Error deserializing task object.", e);
-      driver.sendStatusUpdate(task.getTaskId().getValue(), FAILED);
+      driver.sendStatusUpdate(task.getTaskId().getValue(), FAILED,
+          "Failed to decode task description.");
       return;
     }
 
@@ -65,11 +66,11 @@ public class MesosExecutorImpl implements Executor {
     try {
       executorCore.executeTask(assignedTask, new Closure<ScheduleStatus>() {
         @Override public void execute(ScheduleStatus state) {
-          driver.sendStatusUpdate(assignedTask.getTaskId(), state);
+          driver.sendStatusUpdate(assignedTask.getTaskId(), state, null);
         }
       });
     } catch (TaskRunException e) {
-      driver.sendStatusUpdate(assignedTask.getTaskId(), FAILED);
+      driver.sendStatusUpdate(assignedTask.getTaskId(), FAILED, e.getMessage());
     }
   }
 

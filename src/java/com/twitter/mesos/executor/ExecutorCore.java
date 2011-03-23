@@ -115,7 +115,7 @@ public class ExecutorCore implements TaskManager {
    *    if the task failed to start.
    * @throws TaskRunException If the task failed to start.
    */
-  public void executeTask(final AssignedTask assignedTask,
+  public void executeTask(AssignedTask assignedTask,
       final Closure<ScheduleStatus> completedCallback) throws TaskRunException {
     Preconditions.checkNotNull(assignedTask);
 
@@ -132,8 +132,8 @@ public class ExecutorCore implements TaskManager {
       task.stage();
       task.run();
     } catch (TaskRunException e) {
-      LOG.log(Level.SEVERE, "Failed to stage task " + taskId, e);
-      task.terminate(FAILED);
+      LOG.log(Level.SEVERE, "Failed to stage or run task " + taskId, e);
+      task.terminate(FAILED, e.getMessage());
       deleteCompletedTask(taskId);
       throw e;
     }
@@ -153,7 +153,7 @@ public class ExecutorCore implements TaskManager {
 
     if (task != null && task.isRunning()) {
       LOG.info("Killing task: " + task);
-      task.terminate(ScheduleStatus.KILLED);
+      task.terminate(ScheduleStatus.KILLED, "Executor shutting down.");
     } else if (task == null) {
       LOG.severe("No such task found: " + taskId);
     } else {
