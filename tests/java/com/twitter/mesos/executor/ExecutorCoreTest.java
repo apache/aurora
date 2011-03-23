@@ -101,7 +101,7 @@ public class ExecutorCoreTest extends EasyMockTest {
     runningTask.stage();
     expectLastCall().andThrow(new TaskRunException("Staging failed."));
     expect(runningTask.isRunning()).andReturn(false);
-    runningTask.terminate(FAILED);
+    runningTask.terminate(FAILED, "Staging failed.");
 
     control.replay();
 
@@ -115,9 +115,9 @@ public class ExecutorCoreTest extends EasyMockTest {
     expect(taskFactory.apply(task)).andReturn(runningTask);
     runningTask.stage();
     runningTask.run();
-    expectLastCall().andThrow(new TaskRunException("Staging failed."));
+    expectLastCall().andThrow(new TaskRunException("Failed to start."));
     expect(runningTask.isRunning()).andReturn(false);
-    runningTask.terminate(FAILED);
+    runningTask.terminate(FAILED, "Failed to start.");
 
     control.replay();
 

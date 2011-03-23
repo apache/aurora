@@ -33,6 +33,8 @@ import static com.twitter.mesos.executor.LiveTask.STDERR_CAPTURE_FILE;
 import static com.twitter.mesos.executor.LiveTask.STDOUT_CAPTURE_FILE;
 import static com.twitter.mesos.executor.TaskOnDisk.TASK_DUMP_FILE;
 import static com.twitter.mesos.executor.TaskOnDisk.TASK_STATUS_FILE;
+import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
+import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
 import static org.easymock.EasyMock.anyInt;
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.createControl;
@@ -110,7 +112,7 @@ public class LiveTaskTest {
     LiveTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
     taskA.run();
-    assertThat(taskA.blockUntilTerminated(), is(ScheduleStatus.FINISHED));
+    assertThat(taskA.blockUntilTerminated(), is(FINISHED));
     assertDirContents(taskA.taskRoot, SANDBOX_DIR_NAME, PIDFILE_NAME, TASK_DUMP_FILE,
         TASK_STATUS_FILE);
     assertDirContents(taskA.sandboxDir, "a.txt", RUN_SCRIPT_NAME, STDERR_CAPTURE_FILE,
@@ -127,7 +129,7 @@ public class LiveTaskTest {
     LiveTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
     taskA.run();
-    assertThat(taskA.blockUntilTerminated(), is(ScheduleStatus.FINISHED));
+    assertThat(taskA.blockUntilTerminated(), is(FINISHED));
     assertDirContents(taskA.taskRoot, SANDBOX_DIR_NAME, PIDFILE_NAME, TASK_DUMP_FILE,
         TASK_STATUS_FILE);
     assertDirContents(taskA.sandboxDir, RUN_SCRIPT_NAME, STDERR_CAPTURE_FILE, STDOUT_CAPTURE_FILE);
@@ -146,7 +148,7 @@ public class LiveTaskTest {
     LiveTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
     taskA.run();
-    assertThat(taskA.blockUntilTerminated(), is(ScheduleStatus.FINISHED));
+    assertThat(taskA.blockUntilTerminated(), is(FINISHED));
     assertDirContents(taskA.taskRoot, SANDBOX_DIR_NAME, PIDFILE_NAME, TASK_DUMP_FILE,
         TASK_STATUS_FILE);
     assertDirContents(taskA.sandboxDir, RUN_SCRIPT_NAME, STDERR_CAPTURE_FILE, STDOUT_CAPTURE_FILE);
@@ -236,7 +238,7 @@ public class LiveTaskTest {
     taskA.stage();
     taskA.run();
 
-    assertThat(taskA.blockUntilTerminated(), is(ScheduleStatus.FINISHED));
+    assertThat(taskA.blockUntilTerminated(), is(FINISHED));
   }
 
   @Test
@@ -254,7 +256,7 @@ public class LiveTaskTest {
     taskA.stage();
     taskA.run();
 
-    taskA.terminate(ScheduleStatus.KILLED);
+    taskA.terminate(KILLED, null);
   }
 
   @Test

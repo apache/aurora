@@ -1730,11 +1730,11 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   }
 
   public void changeStatus(Query query, ScheduleStatus status) {
-    scheduler.setTaskStatus(query, status);
+    scheduler.setTaskStatus(query, status, null);
   }
 
   public void changeStatus(String taskId, ScheduleStatus status) {
-    scheduler.setTaskStatus(query(Arrays.asList(taskId)), status);
+    scheduler.setTaskStatus(query(Arrays.asList(taskId)), status, null);
   }
 
   private void expectAcceptedOffers(int count) {
