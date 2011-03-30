@@ -7,7 +7,7 @@ import java.util.Arrays;
 
 /**
  * Interface for a job manager.  A job manager is responsible for deciding whether and when to
- * trigger execution of a job.
+ * trigger execution of a job.  A job manager will be {@link #start() started} before any other methods are called.
  *
  * @author William Farner
  */
@@ -23,6 +23,15 @@ public abstract class JobManager {
    * @return Job manager key.
    */
   public abstract String getUniqueKey();
+
+  /**
+   * Called to signal the job manager to prepare any existing jobs it manages and prepare for
+   * further job lifecycle requests.  By default this does nothing and subclasses should override
+   * if they have start logic to apply.
+   */
+  public void start() {
+    // noop
+  }
 
   /**
    * Submits a job to the manager.  The job may be submitted to the job runner before this method

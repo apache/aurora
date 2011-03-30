@@ -193,21 +193,9 @@ public class SchedulerCoreImpl implements SchedulerCore {
     this.killTask = Preconditions.checkNotNull(killTask);
     stateMachine.transition(STARTED);
 
-    storage.doInTransaction(new Work.NoResult.Quiet() {
-      @Override protected void execute(SchedulerStore schedulerStore, JobStore jobStore,
-          TaskStore taskStore) throws RuntimeException {
-
-        for (JobManager jobManager : jobManagers) {
-          for (JobConfiguration job : jobStore.fetchJobs(jobManager.getUniqueKey())) {
-            try {
-              jobManager.receiveJob(job);
-            } catch (ScheduleException e) {
-              LOG.log(Level.SEVERE, "While trying to restore state, scheduler module failed.", e);
-            }
-          }
-        }
-      }
-    });
+    for (JobManager jobManager : jobManagers) {
+      jobManager.start();
+    }
   }
 
   @Override

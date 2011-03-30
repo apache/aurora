@@ -108,7 +108,7 @@ public class SchedulerThriftInterface extends ThriftServer implements MesosSched
           response.setMessage("Job was unchanged, no update necessary.");
           break;
         case COMPLETED:
-          response.setMessage("Update did not require restert, update complete.");
+          response.setMessage("Update did not require restart, update complete.");
           break;
         case UPDATER_LAUNCHED:
           response.setMessage("Job updater triggered.");

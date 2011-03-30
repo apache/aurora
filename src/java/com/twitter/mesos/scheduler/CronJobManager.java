@@ -61,6 +61,28 @@ public class CronJobManager extends JobManager {
     scheduler.start();
   }
 
+  private void mapScheduledJob(JobConfiguration job, String scheduledJobKey) {
+    scheduledJobs.put(Tasks.jobKey(job), scheduledJobKey);
+  }
+
+  @Override
+  public void start() {
+    storage.doInTransaction(new Work.NoResult.Quiet() {
+      @Override protected void execute(SchedulerStore schedulerStore, JobStore jobStore,
+          TaskStore taskStore) {
+
+        for (JobConfiguration job : jobStore.fetchJobs(MANAGER_KEY)) {
+          try {
+            String scheduledJobKey = scheduleJob(job);
+            mapScheduledJob(job, scheduledJobKey);
+          } catch (ScheduleException e) {
+            LOG.log(Level.SEVERE, "While trying to restore state, scheduler module failed.", e);
+          }
+        }
+      }
+    });
+  }
+
   /**
    * Triggers execution of a job.
    *
@@ -132,20 +154,19 @@ public class CronJobManager extends JobManager {
     return MANAGER_KEY;
   }
 
+  private static boolean hasCronSchedule(JobConfiguration job) {
+    return !StringUtils.isEmpty(job.getCronSchedule());
+  }
+
   @Override
   public boolean receiveJob(final JobConfiguration job) throws ScheduleException {
     Preconditions.checkNotNull(job);
 
-    if (StringUtils.isEmpty(job.getCronSchedule())) {
+    if (!hasCronSchedule(job)) {
       return false;
     }
 
-    if (!validateSchedule(job.getCronSchedule())) {
-      throw new ScheduleException("Invalid cron schedule: " + job.getCronSchedule());
-    }
-
     String scheduledJobKey = scheduleJob(job);
-
     storage.doInTransaction(new Work.NoResult.Quiet() {
       @Override protected void execute(SchedulerStore schedulerStore, JobStore jobStore,
           TaskStore taskStore) {
@@ -153,12 +174,21 @@ public class CronJobManager extends JobManager {
         jobStore.saveAcceptedJob(MANAGER_KEY, job);
       }
     });
-    scheduledJobs.put(Tasks.jobKey(job), scheduledJobKey);
+    mapScheduledJob(job, scheduledJobKey);
 
     return true;
   }
 
   private String scheduleJob(final JobConfiguration job) throws ScheduleException {
+    if (!hasCronSchedule(job)) {
+      throw new ScheduleException(String.format("Not a valid cronjob, %s has no cron schedule",
+          Tasks.jobKey(job)));
+    }
+
+    if (!validateSchedule(job.getCronSchedule())) {
+      throw new ScheduleException("Invalid cron schedule: " + job.getCronSchedule());
+    }
+
     LOG.info(String.format("Scheduling cron job %s: %s", Tasks.jobKey(job), job.getCronSchedule()));
     try {
       return scheduler.schedule(job.getCronSchedule(), new Runnable() {
@@ -177,7 +207,7 @@ public class CronJobManager extends JobManager {
   public JobUpdateResult updateJob(final JobConfiguration job) throws ScheduleException {
     Preconditions.checkNotNull(job);
 
-    if (StringUtils.isEmpty(job.getCronSchedule()) || !validateSchedule(job.getCronSchedule())) {
+    if (!hasCronSchedule(job) || !validateSchedule(job.getCronSchedule())) {
       throw new ScheduleException("Invalid cron schedule: " + job.getCronSchedule());
     }
 
