@@ -3,6 +3,7 @@ package com.twitter.mesos.scheduler;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -38,15 +39,19 @@ import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.NotNull;
 import com.twitter.common.base.Closure;
+import com.twitter.common.base.Closures;
 import com.twitter.common.base.Command;
 import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.inject.TimedInterceptor;
 import com.twitter.common.io.FileUtils;
+import com.twitter.common.logging.ScribeLog;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.common.thrift.ThriftFactory.ThriftFactoryException;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.common.zookeeper.ZooKeeperUtils;
+import com.twitter.common_internal.cuckoo.CuckooWriter;
 import com.twitter.common_internal.zookeeper.TwitterZk;
 import com.twitter.mesos.scheduler.httphandlers.HttpAssets;
 import com.twitter.mesos.gen.TwitterTaskInfo;
@@ -104,14 +109,25 @@ public class SchedulerModule extends AbstractModule {
   @CmdLine(name = "executor_path", help ="Path to the executor launch script.")
   private static final Arg<String> executorPath = Arg.create();
 
+  @CmdLine(name = "cuckoo_scribe_endpoints",
+      help = "Cuckoo endpoints for stat export.  Leave empty to disable stat export.")
+  private static final Arg<List<InetSocketAddress>> CUCKOO_SCRIBE_ENDPOINTS = Arg.create(
+      Arrays.asList(InetSocketAddress.createUnresolved("localhost", 1463)));
+
+  @CmdLine(name = "cuckoo_scribe_category", help = "Scribe category to send cuckoo stats to.")
+  private static final Arg<String> CUCKOO_SCRIBE_CATEGORY =
+      Arg.create(CuckooWriter.DEFAULT_SCRIBE_CATEGORY);
+
+  @CmdLine(name = "cuckoo_service_id", help = "Cuckoo service ID.")
+  private static final Arg<String> CUCKOO_SERVICE_ID = Arg.create("mesos_scheduler");
+
+  @CmdLine(name = "cuckoo_source_id", help = "Cuckoo stat source ID.")
+  private static final Arg<String> CUCKOO_SOURCE_ID = Arg.create("mesos_scheduler");
+
   @Override
   protected void configure() {
     // Enable intercepted method timings
     TimedInterceptor.bind(binder());
-
-    // Bindings for SchedulerMain.
-    // MesosSchedulerDriver handled in provider.
-    bind(new TypeLiteral<AtomicReference<InetSocketAddress>>() {}).in(Singleton.class);
 
     // Bindings for MesosSchedulerImpl.
     bind(SchedulerCore.class).to(SchedulerCoreImpl.class).in(Singleton.class);
@@ -227,6 +243,18 @@ public class SchedulerModule extends AbstractModule {
       }
     } else {
       return new ZooKeeperClient(zooKeeperSessionTimeout.get(), zooKeeperEndpoints.get());
+    }
+  }
+
+  @Provides
+  @Singleton
+  Closure<Map<String, ? extends Number>> provideStatSink() throws ThriftFactoryException {
+    if (CUCKOO_SCRIBE_ENDPOINTS.get().isEmpty()) {
+      LOG.info("No scribe hosts provided, cuckoo stat export disabled.");
+      return Closures.noop();
+    } else {
+      return new CuckooWriter(new ScribeLog(CUCKOO_SCRIBE_ENDPOINTS.get()),
+          CUCKOO_SCRIBE_CATEGORY.get(), CUCKOO_SERVICE_ID.get(), CUCKOO_SOURCE_ID.get());
     }
   }
 

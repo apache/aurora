@@ -23,6 +23,7 @@ import com.twitter.common.application.AbstractApplication;
 import com.twitter.common.application.ActionRegistry;
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.application.ShutdownStage;
+import com.twitter.common.application.modules.StatsExportModule;
 import com.twitter.common.application.modules.HttpModule;
 import com.twitter.common.application.modules.LogModule;
 import com.twitter.common.application.modules.StatsModule;
@@ -100,6 +101,7 @@ public class SchedulerMain extends AbstractApplication {
   public Iterable<Module> getModules() {
     return Arrays.<Module>asList(
         new DbStorageModule(StorageRole.Role.Primary),
+        new StatsExportModule(),
         new HttpModule(),
         new LogModule(),
         new SchedulerModule(),
