@@ -105,6 +105,7 @@ public class ExecutorCore implements TaskManager {
 
   void setSlaveId(String slaveId) {
     this.slaveId.set(Preconditions.checkNotNull(slaveId));
+    LOG.info("Assigned slave ID: " + slaveId);
   }
 
   /**
@@ -235,6 +236,7 @@ public class ExecutorCore implements TaskManager {
     Runnable syncer = new Runnable() {
       @Override public void run() {
         if (slaveId.get() == null) {
+          LOG.severe("slaveID not set, can't send executor status to scheduler.");
           return;
         }
 

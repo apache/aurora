@@ -3,6 +3,8 @@ package com.twitter.mesos.executor;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
+
+import com.twitter.common.stats.Stats;
 import com.twitter.mesos.Message;
 import com.twitter.mesos.StateTranslator;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
@@ -14,6 +16,7 @@ import org.apache.mesos.Protos.FrameworkMessage;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskStatus;
 
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -53,6 +56,13 @@ public interface Driver extends Function<Message, Integer> {
 
     private final AtomicReference<ExecutorDriver> driverRef = new AtomicReference<ExecutorDriver>();
     private final AtomicReference<ExecutorArgs> executorArgs = new AtomicReference<ExecutorArgs>();
+
+    private final AtomicLong statusUpdatesSent = Stats.exportLong("executor_status_updates_sent");
+    private final AtomicLong statusUpdatesFailed =
+        Stats.exportLong("executor_status_updates_failed");
+    private final AtomicLong messagesSent = Stats.exportLong("executor_framework_messages_sent");
+    private final AtomicLong messagesFailed =
+        Stats.exportLong("executor_framework_messages_failed");
 
     @Override
     public void init(ExecutorDriver driver, ExecutorArgs executorArgs) {
@@ -99,6 +109,9 @@ public interface Driver extends Function<Message, Integer> {
           if (result != 0) {
             LOG.warning(String.format("Attempt to send executor message returned code %d: %s",
                 result, message));
+            messagesFailed.incrementAndGet();
+          } else {
+            messagesSent.incrementAndGet();
           }
 
           return result;
@@ -130,6 +143,9 @@ public interface Driver extends Function<Message, Integer> {
           int result = driver.sendStatusUpdate(msg.build());
           if (result != 0) {
             LOG.warning("Attempt to send executor message returned code " + result);
+            statusUpdatesFailed.incrementAndGet();
+          } else {
+            statusUpdatesSent.incrementAndGet();
           }
           return result;
         }
