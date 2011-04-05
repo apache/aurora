@@ -12,7 +12,6 @@ import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.ScheduleStatus;
 import org.apache.mesos.ExecutorDriver;
 import org.apache.mesos.Protos.ExecutorArgs;
-import org.apache.mesos.Protos.FrameworkMessage;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskStatus;
 
@@ -93,11 +92,9 @@ public interface Driver extends Function<Message, Integer> {
 
       int result = doWorkWithDriver(new Function<ExecutorDriver, Integer>() {
         @Override public Integer apply(ExecutorDriver driver) {
-          FrameworkMessage.Builder messageBuilder = FrameworkMessage.newBuilder()
-              .setSlaveId(executorArgs.get().getSlaveId());
+          byte[] data;
           try {
-            messageBuilder.setData(
-                ByteString.copyFrom(ThriftBinaryCodec.encode(message.getMessage())));
+            data = ThriftBinaryCodec.encode(message.getMessage());
           } catch (CodingException e) {
             LOG.log(Level.SEVERE, "Failed to encode message: " + message.getMessage()
                                   + " intended for slave " + message.getSlaveId());
@@ -105,7 +102,7 @@ public interface Driver extends Function<Message, Integer> {
           }
 
           LOG.info("Sending message to scheduler.");
-          int result = driver.sendFrameworkMessage(messageBuilder.build());
+          int result = driver.sendFrameworkMessage(data);
           if (result != 0) {
             LOG.warning(String.format("Attempt to send executor message returned code %d: %s",
                 result, message));

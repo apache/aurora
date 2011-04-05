@@ -199,7 +199,7 @@ public class CronJobManager extends JobManager {
         }
       });
     } catch (InvalidPatternException e) {
-      throw new ScheduleException("Failed to schedule cron job.", e);
+      throw new ScheduleException("Failed to schedule cron job: " + e.getMessage(), e);
     }
   }
 

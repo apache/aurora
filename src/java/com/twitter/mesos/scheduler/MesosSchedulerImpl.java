@@ -16,7 +16,6 @@ import com.google.protobuf.ByteString;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.ExecutorInfo;
 import org.apache.mesos.Protos.FrameworkID;
-import org.apache.mesos.Protos.FrameworkMessage;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.SlaveOffer;
@@ -51,6 +50,9 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  */
 class MesosSchedulerImpl implements Scheduler {
   private static final Logger LOG = Logger.getLogger(MesosSchedulerImpl.class.getName());
+
+  private static final String TWITTER_EXECUTOR_ID = "twitter";
+
   /**
    * Binding annotation for the path to the executor binary.
    */
@@ -87,7 +89,7 @@ class MesosSchedulerImpl implements Scheduler {
   public ExecutorInfo getExecutorInfo(SchedulerDriver driver) {
 
     return ExecutorInfo.newBuilder().setUri(executorPath)
-        .setExecutorId(ExecutorID.newBuilder().setValue("twitter"))
+        .setExecutorId(ExecutorID.newBuilder().setValue(TWITTER_EXECUTOR_ID))
         .build();
   }
 
@@ -111,12 +113,9 @@ class MesosSchedulerImpl implements Scheduler {
           return;
         }
 
-        FrameworkMessage.Builder messageBuilder = FrameworkMessage.newBuilder()
-              .setSlaveId(SlaveID.newBuilder().setValue(slaveId))
-              .setData(ByteString.copyFrom(data));
-
         LOG.info("Attempting to send message from scheduler to " + slaveId + " - " + message);
-        int result = driver.sendFrameworkMessage(messageBuilder.build());
+        int result = driver.sendFrameworkMessage(SlaveID.newBuilder().setValue(slaveId).build(),
+            ExecutorID.newBuilder().setValue(TWITTER_EXECUTOR_ID).build(), data);
         if (result != 0) {
           LOG.severe(String.format("Attempt to send message failed with code %d [%s]",
               result, message));
@@ -198,15 +197,16 @@ class MesosSchedulerImpl implements Scheduler {
   }
 
   @Override
-  public void frameworkMessage(SchedulerDriver driver, FrameworkMessage message) {
-    if (message.getData() == null) {
+  public void frameworkMessage(SchedulerDriver driver, SlaveID slave, ExecutorID executor,
+      byte[] data) {
+
+    if (data == null) {
       LOG.info("Received empty framework message.");
       return;
     }
 
     try {
-      SchedulerMessage schedulerMsg = ThriftBinaryCodec.decode(SchedulerMessage.class,
-          message.getData().toByteArray());
+      SchedulerMessage schedulerMsg = ThriftBinaryCodec.decode(SchedulerMessage.class, data);
       if (schedulerMsg == null || !schedulerMsg.isSet()) {
         LOG.warning("Received empty scheduler message.");
         return;

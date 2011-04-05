@@ -15,7 +15,6 @@ import java.util.logging.Logger;
 import org.apache.mesos.Executor;
 import org.apache.mesos.ExecutorDriver;
 import org.apache.mesos.Protos.ExecutorArgs;
-import org.apache.mesos.Protos.FrameworkMessage;
 import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskDescription;
 import org.apache.mesos.Protos.TaskID;
@@ -98,15 +97,14 @@ public class MesosExecutorImpl implements Executor {
   }
 
   @Override
-  public void frameworkMessage(ExecutorDriver driver, FrameworkMessage message) {
-    if (message.getData() == null) {
+  public void frameworkMessage(ExecutorDriver driver, byte[] data) {
+    if (data == null) {
       LOG.info("Received empty framework message.");
       return;
     }
 
     try {
-      ExecutorMessage executorMsg = ThriftBinaryCodec.decode(ExecutorMessage.class,
-          message.getData().toByteArray());
+      ExecutorMessage executorMsg = ThriftBinaryCodec.decode(ExecutorMessage.class, data);
       if (!executorMsg.isSet()) {
         LOG.warning("Received empty executor message.");
         return;
