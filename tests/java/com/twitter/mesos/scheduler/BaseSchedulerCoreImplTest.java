@@ -700,7 +700,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   @Test
   public void testResourceUpdate() throws Exception {
     expectRestore();
-    expectPersists(4);
+    expectPersists(3);
     expectOffer(true);
 
     control.replay();
@@ -779,7 +779,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   @Test
   public void testSlaveCannotModifyTasksForOtherSlave() throws Exception {
     expectRestore();
-    expectPersists(7);
+    expectPersists(6);
     expectOffer(true);
     expectOffer(true);
 

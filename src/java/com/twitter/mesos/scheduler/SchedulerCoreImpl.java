@@ -295,19 +295,13 @@ public class SchedulerCoreImpl implements SchedulerCore {
         taskInfoMap.keySet().removeAll(unknownTasks);
 
         // Update the resource information for the tasks that we currently have on record.
-        if (!recognizedTasks.isEmpty()) {
-          taskStore.mutate(Query.byId(recognizedTasks),
-              new Closure<ScheduledTask>() {
-                @Override public void execute(ScheduledTask task) {
-                  String taskId = Tasks.id(task);
-                  LiveTaskInfo taskUpdate = taskInfoMap.get(taskId);
-                  if (taskUpdate.getResources() != null) {
-                    VolatileTaskState volatileTaskState = taskStateById.get(taskId);
-                    volatileTaskState.resources =
-                        new ResourceConsumption(taskUpdate.getResources());
-                  }
-                }
-              });
+        for (String taskId : recognizedTasks) {
+          LiveTaskInfo taskUpdate = taskInfoMap.get(taskId);
+          if (taskUpdate.getResources() != null) {
+            VolatileTaskState volatileTaskState = taskStateById.get(taskId);
+            volatileTaskState.resources =
+                new ResourceConsumption(taskUpdate.getResources());
+          }
         }
 
         Predicate<LiveTaskInfo> getTerminatedTasks = new Predicate<LiveTaskInfo>() {

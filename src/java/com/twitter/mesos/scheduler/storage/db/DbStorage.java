@@ -18,6 +18,8 @@ import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.inject.TimedInterceptor.Timed;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
 import com.twitter.mesos.Tasks;
@@ -478,6 +480,9 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
       mutator.execute(taskState);
     }
 
+    LOG.info("Performing update on " + taskStates.size() + " tasks.");
+    long startNanos = System.nanoTime();
+
     final Iterator<ScheduledTask> tasks = taskStates.iterator();
     jdbcTemplate.batchUpdate("UPDATE task_state SET owner = ?, job_name = ?,"
                              + " job_key = ?, slave_host = ?, shard_id = ?, status = ?,"
@@ -496,6 +501,8 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
             return taskStates.size();
           }
         });
+    LOG.info("Update completed in "
+        + Amount.of(System.nanoTime() - startNanos, Time.NANOSECONDS).as(Time.MILLISECONDS) + "ms");
 
     // TODO(John Sirois): detect real mutations, some or all of these may have been noops
     vars.tasksMutated.addAndGet(taskStates.size());
@@ -543,7 +550,7 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
     WhereClauseBuilder whereClauseBuilder = createWhereClause(query);
     String rawQuery = whereClauseBuilder.appendWhereClause(sqlBuilder).toString();
 
-    long queryStart = System.nanoTime();
+    long startNanos = System.nanoTime();
     List<ScheduledTask> results = jdbcTemplate.query(
         rawQuery,
         whereClauseBuilder.parameters(),
@@ -562,14 +569,11 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
             return scheduledTask;
           }
         });
-    long queryDuration = System.nanoTime() - queryStart;
 
-    long postFilterStart = System.nanoTime();
     Iterable<ScheduledTask> postFiltered = query.hasPostFilter()
         ? Iterables.filter(results, query.postFilter()) : results;
-    long postFilterDuration = System.nanoTime() - postFilterStart;
-    LOG.info("Query '" + rawQuery + "' completed in " + queryDuration + "ns, and took "
-        + postFilterDuration + "ns to post-filter");
+    LOG.info("Query '" + rawQuery + "' completed in "
+        + Amount.of(System.nanoTime() - startNanos, Time.NANOSECONDS).as(Time.MILLISECONDS) + "ms");
 
     return postFiltered;
   }
