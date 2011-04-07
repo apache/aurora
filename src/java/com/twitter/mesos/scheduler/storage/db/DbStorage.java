@@ -12,6 +12,8 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.primitives.Ints;
 import com.google.inject.Inject;
+import com.sun.corba.se.spi.logging.LogWrapperBase;
+
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.ExceptionTransporter;
 import com.twitter.common.base.ExceptionalClosure;
@@ -82,6 +84,9 @@ import static com.google.common.collect.Iterables.transform;
 public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
 
   private static final Logger LOG = Logger.getLogger(DbStorage.class.getName());
+
+  private static final long SLOW_QUERY_THRESHOLD_NS =
+      Amount.of(100L, Time.MILLISECONDS).as(Time.NANOSECONDS);
 
   /**
    * The {@link com.twitter.mesos.gen.StorageSystemId#getType() type} identifier for
@@ -480,9 +485,7 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
       mutator.execute(taskState);
     }
 
-    LOG.info("Performing update on " + taskStates.size() + " tasks.");
     long startNanos = System.nanoTime();
-
     final Iterator<ScheduledTask> tasks = taskStates.iterator();
     jdbcTemplate.batchUpdate("UPDATE task_state SET owner = ?, job_name = ?,"
                              + " job_key = ?, slave_host = ?, shard_id = ?, status = ?,"
@@ -501,8 +504,12 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
             return taskStates.size();
           }
         });
-    LOG.info("Update completed in "
-        + Amount.of(System.nanoTime() - startNanos, Time.NANOSECONDS).as(Time.MILLISECONDS) + "ms");
+
+    long durationNanos = System.nanoTime() - startNanos;
+    if (durationNanos >= SLOW_QUERY_THRESHOLD_NS) {
+      LOG.warning("Slow update of " + taskStates.size() + " tasks took "
+          + Amount.of(durationNanos, Time.NANOSECONDS).as(Time.MILLISECONDS) + " ms");
+    }
 
     // TODO(John Sirois): detect real mutations, some or all of these may have been noops
     vars.tasksMutated.addAndGet(taskStates.size());
@@ -572,8 +579,12 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
 
     Iterable<ScheduledTask> postFiltered = query.hasPostFilter()
         ? Iterables.filter(results, query.postFilter()) : results;
-    LOG.info("Query '" + rawQuery + "' completed in "
-        + Amount.of(System.nanoTime() - startNanos, Time.NANOSECONDS).as(Time.MILLISECONDS) + "ms");
+
+    long durationNanos = System.nanoTime() - startNanos;
+    if (durationNanos >= SLOW_QUERY_THRESHOLD_NS) {
+      LOG.warning("Slow query '" + rawQuery + "' completed in "
+          + Amount.of(durationNanos, Time.NANOSECONDS).as(Time.MILLISECONDS) + "ms");
+    }
 
     return postFiltered;
   }
