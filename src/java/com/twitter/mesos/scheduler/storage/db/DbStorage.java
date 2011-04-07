@@ -541,8 +541,11 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
     StringBuilder sqlBuilder = new StringBuilder("SELECT scheduled_task FROM task_state");
 
     WhereClauseBuilder whereClauseBuilder = createWhereClause(query);
+    String rawQuery = whereClauseBuilder.appendWhereClause(sqlBuilder).toString();
+
+    long queryStart = System.nanoTime();
     List<ScheduledTask> results = jdbcTemplate.query(
-        whereClauseBuilder.appendWhereClause(sqlBuilder).toString(),
+        rawQuery,
         whereClauseBuilder.parameters(),
         whereClauseBuilder.parameterTypes(),
         new RowMapper<ScheduledTask>() {
@@ -559,7 +562,16 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
             return scheduledTask;
           }
         });
-    return query.hasPostFilter() ? Iterables.filter(results, query.postFilter()) : results;
+    long queryDuration = System.nanoTime() - queryStart;
+
+    long postFilterStart = System.nanoTime();
+    Iterable<ScheduledTask> postFiltered = query.hasPostFilter()
+        ? Iterables.filter(results, query.postFilter()) : results;
+    long postFilterDuration = System.nanoTime() - postFilterStart;
+    LOG.info("Query '" + rawQuery + "' completed in " + queryDuration + "ns, and took "
+        + postFilterDuration + "ns to post-filter");
+
+    return postFiltered;
   }
 
   /**
@@ -609,7 +621,7 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
     }
   }
 
-  private WhereClauseBuilder createWhereClause(Query query) {
+  private static WhereClauseBuilder createWhereClause(Query query) {
     // TODO(John Sirois): investigate using:
     // org.springframework.jdbc.core.namedparam.MapSqlParameterSource
     WhereClauseBuilder whereClauseBuilder = new WhereClauseBuilder();
