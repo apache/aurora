@@ -7,7 +7,12 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.annotation.Nullable;
+
+import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
@@ -28,6 +33,7 @@ import org.apache.mesos.SchedulerDriver;
 import com.twitter.common.base.Closure;
 import com.twitter.common.stats.Stats;
 import com.twitter.mesos.StateTranslator;
+import com.twitter.mesos.Tasks;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.ExecutorMessage;
@@ -159,8 +165,20 @@ class MesosSchedulerImpl implements Scheduler {
       return;
     }
 
+    if (!scheduledTasks.isEmpty()) {
+      LOG.info(String.format("Accepting offer %s, to launch tasks %s", offerId.getValue(),
+          ImmutableSet.copyOf(Iterables.transform(scheduledTasks, TASK_TO_ID))));
+    }
+
     driver.replyToOffer(offerId, scheduledTasks);
   }
+
+  private static final Function<TaskDescription, String> TASK_TO_ID =
+      new Function<TaskDescription, String>() {
+        @Override public String apply(TaskDescription task) {
+          return task.getTaskId().getValue();
+        }
+      };
 
   @Override
   public void offerRescinded(SchedulerDriver schedulerDriver, OfferID offerID) {

@@ -25,7 +25,7 @@ import org.joda.time.format.DateTimeFormatter;
 public class LogFormatter extends Formatter {
 
   private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormat.forPattern(
-    "MMdd kk:mm:ss.SSS"
+    "MMdd HH:mm:ss.SSS"
   ).withZone(DateTimeZone.UTC);
 
   /**
