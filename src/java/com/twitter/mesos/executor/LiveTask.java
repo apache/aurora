@@ -122,7 +122,7 @@ public class LiveTask extends TaskOnDisk {
 
     stateMachine = StateMachine.<ScheduleStatus>builder(toString())
           .initialState(STARTING)
-          .addState(STARTING, RUNNING, FAILED)
+          .addState(STARTING, RUNNING, FAILED, KILLED)
           .addState(RUNNING, FINISHED, FAILED, KILLED, LOST)
           .build();
   }
