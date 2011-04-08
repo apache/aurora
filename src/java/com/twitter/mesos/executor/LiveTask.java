@@ -462,9 +462,6 @@ public class LiveTask extends TaskOnDisk {
       }
     }
 
-    if (process == null) {
-      return;
-    }
     ScheduleStatus currentStatus = stateMachine.getState();
     if (Tasks.isTerminated(currentStatus)) {
       LOG.info("Task " + this + " is already terminated, not changing state to " + terminalState);
@@ -473,6 +470,10 @@ public class LiveTask extends TaskOnDisk {
 
     LOG.info("Terminating task " + this);
     setStatus(terminalState);
+
+    if (process == null) {
+      return;
+    }
 
     if (killCommand != null) {
       try {
