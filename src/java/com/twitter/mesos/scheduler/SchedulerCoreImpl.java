@@ -242,7 +242,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
    * @param task Task that an ID is being generated for.
    * @return New task ID.
    */
-  private String generateTaskId(TwitterTaskInfo task) {
+  private static String generateTaskId(TwitterTaskInfo task) {
     return new StringBuilder()
         .append(System.currentTimeMillis())      // Allows chronological sorting.
         .append("-")

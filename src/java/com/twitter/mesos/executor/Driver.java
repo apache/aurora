@@ -2,8 +2,10 @@ package com.twitter.mesos.executor;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
+import com.google.inject.Inject;
 import com.google.protobuf.ByteString;
 
+import com.twitter.common.application.Lifecycle;
 import com.twitter.common.stats.Stats;
 import com.twitter.mesos.Message;
 import com.twitter.mesos.StateTranslator;
@@ -21,6 +23,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Abstraction away from the mesos executor driver.
@@ -62,6 +66,13 @@ public interface Driver extends Function<Message, Integer> {
     private final AtomicLong messagesSent = Stats.exportLong("executor_framework_messages_sent");
     private final AtomicLong messagesFailed =
         Stats.exportLong("executor_framework_messages_failed");
+
+    private final Lifecycle lifecycle;
+
+    @Inject
+    public DriverImpl(Lifecycle lifecycle) {
+      this.lifecycle = checkNotNull(lifecycle);
+    }
 
     @Override
     public void init(ExecutorDriver driver, ExecutorArgs executorArgs) {
@@ -116,7 +127,8 @@ public interface Driver extends Function<Message, Integer> {
       });
 
       if (result != 0) {
-        LOG.warning("Attempt to send message failed with code " + result);
+        LOG.severe("Attempt to send message failed with code " + result + ", committing suicide.");
+        lifecycle.shutdown();
       }
 
       return result;
