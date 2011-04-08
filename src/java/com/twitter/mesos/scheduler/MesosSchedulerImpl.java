@@ -7,8 +7,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.annotation.Nullable;
-
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
@@ -30,10 +28,12 @@ import org.apache.mesos.Protos.TaskStatus;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
 
+import com.twitter.common.application.Lifecycle;
 import com.twitter.common.base.Closure;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
 import com.twitter.mesos.StateTranslator;
-import com.twitter.mesos.Tasks;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.ExecutorMessage;
@@ -59,6 +59,8 @@ class MesosSchedulerImpl implements Scheduler {
 
   private static final String TWITTER_EXECUTOR_ID = "twitter";
 
+  private static final Amount<Long, Time> MAX_REGISTRATION_DELAY = Amount.of(10L, Time.SECONDS);
+
   /**
    * Binding annotation for the path to the executor binary.
    */
@@ -70,15 +72,34 @@ class MesosSchedulerImpl implements Scheduler {
   private final SchedulerCore schedulerCore;
 
   private final ExecutorTracker executorTracker;
-  private FrameworkID frameworkID;
+  private volatile FrameworkID frameworkID = null;
   private final String executorPath;
 
   @Inject
   public MesosSchedulerImpl(SchedulerCore schedulerCore, ExecutorTracker executorTracker,
-      @ExecutorPath String executorPath) {
+      @ExecutorPath String executorPath, final Lifecycle lifecycle) {
     this.schedulerCore = checkNotNull(schedulerCore);
     this.executorTracker = checkNotNull(executorTracker);
     this.executorPath = checkNotBlank(executorPath);
+
+    // TODO(William Farner): Clean this up.
+    Thread registrationChecker = new Thread() {
+      @Override public void run() {
+        try {
+          Thread.currentThread().sleep(MAX_REGISTRATION_DELAY.as(Time.MILLISECONDS));
+        } catch (InterruptedException e) {
+          LOG.log(Level.WARNING, "Delayed registration check interrupted.", e);
+          Thread.currentThread().interrupt();
+        }
+
+        if (frameworkID == null) {
+          LOG.severe("Framework has not been registered within the tolerated delay, quitting.");
+          lifecycle.shutdown();
+        }
+      }
+    };
+    registrationChecker.setDaemon(true);
+    registrationChecker.start();
   }
 
   @Override
