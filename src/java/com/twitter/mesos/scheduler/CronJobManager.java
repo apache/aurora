@@ -58,6 +58,7 @@ public class CronJobManager extends JobManager {
   public CronJobManager(@StorageRole(Role.Primary) Storage storage) {
     this.storage = Preconditions.checkNotNull(storage);
 
+    scheduler.setDaemon(true);
     scheduler.start();
   }
 

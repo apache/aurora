@@ -146,7 +146,8 @@ public interface SchedulingFilter {
         @Override public boolean apply(ScheduledTask task) {
           Collection<ScheduledTask> tasks = tasksOnHostByJob.get(Tasks.jobKey(task));
 
-          int maxPerHost = !task.getAssignedTask().getTask().isSetMaxPerHost() ? 1
+          TwitterTaskInfo taskInfo = task.getAssignedTask().getTask();
+          int maxPerHost = (!taskInfo.isSetMaxPerHost() || taskInfo.getMaxPerHost() == 0) ? 1
               : task.getAssignedTask().getTask().getMaxPerHost();
 
           return (tasks != null) && (tasks.size() < maxPerHost)

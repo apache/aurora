@@ -1,17 +1,5 @@
 package com.twitter.mesos.scheduler;
 
-import java.io.File;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Logger;
-
-import javax.annotation.Nullable;
-
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.AbstractModule;
@@ -21,17 +9,6 @@ import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 import com.google.inject.multibindings.Multibinder;
 import com.google.inject.name.Names;
-
-import org.apache.mesos.MesosSchedulerDriver;
-import org.apache.mesos.Protos.FrameworkID;
-import org.apache.mesos.Protos.TaskID;
-import org.apache.mesos.Scheduler;
-import org.apache.mesos.SchedulerDriver;
-import org.apache.zookeeper.server.NIOServerCnxn;
-import org.apache.zookeeper.server.ZooKeeperServer;
-import org.apache.zookeeper.server.ZooKeeperServer.BasicDataTreeBuilder;
-import org.apache.zookeeper.server.persistence.FileTxnSnapLog;
-
 import com.twitter.common.application.ActionRegistry;
 import com.twitter.common.application.ShutdownStage;
 import com.twitter.common.application.http.Registration;
@@ -53,11 +30,12 @@ import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.common.zookeeper.ZooKeeperUtils;
 import com.twitter.common_internal.cuckoo.CuckooWriter;
 import com.twitter.common_internal.zookeeper.TwitterZk;
-import com.twitter.mesos.scheduler.httphandlers.HttpAssets;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.ExecutorPath;
+import com.twitter.mesos.scheduler.PulseMonitor.PulseMonitorImpl;
 import com.twitter.mesos.scheduler.SchedulingFilter.SchedulingFilterImpl;
 import com.twitter.mesos.scheduler.httphandlers.CreateJob;
+import com.twitter.mesos.scheduler.httphandlers.HttpAssets;
 import com.twitter.mesos.scheduler.httphandlers.Mname;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzHome;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzJob;
@@ -65,6 +43,26 @@ import com.twitter.mesos.scheduler.httphandlers.SchedulerzUser;
 import com.twitter.mesos.scheduler.storage.Migrator;
 import com.twitter.mesos.scheduler.storage.StorageRole;
 import com.twitter.mesos.scheduler.storage.stream.StreamStorageModule;
+import org.apache.mesos.MesosSchedulerDriver;
+import org.apache.mesos.Protos.FrameworkID;
+import org.apache.mesos.Protos.TaskID;
+import org.apache.mesos.Scheduler;
+import org.apache.mesos.SchedulerDriver;
+import org.apache.zookeeper.server.NIOServerCnxn;
+import org.apache.zookeeper.server.ZooKeeperServer;
+import org.apache.zookeeper.server.ZooKeeperServer.BasicDataTreeBuilder;
+import org.apache.zookeeper.server.persistence.FileTxnSnapLog;
+
+import javax.annotation.Nullable;
+import java.io.File;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Logger;
 
 public class SchedulerModule extends AbstractModule {
   private static final Logger LOG = Logger.getLogger(SchedulerModule.class.getName());
@@ -124,6 +122,11 @@ public class SchedulerModule extends AbstractModule {
   @CmdLine(name = "cuckoo_source_id", help = "Cuckoo stat source ID.")
   private static final Arg<String> CUCKOO_SOURCE_ID = Arg.create("mesos_scheduler");
 
+  @CmdLine(name = "executor_dead_threashold", help =
+      "Time after which the scheduler will consider an executor dead and attempt to revive it.")
+  private static final Arg<Amount<Long, Time>> EXECUTOR_DEAD_THRESHOLD =
+      Arg.create(Amount.of(10L, Time.MINUTES));
+
   @Override
   protected void configure() {
     // Enable intercepted method timings
@@ -136,6 +139,8 @@ public class SchedulerModule extends AbstractModule {
     // Bindings for SchedulerCoreImpl.
     bind(CronJobManager.class).in(Singleton.class);
     bind(ImmediateJobManager.class).in(Singleton.class);
+    bind(new TypeLiteral<PulseMonitor<String>>() {})
+        .toInstance(new PulseMonitorImpl<String>(EXECUTOR_DEAD_THRESHOLD.get()));
 
     if (upgradeStorage.get()) {
       // Both StreamStorageModule and the Migrator need a binding for the Set of installed job

@@ -95,12 +95,14 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private SchedulerCoreImpl scheduler;
   private CronJobManager cron;
   private Function<String, TwitterTaskInfo> updateTaskBuilder;
+  private PulseMonitor<String> executorPulseMonitor;
 
   @Before
   public void setUp() throws Exception {
     schedulingFilter = createMock(SchedulingFilter.class);
     killTask = createMock(new Clazz<Closure<String>>() {});
     updateTaskBuilder = createMock(new Clazz<Function<String, TwitterTaskInfo>>() {});
+    executorPulseMonitor = createMock(new Clazz<PulseMonitor<String>>() {});
   }
 
   /**
@@ -135,7 +137,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     cron = new CronJobManager(storage);
 
     scheduler = new SchedulerCoreImpl(cron, immediateManager, storage, schedulingFilter,
-        updateTaskBuilder);
+        updateTaskBuilder, executorPulseMonitor);
     cron.schedulerCore = scheduler;
     immediateManager.schedulerCore = scheduler;
     scheduler.initialize();
@@ -702,6 +704,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     expectRestore();
     expectPersists(3);
     expectOffer(true);
+    executorPulseMonitor.pulse(SLAVE_HOST_1);
 
     control.replay();
     buildScheduler();
@@ -740,6 +743,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     expectPersists(6);
     expectOffer(true);
     expectOffer(true);
+    executorPulseMonitor.pulse(SLAVE_HOST_1);
 
     control.replay();
     buildScheduler();
@@ -782,6 +786,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     expectPersists(6);
     expectOffer(true);
     expectOffer(true);
+    executorPulseMonitor.pulse(SLAVE_HOST_2);
 
     control.replay();
     buildScheduler();
@@ -821,6 +826,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     expectOffer(true);
     expectOffer(true);
     expectOffer(true);
+    executorPulseMonitor.pulse(SLAVE_HOST_1);
+    executorPulseMonitor.pulse(SLAVE_HOST_2);
 
     control.replay();
     buildScheduler();
@@ -1742,6 +1749,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   }
 
   private void expectOffer(boolean passFilter) {
+    expect(executorPulseMonitor.isAlive((String) anyObject())).andReturn(true);
     expect(schedulingFilter.makeFilter((TwitterTaskInfo) anyObject(), (String) anyObject()))
         .andReturn(passFilter ? Predicates.<ScheduledTask>alwaysTrue()
         : Predicates.<ScheduledTask>alwaysFalse());

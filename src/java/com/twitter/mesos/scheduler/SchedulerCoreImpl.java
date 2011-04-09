@@ -1,18 +1,5 @@
 package com.twitter.mesos.scheduler;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Set;
-import java.util.SortedSet;
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
-import javax.annotation.Nullable;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
@@ -27,10 +14,6 @@ import com.google.common.collect.MapMaker;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
-
-import org.apache.mesos.Protos.Resource;
-import org.apache.mesos.Protos.SlaveOffer;
-
 import com.twitter.common.base.Closure;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -60,6 +43,20 @@ import com.twitter.mesos.scheduler.storage.Storage.Work;
 import com.twitter.mesos.scheduler.storage.StorageRole;
 import com.twitter.mesos.scheduler.storage.StorageRole.Role;
 import com.twitter.mesos.scheduler.storage.TaskStore;
+import org.apache.mesos.Protos.Resource;
+import org.apache.mesos.Protos.SlaveOffer;
+
+import javax.annotation.Nullable;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -117,6 +114,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
   @VisibleForTesting final Map<String, JobUpdate> updatesInProgress = Maps.newHashMap();
 
   private final Function<String, TwitterTaskInfo> updaterTaskBuilder;
+  private final PulseMonitor<String> executorPulseMonitor;
 
   enum State {
     CONSTRUCTED,
@@ -132,7 +130,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
       ImmediateJobManager immediateScheduler,
       @StorageRole(Role.Primary) Storage storage,
       SchedulingFilter schedulingFilter,
-      Function<String, TwitterTaskInfo> updaterTaskBuilder) {
+      Function<String, TwitterTaskInfo> updaterTaskBuilder,
+      PulseMonitor<String> executorPulseMonitor) {
 
     // The immediate scheduler will accept any job, so it's important that other schedulers are
     // placed first.
@@ -142,6 +141,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     this.storage = checkNotNull(storage);
     this.schedulingFilter = checkNotNull(schedulingFilter);
     this.updaterTaskBuilder = checkNotNull(updaterTaskBuilder);
+    this.executorPulseMonitor = checkNotNull(executorPulseMonitor);
 
    // TODO(John Sirois): Add a method to StateMachine or write a wrapper that allows for a read-locked
    // do-in-state assertion around a block of work.  Transition would then need to grab the write
@@ -263,6 +263,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
     checkNotNull(update);
     checkNotBlank(update.getSlaveHost());
     checkNotNull(update.getTaskInfos());
+
+    executorPulseMonitor.pulse(update.getSlaveHost());
 
     List<LiveTaskInfo> taskInfos = update.isSetTaskInfos() ? update.getTaskInfos()
         : Arrays.<LiveTaskInfo>asList();
@@ -600,6 +602,16 @@ public class SchedulerCoreImpl implements SchedulerCore {
     };
   }
 
+  private static final TwitterTaskInfo makeBootstrapTask() {
+    return new TwitterTaskInfo()
+        .setOwner("mesos")
+        .setJobName("executor_bootstrap")
+        .setNumCpus(1)
+        .setRamMb(512)
+        .setShardId(0)
+        .setStartCommand("echo \"Bootstrapping\"");
+  }
+
   @Override
   public synchronized TwitterTask offer(final SlaveOffer slaveOffer) throws ScheduleException {
     checkStarted();
@@ -619,19 +631,28 @@ public class SchedulerCoreImpl implements SchedulerCore {
       @Override public ScheduledTask apply(SchedulerStore schedulerStore, JobStore jobStore,
           TaskStore taskStore) {
 
-        SortedSet<ScheduledTask> candidates = taskStore.fetch(
-            Query.and(Query.byStatus(PENDING),
-                schedulingFilter.makeFilter(offer, slaveOffer.getHostname())));
+        String taskId;
+        if (!executorPulseMonitor.isAlive(slaveOffer.getHostname())) {
+          LOG.info("Pulse monitor considers executor dead, launching bootstrap task on: "
+              + slaveOffer.getHostname());
+          executorPulseMonitor.pulse(slaveOffer.getHostname());
+          taskId = Iterables.getOnlyElement(launchTasks(ImmutableSet.of(makeBootstrapTask())));
+        } else {
+          SortedSet<ScheduledTask> candidates = taskStore.fetch(
+              Query.and(Query.byStatus(PENDING),
+                  schedulingFilter.makeFilter(offer, slaveOffer.getHostname())));
 
-        if (candidates.isEmpty()) {
-          return null;
+          if (candidates.isEmpty()) {
+            return null;
+          }
+
+          LOG.info("Found " + candidates.size() + " candidates for offer.");
+
+          // Choose the first (top) candidate.
+          taskId = Tasks.id(Iterables.get(candidates, 0));
         }
 
-        LOG.info("Found " + candidates.size() + " candidates for offer.");
-
-        // Choose the first (top) candidate and launch it.
-        return Iterables.getOnlyElement(taskStore.mutate(
-            Query.byId(Tasks.id(Iterables.get(candidates, 0))),
+        return Iterables.getOnlyElement(taskStore.mutate(Query.byId(taskId),
             taskLauncher(slaveOffer.getSlaveId().getValue(), slaveOffer.getHostname())));
       }
     });
