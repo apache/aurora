@@ -185,6 +185,13 @@ public class SchedulerMain extends AbstractApplication {
           }
         }
     ).start();
+
+    shutdownRegistry.addAction(new Command() {
+      @Override public void execute() {
+        LOG.info("Stopping mesos driver.");
+        driver.stop();
+      }
+    });
   }
 
   private int startThriftServer() throws IOException, TTransportException,
@@ -193,8 +200,7 @@ public class SchedulerMain extends AbstractApplication {
         new MesosSchedulerManager.Processor(schedulerThriftInterface));
 
     shutdownRegistry.addAction(new Command() {
-      @Override
-      public void execute() {
+      @Override public void execute() {
         LOG.info("Stopping thrift server.");
         schedulerThriftInterface.shutdown();
       }

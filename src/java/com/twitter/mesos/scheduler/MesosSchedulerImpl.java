@@ -59,7 +59,7 @@ class MesosSchedulerImpl implements Scheduler {
 
   private static final String TWITTER_EXECUTOR_ID = "twitter";
 
-  private static final Amount<Long, Time> MAX_REGISTRATION_DELAY = Amount.of(10L, Time.SECONDS);
+  private static final Amount<Long, Time> MAX_REGISTRATION_DELAY = Amount.of(1L, Time.MINUTES);
 
   /**
    * Binding annotation for the path to the executor binary.
