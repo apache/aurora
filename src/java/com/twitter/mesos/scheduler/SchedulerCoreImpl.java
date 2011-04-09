@@ -320,7 +320,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
             : taskStore.fetchIds(new Query(new TaskQuery().setTaskIds(reportedDeadTasks),
             Tasks.ACTIVE_FILTER));
         if (!deadTasks.isEmpty()) {
-          LOG.info("Found tasks that were recorded as RUNNING but slave " + update.getSlaveHost()
+          LOG.info("Found tasks that were recorded as active but slave " + update.getSlaveHost()
                    + " reports as KILLED: " + deadTasks);
           // We don't set mutated here, since it is implicit in changing task state.
 
@@ -349,7 +349,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
         Set<String> missingNotRunningTasks = taskStore.fetchIds(new Query(slaveAssignedTaskQuery,
             ImmutableList.<Predicate<ScheduledTask>>builder()
               .add(Predicates.not(isTaskReported))
-              .add(Predicates.not(Tasks.hasStatus(RUNNING)))
+              .add(Predicates.not(Tasks.ACTIVE_FILTER))
               .add(lastEventBeyondGracePeriod)
               .build()));
         if (!missingNotRunningTasks.isEmpty()) {
@@ -361,7 +361,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
         Set<String> missingRunningTasks = taskStore.fetchIds(new Query(slaveAssignedTaskQuery,
             Predicates.<ScheduledTask>and(
                 Predicates.not(isTaskReported),
-                Tasks.hasStatus(RUNNING))));
+                Tasks.ACTIVE_FILTER)));
         if (!missingRunningTasks.isEmpty()) {
           LOG.info("Slave " + update.getSlaveHost() + " no longer reports running tasks: "
                    + missingRunningTasks + ", reporting as LOST.");
