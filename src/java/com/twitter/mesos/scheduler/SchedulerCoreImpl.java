@@ -19,6 +19,7 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
+import com.twitter.common.util.Clock;
 import com.twitter.common.util.StateMachine;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
@@ -87,6 +88,9 @@ import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.STOPPED;
  */
 public class SchedulerCoreImpl implements SchedulerCore {
 
+  @VisibleForTesting
+  static final Amount<Long, Time> MISSING_TASK_GRACE_PERIOD = Amount.of(10L, Time.MINUTES);
+
   private final Map<String, VolatileTaskState> taskStateById =
       new MapMaker().makeComputingMap(new Function<String, VolatileTaskState>() {
         @Override public VolatileTaskState apply(String taskId) {
@@ -115,6 +119,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
   private final Function<String, TwitterTaskInfo> updaterTaskBuilder;
   private final PulseMonitor<String> executorPulseMonitor;
+  private final Clock clock;
 
   enum State {
     CONSTRUCTED,
@@ -132,6 +137,18 @@ public class SchedulerCoreImpl implements SchedulerCore {
       SchedulingFilter schedulingFilter,
       Function<String, TwitterTaskInfo> updaterTaskBuilder,
       PulseMonitor<String> executorPulseMonitor) {
+    this(cronScheduler, immediateScheduler, storage, schedulingFilter, updaterTaskBuilder,
+        executorPulseMonitor, Clock.SYSTEM_CLOCK);
+  }
+
+  public SchedulerCoreImpl(CronJobManager cronScheduler,
+      ImmediateJobManager immediateScheduler,
+      Storage storage,
+      SchedulingFilter schedulingFilter,
+      Function<String, TwitterTaskInfo> updaterTaskBuilder,
+      PulseMonitor<String> executorPulseMonitor,
+      Clock clock) {
+
 
     // The immediate scheduler will accept any job, so it's important that other schedulers are
     // placed first.
@@ -142,6 +159,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     this.schedulingFilter = checkNotNull(schedulingFilter);
     this.updaterTaskBuilder = checkNotNull(updaterTaskBuilder);
     this.executorPulseMonitor = checkNotNull(executorPulseMonitor);
+    this.clock = checkNotNull(clock);
 
    // TODO(John Sirois): Add a method to StateMachine or write a wrapper that allows for a read-locked
    // do-in-state assertion around a block of work.  Transition would then need to grab the write
@@ -242,11 +260,11 @@ public class SchedulerCoreImpl implements SchedulerCore {
    * @param task Task that an ID is being generated for.
    * @return New task ID.
    */
-  private static String generateTaskId(TwitterTaskInfo task) {
+  private String generateTaskId(TwitterTaskInfo task) {
     return new StringBuilder()
-        .append(System.currentTimeMillis())      // Allows chronological sorting.
+        .append(clock.nowMillis())               // Allows chronological sorting.
         .append("-")
-        .append(jobKey(task))              // Identification and collision prevention.
+        .append(jobKey(task))                    // Identification and collision prevention.
         .append("-")
         .append(task.getShardId())               // Collision prevention within job.
         .append("-")
@@ -339,34 +357,45 @@ public class SchedulerCoreImpl implements SchedulerCore {
         };
         Predicate<ScheduledTask> lastEventBeyondGracePeriod = new Predicate<ScheduledTask>() {
           @Override public boolean apply(ScheduledTask task) {
-            long taskAgeMillis = System.currentTimeMillis()
+            long taskAgeMillis = clock.nowMillis()
                 - Iterables.getLast(task.getTaskEvents()).getTimestamp();
-            return taskAgeMillis > Amount.of(10, Time.MINUTES).as(Time.MILLISECONDS);
+            return taskAgeMillis > MISSING_TASK_GRACE_PERIOD.as(Time.MILLISECONDS);
           }
         };
 
         TaskQuery slaveAssignedTaskQuery = new TaskQuery().setSlaveHost(update.getSlaveHost());
-        Set<String> missingNotRunningTasks = taskStore.fetchIds(new Query(slaveAssignedTaskQuery,
+        Set<String> missingInactiveTasks = taskStore.fetchIds(new Query(slaveAssignedTaskQuery,
             ImmutableList.<Predicate<ScheduledTask>>builder()
               .add(Predicates.not(isTaskReported))
               .add(Predicates.not(Tasks.ACTIVE_FILTER))
               .add(lastEventBeyondGracePeriod)
               .build()));
-        if (!missingNotRunningTasks.isEmpty()) {
-          LOG.info("Removing non-running tasks no longer reported by slave " + update.getSlaveHost()
-                   + ": " + missingNotRunningTasks);
-          taskStore.remove(missingNotRunningTasks);
+        if (!missingInactiveTasks.isEmpty()) {
+          LOG.info("Removing inactive tasks no longer reported by slave " + update.getSlaveHost()
+                   + ": " + missingInactiveTasks);
+          taskStore.remove(missingInactiveTasks);
         }
 
         Set<String> missingRunningTasks = taskStore.fetchIds(new Query(slaveAssignedTaskQuery,
             Predicates.<ScheduledTask>and(
                 Predicates.not(isTaskReported),
-                Tasks.ACTIVE_FILTER)));
+                Tasks.hasStatus(RUNNING))));
         if (!missingRunningTasks.isEmpty()) {
-          LOG.info("Slave " + update.getSlaveHost() + " no longer reports running tasks: "
+          LOG.info("Slave " + update.getSlaveHost() + " no longer reports RUNNING tasks: "
                    + missingRunningTasks + ", reporting as LOST.");
-
           setTaskStatus(Query.byId(missingRunningTasks), LOST, "Slave stopped reporting.");
+        }
+
+        Set<String> missingStartingTasks = taskStore.fetchIds(new Query(slaveAssignedTaskQuery,
+            ImmutableList.<Predicate<ScheduledTask>>builder()
+              .add(Predicates.not(isTaskReported))
+              .add(Predicates.not(Tasks.hasStatus(STARTING)))
+              .add(lastEventBeyondGracePeriod)
+              .build()));
+        if (!missingStartingTasks.isEmpty()) {
+          LOG.info("Slave " + update.getSlaveHost() + " no longer reports STARTING tasks: "
+                   + missingStartingTasks + ", reporting as LOST.");
+          setTaskStatus(Query.byId(missingStartingTasks), LOST, "Slave stopped reporting.");
         }
       }
     });
@@ -602,7 +631,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     };
   }
 
-  private static final TwitterTaskInfo makeBootstrapTask() {
+  private static TwitterTaskInfo makeBootstrapTask() {
     return new TwitterTaskInfo()
         .setOwner("mesos")
         .setJobName("executor_bootstrap")
@@ -637,6 +666,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
               + slaveOffer.getHostname());
           executorPulseMonitor.pulse(slaveOffer.getHostname());
           taskId = Iterables.getOnlyElement(launchTasks(ImmutableSet.of(makeBootstrapTask())));
+          vars.executorBootstraps.incrementAndGet();
         } else {
           SortedSet<ScheduledTask> candidates = taskStore.fetch(
               Query.and(Query.byStatus(PENDING),
@@ -718,11 +748,11 @@ public class SchedulerCoreImpl implements SchedulerCore {
    * @param message Optional message to add to the status change.
    * @return A reference to the task.
    */
-  private static ScheduledTask changeTaskStatus(ScheduledTask task, ScheduleStatus status,
+  private ScheduledTask changeTaskStatus(ScheduledTask task, ScheduleStatus status,
       @Nullable String message) {
     task.setStatus(status);
     task.addToTaskEvents(new TaskEvent()
-        .setTimestamp(System.currentTimeMillis()).setStatus(status).setMessage(message));
+        .setTimestamp(clock.nowMillis()).setStatus(status).setMessage(message));
     return task;
   }
 
@@ -927,7 +957,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     String updateToken = new StringBuilder()
         .append(jobKey)
         .append("-")
-        .append(System.currentTimeMillis())
+        .append(clock.nowMillis())
         .append("-")
         .append((UUID.randomUUID()))
         .toString();
@@ -1166,6 +1196,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
   private final class Vars {
     final AtomicLong resourceOffers = Stats.exportLong("scheduler_resource_offers");
+    final AtomicLong executorBootstraps = Stats.exportLong("executor_bootstraps");
 
     Vars() {
       for (final ScheduleStatus status : ScheduleStatus.values()) {

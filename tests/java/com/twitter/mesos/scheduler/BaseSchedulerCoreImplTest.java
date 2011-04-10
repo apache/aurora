@@ -11,6 +11,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.twitter.common.base.Closure;
 import com.twitter.common.testing.EasyMockTest;
+import com.twitter.common.util.testing.FakeClock;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.CronCollisionPolicy;
 import com.twitter.mesos.gen.JobConfiguration;
@@ -28,7 +29,6 @@ import com.twitter.mesos.scheduler.SchedulerCore.UpdateException;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import com.twitter.mesos.scheduler.storage.Storage;
-
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.Resource.Scalar;
 import org.apache.mesos.Protos.Resource.Type;
@@ -96,6 +96,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private CronJobManager cron;
   private Function<String, TwitterTaskInfo> updateTaskBuilder;
   private PulseMonitor<String> executorPulseMonitor;
+  private FakeClock clock;
 
   @Before
   public void setUp() throws Exception {
@@ -103,6 +104,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     killTask = createMock(new Clazz<Closure<String>>() {});
     updateTaskBuilder = createMock(new Clazz<Function<String, TwitterTaskInfo>>() {});
     executorPulseMonitor = createMock(new Clazz<PulseMonitor<String>>() {});
+    clock = new FakeClock();
   }
 
   /**
@@ -137,7 +139,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     cron = new CronJobManager(storage);
 
     scheduler = new SchedulerCoreImpl(cron, immediateManager, storage, schedulingFilter,
-        updateTaskBuilder, executorPulseMonitor);
+        updateTaskBuilder, executorPulseMonitor, clock);
     cron.schedulerCore = scheduler;
     immediateManager.schedulerCore = scheduler;
     scheduler.initialize();

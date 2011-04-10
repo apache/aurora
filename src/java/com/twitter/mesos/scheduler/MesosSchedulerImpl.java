@@ -1,12 +1,5 @@
 package com.twitter.mesos.scheduler;
 
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
@@ -15,19 +8,6 @@ import com.google.common.collect.Lists;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
 import com.google.protobuf.ByteString;
-
-import org.apache.mesos.Protos.ExecutorID;
-import org.apache.mesos.Protos.ExecutorInfo;
-import org.apache.mesos.Protos.FrameworkID;
-import org.apache.mesos.Protos.OfferID;
-import org.apache.mesos.Protos.SlaveID;
-import org.apache.mesos.Protos.SlaveOffer;
-import org.apache.mesos.Protos.TaskDescription;
-import org.apache.mesos.Protos.TaskID;
-import org.apache.mesos.Protos.TaskStatus;
-import org.apache.mesos.Scheduler;
-import org.apache.mesos.SchedulerDriver;
-
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.base.Closure;
 import com.twitter.common.quantity.Amount;
@@ -41,6 +21,24 @@ import com.twitter.mesos.gen.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.RestartExecutor;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.SchedulerMessage;
+import org.apache.mesos.Protos.ExecutorID;
+import org.apache.mesos.Protos.ExecutorInfo;
+import org.apache.mesos.Protos.FrameworkID;
+import org.apache.mesos.Protos.OfferID;
+import org.apache.mesos.Protos.SlaveID;
+import org.apache.mesos.Protos.SlaveOffer;
+import org.apache.mesos.Protos.TaskDescription;
+import org.apache.mesos.Protos.TaskID;
+import org.apache.mesos.Protos.TaskStatus;
+import org.apache.mesos.Scheduler;
+import org.apache.mesos.SchedulerDriver;
+
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
@@ -86,7 +84,7 @@ class MesosSchedulerImpl implements Scheduler {
     Thread registrationChecker = new Thread() {
       @Override public void run() {
         try {
-          Thread.currentThread().sleep(MAX_REGISTRATION_DELAY.as(Time.MILLISECONDS));
+          Thread.sleep(MAX_REGISTRATION_DELAY.as(Time.MILLISECONDS));
         } catch (InterruptedException e) {
           LOG.log(Level.WARNING, "Delayed registration check interrupted.", e);
           Thread.currentThread().interrupt();
@@ -188,16 +186,16 @@ class MesosSchedulerImpl implements Scheduler {
 
     if (!scheduledTasks.isEmpty()) {
       LOG.info(String.format("Accepting offer %s, to launch tasks %s", offerId.getValue(),
-          ImmutableSet.copyOf(Iterables.transform(scheduledTasks, TASK_TO_ID))));
+          ImmutableSet.copyOf(Iterables.transform(scheduledTasks, TO_STRING))));
     }
 
     driver.replyToOffer(offerId, scheduledTasks);
   }
 
-  private static final Function<TaskDescription, String> TASK_TO_ID =
+  private static final Function<TaskDescription, String> TO_STRING =
       new Function<TaskDescription, String>() {
         @Override public String apply(TaskDescription task) {
-          return task.getTaskId().getValue();
+          return task.getTaskId().getValue() + " on " + task.getSlaveId().getValue();
         }
       };
 

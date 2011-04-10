@@ -1,20 +1,13 @@
 package com.twitter.mesos.scheduler.identity;
 
-import java.util.Map;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.lang.NegativeArraySizeException;
-
-import net.lag.jaramiko.PKey;
-import net.lag.jaramiko.Message;
-import net.lag.jaramiko.SSHException;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
+import com.twitter.common.collections.Pair;
 import net.lag.crai.Crai;
 import net.lag.craijce.CraiJCE;
-
-import com.google.common.collect.Multimap;
-import com.google.common.collect.HashMultimap;
-import com.twitter.common.collections.Pair;
+import net.lag.jaramiko.Message;
+import net.lag.jaramiko.PKey;
+import net.lag.jaramiko.SSHException;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -53,7 +46,7 @@ public class AuthorizedKeysManager {
   public int numberKeys(String role, String user) {
     checkNotNull(role);
     checkNotNull(user);
-    Pair key = Pair.of(role, user);
+    Pair<String, String> key = Pair.of(role, user);
     if (!rolesMap.containsKey(key)) return -1;
     return rolesMap.get(key).size();
   }

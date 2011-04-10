@@ -3,7 +3,7 @@ package com.twitter.mesos.scheduler;
 import com.google.inject.Inject;
 import com.twitter.mesos.gen.JobConfiguration;
 
-import java.util.Arrays;
+import java.util.Collections;
 
 /**
  * Interface for a job manager.  A job manager is responsible for deciding whether and when to
@@ -67,7 +67,7 @@ public abstract class JobManager {
    * @return Jobs stored by this job manager.
    */
   public Iterable<JobConfiguration> getJobs() {
-    return Arrays.asList();
+    return Collections.emptyList();
   }
 
   /**
