@@ -389,7 +389,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
         Set<String> missingStartingTasks = taskStore.fetchIds(new Query(slaveAssignedTaskQuery,
             ImmutableList.<Predicate<ScheduledTask>>builder()
               .add(Predicates.not(isTaskReported))
-              .add(Predicates.not(Tasks.hasStatus(STARTING)))
+              .add(Tasks.hasStatus(STARTING))
               .add(lastEventBeyondGracePeriod)
               .build()));
         if (!missingStartingTasks.isEmpty()) {
