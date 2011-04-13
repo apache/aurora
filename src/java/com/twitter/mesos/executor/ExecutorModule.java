@@ -2,7 +2,10 @@ package com.twitter.mesos.executor;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -30,10 +33,15 @@ import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.CanRead;
 import com.twitter.common.args.constraints.Exists;
 import com.twitter.common.args.constraints.NotNull;
+import com.twitter.common.base.Closure;
+import com.twitter.common.base.Closures;
 import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
+import com.twitter.common.logging.ScribeLog;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.common.thrift.ThriftFactory.ThriftFactoryException;
+import com.twitter.common_internal.cuckoo.CuckooWriter;
 import com.twitter.mesos.Message;
 import com.twitter.mesos.executor.Driver.DriverImpl;
 import com.twitter.mesos.executor.FileToInt.FetchException;
@@ -84,6 +92,21 @@ public class ExecutorModule extends AbstractModule {
       help = "Time to wait before escalating between task kill procedures.")
   private static final Arg<Amount<Long, Time>> killEscalationDelay =
       Arg.create(Amount.of(5L, Time.SECONDS));
+
+  @CmdLine(name = "cuckoo_scribe_endpoints",
+      help = "Cuckoo endpoints for stat export.  Leave empty to disable stat export.")
+  private static final Arg<List<InetSocketAddress>> CUCKOO_SCRIBE_ENDPOINTS = Arg.create(
+      Arrays.asList(InetSocketAddress.createUnresolved("localhost", 1463)));
+
+  @CmdLine(name = "cuckoo_scribe_category", help = "Scribe category to send cuckoo stats to.")
+  private static final Arg<String> CUCKOO_SCRIBE_CATEGORY =
+      Arg.create(CuckooWriter.DEFAULT_SCRIBE_CATEGORY);
+
+  @CmdLine(name = "cuckoo_service_id", help = "Cuckoo service ID.")
+  private static final Arg<String> CUCKOO_SERVICE_ID = Arg.create();
+
+  @CmdLine(name = "cuckoo_source_id", help = "Cuckoo stat source ID.")
+  private static final Arg<String> CUCKOO_SOURCE_ID = Arg.create();
 
   @Override
   protected void configure() {
@@ -149,5 +172,19 @@ public class ExecutorModule extends AbstractModule {
       ExceptionalFunction<String, List<String>, SignalException> httpSignaler) throws IOException {
 
     return new ProcessKiller(httpSignaler, killTreePath.get(), killEscalationDelay.get());
+  }
+
+  @Provides
+  @Singleton
+  Closure<Map<String, ? extends Number>> provideStatSink() throws ThriftFactoryException {
+    if (CUCKOO_SCRIBE_ENDPOINTS.get().isEmpty() || CUCKOO_SERVICE_ID.get() == null
+        || CUCKOO_SOURCE_ID.get() == null) {
+      LOG.info("Cuckoo stat exort disabled since endpoints, service ID,"
+          + " and source ID were not all specified.");
+      return Closures.noop();
+    } else {
+      return new CuckooWriter(new ScribeLog(CUCKOO_SCRIBE_ENDPOINTS.get()),
+          CUCKOO_SCRIBE_CATEGORY.get(), CUCKOO_SERVICE_ID.get(), CUCKOO_SOURCE_ID.get());
+    }
   }
 }

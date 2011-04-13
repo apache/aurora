@@ -1,27 +1,5 @@
 package com.twitter.mesos.executor;
 
-import com.google.common.base.Function;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.inject.Inject;
-import com.google.inject.name.Named;
-import com.twitter.common.base.Closure;
-import com.twitter.common.util.BuildInfo;
-import com.twitter.mesos.Message;
-import com.twitter.mesos.Tasks;
-import com.twitter.mesos.executor.Task.TaskRunException;
-import com.twitter.mesos.gen.AssignedTask;
-import com.twitter.mesos.gen.ExecutorStatus;
-import com.twitter.mesos.gen.LiveTaskInfo;
-import com.twitter.mesos.gen.RegisteredTaskUpdate;
-import com.twitter.mesos.gen.ScheduleStatus;
-import com.twitter.mesos.gen.SchedulerMessage;
-import org.apache.commons.io.FileSystemUtils;
-
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -32,9 +10,36 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Predicate;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.inject.Inject;
+import com.google.inject.name.Named;
+
+import org.apache.commons.io.FileSystemUtils;
+
+import com.twitter.common.base.Closure;
+import com.twitter.common.stats.StatImpl;
+import com.twitter.common.stats.Stats;
+import com.twitter.common.util.BuildInfo;
+import com.twitter.mesos.Message;
+import com.twitter.mesos.Tasks;
+import com.twitter.mesos.executor.Task.TaskRunException;
+import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.ExecutorStatus;
+import com.twitter.mesos.gen.LiveTaskInfo;
+import com.twitter.mesos.gen.RegisteredTaskUpdate;
+import com.twitter.mesos.gen.ScheduleStatus;
+import com.twitter.mesos.gen.SchedulerMessage;
 
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
 
@@ -68,6 +73,10 @@ public class ExecutorCore implements TaskManager {
   private final ExecutorService taskExecutor;
   private final Function<Message, Integer> messageHandler;
 
+  private final AtomicLong tasksReceived = Stats.exportLong("executor_tasks_received");
+  private final AtomicLong taskFailures = Stats.exportLong("executor_task_launch_failures");
+  private final AtomicLong tasksKilled = Stats.exportLong("executor_tasks_killed");
+
   @Inject
   public ExecutorCore(@ExecutorRootDir File executorRootDir, BuildInfo buildInfo,
       Function<AssignedTask, Task> taskFactory,
@@ -78,6 +87,12 @@ public class ExecutorCore implements TaskManager {
     this.taskFactory = Preconditions.checkNotNull(taskFactory);
     this.taskExecutor = Preconditions.checkNotNull(taskExecutor);
     this.messageHandler = Preconditions.checkNotNull(messageHandler);
+
+    Stats.export(new StatImpl<Integer>("executor_tasks_stored") {
+      @Override public Integer read() {
+        return tasks.size();
+      }
+    });
   }
 
   /**
@@ -124,9 +139,9 @@ public class ExecutorCore implements TaskManager {
 
     LOG.info(String.format("Received task for execution: %s - %s",
         Tasks.jobKey(assignedTask), taskId));
+    tasksReceived.incrementAndGet();
 
     final Task task = taskFactory.apply(assignedTask);
-
     tasks.put(taskId, task);
 
     try {
@@ -134,6 +149,7 @@ public class ExecutorCore implements TaskManager {
       task.run();
     } catch (TaskRunException e) {
       LOG.log(Level.SEVERE, "Failed to stage or run task " + taskId, e);
+      taskFailures.incrementAndGet();
       task.terminate(FAILED, e.getMessage());
       deleteCompletedTask(taskId);
       throw e;
@@ -154,6 +170,7 @@ public class ExecutorCore implements TaskManager {
 
     if (task != null && task.isRunning()) {
       LOG.info("Killing task: " + task);
+      tasksKilled.incrementAndGet();
       task.terminate(ScheduleStatus.KILLED, "Executor shutting down.");
     } else if (task == null) {
       LOG.severe("No such task found: " + taskId);

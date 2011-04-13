@@ -116,8 +116,9 @@ public class SchedulerModule extends AbstractModule {
   private static final Arg<String> CUCKOO_SCRIBE_CATEGORY =
       Arg.create(CuckooWriter.DEFAULT_SCRIBE_CATEGORY);
 
+  @NotNull
   @CmdLine(name = "cuckoo_service_id", help = "Cuckoo service ID.")
-  private static final Arg<String> CUCKOO_SERVICE_ID = Arg.create("mesos_scheduler");
+  private static final Arg<String> CUCKOO_SERVICE_ID = Arg.create();
 
   @CmdLine(name = "cuckoo_source_id", help = "Cuckoo stat source ID.")
   private static final Arg<String> CUCKOO_SOURCE_ID = Arg.create("mesos_scheduler");
