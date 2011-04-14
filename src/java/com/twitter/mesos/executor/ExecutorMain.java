@@ -17,6 +17,7 @@ import com.twitter.common.application.ActionRegistry;
 import com.twitter.common.application.ShutdownStage;
 import com.twitter.common.application.modules.HttpModule;
 import com.twitter.common.application.modules.LogModule;
+import com.twitter.common.application.modules.StatsExportModule;
 import com.twitter.common.application.modules.StatsModule;
 import com.twitter.common.base.Command;
 
@@ -60,6 +61,7 @@ public class ExecutorMain extends AbstractApplication {
         new LogModule(),
         new HttpModule(),
         new StatsModule(),
+        new StatsExportModule(),
         new ExecutorModule()
     );
   }
