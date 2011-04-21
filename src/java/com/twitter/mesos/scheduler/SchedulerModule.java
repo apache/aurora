@@ -40,7 +40,7 @@ import com.twitter.mesos.scheduler.httphandlers.Mname;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzHome;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzJob;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzUser;
-import com.twitter.mesos.scheduler.storage.Migrator;
+import com.twitter.mesos.scheduler.storage.DualStoreMigrator;
 import com.twitter.mesos.scheduler.storage.StorageRole;
 import com.twitter.mesos.scheduler.storage.stream.StreamStorageModule;
 import org.apache.mesos.MesosSchedulerDriver;
@@ -151,7 +151,7 @@ public class SchedulerModule extends AbstractModule {
       jobManagers.addBinding().to(ImmediateJobManager.class);
 
       install(new StreamStorageModule(StorageRole.Role.Legacy));
-      Migrator.bind(binder());
+      DualStoreMigrator.bind(binder());
     }
 
     bind(SchedulingFilter.class).to(SchedulingFilterImpl.class);
