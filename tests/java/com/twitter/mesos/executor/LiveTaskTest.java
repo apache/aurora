@@ -23,6 +23,7 @@ import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
 import com.twitter.mesos.executor.ProcessKiller.KillException;
 import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 
@@ -56,7 +57,7 @@ public class LiveTaskTest {
   private static final String TASK_ID_A = "my-fake-task-id";
   private static final int SHARD_ID_A = 5;
   private static final TwitterTaskInfo TASK_A = new TwitterTaskInfo()
-      .setOwner(System.getProperty("user.name"))
+      .setOwner(new Identity(System.getProperty("user.name"), System.getProperty("user.name")))
       .setJobName("JOB_A")
       .setStartCommand("touch a.txt")
       .setShardId(SHARD_ID_A)

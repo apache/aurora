@@ -1,6 +1,5 @@
 package com.twitter.mesos.scheduler.storage;
 
-import com.twitter.mesos.gen.StorageMigrationResult;
 import com.twitter.mesos.gen.StorageSystemId;
 
 /**
@@ -89,25 +88,10 @@ public interface Storage {
    * Prepares the underlying storage for serving traffic.
    *
    * @param initilizationLogic work to perform after this storage system is ready but before
-   *     allowing general use of {@link #doInTransaction}.
+   *     allowing general use of
+   *     {@link #doInTransaction(com.twitter.mesos.scheduler.storage.Storage.Work)}.
    */
   void start(Work.NoResult.Quiet initilizationLogic);
-
-  /**
-   * Records a successful migration result.
-   *
-   * @param result The result to record.
-   */
-  void markMigration(StorageMigrationResult result);
-
-  /**
-   * Determines if this storage system has completed migration from the specified storage system
-   * already.
-   *
-   * @param from The storage system to migrate from.
-   * @return {@code true} if this storage system has already migrated its data from {@code from}
-   */
-  boolean hasMigrated(Storage from);
 
   /**
    * Executes the unit of {@code work} in a transaction such that any storage write operations

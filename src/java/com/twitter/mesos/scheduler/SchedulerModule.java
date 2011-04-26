@@ -1,5 +1,15 @@
 package com.twitter.mesos.scheduler;
 
+import java.io.File;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Logger;
+
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.AbstractModule;
@@ -7,8 +17,17 @@ import com.google.inject.Key;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
-import com.google.inject.multibindings.Multibinder;
 import com.google.inject.name.Names;
+
+import org.apache.mesos.MesosSchedulerDriver;
+import org.apache.mesos.Protos.FrameworkID;
+import org.apache.mesos.Scheduler;
+import org.apache.mesos.SchedulerDriver;
+import org.apache.zookeeper.server.NIOServerCnxn;
+import org.apache.zookeeper.server.ZooKeeperServer;
+import org.apache.zookeeper.server.ZooKeeperServer.BasicDataTreeBuilder;
+import org.apache.zookeeper.server.persistence.FileTxnSnapLog;
+
 import com.twitter.common.application.ActionRegistry;
 import com.twitter.common.application.ShutdownStage;
 import com.twitter.common.application.http.Registration;
@@ -39,30 +58,8 @@ import com.twitter.mesos.scheduler.httphandlers.HttpAssets;
 import com.twitter.mesos.scheduler.httphandlers.Mname;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzHome;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzJob;
-import com.twitter.mesos.scheduler.httphandlers.SchedulerzUser;
-import com.twitter.mesos.scheduler.storage.DualStoreMigrator;
-import com.twitter.mesos.scheduler.storage.StorageRole;
-import com.twitter.mesos.scheduler.storage.stream.StreamStorageModule;
-import org.apache.mesos.MesosSchedulerDriver;
-import org.apache.mesos.Protos.FrameworkID;
-import org.apache.mesos.Protos.TaskID;
-import org.apache.mesos.Scheduler;
-import org.apache.mesos.SchedulerDriver;
-import org.apache.zookeeper.server.NIOServerCnxn;
-import org.apache.zookeeper.server.ZooKeeperServer;
-import org.apache.zookeeper.server.ZooKeeperServer.BasicDataTreeBuilder;
-import org.apache.zookeeper.server.persistence.FileTxnSnapLog;
-
-import javax.annotation.Nullable;
-import java.io.File;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Logger;
+import com.twitter.mesos.scheduler.httphandlers.SchedulerzRole;
+import com.twitter.mesos.scheduler.storage.db.DbStorageModule;
 
 public class SchedulerModule extends AbstractModule {
   private static final Logger LOG = Logger.getLogger(SchedulerModule.class.getName());
@@ -74,7 +71,7 @@ public class SchedulerModule extends AbstractModule {
 
   @CmdLine(name = "scheduler_upgrade_storage",
           help ="True to upgrade storage from a legacy system to a new primary system.")
-  private static final Arg<Boolean>upgradeStorage = Arg.create(true);
+  private static final Arg<Boolean> upgradeStorage = Arg.create(true);
 
   @CmdLine(name = "machine_restrictions",
       help ="Map of machine hosts to job keys."
@@ -150,14 +147,9 @@ public class SchedulerModule extends AbstractModule {
         .toInstance(new PulseMonitorImpl<String>(EXECUTOR_DEAD_THRESHOLD.get()));
 
     if (upgradeStorage.get()) {
-      // Both StreamStorageModule and the Migrator need a binding for the Set of installed job
-      // managers
-      Multibinder<JobManager> jobManagers = Multibinder.newSetBinder(binder(), JobManager.class);
-      jobManagers.addBinding().to(CronJobManager.class);
-      jobManagers.addBinding().to(ImmediateJobManager.class);
-
-      install(new StreamStorageModule(StorageRole.Role.Legacy));
-      DualStoreMigrator.bind(binder());
+      DbStorageModule.bindWithSchemaMigrator(binder());
+    } else {
+      DbStorageModule.bind(binder());
     }
 
     bind(SchedulingFilter.class).to(SchedulingFilterImpl.class);
@@ -173,7 +165,7 @@ public class SchedulerModule extends AbstractModule {
 
     HttpAssets.register(binder());
     Registration.registerServlet(binder(), "/scheduler", SchedulerzHome.class, false);
-    Registration.registerServlet(binder(), "/scheduler/user", SchedulerzUser.class, true);
+    Registration.registerServlet(binder(), "/scheduler/role", SchedulerzRole.class, true);
     Registration.registerServlet(binder(), "/scheduler/job", SchedulerzJob.class, true);
     Registration.registerServlet(binder(), "/mname", Mname.class, false);
     Registration.registerServlet(binder(), "/create_job", CreateJob.class, true);
@@ -209,23 +201,9 @@ public class SchedulerModule extends AbstractModule {
   @Provides
   @Singleton
   SchedulerDriver provideMesosSchedulerDriver(Scheduler scheduler, SchedulerCore schedulerCore) {
+    String frameworkId = schedulerCore.initialize();
     LOG.info("Connecting to mesos master: " + mesosMasterAddress.get());
 
-    String frameworkId = schedulerCore.initialize();
-    final SchedulerDriver schedulerDriver = createDriver(scheduler, frameworkId);
-    schedulerCore.start(new Closure<String>() {
-      @Override public void execute(String taskId) throws RuntimeException {
-        int result = schedulerDriver.killTask(TaskID.newBuilder().setValue(taskId).build());
-        if (result != 0) {
-          LOG.severe(String.format("Attempt to kill task %s failed with code %d",
-              taskId, result));
-        }
-      }
-    });
-    return schedulerDriver;
-  }
-
-  private SchedulerDriver createDriver(Scheduler scheduler, @Nullable String frameworkId) {
     if (frameworkId != null) {
       LOG.info("Found persisted framework ID: " + frameworkId);
       return new MesosSchedulerDriver(scheduler, mesosMasterAddress.get(),

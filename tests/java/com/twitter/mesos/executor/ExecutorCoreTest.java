@@ -1,21 +1,24 @@
 package com.twitter.mesos.executor;
 
+import java.io.File;
+import java.util.Random;
+import java.util.concurrent.ExecutorService;
+
 import com.google.common.base.Function;
+
+import org.easymock.Capture;
+import org.junit.Before;
+import org.junit.Test;
+
 import com.twitter.common.base.Closure;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.common.util.BuildInfo;
 import com.twitter.mesos.Message;
 import com.twitter.mesos.executor.Task.TaskRunException;
 import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import org.easymock.Capture;
-import org.junit.Before;
-import org.junit.Test;
-
-import java.io.File;
-import java.util.Random;
-import java.util.concurrent.ExecutorService;
 
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
@@ -29,7 +32,8 @@ import static org.junit.Assert.fail;
  */
 public class ExecutorCoreTest extends EasyMockTest {
 
-  private static final String USER_A = "user-a";
+  private static final String ROLE_A = "role-a";
+  private static final Identity OWNER_A = new Identity(ROLE_A, "user-a");
   private static final String JOB_A = "job-a";
 
   private Function<AssignedTask, Task> taskFactory;
@@ -59,7 +63,7 @@ public class ExecutorCoreTest extends EasyMockTest {
 
   @Test
   public void testRunTask() throws Exception {
-    AssignedTask task = makeTask(USER_A, JOB_A);
+    AssignedTask task = makeTask(OWNER_A, JOB_A);
 
     expect(taskFactory.apply(task)).andReturn(runningTask);
     runningTask.stage();
@@ -77,7 +81,7 @@ public class ExecutorCoreTest extends EasyMockTest {
 
   @Test
   public void testTaskFails() throws Exception {
-    AssignedTask task = makeTask(USER_A, JOB_A);
+    AssignedTask task = makeTask(OWNER_A, JOB_A);
 
     expect(taskFactory.apply(task)).andReturn(runningTask);
     runningTask.stage();
@@ -95,7 +99,7 @@ public class ExecutorCoreTest extends EasyMockTest {
 
   @Test(expected = TaskRunException.class)
   public void testStagingFails() throws Exception {
-    AssignedTask task = makeTask(USER_A, JOB_A);
+    AssignedTask task = makeTask(OWNER_A, JOB_A);
 
     expect(taskFactory.apply(task)).andReturn(runningTask);
     runningTask.stage();
@@ -110,7 +114,7 @@ public class ExecutorCoreTest extends EasyMockTest {
 
   @Test(expected = TaskRunException.class)
   public void testRunFails() throws Exception {
-    AssignedTask task = makeTask(USER_A, JOB_A);
+    AssignedTask task = makeTask(OWNER_A, JOB_A);
 
     expect(taskFactory.apply(task)).andReturn(runningTask);
     runningTask.stage();
@@ -126,7 +130,7 @@ public class ExecutorCoreTest extends EasyMockTest {
 
   @Test
   public void testDeleteActiveTask() throws Exception {
-    AssignedTask task = makeTask(USER_A, JOB_A);
+    AssignedTask task = makeTask(OWNER_A, JOB_A);
 
     expect(taskFactory.apply(task)).andReturn(runningTask);
     runningTask.stage();
@@ -150,7 +154,7 @@ public class ExecutorCoreTest extends EasyMockTest {
     taskCapture.getValue().run();
   }
 
-  private static AssignedTask makeTask(String owner, String jobName) {
+  private static AssignedTask makeTask(Identity owner, String jobName) {
     TwitterTaskInfo task = new TwitterTaskInfo()
         .setOwner(owner)
         .setJobName(jobName);

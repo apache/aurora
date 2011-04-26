@@ -23,6 +23,7 @@ import org.antlr.stringtemplate.StringTemplate;
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.mesos.Tasks;
+import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.LiveTask;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.TaskQuery;
@@ -49,7 +50,7 @@ import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
  * @author William Farner
  */
 public class SchedulerzJob extends StringTemplateServlet {
-
+  private static final String ROLE_PARAM = "role";
   private static final String USER_PARAM = "user";
   private static final String JOB_PARAM = "job";
   // TODO(William Farner): Allow filtering by task status.
@@ -101,10 +102,13 @@ public class SchedulerzJob extends StringTemplateServlet {
         template.setAttribute("cluster_name", clusterName);
 
         String user = req.getParameter(USER_PARAM);
-        if (user == null) {
-          template.setAttribute("exception", "Please specify a user.");
+        String role = req.getParameter(ROLE_PARAM);
+        if (role == null) {
+          template.setAttribute("exception", "Please specify a role.");
           return;
         }
+        Identity identity = new Identity(role, user);
+
         String job = req.getParameter(JOB_PARAM);
         if (job == null) {
           template.setAttribute("exception", "Please specify a job.");
@@ -121,11 +125,11 @@ public class SchedulerzJob extends StringTemplateServlet {
           }
         }
 
-        template.setAttribute("user", user);
+        template.setAttribute("role", role);
         template.setAttribute("job", job);
 
         TaskQuery query = new TaskQuery()
-            .setOwner(user)
+            .setOwner(identity)
             .setJobName(job);
 
         Set<TaskState> activeTasks;

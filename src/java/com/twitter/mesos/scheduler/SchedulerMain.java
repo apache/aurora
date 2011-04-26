@@ -15,7 +15,9 @@ import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 import com.google.inject.Module;
+import com.google.inject.Provider;
 
+import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.SchedulerDriver;
 import org.apache.thrift.transport.TTransportException;
 
@@ -23,10 +25,11 @@ import com.twitter.common.application.AbstractApplication;
 import com.twitter.common.application.ActionRegistry;
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.application.ShutdownStage;
-import com.twitter.common.application.modules.StatsExportModule;
 import com.twitter.common.application.modules.HttpModule;
 import com.twitter.common.application.modules.LogModule;
+import com.twitter.common.application.modules.StatsExportModule;
 import com.twitter.common.application.modules.StatsModule;
+import com.twitter.common.base.Closure;
 import com.twitter.common.base.Command;
 import com.twitter.common.net.InetSocketAddressHelper;
 import com.twitter.common.thrift.Util;
@@ -38,14 +41,13 @@ import com.twitter.common.zookeeper.SingletonService.LeadershipListener;
 import com.twitter.mesos.gen.MesosSchedulerManager;
 import com.twitter.mesos.gen.StorageMigrationResult;
 import com.twitter.mesos.scheduler.storage.Migrator;
-import com.twitter.mesos.scheduler.storage.StorageRole;
-import com.twitter.mesos.scheduler.storage.db.DbStorageModule;
 import com.twitter.thrift.Status;
 
 /**
  * Launcher for the twitter mesos scheduler.
  *
- * TODO(William Farner): Include information in /schedulerz about who is the current scheduler leader.
+ * TODO(William Farner): Include information in /schedulerz about who is the current scheduler
+ * leader.
  *
  * @author William Farner
  */
@@ -55,7 +57,7 @@ public class SchedulerMain extends AbstractApplication {
 
   @Inject private SingletonService schedulerService;
   @Inject private SchedulerThriftInterface schedulerThriftInterface;
-  @Inject private SchedulerDriver driver;
+  @Inject private Provider<SchedulerDriver> driverProvider;
   @Inject private AtomicReference<InetSocketAddress> schedulerThriftPort;
   @Inject private SchedulerCore scheduler;
   @Inject private Lifecycle lifecycle;
@@ -100,7 +102,6 @@ public class SchedulerMain extends AbstractApplication {
   @Override
   public Iterable<Module> getModules() {
     return Arrays.<Module>asList(
-        new DbStorageModule(StorageRole.Role.Primary),
         new StatsExportModule(),
         new HttpModule(),
         new LogModule(),
@@ -155,27 +156,37 @@ public class SchedulerMain extends AbstractApplication {
       Throwables.propagate(e);
     }
 
-    if (schedulerService != null) {
-      try {
-        schedulerService.lead(InetSocketAddressHelper.getLocalAddress(port),
-            Collections.<String, InetSocketAddress>emptyMap(), Status.STARTING, leadershipListener);
-      } catch (Group.WatchException e) {
-        LOG.log(Level.SEVERE, "Failed to watch group and lead service.", e);
-      } catch (Group.JoinException e) {
-        LOG.log(Level.SEVERE, "Failed to join scheduler service group.", e);
-      } catch (InterruptedException e) {
-        LOG.log(Level.SEVERE, "Interrupted while joining scheduler service group.", e);
-      } catch (UnknownHostException e) {
-        LOG.log(Level.SEVERE, "Failed to find self host name.", e);
-      }
-    } else {
-      runMesosDriver();
+    try {
+      schedulerService.lead(InetSocketAddressHelper.getLocalAddress(port),
+          Collections.<String, InetSocketAddress>emptyMap(), Status.STARTING, leadershipListener);
+    } catch (Group.WatchException e) {
+      LOG.log(Level.SEVERE, "Failed to watch group and lead service.", e);
+    } catch (Group.JoinException e) {
+      LOG.log(Level.SEVERE, "Failed to join scheduler service group.", e);
+    } catch (InterruptedException e) {
+      LOG.log(Level.SEVERE, "Interrupted while joining scheduler service group.", e);
+    } catch (UnknownHostException e) {
+      LOG.log(Level.SEVERE, "Failed to find self host name.", e);
     }
 
     lifecycle.awaitShutdown();
   }
 
   private void runMesosDriver() {
+    // Initialize the driver just in time
+    // TODO(John Sirois): control this lifecycle in a more explicit - non Guice specific way
+    final SchedulerDriver driver = driverProvider.get();
+
+    scheduler.start(new Closure<String>() {
+      @Override public void execute(String taskId) throws RuntimeException {
+        int result = driver.killTask(TaskID.newBuilder().setValue(taskId).build());
+        if (result != 0) {
+          LOG.severe(String.format("Attempt to kill task %s failed with code %d",
+              taskId, result));
+        }
+      }
+    });
+
     new ThreadFactoryBuilder().setNameFormat("Driver-Runner-%d").setDaemon(true).build().newThread(
         new Runnable() {
           @Override public void run() {

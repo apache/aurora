@@ -1,5 +1,21 @@
 package com.twitter.mesos.scheduler.storage.db;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Types;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import javax.annotation.Nullable;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
@@ -12,7 +28,20 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.primitives.Ints;
 import com.google.inject.Inject;
-import com.sun.corba.se.spi.logging.LogWrapperBase;
+
+import org.apache.commons.lang.StringUtils;
+import org.apache.thrift.TBase;
+import org.apache.thrift.TException;
+import org.apache.thrift.protocol.TProtocol;
+import org.apache.thrift.transport.TIOStreamTransport;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.BatchPreparedStatementSetter;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionCallbackWithoutResult;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.ExceptionTransporter;
@@ -42,37 +71,6 @@ import com.twitter.mesos.scheduler.storage.MigrationUtils;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.TaskStore;
-import org.apache.commons.lang.StringUtils;
-import org.apache.thrift.TBase;
-import org.apache.thrift.TException;
-import org.apache.thrift.protocol.TProtocol;
-import org.apache.thrift.transport.TIOStreamTransport;
-import org.springframework.core.io.ClassRelativeResourceLoader;
-import org.springframework.dao.DuplicateKeyException;
-import org.springframework.jdbc.core.BatchPreparedStatementSetter;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
-import org.springframework.transaction.TransactionStatus;
-import org.springframework.transaction.support.TransactionCallback;
-import org.springframework.transaction.support.TransactionCallbackWithoutResult;
-import org.springframework.transaction.support.TransactionTemplate;
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.net.URL;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Types;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import javax.annotation.Nullable;
 
 import static com.google.common.collect.Iterables.transform;
 
@@ -98,13 +96,13 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
    * The version of this {@code DbStorage}.  Should be bumped when any combination of database
    * implementation change and/or schema change requires a data migration.
    */
-  static final int STORAGE_SYSTEM_VERSION = 0;
-
-  private static final StorageSystemId ID =
-      new StorageSystemId(STORAGE_SYSTEM_TYPE, STORAGE_SYSTEM_VERSION);
+  static final int CURRENT_VERSION = 1;
 
   @VisibleForTesting final JdbcTemplate jdbcTemplate;
   private final TransactionTemplate transactionTemplate;
+  private final StorageSystemId id;
+
+  private boolean initialized;
 
   /**
    * @param jdbcTemplate The {@code JdbcTemplate} object to execute database operation against.
@@ -112,38 +110,57 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
    *     scope for database operations.
    */
   @Inject
-  public DbStorage(JdbcTemplate jdbcTemplate, TransactionTemplate transactionTemplate) {
+  public DbStorage(JdbcTemplate jdbcTemplate, TransactionTemplate transactionTemplate,
+      @Version int version) {
     this.jdbcTemplate = Preconditions.checkNotNull(jdbcTemplate);
     this.transactionTemplate = Preconditions.checkNotNull(transactionTemplate);
+    id = new StorageSystemId(STORAGE_SYSTEM_TYPE, version);
   }
 
-  @Override
-  public StorageSystemId id() {
-    return ID;
+  public synchronized void ensureInitialized() {
+    if (!initialized) {
+      executeSql(getClass(), "db-task-store-schema.sql", false);
+      LOG.info("Initialized schema.");
+      initialized = true;
+    }
   }
 
-  @Override
-  public void start(final Work.NoResult.Quiet initilizationLogic) {
-    doInTransaction(new Work.NoResult.Quiet() {
-      @Override protected void execute(SchedulerStore schedulerStore, JobStore jobStore,
-          TaskStore taskStore) throws RuntimeException {
-
-        ClassRelativeResourceLoader resourceLoader = new ClassRelativeResourceLoader(getClass());
-        URL schemaUrl;
-        try {
-          schemaUrl = resourceLoader.getResource("db-task-store-schema.sql").getURL();
-        } catch (IOException e) {
-          throw new IllegalStateException("Could not find schema on classpath", e);
-        }
-        jdbcTemplate.execute(String.format("RUNSCRIPT FROM '%s'", schemaUrl));
-
-        initilizationLogic.apply(schedulerStore, jobStore, taskStore);
+  public void executeSql(final Class<?> contextClass, final String sqlResourcePath,
+      final boolean logSql) {
+    transactionTemplate.execute(new TransactionCallbackWithoutResult() {
+      @Override protected void doInTransactionWithoutResult(TransactionStatus status) {
+        DbStorageUtil.executeSql(jdbcTemplate, contextClass, sqlResourcePath, logSql);
       }
     });
   }
 
-  @Timed("db_storage_mark_migration")
   @Override
+  public StorageSystemId id() {
+    return id;
+  }
+
+  @Override
+  public void start(final Work.NoResult.Quiet initilizationLogic) {
+    Preconditions.checkNotNull(initilizationLogic);
+
+    doInTransaction(new Work.NoResult.Quiet() {
+      @Override protected void execute(SchedulerStore schedulerStore, JobStore jobStore,
+          TaskStore taskStore) {
+
+        ensureInitialized();
+
+        initilizationLogic.apply(schedulerStore, jobStore, taskStore);
+        LOG.info("Applied initialization logic.");
+      }
+    });
+  }
+
+  /**
+   * Records a successful migration result.
+   *
+   * @param result The result to record.
+   */
+  @Timed("db_storage_mark_migration")
   public void markMigration(final StorageMigrationResult result) {
     Preconditions.checkNotNull(result);
 
@@ -155,8 +172,14 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
         });
   }
 
+  /**
+   * Determines if this storage system has completed migration from the specified storage system
+   * already.
+   *
+   * @param from The storage system to migrate from.
+   * @return {@code true} if this storage system has already migrated its data from {@code from}
+   */
   @Timed("db_storage_has_migrated")
-  @Override
   public boolean hasMigrated(Storage from) {
     Preconditions.checkNotNull(from);
 
@@ -186,6 +209,7 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
               // We know work throws E by its signature
               @SuppressWarnings("unchecked")
               E exception = (E) e;
+              LOG.log(Level.WARNING, "work failed in transaction", e);
               throw transporter.transport(exception);
             }
           }
@@ -401,9 +425,9 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
   private void insert(final Set<ScheduledTask> newTasks) {
     final Iterator<ScheduledTask> tasks = newTasks.iterator();
     try {
-      jdbcTemplate.batchUpdate("INSERT INTO task_state (task_id, owner, job_name, job_key,"
-                               + " slave_host, shard_id, status, scheduled_task) VALUES"
-                               + " (?, ?, ?, ?, ?, ?, ?, ?)",
+      jdbcTemplate.batchUpdate("INSERT INTO task_state (task_id, job_role, job_user, job_name,"
+                               + " job_key, slave_host, shard_id, status, scheduled_task)"
+                               + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
           new BatchPreparedStatementSetter() {
             @Override public void setValues(PreparedStatement preparedStatement, int batchItemIndex)
                 throws SQLException {
@@ -417,7 +441,7 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
               return newTasks.size();
             }
           });
-    } catch (DuplicateKeyException e) {
+    } catch (DataIntegrityViolationException e) {
       throw new IllegalStateException(e);
     }
   }
@@ -480,39 +504,48 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
   }
 
   private ImmutableSet<ScheduledTask> update(Query query, Closure<ScheduledTask> mutator) {
-    final ImmutableSortedSet<ScheduledTask> taskStates = fetch(query);
+    ImmutableSortedSet<ScheduledTask> taskStates = fetch(query);
+
+    final List<ScheduledTask> tasksToUpdate = Lists.newLinkedList();
     for (ScheduledTask taskState : taskStates) {
+      ScheduledTask original = taskState.deepCopy();
       mutator.execute(taskState);
+      if (!taskState.equals(original)) {
+        tasksToUpdate.add(taskState);
+      }
     }
 
-    long startNanos = System.nanoTime();
-    final Iterator<ScheduledTask> tasks = taskStates.iterator();
-    jdbcTemplate.batchUpdate("UPDATE task_state SET owner = ?, job_name = ?,"
-                             + " job_key = ?, slave_host = ?, shard_id = ?, status = ?,"
-                             + " scheduled_task = ? WHERE task_id = ?",
-        new BatchPreparedStatementSetter() {
-          @Override public void setValues(PreparedStatement preparedStatement, int batchItemIndex)
-              throws SQLException {
+    if (!tasksToUpdate.isEmpty()) {
+      LOG.info(String.format("Updating %d tasks", tasksToUpdate.size()));
 
-            ScheduledTask scheduledTask = tasks.next();
+      long startNanos = System.nanoTime();
+      final Iterator<ScheduledTask> tasks = tasksToUpdate.iterator();
+      jdbcTemplate.batchUpdate("UPDATE task_state SET job_role = ?, job_user = ?, job_name = ?,"
+                               + " job_key = ?, slave_host = ?, shard_id = ?, status = ?,"
+                               + " scheduled_task = ? WHERE task_id = ?",
+          new BatchPreparedStatementSetter() {
+            @Override public void setValues(PreparedStatement preparedStatement, int batchItemIndex)
+                throws SQLException {
 
-            int col = prepareRow(preparedStatement, 1, scheduledTask);
-            setTaskId(preparedStatement, col, scheduledTask);
-          }
+              ScheduledTask scheduledTask = tasks.next();
 
-          @Override public int getBatchSize() {
-            return taskStates.size();
-          }
-        });
+              int col = prepareRow(preparedStatement, 1, scheduledTask);
+              setTaskId(preparedStatement, col, scheduledTask);
+            }
 
-    long durationNanos = System.nanoTime() - startNanos;
-    if (durationNanos >= SLOW_QUERY_THRESHOLD_NS) {
-      LOG.warning("Slow update of " + taskStates.size() + " tasks took "
-          + Amount.of(durationNanos, Time.NANOSECONDS).as(Time.MILLISECONDS) + " ms");
+            @Override public int getBatchSize() {
+              return tasksToUpdate.size();
+            }
+          });
+
+      long durationNanos = System.nanoTime() - startNanos;
+      if (durationNanos >= SLOW_QUERY_THRESHOLD_NS) {
+        LOG.warning("Slow update of " + taskStates.size() + " tasks took "
+                    + Amount.of(durationNanos, Time.NANOSECONDS).as(Time.MILLISECONDS) + " ms");
+      }
+
+      vars.tasksMutated.addAndGet(tasksToUpdate.size());
     }
-
-    // TODO(John Sirois): detect real mutations, some or all of these may have been noops
-    vars.tasksMutated.addAndGet(taskStates.size());
 
     return taskStates;
   }
@@ -642,8 +675,13 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
     WhereClauseBuilder whereClauseBuilder = new WhereClauseBuilder();
 
     TaskQuery taskQuery = query.base();
-    if (!StringUtils.isEmpty(taskQuery.getOwner())) {
-      whereClauseBuilder.equals("owner", Types.VARCHAR, taskQuery.getOwner());
+    if (taskQuery.getOwner() != null) {
+      if (!StringUtils.isBlank(taskQuery.getOwner().getRole())) {
+        whereClauseBuilder.equals("job_role", Types.VARCHAR, taskQuery.getOwner().getRole());
+      }
+      if (!StringUtils.isBlank(taskQuery.getOwner().getUser())) {
+        whereClauseBuilder.equals("job_user", Types.VARCHAR, taskQuery.getOwner().getUser());
+      }
     }
     if (!StringUtils.isEmpty(taskQuery.getJobName())) {
       whereClauseBuilder.equals("job_name", Types.VARCHAR, taskQuery.getJobName());
@@ -694,7 +732,8 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
   private static int prepareRow(PreparedStatement preparedStatement, int col,
       ScheduledTask scheduledTask) throws SQLException {
 
-    setString(preparedStatement, col++, scheduledTask.assignedTask.task.owner);
+    setString(preparedStatement, col++, scheduledTask.assignedTask.task.owner.role);
+    setString(preparedStatement, col++, scheduledTask.assignedTask.task.owner.user);
     setString(preparedStatement, col++, scheduledTask.assignedTask.task.jobName);
     setString(preparedStatement, col++, Tasks.jobKey(scheduledTask));
     setString(preparedStatement, col++, scheduledTask.assignedTask.slaveHost);
@@ -754,6 +793,9 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
 
   @VisibleForTesting
   int getTaskStoreSize() {
+    // Stats sampling comes up early - make sure we have a schema to query against.
+    ensureInitialized();
+
     return transactionTemplate.execute(new TransactionCallback<Integer>() {
       @Override public Integer doInTransaction(TransactionStatus transactionStatus) {
         return jdbcTemplate.queryForInt("SELECT COUNT(task_id) FROM task_state");

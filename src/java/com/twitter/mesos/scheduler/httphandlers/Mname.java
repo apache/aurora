@@ -1,22 +1,25 @@
 package com.twitter.mesos.scheduler.httphandlers;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
-import com.google.inject.Inject;
-import com.twitter.mesos.scheduler.Query;
-import com.twitter.mesos.scheduler.SchedulerCore;
-import com.twitter.mesos.scheduler.TaskState;
-import org.apache.commons.lang.StringUtils;
-
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
+import com.google.inject.Inject;
+
+import org.apache.commons.lang.StringUtils;
+
+import com.twitter.mesos.scheduler.Query;
+import com.twitter.mesos.scheduler.SchedulerCore;
+import com.twitter.mesos.scheduler.TaskState;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.mesos.Tasks.jobKey;
@@ -51,7 +54,7 @@ public class Mname extends HttpServlet {
 
     Matcher matcher = TASK_PATTERN.matcher(req.getPathInfo());
     if (matcher.matches()) {
-      String owner = matcher.group(1);
+      String role = matcher.group(1);
       String jobName = matcher.group(2);
       String shardIdStr = matcher.group(3);
       String forwardRequest = matcher.group(4);
@@ -64,7 +67,7 @@ public class Mname extends HttpServlet {
         return;
       }
 
-      Set<TaskState> states = scheduler.getTasks(Query.liveShard(jobKey(owner, jobName), shardId));
+      Set<TaskState> states = scheduler.getTasks(Query.liveShard(jobKey(role, jobName), shardId));
 
       if (states.isEmpty()) {
         resp.sendError(SC_NOT_FOUND, "No such live shard found.");
@@ -105,6 +108,6 @@ public class Mname extends HttpServlet {
   }
 
   private void sendUsageError(HttpServletResponse resp) throws IOException {
-    resp.sendError(SC_BAD_REQUEST, "Request must be of the format /mname/owner/job/shard.");
+    resp.sendError(SC_BAD_REQUEST, "Request must be of the format /mname/role/job/shard.");
   }
 }

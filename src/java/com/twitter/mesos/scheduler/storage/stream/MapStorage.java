@@ -1,5 +1,19 @@
 package com.twitter.mesos.scheduler.storage.stream;
 
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import javax.annotation.Nullable;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
@@ -15,6 +29,9 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
+
+import org.apache.commons.lang.StringUtils;
+
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Command;
 import com.twitter.common.stats.RequestStats;
@@ -22,10 +39,10 @@ import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.NonVolatileSchedulerState;
 import com.twitter.mesos.gen.ScheduledTask;
-import com.twitter.mesos.gen.StorageMigrationResult;
 import com.twitter.mesos.gen.StorageSystemId;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
@@ -35,19 +52,6 @@ import com.twitter.mesos.scheduler.storage.JobStore;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.TaskStore;
-import org.apache.commons.lang.StringUtils;
-
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.filter;
@@ -108,16 +112,6 @@ public class MapStorage implements Storage {
   @Override
   public StorageSystemId id() {
     return ID;
-  }
-
-  @Override
-  public void markMigration(StorageMigrationResult result) {
-    throw new UnsupportedOperationException("MapStorage cannot be migrated to.");
-  }
-
-  @Override
-  public boolean hasMigrated(Storage from) {
-    throw new UnsupportedOperationException("MapStorage cannot be migrated to.");
   }
 
   @Override
@@ -431,6 +425,13 @@ public class MapStorage implements Storage {
 
       private <T> boolean matches(Collection<T> collection, T item) {
         return collection == null || collection.contains(item);
+      }
+
+      private boolean matches(@Nullable Identity query, @Nullable Identity value) {
+        return query == null ||
+          (value != null &&
+           value.getUser().matches(query.getUser()) &&
+           value.getRole().matches(query.getRole()));
       }
 
       @Override public boolean apply(ScheduledTask task) {

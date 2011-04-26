@@ -1,8 +1,14 @@
 package com.twitter.mesos.scheduler.storage.db;
 
+import java.sql.SQLException;
+
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+
+import org.junit.Test;
+
 import com.twitter.mesos.Tasks;
+import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.storage.BaseTaskStoreTest;
@@ -10,9 +16,6 @@ import com.twitter.mesos.scheduler.storage.JobStore;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
 import com.twitter.mesos.scheduler.storage.TaskStore;
-import org.junit.Test;
-
-import java.sql.SQLException;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
@@ -53,13 +56,16 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
 
   @Test
   public void testJobConfigurationStorage() {
-    JobConfiguration jobConfig1 = new JobConfiguration().setOwner("jake").setName("fortune");
+    JobConfiguration jobConfig1 = new JobConfiguration().setOwner(new Identity("jake", "jake"))
+        .setName("fortune");
     store.saveAcceptedJob("CRON", jobConfig1);
 
-    JobConfiguration jobConfig2 = new JobConfiguration().setOwner("jane").setName("df");
+    JobConfiguration jobConfig2 = new JobConfiguration().setOwner(new Identity("jane", "jane"))
+        .setName("df");
     store.saveAcceptedJob("CRON", jobConfig2);
 
-    JobConfiguration jobConfig3 = new JobConfiguration().setOwner("fred").setName("uname");
+    JobConfiguration jobConfig3 = new JobConfiguration().setOwner(new Identity("fred", "fred"))
+        .setName("uname");
     store.saveAcceptedJob("IMMEDIATE", jobConfig3);
 
     assertTrue(Iterables.isEmpty(store.fetchJobs("DNE")));

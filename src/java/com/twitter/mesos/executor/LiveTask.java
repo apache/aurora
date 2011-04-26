@@ -1,30 +1,5 @@
 package com.twitter.mesos.executor;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Charsets;
-import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.io.ByteStreams;
-import com.google.common.io.Closeables;
-import com.google.common.io.Files;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.twitter.common.base.ExceptionalClosure;
-import com.twitter.common.base.ExceptionalFunction;
-import com.twitter.common.collections.Pair;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
-import com.twitter.common.util.StateMachine;
-import com.twitter.mesos.Tasks;
-import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
-import com.twitter.mesos.executor.ProcessKiller.KillCommand;
-import com.twitter.mesos.executor.ProcessKiller.KillException;
-import com.twitter.mesos.gen.AssignedTask;
-import com.twitter.mesos.gen.ResourceConsumption;
-import com.twitter.mesos.gen.ScheduleStatus;
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -44,9 +19,40 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Charsets;
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.io.ByteStreams;
+import com.google.common.io.Closeables;
+import com.google.common.io.Files;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+
 import org.apache.commons.lang.StringUtils;
 
-import static com.twitter.mesos.gen.ScheduleStatus.*;
+import com.twitter.common.base.ExceptionalClosure;
+import com.twitter.common.base.ExceptionalFunction;
+import com.twitter.common.collections.Pair;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
+import com.twitter.common.util.StateMachine;
+import com.twitter.mesos.Tasks;
+import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
+import com.twitter.mesos.executor.ProcessKiller.KillCommand;
+import com.twitter.mesos.executor.ProcessKiller.KillException;
+import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.ResourceConsumption;
+import com.twitter.mesos.gen.ScheduleStatus;
+
+import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
+import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
+import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
+import static com.twitter.mesos.gen.ScheduleStatus.LOST;
+import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
+import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 
 /**
  * Handles storing information and performing duties related to a running task.
@@ -262,12 +268,12 @@ public class LiveTask extends TaskOnDisk {
     commands.add("echo $$ > ../" + PIDFILE_NAME);
 
     if (multiUser) {
-      String owner = task.getTask().getOwner();
-      LOG.info("Launching as user " + owner);
+      String user = task.getTask().getOwner().getUser();
+      LOG.info("Launching as user " + user);
       // chown the sandbox.
-      commands.add(String.format("chown -R %s .", owner));
+      commands.add(String.format("chown -R %s .", user));
       // Run as the user.
-      commands.add(String.format("su %s -c \"bash %s\"", owner, RUN_SCRIPT_NAME));
+      commands.add(String.format("su %s -c \"bash %s\"", user, RUN_SCRIPT_NAME));
     } else {
       // Execute the laucn script containing the user shell code.
       commands.add("bash " + RUN_SCRIPT_NAME);

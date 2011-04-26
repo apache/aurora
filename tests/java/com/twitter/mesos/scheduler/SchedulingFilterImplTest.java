@@ -1,5 +1,8 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Map;
+import java.util.Set;
+
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
@@ -7,18 +10,18 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
+
+import org.junit.Before;
+import org.junit.Test;
+
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.SchedulingFilter.SchedulingFilterImpl;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
-import org.junit.Before;
-import org.junit.Test;
-
-import java.util.Map;
-import java.util.Set;
 
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.expect;
@@ -36,7 +39,10 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
   private static final String JOB_A = "myJobA";
   private static final String JOB_B = "myJobB";
-  private static final String OWNER_A = "ownerA";
+
+  private static final String ROLE_A = "roleA";
+  private static final String USER_A = "userA";
+  private static final Identity OWNER_A = new Identity(ROLE_A, USER_A);
 
   private static final Map<String, String> EMPTY_MAP = Maps.newHashMap();
   private static final long DEFAULT_DISK = 1000;
@@ -151,18 +157,19 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
   @Test
   public void testHonorsAvoidJobs() throws Exception {
-    expectGetTasks(makeTask(0, "jim", "jobA", ImmutableSet.of("sue/jobC")));
-    expectGetTasks(makeTask(0, "jim", "jobA", ImmutableSet.of("sue/jobC")));
-    expectGetTasks(makeTask(0, "jim", "jobA", ImmutableSet.of("sue/jobC")));
+    Identity jimmy = new Identity("jim", "jim");
+    expectGetTasks(makeTask(0, jimmy, "jobA", ImmutableSet.of("sue/jobC")));
+    expectGetTasks(makeTask(0, jimmy, "jobA", ImmutableSet.of("sue/jobC")));
+    expectGetTasks(makeTask(0, jimmy, "jobA", ImmutableSet.of("sue/jobC")));
 
     control.replay();
 
     assertThat(defaultFilter.makeFilter(DEFAULT_OFFER, HOST_A).apply(
-        makeTask(0, "jack", "jobB", ImmutableSet.<String>of())), is(true));
+        makeTask(0, new Identity("jack", "jack"), "jobB", ImmutableSet.<String>of())), is(true));
     assertThat(defaultFilter.makeFilter(DEFAULT_OFFER, HOST_A).apply(
-        makeTask(0, "jack", "jobB", ImmutableSet.of("jim/jobA"))), is(false));
+        makeTask(0, new Identity("jack", "jack"), "jobB", ImmutableSet.of("jim/jobA"))), is(false));
     assertThat(defaultFilter.makeFilter(DEFAULT_OFFER, HOST_A).apply(
-        makeTask(0, "sue", "jobC", ImmutableSet.<String>of())), is(false));
+        makeTask(0, new Identity("sue", "sue"), "jobC", ImmutableSet.<String>of())), is(false));
   }
 
   private void expectGetTasks(ScheduledTask... tasks) {
@@ -185,7 +192,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     return task;
   }
 
-  private ScheduledTask makeTask(int shard, String owner, String jobName, Set<String> avoidJobs)
+  private ScheduledTask makeTask(int shard, Identity owner, String jobName, Set<String> avoidJobs)
       throws Exception {
     ScheduledTask task = makeTask(owner, jobName, DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK);
     task.getAssignedTask().getTask()
@@ -197,7 +204,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   }
 
   private int taskId = 1;
-  private ScheduledTask makeTask(String owner, String jobName, int cpus, long ramMb,
+  private ScheduledTask makeTask(Identity owner, String jobName, int cpus, long ramMb,
       long diskMb) throws Exception {
     return new ScheduledTask().setAssignedTask(new AssignedTask().setTask(
         ConfigurationManager.applyDefaultsIfUnset(new TwitterTaskInfo()

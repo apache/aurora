@@ -1,5 +1,12 @@
 package com.twitter.mesos.scheduler.storage;
 
+import java.util.Map;
+import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import javax.annotation.Nullable;
+
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
@@ -15,6 +22,7 @@ import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 import com.google.inject.name.Named;
+
 import com.twitter.common.base.Function;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.JobConfiguration;
@@ -35,12 +43,6 @@ import com.twitter.mesos.scheduler.storage.StorageRole.Role;
 import com.twitter.mesos.scheduler.storage.db.DbStorage;
 import com.twitter.mesos.scheduler.storage.stream.MapStorage;
 
-import java.util.Map;
-import java.util.Set;
-import java.util.logging.Logger;
-
-import javax.annotation.Nullable;
-
 /**
  * Migrates from one {@link Storage} system to another and provides detailed results.
  *
@@ -48,7 +50,51 @@ import javax.annotation.Nullable;
  */
 public class DualStoreMigrator implements Migrator {
 
-  private static final Logger LOG = Logger.getLogger(DualStoreMigrator.class.getName());
+  /**
+   * A strategy for preparing schemas, transforming data and finalizing data migrations.
+   * Implementations can expect the following call ordering where * denotes zero or more:
+   * <ol>
+   *   <li>{@link #prepare()}
+   *   <li>*{@link #migrateTask(com.twitter.mesos.gen.ScheduledTask)}
+   *   <li>*{@link #migrateJobConfig(com.twitter.mesos.gen.JobConfiguration)}
+   *   <li>{@link #migrateFrameworkId(String)}
+   *   <li>{@link #finish(com.twitter.mesos.gen.StorageMigrationResult)}
+   * </ol>
+   */
+  public interface DataMigrator {
+
+    /**
+     * Typically prepares the source or target schema for migration.
+     *
+     * @return {@code true} if migration should proceed; {@code false} if no migration is needed
+     */
+    boolean prepare();
+
+    /**
+     * @param task A task from the source store that will be persisted to the target store.
+     * @return the task in a form suitable for storage in the target store and schema.
+     */
+    ScheduledTask migrateTask(ScheduledTask task);
+
+    /**
+     * @param jobConfiguration A job config from the source store that will be persisted to the
+     *     target store.
+     * @return the job config in a form suitable for storage in the target store and schema.
+     */
+    JobConfiguration migrateJobConfig(JobConfiguration jobConfiguration);
+
+    /**
+     * Allows implementors to change the framework id persisted to the target store.
+     *
+     * @param frameworkId The framework id stored in the source database
+     */
+    String migrateFrameworkId(String frameworkId);
+
+    /**
+     * Typically finalizes the target schema.
+     */
+    void finish(StorageMigrationResult migrationResult);
+  }
 
   /**
    * {@literal @Named} binding key for the Migrator's job manager ids.
@@ -68,6 +114,7 @@ public class DualStoreMigrator implements Migrator {
         requireBinding(Key.get(new TypeLiteral<Set<JobManager>>() {}));
         requireBinding(Key.get(Storage.class, StorageRoles.forRole(Role.Primary)));
         requireBinding(Key.get(Storage.class, StorageRoles.forRole(Role.Legacy)));
+        requireBinding(DataMigrator.class);
         bind(Migrator.class).to(DualStoreMigrator.class);
       }
       @Provides @Singleton @Named(JOB_MANAGER_IDS_KEY) Set<String> providesJobManagerIds(
@@ -82,15 +129,22 @@ public class DualStoreMigrator implements Migrator {
     });
   }
 
+  private static final Logger LOG = Logger.getLogger(DualStoreMigrator.class.getName());
+
   private Set<String> jobManagerIds;
   private final Storage from;
   private final Storage to;
+  private final DataMigrator dataMigrator;
   private final StorageMigrationPath migrationPath;
 
   private static final ImmutableSet<StorageMigrationPath> VALID_MIGRATION_PATHS =
-      ImmutableSet.of(MigrationUtils.migrationPath(
-          new StorageSystemId(MapStorage.STORAGE_SYSTEM_TYPE, 0),
-          new StorageSystemId(DbStorage.STORAGE_SYSTEM_TYPE, 0)));
+      ImmutableSet.of(
+          MigrationUtils.migrationPath(
+              new StorageSystemId(MapStorage.STORAGE_SYSTEM_TYPE, 0),
+              new StorageSystemId(DbStorage.STORAGE_SYSTEM_TYPE, 0)),
+          MigrationUtils.migrationPath(
+              new StorageSystemId(DbStorage.STORAGE_SYSTEM_TYPE, 0),
+              new StorageSystemId(DbStorage.STORAGE_SYSTEM_TYPE, 1)));
 
   /**
    * Creates a new {@code Migrator} that can migrate from the given legacy storage system to the new
@@ -102,10 +156,12 @@ public class DualStoreMigrator implements Migrator {
    */
   @Inject
   public DualStoreMigrator(@Named(JOB_MANAGER_IDS_KEY) Set<String> jobManagersIds,
-      @StorageRole(Role.Legacy) Storage from, @StorageRole(Role.Primary) Storage to) {
+      @StorageRole(Role.Legacy) Storage from, @StorageRole(Role.Primary) Storage to,
+      DataMigrator dataMigrator) {
     this.jobManagerIds = Preconditions.checkNotNull(jobManagersIds);
     this.from = Preconditions.checkNotNull(from);
     this.to = Preconditions.checkNotNull(to);
+    this.dataMigrator = Preconditions.checkNotNull(dataMigrator);
     migrationPath = MigrationUtils.migrationPath(from, to);
   }
 
@@ -127,10 +183,6 @@ public class DualStoreMigrator implements Migrator {
           migrationPath);
     }
 
-    if (to.hasMigrated(from)) {
-      return new StorageMigrationResult(StorageMigrationStatus.NO_MIGRATION_NEEDED, migrationPath);
-    }
-
     return to.doInTransaction(new Quiet<StorageMigrationResult>() {
       @Override public StorageMigrationResult apply(SchedulerStore toSchedulerStore,
           JobStore toJobStore, TaskStore toTaskStore) {
@@ -150,6 +202,11 @@ public class DualStoreMigrator implements Migrator {
       @Override public StorageMigrationResult apply(SchedulerStore fromSchedulerStore,
           JobStore fromJobStore, TaskStore fromTaskStore) {
 
+        if (!dataMigrator.prepare()) {
+          return new StorageMigrationResult(StorageMigrationStatus.NO_MIGRATION_NEEDED,
+              migrationPath);
+        }
+
         StorageMigrationResult migrationResult =
             new StorageMigrationResult(StorageMigrationStatus.SUCCESS, migrationPath);
 
@@ -164,21 +221,31 @@ public class DualStoreMigrator implements Migrator {
             .setJobManagerResult(migrateJobStore(fromJobStore, toJobStore))
             .setSchedulerResult(schedulerResult);
 
-        to.markMigration(migrationResult);
+        dataMigrator.finish(migrationResult);
 
         return migrationResult;
       }
     });
   }
 
+  private final Function<ScheduledTask,ScheduledTask> migrateTask =
+        new Function<ScheduledTask, ScheduledTask>() {
+          @Override public ScheduledTask apply(ScheduledTask task) {
+            return dataMigrator.migrateTask(task);
+          }
+        };
+
   private TaskMigrationResult migrateTaskStore(TaskStore fromTaskStore, TaskStore toTaskStore) {
     TaskMigrationResult taskMigrationResult = new TaskMigrationResult();
     try {
       ImmutableSortedSet<ScheduledTask> allTasks = fromTaskStore.fetch(Query.GET_ALL);
-      toTaskStore.add(allTasks);
+      ImmutableSet<ScheduledTask> migratedTasks =
+          ImmutableSet.copyOf(Iterables.transform(allTasks, migrateTask));
+      toTaskStore.add(migratedTasks);
       taskMigrationResult.setMigratedCount(allTasks.size());
     } catch (RuntimeException e) {
-      taskMigrationResult.setFailureMessage(Throwables.getStackTraceAsString(e));
+      LOG.log(Level.SEVERE, "Problem migrating tasks", e);
+      taskMigrationResult.setFailureMessage(e.toString());
     }
     return taskMigrationResult;
   }
@@ -194,12 +261,14 @@ public class DualStoreMigrator implements Migrator {
       try {
         ImmutableList.Builder<JobMigrationResult> migrationResultBuilder = ImmutableList.builder();
         for (JobConfiguration jobConfiguration : fromJobStore.fetchJobs(managerId)) {
-          String jobKey = Tasks.jobKey(jobConfiguration);
-          JobMigrationResult result = new JobMigrationResult(jobKey);
+          JobMigrationResult result = new JobMigrationResult();
           try {
-            toJobStore.saveAcceptedJob(managerId, jobConfiguration);
+            JobConfiguration migratedJob = dataMigrator.migrateJobConfig(jobConfiguration);
+            result.setJobKey(Tasks.jobKey(migratedJob));
+            toJobStore.saveAcceptedJob(managerId, migratedJob);
           } catch (RuntimeException e) {
-            result.setFailureMessage(Throwables.getStackTraceAsString(e));
+            LOG.log(Level.SEVERE, "Problem migrating jobs", e);
+            result.setFailureMessage(e.toString());
           }
           migrationResultBuilder.add(result);
         }
@@ -222,11 +291,13 @@ public class DualStoreMigrator implements Migrator {
       if (frameworkId == null) {
         return schedulerMigrationResult;
       }
-      toSchedulerStore.saveFrameworkId(frameworkId);
+      String migratedFrameworkId = dataMigrator.migrateFrameworkId(frameworkId);
+      toSchedulerStore.saveFrameworkId(migratedFrameworkId);
       schedulerMigrationResult = new SchedulerMigrationResult();
       schedulerMigrationResult.setMigratedFameworkId(frameworkId);
     } catch (RuntimeException e) {
-      schedulerMigrationResult.setFailureMessage(Throwables.getStackTraceAsString(e));
+      LOG.log(Level.SEVERE, "Problem migrating scheduler state", e);
+      schedulerMigrationResult.setFailureMessage(e.toString());
     }
     return schedulerMigrationResult;
   }

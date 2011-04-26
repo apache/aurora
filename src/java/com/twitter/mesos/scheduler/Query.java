@@ -8,6 +8,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
 
 import com.twitter.mesos.Tasks;
+import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
@@ -88,8 +89,13 @@ public class Query {
    * @return {@code true} if this query will filter to a specific job, {@code false} otherwise.
    */
   public boolean specifiesJob() {
-    return (!isEmpty(base().getOwner()) && !isEmpty(base().getJobName())
-            || !isEmpty(base().getJobKey()));
+    if (base().getOwner() != null
+        && !isEmpty(base().getOwner().getRole())
+        && !isEmpty(base().getJobName())) {
+      return true;
+    }
+
+    return !isEmpty(base().getJobKey());
   }
 
   /**
@@ -147,6 +153,14 @@ public class Query {
         Tasks.ACTIVE_FILTER);
   }
 
+  public static Query byRole(String roleAccount) {
+    return new Query(new TaskQuery().setOwner(new Identity().setRole(roleAccount)));
+  }
+
+  public static Query byUser(String userAccount) {
+    return new Query(new TaskQuery().setOwner(new Identity().setUser(userAccount)));
+  }
+
   public static Query byStatus(ScheduleStatus status) {
     return new Query(new TaskQuery().setStatuses(ImmutableSet.of(status)));
   }
@@ -155,7 +169,7 @@ public class Query {
     return new Query(new TaskQuery().setJobKey(jobKey).setStatuses(Tasks.ACTIVE_STATES));
   }
 
-  public static Query activeQuery(String owner, String jobName) {
+  public static Query activeQuery(Identity owner, String jobName) {
     return activeQuery(Tasks.jobKey(owner, jobName));
   }
 

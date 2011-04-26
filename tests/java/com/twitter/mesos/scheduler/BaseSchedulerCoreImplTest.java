@@ -1,5 +1,11 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
@@ -9,11 +15,22 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+
+import org.apache.mesos.Protos.Resource;
+import org.apache.mesos.Protos.Resource.Scalar;
+import org.apache.mesos.Protos.Resource.Type;
+import org.apache.mesos.Protos.SlaveID;
+import org.apache.mesos.Protos.SlaveOffer;
+import org.easymock.Capture;
+import org.junit.Before;
+import org.junit.Test;
+
 import com.twitter.common.base.Closure;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.CronCollisionPolicy;
+import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.LiveTaskInfo;
 import com.twitter.mesos.gen.RegisteredTaskUpdate;
@@ -29,20 +46,6 @@ import com.twitter.mesos.scheduler.SchedulerCore.UpdateException;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import com.twitter.mesos.scheduler.storage.Storage;
-import org.apache.mesos.Protos.Resource;
-import org.apache.mesos.Protos.Resource.Scalar;
-import org.apache.mesos.Protos.Resource.Type;
-import org.apache.mesos.Protos.SlaveID;
-import org.apache.mesos.Protos.SlaveOffer;
-import org.easymock.Capture;
-import org.junit.Before;
-import org.junit.Test;
-
-import java.util.Arrays;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
@@ -78,12 +81,12 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   private static final String FRAMEWORK_ID = "framework_id";
 
-  private static final String OWNER_A = "Test_Owner_A";
+  private static final Identity OWNER_A = new Identity("Test_Role_A", "Test_User_A");
   private static final String JOB_A = "Test_Job_A";
   private static final String JOB_A_KEY = Tasks.jobKey(OWNER_A, JOB_A);
   private static final TwitterTaskInfo DEFAULT_TASK = defaultTask();
 
-  private static final String OWNER_B = "Test_Owner_B";
+  private static final Identity OWNER_B = new Identity("Test_Role_B", "Test_User_B");
   private static final String JOB_B = "Test_Job_B";
 
   private static final SlaveID SLAVE_ID = SlaveID.newBuilder().setValue("SlaveId").build();
@@ -210,14 +213,33 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    expectRejected("foo/bar", "bar/foo");
-    expectRejected("foo/bar", "bar/foo");
-    expectRejected("foo&bar", "bar/foo&");
-    expectRejected("foo", "");
-    expectRejected("", "bar");
+    Identity validIdentity = new Identity("foo", "bar");
+    Identity[] invalidIdentities = {
+      new Identity().setRole("foo"),
+      new Identity("foo/", "bar"),
+      new Identity("foo", "&bar"),
+      new Identity().setUser("bar")
+    };
+
+    String validJob = "baz";
+    String[] invalidJobs = { "&baz", "/baz", "baz&", "" };
+
+    for (Identity ident : invalidIdentities) {
+      for (String job : invalidJobs) {
+        expectRejected(ident, job);
+      }
+    }
+
+    for (String job : invalidJobs) {
+      expectRejected(validIdentity, job);
+    }
+
+    for (Identity ident : invalidIdentities) {
+      expectRejected(ident, validJob);
+    }
   }
 
-  private void expectRejected(String owner, String jobName) throws ScheduleException {
+  private void expectRejected(Identity owner, String jobName) throws ScheduleException {
     try {
       scheduler.createJob(makeJob(owner, jobName, DEFAULT_TASK, 1));
       fail("Job owner/name should have been rejected.");
@@ -233,9 +255,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    int i = 0;
     for (TaskState task : getTasks(Query.GET_ALL)) {
-      assertThat(task.task.getAssignedTask().getTask().getOwner(), is(OWNER_A + i));
+      assertThat(task.task.getAssignedTask().getTask().getOwner(), is(OWNER_A));
     }
   }
 
@@ -1223,7 +1244,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     Map<Integer, TwitterTaskInfo> updateTo = Tasks.mapInfoByShardId(updatedJob.getTaskConfigs());
 
     scheduler.registerUpdate(new UpdateConfig(), updateFrom, updateTo);
-    scheduler.updateFinished(OWNER_A, JOB_A);
+    scheduler.updateFinished(OWNER_A.getRole(), JOB_A);
 
     // Register the update again.  If the previous update was not removed, this will fail.
     scheduler.registerUpdate(new UpdateConfig(), updateFrom, updateTo);
@@ -1236,7 +1257,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    scheduler.updateFinished(OWNER_A, JOB_A);
+    scheduler.updateFinished(OWNER_A.getRole(), JOB_A);
   }
 
   @Test
@@ -1643,7 +1664,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     assertThat(scheduler.getTasks(Query.GET_ALL).size(), is(numTasks));
   }
 
-  private static JobConfiguration makeJob(String owner, String jobName, TwitterTaskInfo task,
+  private static JobConfiguration makeJob(Identity owner, String jobName, TwitterTaskInfo task,
       int numTasks) {
     List<TwitterTaskInfo> tasks = Lists.newArrayList();
     for (int i = 0; i < numTasks; i++) {
@@ -1652,7 +1673,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     return makeJob(owner, jobName, tasks);
   }
 
-  private static JobConfiguration makeJob(String owner, String jobName,
+  private static JobConfiguration makeJob(Identity owner, String jobName,
       Iterable<TwitterTaskInfo> tasks) {
     JobConfiguration job = new JobConfiguration();
     job.setOwner(owner).setName(jobName);
@@ -1709,7 +1730,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     return scheduler.getTasks(Query.byStatus(status));
   }
 
-  private Set<TaskState> getTasksOwnedBy(String owner) {
+  private Set<TaskState> getTasksOwnedBy(Identity owner) {
     return scheduler.getTasks(query(owner, null, null));
   }
 
@@ -1721,15 +1742,15 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     return query(null, null, ImmutableList.copyOf(taskIds));
   }
 
-  private Query queryByOwner(String owner) {
+  private Query queryByOwner(Identity owner) {
     return query(owner, null, null);
   }
 
-  private Query queryJob(String owner, String jobName) {
+  private Query queryJob(Identity owner, String jobName) {
     return query(owner, jobName, null);
   }
 
-  private Query query(String owner, String jobName, Iterable<String> taskIds) {
+  private Query query(Identity owner, String jobName, Iterable<String> taskIds) {
     TaskQuery query = new TaskQuery();
     if (owner != null) query.setOwner(owner);
     if (jobName != null) query.setJobName(jobName);

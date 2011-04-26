@@ -1,5 +1,18 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import javax.annotation.Nullable;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
@@ -14,6 +27,10 @@ import com.google.common.collect.MapMaker;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
+
+import org.apache.mesos.Protos.Resource;
+import org.apache.mesos.Protos.SlaveOffer;
+
 import com.twitter.common.base.Closure;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -23,6 +40,7 @@ import com.twitter.common.util.Clock;
 import com.twitter.common.util.StateMachine;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.LiveTaskInfo;
 import com.twitter.mesos.gen.RegisteredTaskUpdate;
@@ -44,20 +62,6 @@ import com.twitter.mesos.scheduler.storage.Storage.Work;
 import com.twitter.mesos.scheduler.storage.StorageRole;
 import com.twitter.mesos.scheduler.storage.StorageRole.Role;
 import com.twitter.mesos.scheduler.storage.TaskStore;
-import org.apache.mesos.Protos.Resource;
-import org.apache.mesos.Protos.SlaveOffer;
-
-import javax.annotation.Nullable;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Set;
-import java.util.SortedSet;
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -183,14 +187,13 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
         taskStore.mutate(Query.GET_ALL, new Closure<ScheduledTask>() {
           @Override public void execute(ScheduledTask task) {
-            // TODO(John Sirois): implement change detection in DbStorage mutate to make this more
-            // efficient or else re-jigger where unset defaults get applied/handled
             ConfigurationManager.applyDefaultsIfUnset(task.getAssignedTask().getTask());
           }
         });
       }
     });
 
+    LOG.info("Initialization of DbStorage complete.");
     String frameworkId = getFrameworkId();
     stateMachine.transition(INITIALIZED);
     return frameworkId;
@@ -596,7 +599,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     });
   }
 
-  private void launchUpdater(String owner, String updatingJobName, String updateToken) {
+  private void launchUpdater(Identity owner, String updatingJobName, String updateToken) {
     TwitterTaskInfo baseUpdaterTask = updaterTaskBuilder.apply(updateToken);
     Preconditions.checkNotNull(baseUpdaterTask, "Unable to get updater task.");
 
@@ -633,7 +636,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
   private static TwitterTaskInfo makeBootstrapTask() {
     return new TwitterTaskInfo()
-        .setOwner("mesos")
+        .setOwner(new Identity("mesos", "mesos"))
         .setJobName("executor_bootstrap")
         .setNumCpus(1)
         .setRamMb(512)
@@ -994,14 +997,14 @@ public class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public void updateFinished(String owner, String jobName) throws UpdateException {
+  public void updateFinished(String role, String jobName) throws UpdateException {
     checkStarted();
-    checkNotBlank(owner);
+    checkNotBlank(role);
     checkNotBlank(jobName);
 
     if (!Iterables.removeIf(transform(updatesInProgress.values(), getUpdateJobKey),
-        Predicates.equalTo(jobKey(owner, jobName)))) {
-      throw new UpdateException("No update in progress for job " + jobKey(owner, jobName));
+        Predicates.equalTo(jobKey(role, jobName)))) {
+      throw new UpdateException("No update in progress for job " + jobKey(role, jobName));
     }
   }
 

@@ -18,32 +18,31 @@ import com.google.inject.Inject;
 
 import org.antlr.stringtemplate.StringTemplate;
 
-import it.sauronsoftware.cron4j.Predictor;
-
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.JobConfiguration;
-import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.CronJobManager;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerCore;
 import com.twitter.mesos.scheduler.TaskState;
 
+import it.sauronsoftware.cron4j.Predictor;
+
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**
- * HTTP interface to provide information about jobs for a specific mesos user.
+ * HTTP interface to provide information about jobs for a specific mesos role.
  *
  * @author William Farner
  */
-public class SchedulerzUser extends StringTemplateServlet {
+public class SchedulerzRole extends StringTemplateServlet {
 
-  private static Logger LOG = Logger.getLogger(SchedulerzUser.class.getName());
+  private static Logger LOG = Logger.getLogger(SchedulerzRole.class.getName());
 
-  private static final String USER_PARAM = "user";
+  private static final String ROLE_PARAM = "role";
   private static final String START_CRON_PARAM = "start_cron";
 
   private final SchedulerCore scheduler;
@@ -51,11 +50,11 @@ public class SchedulerzUser extends StringTemplateServlet {
   private final String clusterName;
 
   @Inject
-  public SchedulerzUser(@CacheTemplates boolean cacheTemplates,
+  public SchedulerzRole(@CacheTemplates boolean cacheTemplates,
       SchedulerCore scheduler,
       CronJobManager cronScheduler,
       @ClusterName String clusterName) {
-    super("schedulerzuser", cacheTemplates);
+    super("schedulerzrole", cacheTemplates);
     this.scheduler = checkNotNull(scheduler);
     this.cronScheduler = checkNotNull(cronScheduler);
     this.clusterName = checkNotBlank(clusterName);
@@ -65,16 +64,17 @@ public class SchedulerzUser extends StringTemplateServlet {
   protected void doGet(final HttpServletRequest req, final HttpServletResponse resp)
       throws ServletException, IOException {
 
-    final String user = req.getParameter(USER_PARAM);
+    final String role = req.getParameter(ROLE_PARAM);
     final String cronJobLaunched = req.getParameter(START_CRON_PARAM);
+
     final AtomicReference<String> cronLaunchException = new AtomicReference<String>();
     if (cronJobLaunched != null) {
-      if (!cronScheduler.hasJob(Tasks.jobKey(user, cronJobLaunched))) {
+      if (!cronScheduler.hasJob(Tasks.jobKey(role, cronJobLaunched))) {
         cronLaunchException.set("Unrecognized cron job " + cronJobLaunched);
       } else {
-        LOG.info("Received web request to launch cron job " + user + "/" + cronJobLaunched);
-        cronScheduler.startJobNow(Tasks.jobKey(user, cronJobLaunched));
-        resp.sendRedirect("/scheduler/user?user=" + user);
+        LOG.info("Received web request to launch cron job " + role + "/" + cronJobLaunched);
+        cronScheduler.startJobNow(Tasks.jobKey(role, cronJobLaunched));
+        resp.sendRedirect("/scheduler/role?role=" + role);
       }
     }
 
@@ -82,11 +82,11 @@ public class SchedulerzUser extends StringTemplateServlet {
       @Override public void execute(StringTemplate template) {
         template.setAttribute("cluster_name", clusterName);
 
-        if (user == null) {
+        if (role == null) {
           template.setAttribute("exception", "Please specify a user.");
           return;
         }
-        template.setAttribute("user", user);
+        template.setAttribute("role", role);
 
         if (cronLaunchException.get() != null) {
           template.setAttribute("exception", cronLaunchException);
@@ -95,7 +95,7 @@ public class SchedulerzUser extends StringTemplateServlet {
 
         Map<String, Job> jobs = Maps.newHashMap();
 
-        for (TaskState state : scheduler.getTasks(new Query(new TaskQuery().setOwner(user)))) {
+        for (TaskState state : scheduler.getTasks(Query.byRole(role))) {
           Job job = jobs.get(state.task.getAssignedTask().getTask().getJobName());
           if (job == null) {
             job = new Job();
@@ -136,7 +136,7 @@ public class SchedulerzUser extends StringTemplateServlet {
         Iterable<JobConfiguration> cronJobs = Iterables.filter(
             cronScheduler.getJobs(), new Predicate<JobConfiguration>() {
               @Override public boolean apply(JobConfiguration job) {
-                return job.getOwner().equals(user);
+                return job.getOwner().getRole().equals(role);
               }
             });
         cronJobs = DisplayUtils.sort(cronJobs, DisplayUtils.SORT_JOB_CONFIG_BY_NAME);

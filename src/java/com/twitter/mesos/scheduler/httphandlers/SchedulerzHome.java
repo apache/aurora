@@ -21,6 +21,7 @@ import org.antlr.stringtemplate.StringTemplate;
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.mesos.Tasks;
+import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.CronJobManager;
@@ -60,59 +61,60 @@ public class SchedulerzHome extends StringTemplateServlet {
       @Override public void execute(StringTemplate template) {
         template.setAttribute("cluster_name", clusterName);
 
-        Map<String, User> users = new MapMaker().makeComputingMap(new Function<String, User>() {
-          @Override public User apply(String userName) {
-            User user = new User();
-            user.name = userName;
-            return user;
-          }
-        });
+        Map<Identity, Role> owners =
+            new MapMaker().makeComputingMap(new Function<Identity, Role>() {
+              @Override public Role apply(Identity owner) {
+                Role role = new Role();
+                role.role = owner.role;
+                return role;
+              }
+            });
 
-        Multimap<String, TaskState> userJobs = HashMultimap.create();
+        Multimap<String, TaskState> ownerJobs = HashMultimap.create();
 
         Set<TaskState> tasks = scheduler.getTasks(Query.GET_ALL);
 
         for (TaskState state : tasks) {
-          User user = users.get(state.task.getAssignedTask().getTask().getOwner());
+          Role role = owners.get(state.task.getAssignedTask().getTask().getOwner());
           switch (state.task.getStatus()) {
             case PENDING:
-              user.pendingTaskCount++;
+              role.pendingTaskCount++;
               break;
 
             case STARTING:
             case RUNNING:
-              user.activeTaskCount++;
+              role.activeTaskCount++;
               break;
 
             case KILLED:
             case KILLED_BY_CLIENT:
             case FINISHED:
-              user.finishedTaskCount++;
+              role.finishedTaskCount++;
               break;
 
             case LOST:
             case NOT_FOUND:
             case FAILED:
-              user.failedTaskCount++;
+              role.failedTaskCount++;
               break;
 
             default:
               throw new IllegalArgumentException("Unsupported status: " + state.task.getStatus());
           }
 
-          userJobs.put(user.name, state);
+          ownerJobs.put(role.role, state);
         }
 
-        for (User user : users.values()) {
-          Iterable<ScheduledTask> activeUserTasks = Iterables.filter(
-              Iterables.transform(userJobs.get(user.name), TaskState.STATE_TO_SCHEDULED),
+        for (Role role : owners.values()) {
+          Iterable<ScheduledTask> activeRoleTasks = Iterables.filter(
+              Iterables.transform(ownerJobs.get(role.role), TaskState.STATE_TO_SCHEDULED),
               Tasks.ACTIVE_FILTER);
-          user.jobCount = Sets.newHashSet(Iterables.transform(
-              activeUserTasks, GET_JOB_NAME)).size();
+          role.jobCount = Sets.newHashSet(Iterables.transform(
+              activeRoleTasks, GET_JOB_NAME)).size();
         }
 
-        template.setAttribute("users",
-            DisplayUtils.sort(users.values(), DisplayUtils.SORT_USERS_BY_NAME));
+        template.setAttribute("owners",
+            DisplayUtils.sort(owners.values(), DisplayUtils.SORT_USERS_BY_NAME));
 
         template.setAttribute("cronJobs",
             DisplayUtils.sort(cronScheduler.getJobs(), DisplayUtils.SORT_JOB_CONFIG_BY_NAME));
@@ -127,16 +129,16 @@ public class SchedulerzHome extends StringTemplateServlet {
         }
       };
 
-  static class User {
-    String name;
+  static class Role {
+    String role;
     int jobCount;
     private int pendingTaskCount = 0;
     private int activeTaskCount = 0;
     private int finishedTaskCount = 0;
     private int failedTaskCount = 0;
 
-    public String getName() {
-      return name;
+    public String getRole() {
+      return role;
     }
 
     public int getJobCount() {

@@ -11,6 +11,7 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.Maps;
 
 import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.LiveTaskInfo;
 import com.twitter.mesos.gen.ScheduleStatus;
@@ -145,8 +146,12 @@ public class Tasks {
     };
   }
 
-  public static String jobKey(String owner, String jobName) {
-    return owner + "/" + jobName;
+  public static String jobKey(Identity owner, String jobName) {
+    return jobKey(owner.getRole(), jobName);
+  }
+
+  public static String jobKey(String role, String jobName) {
+    return role + "/" + jobName;
   }
 
   public static String jobKey(TwitterTaskInfo task) {

@@ -19,6 +19,7 @@ import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.mesos.gen.CreateJobResponse;
 import com.twitter.mesos.gen.CronCollisionPolicy;
+import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ResponseCode;
 import com.twitter.mesos.gen.TwitterTaskInfo;
@@ -80,7 +81,9 @@ public class CreateJob extends StringTemplateServlet {
 
   private static JobConfiguration getJobFromRequest(HttpServletRequest req) {
     JobConfiguration job = new JobConfiguration();
-    job.setOwner(req.getParameter("job_owner"));
+    Identity jobIdentity = new Identity();
+    jobIdentity.setRole(req.getParameter("job_role")).setUser(req.getParameter("job_user"));
+    job.setOwner(jobIdentity);
     job.setName(req.getParameter("job_name"));
     job.setCronSchedule(req.getParameter("cron_schedule"));
 

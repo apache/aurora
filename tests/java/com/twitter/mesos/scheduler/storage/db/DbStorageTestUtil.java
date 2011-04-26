@@ -1,19 +1,19 @@
 package com.twitter.mesos.scheduler.storage.db;
 
+import java.sql.SQLException;
+import java.util.logging.Logger;
+
 import com.google.common.base.Preconditions;
 import com.google.common.testing.TearDown;
 import com.google.common.testing.TearDownAccepter;
+
 import org.h2.tools.Server;
-import org.springframework.core.io.ClassRelativeResourceLoader;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabase;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
 import org.springframework.transaction.support.TransactionTemplate;
-
-import java.sql.SQLException;
-import java.util.logging.Logger;
 
 /**
  * Provides utility methods for testing against H2 databases.
@@ -59,7 +59,7 @@ final class DbStorageTestUtil {
     JdbcTemplate jdbcTemplate = new JdbcTemplate(embeddedDatabase);
     TransactionTemplate transactionTemplate =
         new TransactionTemplate(new DataSourceTransactionManager(embeddedDatabase));
-    return new DbStorage(jdbcTemplate, transactionTemplate);
+    return new DbStorage(jdbcTemplate, transactionTemplate, -1 /* version */);
   }
 
   private DbStorageTestUtil() {

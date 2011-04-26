@@ -147,11 +147,11 @@ public interface SchedulerCore {
   /**
    * Identical to {@link #updateFinished(String)}, but allows canceling by owner and job name.
    *
-   * @param owner The owner of the job to cancel an update for.
+   * @param role The role account of the job to cancel an update for.
    * @param jobName The name of the job to cancel an update for.
    * @throws com.twitter.mesos.scheduler.SchedulerCoreImpl.UpdateException If an update was not found for the job spec.
    */
-  void updateFinished(String owner, String jobName) throws SchedulerCoreImpl.UpdateException;
+  void updateFinished(String role, String jobName) throws SchedulerCoreImpl.UpdateException;
 
   class RestartException extends Exception {
     RestartException(String msg) { super(msg); }

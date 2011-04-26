@@ -1,13 +1,14 @@
 package com.twitter.mesos.scheduler.httphandlers;
 
-import com.google.common.collect.Lists;
-import com.twitter.mesos.gen.JobConfiguration;
-import com.twitter.mesos.scheduler.httphandlers.SchedulerzHome.User;
-import com.twitter.mesos.scheduler.httphandlers.SchedulerzUser.Job;
-
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+
+import com.google.common.collect.Lists;
+
+import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.scheduler.httphandlers.SchedulerzHome.Role;
+import com.twitter.mesos.scheduler.httphandlers.SchedulerzRole.Job;
 
 /**
  * Utility class to hold common display helper functions.
@@ -22,9 +23,9 @@ public class DisplayUtils {
     return copy;
   }
 
-  public static final Comparator<User> SORT_USERS_BY_NAME = new Comparator<User>() {
-      @Override public int compare(User userA, User userB) {
-        return userA.name.compareTo(userB.name);
+  public static final Comparator<Role> SORT_USERS_BY_NAME = new Comparator<Role>() {
+      @Override public int compare(Role roleA, Role roleB) {
+        return roleA.role.compareTo(roleB.role);
       }
     };
 
