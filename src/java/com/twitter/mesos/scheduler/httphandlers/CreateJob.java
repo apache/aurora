@@ -2,9 +2,6 @@ package com.twitter.mesos.scheduler.httphandlers;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.servlet.http.HttpServletRequest;
@@ -25,9 +22,11 @@ import com.twitter.mesos.gen.CronCollisionPolicy;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ResponseCode;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.SchedulerThriftInterface;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**
  * Servlet to support job creation through the web interface.
@@ -38,30 +37,23 @@ public class CreateJob extends StringTemplateServlet {
 
   private static final Logger LOG = Logger.getLogger(CreateJob.class.getName());
 
-  private final String hostname;
-
   private final SchedulerThriftInterface scheduler;
+  private final String clusterName;
 
   @Inject
-  CreateJob(@CacheTemplates boolean cacheTemplates, SchedulerThriftInterface scheduler) {
+  CreateJob(@CacheTemplates boolean cacheTemplates,
+      SchedulerThriftInterface scheduler,
+      @ClusterName String clusterName) {
     super("create_job", cacheTemplates);
+    this.clusterName = checkNotBlank(clusterName);
     this.scheduler = checkNotNull(scheduler);
-
-    String hostname = null;
-    try {
-      hostname = InetAddress.getLocalHost().getHostName();
-    } catch (UnknownHostException e) {
-      LOG.log(Level.SEVERE, "Failed to get hostname.", e);
-    }
-
-    this.hostname = hostname;
   }
 
   @Override
   protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
     writeTemplate(resp, new Closure<StringTemplate>() {
       @Override public void execute(StringTemplate template) {
-        template.setAttribute("scheduler", hostname);
+        template.setAttribute("cluster_name", clusterName);
       }
     });
   }

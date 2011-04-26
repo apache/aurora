@@ -128,10 +128,16 @@ public class SchedulerModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> EXECUTOR_DEAD_THRESHOLD =
       Arg.create(Amount.of(10L, Time.MINUTES));
 
+  @NotNull
+  @CmdLine(name = "cluster_name", help = "Name to identify the cluster being served.")
+  private static final Arg<String> CLUSTER_NAME = Arg.create();
+
   @Override
   protected void configure() {
     // Enable intercepted method timings
     TimedInterceptor.bind(binder());
+
+    bind(Key.get(String.class, ClusterName.class)).toInstance(CLUSTER_NAME.get());
 
     // Bindings for MesosSchedulerImpl.
     bind(SchedulerCore.class).to(SchedulerCoreImpl.class).in(Singleton.class);

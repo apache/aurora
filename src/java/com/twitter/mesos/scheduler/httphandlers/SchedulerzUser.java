@@ -15,19 +15,24 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.inject.Inject;
+
+import org.antlr.stringtemplate.StringTemplate;
+
+import it.sauronsoftware.cron4j.Predictor;
+
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.TaskQuery;
+import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.CronJobManager;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerCore;
 import com.twitter.mesos.scheduler.TaskState;
 
-import org.antlr.stringtemplate.StringTemplate;
-
-import it.sauronsoftware.cron4j.Predictor;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**
  * HTTP interface to provide information about jobs for a specific mesos user.
@@ -41,12 +46,19 @@ public class SchedulerzUser extends StringTemplateServlet {
   private static final String USER_PARAM = "user";
   private static final String START_CRON_PARAM = "start_cron";
 
-  @Inject private SchedulerCore scheduler;
-  @Inject private CronJobManager cronScheduler;
+  private final SchedulerCore scheduler;
+  private final CronJobManager cronScheduler;
+  private final String clusterName;
 
   @Inject
-  public SchedulerzUser(@CacheTemplates boolean cacheTemplates) {
+  public SchedulerzUser(@CacheTemplates boolean cacheTemplates,
+      SchedulerCore scheduler,
+      CronJobManager cronScheduler,
+      @ClusterName String clusterName) {
     super("schedulerzuser", cacheTemplates);
+    this.scheduler = checkNotNull(scheduler);
+    this.cronScheduler = checkNotNull(cronScheduler);
+    this.clusterName = checkNotBlank(clusterName);
   }
 
   @Override
@@ -67,8 +79,8 @@ public class SchedulerzUser extends StringTemplateServlet {
     }
 
     writeTemplate(resp, new Closure<StringTemplate>() {
-      @Override
-      public void execute(StringTemplate template) {
+      @Override public void execute(StringTemplate template) {
+        template.setAttribute("cluster_name", clusterName);
 
         if (user == null) {
           template.setAttribute("exception", "Please specify a user.");

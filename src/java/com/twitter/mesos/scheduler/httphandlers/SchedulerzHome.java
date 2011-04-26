@@ -1,5 +1,13 @@
 package com.twitter.mesos.scheduler.httphandlers;
 
+import java.io.IOException;
+import java.util.Map;
+import java.util.Set;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
 import com.google.common.base.Function;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Iterables;
@@ -7,22 +15,21 @@ import com.google.common.collect.MapMaker;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
+
+import org.antlr.stringtemplate.StringTemplate;
+
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.CronJobManager;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerCore;
 import com.twitter.mesos.scheduler.TaskState;
-import org.antlr.stringtemplate.StringTemplate;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.util.Map;
-import java.util.Set;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**
  * HTTP interface to serve as a HUD for the mesos scheduler.
@@ -31,12 +38,19 @@ import java.util.Set;
  */
 public class SchedulerzHome extends StringTemplateServlet {
 
-  @Inject private SchedulerCore scheduler;
-  @Inject private CronJobManager cronScheduler;
+  private final SchedulerCore scheduler;
+  private final CronJobManager cronScheduler;
+  private final String clusterName;
 
   @Inject
-  public SchedulerzHome(@CacheTemplates boolean cacheTemplates) {
+  public SchedulerzHome(@CacheTemplates boolean cacheTemplates,
+      SchedulerCore scheduler,
+      CronJobManager cronScheduler,
+      @ClusterName String clusterName) {
     super("schedulerzhome", cacheTemplates);
+    this.scheduler = checkNotNull(scheduler);
+    this.cronScheduler = checkNotNull(cronScheduler);
+    this.clusterName = checkNotBlank(clusterName);
   }
 
   @Override
@@ -44,6 +58,8 @@ public class SchedulerzHome extends StringTemplateServlet {
       throws ServletException, IOException {
     writeTemplate(resp, new Closure<StringTemplate>() {
       @Override public void execute(StringTemplate template) {
+        template.setAttribute("cluster_name", clusterName);
+
         Map<String, User> users = new MapMaker().makeComputingMap(new Function<String, User>() {
           @Override public User apply(String userName) {
             User user = new User();

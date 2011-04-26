@@ -1,24 +1,5 @@
 package com.twitter.mesos.scheduler.httphandlers;
 
-import com.google.common.base.Predicates;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
-import com.google.inject.Inject;
-import com.twitter.common.base.Closure;
-import com.twitter.common.net.http.handlers.StringTemplateServlet;
-import com.twitter.mesos.Tasks;
-import com.twitter.mesos.gen.LiveTask;
-import com.twitter.mesos.gen.ScheduleStatus;
-import com.twitter.mesos.gen.TaskQuery;
-import com.twitter.mesos.scheduler.Query;
-import com.twitter.mesos.scheduler.SchedulerCore;
-import com.twitter.mesos.scheduler.TaskState;
-import org.antlr.stringtemplate.StringTemplate;
-
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Comparator;
@@ -27,7 +8,40 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static com.twitter.mesos.gen.ScheduleStatus.*;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import com.google.common.base.Predicates;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.inject.Inject;
+
+import org.antlr.stringtemplate.StringTemplate;
+
+import com.twitter.common.base.Closure;
+import com.twitter.common.net.http.handlers.StringTemplateServlet;
+import com.twitter.mesos.Tasks;
+import com.twitter.mesos.gen.LiveTask;
+import com.twitter.mesos.gen.ScheduleStatus;
+import com.twitter.mesos.gen.TaskQuery;
+import com.twitter.mesos.scheduler.ClusterName;
+import com.twitter.mesos.scheduler.Query;
+import com.twitter.mesos.scheduler.SchedulerCore;
+import com.twitter.mesos.scheduler.TaskState;
+
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.twitter.common.base.MorePreconditions.checkNotBlank;
+import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
+import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
+import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
+import static com.twitter.mesos.gen.ScheduleStatus.KILLED_BY_CLIENT;
+import static com.twitter.mesos.gen.ScheduleStatus.LOST;
+import static com.twitter.mesos.gen.ScheduleStatus.NOT_FOUND;
+import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
+import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
+import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 
 /**
  * HTTP interface to view information about a job in the mesos scheduler.
@@ -67,11 +81,16 @@ public class SchedulerzJob extends StringTemplateServlet {
         }
       };
 
-  @Inject private SchedulerCore scheduler;
+  private final SchedulerCore scheduler;
+  private final String clusterName;
 
   @Inject
-  public SchedulerzJob(@CacheTemplates boolean cacheTemplates) {
+  public SchedulerzJob(@CacheTemplates boolean cacheTemplates,
+      SchedulerCore scheduler,
+      @ClusterName String clusterName) {
     super("schedulerzjob", cacheTemplates);
+    this.scheduler = checkNotNull(scheduler);
+    this.clusterName = checkNotBlank(clusterName);
   }
 
   @Override
@@ -79,6 +98,8 @@ public class SchedulerzJob extends StringTemplateServlet {
       throws ServletException, IOException {
     writeTemplate(resp, new Closure<StringTemplate>() {
       @Override public void execute(StringTemplate template) {
+        template.setAttribute("cluster_name", clusterName);
+
         String user = req.getParameter(USER_PARAM);
         if (user == null) {
           template.setAttribute("exception", "Please specify a user.");
