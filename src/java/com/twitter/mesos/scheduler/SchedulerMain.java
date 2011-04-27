@@ -84,7 +84,11 @@ public class SchedulerMain extends AbstractApplication {
       } catch (UpdateException e) {
         LOG.log(Level.WARNING, "Failed to leave server set.", e);
       } finally {
-        scheduler.stop();
+
+        // TODO(John Sirois): add a call to scheduler.failover() or scheduler.restarting() when this
+        // becomes available.  The existing scheduler.stop() deregisters our framework and kills all
+        // our executors causing more ripple than is needed.
+
         lifecycle.shutdown();
         // TODO(William Farner): This seems necessary to break out of the blocking driver run.
         System.exit(1);
