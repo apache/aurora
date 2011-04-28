@@ -85,9 +85,10 @@ public class SchedulerMain extends AbstractApplication {
         LOG.log(Level.WARNING, "Failed to leave server set.", e);
       } finally {
 
-        // TODO(John Sirois): add a call to scheduler.failover() or scheduler.restarting() when this
-        // becomes available.  The existing scheduler.stop() deregisters our framework and kills all
+        // TODO(John Sirois): add a call to driver.failover() or driver.restarting() when this
+        // becomes available.  The existing driver.stop() deregisters our framework and kills all
         // our executors causing more ripple than is needed.
+        scheduler.stop();
 
         lifecycle.shutdown();
         // TODO(William Farner): This seems necessary to break out of the blocking driver run.
@@ -200,13 +201,6 @@ public class SchedulerMain extends AbstractApplication {
           }
         }
     ).start();
-
-    shutdownRegistry.addAction(new Command() {
-      @Override public void execute() {
-        LOG.info("Stopping mesos driver.");
-        driver.stop();
-      }
-    });
   }
 
   private int startThriftServer() throws IOException, TTransportException,
