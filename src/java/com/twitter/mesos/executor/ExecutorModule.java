@@ -51,6 +51,7 @@ import com.twitter.mesos.executor.ProcessKiller.KillCommand;
 import com.twitter.mesos.executor.ProcessKiller.KillException;
 import com.twitter.mesos.executor.httphandlers.ExecutorHome;
 import com.twitter.mesos.executor.httphandlers.TaskHome;
+import com.twitter.mesos.executor.migrations.DeadTaskMigratorModule;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.util.HdfsUtil;
 
@@ -162,6 +163,9 @@ public class ExecutorModule extends AbstractModule {
       LOG.log(Level.SEVERE, "Failed to create HDFS fileSystem.", e);
       Throwables.propagate(e);
     }
+
+    // Binds a migrator for dead task serialized structs
+    install(new DeadTaskMigratorModule());
 
     Registration.registerServlet(binder(), "/task", TaskHome.class, false);
     Registration.registerServlet(binder(), "/executor", ExecutorHome.class, false);

@@ -1,20 +1,21 @@
 package com.twitter.mesos.executor;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Charsets;
-import com.google.common.base.Preconditions;
-import com.google.common.io.Files;
-import com.twitter.mesos.Tasks;
-import com.twitter.mesos.codec.ThriftBinaryCodec;
-import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
-import com.twitter.mesos.gen.AssignedTask;
-import com.twitter.mesos.gen.ScheduleStatus;
-
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Charsets;
+import com.google.common.base.Preconditions;
+import com.google.common.io.Files;
+
+import com.twitter.mesos.Tasks;
+import com.twitter.mesos.codec.ThriftBinaryCodec;
+import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
+import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.ScheduleStatus;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -59,7 +60,7 @@ public abstract class TaskOnDisk implements Task {
    *
    * @throws TaskStorageException If there was a problem recording the task.
    */
-  protected void recordTask() throws TaskStorageException {
+  public void recordTask() throws TaskStorageException {
     checkTaskRoot(taskRoot);
 
     AssignedTask task = getAssignedTask();
