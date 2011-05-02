@@ -38,6 +38,7 @@ import com.twitter.common.zookeeper.ServerSet.EndpointStatus;
 import com.twitter.common.zookeeper.ServerSet.UpdateException;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.SingletonService.LeadershipListener;
+import com.twitter.common_internal.webassets.Blueprint;
 import com.twitter.mesos.gen.MesosSchedulerManager;
 import com.twitter.mesos.gen.StorageMigrationResult;
 import com.twitter.mesos.scheduler.storage.Migrator;
@@ -111,7 +112,8 @@ public class SchedulerMain extends AbstractApplication {
         new HttpModule(),
         new LogModule(),
         new SchedulerModule(),
-        new StatsModule()
+        new StatsModule(),
+        new Blueprint.HttpAssetModule()
     );
   }
 

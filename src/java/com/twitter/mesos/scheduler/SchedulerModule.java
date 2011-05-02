@@ -54,7 +54,6 @@ import com.twitter.mesos.scheduler.MesosSchedulerImpl.ExecutorPath;
 import com.twitter.mesos.scheduler.PulseMonitor.PulseMonitorImpl;
 import com.twitter.mesos.scheduler.SchedulingFilter.SchedulingFilterImpl;
 import com.twitter.mesos.scheduler.httphandlers.CreateJob;
-import com.twitter.mesos.scheduler.httphandlers.HttpAssets;
 import com.twitter.mesos.scheduler.httphandlers.Mname;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzHome;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzJob;
@@ -163,7 +162,6 @@ public class SchedulerModule extends AbstractModule {
     bind(String.class).annotatedWith(ExecutorPath.class).toInstance(executorPath.get());
     bind(Scheduler.class).to(MesosSchedulerImpl.class).in(Singleton.class);
 
-    HttpAssets.register(binder());
     Registration.registerServlet(binder(), "/scheduler", SchedulerzHome.class, false);
     Registration.registerServlet(binder(), "/scheduler/role", SchedulerzRole.class, true);
     Registration.registerServlet(binder(), "/scheduler/job", SchedulerzJob.class, true);
