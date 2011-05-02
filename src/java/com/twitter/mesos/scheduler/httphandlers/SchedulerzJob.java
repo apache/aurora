@@ -13,6 +13,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.google.common.base.Predicates;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -56,6 +57,10 @@ public class SchedulerzJob extends StringTemplateServlet {
   // TODO(William Farner): Allow filtering by task status.
   private static final String STATUS_FILTER_PARAM = "status";
 
+  // Pagination controls.
+  private static final String OFFSET_PARAM = "o";
+  private static final int PAGE_SIZE = 50;
+
   private static final Map<ScheduleStatus, Set<ScheduleStatus>> FILTER_MAP =
       ImmutableMap.<ScheduleStatus, Set<ScheduleStatus>>builder()
         .put(PENDING, EnumSet.of(PENDING))
@@ -94,6 +99,29 @@ public class SchedulerzJob extends StringTemplateServlet {
     this.clusterName = checkNotBlank(clusterName);
   }
 
+  /**
+   * Extracts the offset count from the request, and returns the number of items that should be
+   * skipped to render the page.
+   *
+   * @param req Servlet request.
+   * @return The number of items to skip to get to the requested offset.
+   */
+  private static int getOffset(HttpServletRequest req) {
+    String offset = req.getParameter(OFFSET_PARAM);
+    if (offset != null) {
+      try {
+        return Integer.parseInt(offset);
+      } catch (NumberFormatException e) {
+        // Ignore, default to zero offset.
+      }
+    }
+    return 0;
+  }
+
+  private static <T> Iterable<T> offsetAndLimit(Iterable<T> iterable, int offset) {
+    return ImmutableList.copyOf(Iterables.limit(Iterables.skip(iterable, offset), PAGE_SIZE));
+  }
+
   @Override
   protected void doGet(final HttpServletRequest req, HttpServletResponse resp)
       throws ServletException, IOException {
@@ -118,6 +146,8 @@ public class SchedulerzJob extends StringTemplateServlet {
         String filterArg = req.getParameter(STATUS_FILTER_PARAM);
         ScheduleStatus statusFilter = null;
         if (filterArg != null) {
+          template.setAttribute(STATUS_FILTER_PARAM, filterArg);
+
           try {
             statusFilter = ScheduleStatus.valueOf(filterArg.toUpperCase());
           } catch (IllegalArgumentException e) {
@@ -132,6 +162,9 @@ public class SchedulerzJob extends StringTemplateServlet {
             .setOwner(identity)
             .setJobName(job);
 
+        int offset = getOffset(req);
+        boolean hasMore = false;
+
         Set<TaskState> activeTasks;
         if (statusFilter != null) {
           query.setStatuses(FILTER_MAP.get(statusFilter));
@@ -142,14 +175,23 @@ public class SchedulerzJob extends StringTemplateServlet {
               scheduler.getTasks(new Query(query, Predicates.not(Tasks.ACTIVE_FILTER))),
               TaskState.STATE_TO_LIVE));
           Collections.sort(completedTasks, REVERSE_CHRON_COMPARATOR);
-          template.setAttribute("completedTasks", completedTasks);
+          template.setAttribute("completedTasks", offsetAndLimit(completedTasks, offset));
+          hasMore = completedTasks.size() > offset + PAGE_SIZE;
         }
 
         List<LiveTask> liveTasks = Lists.newArrayList(Iterables.transform(activeTasks,
             TaskState.STATE_TO_LIVE));
 
         Collections.sort(liveTasks, SHARD_ID_COMPARATOR);
-        template.setAttribute("activeTasks", liveTasks);
+        template.setAttribute("activeTasks", offsetAndLimit(liveTasks, offset));
+        hasMore = hasMore || liveTasks.size() > (offset + PAGE_SIZE);
+
+        if (offset > 0) {
+          template.setAttribute("prevOffset", Math.max(0, offset - PAGE_SIZE));
+        }
+        if (hasMore) {
+          template.setAttribute("nextOffset", offset + PAGE_SIZE);
+        }
       }
     });
   }
