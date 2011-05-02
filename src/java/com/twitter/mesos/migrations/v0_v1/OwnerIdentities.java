@@ -17,6 +17,7 @@ public final class OwnerIdentities {
   /**
    * @param task a v0 task struct
    * @return a v1 owner identity that represents the tasks v0 owner
+   * @throws IllegalArgumentException if the task does not have a proper owner
    */
   public static Identity getOwner(TwitterTaskInfo task) {
     return repairIdentity(task.getOldOwner(), task.getOwner());
@@ -26,6 +27,7 @@ public final class OwnerIdentities {
    * @param oldOwner a possibly null v0 owner string
    * @param owner a possibly null v1 owner identity
    * @return {@code owner} if non-null; otherwise an identity constructed from the {@code oldOwner}
+   * @throws IllegalArgumentException if the task does not have a proper owner
    */
   public static Identity repairIdentity(@Nullable String oldOwner, @Nullable Identity owner) {
     Preconditions.checkArgument(oldOwner != null || owner != null,

@@ -23,7 +23,7 @@ public class OwnerMigrator implements DeadTaskMigrator {
   @Override
   public boolean migrateDeadTask(DeadTask task) throws TaskStorageException {
     TwitterTaskInfo taskInfo = task.getAssignedTask().getTask();
-    Identity migratedOwner = OwnerIdentities.getOwner(taskInfo);
+    Identity migratedOwner = migrateIdentity(taskInfo);
     if (migratedOwner.equals(taskInfo.getOwner())) {
       return false;
     }
@@ -32,5 +32,13 @@ public class OwnerMigrator implements DeadTaskMigrator {
     task.recordTask();
     LOG.info("Migrated task " + task.getId() + " " + Tasks.jobKey(taskInfo));
     return true;
+  }
+
+  private Identity migrateIdentity(TwitterTaskInfo taskInfo) throws TaskStorageException {
+    try {
+      return OwnerIdentities.getOwner(taskInfo);
+    } catch (IllegalArgumentException e) {
+      throw new TaskStorageException("Failed to migrate owner for " + taskInfo, e);
+    }
   }
 }

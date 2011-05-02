@@ -17,6 +17,7 @@ public interface DeadTaskMigrator {
    *
    * @param task A dead task recorded in the previous version
    * @return the {@code true} if the task was migrated and {@code false} if it was up to date
+   * @throws TaskStorageException if there was a problem migrating the dead task
    */
   boolean migrateDeadTask(DeadTask task) throws TaskStorageException;
 
