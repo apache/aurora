@@ -1,16 +1,12 @@
 package com.twitter.mesos.executor;
 
-import com.google.common.base.Preconditions;
-import com.google.inject.Inject;
-import com.twitter.common.base.Closure;
-import com.twitter.mesos.codec.ThriftBinaryCodec;
-import com.twitter.mesos.executor.Task.TaskRunException;
-import com.twitter.mesos.gen.AssignedTask;
-import com.twitter.mesos.gen.ExecutorMessage;
-import com.twitter.mesos.gen.ScheduleStatus;
-
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import com.google.common.base.Preconditions;
+import com.google.inject.Inject;
 
 import org.apache.mesos.Executor;
 import org.apache.mesos.ExecutorDriver;
@@ -21,12 +17,22 @@ import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskState;
 import org.apache.mesos.Protos.TaskStatus;
 
+import com.twitter.common.base.Closure;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
+import com.twitter.mesos.codec.ThriftBinaryCodec;
+import com.twitter.mesos.executor.Task.TaskRunException;
+import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.ExecutorMessage;
+import com.twitter.mesos.gen.ScheduleStatus;
+
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
 
 public class MesosExecutorImpl implements Executor {
 
   private static final Logger LOG = Logger.getLogger(MesosExecutorImpl.class.getName());
 
+  private final CountDownLatch initialized = new CountDownLatch(1);
   private final ExecutorCore executorCore;
   private final Driver driver;
   private SlaveID slaveId;
@@ -43,6 +49,11 @@ public class MesosExecutorImpl implements Executor {
     executorCore.setSlaveId(executorArgs.getSlaveId().getValue());
     driver.init(executorDriver, executorArgs);
     slaveId = executorArgs.getSlaveId();
+    initialized.countDown();
+  }
+
+  public boolean awaitInit(Amount<Long, Time> timeout) throws InterruptedException {
+    return initialized.await(timeout.as(Time.MILLISECONDS), TimeUnit.MILLISECONDS);
   }
 
   @Override

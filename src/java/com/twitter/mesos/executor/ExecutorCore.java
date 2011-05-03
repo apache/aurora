@@ -27,7 +27,9 @@ import com.google.inject.name.Named;
 
 import org.apache.commons.io.FileSystemUtils;
 
+import com.twitter.common.application.ActionRegistry;
 import com.twitter.common.base.Closure;
+import com.twitter.common.base.Command;
 import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.BuildInfo;
@@ -110,12 +112,19 @@ public class ExecutorCore implements TaskManager {
 
   /**
    * Initiates periodic tasks that the executor performs (state sync, resource monitoring, etc).
+   *
+   * @param shutdownRegistry to register orderly shutdown of the periodic task scheduler.
    */
-  void startPeriodicTasks() {
-    // TODO(William Farner): Apply a shutdown registry here to cleanly halt these tasks.
-    new ResourceManager(this, executorRootDir).start();
+  void startPeriodicTasks(ActionRegistry shutdownRegistry) {
+    new ResourceManager(this, executorRootDir, shutdownRegistry).start();
     startStateSync();
     startRegisteredTaskPusher();
+    shutdownRegistry.addAction(new Command() {
+      @Override public void execute() {
+        LOG.info("Shutting down sync executor.");
+        syncExecutor.shutdownNow();
+      }
+    });
   }
 
   void setSlaveId(String slaveId) {

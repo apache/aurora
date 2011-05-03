@@ -1,18 +1,21 @@
 package com.twitter.mesos.executor;
 
-import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.twitter.common.base.Closure;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Data;
-import com.twitter.common.quantity.Time;
-
 import java.io.File;
 import java.io.FileFilter;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
+
+import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+
+import com.twitter.common.application.ActionRegistry;
+import com.twitter.common.base.Closure;
+import com.twitter.common.base.Command;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Data;
+import com.twitter.common.quantity.Time;
 
 /**
  * Manages system resources and periodically gathers information about resource consumption by
@@ -29,17 +32,21 @@ public class ResourceManager {
 
   private final File managedDir;
   private final TaskManager taskManager;
+  private final ActionRegistry shutdownRegistry;
   // TODO(William Farner): Enable this if we decide to use this instead of pushing it into the mesos
   //    core.
   //private final ResourceScanner resourceScanner;
 
-  public ResourceManager(TaskManager taskManager, File managedDir) {
+  public ResourceManager(TaskManager taskManager, File managedDir,
+      ActionRegistry shutdownRegistry) {
     this.managedDir = Preconditions.checkNotNull(managedDir);
     Preconditions.checkArgument(managedDir.exists(),
         "Managed directory does not exist: " + managedDir);
 
     this.taskManager = Preconditions.checkNotNull(taskManager);
     //this.resourceScanner = new LinuxProcScraper();
+
+    this.shutdownRegistry = Preconditions.checkNotNull(shutdownRegistry);
   }
 
   public void start() {
@@ -121,9 +128,15 @@ public class ResourceManager {
         managedDir, completedTaskFileFilter, MAX_DISK_SPACE, gcCallback);
 
     // TODO(William Farner): Make GC intervals configurable.
-    ScheduledExecutorService gcExecutor = new ScheduledThreadPoolExecutor(2,
+    final ScheduledExecutorService gcExecutor = new ScheduledThreadPoolExecutor(2,
         new ThreadFactoryBuilder().setDaemon(true).setNameFormat("Disk GC-%d").build());
     gcExecutor.scheduleAtFixedRate(expiredDirGc, 1, 5, TimeUnit.MINUTES);
     gcExecutor.scheduleAtFixedRate(completedTaskGc, 2, 1, TimeUnit.MINUTES);
+    shutdownRegistry.addAction(new Command() {
+      @Override public void execute() throws RuntimeException {
+        LOG.info("Shutting down gc executor.");
+        gcExecutor.shutdownNow();
+      }
+    });
   }
 }
