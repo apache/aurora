@@ -33,7 +33,7 @@ public class ExecutorMain extends AbstractApplication {
   @CmdLine(name = "executor_initialization_timeout",
       help = "Specifies the maximum amount of time to wait for the executor driver to initialize "
              + "before comitting suicide.")
-  private final Arg<Amount<Long, Time>> driverInitializationTimeout =
+  private static final Arg<Amount<Long, Time>> driverInitializationTimeout =
       Arg.create(Amount.of(5L, Time.SECONDS));
 
   private static final Logger LOG = Logger.getLogger(ExecutorMain.class.getName());
