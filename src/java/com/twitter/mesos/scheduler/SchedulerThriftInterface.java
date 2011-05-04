@@ -1,15 +1,16 @@
 package com.twitter.mesos.scheduler;
 
-import java.util.Map;
 import java.util.Set;
 import java.util.logging.Logger;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
-import com.twitter.common.thrift.ThriftServer;
+
+import org.apache.commons.lang.StringUtils;
+
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.CreateJobResponse;
 import com.twitter.mesos.gen.JobConfiguration;
@@ -30,11 +31,11 @@ import com.twitter.mesos.scheduler.SchedulerCore.UpdateException;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 
-import org.apache.commons.lang.StringUtils;
-
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
-import static com.twitter.mesos.gen.ResponseCode.*;
+import static com.twitter.mesos.gen.ResponseCode.INVALID_REQUEST;
+import static com.twitter.mesos.gen.ResponseCode.OK;
+import static com.twitter.mesos.gen.ResponseCode.WARNING;
 
 /**
  * Mesos scheduler thrift server implementation.
@@ -42,15 +43,14 @@ import static com.twitter.mesos.gen.ResponseCode.*;
  *
  * @author William Farner
  */
-public class SchedulerThriftInterface extends ThriftServer implements MesosSchedulerManager.Iface {
+public class SchedulerThriftInterface implements MesosSchedulerManager.Iface {
   private static final Logger LOG = Logger.getLogger(SchedulerThriftInterface.class.getName());
 
   private final SchedulerCore schedulerCore;
 
   @Inject
   public SchedulerThriftInterface(SchedulerCore schedulerCore) {
-    super("TwitterMesosScheduler", "1");
-    this.schedulerCore = schedulerCore;
+    this.schedulerCore = Preconditions.checkNotNull(schedulerCore);
   }
 
   @Override
@@ -240,45 +240,5 @@ public class SchedulerThriftInterface extends ThriftServer implements MesosSched
     }
 
     return new ShardUpdateResponse(response, message, restartedTaskIds);
-  }
-
-  @Override
-  protected void tryShutdown() throws Exception {
-    // TODO(William Farner): Implement.
-  }
-
-  @Override
-  public String getStatusDetails() {
-    // TODO(William Farner): Return something useful here.
-    return "Not implemented";
-  }
-
-  @Override
-  public Map<String, Long> getCounters() {
-    // TODO(William Farner): Return something useful here.
-    return Maps.newHashMap();
-  }
-
-  @Override
-  public long getCounter(String key) {
-    // TODO(William Farner): Return something useful here.
-    return 0;
-  }
-
-  @Override
-  public void setOption(String key, String value) {
-    // TODO(William Farner): Implement.
-  }
-
-  @Override
-  public String getOption(String key) {
-    // TODO(William Farner): Return something useful here.
-    return "Not implemented";
-  }
-
-  @Override
-  public Map<String, String> getOptions() {
-    // TODO(William Farner): Return something useful here.
-    return Maps.newHashMap();
   }
 }

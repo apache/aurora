@@ -2,6 +2,7 @@ package com.twitter.mesos.scheduler;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -32,6 +33,8 @@ import com.twitter.common.application.modules.StatsModule;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Command;
 import com.twitter.common.net.InetSocketAddressHelper;
+import com.twitter.common.thrift.ThriftServer;
+import com.twitter.common.thrift.ThriftServer.ServerSetup;
 import com.twitter.common.thrift.Util;
 import com.twitter.common.zookeeper.Group;
 import com.twitter.common.zookeeper.ServerSet.EndpointStatus;
@@ -57,7 +60,8 @@ public class SchedulerMain extends AbstractApplication {
   private static final Logger LOG = Logger.getLogger(SchedulerMain.class.getName());
 
   @Inject private SingletonService schedulerService;
-  @Inject private SchedulerThriftInterface schedulerThriftInterface;
+  @Inject private ThriftServer schedulerThriftServer;
+  @Inject private MesosSchedulerManager.Iface schedulerThriftInterface;
   @Inject private Provider<SchedulerDriver> driverProvider;
   @Inject private AtomicReference<InetSocketAddress> schedulerThriftPort;
   @Inject private SchedulerCore scheduler;
@@ -207,16 +211,23 @@ public class SchedulerMain extends AbstractApplication {
 
   private int startThriftServer() throws IOException, TTransportException,
       Group.JoinException, InterruptedException {
-    schedulerThriftInterface.start(0,
-        new MesosSchedulerManager.Processor(schedulerThriftInterface));
+
+    ServerSocket serverSocket = new ServerSocket(0);
+    ServerSetup setup = new ServerSetup(
+        0, // TODO(John Sirois): unused, fix ServerSetup constructors
+        new MesosSchedulerManager.Processor(schedulerThriftInterface),
+        ThriftServer.BINARY_PROTOCOL.get());
+    setup.setSocket(serverSocket);
+
+    schedulerThriftServer.start(setup);
 
     shutdownRegistry.addAction(new Command() {
       @Override public void execute() {
         LOG.info("Stopping thrift server.");
-        schedulerThriftInterface.shutdown();
+        schedulerThriftServer.shutdown();
       }
     });
 
-    return schedulerThriftInterface.getListeningPort();
+    return schedulerThriftServer.getListeningPort();
   }
 }

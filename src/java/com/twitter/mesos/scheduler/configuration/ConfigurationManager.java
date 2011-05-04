@@ -24,7 +24,6 @@ import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.Resources;
 import com.twitter.mesos.scheduler.configuration.ValueParser.ParseException;
-import com.twitter.mesos.scheduler.storage.db.migrations.v0_v1.OwnerMigrator;
 
 /**
  * Manages translation from a string-mapped configuration to a concrete configuration type, and
@@ -44,33 +43,35 @@ public class ConfigurationManager {
            && (identifier.length() <= MAX_IDENTIFIED_LENGTH);
   }
 
+  private static void checkNotNull(Object value, String error) throws TaskDescriptionException {
+    if (value == null) {
+      throw new TaskDescriptionException(error);
+    }
+  }
+
+  private static void assertOwnerValidity(Identity jobOwner) throws TaskDescriptionException {
+    checkNotNull(jobOwner, "No job owner specified!");
+    checkNotNull(jobOwner.getRole(), "No job role specified!");
+    checkNotNull(jobOwner.getUser(), "No job user specified!");
+
+    if (!isGoodIdentifier(jobOwner.getRole())) {
+      throw new TaskDescriptionException("Job role contains illegal characters: " +
+          jobOwner.getRole());
+    }
+
+    if (!isGoodIdentifier(jobOwner.getUser())) {
+      throw new TaskDescriptionException("Job user contains illegal characters: " +
+          jobOwner.getUser());
+    }
+  }
+
   public static JobConfiguration validateAndPopulate(JobConfiguration job)
       throws TaskDescriptionException {
     Preconditions.checkNotNull(job);
 
     JobConfiguration copy = job.deepCopy();
 
-    // TODO(John Sirois): kill OwnerMigrator use post v0-v1 migration
-    Identity owner = OwnerMigrator.getOwner(copy);
-    copy.setOwner(owner);
-
-    if (owner.getRole() == null) {
-      throw new TaskDescriptionException("No job role specified!");
-    }
-
-    if (!isGoodIdentifier(owner.getRole())) {
-      throw new TaskDescriptionException("Job role contains illegal characters: " +
-          owner.getRole());
-    }
-
-    if (owner.getUser() == null) {
-      throw new TaskDescriptionException("No job user specified!");
-    }
-
-    if (!isGoodIdentifier(owner.getUser())) {
-      throw new TaskDescriptionException("Job user contains illegal characters: " +
-          owner.getUser());
-    }
+    assertOwnerValidity(job.getOwner());
 
     if (!isGoodIdentifier(copy.getName())) {
       throw new TaskDescriptionException("Job name contains illegal characters: " + copy.getName());
@@ -122,9 +123,7 @@ public class ConfigurationManager {
       throw new TaskDescriptionException("Tasks must have a shard ID.");
     }
 
-    // TODO(John Sirois): kill OwnerMigrator use post v0-v1 migration
-    config.setOwner(OwnerMigrator.getOwner(job));
-
+    config.setOwner(job.getOwner());
     config.setJobName(job.getName());
 
     assertUnset(config);

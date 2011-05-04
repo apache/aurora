@@ -68,9 +68,9 @@ public class SchedulerModule extends AbstractModule {
       help ="The name service name for the mesos scheduler thrift server.")
   private static final Arg<String> mesosSchedulerNameSpec = Arg.create();
 
-  @CmdLine(name = "scheduler_upgrade_storage",
-          help ="True to upgrade storage from a legacy system to a new primary system.")
-  private static final Arg<Boolean> upgradeStorage = Arg.create(true);
+  @CmdLine(name = "scheduler_upgrade_schema",
+      help ="True to upgrade storage and/or thrift structs from a legacy version.")
+  private static final Arg<Boolean> upgradeSchema = Arg.create(true);
 
   @CmdLine(name = "machine_restrictions",
       help ="Map of machine hosts to job keys."
@@ -145,9 +145,11 @@ public class SchedulerModule extends AbstractModule {
     bind(new TypeLiteral<PulseMonitor<String>>() {})
         .toInstance(new PulseMonitorImpl<String>(EXECUTOR_DEAD_THRESHOLD.get()));
 
-    if (upgradeStorage.get()) {
+    if (upgradeSchema.get()) {
+      ThriftModule.bindWithSchemaMigrator(binder());
       DbStorageModule.bindWithSchemaMigrator(binder());
     } else {
+      ThriftModule.bind(binder());
       DbStorageModule.bind(binder());
     }
 
@@ -167,6 +169,14 @@ public class SchedulerModule extends AbstractModule {
     Registration.registerServlet(binder(), "/scheduler/job", SchedulerzJob.class, true);
     Registration.registerServlet(binder(), "/mname", Mname.class, false);
     Registration.registerServlet(binder(), "/create_job", CreateJob.class, true);
+  }
+
+  // TODO(John Sirois): find a better way to bind the update job supplier that does not rely on
+  // action at a distance
+  @Provides
+  @Singleton
+  AtomicReference<InetSocketAddress> provideThriftEndpoint() {
+    return new AtomicReference<InetSocketAddress>();
   }
 
   @Provides

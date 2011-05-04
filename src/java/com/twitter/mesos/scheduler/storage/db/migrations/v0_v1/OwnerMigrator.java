@@ -7,7 +7,6 @@ import com.google.inject.Inject;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduledTask;
-import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.migrations.v0_v1.OwnerIdentities;
 import com.twitter.mesos.scheduler.storage.StorageRole;
 import com.twitter.mesos.scheduler.storage.StorageRole.Role;
@@ -36,17 +35,7 @@ public class OwnerMigrator extends SchemaMigrator {
 
   @Override
   public JobConfiguration migrateJobConfig(JobConfiguration jobConfiguration) {
-    JobConfiguration migrated = jobConfiguration.deepCopy();
-    migrated.setOwner(getOwner(jobConfiguration));
-    for (TwitterTaskInfo taskInfo : migrated.getTaskConfigs()) {
-      taskInfo.setOwner(OwnerIdentities.getOwner(taskInfo));
-    }
-    return migrated;
-  }
-
-  public static Identity getOwner(JobConfiguration jobConfiguration) {
-    return OwnerIdentities.repairIdentity(jobConfiguration.getOldOwner(), jobConfiguration
-        .getOwner());
+    return OwnerIdentities.repairOwnership(jobConfiguration);
   }
 
   public static Identity getOwner(ScheduledTask scheduledTask) {
