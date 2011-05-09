@@ -6,6 +6,8 @@ import javax.annotation.Nullable;
 
 import com.google.common.base.Preconditions;
 
+import org.springframework.core.io.ClassPathResource;
+
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.StorageMigrationResult;
@@ -63,13 +65,13 @@ public abstract class SchemaMigrator implements DataMigrator {
     if (toPrepareSqlResourcePath != null) {
       LOG.info("Executing prepare phase sql against the new primary store from resource: "
                + toPrepareSqlResourcePath);
-      to.executeSql(SchemaMigrator.this.getClass(), toPrepareSqlResourcePath, true);
+      to.executeSql(getResource(toPrepareSqlResourcePath), true);
     }
 
     if (fromPrepareSqlResourcePath != null) {
       LOG.info("Executing prepare phase sql against the legacy store from resource: "
                + fromPrepareSqlResourcePath);
-      from.executeSql(SchemaMigrator.this.getClass(), fromPrepareSqlResourcePath, true);
+      from.executeSql(getResource(fromPrepareSqlResourcePath), true);
     }
     from.ensureInitialized();
 
@@ -106,14 +108,18 @@ public abstract class SchemaMigrator implements DataMigrator {
     if (fromFinishSqlResourcePath != null) {
       LOG.info("Executing finish phase sql against the legacy store from resource: "
                + fromFinishSqlResourcePath);
-      from.executeSql(SchemaMigrator.this.getClass(), fromFinishSqlResourcePath, true);
+      from.executeSql(getResource(fromFinishSqlResourcePath), true);
     }
     if (toFinishSqlResourcePath != null) {
       LOG.info("Executing finish phase sql against the new primary store from resource: "
                + toFinishSqlResourcePath);
-      to.executeSql(SchemaMigrator.this.getClass(), toFinishSqlResourcePath, true);
+      to.executeSql(getResource(toFinishSqlResourcePath), true);
     }
 
     to.markMigration(migrationResult);
+  }
+
+  private ClassPathResource getResource(String relativePath) {
+    return new ClassPathResource(relativePath, getClass());
   }
 }

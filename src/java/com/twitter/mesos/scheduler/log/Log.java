@@ -1,12 +1,18 @@
 package com.twitter.mesos.scheduler.log;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.util.Iterator;
-
-import com.google.common.base.Preconditions;
 
 /**
  * Represents an append only log that can be read after and truncated before a known
  * {@link Position}.
+ *
+ * <p>Logs are accessed by {@link #open() opening} a {@link Stream}.  All stream
+ * access occurs with references to log entry {@link Position positions} in the stream.  These
+ * positions can be remembered between runs of a client application by recording their
+ * {@link Position#identity()} and {@link #position(byte[]) exchanging} it later for the original
+ * position.
  *
  * @author John Sirois
  */
@@ -18,78 +24,13 @@ public interface Log {
   interface Position extends Comparable<Position> {
 
     /**
-     * A position that never points to any entry but is guaranteed to immediately precede the first
-     * (oldest) log entry.
-     */
-    Position BEGINNING = new Position() {
-      @Override public int compareTo(Position o) {
-        return this == o ? 0 : -1 /* BEGINNING is always first */;
-      }
-      @Override public String toString() {
-        return "BEGINNING";
-      }
-    };
-
-    /**
-     * A position that never points to any entry but is guaranteed to immediately follow the last
-     * (newest) log entry.
-     */
-    Position END = new Position() {
-      @Override public int compareTo(Position o) {
-        return this == o ? 0 : +1 /* END is always last */;
-      }
-      @Override public String toString() {
-        return "END";
-      }
-    };
-
-    /**
-     * A base class suitable for position implementations that are not intended for subclassing
-     * themselves.
+     * A unique value that can be exchanged with the {@link Log} for this position.  Useful for
+     * saving checkpoints.
      *
-     * @param <T> the type of the the subclass itself
+     * @return this position's unique identity
      */
-    abstract class Base<T extends Base> implements Position {
-      private final Class<T> type;
+    byte[] identity();
 
-      protected Base(Class<T> type) {
-        this.type = Preconditions.checkNotNull(type);
-      }
-
-      @Override
-      public final int compareTo(Position other) {
-        if (type != other.getClass()) {
-          return -1 * other.compareTo(this);
-        }
-        return compareWith(type.cast(other));
-      }
-
-      /**
-       * Equivalent to {@link Comparable#compareTo(Object)} except that instances are guaranteed
-       * to be of this subclasses exact type.  This ensures ordering with respect to
-       * {@link Position#BEGINNING} and {@link Position#END} is always correct.
-       *
-       * @param other another position of the same type as the subclass
-       * @return a negative integer, zero, or a positive integer as this object
-       *     is less than, equal to, or greater than the {@code other} object.
-       */
-      protected abstract int compareWith(T other);
-
-      @Override
-      public final boolean equals(Object other) {
-        return (type == other.getClass()) && equalTo(type.cast(other));
-      }
-
-      /**
-       * Equivalent to {@link Object#equals(Object)} except that instances are guaranteed
-       * to be of this subclasses exact type.  This ensures instances of this subclass type will
-       * never be considered equal to {@link Position#BEGINNING} or {@link Position#END}.
-       *
-       * @param other another position of the same type as the subclass
-       * @return true if other is equivalent to this object
-       */
-      protected abstract boolean equalTo(T other);
-    }
   }
 
   /**
@@ -98,8 +39,8 @@ public interface Log {
   interface Entry {
 
     /**
-     * All entries are guaranteed to have a position between {@link Position#BEGINNING} and
-     * {@link Position#END}.
+     * All entries are guaranteed to have a position between {@link Stream#beginning()} and
+     * {@link Stream#end()}.
      *
      * @return the position of this entry on the log stream
      */
@@ -120,43 +61,105 @@ public interface Log {
     public InvalidPositionException(String message) {
       super(message);
     }
+    public InvalidPositionException(String message, Throwable cause) {
+      super(message, cause);
+    }
   }
 
   /**
-   * Appends an {@link Entry} to the end of the log stream.
-   *
-   * @param contents the data to store in the appended entry
-   * @return the posiiton of the appended entry
+   * An interface to the live {@link Log} stream that allows for appending, reading and writing
+   * entries.
    */
-  Position append(byte[] contents);
+  interface Stream extends Closeable {
+
+    /**
+     * Indicates a {@link Stream} could not be read from, written to or truncated due to some
+     * underlying IO error.
+     */
+    class StreamAccessException extends RuntimeException {
+      public StreamAccessException(String message, Throwable cause) {
+        super(message, cause);
+      }
+    }
+
+    /**
+     * Appends an {@link Entry} to the end of the log stream.
+     *
+     * @param contents the data to store in the appended entry
+     * @return the posiiton of the appended entry
+     * @throws StreamAccessException if contents could not be appended to the stream
+     */
+    Position append(byte[] contents) throws StreamAccessException;
+
+    /**
+     * Allows reading log entries after a given {@code position}. To read all log entries, pass
+     * {@link #beginning()}.  Implementations may materialize all entries after the the given
+     * position at once or the may provide some form of streaming to back the returned entry
+     * iterator.  If the implementation does use some form of streaming or batching, it may throw a
+     * {@code StreamAccessException} on any call to {@link Iterator#hasNext()} or
+     * {@link Iterator#next()}.
+     *
+     * @param position the position to read after
+     * @return an iterator that ranges from the entry after the given {@code position} to the last
+     *     entry in the log.
+     * @throws InvalidPositionException if the specified position does not exist in this log
+     * @throws StreamAccessException if the stream could not be read from
+     */
+    Iterator<Entry> readAfter(Position position)
+        throws InvalidPositionException, StreamAccessException;
+
+    /**
+     * Removes all log entries preceding and including log entry at the given {@code position}. To
+     * truncate all log entries, pass {@link #end()}.
+     *
+     * @param position the position of the latest entry to remove
+     * @return the number of entries truncated
+     * @throws InvalidPositionException if the specified position does not exist in this log
+     * @throws StreamAccessException if the stream could not be truncated
+     */
+    long truncateTo(Position position) throws InvalidPositionException, StreamAccessException;
+
+    /**
+     * Returns a position that never points to any entry but is guaranteed to immediately precede
+     * the first (oldest) log entry.
+     *
+     * @return the position immediately preceeding the first stream log entry
+     */
+    Position beginning();
+
+    /**
+     * Returns a position of the last (newest) log stream entry.
+     *
+     * @return the position immediately following the last stream log entry
+     */
+    Position end();
+
+    /**
+     * Returns a reasonable estimate of the current size of the log stream.  Depending on the
+     * implementation and rate of log stream growth the result may deviate from the actual value
+     * deemed reasonable for the log implementation.
+     *
+     * @return the current number of entries in the log stream
+     */
+    long size();
+  }
 
   /**
-   * Allows reading log entries after a given {@code position}. To read all log entries, pass
-   * {@link Position#BEGINNING}.
+   * Opens the log stream for reading writing and truncation.  Clients should ensure the stream is
+   * closed when they are done using it.
    *
-   * @param position the position of the oldest entry to read
-   * @return an iterator that ranges from the entry at the given {@code position} to the last entry
-   *     in the log.
-   * @throws InvalidPositionException if the specified position does not exist in this log
+   * @return the log stream
+   * @throws IOException if there was a problem opening the log stream
    */
-  Iterator<Entry> readAfter(Position position) throws InvalidPositionException;
+  Stream open() throws IOException;
 
   /**
-   * Removes all log entries preceding and the log entry at the given {@code position}. To truncate
-   * all log entries, pass {@link Position#END}.
+   * Exchanges an {@code identity} obtained from {@link Position#identity()} for the position
+   * uniquely associated with it.  Useful for restoring saved checkpoints.
    *
-   * @param position the position of the latest entry to remove
-   * @return the number of entries truncated
-   * @throws InvalidPositionException if the specified position does not exist in this log
+   * @param identity the identity obtained from a prior call to {@link Position#identity()}
+   * @return the corresponding position
+   * @throws InvalidPositionException if identity does not represent a position produced by this log
    */
-  long truncateBefore(Position position) throws InvalidPositionException;
-
-  /**
-   * Returns a reasonable estimate of the current size of the log stream.  Depending on the
-   * implementation and rate of log stream growth the result may deviate from the actual value
-   * deemed reasonable for the log implementation.
-   *
-   * @return the current number of entries in the log stream
-   */
-  long size();
+  Position position(byte[] identity) throws InvalidPositionException;
 }

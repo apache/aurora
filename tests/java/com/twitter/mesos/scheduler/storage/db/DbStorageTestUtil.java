@@ -1,28 +1,18 @@
 package com.twitter.mesos.scheduler.storage.db;
 
 import java.sql.SQLException;
-import java.util.logging.Logger;
 
-import com.google.common.base.Preconditions;
-import com.google.common.testing.TearDown;
 import com.google.common.testing.TearDownAccepter;
 
-import org.h2.tools.Server;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.DataSourceTransactionManager;
-import org.springframework.jdbc.datasource.embedded.EmbeddedDatabase;
-import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
-import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
-import org.springframework.transaction.support.TransactionTemplate;
+import com.twitter.mesos.scheduler.db.testing.DbTestUtil;
+import com.twitter.mesos.scheduler.db.testing.DbTestUtil.DbAccess;
 
 /**
- * Provides utility methods for testing against H2 databases.
+ * Provides utility methods for testing against DbStorage H2 databases.
  *
  * @author John Sirois
  */
 final class DbStorageTestUtil {
-
-  private static final Logger LOG = Logger.getLogger(DbStorageTestUtil.class.getName());
 
   /**
    * Sets up a DbStorage against a new in-memory database with empty tables.  Also props up the H2
@@ -34,32 +24,8 @@ final class DbStorageTestUtil {
    * @throws SQLException if there is a problem setting up the fresh in-memory database
    */
   public static DbStorage setupStorage(TearDownAccepter tearDownAccepter) throws SQLException {
-
-    Preconditions.checkNotNull(tearDownAccepter);
-
-    // Prop up a web console at: http://localhost:XXX, allows connections to jdbc:h2:mem:testdb
-    final Server webServer = Server.createWebServer("-webAllowOthers", "-webPort", "0").start();
-    tearDownAccepter.addTearDown(new TearDown() {
-      @Override public void tearDown() {
-        webServer.stop();
-      }
-    });
-    LOG.info("Test db console for jdbc:h2:mem:testdb available at: " + webServer.getURL());
-
-    final EmbeddedDatabase embeddedDatabase =
-        new EmbeddedDatabaseBuilder()
-            .setType(EmbeddedDatabaseType.H2)
-            .build();
-    tearDownAccepter.addTearDown(new TearDown() {
-      @Override public void tearDown() throws Exception {
-        embeddedDatabase.shutdown();
-      }
-    });
-
-    JdbcTemplate jdbcTemplate = new JdbcTemplate(embeddedDatabase);
-    TransactionTemplate transactionTemplate =
-        new TransactionTemplate(new DataSourceTransactionManager(embeddedDatabase));
-    return new DbStorage(jdbcTemplate, transactionTemplate, -1 /* version */);
+    DbAccess dbAccess = DbTestUtil.setupStorage(tearDownAccepter);
+    return new DbStorage(dbAccess.jdbcTemplate, dbAccess.transactionTemplate, -1 /* version */);
   }
 
   private DbStorageTestUtil() {

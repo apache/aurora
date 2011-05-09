@@ -34,6 +34,7 @@ import org.apache.thrift.TBase;
 import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TProtocol;
 import org.apache.thrift.transport.TIOStreamTransport;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -66,6 +67,7 @@ import com.twitter.mesos.gen.StorageMigrationStatus;
 import com.twitter.mesos.gen.StorageSystemId;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.Query;
+import com.twitter.mesos.scheduler.db.DbUtil;
 import com.twitter.mesos.scheduler.storage.JobStore;
 import com.twitter.mesos.scheduler.storage.MigrationUtils;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
@@ -119,17 +121,16 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
 
   public synchronized void ensureInitialized() {
     if (!initialized) {
-      executeSql(getClass(), "db-task-store-schema.sql", false);
+      executeSql(new ClassPathResource("db-task-store-schema.sql", getClass()), false);
       LOG.info("Initialized schema.");
       initialized = true;
     }
   }
 
-  public void executeSql(final Class<?> contextClass, final String sqlResourcePath,
-      final boolean logSql) {
+  public void executeSql(final ClassPathResource sqlResource, final boolean logSql) {
     transactionTemplate.execute(new TransactionCallbackWithoutResult() {
       @Override protected void doInTransactionWithoutResult(TransactionStatus status) {
-        DbStorageUtil.executeSql(jdbcTemplate, contextClass, sqlResourcePath, logSql);
+        DbUtil.executeSql(jdbcTemplate, sqlResource, logSql);
       }
     });
   }
