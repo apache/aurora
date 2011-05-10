@@ -120,7 +120,6 @@ public class SchedulerzRole extends StringTemplateServlet {
               break;
 
             case LOST:
-            case NOT_FOUND:
             case FAILED:
               job.failedTaskCount++;
               break;

@@ -40,7 +40,6 @@ import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED_BY_CLIENT;
 import static com.twitter.mesos.gen.ScheduleStatus.LOST;
-import static com.twitter.mesos.gen.ScheduleStatus.NOT_FOUND;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
@@ -66,7 +65,7 @@ public class SchedulerzJob extends StringTemplateServlet {
         .put(PENDING, EnumSet.of(PENDING))
         .put(RUNNING, EnumSet.of(STARTING, RUNNING))
         .put(FINISHED, EnumSet.of(KILLED, KILLED_BY_CLIENT, FINISHED))
-        .put(FAILED, EnumSet.of(LOST, NOT_FOUND, FAILED))
+        .put(FAILED, EnumSet.of(LOST, FAILED))
       .build();
 
   private static final Comparator<LiveTask> REVERSE_CHRON_COMPARATOR =

@@ -93,7 +93,6 @@ public class SchedulerzHome extends StringTemplateServlet {
               break;
 
             case LOST:
-            case NOT_FOUND:
             case FAILED:
               role.failedTaskCount++;
               break;

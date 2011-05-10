@@ -23,7 +23,6 @@ import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED_BY_CLIENT;
 import static com.twitter.mesos.gen.ScheduleStatus.LOST;
-import static com.twitter.mesos.gen.ScheduleStatus.NOT_FOUND;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
@@ -103,7 +102,7 @@ public class Tasks {
    * Terminal states, which a task should not move from.
    */
   public static final Set<ScheduleStatus> TERMINAL_STATES = EnumSet.of(
-      FAILED, FINISHED, KILLED, KILLED_BY_CLIENT, LOST, NOT_FOUND
+      FAILED, FINISHED, KILLED, KILLED_BY_CLIENT, LOST
   );
 
   /**

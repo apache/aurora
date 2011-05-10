@@ -825,7 +825,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
       case KILLED: // This can happen if the executor dies, or the task process itself is killed.
       case LOST:
-      case NOT_FOUND:
         // Move to pending state.
         mutateOperation = new Closure<ScheduledTask>() {
           @Override public void execute(ScheduledTask task) {

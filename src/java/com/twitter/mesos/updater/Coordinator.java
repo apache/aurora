@@ -12,6 +12,9 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
+
+import org.apache.thrift.TException;
+
 import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -29,11 +32,16 @@ import com.twitter.mesos.gen.UpdateConfigResponse;
 import com.twitter.mesos.updater.ConfigParser.UpdateConfigException;
 import com.twitter.mesos.updater.UpdateLogic.UpdateException;
 
-import org.apache.thrift.TException;
-
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
-import static com.twitter.mesos.gen.ScheduleStatus.*;
+import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
+import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
+import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
+import static com.twitter.mesos.gen.ScheduleStatus.KILLED_BY_CLIENT;
+import static com.twitter.mesos.gen.ScheduleStatus.LOST;
+import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
+import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
+import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 
 /**
  * Coordinates between the scheduler and the update logic to perform an update.
@@ -161,14 +169,15 @@ public class Coordinator {
   /**
    * Terminal states, which a task should not move from.
    */
-  private static final Set<ScheduleStatus> TERMINAL_STATES = EnumSet.of(FAILED, FINISHED, KILLED, KILLED_BY_CLIENT, LOST, NOT_FOUND);
+  private static final Set<ScheduleStatus> TERMINAL_STATES = EnumSet.of(FAILED, FINISHED, KILLED,
+      KILLED_BY_CLIENT, LOST);
   private static final Predicate<TaskEvent> IS_FAILED_EVENT = new Predicate<TaskEvent>() {
     @Override public boolean apply(TaskEvent event) {
       return TERMINAL_STATES.contains(event.getStatus());
     }
   };
 
-  private static final Set<ScheduleStatus> STARTING_STATES = ImmutableSet.of(PENDING, STARTING);
+  private static final Set<ScheduleStatus> STARTING_STATES = EnumSet.of(PENDING, STARTING);
   private static Predicate<TaskEvent> exceedingRestartTimeout(final long restartedAtTimestamp,
       final int restartTimeoutSecs) {
     return new Predicate<TaskEvent>() {
