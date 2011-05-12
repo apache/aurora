@@ -110,8 +110,8 @@ public class SchedulerMain extends AbstractApplication {
   }
 
   @Override
-  public Iterable<Module> getModules() {
-    return Arrays.<Module>asList(
+  public Iterable<? extends Module> getModules() {
+    return Arrays.asList(
         new StatsExportModule(),
         new HttpModule(),
         new LogModule(),

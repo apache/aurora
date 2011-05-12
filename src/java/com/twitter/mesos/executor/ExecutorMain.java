@@ -79,8 +79,8 @@ public class ExecutorMain extends AbstractApplication {
   }
 
   @Override
-  public Iterable<Module> getModules() {
-    return Arrays.<Module>asList(
+  public Iterable<? extends Module> getModules() {
+    return Arrays.asList(
         new LogModule(),
         new HttpModule(),
         new StatsModule(),
