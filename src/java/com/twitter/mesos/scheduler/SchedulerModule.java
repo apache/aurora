@@ -58,7 +58,31 @@ import com.twitter.mesos.scheduler.httphandlers.Mname;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzHome;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzJob;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzRole;
+import com.twitter.mesos.scheduler.storage.Migrator;
+import com.twitter.mesos.scheduler.storage.StorageRole;
 import com.twitter.mesos.scheduler.storage.db.DbStorageModule;
+import com.twitter.mesos.scheduler.storage.stream.StreamStorageModule;
+import org.apache.mesos.MesosSchedulerDriver;
+import org.apache.mesos.Protos.FrameworkID;
+import org.apache.mesos.Protos.TaskID;
+import org.apache.mesos.Scheduler;
+import org.apache.mesos.SchedulerDriver;
+import org.apache.zookeeper.server.NIOServerCnxn;
+import org.apache.zookeeper.server.ZooKeeperServer;
+import org.apache.zookeeper.server.ZooKeeperServer.BasicDataTreeBuilder;
+import org.apache.zookeeper.server.persistence.FileTxnSnapLog;
+
+import javax.annotation.Nullable;
+import java.io.File;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Logger;
+
 
 public class SchedulerModule extends AbstractModule {
   private static final Logger LOG = Logger.getLogger(SchedulerModule.class.getName());
@@ -70,7 +94,7 @@ public class SchedulerModule extends AbstractModule {
 
   @CmdLine(name = "scheduler_upgrade_schema",
       help ="True to upgrade storage and/or thrift structs from a legacy version.")
-  private static final Arg<Boolean> upgradeSchema = Arg.create(true);
+  private static final Arg<Boolean> upgradeSchema = Arg.create(false);
 
   @CmdLine(name = "machine_restrictions",
       help ="Map of machine hosts to job keys."

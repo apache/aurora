@@ -45,8 +45,8 @@ public class ConfigurationManager {
 
   private static void checkNotNull(Object value, String error) throws TaskDescriptionException {
     if (value == null) {
-      throw new TaskDescriptionException(error);
-    }
+       throw new TaskDescriptionException(error);
+     }
   }
 
   private static void assertOwnerValidity(Identity jobOwner) throws TaskDescriptionException {

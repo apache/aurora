@@ -10,6 +10,7 @@ import org.apache.mesos.Protos.SlaveOffer;
 
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.ScheduleStatus;

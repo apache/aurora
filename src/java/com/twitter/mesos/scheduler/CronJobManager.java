@@ -47,7 +47,7 @@ public class CronJobManager extends JobManager {
 
   private final AtomicLong cronJobsTriggered = Stats.exportLong("cron_jobs_triggered");
 
-  // Maps from the our unique job identifier (<owner>/<jobName>) to the unique identifier used
+  // Maps from the our unique job identifier (<role>/<jobName>) to the unique identifier used
   // internally by the cron4j scheduler.
   private final Map<String, String> scheduledJobs =
       Collections.synchronizedMap(Maps.<String, String>newHashMap());

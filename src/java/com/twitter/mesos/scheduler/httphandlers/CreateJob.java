@@ -24,7 +24,9 @@ import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ResponseCode;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.ClusterName;
-import com.twitter.mesos.scheduler.SchedulerThriftInterface;
+import com.twitter.mesos.scheduler.ScheduleException;
+import com.twitter.mesos.scheduler.SchedulerCoreImpl;
+import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
@@ -38,12 +40,12 @@ public class CreateJob extends StringTemplateServlet {
 
   private static final Logger LOG = Logger.getLogger(CreateJob.class.getName());
 
-  private final SchedulerThriftInterface scheduler;
+  private final SchedulerCoreImpl scheduler;
   private final String clusterName;
 
   @Inject
   CreateJob(@CacheTemplates boolean cacheTemplates,
-      SchedulerThriftInterface scheduler,
+      SchedulerCoreImpl scheduler,
       @ClusterName String clusterName) {
     super("create_job", cacheTemplates);
     this.clusterName = checkNotBlank(clusterName);
@@ -64,16 +66,26 @@ public class CreateJob extends StringTemplateServlet {
     resp.setContentType("application/json");
 
     JobConfiguration newJob = getJobFromRequest(req);
-    LOG.info("Job created through web UI: " + newJob);
-    CreateJobResponse response = scheduler.createJob(newJob);
+    LOG.info("Creating job through web UI: " + newJob);
+
+    String result = "error";
+    String message;
+    try {
+      scheduler.createJob(newJob);
+      result = "success";
+      message = "Successfully scheduled job.";
+    } catch (ScheduleException x) {
+      message = "Unable to schedule job.";
+    } catch (TaskDescriptionException x) {
+      message = "Invalid job specification.";
+    }
 
     OutputStream responseBody = resp.getOutputStream();
 
     resp.setStatus(HttpServletResponse.SC_OK);
-    String result = (response.responseCode == ResponseCode.OK) ? "success" : "error";
     try {
       IOUtils.write(new Gson().toJson(
-          ImmutableMap.of("result", result, "message", response.getMessage())), responseBody);
+          ImmutableMap.of("result", result, "message", message)), responseBody);
     } finally {
       responseBody.close();
     }

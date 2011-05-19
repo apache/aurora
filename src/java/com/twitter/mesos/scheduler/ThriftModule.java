@@ -10,7 +10,6 @@ import com.twitter.common.thrift.ThriftServer;
 import com.twitter.mesos.gen.MesosSchedulerManager;
 import com.twitter.mesos.gen.MesosSchedulerManager.Iface;
 import com.twitter.mesos.scheduler.migrations.SchemaMigrationDelegate;
-import com.twitter.mesos.scheduler.migrations.v0_v1.OwnerSanitizingSchedulerManager;
 
 /**
  * Binds components needed to serve the scheduler thrift interface.
@@ -44,7 +43,8 @@ abstract class ThriftModule extends AbstractModule {
     // A volatile binding for the current sanitizer to apply to thrift structs.
     // A new or refactored sanitizer will need to be bound for each thrift schema change
     // requiring migration
-    bindThriftEndpoint(binder, OwnerSanitizingSchedulerManager.class);
+    // v0_v1 => bindThriftEndpoint(binder, OwnerSanitizingSchedulerManager.class);
+    throw new UnsupportedOperationException("No migrations present.");
   }
 
   /**

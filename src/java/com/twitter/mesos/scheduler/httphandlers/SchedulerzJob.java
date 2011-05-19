@@ -130,6 +130,7 @@ public class SchedulerzJob extends StringTemplateServlet {
 
         String user = req.getParameter(USER_PARAM);
         String role = req.getParameter(ROLE_PARAM);
+
         if (role == null) {
           template.setAttribute("exception", "Please specify a role.");
           return;

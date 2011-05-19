@@ -94,7 +94,6 @@ public class Query {
         && !isEmpty(base().getJobName())) {
       return true;
     }
-
     return !isEmpty(base().getJobKey());
   }
 

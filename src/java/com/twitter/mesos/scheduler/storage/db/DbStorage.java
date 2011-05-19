@@ -676,6 +676,7 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
     WhereClauseBuilder whereClauseBuilder = new WhereClauseBuilder();
 
     TaskQuery taskQuery = query.base();
+
     if (taskQuery.getOwner() != null) {
       if (!StringUtils.isBlank(taskQuery.getOwner().getRole())) {
         whereClauseBuilder.equals("job_role", Types.VARCHAR, taskQuery.getOwner().getRole());

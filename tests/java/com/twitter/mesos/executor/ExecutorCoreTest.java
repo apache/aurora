@@ -31,9 +31,9 @@ import static org.junit.Assert.fail;
  * @author William Farner
  */
 public class ExecutorCoreTest extends EasyMockTest {
-
+  private static final String USER_A = "user-a";
   private static final String ROLE_A = "role-a";
-  private static final Identity OWNER_A = new Identity(ROLE_A, "user-a");
+  private static final Identity OWNER_A = new Identity(ROLE_A, USER_A);
   private static final String JOB_A = "job-a";
 
   private Function<AssignedTask, Task> taskFactory;

@@ -66,6 +66,7 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
 
     JobConfiguration jobConfig3 = new JobConfiguration().setOwner(new Identity("fred", "fred"))
         .setName("uname");
+
     store.saveAcceptedJob("IMMEDIATE", jobConfig3);
 
     assertTrue(Iterables.isEmpty(store.fetchJobs("DNE")));

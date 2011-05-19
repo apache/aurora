@@ -21,6 +21,7 @@ import org.antlr.stringtemplate.StringTemplate;
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.mesos.Tasks;
+import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.CronJobManager;
@@ -97,6 +98,7 @@ public class SchedulerzRole extends StringTemplateServlet {
 
         for (TaskState state : scheduler.getTasks(Query.byRole(role))) {
           Job job = jobs.get(state.task.getAssignedTask().getTask().getJobName());
+
           if (job == null) {
             job = new Job();
             job.name = state.task.getAssignedTask().getTask().getJobName();
@@ -138,6 +140,7 @@ public class SchedulerzRole extends StringTemplateServlet {
                 return job.getOwner().getRole().equals(role);
               }
             });
+
         cronJobs = DisplayUtils.sort(cronJobs, DisplayUtils.SORT_JOB_CONFIG_BY_NAME);
         Iterable<CronJob> cronJobObjs = Iterables.transform(cronJobs,
             new Function<JobConfiguration, CronJob>() {

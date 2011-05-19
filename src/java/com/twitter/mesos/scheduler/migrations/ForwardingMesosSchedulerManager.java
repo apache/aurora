@@ -12,6 +12,7 @@ import com.twitter.mesos.gen.KillResponse;
 import com.twitter.mesos.gen.MesosSchedulerManager;
 import com.twitter.mesos.gen.RestartResponse;
 import com.twitter.mesos.gen.ScheduleStatusResponse;
+import com.twitter.mesos.gen.SessionKey;
 import com.twitter.mesos.gen.ShardUpdateRequest;
 import com.twitter.mesos.gen.ShardUpdateResponse;
 import com.twitter.mesos.gen.TaskQuery;
@@ -39,8 +40,8 @@ public abstract class ForwardingMesosSchedulerManager implements MesosSchedulerM
   }
 
   @Override
-  public CreateJobResponse createJob(JobConfiguration description) throws TException {
-    return delegate.createJob(description);
+  public CreateJobResponse createJob(JobConfiguration description, SessionKey session) throws TException {
+    return delegate.createJob(description, session);
   }
 
   @Override
@@ -54,13 +55,13 @@ public abstract class ForwardingMesosSchedulerManager implements MesosSchedulerM
   }
 
   @Override
-  public KillResponse killTasks(TaskQuery query) throws TException {
-    return delegate.killTasks(query);
+  public KillResponse killTasks(TaskQuery query, SessionKey session) throws TException {
+    return delegate.killTasks(query, session);
   }
 
   @Override
-  public RestartResponse restartTasks(Set<String> taskIds) throws TException {
-    return delegate.restartTasks(taskIds);
+  public RestartResponse restartTasks(Set<String> taskIds, SessionKey session) throws TException {
+    return delegate.restartTasks(taskIds, session);
   }
 
   @Override
@@ -79,7 +80,7 @@ public abstract class ForwardingMesosSchedulerManager implements MesosSchedulerM
   }
 
   @Override
-  public UpdateCompleteResponse cancelUpdate(String owner, String jobName) throws TException {
-    return delegate.cancelUpdate(owner, jobName);
+  public UpdateCompleteResponse cancelUpdate(String role, String jobName, SessionKey session) throws TException {
+    return delegate.cancelUpdate(role, jobName, session);
   }
 }

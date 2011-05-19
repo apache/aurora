@@ -45,7 +45,6 @@ import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.StorageRole;
 import com.twitter.mesos.scheduler.storage.StorageRole.Role;
 import com.twitter.mesos.scheduler.storage.StorageRoles;
-import com.twitter.mesos.scheduler.storage.db.migrations.v0_v1.OwnerMigrator;
 
 /**
  * Provides bindings for db based scheduler storage.
@@ -103,10 +102,11 @@ public class DbStorageModule extends PrivateModule {
         // OwnerMigrator needs to be injected with the primary (target) JdbcTemplate and
         // TransactionTemplate so we install the migrator inside the Primary private module to avoid
         // exposing those bindings
-        bind(DataMigrator.class).to(OwnerMigrator.class);
-
-        DualStoreMigrator.bind(binder());
-        expose(Migrator.class);
+        // v0_v1 => bind(DataMigrator.class).to(OwnerMigrator.class);
+        //          DualStoreMigrator.bind(binder());
+        //          expose(Migrator.class);
+        // There are no currently supported migrations.
+        throw new UnsupportedOperationException("No migrations present.");
       }
     });
     installAdminInterface(binder);

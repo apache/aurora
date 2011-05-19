@@ -1,5 +1,7 @@
 package com.twitter.mesos.scheduler;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -11,6 +13,15 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
+
+import java.security.KeyStore;
+import java.security.GeneralSecurityException;
+
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLServerSocketFactory;
+import javax.net.ServerSocketFactory;
 
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -30,6 +41,10 @@ import com.twitter.common.application.modules.HttpModule;
 import com.twitter.common.application.modules.LogModule;
 import com.twitter.common.application.modules.StatsExportModule;
 import com.twitter.common.application.modules.StatsModule;
+import com.twitter.common.args.Arg;
+import com.twitter.common.args.CmdLine;
+import com.twitter.common.args.constraints.CanRead;
+import com.twitter.common.args.constraints.NotNull;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Command;
 import com.twitter.common.net.InetSocketAddressHelper;
@@ -67,6 +82,15 @@ public class SchedulerMain extends AbstractApplication {
   @Inject private SchedulerCore scheduler;
   @Inject private Lifecycle lifecycle;
   @Inject @ShutdownStage ActionRegistry shutdownRegistry;
+
+  @CanRead
+  @NotNull
+  @CmdLine(name = "mesos_ssl_keyfile",
+           help = "JKS keyfile for operating the Mesos Thrift-over-SSL interface.")
+  private static final Arg<File> mesosSSLKeyFile = Arg.create();
+
+  // Security is enforced via file permissions, not via this password, for what it's worth.
+  private static final String SSL_KEYFILE_PASSWORD = "MesosKeyStorePassword";
 
   private final LeadershipListener leadershipListener = new LeadershipListener() {
     @Override public void onLeading(EndpointStatus status) {
@@ -153,6 +177,8 @@ public class SchedulerMain extends AbstractApplication {
       LOG.log(Level.SEVERE, "Failed to join mesos scheduler server set in ZooKeeper.", e);
     } catch (InterruptedException e) {
       LOG.log(Level.SEVERE, "Interrupted while starting thrift server.", e);
+    } catch (GeneralSecurityException e) {
+      LOG.log(Level.SEVERE, "Failed to initialize SSL context for thrift server.", e);
     }
     if (port == -1) {
       return;
@@ -210,15 +236,27 @@ public class SchedulerMain extends AbstractApplication {
   }
 
   private int startThriftServer() throws IOException, TTransportException,
-      Group.JoinException, InterruptedException {
+      Group.JoinException, InterruptedException, GeneralSecurityException {
+    // TODO(Brian Wickman): Add helper to science thrift to perform this keyfile import.
+    SSLContext ctx = null;
 
-    ServerSocket serverSocket = new ServerSocket(0);
+    ctx = SSLContext.getInstance("TLS");
+    KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
+    KeyStore ks = KeyStore.getInstance("JKS");
+    ks.load(new FileInputStream(mesosSSLKeyFile.get()), SSL_KEYFILE_PASSWORD.toCharArray());
+    kmf.init(ks, SSL_KEYFILE_PASSWORD.toCharArray());
+    ctx.init(kmf.getKeyManagers(), null, null);
+
+    SSLServerSocketFactory ssf = ctx.getServerSocketFactory();
+    SSLServerSocket serverSocket = (SSLServerSocket) ssf.createServerSocket(0);
+    serverSocket.setEnabledCipherSuites(serverSocket.getSupportedCipherSuites());
+    serverSocket.setNeedClientAuth(false);
+
     ServerSetup setup = new ServerSetup(
-        0, // TODO(John Sirois): unused, fix ServerSetup constructors
+        0,  // TODO(John Sirois): unused, fix ServerSetup constructors
         new MesosSchedulerManager.Processor(schedulerThriftInterface),
         ThriftServer.BINARY_PROTOCOL.get());
     setup.setSocket(serverSocket);
-
     schedulerThriftServer.start(setup);
 
     shutdownRegistry.addAction(new Command() {

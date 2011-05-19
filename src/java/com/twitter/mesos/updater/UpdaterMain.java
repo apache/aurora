@@ -68,6 +68,7 @@ public class UpdaterMain extends AbstractApplication {
     @Override protected void configure() {
       Iface scheduler = ThriftFactory.create(Iface.class)
           .withMaxConnectionsPerEndpoint(5)
+          .withSslEnabled()
           .build(ImmutableSet.of(schedulerAddress.get()))
           .builder()
           .noRetries()
