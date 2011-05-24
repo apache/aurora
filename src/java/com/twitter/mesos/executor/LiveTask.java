@@ -268,14 +268,14 @@ public class LiveTask extends TaskOnDisk {
     commands.add("echo $$ > ../" + PIDFILE_NAME);
 
     if (multiUser) {
-      String user = task.getTask().getOwner().getUser();
-      LOG.info("Launching as user " + user);
+      String role = task.getTask().getOwner().getRole();
+      LOG.info("Launching as role " + role);
       // chown the sandbox.
-      commands.add(String.format("chown -R %s .", user));
-      // Run as the user.
-      commands.add(String.format("su %s -c \"bash %s\"", user, RUN_SCRIPT_NAME));
+      commands.add(String.format("chown -R %s .", role));
+      // Run as the role account.
+      commands.add(String.format("su %s -c \"bash %s\"", role, RUN_SCRIPT_NAME));
     } else {
-      // Execute the laucn script containing the user shell code.
+      // Execute the launch script containing the user shell code.
       commands.add("bash " + RUN_SCRIPT_NAME);
     }
 

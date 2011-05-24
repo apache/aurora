@@ -61,11 +61,11 @@ public class SchedulerzHome extends StringTemplateServlet {
       @Override public void execute(StringTemplate template) {
         template.setAttribute("cluster_name", clusterName);
 
-        Map<Identity, Role> owners =
-            new MapMaker().makeComputingMap(new Function<Identity, Role>() {
-              @Override public Role apply(Identity owner) {
+        Map<String, Role> owners =
+            new MapMaker().makeComputingMap(new Function<String, Role>() {
+              @Override public Role apply(String ownerRole) {
                 Role role = new Role();
-                role.role = owner.role;
+                role.role = ownerRole;
                 return role;
               }
             });
@@ -75,7 +75,7 @@ public class SchedulerzHome extends StringTemplateServlet {
         Set<TaskState> tasks = scheduler.getTasks(Query.GET_ALL);
 
         for (TaskState state : tasks) {
-          Role role = owners.get(state.task.getAssignedTask().getTask().getOwner());
+          Role role = owners.get(state.task.getAssignedTask().getTask().getOwner().getRole());
           switch (state.task.getStatus()) {
             case PENDING:
               role.pendingTaskCount++;
