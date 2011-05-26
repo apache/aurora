@@ -18,23 +18,16 @@ public class MapStorageSchedulerCoreImplTest extends BaseSchedulerCoreImplTest {
   private PersistenceLayer<NonVolatileSchedulerState> persistenceLayer;
 
   @Before
-  public void mySetUp() {
+  public void mySetUp() throws Exception {
     persistenceLayer = createMock(new Clazz<PersistenceLayer<NonVolatileSchedulerState>>() {});
+
+    expect(persistenceLayer.fetch()).andReturn(null).times(2);
+    persistenceLayer.commit((NonVolatileSchedulerState) anyObject());
+    expectLastCall().anyTimes();
   }
 
   @Override
   protected Storage createStorage() {
     return new MapStorage(persistenceLayer);
-  }
-
-  @Override
-  protected void expectRestore() throws Exception {
-    expect(persistenceLayer.fetch()).andReturn(null).times(2);
-  }
-
-  @Override
-  protected void expectPersists(int count) throws Exception {
-    persistenceLayer.commit((NonVolatileSchedulerState) anyObject());
-    expectLastCall().times(count);
   }
 }

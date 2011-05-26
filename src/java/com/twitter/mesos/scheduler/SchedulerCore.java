@@ -5,6 +5,8 @@ import java.util.Set;
 
 import javax.annotation.Nullable;
 
+import org.apache.commons.lang.builder.EqualsBuilder;
+import org.apache.commons.lang.builder.ToStringBuilder;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.SlaveOffer;
 
@@ -14,10 +16,7 @@ import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.ScheduleStatus;
-import com.twitter.mesos.gen.UpdateConfigResponse;
-import com.twitter.mesos.scheduler.JobManager.JobUpdateResult;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
-import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
@@ -113,6 +112,7 @@ public interface SchedulerCore {
    *    pending tasks that are satisfied by the slave offer.
    * @throws ScheduleException If an error occurs while attempting to schedule a task.
    */
+  @Nullable
   TwitterTask offer(SlaveOffer offer) throws ScheduleException;
 
   /**
@@ -132,28 +132,6 @@ public interface SchedulerCore {
    */
   void killTasks(Query query) throws ScheduleException;
 
-  UpdateConfigResponse getUpdateConfig(String updateToken) throws SchedulerCoreImpl.UpdateException;
-
-  Set<String> updateShards(String updateToken, Set<Integer> restartShards, boolean rollBack)
-      throws SchedulerCoreImpl.UpdateException;
-
-  /**
-   * Cancels an update by token.
-   *
-   * @param updateToken The token of the job update to cancel.
-   * @throws com.twitter.mesos.scheduler.SchedulerCoreImpl.UpdateException If an update was not found matching the token.
-   */
-  void updateFinished(String updateToken) throws SchedulerCoreImpl.UpdateException;
-
-  /**
-   * Identical to {@link #updateFinished(String)}, but allows canceling by owner and job name.
-   *
-   * @param role The role account of the job to cancel an update for.
-   * @param jobName The name of the job to cancel an update for.
-   * @throws com.twitter.mesos.scheduler.SchedulerCoreImpl.UpdateException If an update was not found for the job spec.
-   */
-  void updateFinished(String role, String jobName) throws SchedulerCoreImpl.UpdateException;
-
   class RestartException extends Exception {
     RestartException(String msg) { super(msg); }
   }
@@ -162,26 +140,9 @@ public interface SchedulerCore {
    * Schedules a restart on a set of tasks.
    *
    * @param taskIds The tasks to restart.
-   * @return The set of task IDs for tasks that a restart was requested for.  A task that was
-   *    requested for restart may be rejected if it was not found, or was in a non-active state.
    * @throws RestartException If the restart request could not be honored.
    */
-  Set<String> restartTasks(Set<String> taskIds) throws RestartException;
-
-  /**
-   * Triggers an update to a job.
-   *
-   * @param updatedJob The updated job, which must correspond with an existing job.
-   * @return A description of the action that was or will be taken to update the job.
-   * @throws ScheduleException If the job could not be updated.
-   * @throws TaskDescriptionException If the updated job configuration was invalid.
-   */
-  JobUpdateResult updateJob(JobConfiguration updatedJob) throws ScheduleException,
-      TaskDescriptionException;
-
-  // TODO(William Farner): This makes the interface look ugly, and shows how the encapsulation between
-  //    SchedulreCoreImpl and ImmediateJobManager is broken.
-  JobUpdateResult doJobUpdate(JobConfiguration updatedJob) throws ScheduleException;
+  void restartTasks(Set<String> taskIds) throws RestartException;
 
   void updateRegisteredTasks(RegisteredTaskUpdate update);
 
@@ -205,9 +166,33 @@ public interface SchedulerCore {
       this.resources = checkNotBlank(resources);
       this.task = checkNotNull(task);
     }
-  }
 
-  public static class UpdateException extends Exception {
-    public UpdateException(String msg) { super(msg); }
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof TwitterTask)) {
+        return false;
+      }
+
+      TwitterTask other = (TwitterTask) o;
+
+      return new EqualsBuilder()
+          .append(taskId, other.taskId)
+          .append(slaveId, other.slaveId)
+          .append(taskName, other.taskName)
+          .append(resources, other.resources)
+          .append(task, other.task)
+          .isEquals();
+    }
+
+    @Override
+    public String toString() {
+      return new ToStringBuilder(this)
+          .append(taskId)
+          .append(slaveId)
+          .append(taskName)
+          .append(resources)
+          .append(task)
+          .toString();
+    }
   }
 }

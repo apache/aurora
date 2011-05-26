@@ -44,23 +44,6 @@ public abstract class JobManager {
    */
   public abstract boolean receiveJob(JobConfiguration job) throws ScheduleException;
 
-  public enum JobUpdateResult {
-    JOB_UNCHANGED,
-    COMPLETED,
-    UPDATER_LAUNCHED
-  }
-
-  /**
-   * Instructs the job manager to initiate an update on the job.
-   *
-   * @param job The job to update
-   * @throws ScheduleException If the update could not be performed.
-   * @return A description of the action that was or will be taken to update the job.
-   */
-  // TODO(William Farner): Add more visibility into the updater launched so that the caller may track
-  //    the updater.
-  public abstract JobUpdateResult updateJob(JobConfiguration job) throws ScheduleException;
-
   /**
    * Fetches the configured jobs that this manager is storing.
    *

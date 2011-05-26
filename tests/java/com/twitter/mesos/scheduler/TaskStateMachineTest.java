@@ -5,10 +5,12 @@ import java.util.Set;
 
 import com.google.common.base.Supplier;
 
+import org.easymock.EasyMock;
 import org.easymock.IExpectationSetters;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.twitter.common.base.Closure;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.EasyMockTest;
@@ -27,15 +29,16 @@ import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED_BY_CLIENT;
 import static com.twitter.mesos.gen.ScheduleStatus.LOST;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
+import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.UNKNOWN;
-import static com.twitter.mesos.scheduler.WorkItem.CREATE_TASK;
-import static com.twitter.mesos.scheduler.WorkItem.DELETE;
-import static com.twitter.mesos.scheduler.WorkItem.INCREMENT_FAILURES;
-import static com.twitter.mesos.scheduler.WorkItem.KILL;
-import static com.twitter.mesos.scheduler.WorkItem.RESCHEDULE;
-import static com.twitter.mesos.scheduler.WorkItem.UPDATE_STATE;
+import static com.twitter.mesos.scheduler.WorkCommand.DELETE;
+import static com.twitter.mesos.scheduler.WorkCommand.INCREMENT_FAILURES;
+import static com.twitter.mesos.scheduler.WorkCommand.KILL;
+import static com.twitter.mesos.scheduler.WorkCommand.RESCHEDULE;
+import static com.twitter.mesos.scheduler.WorkCommand.UPDATE_STATE;
+import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 
@@ -62,35 +65,33 @@ public class TaskStateMachineTest extends EasyMockTest {
 
   @Test
   public void testSimpleTransition() {
-    expectWork(CREATE_TASK);
     expectWork(UPDATE_STATE).times(5);
     expect(taskReader.get()).andReturn(makeTask(false));
     expectWork(DELETE);
 
     control.replay();
 
-    stateMachine.setState(PENDING);
-    stateMachine.setState(ASSIGNED);
-    stateMachine.setState(STARTING);
-    stateMachine.setState(RUNNING);
-    stateMachine.setState(FINISHED);
-    stateMachine.setState(UNKNOWN);
+    stateMachine.updateState(PENDING)
+        .updateState(ASSIGNED)
+        .updateState(STARTING)
+        .updateState(RUNNING)
+        .updateState(FINISHED)
+        .updateState(UNKNOWN);
   }
 
   @Test
   public void testDaemonRescheduled() {
-    expectWork(CREATE_TASK);
     expectWork(UPDATE_STATE).times(5);
     expect(taskReader.get()).andReturn(makeTask(true));
     expectWork(RESCHEDULE);
 
     control.replay();
 
-    stateMachine.setState(PENDING);
-    stateMachine.setState(ASSIGNED);
-    stateMachine.setState(STARTING);
-    stateMachine.setState(RUNNING);
-    stateMachine.setState(FINISHED);
+    stateMachine.updateState(PENDING)
+        .updateState(ASSIGNED)
+        .updateState(STARTING)
+        .updateState(RUNNING)
+        .updateState(FINISHED);
   }
 
   @Test
@@ -99,7 +100,6 @@ public class TaskStateMachineTest extends EasyMockTest {
         FINISHED, FAILED, KILLED, KILLED_BY_CLIENT, LOST);
 
     for (ScheduleStatus endState : terminalStates) {
-      expectWork(CREATE_TASK);
       expectWork(UPDATE_STATE).times(5);
 
       switch (endState) {
@@ -126,14 +126,14 @@ public class TaskStateMachineTest extends EasyMockTest {
 
       control.replay();
 
-      stateMachine.setState(PENDING);
-      stateMachine.setState(ASSIGNED);
-      stateMachine.setState(STARTING);
-      stateMachine.setState(RUNNING);
-      stateMachine.setState(endState);
+      stateMachine.updateState(PENDING)
+          .updateState(ASSIGNED)
+          .updateState(STARTING)
+          .updateState(RUNNING)
+          .updateState(endState);
 
       for (ScheduleStatus badTransition : terminalStates) {
-        stateMachine.setState(badTransition);
+        stateMachine.updateState(badTransition);
       }
 
       control.verify();
@@ -151,46 +151,44 @@ public class TaskStateMachineTest extends EasyMockTest {
 
     control.replay();
 
-    stateMachine.setState(UNKNOWN);
-    stateMachine.setState(RUNNING);
+    stateMachine.updateState(UNKNOWN)
+        .updateState(RUNNING);
   }
 
   @Test
   public void testLostTask() {
-    expectWork(CREATE_TASK);
     expectWork(UPDATE_STATE).times(5);
     expectWork(RESCHEDULE);
 
     control.replay();
 
-    stateMachine.setState(PENDING);
-    stateMachine.setState(ASSIGNED);
-    stateMachine.setState(STARTING);
-    stateMachine.setState(RUNNING);
-    stateMachine.setState(LOST);
+    stateMachine.updateState(PENDING)
+        .updateState(ASSIGNED)
+        .updateState(STARTING)
+        .updateState(RUNNING)
+        .updateState(LOST);
   }
 
   @Test
   public void testKilledPending() {
-    expectWork(CREATE_TASK);
-    expectWork(UPDATE_STATE).times(2);
+    expectWork(UPDATE_STATE);
+    expectWork(DELETE);
 
     control.replay();
 
-    stateMachine.setState(PENDING);
-    stateMachine.setState(KILLED_BY_CLIENT);
+    stateMachine.updateState(PENDING)
+        .updateState(KILLED_BY_CLIENT);
   }
 
   @Test
   public void testReschedulesMissing() {
-    expectWork(CREATE_TASK);
     expectWork(UPDATE_STATE).times(3);
 
     control.replay();
 
-    stateMachine.setState(PENDING);
-    stateMachine.setState(ASSIGNED);
-    stateMachine.setState(STARTING);
+    stateMachine.updateState(PENDING)
+        .updateState(ASSIGNED)
+        .updateState(STARTING);
   }
 
   @Test
@@ -198,7 +196,6 @@ public class TaskStateMachineTest extends EasyMockTest {
     ScheduledTask task = makeTask(false);
     task.addToTaskEvents(new TaskEvent(clock.nowMillis(), ScheduleStatus.PENDING, null));
 
-    expectWork(CREATE_TASK);
     expectWork(UPDATE_STATE).times(2);
 
     clock.waitFor(10);
@@ -209,32 +206,45 @@ public class TaskStateMachineTest extends EasyMockTest {
 
     control.replay();
 
-    stateMachine.setState(PENDING);
-    stateMachine.setState(ASSIGNED);
-    stateMachine.setState(UNKNOWN);
+    stateMachine.updateState(PENDING)
+        .updateState(ASSIGNED)
+        .updateState(UNKNOWN);
     clock.waitFor(MISSING_GRACE_PERIOD.as(Time.MILLISECONDS) - 1);
-    stateMachine.setState(UNKNOWN);
+    stateMachine.updateState(UNKNOWN);
     clock.waitFor(2);
-    stateMachine.setState(UNKNOWN);
+    stateMachine.updateState(UNKNOWN);
   }
 
   @Test
   public void testMissingStartingRescheduledImmediately() {
-    expectWork(CREATE_TASK);
     expectWork(UPDATE_STATE).times(3);
     expectWork(RESCHEDULE);
 
     control.replay();
 
-    stateMachine.setState(PENDING);
-    stateMachine.setState(ASSIGNED);
-    stateMachine.setState(STARTING);
-    stateMachine.setState(UNKNOWN);
-
+    stateMachine.updateState(PENDING)
+        .updateState(ASSIGNED)
+        .updateState(STARTING)
+        .updateState(UNKNOWN);
   }
 
-  private IExpectationSetters<Boolean> expectWork(WorkItem work) {
-    workSink.addWork(work, stateMachine);
+  @Test
+  public void testRogueRestartedTask() {
+    expectWork(UPDATE_STATE).times(5);
+    expectWork(KILL).times(2);
+
+    control.replay();
+
+    stateMachine.updateState(PENDING)
+        .updateState(ASSIGNED)
+        .updateState(STARTING)
+        .updateState(RUNNING)
+        .updateState(RESTARTING)
+        .updateState(RUNNING);
+  }
+
+  private IExpectationSetters<Void> expectWork(WorkCommand work) {
+    workSink.addWork(eq(work), eq(stateMachine), EasyMock.<Closure<ScheduledTask>>anyObject());
     return expectLastCall();
   }
 

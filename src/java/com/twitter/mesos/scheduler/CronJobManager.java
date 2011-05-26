@@ -204,33 +204,6 @@ public class CronJobManager extends JobManager {
     }
   }
 
-  @Override
-  public JobUpdateResult updateJob(final JobConfiguration job) throws ScheduleException {
-    Preconditions.checkNotNull(job);
-
-    if (!hasCronSchedule(job) || !validateSchedule(job.getCronSchedule())) {
-      throw new ScheduleException("Invalid cron schedule: " + job.getCronSchedule());
-    }
-
-    final String jobKey = Tasks.jobKey(job);
-    return storage.doInTransaction(new Work<JobUpdateResult, ScheduleException>() {
-      @Override public JobUpdateResult apply(SchedulerStore schedulerStore, JobStore jobStore,
-          TaskStore taskStore) throws ScheduleException {
-
-        JobConfiguration existingJobConfig = jobStore.fetchJob(MANAGER_KEY, jobKey);
-        Preconditions.checkState(existingJobConfig != null);
-
-        if (job.equals(existingJobConfig)) {
-          return JobUpdateResult.JOB_UNCHANGED;
-        }
-
-        deleteJob(jobKey);
-        Preconditions.checkState(receiveJob(job), "Cron job manager failed to create updated job");
-        return JobUpdateResult.COMPLETED;
-      }
-    });
-  }
-
   private boolean validateSchedule(String cronSchedule) {
     return SchedulingPattern.validate(cronSchedule);
   }

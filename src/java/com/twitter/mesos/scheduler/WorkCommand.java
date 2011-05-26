@@ -1,13 +1,12 @@
 package com.twitter.mesos.scheduler;
 
 /**
- * Descriptions of the different types of external work items that task state machines may trigger.
+ * Descriptions of the different types of external work commands that task state machines may
+ * trigger.
  *
  * @author William Farner
  */
-enum WorkItem {
-  // Insert the task into the persistent store.
-  CREATE_TASK,
+public enum WorkCommand {
   // Send an instruction for the runner of this task to kill the task.
   KILL,
   // Create a new state machine with a copy of this task.

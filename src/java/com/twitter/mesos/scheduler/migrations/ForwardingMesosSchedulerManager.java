@@ -13,13 +13,7 @@ import com.twitter.mesos.gen.MesosSchedulerManager;
 import com.twitter.mesos.gen.RestartResponse;
 import com.twitter.mesos.gen.ScheduleStatusResponse;
 import com.twitter.mesos.gen.SessionKey;
-import com.twitter.mesos.gen.ShardUpdateRequest;
-import com.twitter.mesos.gen.ShardUpdateResponse;
 import com.twitter.mesos.gen.TaskQuery;
-import com.twitter.mesos.gen.UpdateCompleteResponse;
-import com.twitter.mesos.gen.UpdateConfigResponse;
-import com.twitter.mesos.gen.UpdateRequest;
-import com.twitter.mesos.gen.UpdateResponse;
 
 /**
  * An implementation of the mesos scheduler manager thrift interface that forwards all calls to
@@ -40,18 +34,14 @@ public abstract class ForwardingMesosSchedulerManager implements MesosSchedulerM
   }
 
   @Override
-  public CreateJobResponse createJob(JobConfiguration description, SessionKey session) throws TException {
+  public CreateJobResponse createJob(JobConfiguration description, SessionKey session)
+      throws TException {
     return delegate.createJob(description, session);
   }
 
   @Override
   public ScheduleStatusResponse getTasksStatus(TaskQuery query) throws TException {
     return delegate.getTasksStatus(query);
-  }
-
-  @Override
-  public UpdateResponse updateTasks(UpdateRequest request) throws TException {
-    return delegate.updateTasks(request);
   }
 
   @Override
@@ -62,25 +52,5 @@ public abstract class ForwardingMesosSchedulerManager implements MesosSchedulerM
   @Override
   public RestartResponse restartTasks(Set<String> taskIds, SessionKey session) throws TException {
     return delegate.restartTasks(taskIds, session);
-  }
-
-  @Override
-  public UpdateConfigResponse getUpdateConfig(String updateToken) throws TException {
-    return delegate.getUpdateConfig(updateToken);
-  }
-
-  @Override
-  public ShardUpdateResponse updateShards(ShardUpdateRequest request) throws TException {
-    return delegate.updateShards(request);
-  }
-
-  @Override
-  public UpdateCompleteResponse finishUpdate(String updateToken) throws TException {
-    return delegate.finishUpdate(updateToken);
-  }
-
-  @Override
-  public UpdateCompleteResponse cancelUpdate(String role, String jobName, SessionKey session) throws TException {
-    return delegate.cancelUpdate(role, jobName, session);
   }
 }

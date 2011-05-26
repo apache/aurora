@@ -14,14 +14,4 @@ public class DbStorageSchedulerCoreImplTest extends BaseSchedulerCoreImplTest {
   protected Storage createStorage() throws SQLException {
     return DbStorageTestUtil.setupStorage(this);
   }
-
-  @Override
-  protected void expectRestore() throws Exception {
-    // noop
-  }
-
-  @Override
-  protected void expectPersists(int count) throws Exception {
-    // noop
-  }
 }

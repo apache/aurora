@@ -21,11 +21,6 @@ public class ImmediateJobManager extends JobManager {
   }
 
   @Override
-  public JobUpdateResult updateJob(JobConfiguration job) throws ScheduleException {
-    return schedulerCore.doJobUpdate(job);
-  }
-
-  @Override
   public boolean hasJob(String jobKey) {
     return !schedulerCore.getTasks(Query.activeQuery(jobKey)).isEmpty();
   }
