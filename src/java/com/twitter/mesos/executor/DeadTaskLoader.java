@@ -37,9 +37,10 @@ public class DeadTaskLoader implements Supplier<Iterable<Task>> {
    * Creates a new dead task loader.
    *
    * @param taskRoot Root directory to scan for persisted dead task state.
+   * @param deadTaskMigrator A strategy for migrating dead tasks if needed.
    */
   @Inject
-  public DeadTaskLoader(@ExecutorRootDir File taskRoot, DeadTaskMigrator deadTaskMigrator) {
+  DeadTaskLoader(@ExecutorRootDir File taskRoot, DeadTaskMigrator deadTaskMigrator) {
     this.taskRoot = Preconditions.checkNotNull(taskRoot);
     this.deadTaskMigrator = Preconditions.checkNotNull(deadTaskMigrator);
   }
@@ -55,26 +56,36 @@ public class DeadTaskLoader implements Supplier<Iterable<Task>> {
       try {
         LOG.info("Restoring task " + taskDir);
         DeadTask task = new DeadTask(taskDir);
-        TwitterTaskInfo taskInfo = task.getAssignedTask().getTask();
-        if (taskInfo != null) {
-          deadTaskMigrator.migrateDeadTask(task);
-          if (StringUtils.isEmpty(task.getId())) {
-            LOG.warning("Restored task, but task ID was empty: " + taskDir);
-            return null;
-          }
-
-          LOG.info("Recovered task " + task.getId() + " " + Tasks.jobKey(taskInfo));
-          return task;
-        } else {
-          LOG.info("Failed to restore task from " + taskDir);
-          return null;
-        }
+        return migrateDeadTask(taskDir, task);
       } catch (TaskStorageException e) {
         LOG.log(Level.INFO, "Unable to restore task from " + taskDir, e);
         return null;
       }
     }
   };
+
+  private Task migrateDeadTask(File taskDir, DeadTask task) throws TaskStorageException {
+    try {
+      TwitterTaskInfo taskInfo = task.getAssignedTask().getTask();
+      if (taskInfo != null) {
+        deadTaskMigrator.migrateDeadTask(task);
+        if (StringUtils.isEmpty(task.getId())) {
+          LOG.warning("Restored task, but task ID was empty: " + taskDir);
+          return null;
+        }
+
+        LOG.info("Recovered task " + task.getId() + " " + Tasks.jobKey(taskInfo));
+        return task;
+      } else {
+        LOG.info("Failed to restore task from " + taskDir);
+        return null;
+      }
+    } catch (RuntimeException e) {
+      // TODO(John Sirois): this is an overly broad catch that is attempting to handle bad stored
+      // tasks - narrow this catch
+      throw new TaskStorageException("Failed to migrate task: " + task, e);
+    }
+  }
 
   @Override public Iterable<Task> get() {
     LOG.info("Attempting to recover information about dead tasks from " + taskRoot);

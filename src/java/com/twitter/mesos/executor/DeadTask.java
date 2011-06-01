@@ -1,15 +1,17 @@
 package com.twitter.mesos.executor;
 
+import java.io.File;
+
 import com.google.common.base.Preconditions;
+
+import org.apache.commons.io.FileUtils;
+
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ResourceConsumption;
 import com.twitter.mesos.gen.ScheduleStatus;
-import org.apache.commons.io.FileUtils;
-
-import java.io.File;
 
 /**
  * A task that has completed execution.
@@ -92,12 +94,8 @@ public class DeadTask extends TaskOnDisk {
     throw new UnsupportedOperationException("A dead task cannot be run.");
   }
 
-  public static class DeadTaskLoadException extends Exception {
-    public DeadTaskLoadException(String msg) {
-      super(msg);
-    }
-    public DeadTaskLoadException(String msg, Throwable cause) {
-      super(msg, cause);
-    }
+  @Override
+  public String toString() {
+    return String.format("DeadTask(s: %s, t: %s)", state, task);
   }
 }
