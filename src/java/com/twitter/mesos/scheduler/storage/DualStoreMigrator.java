@@ -41,7 +41,6 @@ import com.twitter.mesos.scheduler.storage.Storage.Work;
 import com.twitter.mesos.scheduler.storage.Storage.Work.Quiet;
 import com.twitter.mesos.scheduler.storage.StorageRole.Role;
 import com.twitter.mesos.scheduler.storage.db.DbStorage;
-import com.twitter.mesos.scheduler.storage.stream.MapStorage;
 
 /**
  * Migrates from one {@link Storage} system to another and provides detailed results.
@@ -139,9 +138,6 @@ public class DualStoreMigrator implements Migrator {
 
   private static final ImmutableSet<StorageMigrationPath> VALID_MIGRATION_PATHS =
       ImmutableSet.of(
-          MigrationUtils.migrationPath(
-              new StorageSystemId(MapStorage.STORAGE_SYSTEM_TYPE, 0),
-              new StorageSystemId(DbStorage.STORAGE_SYSTEM_TYPE, 0)),
           MigrationUtils.migrationPath(
               new StorageSystemId(DbStorage.STORAGE_SYSTEM_TYPE, 0),
               new StorageSystemId(DbStorage.STORAGE_SYSTEM_TYPE, 1)));
