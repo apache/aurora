@@ -44,6 +44,7 @@ import com.twitter.common.logging.ScribeLog;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.thrift.ThriftFactory.ThriftFactoryException;
+import com.twitter.common.zookeeper.ServerSetImpl;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.common.zookeeper.ZooKeeperUtils;
@@ -226,7 +227,8 @@ public class SchedulerModule extends AbstractModule {
   @Provides
   @Singleton
   SingletonService provideSingletonService(ZooKeeperClient zkClient) {
-    return new SingletonService(zkClient, mesosSchedulerNameSpec.get());
+    return new SingletonService(zkClient, mesosSchedulerNameSpec.get(),
+        ServerSetImpl.createJsonCodec());
   }
 
   @Provides
