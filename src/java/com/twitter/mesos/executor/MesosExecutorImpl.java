@@ -35,7 +35,6 @@ public class MesosExecutorImpl implements Executor {
   private final CountDownLatch initialized = new CountDownLatch(1);
   private final ExecutorCore executorCore;
   private final Driver driver;
-  private SlaveID slaveId;
 
   @Inject
   public MesosExecutorImpl(ExecutorCore executorCore, Driver driver) {
@@ -48,7 +47,6 @@ public class MesosExecutorImpl implements Executor {
     LOG.info("Initialized with driver " + executorDriver + " and args " + executorArgs);
     executorCore.setSlaveId(executorArgs.getSlaveId().getValue());
     driver.init(executorDriver, executorArgs);
-    slaveId = executorArgs.getSlaveId();
     initialized.countDown();
   }
 
@@ -95,7 +93,7 @@ public class MesosExecutorImpl implements Executor {
     LOG.info("Received shutdown command, terminating...");
     for (Task killedTask : executorCore.shutdownCore()) {
       driver.sendStatusUpdate(TaskStatus.newBuilder()
-          .setTaskId(TaskID.newBuilder().setValue(killedTask.getId())).setSlaveId(slaveId)
+          .setTaskId(TaskID.newBuilder().setValue(killedTask.getId()))
           .setState(TaskState.TASK_KILLED).build());
     }
     driver.stop();
