@@ -130,6 +130,7 @@ public class TaskStateMachine {
      * complete.
      *
      * @param work Description of the work to be performed.
+     * @param stateMachine The state machine that the work is in context of.
      * @param mutation Mutate operationt to perform along with the state transition.
      */
     void addWork(WorkCommand work, TaskStateMachine stateMachine, Closure<ScheduledTask> mutation);
@@ -147,7 +148,12 @@ public class TaskStateMachine {
    */
   public TaskStateMachine(String taskId, Supplier<ScheduledTask> taskReader, WorkSink workSink,
       Amount<Long, Time> missingTaskGracePeriod) {
-    this(taskId, taskReader, workSink, missingTaskGracePeriod, Clock.SYSTEM_CLOCK);
+    this(taskId, taskReader, workSink, missingTaskGracePeriod, Clock.SYSTEM_CLOCK, INIT);
+  }
+
+  public TaskStateMachine(String taskId, Supplier<ScheduledTask> taskReader, WorkSink workSink,
+      Amount<Long, Time> missingTaskGracePeriod, ScheduleStatus initialState) {
+    this(taskId, taskReader, workSink, missingTaskGracePeriod, Clock.SYSTEM_CLOCK, initialState);
   }
 
   /**
@@ -160,19 +166,24 @@ public class TaskStateMachine {
    * @param missingTaskGracePeriod Amount of time to allow a task to be in ASSIGNED state before
    *     considering an {@code UNKNOWN} transition to be a lost task.
    * @param clock Clock to use for reading the current time.
+   * @param initialState The state to begin the state machine at.  All legal transitions will be
+   *     added, but this allows the state machine to 'skip' states, for instance when a task is
+   *     loaded from a persistent store.
    */
   public TaskStateMachine(
       String taskId,
       final Supplier<ScheduledTask> taskReader,
       final WorkSink workSink,
       final Amount<Long, Time> missingTaskGracePeriod,
-      final Clock clock) {
+      final Clock clock,
+      final ScheduleStatus initialState) {
 
     this.taskId = MorePreconditions.checkNotBlank(taskId);
     checkNotNull(taskReader);
     this.workSink = checkNotNull(workSink);
     checkNotNull(missingTaskGracePeriod);
     this.clock = checkNotNull(clock);
+    checkNotNull(initialState);
 
     @SuppressWarnings("unchecked")
     Closure<Transition<State>> manageTerminatedTasks = Closures.combine(
@@ -217,7 +228,7 @@ public class TaskStateMachine {
 
     stateMachine = StateMachine.<State>builder("Task-" + taskId)
         .logTransitions()
-        .initialState(State.create(INIT))
+        .initialState(State.create(initialState))
         .addState(
             State.create(INIT),
             State.array(PENDING, UNKNOWN))

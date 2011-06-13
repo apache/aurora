@@ -130,10 +130,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
   private final Map<String, TaskStateMachine> taskStateMachines = new MapMaker().makeComputingMap(
       new Function<String, TaskStateMachine>() {
         @Override public TaskStateMachine apply(String taskId) {
-          System.out.println("Adding state machine for unknown task " + taskId);
           return new TaskStateMachine(taskId, Suppliers.<ScheduledTask>ofInstance(null), workSink,
-              MISSING_TASK_GRACE_PERIOD.get())
-              .updateState(UNKNOWN);
+              MISSING_TASK_GRACE_PERIOD.get()).updateState(UNKNOWN);
         }
       }
   );
@@ -211,6 +209,11 @@ public class SchedulerCoreImpl implements SchedulerCore {
         taskStore.mutate(Query.GET_ALL, new Closure<ScheduledTask>() {
           @Override public void execute(ScheduledTask task) {
             ConfigurationManager.applyDefaultsIfUnset(task.getAssignedTask().getTask());
+
+            String taskId = Tasks.id(task);
+            taskStateMachines.put(taskId,
+                new TaskStateMachine(taskId, taskSupplier(taskId),
+                    workSink, MISSING_TASK_GRACE_PERIOD.get(), task.getStatus()));
           }
         });
       }
@@ -516,8 +519,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
         Iterables.transform(scheduledTasks, Tasks.SCHEDULED_TO_ID));
 
     processWorkQueueAfter(new Command() {
-      @Override
-      public void execute() {
+      @Override public void execute() {
         for (String taskId : taskIds) {
           taskStateMachines.put(taskId,
               new TaskStateMachine(taskId, taskSupplier(taskId),

@@ -25,6 +25,7 @@ import com.twitter.mesos.scheduler.TaskStateMachine.WorkSink;
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
+import static com.twitter.mesos.gen.ScheduleStatus.INIT;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED_BY_CLIENT;
 import static com.twitter.mesos.gen.ScheduleStatus.LOST;
@@ -60,7 +61,8 @@ public class TaskStateMachineTest extends EasyMockTest {
     taskReader = createMock(new Clazz<Supplier<ScheduledTask>>() {});
     workSink = createMock(WorkSink.class);
     clock = new FakeClock();
-    stateMachine = new TaskStateMachine("test", taskReader, workSink, MISSING_GRACE_PERIOD, clock);
+    stateMachine =
+        new TaskStateMachine("test", taskReader, workSink, MISSING_GRACE_PERIOD, clock, INIT);
   }
 
   @Test
@@ -139,7 +141,7 @@ public class TaskStateMachineTest extends EasyMockTest {
       control.verify();
       control.reset();
       stateMachine =
-          new TaskStateMachine("test", taskReader, workSink, MISSING_GRACE_PERIOD, clock);
+          new TaskStateMachine("test", taskReader, workSink, MISSING_GRACE_PERIOD, clock, INIT);
     }
 
     control.replay();  // Needed so the teardown verify doesn't break.
