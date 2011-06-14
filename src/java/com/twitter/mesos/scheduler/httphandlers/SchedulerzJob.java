@@ -23,10 +23,12 @@ import org.antlr.stringtemplate.StringTemplate;
 
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
+import com.twitter.common.net.http.handlers.StringTemplateServlet.CacheTemplates;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.LiveTask;
 import com.twitter.mesos.gen.ScheduleStatus;
+import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.Query;
@@ -72,9 +74,17 @@ public class SchedulerzJob extends StringTemplateServlet {
       new Comparator<LiveTask>() {
           @Override public int compare(LiveTask taskA, LiveTask taskB) {
             // Sort in reverse chronological order.
-            return (int) Math.signum(
-                Iterables.getLast(taskB.getScheduledTask().getTaskEvents()).getTimestamp()
-                - Iterables.getLast(taskA.getScheduledTask().getTaskEvents()).getTimestamp());
+            Iterable<TaskEvent> taskAEvents = taskA.getScheduledTask().getTaskEvents();
+            Iterable<TaskEvent> taskBEvents = taskB.getScheduledTask().getTaskEvents();
+
+            boolean taskAHasEvents = taskAEvents != null && !Iterables.isEmpty(taskAEvents);
+            boolean taskBHasEvents = taskBEvents != null && !Iterables.isEmpty(taskBEvents);
+            if (taskAHasEvents && taskBHasEvents) {
+              return Long.signum(Iterables.getLast(taskBEvents).getTimestamp()
+                  - Iterables.getLast(taskAEvents).getTimestamp());
+            } else {
+              return 0;
+            }
           }
       };
 

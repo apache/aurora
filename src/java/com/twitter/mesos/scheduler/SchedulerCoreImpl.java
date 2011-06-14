@@ -353,7 +353,11 @@ public class SchedulerCoreImpl implements SchedulerCore {
               TaskStateMachine stateMachine = taskStateMachines.get(taskId);
 
               LiveTaskInfo taskUpdate = taskInfoMap.get(taskId);
-              stateMachine.updateState(taskUpdate == null ? UNKNOWN : taskUpdate.getStatus());
+              ScheduleStatus updatedState = taskUpdate == null ? UNKNOWN : taskUpdate.getStatus();
+              // Prevent log spam from no-op updates.
+              if (updatedState != stateMachine.getState()) {
+                stateMachine.updateState(updatedState);
+              }
 
               // Update the resource information for the tasks that we currently have on record.
               if (taskUpdate != null && taskUpdate.getResources() != null) {
@@ -660,7 +664,12 @@ public class SchedulerCoreImpl implements SchedulerCore {
         processWorkQueueAfter(new Command() {
           @Override public void execute() {
             for (String taskId : taskStore.fetchIds(query)) {
-              taskStateMachines.get(taskId).updateState(status, message);
+              TaskStateMachine stateMachine = taskStateMachines.get(taskId);
+              // Don't bother trying to change the state if matching tasks are already in the
+              // new state.
+              if (stateMachine.getState() != status) {
+                stateMachine.updateState(status, message);
+              }
             }
           }
         });
