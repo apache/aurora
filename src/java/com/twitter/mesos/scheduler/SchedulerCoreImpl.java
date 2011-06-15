@@ -73,7 +73,6 @@ import static com.twitter.mesos.gen.ScheduleStatus.INIT;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED_BY_CLIENT;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
-import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.UNKNOWN;
 import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.CONSTRUCTED;
 import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.INITIALIZED;
@@ -614,10 +613,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
                     assignedTask.set(assigned);
                   }
                 });
-
-            // TODO(William Farner): Remove this once the executor starts reporting received tasks
-            // by sending a STARTING status update.
-            stateMachine.updateState(STARTING);
           }
         });
       }

@@ -257,7 +257,7 @@ public class LiveTaskTest {
     taskA.stage();
     taskA.run();
 
-    taskA.terminate(KILLED, null);
+    taskA.terminate(KILLED);
   }
 
   @Test

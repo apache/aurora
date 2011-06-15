@@ -300,12 +300,9 @@ public class TaskStateMachine {
                     break;
 
                   case UNKNOWN:
-                    // TODO(William Farner): Remove this once slaves are responsible for triggering
-                    //     the ASSIGNED -> STARTING state transition (currently the scheduler does).
-                    // Have we been waiting too long on this task?
-                    if (isTaskTimedOut(taskReader.get().getTaskEvents(), missingTaskGracePeriod)) {
-                      updateState(LOST);
-                    }
+                    // The slave previously acknowledged that it had the task, and now stopped
+                    // reporting it.
+                    updateState(LOST);
                 }
               }
             },

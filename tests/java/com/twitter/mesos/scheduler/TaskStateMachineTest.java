@@ -225,7 +225,6 @@ public class TaskStateMachineTest extends EasyMockTest {
   public void testMissingStartingRescheduledImmediately() {
     ScheduledTask task = makeTask(false);
     task.addToTaskEvents(new TaskEvent(clock.nowMillis(), ScheduleStatus.PENDING, null));
-    expect(taskReader.get()).andReturn(task).times(2);
     expectWork(UPDATE_STATE).times(4);
     expectWork(RESCHEDULE);
 
@@ -234,10 +233,6 @@ public class TaskStateMachineTest extends EasyMockTest {
     stateMachine.updateState(PENDING)
         .updateState(ASSIGNED)
         .updateState(STARTING);
-    stateMachine.updateState(UNKNOWN);
-    assertThat(stateMachine.getState(), is(ScheduleStatus.STARTING));
-    clock.advance(MISSING_GRACE_PERIOD);
-    clock.advance(Amount.of(1L, Time.MILLISECONDS));
     stateMachine.updateState(UNKNOWN);
     assertThat(stateMachine.getState(), is(ScheduleStatus.LOST));
   }

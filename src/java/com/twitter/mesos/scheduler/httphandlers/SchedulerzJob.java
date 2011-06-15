@@ -37,6 +37,7 @@ import com.twitter.mesos.scheduler.TaskState;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
+import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
@@ -65,7 +66,7 @@ public class SchedulerzJob extends StringTemplateServlet {
   private static final Map<ScheduleStatus, Set<ScheduleStatus>> FILTER_MAP =
       ImmutableMap.<ScheduleStatus, Set<ScheduleStatus>>builder()
         .put(PENDING, EnumSet.of(PENDING))
-        .put(RUNNING, EnumSet.of(STARTING, RUNNING))
+        .put(RUNNING, EnumSet.of(ASSIGNED, STARTING, RUNNING))
         .put(FINISHED, EnumSet.of(KILLED, KILLED_BY_CLIENT, FINISHED))
         .put(FAILED, EnumSet.of(LOST, FAILED))
       .build();

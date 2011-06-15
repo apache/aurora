@@ -202,7 +202,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     SlaveOffer slaveOffer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
     TwitterTask launchedTask = scheduler.offer(slaveOffer);
     assertThat(launchedTask.task.getTask(), is(storedTask));
-    assertThat(getTask(storedTaskId).task.getStatus(), is(STARTING));
+    assertThat(getTask(storedTaskId).task.getStatus(), is(ASSIGNED));
   }
 
   @Test
@@ -798,7 +798,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     sendOffer(slaveOffer, taskId1, SLAVE_ID, SLAVE_HOST_1);
     sendOffer(slaveOffer, taskId2, SLAVE_ID, SLAVE_HOST_1);
 
+    changeStatus(taskId1, STARTING);
     changeStatus(taskId1, RUNNING);
+    changeStatus(taskId2, STARTING);
     changeStatus(taskId2, RUNNING);
 
     // Simulate state update from the executor telling the scheduler that the task is dead.
@@ -840,7 +842,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     String taskIdB = Tasks.id(Iterables.get(getTasksOwnedBy(OWNER_B), 0).task);
     sendOffer(slaveOffer2, taskIdB, SLAVE_ID, SLAVE_HOST_2);
 
+    changeStatus(taskIdA, STARTING);
     changeStatus(taskIdA, RUNNING);
+    changeStatus(taskIdB, STARTING);
     changeStatus(taskIdB, RUNNING);
 
     assertThat(getTask(taskIdA).task.getAssignedTask().getSlaveHost(), is(SLAVE_HOST_1));
@@ -885,12 +889,15 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     sendOffer(slaveOffer2, taskIdC, SLAVE_ID, SLAVE_HOST_2);
     sendOffer(slaveOffer2, taskIdD, SLAVE_ID, SLAVE_HOST_2);
 
+    changeStatus(taskIdA, STARTING);
     changeStatus(taskIdA, RUNNING);
+    changeStatus(taskIdB, STARTING);
     changeStatus(taskIdB, FINISHED);
     assertThat(getTasks(new Query(new TaskQuery().setOwner(OWNER_A).setJobName(JOB_A)
             .setStatuses(EnumSet.of(PENDING)))).size(),
         is(1));
 
+    changeStatus(taskIdC, STARTING);
     changeStatus(taskIdC, RUNNING);
     changeStatus(taskIdD, FAILED);
 
