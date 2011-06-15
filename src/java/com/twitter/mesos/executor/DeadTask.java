@@ -66,7 +66,7 @@ public class DeadTask extends TaskOnDisk {
   }
 
   @Override
-  public void terminate(ScheduleStatus terminalState, String reason) {
+  public void terminate(ScheduleStatus terminalState) {
     throw new UnsupportedOperationException("The state of a dead task cannot be changed.");
   }
 

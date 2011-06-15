@@ -11,7 +11,6 @@ import com.google.inject.Inject;
 import org.apache.mesos.Executor;
 import org.apache.mesos.ExecutorDriver;
 import org.apache.mesos.Protos.ExecutorArgs;
-import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskDescription;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskState;
@@ -26,6 +25,7 @@ import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ExecutorMessage;
 import com.twitter.mesos.gen.ScheduleStatus;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
 
 public class MesosExecutorImpl implements Executor {
@@ -35,12 +35,11 @@ public class MesosExecutorImpl implements Executor {
   private final CountDownLatch initialized = new CountDownLatch(1);
   private final ExecutorCore executorCore;
   private final Driver driver;
-  private SlaveID slaveId;
 
   @Inject
   public MesosExecutorImpl(ExecutorCore executorCore, Driver driver) {
-    this.executorCore = Preconditions.checkNotNull(executorCore);
-    this.driver = Preconditions.checkNotNull(driver);
+    this.executorCore = checkNotNull(executorCore);
+    this.driver = checkNotNull(driver);
   }
 
   @Override
@@ -48,7 +47,6 @@ public class MesosExecutorImpl implements Executor {
     LOG.info("Initialized with driver " + executorDriver + " and args " + executorArgs);
     executorCore.setSlaveId(executorArgs.getSlaveId().getValue());
     driver.init(executorDriver, executorArgs);
-    slaveId = executorArgs.getSlaveId();
     initialized.countDown();
   }
 
@@ -73,15 +71,11 @@ public class MesosExecutorImpl implements Executor {
     Preconditions.checkArgument(task.getTaskId().getValue().equals(assignedTask.getTaskId()),
         "Fatal - task IDs do not match: " + task.getTaskId() + ", " + assignedTask.getTaskId());
 
-    try {
-      executorCore.executeTask(assignedTask, new Closure<ScheduleStatus>() {
-        @Override public void execute(ScheduleStatus state) {
-          driver.sendStatusUpdate(assignedTask.getTaskId(), state, null);
-        }
-      });
-    } catch (TaskRunException e) {
-      driver.sendStatusUpdate(assignedTask.getTaskId(), FAILED, e.getMessage());
-    }
+    executorCore.executeTask(assignedTask, new Closure<ExecutorCore.StateChange>() {
+      @Override public void execute(ExecutorCore.StateChange state) {
+        driver.sendStatusUpdate(assignedTask.getTaskId(), state.status, state.message);
+      }
+    });
   }
 
   @Override
@@ -95,7 +89,7 @@ public class MesosExecutorImpl implements Executor {
     LOG.info("Received shutdown command, terminating...");
     for (Task killedTask : executorCore.shutdownCore()) {
       driver.sendStatusUpdate(TaskStatus.newBuilder()
-          .setTaskId(TaskID.newBuilder().setValue(killedTask.getId())).setSlaveId(slaveId)
+          .setTaskId(TaskID.newBuilder().setValue(killedTask.getId()))
           .setState(TaskState.TASK_KILLED).build());
     }
     driver.stop();

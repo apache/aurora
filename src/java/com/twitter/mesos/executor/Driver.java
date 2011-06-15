@@ -58,7 +58,6 @@ public interface Driver extends Function<Message, Integer> {
     private static final Logger LOG = Logger.getLogger(DriverImpl.class.getName());
 
     private final AtomicReference<ExecutorDriver> driverRef = new AtomicReference<ExecutorDriver>();
-    private final AtomicReference<ExecutorArgs> executorArgs = new AtomicReference<ExecutorArgs>();
 
     private final AtomicLong statusUpdatesSent = Stats.exportLong("executor_status_updates_sent");
     private final AtomicLong statusUpdatesFailed =
@@ -78,7 +77,6 @@ public interface Driver extends Function<Message, Integer> {
     public void init(ExecutorDriver driver, ExecutorArgs executorArgs) {
       LOG.info("Driver assigned " + driver + ", and args " + executorArgs);
       this.driverRef.set(driver);
-      this.executorArgs.set(executorArgs);
     }
 
     /**
@@ -143,7 +141,6 @@ public interface Driver extends Function<Message, Integer> {
           LOG.info("Notifying task " + taskId + " in state " + status);
           TaskStatus.Builder msg = TaskStatus.newBuilder()
               .setTaskId(TaskID.newBuilder().setValue(taskId))
-              .setSlaveId(executorArgs.get().getSlaveId())
               .setState(StateTranslator.get(status));
           if (reason != null) {
             msg.setData(ByteString.copyFromUtf8(reason));

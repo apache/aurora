@@ -17,7 +17,7 @@ See the flags defined in main() for all available options.
 
 __author__ = 'Alex Roetter'
 
-# TODO(Brian Wickman):  Does this even still work?
+# TODO(wickman):  Does this even still work?
 
 from optparse import OptionParser
 

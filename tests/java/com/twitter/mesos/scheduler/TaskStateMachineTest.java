@@ -25,6 +25,7 @@ import com.twitter.mesos.scheduler.TaskStateMachine.WorkSink;
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
+import static com.twitter.mesos.gen.ScheduleStatus.INIT;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED_BY_CLIENT;
 import static com.twitter.mesos.gen.ScheduleStatus.LOST;
@@ -41,6 +42,9 @@ import static com.twitter.mesos.scheduler.WorkCommand.UPDATE_STATE;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
+import static org.easymock.EasyMock.isA;
+import static org.hamcrest.CoreMatchers.is;
+import static org.junit.Assert.assertThat;
 
 /**
  * @author William Farner
@@ -60,7 +64,8 @@ public class TaskStateMachineTest extends EasyMockTest {
     taskReader = createMock(new Clazz<Supplier<ScheduledTask>>() {});
     workSink = createMock(WorkSink.class);
     clock = new FakeClock();
-    stateMachine = new TaskStateMachine("test", taskReader, workSink, MISSING_GRACE_PERIOD, clock);
+    stateMachine =
+        new TaskStateMachine("test", taskReader, workSink, MISSING_GRACE_PERIOD, clock, INIT);
   }
 
   @Test
@@ -139,7 +144,7 @@ public class TaskStateMachineTest extends EasyMockTest {
       control.verify();
       control.reset();
       stateMachine =
-          new TaskStateMachine("test", taskReader, workSink, MISSING_GRACE_PERIOD, clock);
+          new TaskStateMachine("test", taskReader, workSink, MISSING_GRACE_PERIOD, clock, INIT);
     }
 
     control.replay();  // Needed so the teardown verify doesn't break.
@@ -196,13 +201,12 @@ public class TaskStateMachineTest extends EasyMockTest {
     ScheduledTask task = makeTask(false);
     task.addToTaskEvents(new TaskEvent(clock.nowMillis(), ScheduleStatus.PENDING, null));
 
-    expectWork(UPDATE_STATE).times(2);
+    expectWork(UPDATE_STATE).times(3);
+    expectWork(RESCHEDULE);
 
     clock.waitFor(10);
     task.addToTaskEvents(new TaskEvent(clock.nowMillis(), ScheduleStatus.ASSIGNED, null));
     expect(taskReader.get()).andReturn(task).times(3);
-    expectWork(KILL);
-    expectWork(RESCHEDULE);
 
     control.replay();
 
@@ -211,21 +215,26 @@ public class TaskStateMachineTest extends EasyMockTest {
         .updateState(UNKNOWN);
     clock.waitFor(MISSING_GRACE_PERIOD.as(Time.MILLISECONDS) - 1);
     stateMachine.updateState(UNKNOWN);
+    assertThat(stateMachine.getState(), is(ScheduleStatus.ASSIGNED));
     clock.waitFor(2);
     stateMachine.updateState(UNKNOWN);
+    assertThat(stateMachine.getState(), is(ScheduleStatus.LOST));
   }
 
   @Test
   public void testMissingStartingRescheduledImmediately() {
-    expectWork(UPDATE_STATE).times(3);
+    ScheduledTask task = makeTask(false);
+    task.addToTaskEvents(new TaskEvent(clock.nowMillis(), ScheduleStatus.PENDING, null));
+    expectWork(UPDATE_STATE).times(4);
     expectWork(RESCHEDULE);
 
     control.replay();
 
     stateMachine.updateState(PENDING)
         .updateState(ASSIGNED)
-        .updateState(STARTING)
-        .updateState(UNKNOWN);
+        .updateState(STARTING);
+    stateMachine.updateState(UNKNOWN);
+    assertThat(stateMachine.getState(), is(ScheduleStatus.LOST));
   }
 
   @Test
@@ -241,6 +250,30 @@ public class TaskStateMachineTest extends EasyMockTest {
         .updateState(RUNNING)
         .updateState(RESTARTING)
         .updateState(RUNNING);
+  }
+
+  @Test
+  public void testAllowsSkipStartingAndRunning() {
+    expectWork(UPDATE_STATE).times(3);
+
+    control.replay();
+
+    stateMachine.updateState(PENDING)
+        .updateState(ASSIGNED)
+        .updateState(FINISHED);
+  }
+
+  @Test
+  public void testAllowsSkipRunning() {
+    expectWork(UPDATE_STATE).times(4);
+    expect(taskReader.get()).andReturn(makeTask(false));
+
+    control.replay();
+
+    stateMachine.updateState(PENDING)
+        .updateState(ASSIGNED)
+        .updateState(STARTING)
+        .updateState(FINISHED);
   }
 
   private IExpectationSetters<Void> expectWork(WorkCommand work) {

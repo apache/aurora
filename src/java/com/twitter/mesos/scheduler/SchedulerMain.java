@@ -237,7 +237,7 @@ public class SchedulerMain extends AbstractApplication {
 
   private int startThriftServer() throws IOException, TTransportException,
       Group.JoinException, InterruptedException, GeneralSecurityException {
-    // TODO(Brian Wickman): Add helper to science thrift to perform this keyfile import.
+    // TODO(wickman): Add helper to science thrift to perform this keyfile import.
     SSLContext ctx = null;
 
     ctx = SSLContext.getInstance("TLS");

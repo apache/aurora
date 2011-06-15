@@ -130,6 +130,7 @@ public class TaskStateMachine {
      * complete.
      *
      * @param work Description of the work to be performed.
+     * @param stateMachine The state machine that the work is in context of.
      * @param mutation Mutate operationt to perform along with the state transition.
      */
     void addWork(WorkCommand work, TaskStateMachine stateMachine, Closure<ScheduledTask> mutation);
@@ -147,7 +148,12 @@ public class TaskStateMachine {
    */
   public TaskStateMachine(String taskId, Supplier<ScheduledTask> taskReader, WorkSink workSink,
       Amount<Long, Time> missingTaskGracePeriod) {
-    this(taskId, taskReader, workSink, missingTaskGracePeriod, Clock.SYSTEM_CLOCK);
+    this(taskId, taskReader, workSink, missingTaskGracePeriod, Clock.SYSTEM_CLOCK, INIT);
+  }
+
+  public TaskStateMachine(String taskId, Supplier<ScheduledTask> taskReader, WorkSink workSink,
+      Amount<Long, Time> missingTaskGracePeriod, ScheduleStatus initialState) {
+    this(taskId, taskReader, workSink, missingTaskGracePeriod, Clock.SYSTEM_CLOCK, initialState);
   }
 
   /**
@@ -160,19 +166,24 @@ public class TaskStateMachine {
    * @param missingTaskGracePeriod Amount of time to allow a task to be in ASSIGNED state before
    *     considering an {@code UNKNOWN} transition to be a lost task.
    * @param clock Clock to use for reading the current time.
+   * @param initialState The state to begin the state machine at.  All legal transitions will be
+   *     added, but this allows the state machine to 'skip' states, for instance when a task is
+   *     loaded from a persistent store.
    */
   public TaskStateMachine(
       String taskId,
       final Supplier<ScheduledTask> taskReader,
       final WorkSink workSink,
       final Amount<Long, Time> missingTaskGracePeriod,
-      final Clock clock) {
+      final Clock clock,
+      final ScheduleStatus initialState) {
 
     this.taskId = MorePreconditions.checkNotBlank(taskId);
     checkNotNull(taskReader);
     this.workSink = checkNotNull(workSink);
     checkNotNull(missingTaskGracePeriod);
     this.clock = checkNotNull(clock);
+    checkNotNull(initialState);
 
     @SuppressWarnings("unchecked")
     Closure<Transition<State>> manageTerminatedTasks = Closures.combine(
@@ -217,7 +228,7 @@ public class TaskStateMachine {
 
     stateMachine = StateMachine.<State>builder("Task-" + taskId)
         .logTransitions()
-        .initialState(State.create(INIT))
+        .initialState(State.create(initialState))
         .addState(
             State.create(INIT),
             State.array(PENDING, UNKNOWN))
@@ -251,18 +262,16 @@ public class TaskStateMachine {
                     break;
 
                   case UNKNOWN:
-                    // Have we been waiting too long on this task?
-                    long lastEventAgeMillis = clock.nowMillis()
-                        - Iterables.getLast(taskReader.get().getTaskEvents()).getTimestamp();
-                    if (lastEventAgeMillis > missingTaskGracePeriod.as(Time.MILLISECONDS)) {
-                      addWork(WorkCommand.KILL);
-                      addWork(WorkCommand.RESCHEDULE);
+                    // Determine if we have been waiting too long on this task.
+                    if (isTaskTimedOut(taskReader.get().getTaskEvents(), missingTaskGracePeriod)) {
+                      updateState(LOST);
                     }
                 }
               }
             },
             State.create(ASSIGNED),
-            State.array(STARTING, FAILED, RESTARTING, KILLED, KILLED_BY_CLIENT, LOST))
+            State.array(STARTING, RUNNING, FINISHED, FAILED, RESTARTING, KILLED, KILLED_BY_CLIENT,
+                LOST))
         .addState(
             new Closure<Transition<State>>() {
               @Override public void execute(Transition<State> transition) {
@@ -288,13 +297,18 @@ public class TaskStateMachine {
                     break;
 
                   case LOST:
-                  case UNKNOWN:
                     addWork(WorkCommand.RESCHEDULE);
+                    break;
+
+                  case UNKNOWN:
+                    // The slave previously acknowledged that it had the task, and now stopped
+                    // reporting it.
+                    updateState(LOST);
                 }
               }
             },
             State.create(STARTING),
-            State.array(RUNNING, FINISHED, RESTARTING, FAILED, KILLED, KILLED_BY_CLIENT, LOST))
+            State.array(RUNNING, FINISHED, FAILED, RESTARTING, KILLED, KILLED_BY_CLIENT, LOST))
         .addState(
             new Closure<Transition<State>>() {
               @Override public void execute(Transition<State> transition) {
@@ -377,6 +391,17 @@ public class TaskStateMachine {
         .build();
   }
 
+  private boolean isTaskTimedOut(Iterable<TaskEvent> taskEvents,
+      Amount<Long, Time> missingTaskGracePeriod) {
+    if (taskEvents == null || Iterables.isEmpty(taskEvents)) {
+      LOG.warning("Task " + taskId + " had no task events, assuming timed out.");
+      return true;
+    } else {
+      long lastEventAgeMillis = clock.nowMillis() - Iterables.getLast(taskEvents).getTimestamp();
+      return lastEventAgeMillis > missingTaskGracePeriod.as(Time.MILLISECONDS);
+    }
+  }
+
   private Closure<Transition<State>> addWorkClosure(final WorkCommand work) {
     return new Closure<Transition<State>>() {
       @Override public void execute(Transition<State> item) {
@@ -395,9 +420,7 @@ public class TaskStateMachine {
   }
 
   /**
-   * Attempt to transition the state machine to the provided state.
-   * At the time this method returns, any work commands required to satisfy the state transition
-   * will be appended to the work queue.
+   * Same as {@link #updateState(ScheduleStatus, Closure)}, but uses a noop mutation.
    *
    * @param status Status to apply to the task.
    * @return A reference to the state machine.
@@ -406,21 +429,55 @@ public class TaskStateMachine {
     return updateState(status, Closures.<ScheduledTask>noop());
   }
 
-  public synchronized TaskStateMachine updateState(final ScheduleStatus status,
-      final String auditMessage) {
-    Preconditions.checkNotNull(clock);
-
-    return updateState(status, new Closure<ScheduledTask>() {
-      @Override public void execute(ScheduledTask task) {
-        task.addToTaskEvents(new TaskEvent(clock.nowMillis(), status, auditMessage));
-      }
-    });
+  /**
+   * Same as {@link #updateState(ScheduleStatus, Closure, String)}, but uses a noop mutation.
+   *
+   * @param status Status to apply to the task.
+   * @param auditMessage The (optional) audit message to associate with the transition.
+   * @return A reference to the state machine.
+   */
+  public synchronized TaskStateMachine updateState(ScheduleStatus status,
+      @Nullable String auditMessage) {
+    return updateState(status, Closures.<ScheduledTask>noop(), auditMessage);
   }
 
+  /**
+   * Same as {@link #updateState(ScheduleStatus, Closure, String)}, but omits the audit message.
+   *
+   * @param status Status to apply to the task.
+   * @param mutation Mutate operation to perform while updating the task.
+   * @return A reference to the state machine.
+   */
   public synchronized TaskStateMachine updateState(ScheduleStatus status,
-      @Nullable Closure<ScheduledTask> mutation) {
+      Closure<ScheduledTask> mutation) {
+    return updateState(status, mutation, null);
+  }
+
+  /**
+   * Attempt to transition the state machine to the provided state.
+   * At the time this method returns, any work commands required to satisfy the state transition
+   * will be appended to the work queue.
+   *
+   * @param status Status to apply to the task.
+   * @param auditMessage The (optional) audit message to associate with the transition.
+   * @param mutation Mutate operation to perform while updating the task.
+   * @return A reference to the state machine.
+   */
+  public synchronized TaskStateMachine updateState(final ScheduleStatus status,
+      Closure<ScheduledTask> mutation,
+      @Nullable final String auditMessage) {
     checkNotNull(status);
-    stateMachine.transition(State.create(status, mutation));
+    checkNotNull(mutation);
+
+    @SuppressWarnings("unchecked")
+    Closure<ScheduledTask> operation = Closures.combine(mutation,
+        new Closure<ScheduledTask>() {
+          @Override public void execute(ScheduledTask task) {
+            task.addToTaskEvents(new TaskEvent(clock.nowMillis(), status, auditMessage));
+          }
+        });
+
+    stateMachine.transition(State.create(status, operation));
     return this;
   }
 

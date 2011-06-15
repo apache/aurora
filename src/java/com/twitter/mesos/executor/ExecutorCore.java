@@ -15,6 +15,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.annotation.Nullable;
+
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
@@ -26,6 +28,8 @@ import com.google.inject.Inject;
 import com.google.inject.name.Named;
 
 import org.apache.commons.io.FileSystemUtils;
+import org.apache.commons.lang.builder.EqualsBuilder;
+import org.apache.commons.lang.builder.ToStringBuilder;
 
 import com.twitter.common.application.ActionRegistry;
 import com.twitter.common.base.Closure;
@@ -43,7 +47,10 @@ import com.twitter.mesos.gen.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.SchedulerMessage;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
+import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
+import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 
 /**
  * ExecutorCore
@@ -84,11 +91,11 @@ public class ExecutorCore implements TaskManager {
       Function<AssignedTask, Task> taskFactory,
       @Named(TASK_EXECUTOR) ExecutorService taskExecutor,
       Function<Message, Integer> messageHandler) {
-    this.executorRootDir = Preconditions.checkNotNull(executorRootDir);
-    this.buildInfo = Preconditions.checkNotNull(buildInfo);
-    this.taskFactory = Preconditions.checkNotNull(taskFactory);
-    this.taskExecutor = Preconditions.checkNotNull(taskExecutor);
-    this.messageHandler = Preconditions.checkNotNull(messageHandler);
+    this.executorRootDir = checkNotNull(executorRootDir);
+    this.buildInfo = checkNotNull(buildInfo);
+    this.taskFactory = checkNotNull(taskFactory);
+    this.taskExecutor = checkNotNull(taskExecutor);
+    this.messageHandler = checkNotNull(messageHandler);
 
     Stats.export(new StatImpl<Integer>("executor_tasks_stored") {
       @Override public Integer read() {
@@ -103,7 +110,7 @@ public class ExecutorCore implements TaskManager {
    * @param deadTasks Dead tasks to store.
    */
   void addDeadTasks(Iterable<Task> deadTasks) {
-    Preconditions.checkNotNull(deadTasks);
+    checkNotNull(deadTasks);
 
     for (Task task : deadTasks) {
       tasks.put(task.getId(), task);
@@ -128,21 +135,55 @@ public class ExecutorCore implements TaskManager {
   }
 
   void setSlaveId(String slaveId) {
-    this.slaveId.set(Preconditions.checkNotNull(slaveId));
+    this.slaveId.set(checkNotNull(slaveId));
     LOG.info("Assigned slave ID: " + slaveId);
+  }
+
+  static class StateChange {
+    final ScheduleStatus status;
+    @Nullable final String message;
+
+    StateChange(ScheduleStatus status) {
+      this(status, null);
+    }
+
+    StateChange(ScheduleStatus status, @Nullable String message) {
+      this.status = checkNotNull(status);
+      this.message = message;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof StateChange)) {
+        return false;
+      }
+
+      StateChange other = (StateChange) o;
+      return new EqualsBuilder()
+          .append(status, other.status)
+          .append(message, other.message)
+          .isEquals();
+    }
+
+    @Override
+    public String toString() {
+      return new ToStringBuilder(this)
+          .append(status)
+          .append(message)
+          .toString();
+    }
   }
 
   /**
    * Executes a task on the system.
    *
    * @param assignedTask The assigned task to run.
-   * @param completedCallback The callback to call when the task has completed, will not be called
-   *    if the task failed to start.
-   * @throws TaskRunException If the task failed to start.
+   * @param stateChangeCallback Called when the task transitions to different states.
    */
   public void executeTask(AssignedTask assignedTask,
-      final Closure<ScheduleStatus> completedCallback) throws TaskRunException {
-    Preconditions.checkNotNull(assignedTask);
+      final Closure<StateChange> stateChangeCallback) {
+    checkNotNull(assignedTask);
+    checkNotNull(stateChangeCallback);
 
     final String taskId = assignedTask.getTaskId();
 
@@ -153,15 +194,18 @@ public class ExecutorCore implements TaskManager {
     final Task task = taskFactory.apply(assignedTask);
     tasks.put(taskId, task);
 
+    stateChangeCallback.execute(new StateChange(STARTING));
     try {
       task.stage();
+      stateChangeCallback.execute(new StateChange(RUNNING));
       task.run();
     } catch (TaskRunException e) {
       LOG.log(Level.SEVERE, "Failed to stage or run task " + taskId, e);
       taskFailures.incrementAndGet();
-      task.terminate(FAILED, e.getMessage());
+      task.terminate(FAILED);
+      stateChangeCallback.execute(new StateChange(FAILED, e.getMessage()));
       deleteCompletedTask(taskId);
-      throw e;
+      return;
     }
 
     taskExecutor.execute(new Runnable() {
@@ -169,7 +213,7 @@ public class ExecutorCore implements TaskManager {
         LOG.info("Waiting for task " + taskId + " to complete.");
         ScheduleStatus state = task.blockUntilTerminated();
         LOG.info("Task " + taskId + " completed in state " + state);
-        completedCallback.execute(state);
+        stateChangeCallback.execute(new StateChange(state));
       }
     });
   }
@@ -180,7 +224,7 @@ public class ExecutorCore implements TaskManager {
     if (task != null && task.isRunning()) {
       LOG.info("Killing task: " + task);
       tasksKilled.incrementAndGet();
-      task.terminate(ScheduleStatus.KILLED, "Executor shutting down.");
+      task.terminate(ScheduleStatus.KILLED);
     } else if (task == null) {
       LOG.severe("No such task found: " + taskId);
     } else {

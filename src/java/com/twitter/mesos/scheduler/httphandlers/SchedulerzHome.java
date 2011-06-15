@@ -81,6 +81,7 @@ public class SchedulerzHome extends StringTemplateServlet {
               role.pendingTaskCount++;
               break;
 
+            case ASSIGNED:
             case STARTING:
             case RUNNING:
               role.activeTaskCount++;
