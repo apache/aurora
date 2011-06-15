@@ -73,6 +73,7 @@ import static com.twitter.mesos.gen.ScheduleStatus.INIT;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED_BY_CLIENT;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
+import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.UNKNOWN;
 import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.CONSTRUCTED;
 import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.INITIALIZED;
@@ -129,8 +130,10 @@ public class SchedulerCoreImpl implements SchedulerCore {
   private final Map<String, TaskStateMachine> taskStateMachines = new MapMaker().makeComputingMap(
       new Function<String, TaskStateMachine>() {
         @Override public TaskStateMachine apply(String taskId) {
+          System.out.println("Adding state machine for unknown task " + taskId);
           return new TaskStateMachine(taskId, Suppliers.<ScheduledTask>ofInstance(null), workSink,
-              MISSING_TASK_GRACE_PERIOD.get()).updateState(UNKNOWN);
+              MISSING_TASK_GRACE_PERIOD.get())
+              .updateState(UNKNOWN);
         }
       }
   );
@@ -208,11 +211,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
         taskStore.mutate(Query.GET_ALL, new Closure<ScheduledTask>() {
           @Override public void execute(ScheduledTask task) {
             ConfigurationManager.applyDefaultsIfUnset(task.getAssignedTask().getTask());
-
-            String taskId = Tasks.id(task);
-            taskStateMachines.put(taskId,
-                new TaskStateMachine(taskId, taskSupplier(taskId),
-                    workSink, MISSING_TASK_GRACE_PERIOD.get(), task.getStatus()));
           }
         });
       }
@@ -352,11 +350,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
               TaskStateMachine stateMachine = taskStateMachines.get(taskId);
 
               LiveTaskInfo taskUpdate = taskInfoMap.get(taskId);
-              ScheduleStatus updatedState = taskUpdate == null ? UNKNOWN : taskUpdate.getStatus();
-              // Prevent log spam from no-op updates.
-              if (updatedState != stateMachine.getState()) {
-                stateMachine.updateState(updatedState);
-              }
+              stateMachine.updateState(taskUpdate == null ? UNKNOWN : taskUpdate.getStatus());
 
               // Update the resource information for the tasks that we currently have on record.
               if (taskUpdate != null && taskUpdate.getResources() != null) {
@@ -522,7 +516,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
         Iterables.transform(scheduledTasks, Tasks.SCHEDULED_TO_ID));
 
     processWorkQueueAfter(new Command() {
-      @Override public void execute() {
+      @Override
+      public void execute() {
         for (String taskId : taskIds) {
           taskStateMachines.put(taskId,
               new TaskStateMachine(taskId, taskSupplier(taskId),
@@ -613,6 +608,10 @@ public class SchedulerCoreImpl implements SchedulerCore {
                     assignedTask.set(assigned);
                   }
                 });
+
+            // TODO(William Farner): Remove this once the executor starts reporting received tasks
+            // by sending a STARTING status update.
+            stateMachine.updateState(STARTING);
           }
         });
       }
@@ -659,12 +658,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
         processWorkQueueAfter(new Command() {
           @Override public void execute() {
             for (String taskId : taskStore.fetchIds(query)) {
-              TaskStateMachine stateMachine = taskStateMachines.get(taskId);
-              // Don't bother trying to change the state if matching tasks are already in the
-              // new state.
-              if (stateMachine.getState() != status) {
-                stateMachine.updateState(status, message);
-              }
+              taskStateMachines.get(taskId).updateState(status, message);
             }
           }
         });

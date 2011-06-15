@@ -23,12 +23,10 @@ import org.antlr.stringtemplate.StringTemplate;
 
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
-import com.twitter.common.net.http.handlers.StringTemplateServlet.CacheTemplates;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.LiveTask;
 import com.twitter.mesos.gen.ScheduleStatus;
-import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.Query;
@@ -37,7 +35,6 @@ import com.twitter.mesos.scheduler.TaskState;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
-import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
@@ -66,7 +63,7 @@ public class SchedulerzJob extends StringTemplateServlet {
   private static final Map<ScheduleStatus, Set<ScheduleStatus>> FILTER_MAP =
       ImmutableMap.<ScheduleStatus, Set<ScheduleStatus>>builder()
         .put(PENDING, EnumSet.of(PENDING))
-        .put(RUNNING, EnumSet.of(ASSIGNED, STARTING, RUNNING))
+        .put(RUNNING, EnumSet.of(STARTING, RUNNING))
         .put(FINISHED, EnumSet.of(KILLED, KILLED_BY_CLIENT, FINISHED))
         .put(FAILED, EnumSet.of(LOST, FAILED))
       .build();
@@ -75,17 +72,9 @@ public class SchedulerzJob extends StringTemplateServlet {
       new Comparator<LiveTask>() {
           @Override public int compare(LiveTask taskA, LiveTask taskB) {
             // Sort in reverse chronological order.
-            Iterable<TaskEvent> taskAEvents = taskA.getScheduledTask().getTaskEvents();
-            Iterable<TaskEvent> taskBEvents = taskB.getScheduledTask().getTaskEvents();
-
-            boolean taskAHasEvents = taskAEvents != null && !Iterables.isEmpty(taskAEvents);
-            boolean taskBHasEvents = taskBEvents != null && !Iterables.isEmpty(taskBEvents);
-            if (taskAHasEvents && taskBHasEvents) {
-              return Long.signum(Iterables.getLast(taskBEvents).getTimestamp()
-                  - Iterables.getLast(taskAEvents).getTimestamp());
-            } else {
-              return 0;
-            }
+            return (int) Math.signum(
+                Iterables.getLast(taskB.getScheduledTask().getTaskEvents()).getTimestamp()
+                - Iterables.getLast(taskA.getScheduledTask().getTaskEvents()).getTimestamp());
           }
       };
 

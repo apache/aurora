@@ -40,20 +40,13 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.SchedulerCore.RestartException;
-import com.twitter.mesos.scheduler.SchedulerCore.TwitterTask;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
-import com.twitter.mesos.scheduler.storage.JobStore;
-import com.twitter.mesos.scheduler.storage.SchedulerStore;
 import com.twitter.mesos.scheduler.storage.Storage;
-import com.twitter.mesos.scheduler.storage.Storage.Work;
-import com.twitter.mesos.scheduler.storage.Storage.Work.NoResult;
-import com.twitter.mesos.scheduler.storage.TaskStore;
 
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
-import static com.twitter.mesos.gen.ScheduleStatus.INIT;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED_BY_CLIENT;
 import static com.twitter.mesos.gen.ScheduleStatus.LOST;
@@ -77,8 +70,6 @@ import static org.junit.Assert.fail;
  *    - Failed tasks have failed count incremented.
  *    - Tasks above maxTaskFailures have _all_ tasks in the job removed.
  *    - Daemon tasks are rescheduled.
- *
- * TODO(William Farner): Add test cases for when the storage has pre-loaded task data.
  *
  * @author William Farner
  */
@@ -123,10 +114,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   protected abstract Storage createStorage() throws Exception;
 
   private void buildScheduler() throws Exception {
-    buildScheduler(createStorage());
-  }
+    Storage storage = createStorage();
 
-  private void buildScheduler(Storage storage) throws Exception {
     ImmediateJobManager immediateManager = new ImmediateJobManager();
     cron = new CronJobManager(storage);
 
@@ -159,50 +148,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
           is(ConfigurationManager.populateFields(job,
               new TwitterTaskInfo(DEFAULT_TASK).setShardId(0))));
     }
-  }
-
-  @Test
-  public void testLoadTasksFromStorage() throws Exception {
-    final String storedTaskId = "task_on_disk";
-
-    expectOffer(true);
-
-    control.replay();
-
-    Storage storage = createStorage();
-
-    storage.start(new NoResult.Quiet() {
-      @Override protected void execute(SchedulerStore schedulerStore, JobStore jobStore,
-          TaskStore taskStore) {}
-    });
-
-    final TwitterTaskInfo storedTask = new TwitterTaskInfo()
-        .setOwner(OWNER_A)
-        .setJobName(JOB_A)
-        .setNumCpus(1.0)
-        .setRamMb(1024)
-        .setShardId(0)
-        .setStartCommand("ls")
-        .setAvoidJobs(ImmutableSet.<String>of());
-
-    storage.doInTransaction(new NoResult.Quiet() {
-      @Override protected void execute(SchedulerStore schedulerStore, JobStore jobStore,
-          TaskStore taskStore) {
-        taskStore.add(ImmutableSet.of(new ScheduledTask()
-            .setStatus(PENDING)
-            .setAssignedTask(
-                new AssignedTask()
-                    .setTaskId(storedTaskId)
-                    .setTask(storedTask))));
-      }
-    });
-
-    buildScheduler(storage);
-
-    SlaveOffer slaveOffer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
-    TwitterTask launchedTask = scheduler.offer(slaveOffer);
-    assertThat(launchedTask.task.getTask(), is(storedTask));
-    assertThat(getTask(storedTaskId).task.getStatus(), is(ASSIGNED));
   }
 
   @Test
@@ -545,6 +490,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       assertThat(getTask(taskId).task.getFailureCount(), is(i - 1));
       changeStatus(taskId, FAILED);
 
+
+
       if (i != maxFailures) {
         assertTaskCount(i + 1);
         TaskState rescheduled = getOnlyTask(Query.byStatus(PENDING));
@@ -798,9 +745,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     sendOffer(slaveOffer, taskId1, SLAVE_ID, SLAVE_HOST_1);
     sendOffer(slaveOffer, taskId2, SLAVE_ID, SLAVE_HOST_1);
 
-    changeStatus(taskId1, STARTING);
     changeStatus(taskId1, RUNNING);
-    changeStatus(taskId2, STARTING);
     changeStatus(taskId2, RUNNING);
 
     // Simulate state update from the executor telling the scheduler that the task is dead.
@@ -842,9 +787,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     String taskIdB = Tasks.id(Iterables.get(getTasksOwnedBy(OWNER_B), 0).task);
     sendOffer(slaveOffer2, taskIdB, SLAVE_ID, SLAVE_HOST_2);
 
-    changeStatus(taskIdA, STARTING);
     changeStatus(taskIdA, RUNNING);
-    changeStatus(taskIdB, STARTING);
     changeStatus(taskIdB, RUNNING);
 
     assertThat(getTask(taskIdA).task.getAssignedTask().getSlaveHost(), is(SLAVE_HOST_1));
@@ -889,15 +832,12 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     sendOffer(slaveOffer2, taskIdC, SLAVE_ID, SLAVE_HOST_2);
     sendOffer(slaveOffer2, taskIdD, SLAVE_ID, SLAVE_HOST_2);
 
-    changeStatus(taskIdA, STARTING);
     changeStatus(taskIdA, RUNNING);
-    changeStatus(taskIdB, STARTING);
     changeStatus(taskIdB, FINISHED);
     assertThat(getTasks(new Query(new TaskQuery().setOwner(OWNER_A).setJobName(JOB_A)
             .setStatuses(EnumSet.of(PENDING)))).size(),
         is(1));
 
-    changeStatus(taskIdC, STARTING);
     changeStatus(taskIdC, RUNNING);
     changeStatus(taskIdD, FAILED);
 

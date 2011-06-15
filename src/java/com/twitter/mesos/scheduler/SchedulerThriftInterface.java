@@ -177,7 +177,7 @@ public class SchedulerThriftInterface implements MesosSchedulerManager.Iface {
     ResponseCode response = OK;
     String message = taskIds.size() + " tasks scheduled for restart.";
 
-    // TODO(wickman): Enforce that taskIds are all a compatible role with the
+    // TODO(Brian Wickman): Enforce that taskIds are all a compatible role with the
     // session.
     Pair<ResponseCode, String> rc = validateSessionKey(session, session.getOwner().getRole());
     if (rc.getFirst() != OK) {

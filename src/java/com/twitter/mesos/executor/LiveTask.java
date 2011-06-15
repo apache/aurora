@@ -292,7 +292,7 @@ public class LiveTask extends TaskOnDisk {
     try {
       process = processBuilder.start();
     } catch (IOException e) {
-      terminate(FAILED);
+      terminate(FAILED, "Failed to launch process.");
       throw new TaskRunException("Failed to launch process.", e);
     }
 
@@ -311,7 +311,7 @@ public class LiveTask extends TaskOnDisk {
             @Override public void run() {
               if (!isHealthy()) {
                 LOG.info("Task not healthy!");
-                terminate(FAILED);
+                terminate(FAILED, "HTTP health check failed.");
               }
             }
           },
@@ -454,7 +454,7 @@ public class LiveTask extends TaskOnDisk {
   }
 
   @Override
-  public void terminate(ScheduleStatus terminalState) {
+  public void terminate(ScheduleStatus terminalState, String reason) {
     LOG.info("Terminating " + this + " with status " + terminalState);
 
     if (healthCheckExecutor != null) {

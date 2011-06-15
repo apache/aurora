@@ -4,8 +4,6 @@ import java.io.File;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 
-import javax.annotation.Nullable;
-
 import com.google.common.base.Function;
 
 import org.easymock.Capture;
@@ -16,7 +14,6 @@ import com.twitter.common.base.Closure;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.common.util.BuildInfo;
 import com.twitter.mesos.Message;
-import com.twitter.mesos.executor.ExecutorCore.StateChange;
 import com.twitter.mesos.executor.Task.TaskRunException;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
@@ -25,8 +22,6 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
-import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
-import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
@@ -44,7 +39,7 @@ public class ExecutorCoreTest extends EasyMockTest {
   private Function<AssignedTask, Task> taskFactory;
   private ExecutorService taskExecutor;
   private Function<Message, Integer> messageHandler;
-  private Closure<ExecutorCore.StateChange> stateChangeCallback;
+  private Closure<ScheduleStatus> completedCallback;
   private Task runningTask;
 
   private ExecutorCore executor;
@@ -55,7 +50,7 @@ public class ExecutorCoreTest extends EasyMockTest {
     taskFactory = createMock(Function.class);
     taskExecutor = createMock(ExecutorService.class);
     messageHandler = createMock(Function.class);
-    stateChangeCallback = createMock(Closure.class);
+    completedCallback = createMock(Closure.class);
     runningTask = createMock(Task.class);
 
     executor = new ExecutorCore(
@@ -71,18 +66,16 @@ public class ExecutorCoreTest extends EasyMockTest {
     AssignedTask task = makeTask(OWNER_A, JOB_A);
 
     expect(taskFactory.apply(task)).andReturn(runningTask);
-    stateChange(STARTING);
     runningTask.stage();
-    stateChange(RUNNING);
     runningTask.run();
     expect(runningTask.blockUntilTerminated()).andReturn(FINISHED);
     Capture<Runnable> taskCapture = new Capture<Runnable>();
     taskExecutor.execute(capture(taskCapture));
-    stateChange(FINISHED);
+    completedCallback.execute(FINISHED);
 
     control.replay();
 
-    executor.executeTask(task, stateChangeCallback);
+    executor.executeTask(task, completedCallback);
     taskCapture.getValue().run();
   }
 
@@ -91,55 +84,48 @@ public class ExecutorCoreTest extends EasyMockTest {
     AssignedTask task = makeTask(OWNER_A, JOB_A);
 
     expect(taskFactory.apply(task)).andReturn(runningTask);
-    stateChange(STARTING);
     runningTask.stage();
-    stateChange(RUNNING);
     runningTask.run();
     expect(runningTask.blockUntilTerminated()).andReturn(FAILED);
     Capture<Runnable> taskCapture = new Capture<Runnable>();
     taskExecutor.execute(capture(taskCapture));
-    stateChange(FAILED);
+    completedCallback.execute(FAILED);
 
     control.replay();
 
-    executor.executeTask(task, stateChangeCallback);
+    executor.executeTask(task, completedCallback);
     taskCapture.getValue().run();
   }
 
-  @Test
+  @Test(expected = TaskRunException.class)
   public void testStagingFails() throws Exception {
     AssignedTask task = makeTask(OWNER_A, JOB_A);
 
     expect(taskFactory.apply(task)).andReturn(runningTask);
-    stateChange(STARTING);
     runningTask.stage();
     expectLastCall().andThrow(new TaskRunException("Staging failed."));
-    stateChange(FAILED, "Staging failed.");
     expect(runningTask.isRunning()).andReturn(false);
-    runningTask.terminate(FAILED);
+    runningTask.terminate(FAILED, "Staging failed.");
 
     control.replay();
 
-    executor.executeTask(task, stateChangeCallback);
+    executor.executeTask(task, completedCallback);
   }
 
-  @Test
+  @Test(expected = TaskRunException.class)
   public void testRunFails() throws Exception {
     AssignedTask task = makeTask(OWNER_A, JOB_A);
 
     expect(taskFactory.apply(task)).andReturn(runningTask);
-    stateChange(STARTING);
     runningTask.stage();
-    stateChange(RUNNING);
     runningTask.run();
     expectLastCall().andThrow(new TaskRunException("Failed to start."));
-    stateChange(FAILED, "Failed to start.");
     expect(runningTask.isRunning()).andReturn(false);
-    runningTask.terminate(FAILED);
+    runningTask.terminate(FAILED, "Failed to start.");
 
     control.replay();
 
-    executor.executeTask(task, stateChangeCallback);
+    executor.executeTask(task, completedCallback);
   }
 
   @Test
@@ -147,19 +133,17 @@ public class ExecutorCoreTest extends EasyMockTest {
     AssignedTask task = makeTask(OWNER_A, JOB_A);
 
     expect(taskFactory.apply(task)).andReturn(runningTask);
-    stateChange(STARTING);
     runningTask.stage();
-    stateChange(RUNNING);
     runningTask.run();
     expect(runningTask.isRunning()).andReturn(true);
     expect(runningTask.blockUntilTerminated()).andReturn(FINISHED);
     Capture<Runnable> taskCapture = new Capture<Runnable>();
     taskExecutor.execute(capture(taskCapture));
-    stateChange(FINISHED);
+    completedCallback.execute(FINISHED);
 
     control.replay();
 
-    executor.executeTask(task, stateChangeCallback);
+    executor.executeTask(task, completedCallback);
 
     try {
       executor.deleteCompletedTask(task.getTaskId());
@@ -178,13 +162,5 @@ public class ExecutorCoreTest extends EasyMockTest {
     return new AssignedTask()
         .setTaskId(String.valueOf(new Random().nextInt(10000)))
         .setTask(task);
-  }
-
-  private void stateChange(ScheduleStatus status) {
-    stateChange(status, null);
-  }
-
-  private void stateChange(ScheduleStatus status, @Nullable String message) {
-    stateChangeCallback.execute(new StateChange(status, message));
   }
 }

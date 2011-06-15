@@ -1,10 +1,10 @@
 package com.twitter.mesos.executor;
 
-import java.io.File;
-
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ResourceConsumption;
 import com.twitter.mesos.gen.ScheduleStatus;
+
+import java.io.File;
 
 /**
  * @author William Farner
@@ -21,7 +21,7 @@ public interface Task {
 
   public boolean isRunning();
 
-  public void terminate(ScheduleStatus terminalState);
+  public void terminate(ScheduleStatus terminalState, String reason);
 
   public File getSandboxDir();
 

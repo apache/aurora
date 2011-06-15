@@ -110,7 +110,6 @@ public class SchedulerzRole extends StringTemplateServlet {
               job.pendingTaskCount++;
               break;
 
-            case ASSIGNED:
             case STARTING:
             case RUNNING:
               job.activeTaskCount++;
