@@ -95,9 +95,3 @@ class FakeScheduler:
     restarted_task_map -- a map from task name to shard id.
     """
     self._restart_calls.append(((role, job, shard_ids), restarted_task_map))
-
-  def clear_state(self):
-    """Clear the data structures of the scheduler for a new test run"""
-    self._shard_calls.clear()
-    self._status_calls.clear()
-    self._restart_calls.clear()

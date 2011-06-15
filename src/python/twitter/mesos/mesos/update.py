@@ -48,7 +48,7 @@ class Updater(object):
       return
     # TODO(sathya): Threshold on batch size
     # Range for restart_threshold and watch_secs - Out of range error
-    batches = int(ceil(len(job_shards) / float(batch_size)));
+    batches = int(ceil(len(job_shards) / float(batch_size)))
     for batch in range(batches):
       batch_start = batch * batch_size
       batch_end = min((batch + 1) * batch_size, len(job_shards))
