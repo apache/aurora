@@ -220,8 +220,12 @@ public class TaskStateMachine {
         ScheduledTask task = taskReader.get();
         addWork(WorkCommand.INCREMENT_FAILURES);
 
-        if (task.getFailureCount() < (task.getAssignedTask().getTask().getMaxTaskFailures() - 1)) {
+        // Max failures is ignored when set to -1.
+        int maxFailures = task.getAssignedTask().getTask().getMaxTaskFailures();
+        if ((maxFailures == -1) || (task.getFailureCount() < (maxFailures - 1))) {
           addWork(WorkCommand.RESCHEDULE);
+        } else {
+          LOG.info("Task " + getTaskId() + " reached failure limit, not rescheduling");
         }
       }
     };
@@ -241,6 +245,10 @@ public class TaskStateMachine {
             new Closure<Transition<State>>() {
               @Override public void execute(Transition<State> transition) {
                 switch (transition.getTo().state) {
+                  case FINISHED:
+                    rescheduleIfDaemon.execute();
+                    break;
+
                   case FAILED:
                     maybeReschedule.execute();
                     break;

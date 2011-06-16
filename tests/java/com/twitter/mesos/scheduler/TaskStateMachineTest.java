@@ -14,6 +14,7 @@ import com.twitter.common.base.Closure;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.EasyMockTest;
+import com.twitter.common.util.StateMachine;
 import com.twitter.common.util.testing.FakeClock;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduleStatus;
@@ -42,7 +43,6 @@ import static com.twitter.mesos.scheduler.WorkCommand.UPDATE_STATE;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
-import static org.easymock.EasyMock.isA;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 
@@ -64,8 +64,11 @@ public class TaskStateMachineTest extends EasyMockTest {
     taskReader = createMock(new Clazz<Supplier<ScheduledTask>>() {});
     workSink = createMock(WorkSink.class);
     clock = new FakeClock();
-    stateMachine =
-        new TaskStateMachine("test", taskReader, workSink, MISSING_GRACE_PERIOD, clock, INIT);
+    stateMachine = makeStateMachine("test");
+  }
+
+  private TaskStateMachine makeStateMachine(String taskId) {
+    return new TaskStateMachine(taskId, taskReader, workSink, MISSING_GRACE_PERIOD, clock, INIT);
   }
 
   @Test
@@ -255,6 +258,7 @@ public class TaskStateMachineTest extends EasyMockTest {
   @Test
   public void testAllowsSkipStartingAndRunning() {
     expectWork(UPDATE_STATE).times(3);
+    expect(taskReader.get()).andReturn(makeTask(false));
 
     control.replay();
 
@@ -276,8 +280,65 @@ public class TaskStateMachineTest extends EasyMockTest {
         .updateState(FINISHED);
   }
 
+  @Test
+  public void testHonorsMaxFailures() {
+    ScheduledTask task = makeTask(false);
+    task.getAssignedTask().getTask().setMaxTaskFailures(10);
+    task.setFailureCount(8);
+
+    expectWork(UPDATE_STATE).times(5);
+    expect(taskReader.get()).andReturn(task);
+    expectWork(RESCHEDULE);
+    expectWork(INCREMENT_FAILURES);
+
+    TaskStateMachine rescheduledMachine = makeStateMachine("test2");
+    ScheduledTask rescheduled = task.deepCopy();
+    rescheduled.setFailureCount(9);
+    expectWork(UPDATE_STATE, rescheduledMachine).times(5);
+    expect(taskReader.get()).andReturn(rescheduled);
+    expectWork(INCREMENT_FAILURES, rescheduledMachine);
+
+    control.replay();
+
+    stateMachine.updateState(PENDING)
+        .updateState(ASSIGNED)
+        .updateState(STARTING)
+        .updateState(RUNNING)
+        .updateState(FAILED);
+
+    rescheduledMachine.updateState(PENDING)
+        .updateState(ASSIGNED)
+        .updateState(STARTING)
+        .updateState(RUNNING)
+        .updateState(FAILED);
+  }
+
+  @Test
+  public void testHonorsUnlimitedFailures() {
+    ScheduledTask task = makeTask(false);
+    task.getAssignedTask().getTask().setMaxTaskFailures(-1);
+    task.setFailureCount(1000);
+
+    expectWork(UPDATE_STATE).times(5);
+    expect(taskReader.get()).andReturn(task);
+    expectWork(RESCHEDULE);
+    expectWork(INCREMENT_FAILURES);
+
+    control.replay();
+
+    stateMachine.updateState(PENDING)
+        .updateState(ASSIGNED)
+        .updateState(STARTING)
+        .updateState(RUNNING)
+        .updateState(FAILED);
+  }
+
   private IExpectationSetters<Void> expectWork(WorkCommand work) {
-    workSink.addWork(eq(work), eq(stateMachine), EasyMock.<Closure<ScheduledTask>>anyObject());
+    return expectWork(work, stateMachine);
+  }
+
+  private IExpectationSetters<Void> expectWork(WorkCommand work, TaskStateMachine machine) {
+    workSink.addWork(eq(work), eq(machine), EasyMock.<Closure<ScheduledTask>>anyObject());
     return expectLastCall();
   }
 
