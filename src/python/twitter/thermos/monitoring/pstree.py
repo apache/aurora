@@ -317,6 +317,7 @@ class ProcessSetRealizer_Procfs(ProcessSetRealizer):
   def collect(self):
     self._reinit()
     data = os.popen('cat /proc/[0-9]*/stat 2>/dev/null').readlines()
+    self._crunch_data(data)
 
   def refresh_set(self, pids):
     self._reinit_pids(pids)
