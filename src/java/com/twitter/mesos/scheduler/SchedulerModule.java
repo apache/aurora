@@ -44,9 +44,9 @@ import com.twitter.common.logging.ScribeLog;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.thrift.ThriftFactory.ThriftFactoryException;
-import com.twitter.common.zookeeper.ServerSetImpl;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
+import com.twitter.common.zookeeper.ZooKeeperClient.Credentials;
 import com.twitter.common.zookeeper.ZooKeeperUtils;
 import com.twitter.common_internal.cuckoo.CuckooWriter;
 import com.twitter.common_internal.zookeeper.TwitterZk;
@@ -136,6 +136,9 @@ public class SchedulerModule extends AbstractModule {
     TimedInterceptor.bind(binder());
 
     bind(Key.get(String.class, ClusterName.class)).toInstance(CLUSTER_NAME.get());
+
+    // TODO(John Sirois): get this from /etc/keys/mesos:mesos
+    bind(Credentials.class).toInstance(ZooKeeperClient.digestCredentials("mesos", "mesos"));
 
     // Bindings for MesosSchedulerImpl.
     bind(SchedulerCore.class).to(SchedulerCoreImpl.class).in(Singleton.class);
@@ -227,22 +230,27 @@ public class SchedulerModule extends AbstractModule {
   @Provides
   @Singleton
   SingletonService provideSingletonService(ZooKeeperClient zkClient) {
-    return new SingletonService(zkClient, mesosSchedulerNameSpec.get());
+    // Scheduler service should be closed for membership but open for discovery (by mesos client)
+    return new SingletonService(zkClient, mesosSchedulerNameSpec.get(),
+        ZooKeeperUtils.EVERYONE_READ_CREATOR_ALL);
   }
 
   @Provides
   @Singleton
-  ZooKeeperClient provideZooKeeperClient(@ShutdownStage ActionRegistry shutdownRegistry) {
+  ZooKeeperClient provideZooKeeperClient(@ShutdownStage ActionRegistry shutdownRegistry,
+      Credentials credentials) {
+
     if (zooKeeperInProcess.get()) {
       try {
-        return startLocalZookeeper(shutdownRegistry);
+        return startLocalZookeeper(shutdownRegistry, credentials);
       } catch (IOException e) {
         throw new RuntimeException("Unable to start local zookeeper", e);
       } catch (InterruptedException e) {
         throw new RuntimeException("Unable to start local zookeeper", e);
       }
     } else {
-      return new ZooKeeperClient(zooKeeperSessionTimeout.get(), zooKeeperEndpoints.get());
+      return new ZooKeeperClient(zooKeeperSessionTimeout.get(), credentials,
+          zooKeeperEndpoints.get());
     }
   }
 
@@ -258,8 +266,9 @@ public class SchedulerModule extends AbstractModule {
     }
   }
 
-  private ZooKeeperClient startLocalZookeeper(ActionRegistry shutdownRegistry)
-      throws IOException, InterruptedException {
+  private ZooKeeperClient startLocalZookeeper(ActionRegistry shutdownRegistry,
+      Credentials credentials) throws IOException, InterruptedException {
+
     ZooKeeperServer zooKeeperServer =
         new ZooKeeperServer(
             new FileTxnSnapLog(createTempDir(shutdownRegistry), createTempDir(shutdownRegistry)),
@@ -277,7 +286,7 @@ public class SchedulerModule extends AbstractModule {
     });
     int zkPort = zooKeeperServer.getClientPort();
     LOG.info("Embedded zookeeper cluster started on port " + zkPort);
-    return new ZooKeeperClient(zooKeeperSessionTimeout.get(),
+    return new ZooKeeperClient(zooKeeperSessionTimeout.get(), credentials,
         InetSocketAddress.createUnresolved("localhost", zkPort));
   }
 
