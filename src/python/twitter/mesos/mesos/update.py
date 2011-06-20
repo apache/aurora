@@ -1,6 +1,7 @@
 from math import ceil
 from twitter.common import options
 import twitter.common.log
+from mesos_twitter.ttypes import *
 
 options.add('--mesos_updater_status_check_inteval',
   dest='mesos_updater_status_check_interval',
@@ -9,11 +10,8 @@ options.add('--mesos_updater_status_check_inteval',
   help='How often Mesos runs update loop...')
 log = twitter.common.log.get()
 
-PENDING = 0
-ASSIGNED = 1
-STARTING = 2
-RUNNING = 3
-KNOWN_STATES = [PENDING, ASSIGNED, STARTING, RUNNING]
+class InvalidUpdaterConfigException(Exception):
+  pass
 
 class Updater(object):
   """Update the shards of a job in batches."""
@@ -24,40 +22,38 @@ class Updater(object):
     self._scheduler = scheduler
     self._clock = clock
 
-  def update(self, batch_size, restart_threshold, watch_secs):
+  def raise_if_invalid_update_config(self, update_config, shard_count):
+    if update_config.batchSize < 1:
+      raise InvalidUpdaterConfigException('Batch size should be greater than 0')
+    if update_config.restartThreshold < 1:
+      raise InvalidUpdaterConfigException('Restart Threshold should be greater than 0')
+    if update_config.watchSecs < 1:
+      raise InvalidUpdaterConfigException('Watch seconds should be greater than 0')
+    if update_config.batchSize > shard_count:
+      raise InvalidUpdaterConfigException('Batch size is greater than the total shards present')
+
+  def update(self, update_config):
     """Performs the job update, blocking until it completes.
 
     Arguments:
-    batch_size -- Number of shards to update simultaneously. After a batch is deemed healthy,
-                  the update will proceed to the next batch.
-                  Must be an integer greater than 0.
-    restart_threshold -- Maximum number of seconds before which a task must move to the RUNNING state.
-                         Else be considered a failed update.
-    watch_secs -- Number of seconds to watch the task once it is RUNNING.
-                  And ensure it remains in the RUNNING state, else be considered a failed update.
+    update_config -- update configuration object that describes how the update is performed
 
     Returns the set of shards that failed to update.
     """
-    failed_tasks = set()
+    failed_shards = set()
     job_shards = [shard for shard in self._scheduler.get_shards(self._role, self._job)]
-    if batch_size > job_shards:
-      log.error('Batch size is greater than the total shards present')
-      return
-    if batch_size < 0:
-      log.error('Batch size specified is less than zero')
-      return
-    # TODO(sathya): Threshold on batch size
-    # Range for restart_threshold and watch_secs - Out of range error
-    batches = int(ceil(len(job_shards) / float(batch_size)))
+    self.raise_if_invalid_update_config(update_config, len(job_shards))
+    batches = int(ceil(len(job_shards) / float(update_config.batchSize)))
     for batch in range(batches):
-      batch_start = batch * batch_size
-      batch_end = min((batch + 1) * batch_size, len(job_shards))
+      batch_start = batch * update_config.batchSize
+      batch_end = min((batch + 1) * update_config.batchSize, len(job_shards))
       batch_shards = set(job_shards[batch_start : batch_end])
       task_ids = set(self.restart_tasks(batch_shards))
-      failed_tasks = failed_tasks.union(self.watch_tasks(task_ids, restart_threshold, watch_secs))
-    return failed_tasks
+      failed_shards = failed_shards.union(self.watch_tasks(task_ids, update_config.restartThreshold,
+        update_config.watchSecs))
+    return failed_shards
 
-  def rollback(self, batch_size):
+  def rollback(self, update_config):
     # TODO(sathya): Implement
     pass
 
@@ -77,20 +73,20 @@ class Updater(object):
 
     Arguments:
     task_ids -- set of shards to watch.
-    restart_threshold -- Maximum number of seconds before which a task must move to the RUNNING state.
-                         Else be considered a failed update.
+    restart_threshold -- Maximum number of seconds before which a task must move
+                         to the RUNNING state.
     watch_secs -- Number of seconds to watch the task once it is RUNNING.
-                  And ensure it remains in the RUNNING state, else be considered a failed update.
 
     Returns a set of tasks that failed to meet the following criteria,
     1. Failed to move to RUNNING state before restart_threshold from the time of restart.
     2. Failed to stay in the RUNNING state before watch_secs expire.
     """
+    ACTIVE_STATES = set([ScheduleStatus.PENDING, ScheduleStatus.STARTING, ScheduleStatus.RUNNING])
     start_time = self._clock.time()
     expected_running_by = start_time + restart_threshold
     running_state_times = {}
     healthy_tasks = set()
-    failed_tasks = set()
+    failed_shards = set()
     while True:
       log.info('Getting Status...')
       statuses = self._scheduler.get_statuses(task_ids)
@@ -99,19 +95,20 @@ class Updater(object):
           ' asked for %s, got %s' % (task_ids, statuses))
       now = self._clock.time()
       for task_id, status in statuses.items():
-        if status is RUNNING and task_id not in failed_tasks.union(running_state_times.keys()):
+        if status is ScheduleStatus.RUNNING and task_id not in (
+          failed_shards.union(running_state_times.keys())):
           running_state_times[task_id] = now
           log.info('Adding %s to Running Tasks' % task_id)
       if now > expected_running_by:
         non_running_tasks = [id for id in task_ids if id not in running_state_times]
         log.error('Tasks failed to move into running: %s' % non_running_tasks)
-        failed_tasks.update(non_running_tasks)
+        failed_shards.update(non_running_tasks)
       healthy_tasks.update(id for id in statuses
           if id in running_state_times and now > running_state_times[id] + watch_secs)
-      failed_tasks.update(id for id in statuses
-          if id not in healthy_tasks and statuses[id] not in KNOWN_STATES)
-      if healthy_tasks.union(failed_tasks) == set(task_ids):
-        return failed_tasks
+      failed_shards.update(id for id in statuses
+          if id not in healthy_tasks and statuses[id] not in ACTIVE_STATES)
+      if healthy_tasks.union(failed_shards) == set(task_ids):
+        return failed_shards
       elif now > (start_time + restart_threshold + watch_secs):
         return task_ids.difference(healthy_tasks)
       self._clock.sleep(options.values().mesos_updater_status_check_interval)

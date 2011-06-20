@@ -1,15 +1,13 @@
 import unittest
+import pytest
 from math import ceil
 from fake_scheduler import *
-from update import *
+from twitter.mesos.mesos.update import *
 from twitter.common import options
-
-PENDING  = 0
-ASSIGNED = 1
-STARTING = 2
-RUNNING  = 3
-FINISHED = 4
-FAILED = 5
+from mesos_twitter.ttypes import *
+from mesos_twitter.ttypes import ScheduleStatus
+import twitter.common.log
+from twitter.common.log.options import LogOptions
 
 class UpdaterTest(unittest.TestCase):
   BATCH_SIZE = 3
@@ -21,11 +19,16 @@ class UpdaterTest(unittest.TestCase):
   @classmethod
   def setup_class(self):
     options.parse()
+    twitter.common.log.init('Update_test')
 
   def setup_method(self, method):
     self._clock = Clock()
     self._scheduler = FakeScheduler()
     self._updater = Updater('mesos', 'sathya', self._scheduler, self._clock)
+    self._update_config = UpdateConfig()
+    self._update_config.batchSize = UpdaterTest.BATCH_SIZE
+    self._update_config.restartThreshold = UpdaterTest.RESTART_THRESHOLD
+    self._update_config.watchSecs = UpdaterTest.WATCH_SECS
 
   def expect_restart(self, shard_ids):
     task_ids = {}
@@ -42,19 +45,18 @@ class UpdaterTest(unittest.TestCase):
     self._scheduler.expect_get_shards('mesos', 'sathya', set(range(10)))
     self.expect_restart(set([0, 1, 2]))
     self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_NORMAL_CASE,
-      {0: RUNNING, 1: RUNNING, 2: RUNNING})
+      {0: ScheduleStatus.RUNNING, 1: ScheduleStatus.RUNNING, 2: ScheduleStatus.RUNNING})
     self.expect_restart(set([3, 4, 5]))
     self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_NORMAL_CASE,
-      {3: RUNNING, 4: RUNNING, 5: RUNNING})
+      {3: ScheduleStatus.RUNNING, 4: ScheduleStatus.RUNNING, 5: ScheduleStatus.RUNNING})
     self.expect_restart(set([6, 7, 8]))
     self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_NORMAL_CASE,
-      {6: RUNNING, 7: RUNNING, 8: RUNNING})
+      {6: ScheduleStatus.RUNNING, 7: ScheduleStatus.RUNNING, 8: ScheduleStatus.RUNNING})
     self.expect_restart(set([9]))
     self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_NORMAL_CASE,
-      {9: RUNNING})
+      {9: ScheduleStatus.RUNNING})
     tasks_expected = set()
-    tasks_returned = self._updater.update(UpdaterTest.BATCH_SIZE, UpdaterTest.RESTART_THRESHOLD,
-      UpdaterTest.WATCH_SECS)
+    tasks_returned = self._updater.update(self._update_config)
     assert tasks_expected == tasks_returned, ('Expected tasks (%s) : Returned Tasks (%s)' %
       (tasks_expected, tasks_returned))
 
@@ -63,18 +65,17 @@ class UpdaterTest(unittest.TestCase):
     self._scheduler.expect_get_shards('mesos', 'sathya', set(range(10)))
     self.expect_restart(set([0, 1, 2]))
     self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_NORMAL_CASE,
-      {0: STARTING, 1: STARTING, 2: STARTING})
+      {0: ScheduleStatus.STARTING, 1: ScheduleStatus.STARTING, 2: ScheduleStatus.STARTING})
     self.expect_restart(set([3, 4, 5]))
     self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_NORMAL_CASE,
-      {3: RUNNING, 4: RUNNING, 5: RUNNING})
+      {3: ScheduleStatus.RUNNING, 4: ScheduleStatus.RUNNING, 5: ScheduleStatus.RUNNING})
     self.expect_restart(set([6, 7, 8]))
     self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_NORMAL_CASE,
-      {6: RUNNING, 7: RUNNING, 8: RUNNING})
+      {6: ScheduleStatus.RUNNING, 7: ScheduleStatus.RUNNING, 8: ScheduleStatus.RUNNING})
     self.expect_restart(set([9]))
-    self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_NORMAL_CASE, {9: RUNNING})
+    self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_NORMAL_CASE, {9: ScheduleStatus.RUNNING})
     tasks_expected = set([0, 1, 2])
-    tasks_returned = self._updater.update(UpdaterTest.BATCH_SIZE, UpdaterTest.RESTART_THRESHOLD,
-      UpdaterTest.WATCH_SECS)
+    tasks_returned = self._updater.update(self._update_config)
     assert tasks_expected == tasks_returned, ('Expected tasks (%s) : Returned Tasks (%s)' %
       (tasks_expected, tasks_returned))
 
@@ -83,18 +84,17 @@ class UpdaterTest(unittest.TestCase):
     self._scheduler.expect_get_shards('mesos', 'sathya', set(range(10)))
     self.expect_restart(set([0, 1, 2]))
     self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_NORMAL_CASE,
-      {0: STARTING, 1: STARTING, 2: STARTING})
+      {0: ScheduleStatus.STARTING, 1: ScheduleStatus.STARTING, 2: ScheduleStatus.STARTING})
     self.expect_restart(set([3, 4, 5]))
     self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_NORMAL_CASE,
-      {3: STARTING, 4: STARTING, 5: STARTING})
+      {3: ScheduleStatus.STARTING, 4: ScheduleStatus.STARTING, 5: ScheduleStatus.STARTING})
     self.expect_restart(set([6, 7, 8]))
     self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_NORMAL_CASE,
-      {6: STARTING, 7: STARTING, 8: STARTING})
+      {6: ScheduleStatus.STARTING, 7: ScheduleStatus.STARTING, 8: ScheduleStatus.STARTING})
     self.expect_restart(set([9]))
-    self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_NORMAL_CASE, {9: STARTING})
+    self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_NORMAL_CASE, {9: ScheduleStatus.STARTING})
     tasks_expected = set(range(10))
-    tasks_returned = self._updater.update(UpdaterTest.BATCH_SIZE, UpdaterTest.RESTART_THRESHOLD,
-      UpdaterTest.WATCH_SECS)
+    tasks_returned = self._updater.update(self._update_config)
     assert tasks_expected == tasks_returned, ('Expected tasks (%s) : Returned Tasks (%s)' %
       (tasks_expected, tasks_returned))
 
@@ -103,25 +103,24 @@ class UpdaterTest(unittest.TestCase):
     self._scheduler.expect_get_shards('mesos', 'sathya', set(range(10)))
     self.expect_restart(set([0, 1, 2]))
     self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_EXTREME_CASE,
-      {0: STARTING, 1: STARTING, 2: STARTING})
+      {0: ScheduleStatus.STARTING, 1: ScheduleStatus.STARTING, 2: ScheduleStatus.STARTING})
     self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_NORMAL_CASE,
-      {0: RUNNING, 1: RUNNING, 2: RUNNING})
+      {0: ScheduleStatus.RUNNING, 1: ScheduleStatus.RUNNING, 2: ScheduleStatus.RUNNING})
     self.expect_restart(set([3, 4, 5]))
     self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_EXTREME_CASE,
-      {3: STARTING, 4: STARTING, 5: STARTING})
+      {3: ScheduleStatus.STARTING, 4: ScheduleStatus.STARTING, 5: ScheduleStatus.STARTING})
     self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_NORMAL_CASE,
-      {3: RUNNING, 4: RUNNING, 5: RUNNING})
+      {3: ScheduleStatus.RUNNING, 4: ScheduleStatus.RUNNING, 5: ScheduleStatus.RUNNING})
     self.expect_restart(set([6, 7, 8]))
     self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_EXTREME_CASE,
-      {6: STARTING, 7: STARTING, 8: STARTING})
+      {6: ScheduleStatus.STARTING, 7: ScheduleStatus.STARTING, 8: ScheduleStatus.STARTING})
     self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_NORMAL_CASE,
-      {6: RUNNING, 7: RUNNING, 8: RUNNING})
+      {6: ScheduleStatus.RUNNING, 7: ScheduleStatus.RUNNING, 8: ScheduleStatus.RUNNING})
     self.expect_restart(set([9]))
-    self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_EXTREME_CASE, {9: STARTING})
-    self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_NORMAL_CASE, {9: RUNNING})
+    self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_EXTREME_CASE, {9: ScheduleStatus.STARTING})
+    self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_NORMAL_CASE, {9: ScheduleStatus.RUNNING})
     tasks_expected = set()
-    tasks_returned = self._updater.update(UpdaterTest.BATCH_SIZE, UpdaterTest.RESTART_THRESHOLD,
-      UpdaterTest.WATCH_SECS)
+    tasks_returned = self._updater.update(self._update_config)
     assert tasks_expected == tasks_returned, ('Expected tasks (%s) : Returned Tasks (%s)' %
       (tasks_expected, tasks_returned))
 
@@ -130,17 +129,37 @@ class UpdaterTest(unittest.TestCase):
     self._scheduler.expect_get_shards('mesos', 'sathya', set(range(10)))
     self.expect_restart(set([0, 1, 2]))
     self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_UNKNOWN_CASE,
-      {0: FINISHED, 1: FINISHED, 2: FINISHED})
+      {0: ScheduleStatus.FINISHED, 1: ScheduleStatus.FINISHED, 2: ScheduleStatus.FINISHED})
     self.expect_restart(set([3, 4, 5]))
     self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_UNKNOWN_CASE,
-      {3: FINISHED, 4: FINISHED, 5: FINISHED})
+      {3: ScheduleStatus.FINISHED, 4: ScheduleStatus.FINISHED, 5: ScheduleStatus.FINISHED})
     self.expect_restart(set([6, 7, 8]))
     self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_UNKNOWN_CASE,
-      {6: FINISHED, 7: FINISHED, 8: FINISHED})
+      {6: ScheduleStatus.FINISHED, 7: ScheduleStatus.FINISHED, 8: ScheduleStatus.FINISHED})
     self.expect_restart(set([9]))
-    self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_UNKNOWN_CASE, {9: FINISHED})
+    self.expect_get_statuses(UpdaterTest.EXPECTED_CALLS_UNKNOWN_CASE, {9: ScheduleStatus.FINISHED})
     tasks_expected = set(range(10))
-    tasks_returned = self._updater.update(UpdaterTest.BATCH_SIZE, UpdaterTest.RESTART_THRESHOLD,
-      UpdaterTest.WATCH_SECS)
+    tasks_returned = self._updater.update(self._update_config)
     assert tasks_expected == tasks_returned, ('Expected tasks (%s) : Returned Tasks (%s)' %
       (tasks_expected, tasks_returned))
+
+  def test_invalid_batch_size(self):
+    """Test for out of range error for batch size"""
+    self._update_config.batchSize = 0
+    self._scheduler.expect_get_shards('mesos', 'sathya', set(range(10)))
+    with pytest.raises(InvalidUpdaterConfigException):
+      self._updater.update(self._update_config)
+
+  def test_invalid_restart_threshold(self):
+    """Test for out of range error for restart threshold"""
+    self._update_config.restartThreshold = 0
+    self._scheduler.expect_get_shards('mesos', 'sathya', set(range(10)))
+    with pytest.raises(InvalidUpdaterConfigException):
+      self._updater.update(self._update_config)
+
+  def test_invalid_watch_secs(self):
+    """Test for out of range error for watch secs"""
+    self._update_config.watchSecs = 0
+    self._scheduler.expect_get_shards('mesos', 'sathya', set(range(10)))
+    with pytest.raises(InvalidUpdaterConfigException):
+      self._updater.update(self._update_config)
