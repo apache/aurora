@@ -1,13 +1,11 @@
 import unittest
 import pytest
-from math import ceil
 from fake_scheduler import *
 from twitter.mesos.mesos.update import *
 from twitter.common import options
 from mesos_twitter.ttypes import *
 from mesos_twitter.ttypes import ScheduleStatus
 import twitter.common.log
-from twitter.common.log.options import LogOptions
 
 class UpdaterTest(unittest.TestCase):
   BATCH_SIZE = 3
@@ -16,12 +14,13 @@ class UpdaterTest(unittest.TestCase):
   EXPECTED_CALLS_NORMAL_CASE = 18
   EXPECTED_CALLS_EXTREME_CASE = 17
   EXPECTED_CALLS_UNKNOWN_CASE = 1
+
   @classmethod
-  def setup_class(self):
-    options.parse()
+  def setUpClass(cls):
+    options.parse([])
     twitter.common.log.init('Update_test')
 
-  def setup_method(self, method):
+  def setUp(self):
     self._clock = Clock()
     self._scheduler = FakeScheduler()
     self._updater = Updater('mesos', 'sathya', self._scheduler, self._clock)
