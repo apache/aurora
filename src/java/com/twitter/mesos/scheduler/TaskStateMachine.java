@@ -7,7 +7,6 @@ import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 
-import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -130,7 +129,7 @@ public class TaskStateMachine {
      * complete.
      *
      * @param work Description of the work to be performed.
-     * @param stateMachine The state machine that the work is in context of.
+     * @param stateMachine The state machine that the work is associated with.
      * @param mutation Mutate operationt to perform along with the state transition.
      */
     void addWork(WorkCommand work, TaskStateMachine stateMachine, Closure<ScheduledTask> mutation);
@@ -477,15 +476,20 @@ public class TaskStateMachine {
     checkNotNull(status);
     checkNotNull(mutation);
 
-    @SuppressWarnings("unchecked")
-    Closure<ScheduledTask> operation = Closures.combine(mutation,
-        new Closure<ScheduledTask>() {
-          @Override public void execute(ScheduledTask task) {
-            task.addToTaskEvents(new TaskEvent(clock.nowMillis(), status, auditMessage));
-          }
-        });
+    // Don't bother applying noop state changes.  If we end up modifying task state without a
+    // state transition (e.g. storing resource consumption of a running task, for example), we need
+    // to find a different way to suppress noop transitions.
+    if (stateMachine.getState().state != status) {
+      @SuppressWarnings("unchecked")
+      Closure<ScheduledTask> operation = Closures.combine(mutation,
+          new Closure<ScheduledTask>() {
+            @Override public void execute(ScheduledTask task) {
+              task.addToTaskEvents(new TaskEvent(clock.nowMillis(), status, auditMessage));
+            }
+          });
+      stateMachine.transition(State.create(status, operation));
+    }
 
-    stateMachine.transition(State.create(status, operation));
     return this;
   }
 

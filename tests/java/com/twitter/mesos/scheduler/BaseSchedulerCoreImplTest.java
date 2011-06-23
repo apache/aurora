@@ -129,9 +129,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private void buildScheduler(Storage storage) throws Exception {
     ImmediateJobManager immediateManager = new ImmediateJobManager();
     cron = new CronJobManager(storage);
-
-    scheduler = new SchedulerCoreImpl(cron, immediateManager, storage, schedulingFilter,
-        executorPulseMonitor, clock);
+    StateManager stateManager = new StateManager(storage, clock);
+    scheduler = new SchedulerCoreImpl(cron, immediateManager, stateManager, schedulingFilter,
+        executorPulseMonitor);
     cron.schedulerCore = scheduler;
     immediateManager.schedulerCore = scheduler;
     scheduler.initialize();
