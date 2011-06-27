@@ -15,19 +15,22 @@ class Clock:
     self._current_time += secs
 
 class FakeScheduler:
-  """Performs the functions of a mesos scheduler for testing"""
+  """Performs the functions of a mesos scheduler for testing."""
 
   def __init__(self):
     self._shard_calls = deque()
     self._status_calls = deque()
     self._restart_calls = deque()
+    self._rollback_calls = deque()
 
   def get_shards(self, role, job):
-    """Returns the shards as queued by the test script.
+    """Check input paramters with expected paramters queued by expect_get_shards
 
     Arguments:
     role -- string specifying the role.
     job -- string specifying the job.
+
+    Returns a set of shards.
     """
     assert self._shard_calls, 'Unexpected call to get_shards(%s, %s)' % (role, job)
     response = self._shard_calls.popleft()
@@ -37,7 +40,7 @@ class FakeScheduler:
     return response[1]
 
   def expect_get_shards(self, role, job, shards):
-    """Called by the test script to queue the scheduler with the shards for role and job.
+    """Sets up an expectation for a get_shards call to be made.
 
     Arguments:
     role -- string specifying the role.
@@ -47,20 +50,24 @@ class FakeScheduler:
     self._shard_calls.append(((role, job), shards))
 
   def get_statuses(self, task_ids):
-    """Returns a map of the current status of the shards.
+    """Check input paramters with expected paramters queued by expect_get_statuses
 
     Arguments:
     task_ids -- set of shards to verify validity of the call.
+
+    Returns a map of the current status of the shards.
     """
     assert self._status_calls, 'Unexpected call to get_statuses(%s)' % task_ids
     response = self._status_calls.popleft()
     args = response[0]
+    task_ids.sort()
+    args.sort()
     assert task_ids == args, ('Call to get_statuses(%s), expected get_statuses(%s)'
         % (task_ids, args))
     return response[1]
 
   def expect_get_statuses(self, task_ids, statuses):
-    """Called by the test script to queue the status of shards for the next call.
+    """Sets up an expectation for a get_statuses call to be made.
 
     Arguments:
     task_ids -- set of shards.
@@ -68,25 +75,27 @@ class FakeScheduler:
     """
     self._status_calls.append((task_ids, statuses))
 
-  def restart_tasks(self, role, job, shard_ids):
-    """Returns a map of the tasks restarted
+  def restart_tasks(self, role, job, shard_ids, update_config):
+    """Check input paramters with expected paramters queued by expect_restart_tasks.
 
     Arguments:
     role -- string specifying the role.
     job -- string specifying the job.
     shard_ids -- set of shards to verify the validity of the call.
+    update_config -- update configuration object that describes how the restart is performed.
+
+    Returns a set of restarted shards.
     """
     assert self._restart_calls, ('Unexpected call to restart_tasks(%s, %s, %s)'
         % (role, job, shard_ids))
     response = self._restart_calls.popleft()
-    args = response[0]
-    assert role == args[0] and job == args[1] and shard_ids == args[2], (
+    assert role == response[0] and job == response[1] and shard_ids == response[2], (
         'Call to restart_tasks(%s, %s, %s), expected restart_tasks(%s, %s, %s)' %
-        (role, job, shard_ids, args[0], args[1], args[2]))
-    return response[1]
+            (role, job, shard_ids, response[0], response[1], response[2]))
+    return response[2]
 
-  def expect_restart_tasks(self, role, job, shard_ids, restarted_task_map):
-    """Called by the test script to queue the next restart call.
+  def expect_restart_tasks(self, role, job, shard_ids):
+    """Sets up an expectation for a restart_tasks call to be made.
 
     Arguments:
     role -- string specifying the role.
@@ -94,4 +103,30 @@ class FakeScheduler:
     shard_ids -- set of shards.
     restarted_task_map -- a map from task name to shard id.
     """
-    self._restart_calls.append(((role, job, shard_ids), restarted_task_map))
+    self._restart_calls.append((role, job, shard_ids))
+
+  def rollback_tasks(self, role, job, shard_ids, update_config):
+    """Check input paramters with expected paramters queued by expect_rollback_tasks.
+
+    Arguments:
+    role -- string specifying the role.
+    job -- string specifying the job.
+    shard_ids -- set of shards to verify the validity of the call.
+    update_config -- update configuration object that describes how the restart is performed.
+    """
+    assert self._rollback_calls, ('Unexpected call to rollback_tasks(%s, %s, %s)'
+        % (role, job, shard_ids))
+    response = self._rollback_calls.popleft()
+    assert role == response[0] and job == response[1] and shard_ids == response[2], (
+        'Call to rollback_tasks(%s, %s, %s), expected rollback_tasks(%s, %s, %s)' %
+            (role, job, shard_ids, response[0], response[1], response[2]))
+
+  def expect_rollback_tasks(self, role, job, shard_ids):
+    """Sets up an expectation for a rollback_tasks call to be made.
+
+    Arguments:
+    role -- string specifying the role.
+    job -- string specifying the job.
+    shard_ids -- set of shards.
+    """
+    self._rollback_calls.append((role, job, shard_ids))
