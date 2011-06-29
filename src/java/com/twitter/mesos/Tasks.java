@@ -1,14 +1,12 @@
 package com.twitter.mesos;
 
-import java.util.Arrays;
 import java.util.EnumSet;
-import java.util.Map;
 import java.util.Set;
 
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Predicate;
-import com.google.common.collect.Maps;
+import com.google.common.collect.Ordering;
 
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
@@ -17,6 +15,7 @@ import com.twitter.mesos.gen.LiveTaskInfo;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.TaskState;
 
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
@@ -36,6 +35,13 @@ import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
  */
 public class Tasks {
 
+  public static final Function<TaskState, ScheduledTask> STATE_TO_SCHEDULED =
+      new Function<TaskState, ScheduledTask>() {
+        @Override public ScheduledTask apply(TaskState state) {
+          return state.task;
+        }
+      };
+
   public static final Function<ScheduledTask, AssignedTask> SCHEDULED_TO_ASSIGNED =
       new Function<ScheduledTask, AssignedTask>() {
         @Override public AssignedTask apply(ScheduledTask task) {
@@ -52,6 +58,9 @@ public class Tasks {
 
   public static final Function<ScheduledTask, TwitterTaskInfo> SCHEDULED_TO_INFO =
       Functions.compose(ASSIGNED_TO_INFO, SCHEDULED_TO_ASSIGNED);
+
+  public static final Function<TaskState, TwitterTaskInfo> STATE_TO_INFO =
+      Functions.compose(SCHEDULED_TO_INFO, STATE_TO_SCHEDULED);
 
   public static final Function<AssignedTask, String> ASSIGNED_TO_ID =
       new Function<AssignedTask, String>() {
@@ -74,12 +83,6 @@ public class Tasks {
           return task.getShardId();
         }
       };
-
-  public static final Function<ScheduledTask, Integer> SCHEDULED_TO_SHARD_ID =
-      Functions.compose(INFO_TO_SHARD_ID, SCHEDULED_TO_INFO);
-
-  public static final Function<AssignedTask, Integer> ASSIGNED_TO_SHARD_ID =
-      Functions.compose(INFO_TO_SHARD_ID, ASSIGNED_TO_INFO);
 
   public static final Function<TwitterTaskInfo, String> INFO_TO_JOB_KEY =
       new Function<TwitterTaskInfo, String>() {
@@ -116,14 +119,23 @@ public class Tasks {
       }
     };
 
+  private static final Function<TwitterTaskInfo, Integer> INFO_TO_PRIORITY =
+      new Function<TwitterTaskInfo, Integer>() {
+        @Override public Integer apply(TwitterTaskInfo task) {
+          return task.getPriority();
+        }
+      };
+
+  private static final Ordering<AssignedTask> TASK_ID_ORDER =
+      Ordering.natural().onResultOf(ASSIGNED_TO_ID);
+  private static final Ordering<AssignedTask> PRIORITY_ORDERING =
+      Ordering.natural().onResultOf(Functions.compose(INFO_TO_PRIORITY, ASSIGNED_TO_INFO));
+
   /**
-   * Filter that includes only terminated tasks.
+   * Orders by priority, subsorting by task ID.
    */
-  public static final Predicate<ScheduledTask> TERMINATED_FILTER = new Predicate<ScheduledTask>() {
-      @Override public boolean apply(ScheduledTask task) {
-        return isTerminated(task.getStatus());
-      }
-    };
+  public static final Ordering<AssignedTask> SCHEDULING_ORDER =
+      PRIORITY_ORDERING.reverse().compound(TASK_ID_ORDER);
 
   private Tasks() {
     // Utility class.
@@ -135,16 +147,6 @@ public class Tasks {
 
   public static boolean isTerminated(ScheduleStatus status) {
     return TERMINAL_STATES.contains(status);
-  }
-
-  public static Predicate<ScheduledTask> hasStatus(ScheduleStatus... statuses) {
-    final Set<ScheduleStatus> filter = EnumSet.copyOf(Arrays.asList(statuses));
-
-    return new Predicate<ScheduledTask>() {
-      @Override public boolean apply(ScheduledTask task) {
-        return filter.contains(task.getStatus());
-      }
-    };
   }
 
   public static String jobKey(Identity owner, String jobName) {
@@ -173,13 +175,5 @@ public class Tasks {
 
   public static String id(ScheduledTask task) {
     return task.getAssignedTask().getTaskId();
-  }
-
-  public static Map<Integer, TwitterTaskInfo> mapInfoByShardId(Iterable<TwitterTaskInfo> tasks) {
-    return Maps.uniqueIndex(tasks, INFO_TO_SHARD_ID);
-  }
-
-  public static Map<Integer, AssignedTask> mapAssignedByShardId(Iterable<AssignedTask> tasks) {
-    return Maps.uniqueIndex(tasks, ASSIGNED_TO_SHARD_ID);
   }
 }

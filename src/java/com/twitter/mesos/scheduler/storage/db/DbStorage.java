@@ -22,7 +22,6 @@ import com.google.common.base.Functions;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -110,6 +109,7 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
    * @param jdbcTemplate The {@code JdbcTemplate} object to execute database operation against.
    * @param transactionTemplate The {@code TransactionTemplate} object that provides transaction
    *     scope for database operations.
+   * @param version Storage version number, used to manage migrations.
    */
   @Inject
   public DbStorage(JdbcTemplate jdbcTemplate, TransactionTemplate transactionTemplate,
@@ -505,7 +505,7 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
   }
 
   private ImmutableSet<ScheduledTask> update(Query query, Closure<ScheduledTask> mutator) {
-    ImmutableSortedSet<ScheduledTask> taskStates = fetch(query);
+    ImmutableSet<ScheduledTask> taskStates = fetch(query);
 
     final List<ScheduledTask> tasksToUpdate = Lists.newLinkedList();
     for (ScheduledTask taskState : taskStates) {
@@ -553,14 +553,13 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
 
   @Timed("db_storage_fetch_tasks")
   @Override
-  public ImmutableSortedSet<ScheduledTask> fetch(final Query query) {
+  public ImmutableSet<ScheduledTask> fetch(final Query query) {
     Preconditions.checkNotNull(query);
 
-    ImmutableSortedSet<ScheduledTask> fetched =
-        transactionTemplate.execute(new TransactionCallback<ImmutableSortedSet<ScheduledTask>>() {
-          @Override
-          public ImmutableSortedSet<ScheduledTask> doInTransaction(TransactionStatus status) {
-            return ImmutableSortedSet.copyOf(Query.SORT_BY_TASK_ID, query(query));
+    ImmutableSet<ScheduledTask> fetched =
+        transactionTemplate.execute(new TransactionCallback<ImmutableSet<ScheduledTask>>() {
+          @Override public ImmutableSet<ScheduledTask> doInTransaction(TransactionStatus status) {
+            return ImmutableSet.copyOf(query(query));
           }
         });
     vars.tasksFetched.addAndGet(fetched.size());

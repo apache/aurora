@@ -234,7 +234,7 @@ public class DualStoreMigrator implements Migrator {
   private TaskMigrationResult migrateTaskStore(TaskStore fromTaskStore, TaskStore toTaskStore) {
     TaskMigrationResult taskMigrationResult = new TaskMigrationResult();
     try {
-      ImmutableSortedSet<ScheduledTask> allTasks = fromTaskStore.fetch(Query.GET_ALL);
+      ImmutableSet<ScheduledTask> allTasks = fromTaskStore.fetch(Query.GET_ALL);
       ImmutableSet<ScheduledTask> migratedTasks =
           ImmutableSet.copyOf(Iterables.transform(allTasks, migrateTask));
       toTaskStore.add(migratedTasks);

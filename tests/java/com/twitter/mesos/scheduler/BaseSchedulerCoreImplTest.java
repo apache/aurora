@@ -46,14 +46,12 @@ import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescri
 import com.twitter.mesos.scheduler.storage.JobStore;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
 import com.twitter.mesos.scheduler.storage.Storage;
-import com.twitter.mesos.scheduler.storage.Storage.Work;
 import com.twitter.mesos.scheduler.storage.Storage.Work.NoResult;
 import com.twitter.mesos.scheduler.storage.TaskStore;
 
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
-import static com.twitter.mesos.gen.ScheduleStatus.INIT;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED_BY_CLIENT;
 import static com.twitter.mesos.gen.ScheduleStatus.LOST;
@@ -791,8 +789,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 2));
 
-    String taskId1 = Tasks.id(Iterables.get(getTasks(queryByOwner(OWNER_A)), 0).task);
-    String taskId2 = Tasks.id(Iterables.get(getTasks(queryByOwner(OWNER_A)), 1).task);
+
+    String taskId1 = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)).task);
+    String taskId2 = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 1)).task);
 
     SlaveOffer slaveOffer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
     sendOffer(slaveOffer, taskId1, SLAVE_ID, SLAVE_HOST_1);
@@ -878,14 +877,14 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     daemonTask.putToConfiguration("daemon", "true");
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, daemonTask, 2));
-    String taskIdA = Tasks.id(Iterables.get(getTasksOwnedBy(OWNER_A), 0).task);
-    String taskIdB = Tasks.id(Iterables.get(getTasksOwnedBy(OWNER_A), 1).task);
+    String taskIdA = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)).task);
+    String taskIdB = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 1)).task);
     sendOffer(slaveOffer1, taskIdA, SLAVE_ID, SLAVE_HOST_1);
     sendOffer(slaveOffer1, taskIdB, SLAVE_ID, SLAVE_HOST_1);
 
     scheduler.createJob(makeJob(OWNER_B, JOB_B, DEFAULT_TASK, 2));
-    String taskIdC = Tasks.id(Iterables.get(getTasksOwnedBy(OWNER_B), 0).task);
-    String taskIdD = Tasks.id(Iterables.get(getTasksOwnedBy(OWNER_B), 1).task);
+    String taskIdC = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_B, JOB_B), 0)).task);
+    String taskIdD = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_B, JOB_B), 1)).task);
     sendOffer(slaveOffer2, taskIdC, SLAVE_ID, SLAVE_HOST_2);
     sendOffer(slaveOffer2, taskIdD, SLAVE_ID, SLAVE_HOST_2);
 
@@ -925,6 +924,45 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         getAncestorId));
     assertThat(rescheduledTaskAncestors, is((Set<String>) Sets.newHashSet(taskIdC)));
     assertThat(Iterables.isEmpty(getTasks(taskIdD)), is(true));
+  }
+
+  @Test
+  public void testSchedulingOrder() throws Exception {
+    expectOffer(true);
+    expectOffer(true);
+    expectOffer(true);
+    expectOffer(true);
+    expectOffer(true);
+    expectOffer(true);
+
+    control.replay();
+    buildScheduler();
+
+    TwitterTaskInfo task1 = new TwitterTaskInfo(DEFAULT_TASK);
+    task1.putToConfiguration("priority", "10");
+    TwitterTaskInfo task2 = new TwitterTaskInfo(DEFAULT_TASK);
+    task2.putToConfiguration("priority", "12");
+    TwitterTaskInfo task3 = new TwitterTaskInfo(DEFAULT_TASK);
+    task3.putToConfiguration("priority", "11");
+
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, task1, 2));
+    scheduler.createJob(makeJob(OWNER_A, JOB_B, task2, 2));
+    scheduler.createJob(makeJob(OWNER_B, JOB_A, task3, 2));
+
+    String taskId1a = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)).task);
+    String taskId1b = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 1)).task);
+    String taskId2a = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_B), 0)).task);
+    String taskId2b = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_B), 1)).task);
+    String taskId3a = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_B, JOB_A), 0)).task);
+    String taskId3b = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_B, JOB_A), 1)).task);
+
+    SlaveOffer slaveOffer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
+    sendOffer(slaveOffer, taskId2a, SLAVE_ID, SLAVE_HOST_1);
+    sendOffer(slaveOffer, taskId2b, SLAVE_ID, SLAVE_HOST_1);
+    sendOffer(slaveOffer, taskId3a, SLAVE_ID, SLAVE_HOST_1);
+    sendOffer(slaveOffer, taskId3b, SLAVE_ID, SLAVE_HOST_1);
+    sendOffer(slaveOffer, taskId1a, SLAVE_ID, SLAVE_HOST_1);
+    sendOffer(slaveOffer, taskId1b, SLAVE_ID, SLAVE_HOST_1);
   }
 
   private void expectKillTask(int numTasks) {
@@ -1037,8 +1075,15 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   private void expectOffer(boolean passFilter) {
     expect(executorPulseMonitor.isAlive((String) anyObject())).andReturn(true);
-    expect(schedulingFilter.makeFilter((TwitterTaskInfo) anyObject(), (String) anyObject()))
-        .andReturn(passFilter ? Predicates.<ScheduledTask>alwaysTrue()
-        : Predicates.<ScheduledTask>alwaysFalse());
+    expect(schedulingFilter.staticFilter((TwitterTaskInfo) anyObject(), (String) anyObject()))
+        .andReturn(passFilter ? Predicates.<TwitterTaskInfo>alwaysTrue()
+        : Predicates.<TwitterTaskInfo>alwaysFalse());
+    @SuppressWarnings("unchecked")
+    Function<Query, Iterable<TwitterTaskInfo>> anyTaskFetcher =
+        (Function<Query, Iterable<TwitterTaskInfo>>) anyObject();
+    expect(schedulingFilter.dynamicHostFilter(
+        anyTaskFetcher, (String) anyObject()))
+        .andReturn(passFilter ? Predicates.<TwitterTaskInfo>alwaysTrue()
+            : Predicates.<TwitterTaskInfo>alwaysFalse());
   }
 }

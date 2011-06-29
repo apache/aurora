@@ -1,11 +1,8 @@
 package com.twitter.mesos.scheduler;
 
-import java.util.Comparator;
-
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.ImmutableSortedSet;
 
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Identity;
@@ -156,10 +153,6 @@ public class Query {
     return new Query(new TaskQuery().setOwner(new Identity().setRole(roleAccount)));
   }
 
-  public static Query byUser(String userAccount) {
-    return new Query(new TaskQuery().setOwner(new Identity().setUser(userAccount)));
-  }
-
   public static Query byStatus(ScheduleStatus status) {
     return new Query(new TaskQuery().setStatuses(ImmutableSet.of(status)));
   }
@@ -175,15 +168,4 @@ public class Query {
   public static Query activeQuery(JobConfiguration job) {
     return activeQuery(job.getOwner(), job.getName());
   }
-
-  public static ImmutableSortedSet<ScheduledTask> sortTasks(Iterable<ScheduledTask> tasks,
-      Comparator<ScheduledTask> comparator) {
-    return ImmutableSortedSet.copyOf(comparator, tasks);
-  }
-
-  public static final Comparator<ScheduledTask> SORT_BY_TASK_ID = new Comparator<ScheduledTask>() {
-    @Override public int compare(ScheduledTask taskA, ScheduledTask taskB) {
-      return taskA.getAssignedTask().getTaskId().compareTo(taskB.getAssignedTask().getTaskId());
-    }
-  };
 }

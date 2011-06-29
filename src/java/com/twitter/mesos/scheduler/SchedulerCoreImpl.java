@@ -1,5 +1,6 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -16,6 +17,7 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.MapMaker;
 import com.google.common.collect.Maps;
@@ -64,7 +66,8 @@ import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.STOPPED;
  *
  * @author William Farner
  */
-public class SchedulerCoreImpl implements SchedulerCore {
+public class SchedulerCoreImpl
+    implements SchedulerCore, Function<Query, Iterable<TwitterTaskInfo>> {
 
   private static final Logger LOG = Logger.getLogger(SchedulerCore.class.getName());
 
@@ -162,6 +165,11 @@ public class SchedulerCoreImpl implements SchedulerCore {
         }));
   }
 
+  @Override
+  public Iterable<TwitterTaskInfo> apply(Query query) {
+    return Iterables.transform(getTasks(query), Tasks.STATE_TO_INFO);
+  }
+
   private boolean hasActiveJob(JobConfiguration job) {
     return Iterables.any(jobManagers, managerHasJob(job));
   }
@@ -222,8 +230,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
                 Sets.difference(taskInfoMap.keySet(), tasksForOtherHosts));
         for (String taskId : tasksToActOn) {
           LiveTaskInfo taskUpdate = taskInfoMap.get(taskId);
-          ScheduledTask existingTask = tasksForHostById.get(taskId);
-
           changer.changeState(
               ImmutableSet.of(taskId),
               taskUpdate == null ? UNKNOWN : taskUpdate.getStatus());
@@ -331,28 +337,40 @@ public class SchedulerCoreImpl implements SchedulerCore {
     }
 
     Query query;
+    Predicate<TwitterTaskInfo> postFilter;
     if (!executorPulseMonitor.isAlive(slaveOffer.getHostname())) {
       LOG.info("Pulse monitor considers executor dead, launching bootstrap task on: "
           + slaveOffer.getHostname());
       executorPulseMonitor.pulse(slaveOffer.getHostname());
       query = Query.byId(
           Iterables.getOnlyElement(launchTasks(ImmutableSet.of(makeBootstrapTask()))));
+      postFilter = Predicates.alwaysTrue();
       vars.executorBootstraps.incrementAndGet();
     } else {
       query = Query.and(
           Query.byStatus(PENDING),
-          schedulingFilter.makeFilter(offer, slaveOffer.getHostname()));
+          Predicates.compose(schedulingFilter.staticFilter(offer, slaveOffer.getHostname()),
+              Tasks.SCHEDULED_TO_INFO));
+      // Perform the (more expensive) check to find tasks matching the dynamic state of the machine.
+      postFilter = schedulingFilter.dynamicHostFilter(this, slaveOffer.getHostname());
     }
 
-    ScheduledTask assignment = Iterables.get(stateManager.fetchTasks(query), 0, null);
+    ImmutableSortedSet<ScheduledTask> candidates = ImmutableSortedSet.copyOf(
+        Tasks.SCHEDULING_ORDER.onResultOf(Tasks.SCHEDULED_TO_ASSIGNED),
+        stateManager.fetchTasks(query));
+    if (candidates.isEmpty()) {
+      return null;
+    }
+
+    ScheduledTask assignment = Iterables.get(Iterables.filter(
+        candidates, Predicates.compose(postFilter, Tasks.SCHEDULED_TO_INFO)), 0, null);
     if (assignment == null) {
       return null;
     }
 
     AssignedTask task = stateManager.changeState(Query.byId(Tasks.id(assignment)), ASSIGNED,
         new Function<ScheduledTask, AssignedTask>() {
-          @Override
-          public AssignedTask apply(ScheduledTask task) {
+          @Override public AssignedTask apply(ScheduledTask task) {
             AssignedTask assigned = task.getAssignedTask();
             assigned.setSlaveHost(slaveOffer.getHostname());
             assigned.setSlaveId(slaveOffer.getSlaveId().getValue());

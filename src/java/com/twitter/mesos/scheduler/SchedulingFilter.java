@@ -1,7 +1,10 @@
 package com.twitter.mesos.scheduler;
 
+import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
+import com.google.common.base.Supplier;
+import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -10,7 +13,6 @@ import com.google.common.collect.Multimaps;
 import com.google.inject.Inject;
 import com.google.inject.name.Named;
 import com.twitter.mesos.Tasks;
-import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
@@ -29,14 +31,27 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public interface SchedulingFilter {
 
   /**
-   * Creates a new filter that will make decisions about whether tasks meet a resource offer and
-   * may be assigned to a host.
+   * Creates a filter that checks static state to ensure that task configurations meet a
+   * resource offer for a given slave.  The returned filter will not check the configuration against
+   * any dynamic state.
    *
    * @param resourceOffer The resource offer to check against tasks.
    * @param slaveHost The slave host that the resource offer is associated with.
-   * @return A new predicate that can be used to find tasks meeting the offer.
+   * @return A new predicate that can be used to find tasks satisfied by the offer.
    */
-  public Predicate<ScheduledTask> makeFilter(TwitterTaskInfo resourceOffer, String slaveHost);
+  public Predicate<TwitterTaskInfo> staticFilter(TwitterTaskInfo resourceOffer, String slaveHost);
+
+  /**
+   * Creates a filter that will make decisions about whether tasks are allowed to run on a machine,
+   * by checking things such as the active tasks on the machine.
+   *
+   * @param taskFetcher Resource to look up existing task information.
+   * @param slaveHost The slave host to filter tasks against.
+   * @return A new predicate that can be used to find tasks satisfied by the state of
+   *     {@code slaveHost}.
+   */
+  public Predicate<TwitterTaskInfo> dynamicHostFilter(
+      Function<Query, Iterable<TwitterTaskInfo>> taskFetcher, String slaveHost);
 
   /**
    * Implementation of the scheduling filter that ensures resource requirements of tasks are
@@ -45,26 +60,23 @@ public interface SchedulingFilter {
   public static class SchedulingFilterImpl implements SchedulingFilter {
 
     /**
-     * {@literal @Named} binding key for the machine reservation map..
+     * {@literal @Named} binding key for the machine reservation map.
      */
     public static final String MACHINE_RESTRICTIONS =
         "com.twitter.mesos.scheduler.MACHINE_RESTRICTIONS";
 
-    private final SchedulerCore scheduler;
     private final Map<String, String> machineRestrictions;
 
     /**
      * Creates a new scheduling filter.
      *
-     * @param scheduler Scheduler to look up existing task information.
      * @param machineRestrictions Mapping from machine host name to job key.  Restricted machines
      *    may only run the specified job key, and the specified job key may only run on the
      *    respective machine.
      */
     @Inject
-    public SchedulingFilterImpl(SchedulerCore scheduler,
+    public SchedulingFilterImpl(
         @Named(MACHINE_RESTRICTIONS) Map<String, String> machineRestrictions) {
-      this.scheduler = checkNotNull(scheduler);
       this.machineRestrictions = checkNotNull(machineRestrictions);
     }
 
@@ -102,18 +114,17 @@ public interface SchedulingFilter {
       return !foundJobRestriction;
     }
 
-    private Predicate<ScheduledTask> meetsMachineReservation(final String slaveHost) {
-      return new Predicate<ScheduledTask>() {
-        @Override public boolean apply(ScheduledTask task) {
+    private Predicate<TwitterTaskInfo> meetsMachineReservation(final String slaveHost) {
+      return new Predicate<TwitterTaskInfo>() {
+        @Override public boolean apply(TwitterTaskInfo task) {
           String jobKey = Tasks.jobKey(task);
           return machineCanRunJob(slaveHost, jobKey) && jobCanRunOnMachine(slaveHost, jobKey);
         }
       };
     }
 
-    private static Set<String> getAvoidJobs(ScheduledTask task) {
-      TwitterTaskInfo taskInfo = task.getAssignedTask().getTask();
-      return taskInfo.getAvoidJobsSize() > 0 ? taskInfo.getAvoidJobs() : ImmutableSet.<String>of();
+    private static Set<String> getAvoidJobs(TwitterTaskInfo task) {
+      return task.getAvoidJobsSize() > 0 ? task.getAvoidJobs() : ImmutableSet.<String>of();
     }
 
     /**
@@ -122,64 +133,68 @@ public interface SchedulingFilter {
      * @param taskA Task to find compatible tasks for.
      * @return A filte to find tasks compatible with {@code taskA}.
      */
-    private static Predicate<ScheduledTask> canRunWith(final ScheduledTask taskA) {
+    private static Predicate<TwitterTaskInfo> canRunWith(final TwitterTaskInfo taskA) {
       final Set<String> taskAAvoids = getAvoidJobs(taskA);
 
-      return new Predicate<ScheduledTask>() {
-        @Override public boolean apply(ScheduledTask taskB) {
+      return new Predicate<TwitterTaskInfo>() {
+        @Override public boolean apply(TwitterTaskInfo taskB) {
           Set<String> taskBAvoids = getAvoidJobs(taskB);
 
           return !taskAAvoids.contains(Tasks.jobKey(taskB))
-                 && !taskBAvoids.contains(Tasks.jobKey(taskA));
+              && !taskBAvoids.contains(Tasks.jobKey(taskA));
         }
       };
     }
 
-    private Predicate<ScheduledTask> isTaskAllowedWithResidents(String slaveHost) {
-      Set<TaskState> tasks = scheduler.getTasks(
-          new Query(new TaskQuery().setSlaveHost(slaveHost), Tasks.ACTIVE_FILTER));
-      final Multimap<String, ScheduledTask> tasksOnHostByJob =
-          Multimaps.index(Iterables.transform(tasks, TaskState.STATE_TO_SCHEDULED),
-              Tasks.SCHEDULED_TO_JOB_KEY);
-
-      return new Predicate<ScheduledTask>() {
-        @Override public boolean apply(ScheduledTask task) {
-          Collection<ScheduledTask> tasks = tasksOnHostByJob.get(Tasks.jobKey(task));
-
-          TwitterTaskInfo taskInfo = task.getAssignedTask().getTask();
-          int maxPerHost = (!taskInfo.isSetMaxPerHost() || taskInfo.getMaxPerHost() == 0) ? 1
-              : task.getAssignedTask().getTask().getMaxPerHost();
-
-          return (tasks != null) && (tasks.size() < maxPerHost)
-                 && Iterables.all(tasksOnHostByJob.values(), canRunWith(task));
+    private static Predicate<TwitterTaskInfo> offerSatisfiesTask(final TwitterTaskInfo offer) {
+      return new Predicate<TwitterTaskInfo>() {
+        @Override public boolean apply(TwitterTaskInfo task) {
+          return ConfigurationManager.satisfied(task, offer);
         }
       };
     }
 
-    private Predicate<ScheduledTask> offerSatisfiesTask(final TwitterTaskInfo offer) {
-      return new Predicate<ScheduledTask>() {
-        @Override public boolean apply(ScheduledTask task) {
-          return ConfigurationManager.satisfied(task.getAssignedTask().getTask(), offer);
-        }
-      };
-    }
+    @Override
+    public Predicate<TwitterTaskInfo> staticFilter(TwitterTaskInfo resourceOffer,
+        String slaveHost) {
+      final Predicate<TwitterTaskInfo> offerSatisfiesTask = offerSatisfiesTask(resourceOffer);
+      final Predicate<TwitterTaskInfo> isPairAllowed = meetsMachineReservation(slaveHost);
 
-    // TODO(William Farner): Comparing strings as canonical host IDs could be problematic.  Consider
-    //    an approach that would be robust when presented with an IP address as well.
-    @Override public Predicate<ScheduledTask> makeFilter(final TwitterTaskInfo resourceOffer,
-        final String slaveHost) {
-      final Predicate<ScheduledTask> offerSatisfiesTask = offerSatisfiesTask(resourceOffer);
-      final Predicate<ScheduledTask> isTaskAllowedWith = isTaskAllowedWithResidents(slaveHost);
-      final Predicate<ScheduledTask> isPairAllowed = meetsMachineReservation(slaveHost);
-
-      return new Predicate<ScheduledTask>() {
-        @Override public boolean apply(ScheduledTask task) {
-          return Predicates.and(ImmutableList.<Predicate<ScheduledTask>>builder()
+      return new Predicate<TwitterTaskInfo>() {
+        @Override public boolean apply(TwitterTaskInfo task) {
+          return Predicates.and(ImmutableList.<Predicate<TwitterTaskInfo>>builder()
               .add(offerSatisfiesTask)
-              .add(isTaskAllowedWith)
               .add(isPairAllowed)
               .build())
               .apply(task);
+        }
+      };
+    }
+
+    @Override
+    public Predicate<TwitterTaskInfo> dynamicHostFilter(
+        final Function<Query, Iterable<TwitterTaskInfo>> taskFetcher, final String slaveHost) {
+      // TODO(William Farner): Comparing strings as canonical host IDs could be problematic.
+      //     Consider an approach that would be robust when presented with an IP address as well.
+
+      final Supplier<Multimap<String, TwitterTaskInfo>> tasksOnHostByJobSupplier =
+          Suppliers.memoize(new Supplier<Multimap<String, TwitterTaskInfo>>() {
+            @Override public Multimap<String, TwitterTaskInfo> get() {
+              Iterable<TwitterTaskInfo> tasks = taskFetcher.apply(
+                  new Query(new TaskQuery().setSlaveHost(slaveHost), Tasks.ACTIVE_FILTER));
+              return Multimaps.index(tasks, Tasks.INFO_TO_JOB_KEY);
+            }
+          });
+
+      return new Predicate<TwitterTaskInfo>() {
+        @Override public boolean apply(TwitterTaskInfo task) {
+          Collection<TwitterTaskInfo> tasks =
+              tasksOnHostByJobSupplier.get().get(Tasks.jobKey(task));
+          int maxPerHost =
+              (!task.isSetMaxPerHost() || task.getMaxPerHost() == 0) ? 1 : task.getMaxPerHost();
+
+          return (tasks != null) && (tasks.size() < maxPerHost)
+                 && Iterables.all(tasksOnHostByJobSupplier.get().values(), canRunWith(task));
         }
       };
     }

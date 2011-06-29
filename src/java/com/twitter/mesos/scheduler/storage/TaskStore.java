@@ -50,13 +50,12 @@ public interface TaskStore {
   ImmutableSet<ScheduledTask> mutate(Query query, Closure<ScheduledTask> mutator);
 
   /**
-   * Fetches a read-only view of tasks matching a query and filters.  The result will be sorted by
-   * the default ordering, which is by task ID.
+   * Fetches a read-only view of tasks matching a query and filters.
    *
    * @param query Query to identify tasks with.
    * @return A read-only view of matching tasks.
    */
-  ImmutableSortedSet<ScheduledTask> fetch(Query query);
+  ImmutableSet<ScheduledTask> fetch(Query query);
 
   /**
    * Convenience method to execute a query and only retrieve the IDs of the matching tasks.
