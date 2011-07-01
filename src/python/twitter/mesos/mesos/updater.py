@@ -15,14 +15,13 @@ class InvalidUpdaterConfigException(Exception): pass
 
 class Updater(object):
   """Update the shards of a job in batches."""
-  # TODO(sathya): Change file name to updater.py
-  # TODO(sathya): Add main method to include options.parse
 
-  def __init__(self, role, job, scheduler, clock):
+  def __init__(self, role, job, scheduler, clock, update_token):
     self._role = role
     self._job = job
     self._scheduler = scheduler
     self._clock = clock
+    self._update_token = update_token
     self._total_fail_count = 0
     self._max_total_failures = 0
     self._failures_by_shard = collections.defaultdict(int)
@@ -62,29 +61,35 @@ class Updater(object):
     return (self.exceeded_total_fail_count(failed_shards) or
         self.exceeded_shard_fail_count(failed_shards))
 
-  def update(self, update_config):
+  def update(self, job_config):
     """Performs the job update, blocking until it completes.
     A rollback will be performed if the update was considered a failure based on the
     update configuration.
 
     Arguments:
-    update_config -- update configuration object that describes how the update is performed.
+    job_config -- job configuration object.
 
     Returns the set of shards that failed to update.
     """
     # TODO(Sathya): Include an option in update_config to choose either,
     #     a constant forward progress option or a retry batch untill success option.
+    update_config = job_config.updateConfig
     failed_shards = []
+    initial_shards = []
     self._max_total_failures = update_config.maxTotalFailures
     self._max_shard_failures = update_config.maxPerShardFailures
-    initial_shards = self._scheduler.get_shards(self._role, self._job)
+    for config in job_config.taskConfigs:
+      initial_shards += [config.shardId]
+    initial_shards.sort()
     Updater.validate_config(update_config, len(initial_shards))
     remaining_shards = initial_shards
     update_in_progress = True
     while update_in_progress:
       batch_shards = remaining_shards[0 : update_config.batchSize]
       remaining_shards = [shard for shard in set(remaining_shards).difference(batch_shards)]
-      self.restart_tasks(batch_shards, update_config)
+      resp = self.restart_shards(batch_shards, update_config)
+      log.info('Response from scheduler: %s (message: %s)'
+          % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
       failed_shards = self.watch_tasks(batch_shards, update_config.restartThreshold,
           update_config.watchSecs)
       log.info('Failed_tasks : %s' % failed_shards)
@@ -101,6 +106,7 @@ class Updater(object):
 
     Arguments:
     update_config -- update configuration object that describes how the rollback is performed.
+    shards_to_rollback -- shard ids.
     """
     log.info('Reverting update for %s' % shards_to_rollback)
     shards_to_rollback.sort()
@@ -108,19 +114,12 @@ class Updater(object):
     while rollback_in_progress:
       batch_shards = shards_to_rollback[0 : update_config.batchSize]
       shards_to_rollback = [shard for shard in set(shards_to_rollback).difference(batch_shards)]
-      self.rollback_tasks(batch_shards, update_config)
+      resp = self._scheduler.rollbackShards(self._role, self._job['name'], batch_shards, self._update_token)
+      log.info('Response from scheduler: %s (message: %s)'
+          % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
       rollback_in_progress = not(shards_to_rollback == [])
 
-  def rollback_tasks(self, shard_ids, update_config):
-    """Performs a scheduler call for rollback.
-
-    Arguments:
-    shard_ids -- set of shards to be restarted by the scheduler.
-    update_config -- update configuration object that describes how the rollback is performed.
-    """
-    self._scheduler.rollback_tasks(self._role, self._job, shard_ids, update_config)
-
-  def restart_tasks(self, shard_ids, update_config):
+  def restart_shards(self, shard_ids, update_config):
     """Performs a scheduler call for restart.
 
     Arguments:
@@ -130,7 +129,7 @@ class Updater(object):
     Returns a map of the current status of the restarted shards as returned by the scheduler.
     """
     log.info('Restarting shards')
-    return self._scheduler.restart_tasks(self._role, self._job, shard_ids, update_config)
+    return self._scheduler.updateShards(self._role, self._job['name'], shard_ids, self._update_token)
 
   def watch_tasks(self, task_ids, restart_threshold, watch_secs):
     """Monitors the restarted shards.
@@ -148,16 +147,24 @@ class Updater(object):
     ACTIVE_STATES = set([ScheduleStatus.PENDING, ScheduleStatus.STARTING, ScheduleStatus.RUNNING])
     start_time = self._clock.time()
     expected_running_by = start_time + restart_threshold
+    statuses = {}
     running_state_times = {}
     healthy_tasks = set()
     failed_shards = set()
     while True:
       log.info('Getting Status...')
-      statuses = self._scheduler.get_statuses(task_ids)
+      query = TaskQuery()
+      query.owner = Identity(role = self._role)
+      query.jobName = self._job['name']
+      resp = self._scheduler.getTasksStatus(query)
+      log.info('Response from scheduler: %s (message: %s)'
+          % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
+      if resp.tasks:
+        for task in resp.tasks:
+          statuses[task.scheduledTask.assignedTask.task.shardId] = task.scheduledTask.status
+      else:
+        log.info('No tasks found.')
       log.info('Got statuses: %s' % statuses)
-      assert statuses.keys().sort() == task_ids.sort(), (
-          'Scheduler status response did not match request: asked for %s, got %s' %
-              (task_ids, statuses.keys()))
       now = self._clock.time()
       for task_id, status in statuses.items():
         if status is ScheduleStatus.RUNNING and task_id not in (

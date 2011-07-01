@@ -25,6 +25,12 @@ class MesosConfiguration:
 
     Returns the job configurations found in the configuration object.
     """
+
+    DEFAULT_BATCH_SIZE = 3
+    DEFAULT_RESTART_THRESHOLD = 10
+    DEFAULT_WATCH_SECS = 30
+    DEFAULT_MAX_PER_SHARD_FAILURE = 0
+    DEFAULT_MAX_TOTAL_FAILURE = 0
     if not 'jobs' in configObj:
       print 'Configuration must define a python object named "jobs"'
       sys.exit(2)
@@ -73,6 +79,19 @@ class MesosConfiguration:
 
       if not 'cron_schedule' in job:
         job['cron_schedule'] = ''
+
+      if not 'update_config' in job:
+        job['update_config'] = {}
+      if not 'batchSize' in job['update_config']:
+        job['update_config']['batchSize'] = DEFAULT_BATCH_SIZE
+      if not 'restartThreshold' in job['update_config']:
+        job['update_config']['restartThreshold'] = DEFAULT_RESTART_THRESHOLD
+      if not 'watchSecs' in job['update_config']:
+        job['update_config']['watchSecs'] = DEFAULT_WATCH_SECS
+      if not 'maxPerShardFailures' in job['update_config']:
+        job['update_config']['maxPerShardFailures'] = DEFAULT_MAX_PER_SHARD_FAILURE
+      if not 'maxTotalFailures' in job['update_config']:
+        job['update_config']['maxTotalFailures'] = DEFAULT_MAX_TOTAL_FAILURE
 
       try:
         jobDict[job['name']] = job

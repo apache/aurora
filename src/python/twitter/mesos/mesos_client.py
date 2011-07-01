@@ -9,6 +9,7 @@ import logging
 import os
 import subprocess
 import sys
+import time
 import getpass
 import pickle
 import zookeeper
@@ -20,11 +21,12 @@ from twitter.common.log.options import LogOptions
 
 from twitter.common import options
 from twitter.mesos.mesos import clusters
-from twitter.mesos.mesos import scheduler_client
-from twitter.mesos.mesos.tunnel_helper import TunnelHelper
 from twitter.mesos.mesos.ldap_helper import LdapHelper
 from twitter.mesos.mesos.location import Location
 from twitter.mesos.mesos.mesos_configuration import MesosConfiguration
+from twitter.mesos.mesos import scheduler_client
+from twitter.mesos.mesos.tunnel_helper import TunnelHelper
+from twitter.mesos.mesos.updater import *
 
 from mesos_twitter.ttypes import *
 
@@ -409,6 +411,48 @@ class MesosCLI(cmd.Cmd):
       print_tasks(inactive_tasks)
     else:
       log.info('No tasks found.')
+
+  @requires_arguments('job', 'config')
+  def do_update(self, *line):
+    """update job config"""
+
+    (job, owner, tasks, cron_collision_policy, update_config) = self.read_config(*line)
+
+    MesosCLIHelper.get_cluster(self.options.cluster, job.get('cluster'))
+
+    dc = clusters.get_dc(job['cluster'])
+
+    # TODO(William Farner): Add a rudimentary versioning system here so application updates don't overwrite original binary.
+    if self.options.copy_app_from is not None:
+      MesosCLIHelper.copy_app_to_hadoop(self.options.copy_app_from, job['task']['hdfs_path'], dc, self._proxy)
+
+    sessionkey = self.acquire_session(owner)
+
+    log.info('Updating Job %s' % job['name'])
+
+    resp = self._client.startUpdate(
+      JobConfiguration(job['name'], owner, tasks, job['cron_schedule'], cron_collision_policy), sessionkey)
+    if resp.responseCode != ResponseCode.OK:
+      log.warn('Response from scheduler: %s (message: %s)'
+        % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
+    if resp.responseCode == ResponseCode.AUTH_FAILED:
+      MesosCookieHelper.clear_cookie()
+      return
+
+    # TODO(William Farner): Cleanly handle connection failures in case the scheduler restarts mid-update.
+    updater = Updater(owner.role, job, self._client, time, resp.updateToken)
+
+    failed_shards = updater.update(JobConfiguration(job['name'], owner, tasks, job['cron_schedule'], cron_collision_policy, job['update_config']))
+
+    if failed_shards:
+      log.info('Update reverted, failures detected on shards %s' % ','.join(failed_shards))
+      resp = finishUpdate(owner.role, job[name], FAILED, resp.updateToken)
+    else:
+      log.info('Update Successful')
+      resp = finishUpdate(owner.role, job['name'], SUCCESS, updateToken)
+    if resp.responseCode != ResponseCode.OK:
+      log.info('Response from scheduler: %s (message: %s)'
+        % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
 
 def main():
   usage = """Mesos command-line interface.
