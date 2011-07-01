@@ -12,15 +12,20 @@ import com.twitter.common.collections.Pair;
 import com.twitter.common_internal.elfowl.Cookie;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.CreateJobResponse;
+import com.twitter.mesos.gen.FinishUpdateResponse;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.KillResponse;
 import com.twitter.mesos.gen.MesosSchedulerManager;
 import com.twitter.mesos.gen.ResponseCode;
 import com.twitter.mesos.gen.RestartResponse;
+import com.twitter.mesos.gen.RollbackShardsResponse;
 import com.twitter.mesos.gen.ScheduleStatusResponse;
 import com.twitter.mesos.gen.SessionKey;
+import com.twitter.mesos.gen.StartUpdateResponse;
 import com.twitter.mesos.gen.TaskQuery;
+import com.twitter.mesos.gen.UpdateResult;
+import com.twitter.mesos.gen.UpdateShardsResponse;
 import com.twitter.mesos.scheduler.SchedulerCore.RestartException;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 
@@ -58,7 +63,7 @@ public class SchedulerThriftInterface implements MesosSchedulerManager.Iface {
       return Pair.of(AUTH_FAILED, "Incorrectly specified session key.");
     }
 
-    Cookie cookie = Cookie.fromBase64(sessionKey.getCookie().toString());
+    Cookie cookie = Cookie.fromBase64(sessionKey.getCookie());
 
     if (cookie == null) {
       return Pair.of(AUTH_FAILED, "Unable to parse supplied cookie.");
@@ -118,6 +123,30 @@ public class SchedulerThriftInterface implements MesosSchedulerManager.Iface {
     }
 
     return response;
+  }
+
+  @Override public StartUpdateResponse startUpdate(JobConfiguration jobConfiguration,
+      SessionKey sessionKey) {
+    // TODO(Sathya): Implement.
+    return null;
+  }
+
+  @Override public UpdateShardsResponse updateShards(String s, String s1, Set<Integer> integers,
+      String s2) {
+    // TODO(Sathya): Implement.
+    return null;
+  }
+
+  @Override public RollbackShardsResponse rollbackShards(String s, String s1, Set<Integer> integers,
+      String s2) {
+    // TODO(Sathya): Implement.
+    return null;
+  }
+
+  @Override public FinishUpdateResponse finishUpdate(String s, String s1, UpdateResult updateResult,
+      String s2) {
+    // TODO(Sathya): Implement.
+    return null;
   }
 
   // TODO(William Farner): Provide status information about cron jobs here.
