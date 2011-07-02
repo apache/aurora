@@ -1,6 +1,5 @@
 package com.twitter.mesos.scheduler;
 
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -167,7 +166,7 @@ public class SchedulerCoreImpl
 
   @Override
   public Iterable<TwitterTaskInfo> apply(Query query) {
-    return Iterables.transform(getTasks(query), Tasks.STATE_TO_INFO);
+    return Iterables.transform(getTasks(query), TaskState.STATE_TO_INFO);
   }
 
   private boolean hasActiveJob(JobConfiguration job) {

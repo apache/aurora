@@ -15,7 +15,6 @@ import com.twitter.mesos.gen.LiveTaskInfo;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.TaskState;
 
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
@@ -35,13 +34,6 @@ import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
  */
 public class Tasks {
 
-  public static final Function<TaskState, ScheduledTask> STATE_TO_SCHEDULED =
-      new Function<TaskState, ScheduledTask>() {
-        @Override public ScheduledTask apply(TaskState state) {
-          return state.task;
-        }
-      };
-
   public static final Function<ScheduledTask, AssignedTask> SCHEDULED_TO_ASSIGNED =
       new Function<ScheduledTask, AssignedTask>() {
         @Override public AssignedTask apply(ScheduledTask task) {
@@ -58,9 +50,6 @@ public class Tasks {
 
   public static final Function<ScheduledTask, TwitterTaskInfo> SCHEDULED_TO_INFO =
       Functions.compose(ASSIGNED_TO_INFO, SCHEDULED_TO_ASSIGNED);
-
-  public static final Function<TaskState, TwitterTaskInfo> STATE_TO_INFO =
-      Functions.compose(SCHEDULED_TO_INFO, STATE_TO_SCHEDULED);
 
   public static final Function<AssignedTask, String> ASSIGNED_TO_ID =
       new Function<AssignedTask, String>() {
