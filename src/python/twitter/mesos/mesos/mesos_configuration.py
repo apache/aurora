@@ -80,18 +80,17 @@ class MesosConfiguration:
       if not 'cron_schedule' in job:
         job['cron_schedule'] = ''
 
-      if not 'update_config' in job:
-        job['update_config'] = {}
-      if not 'batchSize' in job['update_config']:
-        job['update_config']['batchSize'] = DEFAULT_BATCH_SIZE
-      if not 'restartThreshold' in job['update_config']:
-        job['update_config']['restartThreshold'] = DEFAULT_RESTART_THRESHOLD
-      if not 'watchSecs' in job['update_config']:
-        job['update_config']['watchSecs'] = DEFAULT_WATCH_SECS
-      if not 'maxPerShardFailures' in job['update_config']:
-        job['update_config']['maxPerShardFailures'] = DEFAULT_MAX_PER_SHARD_FAILURE
-      if not 'maxTotalFailures' in job['update_config']:
-        job['update_config']['maxTotalFailures'] = DEFAULT_MAX_TOTAL_FAILURE
+      update_config = job.setdefault('update_config', {})
+      if not 'batchSize' in update_config:
+        update_config['batchSize'] = DEFAULT_BATCH_SIZE
+      if not 'restartThreshold' in update_config:
+        update_config['restartThreshold'] = DEFAULT_RESTART_THRESHOLD
+      if not 'watchSecs' in update_config:
+        update_config['watchSecs'] = DEFAULT_WATCH_SECS
+      if not 'maxPerShardFailures' in update_config:
+        update_config['maxPerShardFailures'] = DEFAULT_MAX_PER_SHARD_FAILURE
+      if not 'maxTotalFailures' in update_config:
+        update_config['maxTotalFailures'] = DEFAULT_MAX_TOTAL_FAILURE
 
       try:
         jobDict[job['name']] = job

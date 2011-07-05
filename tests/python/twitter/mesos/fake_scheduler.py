@@ -35,7 +35,8 @@ class FakeScheduler:
     statuses = self._status_calls.popleft()
     response = ScheduleStatusResponse(responseCode = ResponseCode.OK, message = 'test', tasks = [])
     for shard in statuses:
-      response.tasks += [LiveTask(scheduledTask = ScheduledTask(assignedTask = AssignedTask(task = TwitterTaskInfo(shardId = shard)), status = statuses[shard]))]
+      response.tasks += [LiveTask(scheduledTask = ScheduledTask(assignedTask = AssignedTask(
+          task = TwitterTaskInfo(shardId = shard)), status = statuses[shard]))]
     return response
 
   def expect_getTasksStatus(self, statuses):

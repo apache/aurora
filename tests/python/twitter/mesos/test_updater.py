@@ -29,7 +29,8 @@ class UpdaterTest(unittest.TestCase):
   def setUp(self):
     self._clock = Clock()
     self._scheduler = FakeScheduler()
-    self._updater = Updater('mesos', {'name' : 'sathya'}, self._scheduler, self._clock, 'test_update')
+    self._updater = Updater('mesos', {'name' : 'sathya'}, self._scheduler, self._clock,
+        'test_update')
     self._update_config = UpdateConfig()
     self._update_config.batchSize = UpdaterTest.BATCH_SIZE
     self._update_config.restartThreshold = UpdaterTest.RESTART_THRESHOLD

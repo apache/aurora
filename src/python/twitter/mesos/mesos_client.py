@@ -327,13 +327,15 @@ class MesosCLI(cmd.Cmd):
     dc = clusters.get_dc(job['cluster'])
 
     if self.options.copy_app_from is not None:
-      MesosCLIHelper.copy_app_to_hadoop(self.options.copy_app_from, job['task']['hdfs_path'], dc, self._proxy)
+      MesosCLIHelper.copy_app_to_hadoop(self.options.copy_app_from,
+          job['task']['hdfs_path'], dc, self._proxy)
 
     sessionkey = self.acquire_session(owner)
 
     log.info('Creating job %s' % job['name'])
     resp = self._client.createJob(
-      JobConfiguration(job['name'], owner, tasks, job['cron_schedule'], cron_collision_policy), sessionkey)
+      JobConfiguration(job['name'], owner, tasks, job['cron_schedule'],
+          cron_collision_policy), sessionkey)
     log.info('Response from scheduler: %s (message: %s)'
       % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
     if resp.responseCode == ResponseCode.AUTH_FAILED:
@@ -422,16 +424,19 @@ class MesosCLI(cmd.Cmd):
 
     dc = clusters.get_dc(job['cluster'])
 
-    # TODO(William Farner): Add a rudimentary versioning system here so application updates don't overwrite original binary.
+    # TODO(William Farner): Add a rudimentary versioning system here so application updates
+    #                       don't overwrite original binary.
     if self.options.copy_app_from is not None:
-      MesosCLIHelper.copy_app_to_hadoop(self.options.copy_app_from, job['task']['hdfs_path'], dc, self._proxy)
+      MesosCLIHelper.copy_app_to_hadoop(self.options.copy_app_from, job['task']['hdfs_path'],
+          dc, self._proxy)
 
     sessionkey = self.acquire_session(owner)
 
     log.info('Updating Job %s' % job['name'])
 
     resp = self._client.startUpdate(
-      JobConfiguration(job['name'], owner, tasks, job['cron_schedule'], cron_collision_policy), sessionkey)
+      JobConfiguration(job['name'], owner, tasks, job['cron_schedule'], cron_collision_policy),
+          sessionkey)
     if resp.responseCode != ResponseCode.OK:
       log.warn('Response from scheduler: %s (message: %s)'
         % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
@@ -439,10 +444,12 @@ class MesosCLI(cmd.Cmd):
       MesosCookieHelper.clear_cookie()
       return
 
-    # TODO(William Farner): Cleanly handle connection failures in case the scheduler restarts mid-update.
+    # TODO(William Farner): Cleanly handle connection failures in case the scheduler
+    #                       restarts mid-update.
     updater = Updater(owner.role, job, self._client, time, resp.updateToken)
 
-    failed_shards = updater.update(JobConfiguration(job['name'], owner, tasks, job['cron_schedule'], cron_collision_policy, job['update_config']))
+    failed_shards = updater.update(JobConfiguration(job['name'], owner, tasks, job['cron_schedule'],
+        cron_collision_policy, job['update_config']))
 
     if failed_shards:
       log.info('Update reverted, failures detected on shards %s' % ','.join(failed_shards))
