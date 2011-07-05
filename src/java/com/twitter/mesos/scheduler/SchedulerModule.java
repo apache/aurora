@@ -44,6 +44,7 @@ import com.twitter.common.logging.ScribeLog;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.thrift.ThriftFactory.ThriftFactoryException;
+import com.twitter.common.util.Clock;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.common.zookeeper.ZooKeeperClient.Credentials;
@@ -168,6 +169,9 @@ public class SchedulerModule extends AbstractModule {
         .toInstance(machineRestrictions.get());
     bind(String.class).annotatedWith(ExecutorPath.class).toInstance(executorPath.get());
     bind(Scheduler.class).to(MesosSchedulerImpl.class).in(Singleton.class);
+
+    // Bindings for StateManager
+    bind(Clock.class).toInstance(Clock.SYSTEM_CLOCK);
 
     Registration.registerServlet(binder(), "/scheduler", SchedulerzHome.class, false);
     Registration.registerServlet(binder(), "/scheduler/role", SchedulerzRole.class, true);
