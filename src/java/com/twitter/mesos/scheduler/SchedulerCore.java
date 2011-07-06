@@ -5,6 +5,8 @@ import java.util.Set;
 
 import javax.annotation.Nullable;
 
+import com.google.common.base.Function;
+
 import org.apache.commons.lang.builder.EqualsBuilder;
 import org.apache.commons.lang.builder.ToStringBuilder;
 import org.apache.mesos.Protos.Resource;
@@ -16,6 +18,7 @@ import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.ScheduleStatus;
+import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -39,20 +42,13 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
  * <li>{@link #stop()}
  * </ol>
  *
- * TODO(William Farner): Figure out how to handle permissions for modification of running tasks.  As it
- * stands it would be quite easy to accidentally modify something that does not belong to you.
- *
- * TODO(William Farner): Clean up persistence routine to ensure that persistence happens whenever state
- * is modified.
- *
- * TODO(William Farner): Add support for machine drains via an administrator interface.  This would accept
- * a machine host name (or slave ID) and a.) kill tasks running on the machine, b.) prevent tasks
- * from being scheduled on the machine.
+ * TODO(William Farner): Add support for machine drains via an administrator interface.  This would
+ * accept a machine host name (or slave ID) and a.) kill tasks running on the machine, b.) prevent
+ * tasks from being scheduled on the machine.
  *
  * @author William Farner
  */
-public interface SchedulerCore {
-
+public interface SchedulerCore extends Function<Query, Iterable<TwitterTaskInfo>> {
 
   /**
    * Initializes the scheduler's storage system and returns the last framework ID assigned to this
@@ -131,6 +127,15 @@ public interface SchedulerCore {
    * @throws ScheduleException If a problem occurs with the kill request.
    */
   void killTasks(Query query) throws ScheduleException;
+
+  /**
+   * Preempts a task in favor of another.
+   *
+   * @param task Task being preempted.
+   * @param preemptingTask Task we are preempting in favor of.
+   * @throws ScheduleException If a problem occurs while trying to perform the preemption.
+   */
+  void preemptTask(AssignedTask task, AssignedTask preemptingTask) throws ScheduleException;
 
   class RestartException extends Exception {
     RestartException(String msg) { super(msg); }

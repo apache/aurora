@@ -3,8 +3,11 @@ package com.twitter.mesos;
 import java.util.EnumSet;
 import java.util.Set;
 
+import javax.annotation.Nullable;
+
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Ordering;
 
@@ -15,6 +18,7 @@ import com.twitter.mesos.gen.LiveTaskInfo;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.TaskState;
 
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
@@ -23,6 +27,7 @@ import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED_BY_CLIENT;
 import static com.twitter.mesos.gen.ScheduleStatus.LOST;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
+import static com.twitter.mesos.gen.ScheduleStatus.PREEMPTING;
 import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
@@ -90,7 +95,7 @@ public class Tasks {
    * Different states that an active task may be in.
    */
   public static final Set<ScheduleStatus> ACTIVE_STATES = EnumSet.of(
-      PENDING, ASSIGNED, STARTING, RUNNING, RESTARTING);
+      PENDING, ASSIGNED, STARTING, RUNNING, RESTARTING, PREEMPTING);
 
   /**
    * Terminal states, which a task should not move from.
@@ -119,7 +124,6 @@ public class Tasks {
       Ordering.natural().onResultOf(ASSIGNED_TO_ID);
   private static final Ordering<AssignedTask> PRIORITY_ORDERING =
       Ordering.natural().onResultOf(Functions.compose(INFO_TO_PRIORITY, ASSIGNED_TO_INFO));
-
   /**
    * Orders by priority, subsorting by task ID.
    */
@@ -128,6 +132,23 @@ public class Tasks {
 
   private Tasks() {
     // Utility class.
+  }
+
+  /**
+   * Creates a predicate that tests whether other {@link ScheduledTask}s have a status equal to
+   * {@code status}.
+   *
+   * @param status Status to compare against other tasks.
+   * @return A new filter that will match other tasks with the same status.
+   */
+  public static Predicate<ScheduledTask> hasStatus(final ScheduleStatus status) {
+    Preconditions.checkNotNull(status);
+
+    return new Predicate<ScheduledTask>() {
+      @Override public boolean apply(ScheduledTask task) {
+        return task.getStatus() == status;
+      }
+    };
   }
 
   public static boolean isActive(ScheduleStatus status) {

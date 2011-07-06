@@ -36,6 +36,7 @@ import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED_BY_CLIENT;
 import static com.twitter.mesos.gen.ScheduleStatus.LOST;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
+import static com.twitter.mesos.gen.ScheduleStatus.PREEMPTING;
 import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
@@ -214,7 +215,7 @@ public class TaskStateMachine {
     };
 
     // To be called on a task transitioning into the FAILED state.
-    final Command maybeReschedule = new Command() {
+    final Command incrementFailuresMaybeReschedule = new Command() {
       @Override public void execute() {
         ScheduledTask task = taskReader.get();
         addWork(WorkCommand.INCREMENT_FAILURES);
@@ -248,8 +249,12 @@ public class TaskStateMachine {
                     rescheduleIfDaemon.execute();
                     break;
 
+                  case PREEMPTING:
+                    addWork(WorkCommand.KILL);
+                    break;
+
                   case FAILED:
-                    maybeReschedule.execute();
+                    incrementFailuresMaybeReschedule.execute();
                     break;
 
                   case RESTARTING:
@@ -277,8 +282,8 @@ public class TaskStateMachine {
               }
             },
             State.create(ASSIGNED),
-            State.array(STARTING, RUNNING, FINISHED, FAILED, RESTARTING, KILLED, KILLED_BY_CLIENT,
-                LOST))
+            State.array(STARTING, RUNNING, FINISHED, FAILED, RESTARTING, PREEMPTING, KILLED,
+                KILLED_BY_CLIENT, LOST))
         .addState(
             new Closure<Transition<State>>() {
               @Override public void execute(Transition<State> transition) {
@@ -291,8 +296,12 @@ public class TaskStateMachine {
                     addWork(WorkCommand.KILL);
                     break;
 
+                  case PREEMPTING:
+                    addWork(WorkCommand.KILL);
+                    break;
+
                   case FAILED:
-                    maybeReschedule.execute();
+                    incrementFailuresMaybeReschedule.execute();
                     break;
 
                   case KILLED:
@@ -315,7 +324,8 @@ public class TaskStateMachine {
               }
             },
             State.create(STARTING),
-            State.array(RUNNING, FINISHED, FAILED, RESTARTING, KILLED, KILLED_BY_CLIENT, LOST))
+            State.array(RUNNING, FINISHED, FAILED, RESTARTING, PREEMPTING, KILLED, KILLED_BY_CLIENT,
+                LOST))
         .addState(
             new Closure<Transition<State>>() {
               @Override public void execute(Transition<State> transition) {
@@ -324,12 +334,16 @@ public class TaskStateMachine {
                     rescheduleIfDaemon.execute();
                     break;
 
+                  case PREEMPTING:
+                    addWork(WorkCommand.KILL);
+                    break;
+
                   case RESTARTING:
                     addWork(WorkCommand.KILL);
                     break;
 
                   case FAILED:
-                    maybeReschedule.execute();
+                    incrementFailuresMaybeReschedule.execute();
                     break;
 
                   case KILLED:
@@ -347,11 +361,30 @@ public class TaskStateMachine {
               }
             },
             State.create(RUNNING),
-            State.array(FINISHED, RESTARTING, FAILED, KILLED, KILLED_BY_CLIENT, LOST))
+            State.array(FINISHED, RESTARTING, PREEMPTING, FAILED, KILLED, KILLED_BY_CLIENT, LOST))
         .addState(
             manageTerminatedTasks,
             State.create(FINISHED),
             State.create(UNKNOWN))
+        .addState(
+            new Closure<Transition<State>>() {
+              @Override public void execute(Transition<State> transition) {
+                switch (transition.getTo().state) {
+                  case ASSIGNED:
+                  case STARTING:
+                  case RUNNING:
+                    addWork(WorkCommand.KILL);
+                    break;
+
+                  case KILLED:
+                  case LOST:
+                  case UNKNOWN:
+                    addWork(WorkCommand.RESCHEDULE);
+                }
+              }
+            },
+            State.create(PREEMPTING),
+            State.array(FINISHED, FAILED, KILLED, KILLED_BY_CLIENT, LOST))
         .addState(
             manageRestartingTask,
             State.create(RESTARTING),
@@ -379,7 +412,8 @@ public class TaskStateMachine {
         // must be the last chained transition callback.
         .onAnyTransition(
             new Closure<Transition<State>>() {
-              @Override public void execute(final Transition<State> transition) {
+              @Override
+              public void execute(final Transition<State> transition) {
                 if (transition.isValidStateChange()
                     && (transition.getTo().state != UNKNOWN)
                     // Prevent an update when killing a pending task, since the task is deleted

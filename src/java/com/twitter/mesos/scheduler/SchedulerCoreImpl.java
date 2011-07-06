@@ -65,15 +65,14 @@ import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.STOPPED;
  *
  * @author William Farner
  */
-public class SchedulerCoreImpl
-    implements SchedulerCore, Function<Query, Iterable<TwitterTaskInfo>> {
+public class SchedulerCoreImpl implements SchedulerCore {
 
   private static final Logger LOG = Logger.getLogger(SchedulerCore.class.getName());
 
   private final Map<String, VolatileTaskState> taskStateById =
       new MapMaker().makeComputingMap(new Function<String, VolatileTaskState>() {
         @Override public VolatileTaskState apply(String taskId) {
-          return new VolatileTaskState(taskId);
+          return new VolatileTaskState();
         }
       });
 
@@ -471,6 +470,16 @@ public class SchedulerCoreImpl
                 RESTARTING, "Restarting by client request");
           }
         });
+  }
+
+  @Override
+  public synchronized void preemptTask(AssignedTask task, AssignedTask preemptingTask) {
+    checkNotNull(task);
+    checkNotNull(preemptingTask);
+    // TODO(William Farner): Throw SchedulingException if either task doesn't exist, etc.
+
+    stateManager.changeState(Query.byId(task.getTaskId()), ScheduleStatus.PREEMPTING,
+        "Preempting in favor of " + Tasks.jobKey(preemptingTask));
   }
 
   @Override

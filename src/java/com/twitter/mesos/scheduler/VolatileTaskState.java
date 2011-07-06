@@ -12,16 +12,14 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
  * @author William Farner
  */
 public class VolatileTaskState {
-  public final String taskId;
   @Nullable
   public ResourceConsumption resources;
 
-  VolatileTaskState(String taskId) {
-    this.taskId = checkNotBlank(taskId);
+  VolatileTaskState() {
+    this.resources = null;
   }
 
   VolatileTaskState(VolatileTaskState toCopy) {
-    this.taskId = toCopy.taskId;
     this.resources = toCopy.resources == null ? null : new ResourceConsumption(toCopy.resources);
   }
 }
