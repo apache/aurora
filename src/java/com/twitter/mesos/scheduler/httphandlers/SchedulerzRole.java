@@ -2,8 +2,6 @@ package com.twitter.mesos.scheduler.httphandlers;
 
 import java.io.IOException;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Logger;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -20,8 +18,6 @@ import org.antlr.stringtemplate.StringTemplate;
 
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
-import com.twitter.mesos.Tasks;
-import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.CronJobManager;
@@ -41,10 +37,7 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
  */
 public class SchedulerzRole extends StringTemplateServlet {
 
-  private static Logger LOG = Logger.getLogger(SchedulerzRole.class.getName());
-
   private static final String ROLE_PARAM = "role";
-  private static final String START_CRON_PARAM = "start_cron";
 
   private final SchedulerCore scheduler;
   private final CronJobManager cronScheduler;
@@ -66,18 +59,6 @@ public class SchedulerzRole extends StringTemplateServlet {
       throws ServletException, IOException {
 
     final String role = req.getParameter(ROLE_PARAM);
-    final String cronJobLaunched = req.getParameter(START_CRON_PARAM);
-
-    final AtomicReference<String> cronLaunchException = new AtomicReference<String>();
-    if (cronJobLaunched != null) {
-      if (!cronScheduler.hasJob(Tasks.jobKey(role, cronJobLaunched))) {
-        cronLaunchException.set("Unrecognized cron job " + cronJobLaunched);
-      } else {
-        LOG.info("Received web request to launch cron job " + role + "/" + cronJobLaunched);
-        cronScheduler.startJobNow(Tasks.jobKey(role, cronJobLaunched));
-        resp.sendRedirect("/scheduler/role?role=" + role);
-      }
-    }
 
     writeTemplate(resp, new Closure<StringTemplate>() {
       @Override public void execute(StringTemplate template) {
@@ -89,13 +70,7 @@ public class SchedulerzRole extends StringTemplateServlet {
         }
         template.setAttribute("role", role);
 
-        if (cronLaunchException.get() != null) {
-          template.setAttribute("exception", cronLaunchException);
-          return;
-        }
-
         Map<String, Job> jobs = Maps.newHashMap();
-
         for (TaskState state : scheduler.getTasks(Query.byRole(role))) {
           Job job = jobs.get(state.task.getAssignedTask().getTask().getJobName());
 

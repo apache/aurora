@@ -85,20 +85,6 @@ public class CronJobManager extends JobManager {
   }
 
   /**
-   * Triggers execution of a job.
-   *
-   * @param jobKey Key of the job to start.
-   */
-  public void startJobNow(final String jobKey) {
-    Preconditions.checkNotNull(jobKey);
-
-    JobConfiguration job = fetchJob(jobKey);
-    Preconditions.checkArgument(job != null, "No such cron job " + jobKey);
-
-    cronTriggered(job);
-  }
-
-  /**
    * Triggers execution of a cron job, depending on the cron collision policy for the job.
    *
    * @param job The config of the job to be triggered.
