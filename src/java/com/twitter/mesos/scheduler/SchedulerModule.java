@@ -1,6 +1,5 @@
 package com.twitter.mesos.scheduler;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
@@ -23,10 +22,6 @@ import org.apache.mesos.MesosSchedulerDriver;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
-import org.apache.zookeeper.server.NIOServerCnxn;
-import org.apache.zookeeper.server.ZooKeeperServer;
-import org.apache.zookeeper.server.ZooKeeperServer.BasicDataTreeBuilder;
-import org.apache.zookeeper.server.persistence.FileTxnSnapLog;
 
 import com.twitter.common.application.ActionRegistry;
 import com.twitter.common.application.ShutdownStage;
@@ -36,10 +31,7 @@ import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.NotNull;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Closures;
-import com.twitter.common.base.Command;
-import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.inject.TimedInterceptor;
-import com.twitter.common.io.FileUtils;
 import com.twitter.common.logging.ScribeLog;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -49,6 +41,7 @@ import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.common.zookeeper.ZooKeeperClient.Credentials;
 import com.twitter.common.zookeeper.ZooKeeperUtils;
+import com.twitter.common.zookeeper.testing.ZooKeeperTestServer;
 import com.twitter.common_internal.cuckoo.CuckooWriter;
 import com.twitter.common_internal.zookeeper.TwitterZk;
 import com.twitter.mesos.gen.TwitterTaskInfo;
@@ -272,35 +265,9 @@ public class SchedulerModule extends AbstractModule {
 
   private ZooKeeperClient startLocalZookeeper(ActionRegistry shutdownRegistry,
       Credentials credentials) throws IOException, InterruptedException {
-
-    ZooKeeperServer zooKeeperServer =
-        new ZooKeeperServer(
-            new FileTxnSnapLog(createTempDir(shutdownRegistry), createTempDir(shutdownRegistry)),
-            new BasicDataTreeBuilder());
-
-    final NIOServerCnxn.Factory connectionFactory =
-        new NIOServerCnxn.Factory(new InetSocketAddress(0));
-    connectionFactory.startup(zooKeeperServer);
-    shutdownRegistry.addAction(new Command() {
-      @Override public void execute() throws RuntimeException {
-        if (connectionFactory.isAlive()) {
-          connectionFactory.shutdown();
-        }
-      }
-    });
-    int zkPort = zooKeeperServer.getClientPort();
-    LOG.info("Embedded zookeeper cluster started on port " + zkPort);
-    return new ZooKeeperClient(zooKeeperSessionTimeout.get(), credentials,
-        InetSocketAddress.createUnresolved("localhost", zkPort));
-  }
-
-  private File createTempDir(ActionRegistry shutdownRegistry) {
-    final File tempDir = FileUtils.createTempDir();
-    shutdownRegistry.addAction(new ExceptionalCommand<IOException>() {
-      @Override public void execute() throws IOException {
-        org.apache.commons.io.FileUtils.deleteDirectory(tempDir);
-      }
-    });
-    return tempDir;
+    ZooKeeperTestServer zooKeeperServer = new ZooKeeperTestServer(0, shutdownRegistry);
+    zooKeeperServer.startNetwork();
+    LOG.info("Embedded zookeeper cluster started on port " + zooKeeperServer.getPort());
+    return zooKeeperServer.createClient(zooKeeperSessionTimeout.get(), credentials);
   }
 }
