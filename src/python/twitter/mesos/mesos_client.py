@@ -342,6 +342,17 @@ class MesosCLI(cmd.Cmd):
       MesosCookieHelper.clear_cookie()
 
   @requires_arguments('role', 'job')
+  def do_start_cron(self, *line):
+    """start_cron role job"""
+
+    (role, job) = line
+    resp = self._client.startCronJob(job, self.acquire_session(Identity(role = role, user = getpass.getuser())))
+    log.info('Response from scheduler: %s (message: %s)'
+      % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
+    if resp.responseCode == ResponseCode.AUTH_FAILED:
+      MesosCookieHelper.clear_cookie()
+
+  @requires_arguments('role', 'job')
   def do_kill(self, *line):
     """kill role job"""
 

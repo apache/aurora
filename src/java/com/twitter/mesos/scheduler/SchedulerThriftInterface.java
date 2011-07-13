@@ -22,6 +22,7 @@ import com.twitter.mesos.gen.RestartResponse;
 import com.twitter.mesos.gen.RollbackShardsResponse;
 import com.twitter.mesos.gen.ScheduleStatusResponse;
 import com.twitter.mesos.gen.SessionKey;
+import com.twitter.mesos.gen.StartCronResponse;
 import com.twitter.mesos.gen.StartUpdateResponse;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.UpdateResult;
@@ -30,6 +31,7 @@ import com.twitter.mesos.scheduler.SchedulerCore.RestartException;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.mesos.gen.ResponseCode.AUTH_FAILED;
 import static com.twitter.mesos.gen.ResponseCode.INVALID_REQUEST;
 import static com.twitter.mesos.gen.ResponseCode.OK;
@@ -125,25 +127,53 @@ public class SchedulerThriftInterface implements MesosSchedulerManager.Iface {
     return response;
   }
 
-  @Override public StartUpdateResponse startUpdate(JobConfiguration jobConfiguration,
+  @Override
+  public StartCronResponse startCronJob(String jobName, SessionKey session) {
+    checkNotBlank(jobName, "Job name must not be blank.");
+    checkNotNull(session, "Session must be provided.");
+
+    StartCronResponse response = new StartCronResponse();
+    Pair<ResponseCode, String> rc = validateSessionKey(session, session.getOwner().getRole());
+
+    if (rc.getFirst() != OK) {
+      response.setResponseCode(rc.getFirst()).setMessage(rc.getSecond());
+      return response;
+    }
+
+    try {
+      schedulerCore.startCronJob(session.getOwner().getRole(), jobName);
+      response.setResponseCode(OK).setMessage("Cron run started.");
+    } catch (ScheduleException e) {
+      response.setResponseCode(INVALID_REQUEST)
+          .setMessage("Failed to start cron job - " + e.getMessage());
+    }
+
+    return response;
+  }
+
+  @Override
+  public StartUpdateResponse startUpdate(JobConfiguration jobConfiguration,
       SessionKey sessionKey) {
     // TODO(Sathya): Implement.
     return null;
   }
 
-  @Override public UpdateShardsResponse updateShards(String s, String s1, Set<Integer> integers,
+  @Override
+  public UpdateShardsResponse updateShards(String s, String s1, Set<Integer> integers,
       String s2) {
     // TODO(Sathya): Implement.
     return null;
   }
 
-  @Override public RollbackShardsResponse rollbackShards(String s, String s1, Set<Integer> integers,
+  @Override
+  public RollbackShardsResponse rollbackShards(String s, String s1, Set<Integer> integers,
       String s2) {
     // TODO(Sathya): Implement.
     return null;
   }
 
-  @Override public FinishUpdateResponse finishUpdate(String s, String s1, UpdateResult updateResult,
+  @Override
+  public FinishUpdateResponse finishUpdate(String s, String s1, UpdateResult updateResult,
       String s2) {
     // TODO(Sathya): Implement.
     return null;

@@ -14,7 +14,6 @@ import org.apache.mesos.Protos.SlaveOffer;
 
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.gen.AssignedTask;
-import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.ScheduleStatus;
@@ -91,6 +90,15 @@ public interface SchedulerCore extends Function<Query, Iterable<TwitterTaskInfo>
    */
   void createJob(JobConfiguration job) throws ScheduleException,
       ConfigurationManager.TaskDescriptionException;
+
+  /**
+   * Starts a cron job immediately.
+   *
+   * @param role Owner of the job.
+   * @param job Name of the job.
+   * @throws ScheduleException If the specified job does not exist, or is not a cron job.
+   */
+  void startCronJob(String role, String job) throws ScheduleException;
 
   /**
    * Triggers execution of a job.  This should only be called by job managers.

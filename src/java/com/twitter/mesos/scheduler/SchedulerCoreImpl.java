@@ -76,6 +76,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
         }
       });
 
+  private final CronJobManager cronScheduler;
+
   // Schedulers that are responsible for triggering execution of jobs.
   private final ImmutableList<JobManager> jobManagers;
 
@@ -103,9 +105,11 @@ public class SchedulerCoreImpl implements SchedulerCore {
       SchedulingFilter schedulingFilter,
       PulseMonitor<String> executorPulseMonitor) {
 
+
     // The immediate scheduler will accept any job, so it's important that other schedulers are
     // placed first.
     this.jobManagers = ImmutableList.of(cronScheduler, immediateScheduler);
+    this.cronScheduler = cronScheduler;
     this.stateManager = checkNotNull(stateManager);
 
     this.schedulingFilter = checkNotNull(schedulingFilter);
@@ -267,6 +271,19 @@ public class SchedulerCoreImpl implements SchedulerCore {
       LOG.severe("Discarded job: " + populated);
       throw new ScheduleException("Job not accepted, discarding.");
     }
+  }
+
+  @Override public void startCronJob(String role, String job) throws ScheduleException {
+    checkNotBlank(role);
+    checkNotBlank(job);
+    checkStarted();
+
+    String key = Tasks.jobKey(role, job);
+    if (!cronScheduler.hasJob(key)) {
+      throw new ScheduleException("Cron job does not exist for " + key);
+    }
+
+    cronScheduler.startJobNow(key);
   }
 
   @Override

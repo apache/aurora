@@ -209,23 +209,23 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     buildScheduler();
 
     TwitterTaskInfo task = new TwitterTaskInfo().setConfiguration(
-        ImmutableMap.<String, String>builder()
-        .put("start_command", "date")
-        .put("cpus", "1.0")
-        .put("ram_mb", "1024")
-        .build());
+        ImmutableMap.<String, String> builder()
+            .put("start_command", "date")
+            .put("cpus", "1.0")
+            .put("ram_mb", "1024")
+            .build());
 
     JobConfiguration job = makeJob(OWNER_A, JOB_A, task, 1);
     scheduler.createJob(job);
     assertTaskCount(1);
 
     TwitterTaskInfo task2 = new TwitterTaskInfo().setConfiguration(
-        ImmutableMap.<String, String>builder()
-        .put("start_command", "date")
-        .put("hdfs_path", "")
-        .put("cpus", "1.0")
-        .put("ram_mb", "1024")
-        .build());
+        ImmutableMap.<String, String> builder()
+            .put("start_command", "date")
+            .put("hdfs_path", "")
+            .put("cpus", "1.0")
+            .put("ram_mb", "1024")
+            .build());
     JobConfiguration job2 = makeJob(OWNER_A, JOB_B, task2, 1);
     scheduler.createJob(job2);
     assertTaskCount(2);
@@ -304,6 +304,95 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     assertTaskCount(0);
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
+  }
+
+  @Test
+  public void testStartCronJob() throws Exception {
+    // Create a cron job, ask the scheduler to start it, and ensure that the tasks exist
+    // in the PENDING state.
+    control.replay();
+    buildScheduler();
+
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1)
+        .setCronSchedule("1 1 1 1 1"));
+    assertTaskCount(0);
+
+    scheduler.startCronJob(OWNER_A.getRole(), JOB_A);
+    assertThat(getOnlyTask(queryJob(OWNER_A, JOB_A)).task.getStatus(), is(PENDING));
+  }
+
+  @Test(expected = ScheduleException.class)
+  public void testStartNonexistentCronJob() throws Exception {
+    // Try to start a cron job that doesn't exist.
+    control.replay();
+    buildScheduler();
+
+    scheduler.startCronJob(OWNER_A.getRole(), JOB_A);
+  }
+
+  @Test
+  public void testStartNonCronJob() throws Exception {
+    // Create a NON cron job and try to start it as though it were a cron job, and ensure that
+    // no cron tasks are created.
+    control.replay();
+    buildScheduler();
+
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
+    String taskId = Tasks.id(getOnlyTask(queryJob(OWNER_A,JOB_A)).task);
+
+    try {
+      scheduler.startCronJob(OWNER_A.getRole(), JOB_A);
+      fail("Start should have failed.");
+    } catch (ScheduleException e) {
+      // Expected.
+    }
+
+    assertThat(getTask(taskId).task.getStatus(), is(PENDING));
+    assertThat(cron.hasJob(JOB_A_KEY), is(false));
+  }
+
+  @Test(expected = ScheduleException.class)
+  public void testStartNonOwnedCronJob() throws Exception {
+    // Try to start a cron job that is not owned by us.
+    // Should throw an exception.
+    control.replay();
+    buildScheduler();
+
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1)
+        .setCronSchedule("1 1 1 1 1"));
+    assertTaskCount(0);
+
+    scheduler.startCronJob(OWNER_B.getRole(), JOB_A);
+  }
+
+  @Test
+  public void testStartRunningCronJob() throws Exception {
+    // Start a cron job that is already started by an earlier
+    // call and is PENDING. Make sure it follows the cron collision policy.
+    control.replay();
+    buildScheduler();
+
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1)
+        .setCronSchedule("1 1 1 1 1")
+        .setCronCollisionPolicy(CronCollisionPolicy.KILL_EXISTING);
+
+    scheduler.createJob(job);
+    assertTaskCount(0);
+    assertThat(cron.hasJob(JOB_A_KEY), is(true));
+
+    cron.cronTriggered(job);
+    assertTaskCount(1);
+
+    String taskId = Tasks.id(getOnlyTask(queryJob(OWNER_A,JOB_A)).task);
+
+    // Now start the same cron job immediately.
+    scheduler.startCronJob(OWNER_A.getRole(), JOB_A);
+    assertTaskCount(1);
+    assertThat(getOnlyTask(queryJob(OWNER_A, JOB_A)).task.getStatus(), is(PENDING));
+
+    // Make sure the pending job is the new one.
+    String newTaskId = Tasks.id(getOnlyTask(queryJob(OWNER_A,JOB_A)).task);
+    assertThat(taskId == newTaskId, is(false));
   }
 
   @Test(expected = TaskDescriptionException.class)
@@ -607,9 +696,17 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     cron.cronTriggered(job);
     assertTaskCount(10);
 
+    Set<String> taskIds = ImmutableSet.copyOf(Iterables.transform(getTasksOwnedBy(OWNER_A),
+        TaskState.STATE_TO_ID));
+
     // Simulate a triggering of the cron job.
     cron.cronTriggered(job);
     assertTaskCount(10);
+
+    Set<String> newTaskIds = ImmutableSet.copyOf(Iterables.transform(getTasksOwnedBy(OWNER_A),
+        TaskState.STATE_TO_ID));
+
+    assertThat(Sets.intersection(taskIds, newTaskIds).isEmpty(), is(true));
 
     try {
       scheduler.createJob(job);
@@ -789,7 +886,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 2));
 
-
     String taskId1 = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)).task);
     String taskId2 = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 1)).task);
 
@@ -811,7 +907,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.updateRegisteredTasks(update);
 
     // The expected outcome is that one task is rescheduled, and the old task is moved into the
-    // LOST state.  The FINISHED task's state is updated on the scheduler.
+    // LOST state. The FINISHED task's state is updated on the scheduler.
     assertTaskCount(3);
     assertThat(getOnlyTask(Query.byId(taskId1)).task.getStatus(), is(LOST));
     assertThat(getOnlyTask(Query.byId(taskId2)).task.getStatus(), is(FINISHED));
@@ -850,8 +946,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     scheduler.updateRegisteredTasks(new RegisteredTaskUpdate().setSlaveHost(SLAVE_HOST_2)
         .setTaskInfos(Arrays.asList(
-          new LiveTaskInfo().setTaskId(taskIdA).setStatus(FAILED),
-          new LiveTaskInfo().setTaskId(taskIdB).setStatus(RUNNING))));
+            new LiveTaskInfo().setTaskId(taskIdA).setStatus(FAILED),
+            new LiveTaskInfo().setTaskId(taskIdB).setStatus(RUNNING))));
 
     assertThat(getTasksByStatus(RUNNING).size(), is(2));
     assertTaskCount(2);
@@ -1058,9 +1154,15 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private Query query(@Nullable Identity owner, @Nullable String jobName,
       @Nullable Iterable<String> taskIds) {
     TaskQuery query = new TaskQuery();
-    if (owner != null) query.setOwner(owner);
-    if (jobName != null) query.setJobName(jobName);
-    if (taskIds!= null) query.setTaskIds(Sets.newHashSet(taskIds));
+    if (owner != null) {
+      query.setOwner(owner);
+    }
+    if (jobName != null) {
+      query.setJobName(jobName);
+    }
+    if (taskIds != null) {
+      query.setTaskIds(Sets.newHashSet(taskIds));
+    }
 
     return new Query(query);
   }
@@ -1076,14 +1178,14 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private void expectOffer(boolean passFilter) {
     expect(executorPulseMonitor.isAlive((String) anyObject())).andReturn(true);
     expect(schedulingFilter.staticFilter((TwitterTaskInfo) anyObject(), (String) anyObject()))
-        .andReturn(passFilter ? Predicates.<TwitterTaskInfo>alwaysTrue()
-        : Predicates.<TwitterTaskInfo>alwaysFalse());
+        .andReturn(passFilter ? Predicates.<TwitterTaskInfo> alwaysTrue()
+            : Predicates.<TwitterTaskInfo> alwaysFalse());
     @SuppressWarnings("unchecked")
     Function<Query, Iterable<TwitterTaskInfo>> anyTaskFetcher =
         (Function<Query, Iterable<TwitterTaskInfo>>) anyObject();
     expect(schedulingFilter.dynamicHostFilter(
         anyTaskFetcher, (String) anyObject()))
-        .andReturn(passFilter ? Predicates.<TwitterTaskInfo>alwaysTrue()
-            : Predicates.<TwitterTaskInfo>alwaysFalse());
+        .andReturn(passFilter ? Predicates.<TwitterTaskInfo> alwaysTrue()
+            : Predicates.<TwitterTaskInfo> alwaysFalse());
   }
 }
