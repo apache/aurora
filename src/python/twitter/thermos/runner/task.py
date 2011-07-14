@@ -3,8 +3,7 @@ import errno
 import time
 import subprocess
 
-import twitter.common.log
-log = twitter.common.log.get()
+from twitter.common import log
 from twitter.common.recordio import ThriftRecordWriter
 
 from thermos_thrift.ttypes import *

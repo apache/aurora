@@ -1,11 +1,11 @@
+import errno
 import os
 import signal
 import subprocess
 
 import clusters
 
-import twitter.common.log
-log = twitter.common.log.get()
+from twitter.common import log
 
 class TunnelHelper:
   SSH_TUNNEL_LIFETIME_SECS = 60
@@ -52,4 +52,8 @@ class TunnelHelper:
     for pid in pids_to_kill:
       if pid == mypid: continue
       log.debug('Killing pid %s' % pid)
-      os.kill(pid, signal.SIGKILL)
+      try:
+        os.kill(pid, signal.SIGKILL)
+      except OSError, e:
+        if e.errno != errno.ESRCH: # no such process
+          raise

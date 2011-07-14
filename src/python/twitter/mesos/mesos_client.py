@@ -16,10 +16,12 @@ import zookeeper
 import errno
 from optparse import OptionParser
 
-import twitter.common.log
+
+from twitter.common import app
+from twitter.common import options
+from twitter.common import log
 from twitter.common.log.options import LogOptions
 
-from twitter.common import options
 from twitter.mesos.mesos import clusters
 from twitter.mesos.mesos.ldap_helper import LdapHelper
 from twitter.mesos.mesos.location import Location
@@ -39,8 +41,6 @@ except Exception, e:
 __authors__ = ['William Farner',
                'Travis Crawford',
                'Alex Roetter']
-
-log = twitter.common.log.get()
 
 def _die(msg):
   log.fatal(msg)
@@ -472,7 +472,7 @@ class MesosCLI(cmd.Cmd):
       log.info('Response from scheduler: %s (message: %s)'
         % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
 
-def main():
+def initialize_options():
   usage = """Mesos command-line interface.
 
 For more information contact mesos-users@twitter.com, or explore the
@@ -522,7 +522,8 @@ The subcommands and their arguments are:
     action='store_true',
     help="Force reauthentication with Mesos master, replacing cached credentials.")
 
-  (values, args) = options.parse()
+def main(args):
+  values = options.values()
 
   if values.quiet:
     LogOptions.set_stdout_log_level('NONE')
@@ -531,7 +532,6 @@ The subcommands and their arguments are:
       LogOptions.set_stdout_log_level('DEBUG')
     else:
       LogOptions.set_stdout_log_level('INFO')
-  twitter.common.log.init("mesos_client.%s" % getpass.getuser())
 
   if not args:
     options.help()
@@ -544,5 +544,5 @@ The subcommands and their arguments are:
   except AssertionError as e:
     _die('\n%s' % e)
 
-if __name__ == '__main__':
-  main()
+initialize_options()
+app.main()

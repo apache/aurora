@@ -1,15 +1,13 @@
 import collections
 from math import ceil
 from mesos_twitter.ttypes import *
-import twitter.common.log
-from twitter.common import options
+from twitter.common import options, log
 
-options.add('--mesos_updater_status_check_inteval',
+options.add('--mesos_updater_status_check_interval',
   dest='mesos_updater_status_check_interval',
   default=3,
   type='int',
   help='How often Mesos runs update loop...')
-log = twitter.common.log.get()
 
 class InvalidUpdaterConfigException(Exception): pass
 

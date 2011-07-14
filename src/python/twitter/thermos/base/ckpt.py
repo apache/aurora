@@ -1,7 +1,6 @@
 import copy
 
-import twitter.common.log
-log = twitter.common.log.get()
+from twitter.common import log
 from twitter.common.recordio import ThriftRecordReader
 from thermos_thrift.ttypes import *
 

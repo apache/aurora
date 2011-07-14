@@ -4,8 +4,7 @@ import time
 import random
 import socket
 
-import twitter.common.log
-log = twitter.common.log.get()
+from twitter.common import log
 from twitter.common.recordio import ThriftRecordReader, ThriftRecordWriter
 
 from twitter.thermos.base.helper   import Helper

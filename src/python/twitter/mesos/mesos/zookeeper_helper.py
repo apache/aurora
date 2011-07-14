@@ -6,8 +6,7 @@ import clusters
 from location import Location
 from tunnel_helper import TunnelHelper
 
-import twitter.common.log
-log = twitter.common.log.get()
+from twitter.common import log
 
 class ZookeeperHelper:
   ZOOKEEPER_PORT = 2181

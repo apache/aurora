@@ -7,8 +7,7 @@ import pkg_resources
 from wsgiref.simple_server import make_server
 from urlparse import parse_qs
 
-import twitter.common.log
-log = twitter.common.log.get()
+from twitter.common import log
 
 from observer import WorkflowObserver
 

@@ -5,8 +5,7 @@ import json
 import urllib
 import threading
 
-import twitter.common.log
-log = twitter.common.log.get()
+from twitter.common import log
 from twitter.common.recordio import ThriftRecordReader
 
 from detector import WorkflowDetector

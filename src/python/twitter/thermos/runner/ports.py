@@ -4,8 +4,7 @@ import random
 import time
 import errno
 
-import twitter.common.log
-log = twitter.common.log.get()
+from twitter.common import log
 
 class EntityParser:
   PORT_RE = r'%port:(\w+)%'

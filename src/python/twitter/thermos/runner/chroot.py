@@ -1,8 +1,7 @@
 import os
 import shutil
 
-import twitter.common.log
-log = twitter.common.log.get()
+from twitter.common import log
 
 __author__ = 'wickman@twitter.com (brian wickman)'
 __tested__ = False

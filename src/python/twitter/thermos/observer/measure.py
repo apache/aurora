@@ -1,9 +1,7 @@
 import time
 import threading
 
-import twitter.common.log
-log = twitter.common.log.get()
-
+from twitter.common import log
 from twitter.thermos.monitoring.pstree import ProcessSetFactory
 from twitter.thermos.monitoring.sample_vector import SampleVector
 

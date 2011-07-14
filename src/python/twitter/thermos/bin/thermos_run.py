@@ -6,10 +6,7 @@ import time
 import pprint
 import logging
 
-import twitter.common.log
-log = twitter.common.log.get()
-
-from twitter.common import options
+from twitter.common import log, options
 from twitter.common.recordio import ThriftRecordReader
 from twitter.tcl.loader import ThermosJobLoader, MesosJobLoader
 from tcl_thrift.ttypes import ThermosJob
