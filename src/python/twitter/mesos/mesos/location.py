@@ -9,7 +9,7 @@ class Location(object):
   @staticmethod
   def get_location():
     hostname = socket.gethostname()
-    prod_matcher = re.match('^(\w{3})\d.*.twitter\.com$', hostname)
+    prod_matcher = re.match('^(\w{3}).*.twitter\.com$', hostname)
 
     if re.search('.+\.local$', hostname):
       return Location.CORP
