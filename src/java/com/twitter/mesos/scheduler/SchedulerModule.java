@@ -201,7 +201,6 @@ public class SchedulerModule extends AbstractModule {
                 "unzip mesos-updater.zip;"
                 + " java -cp mesos-updater.jar"
                 + " com.twitter.common.application.AppLauncher"
-                + " -arg_scan_packages=com.twitter"
                 + " -app_class=com.twitter.mesos.updater.UpdaterMain"
                 + " -scheduler_address=" + schedulerAddress + " -update_token=" + updateToken);
       }
