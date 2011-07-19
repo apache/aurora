@@ -88,6 +88,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
   private final SchedulingFilter schedulingFilter;
 
   private final PulseMonitor<String> executorPulseMonitor;
+  private final Function<TwitterTaskInfo, TwitterTaskInfo> executorResourceAugmenter;
 
   enum State {
     CONSTRUCTED,
@@ -103,7 +104,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
       ImmediateJobManager immediateScheduler,
       StateManager stateManager,
       SchedulingFilter schedulingFilter,
-      PulseMonitor<String> executorPulseMonitor) {
+      PulseMonitor<String> executorPulseMonitor,
+      Function<TwitterTaskInfo, TwitterTaskInfo> executorResourceAugmenter) {
 
 
     // The immediate scheduler will accept any job, so it's important that other schedulers are
@@ -114,6 +116,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
     this.schedulingFilter = checkNotNull(schedulingFilter);
     this.executorPulseMonitor = checkNotNull(executorPulseMonitor);
+    this.executorResourceAugmenter = checkNotNull(executorResourceAugmenter);
 
    // TODO(John Sirois): Add a method to StateMachine or write a wrapper that allows for a
    // read-locked do-in-state assertion around a block of work.  Transition would then need to grab
@@ -351,23 +354,34 @@ public class SchedulerCoreImpl implements SchedulerCore {
       return null;
     }
 
+    final String hostname = slaveOffer.getHostname();
+    Predicate<TwitterTaskInfo> hostResourcesFilter = schedulingFilter.staticFilter(offer, hostname);
+
     Query query;
     Predicate<TwitterTaskInfo> postFilter;
-    if (!executorPulseMonitor.isAlive(slaveOffer.getHostname())) {
-      LOG.info("Pulse monitor considers executor dead, launching bootstrap task on: "
-          + slaveOffer.getHostname());
-      executorPulseMonitor.pulse(slaveOffer.getHostname());
-      query = Query.byId(
-          Iterables.getOnlyElement(launchTasks(ImmutableSet.of(makeBootstrapTask()))));
+    if (!executorPulseMonitor.isAlive(hostname)) {
+      TwitterTaskInfo bootstrapTask = makeBootstrapTask();
+
+      // Mesos core does not account for the resources the executor itself will use up when it has
+      // not yet started - do that accounting here and fail fast if we can't both run the executor
+      // and the bootstrap task on the given host.
+      if (!hostResourcesFilter.apply(executorResourceAugmenter.apply(bootstrapTask))) {
+        LOG.severe(String.format(
+            "Insufficient resources on host %s to start executor plus a bootstrap task", hostname));
+        return null;
+      }
+
+      LOG.info("Pulse monitor considers executor dead, launching bootstrap task on: " + hostname);
+      executorPulseMonitor.pulse(hostname);
+      query = Query.byId(Iterables.getOnlyElement(launchTasks(ImmutableSet.of(bootstrapTask))));
       postFilter = Predicates.alwaysTrue();
       vars.executorBootstraps.incrementAndGet();
     } else {
       query = Query.and(
           Query.byStatus(PENDING),
-          Predicates.compose(schedulingFilter.staticFilter(offer, slaveOffer.getHostname()),
-              Tasks.SCHEDULED_TO_INFO));
+          Predicates.compose(hostResourcesFilter, Tasks.SCHEDULED_TO_INFO));
       // Perform the (more expensive) check to find tasks matching the dynamic state of the machine.
-      postFilter = schedulingFilter.dynamicHostFilter(this, slaveOffer.getHostname());
+      postFilter = schedulingFilter.dynamicHostFilter(this, hostname);
     }
 
     ImmutableSortedSet<ScheduledTask> candidates = ImmutableSortedSet.copyOf(
@@ -387,7 +401,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
         new Function<ScheduledTask, AssignedTask>() {
           @Override public AssignedTask apply(ScheduledTask task) {
             AssignedTask assigned = task.getAssignedTask();
-            assigned.setSlaveHost(slaveOffer.getHostname());
+            assigned.setSlaveHost(hostname);
             assigned.setSlaveId(slaveOffer.getSlaveId().getValue());
             return assigned;
           }
@@ -399,7 +413,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     }
 
     LOG.info(String.format("Offer on slave %s (id %s) is being assigned task for %s.",
-        slaveOffer.getHostname(), task.getSlaveId(), jobKey(task)));
+        hostname, task.getSlaveId(), jobKey(task)));
 
     List<Resource> resources = ImmutableList.of(
         Resources.makeResource(Resources.CPUS, task.getTask().getNumCpus()),

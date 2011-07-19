@@ -8,6 +8,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
+import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -21,6 +22,7 @@ import org.apache.mesos.Protos.Resource.Scalar;
 import org.apache.mesos.Protos.Resource.Type;
 import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.SlaveOffer;
+import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -101,6 +103,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private SchedulerCoreImpl scheduler;
   private CronJobManager cron;
   private PulseMonitor<String> executorPulseMonitor;
+  private Function<TwitterTaskInfo, TwitterTaskInfo> executorResourceAugmenter;
   private FakeClock clock;
 
   @Before
@@ -108,6 +111,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     schedulingFilter = createMock(SchedulingFilter.class);
     killTask = createMock(new Clazz<Closure<String>>() {});
     executorPulseMonitor = createMock(new Clazz<PulseMonitor<String>>() {});
+    executorResourceAugmenter =
+        createMock(new Clazz<Function<TwitterTaskInfo, TwitterTaskInfo>>() {});
     clock = new FakeClock();
   }
 
@@ -129,7 +134,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     cron = new CronJobManager(storage);
     StateManager stateManager = new StateManager(storage, clock);
     scheduler = new SchedulerCoreImpl(cron, immediateManager, stateManager, schedulingFilter,
-        executorPulseMonitor);
+        executorPulseMonitor, executorResourceAugmenter);
     cron.schedulerCore = scheduler;
     immediateManager.schedulerCore = scheduler;
     scheduler.initialize();
@@ -837,6 +842,28 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     assertThat(scheduler.offer(offer),
         is(SchedulerCoreImpl.makeTwitterTask(task, slave.getValue(), resources)));
+  }
+
+  @Test
+  public void testExecutorBootstrap() throws Exception {
+    expect(executorPulseMonitor.isAlive(SLAVE_HOST_1)).andReturn(false);
+
+    SlaveOffer slaveOffer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 3, 4096);
+    final TwitterTaskInfo offerInfo = ConfigurationManager.makeConcrete(slaveOffer);
+
+    final TwitterTaskInfo augmented = new TwitterTaskInfo().setNumCpus(3.14).setRamMb(1137);
+    expect(executorResourceAugmenter.apply(EasyMock.<TwitterTaskInfo>notNull()))
+        .andReturn(augmented);
+
+    final Predicate<TwitterTaskInfo> staticFilter =
+        createMock(new Clazz<Predicate<TwitterTaskInfo>>() {});
+    expect(staticFilter.apply(augmented)).andReturn(false);
+    expect(schedulingFilter.staticFilter(offerInfo, SLAVE_HOST_1)).andReturn(staticFilter);
+
+    control.replay();
+
+    buildScheduler();
+    assertNull(scheduler.offer(slaveOffer));
   }
 
   @Test

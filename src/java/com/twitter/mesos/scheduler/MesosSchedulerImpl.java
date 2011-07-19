@@ -1,7 +1,5 @@
 package com.twitter.mesos.scheduler;
 
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -12,7 +10,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
 import com.google.protobuf.ByteString;
 
@@ -43,11 +40,6 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.SchedulerMessage;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.twitter.common.base.MorePreconditions.checkNotBlank;
-import static java.lang.annotation.ElementType.FIELD;
-import static java.lang.annotation.ElementType.METHOD;
-import static java.lang.annotation.ElementType.PARAMETER;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Location for communication with the mesos core.
@@ -57,30 +49,21 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 class MesosSchedulerImpl implements Scheduler {
   private static final Logger LOG = Logger.getLogger(MesosSchedulerImpl.class.getName());
 
-  private static final String TWITTER_EXECUTOR_ID = "twitter";
-
   private static final Amount<Long, Time> MAX_REGISTRATION_DELAY = Amount.of(1L, Time.MINUTES);
-
-  /**
-   * Binding annotation for the path to the executor binary.
-   */
-  @BindingAnnotation
-  @Target({FIELD, PARAMETER, METHOD}) @Retention(RUNTIME)
-  public @interface ExecutorPath {}
 
   // Stores scheduler state and handles actual scheduling decisions.
   private final SchedulerCore schedulerCore;
 
   private final ExecutorTracker executorTracker;
   private volatile FrameworkID frameworkID = null;
-  private final String executorPath;
+  private final ExecutorInfo executorInfo;
 
   @Inject
   public MesosSchedulerImpl(SchedulerCore schedulerCore, ExecutorTracker executorTracker,
-      @ExecutorPath String executorPath, final Lifecycle lifecycle) {
+      ExecutorInfo executorInfo, final Lifecycle lifecycle) {
     this.schedulerCore = checkNotNull(schedulerCore);
     this.executorTracker = checkNotNull(executorTracker);
-    this.executorPath = checkNotBlank(executorPath);
+    this.executorInfo = checkNotNull(executorInfo);
 
     // TODO(William Farner): Clean this up.
     Thread registrationChecker = new Thread() {
@@ -114,9 +97,7 @@ class MesosSchedulerImpl implements Scheduler {
 
   @Override
   public ExecutorInfo getExecutorInfo(SchedulerDriver driver) {
-    return ExecutorInfo.newBuilder().setUri(executorPath)
-        .setExecutorId(ExecutorID.newBuilder().setValue(TWITTER_EXECUTOR_ID))
-        .build();
+    return executorInfo;
   }
 
   @Override
@@ -141,7 +122,7 @@ class MesosSchedulerImpl implements Scheduler {
 
         LOG.info("Attempting to send message from scheduler to " + slaveId + " - " + message);
         int result = driver.sendFrameworkMessage(SlaveID.newBuilder().setValue(slaveId).build(),
-            ExecutorID.newBuilder().setValue(TWITTER_EXECUTOR_ID).build(), data);
+            executorInfo.getExecutorId(), data);
         if (result != 0) {
           LOG.severe(String.format("Attempt to send message failed with code %d [%s]",
               result, message));

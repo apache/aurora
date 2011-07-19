@@ -19,6 +19,8 @@ import com.google.inject.TypeLiteral;
 import com.google.inject.name.Names;
 
 import org.apache.mesos.MesosSchedulerDriver;
+import org.apache.mesos.Protos.ExecutorID;
+import org.apache.mesos.Protos.ExecutorInfo;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
@@ -34,6 +36,7 @@ import com.twitter.common.base.Closures;
 import com.twitter.common.inject.TimedInterceptor;
 import com.twitter.common.logging.ScribeLog;
 import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.thrift.ThriftFactory.ThriftFactoryException;
 import com.twitter.common.util.Clock;
@@ -45,7 +48,6 @@ import com.twitter.common.zookeeper.testing.ZooKeeperTestServer;
 import com.twitter.common_internal.cuckoo.CuckooWriter;
 import com.twitter.common_internal.zookeeper.TwitterZk;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.MesosSchedulerImpl.ExecutorPath;
 import com.twitter.mesos.scheduler.PulseMonitor.PulseMonitorImpl;
 import com.twitter.mesos.scheduler.SchedulingFilter.SchedulingFilterImpl;
 import com.twitter.mesos.scheduler.httphandlers.CreateJob;
@@ -124,6 +126,16 @@ public class SchedulerModule extends AbstractModule {
   @CmdLine(name = "cluster_name", help = "Name to identify the cluster being served.")
   private static final Arg<String> CLUSTER_NAME = Arg.create();
 
+  @CmdLine(name = "executor_resources_cpus",
+      help = "The number of CPUS that should be reserved by mesos for the executor.")
+  private static final Arg<Double> CPUS = Arg.create(0.25);
+
+  @CmdLine(name = "executor_resources_ram",
+      help = "The amount of RAM that should be reserved by mesos for the executor.")
+  private static final Arg<Amount<Double, Data>> RAM = Arg.create(Amount.of(2d, Data.GB));
+
+  private static final String TWITTER_EXECUTOR_ID = "twitter";
+
   @Override
   protected void configure() {
     // Enable intercepted method timings
@@ -160,7 +172,6 @@ public class SchedulerModule extends AbstractModule {
     bind(Key.get(new TypeLiteral<Map<String, String>>() {},
         Names.named(SchedulingFilterImpl.MACHINE_RESTRICTIONS)))
         .toInstance(machineRestrictions.get());
-    bind(String.class).annotatedWith(ExecutorPath.class).toInstance(executorPath.get());
     bind(Scheduler.class).to(MesosSchedulerImpl.class).in(Singleton.class);
 
     // Bindings for StateManager
@@ -260,6 +271,30 @@ public class SchedulerModule extends AbstractModule {
       return new CuckooWriter(new ScribeLog(CUCKOO_SCRIBE_ENDPOINTS.get()),
           CUCKOO_SCRIBE_CATEGORY.get(), CUCKOO_SERVICE_ID.get(), CUCKOO_SOURCE_ID.get());
     }
+  }
+
+  @Provides
+  @Singleton
+  ExecutorInfo provideExecutorInfo() {
+    return ExecutorInfo.newBuilder().setUri(executorPath.get())
+        .setExecutorId(ExecutorID.newBuilder().setValue(TWITTER_EXECUTOR_ID))
+        .addResources(Resources.makeResource(Resources.CPUS, CPUS.get()))
+        .addResources(Resources.makeResource(Resources.RAM_MB, RAM.get().as(Data.MB)))
+        .build();
+  }
+
+  @Provides
+  @Singleton
+  Function<TwitterTaskInfo, TwitterTaskInfo> provideExecutorResourceAugmenter() {
+    final Double executorCpus = CPUS.get();
+    final long executorRam = RAM.get().as(Data.MB).longValue();
+    return new Function<TwitterTaskInfo, TwitterTaskInfo>() {
+      @Override public TwitterTaskInfo apply(TwitterTaskInfo task) {
+        return task.deepCopy()
+            .setNumCpus(task.getNumCpus() + executorCpus)
+            .setRamMb(task.getRamMb() + executorRam);
+      }
+    };
   }
 
   private ZooKeeperClient startLocalZookeeper(ActionRegistry shutdownRegistry,
