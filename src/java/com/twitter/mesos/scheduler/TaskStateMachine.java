@@ -11,6 +11,7 @@ import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 
+import org.apache.commons.daemon.Daemon;
 import org.apache.commons.lang.builder.HashCodeBuilder;
 
 import com.twitter.common.base.Closure;
@@ -220,9 +221,12 @@ public class TaskStateMachine {
         ScheduledTask task = taskReader.get();
         addWork(WorkCommand.INCREMENT_FAILURES);
 
+        // Max failures is ignored for daemon task.
+        boolean isDaemon = task.getAssignedTask().getTask().isIsDaemon();
+
         // Max failures is ignored when set to -1.
         int maxFailures = task.getAssignedTask().getTask().getMaxTaskFailures();
-        if ((maxFailures == -1) || (task.getFailureCount() < (maxFailures - 1))) {
+        if (isDaemon || (maxFailures == -1) || (task.getFailureCount() < (maxFailures - 1))) {
           addWork(WorkCommand.RESCHEDULE);
         } else {
           LOG.info("Task " + getTaskId() + " reached failure limit, not rescheduling");
@@ -262,7 +266,7 @@ public class TaskStateMachine {
                     break;
 
                   case KILLED:
-                    rescheduleIfDaemon.execute();
+                    addWork(WorkCommand.RESCHEDULE);
                     break;
 
                   case KILLED_BY_CLIENT:
@@ -305,7 +309,7 @@ public class TaskStateMachine {
                     break;
 
                   case KILLED:
-                    rescheduleIfDaemon.execute();
+                    addWork(WorkCommand.RESCHEDULE);
                     break;
 
                   case KILLED_BY_CLIENT:
@@ -347,7 +351,7 @@ public class TaskStateMachine {
                     break;
 
                   case KILLED:
-                    rescheduleIfDaemon.execute();
+                    addWork(WorkCommand.RESCHEDULE);
                     break;
 
                   case KILLED_BY_CLIENT:

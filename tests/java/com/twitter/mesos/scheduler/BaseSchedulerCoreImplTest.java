@@ -592,6 +592,65 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   }
 
   @Test
+  public void testDaemonTaskIgnoresMaxFailures() throws Exception {
+    control.replay();
+    buildScheduler();
+
+    int maxFailures = 5;
+    int totalFailures = 10;
+
+    // Schedule a daemon task.
+    TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
+    task.putToConfiguration("max_task_failures", String.valueOf(maxFailures));
+    task.putToConfiguration("daemon", "true");
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, task, 1));
+    assertTaskCount(1);
+
+    // Fail the task more than maxFailures.
+    for (int i = 1; i <= totalFailures; i++) {
+      String taskId = TaskState.id(getOnlyTask(Query.activeQuery(OWNER_A, JOB_A)));
+
+      changeStatus(taskId, ASSIGNED);
+      changeStatus(taskId, STARTING);
+      changeStatus(taskId, RUNNING);
+      assertThat(getTask(taskId).task.getFailureCount(), is(i - 1));
+      changeStatus(taskId, FAILED);
+
+      assertTaskCount(i + 1);
+      TaskState rescheduled = getOnlyTask(Query.byStatus(PENDING));
+      assertThat(rescheduled.task.getFailureCount(), is(i));
+    }
+
+    assertThat(getTasksByStatus(FAILED).size(), is(totalFailures));
+    assertThat(getTasksByStatus(PENDING).size(), is(1));
+  }
+
+  @Test
+  public void testTaskRescheduleOnKill() throws Exception {
+    control.replay();
+    buildScheduler();
+
+    // Create 5 non-daemon and 5 daemon tasks.
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 5));
+    TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
+    task.putToConfiguration("daemon", "true");
+    scheduler.createJob(makeJob(OWNER_A, JOB_A + "daemon", task, 5));
+
+    assertThat(getTasksByStatus(PENDING).size(), is(10));
+    changeStatus(queryByOwner(OWNER_A), ASSIGNED);
+    changeStatus(queryByOwner(OWNER_A), STARTING);
+    assertThat(getTasksByStatus(STARTING).size(), is(10));
+    changeStatus(queryByOwner(OWNER_A), RUNNING);
+    assertThat(getTasksByStatus(RUNNING).size(), is(10));
+
+    // All tasks will move back into PENDING state after getting KILLED.
+    changeStatus(queryByOwner(OWNER_A), KILLED);
+    Set<TaskState> newTasks = getTasksByStatus(PENDING);
+    assertThat(newTasks.size(), is(10));
+    assertThat(getTasksByStatus(KILLED).size(), is(10));
+  }
+
+  @Test
   public void testNoTransitionFromTerminalState() throws Exception {
     expectKillTask(1);
 

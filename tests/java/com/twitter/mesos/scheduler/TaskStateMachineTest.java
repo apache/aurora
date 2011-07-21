@@ -121,9 +121,6 @@ public class TaskStateMachineTest extends EasyMockTest {
           break;
 
         case KILLED:
-          expect(taskReader.get()).andReturn(makeTask(false));
-          break;
-
         case LOST:
           expectWork(RESCHEDULE);
           break;
