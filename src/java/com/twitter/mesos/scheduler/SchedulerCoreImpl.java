@@ -211,7 +211,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     stateManager.taskOperation(new StateMutation.Quiet() {
       @Override public void execute(Set<ScheduledTask> tasks, StateChanger changer) {
         // Look for any tasks that we don't know about, or this slave should not be modifying.
-        Set<ScheduledTask> tasksForHost = stateManager.fetchTasks(
+        Set<String> tasksForHost = stateManager.fetchTaskIds(
             new Query(new TaskQuery().setSlaveHost(update.getSlaveHost())));
 
         Set<String> tasksForOtherHosts = stateManager.fetchTaskIds(
@@ -227,13 +227,10 @@ public class SchedulerCoreImpl implements SchedulerCore {
               + " sent an update for task(s) not assigned to it: " + update);
         }
 
-        Map<String, ScheduledTask> tasksForHostById = Maps.uniqueIndex(tasksForHost,
-            Tasks.SCHEDULED_TO_ID);
-
         // We will only take action on tasks that we believe to be running on the host, or tasks
         // that were reported by the slave so long as they are not allocated to a different slave.
         Set<String> tasksToActOn =
-            Sets.union(tasksForHostById.keySet(),
+            Sets.union(tasksForHost,
                 Sets.difference(taskInfoMap.keySet(), tasksForOtherHosts));
         for (String taskId : tasksToActOn) {
           LiveTaskInfo taskUpdate = taskInfoMap.get(taskId);
@@ -571,8 +568,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
       throw new ScheduleException(e);
     }
   }
-  
-  @Override  
+
+  @Override
   public synchronized void preemptTask(AssignedTask task, AssignedTask preemptingTask) {
     checkNotNull(task);
     checkNotNull(preemptingTask);
