@@ -17,6 +17,7 @@ import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.ScheduleStatus;
+import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 
@@ -106,6 +107,60 @@ public interface SchedulerCore extends Function<Query, Iterable<TwitterTaskInfo>
    * @param job Job to run.
    */
   void runJob(JobConfiguration job);
+
+  /**
+   * Registers an update for a job.
+   *
+   * @param job Updated job configuration.
+   * @throws ScheduleException If there was an error in scheduling an update when no active tasks
+   *     are found for a job or an update for the job is already in progress.
+   * @throws ConfigurationManager.TaskDescriptionException If an invalid task description was given.
+   * @return A unique string identifying the update.
+   */
+  String startUpdate(JobConfiguration job)
+      throws ScheduleException, ConfigurationManager.TaskDescriptionException;
+
+  /**
+   * Initiates an update on shards within a job.
+   * Requires that startUpdate was called for the job first.
+   *
+   * @param role The job owner.
+   * @param jobName Job being updated.
+   * @param shards Shards to be updated.
+   * @param updateToken A unique string identifying the update, must be provided from
+   *     {@link #startUpdate(JobConfiguration)}.
+   * @throws ScheduleException If there was an error in updating the state to UPDATING.
+   */
+  void updateShards(String role, String jobName, Set<Integer> shards, String updateToken)
+      throws ScheduleException;
+
+  /**
+   * Initiates a rollback of the specified shards.
+   * Requires that startUpdate was called for the job first.
+   *
+   * @param role The job owner.
+   * @param jobName Name of the job being updated.
+   * @param shards Shards to be updated.
+   * @param updateToken A unique string identifying the update, must be provided from
+   *     {@link #startUpdate(JobConfiguration)}
+   * @throws ScheduleException If there was an error in updating the state to ROLLBACK.
+   */
+  void rollbackShards(String role, String jobName, Set<Integer> shards, String updateToken)
+      throws ScheduleException;
+
+  /**
+   * Completes an update.
+   *
+   * @param role The job owner.
+   * @param jobName Name of the job being updated.
+   * @param updateToken The update token provided from {@link #startUpdate(JobConfiguration)}, or
+   *     {@code null} if the update is being forcibly terminated.
+   * @param result {@code true} if the update was successful, {@code false} otherwise.
+   * @throws ScheduleException If an update for the job does not exist or if the update token is
+   *     invalid.
+   */
+  void finishUpdate(String role, String jobName, @Nullable String updateToken, UpdateResult result)
+      throws ScheduleException;
 
   /**
    * Offers resources to the scheduler.  If the scheduler has a pending task that is satisfied by

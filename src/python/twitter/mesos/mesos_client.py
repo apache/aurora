@@ -429,7 +429,7 @@ class MesosCLI(cmd.Cmd):
   def do_update(self, *line):
     """update job config"""
 
-    (job, owner, tasks, cron_collision_policy, update_config) = self.read_config(*line)
+    (job, owner, tasks, cron_collision_policy) = self.read_config(*line)
 
     MesosCLIHelper.get_cluster(self.options.cluster, job.get('cluster'))
 
@@ -457,17 +457,19 @@ class MesosCLI(cmd.Cmd):
 
     # TODO(William Farner): Cleanly handle connection failures in case the scheduler
     #                       restarts mid-update.
-    updater = Updater(owner.role, job, self._client, time, resp.updateToken)
+    updater = Updater(owner.role, job, self._client, time, resp.updateToken, session)
 
     failed_shards = updater.update(JobConfiguration(job['name'], owner, tasks, job['cron_schedule'],
         cron_collision_policy, job['update_config']))
 
     if failed_shards:
       log.info('Update reverted, failures detected on shards %s' % ','.join(failed_shards))
-      resp = finishUpdate(owner.role, job[name], FAILED, resp.updateToken)
+      resp = self._client.finishUpdate(owner.role, job['name'], UpdateResult.FAILED,
+          resp.updateToken, sessionkey)
     else:
       log.info('Update Successful')
-      resp = finishUpdate(owner.role, job['name'], SUCCESS, updateToken)
+      resp = self._client.finishUpdate(owner.role, job['name'], UpdateResult.SUCCESS,
+          resp.updateToken, sessionkey)
     if resp.responseCode != ResponseCode.OK:
       log.info('Response from scheduler: %s (message: %s)'
         % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))

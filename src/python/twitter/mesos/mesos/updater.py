@@ -14,12 +14,13 @@ class InvalidUpdaterConfigException(Exception): pass
 class Updater(object):
   """Update the shards of a job in batches."""
 
-  def __init__(self, role, job, scheduler, clock, update_token):
+  def __init__(self, role, job, scheduler, clock, update_token, session):
     self._role = role
     self._job = job
     self._scheduler = scheduler
     self._clock = clock
     self._update_token = update_token
+    self._session = session
     self._total_fail_count = 0
     self._max_total_failures = 0
     self._failures_by_shard = collections.defaultdict(int)
@@ -114,7 +115,7 @@ class Updater(object):
       batch_shards = shards_to_rollback[0 : update_config.batchSize]
       shards_to_rollback = [shard for shard in set(shards_to_rollback).difference(batch_shards)]
       resp = self._scheduler.rollbackShards(self._role, self._job['name'], batch_shards,
-          self._update_token)
+          self._update_token, self._session)
       log.info('Response from scheduler: %s (message: %s)'
           % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
       rollback_in_progress = not(shards_to_rollback == [])
@@ -130,7 +131,7 @@ class Updater(object):
     """
     log.info('Restarting shards')
     return self._scheduler.updateShards(self._role, self._job['name'], shard_ids,
-        self._update_token)
+        self._update_token, self._session)
 
   def watch_tasks(self, task_ids, restart_threshold, watch_secs):
     """Monitors the restarted shards.
@@ -157,7 +158,7 @@ class Updater(object):
       query = TaskQuery()
       query.owner = Identity(role = self._role)
       query.jobName = self._job['name']
-      resp = self._scheduler.getTasksStatus(query)
+      resp = self._scheduler.getTasksStatus(query, self._session)
       log.info('Response from scheduler: %s (message: %s)'
           % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
       if resp.tasks:

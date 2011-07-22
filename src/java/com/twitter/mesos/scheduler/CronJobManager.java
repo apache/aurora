@@ -69,10 +69,9 @@ public class CronJobManager extends JobManager {
   @Override
   public void start() {
     storage.doInTransaction(new Work.NoResult.Quiet() {
-      @Override protected void execute(SchedulerStore schedulerStore, JobStore jobStore,
-          TaskStore taskStore) {
+      @Override protected void execute(Storage.StoreProvider storeProvider) {
 
-        for (JobConfiguration job : jobStore.fetchJobs(MANAGER_KEY)) {
+        for (JobConfiguration job : storeProvider.getJobStore().fetchJobs(MANAGER_KEY)) {
           try {
             String scheduledJobKey = scheduleJob(job);
             mapScheduledJob(job, scheduledJobKey);
@@ -169,10 +168,9 @@ public class CronJobManager extends JobManager {
 
     String scheduledJobKey = scheduleJob(job);
     storage.doInTransaction(new Work.NoResult.Quiet() {
-      @Override protected void execute(SchedulerStore schedulerStore, JobStore jobStore,
-          TaskStore taskStore) {
+      @Override protected void execute(Storage.StoreProvider storeProvider) {
 
-        jobStore.saveAcceptedJob(MANAGER_KEY, job);
+        storeProvider.getJobStore().saveAcceptedJob(MANAGER_KEY, job);
       }
     });
     mapScheduledJob(job, scheduledJobKey);
@@ -211,10 +209,9 @@ public class CronJobManager extends JobManager {
   @Override
   public Iterable<JobConfiguration> getJobs() {
     return storage.doInTransaction(new Work.Quiet<Iterable<JobConfiguration>>() {
-      @Override public Iterable<JobConfiguration> apply(SchedulerStore schedulerStore,
-          JobStore jobStore, TaskStore taskStore) throws RuntimeException {
+      @Override public Iterable<JobConfiguration> apply(Storage.StoreProvider storeProvider) {
 
-        return jobStore.fetchJobs(MANAGER_KEY);
+        return storeProvider.getJobStore().fetchJobs(MANAGER_KEY);
       }
     });
   }
@@ -228,10 +225,9 @@ public class CronJobManager extends JobManager {
 
   private JobConfiguration fetchJob(final String jobKey) {
     return storage.doInTransaction(new Work.Quiet<JobConfiguration>() {
-      @Override public JobConfiguration apply(SchedulerStore schedulerStore, JobStore jobStore,
-          TaskStore taskStore) throws RuntimeException {
+      @Override public JobConfiguration apply(Storage.StoreProvider storeProvider) {
 
-        return jobStore.fetchJob(MANAGER_KEY, jobKey);
+        return storeProvider.getJobStore().fetchJob(MANAGER_KEY, jobKey);
       }
     });
   }
@@ -248,10 +244,9 @@ public class CronJobManager extends JobManager {
     if (scheduledJobKey != null) {
       scheduler.deschedule(scheduledJobKey);
       storage.doInTransaction(new Work.NoResult.Quiet() {
-        @Override protected void execute(SchedulerStore schedulerStore, JobStore jobStore,
-            TaskStore taskStore) throws RuntimeException {
+        @Override protected void execute(Storage.StoreProvider storeProvider) {
 
-          jobStore.deleteJob(jobKey);
+          storeProvider.getJobStore().deleteJob(jobKey);
         }
       });
       LOG.info("Successfully deleted cron job " + jobKey);

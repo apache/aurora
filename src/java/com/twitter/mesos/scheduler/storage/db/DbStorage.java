@@ -28,6 +28,8 @@ import com.google.common.collect.Sets;
 import com.google.common.primitives.Ints;
 import com.google.inject.Inject;
 
+import com.twitter.mesos.gen.TaskUpdateConfiguration;
+import com.twitter.mesos.scheduler.storage.UpdateStore;
 import org.apache.commons.lang.StringUtils;
 import org.apache.thrift.TBase;
 import org.apache.thrift.TException;
@@ -73,14 +75,16 @@ import com.twitter.mesos.scheduler.storage.SchedulerStore;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.TaskStore;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.transform;
+import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**
  * A task store that saves data to a database with a JDBC driver.
  *
  * @author John Sirois
  */
-public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
+public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore, UpdateStore {
 
   private static final Logger LOG = Logger.getLogger(DbStorage.class.getName());
 
@@ -105,6 +109,22 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
 
   private boolean initialized;
 
+  private final DbStorage self = this;
+  private final StoreProvider storeProvider = new StoreProvider() {
+    @Override public SchedulerStore getSchedulerStore() {
+      return self;
+    }
+    @Override public JobStore getJobStore() {
+      return self;
+    }
+    @Override public TaskStore getTaskStore() {
+      return self;
+    }
+    @Override public UpdateStore getUpdateStore() {
+      return self;
+    }
+  };
+
   /**
    * @param jdbcTemplate The {@code JdbcTemplate} object to execute database operation against.
    * @param transactionTemplate The {@code TransactionTemplate} object that provides transaction
@@ -114,8 +134,8 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
   @Inject
   public DbStorage(JdbcTemplate jdbcTemplate, TransactionTemplate transactionTemplate,
       @Version int version) {
-    this.jdbcTemplate = Preconditions.checkNotNull(jdbcTemplate);
-    this.transactionTemplate = Preconditions.checkNotNull(transactionTemplate);
+    this.jdbcTemplate = checkNotNull(jdbcTemplate);
+    this.transactionTemplate = checkNotNull(transactionTemplate);
     id = new StorageSystemId(STORAGE_SYSTEM_TYPE, version);
   }
 
@@ -142,15 +162,13 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
 
   @Override
   public void start(final Work.NoResult.Quiet initilizationLogic) {
-    Preconditions.checkNotNull(initilizationLogic);
+    checkNotNull(initilizationLogic);
 
     doInTransaction(new Work.NoResult.Quiet() {
-      @Override protected void execute(SchedulerStore schedulerStore, JobStore jobStore,
-          TaskStore taskStore) {
-
+      @Override protected void execute(StoreProvider storeProvider) {
         ensureInitialized();
 
-        initilizationLogic.apply(schedulerStore, jobStore, taskStore);
+        initilizationLogic.apply(storeProvider);
         LOG.info("Applied initialization logic.");
       }
     });
@@ -163,7 +181,7 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
    */
   @Timed("db_storage_mark_migration")
   public void markMigration(final StorageMigrationResult result) {
-    Preconditions.checkNotNull(result);
+    checkNotNull(result);
 
     updateSchedulerState(ConfiguratonKey.MIGRATION_RESULTS, new StorageMigrationResults(),
         new Closure<StorageMigrationResults>() {
@@ -182,7 +200,7 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
    */
   @Timed("db_storage_has_migrated")
   public boolean hasMigrated(Storage from) {
-    Preconditions.checkNotNull(from);
+    checkNotNull(from);
 
     StorageMigrationResults fetched =
         fetchSchedulerState(ConfiguratonKey.MIGRATION_RESULTS, new StorageMigrationResults());
@@ -197,15 +215,14 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
 
   @Override
   public <T, E extends Exception> T doInTransaction(final Work<T, E> work) throws E {
-    Preconditions.checkNotNull(work);
+    checkNotNull(work);
 
-    final DbStorage self = this;
     return ExceptionTransporter.guard(new Function<ExceptionTransporter<E>, T>() {
       @Override public T apply(final ExceptionTransporter<E> transporter) {
         return transactionTemplate.execute(new TransactionCallback<T>() {
           @Override public T doInTransaction(TransactionStatus transactionStatus) {
             try {
-              return work.apply(self, self, self);
+              return work.apply(storeProvider);
             } catch (Exception e) {
               // We know work throws E by its signature
               @SuppressWarnings("unchecked")
@@ -227,7 +244,7 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
   @Timed("db_storage_save_framework_id")
   @Override
   public void saveFrameworkId(final String frameworkId) {
-    MorePreconditions.checkNotBlank(frameworkId);
+    checkNotBlank(frameworkId);
 
     updateSchedulerState(com.twitter.mesos.gen.ConfiguratonKey.FRAMEWORK_ID,
         new ExceptionalClosure<TProtocol, TException>() {
@@ -318,7 +335,7 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
   @Timed("db_storage_fetch_jobs")
   @Override
   public Iterable<JobConfiguration> fetchJobs(final String managerId) {
-    MorePreconditions.checkNotBlank(managerId);
+    checkNotBlank(managerId);
 
     List<JobConfiguration> fetched =
         transactionTemplate.execute(new TransactionCallback<List<JobConfiguration>>() {
@@ -334,8 +351,8 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
   @Timed("db_storage_fetch_job")
   @Override
   public JobConfiguration fetchJob(final String managerId, final String jobKey) {
-    MorePreconditions.checkNotBlank(managerId);
-    MorePreconditions.checkNotBlank(jobKey);
+    checkNotBlank(managerId);
+    checkNotBlank(jobKey);
 
     return transactionTemplate.execute(new TransactionCallback<JobConfiguration>() {
       @Override public JobConfiguration doInTransaction(TransactionStatus transactionStatus) {
@@ -374,8 +391,8 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
   @Timed("db_storage_save_accepted_job")
   @Override
   public void saveAcceptedJob(final String managerId, final JobConfiguration jobConfig) {
-    MorePreconditions.checkNotBlank(managerId);
-    Preconditions.checkNotNull(jobConfig);
+    checkNotBlank(managerId);
+    checkNotNull(jobConfig);
 
     transactionTemplate.execute(new TransactionCallbackWithoutResult() {
       @Override protected void doInTransactionWithoutResult(TransactionStatus transactionStatus) {
@@ -390,7 +407,7 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
   @Timed("db_storage_delete_job")
   @Override
   public void deleteJob(final String jobKey) {
-    MorePreconditions.checkNotBlank(jobKey);
+    checkNotBlank(jobKey);
 
     transactionTemplate.execute(new TransactionCallbackWithoutResult() {
       @Override protected void doInTransactionWithoutResult(TransactionStatus transactionStatus) {
@@ -402,18 +419,18 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
   @Timed("db_storage_add_tasks")
   @Override
   public void add(final Set<ScheduledTask> newTasks) {
-    Preconditions.checkNotNull(newTasks);
+    checkNotNull(newTasks);
     Preconditions.checkState(
         Sets.newHashSet(transform(newTasks, Tasks.SCHEDULED_TO_ID)).size() == newTasks.size(),
         "Proposed new tasks would create task ID collision.");
 
     // Do a first pass to make sure all of the values are good.
     for (ScheduledTask task : newTasks) {
-      Preconditions.checkNotNull(task.getAssignedTask(), "Assigned task may not be null.");
-      Preconditions.checkNotNull(task.getAssignedTask().getTask(), "Task info may not be null.");
+      checkNotNull(task.getAssignedTask(), "Assigned task may not be null.");
+      checkNotNull(task.getAssignedTask().getTask(), "Task info may not be null.");
     }
 
-    if(!newTasks.isEmpty()) {
+    if (!newTasks.isEmpty()) {
       transactionTemplate.execute(new TransactionCallbackWithoutResult() {
         @Override protected void doInTransactionWithoutResult(TransactionStatus status) {
           insert(newTasks);
@@ -450,7 +467,7 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
   @Timed("db_storage_remove_tasks")
   @Override
   public void remove(final Query query) {
-    Preconditions.checkNotNull(query);
+    checkNotNull(query);
 
     transactionTemplate.execute(new TransactionCallbackWithoutResult() {
       @Override protected void doInTransactionWithoutResult(TransactionStatus status) {
@@ -477,6 +494,139 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
     }
   }
 
+  @Timed("db_storage_add_job_update")
+  @Override
+  public void add(final String jobKey, final String updateToken,
+      final Set<TaskUpdateConfiguration> updateConfiguration) {
+    checkNotNull(jobKey);
+    checkNotNull(updateToken);
+    checkNotNull(updateConfiguration);
+
+    if (!updateConfiguration.isEmpty()) {
+      transactionTemplate.execute(new TransactionCallbackWithoutResult() {
+        @Override protected void doInTransactionWithoutResult(TransactionStatus status) {
+          insertUpdateConfig(jobKey, updateToken, updateConfiguration);
+        }
+      });
+    }
+  }
+
+  private void insertUpdateConfig(final String jobKey, final String updateToken,
+      final Set<TaskUpdateConfiguration> updateConfiguration) {
+    final Iterator<TaskUpdateConfiguration> configIterator = updateConfiguration.iterator();
+    try {
+      jdbcTemplate.batchUpdate("INSERT INTO update_store (job_key, update_token, shard_id, config)"
+          + " VALUES (?, ?, ?, ?)",
+          new BatchPreparedStatementSetter() {
+            @Override public void setValues(PreparedStatement preparedStatement, int batchItemIndex)
+                throws SQLException {
+
+              TaskUpdateConfiguration config = configIterator.next();
+
+              int shardId = config.getNewConfig() != null ? config.getNewConfig().getShardId() :
+                  config.getOldConfig().getShardId();
+
+              setString(preparedStatement, 1, jobKey);
+              setString(preparedStatement, 2, updateToken);
+              setInt(preparedStatement, 3, shardId);
+              setBytes(preparedStatement, 4, config);
+            }
+
+            @Override public int getBatchSize() {
+              return updateConfiguration.size();
+            }
+          });
+    } catch (DataIntegrityViolationException e) {
+        throw new IllegalStateException(e);
+    }
+  }
+
+  @Override
+  @Nullable
+  public ShardUpdateConfiguration fetchShardUpdateConfig(String jobKey, int shardId) {
+    checkNotBlank(jobKey);
+    checkNotNull(shardId);
+
+    return Iterables.getOnlyElement(
+        fetchShardUpdateConfigs(jobKey, ImmutableSet.of(shardId)), null);
+  }
+
+  @Timed("db_storage_fetch_shard_update_configs_by_shard")
+  @Override
+  @Nullable
+  public Set<ShardUpdateConfiguration> fetchShardUpdateConfigs(final String jobKey,
+      final Set<Integer> shardIds) {
+    checkNotBlank(jobKey);
+
+    return transactionTemplate.execute(new TransactionCallback<Set<ShardUpdateConfiguration>>() {
+      @Override public Set<ShardUpdateConfiguration> doInTransaction(
+          TransactionStatus transactionStatus) {
+        return queryShardUpdateConfigs(jobKey, shardIds);
+      }
+    });
+  }
+
+  @Nullable
+  private Set<ShardUpdateConfiguration> queryShardUpdateConfigs(String jobKey,
+      Set<Integer> shardIds) {
+    WhereClauseBuilder whereClauseBuilder = new WhereClauseBuilder()
+        .equals("job_key", Types.VARCHAR, jobKey)
+        .in("shard_id", Types.INTEGER, shardIds);
+
+    StringBuilder sqlBuilder = new StringBuilder("SELECT update_token, config FROM update_store");
+    return ImmutableSet.copyOf(jdbcTemplate.query(
+        whereClauseBuilder.appendWhereClause(sqlBuilder).toString(),
+        whereClauseBuilder.parameters(),
+        whereClauseBuilder.parameterTypes(),
+        SHARD_UPDATE_CONFIG_ROW_MAPPER));
+  }
+
+  private static final RowMapper<ShardUpdateConfiguration> SHARD_UPDATE_CONFIG_ROW_MAPPER =
+      new RowMapper<ShardUpdateConfiguration>() {
+        @Override public ShardUpdateConfiguration mapRow(ResultSet resultSet, int rowIndex)
+            throws SQLException {
+          try {
+            return new ShardUpdateConfiguration(resultSet.getString(1),
+                ThriftBinaryCodec.decode(TaskUpdateConfiguration.class, resultSet.getBytes(2)));
+          } catch (CodingException e) {
+            throw new SQLException("Problem decoding TaskUpdateConfiguration", e);
+          }
+        }
+  };
+
+  @Timed("db_storage_fetch_shard_update_configs_by_job")
+  @Override
+  @Nullable
+  public Set<ShardUpdateConfiguration> fetchShardUpdateConfigs(final String jobKey) {
+    checkNotBlank(jobKey);
+
+    return transactionTemplate.execute(new TransactionCallback<Set<ShardUpdateConfiguration>>() {
+      @Override public Set<ShardUpdateConfiguration> doInTransaction(
+          TransactionStatus transactionStatus) {
+        return queryShardUpdateConfigs(jobKey);
+      }
+    });
+  }
+
+  @Nullable
+  private Set<ShardUpdateConfiguration> queryShardUpdateConfigs(String jobKey) {
+    return ImmutableSet.copyOf(jdbcTemplate.query(
+        "SELECT update_token, config FROM update_store WHERE job_key = ?",
+        SHARD_UPDATE_CONFIG_ROW_MAPPER, jobKey));
+  }
+
+  @Timed("db_storage_remove_job_update")
+  @Override
+  public void remove(final String jobKey) {
+    checkNotBlank(jobKey);
+
+    transactionTemplate.execute(new TransactionCallbackWithoutResult() {
+      @Override protected void doInTransactionWithoutResult(TransactionStatus transactionStatus) {
+        jdbcTemplate.update("DELETE FROM update_store WHERE job_key = ?", jobKey);
+      }
+    });
+  }
+
   private void remove(WhereClauseBuilder whereClauseBuilder) {
     StringBuilder sql = new StringBuilder("DELETE FROM task_state");
     String sqlString = whereClauseBuilder.appendWhereClause(sql).toString();
@@ -494,8 +644,8 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
   public ImmutableSet<ScheduledTask> mutate(final Query query,
       final Closure<ScheduledTask> mutator) {
 
-    Preconditions.checkNotNull(query);
-    Preconditions.checkNotNull(mutator);
+    checkNotNull(query);
+    checkNotNull(mutator);
 
     return transactionTemplate.execute(new TransactionCallback<ImmutableSet<ScheduledTask>>() {
       @Override public ImmutableSet<ScheduledTask> doInTransaction(TransactionStatus status) {
@@ -554,7 +704,7 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
   @Timed("db_storage_fetch_tasks")
   @Override
   public ImmutableSet<ScheduledTask> fetch(final Query query) {
-    Preconditions.checkNotNull(query);
+    checkNotNull(query);
 
     ImmutableSet<ScheduledTask> fetched =
         transactionTemplate.execute(new TransactionCallback<ImmutableSet<ScheduledTask>>() {
@@ -569,7 +719,7 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
   @Timed("db_storage_fetch_task_ids")
   @Override
   public Set<String> fetchIds(final Query query) {
-    Preconditions.checkNotNull(query);
+    checkNotNull(query);
 
     Set<String> fetched = transactionTemplate.execute(new TransactionCallback<Set<String>>() {
       @Override public Set<String> doInTransaction(TransactionStatus status) {
@@ -691,7 +841,7 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
       whereClauseBuilder.equals("job_key", Types.VARCHAR, taskQuery.getJobKey());
     }
 
-    // MapStorage currently has the semantics that null taskIds skips the restiction, but empty
+    // MapStorage currently has the semantics that null taskIds skips the restriction, but empty
     // taskIds applies the always unsatisfiable restriction - we emulate this here by generating the
     // query clause 'where ... task_id in () ...' but the semantics seem confusing - address this.
     if (taskQuery.getTaskIds() != null) {
@@ -753,6 +903,11 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore {
     } else {
       preparedStatement.setString(col, value);
     }
+  }
+
+  private static void setInt(PreparedStatement preparedStatement, int col, int value)
+    throws SQLException {
+    preparedStatement.setInt(col, value);
   }
 
   private static void setBytes(PreparedStatement preparedStatement, int col,

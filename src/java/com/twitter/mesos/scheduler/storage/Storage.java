@@ -9,6 +9,13 @@ import com.twitter.mesos.gen.StorageSystemId;
  */
 public interface Storage {
 
+  interface StoreProvider {
+    SchedulerStore getSchedulerStore();
+    JobStore getJobStore();
+    TaskStore getTaskStore();
+    UpdateStore getUpdateStore();
+  }
+
   /**
    * Encapsulates a storage transaction unit of work.
    *
@@ -21,13 +28,11 @@ public interface Storage {
      * Abstracts a unit of work that should either commit a set of changes to storage as a side
      * effect of successful completion or else commit no changes at all when an exception is thrown.
      *
-     * @param schedulerStore The storage for scheduler data.
-     * @param jobStore The storage for job configuration data.
-     * @param taskStore The storage for task data.
+     * @param storeProvider A provider to give access to different available stores.
      * @return the result of the successfully completed unit of work
      * @throws E if the unit of work could not be completed
      */
-    T apply(SchedulerStore schedulerStore, JobStore jobStore, TaskStore taskStore) throws E;
+    T apply(StoreProvider storeProvider) throws E;
 
     /**
      * A convenient typedef for Work that throws no checked exceptions - it runs quitely.
@@ -46,24 +51,19 @@ public interface Storage {
     abstract class NoResult<E extends Exception> implements Work<Void, E> {
 
       @Override
-      public final Void apply(SchedulerStore schedulerStore, JobStore jobStore,
-          TaskStore taskStore) throws E {
-
-        execute(schedulerStore, jobStore, taskStore);
+      public final Void apply(StoreProvider storeProvider) throws E {
+        execute(storeProvider);
         return null;
       }
 
       /**
-       * Similar to {@link #apply(SchedulerStore, JobStore, TaskStore)} except that no result is
+       * Similar to {@link #apply(StoreProvider)} except that no result is
        * returned.
        *
-       * @param schedulerStore The storage for scheduler data.
-       * @param jobStore The storage for job configuration data.
-       * @param taskStore The storage for task data.
+       * @param storeProvider A provider to give access to different available stores.
        * @throws E if the unit of work could not be completed
        */
-      protected abstract void execute(SchedulerStore schedulerStore, JobStore jobStore,
-          TaskStore taskStore) throws E;
+      protected abstract void execute(StoreProvider storeProvider) throws E;
 
       /**
        * A convenient typedef for Work with no result that throws no checked exceptions - it runs

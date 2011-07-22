@@ -11,6 +11,8 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 
+import java.util.Set;
+
 import static com.google.common.base.Preconditions.checkNotNull;
 import static org.apache.commons.lang.StringUtils.isEmpty;
 
@@ -145,8 +147,12 @@ public class Query {
   }
 
   public static Query liveShard(String jobKey, int shard) {
-    return new Query(new TaskQuery().setJobKey(jobKey).setShardIds(ImmutableSet.of(shard)),
-        Tasks.ACTIVE_FILTER);
+    return liveShards(jobKey, ImmutableSet.of(shard));
+  }
+
+  public static Query liveShards(String jobKey, Set<Integer> shards) {
+    return new Query(new TaskQuery().setJobKey(jobKey).setShardIds(ImmutableSet.copyOf(shards))
+        .setStatuses(Tasks.ACTIVE_STATES));
   }
 
   public static Query byRole(String roleAccount) {

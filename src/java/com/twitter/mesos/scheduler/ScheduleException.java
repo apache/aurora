@@ -13,4 +13,8 @@ public class ScheduleException extends Exception {
   public ScheduleException(String msg, Throwable t) {
     super(msg, t);
   }
+
+  public ScheduleException(Throwable t) {
+    super(t);
+  }
 }

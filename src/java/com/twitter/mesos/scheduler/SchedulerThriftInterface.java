@@ -5,7 +5,6 @@ import java.util.logging.Logger;
 
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
 import com.twitter.common.collections.Pair;
@@ -20,6 +19,7 @@ import com.twitter.mesos.gen.MesosSchedulerManager;
 import com.twitter.mesos.gen.ResponseCode;
 import com.twitter.mesos.gen.RestartResponse;
 import com.twitter.mesos.gen.RollbackShardsResponse;
+import com.twitter.mesos.gen.UpdateResponseCode;
 import com.twitter.mesos.gen.ScheduleStatusResponse;
 import com.twitter.mesos.gen.SessionKey;
 import com.twitter.mesos.gen.StartCronResponse;
@@ -35,7 +35,6 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.mesos.gen.ResponseCode.AUTH_FAILED;
 import static com.twitter.mesos.gen.ResponseCode.INVALID_REQUEST;
 import static com.twitter.mesos.gen.ResponseCode.OK;
-import static com.twitter.mesos.gen.ResponseCode.WARNING;
 
 /**
  * Mesos scheduler thrift server implementation.
@@ -101,8 +100,10 @@ public class SchedulerThriftInterface implements MesosSchedulerManager.Iface {
 
   @Override
   public CreateJobResponse createJob(JobConfiguration job, SessionKey session) {
-    LOG.info("Received createJob request: " + job);
+    checkNotNull(job);
+    checkNotNull(session, "Session must be set.");
 
+    LOG.info("Received createJob request: " + Tasks.jobKey(job));
     CreateJobResponse response = new CreateJobResponse();
 
     Pair<ResponseCode, String> rc = validateSessionKey(session, job.getOwner().getRole());
@@ -151,37 +152,11 @@ public class SchedulerThriftInterface implements MesosSchedulerManager.Iface {
     return response;
   }
 
-  @Override
-  public StartUpdateResponse startUpdate(JobConfiguration jobConfiguration,
-      SessionKey sessionKey) {
-    // TODO(Sathya): Implement.
-    return null;
-  }
-
-  @Override
-  public UpdateShardsResponse updateShards(String s, String s1, Set<Integer> integers,
-      String s2) {
-    // TODO(Sathya): Implement.
-    return null;
-  }
-
-  @Override
-  public RollbackShardsResponse rollbackShards(String s, String s1, Set<Integer> integers,
-      String s2) {
-    // TODO(Sathya): Implement.
-    return null;
-  }
-
-  @Override
-  public FinishUpdateResponse finishUpdate(String s, String s1, UpdateResult updateResult,
-      String s2) {
-    // TODO(Sathya): Implement.
-    return null;
-  }
-
   // TODO(William Farner): Provide status information about cron jobs here.
   @Override
   public ScheduleStatusResponse getTasksStatus(TaskQuery query) {
+    checkNotNull(query);
+
     Set<TaskState> tasks = schedulerCore.getTasks(new Query(query));
 
     ScheduleStatusResponse response = new ScheduleStatusResponse();
@@ -197,6 +172,7 @@ public class SchedulerThriftInterface implements MesosSchedulerManager.Iface {
 
   @Override
   public KillResponse killTasks(TaskQuery query, SessionKey session) {
+    checkNotNull(query);
     checkNotNull(session, "Session must be set.");
 
     LOG.info("Received kill request for tasks: " + query);
@@ -229,8 +205,11 @@ public class SchedulerThriftInterface implements MesosSchedulerManager.Iface {
     return response;
   }
 
+  // TODO(William Farner); This should address a job/shard and not task IDs, and should check to
+  //     ensure that the shards requested exist (reporting failure and ignoring request otherwise).
   @Override
   public RestartResponse restartTasks(Set<String> taskIds, SessionKey session) {
+    checkNotBlank(taskIds, "At least one task ID must be provided.");
     checkNotNull(session, "Session must be set.");
 
     ResponseCode response = OK;
@@ -243,18 +222,98 @@ public class SchedulerThriftInterface implements MesosSchedulerManager.Iface {
       return new RestartResponse(rc.getFirst(), rc.getSecond());
     }
 
-    Set<String> tasksRestarting = null;
     try {
-      schedulerCore.restartTasks(Sets.newHashSet(taskIds));
+      schedulerCore.restartTasks(taskIds);
     } catch (RestartException e) {
       response = INVALID_REQUEST;
       message = e.getMessage();
     }
-    if (!taskIds.equals(tasksRestarting)) {
-      response = WARNING;
-      message = "Unable to restart tasks: " + Sets.difference(taskIds, tasksRestarting);
-    }
 
     return new RestartResponse(response, message);
+  }
+
+  @Override
+  public StartUpdateResponse startUpdate(JobConfiguration job, SessionKey session) {
+    checkNotNull(job);
+    checkNotNull(session, "Session must be set.");
+
+    LOG.info("Received update request for tasks: " + Tasks.jobKey(job));
+    StartUpdateResponse response = new StartUpdateResponse();
+    Pair<ResponseCode, String> rc = validateSessionKey(session, job.getOwner().getRole());
+    if (rc.getFirst() != OK) {
+      return response.setResponseCode(rc.getFirst()).setMessage(rc.getSecond());
+    }
+
+    try {
+      response.setUpdateToken(schedulerCore.startUpdate(job));
+      response.setResponseCode(OK).setMessage("Update successfully started.");
+    } catch (ScheduleException e) {
+      response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
+    } catch (ConfigurationManager.TaskDescriptionException e) {
+      response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
+    }
+
+    return response;
+  }
+
+  @Override
+  public UpdateShardsResponse updateShards(String role, String jobName,
+      Set<Integer> shards, String updateToken, SessionKey session) {
+    checkNotBlank(role, "Role may not be blank.");
+    checkNotBlank(jobName, "Job may not be blank.");
+    checkNotBlank(shards, "At least one shard must be specified.");
+    checkNotBlank(updateToken, "Update token may not be blank.");
+    checkNotNull(session, "Session must be set.");
+
+    UpdateShardsResponse response = new UpdateShardsResponse();
+    try {
+      schedulerCore.updateShards(role, jobName, shards, updateToken);
+      response.setResponseCode(UpdateResponseCode.OK).
+          setMessage("Successful update of shards: " + shards);
+    } catch (ScheduleException e) {
+      response.setResponseCode(UpdateResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
+    }
+
+    return response;
+  }
+
+  @Override
+  public RollbackShardsResponse rollbackShards(String role, String jobName,
+      Set<Integer> shards, String updateToken, SessionKey session) {
+    checkNotBlank(role, "Role may not be blank.");
+    checkNotBlank(jobName, "Job may not be blank.");
+    checkNotBlank(shards, "At least one shard must be specified.");
+    checkNotBlank(updateToken, "Update token may not be blank.");
+    checkNotNull(session, "Session must be set.");
+
+    RollbackShardsResponse response = new RollbackShardsResponse();
+    try {
+      schedulerCore.rollbackShards(role, jobName, shards, updateToken);
+      response.setResponseCode(UpdateResponseCode.OK).
+          setMessage("Successful rollback of shards: " + shards);
+    } catch (ScheduleException e) {
+      response.setResponseCode(UpdateResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
+    }
+
+    return response;
+  }
+
+  @Override
+  public FinishUpdateResponse finishUpdate(String role, String jobName,
+      UpdateResult updateResult, String updateToken, SessionKey session) {
+    checkNotBlank(role, "Role may not be blank.");
+    checkNotBlank(jobName, "Job may not be blank.");
+    checkNotNull(session, "Session must be set.");
+
+    FinishUpdateResponse response = new FinishUpdateResponse();
+    try {
+      schedulerCore.finishUpdate(role, jobName,
+          updateResult == UpdateResult.TERMINATE ? null : updateToken, updateResult);
+      response.setResponseCode(UpdateResponseCode.OK);
+    } catch (ScheduleException e) {
+      response.setResponseCode(UpdateResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
+    }
+
+    return response;
   }
 }

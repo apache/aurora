@@ -26,8 +26,10 @@ import static com.twitter.mesos.gen.ScheduleStatus.LOST;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.PREEMPTING;
 import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
+import static com.twitter.mesos.gen.ScheduleStatus.ROLLBACK;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
+import static com.twitter.mesos.gen.ScheduleStatus.UPDATING;
 
 /**
  * Utility class providing convenience functions relating to tasks.
@@ -75,6 +77,9 @@ public class Tasks {
         }
       };
 
+  public static final Function<ScheduledTask, Integer> SCHEDULED_TO_SHARD_ID =
+      Functions.compose(INFO_TO_SHARD_ID, SCHEDULED_TO_INFO);
+
   public static final Function<TwitterTaskInfo, String> INFO_TO_JOB_KEY =
       new Function<TwitterTaskInfo, String>() {
         @Override public String apply(TwitterTaskInfo info) {
@@ -92,7 +97,7 @@ public class Tasks {
    * Different states that an active task may be in.
    */
   public static final Set<ScheduleStatus> ACTIVE_STATES = EnumSet.of(
-      PENDING, ASSIGNED, STARTING, RUNNING, RESTARTING, PREEMPTING);
+      PENDING, ASSIGNED, STARTING, RUNNING, RESTARTING, UPDATING, ROLLBACK, PREEMPTING);
 
   /**
    * Terminal states, which a task should not move from.

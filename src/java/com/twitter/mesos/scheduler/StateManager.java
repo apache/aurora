@@ -12,12 +12,15 @@ import javax.annotation.Nullable;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicate;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.MapMaker;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
 import com.twitter.common.args.Arg;
@@ -32,23 +35,28 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TaskUpdateConfiguration;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
-import com.twitter.mesos.scheduler.storage.JobStore;
-import com.twitter.mesos.scheduler.storage.SchedulerStore;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
 import com.twitter.mesos.scheduler.storage.Storage.Work.NoResult;
 import com.twitter.mesos.scheduler.storage.StorageRole;
 import com.twitter.mesos.scheduler.storage.StorageRole.Role;
 import com.twitter.mesos.scheduler.storage.TaskStore;
+import com.twitter.mesos.scheduler.storage.UpdateStore;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.transform;
+
+import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.mesos.Tasks.jobKey;
 import static com.twitter.mesos.gen.ScheduleStatus.INIT;
+import static com.twitter.mesos.gen.ScheduleStatus.KILLED_BY_CLIENT;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.UNKNOWN;
+import static com.twitter.mesos.scheduler.storage.UpdateStore.ShardUpdateConfiguration;
 
 /**
  * Manager of all persistence-related operations for the scheduler.  Acts as a controller for
@@ -110,7 +118,12 @@ class StateManager {
   private final Map<String, TaskStateMachine> taskStateMachines = new MapMaker().makeComputingMap(
       new Function<String, TaskStateMachine>() {
         @Override public TaskStateMachine apply(String taskId) {
-          return new TaskStateMachine(taskId, Suppliers.<ScheduledTask>ofInstance(null), workSink,
+          return new TaskStateMachine(taskId,
+              // The task is unknown, so there is no matching task to fetch.
+              Suppliers.<ScheduledTask>ofInstance(null),
+              // Since the task doesn't exist, its job cannot be updating.
+              Suppliers.ofInstance(false),
+              workSink,
               MISSING_TASK_GRACE_PERIOD.get())
               .updateState(UNKNOWN);
         }
@@ -131,7 +144,6 @@ class StateManager {
 
   // Kills the task with the id passed into execute.
   private Closure<String> killTask;
-
   private final Clock clock;
 
   @Inject
@@ -150,17 +162,12 @@ class StateManager {
     managerState.transition(State.INITIALIZED);
 
     storage.start(new Work.NoResult.Quiet() {
-      @Override protected void execute(SchedulerStore schedulerStore, JobStore jobStore,
-          TaskStore taskStore) {
+      @Override protected void execute(Storage.StoreProvider storeProvider) {
 
-        taskStore.mutate(Query.GET_ALL, new Closure<ScheduledTask>() {
+        storeProvider.getTaskStore().mutate(Query.GET_ALL, new Closure<ScheduledTask>() {
           @Override public void execute(ScheduledTask task) {
             ConfigurationManager.applyDefaultsIfUnset(task.getAssignedTask().getTask());
-
-            String taskId = Tasks.id(task);
-            taskStateMachines.put(taskId,
-                new TaskStateMachine(taskId, taskSupplier(taskId),
-                    workSink, MISSING_TASK_GRACE_PERIOD.get(), task.getStatus()));
+            createStateMachine(task, task.getStatus());
           }
         });
       }
@@ -173,9 +180,8 @@ class StateManager {
     managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
 
     return storage.doInTransaction(new Work<String, RuntimeException>() {
-      @Override public String apply(SchedulerStore schedulerStore, JobStore jobStore,
-          TaskStore taskStore) throws RuntimeException {
-        return schedulerStore.fetchFrameworkId();
+      @Override public String apply(Storage.StoreProvider storeProvider) {
+        return storeProvider.getSchedulerStore().fetchFrameworkId();
       }
     });
   }
@@ -191,9 +197,8 @@ class StateManager {
     managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
 
     storage.doInTransaction(new Work.NoResult.Quiet() {
-      @Override protected void execute(SchedulerStore schedulerStore, JobStore jobStore,
-          TaskStore taskStore) {
-        schedulerStore.saveFrameworkId(frameworkId);
+      @Override protected void execute(Storage.StoreProvider storeProvider) {
+        storeProvider.getSchedulerStore().saveFrameworkId(frameworkId);
       }
     });
   }
@@ -231,22 +236,133 @@ class StateManager {
     final Set<ScheduledTask> scheduledTasks = ImmutableSet.copyOf(transform(tasks, taskCreator));
 
     transactionalWork(new Work.NoResult.Quiet() {
-      @Override protected void execute(SchedulerStore schedulerStore, JobStore jobStore,
-          TaskStore taskStore) {
-        taskStore.add(scheduledTasks);
+      @Override protected void execute(Storage.StoreProvider storeProvider) {
+        storeProvider.getTaskStore().add(scheduledTasks);
 
         for (ScheduledTask task : scheduledTasks) {
-          String taskId = Tasks.id(task);
-
-          taskStateMachines.put(taskId,
-              new TaskStateMachine(taskId, taskSupplier(taskId),
-                  workSink, MISSING_TASK_GRACE_PERIOD.get())
-                  .updateState(PENDING));
+          createStateMachine(task).updateState(PENDING);
         }
       }
     });
 
     return ImmutableSet.copyOf(Iterables.transform(scheduledTasks, Tasks.SCHEDULED_TO_ID));
+  }
+
+  static class UpdateException extends Exception {
+    public UpdateException(String msg) {
+      super(msg);
+    }
+    public UpdateException(String msg, Throwable cause) {
+      super(msg, cause);
+    }
+  }
+
+  /**
+   * Registers a new update.
+   *
+   * @param jobKey Key of the job update to update.
+   * @param updatedTasks Updated Task information to be registered.
+   * @throws UpdateException If no active tasks are found for the job, or if an update for the job
+   *     is already in progress.
+   * @return A unique string identifying the update.
+   */
+  String registerUpdate(final String jobKey, final Set<TwitterTaskInfo> updatedTasks)
+      throws UpdateException {
+    checkNotBlank(jobKey);
+    checkNotBlank(updatedTasks);
+
+    return storage.doInTransaction(new Work<String, UpdateException>() {
+      @Override public String apply(Storage.StoreProvider storeProvider) throws UpdateException {
+        TaskStore taskStore = storeProvider.getTaskStore();
+        Set<TwitterTaskInfo> existingTasks =
+            ImmutableSet.copyOf(Iterables.transform(taskStore.fetch(Query.activeQuery(jobKey)),
+                Tasks.SCHEDULED_TO_INFO));
+
+        if (existingTasks.isEmpty()) {
+          throw new UpdateException("No active tasks found for job" + jobKey);
+        }
+
+        UpdateStore updateStore = storeProvider.getUpdateStore();
+        if (updateStore.fetchShardUpdateConfig(jobKey, 0) != null) {
+          throw new UpdateException("Update already in progress for " + jobKey);
+        }
+
+        Map<Integer, TwitterTaskInfo> oldShards = Maps.uniqueIndex(existingTasks,
+            Tasks.INFO_TO_SHARD_ID);
+        Map<Integer, TwitterTaskInfo> newShards = Maps.uniqueIndex(updatedTasks,
+            Tasks.INFO_TO_SHARD_ID);
+
+        ImmutableSet.Builder<TaskUpdateConfiguration> shardConfigBuilder = ImmutableSet.builder();
+        for (int shard : Sets.union(oldShards.keySet(), newShards.keySet())) {
+          shardConfigBuilder.add(
+              new TaskUpdateConfiguration(oldShards.get(shard), newShards.get(shard)));
+        }
+
+        String updateToken = UUID.randomUUID().toString();
+        updateStore.add(jobKey, updateToken, shardConfigBuilder.build());
+        return updateToken;
+      }
+    });
+  }
+
+  /**
+   * Terminates an in-progress update.
+   *
+   * @param jobKey Key of the job update to terminate.
+   * @param updateToken Token associated with the update.  If non-null, the token must match the
+   *     the stored token for the update.
+   * @param result The result of the update.
+   * @throws UpdateException If an update is not in-progress for the job, or the non-null token
+   *     does not match the stored token.
+   */
+  void finishUpdate(final String jobKey, @Nullable final String updateToken,
+      final UpdateResult result) throws UpdateException{
+    checkNotBlank(jobKey);
+
+    storage.doInTransaction(new NoResult<UpdateException>() {
+      @Override protected void execute(Storage.StoreProvider storeProvider) throws UpdateException {
+        UpdateStore updateStore = storeProvider.getUpdateStore();
+
+        // Since we store all shards in a job with the same token, we can just check shard 0,
+        // which is always guaranteed to exist for a job.
+        UpdateStore.ShardUpdateConfiguration updateConfig =
+            updateStore.fetchShardUpdateConfig(jobKey, 0);
+        if (updateConfig == null) {
+          throw new UpdateException("Update does not exist for" + jobKey);
+        }
+
+        if ((updateToken != null) && !updateToken.equals(updateConfig.getUpdateToken())) {
+          throw new UpdateException("Invalid update token for" + jobKey);
+        }
+
+        if (result == UpdateResult.SUCCESS) {
+          for (Integer shard : fetchShardsToKill(jobKey, updateStore)) {
+            changeState(Query.liveShard(jobKey, shard), KILLED_BY_CLIENT);
+          }
+        }
+
+        updateStore.remove(jobKey);
+      }
+    });
+  }
+
+  private static final Predicate<ShardUpdateConfiguration> SELECT_SHARDS_TO_KILL =
+      new Predicate<ShardUpdateConfiguration>() {
+        @Override public boolean apply(ShardUpdateConfiguration config) {
+          return config.getNewConfig() == null;
+        }
+      };
+
+  private final Function<ShardUpdateConfiguration, Integer> GET_ORIGINAL_SHARD_ID =
+    new Function<ShardUpdateConfiguration, Integer>() {
+      @Override public Integer apply(ShardUpdateConfiguration config) {
+        return config.getOldConfig().getShardId();
+      }
+    };
+
+  private Set<Integer> fetchShardsToKill(String jobKey, UpdateStore updateStore) {
+    return ImmutableSet.copyOf(Iterables.transform(Iterables.filter(
+        updateStore.fetchShardUpdateConfigs(jobKey), SELECT_SHARDS_TO_KILL), GET_ORIGINAL_SHARD_ID));
   }
 
   /**
@@ -300,12 +416,9 @@ class StateManager {
     checkNotNull(operation);
 
     transactionalWork(new NoResult<E>() {
-      @Override protected void execute(
-          SchedulerStore schedulerStore,
-          JobStore jobStore,
-          final TaskStore taskStore) throws E {
+      @Override protected void execute(Storage.StoreProvider storeProvider) throws E {
 
-        operation.execute(taskQuery == null ? null : taskStore.fetch(taskQuery),
+        operation.execute(taskQuery == null ? null : storeProvider.getTaskStore().fetch(taskQuery),
             new StateChanger() {
               @Override public void changeState(Set<String> taskIds, ScheduleStatus state,
                   String auditMessage) {
@@ -399,9 +512,8 @@ class StateManager {
     managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
 
     return storage.doInTransaction(new Work.Quiet<Set<ScheduledTask>>() {
-      @Override public Set<ScheduledTask> apply(SchedulerStore schedulerStore, JobStore jobStore,
-          TaskStore taskStore) {
-        return taskStore.fetch(query);
+      @Override public Set<ScheduledTask> apply(Storage.StoreProvider storeProvider) {
+        return storeProvider.getTaskStore().fetch(query);
       }
     });
   }
@@ -418,11 +530,38 @@ class StateManager {
 
     return storage.doInTransaction(new Work.Quiet<Set<String>>() {
       @Override
-      public Set<String> apply(SchedulerStore schedulerStore, JobStore jobStore,
-          TaskStore taskStore) {
-        return taskStore.fetchIds(query);
+      public Set<String> apply(Storage.StoreProvider storeProvider) {
+        return storeProvider.getTaskStore().fetchIds(query);
       }
     });
+  }
+
+  private static final Function<ShardUpdateConfiguration, TwitterTaskInfo> GET_NEW_CONFIG =
+      new Function<ShardUpdateConfiguration, TwitterTaskInfo>() {
+        @Override public TwitterTaskInfo apply(ShardUpdateConfiguration updateConfig) {
+          return updateConfig.getNewConfig();
+        }
+      };
+
+  /**
+   * Fetches the updated configuration of a shard.
+   *
+   * @param jobKey Key of the job to fetch.
+   * @param shards Shards within a job to fetch.
+   * @return The task information of the shard.
+   */
+  Set<TwitterTaskInfo> fetchUpdatedTaskConfigs(final String jobKey, final Set<Integer> shards) {
+    checkNotNull(jobKey);
+    checkNotBlank(shards);
+
+    Set<ShardUpdateConfiguration> configs =
+        storage.doInTransaction(new Work.Quiet<Set<ShardUpdateConfiguration>>() {
+      @Override public Set<ShardUpdateConfiguration> apply(Storage.StoreProvider storeProvider) {
+        return storeProvider.getUpdateStore().fetchShardUpdateConfigs(jobKey, shards);
+      }
+    });
+
+    return ImmutableSet.copyOf(Iterables.transform(configs, GET_NEW_CONFIG));
   }
 
   private <T, E extends Exception> void transactionalWork(final Work<T, E> work) throws E {
@@ -444,12 +583,8 @@ class StateManager {
 
   private void changeState(final Query taskQuery, final Closure<TaskStateMachine> stateChange) {
     transactionalWork(new Work.NoResult.Quiet() {
-      @Override protected void execute(
-          SchedulerStore schedulerStore,
-          JobStore jobStore,
-          TaskStore taskStore) {
-
-        changeStateInTransaction(taskStore.fetchIds(taskQuery), stateChange);
+      @Override protected void execute(Storage.StoreProvider storeProvider) {
+        changeStateInTransaction(storeProvider.getTaskStore().fetchIds(taskQuery), stateChange);
       }
     });
   }
@@ -488,6 +623,19 @@ class StateManager {
     };
   }
 
+  // Supplier that checks if there is an active update for a job.
+  private Supplier<Boolean> taskUpdateChecker(final String jobKey) {
+    return new Supplier<Boolean>() {
+      @Override public Boolean get() {
+        return storage.doInTransaction(new Work.Quiet<Boolean>() {
+          @Override public Boolean apply(Storage.StoreProvider storeProvider) {
+            return storeProvider.getUpdateStore().fetchShardUpdateConfig(jobKey, 0) != null;
+          }
+        });
+      }
+    };
+  }
+
   /**
    * Creates a new task ID that is permanently unique (not guaranteed, but highly confident),
    * and by default sorts in chronological order.
@@ -518,32 +666,36 @@ class StateManager {
         killTask.execute(stateMachine.getTaskId());
       } else {
         storage.doInTransaction(new Work.NoResult.Quiet() {
-          @Override protected void execute(SchedulerStore schedulerStore, JobStore jobStore,
-              final TaskStore taskStore) {
+          @Override protected void execute(Storage.StoreProvider storeProvider) {
+            TaskStore taskStore = storeProvider.getTaskStore();
+            String taskId = stateMachine.getTaskId();
+            Query idQuery = Query.byId(taskId);
 
             switch (work.command) {
               case RESCHEDULE:
-                ScheduledTask task = Iterables.getOnlyElement(
-                    taskStore.fetch(Query.byId(stateMachine.getTaskId()))).deepCopy();
+                ScheduledTask task = Iterables.getOnlyElement(taskStore.fetch(idQuery)).deepCopy();
                 task.getAssignedTask().unsetSlaveId();
                 task.getAssignedTask().unsetSlaveHost();
                 task.unsetTaskEvents();
-                task.setAncestorId(Tasks.id(task));
-                String taskId = generateTaskId(task.getAssignedTask().getTask());
-                task.getAssignedTask().setTaskId(taskId);
+                task.setAncestorId(taskId);
+                String newTaskId = generateTaskId(task.getAssignedTask().getTask());
+                task.getAssignedTask().setTaskId(newTaskId);
 
-                LOG.info("Task being rescheduled: " + stateMachine.getTaskId());
+                LOG.info("Task being rescheduled: " + taskId);
 
                 taskStore.add(ImmutableSet.of(task));
 
-                taskStateMachines.put(taskId,
-                    new TaskStateMachine(taskId, taskSupplier(taskId),
-                        workSink, MISSING_TASK_GRACE_PERIOD.get())
-                        .updateState(PENDING, "Rescheduled"));
+                createStateMachine(task).updateState(PENDING, "Rescheduled");
+                break;
+
+              case UPDATE:
+              case ROLLBACK:
+                maybeRescheduleForUpdate(storeProvider, taskId,
+                    work.command == WorkCommand.ROLLBACK);
                 break;
 
               case UPDATE_STATE:
-                taskStore.mutate(Query.byId(stateMachine.getTaskId()),
+                taskStore.mutate(idQuery,
                     new Closure<ScheduledTask>() {
                       @Override public void execute(ScheduledTask task) {
                         task.setStatus(stateMachine.getState());
@@ -553,11 +705,11 @@ class StateManager {
                 break;
 
               case DELETE:
-                taskStore.remove(ImmutableSet.of(stateMachine.getTaskId()));
+                taskStore.remove(ImmutableSet.of(taskId));
                 break;
 
               case INCREMENT_FAILURES:
-                taskStore.mutate(Query.byId(stateMachine.getTaskId()),
+                taskStore.mutate(idQuery,
                     new Closure<ScheduledTask>() {
                       @Override public void execute(ScheduledTask task) {
                         task.setFailureCount(task.getFailureCount() + 1);
@@ -572,5 +724,58 @@ class StateManager {
         });
       }
     }
+  }
+
+  private void maybeRescheduleForUpdate(Storage.StoreProvider storeProvider, String taskId,
+      boolean rollingBack) {
+    TaskStore taskStore = storeProvider.getTaskStore();
+
+    TwitterTaskInfo oldConfig = Tasks.SCHEDULED_TO_INFO.apply(
+        Iterables.getOnlyElement(taskStore.fetch(Query.byId(taskId))));
+
+    UpdateStore.ShardUpdateConfiguration updateConfig = storeProvider.getUpdateStore()
+        .fetchShardUpdateConfig(Tasks.jobKey(oldConfig), oldConfig.getShardId());
+    Preconditions.checkState(updateConfig != null,
+        "No update configuration found for key "
+        + Tasks.jobKey(oldConfig) + " shard " + oldConfig.getShardId());
+
+    TwitterTaskInfo newConfig =
+        rollingBack ? updateConfig.getOldConfig() : updateConfig.getNewConfig();
+    if (newConfig == null) {
+      // The updated configuration removed the shard, nothing to reschedule.
+      return;
+    }
+
+    ScheduledTask newTask = taskCreator.apply(newConfig).setAncestorId(taskId);
+    taskStore.add(ImmutableSet.of(newTask));
+    createStateMachine(newTask)
+        .updateState(PENDING, "Rescheduled after " + (rollingBack ? "rollback." : "update."));
+  }
+
+  private TaskStateMachine createStateMachine(ScheduledTask task) {
+    return createStateMachine(task, null);
+  }
+
+  private TaskStateMachine createStateMachine(ScheduledTask task,
+      @Nullable ScheduleStatus initialState) {
+    String taskId = Tasks.id(task);
+    TaskStateMachine stateMachine =
+        initialState == null
+            ? new TaskStateMachine(
+                taskId,
+                taskSupplier(taskId),
+                taskUpdateChecker(Tasks.jobKey(task)),
+                workSink,
+                MISSING_TASK_GRACE_PERIOD.get())
+            : new TaskStateMachine(
+                taskId,
+                taskSupplier(taskId),
+                taskUpdateChecker(Tasks.jobKey(task)),
+                workSink,
+                MISSING_TASK_GRACE_PERIOD.get(),
+                initialState)
+        ;
+    taskStateMachines.put(taskId, stateMachine);
+    return stateMachine;
   }
 }

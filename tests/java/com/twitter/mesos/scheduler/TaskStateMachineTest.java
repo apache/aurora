@@ -14,7 +14,6 @@ import com.twitter.common.base.Closure;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.EasyMockTest;
-import com.twitter.common.util.StateMachine;
 import com.twitter.common.util.testing.FakeClock;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduleStatus;
@@ -22,6 +21,7 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.TaskStateMachine.WorkSink;
+
 
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
@@ -32,19 +32,23 @@ import static com.twitter.mesos.gen.ScheduleStatus.KILLED_BY_CLIENT;
 import static com.twitter.mesos.gen.ScheduleStatus.LOST;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
+import static com.twitter.mesos.gen.ScheduleStatus.ROLLBACK;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.UNKNOWN;
+import static com.twitter.mesos.gen.ScheduleStatus.UPDATING;
 import static com.twitter.mesos.scheduler.WorkCommand.DELETE;
 import static com.twitter.mesos.scheduler.WorkCommand.INCREMENT_FAILURES;
 import static com.twitter.mesos.scheduler.WorkCommand.KILL;
 import static com.twitter.mesos.scheduler.WorkCommand.RESCHEDULE;
+import static com.twitter.mesos.scheduler.WorkCommand.UPDATE;
 import static com.twitter.mesos.scheduler.WorkCommand.UPDATE_STATE;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
 
 /**
  * @author William Farner
@@ -56,19 +60,22 @@ public class TaskStateMachineTest extends EasyMockTest {
   private TaskStateMachine stateMachine;
 
   private Supplier<ScheduledTask> taskReader;
+  private Supplier<Boolean> isJobUpdating;
   private WorkSink workSink;
   private FakeClock clock;
 
   @Before
   public void setUp() {
     taskReader = createMock(new Clazz<Supplier<ScheduledTask>>() {});
+    isJobUpdating = createMock(new Clazz<Supplier<Boolean>>() {});
     workSink = createMock(WorkSink.class);
     clock = new FakeClock();
     stateMachine = makeStateMachine("test");
   }
 
   private TaskStateMachine makeStateMachine(String taskId) {
-    return new TaskStateMachine(taskId, taskReader, workSink, MISSING_GRACE_PERIOD, clock, INIT);
+    return new TaskStateMachine(taskId, taskReader, isJobUpdating, workSink, MISSING_GRACE_PERIOD,
+        clock, INIT);
   }
 
   @Test
@@ -144,7 +151,8 @@ public class TaskStateMachineTest extends EasyMockTest {
       control.verify();
       control.reset();
       stateMachine =
-          new TaskStateMachine("test", taskReader, workSink, MISSING_GRACE_PERIOD, clock, INIT);
+          new TaskStateMachine("test", taskReader, isJobUpdating, workSink, MISSING_GRACE_PERIOD,
+              clock, INIT);
     }
 
     control.replay();  // Needed so the teardown verify doesn't break.
@@ -328,6 +336,60 @@ public class TaskStateMachineTest extends EasyMockTest {
         .updateState(STARTING)
         .updateState(RUNNING)
         .updateState(FAILED);
+  }
+
+  @Test
+  public void testUpdate() {
+    expectWork(UPDATE_STATE).times(6);
+    expect(isJobUpdating.get()).andReturn(true);
+    expectWork(UPDATE);
+    expectWork(KILL);
+
+    control.replay();
+
+    stateMachine.updateState(PENDING)
+        .updateState(ASSIGNED)
+        .updateState(STARTING)
+        .updateState(RUNNING)
+        .updateState(UPDATING)
+        .updateState(KILLED);
+  }
+
+  @Test
+  public void testRollback() {
+    expectWork(UPDATE_STATE).times(7);
+    expect(isJobUpdating.get()).andReturn(true);
+    expectWork(WorkCommand.ROLLBACK);
+    expectWork(KILL).times(2);
+
+    control.replay();
+
+    stateMachine.updateState(PENDING)
+        .updateState(ASSIGNED)
+        .updateState(STARTING)
+        .updateState(RUNNING)
+        .updateState(UPDATING)
+        .updateState(ROLLBACK)
+        .updateState(KILLED);
+  }
+
+  @Test
+  public void testIllegalUpdate() {
+    expectWork(UPDATE_STATE).times(4);
+    expect(isJobUpdating.get()).andReturn(false);
+
+    control.replay();
+
+    try {
+      stateMachine.updateState(PENDING)
+        .updateState(ASSIGNED)
+        .updateState(STARTING)
+        .updateState(RUNNING)
+        .updateState(UPDATING);
+      fail("Call should have failed.");
+    } catch (IllegalStateException e) {
+    //Expected
+    }
   }
 
   private IExpectationSetters<Void> expectWork(WorkCommand work) {

@@ -180,9 +180,8 @@ public class DualStoreMigrator implements Migrator {
     }
 
     return to.doInTransaction(new Quiet<StorageMigrationResult>() {
-      @Override public StorageMigrationResult apply(SchedulerStore toSchedulerStore,
-          JobStore toJobStore, TaskStore toTaskStore) {
-        return migrateTo(toSchedulerStore, toJobStore, toTaskStore);
+      @Override public StorageMigrationResult apply(Storage.StoreProvider storeProvider) {
+        return migrateTo(storeProvider);
       }
     });
   }
@@ -191,12 +190,10 @@ public class DualStoreMigrator implements Migrator {
     return VALID_MIGRATION_PATHS.contains(migrationPath);
   }
 
-  private StorageMigrationResult migrateTo(final SchedulerStore toSchedulerStore,
-      final JobStore toJobStore, final TaskStore toTaskStore) {
+  private StorageMigrationResult migrateTo(final Storage.StoreProvider toStoreProvider) {
 
     return from.doInTransaction(new Work.Quiet<StorageMigrationResult>() {
-      @Override public StorageMigrationResult apply(SchedulerStore fromSchedulerStore,
-          JobStore fromJobStore, TaskStore fromTaskStore) {
+      @Override public StorageMigrationResult apply(Storage.StoreProvider fromStoreProvider) {
 
         if (!dataMigrator.prepare()) {
           return new StorageMigrationResult(StorageMigrationStatus.NO_MIGRATION_NEEDED,
@@ -207,14 +204,17 @@ public class DualStoreMigrator implements Migrator {
             new StorageMigrationResult(StorageMigrationStatus.SUCCESS, migrationPath);
 
         SchedulerMigrationResult schedulerResult =
-            migrateSchedulerStore(fromSchedulerStore, toSchedulerStore);
+            migrateSchedulerStore(fromStoreProvider.getSchedulerStore(),
+                toStoreProvider.getSchedulerStore());
         if (schedulerResult == null) {
           LOG.info("From store contained no data: " + from.id());
           return migrationResult;
         }
 
-        migrationResult.setTaskResult(migrateTaskStore(fromTaskStore, toTaskStore))
-            .setJobManagerResult(migrateJobStore(fromJobStore, toJobStore))
+        migrationResult.setTaskResult(migrateTaskStore(fromStoreProvider.getTaskStore(),
+            toStoreProvider.getTaskStore()))
+            .setJobManagerResult(migrateJobStore(fromStoreProvider.getJobStore(),
+                toStoreProvider.getJobStore()))
             .setSchedulerResult(schedulerResult);
 
         dataMigrator.finish(migrationResult);

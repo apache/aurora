@@ -1,11 +1,15 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import javax.annotation.Nullable;
+import javax.print.attribute.IntegerSyntax;
 
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
@@ -15,8 +19,11 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
+import com.twitter.common.base.Closures;
+import com.twitter.mesos.gen.UpdateResult;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.Resource.Scalar;
 import org.apache.mesos.Protos.Resource.Type;
@@ -54,18 +61,25 @@ import com.twitter.mesos.scheduler.storage.TaskStore;
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
+import static com.twitter.mesos.gen.ScheduleStatus.INIT;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED_BY_CLIENT;
 import static com.twitter.mesos.gen.ScheduleStatus.LOST;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
+import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
+import static com.twitter.mesos.gen.ScheduleStatus.ROLLBACK;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
+import static com.twitter.mesos.gen.ScheduleStatus.UNKNOWN;
+import static com.twitter.mesos.gen.ScheduleStatus.UPDATING;
+import static com.twitter.mesos.gen.UpdateResult.SUCCESS;
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /**
@@ -175,8 +189,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     Storage storage = createStorage();
 
     storage.start(new NoResult.Quiet() {
-      @Override protected void execute(SchedulerStore schedulerStore, JobStore jobStore,
-          TaskStore taskStore) {}
+      @Override protected void execute(Storage.StoreProvider storeProvider) {}
     });
 
     final TwitterTaskInfo storedTask = new TwitterTaskInfo()
@@ -189,9 +202,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setAvoidJobs(ImmutableSet.<String>of());
 
     storage.doInTransaction(new NoResult.Quiet() {
-      @Override protected void execute(SchedulerStore schedulerStore, JobStore jobStore,
-          TaskStore taskStore) {
-        taskStore.add(ImmutableSet.of(new ScheduledTask()
+      @Override protected void execute(Storage.StoreProvider storeProvider) {
+        storeProvider.getTaskStore().add(ImmutableSet.of(new ScheduledTask()
             .setStatus(PENDING)
             .setAssignedTask(
                 new AssignedTask()
@@ -1147,6 +1159,435 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     sendOffer(slaveOffer, taskId1b, SLAVE_ID, SLAVE_HOST_1);
   }
 
+  @Test
+  public void testStartAndFinishUpdate() throws Exception {
+    control.replay();
+    buildScheduler();
+
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1);
+    scheduler.createJob(job);
+    String updateToken = scheduler.startUpdate(job);
+    scheduler.finishUpdate(OWNER_A.getRole(), job.getName(), updateToken, SUCCESS);
+
+    // If the finish update succeeded internally, we should be able to start a new update.
+    scheduler.startUpdate(job);
+  }
+
+  @Test
+  public void testFinishUpdateNotFound() throws Exception {
+    control.replay();
+    buildScheduler();
+
+    try {
+      scheduler.finishUpdate("foo", "foo", "foo", SUCCESS);
+      fail("Call should have failed.");
+    } catch (ScheduleException e) {
+      // Expected.
+    }
+
+    try {
+      scheduler.finishUpdate("foo", "foo", null, SUCCESS);
+      fail("Call should have failed.");
+    } catch (ScheduleException e) {
+      // Expected.
+    }
+  }
+
+  @Test
+  public void testFinishUpdateInvalidToken() throws Exception {
+    control.replay();
+    buildScheduler();
+
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1);
+    scheduler.createJob(job);
+    String token = scheduler.startUpdate(job);
+
+    try {
+      scheduler.finishUpdate(OWNER_B.getRole(), job.getName(), "foo", SUCCESS);
+      fail("Finish update should have failed.");
+    } catch (ScheduleException e) {
+      // expected.
+    }
+
+    scheduler.finishUpdate(OWNER_A.getRole(), job.getName(), token, SUCCESS);
+  }
+
+  @Test
+  public void testRejectsSimultaneousUpdates() throws Exception {
+    control.replay();
+    buildScheduler();
+
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1);
+    scheduler.createJob(job);
+    String token = scheduler.startUpdate(job);
+
+    try {
+      scheduler.startUpdate(job);
+      fail("Second update should have failed.");
+    } catch (ScheduleException e) {
+      // expected.
+    }
+
+    scheduler.finishUpdate(OWNER_A.getRole(), JOB_A, token, SUCCESS);
+  }
+
+  private Function<Integer, String> newCommandFactory = new Function<Integer, String>() {
+    @Override public String apply(Integer shardId) {
+      return "updated start command for shard " + shardId;
+    }
+  };
+
+  private Function<Integer, String> oldCommandFactory = new Function<Integer, String>() {
+    @Override public String apply(Integer shardId) {
+      return "start command for shard " + shardId;
+    }
+  };
+
+  private void verifyUpdate(Set<TaskState> tasks, JobConfiguration job,
+      Closure<TaskState> updatedTaskChecker) {
+    Map<Integer, TaskState> fetchedShards = Maps.uniqueIndex(tasks, TaskState.STATE_TO_SHARD_ID);
+    Map<Integer, TwitterTaskInfo> originalConfigsByShard =
+        Maps.uniqueIndex(job.getTaskConfigs(), Tasks.INFO_TO_SHARD_ID);
+    assertThat(fetchedShards.keySet(), is(originalConfigsByShard.keySet()));
+    for (TaskState task : tasks) {
+      updatedTaskChecker.execute(task);
+    }
+  }
+
+  private abstract class UpdaterTest {
+    void runTest(int numTasks, int additionalTasks) throws Exception {
+      control.replay();
+      buildScheduler();
+
+      JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, numTasks);
+      for (TwitterTaskInfo config : job.getTaskConfigs()) {
+        config.putToConfiguration("start_command", oldCommandFactory.apply(config.getShardId()));
+      }
+      scheduler.createJob(job);
+
+      JobConfiguration updatedJob =
+          makeJob(OWNER_A, JOB_A, DEFAULT_TASK, numTasks + additionalTasks);
+      for (TwitterTaskInfo config : updatedJob.getTaskConfigs()) {
+        config.putToConfiguration("start_command", newCommandFactory.apply(config.getShardId()));
+      }
+      String updateToken = scheduler.startUpdate(updatedJob);
+
+      Set<Integer> jobShards = ImmutableSet.copyOf(Iterables.transform(
+          updatedJob.getTaskConfigs(), Tasks.INFO_TO_SHARD_ID));
+
+      UpdateResult result =
+          performRegisteredUpdate(updatedJob, updateToken, jobShards, numTasks, additionalTasks);
+
+      Set<TaskState> tasks = getTasks(Query.byStatus(RUNNING));
+      verify(tasks, job, updatedJob);
+
+      scheduler.finishUpdate(OWNER_A.role, JOB_A, updateToken, result);
+      scheduler.startUpdate(job);
+    }
+
+    abstract UpdateResult performRegisteredUpdate(JobConfiguration job, String updateToken,
+        Set<Integer> jobShards, int numTasks, int additionalTasks) throws Exception;
+
+    abstract void verify(Set<TaskState> tasks, JobConfiguration oldJob,
+        JobConfiguration updatedJob);
+
+  }
+
+  @Test
+  public void testUpdateShards() throws Exception {
+    int numTasks = 10;
+    int additionalTasks = 0;
+    // Kill Tasks called at RUNNING->UPDATING
+    expectKillTask(numTasks);
+
+    new UpdaterTest() {
+      @Override UpdateResult performRegisteredUpdate(JobConfiguration job, String updateToken,
+          Set<Integer> jobShards, int numTasks, int additionalTasks) throws Exception{
+        changeStatus(queryByOwner(OWNER_A), ASSIGNED);
+        changeStatus(queryByOwner(OWNER_A), RUNNING);
+
+        scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken);
+        assertThat(getTasks(Query.byStatus(UPDATING)).size(), is(numTasks));
+
+        changeStatus(queryByOwner(OWNER_A), FINISHED);
+        changeStatus(Query.byStatus(PENDING), ASSIGNED);
+        changeStatus(Query.byStatus(ASSIGNED), RUNNING);
+
+        return SUCCESS;
+      }
+
+      @Override void verify(Set<TaskState> tasks, JobConfiguration oldJob,
+          JobConfiguration updatedJob) {
+        verifyUpdate(tasks, oldJob, new Closure<TaskState>() {
+          @Override public void execute(TaskState state) {
+            TwitterTaskInfo task = TaskState.STATE_TO_INFO.apply(state);
+            assertThat(task.getStartCommand(), is(newCommandFactory.apply(task.getShardId())));
+          }
+        });
+      }
+    }.runTest(numTasks, additionalTasks);
+  }
+
+  @Test
+  public void testRollback() throws Exception {
+    int numTasks = 10;
+    int additionalTasks = 0;
+    // Kill Tasks called at RUNNING->UPDATING.
+    expectKillTask(numTasks);
+
+    new UpdaterTest() {
+      @Override UpdateResult performRegisteredUpdate(JobConfiguration job, String updateToken,
+          Set<Integer> jobShards, int numTasks, int additionalTask) throws Exception{
+        changeStatus(queryByOwner(OWNER_A), ASSIGNED);
+        changeStatus(queryByOwner(OWNER_A), RUNNING);
+
+        scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken);
+        assertThat(getTasks(Query.byStatus(UPDATING)).size(), is(numTasks));
+
+        changeStatus(queryByOwner(OWNER_A), KILLED);
+
+        scheduler.rollbackShards(OWNER_A.role, JOB_A, jobShards, updateToken);
+
+        changeStatus(Query.byStatus(PENDING), ASSIGNED);
+        changeStatus(Query.byStatus(ASSIGNED), RUNNING);
+
+        return UpdateResult.FAILED;
+      }
+
+      @Override void verify(Set<TaskState> tasks, JobConfiguration oldJob,
+          JobConfiguration updatedJob) {
+        verifyUpdate(tasks, oldJob, new Closure<TaskState>() {
+          @Override public void execute(TaskState state) {
+            TwitterTaskInfo task = TaskState.STATE_TO_INFO.apply(state);
+            assertThat(task.getStartCommand(), is(oldCommandFactory.apply(task.getShardId())));
+          }
+        });
+      }
+    }.runTest(numTasks, additionalTasks);
+  }
+
+  @Test
+  public void testInvalidTransition() throws Exception {
+    int numTasks = 10;
+    int additionalTasks = 0;
+    // Kill Tasks called at RUNNING->UPDATING and UPDATING->RUNNING (Invalid).
+    int expectedKillTasks = 20;
+    expectKillTask(expectedKillTasks);
+
+    new UpdaterTest() {
+      @Override UpdateResult performRegisteredUpdate(JobConfiguration job, String updateToken,
+          Set<Integer> jobShards, int numTasks, int additionalTasks) throws Exception{
+        changeStatus(queryByOwner(OWNER_A), ASSIGNED);
+        changeStatus(queryByOwner(OWNER_A), RUNNING);
+
+        scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken);
+        assertThat(getTasks(Query.byStatus(UPDATING)).size(), is(numTasks));
+
+        changeStatus(queryByOwner(OWNER_A), RUNNING);
+        changeStatus(queryByOwner(OWNER_A), KILLED);
+        changeStatus(Query.byStatus(PENDING), ASSIGNED);
+        changeStatus(Query.byStatus(ASSIGNED), RUNNING);
+
+        return SUCCESS;
+      }
+
+      @Override void verify(Set<TaskState> tasks, JobConfiguration oldJob,
+          JobConfiguration updatedJob) {
+        verifyUpdate(tasks, oldJob, new Closure<TaskState>() {
+          @Override public void execute(TaskState state) {
+            TwitterTaskInfo task = TaskState.STATE_TO_INFO.apply(state);
+            assertThat(task.getStartCommand(), is(newCommandFactory.apply(task.getShardId())));
+          }
+        });
+      }
+    }.runTest(numTasks, additionalTasks);
+  }
+
+  @Test
+  public void testPendingToUpdating() throws Exception {
+    int numTasks = 10;
+    int additionalTasks = 0;
+
+    new UpdaterTest() {
+      @Override UpdateResult performRegisteredUpdate(JobConfiguration job, String updateToken,
+          Set<Integer> jobShards, int numTasks, int additionalTasks) throws Exception{
+        scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken);
+        assertThat(getTasks(Query.byStatus(PENDING)).size(), is(numTasks));
+
+        changeStatus(Query.byStatus(PENDING), ASSIGNED);
+        changeStatus(Query.byStatus(ASSIGNED), RUNNING);
+
+        return SUCCESS;
+      }
+
+      @Override void verify(Set<TaskState> tasks, JobConfiguration oldJob,
+          JobConfiguration updatedJob) {
+        verifyUpdate(tasks, oldJob, new Closure<TaskState>() {
+          @Override public void execute(TaskState state) {
+            TwitterTaskInfo task = TaskState.STATE_TO_INFO.apply(state);
+            assertThat(task.getStartCommand(), is(newCommandFactory.apply(task.getShardId())));
+          }
+        });
+      }
+    }.runTest(numTasks, additionalTasks);
+  }
+
+  @Test
+  public void testIncreaseShardsUpdate() throws Exception {
+    int numTasks = 10;
+    int additionalTasks = 10;
+    // Kill Tasks called at RUNNING->UPDATING.
+    expectKillTask(numTasks);
+
+    new UpdaterTest() {
+      @Override UpdateResult performRegisteredUpdate(JobConfiguration job, String updateToken,
+          Set<Integer> jobShards, int numTasks, int additionalTasks) throws Exception{
+        changeStatus(queryByOwner(OWNER_A), ASSIGNED);
+        changeStatus(queryByOwner(OWNER_A), RUNNING);
+
+        scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken);
+
+        changeStatus(Query.byStatus(UPDATING), KILLED);
+
+        assertThat(getTasks(Query.byStatus(PENDING)).size(), is(numTasks + additionalTasks));
+
+        changeStatus(Query.byStatus(PENDING), ASSIGNED);
+        changeStatus(Query.byStatus(ASSIGNED), RUNNING);
+
+        return SUCCESS;
+      }
+
+      @Override void verify(Set<TaskState> tasks, JobConfiguration oldJob,
+          JobConfiguration updatedJob) {
+        verifyUpdate(tasks, updatedJob, new Closure<TaskState>() {
+          @Override public void execute(TaskState state) {
+            TwitterTaskInfo task = TaskState.STATE_TO_INFO.apply(state);
+            assertThat(task.getStartCommand(), is(newCommandFactory.apply(task.getShardId())));
+          }
+        });
+      }
+    }.runTest(numTasks, additionalTasks);
+  }
+
+  @Test
+  public void testDecreaseShardsUpdate() throws Exception {
+    int numTasks = 10;
+    int additionalTasks = -5;
+    // Kill Tasks called at RUNNING->UPDATING.
+    int expectedKillTasks = 5;
+    expectKillTask(expectedKillTasks);
+
+    new UpdaterTest() {
+      @Override UpdateResult performRegisteredUpdate(JobConfiguration job, String updateToken,
+          Set<Integer> jobShards, int numTasks, int additionalTasks) throws Exception{
+        changeStatus(queryByOwner(OWNER_A), ASSIGNED);
+        changeStatus(queryByOwner(OWNER_A), RUNNING);
+
+        scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken);
+
+        changeStatus(queryByOwner(OWNER_A), KILLED);
+
+        assertThat(getTasks(Query.byStatus(PENDING)).size(), is(numTasks + additionalTasks));
+
+        changeStatus(Query.byStatus(PENDING), ASSIGNED);
+        changeStatus(Query.byStatus(ASSIGNED), RUNNING);
+
+        return SUCCESS;
+      }
+
+      @Override void verify(Set<TaskState> tasks, JobConfiguration oldJob,
+          JobConfiguration updatedJob) {
+        verifyUpdate(tasks, updatedJob, new Closure<TaskState>() {
+          @Override public void execute(TaskState state) {
+            TwitterTaskInfo task = TaskState.STATE_TO_INFO.apply(state);
+            assertThat(task.getStartCommand(), is(newCommandFactory.apply(task.getShardId())));
+          }
+        });
+      }
+    }.runTest(numTasks, additionalTasks);
+  }
+
+  @Test
+  public void testIncreaseShardsRollback() throws Exception {
+    int numTasks = 10;
+    int additionalTasks = 10;
+    // Kill Tasks called at RUNNING->UPDATING.
+    expectKillTask(numTasks);
+
+    new UpdaterTest() {
+      @Override UpdateResult performRegisteredUpdate(JobConfiguration job, String updateToken,
+          Set<Integer> jobShards, int numTasks, int additionalTasks) throws Exception{
+        changeStatus(queryByOwner(OWNER_A), ASSIGNED);
+        changeStatus(queryByOwner(OWNER_A), RUNNING);
+
+        scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken);
+
+        changeStatus(Query.byStatus(UPDATING), KILLED);
+
+        assertThat(getTasks(Query.byStatus(PENDING)).size(), is(numTasks + additionalTasks));
+
+        scheduler.rollbackShards(OWNER_A.role, JOB_A, jobShards, updateToken);
+
+        changeStatus(Query.byStatus(PENDING), ASSIGNED);
+        changeStatus(Query.byStatus(ASSIGNED), RUNNING);
+
+        return UpdateResult.FAILED;
+      }
+
+      @Override void verify(Set<TaskState> tasks, JobConfiguration oldJob,
+          JobConfiguration updatedJob) {
+        verifyUpdate(tasks, oldJob, new Closure<TaskState>() {
+          @Override public void execute(TaskState state) {
+            TwitterTaskInfo task = TaskState.STATE_TO_INFO.apply(state);
+            assertThat(task.getStartCommand(), is(oldCommandFactory.apply(task.getShardId())));
+          }
+        });
+      }
+    }.runTest(numTasks, additionalTasks);
+  }
+
+  @Test
+  public void testDecreaseShardsRollback() throws Exception {
+    int numTasks = 10;
+    int additionalTasks = -5;
+    // Kill Tasks called at RUNNING->UPDATING and PENDING->ROLLBACK
+    int expectedKillTasks = 5;
+    expectKillTask(expectedKillTasks);
+
+    new UpdaterTest() {
+      @Override UpdateResult performRegisteredUpdate(JobConfiguration job, String updateToken,
+          Set<Integer> jobShards, int numTasks, int additionalTasks) throws Exception{
+        changeStatus(queryByOwner(OWNER_A), ASSIGNED);
+        changeStatus(queryByOwner(OWNER_A), RUNNING);
+
+        scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken);
+
+        changeStatus(Query.byStatus(UPDATING), KILLED);
+
+        assertThat(getTasks(Query.byStatus(PENDING)).size(), is(numTasks + additionalTasks));
+
+        scheduler.rollbackShards(OWNER_A.role, JOB_A, jobShards, updateToken);
+
+        changeStatus(Query.byStatus(PENDING), ASSIGNED);
+        changeStatus(Query.byStatus(ASSIGNED), RUNNING);
+
+        return UpdateResult.FAILED;
+      }
+
+      @Override void verify(Set<TaskState> tasks, JobConfiguration oldJob,
+          JobConfiguration updatedJob) {
+        verifyUpdate(tasks, oldJob, new Closure<TaskState>() {
+          @Override public void execute(TaskState state) {
+            TwitterTaskInfo task = TaskState.STATE_TO_INFO.apply(state);
+            assertThat(task.getStartCommand(), is(oldCommandFactory.apply(task.getShardId())));
+          }
+        });
+      }
+    }.runTest(numTasks, additionalTasks);
+  }
+
+  // TODO(William Farner): Inject a task ID generation function into StateManager so that we can
+  //     expect specific task IDs to be killed here.
   private void expectKillTask(int numTasks) {
     killTask.execute((String) anyObject());
     expectLastCall().times(numTasks);

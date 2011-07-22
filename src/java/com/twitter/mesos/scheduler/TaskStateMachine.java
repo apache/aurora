@@ -7,6 +7,7 @@ import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -28,6 +29,7 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskEvent;
 
+
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
@@ -39,9 +41,11 @@ import static com.twitter.mesos.gen.ScheduleStatus.LOST;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.PREEMPTING;
 import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
+import static com.twitter.mesos.gen.ScheduleStatus.ROLLBACK;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.UNKNOWN;
+import static com.twitter.mesos.gen.ScheduleStatus.UPDATING;
 
 /**
  * State machine for a mesos task.
@@ -132,7 +136,7 @@ public class TaskStateMachine {
      *
      * @param work Description of the work to be performed.
      * @param stateMachine The state machine that the work is associated with.
-     * @param mutation Mutate operationt to perform along with the state transition.
+     * @param mutation Mutate operation to perform along with the state transition.
      */
     void addWork(WorkCommand work, TaskStateMachine stateMachine, Closure<ScheduledTask> mutation);
   }
@@ -143,18 +147,23 @@ public class TaskStateMachine {
    * @param taskId ID of the task managed by this state machine.
    * @param taskReader Interface to provide read-only access to the task that this state machine
    *     manages.
+   * @param isJobUpdating Supplier to test whether the task's job is currently in a rolling update.
    * @param workSink Work sink to receive transition response actions.
    * @param missingTaskGracePeriod Amount of time to allow a task to be in ASSIGNED state before
    *     considering an {@code UNKNOWN} transition to be a lost task.
    */
-  public TaskStateMachine(String taskId, Supplier<ScheduledTask> taskReader, WorkSink workSink,
+  public TaskStateMachine(String taskId, Supplier<ScheduledTask> taskReader,
+      Supplier<Boolean> isJobUpdating, WorkSink workSink,
       Amount<Long, Time> missingTaskGracePeriod) {
-    this(taskId, taskReader, workSink, missingTaskGracePeriod, Clock.SYSTEM_CLOCK, INIT);
+    this(taskId, taskReader, isJobUpdating, workSink, missingTaskGracePeriod,
+        Clock.SYSTEM_CLOCK, INIT);
   }
 
-  public TaskStateMachine(String taskId, Supplier<ScheduledTask> taskReader, WorkSink workSink,
+  public TaskStateMachine(String taskId, Supplier<ScheduledTask> taskReader,
+      Supplier<Boolean> isJobUpdating, WorkSink workSink,
       Amount<Long, Time> missingTaskGracePeriod, ScheduleStatus initialState) {
-    this(taskId, taskReader, workSink, missingTaskGracePeriod, Clock.SYSTEM_CLOCK, initialState);
+    this(taskId, taskReader, isJobUpdating, workSink, missingTaskGracePeriod,
+        Clock.SYSTEM_CLOCK, initialState);
   }
 
   /**
@@ -163,6 +172,7 @@ public class TaskStateMachine {
    * @param taskId ID of the task managed by this state machine.
    * @param taskReader Interface to provide read-only access to the task that this state machine
    *     manages.
+   * @param isJobUpdating Supplier to test whether the task's job is currently in a rolling update.
    * @param workSink Work sink to receive transition response actions
    * @param missingTaskGracePeriod Amount of time to allow a task to be in ASSIGNED state before
    *     considering an {@code UNKNOWN} transition to be a lost task.
@@ -172,8 +182,9 @@ public class TaskStateMachine {
    *     loaded from a persistent store.
    */
   public TaskStateMachine(
-      String taskId,
+      final String taskId,
       final Supplier<ScheduledTask> taskReader,
+      final Supplier<Boolean> isJobUpdating,
       final WorkSink workSink,
       final Amount<Long, Time> missingTaskGracePeriod,
       final Clock clock,
@@ -234,6 +245,14 @@ public class TaskStateMachine {
       }
     };
 
+    final Command initiateUpdateSequence = new Command() {
+      @Override public void execute() throws IllegalStateException {
+        Preconditions.checkState(isJobUpdating.get(),
+            "No active update found for task " + taskId + ", which is trying to update/rollback.");
+        addWork(WorkCommand.KILL);
+      }
+    };
+
     stateMachine = StateMachine.<State>builder("Task-" + taskId)
         .logTransitions()
         .initialState(State.create(initialState))
@@ -241,10 +260,26 @@ public class TaskStateMachine {
             State.create(INIT),
             State.array(PENDING, UNKNOWN))
         .addState(
-            Closures.filter(Transition.to(State.create(KILLED_BY_CLIENT)),
-                addWorkClosure(WorkCommand.DELETE)),
+            new Closure<Transition<State>>() {
+              @Override public void execute(Transition<State> transition) {
+                switch (transition.getTo().state) {
+                  case KILLED_BY_CLIENT:
+                    addWork(WorkCommand.DELETE);
+                    break;
+
+                  case UPDATING:
+                    addWork(WorkCommand.UPDATE);
+                    addWork(WorkCommand.DELETE);
+                    break;
+
+                  case ROLLBACK:
+                    addWork(WorkCommand.ROLLBACK);
+                    addWork(WorkCommand.DELETE);
+                }
+              }
+            },
             State.create(PENDING),
-            State.array(ASSIGNED, KILLED_BY_CLIENT))
+            State.array(ASSIGNED, UPDATING, ROLLBACK, KILLED_BY_CLIENT))
         .addState(
             new Closure<Transition<State>>() {
               @Override public void execute(Transition<State> transition) {
@@ -263,6 +298,11 @@ public class TaskStateMachine {
 
                   case RESTARTING:
                     addWork(WorkCommand.KILL);
+                    break;
+
+                  case UPDATING:
+                  case ROLLBACK:
+                    initiateUpdateSequence.execute();
                     break;
 
                   case KILLED:
@@ -286,8 +326,8 @@ public class TaskStateMachine {
               }
             },
             State.create(ASSIGNED),
-            State.array(STARTING, RUNNING, FINISHED, FAILED, RESTARTING, PREEMPTING, KILLED,
-                KILLED_BY_CLIENT, LOST))
+            State.array(STARTING, RUNNING, FINISHED, FAILED, RESTARTING, UPDATING, ROLLBACK, KILLED,
+                KILLED_BY_CLIENT, LOST, PREEMPTING))
         .addState(
             new Closure<Transition<State>>() {
               @Override public void execute(Transition<State> transition) {
@@ -300,6 +340,11 @@ public class TaskStateMachine {
                     addWork(WorkCommand.KILL);
                     break;
 
+                  case UPDATING:
+                  case ROLLBACK:
+                    initiateUpdateSequence.execute();
+                    break;
+                  
                   case PREEMPTING:
                     addWork(WorkCommand.KILL);
                     break;
@@ -328,8 +373,8 @@ public class TaskStateMachine {
               }
             },
             State.create(STARTING),
-            State.array(RUNNING, FINISHED, FAILED, RESTARTING, PREEMPTING, KILLED, KILLED_BY_CLIENT,
-                LOST))
+            State.array(RUNNING, FINISHED, FAILED, RESTARTING, UPDATING, KILLED, KILLED_BY_CLIENT,
+                ROLLBACK, LOST, PREEMPTING))
         .addState(
             new Closure<Transition<State>>() {
               @Override public void execute(Transition<State> transition) {
@@ -344,6 +389,11 @@ public class TaskStateMachine {
 
                   case RESTARTING:
                     addWork(WorkCommand.KILL);
+                    break;
+
+                  case UPDATING:
+                  case ROLLBACK:
+                    initiateUpdateSequence.execute();
                     break;
 
                   case FAILED:
@@ -365,7 +415,8 @@ public class TaskStateMachine {
               }
             },
             State.create(RUNNING),
-            State.array(FINISHED, RESTARTING, PREEMPTING, FAILED, KILLED, KILLED_BY_CLIENT, LOST))
+            State.array(FINISHED, RESTARTING, UPDATING, FAILED, KILLED, KILLED_BY_CLIENT, ROLLBACK,
+                LOST, PREEMPTING))
         .addState(
             manageTerminatedTasks,
             State.create(FINISHED),
@@ -393,6 +444,14 @@ public class TaskStateMachine {
             manageRestartingTask,
             State.create(RESTARTING),
             State.array(KILLED, UNKNOWN))
+        .addState(
+            manageUpdatingTask(false),
+            State.create(UPDATING),
+            State.array(ROLLBACK, FINISHED, FAILED, KILLED, KILLED_BY_CLIENT, LOST, UNKNOWN))
+        .addState(
+            manageUpdatingTask(true),
+            State.create(ROLLBACK),
+            State.array(FINISHED, FAILED, KILLED, KILLED_BY_CLIENT, LOST))
         .addState(
             manageTerminatedTasks,
             State.create(FAILED),
@@ -445,6 +504,28 @@ public class TaskStateMachine {
       long lastEventAgeMillis = clock.nowMillis() - Iterables.getLast(taskEvents).getTimestamp();
       return lastEventAgeMillis > missingTaskGracePeriod.as(Time.MILLISECONDS);
     }
+  }
+
+  private Closure<Transition<State>> manageUpdatingTask(final boolean rollback) {
+    return new Closure<Transition<State>>() {
+      @Override public void execute(Transition<State> transition) {
+        switch (transition.getTo().state) {
+          case ASSIGNED:
+          case STARTING:
+          case KILLED_BY_CLIENT:
+          case ROLLBACK:
+          case RUNNING:
+            addWork(WorkCommand.KILL);
+            break;
+          case FINISHED:
+          case FAILED:
+          case KILLED:
+          case LOST:
+          case UNKNOWN:
+            addWork(rollback ? WorkCommand.ROLLBACK : WorkCommand.UPDATE);
+        }
+      }
+    };
   }
 
   private Closure<Transition<State>> addWorkClosure(final WorkCommand work) {

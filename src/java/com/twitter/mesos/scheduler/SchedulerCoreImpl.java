@@ -23,6 +23,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
+import com.twitter.mesos.gen.UpdateResult;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.SlaveOffer;
 
@@ -49,6 +50,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.transform;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
+import static com.twitter.mesos.Tasks.SCHEDULED_TO_SHARD_ID;
 import static com.twitter.mesos.Tasks.jobKey;
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED_BY_CLIENT;
@@ -407,7 +409,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
           }
         });
 
-    // There were no PENDING candidates
+    // There were no PENDING candidates.
     if (task == null) {
       return null;
     }
@@ -504,6 +506,73 @@ public class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
+  public synchronized String startUpdate(JobConfiguration job)
+      throws ScheduleException, ConfigurationManager.TaskDescriptionException {
+    checkStarted();
+
+    JobConfiguration populated = ConfigurationManager.validateAndPopulate(job);
+    try {
+      return stateManager.registerUpdate(Tasks.jobKey(job), populated.getTaskConfigs());
+    } catch (StateManager.UpdateException e) {
+      LOG.log(Level.INFO, "Failed to start update.", e);
+      throw new ScheduleException(e);
+    }
+  }
+
+  @Override
+  public synchronized void updateShards(String role, String jobName, Set<Integer> shards,
+      String updateToken) throws ScheduleException {
+    checkStarted();
+
+    String jobKey = Tasks.jobKey(role, jobName);
+    Set<ScheduledTask> tasks =
+       stateManager.fetchTasks(Query.liveShards(jobKey, shards));
+
+    // Extract any shard IDs that are being added as a part of this stage in the update.
+    Set<Integer> newShardIds = Sets.difference(shards,
+        ImmutableSet.copyOf(Iterables.transform(tasks, SCHEDULED_TO_SHARD_ID)));
+
+    if (!newShardIds.isEmpty()) {
+      Set<TwitterTaskInfo> newTasks = stateManager.fetchUpdatedTaskConfigs(jobKey, newShardIds);
+      Set<Integer> unrecognizedShards = Sets.difference(newShardIds,
+          ImmutableSet.copyOf(Iterables.transform(newTasks, Tasks.INFO_TO_SHARD_ID)));
+      if (!unrecognizedShards.isEmpty()) {
+        throw new ScheduleException("Cannot update unrecognized shards " + unrecognizedShards);
+      }
+
+      // Create new tasks, so they will be moved into the PENDING state.
+      stateManager.insertTasks(newTasks);
+    }
+
+    // Initiate update on the existing shards.
+    stateManager.changeState(Query.liveShards(jobKey, Sets.difference(shards, newShardIds)),
+        ScheduleStatus.UPDATING);
+  }
+
+  @Override
+  public synchronized void rollbackShards(String role, String jobName, Set<Integer> shards,
+      String updateToken) throws ScheduleException {
+    checkStarted();
+
+    stateManager.changeState(Query.liveShards(Tasks.jobKey(role, jobName), shards),
+        ScheduleStatus.ROLLBACK);
+  }
+
+  @Override
+  public synchronized void finishUpdate(String role, String jobName, @Nullable String updateToken,
+      UpdateResult result) throws ScheduleException {
+    checkStarted();
+
+    String jobKey = Tasks.jobKey(role, jobName);
+    try {
+      stateManager.finishUpdate(jobKey, updateToken, result);
+    } catch (StateManager.UpdateException e) {
+      LOG.log(Level.INFO, "Failed to finish update.", e);
+      throw new ScheduleException(e);
+    }
+  }
+  
+  @Override  
   public synchronized void preemptTask(AssignedTask task, AssignedTask preemptingTask) {
     checkNotNull(task);
     checkNotNull(preemptingTask);

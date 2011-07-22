@@ -5,17 +5,15 @@ import java.sql.SQLException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 
-import org.junit.Test;
-
-import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.storage.BaseTaskStoreTest;
-import com.twitter.mesos.scheduler.storage.JobStore;
-import com.twitter.mesos.scheduler.storage.SchedulerStore;
+import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
-import com.twitter.mesos.scheduler.storage.TaskStore;
+import com.twitter.mesos.Tasks;
+
+import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
@@ -30,8 +28,7 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
   protected DbStorage createTaskStore() throws SQLException {
     DbStorage dbStorage = DbStorageTestUtil.setupStorage(this);
     dbStorage.start(new Work.NoResult.Quiet() {
-      @Override protected void execute(SchedulerStore schedulerStore, JobStore jobStore,
-          TaskStore taskStore) throws RuntimeException {
+      @Override protected void execute(Storage.StoreProvider storeProvider) {
         // noop
       }
     });
