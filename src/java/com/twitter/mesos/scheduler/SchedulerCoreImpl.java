@@ -23,7 +23,6 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
-import com.twitter.mesos.gen.UpdateResult;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.SlaveOffer;
 
@@ -42,6 +41,7 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.scheduler.StateManager.StateChanger;
 import com.twitter.mesos.scheduler.StateManager.StateMutation;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
@@ -275,7 +275,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
     }
   }
 
-  @Override public void startCronJob(String role, String job) throws ScheduleException {
+  @Override
+  public synchronized void startCronJob(String role, String job) throws ScheduleException {
     checkNotBlank(role);
     checkNotBlank(job);
     checkStarted();
@@ -331,8 +332,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
     return new TwitterTaskInfo()
         .setOwner(new Identity("mesos", "mesos"))
         .setJobName("executor_bootstrap")
-        .setNumCpus(1)
-        .setRamMb(512)
+        .setNumCpus(0.25)
+        .setRamMb(1)
         .setShardId(0)
         .setStartCommand("echo \"Bootstrapping\"");
   }
@@ -602,7 +603,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
       for (final ScheduleStatus status : ScheduleStatus.values()) {
         Stats.export(new StatImpl<Integer>("task_store_" + status) {
           @Override public Integer read() {
-            return stateManager.fetchTasks(Query.byStatus(status)).size();
+            return stateManager.fetchTaskIds(Query.byStatus(status)).size();
           }
         });
       }

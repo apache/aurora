@@ -17,15 +17,13 @@ import org.apache.commons.lang.StringUtils;
 
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
-import com.twitter.mesos.gen.CreateJobResponse;
 import com.twitter.mesos.gen.CronCollisionPolicy;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
-import com.twitter.mesos.gen.ResponseCode;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.ScheduleException;
-import com.twitter.mesos.scheduler.SchedulerCoreImpl;
+import com.twitter.mesos.scheduler.SchedulerCore;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -40,12 +38,11 @@ public class CreateJob extends StringTemplateServlet {
 
   private static final Logger LOG = Logger.getLogger(CreateJob.class.getName());
 
-  private final SchedulerCoreImpl scheduler;
+  private final SchedulerCore scheduler;
   private final String clusterName;
 
   @Inject
-  CreateJob(@CacheTemplates boolean cacheTemplates,
-      SchedulerCoreImpl scheduler,
+  CreateJob(@CacheTemplates boolean cacheTemplates, SchedulerCore scheduler,
       @ClusterName String clusterName) {
     super("create_job", cacheTemplates);
     this.clusterName = checkNotBlank(clusterName);

@@ -29,6 +29,8 @@ import com.twitter.common.base.Closure;
 import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.common.stats.StatImpl;
+import com.twitter.common.stats.Stats;
 import com.twitter.common.util.Clock;
 import com.twitter.common.util.StateMachine;
 import com.twitter.mesos.Tasks;
@@ -49,7 +51,6 @@ import com.twitter.mesos.scheduler.storage.UpdateStore;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.transform;
-
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.mesos.Tasks.jobKey;
 import static com.twitter.mesos.gen.ScheduleStatus.INIT;
@@ -150,6 +151,12 @@ class StateManager {
   StateManager(@StorageRole(Role.Primary) Storage storage, Clock clock) {
     this.clock = checkNotNull(clock);
     this.storage = checkNotNull(storage);
+
+    Stats.export(new StatImpl<Integer>("work_queue_depth") {
+      @Override public Integer read() {
+        return workQueue.size();
+      }
+    });
   }
 
   /**
@@ -362,7 +369,8 @@ class StateManager {
 
   private Set<Integer> fetchShardsToKill(String jobKey, UpdateStore updateStore) {
     return ImmutableSet.copyOf(Iterables.transform(Iterables.filter(
-        updateStore.fetchShardUpdateConfigs(jobKey), SELECT_SHARDS_TO_KILL), GET_ORIGINAL_SHARD_ID));
+        updateStore.fetchShardUpdateConfigs(jobKey), SELECT_SHARDS_TO_KILL),
+        GET_ORIGINAL_SHARD_ID));
   }
 
   /**
