@@ -47,7 +47,7 @@ class FakeScheduler:
     """
     self._status_calls.append(statuses)
 
-  def updateShards(self, role, job, shard_ids, update_token):
+  def updateShards(self, role, job, shard_ids, update_token, session):
     """Check input paramters with expected paramters queued by expect_restart_tasks.
 
     Arguments:
@@ -78,7 +78,7 @@ class FakeScheduler:
     """
     self._restart_calls.append((role, job, shard_ids))
 
-  def rollbackShards(self, role, job, shard_ids, update_token):
+  def rollbackShards(self, role, job, shard_ids, update_token, session):
     """Check input paramters with expected paramters queued by expect_rollback_tasks.
 
     Arguments:

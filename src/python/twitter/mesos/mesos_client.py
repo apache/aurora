@@ -308,9 +308,15 @@ class MesosCLI(cmd.Cmd):
       taskCopy.shardId = i
       tasks.append(taskCopy)
 
+    update_config_dict = job['update_config']
+    update_config = UpdateConfig(update_config_dict['batchSize'],
+        update_config_dict['restartThreshold'], update_config_dict['watchSecs'],
+        update_config_dict['maxPerShardFailures'], update_config_dict['maxTotalFailures'])
+
     cron_collision_policy = None
     if 'cron_collision_policy' in job: cron_collision_policy = job['cron_collision_policy']
-    return job, query.owner, tasks, MesosCLI.get_cron_collision_value(cron_collision_policy)
+    return (job, query.owner, tasks, MesosCLI.get_cron_collision_value(cron_collision_policy),
+        update_config)
 
   def acquire_session(self, owner):
     return MesosCLIHelper.acquire_session_key_or_die(owner,
@@ -320,7 +326,7 @@ class MesosCLI(cmd.Cmd):
   @requires_arguments('job', 'config')
   def do_create(self, *line):
     """create job config"""
-    (job, owner, tasks, cron_collision_policy) = self.read_config(*line)
+    (job, owner, tasks, cron_collision_policy, _) = self.read_config(*line)
 
     MesosCLIHelper.get_cluster(self.options.cluster, job.get('cluster'))
 
@@ -429,7 +435,7 @@ class MesosCLI(cmd.Cmd):
   def do_update(self, *line):
     """update job config"""
 
-    (job, owner, tasks, cron_collision_policy) = self.read_config(*line)
+    (job, owner, tasks, cron_collision_policy, update_config) = self.read_config(*line)
 
     MesosCLIHelper.get_cluster(self.options.cluster, job.get('cluster'))
 
@@ -449,7 +455,7 @@ class MesosCLI(cmd.Cmd):
       JobConfiguration(job['name'], owner, tasks, job['cron_schedule'], cron_collision_policy),
           sessionkey)
     if resp.responseCode != ResponseCode.OK:
-      log.warn('Response from scheduler: %s (message: %s)'
+      log.warning('Response from scheduler: %s (message: %s)'
         % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
     if resp.responseCode == ResponseCode.AUTH_FAILED:
       MesosCookieHelper.clear_cookie()
@@ -457,10 +463,10 @@ class MesosCLI(cmd.Cmd):
 
     # TODO(William Farner): Cleanly handle connection failures in case the scheduler
     #                       restarts mid-update.
-    updater = Updater(owner.role, job, self._client, time, resp.updateToken, session)
+    updater = Updater(owner.role, job, self._client, time, resp.updateToken, sessionkey)
 
     failed_shards = updater.update(JobConfiguration(job['name'], owner, tasks, job['cron_schedule'],
-        cron_collision_policy, job['update_config']))
+        cron_collision_policy, update_config))
 
     if failed_shards:
       log.info('Update reverted, failures detected on shards %s' % ','.join(failed_shards))

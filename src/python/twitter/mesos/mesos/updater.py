@@ -158,7 +158,7 @@ class Updater(object):
       query = TaskQuery()
       query.owner = Identity(role = self._role)
       query.jobName = self._job['name']
-      resp = self._scheduler.getTasksStatus(query, self._session)
+      resp = self._scheduler.getTasksStatus(query)
       log.info('Response from scheduler: %s (message: %s)'
           % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
       if resp.tasks:
