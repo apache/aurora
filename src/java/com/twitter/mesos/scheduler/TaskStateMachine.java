@@ -12,7 +12,6 @@ import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 
-import org.apache.commons.daemon.Daemon;
 import org.apache.commons.lang.builder.HashCodeBuilder;
 
 import com.twitter.common.base.Closure;

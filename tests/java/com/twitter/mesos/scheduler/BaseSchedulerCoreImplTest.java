@@ -1474,7 +1474,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     int numTasks = 10;
     int additionalTasks = -5;
     // Kill Tasks called at RUNNING->UPDATING.
-    int expectedKillTasks = 5;
+    int expectedKillTasks = 10;
     expectKillTask(expectedKillTasks);
 
     new UpdaterTest() {
@@ -1485,12 +1485,14 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
         scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken);
 
-        changeStatus(queryByOwner(OWNER_A), KILLED);
+        changeStatus(Query.byStatus(UPDATING), KILLED);
 
         assertThat(getTasks(Query.byStatus(PENDING)).size(), is(numTasks + additionalTasks));
 
+        changeStatus(Query.byStatus(RUNNING), KILLED_BY_CLIENT);
         changeStatus(Query.byStatus(PENDING), ASSIGNED);
         changeStatus(Query.byStatus(ASSIGNED), RUNNING);
+
 
         return SUCCESS;
       }
