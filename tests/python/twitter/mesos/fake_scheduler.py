@@ -31,7 +31,7 @@ class FakeScheduler:
 
     Returns a map of the current status of the shards.
     """
-    assert self._status_calls, 'Unexpected call to get_statuses(%s)' % task_ids
+    assert self._status_calls, 'Unexpected call to get_statuses(%s)' % query.jobName
     statuses = self._status_calls.popleft()
     response = ScheduleStatusResponse(responseCode = ResponseCode.OK, message = 'test', tasks = [])
     for shard in statuses:

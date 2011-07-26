@@ -26,7 +26,7 @@ class Updater(object):
     self._failures_by_shard = collections.defaultdict(int)
 
   @staticmethod
-  def validate_config(update_config, shard_count):
+  def validate_config(update_config):
     """Perform sanity test on update_config."""
     if update_config.batchSize < 1:
       raise InvalidUpdaterConfigException('Batch size should be greater than 0')
@@ -34,8 +34,6 @@ class Updater(object):
       raise InvalidUpdaterConfigException('Restart Threshold should be greater than 0')
     if update_config.watchSecs < 1:
       raise InvalidUpdaterConfigException('Watch seconds should be greater than 0')
-    if update_config.batchSize > shard_count:
-      raise InvalidUpdaterConfigException('Batch size is greater than the total shards present')
 
   def exceeded_total_fail_count(self, failed_shards):
     """Checks if the total number of failures is greater than a threshold."""
@@ -80,7 +78,7 @@ class Updater(object):
     for config in job_config.taskConfigs:
       initial_shards += [config.shardId]
     initial_shards.sort()
-    Updater.validate_config(update_config, len(initial_shards))
+    Updater.validate_config(update_config)
     remaining_shards = initial_shards
     update_in_progress = True
     while update_in_progress:
@@ -88,7 +86,7 @@ class Updater(object):
       remaining_shards = [shard for shard in set(remaining_shards).difference(batch_shards)]
       resp = self.restart_shards(batch_shards, update_config)
       log.info('Response from scheduler: %s (message: %s)'
-          % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
+          % (UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
       failed_shards = self.watch_tasks(batch_shards, update_config.restartThreshold,
           update_config.watchSecs)
       log.info('Failed_tasks : %s' % failed_shards)
@@ -116,8 +114,9 @@ class Updater(object):
       shards_to_rollback = [shard for shard in set(shards_to_rollback).difference(batch_shards)]
       resp = self._scheduler.rollbackShards(self._role, self._job['name'], batch_shards,
           self._update_token, self._session)
+      self.watch_tasks(batch_shards, update_config.restartThreshold, update_config.watchSecs)
       log.info('Response from scheduler: %s (message: %s)'
-          % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
+          % (UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
       rollback_in_progress = not(shards_to_rollback == [])
 
   def restart_shards(self, shard_ids, update_config):
@@ -146,7 +145,8 @@ class Updater(object):
     1. Failed to move to RUNNING state before restart_threshold from the time of restart.
     2. Failed to stay in the RUNNING state before watch_secs expire.
     """
-    ACTIVE_STATES = set([ScheduleStatus.PENDING, ScheduleStatus.STARTING, ScheduleStatus.RUNNING])
+    ACTIVE_STATES = set([ScheduleStatus.PENDING, ScheduleStatus.STARTING, ScheduleStatus.RUNNING,
+        ScheduleStatus.UPDATING, ScheduleStatus.ROLLBACK])
     start_time = self._clock.time()
     expected_running_by = start_time + restart_threshold
     statuses = {}

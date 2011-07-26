@@ -87,6 +87,8 @@ class UpdaterTest(unittest.TestCase):
     self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS,
         {0: ScheduleStatus.STARTING, 1: ScheduleStatus.STARTING, 2: ScheduleStatus.STARTING})
     self.expect_rollback([0, 1, 2])
+    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS,
+        {0: ScheduleStatus.RUNNING, 1: ScheduleStatus.RUNNING, 2: ScheduleStatus.RUNNING})
     shards_expected = [0, 1, 2]
     shards_returned = self._updater.update(self._job_config)
     assert shards_expected == shards_returned, ('Expected shards (%s) : Returned shards (%s)' %
@@ -106,8 +108,14 @@ class UpdaterTest(unittest.TestCase):
     self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS,
         {0: ScheduleStatus.STARTING, 5: ScheduleStatus.RUNNING, 6: ScheduleStatus.RUNNING})
     self.expect_rollback([0, 1, 2])
+    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS,
+        {0: ScheduleStatus.RUNNING, 1: ScheduleStatus.RUNNING, 2: ScheduleStatus.RUNNING})
     self.expect_rollback([3, 4, 5])
+    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS,
+        {3: ScheduleStatus.RUNNING, 4: ScheduleStatus.RUNNING, 5: ScheduleStatus.RUNNING})
     self.expect_rollback([6])
+    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS,
+        {6: ScheduleStatus.RUNNING})
     shards_expected = [0]
     shards_returned = self._updater.update(self._job_config)
     assert shards_expected == shards_returned, ('Expected shards (%s) : Returned shards (%s)' %
@@ -151,6 +159,8 @@ class UpdaterTest(unittest.TestCase):
     self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS_IN_UNKNOWN_STATE,
         {0: ScheduleStatus.FINISHED, 1: ScheduleStatus.FINISHED, 2: ScheduleStatus.FINISHED})
     self.expect_rollback([0, 1, 2])
+    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS,
+        {0: ScheduleStatus.RUNNING, 1: ScheduleStatus.RUNNING, 2: ScheduleStatus.RUNNING})
     shards_expected = [0, 1, 2]
     shards_returned = self._updater.update(self._job_config)
     assert shards_expected == shards_returned, ('Expected shards (%s) : Returned shards (%s)' %

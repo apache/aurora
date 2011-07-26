@@ -454,11 +454,12 @@ class MesosCLI(cmd.Cmd):
     resp = self._client.startUpdate(
       JobConfiguration(job['name'], owner, tasks, job['cron_schedule'], cron_collision_policy),
           sessionkey)
-    if resp.responseCode != ResponseCode.OK:
-      log.warning('Response from scheduler: %s (message: %s)'
-        % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
     if resp.responseCode == ResponseCode.AUTH_FAILED:
       MesosCookieHelper.clear_cookie()
+
+    if resp.responseCode != ResponseCode.OK:
+      log.warning('Response from scheduler: %s (message: %s)'
+          % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
       return
 
     # TODO(William Farner): Cleanly handle connection failures in case the scheduler
@@ -469,16 +470,16 @@ class MesosCLI(cmd.Cmd):
         cron_collision_policy, update_config))
 
     if failed_shards:
-      log.info('Update reverted, failures detected on shards %s' % ','.join(failed_shards))
+      log.info('Update reverted, failures detected on shards %s' % failed_shards)
       resp = self._client.finishUpdate(owner.role, job['name'], UpdateResult.FAILED,
           resp.updateToken, sessionkey)
     else:
       log.info('Update Successful')
       resp = self._client.finishUpdate(owner.role, job['name'], UpdateResult.SUCCESS,
           resp.updateToken, sessionkey)
-    if resp.responseCode != ResponseCode.OK:
+    if resp.responseCode != UpdateResponseCode.OK:
       log.info('Response from scheduler: %s (message: %s)'
-        % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
+        % (UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
 
 def initialize_options():
   usage = """Mesos command-line interface.
