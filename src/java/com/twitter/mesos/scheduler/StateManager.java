@@ -743,9 +743,15 @@ class StateManager {
 
     UpdateStore.ShardUpdateConfiguration updateConfig = storeProvider.getUpdateStore()
         .fetchShardUpdateConfig(Tasks.jobKey(oldConfig), oldConfig.getShardId());
-    Preconditions.checkState(updateConfig != null,
-        "No update configuration found for key "
-        + Tasks.jobKey(oldConfig) + " shard " + oldConfig.getShardId());
+
+    // TODO(Sathya): Figure out a way to handle race condition when finish update is called
+    //     before ROLLBACK
+
+    if (updateConfig == null) {
+      LOG.warning("No update configuration found for key " + Tasks.jobKey(oldConfig)
+          + " shard " + oldConfig.getShardId() + " : Assuming update has finished.");
+      return;
+    }
 
     TwitterTaskInfo newConfig =
         rollingBack ? updateConfig.getOldConfig() : updateConfig.getNewConfig();
