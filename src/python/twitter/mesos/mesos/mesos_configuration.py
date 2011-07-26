@@ -1,20 +1,33 @@
-#!/usr/bin/env python2.6
-
+import os
 import sys
 
-class MesosConfiguration:
+class MesosConfiguration(object):
   def __init__(self, configFile):
     """Loads a job configuration from a file and validates it.
 
     Returns a validated configuration object.
     """
-    self.config = None
-    globalScope = {}
-    localScope = {}
-    execfile(configFile, globalScope, localScope)
-    self.config = self.validate(localScope)
+    self._configfile = configFile
+    env = self._execute(self._configfile)
+    self.config = self._validate(env)
 
-  def validate(self, configObj):
+  def _execute(self, configFile):
+    """
+      Execute the .mesos configuration "configFile" in the context of preloaded
+      library functions, e.g. mesos_include.
+    """
+    env = {}
+    deposit_stack = [os.path.dirname(configFile)]
+    def ast_executor(filename):
+      actual_file = os.path.join(deposit_stack[-1], filename)
+      deposit_stack.append(os.path.dirname(actual_file))
+      execfile(actual_file, env)
+      deposit_stack.pop()
+    env.update({ 'mesos_include': lambda filename: ast_executor(filename) })
+    execfile(configFile, env)
+    return env
+
+  def _validate(self, configObj):
     """Validates a configuration object.
     This will make sure that the configuration object has the appropriate
     'magic' fields defined, and are of the correct types.
@@ -105,4 +118,5 @@ class MesosConfiguration:
 
 if __name__ == '__main__':
   config = MesosConfiguration(sys.argv[1])
-  print 'Valid configuration.'
+  print 'Valid configuration:'
+  print config.config

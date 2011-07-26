@@ -9,3 +9,9 @@ python_library(
     pants('src/python/twitter/common')
   ]
 )
+
+python_binary(
+  name = "mesos_configuration",
+  dependencies = [ pants(":mesos-lib") ],
+  source = "mesos_configuration.py"
+)
