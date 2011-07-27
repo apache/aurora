@@ -145,8 +145,9 @@ class Updater(object):
     1. Failed to move to RUNNING state before restart_threshold from the time of restart.
     2. Failed to stay in the RUNNING state before watch_secs expire.
     """
+    # TODO(Sathya): Consider adding PREEMPTING as an active state.
     ACTIVE_STATES = set([ScheduleStatus.PENDING, ScheduleStatus.STARTING, ScheduleStatus.RUNNING,
-        ScheduleStatus.UPDATING, ScheduleStatus.ROLLBACK])
+        ScheduleStatus.ASSIGNED, ScheduleStatus.UPDATING, ScheduleStatus.ROLLBACK])
     start_time = self._clock.time()
     expected_running_by = start_time + restart_threshold
     statuses = {}
