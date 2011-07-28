@@ -1,6 +1,6 @@
 package com.twitter.mesos.scheduler.storage;
 
-import com.twitter.mesos.gen.StorageSystemId;
+import com.twitter.mesos.gen.storage.migration.StorageSystemId;
 
 /**
  * Manages scheduler storage operations providing an interface to perform atomic changes.

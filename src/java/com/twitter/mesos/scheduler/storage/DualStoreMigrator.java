@@ -12,7 +12,6 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Iterables;
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
@@ -26,15 +25,15 @@ import com.google.inject.name.Named;
 import com.twitter.common.base.Function;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.JobConfiguration;
-import com.twitter.mesos.gen.JobManagerMigrationResult;
-import com.twitter.mesos.gen.JobMigrationResult;
 import com.twitter.mesos.gen.ScheduledTask;
-import com.twitter.mesos.gen.SchedulerMigrationResult;
-import com.twitter.mesos.gen.StorageMigrationPath;
-import com.twitter.mesos.gen.StorageMigrationResult;
-import com.twitter.mesos.gen.StorageMigrationStatus;
-import com.twitter.mesos.gen.StorageSystemId;
-import com.twitter.mesos.gen.TaskMigrationResult;
+import com.twitter.mesos.gen.storage.migration.JobManagerMigrationResult;
+import com.twitter.mesos.gen.storage.migration.JobMigrationResult;
+import com.twitter.mesos.gen.storage.migration.SchedulerMigrationResult;
+import com.twitter.mesos.gen.storage.migration.StorageMigrationPath;
+import com.twitter.mesos.gen.storage.migration.StorageMigrationResult;
+import com.twitter.mesos.gen.storage.migration.StorageMigrationStatus;
+import com.twitter.mesos.gen.storage.migration.StorageSystemId;
+import com.twitter.mesos.gen.storage.migration.TaskMigrationResult;
 import com.twitter.mesos.scheduler.JobManager;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
@@ -57,7 +56,7 @@ public class DualStoreMigrator implements Migrator {
    *   <li>*{@link #migrateTask(com.twitter.mesos.gen.ScheduledTask)}
    *   <li>*{@link #migrateJobConfig(com.twitter.mesos.gen.JobConfiguration)}
    *   <li>{@link #migrateFrameworkId(String)}
-   *   <li>{@link #finish(com.twitter.mesos.gen.StorageMigrationResult)}
+   *   <li>{@link #finish(com.twitter.mesos.gen.storage.migration.StorageMigrationResult)}
    * </ol>
    */
   public interface DataMigrator {

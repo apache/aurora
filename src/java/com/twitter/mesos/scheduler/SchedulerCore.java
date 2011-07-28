@@ -15,10 +15,10 @@ import org.apache.mesos.Protos.SlaveOffer;
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.JobConfiguration;
-import com.twitter.mesos.gen.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.ScheduleStatus;
-import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.gen.UpdateResult;
+import com.twitter.mesos.gen.comm.RegisteredTaskUpdate;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 
 import static com.google.common.base.Preconditions.checkNotNull;

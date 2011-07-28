@@ -1,13 +1,14 @@
 package com.twitter.mesos.scheduler;
 
-import com.twitter.common.util.BuildInfo;
-import com.twitter.mesos.gen.ExecutorStatus;
+import java.util.Properties;
+import java.util.Queue;
+
 import org.easymock.IMocksControl;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.util.Properties;
-import java.util.Queue;
+import com.twitter.common.util.BuildInfo;
+import com.twitter.mesos.gen.comm.ExecutorStatus;
 
 import static org.easymock.EasyMock.createControl;
 import static org.easymock.EasyMock.expect;
@@ -27,7 +28,6 @@ public class ExecutorTrackerImplTest {
   private IMocksControl control;
 
   private Queue<String> restartQueue;
-  private BuildInfo buildInfo;
   private ExecutorTracker tracker;
 
   @Before
@@ -40,7 +40,7 @@ public class ExecutorTrackerImplTest {
     Properties props = new Properties();
     props.setProperty(BuildInfo.Key.GIT_REVISION.value, GIT_REVISION_1);
     props.setProperty(BuildInfo.Key.TIMESTAMP.value, TIMESTAMP_1);
-    buildInfo = new BuildInfo(props);
+    BuildInfo buildInfo = new BuildInfo(props);
 
     tracker = new ExecutorTrackerImpl(buildInfo, restartQueue);
   }

@@ -4,8 +4,9 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.ServerSocket;
 import java.net.UnknownHostException;
+import java.security.GeneralSecurityException;
+import java.security.KeyStore;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicReference;
@@ -13,15 +14,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
-
-import java.security.KeyStore;
-import java.security.GeneralSecurityException;
-
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
-import javax.net.ServerSocketFactory;
 
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -58,7 +54,7 @@ import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.SingletonService.LeadershipListener;
 import com.twitter.common_internal.webassets.Blueprint;
 import com.twitter.mesos.gen.MesosSchedulerManager;
-import com.twitter.mesos.gen.StorageMigrationResult;
+import com.twitter.mesos.gen.storage.migration.StorageMigrationResult;
 import com.twitter.mesos.scheduler.storage.Migrator;
 import com.twitter.thrift.Status;
 
@@ -129,7 +125,7 @@ public class SchedulerMain extends AbstractApplication {
   @Nullable private Migrator migrator;
 
   @Inject(optional = true)
-  public void setMigrator(Migrator migrator) {
+  public void setMigrator(@Nullable Migrator migrator) {
     this.migrator = migrator;
   }
 
@@ -190,7 +186,7 @@ public class SchedulerMain extends AbstractApplication {
       schedulerThriftPort.set(InetSocketAddressHelper.getLocalAddress(port));
     } catch (UnknownHostException e) {
       LOG.severe("Unable to get local host address.");
-      Throwables.propagate(e);
+      throw Throwables.propagate(e);
     }
 
     try {
@@ -238,7 +234,7 @@ public class SchedulerMain extends AbstractApplication {
   private int startThriftServer() throws IOException, TTransportException,
       Group.JoinException, InterruptedException, GeneralSecurityException {
     // TODO(wickman): Add helper to science thrift to perform this keyfile import.
-    SSLContext ctx = null;
+    SSLContext ctx;
 
     ctx = SSLContext.getInstance("TLS");
     KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");

@@ -1,15 +1,12 @@
 package com.twitter.mesos.scheduler;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import javax.annotation.Nullable;
-import javax.print.attribute.IntegerSyntax;
 
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
@@ -22,8 +19,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
-import com.twitter.common.base.Closures;
-import com.twitter.mesos.gen.UpdateResult;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.Resource.Scalar;
 import org.apache.mesos.Protos.Resource.Type;
@@ -41,36 +36,30 @@ import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.CronCollisionPolicy;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
-import com.twitter.mesos.gen.LiveTaskInfo;
-import com.twitter.mesos.gen.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.ResourceConsumption;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.gen.UpdateResult;
+import com.twitter.mesos.gen.comm.LiveTaskInfo;
+import com.twitter.mesos.gen.comm.RegisteredTaskUpdate;
 import com.twitter.mesos.scheduler.SchedulerCore.RestartException;
 import com.twitter.mesos.scheduler.SchedulerCore.TwitterTask;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
-import com.twitter.mesos.scheduler.storage.JobStore;
-import com.twitter.mesos.scheduler.storage.SchedulerStore;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.Work.NoResult;
-import com.twitter.mesos.scheduler.storage.TaskStore;
 
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
-import static com.twitter.mesos.gen.ScheduleStatus.INIT;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED_BY_CLIENT;
 import static com.twitter.mesos.gen.ScheduleStatus.LOST;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
-import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
-import static com.twitter.mesos.gen.ScheduleStatus.ROLLBACK;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
-import static com.twitter.mesos.gen.ScheduleStatus.UNKNOWN;
 import static com.twitter.mesos.gen.ScheduleStatus.UPDATING;
 import static com.twitter.mesos.gen.UpdateResult.SUCCESS;
 import static org.easymock.EasyMock.anyObject;
@@ -79,7 +68,6 @@ import static org.easymock.EasyMock.expectLastCall;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /**
@@ -409,7 +397,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     // Make sure the pending job is the new one.
     String newTaskId = Tasks.id(getOnlyTask(queryJob(OWNER_A,JOB_A)).task);
-    assertThat(taskId == newTaskId, is(false));
+    assertThat(taskId.equals(newTaskId), is(false));
   }
 
   @Test(expected = TaskDescriptionException.class)

@@ -1,7 +1,7 @@
 package com.twitter.mesos.scheduler.storage;
 
-import com.twitter.mesos.gen.StorageMigrationPath;
-import com.twitter.mesos.gen.StorageMigrationResult;
+import com.twitter.mesos.gen.storage.migration.StorageMigrationPath;
+import com.twitter.mesos.gen.storage.migration.StorageMigrationResult;
 
 /**
  * Migrates storage data and provides detailed results.
@@ -21,7 +21,7 @@ public interface Migrator {
    * Attempts to migrate data along the configured storage migration path.  Any errors encountered
    * are trapped and recorded in the returned result object.  If migration is successful, subsequent
    * attempts to migrate along the same path are guaranteed to short circuit with a result status of
-   * {@link com.twitter.mesos.gen.StorageMigrationStatus#NO_MIGRATION_NEEDED}.
+   * {@link com.twitter.mesos.gen.storage.migration.StorageMigrationStatus#NO_MIGRATION_NEEDED}.
    *
    * @return The result encoding the migration status.
    */

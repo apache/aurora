@@ -1,7 +1,7 @@
 package com.twitter.mesos.scheduler;
 
 import com.twitter.common.base.Closure;
-import com.twitter.mesos.gen.ExecutorStatus;
+import com.twitter.mesos.gen.comm.ExecutorStatus;
 
 /**
  * Receives executor status messages, and may trigger a callback to suggest that an executor

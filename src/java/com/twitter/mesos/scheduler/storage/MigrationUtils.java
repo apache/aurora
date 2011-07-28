@@ -1,8 +1,9 @@
 package com.twitter.mesos.scheduler.storage;
 
 import com.google.common.base.Preconditions;
-import com.twitter.mesos.gen.StorageMigrationPath;
-import com.twitter.mesos.gen.StorageSystemId;
+
+import com.twitter.mesos.gen.storage.migration.StorageMigrationPath;
+import com.twitter.mesos.gen.storage.migration.StorageSystemId;
 
 /**
  * Utilities for dealing with storage migration.

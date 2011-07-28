@@ -10,7 +10,7 @@ import org.springframework.core.io.ClassPathResource;
 
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduledTask;
-import com.twitter.mesos.gen.StorageMigrationResult;
+import com.twitter.mesos.gen.storage.migration.StorageMigrationResult;
 import com.twitter.mesos.scheduler.storage.DualStoreMigrator.DataMigrator;
 import com.twitter.mesos.scheduler.storage.db.DbStorage;
 
@@ -37,13 +37,14 @@ public abstract class SchemaMigrator implements DataMigrator {
    * @param fromPrepareSqlResourcePath The relative resource path to the sql to run on
    *     {@link #prepare()} against the legacy storage
    * @param fromFinishSqlResourcePath The relative resource path to the sql to run on
-   *     {@link #finish(com.twitter.mesos.gen.StorageMigrationResult)} against the legacy storage
+   *     {@link #finish(com.twitter.mesos.gen.storage.migration.StorageMigrationResult)} against the
+   *     legacy storage
    * @param to The new primary database storage
    * @param toPrepareSqlResourcePath The relative resource path to the sql to run on
    *     {@link #prepare()} against the new primary storage
    * @param toFinishSqlResourcePath The relative resource path to the sql to run on
-   *     {@link #finish(com.twitter.mesos.gen.StorageMigrationResult)} against the new primary
-   *     storage
+   *     {@link #finish(com.twitter.mesos.gen.storage.migration.StorageMigrationResult)} against the
+   *     new primary storage
    */
   protected SchemaMigrator(DbStorage from, @Nullable String fromPrepareSqlResourcePath,
       @Nullable String fromFinishSqlResourcePath, DbStorage to,

@@ -33,11 +33,11 @@ import com.twitter.common.stats.Stats;
 import com.twitter.mesos.StateTranslator;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
-import com.twitter.mesos.gen.ExecutorMessage;
-import com.twitter.mesos.gen.RegisteredTaskUpdate;
-import com.twitter.mesos.gen.RestartExecutor;
 import com.twitter.mesos.gen.ScheduleStatus;
-import com.twitter.mesos.gen.SchedulerMessage;
+import com.twitter.mesos.gen.comm.ExecutorMessage;
+import com.twitter.mesos.gen.comm.RegisteredTaskUpdate;
+import com.twitter.mesos.gen.comm.RestartExecutor;
+import com.twitter.mesos.gen.comm.SchedulerMessage;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 

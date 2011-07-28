@@ -20,10 +20,8 @@ import com.twitter.common.base.Closure;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
-import com.twitter.mesos.executor.Task.TaskRunException;
 import com.twitter.mesos.gen.AssignedTask;
-import com.twitter.mesos.gen.ExecutorMessage;
-import com.twitter.mesos.gen.ScheduleStatus;
+import com.twitter.mesos.gen.comm.ExecutorMessage;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;

@@ -1,11 +1,11 @@
 package com.twitter.mesos.scheduler.storage;
 
-import com.twitter.mesos.gen.TaskUpdateConfiguration;
-import com.twitter.mesos.gen.TwitterTaskInfo;
+import java.util.Set;
 
 import javax.annotation.Nullable;
-import java.util.Map;
-import java.util.Set;
+
+import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 
 /**
  * Stores all update configurations for on-going updates.

@@ -28,8 +28,6 @@ import com.google.common.collect.Sets;
 import com.google.common.primitives.Ints;
 import com.google.inject.Inject;
 
-import com.twitter.mesos.gen.TaskUpdateConfiguration;
-import com.twitter.mesos.scheduler.storage.UpdateStore;
 import org.apache.commons.lang.StringUtils;
 import org.apache.thrift.TBase;
 import org.apache.thrift.TException;
@@ -49,7 +47,6 @@ import com.twitter.common.base.Closure;
 import com.twitter.common.base.ExceptionTransporter;
 import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
-import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -58,15 +55,16 @@ import com.twitter.common.stats.Stats;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
-import com.twitter.mesos.gen.ConfiguratonKey;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
-import com.twitter.mesos.gen.StorageMigrationResult;
-import com.twitter.mesos.gen.StorageMigrationResults;
-import com.twitter.mesos.gen.StorageMigrationStatus;
-import com.twitter.mesos.gen.StorageSystemId;
 import com.twitter.mesos.gen.TaskQuery;
+import com.twitter.mesos.gen.storage.ConfiguratonKey;
+import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
+import com.twitter.mesos.gen.storage.migration.StorageMigrationResult;
+import com.twitter.mesos.gen.storage.migration.StorageMigrationResults;
+import com.twitter.mesos.gen.storage.migration.StorageMigrationStatus;
+import com.twitter.mesos.gen.storage.migration.StorageSystemId;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.db.DbUtil;
 import com.twitter.mesos.scheduler.storage.JobStore;
@@ -74,6 +72,7 @@ import com.twitter.mesos.scheduler.storage.MigrationUtils;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.TaskStore;
+import com.twitter.mesos.scheduler.storage.UpdateStore;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.transform;
@@ -92,8 +91,8 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore, 
       Amount.of(100L, Time.MILLISECONDS).as(Time.NANOSECONDS);
 
   /**
-   * The {@link com.twitter.mesos.gen.StorageSystemId#getType() type} identifier for
-   * {@code DbStorage}.
+   * The {@link com.twitter.mesos.gen.storage.migration.StorageSystemId#getType() type} identifier
+   * for {@code DbStorage}.
    */
   public static final String STORAGE_SYSTEM_TYPE = "EMBEDDED_H2_DB";
 
@@ -246,7 +245,7 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore, 
   public void saveFrameworkId(final String frameworkId) {
     checkNotBlank(frameworkId);
 
-    updateSchedulerState(com.twitter.mesos.gen.ConfiguratonKey.FRAMEWORK_ID,
+    updateSchedulerState(ConfiguratonKey.FRAMEWORK_ID,
         new ExceptionalClosure<TProtocol, TException>() {
           @Override public void execute(TProtocol stream) throws TException {
             stream.writeString(frameworkId);
@@ -258,7 +257,7 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore, 
   @Override
   @Nullable
   public String fetchFrameworkId() {
-    return fetchSchedulerState(com.twitter.mesos.gen.ConfiguratonKey.FRAMEWORK_ID,
+    return fetchSchedulerState(ConfiguratonKey.FRAMEWORK_ID,
         new ExceptionalFunction<TProtocol, String, TException>() {
           @Override public String apply(TProtocol data) throws TException {
             return data.readString();
