@@ -27,10 +27,6 @@ public interface UpdateStore {
       return updateToken;
     }
 
-    public TaskUpdateConfiguration getTaskConfig() {
-      return taskConfig;
-    }
-
     public TwitterTaskInfo getOldConfig() {
       return taskConfig.getOldConfig();
     }
