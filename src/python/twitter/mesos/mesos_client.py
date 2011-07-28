@@ -16,27 +16,20 @@ import zookeeper
 import errno
 from optparse import OptionParser
 
-
 from twitter.common import app
 from twitter.common import options
 from twitter.common import log
 from twitter.common.log.options import LogOptions
 
 from twitter.mesos.mesos import clusters
-from twitter.mesos.mesos.ldap_helper import LdapHelper
 from twitter.mesos.mesos.location import Location
 from twitter.mesos.mesos.mesos_configuration import MesosConfiguration
 from twitter.mesos.mesos import scheduler_client
 from twitter.mesos.mesos.tunnel_helper import TunnelHelper
+from twitter.mesos.mesos.session_key_helper import SessionKeyHelper
 from twitter.mesos.mesos.updater import *
 
 from mesos_twitter.ttypes import *
-
-try:
-  import elfowl
-except Exception, e:
-  print >> sys.stderr, 'Could not import ElfOwl dependencies! Error: %s' % e
-  sys.exit(1)
 
 __authors__ = ['William Farner',
                'Travis Crawford',
@@ -104,28 +97,8 @@ class MesosCookieHelper:
 class MesosCLIHelper:
   @staticmethod
   def acquire_session_key_or_die(owner, try_cached=False, save=False):
-    MESOS_USER_AGENT = 'MesosClient/1.0'
-
-    if not LdapHelper.is_valid_identity(owner.role, owner.user):
-      _die("""Either the supplied role (%s) is not a role account or you do not have
-              permission to run as this role.""" % owner.role)
-
-    if try_cached:
-      try:
-        token = MesosCookieHelper.read_cached_cookie()
-        if token and token.verified and (token.user == owner.user):
-          return SessionKey(owner = owner, cookie = token._cookie)
-      except:
-        pass
-
-    print 'Authenticating directly with scheduler (ODS credentials).'
-    print 'username: %s' % owner.user
-    token = elfowl.session.Session.authorize(username = owner.user, user_agent = MESOS_USER_AGENT)
-    if token is None:
-      _die("Unable to authorize user %s!" % owner)
-    key = SessionKey(owner = owner, cookie = token._cookie)
-    if save:
-      MesosCookieHelper.save_cookie_or_die(token)
+    key = SessionKey(user = owner)
+    SessionKeyHelper.sign_session(key)
     return key
 
   @staticmethod
@@ -289,7 +262,7 @@ class MesosCLI(cmd.Cmd):
         _die('both role and owner specified!')
       else:
         log.warning('WARNING: the owner field is deprecated.  use "role" instead.')
-        job['role'] = owner
+        job['role'] = job['owner']
     if 'role' not in job:
       _die('role must be specified!')
     query.owner = Identity(role = job['role'], user = getpass.getuser())
@@ -318,8 +291,8 @@ class MesosCLI(cmd.Cmd):
     return (job, query.owner, tasks, MesosCLI.get_cron_collision_value(cron_collision_policy),
         update_config)
 
-  def acquire_session(self, owner):
-    return MesosCLIHelper.acquire_session_key_or_die(owner,
+  def acquire_session(self):
+    return MesosCLIHelper.acquire_session_key_or_die(getpass.getuser(),
       self.options.cache_credentials,
       self.options.cache_credentials)
 
@@ -336,7 +309,7 @@ class MesosCLI(cmd.Cmd):
       MesosCLIHelper.copy_app_to_hadoop(self.options.copy_app_from,
           job['task']['hdfs_path'], dc, self._proxy)
 
-    sessionkey = self.acquire_session(owner)
+    sessionkey = self.acquire_session()
 
     log.info('Creating job %s' % job['name'])
     resp = self._client.createJob(
@@ -352,7 +325,7 @@ class MesosCLI(cmd.Cmd):
     """start_cron role job"""
 
     (role, job) = line
-    resp = self._client.startCronJob(job, self.acquire_session(Identity(role = role, user = getpass.getuser())))
+    resp = self._client.startCronJob(role, job, self.acquire_session())
     log.info('Response from scheduler: %s (message: %s)'
       % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
     if resp.responseCode == ResponseCode.AUTH_FAILED:
@@ -368,7 +341,7 @@ class MesosCLI(cmd.Cmd):
     query.owner = Identity(role = role)
     query.jobName = job
 
-    sessionkey = self.acquire_session(Identity(role = role, user = getpass.getuser()))
+    sessionkey = self.acquire_session()
 
     resp = self._client.killTasks(query, sessionkey)
     log.info('Response from scheduler: %s (message: %s)'
@@ -447,7 +420,7 @@ class MesosCLI(cmd.Cmd):
       MesosCLIHelper.copy_app_to_hadoop(self.options.copy_app_from, job['task']['hdfs_path'],
           dc, self._proxy)
 
-    sessionkey = self.acquire_session(owner)
+    sessionkey = self.acquire_session()
 
     log.info('Updating Job %s' % job['name'])
 

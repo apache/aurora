@@ -3,16 +3,25 @@ package com.twitter.mesos.scheduler;
 import java.util.Set;
 import java.util.logging.Logger;
 
+import com.google.common.base.Function;
+import com.google.common.base.Functions;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
+import org.apache.commons.lang.StringUtils;
+
 import com.twitter.common.collections.Pair;
-import com.twitter.common_internal.elfowl.Cookie;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
+import com.twitter.common.util.Clock;
+import com.twitter.common_internal.ldap.Ods;
+import com.twitter.common_internal.ldap.User;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.CreateJobResponse;
 import com.twitter.mesos.gen.FinishUpdateResponse;
-import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.KillResponse;
 import com.twitter.mesos.gen.MesosSchedulerManager;
@@ -25,16 +34,20 @@ import com.twitter.mesos.gen.SessionKey;
 import com.twitter.mesos.gen.StartCronResponse;
 import com.twitter.mesos.gen.StartUpdateResponse;
 import com.twitter.mesos.gen.TaskQuery;
+import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.UpdateShardsResponse;
 import com.twitter.mesos.scheduler.SchedulerCore.RestartException;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
+import com.twitter.mesos.scheduler.identity.AuthorizedKeySet;
+import com.twitter.mesos.scheduler.identity.AuthorizedKeySet.KeyParseException;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.mesos.gen.ResponseCode.AUTH_FAILED;
 import static com.twitter.mesos.gen.ResponseCode.INVALID_REQUEST;
 import static com.twitter.mesos.gen.ResponseCode.OK;
+import static com.twitter.mesos.gen.ResponseCode.WARNING;
 
 /**
  * Mesos scheduler thrift server implementation.
@@ -44,12 +57,17 @@ import static com.twitter.mesos.gen.ResponseCode.OK;
  */
 public class SchedulerThriftInterface implements MesosSchedulerManager.Iface {
   private static final Logger LOG = Logger.getLogger(SchedulerThriftInterface.class.getName());
+  private static final Amount<Long, Time> MAXIMUM_NONCE_DRIFT = Amount.of(10L, Time.SECONDS);
 
   private final SchedulerCore schedulerCore;
+  private final Ods ods;
+  private final Clock clock;
 
   @Inject
-  public SchedulerThriftInterface(SchedulerCore schedulerCore) {
+  public SchedulerThriftInterface(SchedulerCore schedulerCore, Ods ods, Clock clock) {
     this.schedulerCore = checkNotNull(schedulerCore);
+    this.ods = checkNotNull(ods);
+    this.clock = checkNotNull(clock);
   }
 
   /**
@@ -57,42 +75,60 @@ public class SchedulerThriftInterface implements MesosSchedulerManager.Iface {
    */
   private Pair<ResponseCode, String> validateSessionKey(SessionKey sessionKey,
       String targetRole) {
-    if (!sessionKey.isSetOwner()
-        || !sessionKey.getOwner().isSetRole()
-        || !sessionKey.getOwner().isSetUser()
-        || !sessionKey.isSetCookie()) {
+    if (StringUtils.isBlank(sessionKey.getUser())
+        || !sessionKey.isSetNonce()
+        || !sessionKey.isSetNonceSig()) {
       return Pair.of(AUTH_FAILED, "Incorrectly specified session key.");
     }
 
-    Cookie cookie = Cookie.fromBase64(sessionKey.getCookie());
-
-    if (cookie == null) {
-      return Pair.of(AUTH_FAILED, "Unable to parse supplied cookie.");
+    long now = this.clock.nowMillis();
+    long diff = Math.abs(now - sessionKey.getNonce());
+    if (Amount.of(diff, Time.MILLISECONDS).compareTo(MAXIMUM_NONCE_DRIFT) > 0) {
+      return Pair.of(AUTH_FAILED, "Session key nonce expired.");
     }
 
-    // Make sure the cookie is properly cryptographically signed by the correct user.
-    if (!cookie.isVerified()) {
-      return Pair.of(AUTH_FAILED, "Cookie appears to be forged.");
+    String userId = sessionKey.getUser();
+    if (!userId.equals(targetRole)) {
+      if (!ods.isRoleAccount(targetRole)) {
+        return Pair.of(AUTH_FAILED,
+            String.format("%s is not a role account.", targetRole));
+      } else if (!ods.isMember(userId, targetRole)) {
+        return Pair.of(AUTH_FAILED,
+            String.format("User %s does not have permission for role %s", userId, targetRole));
+      }
     }
 
-    // The cookie identity and the session key identity must match for the session to
-    // be valid.
-    if (!cookie.getUser().equals(sessionKey.getOwner().getUser())) {
-      return Pair.of(AUTH_FAILED,
-          String.format("Supplied cookie and session identity are for different users (%s vs %s)",
-              cookie.getUser(),
-              sessionKey.getOwner().getUser()));
+    User user = ods.getUser(userId);
+    if (user == null) {
+      return Pair.of(AUTH_FAILED, String.format("User %s not found.", userId));
     }
 
-    // We need to accept this session based upon a targetRole.  The targetRole is going to be
-    // one of two cases:
-    //   - the username -- not an explicit ODS group but an accepted role
-    //       (this will be made explicit when we have the usermap)
-    //   - the ODS group that the user has choosed as the role
-    if (!cookie.getUser().equals(targetRole) && !cookie.hasGroup(targetRole)) {
-      return Pair.of(AUTH_FAILED,
-          String.format("User %s does not have permission for role %s",
-              cookie.getUser(), targetRole));
+    AuthorizedKeySet keySet;
+    try {
+      keySet = AuthorizedKeySet.createFromKeys(user.getSshPubkeys());
+    } catch (KeyParseException e) {
+      return Pair.of(AUTH_FAILED, "Failed to parse SSH keys for user " + userId);
+    }
+
+    if (!keySet.verify(
+        Long.toString(sessionKey.getNonce()).getBytes(),
+        sessionKey.getNonceSig())) {
+      return Pair.of(AUTH_FAILED, "Authentication failed for " + userId);
+    }
+
+    return Pair.of(OK, "");
+  }
+
+  /**
+   * Validate the session key against the roles of a set of tasks.
+   */
+  private Pair<ResponseCode, String> validateSessionKey(SessionKey session, Set<String> taskIds) {
+    Set<TaskState> tasks = schedulerCore.getTasks(Query.byId(taskIds));
+    for (String role : ImmutableSet.copyOf(Iterables.transform(tasks, GET_ROLE))) {
+      Pair<ResponseCode, String> rc = validateSessionKey(session, role);
+      if (rc.getFirst() != OK) {
+        return rc;
+      }
     }
 
     return Pair.of(OK, "");
@@ -129,12 +165,13 @@ public class SchedulerThriftInterface implements MesosSchedulerManager.Iface {
   }
 
   @Override
-  public StartCronResponse startCronJob(String jobName, SessionKey session) {
+  public StartCronResponse startCronJob(String role, String jobName, SessionKey session) {
+    checkNotBlank(role, "Role must not be blank.");
     checkNotBlank(jobName, "Job name must not be blank.");
     checkNotNull(session, "Session must be provided.");
 
     StartCronResponse response = new StartCronResponse();
-    Pair<ResponseCode, String> rc = validateSessionKey(session, session.getOwner().getRole());
+    Pair<ResponseCode, String> rc = validateSessionKey(session, role);
 
     if (rc.getFirst() != OK) {
       response.setResponseCode(rc.getFirst()).setMessage(rc.getSecond());
@@ -142,7 +179,7 @@ public class SchedulerThriftInterface implements MesosSchedulerManager.Iface {
     }
 
     try {
-      schedulerCore.startCronJob(session.getOwner().getRole(), jobName);
+      schedulerCore.startCronJob(role, jobName);
       response.setResponseCode(OK).setMessage("Cron run started.");
     } catch (ScheduleException e) {
       response.setResponseCode(INVALID_REQUEST)
@@ -161,7 +198,8 @@ public class SchedulerThriftInterface implements MesosSchedulerManager.Iface {
 
     ScheduleStatusResponse response = new ScheduleStatusResponse();
     if (tasks.isEmpty()) {
-      response.setResponseCode(INVALID_REQUEST).setMessage("No tasks found for query: " + query);
+      response.setResponseCode(INVALID_REQUEST)
+          .setMessage("No tasks found for query: " + query);
     } else {
       response.setResponseCode(OK)
           .setTasks(Lists.newArrayList(Iterables.transform(tasks, TaskState.STATE_TO_LIVE)));
@@ -170,29 +208,31 @@ public class SchedulerThriftInterface implements MesosSchedulerManager.Iface {
     return response;
   }
 
+  private static final Function<TaskState, String> GET_ROLE = Functions.compose(
+      new Function<TwitterTaskInfo, String>() {
+        @Override public String apply(TwitterTaskInfo task) {
+          return task.getOwner().getRole();
+        }
+      },
+      TaskState.STATE_TO_INFO);
+
   @Override
   public KillResponse killTasks(TaskQuery query, SessionKey session) {
     checkNotNull(query);
     checkNotNull(session, "Session must be set.");
+    checkNotNull(session.getUser(), "Session user must be set.");
 
     LOG.info("Received kill request for tasks: " + query);
     KillResponse response = new KillResponse();
 
     Set<TaskState> tasks = schedulerCore.getTasks(new Query(query));
-    String sessionRole = session.getOwner().getRole();
-    for (TaskState task : tasks) {
-      Identity taskId = task.task.getAssignedTask().getTask().getOwner();
-      if (!sessionRole.equals(taskId.getRole()) && !sessionRole.equals(taskId.getUser())) {
-        response.setResponseCode(AUTH_FAILED).setMessage(
-            "You do not have permission to kill all tasks in this query.");
+    for (String role : ImmutableSet.copyOf(Iterables.transform(tasks, GET_ROLE))) {
+      Pair<ResponseCode, String> rc = validateSessionKey(session, role);
+      if (rc.getFirst() != OK) {
+        response.setResponseCode(rc.getFirst())
+            .setMessage(rc.getSecond());
         return response;
       }
-    }
-
-    Pair<ResponseCode, String> rc = validateSessionKey(session, sessionRole);
-    if (rc.getFirst() != OK) {
-      response.setResponseCode(rc.getFirst()).setMessage(rc.getSecond());
-      return response;
     }
 
     try {
@@ -205,6 +245,7 @@ public class SchedulerThriftInterface implements MesosSchedulerManager.Iface {
     return response;
   }
 
+
   // TODO(William Farner); This should address a job/shard and not task IDs, and should check to
   //     ensure that the shards requested exist (reporting failure and ignoring request otherwise).
   @Override
@@ -212,24 +253,31 @@ public class SchedulerThriftInterface implements MesosSchedulerManager.Iface {
     checkNotBlank(taskIds, "At least one task ID must be provided.");
     checkNotNull(session, "Session must be set.");
 
-    ResponseCode response = OK;
-    String message = taskIds.size() + " tasks scheduled for restart.";
+    RestartResponse response = new RestartResponse()
+        .setMessage(taskIds.size() + " tasks scheduled for restart.");
 
-    // TODO(wickman): Enforce that taskIds are all a compatible role with the
-    // session.
-    Pair<ResponseCode, String> rc = validateSessionKey(session, session.getOwner().getRole());
+    Pair<ResponseCode, String> rc = validateSessionKey(session, taskIds);
     if (rc.getFirst() != OK) {
-      return new RestartResponse(rc.getFirst(), rc.getSecond());
+      response.setResponseCode(rc.getFirst())
+          .setMessage(rc.getSecond());
+      return response;
     }
 
+    // TODO(wfarner): This is busted, fix when we begin restarting tasks by shard instead of task
+    //     ID.
+    Set<String> tasksRestarting = null;
     try {
       schedulerCore.restartTasks(taskIds);
     } catch (RestartException e) {
-      response = INVALID_REQUEST;
-      message = e.getMessage();
+      response.setResponseCode(INVALID_REQUEST)
+          .setMessage(e.getMessage());
+    }
+    if (!taskIds.equals(tasksRestarting)) {
+      response.setResponseCode(WARNING)
+          .setMessage("Unable to restart tasks: " + Sets.difference(taskIds, tasksRestarting));
     }
 
-    return new RestartResponse(response, message);
+    return response;
   }
 
   @Override
