@@ -133,15 +133,6 @@ public interface Log {
      * @return the position immediately following the last stream log entry
      */
     Position end();
-
-    /**
-     * Returns a reasonable estimate of the current size of the log stream.  Depending on the
-     * implementation and rate of log stream growth the result may deviate from the actual value
-     * deemed reasonable for the log implementation.
-     *
-     * @return the current number of entries in the log stream
-     */
-    long size();
   }
 
   /**

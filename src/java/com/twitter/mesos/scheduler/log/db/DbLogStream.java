@@ -125,7 +125,7 @@ public class DbLogStream implements Log, Stream {
   }
 
   @Override
-  public synchronized Stream open() {
+  public synchronized DbLogStream open() {
     if (!opened) {
       opened = transactionTemplate.execute(new TransactionCallback<Boolean>() {
         @Override public Boolean doInTransaction(TransactionStatus status) {
@@ -206,17 +206,6 @@ public class DbLogStream implements Log, Stream {
         return new LongPosition(jdbcTemplate.queryForLong("SELECT MAX(id) FROM log_stream"));
       }
     });
-  }
-
-  private TransactionCallback<Long> fetchSize = new TransactionCallback<Long>() {
-    @Override public Long doInTransaction(TransactionStatus status) {
-      return jdbcTemplate.queryForLong("SELECT COUNT(id) FROM log_stream");
-    }
-  };
-
-  @Override
-  public long size() {
-    return transactionTemplate.execute(fetchSize);
   }
 
   @Override

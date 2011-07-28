@@ -61,7 +61,7 @@ public class DbLogStreamTest extends TearDownTestCase {
   @Test
   public void testSize_empty() throws IOException {
     Stream stream = openStream();
-    assertEquals(0, stream.size());
+    assertFalse(stream.readAfter(stream.beginning()).hasNext());
   }
 
   @Test
@@ -76,22 +76,6 @@ public class DbLogStreamTest extends TearDownTestCase {
     stream.append("bob".getBytes());
     stream.append("jane".getBytes());
     assertContents(stream.readAfter(joe), "bob", "jane");
-  }
-
-  @Test
-  public void testSize() throws IOException {
-    Stream stream = openStream();
-
-    stream.append("Long".getBytes());
-    byte[] checkpoint = stream.append("Bridwell".getBytes()).identity();
-    stream.append("Westbay".getBytes());
-    assertEquals(3, stream.size());
-
-    stream.truncateTo(log.position(checkpoint));
-    assertEquals(1, stream.size());
-
-    stream.truncateTo(stream.end());
-    assertEquals(0, stream.size());
   }
 
   private static final Function<Entry,Position> GET_POSITION = new Function<Entry, Position>() {
