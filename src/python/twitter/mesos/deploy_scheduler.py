@@ -13,9 +13,6 @@ __author__ = 'William Farner'
 
 REMOTE_USER = 'mesos'
 
-HADOOP_CONF_DIR = '/etc/hadoop/hadoop-conf-smf1'
-BASE_HADOOP_CMD = ['hadoop', '--config', HADOOP_CONF_DIR, 'fs']
-
 TEST_CMD = './pants %s clean-all test'
 TEST_TARGETS = ['tests/java/com/twitter/mesos:all-tests!']
 
@@ -47,9 +44,11 @@ SCHEDULER_HTTP = 'http://localhost:8081'
 
 options = None
 
+def get_cluster_dc():
+  return clusters.get_dc(options.cluster)
+
 def get_scheduler_machine():
   return clusters.get_scheduler_host(options.cluster)
-
 
 def read_bool_stdin(prompt, default=None):
   if default is not None:
@@ -150,6 +149,9 @@ def find_current_build():
 
 
 def replace_hdfs_file(local_file, hdfs_path):
+  HADOOP_CONF_DIR = '/etc/hadoop/hadoop-conf-%s' % get_cluster_dc()
+  BASE_HADOOP_CMD = ['hadoop', '--config', HADOOP_CONF_DIR, 'fs']
+
   remote_call(BASE_HADOOP_CMD + ['-mkdir', os.path.dirname(hdfs_path)])
   remote_call(BASE_HADOOP_CMD + ['-rm', hdfs_path])
   remote_check_call(BASE_HADOOP_CMD + ['-put', local_file, hdfs_path])
@@ -190,7 +192,7 @@ def set_live_build(build_path):
 
   print 'Linking the new build on the scheduler'
   remote_check_call(['bash', '-c',
-    '"rm %(live_build)s &&'
+    '"rm -f %(live_build)s &&'
     ' ln -s %(build)s %(live_build)s"' % {
       'live_build': LIVE_BUILD_PATH,
       'build': build_path
