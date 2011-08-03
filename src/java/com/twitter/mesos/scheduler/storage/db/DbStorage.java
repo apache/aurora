@@ -648,28 +648,45 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore, 
 
     return transactionTemplate.execute(new TransactionCallback<ImmutableSet<ScheduledTask>>() {
       @Override public ImmutableSet<ScheduledTask> doInTransaction(TransactionStatus status) {
-        return update(query, mutator);
+        return doMutate(query, mutator);
       }
     });
   }
 
-  private ImmutableSet<ScheduledTask> update(Query query, Closure<ScheduledTask> mutator) {
+  private ImmutableSet<ScheduledTask> doMutate(Query query, Closure<ScheduledTask> mutator) {
     ImmutableSet<ScheduledTask> taskStates = fetch(query);
 
-    final List<ScheduledTask> tasksToUpdate = Lists.newLinkedList();
+    ImmutableSet.Builder<ScheduledTask> tasksToUpdateBuilder = ImmutableSet.builder();
     for (ScheduledTask taskState : taskStates) {
       ScheduledTask original = taskState.deepCopy();
       mutator.execute(taskState);
       if (!taskState.equals(original)) {
-        tasksToUpdate.add(taskState);
+        tasksToUpdateBuilder.add(taskState);
       }
     }
+    ImmutableSet<ScheduledTask> tasksToUpdate = tasksToUpdateBuilder.build();
+    doUpdate(tasksToUpdate);
+    vars.tasksMutated.addAndGet(tasksToUpdate.size());
+    return tasksToUpdate;
+  }
 
-    if (!tasksToUpdate.isEmpty()) {
-      LOG.info(String.format("Updating %d tasks", tasksToUpdate.size()));
+  @Timed("db_storage_update_tasks")
+  @Override
+  public void update(final Set<ScheduledTask> updates) {
+    transactionTemplate.execute(new TransactionCallbackWithoutResult() {
+      @Override protected void doInTransactionWithoutResult(TransactionStatus status) {
+        doUpdate(updates);
+      }
+    });
+    vars.tasksUpdated.addAndGet(updates.size());
+  }
+
+  private void doUpdate(final Set<ScheduledTask> updates) {
+    if (!updates.isEmpty()) {
+      LOG.info(String.format("Updating %d tasks", updates.size()));
 
       long startNanos = System.nanoTime();
-      final Iterator<ScheduledTask> tasks = tasksToUpdate.iterator();
+      final Iterator<ScheduledTask> tasks = updates.iterator();
       jdbcTemplate.batchUpdate("UPDATE task_state SET job_role = ?, job_user = ?, job_name = ?,"
                                + " job_key = ?, slave_host = ?, shard_id = ?, status = ?,"
                                + " scheduled_task = ? WHERE task_id = ?",
@@ -684,20 +701,16 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore, 
             }
 
             @Override public int getBatchSize() {
-              return tasksToUpdate.size();
+              return updates.size();
             }
           });
 
       long durationNanos = System.nanoTime() - startNanos;
       if (durationNanos >= SLOW_QUERY_THRESHOLD_NS) {
-        LOG.warning("Slow update of " + taskStates.size() + " tasks took "
+        LOG.warning("Slow update of " + updates.size() + " tasks took "
                     + Amount.of(durationNanos, Time.NANOSECONDS).as(Time.MILLISECONDS) + " ms");
       }
-
-      vars.tasksMutated.addAndGet(tasksToUpdate.size());
     }
-
-    return taskStates;
   }
 
   @Timed("db_storage_fetch_tasks")
@@ -931,6 +944,7 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore, 
     private final AtomicLong tasksAdded = Stats.exportLong("task_store_tasks_added");
     private final AtomicLong tasksRemoved = Stats.exportLong("task_store_tasks_removed");
     private final AtomicLong tasksMutated = Stats.exportLong("task_store_tasks_mutated");
+    private final AtomicLong tasksUpdated = Stats.exportLong("task_store_tasks_updated");
     private final AtomicLong tasksFetched = Stats.exportLong("task_store_tasks_fetched");
     private final AtomicLong taskIdsFetched = Stats.exportLong("task_store_task_ids_fetched");
     private final AtomicLong jobsFetched = Stats.exportLong("job_store_jobs_fetched");

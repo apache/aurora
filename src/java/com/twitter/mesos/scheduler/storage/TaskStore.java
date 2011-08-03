@@ -1,11 +1,12 @@
 package com.twitter.mesos.scheduler.storage;
 
+import java.util.Set;
+
 import com.google.common.collect.ImmutableSet;
+
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.scheduler.Query;
-
-import java.util.Set;
 
 /**
  * Stores all tasks configured with the scheduler.
@@ -44,9 +45,17 @@ public interface TaskStore {
    *
    * @param query Query to match tasks against.
    * @param mutator The mutate operation.
-   * @return Immutable copies of the mutated tasks.
+   * @return Immutable copies of only the tasks that were mutated.
    */
   ImmutableSet<ScheduledTask> mutate(Query query, Closure<ScheduledTask> mutator);
+
+  /**
+   * Applies the given updates to the store as over-writes.  If any of the supplied {@code updates}
+   * does not represent an existing stored task an exception will be thrown.
+   *
+   * @param updates The updates to apply
+   */
+  void update(Set<ScheduledTask> updates);
 
   /**
    * Fetches a read-only view of tasks matching a query and filters.

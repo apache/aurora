@@ -146,6 +146,20 @@ public abstract class BaseTaskStoreTest<T extends TaskStore> extends TearDownTes
   }
 
   @Test
+  public void testUpdate() {
+    store(tasks);
+
+    store.update(ImmutableSet.<ScheduledTask>of(taskA));
+    assertThat(Iterables.getOnlyElement(store.fetch(Query.byId(TASK_A_ID))), is(taskA));
+
+    ScheduledTask updated = taskA.deepCopy();
+    updated.setStatus(ScheduleStatus.FAILED);
+    updated.setAncestorId("parent");
+    store.update(ImmutableSet.<ScheduledTask>of(updated));
+    assertThat(Iterables.getOnlyElement(store.fetch(Query.byId(TASK_A_ID))), is(updated));
+  }
+
+  @Test
   public void testRemove() {
     store(tasks);
     store.remove(Sets.newHashSet(taskA.getAssignedTask().getTaskId()));
