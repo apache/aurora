@@ -35,6 +35,7 @@ public class DbLogStream implements Log, Stream {
 
   static class LongPosition implements Position {
     static final LongPosition BEGINNING = new LongPosition(0);
+    static final LongPosition END = new LongPosition(Long.MAX_VALUE);
 
     private static final int LONG_BYTES = Long.SIZE / Byte.SIZE;
 
@@ -168,12 +169,12 @@ public class DbLogStream implements Log, Stream {
   }
 
   @Override
-  public Iterator<Entry> readAfter(Position position) throws InvalidPositionException {
+  public Iterator<Entry> readFrom(Position position) throws InvalidPositionException {
     Preconditions.checkNotNull(position);
     final LongPosition after = checkPosition(position);
     return transactionTemplate.execute(new TransactionCallback<Iterator<Entry>>() {
       @Override public Iterator<Entry> doInTransaction(TransactionStatus status) {
-        return jdbcTemplate.query("SELECT id, contents FROM log_stream WHERE id > ?",
+        return jdbcTemplate.query("SELECT id, contents FROM log_stream WHERE id >= ?",
             new RowMapper<Entry>() {
               @Override public Entry mapRow(ResultSet rs, int rowNum) throws SQLException {
                 return new DbEntry(new LongPosition(rs.getLong("id")), rs.getBytes("contents"));
@@ -184,12 +185,12 @@ public class DbLogStream implements Log, Stream {
   }
 
   @Override
-  public long truncateTo(Position position) throws InvalidPositionException {
+  public long truncateBefore(Position position) throws InvalidPositionException {
     Preconditions.checkNotNull(position);
     final LongPosition to = checkPosition(position);
     return transactionTemplate.execute(new TransactionCallback<Integer>() {
       @Override public Integer doInTransaction(TransactionStatus status) {
-        return jdbcTemplate.update("DELETE FROM log_stream WHERE id <= ?", to.position);
+        return jdbcTemplate.update("DELETE FROM log_stream WHERE id < ?", to.position);
       }
     });
   }
@@ -201,11 +202,7 @@ public class DbLogStream implements Log, Stream {
 
   @Override
   public Position end() {
-    return transactionTemplate.execute(new TransactionCallback<Position>() {
-      @Override public Position doInTransaction(TransactionStatus status) {
-        return new LongPosition(jdbcTemplate.queryForLong("SELECT MAX(id) FROM log_stream"));
-      }
-    });
+    return LongPosition.END;
   }
 
   @Override

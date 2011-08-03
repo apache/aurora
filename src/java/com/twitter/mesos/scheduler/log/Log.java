@@ -92,24 +92,24 @@ public interface Log {
     Position append(byte[] contents) throws StreamAccessException;
 
     /**
-     * Allows reading log entries after a given {@code position}. To read all log entries, pass
+     * Allows reading log entries from a given {@code position}. To read all log entries, pass
      * {@link #beginning()}.  Implementations may materialize all entries after the the given
      * position at once or the may provide some form of streaming to back the returned entry
      * iterator.  If the implementation does use some form of streaming or batching, it may throw a
      * {@code StreamAccessException} on any call to {@link Iterator#hasNext()} or
      * {@link Iterator#next()}.
      *
-     * @param position the position to read after
-     * @return an iterator that ranges from the entry after the given {@code position} to the last
+     * @param position the position to read from
+     * @return an iterator that ranges from the entry from the given {@code position} to the last
      *     entry in the log.
      * @throws InvalidPositionException if the specified position does not exist in this log
      * @throws StreamAccessException if the stream could not be read from
      */
-    Iterator<Entry> readAfter(Position position)
+    Iterator<Entry> readFrom(Position position)
         throws InvalidPositionException, StreamAccessException;
 
     /**
-     * Removes all log entries preceding and including log entry at the given {@code position}. To
+     * Removes all log entries preceding the log entry at the given {@code position}. To
      * truncate all log entries, pass {@link #end()}.
      *
      * @param position the position of the latest entry to remove
@@ -117,22 +117,32 @@ public interface Log {
      * @throws InvalidPositionException if the specified position does not exist in this log
      * @throws StreamAccessException if the stream could not be truncated
      */
-    long truncateTo(Position position) throws InvalidPositionException, StreamAccessException;
+    long truncateBefore(Position position) throws InvalidPositionException, StreamAccessException;
 
     /**
-     * Returns a position that never points to any entry but is guaranteed to immediately precede
-     * the first (oldest) log entry.
+     * Returns a position of the first (oldest) log entry.
      *
-     * @return the position immediately preceeding the first stream log entry
+     * @return the position of the first stream log entry
      */
     Position beginning();
 
     /**
-     * Returns a position of the last (newest) log stream entry.
+     * Returns a position that never points to any entry but is guaranteed to immediately follow
+     * the last (newest) log entry.
      *
      * @return the position immediately following the last stream log entry
      */
     Position end();
+
+    /**
+     * Exchanges an {@code identity} obtained from {@link Position#identity()} for the position
+     * uniquely associated with it.  Useful for restoring saved checkpoints.
+     *
+     * @param identity the identity obtained from a prior call to {@link Position#identity()}
+     * @return the corresponding position
+     * @throws InvalidPositionException if identity does not represent a position in this stream
+     */
+    Position position(byte[] identity) throws InvalidPositionException;
   }
 
   /**
@@ -143,14 +153,4 @@ public interface Log {
    * @throws IOException if there was a problem opening the log stream
    */
   Stream open() throws IOException;
-
-  /**
-   * Exchanges an {@code identity} obtained from {@link Position#identity()} for the position
-   * uniquely associated with it.  Useful for restoring saved checkpoints.
-   *
-   * @param identity the identity obtained from a prior call to {@link Position#identity()}
-   * @return the corresponding position
-   * @throws InvalidPositionException if identity does not represent a position produced by this log
-   */
-  Position position(byte[] identity) throws InvalidPositionException;
 }

@@ -44,38 +44,37 @@ public class DbLogStreamTest extends TearDownTestCase {
   @Test
   public void testReadAfter_empty() throws IOException {
     Stream stream = openStream();
-    assertContents(stream.readAfter(stream.beginning()));
-    assertContents(stream.readAfter(stream.end()));
+    assertContents(stream.readFrom(stream.beginning()));
+    assertContents(stream.readFrom(stream.end()));
   }
 
   @Test
   public void testTruncateBefore_empty() throws Exception {
     Stream stream = openStream();
-    stream.truncateTo(stream.beginning());
-    assertContents(stream.readAfter(stream.beginning()));
+    stream.truncateBefore(stream.beginning());
+    assertContents(stream.readFrom(stream.beginning()));
 
-    stream.truncateTo(stream.end());
-    assertContents(stream.readAfter(stream.beginning()));
+    stream.truncateBefore(stream.end());
+    assertContents(stream.readFrom(stream.beginning()));
   }
 
   @Test
   public void testSize_empty() throws IOException {
     Stream stream = openStream();
-    assertFalse(stream.readAfter(stream.beginning()).hasNext());
+    assertFalse(stream.readFrom(stream.beginning()).hasNext());
   }
 
   @Test
   public void testAppend() throws IOException {
     Stream stream = openStream();
-    assertContents(stream.readAfter(stream.beginning()));
+    assertContents(stream.readFrom(stream.beginning()));
 
     Position joe = stream.append("joe".getBytes());
-    assertFalse(stream.readAfter(joe).hasNext());
-    assertContents(stream.readAfter(stream.beginning()), "joe");
+    assertContents(stream.readFrom(stream.beginning()), "joe");
 
     stream.append("bob".getBytes());
     stream.append("jane".getBytes());
-    assertContents(stream.readAfter(joe), "bob", "jane");
+    assertContents(stream.readFrom(joe), "joe", "bob", "jane");
   }
 
   private static final Function<Entry,Position> GET_POSITION = new Function<Entry, Position>() {
@@ -92,7 +91,7 @@ public class DbLogStreamTest extends TearDownTestCase {
     Position b = stream.append("b".getBytes());
     Position a = stream.append("a".getBytes());
 
-    List<Entry> entries = Lists.newArrayList(stream.readAfter(stream.beginning()));
+    List<Entry> entries = Lists.newArrayList(stream.readFrom(stream.beginning()));
     assertContents(entries.iterator(), "c", "b", "a");
 
     ImmutableList<Position> sortedPositions =
