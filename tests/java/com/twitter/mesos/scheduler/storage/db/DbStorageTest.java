@@ -1,19 +1,27 @@
 package com.twitter.mesos.scheduler.storage.db;
 
+import java.nio.ByteBuffer;
 import java.sql.SQLException;
+import java.util.Set;
 
+import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
+import org.junit.Test;
+
+import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.storage.BaseTaskStoreTest;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
-import com.twitter.mesos.Tasks;
-
-import org.junit.Test;
+import com.twitter.mesos.scheduler.storage.UpdateStore.ShardUpdateConfiguration;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
@@ -53,17 +61,13 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
 
   @Test
   public void testJobConfigurationStorage() {
-    JobConfiguration jobConfig1 = new JobConfiguration().setOwner(new Identity("jake", "jake"))
-        .setName("fortune");
+    JobConfiguration jobConfig1 = createJobConfig("jake", "jake", "fortune");
     store.saveAcceptedJob("CRON", jobConfig1);
 
-    JobConfiguration jobConfig2 = new JobConfiguration().setOwner(new Identity("jane", "jane"))
-        .setName("df");
+    JobConfiguration jobConfig2 = createJobConfig("jane", "jane", "df");
     store.saveAcceptedJob("CRON", jobConfig2);
 
-    JobConfiguration jobConfig3 = new JobConfiguration().setOwner(new Identity("fred", "fred"))
-        .setName("uname");
-
+    JobConfiguration jobConfig3 = createJobConfig("fred", "fred", "uname");
     store.saveAcceptedJob("IMMEDIATE", jobConfig3);
 
     assertTrue(Iterables.isEmpty(store.fetchJobs("DNE")));
@@ -92,5 +96,78 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
 
     store.remove(Query.GET_ALL);
     assertEquals(0, store.getTaskStoreSize());
+  }
+
+  @Test
+  public void testCheckpointing() {
+    assertNull(store.fetchLatestCheckpoint());
+
+    store.checkpoint(createCheckpoint("bob"));
+    store.checkpoint(createCheckpoint("fred"));
+    assertEquals("fred", decodeCheckpoint(store.fetchLatestCheckpoint()));
+
+    store.checkpoint(createCheckpoint("bob"));
+    assertEquals("bob", decodeCheckpoint(store.fetchLatestCheckpoint()));
+  }
+
+  @Test
+  public void testSnapshotting() {
+    byte[] snapshot1 = store.createSnapshot();
+
+    store.saveFrameworkId("jake");
+    store.checkpoint(createCheckpoint("1"));
+    byte[] snapshot2 = store.createSnapshot();
+
+    JobConfiguration fortuneCron = createJobConfig("jake", "jake", "fortune");
+    store.saveAcceptedJob("CRON", fortuneCron);
+
+    ScheduledTask originalTask = makeTask("42");
+    store.add(ImmutableSet.<ScheduledTask>of(originalTask));
+
+    TwitterTaskInfo originalTaskInfo = originalTask.getAssignedTask().getTask();
+    final TwitterTaskInfo newTaskInfo = originalTaskInfo.deepCopy().setNumCpus(42);
+    TaskUpdateConfiguration updateConfiguration =
+        new TaskUpdateConfiguration(originalTaskInfo, newTaskInfo);
+    store.add("fortune", "please", ImmutableSet.<TaskUpdateConfiguration>of(updateConfiguration));
+    store.checkpoint(createCheckpoint("2"));
+    byte[] snapshot3 = store.createSnapshot();
+
+    store.applySnapshot(snapshot1);
+    assertNull(store.fetchLatestCheckpoint());
+    assertNull(store.fetchFrameworkId());
+    assertTrue(Iterables.isEmpty(store.fetchJobs("CRON")));
+    assertTrue(store.fetchIds(Query.GET_ALL).isEmpty());
+    assertTrue(store.fetchShardUpdateConfigs("fortune").isEmpty());
+
+    store.applySnapshot(snapshot3);
+    assertEquals("2", decodeCheckpoint(store.fetchLatestCheckpoint()));
+    assertEquals("jake", store.fetchFrameworkId());
+    assertEquals(ImmutableList.of(fortuneCron), ImmutableList.copyOf(store.fetchJobs("CRON")));
+    assertEquals("42", Iterables.getOnlyElement(store.fetchIds(Query.GET_ALL)));
+    Set<ShardUpdateConfiguration> updateConfigs = store.fetchShardUpdateConfigs("fortune");
+    assertEquals(1, updateConfigs.size());
+    ShardUpdateConfiguration config = Iterables.getOnlyElement(updateConfigs);
+    assertEquals("please", config.getUpdateToken());
+    assertEquals(originalTaskInfo, config.getOldConfig());
+    assertEquals(newTaskInfo, config.getNewConfig());
+
+    store.applySnapshot(snapshot2);
+    assertEquals("1", decodeCheckpoint(store.fetchLatestCheckpoint()));
+    assertEquals("jake", store.fetchFrameworkId());
+    assertTrue(Iterables.isEmpty(store.fetchJobs("CRON")));
+    assertTrue(store.fetchIds(Query.GET_ALL).isEmpty());
+    assertTrue(store.fetchShardUpdateConfigs("fortune").isEmpty());
+  }
+
+  private JobConfiguration createJobConfig(String name, String role, String user) {
+    return new JobConfiguration().setOwner(new Identity(role, user)).setName(name);
+  }
+
+  private byte[] createCheckpoint(String checkpoint) {
+    return checkpoint.getBytes(Charsets.UTF_8);
+  }
+
+  private String decodeCheckpoint(byte[] data) {
+    return new String(data, Charsets.UTF_8);
   }
 }

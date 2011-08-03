@@ -2,6 +2,9 @@ package com.twitter.mesos.scheduler.storage.db;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -25,11 +28,13 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.google.common.io.Files;
 import com.google.common.primitives.Ints;
 import com.google.inject.Inject;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.thrift.TBase;
+import org.apache.thrift.TBaseHelper;
 import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TProtocol;
 import org.apache.thrift.transport.TIOStreamTransport;
@@ -48,6 +53,8 @@ import com.twitter.common.base.ExceptionTransporter;
 import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.common.inject.TimedInterceptor.Timed;
+import com.twitter.common.io.FileUtils;
+import com.twitter.common.io.FileUtils.Temporary;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.StatImpl;
@@ -67,6 +74,7 @@ import com.twitter.mesos.gen.storage.migration.StorageMigrationStatus;
 import com.twitter.mesos.gen.storage.migration.StorageSystemId;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.db.DbUtil;
+import com.twitter.mesos.scheduler.storage.CheckpointStore;
 import com.twitter.mesos.scheduler.storage.JobStore;
 import com.twitter.mesos.scheduler.storage.MigrationUtils;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
@@ -83,7 +91,8 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
  *
  * @author John Sirois
  */
-public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore, UpdateStore {
+public class DbStorage
+    implements CheckpointStore, Storage, SchedulerStore, JobStore, TaskStore, UpdateStore {
 
   private static final Logger LOG = Logger.getLogger(DbStorage.class.getName());
 
@@ -105,7 +114,7 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore, 
   @VisibleForTesting final JdbcTemplate jdbcTemplate;
   private final TransactionTemplate transactionTemplate;
   private final StorageSystemId id;
-
+  private final Temporary temporary = FileUtils.SYSTEM_TMP;
   private boolean initialized;
 
   private final DbStorage self = this;
@@ -259,8 +268,73 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore, 
   public String fetchFrameworkId() {
     return fetchSchedulerState(ConfiguratonKey.FRAMEWORK_ID,
         new ExceptionalFunction<TProtocol, String, TException>() {
-          @Override public String apply(TProtocol data) throws TException {
-            return data.readString();
+          @Override public String apply(TProtocol stream) throws TException {
+            return stream.readString();
+          }
+        }, null);
+  }
+
+  @Timed("db_storage_create_snapshot")
+  @Override
+  public byte[] createSnapshot() {
+    try {
+      return temporary.doWithFile(new ExceptionalFunction<File, byte[], IOException>() {
+        @Override public byte[] apply(final File file) throws IOException {
+          transactionTemplate.execute(new TransactionCallbackWithoutResult() {
+            @Override protected void doInTransactionWithoutResult(TransactionStatus status) {
+              jdbcTemplate.execute(
+                  String.format("SCRIPT TO '%s' COMPRESSION GZIP CHARSET 'UTF-8'",
+                      file.getAbsolutePath()));
+            }
+          });
+          return Files.toByteArray(file);
+        }
+      });
+    } catch (IOException e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  @Timed("db_storage_apply_snapshot")
+  @Override
+  public void applySnapshot(final byte[] snapshot) {
+    try {
+      temporary.doWithFile(new ExceptionalClosure<File, IOException>() {
+        @Override public void execute(final File file) throws IOException {
+          Files.write(snapshot, file);
+          transactionTemplate.execute(new TransactionCallbackWithoutResult() {
+            @Override protected void doInTransactionWithoutResult(TransactionStatus status) {
+              jdbcTemplate.execute(
+                  String.format(
+                      "DROP ALL OBJECTS; RUNSCRIPT FROM '%s' COMPRESSION GZIP CHARSET 'UTF-8'",
+                      file.getAbsolutePath()));
+            }
+          });
+        }
+      });
+    } catch (IOException e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  @Timed("db_storage_record_checkpoint")
+  @Override
+  public void checkpoint(final byte[] handle) {
+    updateSchedulerState(ConfiguratonKey.LAST_COMMITTED_LOG_POSITION,
+        new ExceptionalClosure<TProtocol, TException>() {
+          @Override public void execute(TProtocol stream) throws TException {
+            stream.writeBinary(ByteBuffer.wrap(handle));
+          }
+        });
+  }
+
+  @Timed("db_storage_fetch_checkpoint")
+  @Override
+  public byte[] fetchLatestCheckpoint() {
+    return fetchSchedulerState(ConfiguratonKey.LAST_COMMITTED_LOG_POSITION,
+        new ExceptionalFunction<TProtocol, byte[], TException>() {
+          @Override public byte[] apply(TProtocol stream) throws TException {
+            return TBaseHelper.byteBufferToByteArray(stream.readBinary());
           }
         }, null);
   }
@@ -595,7 +669,6 @@ public class DbStorage implements Storage, SchedulerStore, JobStore, TaskStore, 
 
   @Timed("db_storage_fetch_shard_update_configs_by_job")
   @Override
-  @Nullable
   public Set<ShardUpdateConfiguration> fetchShardUpdateConfigs(final String jobKey) {
     checkNotBlank(jobKey);
 
