@@ -141,6 +141,7 @@ class MesosSchedulerImpl implements Scheduler {
 
     try {
       for (SlaveOffer offer : slaveOffers) {
+        log(Level.FINE, "Received offer: %s", offer);
         SchedulerCore.TwitterTask task = schedulerCore.offer(offer);
 
         if (task != null) {
@@ -152,13 +153,15 @@ class MesosSchedulerImpl implements Scheduler {
             throw new ScheduleException("Internal error.", e);
           }
 
-          scheduledTasks.add(TaskDescription.newBuilder()
-              .setName(task.taskName)
-              .setTaskId(TaskID.newBuilder().setValue(task.taskId))
-              .setSlaveId(SlaveID.newBuilder().setValue(task.slaveId))
-              .addAllResources(task.resources)
-              .setData(ByteString.copyFrom(taskInBytes))
-              .build());
+          TaskDescription assignedTask =
+              TaskDescription.newBuilder().setName(task.taskName)
+                  .setTaskId(TaskID.newBuilder().setValue(task.taskId))
+                  .setSlaveId(SlaveID.newBuilder().setValue(task.slaveId))
+                  .addAllResources(task.resources)
+                  .setData(ByteString.copyFrom(taskInBytes))
+                  .build();
+          log(Level.FINE, "Accepted offer: ", assignedTask);
+          scheduledTasks.add(assignedTask);
         }
       }
     } catch (ScheduleException e) {
@@ -246,6 +249,12 @@ class MesosSchedulerImpl implements Scheduler {
       }
     } catch (ThriftBinaryCodec.CodingException e) {
       LOG.log(Level.SEVERE, "Failed to decode framework message.", e);
+    }
+  }
+
+  private static void log(Level level, String message, Object... args) {
+    if (LOG.isLoggable(level)) {
+      LOG.log(level, String.format(message, args));
     }
   }
 

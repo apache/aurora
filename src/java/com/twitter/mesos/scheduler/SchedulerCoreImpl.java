@@ -384,12 +384,17 @@ public class SchedulerCoreImpl implements SchedulerCore {
       postFilter = schedulingFilter.dynamicHostFilter(this, hostname);
     }
 
-    ImmutableSortedSet<ScheduledTask> candidates = ImmutableSortedSet.copyOf(
+    final ImmutableSortedSet<ScheduledTask> candidates = ImmutableSortedSet.copyOf(
         Tasks.SCHEDULING_ORDER.onResultOf(Tasks.SCHEDULED_TO_ASSIGNED),
         stateManager.fetchTasks(query));
     if (candidates.isEmpty()) {
       return null;
     }
+    log(Level.FINEST, "Candidates for offer: %s", new Object() {
+      @Override public String toString() {
+        return Iterables.transform(candidates, Tasks.SCHEDULED_TO_ID).toString();
+      }
+    });
 
     ScheduledTask assignment = Iterables.get(Iterables.filter(
         candidates, Predicates.compose(postFilter, Tasks.SCHEDULED_TO_INFO)), 0, null);
@@ -593,6 +598,12 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
   private void checkLifecycleState(State state) {
     Preconditions.checkState(stateMachine.getState() == state);
+  }
+
+  private static void log(Level level, String message, Object... args) {
+    if (LOG.isLoggable(level)) {
+      LOG.log(level, String.format(message, args));
+    }
   }
 
   private final class Vars {
