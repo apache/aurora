@@ -29,10 +29,11 @@ BUILD_SCHEDULER_PACKAGE_PATH = 'dist/%s' % SCHEDULER_PACKAGE
 BUILD_SCHEDULER_JAR_PATH = 'dist/mesos-scheduler-bundle/mesos-scheduler.jar'
 STAGED_PACKAGE_PATH = '%s/%s' % (STAGE_DIR, SCHEDULER_PACKAGE)
 
+DC_WILDCARD = '$dc'
 CLUSTER_WILDCARD = '$cluster'
 HDFS_BIN_DIR = '/mesos/pkg/mesos/bin'
 HDFS_BIN_FILES = {
-  'mesos/scripts/executor.sh': '%s/$cluster/$cluster-executor.sh' % HDFS_BIN_DIR,
+  'mesos/scripts/executor.sh': '%s/$cluster/$dc-$cluster-executor.sh' % HDFS_BIN_DIR,
   'dist/mesos-executor.zip':  '%s/$cluster/mesos-executor.zip' % HDFS_BIN_DIR,
 }
 
@@ -47,8 +48,14 @@ options = None
 def get_cluster_dc():
   return clusters.get_dc(options.cluster)
 
+
+def get_cluster_name():
+  return clusters.get_local_name(options.cluster)
+
+
 def get_scheduler_machine():
   return clusters.get_scheduler_host(options.cluster)
+
 
 def read_bool_stdin(prompt, default=None):
   if default is not None:
@@ -65,11 +72,13 @@ def read_bool_stdin(prompt, default=None):
     else:
       print "I'll keep asking until you answer!"
 
+
 def maybe_run_command(runner, cmd):
   if options.verbose or not options.really_push:
     print '%s command: %s' % ('Executing' if options.really_push else 'Would run', ' '.join(cmd))
   if options.really_push:
     return runner(cmd)
+
 
 def check_call(cmd):
   """Wrapper for subprocess.check_call."""
@@ -180,11 +189,16 @@ def stage_build():
   ])
   return release_scheduler_path
 
+
 def set_live_build(build_path):
-  cluster_name = clusters.get_local_name(options.cluster)
+  wildcards = {
+    DC_WILDCARD: get_cluster_dc(),
+    CLUSTER_WILDCARD: get_cluster_name()
+  }
   for local_file, hdfs_target in HDFS_BIN_FILES.items():
-    local_file = local_file.replace(CLUSTER_WILDCARD, cluster_name)
-    hdfs_target = hdfs_target.replace(CLUSTER_WILDCARD, cluster_name)
+    for wildcard, value in wildcards.items():
+      local_file = local_file.replace(wildcard, value)
+      hdfs_target = hdfs_target.replace(wildcard, value)
     print 'Sending local file from %s to HDFS %s' % (local_file, hdfs_target)
     stage_file = os.path.join(STAGE_DIR, os.path.basename(local_file))
     check_output(['scp', local_file, '%s:%s' % (ssh_target(), stage_file)])
