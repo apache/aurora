@@ -14,6 +14,7 @@ import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
+import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
@@ -26,7 +27,10 @@ import com.google.inject.Inject;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.SlaveOffer;
 
+import com.twitter.common.base.CachingSupplier;
 import com.twitter.common.base.Closure;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.StateMachine;
@@ -289,12 +293,43 @@ public class SchedulerCoreImpl implements SchedulerCore {
     cronScheduler.startJobNow(key);
   }
 
+  // Handles exporting of stats related to task counts for each job by status.
+  private final Supplier<Set<ScheduledTask>> taskCache = new CachingSupplier<Set<ScheduledTask>>(
+      new com.twitter.common.base.Supplier<Set<ScheduledTask>>() {
+        @Override public Set<ScheduledTask> get() {
+          return stateManager.fetchTasks(Query.GET_ALL);
+        }
+      },
+      Amount.of(1L, Time.SECONDS));
+  private final Map<String, String> countersByJobAndStatus = new MapMaker().makeComputingMap(
+      new Function<String, String>() {
+        @Override public String apply(final String jobKey) {
+          for (final ScheduleStatus status : ScheduleStatus.values()) {
+            Stats.export(new StatImpl<Integer>("job_" + jobKey + "_tasks_" + status) {
+              @Override public Integer read() {
+                int count = 0;
+                for (ScheduledTask task : taskCache.get()) {
+                  if (Tasks.jobKey(task).equals(jobKey) && task.getStatus() == status) {
+                    count++;
+                  }
+                }
+                return count;
+              }
+            });
+          }
+          return jobKey;
+        }
+      });
+
   @Override
   public synchronized void runJob(JobConfiguration job) {
     checkNotNull(job);
     checkNotNull(job.getTaskConfigs());
     checkStarted();
     checkState(!hasRunningTasks(job));
+
+    // Dummy read to ensure stats are exported for the job.
+    countersByJobAndStatus.get(Tasks.jobKey(job));
 
     launchTasks(job.getTaskConfigs());
   }
