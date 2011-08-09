@@ -173,7 +173,7 @@ class MesosCLIHelper:
     MesosCLIHelper.check_call(['hadoop', 'fs', '-put', hdfs_src, dst], ssh_proxy_host)
 
   @staticmethod
-  def copy_app_to_hadoop(source_path, hdfs_path, target_dc, ssh_proxy):
+  def copy_app_to_hadoop(source_path, hdfs_path, cluster, ssh_proxy):
     assert hdfs_path is not None, 'No target HDFS path specified'
     hdfs = clusters.get_hadoop_uri(cluster)
     hdfs_uri = '%s%s' % (hdfs, hdfs_path)
@@ -302,13 +302,11 @@ class MesosCLI(cmd.Cmd):
     """create job config"""
     (job, owner, tasks, cron_collision_policy, _) = self.read_config(*line)
 
-    MesosCLIHelper.get_cluster(self.options.cluster, job.get('cluster'))
-
-    dc = clusters.get_dc(job['cluster'])
+    cluster = MesosCLIHelper.get_cluster(self.options.cluster, job.get('cluster'))
 
     if self.options.copy_app_from is not None:
       MesosCLIHelper.copy_app_to_hadoop(self.options.copy_app_from,
-          job['task']['hdfs_path'], dc, self._proxy)
+          job['task']['hdfs_path'], cluster, self._proxy)
 
     sessionkey = self.acquire_session()
 
@@ -411,15 +409,13 @@ class MesosCLI(cmd.Cmd):
 
     (job, owner, tasks, cron_collision_policy, update_config) = self.read_config(*line)
 
-    MesosCLIHelper.get_cluster(self.options.cluster, job.get('cluster'))
-
-    dc = clusters.get_dc(job['cluster'])
+    cluster = MesosCLIHelper.get_cluster(self.options.cluster, job.get('cluster'))
 
     # TODO(William Farner): Add a rudimentary versioning system here so application updates
     #                       don't overwrite original binary.
     if self.options.copy_app_from is not None:
       MesosCLIHelper.copy_app_to_hadoop(self.options.copy_app_from, job['task']['hdfs_path'],
-          dc, self._proxy)
+          cluster, self._proxy)
 
     sessionkey = self.acquire_session()
 
