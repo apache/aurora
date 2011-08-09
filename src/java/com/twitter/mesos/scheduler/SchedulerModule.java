@@ -50,6 +50,8 @@ import com.twitter.common_internal.zookeeper.TwitterZk;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.PulseMonitor.PulseMonitorImpl;
 import com.twitter.mesos.scheduler.SchedulingFilter.SchedulingFilterImpl;
+import com.twitter.mesos.scheduler.auth.SessionValidator;
+import com.twitter.mesos.scheduler.auth.SessionValidator.SessionValidatorImpl;
 import com.twitter.mesos.scheduler.httphandlers.CreateJob;
 import com.twitter.mesos.scheduler.httphandlers.Mname;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzHome;
@@ -147,6 +149,7 @@ public class SchedulerModule extends AbstractModule {
     bind(Credentials.class).toInstance(ZooKeeperClient.digestCredentials("mesos", "mesos"));
 
     // Bindings for MesosSchedulerImpl.
+    bind(SessionValidator.class).to(SessionValidatorImpl.class);
     bind(SchedulerCore.class).to(SchedulerCoreImpl.class).in(Singleton.class);
     bind(ExecutorTracker.class).to(ExecutorTrackerImpl.class).in(Singleton.class);
 

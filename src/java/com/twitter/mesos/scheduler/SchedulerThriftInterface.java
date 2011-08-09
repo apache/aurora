@@ -11,14 +11,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
-import org.apache.commons.lang.StringUtils;
-
-import com.twitter.common.collections.Pair;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
-import com.twitter.common.util.Clock;
-import com.twitter.common_internal.ldap.Ods;
-import com.twitter.common_internal.ldap.User;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.CreateJobResponse;
 import com.twitter.mesos.gen.FinishUpdateResponse;
@@ -28,19 +20,19 @@ import com.twitter.mesos.gen.MesosSchedulerManager;
 import com.twitter.mesos.gen.ResponseCode;
 import com.twitter.mesos.gen.RestartResponse;
 import com.twitter.mesos.gen.RollbackShardsResponse;
-import com.twitter.mesos.gen.UpdateResponseCode;
 import com.twitter.mesos.gen.ScheduleStatusResponse;
 import com.twitter.mesos.gen.SessionKey;
 import com.twitter.mesos.gen.StartCronResponse;
 import com.twitter.mesos.gen.StartUpdateResponse;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.gen.UpdateResponseCode;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.UpdateShardsResponse;
 import com.twitter.mesos.scheduler.SchedulerCore.RestartException;
+import com.twitter.mesos.scheduler.auth.SessionValidator;
+import com.twitter.mesos.scheduler.auth.SessionValidator.AuthFailedException;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
-import com.twitter.mesos.scheduler.identity.AuthorizedKeySet;
-import com.twitter.mesos.scheduler.identity.AuthorizedKeySet.KeyParseException;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
@@ -57,81 +49,22 @@ import static com.twitter.mesos.gen.ResponseCode.WARNING;
  */
 public class SchedulerThriftInterface implements MesosSchedulerManager.Iface {
   private static final Logger LOG = Logger.getLogger(SchedulerThriftInterface.class.getName());
-  private static final Amount<Long, Time> MAXIMUM_NONCE_DRIFT = Amount.of(10L, Time.SECONDS);
 
   private final SchedulerCore schedulerCore;
-  private final Ods ods;
-  private final Clock clock;
+  private final SessionValidator sessionValidator;
 
   @Inject
-  public SchedulerThriftInterface(SchedulerCore schedulerCore, Ods ods, Clock clock) {
+  public SchedulerThriftInterface(SchedulerCore schedulerCore, SessionValidator sessionValidator) {
     this.schedulerCore = checkNotNull(schedulerCore);
-    this.ods = checkNotNull(ods);
-    this.clock = checkNotNull(clock);
+    this.sessionValidator = checkNotNull(sessionValidator);
   }
 
-  /**
-   * Given a sessionKey, determine the response type and provide human-readable error message.
-   */
-  private Pair<ResponseCode, String> validateSessionKey(SessionKey sessionKey,
-      String targetRole) {
-    if (StringUtils.isBlank(sessionKey.getUser())
-        || !sessionKey.isSetNonce()
-        || !sessionKey.isSetNonceSig()) {
-      return Pair.of(AUTH_FAILED, "Incorrectly specified session key.");
-    }
-
-    long now = this.clock.nowMillis();
-    long diff = Math.abs(now - sessionKey.getNonce());
-    if (Amount.of(diff, Time.MILLISECONDS).compareTo(MAXIMUM_NONCE_DRIFT) > 0) {
-      return Pair.of(AUTH_FAILED, "Session key nonce expired.");
-    }
-
-    String userId = sessionKey.getUser();
-    if (!userId.equals(targetRole)) {
-      if (!ods.isRoleAccount(targetRole)) {
-        return Pair.of(AUTH_FAILED,
-            String.format("%s is not a role account.", targetRole));
-      } else if (!ods.isMember(userId, targetRole)) {
-        return Pair.of(AUTH_FAILED,
-            String.format("User %s does not have permission for role %s", userId, targetRole));
-      }
-    }
-
-    User user = ods.getUser(userId);
-    if (user == null) {
-      return Pair.of(AUTH_FAILED, String.format("User %s not found.", userId));
-    }
-
-    AuthorizedKeySet keySet;
-    try {
-      keySet = AuthorizedKeySet.createFromKeys(user.getSshPubkeys());
-    } catch (KeyParseException e) {
-      return Pair.of(AUTH_FAILED, "Failed to parse SSH keys for user " + userId);
-    }
-
-    if (!keySet.verify(
-        Long.toString(sessionKey.getNonce()).getBytes(),
-        sessionKey.getNonceSig())) {
-      return Pair.of(AUTH_FAILED, "Authentication failed for " + userId);
-    }
-
-    return Pair.of(OK, "");
-  }
-
-  /**
-   * Validate the session key against the roles of a set of tasks.
-   */
-  private Pair<ResponseCode, String> validateSessionKey(SessionKey session, Set<String> taskIds) {
-    Set<TaskState> tasks = schedulerCore.getTasks(Query.byId(taskIds));
+  private void validateSessionKeyForTasks(SessionKey session, Query taskQuery)
+      throws AuthFailedException {
+    Set<TaskState> tasks = schedulerCore.getTasks(taskQuery);
     for (String role : ImmutableSet.copyOf(Iterables.transform(tasks, GET_ROLE))) {
-      Pair<ResponseCode, String> rc = validateSessionKey(session, role);
-      if (rc.getFirst() != OK) {
-        return rc;
-      }
+      sessionValidator.checkAuthenticated(session, role);
     }
-
-    return Pair.of(OK, "");
   }
 
   @Override
@@ -142,9 +75,10 @@ public class SchedulerThriftInterface implements MesosSchedulerManager.Iface {
     LOG.info("Received createJob request: " + Tasks.jobKey(job));
     CreateJobResponse response = new CreateJobResponse();
 
-    Pair<ResponseCode, String> rc = validateSessionKey(session, job.getOwner().getRole());
-    if (rc.getFirst() != OK) {
-      response.setResponseCode(rc.getFirst()).setMessage(rc.getSecond());
+    try {
+      sessionValidator.checkAuthenticated(session, job.getOwner().getRole());
+    } catch (AuthFailedException e) {
+      response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
       return response;
     }
 
@@ -171,10 +105,10 @@ public class SchedulerThriftInterface implements MesosSchedulerManager.Iface {
     checkNotNull(session, "Session must be provided.");
 
     StartCronResponse response = new StartCronResponse();
-    Pair<ResponseCode, String> rc = validateSessionKey(session, role);
-
-    if (rc.getFirst() != OK) {
-      response.setResponseCode(rc.getFirst()).setMessage(rc.getSecond());
+    try {
+      sessionValidator.checkAuthenticated(session, role);
+    } catch (AuthFailedException e) {
+      response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
       return response;
     }
 
@@ -225,14 +159,11 @@ public class SchedulerThriftInterface implements MesosSchedulerManager.Iface {
     LOG.info("Received kill request for tasks: " + query);
     KillResponse response = new KillResponse();
 
-    Set<TaskState> tasks = schedulerCore.getTasks(new Query(query));
-    for (String role : ImmutableSet.copyOf(Iterables.transform(tasks, GET_ROLE))) {
-      Pair<ResponseCode, String> rc = validateSessionKey(session, role);
-      if (rc.getFirst() != OK) {
-        response.setResponseCode(rc.getFirst())
-            .setMessage(rc.getSecond());
-        return response;
-      }
+    try {
+      validateSessionKeyForTasks(session, new Query(query));
+    } catch (AuthFailedException e) {
+      response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
+      return response;
     }
 
     try {
@@ -256,10 +187,10 @@ public class SchedulerThriftInterface implements MesosSchedulerManager.Iface {
     RestartResponse response = new RestartResponse()
         .setMessage(taskIds.size() + " tasks scheduled for restart.");
 
-    Pair<ResponseCode, String> rc = validateSessionKey(session, taskIds);
-    if (rc.getFirst() != OK) {
-      response.setResponseCode(rc.getFirst())
-          .setMessage(rc.getSecond());
+    try {
+      validateSessionKeyForTasks(session, Query.byId(taskIds));
+    } catch (AuthFailedException e) {
+      response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
       return response;
     }
 
@@ -287,9 +218,11 @@ public class SchedulerThriftInterface implements MesosSchedulerManager.Iface {
 
     LOG.info("Received update request for tasks: " + Tasks.jobKey(job));
     StartUpdateResponse response = new StartUpdateResponse();
-    Pair<ResponseCode, String> rc = validateSessionKey(session, job.getOwner().getRole());
-    if (rc.getFirst() != OK) {
-      return response.setResponseCode(rc.getFirst()).setMessage(rc.getSecond());
+    try {
+      sessionValidator.checkAuthenticated(session, job.getOwner().getRole());
+    } catch (AuthFailedException e) {
+      response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
+      return response;
     }
 
     try {
