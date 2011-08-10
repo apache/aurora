@@ -154,6 +154,7 @@ public class PreempterTest extends EasyMockTest {
     clock.advance(preemptionCandidacyDelay);
 
     expectGetTasks().times(2);
+    expectFiltering();
 
     control.replay();
     preempter.run();
@@ -179,6 +180,55 @@ public class PreempterTest extends EasyMockTest {
   }
 
   @Test
+  public void testProductionPreemptingNonproduction() throws Exception {
+    // Use a very low priority for the production task to show that priority is irrelevant.
+    TaskState p1 = makeProductionTask(USER_A, JOB_A, TASK_ID_A + "_p1", -1000);
+    TaskState a1 = makeTask(USER_A, JOB_A, TASK_ID_B + "_a1", 100);
+    runOnHost(a1, HOST_A);
+
+    clock.advance(preemptionCandidacyDelay);
+    expectGetTasks().times(2);
+
+    expectFiltering();
+    expectPreempted(a1, p1);
+
+    control.replay();
+    preempter.run();
+  }
+
+  @Test
+  public void testProductionPreemptingNonproductionAcrossUsers() throws Exception {
+    // Use a very low priority for the production task to show that priority is irrelevant.
+    TaskState p1 = makeProductionTask(USER_A, JOB_A, TASK_ID_A + "_p1", -1000);
+    TaskState a1 = makeTask(USER_B, JOB_A, TASK_ID_B + "_a1", 100);
+    runOnHost(a1, HOST_A);
+
+    clock.advance(preemptionCandidacyDelay);
+    expectGetTasks().times(2);
+
+    expectFiltering();
+    expectPreempted(a1, p1);
+
+    control.replay();
+    preempter.run();
+  }
+
+  @Test
+  public void testProductionUsersDoNotPreemptEachOther() throws Exception {
+    TaskState p1 = makeProductionTask(USER_A, JOB_A, TASK_ID_A + "_p1", 1000);
+    TaskState a1 = makeProductionTask(USER_B, JOB_A, TASK_ID_B + "_a1", 0);
+    runOnHost(a1, HOST_A);
+
+    clock.advance(preemptionCandidacyDelay);
+    expectGetTasks().times(2);
+
+    expectFiltering();
+
+    control.replay();
+    preempter.run();
+  }
+
+  @Test
   public void testInterleavedPriorities() throws Exception {
     TaskState p1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_p1", 1);
     TaskState a3 = makeTask(USER_A, JOB_A, TASK_ID_B + "_a3", 3);
@@ -195,10 +245,7 @@ public class PreempterTest extends EasyMockTest {
     expectGetTasks().times(2);
 
     expectFiltering();
-    // TODO(William Farner): This exhibits a shortcoming in the preempter.  Ideally we would
-    // preempt a1 in favor of p2, and a2 in favor of p3.  Since the preempter is greedy, though,
-    // we instead preempt in favor of the highest priority task first.
-    expectPreempted(a1, p3);
+    expectPreempted(a1, p2);
 
     control.replay();
     preempter.run();
@@ -234,11 +281,21 @@ public class PreempterTest extends EasyMockTest {
   }
 
   private TaskState makeTask(String role, String job, String taskId, int priority) {
+    return makeTask(role, job, taskId, priority, false);
+  }
+
+  private TaskState makeProductionTask(String role, String job, String taskId, int priority) {
+    return makeTask(role, job, taskId, priority, true);
+  }
+
+  private TaskState makeTask(String role, String job, String taskId, int priority,
+      boolean production) {
     AssignedTask assignedTask = new AssignedTask()
         .setTaskId(taskId)
         .setTask(new TwitterTaskInfo()
             .setOwner(new Identity(role, role))
             .setPriority(priority)
+            .setProduction(production)
             .setJobName(job));
     ScheduledTask scheduledTask = new ScheduledTask()
         .setStatus(PENDING)

@@ -204,7 +204,11 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     SlaveOffer slaveOffer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
     TwitterTask launchedTask = scheduler.offer(slaveOffer);
-    assertThat(launchedTask.task.getTask(), is(storedTask));
+
+    // Since task fields are backfilled with defaults, the production flag should be filled.
+    assertThat(launchedTask.task.getTask(),
+        is(new TwitterTaskInfo(storedTask).setProduction(false)));
+
     assertThat(getTask(storedTaskId).task.getStatus(), is(ASSIGNED));
   }
 
@@ -1123,28 +1127,29 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     TwitterTaskInfo task1 = new TwitterTaskInfo(DEFAULT_TASK);
     task1.putToConfiguration("priority", "10");
     TwitterTaskInfo task2 = new TwitterTaskInfo(DEFAULT_TASK);
-    task2.putToConfiguration("priority", "12");
+    task2.putToConfiguration("priority", "0");
+    task2.putToConfiguration("production", "true");
     TwitterTaskInfo task3 = new TwitterTaskInfo(DEFAULT_TASK);
     task3.putToConfiguration("priority", "11");
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, task1, 2));
-    scheduler.createJob(makeJob(OWNER_A, JOB_B, task2, 2));
-    scheduler.createJob(makeJob(OWNER_B, JOB_A, task3, 2));
+    scheduler.createJob(makeJob(OWNER_B, JOB_A, task2, 2));
+    scheduler.createJob(makeJob(OWNER_A, JOB_B, task3, 2));
 
     String taskId1a = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)).task);
     String taskId1b = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 1)).task);
-    String taskId2a = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_B), 0)).task);
-    String taskId2b = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_B), 1)).task);
-    String taskId3a = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_B, JOB_A), 0)).task);
-    String taskId3b = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_B, JOB_A), 1)).task);
+    String taskId2a = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_B, JOB_A), 0)).task);
+    String taskId2b = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_B, JOB_A), 1)).task);
+    String taskId3a = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_B), 0)).task);
+    String taskId3b = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_B), 1)).task);
 
     SlaveOffer slaveOffer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
     sendOffer(slaveOffer, taskId2a, SLAVE_ID, SLAVE_HOST_1);
     sendOffer(slaveOffer, taskId2b, SLAVE_ID, SLAVE_HOST_1);
-    sendOffer(slaveOffer, taskId3a, SLAVE_ID, SLAVE_HOST_1);
-    sendOffer(slaveOffer, taskId3b, SLAVE_ID, SLAVE_HOST_1);
     sendOffer(slaveOffer, taskId1a, SLAVE_ID, SLAVE_HOST_1);
     sendOffer(slaveOffer, taskId1b, SLAVE_ID, SLAVE_HOST_1);
+    sendOffer(slaveOffer, taskId3a, SLAVE_ID, SLAVE_HOST_1);
+    sendOffer(slaveOffer, taskId3b, SLAVE_ID, SLAVE_HOST_1);
   }
 
   @Test

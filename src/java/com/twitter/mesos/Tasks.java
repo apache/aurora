@@ -3,6 +3,8 @@ package com.twitter.mesos;
 import java.util.EnumSet;
 import java.util.Set;
 
+import javax.annotation.Nullable;
+
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Preconditions;
@@ -122,15 +124,19 @@ public class Tasks {
         }
       };
 
-  private static final Ordering<AssignedTask> TASK_ID_ORDER =
-      Ordering.natural().onResultOf(ASSIGNED_TO_ID);
-  private static final Ordering<AssignedTask> PRIORITY_ORDERING =
-      Ordering.natural().onResultOf(Functions.compose(INFO_TO_PRIORITY, ASSIGNED_TO_INFO));
+  private static final Function<TwitterTaskInfo, Boolean> IS_PRODUCTION =
+      new Function<TwitterTaskInfo, Boolean>() {
+        @Override public Boolean apply(TwitterTaskInfo task) {
+          return task.isProduction();
+        }
+      };
+
   /**
-   * Orders by priority, subsorting by task ID.
+   * Order by production flag (true, then false), subsorting by task ID.
    */
   public static final Ordering<AssignedTask> SCHEDULING_ORDER =
-      PRIORITY_ORDERING.reverse().compound(TASK_ID_ORDER);
+      Ordering.explicit(true, false).onResultOf(Functions.compose(IS_PRODUCTION, ASSIGNED_TO_INFO))
+          .compound(Ordering.natural().onResultOf(ASSIGNED_TO_ID));
 
   private Tasks() {
     // Utility class.

@@ -1,14 +1,18 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.annotation.Nullable;
+
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import com.google.common.collect.MapMaker;
 import com.google.common.collect.Ordering;
 import com.google.inject.Inject;
@@ -67,36 +71,18 @@ class Preempter implements Runnable {
   @Override
   public void run() {
     // We are only interested in preempting in favor of pending tasks.
-    Iterable<AssignedTask> pendingTasks = Iterables.transform(
-        scheduler.getTasks(Query.and(PENDING_QUERY, isIdleTask)), STATE_TO_ASSIGNED);
+    List<AssignedTask> pendingTasks = Lists.newArrayList(Iterables.transform(
+        scheduler.getTasks(Query.and(PENDING_QUERY, isIdleTask)), STATE_TO_ASSIGNED));
     if (Iterables.isEmpty(pendingTasks)) {
       return;
     }
 
     // Only non-pending active tasks may be preempted.
-    Iterable<AssignedTask> activeTasks =
-        Iterables.transform(scheduler.getTasks(ACTIVE_NOT_PENDING_QUERY), STATE_TO_ASSIGNED);
+    List<AssignedTask> activeTasks = Lists.newArrayList(
+        Iterables.transform(scheduler.getTasks(ACTIVE_NOT_PENDING_QUERY), STATE_TO_ASSIGNED));
     if (Iterables.isEmpty(activeTasks)) {
       return;
     }
-
-    // We only preempt tasks that are of lower priority than the max priority of pending tasks.
-    // Sort the preemption candidates in the reverse scheduling order.  This ensures we try to evict
-    // the lowest priority tasks first.
-    int maxPendingPriority =
-        Ordering.natural().max(Iterables.transform(pendingTasks, GET_PRIORITY));
-    List<AssignedTask> preemptableTasks = Tasks.SCHEDULING_ORDER.reverse().sortedCopy(
-        Iterables.filter(activeTasks, lowerPriorityFilter(maxPendingPriority)));
-    if (preemptableTasks.isEmpty()) {
-      return;
-    }
-
-    // The tasks that we preempt in favor of must be of higher priority than the lowest priority
-    // preemption candidate.
-    int minPreemptablePriority =
-        Ordering.natural().min(Iterables.transform(preemptableTasks, GET_PRIORITY));
-    List<AssignedTask> preemptingCandidates = Tasks.SCHEDULING_ORDER.sortedCopy(
-        Iterables.filter(pendingTasks, greaterPriorityFilter(minPreemptablePriority)));
 
     // Memoize filters.
     Map<String, Predicate<AssignedTask>> filtersByHost = new MapMaker().makeComputingMap(
@@ -108,7 +94,13 @@ class Preempter implements Runnable {
         }
     );
 
-    for (AssignedTask preemptableTask : preemptableTasks) {
+    // Arrange the pending tasks in scheduling order.
+    Collections.sort(pendingTasks, Tasks.SCHEDULING_ORDER);
+
+    // Walk through the preemption candidates in reverse scheduling order.
+    Collections.sort(activeTasks, Tasks.SCHEDULING_ORDER.reverse());
+
+    for (AssignedTask preemptableTask : activeTasks) {
       // TODO(William Farner): This doesn't fully work, since the preemption is based solely on
       // the resources reserved for the task running, and does not account for slack resource on
       // the machine.  For example, a machine has 1 CPU available, and is running a low priority
@@ -120,9 +112,9 @@ class Preempter implements Runnable {
           preemptionFilter(preemptableTask),
           filtersByHost.get(preemptableTask.getSlaveHost()));
       AssignedTask preempting =
-          Iterables.get(Iterables.filter(preemptingCandidates, preemptionFilter), 0, null);
+          Iterables.get(Iterables.filter(pendingTasks, preemptionFilter), 0, null);
       if (preempting != null) {
-        preemptingCandidates.remove(preempting);
+        pendingTasks.remove(preempting);
         try {
           scheduler.preemptTask(preemptableTask, preempting);
         } catch (ScheduleException e) {
@@ -133,7 +125,11 @@ class Preempter implements Runnable {
   }
 
   /**
-   * Creates a static filter that will identify tasks that may preempt the provided task
+   * Creates a static filter that will identify tasks that may preempt the provided task.
+   * A task may preempt another task if the following conditions hold true:
+   * - The resources reserved for {@code preemptableTask} are sufficient to satisfy the task.
+   * - The tasks are owned by the same user and the priority of {@code preemptableTask} is lower
+   *     OR {@code preemptableTask} is non-production and the compared task is production.
    *
    * @param preemptableTask Task to possibly preempt.
    * @return A filter that will compare the priorities and resources required by other tasks
@@ -143,9 +139,36 @@ class Preempter implements Runnable {
     Predicate<AssignedTask> staticResourceFilter = Predicates.compose(
         schedulingFilter.staticFilter(preemptableTask.getTask(),
             preemptableTask.getSlaveHost()), Tasks.ASSIGNED_TO_INFO);
+
+    Predicate<AssignedTask> preemptableIsProduction = preemptableTask.getTask().isProduction()
+        ? Predicates.<AssignedTask>alwaysTrue()
+        : Predicates.<AssignedTask>alwaysFalse();
+
     Predicate<AssignedTask> priorityFilter =
         greaterPriorityFilter(GET_PRIORITY.apply(preemptableTask));
-    return Predicates.and(staticResourceFilter, priorityFilter);
+    return Predicates.and(staticResourceFilter,
+        Predicates.or(
+            Predicates.and(Predicates.not(preemptableIsProduction), IS_PRODUCTION),
+            Predicates.and(isOwnedBy(getRole(preemptableTask)), priorityFilter)
+        ));
+  }
+
+  private static final Predicate<AssignedTask> IS_PRODUCTION = new Predicate<AssignedTask>() {
+    @Override public boolean apply(AssignedTask task) {
+      return task.getTask().isProduction();
+    }
+  };
+
+  private Predicate<AssignedTask> isOwnedBy(final String role) {
+    return new Predicate<AssignedTask>() {
+      @Override public boolean apply(AssignedTask task) {
+        return getRole(task).equals(role);
+      }
+    };
+  }
+
+  private static String getRole(AssignedTask task) {
+    return task.getTask().getOwner().getRole();
   }
 
   private final Predicate<ScheduledTask> isIdleTask = new Predicate<ScheduledTask>() {

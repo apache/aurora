@@ -253,6 +253,13 @@ public class ConfigurationManager {
           task.setPriority(value);
         }
       },
+      new TypedField<Boolean>(Boolean.class, "production", false) {
+        @Override boolean isSet(TwitterTaskInfo task) { return task.isSetProduction(); }
+
+        @Override void apply(TwitterTaskInfo task, Boolean value) throws TaskDescriptionException {
+          task.setProduction(value);
+        }
+      },
       new TypedField<Integer>(Integer.class, "health_check_interval_secs", 30) {
         @Override boolean isSet(TwitterTaskInfo task) {
           return task.isSetHealthCheckIntervalSecs();
