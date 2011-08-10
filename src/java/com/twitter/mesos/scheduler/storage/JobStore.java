@@ -1,8 +1,8 @@
 package com.twitter.mesos.scheduler.storage;
 
-import com.twitter.mesos.gen.JobConfiguration;
-
 import javax.annotation.Nullable;
+
+import com.twitter.mesos.gen.JobConfiguration;
 
 /**
  * Stores job configuration data.
@@ -44,10 +44,10 @@ public interface JobStore {
   void saveAcceptedJob(String managerId, JobConfiguration jobConfig);
 
   /**
-   * Deletes the job configuration for the job identified by {@code jobKey}.  If there is no stored
+   * Removes the job configuration for the job identified by {@code jobKey}.  If there is no stored
    * configuration for the identified job, this method returns silently.
    *
    * @param jobKey the key identifying the job to delete.
    */
-  void deleteJob(String jobKey);
+  void removeJob(String jobKey);
 }

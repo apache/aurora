@@ -38,5 +38,5 @@ public interface CheckpointStore {
    * @return The most recent checkpoint or else {@code null} if there have benn none performed.
    */
   @Nullable
-  byte[] fetchLatestCheckpoint();
+  byte[] fetchCheckpoint();
 }

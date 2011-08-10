@@ -1,6 +1,5 @@
 package com.twitter.mesos.scheduler.storage.db;
 
-import java.nio.ByteBuffer;
 import java.sql.SQLException;
 import java.util.Set;
 
@@ -74,7 +73,7 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
     assertEquals(ImmutableList.of(jobConfig1, jobConfig2), store.fetchJobs("CRON"));
     assertEquals(ImmutableList.of(jobConfig3), store.fetchJobs("IMMEDIATE"));
 
-    store.deleteJob(Tasks.jobKey(jobConfig1));
+    store.removeJob(Tasks.jobKey(jobConfig1));
     assertEquals(ImmutableList.of(jobConfig2), store.fetchJobs("CRON"));
     assertEquals(ImmutableList.of(jobConfig3), store.fetchJobs("IMMEDIATE"));
 
@@ -94,20 +93,20 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
     store(ImmutableList.of(makeTask("task2"), makeTask("task3")));
     assertEquals(3, store.getTaskStoreSize());
 
-    store.remove(Query.GET_ALL);
+    store.removeTasks(Query.GET_ALL);
     assertEquals(0, store.getTaskStoreSize());
   }
 
   @Test
   public void testCheckpointing() {
-    assertNull(store.fetchLatestCheckpoint());
+    assertNull(store.fetchCheckpoint());
 
     store.checkpoint(createCheckpoint("bob"));
     store.checkpoint(createCheckpoint("fred"));
-    assertEquals("fred", decodeCheckpoint(store.fetchLatestCheckpoint()));
+    assertEquals("fred", decodeCheckpoint(store.fetchCheckpoint()));
 
     store.checkpoint(createCheckpoint("bob"));
-    assertEquals("bob", decodeCheckpoint(store.fetchLatestCheckpoint()));
+    assertEquals("bob", decodeCheckpoint(store.fetchCheckpoint()));
   }
 
   @Test
@@ -122,28 +121,29 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
     store.saveAcceptedJob("CRON", fortuneCron);
 
     ScheduledTask originalTask = makeTask("42");
-    store.add(ImmutableSet.<ScheduledTask>of(originalTask));
+    store.saveTasks(ImmutableSet.<ScheduledTask>of(originalTask));
 
     TwitterTaskInfo originalTaskInfo = originalTask.getAssignedTask().getTask();
     final TwitterTaskInfo newTaskInfo = originalTaskInfo.deepCopy().setNumCpus(42);
     TaskUpdateConfiguration updateConfiguration =
         new TaskUpdateConfiguration(originalTaskInfo, newTaskInfo);
-    store.add("fortune", "please", ImmutableSet.<TaskUpdateConfiguration>of(updateConfiguration));
+    store.saveShardUpdateConfigs("fortune", "please", ImmutableSet
+        .<TaskUpdateConfiguration>of(updateConfiguration));
     store.checkpoint(createCheckpoint("2"));
     byte[] snapshot3 = store.createSnapshot();
 
     store.applySnapshot(snapshot1);
-    assertNull(store.fetchLatestCheckpoint());
+    assertNull(store.fetchCheckpoint());
     assertNull(store.fetchFrameworkId());
     assertTrue(Iterables.isEmpty(store.fetchJobs("CRON")));
-    assertTrue(store.fetchIds(Query.GET_ALL).isEmpty());
+    assertTrue(store.fetchTaskIds(Query.GET_ALL).isEmpty());
     assertTrue(store.fetchShardUpdateConfigs("fortune").isEmpty());
 
     store.applySnapshot(snapshot3);
-    assertEquals("2", decodeCheckpoint(store.fetchLatestCheckpoint()));
+    assertEquals("2", decodeCheckpoint(store.fetchCheckpoint()));
     assertEquals("jake", store.fetchFrameworkId());
     assertEquals(ImmutableList.of(fortuneCron), ImmutableList.copyOf(store.fetchJobs("CRON")));
-    assertEquals("42", Iterables.getOnlyElement(store.fetchIds(Query.GET_ALL)));
+    assertEquals("42", Iterables.getOnlyElement(store.fetchTaskIds(Query.GET_ALL)));
     Set<ShardUpdateConfiguration> updateConfigs = store.fetchShardUpdateConfigs("fortune");
     assertEquals(1, updateConfigs.size());
     ShardUpdateConfiguration config = Iterables.getOnlyElement(updateConfigs);
@@ -152,10 +152,10 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
     assertEquals(newTaskInfo, config.getNewConfig());
 
     store.applySnapshot(snapshot2);
-    assertEquals("1", decodeCheckpoint(store.fetchLatestCheckpoint()));
+    assertEquals("1", decodeCheckpoint(store.fetchCheckpoint()));
     assertEquals("jake", store.fetchFrameworkId());
     assertTrue(Iterables.isEmpty(store.fetchJobs("CRON")));
-    assertTrue(store.fetchIds(Query.GET_ALL).isEmpty());
+    assertTrue(store.fetchTaskIds(Query.GET_ALL).isEmpty());
     assertTrue(store.fetchShardUpdateConfigs("fortune").isEmpty());
   }
 

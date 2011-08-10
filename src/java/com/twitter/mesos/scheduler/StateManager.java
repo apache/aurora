@@ -171,7 +171,7 @@ class StateManager {
     storage.start(new Work.NoResult.Quiet() {
       @Override protected void execute(Storage.StoreProvider storeProvider) {
 
-        storeProvider.getTaskStore().mutate(Query.GET_ALL, new Closure<ScheduledTask>() {
+        storeProvider.getTaskStore().mutateTasks(Query.GET_ALL, new Closure<ScheduledTask>() {
           @Override public void execute(ScheduledTask task) {
             ConfigurationManager.applyDefaultsIfUnset(task.getAssignedTask().getTask());
             createStateMachine(task, task.getStatus());
@@ -244,7 +244,7 @@ class StateManager {
 
     transactionalWork(new Work.NoResult.Quiet() {
       @Override protected void execute(Storage.StoreProvider storeProvider) {
-        storeProvider.getTaskStore().add(scheduledTasks);
+        storeProvider.getTaskStore().saveTasks(scheduledTasks);
 
         for (ScheduledTask task : scheduledTasks) {
           createStateMachine(task).updateState(PENDING);
@@ -282,7 +282,7 @@ class StateManager {
       @Override public String apply(Storage.StoreProvider storeProvider) throws UpdateException {
         TaskStore taskStore = storeProvider.getTaskStore();
         Set<TwitterTaskInfo> existingTasks =
-            ImmutableSet.copyOf(Iterables.transform(taskStore.fetch(Query.activeQuery(jobKey)),
+            ImmutableSet.copyOf(Iterables.transform(taskStore.fetchTasks(Query.activeQuery(jobKey)),
                 Tasks.SCHEDULED_TO_INFO));
 
         if (existingTasks.isEmpty()) {
@@ -306,7 +306,7 @@ class StateManager {
         }
 
         String updateToken = UUID.randomUUID().toString();
-        updateStore.add(jobKey, updateToken, shardConfigBuilder.build());
+        updateStore.saveShardUpdateConfigs(jobKey, updateToken, shardConfigBuilder.build());
         return updateToken;
       }
     });
@@ -348,7 +348,7 @@ class StateManager {
           }
         }
 
-        updateStore.remove(jobKey);
+        updateStore.removeShardUpdateConfigs(jobKey);
       }
     });
   }
@@ -425,19 +425,19 @@ class StateManager {
 
     transactionalWork(new NoResult<E>() {
       @Override protected void execute(Storage.StoreProvider storeProvider) throws E {
+        Set<ScheduledTask> tasks = (taskQuery == null)
+            ? null : storeProvider.getTaskStore().fetchTasks(taskQuery);
+        operation.execute(tasks, new StateChanger() {
+          @Override public void changeState(Set<String> taskIds, ScheduleStatus state,
+              String auditMessage) {
+            changeStateInTransaction(taskIds,
+                stateUpdaterWithAuditMessage(state, auditMessage));
+          }
 
-        operation.execute(taskQuery == null ? null : storeProvider.getTaskStore().fetch(taskQuery),
-            new StateChanger() {
-              @Override public void changeState(Set<String> taskIds, ScheduleStatus state,
-                  String auditMessage) {
-                changeStateInTransaction(taskIds,
-                    stateUpdaterWithAuditMessage(state, auditMessage));
-              }
-
-              @Override public void changeState(Set<String> taskIds, ScheduleStatus state) {
-                changeStateInTransaction(taskIds, stateUpdater(state));
-              }
-            });
+          @Override public void changeState(Set<String> taskIds, ScheduleStatus state) {
+            changeStateInTransaction(taskIds, stateUpdater(state));
+          }
+        });
       }
     });
   }
@@ -521,7 +521,7 @@ class StateManager {
 
     return storage.doInTransaction(new Work.Quiet<Set<ScheduledTask>>() {
       @Override public Set<ScheduledTask> apply(Storage.StoreProvider storeProvider) {
-        return storeProvider.getTaskStore().fetch(query);
+        return storeProvider.getTaskStore().fetchTasks(query);
       }
     });
   }
@@ -539,7 +539,7 @@ class StateManager {
     return storage.doInTransaction(new Work.Quiet<Set<String>>() {
       @Override
       public Set<String> apply(Storage.StoreProvider storeProvider) {
-        return storeProvider.getTaskStore().fetchIds(query);
+        return storeProvider.getTaskStore().fetchTaskIds(query);
       }
     });
   }
@@ -592,7 +592,7 @@ class StateManager {
   private void changeState(final Query taskQuery, final Closure<TaskStateMachine> stateChange) {
     transactionalWork(new Work.NoResult.Quiet() {
       @Override protected void execute(Storage.StoreProvider storeProvider) {
-        changeStateInTransaction(storeProvider.getTaskStore().fetchIds(taskQuery), stateChange);
+        changeStateInTransaction(storeProvider.getTaskStore().fetchTaskIds(taskQuery), stateChange);
       }
     });
   }
@@ -681,7 +681,8 @@ class StateManager {
 
             switch (work.command) {
               case RESCHEDULE:
-                ScheduledTask task = Iterables.getOnlyElement(taskStore.fetch(idQuery)).deepCopy();
+                ScheduledTask task =
+                    Iterables.getOnlyElement(taskStore.fetchTasks(idQuery)).deepCopy();
                 task.getAssignedTask().unsetSlaveId();
                 task.getAssignedTask().unsetSlaveHost();
                 task.unsetTaskEvents();
@@ -691,7 +692,7 @@ class StateManager {
 
                 LOG.info("Task being rescheduled: " + taskId);
 
-                taskStore.add(ImmutableSet.of(task));
+                taskStore.saveTasks(ImmutableSet.of(task));
 
                 createStateMachine(task).updateState(PENDING, "Rescheduled");
                 break;
@@ -703,26 +704,24 @@ class StateManager {
                 break;
 
               case UPDATE_STATE:
-                taskStore.mutate(idQuery,
-                    new Closure<ScheduledTask>() {
-                      @Override public void execute(ScheduledTask task) {
-                        task.setStatus(stateMachine.getState());
-                        work.mutation.execute(task);
-                      }
-                    });
+                taskStore.mutateTasks(idQuery, new Closure<ScheduledTask>() {
+                  @Override public void execute(ScheduledTask task) {
+                    task.setStatus(stateMachine.getState());
+                    work.mutation.execute(task);
+                  }
+                });
                 break;
 
               case DELETE:
-                taskStore.remove(ImmutableSet.of(taskId));
+                taskStore.removeTasks(ImmutableSet.of(taskId));
                 break;
 
               case INCREMENT_FAILURES:
-                taskStore.mutate(idQuery,
-                    new Closure<ScheduledTask>() {
-                      @Override public void execute(ScheduledTask task) {
-                        task.setFailureCount(task.getFailureCount() + 1);
-                      }
-                    });
+                taskStore.mutateTasks(idQuery, new Closure<ScheduledTask>() {
+                  @Override public void execute(ScheduledTask task) {
+                    task.setFailureCount(task.getFailureCount() + 1);
+                  }
+                });
                 break;
 
               default:
@@ -739,7 +738,7 @@ class StateManager {
     TaskStore taskStore = storeProvider.getTaskStore();
 
     TwitterTaskInfo oldConfig = Tasks.SCHEDULED_TO_INFO.apply(
-        Iterables.getOnlyElement(taskStore.fetch(Query.byId(taskId))));
+        Iterables.getOnlyElement(taskStore.fetchTasks(Query.byId(taskId))));
 
     UpdateStore.ShardUpdateConfiguration updateConfig = storeProvider.getUpdateStore()
         .fetchShardUpdateConfig(Tasks.jobKey(oldConfig), oldConfig.getShardId());
@@ -761,7 +760,7 @@ class StateManager {
     }
 
     ScheduledTask newTask = taskCreator.apply(newConfig).setAncestorId(taskId);
-    taskStore.add(ImmutableSet.of(newTask));
+    taskStore.saveTasks(ImmutableSet.of(newTask));
     createStateMachine(newTask)
         .updateState(PENDING, "Rescheduled after " + (rollingBack ? "rollback." : "update."));
   }

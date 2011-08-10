@@ -113,11 +113,10 @@ public interface Log {
      * truncate all log entries, pass {@link #end()}.
      *
      * @param position the position of the latest entry to remove
-     * @return the number of entries truncated
      * @throws InvalidPositionException if the specified position does not exist in this log
      * @throws StreamAccessException if the stream could not be truncated
      */
-    long truncateBefore(Position position) throws InvalidPositionException, StreamAccessException;
+    void truncateBefore(Position position) throws InvalidPositionException, StreamAccessException;
 
     /**
      * Returns a position of the first (oldest) log entry.

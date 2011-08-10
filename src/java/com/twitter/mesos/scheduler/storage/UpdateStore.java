@@ -37,14 +37,15 @@ public interface UpdateStore {
   }
 
   /**
-   * Adds the Task Update Configuration for the corresponding jobKey and updateToken.
+   * Saves the Task Update Configuration for the corresponding jobKey and updateToken.
    *
    * @param jobKey Key of the job update to update.
    * @param updateToken Token associated with the update.  If non-null, the token must match the
    *     the stored token for the update.
    * @param updateConfiguration A set of TaskUpdateConfiguration for the tasks in a job.
    */
-  void add(String jobKey, String updateToken, Set<TaskUpdateConfiguration> updateConfiguration);
+  void saveShardUpdateConfigs(String jobKey, String updateToken,
+      Set<TaskUpdateConfiguration> updateConfiguration);
 
   /**
    * Fetches the ShardUpdateConfiguration for the specified jobKey and shardId.
@@ -78,5 +79,5 @@ public interface UpdateStore {
    *
    * @param jobKey Key of the job update to update.
    */
-  void remove(String jobKey);
+  void removeShardUpdateConfigs(String jobKey);
 }

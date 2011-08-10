@@ -85,49 +85,43 @@ public class ForwardingStore implements Storage, SchedulerStore, JobStore, TaskS
   }
 
   @Override
-  public void deleteJob(String jobKey) {
-    jobStore.deleteJob(jobKey);
+  public void removeJob(String jobKey) {
+    jobStore.removeJob(jobKey);
   }
 
   @Override
-  public void add(Set<ScheduledTask> newTasks) throws IllegalStateException {
-    taskStore.add(newTasks);
+  public void saveTasks(Set<ScheduledTask> tasks) throws IllegalStateException {
+    taskStore.saveTasks(tasks);
   }
 
   @Override
-  public void remove(Query query) {
-    taskStore.remove(query);
+  public void removeTasks(Query query) {
+    taskStore.removeTasks(query);
   }
 
   @Override
-  public void remove(Set<String> taskIds) {
-    taskStore.remove(taskIds);
+  public void removeTasks(Set<String> taskIds) {
+    taskStore.removeTasks(taskIds);
   }
 
   @Override
-  public ImmutableSet<ScheduledTask> mutate(Query query, Closure<ScheduledTask> mutator) {
-    return taskStore.mutate(query, mutator);
+  public ImmutableSet<ScheduledTask> mutateTasks(Query query, Closure<ScheduledTask> mutator) {
+    return taskStore.mutateTasks(query, mutator);
+  }
+
+  public ImmutableSet<ScheduledTask> fetchTasks(Query query) {
+    return taskStore.fetchTasks(query);
   }
 
   @Override
-  public void update(Set<ScheduledTask> updates) {
-    taskStore.update(updates);
+  public Set<String> fetchTaskIds(Query query) {
+    return taskStore.fetchTaskIds(query);
   }
 
   @Override
-  public ImmutableSet<ScheduledTask> fetch(Query query) {
-    return taskStore.fetch(query);
-  }
-
-  @Override
-  public Set<String> fetchIds(Query query) {
-    return taskStore.fetchIds(query);
-  }
-
-  @Override
-  public void add(String jobKey, String updateToken,
+  public void saveShardUpdateConfigs(String jobKey, String updateToken,
       Set<TaskUpdateConfiguration> updateConfiguration) {
-    updateStore.add(jobKey, updateToken, updateConfiguration);
+    updateStore.saveShardUpdateConfigs(jobKey, updateToken, updateConfiguration);
   }
 
   @Override
@@ -148,7 +142,7 @@ public class ForwardingStore implements Storage, SchedulerStore, JobStore, TaskS
   }
 
   @Override
-  public void remove(String jobKey) {
-    updateStore.remove(jobKey);
+  public void removeShardUpdateConfigs(String jobKey) {
+    updateStore.removeShardUpdateConfigs(jobKey);
   }
 }

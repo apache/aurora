@@ -20,6 +20,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionCallbackWithoutResult;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.twitter.mesos.scheduler.db.DbUtil;
@@ -185,12 +186,12 @@ public class DbLogStream implements Log, Stream {
   }
 
   @Override
-  public long truncateBefore(Position position) throws InvalidPositionException {
+  public void truncateBefore(Position position) throws InvalidPositionException {
     Preconditions.checkNotNull(position);
     final LongPosition to = checkPosition(position);
-    return transactionTemplate.execute(new TransactionCallback<Integer>() {
-      @Override public Integer doInTransaction(TransactionStatus status) {
-        return jdbcTemplate.update("DELETE FROM log_stream WHERE id < ?", to.position);
+    transactionTemplate.execute(new TransactionCallbackWithoutResult() {
+      @Override protected void doInTransactionWithoutResult(TransactionStatus status) {
+        jdbcTemplate.update("DELETE FROM log_stream WHERE id < ?", to.position);
       }
     });
   }

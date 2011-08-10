@@ -191,7 +191,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     storage.doInTransaction(new NoResult.Quiet() {
       @Override protected void execute(Storage.StoreProvider storeProvider) {
-        storeProvider.getTaskStore().add(ImmutableSet.of(new ScheduledTask()
+        storeProvider.getTaskStore().saveTasks(ImmutableSet.of(new ScheduledTask()
             .setStatus(PENDING)
             .setAssignedTask(
                 new AssignedTask()

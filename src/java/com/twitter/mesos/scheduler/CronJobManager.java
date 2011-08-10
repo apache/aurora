@@ -1,32 +1,32 @@
 package com.twitter.mesos.scheduler;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Maps;
-import com.google.inject.Inject;
-import com.twitter.common.stats.Stats;
-import com.twitter.mesos.Tasks;
-import com.twitter.mesos.gen.CronCollisionPolicy;
-import com.twitter.mesos.gen.JobConfiguration;
-import com.twitter.mesos.gen.TaskQuery;
-import com.twitter.mesos.scheduler.storage.JobStore;
-import com.twitter.mesos.scheduler.storage.SchedulerStore;
-import com.twitter.mesos.scheduler.storage.Storage;
-import com.twitter.mesos.scheduler.storage.Storage.Work;
-import com.twitter.mesos.scheduler.storage.StorageRole;
-import com.twitter.mesos.scheduler.storage.StorageRole.Role;
-import com.twitter.mesos.scheduler.storage.TaskStore;
-import it.sauronsoftware.cron4j.InvalidPatternException;
-import it.sauronsoftware.cron4j.Scheduler;
-import it.sauronsoftware.cron4j.SchedulingPattern;
-import org.apache.commons.lang.StringUtils;
-
 import java.util.Collections;
 import java.util.Date;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
+import com.google.inject.Inject;
+
+import org.apache.commons.lang.StringUtils;
+
+import com.twitter.common.stats.Stats;
+import com.twitter.mesos.Tasks;
+import com.twitter.mesos.gen.CronCollisionPolicy;
+import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.TaskQuery;
+import com.twitter.mesos.scheduler.storage.Storage;
+import com.twitter.mesos.scheduler.storage.Storage.Work;
+import com.twitter.mesos.scheduler.storage.StorageRole;
+import com.twitter.mesos.scheduler.storage.StorageRole.Role;
+
+import it.sauronsoftware.cron4j.InvalidPatternException;
+import it.sauronsoftware.cron4j.Scheduler;
+import it.sauronsoftware.cron4j.SchedulingPattern;
 
 /**
  * A job scheduler that receives jobs that should be run periodically on a cron schedule.
@@ -245,8 +245,7 @@ public class CronJobManager extends JobManager {
       scheduler.deschedule(scheduledJobKey);
       storage.doInTransaction(new Work.NoResult.Quiet() {
         @Override protected void execute(Storage.StoreProvider storeProvider) {
-
-          storeProvider.getJobStore().deleteJob(jobKey);
+          storeProvider.getJobStore().removeJob(jobKey);
         }
       });
       LOG.info("Successfully deleted cron job " + jobKey);

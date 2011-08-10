@@ -330,7 +330,7 @@ public class DbStorage
 
   @Timed("db_storage_fetch_checkpoint")
   @Override
-  public byte[] fetchLatestCheckpoint() {
+  public byte[] fetchCheckpoint() {
     return fetchSchedulerState(ConfiguratonKey.LAST_COMMITTED_LOG_POSITION,
         new ExceptionalFunction<TProtocol, byte[], TException>() {
           @Override public byte[] apply(TProtocol stream) throws TException {
@@ -470,8 +470,8 @@ public class DbStorage
     transactionTemplate.execute(new TransactionCallbackWithoutResult() {
       @Override protected void doInTransactionWithoutResult(TransactionStatus transactionStatus) {
         // TODO(William Farner): consider adding a checksum column to verify job_configuration bytes
-        jdbcTemplate.update(
-            "INSERT INTO job_state (job_key, manager_id, job_configuration) VALUES (?, ?, ?)",
+        jdbcTemplate.update("MERGE INTO job_state (job_key, manager_id, job_configuration)"
+                            + " KEY(job_key) VALUES(?, ?, ?)",
             Tasks.jobKey(jobConfig), managerId, getBytes(jobConfig));
       }
     });
@@ -479,7 +479,7 @@ public class DbStorage
 
   @Timed("db_storage_delete_job")
   @Override
-  public void deleteJob(final String jobKey) {
+  public void removeJob(final String jobKey) {
     checkNotBlank(jobKey);
 
     transactionTemplate.execute(new TransactionCallbackWithoutResult() {
@@ -491,34 +491,34 @@ public class DbStorage
 
   @Timed("db_storage_add_tasks")
   @Override
-  public void add(final Set<ScheduledTask> newTasks) {
-    checkNotNull(newTasks);
+  public void saveTasks(final Set<ScheduledTask> tasks) {
+    checkNotNull(tasks);
     Preconditions.checkState(
-        Sets.newHashSet(transform(newTasks, Tasks.SCHEDULED_TO_ID)).size() == newTasks.size(),
+        Sets.newHashSet(transform(tasks, Tasks.SCHEDULED_TO_ID)).size() == tasks.size(),
         "Proposed new tasks would create task ID collision.");
 
     // Do a first pass to make sure all of the values are good.
-    for (ScheduledTask task : newTasks) {
+    for (ScheduledTask task : tasks) {
       checkNotNull(task.getAssignedTask(), "Assigned task may not be null.");
       checkNotNull(task.getAssignedTask().getTask(), "Task info may not be null.");
     }
 
-    if (!newTasks.isEmpty()) {
+    if (!tasks.isEmpty()) {
       transactionTemplate.execute(new TransactionCallbackWithoutResult() {
         @Override protected void doInTransactionWithoutResult(TransactionStatus status) {
-          insert(newTasks);
+          insert(tasks);
         }
       });
-      vars.tasksAdded.addAndGet(newTasks.size());
+      vars.tasksAdded.addAndGet(tasks.size());
     }
   }
 
   private void insert(final Set<ScheduledTask> newTasks) {
     final Iterator<ScheduledTask> tasks = newTasks.iterator();
     try {
-      jdbcTemplate.batchUpdate("INSERT INTO task_state (task_id, job_role, job_user, job_name,"
+      jdbcTemplate.batchUpdate("MERGE INTO task_state (task_id, job_role, job_user, job_name,"
                                + " job_key, slave_host, shard_id, status, scheduled_task)"
-                               + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                               + " KEY(task_id) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)",
           new BatchPreparedStatementSetter() {
             @Override public void setValues(PreparedStatement preparedStatement, int batchItemIndex)
                 throws SQLException {
@@ -539,13 +539,13 @@ public class DbStorage
 
   @Timed("db_storage_remove_tasks")
   @Override
-  public void remove(final Query query) {
+  public void removeTasks(final Query query) {
     checkNotNull(query);
 
     transactionTemplate.execute(new TransactionCallbackWithoutResult() {
       @Override protected void doInTransactionWithoutResult(TransactionStatus status) {
         if (query.hasPostFilter()) {
-          remove(fetchIds(query));
+          removeTasks(fetchTaskIds(query));
         } else {
           remove(createWhereClause(query));
         }
@@ -555,7 +555,7 @@ public class DbStorage
 
   @Timed("db_storage_remove_tasks_by_id")
   @Override
-  public void remove(final Set<String> taskIds) {
+  public void removeTasks(final Set<String> taskIds) {
     if (!taskIds.isEmpty()) {
       LOG.info("Removing tasks: " + taskIds);
       transactionTemplate.execute(new TransactionCallbackWithoutResult() {
@@ -569,7 +569,7 @@ public class DbStorage
 
   @Timed("db_storage_add_job_update")
   @Override
-  public void add(final String jobKey, final String updateToken,
+  public void saveShardUpdateConfigs(final String jobKey, final String updateToken,
       final Set<TaskUpdateConfiguration> updateConfiguration) {
     checkNotNull(jobKey);
     checkNotNull(updateToken);
@@ -578,18 +578,18 @@ public class DbStorage
     if (!updateConfiguration.isEmpty()) {
       transactionTemplate.execute(new TransactionCallbackWithoutResult() {
         @Override protected void doInTransactionWithoutResult(TransactionStatus status) {
-          insertUpdateConfig(jobKey, updateToken, updateConfiguration);
+          saveUpdateConfig(jobKey, updateToken, updateConfiguration);
         }
       });
     }
   }
 
-  private void insertUpdateConfig(final String jobKey, final String updateToken,
+  private void saveUpdateConfig(final String jobKey, final String updateToken,
       final Set<TaskUpdateConfiguration> updateConfiguration) {
     final Iterator<TaskUpdateConfiguration> configIterator = updateConfiguration.iterator();
     try {
-      jdbcTemplate.batchUpdate("INSERT INTO update_store (job_key, update_token, shard_id, config)"
-          + " VALUES (?, ?, ?, ?)",
+      jdbcTemplate.batchUpdate("MERGE INTO update_store (job_key, update_token, shard_id, config)"
+          + " KEY(job_key, shard_id) VALUES(?, ?, ?, ?)",
           new BatchPreparedStatementSetter() {
             @Override public void setValues(PreparedStatement preparedStatement, int batchItemIndex)
                 throws SQLException {
@@ -689,7 +689,7 @@ public class DbStorage
 
   @Timed("db_storage_remove_job_update")
   @Override
-  public void remove(final String jobKey) {
+  public void removeShardUpdateConfigs(final String jobKey) {
     checkNotBlank(jobKey);
 
     transactionTemplate.execute(new TransactionCallbackWithoutResult() {
@@ -713,7 +713,7 @@ public class DbStorage
 
   @Timed("db_storage_mutate_tasks")
   @Override
-  public ImmutableSet<ScheduledTask> mutate(final Query query,
+  public ImmutableSet<ScheduledTask> mutateTasks(final Query query,
       final Closure<ScheduledTask> mutator) {
 
     checkNotNull(query);
@@ -727,7 +727,7 @@ public class DbStorage
   }
 
   private ImmutableSet<ScheduledTask> doMutate(Query query, Closure<ScheduledTask> mutator) {
-    ImmutableSet<ScheduledTask> taskStates = fetch(query);
+    ImmutableSet<ScheduledTask> taskStates = fetchTasks(query);
 
     ImmutableSet.Builder<ScheduledTask> tasksToUpdateBuilder = ImmutableSet.builder();
     for (ScheduledTask taskState : taskStates) {
@@ -737,29 +737,12 @@ public class DbStorage
         tasksToUpdateBuilder.add(taskState);
       }
     }
-    ImmutableSet<ScheduledTask> tasksToUpdate = tasksToUpdateBuilder.build();
-    doUpdate(tasksToUpdate);
-    vars.tasksMutated.addAndGet(tasksToUpdate.size());
-    return tasksToUpdate;
-  }
-
-  @Timed("db_storage_update_tasks")
-  @Override
-  public void update(final Set<ScheduledTask> updates) {
-    transactionTemplate.execute(new TransactionCallbackWithoutResult() {
-      @Override protected void doInTransactionWithoutResult(TransactionStatus status) {
-        doUpdate(updates);
-      }
-    });
-    vars.tasksUpdated.addAndGet(updates.size());
-  }
-
-  private void doUpdate(final Set<ScheduledTask> updates) {
-    if (!updates.isEmpty()) {
-      LOG.info(String.format("Updating %d tasks", updates.size()));
+    final ImmutableSet<ScheduledTask> tasksToUpdate = tasksToUpdateBuilder.build();
+    if (!tasksToUpdate.isEmpty()) {
+      LOG.info(String.format("Updating %d tasks", tasksToUpdate.size()));
 
       long startNanos = System.nanoTime();
-      final Iterator<ScheduledTask> tasks = updates.iterator();
+      final Iterator<ScheduledTask> tasks = tasksToUpdate.iterator();
       jdbcTemplate.batchUpdate("UPDATE task_state SET job_role = ?, job_user = ?, job_name = ?,"
                                + " job_key = ?, slave_host = ?, shard_id = ?, status = ?,"
                                + " scheduled_task = ? WHERE task_id = ?",
@@ -774,21 +757,23 @@ public class DbStorage
             }
 
             @Override public int getBatchSize() {
-              return updates.size();
+              return tasksToUpdate.size();
             }
           });
 
       long durationNanos = System.nanoTime() - startNanos;
       if (durationNanos >= SLOW_QUERY_THRESHOLD_NS) {
-        LOG.warning("Slow update of " + updates.size() + " tasks took "
+        LOG.warning("Slow update of " + tasksToUpdate.size() + " tasks took "
                     + Amount.of(durationNanos, Time.NANOSECONDS).as(Time.MILLISECONDS) + " ms");
       }
     }
+    vars.tasksMutated.addAndGet(tasksToUpdate.size());
+    return tasksToUpdate;
   }
 
   @Timed("db_storage_fetch_tasks")
   @Override
-  public ImmutableSet<ScheduledTask> fetch(final Query query) {
+  public ImmutableSet<ScheduledTask> fetchTasks(final Query query) {
     checkNotNull(query);
 
     ImmutableSet<ScheduledTask> fetched =
@@ -803,7 +788,7 @@ public class DbStorage
 
   @Timed("db_storage_fetch_task_ids")
   @Override
-  public Set<String> fetchIds(final Query query) {
+  public Set<String> fetchTaskIds(final Query query) {
     checkNotNull(query);
 
     Set<String> fetched = transactionTemplate.execute(new TransactionCallback<Set<String>>() {
