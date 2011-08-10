@@ -63,6 +63,7 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
@@ -77,6 +78,7 @@ import com.twitter.mesos.scheduler.db.DbUtil;
 import com.twitter.mesos.scheduler.storage.CheckpointStore;
 import com.twitter.mesos.scheduler.storage.JobStore;
 import com.twitter.mesos.scheduler.storage.MigrationUtils;
+import com.twitter.mesos.scheduler.storage.QuotaStore;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.TaskStore;
@@ -91,8 +93,14 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
  *
  * @author John Sirois
  */
-public class DbStorage
-    implements CheckpointStore, Storage, SchedulerStore, JobStore, TaskStore, UpdateStore {
+public class DbStorage implements
+    CheckpointStore,
+    Storage,
+    SchedulerStore,
+    JobStore,
+    TaskStore,
+    UpdateStore,
+    QuotaStore {
 
   private static final Logger LOG = Logger.getLogger(DbStorage.class.getName());
 
@@ -129,6 +137,9 @@ public class DbStorage
       return self;
     }
     @Override public UpdateStore getUpdateStore() {
+      return self;
+    }
+    @Override public QuotaStore getQuotaStore() {
       return self;
     }
   };
@@ -697,6 +708,55 @@ public class DbStorage
         jdbcTemplate.update("DELETE FROM update_store WHERE job_key = ?", jobKey);
       }
     });
+  }
+
+  private static final RowMapper<Quota> QUOTA_ROW_MAPPER = new RowMapper<Quota>() {
+    @Override public Quota mapRow(ResultSet resultSet, int rowIndex) throws SQLException {
+      try {
+        return ThriftBinaryCodec.decode(Quota.class, resultSet.getBytes(1));
+      } catch (CodingException e) {
+        throw new SQLException("Problem decoding Quota", e);
+      }
+    }
+  };
+
+  @Timed("db_storage_remove_quota")
+  @Override
+  public void removeQuota(final String role) {
+    checkNotBlank(role);
+
+    transactionTemplate.execute(new TransactionCallbackWithoutResult() {
+      @Override protected void doInTransactionWithoutResult(TransactionStatus status) {
+        jdbcTemplate.update("DELETE FROM quota_store WHERE role = ?", role);
+      }
+    });
+  }
+
+  @Timed("db_storage_save_quota")
+  @Override
+  public void saveQuota(final String role, final Quota quota) {
+    checkNotBlank(role);
+    checkNotNull(quota);
+
+    transactionTemplate.execute(new TransactionCallbackWithoutResult() {
+      @Override protected void doInTransactionWithoutResult(TransactionStatus status) {
+        jdbcTemplate.update(
+            "MERGE INTO quota_store (role, quota) KEY(role) VALUES(?, ?)",
+            role, getBytes(quota));
+      }
+    });
+  }
+
+  @Timed("db_storage_fetch_quota")
+  @Nullable
+  @Override
+  public Quota fetchQuota(String role) {
+    checkNotBlank(role);
+
+    return Iterables.getOnlyElement(jdbcTemplate.query(
+        "SELECT quota FROM quota_store WHERE role = ?",
+        QUOTA_ROW_MAPPER,
+        role), null);
   }
 
   private void remove(WhereClauseBuilder whereClauseBuilder) {

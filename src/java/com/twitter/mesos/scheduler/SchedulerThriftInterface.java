@@ -14,10 +14,10 @@ import com.google.inject.Inject;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.CreateJobResponse;
 import com.twitter.mesos.gen.FinishUpdateResponse;
+import com.twitter.mesos.gen.GetQuotaResponse;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.KillResponse;
 import com.twitter.mesos.gen.MesosSchedulerManager;
-import com.twitter.mesos.gen.ResponseCode;
 import com.twitter.mesos.gen.RestartResponse;
 import com.twitter.mesos.gen.RollbackShardsResponse;
 import com.twitter.mesos.gen.ScheduleStatusResponse;
@@ -33,6 +33,7 @@ import com.twitter.mesos.scheduler.SchedulerCore.RestartException;
 import com.twitter.mesos.scheduler.auth.SessionValidator;
 import com.twitter.mesos.scheduler.auth.SessionValidator.AuthFailedException;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
+import com.twitter.mesos.scheduler.quota.QuotaProvider;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
@@ -52,11 +53,14 @@ public class SchedulerThriftInterface implements MesosSchedulerManager.Iface {
 
   private final SchedulerCore schedulerCore;
   private final SessionValidator sessionValidator;
+  private final QuotaProvider quotaProvider;
 
   @Inject
-  public SchedulerThriftInterface(SchedulerCore schedulerCore, SessionValidator sessionValidator) {
+  public SchedulerThriftInterface(SchedulerCore schedulerCore, SessionValidator sessionValidator,
+      QuotaProvider quotaProvider) {
     this.schedulerCore = checkNotNull(schedulerCore);
     this.sessionValidator = checkNotNull(sessionValidator);
+    this.quotaProvider = checkNotNull(quotaProvider);
   }
 
   private void validateSessionKeyForTasks(SessionKey session, Query taskQuery)
@@ -296,5 +300,11 @@ public class SchedulerThriftInterface implements MesosSchedulerManager.Iface {
     }
 
     return response;
+  }
+
+  @Override
+  public GetQuotaResponse getQuota(String ownerRole) {
+    checkNotBlank(ownerRole, "Owner role may not be blank.");
+    return new GetQuotaResponse().setQuota(quotaProvider.getQuota(ownerRole));
   }
 }

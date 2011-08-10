@@ -13,6 +13,7 @@ import org.junit.Test;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
@@ -81,6 +82,28 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
 
     JobConfiguration actual = store.fetchJob("CRON", Tasks.jobKey(jobConfig2));
     assertEquals(jobConfig2, actual);
+  }
+
+  @Test
+  public void testQuotaStorage() {
+    assertNull(store.fetchQuota("jane"));
+
+    Quota quota = new Quota()
+        .setNumCpus(5)
+        .setRamMb(2)
+        .setDiskMb(10);
+    store.saveQuota("jane", quota);
+    assertEquals(quota, store.fetchQuota("jane"));
+
+    Quota quota2 = new Quota()
+        .setNumCpus(1)
+        .setRamMb(3)
+        .setDiskMb(5);
+    store.saveQuota("jane", quota2);
+    assertEquals(quota2, store.fetchQuota("jane"));
+
+    store.removeQuota("jane");
+    assertNull(store.fetchQuota("jane"));
   }
 
   @Test
