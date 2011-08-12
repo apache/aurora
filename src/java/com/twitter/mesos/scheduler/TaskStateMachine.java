@@ -408,8 +408,11 @@ public class TaskStateMachine {
                     break;
 
                   case LOST:
-                  case UNKNOWN:
                     addWork(WorkCommand.RESCHEDULE);
+                    break;
+
+                  case UNKNOWN:
+                    updateState(LOST);
                 }
               }
             },
@@ -430,10 +433,13 @@ public class TaskStateMachine {
                     addWork(WorkCommand.KILL);
                     break;
 
-                  case KILLED:
                   case LOST:
-                  case UNKNOWN:
+                  case KILLED:
                     addWork(WorkCommand.RESCHEDULE);
+                    break;
+
+                  case UNKNOWN:
+                    updateState(LOST);
                 }
               }
             },
@@ -525,8 +531,15 @@ public class TaskStateMachine {
           case FAILED:
           case KILLED:
           case LOST:
-          case UNKNOWN:
             addWork(rollback ? WorkCommand.ROLLBACK : WorkCommand.UPDATE);
+            break;
+
+          case UNKNOWN:
+            // TODO(wfarner): DELETE isn't the best thing to do here, since we lose track of the
+            // task, but moving to LOST will cause it to be rescheduled.  Need to rethink.
+            addWork(WorkCommand.DELETE);
+            addWork(rollback ? WorkCommand.ROLLBACK : WorkCommand.UPDATE);
+
         }
       }
     };

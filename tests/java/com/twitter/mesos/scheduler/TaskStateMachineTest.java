@@ -15,6 +15,7 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
+import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
@@ -111,8 +112,7 @@ public class TaskStateMachineTest extends EasyMockTest {
 
   @Test
   public void testPostTerminalTransitionDenied() {
-    Set<ScheduleStatus> terminalStates = EnumSet.of(
-        FINISHED, FAILED, KILLED, KILLED_BY_CLIENT, LOST);
+    Set<ScheduleStatus> terminalStates = Tasks.TERMINAL_STATES;
 
     for (ScheduleStatus endState : terminalStates) {
       expectWork(UPDATE_STATE).times(5);
@@ -150,9 +150,8 @@ public class TaskStateMachineTest extends EasyMockTest {
 
       control.verify();
       control.reset();
-      stateMachine =
-          new TaskStateMachine("test", taskReader, isJobUpdating, workSink, MISSING_GRACE_PERIOD,
-              clock, INIT);
+      stateMachine = new TaskStateMachine("test", taskReader, isJobUpdating, workSink,
+          MISSING_GRACE_PERIOD, clock, INIT);
     }
 
     control.replay();  // Needed so the teardown verify doesn't break.
@@ -241,6 +240,23 @@ public class TaskStateMachineTest extends EasyMockTest {
     stateMachine.updateState(PENDING)
         .updateState(ASSIGNED)
         .updateState(STARTING);
+    stateMachine.updateState(UNKNOWN);
+    assertThat(stateMachine.getState(), is(ScheduleStatus.LOST));
+  }
+
+  @Test
+  public void testMissingRunningRescheduledImmediately() {
+    ScheduledTask task = makeTask(false);
+    task.addToTaskEvents(new TaskEvent(clock.nowMillis(), ScheduleStatus.PENDING, null));
+    expectWork(UPDATE_STATE).times(5);
+    expectWork(RESCHEDULE);
+
+    control.replay();
+
+    stateMachine.updateState(PENDING)
+        .updateState(ASSIGNED)
+        .updateState(STARTING)
+        .updateState(RUNNING);
     stateMachine.updateState(UNKNOWN);
     assertThat(stateMachine.getState(), is(ScheduleStatus.LOST));
   }
