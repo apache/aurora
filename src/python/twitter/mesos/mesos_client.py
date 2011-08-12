@@ -39,66 +39,11 @@ def _die(msg):
   log.fatal(msg)
   sys.exit(1)
 
-class MesosCookieHelper:
-  @staticmethod
-  def chmod_600(path):
-    path_mode = int('600', 8)
-    os.chmod(path, path_mode)
-
-  @staticmethod
-  def safe_create(path):
-    if not os.path.exists(path):
-      wp = open(path, "w")
-      wp.close()
-    try:
-      MesosCookieHelper.chmod_600(path)
-      return True
-    except:
-      return False
-
-  @staticmethod
-  def get_cookie_path():
-    path = os.getenv('HOME')
-    if not path:
-      _die('$HOME is not set!')
-    return os.path.join(path, '.mesos_session')
-
-  @staticmethod
-  def save_cookie_or_die(cookie):
-    path = MesosCookieHelper.get_cookie_path()
-    if not MesosCookieHelper.safe_create(path):
-      _die('Unable to create %s!' % path)
-    with open(path, "w") as wp:
-      try:
-        pickle.dump(cookie, wp)
-      except Exception, e:
-        _die("Failed to dump session cookie into %s: %s" % (path, e))
-
-  @staticmethod
-  def read_cached_cookie():
-    path = MesosCookieHelper.get_cookie_path()
-    with open(path, "r") as wp:
-      try:
-        return pickle.load(wp)
-      except:
-        return None
-
-  @staticmethod
-  def clear_cookie():
-    path = MesosCookieHelper.get_cookie_path()
-    try:
-      os.remove(path)
-    except OSError, e:
-      if e.errno == errno.ENOENT:
-        pass
-      else:
-        raise e
-
 class MesosCLIHelper:
   @staticmethod
-  def acquire_session_key_or_die(owner, try_cached=False, save=False):
+  def acquire_session_key_or_die(owner):
     key = SessionKey(user = owner)
-    SessionKeyHelper.sign_session(key)
+    SessionKeyHelper.sign_session(key, owner)
     return key
 
   @staticmethod
@@ -201,8 +146,6 @@ class MesosCLI(cmd.Cmd):
     self.options = opts
     zookeeper.set_debug_level(zookeeper.LOG_LEVEL_WARN)
     MesosCLIHelper.assert_valid_cluster(self.options.cluster)
-    if self.options.force_authenticate:
-      MesosCookieHelper.clear_cookie()
     self._construct_scheduler()  # populates ._proxy, ._scheduler, ._client
 
   @staticmethod
@@ -293,9 +236,7 @@ class MesosCLI(cmd.Cmd):
         update_config)
 
   def acquire_session(self):
-    return MesosCLIHelper.acquire_session_key_or_die(getpass.getuser(),
-      self.options.cache_credentials,
-      self.options.cache_credentials)
+    return MesosCLIHelper.acquire_session_key_or_die(getpass.getuser())
 
   @requires_arguments('job', 'config')
   def do_create(self, *line):
@@ -316,8 +257,6 @@ class MesosCLI(cmd.Cmd):
           cron_collision_policy), sessionkey)
     log.info('Response from scheduler: %s (message: %s)'
       % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
-    if resp.responseCode == ResponseCode.AUTH_FAILED:
-      MesosCookieHelper.clear_cookie()
 
   @requires_arguments('role', 'job')
   def do_start_cron(self, *line):
@@ -327,8 +266,6 @@ class MesosCLI(cmd.Cmd):
     resp = self._client.startCronJob(role, job, self.acquire_session())
     log.info('Response from scheduler: %s (message: %s)'
       % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
-    if resp.responseCode == ResponseCode.AUTH_FAILED:
-      MesosCookieHelper.clear_cookie()
 
   @requires_arguments('role', 'job')
   def do_kill(self, *line):
@@ -345,8 +282,6 @@ class MesosCLI(cmd.Cmd):
     resp = self._client.killTasks(query, sessionkey)
     log.info('Response from scheduler: %s (message: %s)'
       % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
-    if resp.responseCode == ResponseCode.AUTH_FAILED:
-      MesosCookieHelper.clear_cookie()
 
   @requires_arguments('role', 'job')
   def do_status(self, *line):
@@ -424,8 +359,6 @@ class MesosCLI(cmd.Cmd):
     resp = self._client.startUpdate(
       JobConfiguration(job['name'], owner, tasks, job['cron_schedule'], cron_collision_policy),
           sessionkey)
-    if resp.responseCode == ResponseCode.AUTH_FAILED:
-      MesosCookieHelper.clear_cookie()
 
     if resp.responseCode != ResponseCode.OK:
       log.warning('Response from scheduler: %s (message: %s)'
@@ -488,18 +421,6 @@ The subcommands and their arguments are:
     default=None,
     help="Local path to use for the app (will copy to the cluster)" + \
           " (default: %default)")
-  options.add(
-    '--nocache_credentials',
-    dest='cache_credentials',
-    default=True,
-    action='store_false',
-    help="Turn off session credential caching (in $HOME/.mesos_session")
-  options.add(
-    '--force_authenticate',
-    dest='force_authenticate',
-    default=False,
-    action='store_true',
-    help="Force reauthentication with Mesos master, replacing cached credentials.")
 
 def main(args):
   values = options.values()
