@@ -57,6 +57,8 @@ import com.twitter.mesos.scheduler.httphandlers.Mname;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzHome;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzJob;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzRole;
+import com.twitter.mesos.scheduler.quota.QuotaProvider;
+import com.twitter.mesos.scheduler.quota.QuotaProvider.QuotaProviderImpl;
 import com.twitter.mesos.scheduler.storage.db.DbStorageModule;
 
 
@@ -167,6 +169,7 @@ public class SchedulerModule extends AbstractModule {
       DbStorageModule.bind(binder());
     }
 
+    bind(QuotaProvider.class).to(QuotaProviderImpl.class);
     bind(SchedulingFilter.class).to(SchedulingFilterImpl.class);
 
     // updaterTaskProvider handled in provider.
