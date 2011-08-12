@@ -14,7 +14,6 @@ import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
-import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
@@ -27,11 +26,7 @@ import com.google.inject.Inject;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.SlaveOffer;
 
-import com.twitter.common.base.CachingSupplier;
 import com.twitter.common.base.Closure;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
-import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.StateMachine;
 import com.twitter.mesos.Tasks;
@@ -138,7 +133,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public String initialize() {
+  public synchronized String initialize() {
     checkLifecycleState(CONSTRUCTED);
     String storedFrameworkId = stateManager.initialize();
     stateMachine.transition(INITIALIZED);
@@ -146,7 +141,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public void start(Closure<String> killTask) {
+  public synchronized void start(Closure<String> killTask) {
     checkLifecycleState(INITIALIZED);
     stateManager.start(killTask);
     stateMachine.transition(STARTED);
@@ -157,7 +152,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public void registered(String frameworkId) {
+  public synchronized void registered(String frameworkId) {
     checkStarted();
     stateManager.setFrameworkId(frameworkId);
   }
@@ -293,43 +288,12 @@ public class SchedulerCoreImpl implements SchedulerCore {
     cronScheduler.startJobNow(key);
   }
 
-  // Handles exporting of stats related to task counts for each job by status.
-  private final Supplier<Set<ScheduledTask>> taskCache = new CachingSupplier<Set<ScheduledTask>>(
-      new com.twitter.common.base.Supplier<Set<ScheduledTask>>() {
-        @Override public Set<ScheduledTask> get() {
-          return stateManager.fetchTasks(Query.GET_ALL);
-        }
-      },
-      Amount.of(1L, Time.SECONDS));
-  private final Map<String, String> countersByJobAndStatus = new MapMaker().makeComputingMap(
-      new Function<String, String>() {
-        @Override public String apply(final String jobKey) {
-          for (final ScheduleStatus status : ScheduleStatus.values()) {
-            Stats.export(new StatImpl<Integer>("job_" + jobKey + "_tasks_" + status) {
-              @Override public Integer read() {
-                int count = 0;
-                for (ScheduledTask task : taskCache.get()) {
-                  if (Tasks.jobKey(task).equals(jobKey) && task.getStatus() == status) {
-                    count++;
-                  }
-                }
-                return count;
-              }
-            });
-          }
-          return jobKey;
-        }
-      });
-
   @Override
   public synchronized void runJob(JobConfiguration job) {
     checkNotNull(job);
     checkNotNull(job.getTaskConfigs());
     checkStarted();
     checkState(!hasRunningTasks(job));
-
-    // Dummy read to ensure stats are exported for the job.
-    countersByJobAndStatus.get(Tasks.jobKey(job));
 
     launchTasks(job.getTaskConfigs());
   }
@@ -621,7 +585,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public void stop() {
+  public synchronized void stop() {
     checkStarted();
     stateManager.stop();
     stateMachine.transition(STOPPED);
@@ -644,16 +608,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
   private final class Vars {
     final AtomicLong resourceOffers = Stats.exportLong("scheduler_resource_offers");
     final AtomicLong executorBootstraps = Stats.exportLong("executor_bootstraps");
-
-    Vars() {
-      for (final ScheduleStatus status : ScheduleStatus.values()) {
-        Stats.export(new StatImpl<Integer>("task_store_" + status) {
-          @Override public Integer read() {
-            return stateManager.fetchTaskIds(Query.byStatus(status)).size();
-          }
-        });
-      }
-    }
   }
   private final Vars vars = new Vars();
 }

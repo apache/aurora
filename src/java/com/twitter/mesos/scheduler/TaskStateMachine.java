@@ -343,7 +343,7 @@ public class TaskStateMachine {
                   case ROLLBACK:
                     initiateUpdateSequence.execute();
                     break;
-                  
+
                   case PREEMPTING:
                     addWork(WorkCommand.KILL);
                     break;
@@ -476,14 +476,19 @@ public class TaskStateMachine {
             new Closure<Transition<State>>() {
               @Override
               public void execute(final Transition<State> transition) {
-                if (transition.isValidStateChange()
-                    && (transition.getTo().state != UNKNOWN)
+                ScheduleStatus from = transition.getFrom().state;
+                ScheduleStatus to = transition.getTo().state;
+
+                if (transition.isValidStateChange() && (to != UNKNOWN)
                     // Prevent an update when killing a pending task, since the task is deleted
                     // prior to the update.
-                    && !(transition.getFrom().state == PENDING
-                    && transition.getTo().state == KILLED_BY_CLIENT)) {
+                    && !((from == PENDING) && (to == KILLED_BY_CLIENT))) {
                   addWork(WorkCommand.UPDATE_STATE, transition.getTo().mutation);
-                } else if (!transition.isAllowed()) {
+                } else if (!transition.isAllowed()
+                    // Don't log illegal transitions for KILLED_BY_CLIENT -> KILLED,
+                    // since mesos is not yet aware of KILLED_BY_CLIENT, and we don't sync it to
+                    // executors.
+                    && !((from == KILLED_BY_CLIENT) && (to == KILLED))) {
                   LOG.log(Level.SEVERE, "Illegal state transition attempted: " + transition);
                   ILLEGAL_TRANSITIONS.incrementAndGet();
                 }

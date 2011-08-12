@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Logger;
 
@@ -13,13 +14,16 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
+import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.MapMaker;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
@@ -159,6 +163,14 @@ class StateManager {
     });
   }
 
+  private static Predicate<TaskStateMachine> hasStatus(final ScheduleStatus status) {
+    return new Predicate<TaskStateMachine>() {
+      @Override public boolean apply(TaskStateMachine stateMachine) {
+        return stateMachine.getState() == status;
+      }
+    };
+  }
+
   /**
    * Initializes the state manager, by starting the storage and fetching the persisted framework ID.
    *
@@ -179,7 +191,17 @@ class StateManager {
         });
       }
     });
-    LOG.info("Initialization of DbStorage complete.");
+
+    // Export count of tasks in each state.
+    for (final ScheduleStatus status : ScheduleStatus.values()) {
+      Stats.export(new StatImpl<Integer>("task_store_" + status) {
+        @Override public Integer read() {
+          return Iterables.size(Iterables.filter(taskStateMachines.values(), hasStatus(status)));
+        }
+      });
+    }
+
+    LOG.info("Storage initialization complete.");
     return getFrameworkId();
   }
 
@@ -583,9 +605,7 @@ class StateManager {
   private void changeStateInTransaction(Set<String> taskIds,
       final Closure<TaskStateMachine> stateChange) {
     for (String taskId : taskIds) {
-      TaskStateMachine sm = taskStateMachines.get(taskId);
-      Preconditions.checkState(sm != null, "State machine not found for task ID " + taskId);
-      stateChange.execute(sm);
+      stateChange.execute(taskStateMachines.get(taskId));
     }
   }
 
@@ -714,6 +734,7 @@ class StateManager {
 
               case DELETE:
                 taskStore.removeTasks(ImmutableSet.of(taskId));
+                taskStateMachines.remove(taskId);
                 break;
 
               case INCREMENT_FAILURES:
@@ -769,25 +790,46 @@ class StateManager {
     return createStateMachine(task, null);
   }
 
+  // Maintain a mapping from job key to task ID.  When a job key is first inserted,
+  // a stat per ScheduleStatus for the job is exported.
+  private final Multimap<String, String> jobKeysToTaskIds = HashMultimap.create();
+  private void exportCounters(final String jobKey, String taskId) {
+    if (!jobKeysToTaskIds.containsKey(jobKey)) {
+      // Export count of tasks in each state for the job.
+      for (final ScheduleStatus status : ScheduleStatus.values()) {
+        Stats.export(new StatImpl<Integer>("job_" + jobKey + "_tasks_" + status.name()) {
+          @Override public Integer read() {
+            Map<String, TaskStateMachine> jobStateMachines =
+                Maps.filterKeys(taskStateMachines, Predicates.in(jobKeysToTaskIds.get(jobKey)));
+            return Iterables.size(Iterables.filter(jobStateMachines.values(), hasStatus(status)));
+          }
+        });
+      }
+    }
+    jobKeysToTaskIds.put(jobKey, taskId);
+  }
+
   private TaskStateMachine createStateMachine(ScheduledTask task,
       @Nullable ScheduleStatus initialState) {
     String taskId = Tasks.id(task);
+    String jobKey = Tasks.jobKey(task);
     TaskStateMachine stateMachine =
         initialState == null
             ? new TaskStateMachine(
                 taskId,
                 taskSupplier(taskId),
-                taskUpdateChecker(Tasks.jobKey(task)),
+                taskUpdateChecker(jobKey),
                 workSink,
                 MISSING_TASK_GRACE_PERIOD.get())
             : new TaskStateMachine(
                 taskId,
                 taskSupplier(taskId),
-                taskUpdateChecker(Tasks.jobKey(task)),
+                taskUpdateChecker(jobKey),
                 workSink,
                 MISSING_TASK_GRACE_PERIOD.get(),
-                initialState)
-        ;
+                initialState);
+
+    exportCounters(jobKey, taskId);
     taskStateMachines.put(taskId, stateMachine);
     return stateMachine;
   }
