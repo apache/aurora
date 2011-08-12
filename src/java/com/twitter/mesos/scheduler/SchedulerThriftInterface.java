@@ -3,6 +3,7 @@ package com.twitter.mesos.scheduler;
 import java.util.Set;
 import java.util.logging.Logger;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.collect.ImmutableSet;
@@ -11,17 +12,23 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
+import com.twitter.common.args.Arg;
+import com.twitter.common.args.CmdLine;
+import com.twitter.common.args.constraints.NotEmpty;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.CreateJobResponse;
 import com.twitter.mesos.gen.FinishUpdateResponse;
 import com.twitter.mesos.gen.GetQuotaResponse;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.KillResponse;
-import com.twitter.mesos.gen.MesosSchedulerManager;
+import com.twitter.mesos.gen.MesosAdmin;
+import com.twitter.mesos.gen.Quota;
+import com.twitter.mesos.gen.ResponseCode;
 import com.twitter.mesos.gen.RestartResponse;
 import com.twitter.mesos.gen.RollbackShardsResponse;
 import com.twitter.mesos.gen.ScheduleStatusResponse;
 import com.twitter.mesos.gen.SessionKey;
+import com.twitter.mesos.gen.SetQuotaResponse;
 import com.twitter.mesos.gen.StartCronResponse;
 import com.twitter.mesos.gen.StartUpdateResponse;
 import com.twitter.mesos.gen.TaskQuery;
@@ -33,7 +40,7 @@ import com.twitter.mesos.scheduler.SchedulerCore.RestartException;
 import com.twitter.mesos.scheduler.auth.SessionValidator;
 import com.twitter.mesos.scheduler.auth.SessionValidator.AuthFailedException;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
-import com.twitter.mesos.scheduler.quota.QuotaProvider;
+import com.twitter.mesos.scheduler.quota.QuotaManager;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
@@ -48,19 +55,26 @@ import static com.twitter.mesos.gen.ResponseCode.WARNING;
  *
  * @author William Farner
  */
-public class SchedulerThriftInterface implements MesosSchedulerManager.Iface {
+public class SchedulerThriftInterface implements MesosAdmin.Iface {
+
+  @VisibleForTesting
+  @NotEmpty
+  @CmdLine(name = "admin_role",
+      help ="Auth role that is premitted to run administrative functions.")
+  static final Arg<String> ADMIN_ROLE = Arg.create("mesos");
+
   private static final Logger LOG = Logger.getLogger(SchedulerThriftInterface.class.getName());
 
   private final SchedulerCore schedulerCore;
   private final SessionValidator sessionValidator;
-  private final QuotaProvider quotaProvider;
+  private final QuotaManager quotaManager;
 
   @Inject
   public SchedulerThriftInterface(SchedulerCore schedulerCore, SessionValidator sessionValidator,
-      QuotaProvider quotaProvider) {
+      QuotaManager quotaManager) {
     this.schedulerCore = checkNotNull(schedulerCore);
     this.sessionValidator = checkNotNull(sessionValidator);
-    this.quotaProvider = checkNotNull(quotaProvider);
+    this.quotaManager = checkNotNull(quotaManager);
   }
 
   private void validateSessionKeyForTasks(SessionKey session, Query taskQuery)
@@ -305,6 +319,28 @@ public class SchedulerThriftInterface implements MesosSchedulerManager.Iface {
   @Override
   public GetQuotaResponse getQuota(String ownerRole) {
     checkNotBlank(ownerRole, "Owner role may not be blank.");
-    return new GetQuotaResponse().setQuota(quotaProvider.getQuota(ownerRole));
+    return new GetQuotaResponse().setQuota(quotaManager.getQuota(ownerRole));
+  }
+
+  private void assertAdmin(SessionKey session) throws AuthFailedException {
+    sessionValidator.checkAuthenticated(session, ADMIN_ROLE.get());
+  }
+
+  @Override
+  public SetQuotaResponse setQuota(String ownerRole, Quota quota, SessionKey session) {
+    checkNotBlank(ownerRole, "Owner role may not be blank.");
+    checkNotNull(quota, "Quota must not be null");
+
+    SetQuotaResponse response = new SetQuotaResponse();
+    try {
+      assertAdmin(session);
+      quotaManager.setQuota(ownerRole, quota);
+      response.setResponseCode(ResponseCode.OK).setMessage("Quota applied.");
+    } catch (AuthFailedException e) {
+      response.setResponseCode(ResponseCode.AUTH_FAILED)
+          .setMessage("Only admins may perform this operation.");
+    }
+
+    return response;
   }
 }

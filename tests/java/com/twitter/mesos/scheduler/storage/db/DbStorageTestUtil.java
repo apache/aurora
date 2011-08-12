@@ -12,7 +12,7 @@ import com.twitter.mesos.scheduler.db.testing.DbTestUtil.DbAccess;
  *
  * @author John Sirois
  */
-final class DbStorageTestUtil {
+public final class DbStorageTestUtil {
 
   /**
    * Sets up a DbStorage against a new in-memory database with empty tables.  Also props up the H2
