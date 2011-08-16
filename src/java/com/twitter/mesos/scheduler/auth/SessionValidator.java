@@ -80,9 +80,6 @@ public interface SessionValidator {
       if (!userId.equals(targetRole)) {
         if (!ods.isRoleAccount(targetRole)) {
           throw new AuthFailedException(targetRole + " %s is not a role account.");
-        } else if (!ods.isMember(userId, targetRole)) {
-          throw new AuthFailedException(
-              String.format("User %s does not have permission for role %s", userId, targetRole));
         }
       }
 
@@ -93,7 +90,7 @@ public interface SessionValidator {
 
       AuthorizedKeySet keySet;
       try {
-        keySet = AuthorizedKeySet.createFromKeys(user.getSshPubkeys());
+        keySet = AuthorizedKeySet.createFromKeys(ods.expandKeys(userId));
       } catch (KeyParseException e) {
         throw new AuthFailedException("Failed to parse SSH keys for user " + userId);
       }
