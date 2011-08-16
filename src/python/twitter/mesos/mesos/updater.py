@@ -89,7 +89,7 @@ class Updater(object):
           % (UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
       failed_shards = self.watch_tasks(batch_shards, update_config.restartThreshold,
           update_config.watchSecs)
-      log.info('Failed_tasks : %s' % failed_shards)
+      log.info('Failed_tasks : %s' % (failed_shards if failed_shards != [] else 'None'))
       remaining_shards += failed_shards
       remaining_shards.sort()
       update_in_progress = not(self.is_failed_update(failed_shards) or remaining_shards == [])
@@ -128,7 +128,7 @@ class Updater(object):
 
     Returns a map of the current status of the restarted shards as returned by the scheduler.
     """
-    log.info('Restarting shards')
+    log.info('Restarting shards: %s' % shard_ids)
     return self._scheduler.updateShards(self._role, self._job['name'], shard_ids,
         self._update_token, self._session)
 
@@ -155,7 +155,7 @@ class Updater(object):
     healthy_tasks = set()
     failed_shards = set()
     while True:
-      log.info('Getting Status...')
+      log.info('Getting status...')
       query = TaskQuery()
       query.owner = Identity(role = self._role)
       query.jobName = self._job['name']
@@ -167,16 +167,19 @@ class Updater(object):
           statuses[task.scheduledTask.assignedTask.task.shardId] = task.scheduledTask.status
       else:
         log.info('No tasks found.')
-      log.info('Got statuses: %s' % statuses)
+      log.info('Got statuses: %s' %
+          dict([(task,ScheduleStatus._VALUES_TO_NAMES[status])
+          for task,status in statuses.iteritems()]))
       now = self._clock.time()
       for task_id, status in statuses.items():
         if status is ScheduleStatus.RUNNING and task_id not in (
           failed_shards.union(running_state_times.keys())):
           running_state_times[task_id] = now
-          log.info('Adding %s to Running Tasks' % task_id)
+          log.info('Adding task-%s to running tasks' % task_id)
       if now > expected_running_by:
         non_running_tasks = [id for id in task_ids if id not in running_state_times]
-        log.info('Tasks failed to move into running: %s' % non_running_tasks)
+        log.info('Tasks failed to move into running: %s' %
+            (non_running_tasks if non_running_tasks != [] else 'None'))
         failed_shards.update(non_running_tasks)
       healthy_tasks.update(id for id in statuses
           if id in running_state_times and now > running_state_times[id] + watch_secs)

@@ -354,7 +354,7 @@ class MesosCLI(cmd.Cmd):
 
     sessionkey = self.acquire_session()
 
-    log.info('Updating Job %s' % job['name'])
+    log.info('Updating job %s' % job['name'])
 
     resp = self._client.startUpdate(
       JobConfiguration(job['name'], owner, tasks, job['cron_schedule'], cron_collision_policy),
