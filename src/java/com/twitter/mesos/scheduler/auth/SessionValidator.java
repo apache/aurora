@@ -90,7 +90,7 @@ public interface SessionValidator {
 
       AuthorizedKeySet keySet;
       try {
-        keySet = AuthorizedKeySet.createFromKeys(ods.expandKeys(userId));
+        keySet = AuthorizedKeySet.createFromKeys(ods.expandKeys(targetRole));
       } catch (KeyParseException e) {
         throw new AuthFailedException("Failed to parse SSH keys for user " + userId);
       }
