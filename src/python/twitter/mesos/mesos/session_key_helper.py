@@ -21,13 +21,12 @@ class SessionKeyHelper(object):
       your valid ODS key.
     """
     ods = ODS()
-    user = ods.get_user(username)
-    if user is None:
+    if ods.get_user(username) is None:
       raise SessionKeyHelper.LDAPError('Could not query %s from ODS!' % username)
 
     # parse all the ldap pubkeys a user has submitted to ODS
     all_ldap_pubkeys = []
-    for key in user.keys:
+    for key in ODS.query_keys(username, ods):
       if key.startswith('ssh-rsa'):
         pkey = RSAKey(data=base64.decodestring(key.split()[1]))
         if pkey:
