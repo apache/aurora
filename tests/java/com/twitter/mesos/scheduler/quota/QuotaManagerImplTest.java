@@ -6,11 +6,13 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.mesos.gen.Quota;
+import com.twitter.mesos.scheduler.db.testing.DbTestUtil;
+import com.twitter.mesos.scheduler.db.testing.DbTestUtil.DbAccess;
 import com.twitter.mesos.scheduler.quota.QuotaManager.InsufficientQuotaException;
 import com.twitter.mesos.scheduler.quota.QuotaManager.QuotaManagerImpl;
+import com.twitter.mesos.scheduler.storage.db.DbStorage;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.Work.NoResult;
-import com.twitter.mesos.scheduler.storage.db.DbStorageTestUtil;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
@@ -26,7 +28,8 @@ public class QuotaManagerImplTest extends TearDownTestCase {
 
   @Before
   public void setUp() throws Exception {
-    Storage storage = DbStorageTestUtil.setupStorage(this);
+    DbAccess dbAccess = DbTestUtil.setupStorage(this);
+    Storage storage = new DbStorage(dbAccess.jdbcTemplate, dbAccess.transactionTemplate, 0);
     storage.start(new NoResult.Quiet() {
       @Override protected void execute(Storage.StoreProvider storeProvider) {}
     });
