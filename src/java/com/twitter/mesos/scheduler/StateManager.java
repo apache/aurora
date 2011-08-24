@@ -357,11 +357,11 @@ class StateManager {
         UpdateStore.ShardUpdateConfiguration updateConfig =
             updateStore.fetchShardUpdateConfig(jobKey, 0);
         if (updateConfig == null) {
-          throw new UpdateException("Update does not exist for" + jobKey);
+          throw new UpdateException("Update does not exist for " + jobKey);
         }
 
         if ((updateToken != null) && !updateToken.equals(updateConfig.getUpdateToken())) {
-          throw new UpdateException("Invalid update token for" + jobKey);
+          throw new UpdateException("Invalid update token for " + jobKey);
         }
 
         if (result == UpdateResult.SUCCESS) {

@@ -4,7 +4,7 @@ import unittest
 import pytest
 from mesos_twitter.ttypes import *
 from twitter.common import options
-from twitter.mesos.mesos.updater import *
+from twitter.mesos.mesos.updater import Updater
 import twitter.common.log
 from fake_scheduler import *
 
@@ -169,17 +169,17 @@ class UpdaterTest(unittest.TestCase):
   def test_invalid_batch_size(self):
     """Test for out of range error for batch size"""
     self._update_config.batchSize = 0
-    with pytest.raises(InvalidUpdaterConfigException):
+    with pytest.raises(Updater.InvalidConfigError):
       self._updater.update(self._job_config)
 
   def test_invalid_restart_threshold(self):
     """Test for out of range error for restart threshold"""
     self._update_config.restartThreshold = 0
-    with pytest.raises(InvalidUpdaterConfigException):
+    with pytest.raises(Updater.InvalidConfigError):
       self._updater.update(self._job_config)
 
   def test_invalid_watch_secs(self):
     """Test for out of range error for watch secs"""
     self._update_config.watchSecs = 0
-    with pytest.raises(InvalidUpdaterConfigException):
+    with pytest.raises(Updater.InvalidConfigError):
       self._updater.update(self._job_config)

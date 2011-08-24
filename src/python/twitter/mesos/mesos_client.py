@@ -145,6 +145,8 @@ class MesosCLI(cmd.Cmd):
     cmd.Cmd.__init__(self)
     self.options = opts
     zookeeper.set_debug_level(zookeeper.LOG_LEVEL_WARN)
+    # TODO(wickman)  The scheduler should be constructed lazily, and we should
+    # not require --cluster to be passed to every mesos command.
     MesosCLIHelper.assert_valid_cluster(self.options.cluster)
     self._construct_scheduler()  # populates ._proxy, ._scheduler, ._client
 
@@ -183,6 +185,8 @@ class MesosCLI(cmd.Cmd):
               scheduler_client.ZookeeperSchedulerClient(cluster, ssl=True, **kwargs))
 
   def _construct_scheduler(self):
+    # TODO(wickman)  This should not come from self.options.cluster, instead from
+    # the config if this command requires one!
     self._proxy, self._scheduler = MesosCLI.get_scheduler_client(
       self.options.cluster, verbose=self.options.verbose)
     assert self._scheduler, "Could not find scheduler (cluster = %s)" % self.options.cluster
@@ -383,6 +387,20 @@ class MesosCLI(cmd.Cmd):
     if resp.responseCode != UpdateResponseCode.OK:
       log.info('Response from scheduler: %s (message: %s)'
         % (UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
+
+  @requires_arguments('role', 'job')
+  def do_cancel_update(self, *line):
+    """cancel_update role job"""
+
+    (role, job) = line
+    sessionkey = self.acquire_session()
+    cluster = MesosCLIHelper.get_cluster(self.options.cluster, None)
+    log.info('Canceling update on job %s' % job)
+
+    resp = self._client.finishUpdate(role, job, UpdateResult.TERMINATE, None, sessionkey)
+    log.info('Response from scheduler: %s (message: %s)'
+        % (UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
+
 
 def initialize_options():
   usage = """Mesos command-line interface.
