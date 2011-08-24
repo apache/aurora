@@ -11,7 +11,7 @@ from twitter.common.recordio import ThriftRecordReader
 from twitter.tcl.loader import ThermosJobLoader, MesosJobLoader
 from tcl_thrift.ttypes import ThermosJob
 
-from twitter.thermos.runner import WorkflowRunner
+from twitter.thermos.runner import TaskRunner
 
 def parse_commandline():
   options.add("--thermos", dest = "thermos",
@@ -20,18 +20,18 @@ def parse_commandline():
               help = "read thermos job description from stored thrift ThermosJob")
   options.add("--mesos", dest = "mesos",
               help = "translate from mesos job description")
-  options.add("--workflow", dest = "workflow", metavar = "WORKFLOW",
-              help = "run the workflow by name of WORKFLOW")
+  options.add("--task", dest = "task", metavar = "TASK",
+              help = "run the task by name of TASK")
   options.add("--replica", dest = "replica_id", metavar = "ID",
               help = "run the replica number ID, from 0 .. number of replicas.")
   options.add("--sandbox_root", dest = "sandbox_root", metavar = "PATH",
-              help = "the path root where we will spawn workflow sandboxes")
+              help = "the path root where we will spawn task sandboxes")
   options.add("--checkpoint_root", dest = "checkpoint_root", metavar = "PATH",
-              help = "the path where we will store workflow logs and checkpoints")
+              help = "the path where we will store task logs and checkpoints")
   options.add("--job_uid", dest = "uid", metavar = "INT64",
-              help = "the uid assigned to this task by the scheduler")
+              help = "the uid assigned to this process by the scheduler")
   options.add("--action", dest = "action", metavar = "ACTION", default = "run",
-              help = "the action for this workflow runner: run, restart, kill")
+              help = "the action for this task runner: run, restart, kill")
 
   (values, args) = options.parse()
 
@@ -46,9 +46,10 @@ def parse_commandline():
     options.print_help(sys.stderr)
     sys.exit(1)
 
-  if not (values.workflow and values.replica_id and values.sandbox_root and values.checkpoint_root and values.uid):
+  if not (values.task and values.replica_id and values.sandbox_root and (
+      values.checkpoint_root and values.uid)):
     log.error("ERROR: must supply all of: %s\n" % (
-      " ".join(["--workflow", "--replica_id", "--sandbox_root", "--checkpoint_root", "--job_uid"])))
+      " ".join(["--task", "--replica_id", "--sandbox_root", "--checkpoint_root", "--job_uid"])))
     options.print_help(sys.stderr)
     sys.exit(1)
 
@@ -77,39 +78,35 @@ def get_job_from_options(opts):
 
   return thermos_job
 
-def get_workflow_from_job(thermos_job, workflow, replica):
-  for wf in thermos_job.workflows:
-    if wf.name == workflow and wf.replicaId == int(replica):
-      return wf
-  log.error('unable to find workflow: %s and replica: %s!\n' % (workflow, replica))
-  known_workflows = {}
-  for wf in thermos_job.workflows:
-    if wf.name not in known_workflows: known_workflows[wf.name] = []
-    known_workflows[wf.name].append(wf.replicaId)
-  log.info('known workflow/replicas:')
-  log.info(pprint.pformat(known_workflows))
+def get_task_from_job(thermos_job, task, replica):
+  for tsk in thermos_job.tasks:
+    if tsk.name == task and tsk.replica_id == int(replica):
+      return tsk
+  log.error('unable to find task: %s and replica: %s!\n' % (task, replica))
+  known_tasks = {}
+  for tsk in thermos_job.tasks:
+    if tsk.name not in known_tasks: known_tasks[tsk.name] = []
+    known_tasks[tsk.name].append(tsk.replica_id)
+  log.info('known task/replicas:')
+  log.info(pprint.pformat(known_tasks))
 
 def main():
   opts, _ = parse_commandline()
 
   twitter.common.log.init("thermos_run")
 
-  thermos_replica  = opts.replica_id
-  thermos_job      = get_job_from_options(opts)
-  thermos_workflow = get_workflow_from_job(thermos_job, opts.workflow, opts.replica_id)
+  thermos_replica = opts.replica_id
+  thermos_job = get_job_from_options(opts)
+  thermos_task = get_task_from_job(thermos_job, opts.task, opts.replica_id)
 
-  if thermos_job and thermos_workflow:
-    log.info("Woop!  Able to find workflow: %s" % thermos_workflow)
+  if thermos_job and thermos_task:
+    log.info("Woop!  Able to find task: %s" % thermos_task)
   else:
-    log.fatal("Unable to synthesize workflow!")
+    log.fatal("Unable to synthesize task!")
     sys.exit(1)
 
-  workflow_runner = WorkflowRunner(thermos_workflow,
-                                   opts.sandbox_root,
-                                   opts.checkpoint_root,
-                                   long(opts.uid))
-
-  workflow_runner.run()
+  task_runner = TaskRunner(thermos_task, opts.sandbox_root, opts.checkpoint_root, long(opts.uid))
+  task_runner.run()
 
 if __name__ == '__main__':
   main()

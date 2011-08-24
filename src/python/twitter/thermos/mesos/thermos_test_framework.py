@@ -39,9 +39,9 @@ class ThermosFramework(mesos.Scheduler):
   def __init__(self, options):
     self.binary_root = options.binary_root
     self.job = options.job
-    self.workflows = list(self.job.workflows) # copy
+    self.tasks = list(self.job.tasks) # copy                                                         # workflows=>tasks
 
-    # uid => assigned workflow
+    # uid => assigned task                                                                           # workflow=>task
     self.uid_map = {}
 
     # hostname => observer id
@@ -61,78 +61,78 @@ class ThermosFramework(mesos.Scheduler):
     print "Registered with framework ID %s" % fid.value
 
   @staticmethod
-  def _populate_task_cpu_mem(task, cpu = 1, mem_mb = 1024):
-    cpus = task.resources.add()
+  def _populate_process_cpu_mem(process, cpu = 1, mem_mb = 1024):                                    # task=>process
+    cpus = process.resources.add()                                                                   # task=>process
     cpus.name = "cpus"
     cpus.type = mesos_pb.Resource.SCALAR
     cpus.scalar.value = cpu
 
-    mem = task.resources.add()
+    mem = process.resources.add()                                                                    # task=>process
     mem.name = "mem"
     mem.type = mesos_pb.Resource.SCALAR
     mem.scalar.value = mem_mb
 
-  def _set_thermos_executor_info(self, task, uid):
+  def _set_thermos_executor_info(self, process, uid):                                                # task=>process
     executor_path = os.path.join(self.binary_root, "thermos_executor.par")
     executor_info = mesos_pb.ExecutorInfo()
     executor_info.executor_id.value = "uid:%s" % uid
     executor_info.uri = executor_path
-    task.executor.MergeFrom(executor_info)
+    process.executor.MergeFrom(executor_info)                                                        # task=>process
 
-  def _set_thermos_observer_info(self, task):
+  def _set_thermos_observer_info(self, process):                                                     # task=>process
     executor_path = os.path.join(self.binary_root, "thermos_observing_executor.par")
     executor_info = mesos_pb.ExecutorInfo()
     executor_info.executor_id.value = "observer"
     executor_info.uri = executor_path
-    task.executor.MergeFrom(executor_info)
+    process.executor.MergeFrom(executor_info)                                                        # task=>process
 
-  def _populate_task(self, task, uid):
-    self._populate_task_cpu_mem(task, cpu = 0.3, mem_mb = 512)
-    self._set_thermos_executor_info(task, uid)
+  def _populate_process(self, process, uid):                                                         # task=>process
+    self._populate_process_cpu_mem(process, cpu = 0.3, mem_mb = 512)                                 # task=>process
+    self._set_thermos_executor_info(process, uid)                                                    # task=>process
 
-  def _populate_observer_task(self, task):
-    self._populate_task_cpu_mem(task, cpu = 0.1, mem_mb = 64)
-    self._set_thermos_observer_info(task)
+  def _populate_observer_process(self, process):                                                     # task=>process
+    self._populate_process_cpu_mem(process, cpu = 0.1, mem_mb = 64)                                  # task=>process
+    self._set_thermos_observer_info(process)                                                         # task=>process
 
   def resourceOffer(self, driver, offer_id, offers):
     print "Got resource offer %s" % offer_id.value
-    if len(self.workflows) == 0:
-      print 'All workflows have been scheduled!'
+    if len(self.tasks) == 0:                                                                         # workflows=>tasks
+      print 'All tasks have been scheduled!'                                                         # workflows=>tasks
       return
 
-    tasks = []
+    processes = []                                                                                   # tasks=>processes
     for offer in offers:
       if offer.hostname not in self.observers:
         print 'Detected new executor host %s!  Firing off observer' % offer.hostname
-        task = mesos_pb.TaskDescription()
-        task.name = 'observer'
-        task.task_id.value = str(UidGenerator.get())
-        task.slave_id.value = offer.slave_id.value
-        self._populate_observer_task(task)
+        process = mesos_pb.ProcessDescription()                                                      # Task=>Process && task=>process
+        process.name = 'observer'                                                                    # task=>process
+        process.process_id.value = str(UidGenerator.get())                                           # task=>process
+        process.slave_id.value = offer.slave_id.value                                                # task=>process
+        self._populate_observer_process(process)                                                     # task=>process
         self.observers[offer.hostname] = offer.slave_id.value
-        tasks.append(task)
+        processes.append(process)                                                                    # task=>process && tasks=>processes
         continue
 
-      if self.workflows:
-        wf = self.workflows[0]
+      if self.tasks:                                                                                 # workflows=>tasks
+        tsk = self.tasks[0]                                                                          # wf=>tsk && workflows=>tasks
 
-      print "Accepting offer on %s to start task %s:%d" % (
-        offer.hostname, wf.name, wf.replicaId)
+      print "Accepting offer on %s to start process %s:%d" % (                                       # task=>process
+        offer.hostname, tsk.name, tsk.replica_id)                                                    # wf=>tsk && replicaId=>replica_id
 
-      task = mesos_pb.TaskDescription()
-      task.name = wf.name
-      task.task_id.value = str(UidGenerator.get())
-      task.slave_id.value = offer.slave_id.value
-      self._populate_task(task, task.task_id.value)
-      task.data = pickle.dumps( {'job': self.job, 'workflow': wf } )
-      self.uid_map[task.task_id.value] = wf
-      self.workflows.pop(0)
-      tasks.append(task)
+      process = mesos_pb.ProcessDescription()                                                        # Task=>Process && task=>process
+      process.name = tsk.name                                                                        # task=>process && wf=>tsk
+      process.process_id.value = str(UidGenerator.get())                                             # task=>process
+      process.slave_id.value = offer.slave_id.value                                                  # task=>process
+      self._populate_process(process, process.process_id.value)                                      # task=>process
+      process.data = pickle.dumps( {'job': self.job, 'task': tsk } )                                 # task=>process && workflow=>task && wf=>tsk
+      self.uid_map[process.process_id.value] = tsk                                                   # task=>process && wf=>tsk
+      self.tasks.pop(0)                                                                              # workflows=>tasks
+      processes.append(process)                                                                      # task=>process && tasks=>processes
 
-    driver.replyToOffer(offer_id, tasks, {})
+    driver.replyToOffer(offer_id, processes, {})                                                     # tasks=>processes
 
   def statusUpdate(self, driver, update):
-    print 'Task %s is in state %d' % (update.task_id.value, update.state)
+    print 'Process %s is in state %d' % (update.process_id.value, update.state)                      # Task=>Process && task=>process
 
 def get_job_from_options(options):
   thermos_file = options.thermos

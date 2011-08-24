@@ -1,6 +1,7 @@
 import os
 import errno
 
+# TODO(wickman)  Use the twitter.common.dirutils module.
 class Helper:
   @staticmethod
   def safe_create_file(filename, args):
@@ -20,37 +21,38 @@ class Helper:
         raise
 
   @staticmethod
-  def workflow_from_job(thermosjob, workflow_name):
-    for w in thermosjob.workflows:
-      if w.name == workflow_name:
+  def task_from_job(thermosjob, task_name):
+    for w in thermosjob.tasks:
+      if w.name == task_name:
         return w
     return None
 
   @staticmethod
-  def task_from_workflow(workflow, task_name):
-    for t in workflow.tasks:
-      if t.name == task_name:
+  def process_from_task(task, process_name):
+    for t in task.processes:
+      if t.name == process_name:
         return t
     return None
 
   @staticmethod
-  def task_from_name(workflow, task_name):
-    for task in workflow.tasks:
-       if task.name == task_name:
-          return task
+  def process_from_name(task, process_name):
+    for process in task.processes:
+      if process.name == process_name:
+        return process
     return None
 
+  # TODO(wickman)  Change wts to something actually descriptive.
   @staticmethod
-  def task_sequence_number(workflow_state, task_name):
-    if task_name not in workflow_state.tasks:
+  def process_sequence_number(task_state, process_name):
+    if process_name not in task_state.processes:
       return 0
     else:
-      wts = workflow_state.tasks[task_name].runs[-1]
+      wts = task_state.processes[process_name].runs[-1]
       return wts.seq
 
   @staticmethod
-  def task_run_number(workflow_state, task_name):
-    if task_name not in workflow_state.tasks:
+  def process_run_number(task_state, process_name):
+    if process_name not in task_state.processes:
       return 0
     else:
-      return len(workflow_state.tasks[task_name].runs) - 1
+      return len(task_state.processes[process_name].runs) - 1

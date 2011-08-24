@@ -9,16 +9,18 @@ from twitter.common.recordio import ThriftRecordReader
 from tcl_thrift.ttypes import ThermosJob
 from thermos_thrift.ttypes import *
 
-from twitter.thermos.base import WorkflowPath
-from twitter.thermos.base import WorkflowCkptDispatcher
+from twitter.thermos.base import TaskPath
+from twitter.thermos.base import TaskCkptDispatcher
 
 __author__ = 'wickman@twitter.com (brian wickman)'
 __tested__ = False
 
-class WorkflowMuxer:
+# TODO(wickman) More descriptive class name, e.g. ProcessCheckpointMultiplexer
+# TODO(wickman) Properly pydoc this all.
+class TaskMuxer(object):
   """
-    Class responsible for multiplexing incoming task checkpoint streams into a coherent
-    workflow update stream.
+    Class responsible for multiplexing incoming process checkpoint streams into a coherent
+    task update stream.
   """
 
   def __init__(self, pathspec):
@@ -39,7 +41,7 @@ class WorkflowMuxer:
   def add(self, uid):
     self._uids.add(uid)
     self._ckpt_head[uid] = 0
-    self._dispatcher[uid] = WorkflowCkptDispatcher()
+    self._dispatcher[uid] = TaskCkptDispatcher()
     self._init_ckpt(uid)
 
   def pop(self, uid):
@@ -64,12 +66,14 @@ class WorkflowMuxer:
       else: raise
     updated = False
     if self._ckpt_head[uid] < ckpt_offset:
-      # TODO(wickman):  Some of this logic should be factored out.  Right now
+      # TODO(wickman)  Some of this logic should be factored out.  Right now
       # the select interface on Mac is broken, so we have to open/close on every
       # read, whereas on Linux you can keep persistent filehandles and reset eof.
+      #
+      # TODO(wickman)  Implement this using inotify on Linux platforms.
       with file(uid_ckpt, 'r') as fp:
         fp.seek(self._ckpt_head[uid])
-        rr = ThriftRecordReader(fp, WorkflowRunnerCkpt)
+        rr = ThriftRecordReader(fp, TaskRunnerCkpt)
         while True:
           runner_update = rr.try_read()
           if runner_update:
@@ -82,7 +86,7 @@ class WorkflowMuxer:
     return updated
 
   def _init_ckpt(self, uid):
-    self._runnerstate[uid] = WorkflowRunnerState(tasks = {})
+    self._runnerstate[uid] = TaskRunnerState(processes = {})
     self._apply_states(uid)
 
   # grab an intermediate runnerstate
@@ -91,18 +95,20 @@ class WorkflowMuxer:
       return copy.deepcopy(self._runnerstate[uid])
     return None
 
-  def get_active_tasks(self):
+  # TODO(wickman)  Yielding with the lock is unsafe, fix this.
+  def get_active_processes(self):
     self.lock()
     for uid in self._runnerstate:
       applied_states = self._apply_states(uid)
       log.debug('applied_states(%s) = %s' % (uid, applied_states))
       state = self._runnerstate[uid]
-      for task in state.tasks:
-        if len(state.tasks[task].runs) == 0: continue
-        last_run = state.tasks[task].runs[-1]
-        if last_run.run_state == WorkflowTaskRunState.RUNNING:
-          tup = (uid, state.header.workflow_name, last_run, len(state.tasks[task].runs)-1)
+      for process in state.processes:
+        if len(state.processes[process].runs) == 0:
+          continue
+        last_run = state.processes[process].runs[-1]
+        if last_run.run_state == ProcessRunState.RUNNING:
+          tup = (uid, state.header.task_name, last_run, len(state.processes[process].runs)-1)
           log.debug('yielding %s' % repr(tup))
           yield tup
-    # TODO(wickman): look at all callsites to verify sanity
+    # TODO(wickman)  In the meantime look at all call-sites to verify sanity.
     self.unlock()

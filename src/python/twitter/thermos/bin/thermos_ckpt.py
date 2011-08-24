@@ -1,14 +1,12 @@
-#!python
-
 import os
 import sys
 import pprint
 
-from thermos_thrift.ttypes import WorkflowRunnerState, WorkflowRunnerCkpt
+from thermos_thrift.ttypes import TaskRunnerState, TaskRunnerCkpt
 
 from twitter.common import options
 from twitter.common.recordio import ThriftRecordReader
-from twitter.thermos.base.ckpt import WorkflowCkptDispatcher
+from twitter.thermos.base.ckpt import TaskCkptDispatcher
 
 def parse_commandline():
   options.add("--checkpoint", dest = "ckpt", metavar = "CKPT",
@@ -34,26 +32,26 @@ def main():
   values, _ = parse_commandline()
 
   fp = file(values.ckpt, "r")
-  rr = ThriftRecordReader(fp, WorkflowRunnerCkpt)
-  wrs = WorkflowRunnerState(tasks = {})
-  dispatcher = WorkflowCkptDispatcher()
+  rr = ThriftRecordReader(fp, TaskRunnerCkpt)
+  wrs = TaskRunnerState(processes = {})
+  dispatcher = TaskCkptDispatcher()
   for wts in rr:
     print 'Recovering: ', wts
     if values.assemble is True:
        dispatcher.update_runner_state(wrs, wts)
   print '\n\n\n'
   if values.assemble:
-    print 'Recovered Workflow'
+    print 'Recovered Task'
     pprint.pprint(wrs.header)
 
-    print '\nRecovered Workflow State'
+    print '\nRecovered Task State'
     pprint.pprint(wrs.state)
 
     print '\nRecovered Allocated Ports'
     pprint.pprint(wrs.ports)
 
-    print '\nRecovered Tasks'
-    pprint.pprint(wrs.tasks)
+    print '\nRecovered Processes'
+    pprint.pprint(wrs.processes)
 
 if __name__ == '__main__':
   main()

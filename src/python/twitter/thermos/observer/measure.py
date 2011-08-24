@@ -10,12 +10,12 @@ from case_class import CaseClass
 __author__ = 'wickman@twitter.com (brian wickman)'
 __tested__ = False
 
-MeasuredTuple = CaseClass('job_uid', 'workflow_name', 'task_name', 'task_run', 'task_pid')
+MeasuredTuple = CaseClass('job_uid', 'task_name', 'process_name', 'process_run', 'process_pid')
 
-class WorkflowMeasurer_InternalError(Exception): pass
-class WorkflowMeasurer(threading.Thread):
+class TaskMeasurer_InternalError(Exception): pass
+class TaskMeasurer(threading.Thread):
   """
-    Class responsible for polling CPU/RAM/DISK usage from live tasks.
+    Class responsible for polling CPU/RAM/DISK usage from live processes.
     Sublcassed from thread, runs in a background thread.  Control with start()/join().
   """
 
@@ -26,7 +26,7 @@ class WorkflowMeasurer(threading.Thread):
     self._ps          = ProcessSetFactory.get()
     self._alive       = True
     self._interval    = interval
-    self._tasks       = {}    # MeasuredTuple -> SampleVector
+    self._processes   = {}    # MeasuredTuple -> SampleVector
     threading.Thread.__init__(self)
 
   def join(self):
@@ -46,30 +46,32 @@ class WorkflowMeasurer(threading.Thread):
 
     while self._alive:
       last_interval = time_now
-      WorkflowMeasurer.sleep_until(last_interval + self._interval)
+      TaskMeasurer.sleep_until(last_interval + self._interval)
       time_now = time.time()
 
       self._ps.refresh()
 
-      for (uid, workflow_name, task, run) in self._muxer.get_active_tasks():
-        tup = MeasuredTuple(job_uid = uid, workflow_name = workflow_name,
-                            task_name = task.task,
-                            task_run  = run,
-                            task_pid  = task.pid)
-        if tup not in self._tasks:
-          self._tasks[tup] = SampleVector(task.task)
-        children_pids = self._ps.get_children(task.pid)
+      for (uid, task_name, process, run) in self._muxer.get_active_processes():
+        tup = MeasuredTuple(job_uid = uid, task_name = task_name,
+                            process_name = process.process,
+                            process_run  = run,
+                            process_pid  = process.pid)
+        if tup not in self._processes:
+          self._processes[tup] = SampleVector(process.process)
+        children_pids = self._ps.get_children(process.pid)
         pcpu = 0.0
         for ph in children_pids:
           if ph._exists: pcpu += ph.pcpu
-        self._tasks[tup].add(time_now, pcpu / 100.0)
+        self._processes[tup].add(time_now, pcpu / 100.0)
 
   def current_cpu_by_uid(self, job_uid):
-    tasks = filter(lambda task: task.where(job_uid = job_uid) and self._tasks[task].num_samples() > 0,
-                   self._tasks.keys())
+    processes = filter(
+      lambda process: process.where(job_uid = job_uid) and (
+        self._processes[process].num_samples() > 0),
+      self._processes.keys())
 
-    # ugh breaking abstraction barriers big time here
-    last_samples = map(lambda task: self._tasks[task].last_sample(), tasks)
+    # TODO(wickman)  Figure out better abstraction here.
+    last_samples = map(lambda process: self._processes[process].last_sample(), processes)
     if len(last_samples) == 0: return 0
     max_sample_time = max([s[0] for s in last_samples])
     pcpu = sum([s[1] for s in last_samples if s[0] == max_sample_time])
@@ -78,27 +80,28 @@ class WorkflowMeasurer(threading.Thread):
     else:
       return 0
 
-  # the way we're using this now is basically N^2 -- i.e slow as balls.  fix it.
-  def current_cpu_by_task(self, job_uid, workflow_name, task_name):
-    tasks = filter(
-      lambda task: task.where(job_uid = job_uid,
-                              workflow_name = workflow_name,
-                              task_name = task_name) and self._tasks[task].num_samples() > 0,
-                   self._tasks.keys())
+  # TODO(wickman)  Implement the proper O(n) solution.
+  def current_cpu_by_process(self, job_uid, task_name, process_name):
+    processes = filter(
+      lambda process: process.where(
+        job_uid = job_uid, task_name = task_name, process_name = process_name) and (
+          self._processes[process].num_samples() > 0),
+        self._processes.keys())
+    if len(processes) == 0: return 0
 
-    if len(tasks) == 0: return 0
+    if len(processes) > 1:
+      raise TaskMeasurer_InternalError("Unexpectedly large number of samples for %s,%s,%s" % (
+        job_uid, task_name, process_name))
 
-    if len(tasks) > 1:
-      raise WorkflowMeasurer_InternalError("Unexpectedly large number of samples for %s,%s,%s" % (
-        job_uid, workflow_name, task_name))
-
-    # ugh, need to memoize time.time()
-    last_sample = self._tasks[tasks[0]].last_sample()
+    # TODO(wickman)  Memoize time.time() and get rid of all the hardcoded constants.
+    last_sample = self._processes[processes[0]].last_sample()
     if (time.time() - last_sample[0] < 10): # arbitrary time here
       return last_sample[1]
     else:
       return 0
 
   def samples_by_uid(self, job_uid):
-    tasks = filter(lambda task: task.where(job_uid = job_uid), self._tasks.keys())
-    return [self._tasks[task] for task in tasks]
+    processes = filter(
+      lambda process: process.where(job_uid = job_uid),
+      self._processes.keys())
+    return [self._processes[process] for process in processes]

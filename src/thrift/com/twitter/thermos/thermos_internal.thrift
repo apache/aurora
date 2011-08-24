@@ -1,8 +1,8 @@
-//  WorkflowTask(t): =>
+//  Process(t): =>
 //    - runner: pid [which after setsid is session leader]
 //    - child:  pid [whose ppid is runner.pid]
 //
-//    => writes checkpoint_root/job_uid/tasks/{runner.pid}.ckpt
+//    => writes checkpoint_root/job_uid/processes/{runner.pid}.ckpt
 //       { { pid = pid, start_time = start_time }, ..., { stop_time = stop_time, return_code = return_code } }
 //    => does does open/write/close for every write operation
 //
@@ -15,22 +15,22 @@
 //
 //    1) runner dies but child lives
 //       periodically poll for runner health
-//       i) WorkflowRunner observes both runner.pid and child.pid -- if runner.pid goes away,
+//       i) TaskRunner observes both runner.pid and child.pid -- if runner.pid goes away,
 //          check for child.pid (do some accounting to make sure that pids are what we think
-//          they are, obviously) -- kill child.pid, mark task LOST
+//          they are, obviously) -- kill child.pid, mark process LOST
 //
 //    2) child dies but runner lives
 //       observed return_code
 //       i) able to write before death
 //          normal, write then exit [set to FINISHED/FAILED depending upon exit status]
 //       ii) unable to write before death
-//          WorkflowRunner observes both runner.pid and child.pid are missing,
-//          marks task as LOST.
+//          TaskRunner observes both runner.pid and child.pid are missing,
+//          marks process as LOST.
 //
 //    3) fork runner but never see {runner.pid}.ckpt -- kill {runner.pid} on a timeout.
 //       => could there be a race condition where {runner.pid}.ckpt shows up after we've done a SIGKILL?
 //
-//  WorkflowTaskWatcher.add(t => runner.pid):
+//  ProcessWatcher.add(t => runner.pid):
 //    Observe {runner.pid}, and {child.pid} as known.
 //    If at any point {runner.pid} goes away: slurp ckpt, if {child.pid} alive, kill & set LOST
 //    If at any point {child.pid} goes away:
@@ -41,12 +41,12 @@
 
 namespace py thermos_thrift
 
-enum WorkflowTaskRunState {
+enum ProcessRunState {
   // normal state
   WAITING   = 0   // blocked on execution dependencies or footprint restrictions
-  FORKED    = 1   // starting, need to wait for signal from WorkflowTask that it's running
+  FORKED    = 1   // starting, need to wait for signal from Process that it's running
   RUNNING   = 2   // currently running
-  FINISHED  = 3   // WorkflowTaskWatcher has finished and updated task state
+  FINISHED  = 3   // ProcessWatcher has finished and updated process state
   KILLED    = 4   // Killed by user action // not implemented yet
 
   // abnormal states
@@ -55,87 +55,87 @@ enum WorkflowTaskRunState {
 }
 
 // Sent as a stream of diffs
-struct WorkflowTaskState {
+struct ProcessState {
   // Sequence number, must be monotonically increasing for all
-  // WorkflowTaskState messages for a particular task across all runs.
-  1: i64           seq
+  // ProcessState messages for a particular process across all runs.
+  1: i64             seq
 
-  // Task name
-  3: string        task
+  // Process name
+  3: string          process
 
-  5: WorkflowTaskRunState run_state
+  5: ProcessRunState run_state
 
   // WAITING -> FORKED
- 10: i32           runner_pid
- 11: double        fork_time
+ 10: i32             runner_pid
+ 11: double          fork_time
 
   // FORKED -> RUNNING
-  6: double        start_time
-  7: i32           pid
+  6: double          start_time
+  7: i32             pid
 
   // RUNNING -> {FINISHED, FAILED}
-  8: double        stop_time
-  9: i32           return_code
+  8: double          stop_time
+  9: i32             return_code
 
-  // {FORKED, RUNNING} -> LOST nothing happens.  this TaskState ceases to exist.
+  // {FORKED, RUNNING} -> LOST nothing happens.  this ProcessState ceases to exist.
   // Doesn't count against the run total.
 }
 
-// See lib/thermos/workflow/common/ckpt.py for the reconstruction logic.
+// See lib/thermos/task/common/ckpt.py for the reconstruction logic.
 
-enum WorkflowRunState {
+enum TaskRunState {
   ACTIVE   = 0
   SUCCESS  = 1
   FAILED   = 2
 }
 
-enum WorkflowState {
+enum TaskState {
   ACTIVE   = 0
   SUCCESS  = 1
   FAILED   = 2
 }
 
-struct WorkflowTaskHistory {
-  1: WorkflowRunState state
-  2: string task
-  3: list<WorkflowTaskState> runs
+struct ProcessHistory {
+  1: TaskRunState state
+  2: string process
+  3: list<ProcessState> runs
 }
 
-// This is the first framed message in the Ckpt stream.  The rest are WorkflowTaskStates.
-struct WorkflowRunnerHeader {
+// This is the first framed message in the Ckpt stream.  The rest are ProcessStates.
+struct TaskRunnerHeader {
   1: string job_name
   2: i64    job_uid
-  3: string workflow_name
-  4: i32    workflow_replica
+  3: string task_name
+  4: i32    task_replica
   5: i64    launch_time
   6: string hostname
 }
 
-struct WorkflowAllocatedPort {
+struct TaskAllocatedPort {
   1: string port_name
   2: i32    port
 }
 
-struct WorkflowRunStateUpdate {
-  1: string           task
-  2: WorkflowRunState state
+struct TaskRunStateUpdate {
+  1: string       process
+  2: TaskRunState state
 }
 
-struct WorkflowStateUpdate {
-  1: WorkflowState state
+struct TaskStateUpdate {
+  1: TaskState state
 }
 
-struct WorkflowRunnerCkpt {
-  1: WorkflowRunnerHeader   runner_header
-  2: WorkflowTaskState      task_state
-  3: WorkflowAllocatedPort  allocated_port
-  4: WorkflowRunStateUpdate history_state_update
-  5: WorkflowStateUpdate    state_update
+struct TaskRunnerCkpt {
+  1: TaskRunnerHeader   runner_header
+  2: ProcessState       process_state
+  3: TaskAllocatedPort  allocated_port
+  4: TaskRunStateUpdate history_state_update
+  5: TaskStateUpdate    state_update
 }
 
-struct WorkflowRunnerState {
-  1: WorkflowRunnerHeader header
-  2: WorkflowState state
-  3: map<string, WorkflowTaskHistory> tasks
+struct TaskRunnerState {
+  1: TaskRunnerHeader header
+  2: TaskState state
+  3: map<string, ProcessHistory> processes
   4: map<string, i32> ports
 }

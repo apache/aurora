@@ -14,8 +14,8 @@ except ImportError:
   print 'Could not import mesos framework!'
   sys.exit(1)
 
-# chroot / workflow runner
-from twitter.thermos.observer.observer import WorkflowObserver
+# chroot / task runner                                                                               # workflow=>task
+from twitter.thermos.observer.observer import TaskObserver                                           # Workflow=>Task
 from twitter.thermos.observer.http import ObserverHttpHandler
 
 class ThermosObservingExecutor(mesos.Executor):
@@ -29,22 +29,22 @@ class ThermosObservingExecutor(mesos.Executor):
     self.hostname = args.hostname
 
   @staticmethod
-  def _boilerplate_lost_task_update(task):
-    update = mesos_pb.TaskStatus()
-    update.task_id.value = task.task_id.value
-    update.slave_id.value = task.slave_id.value
+  def _boilerplate_lost_process_update(process):                                                     # task=>process
+    update = mesos_pb.ProcessStatus()                                                                # Task=>Process
+    update.process_id.value = process.process_id.value                                               # task=>process
+    update.slave_id.value = process.slave_id.value                                                   # task=>process
     update.state = mesos_pb.TASK_LOST
     return update
 
-  def launchTask(self, driver, task):
-    print 'Got task: %s' % task
+  def launchProcess(self, driver, process):                                                          # Task=>Process && task=>process
+    print 'Got process: %s' % process                                                                # task=>process
 
     if self.observer:
       print 'Error!  Already running an observer! %s' % self.observer
-      driver.sendStatusUpdate(self._boilerplate_lost_task_update(task))
+      driver.sendStatusUpdate(self._boilerplate_lost_process_update(process))                        # task=>process
       return
 
-    self.observer = WorkflowObserver(self.checkpoint_root)
+    self.observer = TaskObserver(self.checkpoint_root)                                               # Workflow=>Task
     assert self.hostname is not None, "Hostname not set, bailing!"
 
     def run_http_server():
@@ -53,8 +53,8 @@ class ThermosObservingExecutor(mesos.Executor):
     self.http_thread = threading.Thread(target = run_http_server)
     self.http_thread.start()
 
-  def killTask(self, driver, taskId):
-    print 'Got killTask %s, ignoring.' % taskId
+  def killProcess(self, driver, processId):                                                          # Task=>Process && task=>process
+    print 'Got killProcess %s, ignoring.' % processId                                                # Task=>Process && task=>process
 
   def frameworkMessage(self, driver, message):
     print 'Got frameworkMessage %s, ignoring.' % message
@@ -69,7 +69,7 @@ def parse_commandline():
   parser = OptionParser()
   parser.add_option("--checkpoint_root", dest = "checkpoint_root", metavar = "PATH",
                     default = "/tmp/thermos",
-                    help = "the path where we will store workflow logs and checkpoints")
+                    help = "the path where we will store task logs and checkpoints")                 # workflow=>task
   parser.add_option("--port", dest = "port", metavar = "PORT",
                     default = 8051,
                     help = "the port on which to register the observer.")

@@ -7,18 +7,17 @@ import socket
 from twitter.common import log
 from twitter.common.recordio import ThriftRecordReader, ThriftRecordWriter
 
-from twitter.thermos.base.helper   import Helper
-from twitter.thermos.base.path     import WorkflowPath
-from twitter.thermos.base.ckpt     import WorkflowCkptDispatcher
-from twitter.thermos.runner.chroot   import WorkflowChroot
-from twitter.thermos.runner.planner  import Planner
-from twitter.thermos.runner.task     import WorkflowTask
-from twitter.thermos.runner.muxer    import WorkflowTaskMuxer
-from twitter.thermos.runner.ports    import EphemeralPortAllocator
+from twitter.thermos.base.helper    import Helper
+from twitter.thermos.base.path      import TaskPath
+from twitter.thermos.base.ckpt      import TaskCkptDispatcher
+from twitter.thermos.runner.chroot  import TaskChroot
+from twitter.thermos.runner.planner import Planner
+from twitter.thermos.runner.process import Process
+from twitter.thermos.runner.muxer   import ProcessMuxer
+from twitter.thermos.runner.ports   import EphemeralPortAllocator
 
 from twitter.tcl.scheduler import Scheduler
 
-# thermos_internal.thrift
 from tcl_thrift.ttypes import ThermosJobHeader
 from thermos_thrift.ttypes import *
 
@@ -28,36 +27,36 @@ __todo__   = """
   Implement active/finished ThermosJob dump handling.
 """
 
-class WorkflowRunner_InternalError(Exception): pass
-class WorkflowRunner_NotImplementedException(Exception): pass
+class TaskRunner_InternalError(Exception): pass
+class TaskRunner_NotImplementedException(Exception): pass
 
-class WorkflowRunnerHelper:
+class TaskRunnerHelper:
   @staticmethod
-  def scheduler_from_workflow(workflow):
+  def scheduler_from_task(task):
     scheduler = Scheduler()
-    for task in workflow.tasks:
-      scheduler.add(task.name)
-    for execution_dependency in workflow.taskBefores:
+    for process in task.processes:
+      scheduler.add(process.name)
+    for execution_dependency in task.before_constraints:
       scheduler.run_before(execution_dependency.first, execution_dependency.second)
-    for task_set in workflow.taskTogethers:
-      scheduler.run_set_together(task_set.tasks)
+    for process_set in task.together_constraints:
+      scheduler.run_set_together(process_set.processes)
     return scheduler
 
-class WorkflowRunner:
-  def __init__(self, workflow, sandbox, root_dir, job_uid):
+class TaskRunner(object):
+  def __init__(self, task, sandbox, root_dir, job_uid):
     """
-      workflow = ThermosWorkflow to run
-      sandbox  = sandbox in which to run all tasks (pathname)
+      task     = ThermosTask to run
+      sandbox  = sandbox in which to run all processes (pathname)
       root_dir = directory to store all log/ckpt data (pathname)
       job_uid  = uid assigned to the parent job, used to disambiguate cached checkpoints
     """
-    self._workflow = copy.deepcopy(workflow)
-    self._workflow.job.uid = job_uid
-    self._workflow_tasks = {}
-    self._watcher  = WorkflowTaskMuxer()
-    if self._workflow.replicaId is None:
-      raise Exception("Workflow must have a replica_id!")
-    self._pathspec = WorkflowPath(root = root_dir, job_uid = job_uid)
+    self._task = copy.deepcopy(task)
+    self._task.job.uid = job_uid
+    self._task_processes = {}
+    self._watcher = ProcessMuxer()
+    if self._task.replica_id is None:
+      raise Exception("Task must have a replica_id!")
+    self._pathspec = TaskPath(root = root_dir, job_uid = job_uid)
     self._recovery = True  # set in recovery mode
     self._port_allocator = EphemeralPortAllocator()
 
@@ -66,26 +65,26 @@ class WorkflowRunner:
       self.die()
       return
 
-    # create scheduler from task workflow
-    scheduler = WorkflowRunnerHelper.scheduler_from_workflow(workflow)
+    # create scheduler from process task
+    scheduler = TaskRunnerHelper.scheduler_from_task(task)
     # create planner from scheduler
     self._planner = Planner(scheduler)
 
     # set up sandbox for running process
-    self._sandbox = WorkflowChroot(sandbox, job_uid)
+    self._sandbox = TaskChroot(sandbox, job_uid)
     self._sandbox.create_if_necessary()
 
     # create runner state
-    self._state      = WorkflowRunnerState(tasks = {})
-    self._dispatcher = WorkflowCkptDispatcher()
+    self._state      = TaskRunnerState(processes = {})
+    self._dispatcher = TaskCkptDispatcher()
     self._register_handlers()
 
     # recover checkpointed state and update plan
     self._setup_checkpointed_state(self._pathspec.getpath('runner_checkpoint'))
 
-    # for any workflow task that hasn't yet been initialized into ._state, initialize
+    # for any task process that hasn't yet been initialized into ._state, initialize
     self._update_runner_ckpt_to_high_watermarks()
-    self._initialize_tasks()
+    self._initialize_processes()
 
   def _setup_checkpointed_state(self, ckpt_file):
     """ give it: ckpt filename, state object
@@ -94,7 +93,7 @@ class WorkflowRunner:
     # recover if necessary
     if os.path.exists(ckpt_file):
       fp = file(ckpt_file, "r")
-      ckpt_recover = ThriftRecordReader(fp, WorkflowRunnerCkpt)
+      ckpt_recover = ThriftRecordReader(fp, TaskRunnerCkpt)
       for wrc in ckpt_recover:
         self._dispatcher.update_runner_state(self._state, wrc, recovery = self._recovery)
       ckpt_recover.close()
@@ -104,115 +103,115 @@ class WorkflowRunner:
     ckpt.set_sync(True)
     self._ckpt = ckpt
 
-  def _initialize_tasks(self):
+  def _initialize_processes(self):
     if self._state.header is None:
-      update = WorkflowRunnerHeader(
-        job_name          = self._workflow.job.name,
-        job_uid           = self._workflow.job.uid,
-        workflow_name     = self._workflow.name,
-        workflow_replica  = self._workflow.replicaId,
-        launch_time       = long(time.time()),
-        hostname          = socket.gethostname())
-      runner_ckpt = WorkflowRunnerCkpt(runner_header = update)
+      update = TaskRunnerHeader(
+        job_name      = self._task.job.name,
+        job_uid       = self._task.job.uid,
+        task_name     = self._task.name,
+        task_replica  = self._task.replica_id,
+        launch_time   = long(time.time()),
+        hostname      = socket.gethostname())
+      runner_ckpt = TaskRunnerCkpt(runner_header = update)
       self._dispatcher.update_runner_state(self._state, runner_ckpt)
-      self._ckpt.write(runner_ckpt)  # change this if we add dispatches for non-task updates
-      self._set_workflow_state(WorkflowState.ACTIVE)
+      self._ckpt.write(runner_ckpt)  # change this if we add dispatches for non-process updates
+      self._set_task_state(TaskState.ACTIVE)
 
-    for task in self._workflow.tasks:
-      if task.name not in self._state.tasks:
-         update = WorkflowTaskState(task = task.name, seq = 0, run_state = WorkflowTaskRunState.WAITING)
-         runner_ckpt = WorkflowRunnerCkpt(task_state = update)
+    for process in self._task.processes:
+      if process.name not in self._state.processes:
+         update = ProcessState(process = process.name, seq = 0, run_state = ProcessRunState.WAITING)
+         runner_ckpt = TaskRunnerCkpt(process_state = update)
          self._dispatcher.update_runner_state(self._state, runner_ckpt, recovery = self._recovery)
 
-  def _set_workflow_state(self, state):
-    update = WorkflowStateUpdate(state = state)
-    runner_ckpt = WorkflowRunnerCkpt(state_update = update)
+  def _set_task_state(self, state):
+    update = TaskStateUpdate(state = state)
+    runner_ckpt = TaskRunnerCkpt(state_update = update)
     if self._dispatcher.update_runner_state(self._state, runner_ckpt, recovery = self._recovery):
       self._ckpt.write(runner_ckpt)
 
-  def _set_task_history_state(self, task, state):
-    update = WorkflowRunStateUpdate(task = task, state = state)
-    runner_ckpt = WorkflowRunnerCkpt(history_state_update = update)
+  def _set_process_history_state(self, process, state):
+    update = TaskRunStateUpdate(process = process, state = state)
+    runner_ckpt = TaskRunnerCkpt(history_state_update = update)
     if self._dispatcher.update_runner_state(self._state, runner_ckpt, recovery = self._recovery):
       self._ckpt.write(runner_ckpt)
 
-  # task transitions for the state machine
-  def _on_everything(self, task_update):
+  # process transitions for the state machine
+  def _on_everything(self, process_update):
     if not self._recovery:
-      self._ckpt.write(WorkflowRunnerCkpt(task_state = task_update))
+      self._ckpt.write(TaskRunnerCkpt(process_state = process_update))
 
-  def _on_waiting (self, task_update):
-    log.debug('_on_waiting %s' % task_update)
-    self._workflow_tasks[task_update.task] = self._workflow_task_from_task_name(task_update.task)
-    self._watcher.register(self._workflow_tasks[task_update.task])
-    self._planner.forget(task_update.task)
+  def _on_waiting(self, process_update):
+    log.debug('_on_waiting %s' % process_update)
+    self._task_processes[process_update.process] = self._task_process_from_process_name(process_update.process)
+    self._watcher.register(self._task_processes[process_update.process])
+    self._planner.forget(process_update.process)
 
-  def _on_forked  (self, task_update):
-    log.debug('_on_forked %s' % task_update)
-    wf_task = self._workflow_tasks[task_update.task]
-    wf_task.set_fork_time(task_update.fork_time)
-    wf_task.set_pid(task_update.runner_pid)
-    self._planner.set_running(task_update.task)
+  def _on_forked(self, process_update):
+    log.debug('_on_forked %s' % process_update)
+    tsk_process = self._task_processes[process_update.process]
+    tsk_process.set_fork_time(process_update.fork_time)
+    tsk_process.set_pid(process_update.runner_pid)
+    self._planner.set_running(process_update.process)
 
-  def _on_running (self, task_update):
-    log.debug('_on_running %s' % task_update)
-    self._planner.set_running(task_update.task)
+  def _on_running(self, process_update):
+    log.debug('_on_running %s' % process_update)
+    self._planner.set_running(process_update.process)
 
-  def _on_finished(self, task_update):
-    log.debug('_on_finished %s' % task_update)
-    self._workflow_tasks.pop(task_update.task)
-    self._watcher.unregister(task_update.task)
-    self._planner.set_finished(task_update.task)
-    self._set_task_history_state(task_update.task, WorkflowRunState.SUCCESS)
+  def _on_finished(self, process_update):
+    log.debug('_on_finished %s' % process_update)
+    self._task_processes.pop(process_update.process)
+    self._watcher.unregister(process_update.process)
+    self._planner.set_finished(process_update.process)
+    self._set_process_history_state(process_update.process, TaskRunState.SUCCESS)
 
-  def _on_abnormal(self, task_update):
-    self._workflow_tasks.pop(task_update.task)
-    self._watcher.unregister(task_update.task)
-    self._on_waiting(task_update)
+  def _on_abnormal(self, process_update):
+    self._task_processes.pop(process_update.process)
+    self._watcher.unregister(process_update.process)
+    self._on_waiting(process_update)
 
-  def _on_failed  (self, task_update):
-    log.debug('_on_failed %s' % task_update)
-    self._on_abnormal(task_update)
+  def _on_failed(self, process_update):
+    log.debug('_on_failed %s' % process_update)
+    self._on_abnormal(process_update)
 
-  def _on_lost    (self, task_update):
-    log.debug('_on_lost %s' % task_update)
-    self._on_abnormal(task_update)
+  def _on_lost(self, process_update):
+    log.debug('_on_lost %s' % process_update)
+    self._on_abnormal(process_update)
 
   def _on_port_allocation(self, name, port):
     self._port_allocator.allocate_port(name, port)
 
   def _register_handlers(self):
     self._dispatcher.register_universal_handler(lambda u: self._on_everything(u))
-    self._dispatcher.register_state_handler(WorkflowTaskRunState.WAITING,  lambda u: self._on_waiting(u))
-    self._dispatcher.register_state_handler(WorkflowTaskRunState.FORKED,   lambda u: self._on_forked(u))
-    self._dispatcher.register_state_handler(WorkflowTaskRunState.RUNNING,  lambda u: self._on_running(u))
-    self._dispatcher.register_state_handler(WorkflowTaskRunState.FAILED,   lambda u: self._on_failed(u))
-    self._dispatcher.register_state_handler(WorkflowTaskRunState.FINISHED, lambda u: self._on_finished(u))
-    self._dispatcher.register_state_handler(WorkflowTaskRunState.LOST,     lambda u: self._on_lost(u))
+    self._dispatcher.register_state_handler(ProcessRunState.WAITING,  lambda u: self._on_waiting(u))
+    self._dispatcher.register_state_handler(ProcessRunState.FORKED,   lambda u: self._on_forked(u))
+    self._dispatcher.register_state_handler(ProcessRunState.RUNNING,  lambda u: self._on_running(u))
+    self._dispatcher.register_state_handler(ProcessRunState.FAILED,   lambda u: self._on_failed(u))
+    self._dispatcher.register_state_handler(ProcessRunState.FINISHED, lambda u: self._on_finished(u))
+    self._dispatcher.register_state_handler(ProcessRunState.LOST,     lambda u: self._on_lost(u))
     self._dispatcher.register_port_handler(lambda name, port: self._on_port_allocation(name, port))
 
   def _update_runner_ckpt_to_high_watermarks(self):
-    task_updates = self._watcher.select()
-    unapplied_task_updates = []
-    for task_update in task_updates:
-      if self._dispatcher.would_update(self._state, task_update):
-        unapplied_task_updates.append(task_update)
+    process_updates = self._watcher.select()
+    unapplied_process_updates = []
+    for process_update in process_updates:
+      if self._dispatcher.would_update(self._state, process_update):
+        unapplied_process_updates.append(process_update)
       else:
-        self._dispatcher.update_runner_state(self._state, task_update, recovery = True)
+        self._dispatcher.update_runner_state(self._state, process_update, recovery = True)
 
     self._recovery = False
-    for task_update in unapplied_task_updates:
-      assert self._dispatcher.update_runner_state(self._state, task_update)
+    for process_update in unapplied_process_updates:
+      assert self._dispatcher.update_runner_state(self._state, process_update)
 
-  def _get_updates_from_tasks(self):
+  def _get_updates_from_processes(self):
     applied_updates = 0
     while applied_updates == 0:
-      task_updates = self._watcher.select()
-      for task_update in task_updates:
-        if self._dispatcher.update_runner_state(self._state, task_update):
+      process_updates = self._watcher.select()
+      for process_update in process_updates:
+        if self._dispatcher.update_runner_state(self._state, process_update):
           applied_updates += 1
 
-      # this is crazy -- wtf is select returning instantly?
+      # this is crazy, but necessary until we support inotify and fsevents.
       # make this OsController.tick() so we can mock out some of this stuff
       # e.g. select.select() and such. -- or write our own OS agnostic FdSelect class
       time.sleep(0.05)
@@ -221,7 +220,7 @@ class WorkflowRunner:
     active_job_path = self._pathspec.getpath('active_job_path')
     fp = Helper.safe_create_file(active_job_path, 'w')
     rw = ThriftRecordWriter(fp)
-    rw.write(self._workflow.job)
+    rw.write(self._task.job)
     fp.close()
 
   def _has_finished_job(self):
@@ -232,7 +231,7 @@ class WorkflowRunner:
     job = rr.read()
     fp.close()
     if job is None: return None
-    return job == self._workflow.job
+    return job == self._task.job
 
   def _enforce_job_active(self):
     # make sure Job is living in 'active' state
@@ -250,38 +249,43 @@ class WorkflowRunner:
         log.error('Corrupt job detected! %s, overwriting...' % active_job_path)
         self._write_job()
       else:
-        if self._workflow.job != job:
-          raise WorkflowRunner_InternalError("Attempting to launch different jobs with same uid?")
+        if self._task.job != job:
+          raise TaskRunner_InternalError("Attempting to launch different jobs with same uid?")
 
   def _save_allocated_ports(self, ports):
     for name in ports:
-      wap = WorkflowAllocatedPort(port_name = name, port = ports[name])
-      runner_ckpt = WorkflowRunnerCkpt(allocated_port = wap)
+      wap = TaskAllocatedPort(port_name = name, port = ports[name])
+      runner_ckpt = TaskRunnerCkpt(allocated_port = wap)
       if self._dispatcher.update_runner_state(self._state, runner_ckpt, self._recovery):
         self._ckpt.write(runner_ckpt)
 
-  def _workflow_task_from_task_name(self, task_name):
-    pathspec = self._pathspec.given(task = task_name, run = Helper.task_run_number(self._state, task_name))
-    task = Helper.task_from_workflow(self._workflow, task_name)
-    (new_cmdline, allocated_ports) = self._port_allocator.synthesize(task.commandLine)
+  def _task_process_from_process_name(self, process_name):
+    pathspec = self._pathspec.given(
+      process = process_name, run = Helper.process_run_number(self._state, process_name))
+    process = Helper.process_from_task(self._task, process_name)
+    (new_cmdline, allocated_ports) = self._port_allocator.synthesize(process.cmdline)
     log.info('allocated ports: %s' % allocated_ports)
     self._save_allocated_ports(allocated_ports)
-    task.commandLine = new_cmdline
-    return WorkflowTask(pathspec,
-                        task,
-                        Helper.task_sequence_number(self._state, task_name),
-                        self._sandbox.path())
+    process.cmdline = new_cmdline
+    return Process(
+      pathspec, process,
+      Helper.process_sequence_number(self._state, process_name),
+      self._sandbox.path())
 
-  def _is_task_failed(self, task_name):
-    task = Helper.task_from_name(self._workflow, task_name)
-    task_failures = filter(lambda run: run.run_state == WorkflowTaskRunState.FAILED,
-                           self._state.tasks[task.name].runs)
-    return task.maxFailures != 0 and len(task_failures) >= task.maxFailures
+  def _is_process_failed(self, process_name):
+    process = Helper.process_from_name(self._task, process_name)
+    process_failures = filter(
+      lambda run: run.run_state == ProcessRunState.FAILED,
+      self._state.processes[process.name].runs)
+    return process.max_process_failures != 0 and (
+      len(process_failures) >= process.max_process_failures)
 
-  def _is_workflow_failed(self):
-    failures = filter(lambda history: history.state == WorkflowState.FAILED,
-                      self._state.tasks.values())
-    return self._workflow.maxFailures != 0 and len(failures) >= self._workflow.maxFailures
+  def _is_task_failed(self):
+    failures = filter(
+      lambda history: history.state == TaskState.FAILED,
+      self._state.processes.values())
+    return self._task.max_process_failures != 0 and (
+      len(failures) >= self._task.max_process_failures)
 
   def run(self):
     if self._has_finished_job() is not None:
@@ -292,7 +296,7 @@ class WorkflowRunner:
 
     # out of recovery mode
     if not self._sandbox.created():
-      raise WorkflowRunner_InternalError("Sandbox not created before start() called.")
+      raise TaskRunner_InternalError("Sandbox not created before start() called.")
 
     MIN_ITER_TIME = 0.1
 
@@ -301,13 +305,13 @@ class WorkflowRunner:
 
       time_now = time.time()
 
-      if self._is_workflow_failed():
-        self._set_workflow_state(WorkflowState.FAILED)
+      if self._is_task_failed():
+        self._set_task_state(TaskState.FAILED)
         self.kill()
         return
 
       if self._planner.is_complete():
-        self._set_workflow_state(WorkflowState.SUCCESS)
+        self._set_task_state(TaskState.SUCCESS)
         break
 
       # make sure Job is living in 'active' state
@@ -320,21 +324,21 @@ class WorkflowRunner:
       log.info('running:  %s' % ' '.join(list(self._planner.running)))
 
       scheduled = False
-      for task_name in runnable:
-        if self._is_task_failed(task_name):
-          log.warning('Task failed: %s' % task_name)
-          self._set_task_history_state(task_name, WorkflowRunState.FAILED)
-          self._planner.set_finished(task_name)
+      for process_name in runnable:
+        if self._is_process_failed(process_name):
+          log.warning('Process failed: %s' % process_name)
+          self._set_process_history_state(process_name, TaskRunState.FAILED)
+          self._planner.set_finished(process_name)
           continue
 
-        log.info('Forking WorkflowTask(%s)' % task_name)
-        wt = self._workflow_tasks[task_name]
+        log.info('Forking Process(%s)' % process_name)
+        wt = self._task_processes[process_name]
         wt.fork()
         scheduled = True
 
       # gather and apply state transitions
       if self._planner.get_running() or scheduled:
-        self._get_updates_from_tasks()
+        self._get_updates_from_processes()
 
     self.cleanup()
     return

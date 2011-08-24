@@ -6,18 +6,17 @@ from twitter.common import log
 __author__ = 'wickman@twitter.com (brian wickman)'
 __tested__ = False
 
-#  /var/run/thermos/{job.name}-{workflow.name}-{workflow.replica}/
-class WorkflowChroot:
+class TaskChroot(object):
   """
     Encapsulate chroot.  AppApp integration will eventually go here.
   """
 
   CHROOT_SPEC = os.path.join("%(root)s", "%(id)s")
 
-  def __init__(self, root, wf_id):
+  def __init__(self, root, tsk_id):
     self._root = root
-    self._id   = wf_id
-    self._path = WorkflowChroot.CHROOT_SPEC % { 'root': root, 'id': wf_id }
+    self._id   = tsk_id
+    self._path = TaskChroot.CHROOT_SPEC % { 'root': root, 'id': tsk_id }
 
   # return path if creation is necessary
   def create_if_necessary(self):

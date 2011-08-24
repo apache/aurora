@@ -12,24 +12,24 @@ from twitter.thermos.base.helper   import Helper
 __author__ = 'wickman@twitter.com (brian wickman)'
 __tested__ = False
 
-class WorkflowTask_OwnerException(Exception): pass
+class Process_OwnerException(Exception): pass
 
-class WorkflowTask:
+class Process(object):
   """
-    Encapsulate a running workflow task.
+    Encapsulate a running process for a task.
   """
 
-  def __init__(self, pathspec, task, sequence_number, sandbox_dir):
+  def __init__(self, pathspec, process, sequence_number, sandbox_dir):
     """
-      pathspec    = WorkflowPath object for synthesizing path names
-      task        = the task in the ThermosWorkflow thrift blob to run
-      sequence    = the current sequence number for WorkflowTaskState updates
-      sandbox_dir = the sandbox in which to run the task
+      pathspec    = TaskPath object for synthesizing path names
+      process     = the process in the ThermosTask thrift blob to run
+      sequence    = the current sequence number for ProcessState updates
+      sandbox_dir = the sandbox in which to run the process
     """
-    self._task      = task
+    self._process   = process
     self._pathspec  = pathspec
-    self._stdout    = pathspec.with_filename('stdout').getpath('task_logdir')
-    self._stderr    = pathspec.with_filename('stderr').getpath('task_logdir')
+    self._stdout    = pathspec.with_filename('stdout').getpath('process_logdir')
+    self._stderr    = pathspec.with_filename('stderr').getpath('process_logdir')
     self._seq       = sequence_number + 1
     self._owner     = False
     self._sandbox   = sandbox_dir
@@ -37,6 +37,7 @@ class WorkflowTask:
     self._fork_time = None
     self._initial_update = None
 
+    # TODO(wickman)  Use twitter.common.dirutil
     # make sure the sandbox dir has been created
     try:
       os.makedirs(self._sandbox)
@@ -45,13 +46,13 @@ class WorkflowTask:
         raise
 
   def _log(self, msg):
-    log.debug('[task:%5s=%s]: %s' % (self._pid, self._task.name, msg))
+    log.debug('[process:%5s=%s]: %s' % (self._pid, self._process.name, msg))
 
-  def _write_task_update(self, runner_ckpt):
+  def _write_process_update(self, runner_ckpt):
     # indicate that we are running
     self._seq += 1
-    runner_ckpt.task_state.seq  = self._seq
-    runner_ckpt.task_state.task = self._task.name
+    runner_ckpt.process_state.seq  = self._seq
+    runner_ckpt.process_state.process = self._process.name
 
     self._log("child state transition [%s] <= %s" % (self.ckpt_file(), runner_ckpt))
     if not ThriftRecordWriter.append(self.ckpt_file(), runner_ckpt):
@@ -66,10 +67,11 @@ class WorkflowTask:
     rc = self._popen.returncode
 
     # indicate that we have finished/failed
-    run_state = WorkflowTaskRunState.FINISHED if (rc == 0) else WorkflowTaskRunState.FAILED
-    wts = WorkflowTaskState(run_state = run_state, return_code = rc, stop_time = time.time())
-    wrc = WorkflowRunnerCkpt(task_state = wts)
-    self._write_task_update(wrc)
+    # TODO(wickman)  Use properly descriptive variables and not wts/wrc
+    run_state = ProcessRunState.FINISHED if (rc == 0) else ProcessRunState.FAILED
+    wts = ProcessState(run_state = run_state, return_code = rc, stop_time = time.time())
+    wrc = TaskRunnerCkpt(process_state = wts)
+    self._write_process_update(wrc)
 
     # normal exit
     sys.exit(0)
@@ -85,49 +87,50 @@ class WorkflowTask:
     fp = Helper.safe_create_file(self.ckpt_file(), "w")
     fp.close()
 
+    # TODO(wickman) parameterize this.
     # break away from our parent
     os.setsid()
 
-    # start task process
+    # start process process
     self._start_time = time.time()
-    self._popen = subprocess.Popen(["/bin/sh", "-c", self._task.commandLine],
+    self._popen = subprocess.Popen(["/bin/sh", "-c", self._process.cmdline],
                      stderr = self._stderr_fd,
                      stdout = self._stdout_fd,
                      cwd    = self._sandbox)
-    self._task_pid = self._popen.pid
+    self._process_pid = self._popen.pid
 
-    wts = WorkflowTaskState(run_state = WorkflowTaskRunState.RUNNING,
-                            pid = self._task_pid, start_time = self._start_time)
-    wrc = WorkflowRunnerCkpt(task_state = wts)
-    self._write_task_update(wrc)
+    wts = ProcessState(run_state = ProcessRunState.RUNNING,
+      pid = self._process_pid, start_time = self._start_time)
+    wrc = TaskRunnerCkpt(process_state = wts)
+    self._write_process_update(wrc)
 
     # wait until finished
     self.wait()
 
-  # WorkflowTask.fork() returns in parent process, does not return in child process.
+  # Process.fork() returns in parent process, does not return in child process.
   def fork(self):
     """
       This is the main call point into the runner.
 
-      Forks off the task specified by workflow/task.  The forked off child never returns,
+      Forks off the process specified by task/process.  The forked off child never returns,
       but the parent returns immediately and populates information about the pid of the
-      task runner process.
+      process runner process.
     """
     self._fork_time = time.time()
     self._pid       = os.fork()
     self._owner     = (self._pid == 0)
     if self._owner:
-      self._pid = os.getpid() # get true pid
+      self._pid = os.getpid()
       self._real_fork()
     self._set_initial_update()
 
   def _set_initial_update(self):
-    initial_update = WorkflowTaskState(seq        = self._seq,
-                                       task       = self._task.name,
-                                       run_state  = WorkflowTaskRunState.FORKED,
-                                       fork_time  = self._fork_time,
-                                       runner_pid = self._pid)
-    self._initial_update = WorkflowRunnerCkpt(task_state = initial_update)
+    initial_update = ProcessState(seq = self._seq,
+      process    = self._process.name,
+      run_state  = ProcessRunState.FORKED,
+      fork_time  = self._fork_time,
+      runner_pid = self._pid)
+    self._initial_update = TaskRunnerCkpt(process_state = initial_update)
 
   def initial_update(self):
     update = self._initial_update
@@ -149,7 +152,7 @@ class WorkflowTask:
     return self._pid
 
   # this is ONLY for recovery. is there a better way to do this?
-  # should we be feeding it WorkflowTaskStates?
+  # should we be feeding it ProcessStates?
   def set_pid(self, pid):
     self._pid = pid
 
@@ -160,10 +163,10 @@ class WorkflowTask:
     self._fork_time = fork_time
 
   def name(self):
-    return self._task.name
+    return self._process.name
 
   def ckpt_file(self):
-    return self._pathspec.given(pid = self._pid).getpath('task_checkpoint')
+    return self._pathspec.given(pid = self._pid).getpath('process_checkpoint')
 
   def die(self):
     self._log('die() called, sending SIGKILL to children.')

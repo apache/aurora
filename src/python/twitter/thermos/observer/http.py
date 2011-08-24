@@ -9,7 +9,7 @@ from urlparse import parse_qs
 
 from twitter.common import log
 
-from observer import WorkflowObserver
+from observer import TaskObserver
 
 __author__ = 'wickman@twitter.com (brian wickman)'
 __tested__ = False
@@ -40,7 +40,7 @@ class ObserverRequestTranslator:
   def method_uid_count(self, d):
     return ('json', self._observer.uid_count(type = d.get('type', ['all'])[0]))
 
-  def method_workflow(self, d):
+  def method_task(self, d):
     try:
       if 'uid' not in d:
         return ('json', '{}')
@@ -48,16 +48,18 @@ class ObserverRequestTranslator:
     except Exception as e:
       self._args_error(d, e)
       return ('json', '{}')
-    return ('json', self._observer.workflow(uids))
+    return ('json', self._observer.task(uids))
 
-  def method_task(self, d):
+  def method_process(self, d):
     run = d.get('run', [None])[0]
     if run: run = int(run)
-    return ('json', self._observer.task(uid = int(d.get('uid', [-1])[0]),
-                                task = d.get('task', [None])[0],
-                                run = run))
+    return ('json',
+            self._observer.process(
+              uid = int(d.get('uid', [-1])[0]),
+              process = d.get('process', [None])[0],
+              run = run))
 
-  def method_tasks(self, d):
+  def method_processes(self, d):
     try:
       if 'uid' not in d:
         return ('json', '{}')
@@ -65,27 +67,27 @@ class ObserverRequestTranslator:
     except Exception as e:
       self._args_error(d, e)
       return ('json', '{}')
-    return ('json', self._observer.tasks(uids))
+    return ('json', self._observer.processes(uids))
 
-  # TODO(wickman): Make some boilerplate wsgi extractors.
+  # TODO(wickman): Make some boilerplate wsgi extractors to avoid the [0] bullshit.
   def method_logs(self, d):
     try:
       uid = int(d['uid'][0])
-      task = d['task'][0]
+      process = d['process'][0]
       run = int(d['run'][0])
       path = d.get('path', [None])[0]
       fmt = d.get('fmt', ['json'])[0]
     except Exception as e:
       self._args_error(d, e)
       return ('json', '{}')
-    return (fmt, self._observer.logs(uid, task, run, path=path, fmt=fmt))
+    return (fmt, self._observer.logs(uid, process, run, path=path, fmt=fmt))
 
-  # TODO(wickman): logs/file/download all share uid/task/run
+  # TODO(wickman): logs/file/download all share uid/process/run
   #   extraction.  abstract this out somehow.
   def method_file(self, d):
     try:
       uid = int(d['uid'][0])
-      task = d['task'][0]
+      process = d['process'][0]
       run = int(d['run'][0])
       filename = d.get('filename', [None])[0]
       fmt = d.get('fmt', ['json'])[0]
@@ -96,7 +98,9 @@ class ObserverRequestTranslator:
     except Exception as e:
       self._args_error(d, e)
       return ('json', '{}')
-    return (fmt, self._observer.browse_file(uid, task, run, filename, offset=offset, bytes=bytes, fmt=fmt))
+    return (fmt,
+      self._observer.browse_file(
+        uid, process, run, filename, offset=offset, bytes=bytes, fmt=fmt))
 
 class ObserverHttpHandler:
   INDEX_HTML = """

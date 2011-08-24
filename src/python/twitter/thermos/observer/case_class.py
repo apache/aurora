@@ -1,16 +1,16 @@
 __author__ = 'wickman@twitter.com (brian wickman)'
 __tested__ = False
 
-# E.g. TaskClass = CaseClass('name', 'owner', 'pid')
-# task1 = TaskClass(name = "hello", owner = "brian", pid = 15)
-# task2 = TaskClass(name = "world", owner = "brian", pid = 13)
-# tasks = [task1, task2]
+# E.g. ProcessClass = CaseClass('name', 'owner', 'pid')
+# process1 = ProcessClass(name = "hello", owner = "brian", pid = 15)
+# process2 = ProcessClass(name = "world", owner = "brian", pid = 13)
+# processes = [process1, process2]
 #
-# filter(lambda task: task.where(owner = "brian"), tasks) => [task1, task2]
-# filter(lambda task: task.where(owner = "brian", pid = 13), tasks) => [task2]
+# filter(lambda process: process.where(owner = "brian"), processes) => [process1, process2]
+# filter(lambda process: process.where(owner = "brian", pid = 13), processes) => [process2]
 #
-# matcher = TaskClass(pid = 13)
-# filter(lambda task: task.match(matcher), tasks) => [task2]
+# matcher = ProcessClass(pid = 13)
+# filter(lambda process: process.match(matcher), processes) => [process2]
 
 class CaseClass:
   def __init__(self, *kw):

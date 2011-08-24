@@ -4,17 +4,17 @@ from twitter.common import log
 from twitter.common.recordio import ThriftRecordReader
 from thermos_thrift.ttypes import *
 
-class WorkflowCkpt_ErrorRecoveringState(Exception): pass
-class WorkflowCkpt_InvalidStateTransition(Exception): pass
-class WorkflowCkpt_InvalidSequenceNumber(Exception): pass
+class TaskCkpt_ErrorRecoveringState(Exception): pass
+class TaskCkpt_InvalidStateTransition(Exception): pass
+class TaskCkpt_InvalidSequenceNumber(Exception): pass
 
-class WorkflowCkptDispatcher:
+class TaskCkptDispatcher(object):
   """
     The reconstruction / dispatching mechanism for logic triggered on
-    workflow/task state transitions.
+    task/process state transitions.
 
     Most applications should build an event-loop around the
-    WorkflowCkptDispatcher.
+    TaskCkptDispatcher.
   """
   def __init__(self):
     self._state_handlers = {}
@@ -23,7 +23,7 @@ class WorkflowCkptDispatcher:
 
   def register_state_handler(self, run_state, function):
     """
-      Register a function callback for when a task transitions its run state.
+      Register a function callback for when a process transitions its run state.
       Current run states: WAITING, FORKED, RUNNING, FINISHED, KILLED, FAILED, LOST.
     """
     if run_state not in self._state_handlers:
@@ -38,132 +38,132 @@ class WorkflowCkptDispatcher:
 
   def register_universal_handler(self, function):
     """
-      Register a function callback that gets called on every task state transition.
+      Register a function callback that gets called on every process state transition.
     """
     self._universal_handlers.append(function)
 
-  def _run_state_dispatch(self, state, task_update):
+  def _run_state_dispatch(self, state, process_update):
     for handler in self._universal_handlers:
-      handler(task_update)
+      handler(process_update)
     for handler in self._state_handlers.get(state, []):
-      handler(task_update)
+      handler(process_update)
 
   def _run_port_dispatch(self, name, port):
     for handler in self._port_handlers:
       handler(name, port)
 
   @staticmethod
-  def check_empty_fields(task_state, fields):
+  def check_empty_fields(process_state, fields):
     for field in fields:
-      if task_state.__dict__[field] is not None:
-        raise WorkflowCkpt_ErrorRecoveringState("Field field %s from %s should be empty, instead got: %s" % (
-          field, task_state, task_state.__dict__[field]))
+      if process_state.__dict__[field] is not None:
+        raise TaskCkpt_ErrorRecoveringState("Field field %s from %s should be empty, instead got: %s" % (
+          field, process_state, process_state.__dict__[field]))
 
   @staticmethod
-  def check_nonempty_fields(task_state, fields):
+  def check_nonempty_fields(process_state, fields):
     for field in fields:
-      if task_state.__dict__[field] is None:
-        raise WorkflowCkpt_ErrorRecoveringState("Missing field %s from %s!" % (field, task_state))
+      if process_state.__dict__[field] is None:
+        raise TaskCkpt_ErrorRecoveringState("Missing field %s from %s!" % (field, process_state))
 
   @staticmethod
-  def check_and_copy_fields(task_state, task_state_update, fields):
-    WorkflowCkptDispatcher.check_empty_fields(task_state, fields)
-    WorkflowCkptDispatcher.check_nonempty_fields(task_state_update, fields)
+  def check_and_copy_fields(process_state, process_state_update, fields):
+    TaskCkptDispatcher.check_empty_fields(process_state, fields)
+    TaskCkptDispatcher.check_nonempty_fields(process_state_update, fields)
     for field in fields:
-      task_state.__dict__[field] = copy.deepcopy(task_state_update.__dict__[field])
+      process_state.__dict__[field] = copy.deepcopy(process_state_update.__dict__[field])
 
   @staticmethod
-  def copy_fields(task_state, task_state_update, fields):
-    WorkflowCkptDispatcher.check_nonempty_fields(task_state_update, fields)
+  def copy_fields(process_state, process_state_update, fields):
+    TaskCkptDispatcher.check_nonempty_fields(process_state_update, fields)
     for field in fields:
-      task_state.__dict__[field] = copy.deepcopy(task_state_update.__dict__[field])
+      process_state.__dict__[field] = copy.deepcopy(process_state_update.__dict__[field])
 
   @staticmethod
-  def is_terminal(task_state_update):
+  def is_terminal(process_state_update):
     TERMINAL_STATES = [
-      WorkflowTaskRunState.FINISHED,
-      WorkflowTaskRunState.FAILED,
-      WorkflowTaskRunState.LOST]
-    return task_state_update.run_state in TERMINAL_STATES
+      ProcessRunState.FINISHED,
+      ProcessRunState.FAILED,
+      ProcessRunState.LOST]
+    return process_state_update.run_state in TERMINAL_STATES
 
-  def update_workflow_state(self, task_state, task_state_update, recovery):
+  def update_task_state(self, process_state, process_state_update, recovery):
     """
-      Apply task_state_update against task_state.
+      Apply process_state_update against process_state.
 
       set recovery = True if you are in checkpoint recovery mode (i.e. you expect
         to see replays of ckpts from forked children.)
 
-      returns True if a state update was applied to task_state
+      returns True if a state update was applied to process_state
     """
-    if task_state_update.seq is None:
-      raise WorkflowCkpt_InvalidSequenceNumber(
-        "Got nil suquence number! update = %s" % task_state_update)
+    if process_state_update.seq is None:
+      raise TaskCkpt_InvalidSequenceNumber(
+        "Got nil suquence number! update = %s" % process_state_update)
 
     # Special-casing seq == 0 is kind of blech.  Should we create an INIT state?
-    if task_state.seq > 0:
-      if task_state_update.seq <= task_state.seq:
+    if process_state.seq > 0:
+      if process_state_update.seq <= process_state.seq:
         if recovery:
           # in recovery mode, we expect to see out of order updates from
-          # task checkpoints since we are starting over at sequence number
+          # process checkpoints since we are starting over at sequence number
           # 0.  if not in recovery mode, this is an error.
           return False
         else:
-          raise WorkflowCkpt_InvalidSequenceNumber("Out of order sequence number! %s => %s" % (
-            task_state, task_state_update))
+          raise TaskCkpt_InvalidSequenceNumber("Out of order sequence number! %s => %s" % (
+            process_state, process_state_update))
 
       # We should not see non-contiguous sequence numbers, but keep it at a
       # warning for now until we're certain there are no bugs.
-      if task_state_update.seq != task_state.seq + 1:
+      if process_state_update.seq != process_state.seq + 1:
         log.error("WARNING: Noncontiguous sequence number: %s => %s" % (
-          task_state, task_state_update))
+          process_state, process_state_update))
 
     # see thrift/thermos_runner.thrift for more explanation of the state transitions
-    if task_state_update.run_state is not None:
+    if process_state_update.run_state is not None:
       # [CREATION] => WAITING
-      if task_state_update.run_state == WorkflowTaskRunState.WAITING:
-        required_fields = ['seq', 'run_state', 'task']
-        WorkflowCkptDispatcher.copy_fields(task_state, task_state_update, required_fields)
+      if process_state_update.run_state == ProcessRunState.WAITING:
+        required_fields = ['seq', 'run_state', 'process']
+        TaskCkptDispatcher.copy_fields(process_state, process_state_update, required_fields)
 
       # WAITING => FORKED
-      elif task_state_update.run_state == WorkflowTaskRunState.FORKED:
-        if task_state.run_state != WorkflowTaskRunState.WAITING:
-          raise WorkflowCkpt_InvalidStateTransition("%s => %s" % (task_state, task_state_update))
+      elif process_state_update.run_state == ProcessRunState.FORKED:
+        if process_state.run_state != ProcessRunState.WAITING:
+          raise TaskCkpt_InvalidStateTransition("%s => %s" % (process_state, process_state_update))
         required_fields = ['seq', 'run_state', 'fork_time', 'runner_pid']
-        WorkflowCkptDispatcher.copy_fields(task_state, task_state_update, required_fields)
+        TaskCkptDispatcher.copy_fields(process_state, process_state_update, required_fields)
 
       # FORKED => RUNNING
-      elif task_state_update.run_state == WorkflowTaskRunState.RUNNING:
-        if task_state.run_state != WorkflowTaskRunState.FORKED:
-          raise WorkflowCkpt_InvalidStateTransition("%s => %s" % (task_state, task_state_update))
+      elif process_state_update.run_state == ProcessRunState.RUNNING:
+        if process_state.run_state != ProcessRunState.FORKED:
+          raise TaskCkpt_InvalidStateTransition("%s => %s" % (process_state, process_state_update))
         required_fields = ['seq', 'run_state', 'start_time', 'pid']
-        WorkflowCkptDispatcher.copy_fields(task_state, task_state_update, required_fields)
+        TaskCkptDispatcher.copy_fields(process_state, process_state_update, required_fields)
 
       # RUNNING => FINISHED
-      elif task_state_update.run_state == WorkflowTaskRunState.FINISHED:
-        if task_state.run_state != WorkflowTaskRunState.RUNNING:
-          raise WorkflowCkpt_InvalidStateTransition("%s => %s" % (task_state, task_state_update))
+      elif process_state_update.run_state == ProcessRunState.FINISHED:
+        if process_state.run_state != ProcessRunState.RUNNING:
+          raise TaskCkpt_InvalidStateTransition("%s => %s" % (process_state, process_state_update))
         required_fields = ['seq', 'run_state', 'stop_time', 'return_code']
-        WorkflowCkptDispatcher.copy_fields(task_state, task_state_update, required_fields)
+        TaskCkptDispatcher.copy_fields(process_state, process_state_update, required_fields)
 
       # RUNNING => FAILED
-      elif task_state_update.run_state == WorkflowTaskRunState.FAILED:
-        if task_state.run_state != WorkflowTaskRunState.RUNNING:
-          raise WorkflowCkpt_InvalidStateTransition("%s => %s" % (task_state, task_state_update))
+      elif process_state_update.run_state == ProcessRunState.FAILED:
+        if process_state.run_state != ProcessRunState.RUNNING:
+          raise TaskCkpt_InvalidStateTransition("%s => %s" % (process_state, process_state_update))
         required_fields = ['seq', 'run_state', 'stop_time', 'return_code']
-        WorkflowCkptDispatcher.copy_fields(task_state, task_state_update, required_fields)
+        TaskCkptDispatcher.copy_fields(process_state, process_state_update, required_fields)
 
       # {FORKED, RUNNING} => LOST
-      elif task_state_update.run_state == WorkflowTaskRunState.LOST:
-        if task_state.run_state not in (WorkflowTaskRunState.FORKED, WorkflowTaskRunState.RUNNING):
-          raise WorkflowCkpt_InvalidStateTransition("%s => %s" % (task_state, task_state_update))
+      elif process_state_update.run_state == ProcessRunState.LOST:
+        if process_state.run_state not in (ProcessRunState.FORKED, ProcessRunState.RUNNING):
+          raise TaskCkpt_InvalidStateTransition("%s => %s" % (process_state, process_state_update))
         required_fields = ['seq', 'run_state']
-        WorkflowCkptDispatcher.copy_fields(task_state, task_state_update, required_fields)
+        TaskCkptDispatcher.copy_fields(process_state, process_state_update, required_fields)
 
       else:
-        raise WorkflowCkpt_ErrorRecoveringState("Unknown run_state = %s" % task_state_update.run_state)
+        raise TaskCkpt_ErrorRecoveringState("Unknown run_state = %s" % process_state_update.run_state)
 
     # dispatch state change to consumer
-    self._run_state_dispatch(task_state_update.run_state, task_state_update)
+    self._run_state_dispatch(process_state_update.run_state, process_state_update)
     return True
 
   @staticmethod
@@ -171,64 +171,67 @@ class WorkflowCkptDispatcher:
     # Check sanity
     changes = 0
     if runner_ckpt.runner_header is not None: changes += 1
-    if runner_ckpt.task_state is not None: changes += 1
+    if runner_ckpt.process_state is not None: changes += 1
     if runner_ckpt.allocated_port is not None: changes += 1
     if runner_ckpt.history_state_update is not None: changes += 1
     if runner_ckpt.state_update is not None: changes += 1
     if changes > 1:
-      raise WorkflowCkpt_InvalidStateTransition(
+      raise TaskCkpt_InvalidStateTransition(
         "Multiple checkpoint types in the same message! %s" % runner_ckpt)
 
-  # Provided a WorkflowTaskState, would this perform a transition and update state?
+
   def would_update(self, state, runner_ckpt):
-    task_update = runner_ckpt.task_state
-    if task_update is None:
+    """
+      Provided a ProcessState, would this perform a transition and update state?
+    """
+    process_update = runner_ckpt.process_state
+    if process_update is None:
       return False
 
-    task = task_update.task
-    if task not in state.tasks:   # never seen before
+    process = process_update.process
+    if process not in state.processes: # never seen before
       return True
     else:
-      # We have seen this task, so the state update must pertain to the current run.
-      wth = state.tasks[task]
-      wts = wth.runs[-1]
+      # We have seen this process, so the state update must pertain to the current run.
+      task_process = state.processes[process]
+      task_state = task_process.runs[-1]
       # if this sequence number is ahead of the current high water mark, it would
       # produce a transition
-      return wts.seq < task_update.seq
+      return task_state.seq < process_update.seq
 
+  # TODO(wickman)  Document exceptions; change wts/wth to more suitable variable names.
   # raises exception if something goes wrong
-  # returns True if checkpoint record was applied, false otherwise
   def update_runner_state(self, state, runner_ckpt, recovery = False):
     """
-      state       = WorkflowRunnerState to apply task update
-      task_update = WorkflowRunnerCkpt update
-      recovery    => Pass in as true if you are in recovery mode
+      state          = TaskRunnerState to apply process update
+      process_update = TaskRunnerCkpt update
+      recovery       => Pass in as true if you are in recovery mode
 
-      returns True if task_update was applied to state.
+      returns True if process_update was applied to state.
     """
     wts, wth = None, None
 
     self._check_runner_ckpt_sanity(runner_ckpt)
 
     # case 1: runner_header
-    #   -> Initialization of the workflow stream.
+    #   -> Initialization of the task stream.
     if runner_ckpt.runner_header is not None:
       if state.header is not None:
-        raise WorkflowCkpt_ErrorRecoveringState(
-          "Multiple headers encountered in WorkflowRunnerState!")
+        raise TaskCkpt_ErrorRecoveringState(
+          "Multiple headers encountered in TaskRunnerState!")
       else:
         state.header = runner_ckpt.runner_header
         return True
 
     # case 2: allocated_port
-    #   -> Allocated a named ephemeral port to a task
+    #   -> Allocated a named ephemeral port to a process
     if runner_ckpt.allocated_port is not None:
       port, port_name = runner_ckpt.allocated_port.port, runner_ckpt.allocated_port.port_name
       if state.ports is None:
         state.ports = {}
       if port_name in state.ports:
         if port != state.ports[port_name]:
-          raise WorkflowCkpt_ErrorRecoveringState(
+          raise TaskCkpt_ErrorRecoveringState(
             "Port assignment conflicts with earlier assignment: %s" % port_name)
         else:
           return False
@@ -238,7 +241,7 @@ class WorkflowCkptDispatcher:
         return True
 
     # case 3: state_update
-    #   -> State transition on the workflow (ACTIVE, FAILED, FINISHED)
+    #   -> State transition on the task (ACTIVE, FAILED, FINISHED)
     if runner_ckpt.state_update is not None:
       if state.state != runner_ckpt.state_update.state:
         state.state = runner_ckpt.state_update.state
@@ -246,64 +249,66 @@ class WorkflowCkptDispatcher:
       return False
 
     # case 4: history_state_update
-    #   -> State transition on the run of a task within the workflow (ACTIVE, FAILED, FINISHED)
+    #   -> State transition on the run of a process within the task (ACTIVE, FAILED, FINISHED)
     if runner_ckpt.history_state_update is not None:
-      task_name, state_change = runner_ckpt.history_state_update.task, runner_ckpt.history_state_update.state
-      if state.tasks[task_name].state != state_change:
-        state.tasks[task_name].state = state_change
+      process_name = runner_ckpt.history_state_update.process
+      state_change = runner_ckpt.history_state_update.state
+      if state.processes[process_name].state != state_change:
+        state.processes[process_name].state = state_change
         return True
       return False
 
-    # case 5: task_state
-    #   -> State transition on a task itself (WAITING, FORKED, RUNNING, FINISHED, KILLED, FAILED, LOST)
-    task_update = runner_ckpt.task_state
-    if task_update is None:
-      log.error(WorkflowCkpt_ErrorRecoveringState("Empty WorkflowRunnerCkpt encountered!"))
+    # case 5: process_state
+    #   -> State transition on a process itself
+    #        (WAITING, FORKED, RUNNING, FINISHED, KILLED, FAILED, LOST)
+    process_update = runner_ckpt.process_state
+    if process_update is None:
+      log.error(TaskCkpt_ErrorRecoveringState("Empty TaskRunnerCkpt encountered!"))
       return False
 
-    task = task_update.task
-    if task not in state.tasks:
-      # Never seen this task before, create a TaskHistory for it and initialize run 0.
-      wts = WorkflowTaskState(seq = 0, task = task, run_state = WorkflowTaskRunState.WAITING)
-      wth = WorkflowTaskHistory(task = task, runs = [], state = WorkflowState.ACTIVE)
+    process = process_update.process
+    if process not in state.processes:
+      # Never seen this process before, create a ProcessHistory for it and initialize run 0.
+      wts = ProcessState(seq = 0, process = process, run_state = ProcessRunState.WAITING)
+      wth = ProcessHistory(process = process, runs = [], state = TaskState.ACTIVE)
       wth.runs.append(wts)
-      state.tasks[task] = wth
+      state.processes[process] = wth
 
     else:
-      # We have seen this task, so the state update must pertain to the current run.
-      wth = state.tasks[task]
+      # We have seen this process, so the state update must pertain to the current run.
+      wth = state.processes[process]
       wts = wth.runs[-1]
 
       # Cannot have two consecutive terminal states
       #
       # You can go nonterminal=>nonterminal (normal), nonterminal=>terminal (success), and
       # terminal=>nonterminal (lost/failure) but not terminal=>terminal, so sanity check that.
-      if WorkflowCkptDispatcher.is_terminal(wth.runs[-1]):
-        if WorkflowCkptDispatcher.is_terminal(task_update):
-          raise WorkflowCkpt_ErrorRecoveringState(
-            "Received two consecutive terminal task states: wts=%s update=%s" % (
-            wts, task_update))
+      if TaskCkptDispatcher.is_terminal(wth.runs[-1]):
+        if TaskCkptDispatcher.is_terminal(process_update):
+          raise TaskCkpt_ErrorRecoveringState(
+            "Received two consecutive terminal process states: wts=%s update=%s" % (
+            wts, process_update))
         else:
           # We transitioned from terminal => nonterminal, so finish up the current run and
-          # initialize a new "latest run" for the task.
-          wts = WorkflowTaskState(seq = wts.seq, task = task, run_state = WorkflowTaskRunState.WAITING)
+          # initialize a new "latest run" for the process.
+          wts = ProcessState(seq = wts.seq, process = process, run_state = ProcessRunState.WAITING)
           wth.runs.append(wts)
 
-    # Run the task state machine.
-    return self.update_workflow_state(wts, task_update, recovery)
+    # Run the process state machine.
+    return self.update_task_state(wts, process_update, recovery)
 
-class AlaCarteRunnerState:
+class AlaCarteRunnerState(object):
   """
-    Helper class to reconstruct a WorkflowRunnerCkpt from its checkpoint file without any fuss.
+    Helper class to reconstruct a TaskRunnerCkpt from its checkpoint file without any fuss.
   """
 
   def __init__(self, path):
-    self._state = WorkflowRunnerState(tasks = {})
-    builder = WorkflowCkptDispatcher()
+    self._state = TaskRunnerState(processes = {})
+    builder = TaskCkptDispatcher()
 
     try:
       fp = open(path, "r")
-      rr = ThriftRecordReader(fp, WorkflowRunnerCkpt)
+      rr = ThriftRecordReader(fp, TaskRunnerCkpt)
       for wrc in rr:
         builder.update_runner_state(self._state, wrc)
     except Exception, e:
