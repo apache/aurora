@@ -55,7 +55,7 @@ import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
-import static com.twitter.mesos.gen.ScheduleStatus.KILLED_BY_CLIENT;
+import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
 import static com.twitter.mesos.gen.ScheduleStatus.LOST;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
@@ -526,8 +526,12 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
       if (!statuses.isEmpty()) {
         // If there was no move out of the PENDING state, the task is deleted outright.
-        assertThat(getTask(taskId).task.getStatus(), is(KILLED_BY_CLIENT));
+        assertThat(getTask(taskId).task.getStatus(), is(KILLING));
       }
+
+      // SImulate a KILLED ack from the executor.
+      changeStatus(queryByOwner(OWNER_A), KILLED);
+
       assertThat(getTasks(Query.activeQuery(OWNER_A, JOB_A)).size(), is(0));
     }
   }
@@ -667,13 +671,14 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     changeStatus(queryByOwner(OWNER_A), STARTING);
     changeStatus(queryByOwner(OWNER_A), RUNNING);
     scheduler.killTasks(queryByOwner(OWNER_A));
+    changeStatus(queryByOwner(OWNER_A), KILLED);
 
     String taskId = Tasks.id(getOnlyTask(queryByOwner(OWNER_A)).task);
 
     // This transition should be rejected.
     changeStatus(queryByOwner(OWNER_A), LOST);
 
-    assertThat(getTask(taskId).task.getStatus(), is(KILLED_BY_CLIENT));
+    assertThat(getTask(taskId).task.getStatus(), is(KILLED));
   }
 
   @Test
@@ -812,12 +817,14 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
     String taskId = Tasks.id(getOnlyTask(queryByOwner(OWNER_A)).task);
-    changeStatus(query(taskId), ASSIGNED);
-    changeStatus(query(taskId), STARTING);
-    changeStatus(query(taskId), RUNNING);
+    changeStatus(taskId, ASSIGNED);
+    changeStatus(taskId, STARTING);
+    changeStatus(taskId, RUNNING);
     scheduler.killTasks(query(taskId));
-    assertThat(getTask(taskId).task.getStatus(), is(KILLED_BY_CLIENT));
+    assertThat(getTask(taskId).task.getStatus(), is(KILLING));
     assertThat(getTasks(queryByOwner(OWNER_A)).size(), is(1));
+    changeStatus(taskId, KILLED);
+    assertThat(getTask(taskId).task.getStatus(), is(KILLED));
   }
 
   @Test
@@ -1482,10 +1489,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
         assertThat(getTasks(Query.byStatus(PENDING)).size(), is(numTasks + additionalTasks));
 
-        changeStatus(Query.byStatus(RUNNING), KILLED_BY_CLIENT);
+        changeStatus(Query.byStatus(RUNNING), KILLING);
         changeStatus(Query.byStatus(PENDING), ASSIGNED);
         changeStatus(Query.byStatus(ASSIGNED), RUNNING);
-
 
         return SUCCESS;
       }

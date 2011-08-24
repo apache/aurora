@@ -91,8 +91,8 @@ public class SchedulerzRole extends StringTemplateServlet {
               job.activeTaskCount++;
               break;
 
+            case KILLING:
             case KILLED:
-            case KILLED_BY_CLIENT:
             case FINISHED:
               job.finishedTaskCount++;
               break;

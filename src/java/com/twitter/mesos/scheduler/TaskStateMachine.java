@@ -35,7 +35,7 @@ import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
 import static com.twitter.mesos.gen.ScheduleStatus.INIT;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
-import static com.twitter.mesos.gen.ScheduleStatus.KILLED_BY_CLIENT;
+import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
 import static com.twitter.mesos.gen.ScheduleStatus.LOST;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.PREEMPTING;
@@ -262,7 +262,7 @@ public class TaskStateMachine {
             new Closure<Transition<State>>() {
               @Override public void execute(Transition<State> transition) {
                 switch (transition.getTo().state) {
-                  case KILLED_BY_CLIENT:
+                  case KILLING:
                     addWork(WorkCommand.DELETE);
                     break;
 
@@ -278,10 +278,11 @@ public class TaskStateMachine {
               }
             },
             State.create(PENDING),
-            State.array(ASSIGNED, UPDATING, ROLLBACK, KILLED_BY_CLIENT))
+            State.array(ASSIGNED, UPDATING, ROLLBACK, KILLING))
         .addState(
             new Closure<Transition<State>>() {
-              @Override public void execute(Transition<State> transition) {
+              @Override
+              public void execute(Transition<State> transition) {
                 switch (transition.getTo().state) {
                   case FINISHED:
                     rescheduleIfDaemon.execute();
@@ -308,7 +309,7 @@ public class TaskStateMachine {
                     addWork(WorkCommand.RESCHEDULE);
                     break;
 
-                  case KILLED_BY_CLIENT:
+                  case KILLING:
                     addWork(WorkCommand.KILL);
                     break;
 
@@ -326,10 +327,11 @@ public class TaskStateMachine {
             },
             State.create(ASSIGNED),
             State.array(STARTING, RUNNING, FINISHED, FAILED, RESTARTING, UPDATING, ROLLBACK, KILLED,
-                KILLED_BY_CLIENT, LOST, PREEMPTING))
+                KILLING, LOST, PREEMPTING))
         .addState(
             new Closure<Transition<State>>() {
-              @Override public void execute(Transition<State> transition) {
+              @Override
+              public void execute(Transition<State> transition) {
                 switch (transition.getTo().state) {
                   case FINISHED:
                     rescheduleIfDaemon.execute();
@@ -356,7 +358,7 @@ public class TaskStateMachine {
                     addWork(WorkCommand.RESCHEDULE);
                     break;
 
-                  case KILLED_BY_CLIENT:
+                  case KILLING:
                     addWork(WorkCommand.KILL);
                     break;
 
@@ -372,11 +374,12 @@ public class TaskStateMachine {
               }
             },
             State.create(STARTING),
-            State.array(RUNNING, FINISHED, FAILED, RESTARTING, UPDATING, KILLED, KILLED_BY_CLIENT,
+            State.array(RUNNING, FINISHED, FAILED, RESTARTING, UPDATING, KILLING, KILLED,
                 ROLLBACK, LOST, PREEMPTING))
         .addState(
             new Closure<Transition<State>>() {
-              @Override public void execute(Transition<State> transition) {
+              @Override
+              public void execute(Transition<State> transition) {
                 switch (transition.getTo().state) {
                   case FINISHED:
                     rescheduleIfDaemon.execute();
@@ -403,7 +406,7 @@ public class TaskStateMachine {
                     addWork(WorkCommand.RESCHEDULE);
                     break;
 
-                  case KILLED_BY_CLIENT:
+                  case KILLING:
                     addWork(WorkCommand.KILL);
                     break;
 
@@ -417,7 +420,7 @@ public class TaskStateMachine {
               }
             },
             State.create(RUNNING),
-            State.array(FINISHED, RESTARTING, UPDATING, FAILED, KILLED, KILLED_BY_CLIENT, ROLLBACK,
+            State.array(FINISHED, RESTARTING, UPDATING, FAILED, KILLING, KILLED, ROLLBACK,
                 LOST, PREEMPTING))
         .addState(
             manageTerminatedTasks,
@@ -444,7 +447,7 @@ public class TaskStateMachine {
               }
             },
             State.create(PREEMPTING),
-            State.array(FINISHED, FAILED, KILLED, KILLED_BY_CLIENT, LOST))
+            State.array(FINISHED, FAILED, KILLING, KILLED, LOST))
         .addState(
             manageRestartingTask,
             State.create(RESTARTING),
@@ -452,11 +455,11 @@ public class TaskStateMachine {
         .addState(
             manageUpdatingTask(false),
             State.create(UPDATING),
-            State.array(ROLLBACK, FINISHED, FAILED, KILLED, KILLED_BY_CLIENT, LOST, UNKNOWN))
+            State.array(ROLLBACK, FINISHED, FAILED, KILLING, KILLED, LOST, UNKNOWN))
         .addState(
             manageUpdatingTask(true),
             State.create(ROLLBACK),
-            State.array(FINISHED, FAILED, KILLED, KILLED_BY_CLIENT, LOST))
+            State.array(FINISHED, FAILED, KILLING, KILLED, LOST))
         .addState(
             manageTerminatedTasks,
             State.create(FAILED),
@@ -467,8 +470,8 @@ public class TaskStateMachine {
             State.create(UNKNOWN))
         .addState(
             manageTerminatedTasks,
-            State.create(KILLED_BY_CLIENT),
-            State.create(UNKNOWN))
+            State.create(KILLING),
+            State.array(FINISHED, FAILED, KILLED, LOST, UNKNOWN))
         .addState(
             manageTerminatedTasks,
             State.create(LOST),
@@ -488,13 +491,9 @@ public class TaskStateMachine {
                 if (transition.isValidStateChange() && (to != UNKNOWN)
                     // Prevent an update when killing a pending task, since the task is deleted
                     // prior to the update.
-                    && !((from == PENDING) && (to == KILLED_BY_CLIENT))) {
+                    && !((from == PENDING) && (to == KILLING))) {
                   addWork(WorkCommand.UPDATE_STATE, transition.getTo().mutation);
-                } else if (!transition.isAllowed()
-                    // Don't log illegal transitions for KILLED_BY_CLIENT -> KILLED,
-                    // since mesos is not yet aware of KILLED_BY_CLIENT, and we don't sync it to
-                    // executors.
-                    && !((from == KILLED_BY_CLIENT) && (to == KILLED))) {
+                } else if (!transition.isAllowed()) {
                   LOG.log(Level.SEVERE, "Illegal state transition attempted: " + transition);
                   ILLEGAL_TRANSITIONS.incrementAndGet();
                 }
@@ -522,7 +521,7 @@ public class TaskStateMachine {
         switch (transition.getTo().state) {
           case ASSIGNED:
           case STARTING:
-          case KILLED_BY_CLIENT:
+          case KILLING:
           case ROLLBACK:
           case RUNNING:
             addWork(WorkCommand.KILL);

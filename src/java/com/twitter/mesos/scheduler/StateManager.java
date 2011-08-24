@@ -58,7 +58,7 @@ import static com.google.common.collect.Iterables.transform;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.mesos.Tasks.jobKey;
 import static com.twitter.mesos.gen.ScheduleStatus.INIT;
-import static com.twitter.mesos.gen.ScheduleStatus.KILLED_BY_CLIENT;
+import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.UNKNOWN;
 import static com.twitter.mesos.scheduler.storage.UpdateStore.ShardUpdateConfiguration;
@@ -366,7 +366,7 @@ class StateManager {
 
         if (result == UpdateResult.SUCCESS) {
           for (Integer shard : fetchShardsToKill(jobKey, updateStore)) {
-            changeState(Query.liveShard(jobKey, shard), KILLED_BY_CLIENT);
+            changeState(Query.liveShard(jobKey, shard), KILLING, "Removed during update.");
           }
         }
 

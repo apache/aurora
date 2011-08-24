@@ -52,7 +52,7 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.mesos.Tasks.SCHEDULED_TO_SHARD_ID;
 import static com.twitter.mesos.Tasks.jobKey;
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
-import static com.twitter.mesos.gen.ScheduleStatus.KILLED_BY_CLIENT;
+import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.UNKNOWN;
@@ -465,7 +465,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     }
 
     if (!matchingScheduler) {
-      stateManager.changeState(query, KILLED_BY_CLIENT, "Manually killed by client.");
+      stateManager.changeState(query, KILLING, "Manually killed by client.");
     }
   }
 

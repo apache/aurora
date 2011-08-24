@@ -23,7 +23,6 @@ import org.antlr.stringtemplate.StringTemplate;
 
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
-import com.twitter.common.net.http.handlers.StringTemplateServlet.CacheTemplates;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.LiveTask;
@@ -41,7 +40,7 @@ import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
-import static com.twitter.mesos.gen.ScheduleStatus.KILLED_BY_CLIENT;
+import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
 import static com.twitter.mesos.gen.ScheduleStatus.LOST;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
@@ -66,8 +65,8 @@ public class SchedulerzJob extends StringTemplateServlet {
   private static final Map<ScheduleStatus, Set<ScheduleStatus>> FILTER_MAP =
       ImmutableMap.<ScheduleStatus, Set<ScheduleStatus>>builder()
         .put(PENDING, EnumSet.of(PENDING))
-        .put(RUNNING, EnumSet.of(ASSIGNED, STARTING, RUNNING))
-        .put(FINISHED, EnumSet.of(KILLED, KILLED_BY_CLIENT, FINISHED))
+        .put(RUNNING, EnumSet.of(ASSIGNED, STARTING, RUNNING, KILLING))
+        .put(FINISHED, EnumSet.of(KILLED, FINISHED))
         .put(FAILED, EnumSet.of(LOST, FAILED))
       .build();
 

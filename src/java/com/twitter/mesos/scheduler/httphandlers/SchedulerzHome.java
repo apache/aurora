@@ -87,8 +87,8 @@ public class SchedulerzHome extends StringTemplateServlet {
               role.activeTaskCount++;
               break;
 
+            case KILLING:
             case KILLED:
-            case KILLED_BY_CLIENT:
             case FINISHED:
               role.finishedTaskCount++;
               break;

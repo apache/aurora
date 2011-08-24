@@ -3,8 +3,6 @@ package com.twitter.mesos;
 import java.util.EnumSet;
 import java.util.Set;
 
-import javax.annotation.Nullable;
-
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Preconditions;
@@ -23,7 +21,7 @@ import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
-import static com.twitter.mesos.gen.ScheduleStatus.KILLED_BY_CLIENT;
+import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
 import static com.twitter.mesos.gen.ScheduleStatus.LOST;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.PREEMPTING;
@@ -99,13 +97,13 @@ public class Tasks {
    * Different states that an active task may be in.
    */
   public static final Set<ScheduleStatus> ACTIVE_STATES = EnumSet.of(
-      PENDING, ASSIGNED, STARTING, RUNNING, RESTARTING, UPDATING, ROLLBACK, PREEMPTING);
+      PENDING, ASSIGNED, STARTING, RUNNING, KILLING, RESTARTING, UPDATING, ROLLBACK, PREEMPTING);
 
   /**
    * Terminal states, which a task should not move from.
    */
   public static final Set<ScheduleStatus> TERMINAL_STATES = EnumSet.of(
-      FAILED, FINISHED, KILLED, KILLED_BY_CLIENT, LOST
+      FAILED, FINISHED, KILLED, LOST
   );
 
   /**

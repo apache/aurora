@@ -29,7 +29,7 @@ import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
 import static com.twitter.mesos.gen.ScheduleStatus.INIT;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
-import static com.twitter.mesos.gen.ScheduleStatus.KILLED_BY_CLIENT;
+import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
 import static com.twitter.mesos.gen.ScheduleStatus.LOST;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
@@ -132,7 +132,7 @@ public class TaskStateMachineTest extends EasyMockTest {
           expectWork(RESCHEDULE);
           break;
 
-        case KILLED_BY_CLIENT:
+        case KILLING:
           expectWork(KILL);
       }
 
@@ -189,7 +189,7 @@ public class TaskStateMachineTest extends EasyMockTest {
     control.replay();
 
     stateMachine.updateState(PENDING)
-        .updateState(KILLED_BY_CLIENT);
+        .updateState(KILLING);
   }
 
   @Test
@@ -406,6 +406,21 @@ public class TaskStateMachineTest extends EasyMockTest {
     } catch (IllegalStateException e) {
     //Expected
     }
+  }
+
+  @Test
+  public void testKillingRequest() {
+    expectWork(UPDATE_STATE).times(6);
+    expectWork(KILL);
+
+    control.replay();
+
+    stateMachine.updateState(PENDING)
+        .updateState(ASSIGNED)
+        .updateState(STARTING)
+        .updateState(RUNNING)
+        .updateState(KILLING)
+        .updateState(KILLED);
   }
 
   private IExpectationSetters<Void> expectWork(WorkCommand work) {
