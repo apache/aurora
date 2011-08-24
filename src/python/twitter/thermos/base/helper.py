@@ -2,7 +2,7 @@ import os
 import errno
 
 # TODO(wickman)  Use the twitter.common.dirutils module.
-class Helper:
+class Helper(object):
   @staticmethod
   def safe_create_file(filename, args):
     try:

@@ -4,10 +4,6 @@ from twitter.common import log
 from twitter.common.recordio import ThriftRecordReader
 from thermos_thrift.ttypes import *
 
-class TaskCkpt_ErrorRecoveringState(Exception): pass
-class TaskCkpt_InvalidStateTransition(Exception): pass
-class TaskCkpt_InvalidSequenceNumber(Exception): pass
-
 class TaskCkptDispatcher(object):
   """
     The reconstruction / dispatching mechanism for logic triggered on
@@ -16,6 +12,11 @@ class TaskCkptDispatcher(object):
     Most applications should build an event-loop around the
     TaskCkptDispatcher.
   """
+
+  class ErrorRecoveringState(Exception): pass
+  class InvalidStateTransition(Exception): pass
+  class InvalidSequenceNumber(Exception): pass
+
   def __init__(self):
     self._state_handlers = {}
     self._universal_handlers = []
@@ -56,14 +57,16 @@ class TaskCkptDispatcher(object):
   def check_empty_fields(process_state, fields):
     for field in fields:
       if process_state.__dict__[field] is not None:
-        raise TaskCkpt_ErrorRecoveringState("Field field %s from %s should be empty, instead got: %s" % (
-          field, process_state, process_state.__dict__[field]))
+        raise TaskCkptDispatcher.ErrorRecoveringState(
+          "Field field %s from %s should be empty, instead got: %s" % (
+            field, process_state, process_state.__dict__[field]))
 
   @staticmethod
   def check_nonempty_fields(process_state, fields):
     for field in fields:
       if process_state.__dict__[field] is None:
-        raise TaskCkpt_ErrorRecoveringState("Missing field %s from %s!" % (field, process_state))
+        raise TaskCkptDispatcher.ErrorRecoveringState(
+          "Missing field %s from %s!" % (field, process_state))
 
   @staticmethod
   def check_and_copy_fields(process_state, process_state_update, fields):
@@ -96,7 +99,7 @@ class TaskCkptDispatcher(object):
       returns True if a state update was applied to process_state
     """
     if process_state_update.seq is None:
-      raise TaskCkpt_InvalidSequenceNumber(
+      raise TaskCkptDispatcher.InvalidSequenceNumber(
         "Got nil suquence number! update = %s" % process_state_update)
 
     # Special-casing seq == 0 is kind of blech.  Should we create an INIT state?
@@ -108,8 +111,9 @@ class TaskCkptDispatcher(object):
           # 0.  if not in recovery mode, this is an error.
           return False
         else:
-          raise TaskCkpt_InvalidSequenceNumber("Out of order sequence number! %s => %s" % (
-            process_state, process_state_update))
+          raise TaskCkptDispatcher.InvalidSequenceNumber(
+            "Out of order sequence number! %s => %s" % (
+              process_state, process_state_update))
 
       # We should not see non-contiguous sequence numbers, but keep it at a
       # warning for now until we're certain there are no bugs.
@@ -127,40 +131,46 @@ class TaskCkptDispatcher(object):
       # WAITING => FORKED
       elif process_state_update.run_state == ProcessRunState.FORKED:
         if process_state.run_state != ProcessRunState.WAITING:
-          raise TaskCkpt_InvalidStateTransition("%s => %s" % (process_state, process_state_update))
+          raise TaskCkptDispatcher.InvalidStateTransition(
+            "%s => %s" % (process_state, process_state_update))
         required_fields = ['seq', 'run_state', 'fork_time', 'runner_pid']
         TaskCkptDispatcher.copy_fields(process_state, process_state_update, required_fields)
 
       # FORKED => RUNNING
       elif process_state_update.run_state == ProcessRunState.RUNNING:
         if process_state.run_state != ProcessRunState.FORKED:
-          raise TaskCkpt_InvalidStateTransition("%s => %s" % (process_state, process_state_update))
+          raise TaskCkptDispatcher.InvalidStateTransition(
+            "%s => %s" % (process_state, process_state_update))
         required_fields = ['seq', 'run_state', 'start_time', 'pid']
         TaskCkptDispatcher.copy_fields(process_state, process_state_update, required_fields)
 
       # RUNNING => FINISHED
       elif process_state_update.run_state == ProcessRunState.FINISHED:
         if process_state.run_state != ProcessRunState.RUNNING:
-          raise TaskCkpt_InvalidStateTransition("%s => %s" % (process_state, process_state_update))
+          raise TaskCkptDispatcher.InvalidStateTransition(
+            "%s => %s" % (process_state, process_state_update))
         required_fields = ['seq', 'run_state', 'stop_time', 'return_code']
         TaskCkptDispatcher.copy_fields(process_state, process_state_update, required_fields)
 
       # RUNNING => FAILED
       elif process_state_update.run_state == ProcessRunState.FAILED:
         if process_state.run_state != ProcessRunState.RUNNING:
-          raise TaskCkpt_InvalidStateTransition("%s => %s" % (process_state, process_state_update))
+          raise TaskCkptDispatcher.InvalidStateTransition(
+            "%s => %s" % (process_state, process_state_update))
         required_fields = ['seq', 'run_state', 'stop_time', 'return_code']
         TaskCkptDispatcher.copy_fields(process_state, process_state_update, required_fields)
 
       # {FORKED, RUNNING} => LOST
       elif process_state_update.run_state == ProcessRunState.LOST:
         if process_state.run_state not in (ProcessRunState.FORKED, ProcessRunState.RUNNING):
-          raise TaskCkpt_InvalidStateTransition("%s => %s" % (process_state, process_state_update))
+          raise TaskCkptDispatcher.InvalidStateTransition(
+            "%s => %s" % (process_state, process_state_update))
         required_fields = ['seq', 'run_state']
         TaskCkptDispatcher.copy_fields(process_state, process_state_update, required_fields)
 
       else:
-        raise TaskCkpt_ErrorRecoveringState("Unknown run_state = %s" % process_state_update.run_state)
+        raise TaskCkptDispatcher.ErrorRecoveringState(
+          "Unknown run_state = %s" % process_state_update.run_state)
 
     # dispatch state change to consumer
     self._run_state_dispatch(process_state_update.run_state, process_state_update)
@@ -176,7 +186,7 @@ class TaskCkptDispatcher(object):
     if runner_ckpt.history_state_update is not None: changes += 1
     if runner_ckpt.state_update is not None: changes += 1
     if changes > 1:
-      raise TaskCkpt_InvalidStateTransition(
+      raise TaskCkptDispatcher.InvalidStateTransition(
         "Multiple checkpoint types in the same message! %s" % runner_ckpt)
 
 
@@ -217,7 +227,7 @@ class TaskCkptDispatcher(object):
     #   -> Initialization of the task stream.
     if runner_ckpt.runner_header is not None:
       if state.header is not None:
-        raise TaskCkpt_ErrorRecoveringState(
+        raise TaskCkptDispatcher.ErrorRecoveringState(
           "Multiple headers encountered in TaskRunnerState!")
       else:
         state.header = runner_ckpt.runner_header
@@ -231,7 +241,7 @@ class TaskCkptDispatcher(object):
         state.ports = {}
       if port_name in state.ports:
         if port != state.ports[port_name]:
-          raise TaskCkpt_ErrorRecoveringState(
+          raise TaskCkptDispatcher.ErrorRecoveringState(
             "Port assignment conflicts with earlier assignment: %s" % port_name)
         else:
           return False
@@ -263,9 +273,10 @@ class TaskCkptDispatcher(object):
     #        (WAITING, FORKED, RUNNING, FINISHED, KILLED, FAILED, LOST)
     process_update = runner_ckpt.process_state
     if process_update is None:
-      log.error(TaskCkpt_ErrorRecoveringState("Empty TaskRunnerCkpt encountered!"))
+      log.error(TaskCkptDispatcher.ErrorRecoveringState("Empty TaskRunnerCkpt encountered!"))
       return False
 
+    # TODO(wickman) Change wts/wth to names meaningful since the naming refactor.
     process = process_update.process
     if process not in state.processes:
       # Never seen this process before, create a ProcessHistory for it and initialize run 0.
@@ -285,7 +296,7 @@ class TaskCkptDispatcher(object):
       # terminal=>nonterminal (lost/failure) but not terminal=>terminal, so sanity check that.
       if TaskCkptDispatcher.is_terminal(wth.runs[-1]):
         if TaskCkptDispatcher.is_terminal(process_update):
-          raise TaskCkpt_ErrorRecoveringState(
+          raise TaskCkptDispatcher.ErrorRecoveringState(
             "Received two consecutive terminal process states: wts=%s update=%s" % (
             wts, process_update))
         else:

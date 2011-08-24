@@ -6,7 +6,7 @@ import errno
 
 from twitter.common import log
 
-class EntityParser:
+class EntityParser(object):
   PORT_RE = r'%port:(\w+)%'
 
   @staticmethod
@@ -15,12 +15,12 @@ class EntityParser:
     matched = matcher.findall(str)
     return matched
 
-class EphemeralPortAllocator_CannotAllocate(Exception): pass
-class EphemeralPortAllocator_RecoveryError(Exception): pass
-
-class EphemeralPortAllocator:
+class EphemeralPortAllocator(object):
   PORT_SPEC = "%%port:%s%%"
   SOCKET_RANGE = [32768, 65535]
+
+  class CannotAllocate(Exception): pass
+  class RecoveryError(Exception): pass
 
   def __init__(self):
     self._ports = {}
@@ -29,7 +29,7 @@ class EphemeralPortAllocator:
     # if a port is provided, it is presumed during recovery step
     if port is not None:
       if name in self._ports and self._ports[name] != port:
-        raise EphemeralPortAllocator_RecoveryError(
+        raise EphemeralPortAllocator.RecoveryError(
           "Recovered port binding %s=>%s conflicts with current binding %s=>%s" % (
           name, port, name, self._ports[name]))
       else:
@@ -47,13 +47,15 @@ class EphemeralPortAllocator:
         s.close()
         self._ports[name] = rand_port
         break
-      except OSError, e:
+      except OSError as e:
         if e.errno in (errno.EADDRINUSE, errno.EINVAL):
           log.error('Could not bind port: %s' % e)
           time.sleep(1)
           continue
         else:
-          raise  # this is dangerous until we know all the possible failure scenarios
+          # this is dangerous until we know all the possible failure scenarios
+          raise EphemeralPortAllocator.CannotAllocate(
+            'Could not allocate a port due to %s' % e)
     return self._ports[name]
 
   def synthesize(self, cmdline):

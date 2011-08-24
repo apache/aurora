@@ -7,13 +7,15 @@ class Planner(object):
      and what has finished.
   """
 
+  class InvalidSchedule(Exception): pass
+
   def __init__(self, scheduler):
     self._scheduler = scheduler
     self.finished   = set([])
     self.running    = set([])
 
     if not scheduler.timetable():
-      raise Exception("Planner was given invalid schedule!")
+      raise Planner.InvalidSchedule("Planner was given an inconsistent schedule!")
 
   def get_runnable(self):
     runnable = self._scheduler.runnable(self.finished)

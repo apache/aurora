@@ -1,8 +1,5 @@
 import os
 
-class TaskPath_UnknownPath(Exception): pass
-class TaskPath_UnderspecifiedPath(Exception): pass
-
 class TaskPath(object):
   """
     Handle the resolution / detection of the path structure for thermos tasks.
@@ -33,6 +30,9 @@ class TaskPath(object):
         uids.append(int(matched_blobs[0]))
       return uids
   """
+
+  class UnknownPath(Exception): pass
+  class UnderspecifiedPath(Exception): pass
 
   # all keys: root job_uid pid process run
   DIR_TEMPLATE = {
@@ -67,7 +67,7 @@ class TaskPath(object):
 
   def getpath(self, pathname):
     if pathname not in TaskPath.DIR_TEMPLATE:
-      raise TaskPath_UnknownPath("Internal error, unknown id: %s" % pathname)
+      raise TaskPath.UnknownPath("Internal error, unknown id: %s" % pathname)
     path = list(TaskPath.DIR_TEMPLATE[pathname]) # copy
     if self._filename: path += [self._filename]
     path = os.path.join(*path)
@@ -75,7 +75,7 @@ class TaskPath(object):
     try:
       _ = interpolated_path % {}
     except KeyError:
-      raise TaskPath_UnderspecifiedPath(
+      raise TaskPath.UnderspecifiedPath(
         "Tried to interpolate path with insufficient variables: %s as %s" % (
         pathname, interpolated_path))
     return interpolated_path

@@ -28,11 +28,12 @@ class TaskChroot(object):
   def created(self):
     return os.path.exists(self.path())
 
+  # TODO(wickman)  Use twitter.common.dirutil and get rid of the blanket exception catch.
   def create(self):
     shutil.rmtree(self.path(), ignore_errors = True)
     try:
       os.makedirs(self.path(), 0700)
-    except Exception, e:
+    except Exception as e:
       log.error('Unable to create dir %s!' % self.path())
       raise e
     return self.path()

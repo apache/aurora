@@ -10,7 +10,7 @@ __tested__ = False
 #  TYPES       = [conv1, conv2, ...]
 #  HANDLER_MAP = {name1: postprocessor1, name2: postprocessor2, ...}
 #
-class ScanfParser:
+class ScanfParser(object):
   # since python doesn't have built-in scanf, we have to emulate it
   # with regular expressions
   CONVERSIONS = {
@@ -64,15 +64,13 @@ class ScanfParser:
       k += 1
     return ScanfObject(self._attrs, matches)
 
-  class ProcessHandleError(Exception): pass
-
   def __init__(self, attrs, types, handlers = {}):
     self._handlers  = handlers
     self._attrs     = attrs
     self._types     = types
     self._regex, self._regex_fns = self._construct_re()
 
-class ScanfObject:
+class ScanfObject(object):
   def __init__(self, attrs, data):
     self._attrs = attrs
     self._data  = data

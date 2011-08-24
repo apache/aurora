@@ -12,13 +12,13 @@ __tested__ = False
 
 MeasuredTuple = CaseClass('job_uid', 'task_name', 'process_name', 'process_run', 'process_pid')
 
-class TaskMeasurer_InternalError(Exception): pass
 class TaskMeasurer(threading.Thread):
   """
     Class responsible for polling CPU/RAM/DISK usage from live processes.
     Sublcassed from thread, runs in a background thread.  Control with start()/join().
   """
 
+  class InternalError(Exception): pass
   SAMPLE_INTERVAL = 1.0 # seconds
 
   def __init__(self, muxer, interval = SAMPLE_INTERVAL):
@@ -90,7 +90,7 @@ class TaskMeasurer(threading.Thread):
     if len(processes) == 0: return 0
 
     if len(processes) > 1:
-      raise TaskMeasurer_InternalError("Unexpectedly large number of samples for %s,%s,%s" % (
+      raise TaskMeasurer.InternalError("Unexpectedly large number of samples for %s,%s,%s" % (
         job_uid, task_name, process_name))
 
     # TODO(wickman)  Memoize time.time() and get rid of all the hardcoded constants.

@@ -8,7 +8,7 @@ __tested__ = False
 __todo__   = """
   There is painful amount of copy-pasted code in here.  Ripe for refactor.
 """
-class ProcessHandlers:
+class ProcessHandlers(object):
   @staticmethod
   def handle_time(key, value):
     return 1.0 * value / os.sysconf('SC_CLK_TCK')
@@ -40,7 +40,7 @@ class ProcessHandlers:
 
     return seconds
 
-class ProcessHandleProcfs:
+class ProcessHandleProcfs(object):
   ATTRS = \
     """pid comm state ppid pgrp session tty_nr tpgid flags minflt cminflt majflt cmajflt utime
        stime cutime cstime priority nice num_threads itrealvalue starttime vsize rss rsslim startcode
@@ -127,7 +127,7 @@ class ProcessHandleProcfs:
     else:
       return self._attrs.__getattr__(key)
 
-class ProcessHandlePs:
+class ProcessHandlePs(object):
   LINE = [ 'USER', 'PID', 'PPID', '%CPU', 'RSS', 'VSZ', 'STAT', 'ELAPSED', 'TIME', 'COMMAND' ]
   KEY  = [ 'user', 'pid', 'ppid', 'pcpu', 'rss', 'vsz', 'stat',   'etime', 'time',    'comm' ]
   TYPE = [   '%s',  '%d',   '%d',   '%f',  '%d',  '%d',   '%s',      '%s',   '%s',     '%s'  ]
@@ -195,7 +195,7 @@ class ProcessHandlePs:
   def __getattr__(self, key):
     return self._attrs.__getattr__(key)
 
-class ProcessTree:
+class ProcessTree(object):
   CMD = 'ps ax -o user,pid,ppid'
 
   def __init__(self):
@@ -221,7 +221,7 @@ class ProcessTree:
       all_children.extend(self.children_of(child))
     return all_children
 
-class ProcessSetRealizer:
+class ProcessSetRealizer(object):
   def collect(self):
     print 'zing!'
 
@@ -331,7 +331,7 @@ class ProcessSetRealizer_Procfs(ProcessSetRealizer):
   def __init__(self):
     ProcessSetRealizer.__init__(self)
 
-class ProcessSetFactory:
+class ProcessSetFactory(object):
   @staticmethod
   def get():
     kernel = os.uname()[0]

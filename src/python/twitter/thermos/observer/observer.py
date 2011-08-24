@@ -141,10 +141,10 @@ class Fileset(object):
       "toplevel_path": self._rel,
       "rows": '\n'.join(out_lines) }
 
-class TaskObserver_UnexpectedError(Exception): pass
-class TaskObserver_UnexpectedState(Exception): pass
-
 class TaskObserver(threading.Thread):
+  class UnexpectedError(Exception): pass
+  class UnexpectedState(Exception): pass
+
   def __init__(self, root):
     self._pathspec = TaskPath(root = root)
     self._detector = TaskDetector(root)
@@ -258,7 +258,7 @@ class TaskObserver(threading.Thread):
       path = self._pathspec.given(job_uid = uid).getpath('runner_checkpoint')
       self._states[uid] = AlaCarteRunnerState(path).state()
       return self._states[uid]
-    log.error(TaskObserver_UnexpectedError("Could not find uid: %s" % uid))
+    log.error(TaskObserver.UnexpectedError("Could not find uid: %s" % uid))
     return None
 
   def _job_stub(self, uid):
@@ -296,7 +296,7 @@ class TaskObserver(threading.Thread):
         elif state.processes[process].state == TaskState.FAILED:
           failed.append(process)
         else:
-          raise TaskObserver_UnexpectedState(
+          raise TaskObserver.UnexpectedState(
             "Unexpected TaskState: %s" % state.processes[process].state)
 
     return {

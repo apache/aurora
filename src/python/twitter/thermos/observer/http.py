@@ -14,7 +14,7 @@ from observer import TaskObserver
 __author__ = 'wickman@twitter.com (brian wickman)'
 __tested__ = False
 
-class ObserverRequestTranslator:
+class ObserverRequestTranslator(object):
   def __init__(self, observer):
     self._observer = observer
 
@@ -102,7 +102,7 @@ class ObserverRequestTranslator:
       self._observer.browse_file(
         uid, process, run, filename, offset=offset, bytes=bytes, fmt=fmt))
 
-class ObserverHttpHandler:
+class ObserverHttpHandler(object):
   INDEX_HTML = """
   <html>
   <title>thermos(%(hostname)s)</title>

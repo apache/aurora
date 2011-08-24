@@ -12,8 +12,6 @@ from twitter.thermos.base.helper   import Helper
 __author__ = 'wickman@twitter.com (brian wickman)'
 __tested__ = False
 
-class Process_OwnerException(Exception): pass
-
 class Process(object):
   """
     Encapsulate a running process for a task.
@@ -41,7 +39,7 @@ class Process(object):
     # make sure the sandbox dir has been created
     try:
       os.makedirs(self._sandbox)
-    except OSError, e:
+    except OSError as e:
       if e.errno != errno.EEXIST:
         raise
 

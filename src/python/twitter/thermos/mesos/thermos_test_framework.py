@@ -1,5 +1,3 @@
-#!python
-
 import os
 import sys
 import time
@@ -20,7 +18,7 @@ except ImportError:
 # loader
 from twitter.tcl.loader import ThermosJobLoader
 
-class UidGenerator:
+class UidGenerator(object):
   _singleton = None
 
   def __init__(self, initial = 1):

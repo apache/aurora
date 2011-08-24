@@ -1,4 +1,4 @@
-class SampleVector:
+class SampleVector(object):
   MAX_SAMPLES = 1000
 
   def __init__(self, name):

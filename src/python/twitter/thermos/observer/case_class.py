@@ -1,18 +1,24 @@
 __author__ = 'wickman@twitter.com (brian wickman)'
 __tested__ = False
 
-# E.g. ProcessClass = CaseClass('name', 'owner', 'pid')
-# process1 = ProcessClass(name = "hello", owner = "brian", pid = 15)
-# process2 = ProcessClass(name = "world", owner = "brian", pid = 13)
-# processes = [process1, process2]
-#
-# filter(lambda process: process.where(owner = "brian"), processes) => [process1, process2]
-# filter(lambda process: process.where(owner = "brian", pid = 13), processes) => [process2]
-#
-# matcher = ProcessClass(pid = 13)
-# filter(lambda process: process.match(matcher), processes) => [process2]
+# TODO(wickman)  Move this to twitter.common.lang ?
+class CaseClass(object):
+  """
+    A case-class-like construct for structuring named-tuples that can be queried with
+      'where' clauses and filtered.
 
-class CaseClass:
+    E.g. ProcessClass = CaseClass('name', 'owner', 'pid')
+    process1 = ProcessClass(name = "hello", owner = "brian", pid = 15)
+    process2 = ProcessClass(name = "world", owner = "brian", pid = 13)
+    processes = [process1, process2]
+
+    filter(lambda process: process.where(owner = "brian"), processes) => [process1, process2]
+    filter(lambda process: process.where(owner = "brian", pid = 13), processes) => [process2]
+
+    matcher = ProcessClass(pid = 13)
+    filter(lambda process: process.match(matcher), processes) => [process2]
+  """
+
   def __init__(self, *kw):
     self._attrs = kw
 

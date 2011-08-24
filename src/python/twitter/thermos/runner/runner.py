@@ -27,10 +27,7 @@ __todo__   = """
   Implement active/finished ThermosJob dump handling.
 """
 
-class TaskRunner_InternalError(Exception): pass
-class TaskRunner_NotImplementedException(Exception): pass
-
-class TaskRunnerHelper:
+class TaskRunnerHelper(object):
   @staticmethod
   def scheduler_from_task(task):
     scheduler = Scheduler()
@@ -43,6 +40,8 @@ class TaskRunnerHelper:
     return scheduler
 
 class TaskRunner(object):
+  class InternalError(Exception): pass
+
   def __init__(self, task, sandbox, root_dir, job_uid):
     """
       task     = ThermosTask to run
@@ -250,7 +249,7 @@ class TaskRunner(object):
         self._write_job()
       else:
         if self._task.job != job:
-          raise TaskRunner_InternalError("Attempting to launch different jobs with same uid?")
+          raise TaskRunner.InternalError("Attempting to launch different jobs with same uid?")
 
   def _save_allocated_ports(self, ports):
     for name in ports:
@@ -296,7 +295,7 @@ class TaskRunner(object):
 
     # out of recovery mode
     if not self._sandbox.created():
-      raise TaskRunner_InternalError("Sandbox not created before start() called.")
+      raise TaskRunner.InternalError("Sandbox not created before start() called.")
 
     MIN_ITER_TIME = 0.1
 

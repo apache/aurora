@@ -5,15 +5,16 @@ import select as fdselect
 from twitter.common import log
 from twitter.common.recordio import ThriftRecordReader
 
-from thermos_thrift.ttypes  import *
+from thermos_thrift.ttypes import *
 from twitter.thermos.runner.process import Process
 
 __author__ = 'wickman@twitter.com (brian wickman)'
 __tested__ = False
 
-class ProcessMuxer_SomethingBadHappened(Exception): pass
-
 class ProcessMuxer(object):
+  class ProcessExists(Exception): pass
+  class ProcessNotFound(Exception): pass
+
   LOST_TIMEOUT = 60.0  # if the pidfile hasn't shown up after this long, consider the process LOST
 
   def __init__(self):
@@ -30,7 +31,7 @@ class ProcessMuxer(object):
     if not pid:
       self._unbound_processes.append(task_process)
     elif pid in self._pid_to_process:
-      raise ProcessMuxer_SomethingBadHappened()
+      raise ProcessMuxer.ProcessExists("Pid %s is already registered" % pid)
     else:
       self._pid_to_process[pid] = task_process
 
@@ -152,7 +153,7 @@ class ProcessMuxer(object):
           found_process = process
           break
       if found_process is None:
-        raise ProcessMuxer_SomethingBadHappened("No trace of process: %s" % process_name)
+        raise ProcessMuxer.ProcessNotFound("No trace of process: %s" % process_name)
       else:
         self._unbound_processes.remove(found_process)
     return pid
