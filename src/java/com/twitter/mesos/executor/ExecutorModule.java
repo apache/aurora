@@ -49,10 +49,15 @@ import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
 import com.twitter.mesos.executor.HttpSignaler.SignalException;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
 import com.twitter.mesos.executor.ProcessKiller.KillException;
+import com.twitter.mesos.executor.StateChangeListener.StateChangeListenerImpl;
 import com.twitter.mesos.executor.httphandlers.ExecutorHome;
 import com.twitter.mesos.executor.httphandlers.TaskHome;
 import com.twitter.mesos.executor.migrations.DeadTaskMigratorModule;
+import com.twitter.mesos.executor.sync.SyncBuffer;
+import com.twitter.mesos.executor.sync.SyncBuffer.SyncBufferImpl;
+import com.twitter.mesos.executor.sync.SyncBufferSize;
 import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.util.HdfsUtil;
 
 /**
@@ -109,6 +114,9 @@ public class ExecutorModule extends AbstractModule {
   @CmdLine(name = "cuckoo_source_id", help = "Cuckoo stat source ID.")
   private static final Arg<String> CUCKOO_SOURCE_ID = Arg.create();
 
+  @CmdLine(name = "state_sync_buffer_limit", help = "Maximum number of state changes to buffer.")
+  private static final Arg<Integer> STATE_SYNC_BUFFER_LIMIT = Arg.create(10000);
+
   @Override
   protected void configure() {
 
@@ -120,10 +128,15 @@ public class ExecutorModule extends AbstractModule {
         .to(DeadTaskLoader.class).in(Singleton.class);
 
     // Bindings for MesosExecutorImpl.
+    bind(Integer.class).annotatedWith(SyncBufferSize.class)
+        .toInstance(STATE_SYNC_BUFFER_LIMIT.get());
+    bind(new TypeLiteral<Supplier<Map<String, ScheduleStatus>>>() {}).to(ExecutorCore.class);
+    bind(SyncBuffer.class).to(SyncBufferImpl.class);
     bind(Driver.class).to(DriverImpl.class);
     bind(DriverImpl.class).in(Singleton.class);
 
     // Bindings needed for ExecutorCore.
+    bind(StateChangeListener.class).to(StateChangeListenerImpl.class);
     bind(new TypeLiteral<Function<AssignedTask, Task>>() {}).to(TaskFactory.class);
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
         .setDaemon(true).setNameFormat("MesosExecutor-[%d]").build();

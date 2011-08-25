@@ -196,6 +196,7 @@ class StateManager {
     for (final ScheduleStatus status : ScheduleStatus.values()) {
       Stats.export(new StatImpl<Integer>("task_store_" + status) {
         @Override public Integer read() {
+          // TODO(wfarner): Provide this stat without requiring a full scan for every read.
           return Iterables.size(Iterables.filter(taskStateMachines.values(), hasStatus(status)));
         }
       });
@@ -829,7 +830,9 @@ class StateManager {
                 MISSING_TASK_GRACE_PERIOD.get(),
                 initialState);
 
-    exportCounters(jobKey, taskId);
+    // TODO(wfarner): Providing counters this way consumes a ton of CPU (scanning tens of thousands
+    //     of objects per second).  Reintroduce if/when needed.
+    // exportCounters(jobKey, taskId);
     taskStateMachines.put(taskId, stateMachine);
     return stateMachine;
   }

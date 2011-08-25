@@ -16,6 +16,7 @@ import com.google.common.collect.Maps;
 import com.google.inject.Inject;
 
 import com.twitter.common.collections.Pair;
+import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.comm.StateUpdateResponse;
@@ -85,6 +86,12 @@ public interface SyncBuffer {
       Preconditions.checkArgument(maxSize > 0, "maxSize must be positive.");
       this.maxSize = maxSize;
       this.fullStatusAccessor = Preconditions.checkNotNull(fullStatusAccessor);
+
+      Stats.export(new StatImpl<Integer>("sync_buffer_size") {
+        @Override public Integer read() {
+          return buffer.size();
+        }
+      });
     }
 
     @Override

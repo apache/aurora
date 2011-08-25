@@ -2,8 +2,6 @@ package com.twitter.mesos.executor;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
@@ -15,24 +13,20 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.annotation.Nullable;
-
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
+import com.google.common.base.Supplier;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 import com.google.inject.name.Named;
 
 import org.apache.commons.io.FileSystemUtils;
-import org.apache.commons.lang.builder.EqualsBuilder;
-import org.apache.commons.lang.builder.ToStringBuilder;
 
 import com.twitter.common.application.ActionRegistry;
-import com.twitter.common.base.Closure;
 import com.twitter.common.base.Command;
 import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
@@ -43,8 +37,6 @@ import com.twitter.mesos.executor.Task.TaskRunException;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.comm.ExecutorStatus;
-import com.twitter.mesos.gen.comm.LiveTaskInfo;
-import com.twitter.mesos.gen.comm.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.comm.SchedulerMessage;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -59,7 +51,7 @@ import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
  *
  * @author William Farner
  */
-public class ExecutorCore implements TaskManager {
+public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleStatus>> {
   private static final Logger LOG = Logger.getLogger(MesosExecutorImpl.class.getName());
 
   /**
@@ -81,6 +73,7 @@ public class ExecutorCore implements TaskManager {
   private final Function<AssignedTask, Task> taskFactory;
   private final ExecutorService taskExecutor;
   private final Function<Message, Integer> messageHandler;
+  private final StateChangeListener stateChangeListener;
 
   private final AtomicLong tasksReceived = Stats.exportLong("executor_tasks_received");
   private final AtomicLong taskFailures = Stats.exportLong("executor_task_launch_failures");
@@ -90,12 +83,14 @@ public class ExecutorCore implements TaskManager {
   public ExecutorCore(@ExecutorRootDir File executorRootDir, BuildInfo buildInfo,
       Function<AssignedTask, Task> taskFactory,
       @Named(TASK_EXECUTOR) ExecutorService taskExecutor,
-      Function<Message, Integer> messageHandler) {
+      Function<Message, Integer> messageHandler,
+      StateChangeListener stateChangeListener) {
     this.executorRootDir = checkNotNull(executorRootDir);
     this.buildInfo = checkNotNull(buildInfo);
     this.taskFactory = checkNotNull(taskFactory);
     this.taskExecutor = checkNotNull(taskExecutor);
     this.messageHandler = checkNotNull(messageHandler);
+    this.stateChangeListener = checkNotNull(stateChangeListener);
 
     Stats.export(new StatImpl<Integer>("executor_tasks_stored") {
       @Override public Integer read() {
@@ -125,7 +120,6 @@ public class ExecutorCore implements TaskManager {
   void startPeriodicTasks(ActionRegistry shutdownRegistry) {
     new ResourceManager(this, executorRootDir, shutdownRegistry).start();
     startStateSync();
-    startRegisteredTaskPusher();
     shutdownRegistry.addAction(new Command() {
       @Override public void execute() {
         LOG.info("Shutting down sync executor.");
@@ -139,51 +133,13 @@ public class ExecutorCore implements TaskManager {
     LOG.info("Assigned slave ID: " + slaveId);
   }
 
-  static class StateChange {
-    final ScheduleStatus status;
-    @Nullable final String message;
-
-    StateChange(ScheduleStatus status) {
-      this(status, null);
-    }
-
-    StateChange(ScheduleStatus status, @Nullable String message) {
-      this.status = checkNotNull(status);
-      this.message = message;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (!(o instanceof StateChange)) {
-        return false;
-      }
-
-      StateChange other = (StateChange) o;
-      return new EqualsBuilder()
-          .append(status, other.status)
-          .append(message, other.message)
-          .isEquals();
-    }
-
-    @Override
-    public String toString() {
-      return new ToStringBuilder(this)
-          .append(status)
-          .append(message)
-          .toString();
-    }
-  }
-
   /**
    * Executes a task on the system.
    *
    * @param assignedTask The assigned task to run.
-   * @param stateChangeCallback Called when the task transitions to different states.
    */
-  public void executeTask(AssignedTask assignedTask,
-      final Closure<StateChange> stateChangeCallback) {
+  public void executeTask(AssignedTask assignedTask) {
     checkNotNull(assignedTask);
-    checkNotNull(stateChangeCallback);
 
     final String taskId = assignedTask.getTaskId();
 
@@ -194,16 +150,16 @@ public class ExecutorCore implements TaskManager {
     final Task task = taskFactory.apply(assignedTask);
     tasks.put(taskId, task);
 
-    stateChangeCallback.execute(new StateChange(STARTING));
+    stateChangeListener.changedState(taskId, STARTING, null);
     try {
       task.stage();
-      stateChangeCallback.execute(new StateChange(RUNNING));
+      stateChangeListener.changedState(taskId, RUNNING, null);
       task.run();
     } catch (TaskRunException e) {
       LOG.log(Level.SEVERE, "Failed to stage or run task " + taskId, e);
       taskFailures.incrementAndGet();
       task.terminate(FAILED);
-      stateChangeCallback.execute(new StateChange(FAILED, e.getMessage()));
+      stateChangeListener.changedState(taskId, FAILED, e.getMessage());
       deleteCompletedTask(taskId);
       return;
     }
@@ -213,7 +169,7 @@ public class ExecutorCore implements TaskManager {
         LOG.info("Waiting for task " + taskId + " to complete.");
         ScheduleStatus state = task.blockUntilTerminated();
         LOG.info("Task " + taskId + " completed in state " + state);
-        stateChangeCallback.execute(new StateChange(state));
+        stateChangeListener.changedState(taskId, state, null);
       }
     });
   }
@@ -264,6 +220,16 @@ public class ExecutorCore implements TaskManager {
   public void deleteCompletedTask(String taskId) {
     Preconditions.checkState(!isRunning(taskId), "Task " + taskId + " is still running!");
     tasks.remove(taskId);
+    stateChangeListener.deleted(taskId);
+  }
+
+  @Override
+  public Map<String, ScheduleStatus> get() {
+    ImmutableMap.Builder<String, ScheduleStatus> statuses = ImmutableMap.builder();
+    for (Map.Entry<String, Task> entry : tasks.entrySet()) {
+      statuses.put(entry.getKey(), entry.getValue().getScheduleStatus());
+    }
+    return statuses.build();
   }
 
   /**
@@ -281,21 +247,13 @@ public class ExecutorCore implements TaskManager {
     return liveTasks;
   }
 
-  private static String getHostName() {
-    try {
-      return InetAddress.getLocalHost().getHostName();
-    } catch (UnknownHostException e) {
-      LOG.log(Level.SEVERE, "Failed to look up own hostname.", e);
-      return null;
-    }
-  }
-
   private void startStateSync() {
+    // TODO(wfarner): Integrate this with the incremental sync messages.
     final Properties buildProperties = buildInfo.getProperties();
 
     final String DEFAULT = "unknown";
     final ExecutorStatus baseStatus = new ExecutorStatus()
-        .setHost(getHostName())
+        .setHost(Util.getHostName())
         .setBuildUser(buildProperties.getProperty(BuildInfo.Key.USER.value, DEFAULT))
         .setBuildMachine(buildProperties.getProperty(BuildInfo.Key.MACHINE.value, DEFAULT))
         .setBuildPath(buildProperties.getProperty(BuildInfo.Key.PATH.value, DEFAULT))
@@ -326,31 +284,5 @@ public class ExecutorCore implements TaskManager {
 
     // TODO(William Farner): Make sync interval configurable.
     syncExecutor.scheduleAtFixedRate(syncer, 30, 30, TimeUnit.SECONDS);
-  }
-
-  private void startRegisteredTaskPusher() {
-    Runnable pusher = new Runnable() {
-      @Override public void run() {
-        RegisteredTaskUpdate update = new RegisteredTaskUpdate().setSlaveHost(getHostName());
-        update.setTaskInfos(Lists.<LiveTaskInfo>newArrayList());
-
-        for (Map.Entry<String, Task> entry : tasks.entrySet()) {
-          Task task = entry.getValue();
-
-          update.addToTaskInfos(new LiveTaskInfo()
-              .setTaskId(entry.getKey())
-              .setTaskInfo(task.getAssignedTask().getTask())
-              .setResources(task.getResourceConsumption())
-              .setStatus(task.getScheduleStatus()));
-        }
-
-        SchedulerMessage message = new SchedulerMessage();
-        message.setTaskUpdate(update);
-        messageHandler.apply(new Message(message));
-      }
-    };
-
-    // TODO(William Farner): Make push interval configurable.
-    syncExecutor.scheduleAtFixedRate(pusher, 5, 5, TimeUnit.SECONDS);
   }
 }

@@ -19,6 +19,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
+import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.Resource.Scalar;
 import org.apache.mesos.Protos.Resource.Type;
@@ -31,19 +32,19 @@ import org.junit.Test;
 import com.twitter.common.base.Closure;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
+import com.twitter.mesos.ExecutorKey;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.CronCollisionPolicy;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
-import com.twitter.mesos.gen.ResourceConsumption;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
-import com.twitter.mesos.gen.comm.LiveTaskInfo;
-import com.twitter.mesos.gen.comm.RegisteredTaskUpdate;
+import com.twitter.mesos.gen.comm.StateUpdateResponse;
+import com.twitter.mesos.gen.comm.TaskStateUpdate;
 import com.twitter.mesos.scheduler.SchedulerCore.RestartException;
 import com.twitter.mesos.scheduler.SchedulerCore.TwitterTask;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
@@ -97,14 +98,20 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private static final String JOB_B = "Test_Job_B";
 
   private static final SlaveID SLAVE_ID = SlaveID.newBuilder().setValue("SlaveId").build();
+  private static final ExecutorID EXECUTOR_ID =
+      ExecutorID.newBuilder().setValue("ExecutorId").build();
   private static final String SLAVE_HOST_1 = "SlaveHost1";
   private static final String SLAVE_HOST_2 = "SlaveHost2";
+  private static final ExecutorKey SLAVE_HOST_1_KEY =
+      new ExecutorKey(SLAVE_ID, EXECUTOR_ID, SLAVE_HOST_1);
+  private static final ExecutorKey SLAVE_HOST_2_KEY =
+      new ExecutorKey(SLAVE_ID, EXECUTOR_ID, SLAVE_HOST_2);
 
   private SchedulingFilter schedulingFilter;
   private Closure<String> killTask;
   private SchedulerCoreImpl scheduler;
   private CronJobManager cron;
-  private PulseMonitor<String> executorPulseMonitor;
+  private PulseMonitor<ExecutorKey> executorPulseMonitor;
   private Function<TwitterTaskInfo, TwitterTaskInfo> executorResourceAugmenter;
   private FakeClock clock;
 
@@ -112,7 +119,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   public void setUp() throws Exception {
     schedulingFilter = createMock(SchedulingFilter.class);
     killTask = createMock(new Clazz<Closure<String>>() {});
-    executorPulseMonitor = createMock(new Clazz<PulseMonitor<String>>() {});
+    executorPulseMonitor = createMock(new Clazz<PulseMonitor<ExecutorKey>>() {});
     executorResourceAugmenter =
         createMock(new Clazz<Function<TwitterTaskInfo, TwitterTaskInfo>>() {});
     clock = new FakeClock();
@@ -203,7 +210,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     buildScheduler(storage);
 
     SlaveOffer slaveOffer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
-    TwitterTask launchedTask = scheduler.offer(slaveOffer);
+    TwitterTask launchedTask = scheduler.offer(slaveOffer, EXECUTOR_ID);
 
     // Since task fields are backfilled with defaults, the production flag should be filled.
     assertThat(launchedTask.task.getTask(),
@@ -458,9 +465,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     SlaveOffer slaveOffer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
 
-    assertNull(scheduler.offer(slaveOffer));
-    assertNull(scheduler.offer(slaveOffer));
-    assertNull(scheduler.offer(slaveOffer));
+    assertNull(scheduler.offer(slaveOffer, EXECUTOR_ID));
+    assertNull(scheduler.offer(slaveOffer, EXECUTOR_ID));
+    assertNull(scheduler.offer(slaveOffer, EXECUTOR_ID));
 
     // No tasks should have moved out of the pending state.
     assertThat(getTasksByStatus(PENDING).size(), is(10));
@@ -910,13 +917,13 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         Resources.makeResource(Resources.RAM_MB, task.getTask().getRamMb())
     );
 
-    assertThat(scheduler.offer(offer),
+    assertThat(scheduler.offer(offer, EXECUTOR_ID),
         is(SchedulerCoreImpl.makeTwitterTask(task, slave.getValue(), resources)));
   }
 
   @Test
   public void testExecutorBootstrap() throws Exception {
-    expect(executorPulseMonitor.isAlive(SLAVE_HOST_1)).andReturn(false);
+    expect(executorPulseMonitor.isAlive(SLAVE_HOST_1_KEY)).andReturn(false);
 
     SlaveOffer slaveOffer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 3, 4096);
     final TwitterTaskInfo offerInfo = ConfigurationManager.makeConcrete(slaveOffer);
@@ -933,50 +940,14 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
 
     buildScheduler();
-    assertNull(scheduler.offer(slaveOffer));
-  }
-
-  @Test
-  public void testResourceUpdate() throws Exception {
-    expectOffer(true);
-    executorPulseMonitor.pulse(SLAVE_HOST_1);
-
-    control.replay();
-    buildScheduler();
-
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
-    String taskId = Tasks.id(getOnlyTask(queryByOwner(OWNER_A)).task);
-
-    SlaveOffer slaveOffer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
-    sendOffer(slaveOffer, taskId, SLAVE_ID, SLAVE_HOST_1);
-
-    changeStatus(taskId, RUNNING);
-
-    assertNull(Iterables.getOnlyElement(scheduler.getTasks(query(taskId))).volatileState.resources);
-
-    RegisteredTaskUpdate update = new RegisteredTaskUpdate()
-        .setSlaveHost(SLAVE_HOST_1);
-    ResourceConsumption resources = new ResourceConsumption()
-        .setDiskUsedMb(100)
-        .setMemUsedMb(10)
-        .setCpusUsed(4)
-        .setLeasedPorts(ImmutableMap.<String, Integer>of("health", 50000))
-        .setNiceLevel(5);
-    update.addToTaskInfos(new LiveTaskInfo()
-        .setTaskId(taskId)
-        .setStatus(RUNNING)
-        .setResources(resources));
-    scheduler.updateRegisteredTasks(update);
-
-    assertThat(Iterables.getOnlyElement(scheduler.getTasks(query(taskId))).volatileState.resources,
-        is(resources));
+    assertNull(scheduler.offer(slaveOffer, EXECUTOR_ID));
   }
 
   @Test
   public void testSlaveAdjustsSchedulerTaskState() throws Exception {
     expectOffer(true);
     expectOffer(true);
-    executorPulseMonitor.pulse(SLAVE_HOST_1);
+    executorPulseMonitor.pulse(SLAVE_HOST_1_KEY);
 
     control.replay();
     buildScheduler();
@@ -998,10 +969,12 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     // Simulate state update from the executor telling the scheduler that the task is dead.
     // This can happen if the entire cluster goes down - the scheduler has persisted state
     // listing the task as running, and the executor reads the task state in and marks it as KILLED.
-    RegisteredTaskUpdate update = new RegisteredTaskUpdate().setSlaveHost(SLAVE_HOST_1);
-    update.addToTaskInfos(new LiveTaskInfo().setTaskId(taskId1).setStatus(LOST));
-    update.addToTaskInfos(new LiveTaskInfo().setTaskId(taskId2).setStatus(FINISHED));
-    scheduler.updateRegisteredTasks(update);
+    scheduler.stateUpdate(SLAVE_HOST_1_KEY,
+        new StateUpdateResponse().setIncrementalUpdate(false)
+            .setExecutorUUID("foo")
+            .setState(ImmutableMap.of(
+                taskId1, new TaskStateUpdate().setStatus(ScheduleStatus.LOST),
+                taskId2, new TaskStateUpdate().setStatus(ScheduleStatus.FINISHED))));
 
     // The expected outcome is that one task is rescheduled, and the old task is moved into the
     // LOST state. The FINISHED task's state is updated on the scheduler.
@@ -1017,7 +990,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   public void testSlaveCannotModifyTasksForOtherSlave() throws Exception {
     expectOffer(true);
     expectOffer(true);
-    executorPulseMonitor.pulse(SLAVE_HOST_2);
+    executorPulseMonitor.pulse(SLAVE_HOST_2_KEY);
 
     control.replay();
     buildScheduler();
@@ -1041,10 +1014,12 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     assertThat(getTask(taskIdA).task.getAssignedTask().getSlaveHost(), is(SLAVE_HOST_1));
 
-    scheduler.updateRegisteredTasks(new RegisteredTaskUpdate().setSlaveHost(SLAVE_HOST_2)
-        .setTaskInfos(Arrays.asList(
-            new LiveTaskInfo().setTaskId(taskIdA).setStatus(FAILED),
-            new LiveTaskInfo().setTaskId(taskIdB).setStatus(RUNNING))));
+    scheduler.stateUpdate(SLAVE_HOST_2_KEY,
+        new StateUpdateResponse().setIncrementalUpdate(false)
+            .setExecutorUUID("foo")
+            .setState(ImmutableMap.of(
+                taskIdA, new TaskStateUpdate().setStatus(FAILED),
+                taskIdB, new TaskStateUpdate().setStatus(RUNNING))));
 
     assertThat(getTasksByStatus(RUNNING).size(), is(2));
     assertTaskCount(2);
@@ -1056,8 +1031,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     expectOffer(true);
     expectOffer(true);
     expectOffer(true);
-    executorPulseMonitor.pulse(SLAVE_HOST_1);
-    executorPulseMonitor.pulse(SLAVE_HOST_2);
+    executorPulseMonitor.pulse(SLAVE_HOST_1_KEY);
+    executorPulseMonitor.pulse(SLAVE_HOST_2_KEY);
 
     control.replay();
     buildScheduler();
@@ -1098,8 +1073,10 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     };
 
     // Since job A is a daemon, its missing RUNNING task should be rescheduled.
-    scheduler.updateRegisteredTasks(new RegisteredTaskUpdate().setSlaveHost(SLAVE_HOST_1)
-        .setTaskInfos(ImmutableList.<LiveTaskInfo>of()));
+    scheduler.stateUpdate(SLAVE_HOST_1_KEY,
+        new StateUpdateResponse().setIncrementalUpdate(false)
+            .setExecutorUUID("foo")
+            .setState(ImmutableMap.<String, TaskStateUpdate>of()));
     Set<TaskState> rescheduledTasks = getTasks(new Query(new TaskQuery()
         .setOwner(OWNER_A).setJobName(JOB_A).setStatuses(EnumSet.of(PENDING))));
     assertThat(rescheduledTasks.size(), is(2));
@@ -1108,8 +1085,10 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     assertThat(rescheduledTaskAncestors, is((Set<String>) Sets.newHashSet(taskIdA, taskIdB)));
 
     // Send an update from host 2 that does not include the FAILED task.
-    scheduler.updateRegisteredTasks(new RegisteredTaskUpdate().setSlaveHost(SLAVE_HOST_2)
-        .setTaskInfos(ImmutableList.<LiveTaskInfo>of()));
+    scheduler.stateUpdate(SLAVE_HOST_2_KEY,
+        new StateUpdateResponse().setIncrementalUpdate(false)
+            .setExecutorUUID("foo")
+            .setState(ImmutableMap.<String, TaskStateUpdate>of()));
     rescheduledTasks = getTasks(new Query(new TaskQuery()
         .setOwner(OWNER_B).setJobName(JOB_B).setStatuses(EnumSet.of(PENDING))));
     assertThat(rescheduledTasks.size(), is(1));
@@ -1117,6 +1096,58 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         getAncestorId));
     assertThat(rescheduledTaskAncestors, is((Set<String>) Sets.newHashSet(taskIdC)));
     assertThat(Iterables.isEmpty(getTasks(taskIdD)), is(true));
+  }
+
+  @Test
+  public void testIncrementalStateUpdates() throws Exception {
+    expectOffer(true);
+    expectOffer(true);
+    expectKillTask(1);  // Rogue task gets killed.
+    executorPulseMonitor.pulse(SLAVE_HOST_1_KEY);
+    executorPulseMonitor.pulse(SLAVE_HOST_2_KEY);
+    expectLastCall().times(2);
+
+    control.replay();
+    buildScheduler();
+
+    SlaveOffer slaveOffer1 = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
+    SlaveOffer slaveOffer2 = createSlaveOffer(SLAVE_ID, SLAVE_HOST_2, 4, 4096);
+
+    // Offer resources for the scheduler to accept.
+    TwitterTaskInfo daemonTask = new TwitterTaskInfo(DEFAULT_TASK);
+    daemonTask.putToConfiguration("daemon", "true");
+
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, daemonTask, 1));
+    String taskIdA = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)).task);
+    sendOffer(slaveOffer1, taskIdA, SLAVE_ID, SLAVE_HOST_1);
+
+    scheduler.createJob(makeJob(OWNER_B, JOB_B, DEFAULT_TASK, 1));
+    String taskIdB = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_B, JOB_B), 0)).task);
+    sendOffer(slaveOffer2, taskIdB, SLAVE_ID, SLAVE_HOST_2);
+
+    changeStatus(taskIdA, STARTING);
+
+    scheduler.stateUpdate(SLAVE_HOST_1_KEY,
+        new StateUpdateResponse().setIncrementalUpdate(true)
+            .setExecutorUUID("foo")
+            .setState(ImmutableMap.of(
+                taskIdA, new TaskStateUpdate().setStatus(RUNNING),
+                "rogue_task", new TaskStateUpdate().setStatus(RUNNING))));
+    assertThat(getTask(taskIdA).task.getStatus(), is(RUNNING));
+
+    scheduler.stateUpdate(SLAVE_HOST_2_KEY,
+        new StateUpdateResponse().setIncrementalUpdate(true)
+            .setExecutorUUID("foo")
+            .setState(ImmutableMap.of(taskIdB, new TaskStateUpdate().setStatus(STARTING))));
+    assertThat(getTask(taskIdB).task.getStatus(), is(STARTING));
+
+    scheduler.stateUpdate(SLAVE_HOST_2_KEY,
+        new StateUpdateResponse().setIncrementalUpdate(true)
+            .setExecutorUUID("foo")
+            .setState(ImmutableMap.of(taskIdB, new TaskStateUpdate().setDeleted(true))));
+    assertThat(getTask(taskIdB).task.getStatus(), is(LOST));
+    // Lost task should be restarted.
+    assertThat(getTasks(Query.activeQuery(Tasks.jobKey(OWNER_B, JOB_B))).size(), is(1));
   }
 
   @Test
@@ -1704,7 +1735,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   }
 
   private void expectOffer(boolean passFilter) {
-    expect(executorPulseMonitor.isAlive((String) anyObject())).andReturn(true);
+    expect(executorPulseMonitor.isAlive((ExecutorKey) anyObject())).andReturn(true);
     expect(schedulingFilter.staticFilter((TwitterTaskInfo) anyObject(), (String) anyObject()))
         .andReturn(passFilter ? Predicates.<TwitterTaskInfo> alwaysTrue()
             : Predicates.<TwitterTaskInfo> alwaysFalse());

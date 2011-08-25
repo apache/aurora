@@ -16,12 +16,15 @@ import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskState;
 import org.apache.mesos.Protos.TaskStatus;
 
-import com.twitter.common.base.Closure;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
+import com.twitter.mesos.executor.sync.SyncBuffer;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.comm.ExecutorMessage;
+import com.twitter.mesos.gen.comm.SchedulerMessage;
+import com.twitter.mesos.gen.comm.StateUpdateRequest;
+import com.twitter.mesos.gen.comm.StateUpdateResponse;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
@@ -33,11 +36,13 @@ public class MesosExecutorImpl implements Executor {
   private final CountDownLatch initialized = new CountDownLatch(1);
   private final ExecutorCore executorCore;
   private final Driver driver;
+  private final SyncBuffer syncBuffer;
 
   @Inject
-  public MesosExecutorImpl(ExecutorCore executorCore, Driver driver) {
+  public MesosExecutorImpl(ExecutorCore executorCore, Driver driver, SyncBuffer syncBuffer) {
     this.executorCore = checkNotNull(executorCore);
     this.driver = checkNotNull(driver);
+    this.syncBuffer = checkNotNull(syncBuffer);
   }
 
   @Override
@@ -69,11 +74,7 @@ public class MesosExecutorImpl implements Executor {
     Preconditions.checkArgument(task.getTaskId().getValue().equals(assignedTask.getTaskId()),
         "Fatal - task IDs do not match: " + task.getTaskId() + ", " + assignedTask.getTaskId());
 
-    executorCore.executeTask(assignedTask, new Closure<ExecutorCore.StateChange>() {
-      @Override public void execute(ExecutorCore.StateChange state) {
-        driver.sendStatusUpdate(assignedTask.getTaskId(), state.status, state.message);
-      }
-    });
+    executorCore.executeTask(assignedTask);
   }
 
   @Override
@@ -108,7 +109,7 @@ public class MesosExecutorImpl implements Executor {
 
     try {
       ExecutorMessage executorMsg = ThriftBinaryCodec.decode(ExecutorMessage.class, data);
-      if (!executorMsg.isSet()) {
+      if (executorMsg == null || !executorMsg.isSet()) {
         LOG.warning("Received empty executor message.");
         return;
       }
@@ -117,12 +118,25 @@ public class MesosExecutorImpl implements Executor {
         case MACHINE_DRAIN:
           LOG.info("Received machine drain request.");
           break;
+
         case RESTART_EXECUTOR:
           LOG.info("Received executor restart request.");
           shutdown(driver);
           break;
+
+        case STATE_UPDATE_REQUEST:
+          LOG.info("Received executor state update request.");
+          StateUpdateRequest request = executorMsg.getStateUpdateRequest();
+          StateUpdateResponse response =
+              syncBuffer.stateSince(request.getExecutorUUID(), request.getLastKnownPosition());
+          response.setSlaveHost(Util.getHostName());
+          SchedulerMessage message = new SchedulerMessage();
+          message.setStateUpdateResponse(response);
+          driver.sendFrameworkMessage(ThriftBinaryCodec.encode(message));
+          break;
+
         default:
-          LOG.warning("Received unhandled executor message type: " + executorMsg.getSetField());
+        LOG.warning("Received unhandled executor message type: " + executorMsg.getSetField());
       }
     } catch (ThriftBinaryCodec.CodingException e) {
       LOG.log(Level.SEVERE, "Failed to decode framework message.", e);

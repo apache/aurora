@@ -6,10 +6,12 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Logger;
 
 import com.google.common.base.Function;
+import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.AbstractModule;
 import com.google.inject.Key;
@@ -47,6 +49,7 @@ import com.twitter.common.zookeeper.ZooKeeperUtils;
 import com.twitter.common.zookeeper.testing.ZooKeeperTestServer;
 import com.twitter.common_internal.cuckoo.CuckooWriter;
 import com.twitter.common_internal.zookeeper.TwitterZk;
+import com.twitter.mesos.ExecutorKey;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.PulseMonitor.PulseMonitorImpl;
 import com.twitter.mesos.scheduler.SchedulingFilter.SchedulingFilterImpl;
@@ -60,6 +63,7 @@ import com.twitter.mesos.scheduler.httphandlers.SchedulerzRole;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 import com.twitter.mesos.scheduler.quota.QuotaManager.QuotaManagerImpl;
 import com.twitter.mesos.scheduler.storage.db.DbStorageModule;
+import com.twitter.mesos.scheduler.sync.SyncModule;
 
 
 public class SchedulerModule extends AbstractModule {
@@ -158,8 +162,10 @@ public class SchedulerModule extends AbstractModule {
     // Bindings for SchedulerCoreImpl.
     bind(CronJobManager.class).in(Singleton.class);
     bind(ImmediateJobManager.class).in(Singleton.class);
-    bind(new TypeLiteral<PulseMonitor<String>>() {})
-        .toInstance(new PulseMonitorImpl<String>(EXECUTOR_DEAD_THRESHOLD.get()));
+    bind(new TypeLiteral<PulseMonitor<ExecutorKey>>() {})
+        .toInstance(new PulseMonitorImpl<ExecutorKey>(EXECUTOR_DEAD_THRESHOLD.get()));
+    bind(new TypeLiteral<Supplier<Set<ExecutorKey>>>() {})
+        .to(new TypeLiteral<PulseMonitor<ExecutorKey>>() {});
 
     if (upgradeSchema.get()) {
       ThriftModule.bindWithSchemaMigrator(binder());
@@ -168,6 +174,8 @@ public class SchedulerModule extends AbstractModule {
       ThriftModule.bind(binder());
       DbStorageModule.bind(binder());
     }
+
+    SyncModule.bind(binder());
 
     bind(QuotaManager.class).to(QuotaManagerImpl.class);
     bind(SchedulingFilter.class).to(SchedulingFilterImpl.class);

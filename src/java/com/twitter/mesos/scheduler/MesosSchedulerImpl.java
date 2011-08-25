@@ -24,12 +24,16 @@ import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskStatus;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
+import org.apache.thrift.TBase;
 
 import com.twitter.common.application.Lifecycle;
+import com.twitter.common.args.Arg;
+import com.twitter.common.args.CmdLine;
 import com.twitter.common.base.Closure;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
+import com.twitter.mesos.ExecutorKey;
 import com.twitter.mesos.StateTranslator;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
@@ -38,6 +42,9 @@ import com.twitter.mesos.gen.comm.ExecutorMessage;
 import com.twitter.mesos.gen.comm.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.comm.RestartExecutor;
 import com.twitter.mesos.gen.comm.SchedulerMessage;
+import com.twitter.mesos.gen.comm.StateUpdateResponse;
+import com.twitter.mesos.scheduler.sync.ExecutorWatchdog;
+import com.twitter.mesos.scheduler.sync.ExecutorWatchdog.UpdateRequest;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -51,19 +58,25 @@ class MesosSchedulerImpl implements Scheduler {
 
   private static final Amount<Long, Time> MAX_REGISTRATION_DELAY = Amount.of(1L, Time.MINUTES);
 
+  @CmdLine(name = "executor_poll_interval", help = "Interval between executor update requests.")
+  private static final Arg<Amount<Long, Time>> EXECUTOR_POLL_INTERVAL =
+      Arg.create(Amount.of(10L, Time.SECONDS));
+
   // Stores scheduler state and handles actual scheduling decisions.
   private final SchedulerCore schedulerCore;
 
   private final ExecutorTracker executorTracker;
   private volatile FrameworkID frameworkID = null;
   private final ExecutorInfo executorInfo;
+  private final ExecutorWatchdog executorWatchdog;
 
   @Inject
   public MesosSchedulerImpl(SchedulerCore schedulerCore, ExecutorTracker executorTracker,
-      ExecutorInfo executorInfo, final Lifecycle lifecycle) {
+      ExecutorInfo executorInfo, final Lifecycle lifecycle, ExecutorWatchdog executorWatchdog) {
     this.schedulerCore = checkNotNull(schedulerCore);
     this.executorTracker = checkNotNull(executorTracker);
     this.executorInfo = checkNotNull(executorInfo);
+    this.executorWatchdog = checkNotNull(executorWatchdog);
 
     // TODO(William Farner): Clean this up.
     Thread registrationChecker = new Thread() {
@@ -100,37 +113,53 @@ class MesosSchedulerImpl implements Scheduler {
     return executorInfo;
   }
 
+  private static void sendMessage(SchedulerDriver driver, ExecutorMessage message, SlaveID slave,
+      ExecutorID executor) {
+    byte[] data;
+    try {
+      data = ThriftBinaryCodec.encode(message);
+    } catch (CodingException e) {
+      LOG.log(Level.SEVERE, "Failed to send restart request.", e);
+      return;
+    }
+
+    LOG.info(String.format("Attempting to send message to %s/%s - %s",
+        slave.getValue(), executor.getValue(), message));
+    int result = driver.sendFrameworkMessage(slave, executor, data);
+    if (result != 0) {
+      LOG.severe(String.format("Attempt to send message failed with code %d [%s]",
+          result, message));
+    } else {
+      LOG.info("Message successfully sent");
+    }
+  }
+
   @Override
   public void registered(final SchedulerDriver driver, FrameworkID frameworkID) {
     LOG.info("Registered with ID " + frameworkID);
     this.frameworkID = frameworkID;
     schedulerCore.registered(frameworkID.getValue());
 
+    // TODO(wfarner): Build this into ExecutorWatchdog.
     executorTracker.start(new Closure<String>() {
       @Override public void execute(String slaveId) {
         LOG.info("Sending restart request to executor " + slaveId);
         ExecutorMessage message = new ExecutorMessage();
         message.setRestartExecutor(new RestartExecutor());
 
-        byte[] data;
-        try {
-          data = ThriftBinaryCodec.encode(message);
-        } catch (CodingException e) {
-          LOG.log(Level.SEVERE, "Failed to send restart request.", e);
-          return;
-        }
-
-        LOG.info("Attempting to send message from scheduler to " + slaveId + " - " + message);
-        int result = driver.sendFrameworkMessage(SlaveID.newBuilder().setValue(slaveId).build(),
-            executorInfo.getExecutorId(), data);
-        if (result != 0) {
-          LOG.severe(String.format("Attempt to send message failed with code %d [%s]",
-              result, message));
-        } else {
-          LOG.info("Message successfully sent");
-        }
+        sendMessage(driver, message, SlaveID.newBuilder().setValue(slaveId).build(),
+            executorInfo.getExecutorId());
       }
     });
+
+    executorWatchdog.startRequestLoop(EXECUTOR_POLL_INTERVAL.get(),
+        new Closure<UpdateRequest>() {
+          @Override public void execute(UpdateRequest request) {
+            ExecutorMessage message = new ExecutorMessage();
+            message.setStateUpdateRequest(request.request);
+            sendMessage(driver, message, request.executor.slave, request.executor.executor);
+          }
+        });
   }
 
   @Override
@@ -142,7 +171,7 @@ class MesosSchedulerImpl implements Scheduler {
     try {
       for (SlaveOffer offer : slaveOffers) {
         log(Level.FINE, "Received offer: %s", offer);
-        SchedulerCore.TwitterTask task = schedulerCore.offer(offer);
+        SchedulerCore.TwitterTask task = schedulerCore.offer(offer, executorInfo.getExecutorId());
 
         if (task != null) {
           byte[] taskInBytes;
@@ -193,7 +222,7 @@ class MesosSchedulerImpl implements Scheduler {
   public void statusUpdate(SchedulerDriver driver, TaskStatus status) {
     String info = status.hasData() ? status.getData().toStringUtf8() : null;
     String infoMsg = info != null ? " with info " + info : "";
-    LOG.info("Received status update for task " + status.getTaskId()
+    LOG.info("Received status update for task " + status.getTaskId().getValue()
         + " in state " + status.getState() + infoMsg);
 
     Query query = Query.byId(status.getTaskId().getValue());
@@ -237,15 +266,25 @@ class MesosSchedulerImpl implements Scheduler {
       switch (schedulerMsg.getSetField()) {
         case TASK_UPDATE:
           RegisteredTaskUpdate update = schedulerMsg.getTaskUpdate();
-          vars.registeredTaskUpdates.incrementAndGet();
-          schedulerCore.updateRegisteredTasks(update);
+          LOG.info("Ignoring registered task from " + update.getSlaveHost());
           break;
+
         case EXECUTOR_STATUS:
           vars.executorStatusUpdates.incrementAndGet();
           executorTracker.addStatus(schedulerMsg.getExecutorStatus());
           break;
+
+        case STATE_UPDATE_RESPONSE:
+          StateUpdateResponse stateUpdate = schedulerMsg.getStateUpdateResponse();
+          ExecutorKey executorKey = new ExecutorKey(slave, executor, stateUpdate.getSlaveHost());
+          LOG.info("Applying state update " + stateUpdate);
+          schedulerCore.stateUpdate(executorKey, stateUpdate);
+          executorWatchdog.stateUpdated(executorKey,
+              stateUpdate.getExecutorUUID(), stateUpdate.getPosition());
+          break;
+
         default:
-          LOG.warning("Received unhandled scheduler message type: " + schedulerMsg.getSetField());
+        LOG.warning("Received unhandled scheduler message type: " + schedulerMsg.getSetField());
       }
     } catch (ThriftBinaryCodec.CodingException e) {
       LOG.log(Level.SEVERE, "Failed to decode framework message.", e);
@@ -260,7 +299,6 @@ class MesosSchedulerImpl implements Scheduler {
 
   private static class Vars {
     final AtomicLong executorStatusUpdates = Stats.exportLong("executor_status_updates");
-    final AtomicLong registeredTaskUpdates = Stats.exportLong("executor_registered_task_updates");
   }
   private final Vars vars = new Vars();
 }

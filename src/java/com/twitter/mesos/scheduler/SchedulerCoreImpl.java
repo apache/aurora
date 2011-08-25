@@ -19,28 +19,28 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.MapMaker;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
+import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.SlaveOffer;
 
 import com.twitter.common.base.Closure;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.StateMachine;
+import com.twitter.mesos.ExecutorKey;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
-import com.twitter.mesos.gen.ResourceConsumption;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
-import com.twitter.mesos.gen.comm.LiveTaskInfo;
-import com.twitter.mesos.gen.comm.RegisteredTaskUpdate;
+import com.twitter.mesos.gen.comm.StateUpdateResponse;
+import com.twitter.mesos.gen.comm.TaskStateUpdate;
 import com.twitter.mesos.scheduler.StateManager.StateChanger;
 import com.twitter.mesos.scheduler.StateManager.StateMutation;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
@@ -55,7 +55,6 @@ import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
-import static com.twitter.mesos.gen.ScheduleStatus.UNKNOWN;
 import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.CONSTRUCTED;
 import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.INITIALIZED;
 import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.STARTED;
@@ -88,7 +87,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
   // Filter to determine whether a task should be scheduled.
   private final SchedulingFilter schedulingFilter;
 
-  private final PulseMonitor<String> executorPulseMonitor;
+  private final PulseMonitor<ExecutorKey> executorPulseMonitor;
   private final Function<TwitterTaskInfo, TwitterTaskInfo> executorResourceAugmenter;
 
   enum State {
@@ -105,9 +104,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
       ImmediateJobManager immediateScheduler,
       StateManager stateManager,
       SchedulingFilter schedulingFilter,
-      PulseMonitor<String> executorPulseMonitor,
+      PulseMonitor<ExecutorKey> executorPulseMonitor,
       Function<TwitterTaskInfo, TwitterTaskInfo> executorResourceAugmenter) {
-
 
     // The immediate scheduler will accept any job, so it's important that other schedulers are
     // placed first.
@@ -188,63 +186,70 @@ public class SchedulerCoreImpl implements SchedulerCore {
   //    Figure out a solution that will work.  Might require mesos support for fetching the list
   //    of slaves.
   @Override
-  public synchronized void updateRegisteredTasks(final RegisteredTaskUpdate update) {
+  public void stateUpdate(final ExecutorKey executor, final StateUpdateResponse update) {
     checkStarted();
+    checkNotNull(executor);
     checkNotNull(update);
-    checkNotBlank(update.getSlaveHost());
-    checkNotNull(update.getTaskInfos());
 
-    executorPulseMonitor.pulse(update.getSlaveHost());
+    executorPulseMonitor.pulse(executor);
 
-    List<LiveTaskInfo> taskInfos = update.isSetTaskInfos() ? update.getTaskInfos()
-        : ImmutableList.<LiveTaskInfo>of();
+    final Map<String, TaskStateUpdate> remoteUpdate = update.getState();
+    if (update.isIncrementalUpdate()) {
+      vars.incrementalTaskUpdates.incrementAndGet();
 
-    // Wrap with a mutable map so we can modify later.
-    final Map<String, LiveTaskInfo> taskInfoMap = Maps.newHashMap(
-        Maps.uniqueIndex(taskInfos, Tasks.LIVE_TO_ID));
+      if (update.getState().isEmpty()) {
+        return;
+      }
 
-    // TODO(William Farner): Have the scheduler only retain configurations for live jobs,
-    //    and acquire all other state from slaves.
-    //    This will allow the scheduler to only persist active tasks.
-
-    stateManager.taskOperation(new StateMutation.Quiet() {
-      @Override public void execute(Set<ScheduledTask> tasks, StateChanger changer) {
-        // Look for any tasks that we don't know about, or this slave should not be modifying.
-        Set<String> tasksForHost = stateManager.fetchTaskIds(
-            new Query(new TaskQuery().setSlaveHost(update.getSlaveHost())));
-
-        Set<String> tasksForOtherHosts = stateManager.fetchTaskIds(
-            new Query(new TaskQuery().setTaskIds(taskInfoMap.keySet()),
-                new Predicate<ScheduledTask>() {
-                  @Override public boolean apply(ScheduledTask task) {
-                    return !update.getSlaveHost().equals(task.getAssignedTask().getSlaveHost());
-                  }
-                })
-        );
-        if (!tasksForOtherHosts.isEmpty()) {
-          LOG.log(Level.SEVERE, "Slave " + update.getSlaveHost()
-              + " sent an update for task(s) not assigned to it: " + update);
-        }
-
-        // We will only take action on tasks that we believe to be running on the host, or tasks
-        // that were reported by the slave so long as they are not allocated to a different slave.
-        Set<String> tasksToActOn =
-            Sets.union(tasksForHost,
-                Sets.difference(taskInfoMap.keySet(), tasksForOtherHosts));
-        for (String taskId : tasksToActOn) {
-          LiveTaskInfo taskUpdate = taskInfoMap.get(taskId);
-          changer.changeState(
-              ImmutableSet.of(taskId),
-              taskUpdate == null ? UNKNOWN : taskUpdate.getStatus());
-
-          // Update the resource information for the tasks that we currently have on record.
-          if (taskUpdate != null && taskUpdate.getResources() != null) {
-            taskStateById.get(taskId).resources =
-                new ResourceConsumption(taskUpdate.getResources());
+      // TODO(wfarner): If the number of queries made here becomes large, a slight improvement
+      //     would be to group task IDs by update state.
+      stateManager.taskOperation(new StateMutation.Quiet() {
+        @Override public void execute(Set<ScheduledTask> tasks, StateChanger changer) {
+          for (Map.Entry<String, TaskStateUpdate> entry : remoteUpdate.entrySet()) {
+            ScheduleStatus remoteStatus = entry.getValue().isDeleted()
+                ? ScheduleStatus.UNKNOWN : entry.getValue().getStatus();
+            changer.changeState(ImmutableSet.of(entry.getKey()), remoteStatus);
           }
         }
-      }
-    });
+      });
+    } else {
+      vars.fullTaskUpdates.incrementAndGet();
+
+      // TODO(William Farner): Have the scheduler only retain configurations for live jobs,
+      //    and acquire all other state from slaves.
+      //    This will allow the scheduler to only persist active tasks.
+
+      stateManager.taskOperation(new StateMutation.Quiet() {
+        @Override public void execute(Set<ScheduledTask> tasks, StateChanger changer) {
+          // Look for any tasks that we don't know about, or this slave should not be modifying.
+          Set<String> tasksForHost = stateManager.fetchTaskIds(
+              new Query(new TaskQuery().setSlaveHost(executor.hostname)));
+
+          Set<String> tasksForOtherHosts = stateManager.fetchTaskIds(
+              new Query(new TaskQuery().setTaskIds(remoteUpdate.keySet()),
+                  new Predicate<ScheduledTask>() {
+                    @Override public boolean apply(ScheduledTask task) {
+                      return !executor.hostname.equals(task.getAssignedTask().getSlaveHost());
+                    }
+                  })
+          );
+          if (!tasksForOtherHosts.isEmpty()) {
+            LOG.log(Level.SEVERE, "Slave " + executor
+                + " sent an update for task(s) not assigned to it: " + update);
+          }
+
+          // We will only take action on tasks that we believe to be running on the host, or tasks
+          // that were reported by the slave so long as they are not allocated to a different slave.
+          Set<String> tasksToActOn = Sets.union(tasksForHost,
+              Sets.difference(remoteUpdate.keySet(), tasksForOtherHosts));
+          for (String taskId : tasksToActOn) {
+            TaskStateUpdate update = remoteUpdate.get(taskId);
+            changer.changeState(ImmutableSet.of(taskId),
+                update == null ? ScheduleStatus.UNKNOWN : update.getStatus());
+          }
+        }
+      });
+    }
   }
 
   @Override
@@ -339,7 +344,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
   @Override
   @Nullable
-  public synchronized TwitterTask offer(final SlaveOffer slaveOffer) throws ScheduleException {
+  public synchronized TwitterTask offer(final SlaveOffer slaveOffer, ExecutorID defaultExecutorId)
+      throws ScheduleException {
     checkStarted();
     checkNotNull(slaveOffer);
 
@@ -356,9 +362,12 @@ public class SchedulerCoreImpl implements SchedulerCore {
     final String hostname = slaveOffer.getHostname();
     Predicate<TwitterTaskInfo> hostResourcesFilter = schedulingFilter.staticFilter(offer, hostname);
 
+    ExecutorKey executorKey =
+        new ExecutorKey(slaveOffer.getSlaveId(), defaultExecutorId, slaveOffer.getHostname());
+
     Query query;
     Predicate<TwitterTaskInfo> postFilter;
-    if (!executorPulseMonitor.isAlive(hostname)) {
+    if (!executorPulseMonitor.isAlive(executorKey)) {
       TwitterTaskInfo bootstrapTask = makeBootstrapTask();
 
       // Mesos core does not account for the resources the executor itself will use up when it has
@@ -371,7 +380,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
       }
 
       LOG.info("Pulse monitor considers executor dead, launching bootstrap task on: " + hostname);
-      executorPulseMonitor.pulse(hostname);
+      executorPulseMonitor.pulse(executorKey);
       query = Query.byId(Iterables.getOnlyElement(launchTasks(ImmutableSet.of(bootstrapTask))));
       postFilter = Predicates.alwaysTrue();
       vars.executorBootstraps.incrementAndGet();
@@ -608,6 +617,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
   private final class Vars {
     final AtomicLong resourceOffers = Stats.exportLong("scheduler_resource_offers");
     final AtomicLong executorBootstraps = Stats.exportLong("executor_bootstraps");
+    final AtomicLong incrementalTaskUpdates = Stats.exportLong("executor_incremental_task_updates");
+    final AtomicLong fullTaskUpdates = Stats.exportLong("executor_full_task_updates");
   }
   private final Vars vars = new Vars();
 }

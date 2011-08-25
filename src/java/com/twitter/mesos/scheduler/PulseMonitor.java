@@ -1,21 +1,24 @@
 package com.twitter.mesos.scheduler;
 
 import com.google.common.base.Functions;
+import com.google.common.base.Supplier;
 import com.google.common.collect.MapMaker;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
  * A pulse monitor to identify when a pulse has not been received for an item beyond a defined
  * threshold.
- *
+ * Also acts as a supplier of the pulsed type, which will provide access to all non-expired
+ * entries.
  *
  * @author William Farner
  */
-public interface PulseMonitor<T> {
+public interface PulseMonitor<T> extends Supplier<Set<T>> {
 
   /**
    * Receive a pulse for an entry, effectively marking it as alive.
@@ -61,6 +64,11 @@ public interface PulseMonitor<T> {
     @Override
     public boolean isAlive(T t) {
       return pulses.containsKey(t);
+    }
+
+    @Override
+    public Set<T> get() {
+      return pulses.keySet();
     }
   }
 }

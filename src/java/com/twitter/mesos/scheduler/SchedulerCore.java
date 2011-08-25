@@ -9,16 +9,18 @@ import com.google.common.base.Function;
 
 import org.apache.commons.lang.builder.EqualsBuilder;
 import org.apache.commons.lang.builder.ToStringBuilder;
+import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.SlaveOffer;
 
 import com.twitter.common.base.Closure;
+import com.twitter.mesos.ExecutorKey;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
-import com.twitter.mesos.gen.comm.RegisteredTaskUpdate;
+import com.twitter.mesos.gen.comm.StateUpdateResponse;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -167,12 +169,13 @@ public interface SchedulerCore extends Function<Query, Iterable<TwitterTaskInfo>
    * the offer, it will return the task description.
    *
    * @param offer Resource offer received from the slave.
+   * @param defaultExecutorId The default executor ID to use when replying to resource offers.
    * @return A task description that defines the task to run, or {@code null} if there are no
    *    pending tasks that are satisfied by the slave offer.
    * @throws ScheduleException If an error occurs while attempting to schedule a task.
    */
   @Nullable
-  TwitterTask offer(SlaveOffer offer) throws ScheduleException;
+  TwitterTask offer(SlaveOffer offer, ExecutorID defaultExecutorId) throws ScheduleException;
 
   /**
    * Assigns a new state to tasks.
@@ -212,7 +215,7 @@ public interface SchedulerCore extends Function<Query, Iterable<TwitterTaskInfo>
    */
   void restartTasks(Set<String> taskIds) throws RestartException;
 
-  void updateRegisteredTasks(RegisteredTaskUpdate update);
+  void stateUpdate(ExecutorKey executorHost, StateUpdateResponse update);
 
   /**
    * Should be called to allow the scheduler to gracefully shut down.
