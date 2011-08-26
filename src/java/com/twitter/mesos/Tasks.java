@@ -7,6 +7,7 @@ import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
 
 import com.twitter.mesos.gen.AssignedTask;
@@ -122,9 +123,9 @@ public class Tasks {
         }
       };
 
-  private static final Function<TwitterTaskInfo, Boolean> IS_PRODUCTION =
-      new Function<TwitterTaskInfo, Boolean>() {
-        @Override public Boolean apply(TwitterTaskInfo task) {
+  public static final Predicate<TwitterTaskInfo> IS_PRODUCTION =
+      new Predicate<TwitterTaskInfo>() {
+        @Override public boolean apply(TwitterTaskInfo task) {
           return task.isProduction();
         }
       };
@@ -133,7 +134,8 @@ public class Tasks {
    * Order by production flag (true, then false), subsorting by task ID.
    */
   public static final Ordering<AssignedTask> SCHEDULING_ORDER =
-      Ordering.explicit(true, false).onResultOf(Functions.compose(IS_PRODUCTION, ASSIGNED_TO_INFO))
+      Ordering.explicit(true, false)
+          .onResultOf(Functions.compose(Functions.forPredicate(IS_PRODUCTION), ASSIGNED_TO_INFO))
           .compound(Ordering.natural().onResultOf(ASSIGNED_TO_ID));
 
   private Tasks() {

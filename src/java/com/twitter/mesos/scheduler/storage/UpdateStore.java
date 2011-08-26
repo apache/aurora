@@ -4,6 +4,8 @@ import java.util.Set;
 
 import javax.annotation.Nullable;
 
+import com.google.common.collect.Multimap;
+
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 
@@ -39,45 +41,58 @@ public interface UpdateStore {
   /**
    * Saves the Task Update Configuration for the corresponding jobKey and updateToken.
    *
-   * @param jobKey Key of the job update to update.
+   * @param role Owner role of the job.
+   * @param job Name of the job.
    * @param updateToken Token associated with the update.  If non-null, the token must match the
    *     the stored token for the update.
    * @param updateConfiguration A set of TaskUpdateConfiguration for the tasks in a job.
    */
-  void saveShardUpdateConfigs(String jobKey, String updateToken,
+  void saveShardUpdateConfigs(String role, String job, String updateToken,
       Set<TaskUpdateConfiguration> updateConfiguration);
 
   /**
    * Fetches the ShardUpdateConfiguration for the specified jobKey and shardId.
    *
-   * @param jobKey Key of the job update to update.
+   * @param role Owner role of the job.
+   * @param job Name of the job.
    * @param shardId Shard to fetch.
    * @return update configuration or {@code null} if a new configuration does not exist.
    */
-  @Nullable ShardUpdateConfiguration fetchShardUpdateConfig(String jobKey, int shardId);
+  @Nullable ShardUpdateConfiguration fetchShardUpdateConfig(String role, String job, int shardId);
 
   /**
-   * Multi-get version of {@link #fetchShardUpdateConfig(String, int)}.
+   * Multi-get version of {@link #fetchShardUpdateConfig(String, String, int)}.
    *
-   * @param jobKey Key of the job update to update.
+   * @param role Owner role of the job.
+   * @param job Name of the job.
    * @param shardIds Shards to fetch.
    * @return update configurations.  Configurations not found will not be represented in the set.
    *     An empty set will be returned if no matches are found.
    */
-  Set<ShardUpdateConfiguration> fetchShardUpdateConfigs(String jobKey, Set<Integer> shardIds);
+  Set<ShardUpdateConfiguration> fetchShardUpdateConfigs(String role, String job,
+      Set<Integer> shardIds);
 
   /**
-   * Fetches the shards that need to be killed for an update with reduced shards.
+   * Fetches all of the shard update configurations for a job.
    *
-   * @param jobKey Key of the job update to update.
+
    * @return Shards to be killed when update completes.
    */
-  Set<ShardUpdateConfiguration> fetchShardUpdateConfigs(String jobKey);
+  Set<ShardUpdateConfiguration> fetchShardUpdateConfigs(String role, String job);
+
+  /**
+   * Fetches all active shard update configurations for a role.
+   *
+   * @param role Role to fetch update configs for.
+   * @return A multimap from job name to shard configurations.
+   */
+  Multimap<String, ShardUpdateConfiguration> fetchShardUpdateConfigs(String role);
 
   /**
    * Removes the update configuration for the job.
    *
-   * @param jobKey Key of the job update to update.
+   * @param role Owner role of the job.
+   * @param job Name of the job.
    */
-  void removeShardUpdateConfigs(String jobKey);
+  void removeShardUpdateConfigs(String role, String job);
 }

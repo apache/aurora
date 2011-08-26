@@ -1,14 +1,18 @@
 package com.twitter.mesos.scheduler.storage.db;
 
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Set;
 
 import com.google.common.base.Charsets;
+import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
 import org.junit.Test;
+import org.springframework.jdbc.core.RowMapper;
 
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Identity;
@@ -24,6 +28,7 @@ import com.twitter.mesos.scheduler.storage.Storage.Work;
 import com.twitter.mesos.scheduler.storage.UpdateStore.ShardUpdateConfiguration;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -41,6 +46,35 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
       }
     });
     return dbStorage;
+  }
+
+  @Test
+  public void testUpdateSchemaUpgrade() {
+    assertFalse(store.isOldUpdateStoreSchema());
+
+    store.jdbcTemplate.execute("DROP TABLE IF EXISTS update_store");
+    store.jdbcTemplate.execute("DROP INDEX IF EXISTS update_store_job_key_shard_id_idx");
+
+    store.jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS update_store (" +
+        "  job_key VARCHAR(511) NOT NULL," +
+        "  update_token VARCHAR(36) NOT NULL," +
+        "  shard_id INT NOT NULL," +
+        "  config BINARY(2000000) NOT NULL)");
+    store.jdbcTemplate.execute(
+        "CREATE INDEX IF NOT EXISTS update_store_job_key_shard_id_idx" +
+            " ON update_store(job_key, shard_id)");
+
+    assertTrue(store.isOldUpdateStoreSchema());
+    store.maybeUpgradeUpdateStoreSchema();
+
+    store.createSchema();
+    assertFalse(store.isOldUpdateStoreSchema());
+  }
+
+  @Test
+  public void testUpdateSchemaUpgradeNoop() {
+    store.maybeUpgradeUpdateStoreSchema();
+    assertFalse(store.isOldUpdateStoreSchema());
   }
 
   @Test
@@ -134,13 +168,18 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
 
   @Test
   public void testSnapshotting() {
+    String frameworkId = "framework";
+    String user = "jim";
+    String role = "jake";
+    String job = "fortune";
+    String token = "please";
     byte[] snapshot1 = store.createSnapshot();
 
-    store.saveFrameworkId("jake");
+    store.saveFrameworkId(frameworkId);
     store.checkpoint(createCheckpoint("1"));
     byte[] snapshot2 = store.createSnapshot();
 
-    JobConfiguration fortuneCron = createJobConfig("jake", "jake", "fortune");
+    JobConfiguration fortuneCron = createJobConfig(job, role, job);
     store.saveAcceptedJob("CRON", fortuneCron);
 
     ScheduledTask originalTask = makeTask("42");
@@ -150,8 +189,8 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
     final TwitterTaskInfo newTaskInfo = originalTaskInfo.deepCopy().setNumCpus(42);
     TaskUpdateConfiguration updateConfiguration =
         new TaskUpdateConfiguration(originalTaskInfo, newTaskInfo);
-    store.saveShardUpdateConfigs("fortune", "please", ImmutableSet
-        .<TaskUpdateConfiguration>of(updateConfiguration));
+    store.saveShardUpdateConfigs(role, job, token,
+        ImmutableSet.<TaskUpdateConfiguration>of(updateConfiguration));
     store.checkpoint(createCheckpoint("2"));
     byte[] snapshot3 = store.createSnapshot();
 
@@ -160,26 +199,26 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
     assertNull(store.fetchFrameworkId());
     assertTrue(Iterables.isEmpty(store.fetchJobs("CRON")));
     assertTrue(store.fetchTaskIds(Query.GET_ALL).isEmpty());
-    assertTrue(store.fetchShardUpdateConfigs("fortune").isEmpty());
+    assertTrue(store.fetchShardUpdateConfigs(role).isEmpty());
 
     store.applySnapshot(snapshot3);
     assertEquals("2", decodeCheckpoint(store.fetchCheckpoint()));
-    assertEquals("jake", store.fetchFrameworkId());
+    assertEquals(frameworkId, store.fetchFrameworkId());
     assertEquals(ImmutableList.of(fortuneCron), ImmutableList.copyOf(store.fetchJobs("CRON")));
     assertEquals("42", Iterables.getOnlyElement(store.fetchTaskIds(Query.GET_ALL)));
-    Set<ShardUpdateConfiguration> updateConfigs = store.fetchShardUpdateConfigs("fortune");
+    Set<ShardUpdateConfiguration> updateConfigs = store.fetchShardUpdateConfigs(role, job);
     assertEquals(1, updateConfigs.size());
     ShardUpdateConfiguration config = Iterables.getOnlyElement(updateConfigs);
-    assertEquals("please", config.getUpdateToken());
+    assertEquals(token, config.getUpdateToken());
     assertEquals(originalTaskInfo, config.getOldConfig());
     assertEquals(newTaskInfo, config.getNewConfig());
 
     store.applySnapshot(snapshot2);
     assertEquals("1", decodeCheckpoint(store.fetchCheckpoint()));
-    assertEquals("jake", store.fetchFrameworkId());
+    assertEquals(frameworkId, store.fetchFrameworkId());
     assertTrue(Iterables.isEmpty(store.fetchJobs("CRON")));
     assertTrue(store.fetchTaskIds(Query.GET_ALL).isEmpty());
-    assertTrue(store.fetchShardUpdateConfigs("fortune").isEmpty());
+    assertTrue(store.fetchShardUpdateConfigs(role).isEmpty());
   }
 
   private JobConfiguration createJobConfig(String name, String role, String user) {

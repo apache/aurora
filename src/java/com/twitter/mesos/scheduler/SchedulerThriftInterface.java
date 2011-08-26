@@ -174,6 +174,9 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     checkNotNull(session, "Session must be set.");
     checkNotNull(session.getUser(), "Session user must be set.");
 
+    // TODO(wfarner): Determine whether this is a useful function, or if it should simply be
+    //     switched to 'killJob'.
+
     LOG.info("Received kill request for tasks: " + query);
     KillResponse response = new KillResponse();
 

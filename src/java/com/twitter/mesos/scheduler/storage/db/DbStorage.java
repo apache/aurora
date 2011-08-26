@@ -27,6 +27,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 import com.google.common.io.Files;
 import com.google.common.primitives.Ints;
@@ -158,11 +160,37 @@ public class DbStorage implements
     id = new StorageSystemId(STORAGE_SYSTEM_TYPE, version);
   }
 
+  // TODO(wfarner): Remove this code once schema has been updated in all clusters.
+  @VisibleForTesting
+  boolean isOldUpdateStoreSchema() {
+    return !jdbcTemplate.queryForList(
+        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'UPDATE_STORE'"
+            + " AND COLUMN_NAME = 'JOB_KEY'", String.class).isEmpty();
+  }
+
+  @VisibleForTesting
+  void maybeUpgradeUpdateStoreSchema() {
+    if (isOldUpdateStoreSchema()) {
+      LOG.warning("Old update_store schema found, DROPPING.");
+      jdbcTemplate.execute("DROP TABLE IF EXISTS update_store");
+      jdbcTemplate.execute("DROP INDEX IF EXISTS update_store_job_key_shard_id_idx");
+    }
+  }
+
+  @VisibleForTesting
+  void createSchema() {
+    executeSql(new ClassPathResource("db-task-store-schema.sql", getClass()), false);
+    LOG.info("Initialized schema.");
+  }
+
   public synchronized void ensureInitialized() {
     if (!initialized) {
-      executeSql(new ClassPathResource("db-task-store-schema.sql", getClass()), false);
-      LOG.info("Initialized schema.");
+      maybeUpgradeUpdateStoreSchema();
+
+      createSchema();
       initialized = true;
+
+      Preconditions.checkState(!isOldUpdateStoreSchema(), "Update store is using old schema!");
     }
   }
 
@@ -580,27 +608,29 @@ public class DbStorage implements
 
   @Timed("db_storage_add_job_update")
   @Override
-  public void saveShardUpdateConfigs(final String jobKey, final String updateToken,
+  public void saveShardUpdateConfigs(final String role, final String job, final String updateToken,
       final Set<TaskUpdateConfiguration> updateConfiguration) {
-    checkNotNull(jobKey);
+    checkNotNull(role);
+    checkNotNull(job);
     checkNotNull(updateToken);
     checkNotNull(updateConfiguration);
 
     if (!updateConfiguration.isEmpty()) {
       transactionTemplate.execute(new TransactionCallbackWithoutResult() {
         @Override protected void doInTransactionWithoutResult(TransactionStatus status) {
-          saveUpdateConfig(jobKey, updateToken, updateConfiguration);
+          saveUpdateConfig(role, job, updateToken, updateConfiguration);
         }
       });
     }
   }
 
-  private void saveUpdateConfig(final String jobKey, final String updateToken,
+  private void saveUpdateConfig(final String role, final String job, final String updateToken,
       final Set<TaskUpdateConfiguration> updateConfiguration) {
     final Iterator<TaskUpdateConfiguration> configIterator = updateConfiguration.iterator();
     try {
-      jdbcTemplate.batchUpdate("MERGE INTO update_store (job_key, update_token, shard_id, config)"
-          + " KEY(job_key, shard_id) VALUES(?, ?, ?, ?)",
+      jdbcTemplate.batchUpdate(
+          "MERGE INTO update_store (job_role, job_name, update_token, shard_id, config)"
+              + " KEY(job_role, job_name, shard_id) VALUES(?, ?, ?, ?, ?)",
           new BatchPreparedStatementSetter() {
             @Override public void setValues(PreparedStatement preparedStatement, int batchItemIndex)
                 throws SQLException {
@@ -610,10 +640,11 @@ public class DbStorage implements
               int shardId = config.getNewConfig() != null ? config.getNewConfig().getShardId() :
                   config.getOldConfig().getShardId();
 
-              setString(preparedStatement, 1, jobKey);
-              setString(preparedStatement, 2, updateToken);
-              setInt(preparedStatement, 3, shardId);
-              setBytes(preparedStatement, 4, config);
+              setString(preparedStatement, 1, role);
+              setString(preparedStatement, 2, job);
+              setString(preparedStatement, 3, updateToken);
+              setInt(preparedStatement, 4, shardId);
+              setBytes(preparedStatement, 5, config);
             }
 
             @Override public int getBatchSize() {
@@ -627,34 +658,37 @@ public class DbStorage implements
 
   @Override
   @Nullable
-  public ShardUpdateConfiguration fetchShardUpdateConfig(String jobKey, int shardId) {
-    checkNotBlank(jobKey);
+  public ShardUpdateConfiguration fetchShardUpdateConfig(String role, String job, int shardId) {
+    checkNotBlank(role);
+    checkNotBlank(job);
     checkNotNull(shardId);
 
     return Iterables.getOnlyElement(
-        fetchShardUpdateConfigs(jobKey, ImmutableSet.of(shardId)), null);
+        fetchShardUpdateConfigs(role, job, ImmutableSet.of(shardId)), null);
   }
 
   @Timed("db_storage_fetch_shard_update_configs_by_shard")
   @Override
   @Nullable
-  public Set<ShardUpdateConfiguration> fetchShardUpdateConfigs(final String jobKey,
+  public Set<ShardUpdateConfiguration> fetchShardUpdateConfigs(final String role, final String job,
       final Set<Integer> shardIds) {
-    checkNotBlank(jobKey);
+    checkNotBlank(role);
+    checkNotBlank(job);
 
     return transactionTemplate.execute(new TransactionCallback<Set<ShardUpdateConfiguration>>() {
       @Override public Set<ShardUpdateConfiguration> doInTransaction(
           TransactionStatus transactionStatus) {
-        return queryShardUpdateConfigs(jobKey, shardIds);
+        return queryShardUpdateConfigs(role, job, shardIds);
       }
     });
   }
 
   @Nullable
-  private Set<ShardUpdateConfiguration> queryShardUpdateConfigs(String jobKey,
+  private Set<ShardUpdateConfiguration> queryShardUpdateConfigs(String role, String job,
       Set<Integer> shardIds) {
     WhereClauseBuilder whereClauseBuilder = new WhereClauseBuilder()
-        .equals("job_key", Types.VARCHAR, jobKey)
+        .equals("job_role", Types.VARCHAR, role)
+        .equals("job_name", Types.VARCHAR, job)
         .in("shard_id", Types.INTEGER, shardIds);
 
     StringBuilder sqlBuilder = new StringBuilder("SELECT update_token, config FROM update_store");
@@ -680,32 +714,67 @@ public class DbStorage implements
 
   @Timed("db_storage_fetch_shard_update_configs_by_job")
   @Override
-  public Set<ShardUpdateConfiguration> fetchShardUpdateConfigs(final String jobKey) {
-    checkNotBlank(jobKey);
+  public Set<ShardUpdateConfiguration> fetchShardUpdateConfigs(final String role,
+      final String job) {
+    checkNotBlank(role);
+    checkNotBlank(job);
 
     return transactionTemplate.execute(new TransactionCallback<Set<ShardUpdateConfiguration>>() {
       @Override public Set<ShardUpdateConfiguration> doInTransaction(
           TransactionStatus transactionStatus) {
-        return queryShardUpdateConfigs(jobKey);
+        return queryShardUpdateConfigs(role, job);
       }
     });
   }
 
+  private static final Function<ShardUpdateConfiguration, String> GET_JOB_NAME =
+      new Function<ShardUpdateConfiguration, String>() {
+        @Override public String apply(ShardUpdateConfiguration input) {
+          return input.getOldConfig() != null ? input.getOldConfig().getJobName()
+              : input.getNewConfig().getJobName();
+        }
+      };
+
+  @Timed("dbOstorage_fetch_shard_update_configs_by_role")
+  @Override
+  public Multimap<String, ShardUpdateConfiguration> fetchShardUpdateConfigs(final String role) {
+    checkNotBlank(role);
+
+    Set<ShardUpdateConfiguration> allConfigs = transactionTemplate.execute(
+        new TransactionCallback<Set<ShardUpdateConfiguration>>() {
+          @Override public Set<ShardUpdateConfiguration> doInTransaction(
+              TransactionStatus transactionStatus) {
+            return queryShardUpdateConfigs(role);
+          }
+        });
+
+    return Multimaps.index(allConfigs, GET_JOB_NAME);
+  }
+
   @Nullable
-  private Set<ShardUpdateConfiguration> queryShardUpdateConfigs(String jobKey) {
+  private Set<ShardUpdateConfiguration> queryShardUpdateConfigs(String role) {
     return ImmutableSet.copyOf(jdbcTemplate.query(
-        "SELECT update_token, config FROM update_store WHERE job_key = ?",
-        SHARD_UPDATE_CONFIG_ROW_MAPPER, jobKey));
+        "SELECT update_token, config FROM update_store WHERE job_role = ?",
+        SHARD_UPDATE_CONFIG_ROW_MAPPER, role));
+  }
+
+  @Nullable
+  private Set<ShardUpdateConfiguration> queryShardUpdateConfigs(String role, String job) {
+    return ImmutableSet.copyOf(jdbcTemplate.query(
+        "SELECT update_token, config FROM update_store WHERE job_role = ? AND job_name = ?",
+        SHARD_UPDATE_CONFIG_ROW_MAPPER, role, job));
   }
 
   @Timed("db_storage_remove_job_update")
   @Override
-  public void removeShardUpdateConfigs(final String jobKey) {
-    checkNotBlank(jobKey);
+  public void removeShardUpdateConfigs(final String role, final String job) {
+    checkNotBlank(role);
+    checkNotBlank(job);
 
     transactionTemplate.execute(new TransactionCallbackWithoutResult() {
       @Override protected void doInTransactionWithoutResult(TransactionStatus transactionStatus) {
-        jdbcTemplate.update("DELETE FROM update_store WHERE job_key = ?", jobKey);
+        jdbcTemplate.update(
+            "DELETE FROM update_store WHERE job_role = ? AND job_name = ?", role, job);
       }
     });
   }

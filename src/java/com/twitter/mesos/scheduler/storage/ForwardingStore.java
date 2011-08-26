@@ -6,6 +6,7 @@ import javax.annotation.Nullable;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Multimap;
 
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.gen.JobConfiguration;
@@ -119,30 +120,35 @@ public class ForwardingStore implements Storage, SchedulerStore, JobStore, TaskS
   }
 
   @Override
-  public void saveShardUpdateConfigs(String jobKey, String updateToken,
+  public void saveShardUpdateConfigs(String role, String job, String updateToken,
       Set<TaskUpdateConfiguration> updateConfiguration) {
-    updateStore.saveShardUpdateConfigs(jobKey, updateToken, updateConfiguration);
+    updateStore.saveShardUpdateConfigs(role, job, updateToken, updateConfiguration);
   }
 
   @Override
   @Nullable
-  public ShardUpdateConfiguration fetchShardUpdateConfig(String jobKey, int shardId) {
-    return updateStore.fetchShardUpdateConfig(jobKey, shardId);
+  public ShardUpdateConfiguration fetchShardUpdateConfig(String role, String job, int shardId) {
+    return updateStore.fetchShardUpdateConfig(role, job, shardId);
   }
 
   @Override
-  public Set<ShardUpdateConfiguration> fetchShardUpdateConfigs(String jobKey,
+  public Set<ShardUpdateConfiguration> fetchShardUpdateConfigs(String role, String job,
       Set<Integer> shardIds) {
-    return updateStore.fetchShardUpdateConfigs(jobKey, shardIds);
+    return updateStore.fetchShardUpdateConfigs(role, job, shardIds);
   }
 
   @Override
-  public Set<ShardUpdateConfiguration> fetchShardUpdateConfigs(String jobKey) {
-    return updateStore.fetchShardUpdateConfigs(jobKey);
+  public Set<ShardUpdateConfiguration> fetchShardUpdateConfigs(String role, String job) {
+    return updateStore.fetchShardUpdateConfigs(role, job);
   }
 
   @Override
-  public void removeShardUpdateConfigs(String jobKey) {
-    updateStore.removeShardUpdateConfigs(jobKey);
+  public Multimap<String, ShardUpdateConfiguration> fetchShardUpdateConfigs(String role) {
+    return updateStore.fetchShardUpdateConfigs(role);
+  }
+
+  @Override
+  public void removeShardUpdateConfigs(String role, String job) {
+    updateStore.removeShardUpdateConfigs(role, job);
   }
 }

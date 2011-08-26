@@ -60,8 +60,7 @@ import com.twitter.mesos.scheduler.httphandlers.Mname;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzHome;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzJob;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzRole;
-import com.twitter.mesos.scheduler.quota.QuotaManager;
-import com.twitter.mesos.scheduler.quota.QuotaManager.QuotaManagerImpl;
+import com.twitter.mesos.scheduler.quota.QuotaModule;
 import com.twitter.mesos.scheduler.storage.db.DbStorageModule;
 import com.twitter.mesos.scheduler.sync.SyncModule;
 
@@ -175,9 +174,6 @@ public class SchedulerModule extends AbstractModule {
       DbStorageModule.bind(binder());
     }
 
-    SyncModule.bind(binder());
-
-    bind(QuotaManager.class).to(QuotaManagerImpl.class);
     bind(SchedulingFilter.class).to(SchedulingFilterImpl.class);
 
     // updaterTaskProvider handled in provider.
@@ -196,6 +192,9 @@ public class SchedulerModule extends AbstractModule {
     Registration.registerServlet(binder(), "/scheduler/job", SchedulerzJob.class, true);
     Registration.registerServlet(binder(), "/mname", Mname.class, false);
     Registration.registerServlet(binder(), "/create_job", CreateJob.class, true);
+
+    QuotaModule.bind(binder());
+    SyncModule.bind(binder());
   }
 
   // TODO(John Sirois): find a better way to bind the update job supplier that does not rely on

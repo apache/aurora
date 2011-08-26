@@ -38,6 +38,7 @@ import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.CronCollisionPolicy;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
@@ -49,6 +50,9 @@ import com.twitter.mesos.scheduler.SchedulerCore.RestartException;
 import com.twitter.mesos.scheduler.SchedulerCore.TwitterTask;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
+import com.twitter.mesos.scheduler.quota.QuotaManager;
+import com.twitter.mesos.scheduler.quota.QuotaManager.QuotaManagerImpl;
+import com.twitter.mesos.scheduler.quota.Quotas;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.Work.NoResult;
 
@@ -93,6 +97,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private static final String JOB_A = "Test_Job_A";
   private static final String JOB_A_KEY = Tasks.jobKey(OWNER_A, JOB_A);
   private static final TwitterTaskInfo DEFAULT_TASK = defaultTask();
+  private static final Quota DEFAULT_TASK_QUOTA = new Quota(1.0, 1024, 1024);
+  private static final int DEFAULT_TASKS_IN_QUOTA = 10;
 
   private static final Identity OWNER_B = new Identity("Test_Role_B", "Test_User_B");
   private static final String JOB_B = "Test_Job_B";
@@ -113,6 +119,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private CronJobManager cron;
   private PulseMonitor<ExecutorKey> executorPulseMonitor;
   private Function<TwitterTaskInfo, TwitterTaskInfo> executorResourceAugmenter;
+  private QuotaManager quotaManager;
   private FakeClock clock;
 
   @Before
@@ -138,24 +145,70 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     buildScheduler(createStorage());
   }
 
+  private static Quota scale(Quota quota, int factor) {
+    return new Quota()
+        .setNumCpus(quota.getNumCpus() * factor)
+        .setRamMb(quota.getRamMb() * factor)
+        .setDiskMb(quota.getDiskMb() * factor);
+  }
+
   private void buildScheduler(Storage storage) throws Exception {
     ImmediateJobManager immediateManager = new ImmediateJobManager();
     cron = new CronJobManager(storage);
     StateManager stateManager = new StateManager(storage, clock);
+    quotaManager = new QuotaManagerImpl(storage);
     scheduler = new SchedulerCoreImpl(cron, immediateManager, stateManager, schedulingFilter,
-        executorPulseMonitor, executorResourceAugmenter);
+        executorPulseMonitor, executorResourceAugmenter, quotaManager);
     cron.schedulerCore = scheduler;
     immediateManager.schedulerCore = scheduler;
     scheduler.initialize();
     scheduler.start(killTask);
+
+    // Apply a default quota for users so we don't have to give quota for every test.
+    quotaManager.setQuota(OWNER_A.getRole(),
+        scale(DEFAULT_TASK_QUOTA, DEFAULT_TASKS_IN_QUOTA));
+    quotaManager.setQuota(OWNER_B.getRole(),
+        scale(DEFAULT_TASK_QUOTA, DEFAULT_TASKS_IN_QUOTA));
+  }
+
+  @Test(expected = ScheduleException.class)
+  public void testCreateJobNoQuota() throws Exception {
+    control.replay();
+    buildScheduler();
+
+    quotaManager.setQuota(OWNER_A.getRole(), Quotas.NO_QUOTA);
+
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1);
+    scheduler.createJob(job);
+  }
+
+  @Test
+  public void testCreateNonproductionJobNoQuota() throws Exception {
+    control.replay();
+    buildScheduler();
+
+    TwitterTaskInfo task = DEFAULT_TASK.deepCopy();
+    task.putToConfiguration("production", "false");
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, task, 1000));
+    assertThat(getTasks(Query.byRole(OWNER_A.getRole())).size(), is(1000));
+  }
+
+  @Test(expected = ScheduleException.class)
+  public void testCreateJobExceedsQuota() throws Exception {
+    control.replay();
+    buildScheduler();
+
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, DEFAULT_TASKS_IN_QUOTA + 1);
+    scheduler.createJob(job);
   }
 
   @Test
   public void testCreateJob() throws Exception {
+    int numTasks = 10;
+
     control.replay();
     buildScheduler();
 
-    int numTasks = 10;
     JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, numTasks);
     scheduler.createJob(job);
     assertTaskCount(numTasks);
@@ -184,7 +237,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     Storage storage = createStorage();
 
     storage.start(new NoResult.Quiet() {
-      @Override protected void execute(Storage.StoreProvider storeProvider) {}
+      @Override
+      protected void execute(Storage.StoreProvider storeProvider) {
+      }
     });
 
     final TwitterTaskInfo storedTask = new TwitterTaskInfo()
@@ -417,6 +472,19 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     buildScheduler();
 
     scheduler.createJob(new JobConfiguration().setOwner(OWNER_A).setName(JOB_A));
+  }
+
+  @Test(expected = TaskDescriptionException.class)
+  public void testRejectsMixedProductionMode() throws Exception {
+    control.replay();
+    buildScheduler();
+
+    TwitterTaskInfo nonProduction = DEFAULT_TASK.deepCopy();
+    nonProduction.putToConfiguration("production", "false");
+    TwitterTaskInfo production = DEFAULT_TASK.deepCopy();
+    production.putToConfiguration("production", "true");
+    scheduler.createJob(makeJob(OWNER_A, JOB_A,
+        ImmutableList.of(nonProduction, production)));
   }
 
   @Test(expected = TaskDescriptionException.class)
@@ -892,14 +960,14 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 10));
-    assertTaskCount(10);
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 5));
+    assertTaskCount(5);
 
-    scheduler.createJob(makeJob(OWNER_A, JOB_A + "2", DEFAULT_TASK, 10));
-    assertTaskCount(20);
+    scheduler.createJob(makeJob(OWNER_A, JOB_A + "2", DEFAULT_TASK, 5));
+    assertTaskCount(10);
 
     scheduler.killTasks(queryJob(OWNER_A, JOB_A + "2"));
-    assertTaskCount(10);
+    assertTaskCount(5);
 
     for (TaskState state : scheduler.getTasks(Query.GET_ALL)) {
       assertThat(state.task.getAssignedTask().getTask().getJobName(), is(JOB_A));
@@ -1164,11 +1232,12 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     TwitterTaskInfo task1 = new TwitterTaskInfo(DEFAULT_TASK);
     task1.putToConfiguration("priority", "10");
+    task1.putToConfiguration("production", "false");
     TwitterTaskInfo task2 = new TwitterTaskInfo(DEFAULT_TASK);
     task2.putToConfiguration("priority", "0");
-    task2.putToConfiguration("production", "true");
     TwitterTaskInfo task3 = new TwitterTaskInfo(DEFAULT_TASK);
     task3.putToConfiguration("priority", "11");
+    task3.putToConfiguration("production", "false");
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, task1, 2));
     scheduler.createJob(makeJob(OWNER_B, JOB_A, task2, 2));
@@ -1465,8 +1534,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testIncreaseShardsUpdate() throws Exception {
-    int numTasks = 10;
-    int additionalTasks = 10;
+    int numTasks = 5;
+    int additionalTasks = 5;
     // Kill Tasks called at RUNNING->UPDATING.
     expectKillTask(numTasks);
 
@@ -1541,8 +1610,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testIncreaseShardsRollback() throws Exception {
-    int numTasks = 10;
-    int additionalTasks = 10;
+    int numTasks = 5;
+    int additionalTasks = 5;
     // Kill Tasks called at RUNNING->UPDATING.
     expectKillTask(numTasks);
 
@@ -1576,6 +1645,28 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         });
       }
     }.runTest(numTasks, additionalTasks);
+  }
+
+  @Test(expected = ScheduleException.class)
+  public void testIncreaseShardsExceedsQuota() throws Exception {
+    int numTasks = 10;
+    int additionalTasks = 1;
+
+    control.replay();
+    buildScheduler();
+
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, numTasks);
+    for (TwitterTaskInfo config : job.getTaskConfigs()) {
+      config.putToConfiguration("start_command", oldCommandFactory.apply(config.getShardId()));
+    }
+    scheduler.createJob(job);
+
+    JobConfiguration updatedJob =
+        makeJob(OWNER_A, JOB_A, DEFAULT_TASK, numTasks + additionalTasks);
+    for (TwitterTaskInfo config : updatedJob.getTaskConfigs()) {
+      config.putToConfiguration("start_command", newCommandFactory.apply(config.getShardId()));
+    }
+    scheduler.startUpdate(updatedJob);
   }
 
   @Test
@@ -1667,6 +1758,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .put("cpus", "1.0")
         .put("ram_mb", "1024")
         .put("hdfs_path", "/fake/path")
+        .put("production", "true")
         .build());
   }
 

@@ -34,6 +34,7 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
@@ -43,7 +44,10 @@ import com.twitter.mesos.gen.comm.StateUpdateResponse;
 import com.twitter.mesos.gen.comm.TaskStateUpdate;
 import com.twitter.mesos.scheduler.StateManager.StateChanger;
 import com.twitter.mesos.scheduler.StateManager.StateMutation;
+import com.twitter.mesos.scheduler.StateManager.UpdateException;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
+import com.twitter.mesos.scheduler.quota.QuotaManager;
+import com.twitter.mesos.scheduler.quota.Quotas;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -89,6 +93,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
   private final PulseMonitor<ExecutorKey> executorPulseMonitor;
   private final Function<TwitterTaskInfo, TwitterTaskInfo> executorResourceAugmenter;
+  private final QuotaManager quotaManager;
 
   enum State {
     CONSTRUCTED,
@@ -105,7 +110,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
       StateManager stateManager,
       SchedulingFilter schedulingFilter,
       PulseMonitor<ExecutorKey> executorPulseMonitor,
-      Function<TwitterTaskInfo, TwitterTaskInfo> executorResourceAugmenter) {
+      Function<TwitterTaskInfo, TwitterTaskInfo> executorResourceAugmenter,
+      QuotaManager quotaManager) {
 
     // The immediate scheduler will accept any job, so it's important that other schedulers are
     // placed first.
@@ -116,6 +122,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     this.schedulingFilter = checkNotNull(schedulingFilter);
     this.executorPulseMonitor = checkNotNull(executorPulseMonitor);
     this.executorResourceAugmenter = checkNotNull(executorResourceAugmenter);
+    this.quotaManager = checkNotNull(quotaManager);
 
    // TODO(John Sirois): Add a method to StateMachine or write a wrapper that allows for a
    // read-locked do-in-state assertion around a block of work.  Transition would then need to grab
@@ -261,6 +268,10 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
     if (hasActiveJob(populated)) {
       throw new ScheduleException("Job already exists: " + jobKey(populated));
+    }
+
+    if (!quotaManager.hasRemaining(job.getOwner().getRole(), Quotas.fromJob(populated))) {
+      throw new ScheduleException("Insufficient resource quota.");
     }
 
     boolean accepted = false;
@@ -474,6 +485,17 @@ public class SchedulerCoreImpl implements SchedulerCore {
     }
 
     if (!matchingScheduler) {
+      if (query.specifiesJobOnly()) {
+        try {
+          stateManager.finishUpdate(
+              query.base().getOwner().getRole(), query.base().getJobName(), null,
+              UpdateResult.TERMINATE);
+        } catch (UpdateException e) {
+          LOG.log(Level.WARNING,
+              "Exception while killing job update associated with " + query.getJobKey(), e);
+        }
+      }
+
       stateManager.changeState(query, KILLING, "Manually killed by client.");
     }
   }
@@ -522,8 +544,22 @@ public class SchedulerCoreImpl implements SchedulerCore {
     checkStarted();
 
     JobConfiguration populated = ConfigurationManager.validateAndPopulate(job);
+
+    Set<ScheduledTask> existingTasks =
+        stateManager.fetchTasks(Query.activeQuery(Tasks.jobKey(job)));
+    if (!existingTasks.isEmpty()) {
+      Quota currentJobQuota =
+          Quotas.fromTasks(Iterables.transform(existingTasks, Tasks.SCHEDULED_TO_INFO));
+      Quota newJobQuota = Quotas.fromJob(populated);
+      Quota additionalQuota = Quotas.subtract(newJobQuota, currentJobQuota);
+      if (!quotaManager.hasRemaining(job.getOwner().getRole(), additionalQuota)) {
+        throw new ScheduleException("Insufficient resource quota.");
+      }
+    }
+
     try {
-      return stateManager.registerUpdate(Tasks.jobKey(job), populated.getTaskConfigs());
+      return stateManager.registerUpdate(job.getOwner().getRole(), job.getName(),
+          populated.getTaskConfigs());
     } catch (StateManager.UpdateException e) {
       LOG.log(Level.INFO, "Failed to start update.", e);
       throw new ScheduleException(e);
@@ -544,7 +580,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
         ImmutableSet.copyOf(Iterables.transform(tasks, SCHEDULED_TO_SHARD_ID)));
 
     if (!newShardIds.isEmpty()) {
-      Set<TwitterTaskInfo> newTasks = stateManager.fetchUpdatedTaskConfigs(jobKey, newShardIds);
+      Set<TwitterTaskInfo> newTasks =
+          stateManager.fetchUpdatedTaskConfigs(role, jobName, newShardIds);
       Set<Integer> unrecognizedShards = Sets.difference(newShardIds,
           ImmutableSet.copyOf(Iterables.transform(newTasks, Tasks.INFO_TO_SHARD_ID)));
       if (!unrecognizedShards.isEmpty()) {
@@ -574,9 +611,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
       UpdateResult result) throws ScheduleException {
     checkStarted();
 
-    String jobKey = Tasks.jobKey(role, jobName);
     try {
-      stateManager.finishUpdate(jobKey, updateToken, result);
+      stateManager.finishUpdate(role, jobName, updateToken, result);
     } catch (StateManager.UpdateException e) {
       LOG.log(Level.INFO, "Failed to finish update.", e);
       throw new ScheduleException(e);

@@ -16,6 +16,8 @@ import com.google.inject.Inject;
 
 import org.antlr.stringtemplate.StringTemplate;
 
+import it.sauronsoftware.cron4j.Predictor;
+
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.mesos.gen.JobConfiguration;
@@ -24,8 +26,7 @@ import com.twitter.mesos.scheduler.CronJobManager;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerCore;
 import com.twitter.mesos.scheduler.TaskState;
-
-import it.sauronsoftware.cron4j.Predictor;
+import com.twitter.mesos.scheduler.quota.QuotaManager;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
@@ -42,16 +43,19 @@ public class SchedulerzRole extends StringTemplateServlet {
   private final SchedulerCore scheduler;
   private final CronJobManager cronScheduler;
   private final String clusterName;
+  private final QuotaManager quotaManager;
 
   @Inject
   public SchedulerzRole(@CacheTemplates boolean cacheTemplates,
       SchedulerCore scheduler,
       CronJobManager cronScheduler,
-      @ClusterName String clusterName) {
+      @ClusterName String clusterName,
+      QuotaManager quotaManager) {
     super("schedulerzrole", cacheTemplates);
     this.scheduler = checkNotNull(scheduler);
     this.cronScheduler = checkNotNull(cronScheduler);
     this.clusterName = checkNotBlank(clusterName);
+    this.quotaManager = checkNotNull(quotaManager);
   }
 
   @Override
@@ -131,6 +135,8 @@ public class SchedulerzRole extends StringTemplateServlet {
             });
 
         template.setAttribute("cronJobs", Lists.newArrayList(cronJobObjs));
+        template.setAttribute("resourcesUsed", quotaManager.getConsumption(role));
+        template.setAttribute("resourceQuota", quotaManager.getQuota(role));
       }
     });
   }

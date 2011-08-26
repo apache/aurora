@@ -258,12 +258,13 @@ public class LogStorage extends ForwardingStore {
 
       case SAVE_JOB_UPDATE:
         SaveJobUpdate jobUpdate = op.getSaveJobUpdate();
-        saveShardUpdateConfigs(jobUpdate.getJobKey(), jobUpdate.getUpdateToken(),
+        saveShardUpdateConfigs(jobUpdate.getRole(), jobUpdate.getJob(), jobUpdate.getUpdateToken(),
             jobUpdate.getDelta());
         break;
 
       case REMOVE_JOB_UPDATE:
-        removeShardUpdateConfigs(op.getRemoveJobUpdate().getJobKey());
+        RemoveJobUpdate removeJob = op.getRemoveJobUpdate();
+        removeShardUpdateConfigs(removeJob.getRole(), removeJob.getJob());
         break;
 
       case REMOVE_JOB:
@@ -441,22 +442,22 @@ public class LogStorage extends ForwardingStore {
   }
 
   @Override
-  public void saveShardUpdateConfigs(final String jobKey, final String updateToken,
+  public void saveShardUpdateConfigs(final String role, final String job, final String updateToken,
       final Set<TaskUpdateConfiguration> delta) {
     doInTransaction(new Work.NoResult.Quiet() {
       @Override protected void execute(StoreProvider storeProvider) {
-        log(Op.saveJobUpdate(new SaveJobUpdate(jobKey, updateToken, delta)));
-        LogStorage.super.saveShardUpdateConfigs(jobKey, updateToken, delta);
+        log(Op.saveJobUpdate(new SaveJobUpdate(role, job, updateToken, delta)));
+        LogStorage.super.saveShardUpdateConfigs(role, job, updateToken, delta);
       }
     });
   }
 
   @Override
-  public void removeShardUpdateConfigs(final String jobKey) {
+  public void removeShardUpdateConfigs(final String role, final String job) {
     doInTransaction(new Work.NoResult.Quiet() {
       @Override protected void execute(StoreProvider storeProvider) {
-        log(Op.removeJobUpdate(new RemoveJobUpdate(jobKey)));
-        LogStorage.super.removeShardUpdateConfigs(jobKey);
+        log(Op.removeJobUpdate(new RemoveJobUpdate(role, job)));
+        LogStorage.super.removeShardUpdateConfigs(role, job);
       }
     });
   }

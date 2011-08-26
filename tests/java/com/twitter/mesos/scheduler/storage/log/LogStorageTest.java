@@ -420,7 +420,8 @@ public class LogStorageTest extends EasyMockTest {
   @Test
   public void testSaveShardUpdateConfigs() throws Exception {
     new MutationFixture() {
-      private String jobKey = "job/key";
+      private String role = "role";
+      private String job = "job";
       private String updateToken = "update-ok";
       private ImmutableSet<TaskUpdateConfiguration> updateConfiguration =
           ImmutableSet.of(
@@ -428,13 +429,13 @@ public class LogStorageTest extends EasyMockTest {
 
       @Override protected void setupExpectations() throws Exception {
         expectStorageTransactionNoResult();
-        updateStore.saveShardUpdateConfigs(jobKey, updateToken, updateConfiguration);
+        updateStore.saveShardUpdateConfigs(role, job, updateToken, updateConfiguration);
         expectStreamTransaction(
-            Op.saveJobUpdate(new SaveJobUpdate(jobKey, updateToken, updateConfiguration)));
+            Op.saveJobUpdate(new SaveJobUpdate(role, job, updateToken, updateConfiguration)));
       }
 
       @Override protected void performMutations() {
-        logStorage.saveShardUpdateConfigs(jobKey, updateToken, updateConfiguration);
+        logStorage.saveShardUpdateConfigs(role, job, updateToken, updateConfiguration);
       }
     }.runTest();
   }
@@ -442,16 +443,17 @@ public class LogStorageTest extends EasyMockTest {
   @Test
   public void testRemoveShardUpdateConfigs() throws Exception {
     new MutationFixture() {
-      private String jobKey = "job/key";
+      private String role = "role";
+      private String job = "job";
 
       @Override protected void setupExpectations() throws Exception {
         expectStorageTransactionNoResult();
-        updateStore.removeShardUpdateConfigs(jobKey);
-        expectStreamTransaction(Op.removeJobUpdate(new RemoveJobUpdate(jobKey)));
+        updateStore.removeShardUpdateConfigs(role, job);
+        expectStreamTransaction(Op.removeJobUpdate(new RemoveJobUpdate(role, job)));
       }
 
       @Override protected void performMutations() {
-        logStorage.removeShardUpdateConfigs(jobKey);
+        logStorage.removeShardUpdateConfigs(role, job);
       }
     }.runTest();
   }

@@ -5,7 +5,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import javax.annotation.Nullable;
+
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Splitter;
@@ -19,6 +22,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.SlaveOffer;
 
+import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.TwitterTaskInfo;
@@ -95,9 +99,17 @@ public class ConfigurationManager {
     Preconditions.checkState(modifiedConfigs.size() == configsCopy.size(),
         "Task count changed after populating fields.");
 
+    // Ensure that all production flags are equal.
+    int numProductionTasks =
+        Iterables.size(Iterables.filter(modifiedConfigs, Tasks.IS_PRODUCTION));
+    if ((numProductionTasks != 0) && (numProductionTasks != modifiedConfigs.size())) {
+      throw new TaskDescriptionException("Tasks within a job must use the same production flag.");
+    }
+
     // The configs were mutated, so we need to refresh the Set.
     copy.setTaskConfigs(modifiedConfigs);
 
+    // Check for contiguous shard IDs.
     for (int i = 0; i < copy.getTaskConfigsSize(); i++) {
       if (!shardIds.contains(i)) {
         throw new TaskDescriptionException("Shard ID " + i + " is missing.");

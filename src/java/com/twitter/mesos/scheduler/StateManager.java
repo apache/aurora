@@ -4,7 +4,6 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Logger;
 
@@ -153,8 +152,8 @@ class StateManager {
 
   @Inject
   StateManager(@StorageRole(Role.Primary) Storage storage, Clock clock) {
-    this.clock = checkNotNull(clock);
     this.storage = checkNotNull(storage);
+    this.clock = checkNotNull(clock);
 
     Stats.export(new StatImpl<Integer>("work_queue_depth") {
       @Override public Integer read() {
@@ -290,19 +289,22 @@ class StateManager {
   /**
    * Registers a new update.
    *
-   * @param jobKey Key of the job update to update.
+   * @param role Role to register an update for.
+   * @param job Job to register an update for.
    * @param updatedTasks Updated Task information to be registered.
    * @throws UpdateException If no active tasks are found for the job, or if an update for the job
    *     is already in progress.
    * @return A unique string identifying the update.
    */
-  String registerUpdate(final String jobKey, final Set<TwitterTaskInfo> updatedTasks)
+  String registerUpdate(final String role, final String job, final Set<TwitterTaskInfo> updatedTasks)
       throws UpdateException {
-    checkNotBlank(jobKey);
+    checkNotBlank(role);
+    checkNotBlank(job);
     checkNotBlank(updatedTasks);
 
     return storage.doInTransaction(new Work<String, UpdateException>() {
       @Override public String apply(Storage.StoreProvider storeProvider) throws UpdateException {
+        String jobKey = Tasks.jobKey(role, job);
         TaskStore taskStore = storeProvider.getTaskStore();
         Set<TwitterTaskInfo> existingTasks =
             ImmutableSet.copyOf(Iterables.transform(taskStore.fetchTasks(Query.activeQuery(jobKey)),
@@ -313,7 +315,7 @@ class StateManager {
         }
 
         UpdateStore updateStore = storeProvider.getUpdateStore();
-        if (updateStore.fetchShardUpdateConfig(jobKey, 0) != null) {
+        if (updateStore.fetchShardUpdateConfig(role, job, 0) != null) {
           throw new UpdateException("Update already in progress for " + jobKey);
         }
 
@@ -329,7 +331,7 @@ class StateManager {
         }
 
         String updateToken = UUID.randomUUID().toString();
-        updateStore.saveShardUpdateConfigs(jobKey, updateToken, shardConfigBuilder.build());
+        updateStore.saveShardUpdateConfigs(role, job, updateToken, shardConfigBuilder.build());
         return updateToken;
       }
     });
@@ -338,25 +340,29 @@ class StateManager {
   /**
    * Terminates an in-progress update.
    *
-   * @param jobKey Key of the job update to terminate.
+   * @param role Role owning the update to finish.
+   * @param job Job to finish updating.
    * @param updateToken Token associated with the update.  If non-null, the token must match the
    *     the stored token for the update.
    * @param result The result of the update.
    * @throws UpdateException If an update is not in-progress for the job, or the non-null token
    *     does not match the stored token.
    */
-  void finishUpdate(final String jobKey, @Nullable final String updateToken,
+  void finishUpdate(final String role, final String job, @Nullable final String updateToken,
       final UpdateResult result) throws UpdateException{
-    checkNotBlank(jobKey);
+    checkNotBlank(role);
+    checkNotBlank(job);
 
     storage.doInTransaction(new NoResult<UpdateException>() {
       @Override protected void execute(Storage.StoreProvider storeProvider) throws UpdateException {
         UpdateStore updateStore = storeProvider.getUpdateStore();
 
+        String jobKey = Tasks.jobKey(role, job);
+
         // Since we store all shards in a job with the same token, we can just check shard 0,
         // which is always guaranteed to exist for a job.
         UpdateStore.ShardUpdateConfiguration updateConfig =
-            updateStore.fetchShardUpdateConfig(jobKey, 0);
+            updateStore.fetchShardUpdateConfig(role, job, 0);
         if (updateConfig == null) {
           throw new UpdateException("Update does not exist for " + jobKey);
         }
@@ -366,12 +372,12 @@ class StateManager {
         }
 
         if (result == UpdateResult.SUCCESS) {
-          for (Integer shard : fetchShardsToKill(jobKey, updateStore)) {
+          for (Integer shard : fetchShardsToKill(role, job, updateStore)) {
             changeState(Query.liveShard(jobKey, shard), KILLING, "Removed during update.");
           }
         }
 
-        updateStore.removeShardUpdateConfigs(jobKey);
+        updateStore.removeShardUpdateConfigs(role, job);
       }
     });
   }
@@ -390,9 +396,9 @@ class StateManager {
       }
     };
 
-  private Set<Integer> fetchShardsToKill(String jobKey, UpdateStore updateStore) {
+  private Set<Integer> fetchShardsToKill(String role, String job, UpdateStore updateStore) {
     return ImmutableSet.copyOf(Iterables.transform(Iterables.filter(
-        updateStore.fetchShardUpdateConfigs(jobKey), SELECT_SHARDS_TO_KILL),
+        updateStore.fetchShardUpdateConfigs(role, job), SELECT_SHARDS_TO_KILL),
         GET_ORIGINAL_SHARD_ID));
   }
 
@@ -567,32 +573,28 @@ class StateManager {
     });
   }
 
-  private static final Function<ShardUpdateConfiguration, TwitterTaskInfo> GET_NEW_CONFIG =
-      new Function<ShardUpdateConfiguration, TwitterTaskInfo>() {
-        @Override public TwitterTaskInfo apply(ShardUpdateConfiguration updateConfig) {
-          return updateConfig.getNewConfig();
-        }
-      };
-
   /**
    * Fetches the updated configuration of a shard.
    *
-   * @param jobKey Key of the job to fetch.
+   * @param role Job owner.
+   * @param job Job to fetch updated configs for.
    * @param shards Shards within a job to fetch.
    * @return The task information of the shard.
    */
-  Set<TwitterTaskInfo> fetchUpdatedTaskConfigs(final String jobKey, final Set<Integer> shards) {
-    checkNotNull(jobKey);
+  Set<TwitterTaskInfo> fetchUpdatedTaskConfigs(final String role, final String job,
+      final Set<Integer> shards) {
+    checkNotNull(role);
+    checkNotNull(job);
     checkNotBlank(shards);
 
     Set<ShardUpdateConfiguration> configs =
         storage.doInTransaction(new Work.Quiet<Set<ShardUpdateConfiguration>>() {
       @Override public Set<ShardUpdateConfiguration> apply(Storage.StoreProvider storeProvider) {
-        return storeProvider.getUpdateStore().fetchShardUpdateConfigs(jobKey, shards);
+        return storeProvider.getUpdateStore().fetchShardUpdateConfigs(role, job, shards);
       }
     });
 
-    return ImmutableSet.copyOf(Iterables.transform(configs, GET_NEW_CONFIG));
+    return ImmutableSet.copyOf(Iterables.transform(configs, Shards.GET_NEW_CONFIG));
   }
 
   private <T, E extends Exception> void transactionalWork(final Work<T, E> work) throws E {
@@ -653,12 +655,12 @@ class StateManager {
   }
 
   // Supplier that checks if there is an active update for a job.
-  private Supplier<Boolean> taskUpdateChecker(final String jobKey) {
+  private Supplier<Boolean> taskUpdateChecker(final String role, final String job) {
     return new Supplier<Boolean>() {
       @Override public Boolean get() {
         return storage.doInTransaction(new Work.Quiet<Boolean>() {
           @Override public Boolean apply(Storage.StoreProvider storeProvider) {
-            return storeProvider.getUpdateStore().fetchShardUpdateConfig(jobKey, 0) != null;
+            return storeProvider.getUpdateStore().fetchShardUpdateConfig(role, job, 0) != null;
           }
         });
       }
@@ -763,7 +765,8 @@ class StateManager {
         Iterables.getOnlyElement(taskStore.fetchTasks(Query.byId(taskId))));
 
     UpdateStore.ShardUpdateConfiguration updateConfig = storeProvider.getUpdateStore()
-        .fetchShardUpdateConfig(Tasks.jobKey(oldConfig), oldConfig.getShardId());
+        .fetchShardUpdateConfig(oldConfig.getOwner().getRole(), oldConfig.getJobName(),
+            oldConfig.getShardId());
 
     // TODO(Sathya): Figure out a way to handle race condition when finish update is called
     //     before ROLLBACK
@@ -813,19 +816,20 @@ class StateManager {
   private TaskStateMachine createStateMachine(ScheduledTask task,
       @Nullable ScheduleStatus initialState) {
     String taskId = Tasks.id(task);
-    String jobKey = Tasks.jobKey(task);
+    String role = task.getAssignedTask().getTask().getOwner().getRole();
+    String job = task.getAssignedTask().getTask().getJobName();
     TaskStateMachine stateMachine =
         initialState == null
             ? new TaskStateMachine(
                 taskId,
                 taskSupplier(taskId),
-                taskUpdateChecker(jobKey),
+                taskUpdateChecker(role, job),
                 workSink,
                 MISSING_TASK_GRACE_PERIOD.get())
             : new TaskStateMachine(
                 taskId,
                 taskSupplier(taskId),
-                taskUpdateChecker(jobKey),
+                taskUpdateChecker(role, job),
                 workSink,
                 MISSING_TASK_GRACE_PERIOD.get(),
                 initialState);
@@ -833,6 +837,7 @@ class StateManager {
     // TODO(wfarner): Providing counters this way consumes a ton of CPU (scanning tens of thousands
     //     of objects per second).  Reintroduce if/when needed.
     // exportCounters(jobKey, taskId);
+    // exportCounters(Tasks.jobKey(task), taskId);
     taskStateMachines.put(taskId, stateMachine);
     return stateMachine;
   }
