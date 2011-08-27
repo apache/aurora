@@ -2,12 +2,9 @@ package com.twitter.mesos.scheduler.quota;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
-import com.google.inject.Key;
 
 import com.twitter.mesos.scheduler.quota.QuotaManager.QuotaManagerImpl;
 import com.twitter.mesos.scheduler.storage.Storage;
-import com.twitter.mesos.scheduler.storage.StorageRole.Role;
-import com.twitter.mesos.scheduler.storage.StorageRoles;
 
 /**
  * @author William Farner
@@ -25,7 +22,7 @@ public class QuotaModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    requireBinding(Key.get(Storage.class, StorageRoles.forRole(Role.Primary)));
+    requireBinding(Storage.class);
 
     bind(QuotaManager.class).to(QuotaManagerImpl.class);
   }

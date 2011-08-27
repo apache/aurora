@@ -21,8 +21,6 @@ import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
-import com.twitter.mesos.scheduler.storage.StorageRole;
-import com.twitter.mesos.scheduler.storage.StorageRole.Role;
 
 import it.sauronsoftware.cron4j.InvalidPatternException;
 import it.sauronsoftware.cron4j.Scheduler;
@@ -55,7 +53,7 @@ public class CronJobManager extends JobManager {
   private final Storage storage;
 
   @Inject
-  public CronJobManager(@StorageRole(Role.Primary) Storage storage) {
+  public CronJobManager(Storage storage) {
     this.storage = Preconditions.checkNotNull(storage);
 
     scheduler.setDaemon(true);

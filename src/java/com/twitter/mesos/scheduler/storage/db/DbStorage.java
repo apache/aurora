@@ -73,13 +73,10 @@ import com.twitter.mesos.gen.storage.ConfiguratonKey;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 import com.twitter.mesos.gen.storage.migration.StorageMigrationResult;
 import com.twitter.mesos.gen.storage.migration.StorageMigrationResults;
-import com.twitter.mesos.gen.storage.migration.StorageMigrationStatus;
-import com.twitter.mesos.gen.storage.migration.StorageSystemId;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.db.DbUtil;
 import com.twitter.mesos.scheduler.storage.CheckpointStore;
 import com.twitter.mesos.scheduler.storage.JobStore;
-import com.twitter.mesos.scheduler.storage.MigrationUtils;
 import com.twitter.mesos.scheduler.storage.QuotaStore;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
 import com.twitter.mesos.scheduler.storage.Storage;
@@ -109,21 +106,8 @@ public class DbStorage implements
   private static final long SLOW_QUERY_THRESHOLD_NS =
       Amount.of(100L, Time.MILLISECONDS).as(Time.NANOSECONDS);
 
-  /**
-   * The {@link com.twitter.mesos.gen.storage.migration.StorageSystemId#getType() type} identifier
-   * for {@code DbStorage}.
-   */
-  public static final String STORAGE_SYSTEM_TYPE = "EMBEDDED_H2_DB";
-
-  /**
-   * The version of this {@code DbStorage}.  Should be bumped when any combination of database
-   * implementation change and/or schema change requires a data migration.
-   */
-  static final int CURRENT_VERSION = 1;
-
   @VisibleForTesting final JdbcTemplate jdbcTemplate;
   private final TransactionTemplate transactionTemplate;
-  private final StorageSystemId id;
   private final Temporary temporary = FileUtils.SYSTEM_TMP;
   private boolean initialized;
 
@@ -150,14 +134,11 @@ public class DbStorage implements
    * @param jdbcTemplate The {@code JdbcTemplate} object to execute database operation against.
    * @param transactionTemplate The {@code TransactionTemplate} object that provides transaction
    *     scope for database operations.
-   * @param version Storage version number, used to manage migrations.
    */
   @Inject
-  public DbStorage(JdbcTemplate jdbcTemplate, TransactionTemplate transactionTemplate,
-      @Version int version) {
+  public DbStorage(JdbcTemplate jdbcTemplate, TransactionTemplate transactionTemplate) {
     this.jdbcTemplate = checkNotNull(jdbcTemplate);
     this.transactionTemplate = checkNotNull(transactionTemplate);
-    id = new StorageSystemId(STORAGE_SYSTEM_TYPE, version);
   }
 
   // TODO(wfarner): Remove this code once schema has been updated in all clusters.
@@ -203,11 +184,6 @@ public class DbStorage implements
   }
 
   @Override
-  public StorageSystemId id() {
-    return id;
-  }
-
-  @Override
   public void start(final Work.NoResult.Quiet initilizationLogic) {
     checkNotNull(initilizationLogic);
 
@@ -238,28 +214,6 @@ public class DbStorage implements
         });
   }
 
-  /**
-   * Determines if this storage system has completed migration from the specified storage system
-   * already.
-   *
-   * @param from The storage system to migrate from.
-   * @return {@code true} if this storage system has already migrated its data from {@code from}
-   */
-  @Timed("db_storage_has_migrated")
-  public boolean hasMigrated(Storage from) {
-    checkNotNull(from);
-
-    StorageMigrationResults fetched =
-        fetchSchedulerState(ConfiguratonKey.MIGRATION_RESULTS, new StorageMigrationResults());
-
-    if (!fetched.isSetResult()) {
-      return false;
-    }
-
-    StorageMigrationResult result = fetched.result.get(MigrationUtils.migrationPath(from, this));
-    return (result != null) && (result.status == StorageMigrationStatus.SUCCESS);
-  }
-
   @Override
   public <T, E extends Exception> T doInTransaction(final Work<T, E> work) throws E {
     checkNotNull(work);
@@ -272,8 +226,7 @@ public class DbStorage implements
               return work.apply(storeProvider);
             } catch (Exception e) {
               // We know work throws E by its signature
-              @SuppressWarnings("unchecked")
-              E exception = (E) e;
+              @SuppressWarnings("unchecked") E exception = (E) e;
               LOG.log(Level.WARNING, "work failed in transaction", e);
               throw transporter.transport(exception);
             }
@@ -359,12 +312,11 @@ public class DbStorage implements
   @Timed("db_storage_record_checkpoint")
   @Override
   public void checkpoint(final byte[] handle) {
-    updateSchedulerState(ConfiguratonKey.LAST_COMMITTED_LOG_POSITION,
-        new ExceptionalClosure<TProtocol, TException>() {
-          @Override public void execute(TProtocol stream) throws TException {
-            stream.writeBinary(ByteBuffer.wrap(handle));
-          }
-        });
+    updateSchedulerState(ConfiguratonKey.LAST_COMMITTED_LOG_POSITION, new ExceptionalClosure<TProtocol, TException>() {
+      @Override public void execute(TProtocol stream) throws TException {
+        stream.writeBinary(ByteBuffer.wrap(handle));
+      }
+    });
   }
 
   @Timed("db_storage_fetch_checkpoint")
@@ -406,8 +358,8 @@ public class DbStorage implements
         } catch (TException e) {
           throw new IllegalStateException("Failed to serialize thrift data", e);
         }
-        jdbcTemplate.update("MERGE INTO scheduler_state (key, value) KEY(key) VALUES(?, ?)",
-            key.getValue(), data.toByteArray());
+        jdbcTemplate.update("MERGE INTO scheduler_state (key, value) KEY(key) VALUES(?, ?)", key
+            .getValue(), data.toByteArray());
       }
     });
   }
@@ -753,9 +705,8 @@ public class DbStorage implements
 
   @Nullable
   private Set<ShardUpdateConfiguration> queryShardUpdateConfigs(String role) {
-    return ImmutableSet.copyOf(jdbcTemplate.query(
-        "SELECT update_token, config FROM update_store WHERE job_role = ?",
-        SHARD_UPDATE_CONFIG_ROW_MAPPER, role));
+    return ImmutableSet.copyOf(jdbcTemplate
+        .query("SELECT update_token, config FROM update_store WHERE job_role = ?", SHARD_UPDATE_CONFIG_ROW_MAPPER, role));
   }
 
   @Nullable

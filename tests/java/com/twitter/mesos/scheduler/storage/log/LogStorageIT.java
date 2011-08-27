@@ -69,7 +69,7 @@ public class LogStorageIT extends TearDownTestCase {
   @Before
   public void setUp() throws SQLException {
     DbAccess dbAccess = DbTestUtil.setupStorage(this);
-    dbStorage = new DbStorage(dbAccess.jdbcTemplate, dbAccess.transactionTemplate, 0);
+    dbStorage = new DbStorage(dbAccess.jdbcTemplate, dbAccess.transactionTemplate);
     log = new DbLogStream(dbAccess.transactionTemplate, dbAccess.jdbcTemplate);
 
     shutdownRegistry = new TearDownRegistry(this);

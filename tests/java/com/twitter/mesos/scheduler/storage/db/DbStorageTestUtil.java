@@ -25,7 +25,7 @@ public final class DbStorageTestUtil {
    */
   public static DbStorage setupStorage(TearDownAccepter tearDownAccepter) throws SQLException {
     DbAccess dbAccess = DbTestUtil.setupStorage(tearDownAccepter);
-    return new DbStorage(dbAccess.jdbcTemplate, dbAccess.transactionTemplate, -1 /* version */);
+    return new DbStorage(dbAccess.jdbcTemplate, dbAccess.transactionTemplate);
   }
 
   private DbStorageTestUtil() {

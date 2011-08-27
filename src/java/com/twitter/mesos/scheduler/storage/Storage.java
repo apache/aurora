@@ -1,7 +1,5 @@
 package com.twitter.mesos.scheduler.storage;
 
-import com.twitter.mesos.gen.storage.migration.StorageSystemId;
-
 /**
  * Manages scheduler storage operations providing an interface to perform atomic changes.
  *
@@ -75,15 +73,6 @@ public interface Storage {
       }
     }
   }
-
-  /**
-   * Returns an identifier for the storage implementation.  The version should be changed to
-   * indicate that either storage semantics or format have changed in such a way that migration
-   * between storage formats is required.
-   *
-   * @return the id number of this {@code Storage} implementation
-   */
-  StorageSystemId id();
 
   /**
    * Prepares the underlying storage for serving traffic.

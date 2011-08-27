@@ -41,6 +41,7 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.thrift.ThriftFactory.ThriftFactoryException;
+import com.twitter.common.thrift.ThriftServer;
 import com.twitter.common.util.Clock;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
@@ -50,6 +51,7 @@ import com.twitter.common.zookeeper.testing.ZooKeeperTestServer;
 import com.twitter.common_internal.cuckoo.CuckooWriter;
 import com.twitter.common_internal.zookeeper.TwitterZk;
 import com.twitter.mesos.ExecutorKey;
+import com.twitter.mesos.gen.MesosSchedulerManager;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.PulseMonitor.PulseMonitorImpl;
 import com.twitter.mesos.scheduler.SchedulingFilter.SchedulingFilterImpl;
@@ -72,10 +74,6 @@ public class SchedulerModule extends AbstractModule {
   @CmdLine(name = "mesos_scheduler_ns",
       help ="The name service name for the mesos scheduler thrift server.")
   private static final Arg<String> mesosSchedulerNameSpec = Arg.create();
-
-  @CmdLine(name = "scheduler_upgrade_schema",
-      help ="True to upgrade storage and/or thrift structs from a legacy version.")
-  private static final Arg<Boolean> upgradeSchema = Arg.create(false);
 
   @CmdLine(name = "machine_restrictions",
       help ="Map of machine hosts to job keys."
@@ -166,13 +164,11 @@ public class SchedulerModule extends AbstractModule {
     bind(new TypeLiteral<Supplier<Set<ExecutorKey>>>() {})
         .to(new TypeLiteral<PulseMonitor<ExecutorKey>>() {});
 
-    if (upgradeSchema.get()) {
-      ThriftModule.bindWithSchemaMigrator(binder());
-      DbStorageModule.bindWithSchemaMigrator(binder());
-    } else {
-      ThriftModule.bind(binder());
-      DbStorageModule.bind(binder());
-    }
+    // Bindings for thrift interfaces.
+    bind(MesosSchedulerManager.Iface.class).to(SchedulerThriftInterface.class).in(Singleton.class);
+    bind(ThriftServer.class).to(SchedulerThriftServer.class).in(Singleton.class);
+
+    DbStorageModule.bind(binder());
 
     bind(SchedulingFilter.class).to(SchedulingFilterImpl.class);
 

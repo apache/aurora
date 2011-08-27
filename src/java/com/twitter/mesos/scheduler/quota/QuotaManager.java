@@ -18,8 +18,6 @@ import com.twitter.mesos.scheduler.Shards;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
-import com.twitter.mesos.scheduler.storage.StorageRole;
-import com.twitter.mesos.scheduler.storage.StorageRole.Role;
 import com.twitter.mesos.scheduler.storage.UpdateStore.ShardUpdateConfiguration;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -74,7 +72,7 @@ public interface QuotaManager {
     private final Storage storage;
 
     @Inject
-    public QuotaManagerImpl(@StorageRole(Role.Primary) Storage storage) {
+    public QuotaManagerImpl(Storage storage) {
       this.storage = checkNotNull(storage);
     }
 

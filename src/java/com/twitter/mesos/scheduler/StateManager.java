@@ -47,8 +47,6 @@ import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
 import com.twitter.mesos.scheduler.storage.Storage.Work.NoResult;
-import com.twitter.mesos.scheduler.storage.StorageRole;
-import com.twitter.mesos.scheduler.storage.StorageRole.Role;
 import com.twitter.mesos.scheduler.storage.TaskStore;
 import com.twitter.mesos.scheduler.storage.UpdateStore;
 
@@ -151,7 +149,7 @@ class StateManager {
   private final Clock clock;
 
   @Inject
-  StateManager(@StorageRole(Role.Primary) Storage storage, Clock clock) {
+  StateManager(Storage storage, Clock clock) {
     this.storage = checkNotNull(storage);
     this.clock = checkNotNull(clock);
 

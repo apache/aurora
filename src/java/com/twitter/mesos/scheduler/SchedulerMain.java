@@ -46,7 +46,6 @@ import com.twitter.common.base.Command;
 import com.twitter.common.net.InetSocketAddressHelper;
 import com.twitter.common.thrift.ThriftServer;
 import com.twitter.common.thrift.ThriftServer.ServerSetup;
-import com.twitter.common.thrift.Util;
 import com.twitter.common.zookeeper.Group;
 import com.twitter.common.zookeeper.ServerSet.EndpointStatus;
 import com.twitter.common.zookeeper.ServerSet.UpdateException;
@@ -54,8 +53,6 @@ import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.SingletonService.LeadershipListener;
 import com.twitter.common_internal.webassets.Blueprint;
 import com.twitter.mesos.gen.MesosSchedulerManager;
-import com.twitter.mesos.gen.storage.migration.StorageMigrationResult;
-import com.twitter.mesos.scheduler.storage.Migrator;
 import com.twitter.thrift.Status;
 
 /**
@@ -122,13 +119,6 @@ public class SchedulerMain extends AbstractApplication {
     }
   };
 
-  @Nullable private Migrator migrator;
-
-  @Inject(optional = true)
-  public void setMigrator(@Nullable Migrator migrator) {
-    this.migrator = migrator;
-  }
-
   @Override
   public Iterable<? extends Module> getModules() {
     return Arrays.asList(
@@ -143,25 +133,6 @@ public class SchedulerMain extends AbstractApplication {
 
   @Override
   public void run() {
-    if (migrator != null) {
-      LOG.info("Attempting storage migration for: "
-               + Util.prettyPrint(migrator.getMigrationPath()));
-      StorageMigrationResult result = migrator.migrate();
-      switch(result.getStatus()) {
-        case NO_MIGRATION_NEEDED:
-          LOG.info("Skipping migration, already performed: " + result);
-          break;
-
-        case SUCCESS:
-          LOG.info("Successfully migrated storage: " + result);
-          break;
-
-        default:
-          LOG.log(Level.SEVERE, "Failed to migrate storage: " + result);
-          return;
-      }
-    }
-
     int port = -1;
     try {
       port = startThriftServer();

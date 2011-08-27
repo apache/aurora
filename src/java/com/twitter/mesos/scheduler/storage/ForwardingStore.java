@@ -12,7 +12,6 @@ import com.twitter.common.base.Closure;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
-import com.twitter.mesos.gen.storage.migration.StorageSystemId;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.storage.Storage.Work.NoResult.Quiet;
 
@@ -36,11 +35,6 @@ public class ForwardingStore implements Storage, SchedulerStore, JobStore, TaskS
     this.jobStore = Preconditions.checkNotNull(jobStore);
     this.taskStore = Preconditions.checkNotNull(taskStore);
     this.updateStore = Preconditions.checkNotNull(updateStore);
-  }
-
-  @Override
-  public StorageSystemId id() {
-    return storage.id();
   }
 
   @Override
