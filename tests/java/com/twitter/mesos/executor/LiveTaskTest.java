@@ -333,6 +333,17 @@ public class LiveTaskTest {
   }
 
   @Test
+  public void testGetTaskId() throws Exception {
+    control.replay();
+
+    taskObj.getTask().setStartCommand("echo '%task_id%'");
+    LiveTask taskA = makeTask(taskObj, TASK_ID_A);
+
+    String commandLine = taskA.expandCommandLine().getFirst();
+    assertThat(commandLine, is("echo '" + TASK_ID_A + "'"));
+  }
+
+  @Test
   public void testLeasePortsDuplicateName() throws Exception {
     expect(socketManager.leaseSocket()).andReturn(HTTP_PORT);
 
@@ -350,7 +361,7 @@ public class LiveTaskTest {
     assertThat(expanded.getSecond(), is(expectedPorts));
   }
 
-  @Test(expected = SocketManager.SocketLeaseException.class)
+  @Test(expected = Task.TaskRunException.class)
   public void testLeasePortsNoneAvailable() throws Exception {
     expect(socketManager.leaseSocket()).andReturn(HTTP_PORT);
     expect(socketManager.leaseSocket()).andReturn(10);

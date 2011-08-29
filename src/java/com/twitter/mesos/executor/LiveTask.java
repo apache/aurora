@@ -35,6 +35,7 @@ import org.apache.commons.lang.StringUtils;
 
 import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
+import com.twitter.common.base.ExceptionalFunctions;
 import com.twitter.common.collections.Pair;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -80,6 +81,7 @@ public class LiveTask extends TaskOnDisk {
 
   private static final Pattern PORT_REQUEST_PATTERN = Pattern.compile("%port:(\\w+)%");
   private static final String SHARD_ID_REGEXP = "%shard_id%";
+  private static final String TASK_ID_REGEXP = "%task_id%";
 
   private static final String HEALTH_CHECK_PORT_NAME = "health";
   private static final Amount<Long, Time> LAUNCH_PIDFILE_GRACE_PERIOD = Amount.of(1L, Time.SECONDS);
@@ -202,16 +204,36 @@ public class LiveTask extends TaskOnDisk {
    * @throws TaskRunException If multiple ports with the same name were requested.
    */
   @VisibleForTesting
-  protected Pair<String, Map<String, Integer>> expandCommandLine()
+  Pair<String, Map<String, Integer>> expandCommandLine()
       throws SocketManager.SocketLeaseException, TaskRunException {
     String command = task.getTask().getStartCommand();
 
     LOG.info("Expanding command line " + command);
-    return Pair.of(expandShardId(expandPortRequests(command)), leasedPorts);
+    return Pair.of(commandLineExpander.apply(command), leasedPorts);
   }
 
-  private String expandPortRequests(String commandLine)
-      throws TaskRunException, SocketManager.SocketLeaseException {
+  @SuppressWarnings("unchecked")
+  private final ExceptionalFunction<String, String, TaskRunException> commandLineExpander =
+    ExceptionalFunctions.compose(
+        new ExceptionalFunction<String, String, TaskRunException>() {
+          @Override public String apply(String commandLine) throws TaskRunException {
+            return expandPortRequests(commandLine);
+          }
+        },
+        new ExceptionalFunction<String, String, TaskRunException>() {
+          @Override public String apply(String commandLine) throws TaskRunException {
+            return commandLine.replaceAll(SHARD_ID_REGEXP,
+                String.valueOf(task.getTask().getShardId()));
+          }
+        },
+        new ExceptionalFunction<String, String, TaskRunException>() {
+          @Override public String apply(String commandLine) throws TaskRunException {
+            return commandLine.replaceAll(TASK_ID_REGEXP, String.valueOf(task.getTaskId()));
+          }
+        }
+    );
+
+  private String expandPortRequests(String commandLine) throws TaskRunException {
     Matcher m = PORT_REQUEST_PATTERN.matcher(commandLine);
 
     StringBuffer sb = new StringBuffer();
@@ -221,18 +243,18 @@ public class LiveTask extends TaskOnDisk {
         throw new TaskRunException("Port name may not be empty.");
       }
 
-      int portNumber = leasedPorts.containsKey(portName) ? leasedPorts.get(portName)
-          : socketManager.leaseSocket();
+      try {
+        int portNumber = leasedPorts.containsKey(portName) ? leasedPorts.get(portName)
+            : socketManager.leaseSocket();
 
-      leasedPorts.put(portName, portNumber);
-      m.appendReplacement(sb, String.valueOf(portNumber));
+        leasedPorts.put(portName, portNumber);
+        m.appendReplacement(sb, String.valueOf(portNumber));
+      } catch (SocketManager.SocketLeaseException e) {
+        throw new TaskRunException("Can't lease socket: ", e);
+      }
     }
     m.appendTail(sb);
     return sb.toString();
-  }
-
-  private String expandShardId(String commandLine) {
-    return commandLine.replaceAll(SHARD_ID_REGEXP, String.valueOf(task.getTask().getShardId()));
   }
 
   @Override
@@ -513,6 +535,7 @@ public class LiveTask extends TaskOnDisk {
     }
   }
 
+  @Override
   public String toString() {
     return String.format("%s/%s", Tasks.jobKey(task), task.getTaskId());
   }
