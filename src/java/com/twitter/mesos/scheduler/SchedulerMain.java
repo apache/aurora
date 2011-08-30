@@ -52,7 +52,7 @@ import com.twitter.common.zookeeper.ServerSet.UpdateException;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.SingletonService.LeadershipListener;
 import com.twitter.common_internal.webassets.Blueprint;
-import com.twitter.mesos.gen.MesosSchedulerManager;
+import com.twitter.mesos.gen.MesosAdmin;
 import com.twitter.thrift.Status;
 
 /**
@@ -69,7 +69,7 @@ public class SchedulerMain extends AbstractApplication {
 
   @Inject private SingletonService schedulerService;
   @Inject private ThriftServer schedulerThriftServer;
-  @Inject private MesosSchedulerManager.Iface schedulerThriftInterface;
+  @Inject private MesosAdmin.Iface schedulerThriftInterface;
   @Inject private Provider<SchedulerDriver> driverProvider;
   @Inject private AtomicReference<InetSocketAddress> schedulerThriftPort;
   @Inject private SchedulerCore scheduler;
@@ -221,7 +221,7 @@ public class SchedulerMain extends AbstractApplication {
 
     ServerSetup setup = new ServerSetup(
         0,  // TODO(John Sirois): unused, fix ServerSetup constructors
-        new MesosSchedulerManager.Processor(schedulerThriftInterface),
+        new MesosAdmin.Processor(schedulerThriftInterface),
         ThriftServer.BINARY_PROTOCOL.get());
     setup.setSocket(serverSocket);
     schedulerThriftServer.start(setup);

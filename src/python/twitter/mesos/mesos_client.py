@@ -401,6 +401,38 @@ class MesosCLI(cmd.Cmd):
     log.info('Response from scheduler: %s (message: %s)'
         % (UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
 
+  @requires_arguments('role')
+  def do_get_quota(self, *line):
+    """get_quota role"""
+
+    role = line[0]
+    resp = self._client.getQuota(role)
+    quota = resp.quota
+
+    quota_fields = [
+      ('CPU', quota.numCpus),
+      ('RAM', '%f GB' % (float(quota.ramMb) / 1024)),
+      ('Disk', '%f GB' % (float(quota.diskMb) / 1024))
+    ]
+    log.info('Quota for %s:\n\t%s' %
+             (role, '\n\t'.join(['%s\t%s' % (k, v) for (k, v) in quota_fields])))
+
+  # TODO(wfarner): Revisit this once we have a better way to add named args per sub-cmmand
+  @requires_arguments('role', 'cpu', 'ramMb', 'diskMb')
+  def do_set_quota(self, *line):
+    """set_quota role cpu ramMb diskMb"""
+
+    (role, cpu_str, ram_mb_str, disk_mb_str) = line
+
+    try:
+      cpu = float(cpu_str)
+      ram_mb = int(ram_mb_str)
+      disk_mb = int(disk_mb_str)
+    except ValueError:
+      log.error('Invalid value')
+
+    resp = self._client.setQuota(role, Quota(cpu, ram_mb, disk_mb), self.acquire_session())
+    log.info('Response from scheduler: %s' % resp)
 
 def initialize_options():
   usage = """Mesos command-line interface.

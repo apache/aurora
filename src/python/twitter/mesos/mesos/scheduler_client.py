@@ -25,7 +25,7 @@ import zookeeper
 
 from endpoint.ttypes import *
 from mesos_twitter.ttypes import *
-from mesos_twitter import MesosSchedulerManager
+from mesos_twitter import MesosAdmin
 
 from location import Location
 import clusters
@@ -57,7 +57,7 @@ class SchedulerClient:
       socket = TSocket.TSocket(host, port)
     transport = TTransport.TBufferedTransport(socket)
     protocol = TBinaryProtocol.TBinaryProtocol(transport)
-    schedulerClient = MesosSchedulerManager.Client(protocol)
+    schedulerClient = MesosAdmin.Client(protocol)
     transport.open()
     return schedulerClient
 
