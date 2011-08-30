@@ -51,7 +51,7 @@ import com.twitter.common.zookeeper.testing.ZooKeeperTestServer;
 import com.twitter.common_internal.cuckoo.CuckooWriter;
 import com.twitter.common_internal.zookeeper.TwitterZk;
 import com.twitter.mesos.ExecutorKey;
-import com.twitter.mesos.gen.MesosSchedulerManager;
+import com.twitter.mesos.gen.MesosAdmin;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.PulseMonitor.PulseMonitorImpl;
 import com.twitter.mesos.scheduler.SchedulingFilter.SchedulingFilterImpl;
@@ -165,7 +165,7 @@ public class SchedulerModule extends AbstractModule {
         .to(new TypeLiteral<PulseMonitor<ExecutorKey>>() {});
 
     // Bindings for thrift interfaces.
-    bind(MesosSchedulerManager.Iface.class).to(SchedulerThriftInterface.class).in(Singleton.class);
+    bind(MesosAdmin.Iface.class).to(SchedulerThriftInterface.class).in(Singleton.class);
     bind(ThriftServer.class).to(SchedulerThriftServer.class).in(Singleton.class);
 
     DbStorageModule.bind(binder());
