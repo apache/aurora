@@ -16,6 +16,7 @@ import com.google.inject.Inject;
 import com.twitter.common.base.Closure;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.BuildInfo;
 import com.twitter.mesos.gen.comm.ExecutorStatus;
@@ -53,6 +54,12 @@ public class ExecutorTrackerImpl implements ExecutorTracker {
     }
 
     this.restartQueue = restartQueue;
+
+    Stats.export(new StatImpl<Integer>("executor_restarts_pending") {
+      @Override public Integer read() {
+        return ExecutorTrackerImpl.this.restartQueue.size();
+      }
+    });
   }
 
   @Override

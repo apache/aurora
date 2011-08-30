@@ -132,6 +132,7 @@ public class ExecutorModule extends AbstractModule {
         .toInstance(STATE_SYNC_BUFFER_LIMIT.get());
     bind(new TypeLiteral<Supplier<Map<String, ScheduleStatus>>>() {}).to(ExecutorCore.class);
     bind(SyncBuffer.class).to(SyncBufferImpl.class);
+    bind(SyncBufferImpl.class).in(Singleton.class);
     bind(Driver.class).to(DriverImpl.class);
     bind(DriverImpl.class).in(Singleton.class);
 

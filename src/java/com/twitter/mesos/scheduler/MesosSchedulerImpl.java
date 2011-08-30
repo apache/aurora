@@ -155,8 +155,7 @@ class MesosSchedulerImpl implements Scheduler {
     executorWatchdog.startRequestLoop(EXECUTOR_POLL_INTERVAL.get(),
         new Closure<UpdateRequest>() {
           @Override public void execute(UpdateRequest request) {
-            ExecutorMessage message = new ExecutorMessage();
-            message.setStateUpdateRequest(request.request);
+            ExecutorMessage message = ExecutorMessage.stateUpdateRequest(request.request);
             sendMessage(driver, message, request.executor.slave, request.executor.executor);
           }
         });

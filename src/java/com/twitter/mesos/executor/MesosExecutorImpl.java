@@ -130,8 +130,7 @@ public class MesosExecutorImpl implements Executor {
           StateUpdateResponse response =
               syncBuffer.stateSince(request.getExecutorUUID(), request.getLastKnownPosition());
           response.setSlaveHost(Util.getHostName());
-          SchedulerMessage message = new SchedulerMessage();
-          message.setStateUpdateResponse(response);
+          SchedulerMessage message = SchedulerMessage.stateUpdateResponse(response);
           driver.sendFrameworkMessage(ThriftBinaryCodec.encode(message));
           break;
 

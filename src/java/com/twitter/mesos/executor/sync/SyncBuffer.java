@@ -109,6 +109,8 @@ public interface SyncBuffer {
 
     @Override
     public synchronized StateUpdateResponse stateSince(String bufferId, int position) {
+      LOG.info(String.format("Computing state log for %s since %d", bufferId, position));
+
       // We always notify the reciever of our current ID, and the latest position for the
       // information sent.
       StateUpdateResponse response = new StateUpdateResponse()
