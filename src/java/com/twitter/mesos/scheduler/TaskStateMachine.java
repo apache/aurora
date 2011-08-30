@@ -141,28 +141,44 @@ public class TaskStateMachine {
   }
 
   /**
-   * Creates a new task state machine using the default system clock.
+   * A listener that will be notified of state transitions.
+   *
+   * TODO(wfarner): Work out a better integration for this into the work queue.
+   */
+  public interface TransitionListener {
+    /**
+     * Called after a valid state transition is made.
+     *
+     * @param oldStatus Previous status.
+     * @param newStatus New status.
+     */
+    void transitioned(ScheduleStatus oldStatus, ScheduleStatus newStatus);
+  }
+
+  /**
+   * Creates a new task state machine, using the system clock to get timestamps.
    *
    * @param taskId ID of the task managed by this state machine.
    * @param taskReader Interface to provide read-only access to the task that this state machine
    *     manages.
    * @param isJobUpdating Supplier to test whether the task's job is currently in a rolling update.
-   * @param workSink Work sink to receive transition response actions.
+   * @param workSink Work sink to receive transition response actions
    * @param missingTaskGracePeriod Amount of time to allow a task to be in ASSIGNED state before
    *     considering an {@code UNKNOWN} transition to be a lost task.
+   * @param initialState The state to begin the state machine at.  All legal transitions will be
+   *     added, but this allows the state machine to 'skip' states, for instance when a task is
+   *     loaded from a persistent store.
+   * @param transitionListener Callback to notify of transitions made.
    */
-  public TaskStateMachine(String taskId, Supplier<ScheduledTask> taskReader,
-      Supplier<Boolean> isJobUpdating, WorkSink workSink,
-      Amount<Long, Time> missingTaskGracePeriod) {
+  public TaskStateMachine(String taskId,
+      Supplier<ScheduledTask> taskReader,
+      Supplier<Boolean> isJobUpdating,
+      WorkSink workSink,
+      Amount<Long, Time> missingTaskGracePeriod,
+      ScheduleStatus initialState,
+      TransitionListener transitionListener) {
     this(taskId, taskReader, isJobUpdating, workSink, missingTaskGracePeriod,
-        Clock.SYSTEM_CLOCK, INIT);
-  }
-
-  public TaskStateMachine(String taskId, Supplier<ScheduledTask> taskReader,
-      Supplier<Boolean> isJobUpdating, WorkSink workSink,
-      Amount<Long, Time> missingTaskGracePeriod, ScheduleStatus initialState) {
-    this(taskId, taskReader, isJobUpdating, workSink, missingTaskGracePeriod,
-        Clock.SYSTEM_CLOCK, initialState);
+        Clock.SYSTEM_CLOCK, initialState, transitionListener);
   }
 
   /**
@@ -179,6 +195,7 @@ public class TaskStateMachine {
    * @param initialState The state to begin the state machine at.  All legal transitions will be
    *     added, but this allows the state machine to 'skip' states, for instance when a task is
    *     loaded from a persistent store.
+   * @param transitionListener Callback to notify of transitions made.
    */
   public TaskStateMachine(
       final String taskId,
@@ -187,7 +204,8 @@ public class TaskStateMachine {
       final WorkSink workSink,
       final Amount<Long, Time> missingTaskGracePeriod,
       final Clock clock,
-      final ScheduleStatus initialState) {
+      final ScheduleStatus initialState,
+      final TransitionListener transitionListener) {
 
     this.taskId = MorePreconditions.checkNotBlank(taskId);
     checkNotNull(taskReader);
@@ -281,8 +299,7 @@ public class TaskStateMachine {
             State.array(ASSIGNED, UPDATING, ROLLBACK, KILLING))
         .addState(
             new Closure<Transition<State>>() {
-              @Override
-              public void execute(Transition<State> transition) {
+              @Override public void execute(Transition<State> transition) {
                 switch (transition.getTo().state) {
                   case FINISHED:
                     rescheduleIfDaemon.execute();
@@ -483,8 +500,7 @@ public class TaskStateMachine {
         // must be the last chained transition callback.
         .onAnyTransition(
             new Closure<Transition<State>>() {
-              @Override
-              public void execute(final Transition<State> transition) {
+              @Override public void execute(final Transition<State> transition) {
                 ScheduleStatus from = transition.getFrom().state;
                 ScheduleStatus to = transition.getTo().state;
 
@@ -496,6 +512,10 @@ public class TaskStateMachine {
                 } else if (!transition.isAllowed()) {
                   LOG.log(Level.SEVERE, "Illegal state transition attempted: " + transition);
                   ILLEGAL_TRANSITIONS.incrementAndGet();
+                }
+
+                if (transition.isValidStateChange()) {
+                  transitionListener.transitioned(from, to);
                 }
               }
             }

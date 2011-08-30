@@ -101,7 +101,7 @@ public class ExecutorTrackerImpl implements ExecutorTracker {
     boolean restart = false;
     if (!localBuild.equals(executorBuild)) {
       LOG.info(String.format("Executor %s has build %s, local build is %s...scheduling restart.",
-          status.getSlaveId(), executorBuild, localBuild));
+          status.getHost(), executorBuild, localBuild));
       restart = true;
     }
 

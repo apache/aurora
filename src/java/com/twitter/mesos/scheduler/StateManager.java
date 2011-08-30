@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Logger;
 
@@ -13,16 +14,13 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
-import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.MapMaker;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
@@ -30,6 +28,7 @@ import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.ExceptionalCommand;
+import com.twitter.common.collections.Pair;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.StatImpl;
@@ -43,6 +42,7 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
+import com.twitter.mesos.scheduler.TaskStateMachine.TransitionListener;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
@@ -117,6 +117,12 @@ class StateManager {
       }
     };
 
+  private final TransitionListener noopListener = new TransitionListener() {
+    @Override public void transitioned(ScheduleStatus oldStatus, ScheduleStatus newStatus) {
+      // No-op.
+    }
+  };
+
   private final Map<String, TaskStateMachine> taskStateMachines = new MapMaker().makeComputingMap(
       new Function<String, TaskStateMachine>() {
         @Override public TaskStateMachine apply(String taskId) {
@@ -126,7 +132,9 @@ class StateManager {
               // Since the task doesn't exist, its job cannot be updating.
               Suppliers.ofInstance(false),
               workSink,
-              MISSING_TASK_GRACE_PERIOD.get())
+              MISSING_TASK_GRACE_PERIOD.get(),
+              INIT,
+              noopListener)
               .updateState(UNKNOWN);
         }
       }
@@ -179,7 +187,6 @@ class StateManager {
 
     storage.start(new Work.NoResult.Quiet() {
       @Override protected void execute(Storage.StoreProvider storeProvider) {
-
         storeProvider.getTaskStore().mutateTasks(Query.GET_ALL, new Closure<ScheduledTask>() {
           @Override public void execute(ScheduledTask task) {
             ConfigurationManager.applyDefaultsIfUnset(task.getAssignedTask().getTask());
@@ -188,16 +195,6 @@ class StateManager {
         });
       }
     });
-
-    // Export count of tasks in each state.
-    for (final ScheduleStatus status : ScheduleStatus.values()) {
-      Stats.export(new StatImpl<Integer>("task_store_" + status) {
-        @Override public Integer read() {
-          // TODO(wfarner): Provide this stat without requiring a full scan for every read.
-          return Iterables.size(Iterables.filter(taskStateMachines.values(), hasStatus(status)));
-        }
-      });
-    }
 
     LOG.info("Storage initialization complete.");
     return getFrameworkId();
@@ -789,54 +786,97 @@ class StateManager {
   }
 
   private TaskStateMachine createStateMachine(ScheduledTask task) {
-    return createStateMachine(task, null);
+    return createStateMachine(task, INIT);
   }
 
-  // Maintain a mapping from job key to task ID.  When a job key is first inserted,
-  // a stat per ScheduleStatus for the job is exported.
-  private final Multimap<String, String> jobKeysToTaskIds = HashMultimap.create();
-  private void exportCounters(final String jobKey, String taskId) {
-    if (!jobKeysToTaskIds.containsKey(jobKey)) {
-      // Export count of tasks in each state for the job.
-      for (final ScheduleStatus status : ScheduleStatus.values()) {
-        Stats.export(new StatImpl<Integer>("job_" + jobKey + "_tasks_" + status.name()) {
-          @Override public Integer read() {
-            Map<String, TaskStateMachine> jobStateMachines =
-                Maps.filterKeys(taskStateMachines, Predicates.in(jobKeysToTaskIds.get(jobKey)));
-            return Iterables.size(Iterables.filter(jobStateMachines.values(), hasStatus(status)));
-          }
-        });
-      }
-    }
-    jobKeysToTaskIds.put(jobKey, taskId);
-  }
-
-  private TaskStateMachine createStateMachine(ScheduledTask task,
-      @Nullable ScheduleStatus initialState) {
+  private TaskStateMachine createStateMachine(ScheduledTask task, ScheduleStatus initialState) {
     String taskId = Tasks.id(task);
     String role = task.getAssignedTask().getTask().getOwner().getRole();
     String job = task.getAssignedTask().getTask().getJobName();
-    TaskStateMachine stateMachine =
-        initialState == null
-            ? new TaskStateMachine(
-                taskId,
-                taskSupplier(taskId),
-                taskUpdateChecker(role, job),
-                workSink,
-                MISSING_TASK_GRACE_PERIOD.get())
-            : new TaskStateMachine(
-                taskId,
-                taskSupplier(taskId),
-                taskUpdateChecker(role, job),
-                workSink,
-                MISSING_TASK_GRACE_PERIOD.get(),
-                initialState);
 
-    // TODO(wfarner): Providing counters this way consumes a ton of CPU (scanning tens of thousands
-    //     of objects per second).  Reintroduce if/when needed.
-    // exportCounters(jobKey, taskId);
-    // exportCounters(Tasks.jobKey(task), taskId);
+    String jobKey = Tasks.jobKey(task);
+    vars.incrementCount(jobKey, initialState);
+    TaskStateMachine stateMachine = new TaskStateMachine(
+        taskId,
+        taskSupplier(taskId),
+        taskUpdateChecker(role, job),
+        workSink,
+        MISSING_TASK_GRACE_PERIOD.get(),
+        initialState,
+        transitionListeners.get(jobKey));
+
     taskStateMachines.put(taskId, stateMachine);
     return stateMachine;
   }
+
+  private Map<String, TransitionListener> transitionListeners = new MapMaker().makeComputingMap(
+      new Function<String, TransitionListener>() {
+        @Override public TransitionListener apply(final String jobKey) {
+          return new TransitionListener() {
+            @Override public void transitioned(ScheduleStatus from, ScheduleStatus to) {
+              vars.adjustCount(jobKey, from, to);
+            }
+          };
+        }
+      }
+  );
+
+  private final class Vars {
+    private final Map<Pair<String, ScheduleStatus>, AtomicLong> countersByJobKeyAndStatus =
+        new MapMaker().makeComputingMap(
+            new Function<Pair<String, ScheduleStatus>, AtomicLong>() {
+              @Override public AtomicLong apply(Pair<String, ScheduleStatus> jobAndStatus) {
+                String jobKey = jobAndStatus.getFirst();
+                ScheduleStatus status = jobAndStatus.getSecond();
+                return Stats.exportLong("job_" + jobKey + "_tasks_" + status.name());
+              }
+            }
+        );
+
+    private final Map<ScheduleStatus, AtomicLong> countersByStatus =
+        new MapMaker().makeComputingMap(
+            new Function<ScheduleStatus, AtomicLong>() {
+              @Override public AtomicLong apply(ScheduleStatus status) {
+                return Stats.exportLong("task_store_" + status);
+              }
+            }
+        );
+
+    Vars() {
+      // Initialize by-status counters.
+      for (ScheduleStatus status : ScheduleStatus.values()) {
+        countersByStatus.get(status);
+      }
+
+      Stats.export(new StatImpl<Integer>("num_task_state_machines") {
+        @Override public Integer read() {
+          return taskStateMachines.size();
+        }
+      });
+    }
+
+    private boolean isAccounted(ScheduleStatus status) {
+      return (status != INIT) && (status != UNKNOWN);
+    }
+
+    void incrementCount(String jobKey, ScheduleStatus status) {
+      if (isAccounted(status)) {
+        countersByStatus.get(status).incrementAndGet();
+        countersByJobKeyAndStatus.get(Pair.of(jobKey, status)).incrementAndGet();
+      }
+    }
+
+    private void decrementCount(String jobKey, ScheduleStatus status) {
+      if (isAccounted(status)) {
+        countersByStatus.get(status).decrementAndGet();
+        countersByJobKeyAndStatus.get(Pair.of(jobKey, status)).decrementAndGet();
+      }
+    }
+
+    void adjustCount(String jobKey, ScheduleStatus oldStatus, ScheduleStatus newStatus) {
+      decrementCount(jobKey, oldStatus);
+      incrementCount(jobKey, newStatus);
+    }
+  }
+  private final Vars vars = new Vars();
 }

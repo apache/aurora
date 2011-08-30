@@ -1,6 +1,5 @@
 package com.twitter.mesos.scheduler;
 
-import java.util.EnumSet;
 import java.util.Set;
 
 import com.google.common.base.Supplier;
@@ -21,8 +20,8 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.TaskStateMachine.TransitionListener;
 import com.twitter.mesos.scheduler.TaskStateMachine.WorkSink;
-
 
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
@@ -62,6 +61,7 @@ public class TaskStateMachineTest extends EasyMockTest {
 
   private Supplier<ScheduledTask> taskReader;
   private Supplier<Boolean> isJobUpdating;
+  private TransitionListener transitionListener;
   private WorkSink workSink;
   private FakeClock clock;
 
@@ -69,6 +69,7 @@ public class TaskStateMachineTest extends EasyMockTest {
   public void setUp() {
     taskReader = createMock(new Clazz<Supplier<ScheduledTask>>() {});
     isJobUpdating = createMock(new Clazz<Supplier<Boolean>>() {});
+    transitionListener = createMock(TransitionListener.class);
     workSink = createMock(WorkSink.class);
     clock = new FakeClock();
     stateMachine = makeStateMachine("test");
@@ -76,38 +77,31 @@ public class TaskStateMachineTest extends EasyMockTest {
 
   private TaskStateMachine makeStateMachine(String taskId) {
     return new TaskStateMachine(taskId, taskReader, isJobUpdating, workSink, MISSING_GRACE_PERIOD,
-        clock, INIT);
+        clock, INIT, transitionListener);
   }
 
   @Test
   public void testSimpleTransition() {
+    expectTransitionCallbacks(INIT, PENDING, ASSIGNED, STARTING, RUNNING, FINISHED, UNKNOWN);
     expectWork(UPDATE_STATE).times(5);
     expect(taskReader.get()).andReturn(makeTask(false));
     expectWork(DELETE);
 
     control.replay();
 
-    stateMachine.updateState(PENDING)
-        .updateState(ASSIGNED)
-        .updateState(STARTING)
-        .updateState(RUNNING)
-        .updateState(FINISHED)
-        .updateState(UNKNOWN);
+    transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, FINISHED, UNKNOWN);
   }
 
   @Test
   public void testDaemonRescheduled() {
+    expectTransitionCallbacks(INIT, PENDING, ASSIGNED, STARTING, RUNNING, FINISHED);
     expectWork(UPDATE_STATE).times(5);
     expect(taskReader.get()).andReturn(makeTask(true));
     expectWork(RESCHEDULE);
 
     control.replay();
 
-    stateMachine.updateState(PENDING)
-        .updateState(ASSIGNED)
-        .updateState(STARTING)
-        .updateState(RUNNING)
-        .updateState(FINISHED);
+    transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, FINISHED);
   }
 
   @Test
@@ -115,43 +109,44 @@ public class TaskStateMachineTest extends EasyMockTest {
     Set<ScheduleStatus> terminalStates = Tasks.TERMINAL_STATES;
 
     for (ScheduleStatus endState : terminalStates) {
+      expectTransitionCallbacks(INIT, PENDING, ASSIGNED, STARTING, RUNNING);
       expectWork(UPDATE_STATE).times(5);
 
       switch (endState) {
         case FAILED:
           expectWork(INCREMENT_FAILURES);
           expect(taskReader.get()).andReturn(makeTask(false));
+          expectTransitionCallbacks(RUNNING, endState);
           break;
 
         case FINISHED:
           expect(taskReader.get()).andReturn(makeTask(false));
+          expectTransitionCallbacks(RUNNING, endState);
           break;
 
         case KILLED:
         case LOST:
           expectWork(RESCHEDULE);
+          expectTransitionCallbacks(RUNNING, endState);
           break;
 
         case KILLING:
           expectWork(KILL);
+          expectTransitionCallbacks(RUNNING, endState);
       }
 
       control.replay();
 
-      stateMachine.updateState(PENDING)
-          .updateState(ASSIGNED)
-          .updateState(STARTING)
-          .updateState(RUNNING)
-          .updateState(endState);
+      transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, endState);
 
       for (ScheduleStatus badTransition : terminalStates) {
-        stateMachine.updateState(badTransition);
+        transition(stateMachine, badTransition);
       }
 
       control.verify();
       control.reset();
       stateMachine = new TaskStateMachine("test", taskReader, isJobUpdating, workSink,
-          MISSING_GRACE_PERIOD, clock, INIT);
+          MISSING_GRACE_PERIOD, clock, INIT, transitionListener);
     }
 
     control.replay();  // Needed so the teardown verify doesn't break.
@@ -159,57 +154,44 @@ public class TaskStateMachineTest extends EasyMockTest {
 
   @Test
   public void testUnknownTask() {
+    expectTransitionCallbacks(INIT, UNKNOWN);
     expectWork(KILL);
 
     control.replay();
 
-    stateMachine.updateState(UNKNOWN)
-        .updateState(RUNNING);
+    transition(stateMachine, UNKNOWN, RUNNING);
   }
 
   @Test
   public void testLostTask() {
+    expectTransitionCallbacks(INIT, PENDING, ASSIGNED, STARTING, RUNNING, LOST);
     expectWork(UPDATE_STATE).times(5);
     expectWork(RESCHEDULE);
 
     control.replay();
 
-    stateMachine.updateState(PENDING)
-        .updateState(ASSIGNED)
-        .updateState(STARTING)
-        .updateState(RUNNING)
-        .updateState(LOST);
+    transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, LOST);
   }
 
   @Test
   public void testKilledPending() {
+    expectTransitionCallbacks(INIT, PENDING, KILLING);
     expectWork(UPDATE_STATE);
     expectWork(DELETE);
 
     control.replay();
 
-    stateMachine.updateState(PENDING)
-        .updateState(KILLING);
-  }
-
-  @Test
-  public void testReschedulesMissing() {
-    expectWork(UPDATE_STATE).times(3);
-
-    control.replay();
-
-    stateMachine.updateState(PENDING)
-        .updateState(ASSIGNED)
-        .updateState(STARTING);
+    transition(stateMachine, PENDING, KILLING);
   }
 
   @Test
   public void testMissingAssignedRescheduledAfterGracePeriod() {
-    ScheduledTask task = makeTask(false);
-    task.addToTaskEvents(new TaskEvent(clock.nowMillis(), ScheduleStatus.PENDING, null));
-
+    expectTransitionCallbacks(INIT, PENDING, ASSIGNED, LOST);
     expectWork(UPDATE_STATE).times(3);
     expectWork(RESCHEDULE);
+
+    ScheduledTask task = makeTask(false);
+    task.addToTaskEvents(new TaskEvent(clock.nowMillis(), ScheduleStatus.PENDING, null));
 
     clock.waitFor(10);
     task.addToTaskEvents(new TaskEvent(clock.nowMillis(), ScheduleStatus.ASSIGNED, null));
@@ -217,19 +199,22 @@ public class TaskStateMachineTest extends EasyMockTest {
 
     control.replay();
 
-    stateMachine.updateState(PENDING)
-        .updateState(ASSIGNED)
-        .updateState(UNKNOWN);
+    transition(stateMachine, PENDING, ASSIGNED, UNKNOWN);
     clock.waitFor(MISSING_GRACE_PERIOD.as(Time.MILLISECONDS) - 1);
-    stateMachine.updateState(UNKNOWN);
+    transition(stateMachine, UNKNOWN);
     assertThat(stateMachine.getState(), is(ScheduleStatus.ASSIGNED));
     clock.waitFor(2);
-    stateMachine.updateState(UNKNOWN);
+    transition(stateMachine, UNKNOWN);
     assertThat(stateMachine.getState(), is(ScheduleStatus.LOST));
   }
 
   @Test
   public void testMissingStartingRescheduledImmediately() {
+    transitionListener.transitioned(INIT, PENDING);
+    transitionListener.transitioned(PENDING, ASSIGNED);
+    transitionListener.transitioned(ASSIGNED, STARTING);
+    transitionListener.transitioned(STARTING, LOST);
+
     ScheduledTask task = makeTask(false);
     task.addToTaskEvents(new TaskEvent(clock.nowMillis(), ScheduleStatus.PENDING, null));
     expectWork(UPDATE_STATE).times(4);
@@ -237,72 +222,63 @@ public class TaskStateMachineTest extends EasyMockTest {
 
     control.replay();
 
-    stateMachine.updateState(PENDING)
-        .updateState(ASSIGNED)
-        .updateState(STARTING);
-    stateMachine.updateState(UNKNOWN);
+    transition(stateMachine, PENDING, ASSIGNED, STARTING, UNKNOWN);
     assertThat(stateMachine.getState(), is(ScheduleStatus.LOST));
   }
 
   @Test
   public void testMissingRunningRescheduledImmediately() {
-    ScheduledTask task = makeTask(false);
-    task.addToTaskEvents(new TaskEvent(clock.nowMillis(), ScheduleStatus.PENDING, null));
+    expectTransitionCallbacks(INIT, PENDING, ASSIGNED, STARTING, RUNNING, LOST);
     expectWork(UPDATE_STATE).times(5);
     expectWork(RESCHEDULE);
 
+    ScheduledTask task = makeTask(false);
+    task.addToTaskEvents(new TaskEvent(clock.nowMillis(), ScheduleStatus.PENDING, null));
+
     control.replay();
 
-    stateMachine.updateState(PENDING)
-        .updateState(ASSIGNED)
-        .updateState(STARTING)
-        .updateState(RUNNING);
-    stateMachine.updateState(UNKNOWN);
+    transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, UNKNOWN);
     assertThat(stateMachine.getState(), is(ScheduleStatus.LOST));
   }
 
   @Test
   public void testRogueRestartedTask() {
+    expectTransitionCallbacks(INIT, PENDING, ASSIGNED, STARTING, RUNNING, RESTARTING);
     expectWork(UPDATE_STATE).times(5);
     expectWork(KILL).times(2);
 
     control.replay();
 
-    stateMachine.updateState(PENDING)
-        .updateState(ASSIGNED)
-        .updateState(STARTING)
-        .updateState(RUNNING)
-        .updateState(RESTARTING)
-        .updateState(RUNNING);
+    transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, RESTARTING, RUNNING);
   }
 
   @Test
   public void testAllowsSkipStartingAndRunning() {
+    expectTransitionCallbacks(INIT, PENDING, ASSIGNED, FINISHED);
     expectWork(UPDATE_STATE).times(3);
     expect(taskReader.get()).andReturn(makeTask(false));
 
     control.replay();
 
-    stateMachine.updateState(PENDING)
-        .updateState(ASSIGNED)
-        .updateState(FINISHED);
+    transition(stateMachine, PENDING, ASSIGNED, FINISHED);
   }
 
   @Test
   public void testAllowsSkipRunning() {
+    expectTransitionCallbacks(INIT, PENDING, ASSIGNED, STARTING, FINISHED);
     expectWork(UPDATE_STATE).times(4);
     expect(taskReader.get()).andReturn(makeTask(false));
 
     control.replay();
 
-    stateMachine.updateState(PENDING)
-        .updateState(ASSIGNED)
-        .updateState(STARTING)
-        .updateState(FINISHED);
+    transition(stateMachine, PENDING, ASSIGNED, STARTING, FINISHED);
   }
 
   @Test
   public void testHonorsMaxFailures() {
+    expectTransitionCallbacks(INIT, PENDING, ASSIGNED, STARTING, RUNNING, FAILED);
+    expectTransitionCallbacks(INIT, PENDING, ASSIGNED, STARTING, RUNNING, FAILED);
+
     ScheduledTask task = makeTask(false);
     task.getAssignedTask().getTask().setMaxTaskFailures(10);
     task.setFailureCount(8);
@@ -321,21 +297,14 @@ public class TaskStateMachineTest extends EasyMockTest {
 
     control.replay();
 
-    stateMachine.updateState(PENDING)
-        .updateState(ASSIGNED)
-        .updateState(STARTING)
-        .updateState(RUNNING)
-        .updateState(FAILED);
-
-    rescheduledMachine.updateState(PENDING)
-        .updateState(ASSIGNED)
-        .updateState(STARTING)
-        .updateState(RUNNING)
-        .updateState(FAILED);
+    transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, FAILED);
+    transition(rescheduledMachine, PENDING, ASSIGNED, STARTING, RUNNING, FAILED);
   }
 
   @Test
   public void testHonorsUnlimitedFailures() {
+    expectTransitionCallbacks(INIT, PENDING, ASSIGNED, STARTING, RUNNING, FAILED);
+
     ScheduledTask task = makeTask(false);
     task.getAssignedTask().getTask().setMaxTaskFailures(-1);
     task.setFailureCount(1000);
@@ -347,15 +316,12 @@ public class TaskStateMachineTest extends EasyMockTest {
 
     control.replay();
 
-    stateMachine.updateState(PENDING)
-        .updateState(ASSIGNED)
-        .updateState(STARTING)
-        .updateState(RUNNING)
-        .updateState(FAILED);
+    transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, FAILED);
   }
 
   @Test
   public void testUpdate() {
+    expectTransitionCallbacks(INIT, PENDING, ASSIGNED, STARTING, RUNNING, UPDATING, KILLED);
     expectWork(UPDATE_STATE).times(6);
     expect(isJobUpdating.get()).andReturn(true);
     expectWork(UPDATE);
@@ -363,16 +329,13 @@ public class TaskStateMachineTest extends EasyMockTest {
 
     control.replay();
 
-    stateMachine.updateState(PENDING)
-        .updateState(ASSIGNED)
-        .updateState(STARTING)
-        .updateState(RUNNING)
-        .updateState(UPDATING)
-        .updateState(KILLED);
+    transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, UPDATING, KILLED);
   }
 
   @Test
   public void testRollback() {
+    expectTransitionCallbacks(
+        INIT, PENDING, ASSIGNED, STARTING, RUNNING, UPDATING, ROLLBACK, KILLED);
     expectWork(UPDATE_STATE).times(7);
     expect(isJobUpdating.get()).andReturn(true);
     expectWork(WorkCommand.ROLLBACK);
@@ -380,28 +343,19 @@ public class TaskStateMachineTest extends EasyMockTest {
 
     control.replay();
 
-    stateMachine.updateState(PENDING)
-        .updateState(ASSIGNED)
-        .updateState(STARTING)
-        .updateState(RUNNING)
-        .updateState(UPDATING)
-        .updateState(ROLLBACK)
-        .updateState(KILLED);
+    transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, UPDATING, ROLLBACK, KILLED);
   }
 
   @Test
   public void testIllegalUpdate() {
+    expectTransitionCallbacks(INIT, PENDING, ASSIGNED, STARTING, RUNNING);
     expectWork(UPDATE_STATE).times(4);
     expect(isJobUpdating.get()).andReturn(false);
 
     control.replay();
 
     try {
-      stateMachine.updateState(PENDING)
-        .updateState(ASSIGNED)
-        .updateState(STARTING)
-        .updateState(RUNNING)
-        .updateState(UPDATING);
+      transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, UPDATING);
       fail("Call should have failed.");
     } catch (IllegalStateException e) {
     //Expected
@@ -410,17 +364,30 @@ public class TaskStateMachineTest extends EasyMockTest {
 
   @Test
   public void testKillingRequest() {
+    expectTransitionCallbacks(INIT, PENDING, ASSIGNED, STARTING, RUNNING, KILLING, KILLED);
     expectWork(UPDATE_STATE).times(6);
     expectWork(KILL);
 
     control.replay();
 
-    stateMachine.updateState(PENDING)
-        .updateState(ASSIGNED)
-        .updateState(STARTING)
-        .updateState(RUNNING)
-        .updateState(KILLING)
-        .updateState(KILLED);
+    transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, KILLING, KILLED);
+  }
+
+  private static void transition(TaskStateMachine stateMachine, ScheduleStatus... states) {
+    for (ScheduleStatus status : states) {
+      stateMachine.updateState(status);
+    }
+  }
+
+  private void expectTransitionCallbacks(ScheduleStatus... states) {
+    ScheduleStatus previous = null;
+    for (ScheduleStatus status : states) {
+      if (previous != null) {
+        transitionListener.transitioned(previous, status);
+      }
+
+      previous = status;
+    }
   }
 
   private IExpectationSetters<Void> expectWork(WorkCommand work) {
