@@ -63,7 +63,7 @@ import com.twitter.mesos.scheduler.httphandlers.SchedulerzHome;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzJob;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzRole;
 import com.twitter.mesos.scheduler.quota.QuotaModule;
-import com.twitter.mesos.scheduler.storage.db.DbStorageModule;
+import com.twitter.mesos.scheduler.storage.StorageModule;
 import com.twitter.mesos.scheduler.sync.SyncModule;
 
 
@@ -168,7 +168,7 @@ public class SchedulerModule extends AbstractModule {
     bind(MesosAdmin.Iface.class).to(SchedulerThriftInterface.class).in(Singleton.class);
     bind(ThriftServer.class).to(SchedulerThriftServer.class).in(Singleton.class);
 
-    DbStorageModule.bind(binder());
+    install(new StorageModule());
 
     bind(SchedulingFilter.class).to(SchedulingFilterImpl.class);
 
