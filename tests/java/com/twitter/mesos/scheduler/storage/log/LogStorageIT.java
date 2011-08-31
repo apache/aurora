@@ -13,9 +13,9 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.TearDownRegistry;
 import com.twitter.common.util.Clock;
 import com.twitter.common.util.testing.FakeClock;
-import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
+import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
@@ -27,6 +27,7 @@ import com.twitter.mesos.scheduler.db.testing.DbTestUtil;
 import com.twitter.mesos.scheduler.db.testing.DbTestUtil.DbAccess;
 import com.twitter.mesos.scheduler.log.Log.Position;
 import com.twitter.mesos.scheduler.log.db.DbLogStream;
+import com.twitter.mesos.scheduler.storage.CheckpointStore;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
 import com.twitter.mesos.scheduler.storage.db.DbStorage;
@@ -68,27 +69,32 @@ public class LogStorageIT extends TearDownTestCase {
 
   @Before
   public void setUp() throws SQLException {
-    DbAccess dbAccess = DbTestUtil.setupStorage(this);
-    dbStorage = new DbStorage(dbAccess.jdbcTemplate, dbAccess.transactionTemplate);
+    DbAccess dbAccess = DbTestUtil.setupStorage(this, "log");
     log = new DbLogStream(dbAccess.transactionTemplate, dbAccess.jdbcTemplate);
-
     shutdownRegistry = new TearDownRegistry(this);
     logManager = new LogManager(log, shutdownRegistry);
-    clock = new FakeClock();
-    logStorage = createLogStorage();
 
+    clock = new FakeClock();
+
+    dbStorage = createDbStorage("local_db1");
+    logStorage = createLogStorage(dbStorage);
     logStorage.start(INITIALIZATION_LOGIC);
   }
 
-  private LogStorage createLogStorage() {
+  private DbStorage createDbStorage(String dbName) throws SQLException {
+    DbAccess dbAccess = DbTestUtil.setupStorage(this, dbName);
+    return new DbStorage(dbAccess.jdbcTemplate, dbAccess.transactionTemplate);
+  }
+
+  private LogStorage createLogStorage(DbStorage storage) {
     return new LogStorage(logManager,
         clock,
         shutdownRegistry,
         NO_TIME,
-        dbStorage,
+        storage,
         NO_TIME,
         NO_TIME,
-        dbStorage, dbStorage, dbStorage, dbStorage, dbStorage);
+        storage, storage, storage, storage, storage, storage);
   }
 
   @Test
@@ -103,15 +109,15 @@ public class LogStorageIT extends TearDownTestCase {
     ImmutableSet<ScheduledTask> tasks = ImmutableSet.of(createTask("task1"));
     Position commit = commitTransaction(Op.saveTasks(new SaveTasks(tasks)));
 
-    LogStorage logStorage2 = createLogStorage();
+    DbStorage storage2 = createDbStorage("local_db2");
+    LogStorage logStorage2 = createLogStorage(storage2);
     logStorage2.start(NOOP);
     assertEquals("1", logStorage2.fetchFrameworkId());
-    assertEquals(tasks, logStorage.fetchTasks(Query.GET_ALL));
+    assertEquals(tasks, logStorage2.fetchTasks(Query.GET_ALL));
 
-    assertNoCheckpoint();
-
+    assertNoCheckpoint(storage2);
     logStorage2.acceptCheckpoint();
-    assertCheckpoint(commit);
+    assertCheckpoint(storage2, commit);
   }
 
   @Test
@@ -126,30 +132,50 @@ public class LogStorageIT extends TearDownTestCase {
 
     assertEquals("3", logStorage.fetchFrameworkId());
 
-    assertNoCheckpoint();
+    assertNoCheckpoint(dbStorage);
     logStorage.acceptCheckpoint();
     byte[] checkpoint = dbStorage.fetchCheckpoint();
     assertNotNull(checkpoint);
     assertNotEqual(log.position(checkpoint), commit);
 
-    LogStorage logStorage2 = createLogStorage();
+    DbStorage storage2 = createDbStorage("local_db2");
+    LogStorage logStorage2 = createLogStorage(storage2);
     logStorage2.start(NOOP);
     logStorage2.acceptCheckpoint();
 
     assertEquals("5", logStorage2.fetchFrameworkId());
-    assertCheckpoint(commit);
+    assertCheckpoint(storage2, commit);
   }
 
   @Test
-  public void testSnapshotting() throws CodingException {
+  public void testSnapshotting() throws Exception {
     logStorage.saveFrameworkId("pre-snapshot");
     logStorage.snapshot();
     logStorage.saveFrameworkId("post-snapshot");
 
-    LogStorage logStorage2 = createLogStorage();
+    DbStorage storage2 = createDbStorage("local_db2");
+    LogStorage logStorage2 = createLogStorage(storage2);
     logStorage2.start(NOOP);
 
     assertEquals("post-snapshot", logStorage2.fetchFrameworkId());
+  }
+
+  @Test
+  public void testUserTransactionIsLogged() throws SQLException {
+    final Quota quota = new Quota(1.0, 128L, 1024L);
+    logStorage.doInTransaction(new Work.NoResult.Quiet() {
+      @Override protected void execute(StoreProvider storeProvider) throws RuntimeException {
+        storeProvider.getSchedulerStore().saveFrameworkId("42");
+        storeProvider.getQuotaStore().saveQuota("jake", quota);
+      }
+    });
+
+    DbStorage storage2 = createDbStorage("local_db2");
+    LogStorage logStorage2 = createLogStorage(storage2);
+    logStorage2.start(NOOP);
+
+    assertEquals("42", logStorage2.fetchFrameworkId());
+    assertEquals(quota, logStorage2.fetchQuota("jake"));
   }
 
   private Position commitTransaction(Op... ops) throws Exception {
@@ -171,17 +197,16 @@ public class LogStorageIT extends TearDownTestCase {
     return new ScheduledTask().setAssignedTask(assignedTask).setStatus(ScheduleStatus.STARTING);
   }
 
-  private void assertNoCheckpoint() {
-    byte[] checkpoint = dbStorage.fetchCheckpoint();
+  private void assertNoCheckpoint(CheckpointStore checkpointStore) {
+    byte[] checkpoint = checkpointStore.fetchCheckpoint();
     assertNull(String.format("Expected no checkpoint but found %s", safeGetPosition(checkpoint)),
         checkpoint);
   }
 
-  private void assertCheckpoint(Position position) {
-    byte[] checkpoint = dbStorage.fetchCheckpoint();
+  private void assertCheckpoint(CheckpointStore checkpointStore, Position position) {
+    byte[] checkpoint = checkpointStore.fetchCheckpoint();
     assertArrayEquals(
-        String.format("Expected checkpoint at %s but found it at %s",
-            position, safeGetPosition(checkpoint)),
+        String.format("Expected checkpoint at %s but found it at %s", position, safeGetPosition(checkpoint)),
         position.identity(), checkpoint);
   }
 

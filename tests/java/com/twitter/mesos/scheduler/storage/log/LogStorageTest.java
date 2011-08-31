@@ -27,6 +27,7 @@ import com.twitter.common.util.testing.FakeClock;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
@@ -34,10 +35,12 @@ import com.twitter.mesos.gen.storage.LogEntry;
 import com.twitter.mesos.gen.storage.Op;
 import com.twitter.mesos.gen.storage.RemoveJob;
 import com.twitter.mesos.gen.storage.RemoveJobUpdate;
+import com.twitter.mesos.gen.storage.RemoveQuota;
 import com.twitter.mesos.gen.storage.RemoveTasks;
 import com.twitter.mesos.gen.storage.SaveAcceptedJob;
 import com.twitter.mesos.gen.storage.SaveFrameworkId;
 import com.twitter.mesos.gen.storage.SaveJobUpdate;
+import com.twitter.mesos.gen.storage.SaveQuota;
 import com.twitter.mesos.gen.storage.SaveTasks;
 import com.twitter.mesos.gen.storage.Snapshot;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
@@ -49,6 +52,7 @@ import com.twitter.mesos.scheduler.log.Log.Position;
 import com.twitter.mesos.scheduler.log.Log.Stream;
 import com.twitter.mesos.scheduler.storage.CheckpointStore;
 import com.twitter.mesos.scheduler.storage.JobStore;
+import com.twitter.mesos.scheduler.storage.QuotaStore;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
@@ -88,6 +92,7 @@ public class LogStorageTest extends EasyMockTest {
   private TaskStore taskStore;
   private UpdateStore updateStore;
   private StoreProvider storeProvider;
+  private QuotaStore quotaStore;
 
   @Before
   public void setUp() {
@@ -107,6 +112,7 @@ public class LogStorageTest extends EasyMockTest {
     taskStore = createMock(TaskStore.class);
     updateStore = createMock(UpdateStore.class);
     storeProvider = createMock(StoreProvider.class);
+    quotaStore = createMock(QuotaStore.class);
 
     logStorage =
         new LogStorage(logManager,
@@ -119,7 +125,8 @@ public class LogStorageTest extends EasyMockTest {
             schedulerStore,
             jobStore,
             taskStore,
-            updateStore);
+            updateStore,
+            quotaStore);
 
     stream = createMock(Stream.class);
   }
@@ -388,7 +395,6 @@ public class LogStorageTest extends EasyMockTest {
       @Override protected void setupExpectations() throws Exception {
         expectStorageTransactionNoResult();
         expectStorageTransactionNoResult(); // nested
-        expect(storeProvider.getTaskStore()).andReturn(taskStore);
         expect(taskStore.fetchTaskIds(Query.GET_ALL)).andReturn(taskIds);
         taskStore.removeTasks(taskIds);
         expectStreamTransaction(Op.removeTasks(new RemoveTasks(taskIds)));
@@ -454,6 +460,41 @@ public class LogStorageTest extends EasyMockTest {
 
       @Override protected void performMutations() {
         logStorage.removeShardUpdateConfigs(role, job);
+      }
+    }.runTest();
+  }
+
+  @Test
+  public void testSaveQuota() throws Exception {
+    new MutationFixture() {
+      private String role = "role";
+      private Quota quota = new Quota(1.0, 128L, 1024L);
+
+      @Override protected void setupExpectations() throws Exception {
+        expectStorageTransactionNoResult();
+        quotaStore.saveQuota(role, quota);
+        expectStreamTransaction(Op.saveQuota(new SaveQuota(role, quota)));
+      }
+
+      @Override protected void performMutations() {
+        logStorage.saveQuota(role, quota);
+      }
+    }.runTest();
+  }
+
+  @Test
+  public void testRemoveQuota() throws Exception {
+    new MutationFixture() {
+      private String role = "role";
+
+      @Override protected void setupExpectations() throws Exception {
+        expectStorageTransactionNoResult();
+        quotaStore.removeQuota(role);
+        expectStreamTransaction(Op.removeQuota(new RemoveQuota(role)));
+      }
+
+      @Override protected void performMutations() {
+        logStorage.removeQuota(role);
       }
     }.runTest();
   }

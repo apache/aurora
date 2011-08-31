@@ -10,6 +10,7 @@ import com.google.common.collect.Multimap;
 
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 import com.twitter.mesos.scheduler.Query;
@@ -21,20 +22,24 @@ import com.twitter.mesos.scheduler.storage.Storage.Work.NoResult.Quiet;
  *
  * @author John Sirois
  */
-public class ForwardingStore implements Storage, SchedulerStore, JobStore, TaskStore, UpdateStore {
+public class ForwardingStore
+    implements Storage, SchedulerStore, JobStore, TaskStore, UpdateStore, QuotaStore {
+
   private final Storage storage;
   private final SchedulerStore schedulerStore;
   private final JobStore jobStore;
   private final TaskStore taskStore;
   private final UpdateStore updateStore;
+  private final QuotaStore quotaStore;
 
   public ForwardingStore(Storage storage, SchedulerStore schedulerStore, JobStore jobStore,
-      TaskStore taskStore, UpdateStore updateStore) {
+      TaskStore taskStore, UpdateStore updateStore, QuotaStore quotaStore) {
     this.storage = Preconditions.checkNotNull(storage);
     this.schedulerStore = Preconditions.checkNotNull(schedulerStore);
     this.jobStore = Preconditions.checkNotNull(jobStore);
     this.taskStore = Preconditions.checkNotNull(taskStore);
     this.updateStore = Preconditions.checkNotNull(updateStore);
+    this.quotaStore = Preconditions.checkNotNull(quotaStore);
   }
 
   @Override
@@ -144,5 +149,20 @@ public class ForwardingStore implements Storage, SchedulerStore, JobStore, TaskS
   @Override
   public void removeShardUpdateConfigs(String role, String job) {
     updateStore.removeShardUpdateConfigs(role, job);
+  }
+
+  @Override
+  public void removeQuota(String role) {
+    quotaStore.removeQuota(role);
+  }
+
+  @Override
+  public void saveQuota(String role, Quota quota) {
+    quotaStore.saveQuota(role, quota);
+  }
+
+  @Override
+  public Quota fetchQuota(String role) {
+    return quotaStore.fetchQuota(role);
   }
 }

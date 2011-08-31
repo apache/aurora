@@ -1,6 +1,10 @@
 package com.twitter.mesos.scheduler.storage.log;
 
 import java.io.IOException;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.nio.ByteBuffer;
 import java.util.Date;
 import java.util.Set;
@@ -16,26 +20,32 @@ import javax.annotation.Nullable;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
+import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
 
 import com.twitter.common.application.ActionRegistry;
 import com.twitter.common.application.ShutdownStage;
 import com.twitter.common.base.Closure;
+import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Clock;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.storage.LogEntry;
 import com.twitter.mesos.gen.storage.Op;
 import com.twitter.mesos.gen.storage.RemoveJob;
 import com.twitter.mesos.gen.storage.RemoveJobUpdate;
+import com.twitter.mesos.gen.storage.RemoveQuota;
 import com.twitter.mesos.gen.storage.RemoveTasks;
 import com.twitter.mesos.gen.storage.SaveAcceptedJob;
 import com.twitter.mesos.gen.storage.SaveFrameworkId;
 import com.twitter.mesos.gen.storage.SaveJobUpdate;
+import com.twitter.mesos.gen.storage.SaveQuota;
 import com.twitter.mesos.gen.storage.SaveTasks;
 import com.twitter.mesos.gen.storage.Snapshot;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
@@ -44,6 +54,7 @@ import com.twitter.mesos.scheduler.log.Log.Position;
 import com.twitter.mesos.scheduler.storage.CheckpointStore;
 import com.twitter.mesos.scheduler.storage.ForwardingStore;
 import com.twitter.mesos.scheduler.storage.JobStore;
+import com.twitter.mesos.scheduler.storage.QuotaStore;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.TaskStore;
@@ -141,24 +152,59 @@ public class LogStorage extends ForwardingStore {
 
   private StreamManager streamManager;
 
+  /**
+   * Identifies the grace period to give in-process snapshots and checkpoints to complete during
+   * shutdown.
+   */
+  @Retention(RetentionPolicy.RUNTIME)
+  @Target({ElementType.PARAMETER, ElementType.METHOD})
+  @BindingAnnotation
+  public @interface ShutdownGracePeriod {}
+
+  /**
+   * Identifies the interval between checkpoints of the log position to local storage.
+   */
+  @Retention(RetentionPolicy.RUNTIME)
+  @Target({ElementType.PARAMETER, ElementType.METHOD})
+  @BindingAnnotation
+  public @interface CheckpointInterval {}
+
+  /**
+   * Identifies the interval between snapshots of local storage truncating the log.
+   */
+  @Retention(RetentionPolicy.RUNTIME)
+  @Target({ElementType.PARAMETER, ElementType.METHOD})
+  @BindingAnnotation
+  public @interface SnapshotInterval {}
+
+  /**
+   * Identifies a local storage layer that is written to only after first ensuring the write
+   * operation is persisted in the log.
+   */
+  @Retention(RetentionPolicy.RUNTIME)
+  @Target({ElementType.PARAMETER, ElementType.METHOD})
+  @BindingAnnotation
+  public @interface WriteBehind {}
+
   @Inject
   LogStorage(LogManager logManager,
       Clock clock,
       @ShutdownStage ActionRegistry shutdownRegistry,
-      Amount<Long, Time> shutdownGracePeriod,
+      @ShutdownGracePeriod Amount<Long, Time> shutdownGracePeriod,
       CheckpointStore checkpointStore,
-      Amount<Long, Time> checkpointInterval,
-      Amount<Long, Time> snapshotInterval,
-      Storage storage,
-      SchedulerStore schedulerStore,
-      JobStore jobStore,
-      TaskStore taskStore,
-      UpdateStore updateStore) {
+      @CheckpointInterval Amount<Long, Time> checkpointInterval,
+      @SnapshotInterval Amount<Long, Time> snapshotInterval,
+      @WriteBehind Storage storage,
+      @WriteBehind SchedulerStore schedulerStore,
+      @WriteBehind JobStore jobStore,
+      @WriteBehind TaskStore taskStore,
+      @WriteBehind UpdateStore updateStore,
+      @WriteBehind QuotaStore quotaStore) {
 
     this(logManager, clock,
         new ScheduledExecutorSchedulingService(shutdownRegistry, shutdownGracePeriod),
         checkpointStore, checkpointInterval, snapshotInterval, storage, schedulerStore, jobStore,
-        taskStore, updateStore);
+        taskStore, updateStore, quotaStore);
   }
 
   @VisibleForTesting
@@ -172,9 +218,10 @@ public class LogStorage extends ForwardingStore {
       SchedulerStore schedulerStore,
       JobStore jobStore,
       TaskStore taskStore,
-      UpdateStore updateStore) {
+      UpdateStore updateStore,
+      QuotaStore quotaStore) {
 
-    super(storage, schedulerStore, jobStore, taskStore, updateStore);
+    super(storage, schedulerStore, jobStore, taskStore, updateStore, quotaStore);
     this.logManager = checkNotNull(logManager);
     this.clock = checkNotNull(clock);
     this.schedulingService = checkNotNull(schedulingService);
@@ -194,7 +241,7 @@ public class LogStorage extends ForwardingStore {
     }
 
     super.start(new Work.NoResult.Quiet() {
-      @Override protected void execute(StoreProvider storeProvider) {
+      @Override protected void execute(StoreProvider unused) {
         // Must have the underlying storage started so we can query it for the last checkpoint.
         // We replay these entries in the forwarded storage system's transactions but not ours - we
         // do not want to re-record these ops to the log.
@@ -211,8 +258,9 @@ public class LogStorage extends ForwardingStore {
     scheduleSnapshots();
   }
 
+  @Timed("scheduler_log_recover")
   @Nullable
-  private Position recover() {
+  Position recover() {
     try {
       // TODO(John Sirois): add support for backing up and trying from beginning() if we fail
       // an attempt to restore from a non-null fetchCheckpoint()
@@ -279,6 +327,15 @@ public class LogStorage extends ForwardingStore {
         removeTasks(op.getRemoveTasks().getTaskIds());
         break;
 
+      case SAVE_QUOTA:
+        SaveQuota saveQuota = op.getSaveQuota();
+        saveQuota(saveQuota.getRole(), saveQuota.getQuota());
+        break;
+
+      case REMOVE_QUOTA:
+        removeQuota(op.getRemoveQuota().getRole());
+        break;
+
       default:
         throw new IllegalStateException("Unknown transaction op: " + op);
     }
@@ -332,15 +389,37 @@ public class LogStorage extends ForwardingStore {
   @VisibleForTesting
   void snapshot()  throws CodingException {
     super.doInTransaction(new Work.NoResult<CodingException>() {
-      @Override protected void execute(StoreProvider storeProvider) throws CodingException {
+      @Override protected void execute(StoreProvider unused) throws CodingException {
         long timestamp = clock.nowMillis();
         byte[] data = checkpointStore.createSnapshot();
         streamManager.snapshot(new Snapshot(timestamp, ByteBuffer.wrap(data)));
+        LOG.info("Snapshot taken consuming " + Amount.of(data.length, Data.BYTES));
       }
     });
   }
 
   private StreamTransaction transaction = null;
+  private final StoreProvider logStoreProvider = new StoreProvider() {
+    @Override public SchedulerStore getSchedulerStore() {
+      return LogStorage.this;
+    }
+
+    @Override public JobStore getJobStore() {
+      return LogStorage.this;
+    }
+
+    @Override public TaskStore getTaskStore() {
+      return LogStorage.this;
+    }
+
+    @Override public UpdateStore getUpdateStore() {
+      return LogStorage.this;
+    }
+
+    @Override public QuotaStore getQuotaStore() {
+      return LogStorage.this;
+    }
+  };
 
   @Override
   public synchronized <T, E extends Exception> T doInTransaction(final Work<T, E> work) throws E {
@@ -352,8 +431,8 @@ public class LogStorage extends ForwardingStore {
     transaction = streamManager.startTransaction();
     try {
       return super.doInTransaction(new Work<T, E>() {
-        @Override public T apply(StoreProvider storeProvider) throws E {
-          T result = work.apply(storeProvider);
+        @Override public T apply(StoreProvider unused) throws E {
+          T result = work.apply(logStoreProvider);
           try {
             checkpoint(transaction.commit());
           } catch (CodingException e) {
@@ -371,7 +450,7 @@ public class LogStorage extends ForwardingStore {
   @Override
   public void saveFrameworkId(final String frameworkId) {
     doInTransaction(new Work.NoResult.Quiet() {
-      @Override protected void execute(StoreProvider storeProvider) {
+      @Override protected void execute(StoreProvider unused) {
         log(Op.saveFrameworkId(new SaveFrameworkId(frameworkId)));
         LogStorage.super.saveFrameworkId(frameworkId);
       }
@@ -381,7 +460,7 @@ public class LogStorage extends ForwardingStore {
   @Override
   public void saveAcceptedJob(final String managerId, final JobConfiguration jobConfig) {
     doInTransaction(new Work.NoResult.Quiet() {
-      @Override protected void execute(StoreProvider storeProvider) {
+      @Override protected void execute(StoreProvider unused) {
         log(Op.saveAcceptedJob(new SaveAcceptedJob(managerId, jobConfig)));
         LogStorage.super.saveAcceptedJob(managerId, jobConfig);
       }
@@ -391,7 +470,7 @@ public class LogStorage extends ForwardingStore {
   @Override
   public void removeJob(final String jobKey) {
     doInTransaction(new Work.NoResult.Quiet() {
-      @Override protected void execute(StoreProvider storeProvider) {
+      @Override protected void execute(StoreProvider unused) {
         log(Op.removeJob(new RemoveJob(jobKey)));
         LogStorage.super.removeJob(jobKey);
       }
@@ -401,7 +480,7 @@ public class LogStorage extends ForwardingStore {
   @Override
   public void saveTasks(final Set<ScheduledTask> newTasks) throws IllegalStateException {
     doInTransaction(new Work.NoResult.Quiet() {
-      @Override protected void execute(StoreProvider storeProvider) {
+      @Override protected void execute(StoreProvider unused) {
         log(Op.saveTasks(new SaveTasks(newTasks)));
         LogStorage.super.saveTasks(newTasks);
       }
@@ -422,7 +501,7 @@ public class LogStorage extends ForwardingStore {
   @Override
   public void removeTasks(final Set<String> taskIds) {
     doInTransaction(new Work.NoResult.Quiet() {
-      @Override protected void execute(StoreProvider storeProvider) {
+      @Override protected void execute(StoreProvider unused) {
         log(Op.removeTasks(new RemoveTasks(taskIds)));
         LogStorage.super.removeTasks(taskIds);
       }
@@ -433,7 +512,7 @@ public class LogStorage extends ForwardingStore {
   public ImmutableSet<ScheduledTask> mutateTasks(final Query query,
       final Closure<ScheduledTask> mutator) {
     return doInTransaction(new Work.Quiet<ImmutableSet<ScheduledTask>>() {
-      @Override public ImmutableSet<ScheduledTask> apply(StoreProvider storeProvider) {
+      @Override public ImmutableSet<ScheduledTask> apply(StoreProvider unused) {
         ImmutableSet<ScheduledTask> mutated = LogStorage.super.mutateTasks(query, mutator);
         log(Op.saveTasks(new SaveTasks(mutated)));
         return mutated;
@@ -445,7 +524,7 @@ public class LogStorage extends ForwardingStore {
   public void saveShardUpdateConfigs(final String role, final String job, final String updateToken,
       final Set<TaskUpdateConfiguration> delta) {
     doInTransaction(new Work.NoResult.Quiet() {
-      @Override protected void execute(StoreProvider storeProvider) {
+      @Override protected void execute(StoreProvider unused) {
         log(Op.saveJobUpdate(new SaveJobUpdate(role, job, updateToken, delta)));
         LogStorage.super.saveShardUpdateConfigs(role, job, updateToken, delta);
       }
@@ -455,9 +534,29 @@ public class LogStorage extends ForwardingStore {
   @Override
   public void removeShardUpdateConfigs(final String role, final String job) {
     doInTransaction(new Work.NoResult.Quiet() {
-      @Override protected void execute(StoreProvider storeProvider) {
+      @Override protected void execute(StoreProvider unused) {
         log(Op.removeJobUpdate(new RemoveJobUpdate(role, job)));
         LogStorage.super.removeShardUpdateConfigs(role, job);
+      }
+    });
+  }
+
+  @Override
+  public void removeQuota(final String role) {
+    doInTransaction(new Work.NoResult.Quiet() {
+      @Override protected void execute(StoreProvider unused) {
+        log(Op.removeQuota(new RemoveQuota(role)));
+        LogStorage.super.removeQuota(role);
+      }
+    });
+  }
+
+  @Override
+  public void saveQuota(final String role, final Quota quota) {
+    doInTransaction(new Work.NoResult.Quiet() {
+      @Override protected void execute(StoreProvider unused) {
+        log(Op.saveQuota(new SaveQuota(role, quota)));
+        LogStorage.super.saveQuota(role, quota);
       }
     });
   }

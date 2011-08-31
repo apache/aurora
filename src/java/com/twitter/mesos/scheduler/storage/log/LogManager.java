@@ -17,6 +17,7 @@ import com.twitter.common.application.ActionRegistry;
 import com.twitter.common.application.ShutdownStage;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.ExceptionalCommand;
+import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.stats.Stats;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
@@ -145,6 +146,7 @@ final class LogManager {
      * @return The position of the snapshot log entry.
      * @throws CodingException if the was aproblem encoding the snapshot into a log entry.
      */
+    @Timed("scheduler_log_snapshot")
     Position snapshot(Snapshot snapshot) throws CodingException {
       Position position = append(LogEntry.snapshot(snapshot));
       vars.logSnapshots.incrementAndGet();
@@ -153,7 +155,8 @@ final class LogManager {
       return position;
     }
 
-    private Position append(LogEntry logEntry) throws CodingException {
+    @Timed("scheduler_log_append")
+    Position append(LogEntry logEntry) throws CodingException {
       byte[] entry = ThriftBinaryCodec.encodeNonNull(logEntry);
       Position position = stream.append(entry);
       vars.logBytesWritten.addAndGet(entry.length);
@@ -237,6 +240,8 @@ final class LogManager {
           case SAVE_JOB_UPDATE:
           case REMOVE_JOB_UPDATE:
           case REMOVE_JOB:
+          case SAVE_QUOTA:
+          case REMOVE_QUOTA:
             return false;
 
           case SAVE_TASKS:
