@@ -16,8 +16,8 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.twitter.mesos.scheduler.db.DbUtil.DbAccess;
 import com.twitter.mesos.scheduler.db.testing.DbTestUtil;
+import com.twitter.mesos.scheduler.db.testing.DbTestUtil.DbAccess;
 import com.twitter.mesos.scheduler.log.Log;
 import com.twitter.mesos.scheduler.log.Log.Entry;
 import com.twitter.mesos.scheduler.log.Log.Position;
