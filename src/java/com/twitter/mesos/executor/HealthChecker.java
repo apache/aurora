@@ -16,7 +16,7 @@ import java.util.List;
  */
 public class HealthChecker implements ExceptionalFunction<Integer, Boolean, HealthCheckException> {
 
-  private static final String HEALTH_CHECK_ENDPOINT = "healthz";
+  private static final String HEALTH_CHECK_ENDPOINT = "health";
   private static final String URL_FORMAT = "http://localhost:%d/" + HEALTH_CHECK_ENDPOINT;
 
   private static final String HEALTH_CHECK_OK_VALUE = "ok";

@@ -20,7 +20,7 @@ import static org.junit.Assert.assertThat;
  */
 public class HealthCheckerTest {
 
-  private static final String SIGNAL_URL = "http://localhost:8080/healthz";
+  private static final String SIGNAL_URL = "http://localhost:8080/health";
 
   private IMocksControl control;
   private ExceptionalFunction<String, List<String>, SignalException> signaler;
