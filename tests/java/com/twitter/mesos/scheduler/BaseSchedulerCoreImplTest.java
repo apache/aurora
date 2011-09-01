@@ -171,6 +171,20 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         scale(DEFAULT_TASK_QUOTA, DEFAULT_TASKS_IN_QUOTA));
   }
 
+  @Test(expected = TaskDescriptionException.class)
+  public void testCreateJobNoResources() throws Exception {
+    control.replay();
+    buildScheduler();
+
+    TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
+    task.getConfiguration().remove("num_cpus");
+    task.getConfiguration().remove("ram_mb");
+    task.getConfiguration().remove("disk_mb");
+
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, task, 1);
+    scheduler.createJob(job);
+  }
+
   @Test(expected = ScheduleException.class)
   public void testCreateJobNoQuota() throws Exception {
     control.replay();
@@ -282,8 +296,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     TwitterTaskInfo task = new TwitterTaskInfo().setConfiguration(
         ImmutableMap.<String, String> builder()
             .put("start_command", "date")
-            .put("cpus", "1.0")
+            .put("num_cpus", "1.0")
             .put("ram_mb", "1024")
+            .put("disk_mb", "1024")
             .build());
 
     JobConfiguration job = makeJob(OWNER_A, JOB_A, task, 1);
@@ -294,8 +309,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         ImmutableMap.<String, String> builder()
             .put("start_command", "date")
             .put("hdfs_path", "")
-            .put("cpus", "1.0")
+            .put("num_cpus", "1.0")
             .put("ram_mb", "1024")
+            .put("disk_mb", "1024")
             .build());
     JobConfiguration job2 = makeJob(OWNER_A, JOB_B, task2, 1);
     scheduler.createJob(job2);
@@ -1755,8 +1771,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private static TwitterTaskInfo defaultTask() {
     return new TwitterTaskInfo().setConfiguration(ImmutableMap.<String, String>builder()
         .put("start_command", "date")
-        .put("cpus", "1.0")
+        .put("num_cpus", "1.0")
         .put("ram_mb", "1024")
+        .put("disk_mb", "1024")
         .put("hdfs_path", "/fake/path")
         .put("production", "true")
         .build());

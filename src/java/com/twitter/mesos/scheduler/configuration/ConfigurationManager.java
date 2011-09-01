@@ -5,10 +5,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import javax.annotation.Nullable;
-
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Splitter;
@@ -237,21 +234,21 @@ public class ConfigurationManager {
           task.setIsDaemon(value);
         }
       },
-      new TypedField<Double>(Double.class, "num_cpus", 1.0) {
+      new TypedField<Double>(Double.class, "num_cpus") {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetNumCpus(); }
 
         @Override void apply(TwitterTaskInfo task, Double value) throws TaskDescriptionException {
           task.setNumCpus(value);
         }
       },
-      new TypedField<Integer>(Integer.class, "ram_mb", 1024) {
+      new TypedField<Integer>(Integer.class, "ram_mb") {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetRamMb(); }
 
         @Override void apply(TwitterTaskInfo task, Integer value) throws TaskDescriptionException {
           task.setRamMb(value);
         }
       },
-      new TypedField<Integer>(Integer.class, "disk_mb", 1024) {
+      new TypedField<Integer>(Integer.class, "disk_mb") {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetDiskMb(); }
 
         @Override void apply(TwitterTaskInfo task, Integer value) throws TaskDescriptionException {

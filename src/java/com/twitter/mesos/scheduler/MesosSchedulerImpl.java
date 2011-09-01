@@ -24,7 +24,6 @@ import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskStatus;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
-import org.apache.thrift.TBase;
 
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.args.Arg;
