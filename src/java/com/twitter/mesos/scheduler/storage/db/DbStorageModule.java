@@ -1,31 +1,16 @@
 package com.twitter.mesos.scheduler.storage.db;
 
-import java.beans.PropertyVetoException;
 import java.io.File;
-import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.util.logging.Logger;
 
-import javax.sql.DataSource;
-
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.io.Files;
 import com.google.inject.Binder;
 import com.google.inject.Key;
 import com.google.inject.PrivateBinder;
 import com.google.inject.PrivateModule;
-import com.google.inject.Provides;
 import com.google.inject.Singleton;
-import com.mchange.v2.c3p0.ComboPooledDataSource;
 
-import org.h2.server.web.WebServlet;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.DataSourceTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
-
-import com.twitter.common.application.http.HttpServletConfig;
-import com.twitter.common.application.http.Registration;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.CanRead;
@@ -37,6 +22,7 @@ import com.twitter.common.base.Closure;
 import com.twitter.common.base.Closures;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
+import com.twitter.mesos.scheduler.db.DbUtil;
 import com.twitter.mesos.scheduler.storage.Storage;
 
 /**
@@ -57,7 +43,7 @@ public class DbStorageModule extends PrivateModule {
 
   @CmdLine(name = "scheduler_db_cache_size",
           help ="The size to use for the H2 in-memory db cache.")
-  private static final Arg<Amount<Long, Data>> dbCacheSize = Arg.create(Amount.of(256L, Data.Mb));
+  private static final Arg<Amount<Long, Data>> dbCacheSize = Arg.create(Amount.of(256L, Data.MB));
 
   // TODO(John Sirois): reconsider exposing the db by default - obvious danger here
   @CmdLine(name = "scheduler_db_admin_interface",
@@ -100,14 +86,8 @@ public class DbStorageModule extends PrivateModule {
 
     binder.install(new DbStorageModule(key, bindAdditional));
 
-    installAdminInterface(binder);
-  }
-
-  private static void installAdminInterface(Binder binder) {
     if (exposeDbAdmin.get()) {
-      ImmutableMap<String, String> initParams = ImmutableMap.of("webAllowOthers", "true");
-      Registration.registerServlet(binder,
-          new HttpServletConfig("/scheduler/storage", WebServlet.class, initParams, true));
+      DbUtil.bindAdminInterface(binder, "/scheduler/storage");
     }
   }
 
@@ -125,40 +105,12 @@ public class DbStorageModule extends PrivateModule {
     bind(DbStorage.class).in(Singleton.class);
     expose(storageKey);
 
+    // TODO(John Sirois): Consider switching to inMemory(...) when we are successfully running on
+    // the mesos-core log.
+    DbUtil.fileSystem(dbFilePath.get(), "h2-v1", dbCacheSize.get())
+        .secured("scheduler", "ep1nephrin3")
+        .bind(binder());
+
     bindAdditional.execute(binder());
-  }
-
-  @Provides
-  @Singleton
-  DataSource provideDataSource() throws PropertyVetoException, IOException {
-    File dbFilePath = new File(DbStorageModule.dbFilePath.get(), "h2-v1");
-    Files.createParentDirs(dbFilePath);
-    LOG.info("Using db storage path: " + dbFilePath);
-
-    ComboPooledDataSource dataSource = new ComboPooledDataSource();
-    dataSource.setDriverClass(org.h2.Driver.class.getName());
-    dataSource.setJdbcUrl(String.format("jdbc:h2:file:%s;AUTO_SERVER=TRUE;CACHE_SIZE=%d",
-        dbFilePath.getPath(), dbCacheSize.get().as(Data.Kb)));
-
-    // We may be exposing the H2 web ui, so at least make the user/pass non-default.
-    dataSource.setUser("scheduler");
-    dataSource.setPassword("ep1nephrin3");
-
-    // Consider accepting/setting connection pooling here.
-    // c3p0 defaults of start=3,min=3,max=15,acquire=3 etc... seem fine for now
-
-    return dataSource;
-  }
-
-  @Provides
-  @Singleton
-  JdbcTemplate provideJdbcTemplate(DataSource dataSource) {
-    return new JdbcTemplate(dataSource);
-  }
-
-  @Provides
-  @Singleton
-  TransactionTemplate provideTransactionTemplate(DataSource dataSource) {
-    return new TransactionTemplate(new DataSourceTransactionManager(dataSource));
   }
 }
