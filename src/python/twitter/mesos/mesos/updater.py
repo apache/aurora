@@ -1,9 +1,9 @@
 import collections
 from math import ceil
 from mesos_twitter.ttypes import *
-from twitter.common import options, log
+from twitter.common import app, log
 
-options.add('--mesos_updater_status_check_interval',
+app.add_option('--mesos_updater_status_check_interval',
   dest='mesos_updater_status_check_interval',
   default=3,
   type='int',
@@ -199,4 +199,4 @@ class Updater(object):
         return [shard for shard in failed_shards]
       elif now > (start_time + restart_threshold + watch_secs):
         return [shard for shard in set(task_ids).difference(healthy_tasks)]
-      self._clock.sleep(options.values().mesos_updater_status_check_interval)
+      self._clock.sleep(app.get_options().mesos_updater_status_check_interval)

@@ -4,32 +4,27 @@ import pprint
 
 from thermos_thrift.ttypes import TaskRunnerState, TaskRunnerCkpt
 
-from twitter.common import options
+from twitter.common import app
 from twitter.common.recordio import ThriftRecordReader
 from twitter.thermos.base.ckpt import TaskCkptDispatcher
 
-def parse_commandline():
-  options.add("--checkpoint", dest = "ckpt", metavar = "CKPT",
-              help = "read checkpoint from CKPT")
-  options.add("--assemble", dest = "assemble", metavar = "CKPT", default=True,
-              help = "read checkpoint from CKPT")
+app.add_option("--checkpoint", dest = "ckpt", metavar = "CKPT",
+               help = "read checkpoint from CKPT")
+app.add_option("--assemble", dest = "assemble", metavar = "CKPT", default=True,
+               help = "read checkpoint from CKPT")
 
-  (values, args) = options.parse()
+def main(args):
+  values = app.get_options()
 
   if len(args) > 0:
     print >> sys.stderr, "ERROR: unrecognized arguments: %s\n" % (" ".join(args))
-    options.print_help(sys.stderr)
+    app.help()
     sys.exit(1)
 
   if not values.ckpt:
     print >> sys.stderr, "ERROR: must supply --checkpoint"
-    options.print_help(sys.stderr)
+    app.help()
     sys.exit(1)
-
-  return (values, args)
-
-def main():
-  values, _ = parse_commandline()
 
   fp = file(values.ckpt, "r")
   rr = ThriftRecordReader(fp, TaskRunnerCkpt)
@@ -53,5 +48,4 @@ def main():
     print '\nRecovered Processes'
     pprint.pprint(wrs.processes)
 
-if __name__ == '__main__':
-  main()
+app.main()

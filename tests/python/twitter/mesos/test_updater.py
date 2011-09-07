@@ -3,7 +3,6 @@ import copy
 import unittest
 import pytest
 from mesos_twitter.ttypes import *
-from twitter.common import options
 from twitter.mesos.mesos.updater import Updater
 import twitter.common.log
 from fake_scheduler import *
@@ -20,11 +19,6 @@ class UpdaterTest(unittest.TestCase):
   EXPECTED_GET_STATUS_CALLS_IN_UNKNOWN_STATE = 1
   MAX_SHARD_FAILURE = 0
   MAX_TOTAL_FAILURE = 0
-
-  @classmethod
-  def setUpClass(cls):
-    options.parse([])
-    twitter.common.log.init('Update_test')
 
   def setUp(self):
     self._clock = Clock()

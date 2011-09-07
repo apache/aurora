@@ -448,24 +448,24 @@ The subcommands and their arguments are:
     if method.startswith('do_') and getattr(MesosCLI, method).__doc__:
       usage = usage + '\n    ' + getattr(MesosCLI, method).__doc__
 
-  options.set_usage(usage)
-  options.add(
+  app.set_usage(usage)
+  app.add_option(
     '-v',
     dest='verbose',
     default=False,
     action='store_true',
     help='Verbose logging. (default: %default)')
-  options.add(
+  app.add_option(
     '-q',
     dest='quiet',
     default=False,
     action='store_true',
     help='Minimum logging. (default: %default)')
-  options.add(
+  app.add_option(
     '--cluster',
     dest='cluster',
     help='Cluster to launch the job in (e.g. sjc1, smf1-prod, smf1-nonprod)')
-  options.add(
+  app.add_option(
     '--copy_app_from',
     dest='copy_app_from',
     default=None,
@@ -473,7 +473,7 @@ The subcommands and their arguments are:
           " (default: %default)")
 
 def main(args):
-  values = options.values()
+  values = app.get_options()
 
   if values.quiet:
     LogOptions.set_stdout_log_level('NONE')
@@ -484,8 +484,8 @@ def main(args):
       LogOptions.set_stdout_log_level('INFO')
 
   if not args:
-    options.help()
-    return
+    app.help()
+    sys.exit(1)
 
   cli = MesosCLI(values)
 
