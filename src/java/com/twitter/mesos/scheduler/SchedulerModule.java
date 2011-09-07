@@ -29,12 +29,14 @@ import org.apache.mesos.SchedulerDriver;
 
 import com.twitter.common.application.ActionRegistry;
 import com.twitter.common.application.ShutdownStage;
+import com.twitter.common.application.StartupStage;
 import com.twitter.common.application.http.Registration;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.NotNull;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Closures;
+import com.twitter.common.base.Command;
 import com.twitter.common.inject.TimedInterceptor;
 import com.twitter.common.logging.ScribeLog;
 import com.twitter.common.quantity.Amount;
@@ -139,6 +141,15 @@ public class SchedulerModule extends AbstractModule {
       help = "The amount of RAM that should be reserved by mesos for the executor.")
   private static final Arg<Amount<Double, Data>> RAM = Arg.create(Amount.of(2d, Data.GB));
 
+  @CmdLine(name = "task_reaper_start_delay", help =
+      "Time to wait after startup before running the task reaper.")
+  private static final Arg<Amount<Long, Time>> TASK_REAPER_START_DELAY =
+      Arg.create(Amount.of(5L, Time.MINUTES));
+
+  @CmdLine(name = "task_reaper_interval", help = "Time to wait between task reaper runs.")
+  private static final Arg<Amount<Long, Time>> TASK_REAPER_INTERVAL =
+      Arg.create(Amount.of(10L, Time.MINUTES));
+
   private static final String TWITTER_EXECUTOR_ID = "twitter";
 
   @Override
@@ -182,6 +193,7 @@ public class SchedulerModule extends AbstractModule {
 
     // Bindings for StateManager
     bind(Clock.class).toInstance(Clock.SYSTEM_CLOCK);
+    bind(StateManager.class).in(Singleton.class);
 
     Registration.registerServlet(binder(), "/scheduler", SchedulerzHome.class, false);
     Registration.registerServlet(binder(), "/scheduler/role", SchedulerzRole.class, true);
@@ -305,6 +317,25 @@ public class SchedulerModule extends AbstractModule {
       }
     };
   }
+
+  // TODO(wfarner): Bind this in a more appropriate way.
+  /*
+  @Provides
+  @Singleton
+  TaskReaper provideTaskReaper(@StartupStage ActionRegistry startupRegistry,
+      final @ShutdownStage ActionRegistry shutdownRegistry,
+      StateManager stateManager,
+      Supplier<Set<ExecutorKey>> knownExecutorSupplier) {
+    final TaskReaper reaper = new TaskReaper(stateManager, knownExecutorSupplier);
+    startupRegistry.addAction(new Command() {
+      @Override public void execute() {
+        shutdownRegistry.addAction(
+            reaper.start(TASK_REAPER_START_DELAY.get(), TASK_REAPER_INTERVAL.get()));
+      }
+    });
+    return reaper;
+  }
+  */
 
   private ZooKeeperClient startLocalZookeeper(ActionRegistry shutdownRegistry,
       Credentials credentials) throws IOException, InterruptedException {

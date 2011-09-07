@@ -14,6 +14,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
+import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableSet;
@@ -21,13 +22,21 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.MapMaker;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
+
+import org.apache.commons.lang.StringUtils;
+import org.apache.mesos.Protos.SlaveID;
 
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.base.Closure;
+import com.twitter.common.base.Closures;
+import com.twitter.common.base.Command;
 import com.twitter.common.base.ExceptionalCommand;
+import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.collections.Pair;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -45,6 +54,7 @@ import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 import com.twitter.mesos.scheduler.TaskStateMachine.TransitionListener;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.storage.Storage;
+import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
 import com.twitter.mesos.scheduler.storage.Storage.Work.NoResult;
 import com.twitter.mesos.scheduler.storage.TaskStore;
@@ -133,6 +143,7 @@ class StateManager {
               Suppliers.ofInstance(false),
               workSink,
               MISSING_TASK_GRACE_PERIOD.get(),
+              clock,
               INIT,
               noopListener)
               .updateState(UNKNOWN);
@@ -168,21 +179,13 @@ class StateManager {
     });
   }
 
-  private static Predicate<TaskStateMachine> hasStatus(final ScheduleStatus status) {
-    return new Predicate<TaskStateMachine>() {
-      @Override public boolean apply(TaskStateMachine stateMachine) {
-        return stateMachine.getState() == status;
-      }
-    };
-  }
-
   /**
    * Initializes the state manager, by starting the storage and fetching the persisted framework ID.
    *
    * @return The persisted framework ID, or {@code null} if no framework ID exists in the store.
    */
   @Nullable
-  String initialize() {
+  synchronized String initialize() {
     managerState.transition(State.INITIALIZED);
 
     storage.start(new Work.NoResult.Quiet() {
@@ -215,7 +218,7 @@ class StateManager {
    *
    * @param frameworkId Updated framework ID.
    */
-  void setFrameworkId(final String frameworkId) {
+  synchronized void setFrameworkId(final String frameworkId) {
     checkNotNull(frameworkId);
 
     managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
@@ -233,7 +236,7 @@ class StateManager {
    *
    * @param killTask Task killer callback.
    */
-  void start(Closure<String> killTask) {
+  synchronized void start(Closure<String> killTask) {
     managerState.transition(State.STARTED);
 
     this.killTask = checkNotNull(killTask);
@@ -242,7 +245,7 @@ class StateManager {
   /**
    * Instructs the state manager to stop, and shut down the backing storage.
    */
-  void stop() {
+  synchronized void stop() {
     managerState.transition(State.STOPPED);
 
     storage.stop();
@@ -254,7 +257,7 @@ class StateManager {
    * @param tasks Tasks to insert.
    * @return Generated task IDs for the tasks inserted.
    */
-  Set<String> insertTasks(Set<TwitterTaskInfo> tasks) {
+  synchronized Set<String> insertTasks(Set<TwitterTaskInfo> tasks) {
     checkNotNull(tasks);
 
     final Set<ScheduledTask> scheduledTasks = ImmutableSet.copyOf(transform(tasks, taskCreator));
@@ -291,8 +294,9 @@ class StateManager {
    *     is already in progress.
    * @return A unique string identifying the update.
    */
-  String registerUpdate(final String role, final String job, final Set<TwitterTaskInfo> updatedTasks)
-      throws UpdateException {
+  synchronized String registerUpdate(final String role, final String job,
+      final Set<TwitterTaskInfo> updatedTasks) throws UpdateException {
+
     checkNotBlank(role);
     checkNotBlank(job);
     checkNotBlank(updatedTasks);
@@ -343,8 +347,8 @@ class StateManager {
    * @throws UpdateException If an update is not in-progress for the job, or the non-null token
    *     does not match the stored token.
    */
-  void finishUpdate(final String role, final String job, @Nullable final String updateToken,
-      final UpdateResult result) throws UpdateException{
+  synchronized void finishUpdate(final String role, final String job,
+      @Nullable final String updateToken, final UpdateResult result) throws UpdateException {
     checkNotBlank(role);
     checkNotBlank(job);
 
@@ -443,22 +447,25 @@ class StateManager {
    * @param <E> Type of exception thrown by the state change.
    * @throws E If the operation fails.
    */
-  <E extends Exception> void taskOperation(@Nullable final Query taskQuery,
+  synchronized <E extends Exception> void taskOperation(@Nullable final Query taskQuery,
       final StateMutation<E> operation) throws E {
     checkNotNull(operation);
 
     transactionalWork(new NoResult<E>() {
-      @Override protected void execute(Storage.StoreProvider storeProvider) throws E {
+      @Override
+      protected void execute(Storage.StoreProvider storeProvider) throws E {
         Set<ScheduledTask> tasks = (taskQuery == null)
             ? null : storeProvider.getTaskStore().fetchTasks(taskQuery);
         operation.execute(tasks, new StateChanger() {
-          @Override public void changeState(Set<String> taskIds, ScheduleStatus state,
+          @Override
+          public void changeState(Set<String> taskIds, ScheduleStatus state,
               String auditMessage) {
             changeStateInTransaction(taskIds,
                 stateUpdaterWithAuditMessage(state, auditMessage));
           }
 
-          @Override public void changeState(Set<String> taskIds, ScheduleStatus state) {
+          @Override
+          public void changeState(Set<String> taskIds, ScheduleStatus state) {
             changeStateInTransaction(taskIds, stateUpdater(state));
           }
         });
@@ -473,7 +480,7 @@ class StateManager {
    * @param <E> Type of exception thrown by the state change.
    * @throws E If the operation fails.
    */
-  <E extends Exception> void taskOperation(StateMutation<E> operation) throws E {
+  synchronized <E extends Exception> void taskOperation(StateMutation<E> operation) throws E {
     taskOperation(null, operation);
   }
 
@@ -485,7 +492,7 @@ class StateManager {
    * @param taskQuery Query to perform, the results of which will be modified.
    * @param newState State to move the resulting tasks into.
    */
-  void changeState(Query taskQuery, ScheduleStatus newState) {
+  synchronized void changeState(Query taskQuery, ScheduleStatus newState) {
     changeState(taskQuery, stateUpdater(newState));
   }
 
@@ -497,38 +504,25 @@ class StateManager {
    * @param newState State to move the resulting tasks into.
    * @param auditMessage Audit message to apply along with the state change.
    */
-  void changeState(Query taskQuery, ScheduleStatus newState, String auditMessage) {
+  synchronized void changeState(Query taskQuery, ScheduleStatus newState, String auditMessage) {
     changeState(taskQuery, stateUpdaterWithAuditMessage(newState, auditMessage));
   }
 
   /**
-   * Performs a state change on at most one task.
-   * If a result of {@code taskQuery} is found, {@code mutation} will be called with the result,
-   * and the return value from {@code mutation} will be returned, or {@code null} if no result was
-   * found.
-   * If multiple results are found from {@code taskQuery}, {@link IllegalStateException} will be
-   * thrown.
+   * Assigns a task to a specific slave.
+   * This will modify the task record to reflect the host assignment and return the updated record.
    *
-   * @param taskQuery Query to perform, the results of which will be modified.
-   * @param newState State to move the resulting tasks into.
-   * @param mutation Mutate operation to execute on the query result, if one exists.
-   * @param <T> The function return type.
-   * @return The return value from {@code mutation}.
+   * @param taskId ID of the task to mutate.
+   * @param slaveHost Host name that the task is being assigned to.
+   * @param slaveId ID of the slave that the task is being assigned to.
+   * @return The updated task record, or {@code null} if the task was not found.
    */
-  <T> T changeState(Query taskQuery, ScheduleStatus newState,
-      final Function<ScheduledTask, T> mutation) {
-    checkNotNull(taskQuery);
-    checkNotNull(newState);
-    checkNotNull(mutation);
+  synchronized AssignedTask assignTask(String taskId, String slaveHost, SlaveID slaveId) {
+    checkNotBlank(taskId);
+    checkNotBlank(slaveHost);
 
-    final AtomicReference<T> returnValue = new AtomicReference<T>();
-    changeState(taskQuery, stateUpdaterWithMutation(newState, new Closure<ScheduledTask>() {
-      @Override public void execute(ScheduledTask task) {
-        Preconditions.checkState(
-            returnValue.compareAndSet(null, mutation.apply(task)),
-            "More than one result was found for an identity query.");
-      }
-    }));
+    final AtomicReference<AssignedTask> returnValue = new AtomicReference<AssignedTask>();
+    changeState(Query.byId(taskId), assignHost(slaveHost, slaveId, returnValue));
 
     return returnValue.get();
   }
@@ -539,7 +533,7 @@ class StateManager {
    * @param query Query to perform.
    * @return A read-only view of the tasks matching the query.
    */
-  Set<ScheduledTask> fetchTasks(final Query query) {
+  synchronized Set<ScheduledTask> fetchTasks(final Query query) {
     checkNotNull(query);
     managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
 
@@ -556,7 +550,7 @@ class StateManager {
    * @param query Query to perform.
    * @return The IDs of all tasks matching the query.
    */
-  Set<String> fetchTaskIds(final Query query) {
+  synchronized Set<String> fetchTaskIds(final Query query) {
     checkNotNull(query);
     managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
 
@@ -576,11 +570,12 @@ class StateManager {
    * @param shards Shards within a job to fetch.
    * @return The task information of the shard.
    */
-  Set<TwitterTaskInfo> fetchUpdatedTaskConfigs(final String role, final String job,
+  synchronized Set<TwitterTaskInfo> fetchUpdatedTaskConfigs(final String role, final String job,
       final Set<Integer> shards) {
     checkNotNull(role);
     checkNotNull(job);
     checkNotBlank(shards);
+    managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
 
     Set<ShardUpdateConfiguration> configs =
         storage.doInTransaction(new Work.Quiet<Set<ShardUpdateConfiguration>>() {
@@ -590,6 +585,69 @@ class StateManager {
     });
 
     return ImmutableSet.copyOf(Iterables.transform(configs, Shards.GET_NEW_CONFIG));
+  }
+
+  private static final Function<TaskStateMachine, String> GET_TASK_ID =
+      new Function<TaskStateMachine, String>() {
+        @Override public String apply(TaskStateMachine stateMachine) {
+          return stateMachine.getTaskId();
+        }
+      };
+
+  private static final Function<TaskStateMachine, String> GET_HOST =
+      new Function<TaskStateMachine, String>() {
+        @Override public String apply(TaskStateMachine stateMachine) {
+          return stateMachine.getSlaveHost();
+        }
+      };
+
+  private static final Predicate<TaskStateMachine> HAS_HOST =
+      Predicates.compose(Predicates.notNull(), GET_HOST);
+
+  /**
+   * Generates a mapping from slave hostname to task IDs, including only tasks that have been
+   * assigned to a host.
+   *
+   * @return Map from slave hosts to task IDs.
+   */
+  synchronized Multimap<String, String> getHostAssignedTasks() {
+    return Multimaps.transformValues(
+        Multimaps.index(Iterables.filter(taskStateMachines.values(), HAS_HOST), GET_HOST),
+        GET_TASK_ID);
+  }
+
+  /**
+   * Instructs the state manager to abandon records of the provided tasks.  This is essentially
+   * simulating an executor notifying the state manager of missing tasks.
+   * Tasks will be deleted in this process.
+   *
+   * @param taskIds IDs of tasks to abandon.
+   * @throws IllegalStateException If the manager is not in a state to service abandon requests.
+   */
+  synchronized void abandonTasks(final Set<String> taskIds) throws IllegalStateException {
+    MorePreconditions.checkNotBlank(taskIds);
+    managerState.checkState(State.STARTED);
+
+    processWorkQueueAfter(new Command() {
+      @Override public void execute() {
+        for (String taskId : taskIds) {
+          TaskStateMachine stateMachine = taskStateMachines.get(taskId);
+          if (stateMachine != null) {
+            stateMachine.updateState(ScheduleStatus.UNKNOWN, "Dead executor.");
+          } else {
+            LOG.severe("Unknown task ID " + taskId);
+          }
+        }
+      }
+    });
+
+    storage.doInTransaction(
+        new Work.NoResult.Quiet() {
+          @Override protected void execute(StoreProvider storeProvider) {
+            deleteTasks(storeProvider.getTaskStore(), taskIds);
+          }
+        }
+    );
   }
 
   private <T, E extends Exception> void transactionalWork(final Work<T, E> work) throws E {
@@ -630,6 +688,29 @@ class StateManager {
         stateMachine.updateState(state, auditMessage);
       }
     };
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Closure<TaskStateMachine> assignHost(final String slaveHost,
+      final SlaveID slaveId, final AtomicReference<AssignedTask> taskReference) {
+    Closure<ScheduledTask> mutation = new Closure<ScheduledTask>() {
+      @Override public void execute(ScheduledTask task) {
+        AssignedTask assigned = task.getAssignedTask();
+        assigned.setSlaveHost(slaveHost)
+            .setSlaveId(slaveId.getValue());
+        Preconditions.checkState(
+            taskReference.compareAndSet(null, assigned),
+            "More than one result was found for an identity query.");
+      }
+    };
+
+    return Closures.combine(
+        stateUpdaterWithMutation(ScheduleStatus.ASSIGNED, mutation),
+        new Closure<TaskStateMachine>() {
+          @Override public void execute(TaskStateMachine stateMachine) {
+            stateMachine.setSlaveHost(slaveHost);
+          }
+        });
   }
 
   private static Closure<TaskStateMachine> stateUpdaterWithMutation(final ScheduleStatus state,
@@ -731,8 +812,7 @@ class StateManager {
                 break;
 
               case DELETE:
-                taskStore.removeTasks(ImmutableSet.of(taskId));
-                taskStateMachines.remove(taskId);
+                deleteTasks(taskStore, ImmutableSet.of(taskId));
                 break;
 
               case INCREMENT_FAILURES:
@@ -750,6 +830,11 @@ class StateManager {
         });
       }
     }
+  }
+
+  private void deleteTasks(TaskStore taskStore, Set<String> taskIds) {
+    taskStore.removeTasks(taskIds);
+    taskStateMachines.keySet().removeAll(taskIds);
   }
 
   private void maybeRescheduleForUpdate(Storage.StoreProvider storeProvider, String taskId,
@@ -802,8 +887,14 @@ class StateManager {
         taskUpdateChecker(role, job),
         workSink,
         MISSING_TASK_GRACE_PERIOD.get(),
+        clock,
         initialState,
         transitionListeners.get(jobKey));
+
+    String slaveHost = task.getAssignedTask().getSlaveHost();
+    if (!StringUtils.isBlank(slaveHost)) {
+      stateMachine.setSlaveHost(slaveHost);
+    }
 
     taskStateMachines.put(taskId, stateMachine);
     return stateMachine;

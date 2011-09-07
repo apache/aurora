@@ -434,6 +434,7 @@ class MesosCLI(cmd.Cmd):
     resp = self._client.setQuota(role, Quota(cpu, ram_mb, disk_mb), self.acquire_session())
     log.info('Response from scheduler: %s' % resp)
 
+
 def initialize_options():
   usage = """Mesos command-line interface.
 

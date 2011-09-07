@@ -189,9 +189,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
     return !getTasks(Query.activeQuery(job)).isEmpty();
   }
 
-  // TODO(William Farner): This is does not currently clear out tasks when a host is decommissioned.
-  //    Figure out a solution that will work.  Might require mesos support for fetching the list
-  //    of slaves.
   @Override
   public void stateUpdate(final ExecutorKey executor, final StateUpdateResponse update) {
     checkStarted();
@@ -421,15 +418,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
       return null;
     }
 
-    AssignedTask task = stateManager.changeState(Query.byId(Tasks.id(assignment)), ASSIGNED,
-        new Function<ScheduledTask, AssignedTask>() {
-          @Override public AssignedTask apply(ScheduledTask task) {
-            AssignedTask assigned = task.getAssignedTask();
-            assigned.setSlaveHost(hostname);
-            assigned.setSlaveId(slaveOffer.getSlaveId().getValue());
-            return assigned;
-          }
-        });
+    AssignedTask task =
+        stateManager.assignTask(Tasks.id(assignment), hostname, slaveOffer.getSlaveId());
 
     // There were no PENDING candidates.
     if (task == null) {

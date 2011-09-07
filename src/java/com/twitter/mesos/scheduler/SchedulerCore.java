@@ -44,10 +44,6 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
  * <li>{@link #stop()}
  * </ol>
  *
- * TODO(William Farner): Add support for machine drains via an administrator interface.  This would
- * accept a machine host name (or slave ID) and a.) kill tasks running on the machine, b.) prevent
- * tasks from being scheduled on the machine.
- *
  * @author William Farner
  */
 public interface SchedulerCore extends Function<Query, Iterable<TwitterTaskInfo>> {

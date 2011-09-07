@@ -329,10 +329,13 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     sessionValidator.checkAuthenticated(session, ADMIN_ROLE.get());
   }
 
+  private static final String NOT_ADMIN_MESSAGE = "Only admins may perform this operation.";
+
   @Override
   public SetQuotaResponse setQuota(String ownerRole, Quota quota, SessionKey session) {
-    checkNotBlank(ownerRole, "Owner role may not be blank.");
+    checkNotBlank(ownerRole, "Owner role must not be blank.");
     checkNotNull(quota, "Quota must not be null");
+    checkNotNull(session, "Session must be set.");
 
     SetQuotaResponse response = new SetQuotaResponse();
     try {
@@ -340,8 +343,7 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
       quotaManager.setQuota(ownerRole, quota);
       response.setResponseCode(ResponseCode.OK).setMessage("Quota applied.");
     } catch (AuthFailedException e) {
-      response.setResponseCode(ResponseCode.AUTH_FAILED)
-          .setMessage("Only admins may perform this operation.");
+      response.setResponseCode(ResponseCode.AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
     }
 
     return response;
