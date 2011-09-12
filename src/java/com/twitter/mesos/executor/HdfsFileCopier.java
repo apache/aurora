@@ -3,7 +3,7 @@ package com.twitter.mesos.executor;
 import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
 import com.twitter.common.base.ExceptionalFunction;
-import com.twitter.mesos.util.HdfsUtil;
+import com.twitter.common_internal.util.HdfsUtils;
 import org.apache.hadoop.conf.Configuration;
 
 import java.io.File;
@@ -32,7 +32,7 @@ public class HdfsFileCopier implements ExceptionalFunction<FileCopyRequest, File
     LOG.info(String.format(
         "HDFS file %s -> local file %s", copy.getSourcePath(), copy.getDestPath()));
     try {
-      return HdfsUtil.downloadFileFromHdfs(conf, copy.getSourcePath(), copy.getDestPath(), true);
+      return HdfsUtils.downloadFileFromHdfs(conf, copy.getSourcePath(), copy.getDestPath(), true);
     } catch (IOException e) {
       LOG.log(Level.SEVERE, "Failed to download file from HDFS", e);
       throw e;

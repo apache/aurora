@@ -42,6 +42,7 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.thrift.ThriftFactory.ThriftFactoryException;
 import com.twitter.common_internal.cuckoo.CuckooWriter;
+import com.twitter.common_internal.util.HdfsUtils;
 import com.twitter.mesos.Message;
 import com.twitter.mesos.executor.Driver.DriverImpl;
 import com.twitter.mesos.executor.FileToInt.FetchException;
@@ -58,7 +59,6 @@ import com.twitter.mesos.executor.sync.SyncBuffer.SyncBufferImpl;
 import com.twitter.mesos.executor.sync.SyncBufferSize;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduleStatus;
-import com.twitter.mesos.util.HdfsUtil;
 
 /**
  * ExecutorModule
@@ -172,7 +172,7 @@ public class ExecutorModule extends AbstractModule {
 
     // Bindings needed for HdfsFileCopier
     try {
-      bind(Configuration.class).toInstance(HdfsUtil.getHdfsConfiguration(hdfsConfig.get()));
+      bind(Configuration.class).toInstance(HdfsUtils.getHdfsConfiguration(hdfsConfig.get()));
     } catch (IOException e) {
       LOG.log(Level.SEVERE, "Failed to create HDFS fileSystem.", e);
       Throwables.propagate(e);
