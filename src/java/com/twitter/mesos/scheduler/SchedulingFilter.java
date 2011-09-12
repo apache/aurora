@@ -1,5 +1,9 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Collection;
+import java.util.Map;
+import java.util.Set;
+
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
@@ -12,14 +16,10 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.inject.Inject;
 import com.google.inject.name.Named;
+
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
-
-import java.util.Collection;
-import java.util.Map;
-import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -39,7 +39,7 @@ public interface SchedulingFilter {
    * @param slaveHost The slave host that the resource offer is associated with.
    * @return A new predicate that can be used to find tasks satisfied by the offer.
    */
-  public Predicate<TwitterTaskInfo> staticFilter(TwitterTaskInfo resourceOffer, String slaveHost);
+  public Predicate<TwitterTaskInfo> staticFilter(Resources resourceOffer, String slaveHost);
 
   /**
    * Creates a filter that will make decisions about whether tasks are allowed to run on a machine,
@@ -146,16 +146,16 @@ public interface SchedulingFilter {
       };
     }
 
-    private static Predicate<TwitterTaskInfo> offerSatisfiesTask(final TwitterTaskInfo offer) {
+    private static Predicate<TwitterTaskInfo> offerSatisfiesTask(final Resources offer) {
       return new Predicate<TwitterTaskInfo>() {
         @Override public boolean apply(TwitterTaskInfo task) {
-          return ConfigurationManager.satisfied(task, offer);
+          return offer.greaterThanOrEqual(Resources.from(task));
         }
       };
     }
 
     @Override
-    public Predicate<TwitterTaskInfo> staticFilter(TwitterTaskInfo resourceOffer,
+    public Predicate<TwitterTaskInfo> staticFilter(Resources resourceOffer,
         String slaveHost) {
       final Predicate<TwitterTaskInfo> offerSatisfiesTask = offerSatisfiesTask(resourceOffer);
       final Predicate<TwitterTaskInfo> isPairAllowed = meetsMachineReservation(slaveHost);

@@ -260,7 +260,7 @@ public class PreempterTest extends EasyMockTest {
   }
 
   private void expectStaticFiltering() {
-    expect(schedulingFilter.staticFilter(EasyMock.<TwitterTaskInfo>anyObject(), EasyMock
+    expect(schedulingFilter.staticFilter(EasyMock.<Resources>anyObject(), EasyMock
         .<String>anyObject()))
         .andReturn(Predicates.<TwitterTaskInfo>alwaysTrue())
         .anyTimes();

@@ -3,10 +3,8 @@ package com.twitter.mesos.executor;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Map;
 
 import com.google.common.base.Charsets;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import com.google.common.io.Files;
 
@@ -17,7 +15,6 @@ import org.junit.Test;
 
 import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
-import com.twitter.common.collections.Pair;
 import com.twitter.common.io.FileUtils;
 import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
@@ -35,8 +32,6 @@ import static com.twitter.mesos.executor.LiveTask.STDOUT_CAPTURE_FILE;
 import static com.twitter.mesos.executor.TaskOnDisk.TASK_DUMP_FILE;
 import static com.twitter.mesos.executor.TaskOnDisk.TASK_STATUS_FILE;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
-import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
-import static org.easymock.EasyMock.anyInt;
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.createControl;
 import static org.easymock.EasyMock.expect;
@@ -49,7 +44,6 @@ import static org.junit.Assert.assertThat;
 public class LiveTaskTest {
 
   private static final int PID = 12345;
-  private static final int HTTP_PORT = 6789;
 
   private File executorRoot;
 
@@ -65,7 +59,6 @@ public class LiveTaskTest {
   private AssignedTask taskObj;
 
   private IMocksControl control;
-  private SocketManager socketManager;
   private ExceptionalFunction<Integer, Boolean, HealthCheckException> healthChecker;
   private ExceptionalClosure<KillCommand, KillException> processKiller;
   private ExceptionalFunction<File, Integer, FileToInt.FetchException> pidFetcher;
@@ -74,7 +67,6 @@ public class LiveTaskTest {
   @SuppressWarnings("unchecked")
   public void setUp() throws Exception {
     control = createControl();
-    socketManager = control.createMock(SocketManager.class);
     healthChecker = control.createMock(ExceptionalFunction.class);
     processKiller = control.createMock(ExceptionalClosure.class);
     pidFetcher = control.createMock(ExceptionalFunction.class);
@@ -208,16 +200,15 @@ public class LiveTaskTest {
   @Test
   public void testHealthCheckFailure() throws Exception {
     final int customPort = 4634;
-    expect(socketManager.leaseSocket()).andReturn(customPort);
     expect(pidFetcher.apply((File) anyObject())).andReturn(PID);
-    expect(healthChecker.apply(anyInt())).andThrow(new HealthCheckException("Timeout."))
+    expect(healthChecker.apply(customPort)).andThrow(new HealthCheckException("Timeout."))
         .atLeastOnce();
-    socketManager.returnSocket(customPort);
 
     control.replay();
 
     taskObj.getTask().setHealthCheckIntervalSecs(1)
-        .setStartCommand("echo '%port:health%'; sleep 40");
+        .setStartCommand("sleep 40");
+    taskObj.putToAssignedPorts(LiveTask.HEALTH_CHECK_PORT_NAME, customPort);
     LiveTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
     taskA.run();
@@ -225,158 +216,9 @@ public class LiveTaskTest {
     assertThat(taskA.blockUntilTerminated(), is(ScheduleStatus.FAILED));
   }
 
-  @Test
-  public void testReleasesPortsNormalShutdown() throws Exception {
-    final int customPort = 4634;
-    expect(socketManager.leaseSocket()).andReturn(customPort);
-    expect(pidFetcher.apply((File) anyObject())).andReturn(PID);
-    socketManager.returnSocket(customPort);
-
-    control.replay();
-
-    taskObj.getTask().setStartCommand("echo '%port:myport%'");
-    LiveTask taskA = makeTask(taskObj, TASK_ID_A);
-    taskA.stage();
-    taskA.run();
-
-    assertThat(taskA.blockUntilTerminated(), is(FINISHED));
-  }
-
-  @Test
-  public void testReleasesPortsKill() throws Exception {
-    final int customPort = 4634;
-    expect(socketManager.leaseSocket()).andReturn(customPort);
-    expect(pidFetcher.apply((File) anyObject())).andReturn(PID);
-    processKiller.execute(new KillCommand(PID));
-    socketManager.returnSocket(customPort);
-
-    control.replay();
-
-    taskObj.getTask().setStartCommand("echo '%port:myport%'; sleep 10");
-    LiveTask taskA = makeTask(taskObj, TASK_ID_A);
-    taskA.stage();
-    taskA.run();
-
-    taskA.terminate(KILLED);
-  }
-
-  @Test
-  public void testLeasePort() throws Exception {
-    expect(socketManager.leaseSocket()).andReturn(HTTP_PORT);
-
-    control.replay();
-
-    taskObj.getTask().setStartCommand("echo '%port:http%'");
-    LiveTask taskA = makeTask(taskObj, TASK_ID_A);
-
-    Pair<String, Map<String, Integer>> expanded = taskA.expandCommandLine();
-
-    assertThat(expanded.getFirst(), is(String.format("echo '%d'", HTTP_PORT)));
-
-    Map<String, Integer> expectedPorts = ImmutableMap.of("http", HTTP_PORT);
-    assertThat(expanded.getSecond(), is(expectedPorts));
-  }
-
-  @Test
-  public void testLeasePortDuplicate() throws Exception {
-    expect(socketManager.leaseSocket()).andReturn(HTTP_PORT);
-
-    control.replay();
-
-    taskObj.getTask().setStartCommand("echo '%port:http%'; echo '%port:http%';");
-    LiveTask taskA = makeTask(taskObj, TASK_ID_A);
-
-    Pair<String, Map<String, Integer>> expanded = taskA.expandCommandLine();
-
-    assertThat(expanded.getFirst(),
-        is(String.format("echo '%d'; echo '%d';", HTTP_PORT, HTTP_PORT)));
-
-    Map<String, Integer> expectedPorts = ImmutableMap.of("http", HTTP_PORT);
-    assertThat(expanded.getSecond(), is(expectedPorts));
-  }
-
-  @Test
-  public void testLeasePorts() throws Exception {
-    final int thriftPort = 10000;
-    final int mailPort = 10001;
-
-    expect(socketManager.leaseSocket()).andReturn(HTTP_PORT);
-    expect(socketManager.leaseSocket()).andReturn(thriftPort);
-    expect(socketManager.leaseSocket()).andReturn(mailPort);
-
-    control.replay();
-
-    taskObj.getTask().setStartCommand(
-        "echo '%port:http%'; echo '%port:thrift%'; echo '%port:mail%'");
-    LiveTask taskA = makeTask(taskObj, TASK_ID_A);
-
-    Pair<String, Map<String, Integer>> expanded = taskA.expandCommandLine();
-
-    assertThat(expanded.getFirst(),
-        is(String.format("echo '%d'; echo '%d'; echo '%d'", HTTP_PORT, thriftPort, mailPort)));
-    Map<String, Integer> expectedPorts = ImmutableMap.of(
-        "http", HTTP_PORT,
-        "thrift", thriftPort,
-        "mail", mailPort);
-    assertThat(expanded.getSecond(), is(expectedPorts));
-  }
-
-  @Test
-  public void testGetShardId() throws Exception {
-    control.replay();
-
-    taskObj.getTask().setStartCommand("echo '%shard_id%'");
-    LiveTask taskA = makeTask(taskObj, TASK_ID_A);
-
-    String commandLine = taskA.expandCommandLine().getFirst();
-    assertThat(commandLine, is("echo '" + SHARD_ID_A + "'"));
-  }
-
-  @Test
-  public void testGetTaskId() throws Exception {
-    control.replay();
-
-    taskObj.getTask().setStartCommand("echo '%task_id%'");
-    LiveTask taskA = makeTask(taskObj, TASK_ID_A);
-
-    String commandLine = taskA.expandCommandLine().getFirst();
-    assertThat(commandLine, is("echo '" + TASK_ID_A + "'"));
-  }
-
-  @Test
-  public void testLeasePortsDuplicateName() throws Exception {
-    expect(socketManager.leaseSocket()).andReturn(HTTP_PORT);
-
-    control.replay();
-
-    taskObj.getTask().setStartCommand("echo '%port:http%'; echo '%port:http%'");
-    LiveTask taskA = makeTask(taskObj, TASK_ID_A);
-
-    Pair<String, Map<String, Integer>> expanded = taskA.expandCommandLine();
-
-    assertThat(expanded.getFirst(),
-        is(String.format("echo '%d'; echo '%d'", HTTP_PORT, HTTP_PORT)));
-
-    Map<String, Integer> expectedPorts = ImmutableMap.of("http", HTTP_PORT);
-    assertThat(expanded.getSecond(), is(expectedPorts));
-  }
-
-  @Test(expected = Task.TaskRunException.class)
-  public void testLeasePortsNoneAvailable() throws Exception {
-    expect(socketManager.leaseSocket()).andReturn(HTTP_PORT);
-    expect(socketManager.leaseSocket()).andReturn(10);
-    expect(socketManager.leaseSocket()).andThrow(new SocketManager.SocketLeaseException("Empty"));
-
-    control.replay();
-
-    taskObj.getTask().setStartCommand(
-        "echo '%port:http%'; echo '%port:thrift%'; echo '%port:mail%'");
-    makeTask(taskObj, TASK_ID_A).expandCommandLine();
-  }
-
   private LiveTask makeTask(AssignedTask task, String taskId) {
     task.setTaskId(taskId);
-    return new LiveTask(socketManager, healthChecker, processKiller, pidFetcher,
+    return new LiveTask(healthChecker, processKiller, pidFetcher,
         new File(executorRoot, String.valueOf(task.getTaskId())), task, COPIER, false);
   }
 

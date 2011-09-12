@@ -9,8 +9,10 @@ import java.util.Set;
 import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
+import com.google.common.base.Functions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -21,6 +23,8 @@ import com.google.common.collect.Sets;
 
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.Resource;
+import org.apache.mesos.Protos.Resource.Range;
+import org.apache.mesos.Protos.Resource.Ranges;
 import org.apache.mesos.Protos.Resource.Scalar;
 import org.apache.mesos.Protos.Resource.Type;
 import org.apache.mesos.Protos.SlaveID;
@@ -30,6 +34,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.common.base.Closure;
+import com.twitter.common.collections.Pair;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 import com.twitter.mesos.ExecutorKey;
@@ -992,25 +997,36 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   private void sendOffer(SlaveOffer offer, String taskId, SlaveID slave, String slaveHost)
       throws Exception {
+    sendOffer(offer, taskId, slave, slaveHost, ImmutableSet.<String>of(),
+        ImmutableSet.<Integer>of());
+  }
+
+  private void sendOffer(SlaveOffer offer, String taskId, SlaveID slave, String slaveHost,
+      Set<String> portNames, Set<Integer> ports) throws Exception {
     AssignedTask task = getTask(taskId).task.getAssignedTask().deepCopy();
-    task.setSlaveId(slave.getValue());
-    task.setSlaveHost(slaveHost);
 
     List<Resource> resources = ImmutableList.of(
-        Resources.makeResource(Resources.CPUS, task.getTask().getNumCpus()),
-        Resources.makeResource(Resources.RAM_MB, task.getTask().getRamMb())
+        Resources.makeMesosResource(Resources.CPUS, task.getTask().getNumCpus()),
+        Resources.makeMesosResource(Resources.RAM_MB, task.getTask().getRamMb()),
+        Resources.makeMesosRangeResource(Resources.PORTS, ports)
     );
 
-    assertThat(scheduler.offer(offer, EXECUTOR_ID),
-        is(SchedulerCoreImpl.makeTwitterTask(task, slave.getValue(), resources)));
+    TwitterTask assigned = scheduler.offer(offer, EXECUTOR_ID);
+
+    assertThat(assigned, is(SchedulerCoreImpl.makeTwitterTask(
+        getTask(taskId).task.getAssignedTask(), slave.getValue(), resources)));
+    assertThat(assigned.task.getSlaveHost(), is(slaveHost));
+    Map<String, Integer> assignedPorts = assigned.task.getAssignedPorts();
+    assertThat(assignedPorts.keySet(), is(portNames));
+    assertThat(ImmutableSet.copyOf(assignedPorts.values()), is(ports));
   }
 
   @Test
   public void testExecutorBootstrap() throws Exception {
     expect(executorPulseMonitor.isAlive(SLAVE_HOST_1_KEY)).andReturn(false);
 
-    SlaveOffer slaveOffer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 3, 4096);
-    final TwitterTaskInfo offerInfo = ConfigurationManager.makeConcrete(slaveOffer);
+    SlaveOffer offer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 3, 4096);
+    final Resources offerResources = Resources.from(offer);
 
     final TwitterTaskInfo augmented = new TwitterTaskInfo().setNumCpus(3.14).setRamMb(1137);
     expect(executorResourceAugmenter.apply(EasyMock.<TwitterTaskInfo>notNull()))
@@ -1019,12 +1035,12 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     final Predicate<TwitterTaskInfo> staticFilter =
         createMock(new Clazz<Predicate<TwitterTaskInfo>>() {});
     expect(staticFilter.apply(augmented)).andReturn(false);
-    expect(schedulingFilter.staticFilter(offerInfo, SLAVE_HOST_1)).andReturn(staticFilter);
+    expect(schedulingFilter.staticFilter(offerResources, SLAVE_HOST_1)).andReturn(staticFilter);
 
     control.replay();
 
     buildScheduler();
-    assertNull(scheduler.offer(slaveOffer, EXECUTOR_ID));
+    assertNull(scheduler.offer(offer, EXECUTOR_ID));
   }
 
   @Test
@@ -1725,6 +1741,81 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     }.runTest(numTasks, additionalTasks);
   }
 
+  @Test
+  public void testTaskIdExpansion() throws Exception {
+    expectOffer(true);
+
+    control.replay();
+    buildScheduler();
+
+    TwitterTaskInfo config = new TwitterTaskInfo(DEFAULT_TASK);
+    config.putToConfiguration("start_command", "%task_id%");
+
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, config, 1));
+
+    String taskId = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)).task);
+    SlaveOffer offer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
+    sendOffer(offer, taskId, SLAVE_ID, SLAVE_HOST_1);
+
+    AssignedTask task = getTask(taskId).task.getAssignedTask();
+    assertThat(task.getTask().getStartCommand(), is(taskId));
+  }
+
+  @Test
+  public void testShardIdExpansion() throws Exception {
+    expectOffer(true);
+
+    control.replay();
+    buildScheduler();
+
+    TwitterTaskInfo config = new TwitterTaskInfo(DEFAULT_TASK);
+    config.putToConfiguration("start_command", "%shard_id%");
+
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, config, 1));
+
+    String taskId = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)).task);
+    SlaveOffer offer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
+    sendOffer(offer, taskId, SLAVE_ID, SLAVE_HOST_1);
+
+    AssignedTask task = getTask(taskId).task.getAssignedTask();
+    assertThat(task.getTask().getStartCommand(), is("0"));
+  }
+
+  @Test
+  public void testPortResource() throws Exception {
+    expectOffer(true);
+
+    control.replay();
+    buildScheduler();
+
+    TwitterTaskInfo config = new TwitterTaskInfo(DEFAULT_TASK);
+    config.putToConfiguration("start_command", "%port:one% %port:two% %port:three%");
+
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, config, 1));
+
+    String taskId = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)).task);
+
+    Set<Integer> assignedPorts = ImmutableSet.of(80, 81, 82);
+    SlaveOffer threePorts = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096, ImmutableSet.of(Pair.of(80, 82)));
+    sendOffer(threePorts, taskId, SLAVE_ID, SLAVE_HOST_1,
+        ImmutableSet.of("one", "two", "three"), assignedPorts);
+
+    AssignedTask task = getTask(taskId).task.getAssignedTask();
+
+    assertThat(ImmutableSet.copyOf(Splitter.on(" ").split(task.getTask().getStartCommand())),
+        is(ImmutableSet.of("80", "81", "82")));
+  }
+
+  @Test
+  public void testBadExpansion() throws Exception {
+    control.replay();
+    buildScheduler();
+
+    TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
+    task.putToConfiguration("start_command", "%port%");
+    scheduler.createJob(makeJob(OWNER_A, "foo", task, 1));
+  }
+
   // TODO(William Farner): Inject a task ID generation function into StateManager so that we can
   //     expect specific task IDs to be killed here.
   private void expectKillTask(int numTasks) {
@@ -1758,11 +1849,28 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   private static SlaveOffer createSlaveOffer(SlaveID slave, String slaveHost, double cpu,
       double ramMb) {
+    return createSlaveOffer(slave, slaveHost, cpu, ramMb,
+        ImmutableSet.<Pair<Integer, Integer>>of());
+  }
+
+  private static SlaveOffer createSlaveOffer(SlaveID slave, String slaveHost, double cpu,
+      double ramMb, Set<Pair<Integer, Integer>> ports) {
+
+    Ranges portRanges = Ranges.newBuilder()
+        .addAllRange(Iterables.transform(ports, new Function<Pair<Integer, Integer>, Range>() {
+          @Override public Range apply(Pair<Integer, Integer> range) {
+            return Range.newBuilder().setBegin(range.getFirst()).setEnd(range.getSecond()).build();
+          }
+        }))
+        .build();
+
     return SlaveOffer.newBuilder()
         .addResources(Resource.newBuilder().setType(Type.SCALAR).setName(Resources.CPUS)
             .setScalar(Scalar.newBuilder().setValue(cpu)))
         .addResources(Resource.newBuilder().setType(Type.SCALAR).setName(Resources.RAM_MB)
             .setScalar(Scalar.newBuilder().setValue(ramMb)))
+        .addResources(Resource.newBuilder().setType(Type.RANGES).setName(Resources.PORTS)
+            .setRanges(portRanges))
         .setSlaveId(slave)
         .setHostname(slaveHost)
         .build();
@@ -1844,8 +1952,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   }
 
   private void expectOffer(boolean passFilter) {
-    expect(executorPulseMonitor.isAlive((ExecutorKey) anyObject())).andReturn(true);
-    expect(schedulingFilter.staticFilter((TwitterTaskInfo) anyObject(), (String) anyObject()))
+    expect(executorPulseMonitor.isAlive(EasyMock.<ExecutorKey>anyObject())).andReturn(true);
+    expect(schedulingFilter.staticFilter(EasyMock.<Resources>anyObject(),
+        EasyMock.<String>anyObject()))
         .andReturn(passFilter ? Predicates.<TwitterTaskInfo> alwaysTrue()
             : Predicates.<TwitterTaskInfo> alwaysFalse());
     @SuppressWarnings("unchecked")

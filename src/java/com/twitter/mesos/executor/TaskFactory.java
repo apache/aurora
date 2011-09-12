@@ -21,7 +21,6 @@ import java.io.IOException;
  */
 public class TaskFactory implements Function<AssignedTask, Task> {
 
-  private final SocketManager socketManager;
   private final ExceptionalFunction<Integer, Boolean, HealthCheckException> healthChecker;
   private final ExceptionalClosure<KillCommand, KillException> processKiller;
   private final ExceptionalFunction<File, Integer, FetchException> pidFetcher;
@@ -31,7 +30,6 @@ public class TaskFactory implements Function<AssignedTask, Task> {
 
   @Inject
   public TaskFactory(@ExecutorRootDir File executorRootDir,
-      SocketManager socketManager,
       ExceptionalFunction<Integer, Boolean, HealthCheckException> healthChecker,
       ExceptionalClosure<KillCommand, KillException> processKiller,
       ExceptionalFunction<File, Integer, FileToInt.FetchException> pidFetcher,
@@ -39,7 +37,6 @@ public class TaskFactory implements Function<AssignedTask, Task> {
       @MultiUserMode boolean multiUser) {
 
     this.executorRootDir = Preconditions.checkNotNull(executorRootDir);
-    this.socketManager = Preconditions.checkNotNull(socketManager);
     this.healthChecker = Preconditions.checkNotNull(healthChecker);
     this.processKiller = Preconditions.checkNotNull(processKiller);
     this.pidFetcher = Preconditions.checkNotNull(pidFetcher);
@@ -51,7 +48,12 @@ public class TaskFactory implements Function<AssignedTask, Task> {
   public Task apply(AssignedTask task) {
     Preconditions.checkNotNull(task);
 
-    return new LiveTask(socketManager, healthChecker, processKiller,
-      pidFetcher, new File(executorRootDir, task.getTaskId()), task, fileCopier, multiUser);
+    return new LiveTask(healthChecker,
+        processKiller,
+        pidFetcher,
+        new File(executorRootDir, task.getTaskId()),
+        task,
+        fileCopier,
+        multiUser);
   }
 }

@@ -81,15 +81,6 @@ public class DeadTask extends TaskOnDisk {
   }
 
   @Override
-  public ResourceConsumption getResourceConsumption() {
-    if (diskConsumed == null) {
-      diskConsumed = Amount.of(FileUtils.sizeOfDirectory(taskRoot), Data.BYTES);
-    }
-
-    return new ResourceConsumption().setDiskUsedMb(diskConsumed.as(Data.MB).intValue());
-  }
-
-  @Override
   public void run() {
     throw new UnsupportedOperationException("A dead task cannot be run.");
   }

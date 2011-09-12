@@ -13,6 +13,8 @@ import com.google.common.collect.Maps;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Data;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Identity;
@@ -46,8 +48,8 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
   private static final long DEFAULT_RAM = 1000;
   private static final int DEFAULT_CPUS = 4;
-  private static final TwitterTaskInfo DEFAULT_OFFER = new TwitterTaskInfo()
-      .setDiskMb(DEFAULT_DISK).setRamMb(DEFAULT_RAM).setNumCpus(DEFAULT_CPUS);
+  private static final Resources DEFAULT_OFFER =
+      new Resources(DEFAULT_CPUS, Amount.of(DEFAULT_RAM, Data.MB), 0);
 
   private SchedulingFilter defaultFilter;
   private Function<Query, Iterable<TwitterTaskInfo>> taskFetcher;
@@ -69,6 +71,28 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   }
 
   @Test
+  public void testSufficientPorts() throws Exception {
+    control.replay();
+
+    Resources twoPorts = new Resources(DEFAULT_CPUS, Amount.of(DEFAULT_RAM, Data.MB), 2);
+
+    Predicate<TwitterTaskInfo> filter = defaultFilter.staticFilter(twoPorts, HOST_A);
+
+    TwitterTaskInfo noPortTask = makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
+        .setStartCommand("%task_id%");
+    TwitterTaskInfo onePortTask = makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
+        .setStartCommand("%port:one% %port:one% %port:one% %port:one%");
+    TwitterTaskInfo twoPortTask = makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
+        .setStartCommand("%port:one% %port:two% %port:two%");
+    TwitterTaskInfo threePortTask = makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
+        .setStartCommand("%port:one% %port:two% %port:three%");
+    assertThat(filter.apply(noPortTask), is(true));
+    assertThat(filter.apply(onePortTask), is(true));
+    assertThat(filter.apply(twoPortTask), is(true));
+    assertThat(filter.apply(threePortTask), is(false));
+  }
+
+  @Test
   public void testInsufficientResources() throws Exception {
     control.replay();
 
@@ -78,8 +102,6 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     assertThat(filter.apply(makeTask(DEFAULT_CPUS + 1, DEFAULT_RAM, DEFAULT_DISK)),
         is(false));
     assertThat(filter.apply(makeTask(DEFAULT_CPUS, DEFAULT_RAM + 1, DEFAULT_DISK)),
-        is(false));
-    assertThat(filter.apply(makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK + 1)),
         is(false));
   }
 

@@ -55,7 +55,6 @@ import static com.google.common.collect.Iterables.transform;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.mesos.Tasks.SCHEDULED_TO_SHARD_ID;
 import static com.twitter.mesos.Tasks.jobKey;
-import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
@@ -169,7 +168,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
     Set<ScheduledTask> tasks = stateManager.fetchTasks(query);
     return ImmutableSet.copyOf(Iterables.transform(tasks,
         new Function<ScheduledTask, TaskState>() {
-          @Override public TaskState apply(ScheduledTask task) {
+          @Override
+          public TaskState apply(ScheduledTask task) {
             VolatileTaskState volatileTaskState = taskStateById.get(Tasks.id(task));
             return new TaskState(task, volatileTaskState);
           }
@@ -352,26 +352,19 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
   @Override
   @Nullable
-  public synchronized TwitterTask offer(final SlaveOffer slaveOffer, ExecutorID defaultExecutorId)
+  public synchronized TwitterTask offer(final SlaveOffer offer, ExecutorID defaultExecutorId)
       throws ScheduleException {
     checkStarted();
-    checkNotNull(slaveOffer);
+    checkNotNull(offer);
 
     vars.resourceOffers.incrementAndGet();
 
-    final TwitterTaskInfo offer;
-    try {
-      offer = ConfigurationManager.makeConcrete(slaveOffer);
-    } catch (ConfigurationManager.TaskDescriptionException e) {
-      LOG.log(Level.SEVERE, "Invalid slave offer", e);
-      return null;
-    }
-
-    final String hostname = slaveOffer.getHostname();
-    Predicate<TwitterTaskInfo> hostResourcesFilter = schedulingFilter.staticFilter(offer, hostname);
+    final String hostname = offer.getHostname();
+    Predicate<TwitterTaskInfo> hostResourcesFilter =
+        schedulingFilter.staticFilter(Resources.from(offer), hostname);
 
     ExecutorKey executorKey =
-        new ExecutorKey(slaveOffer.getSlaveId(), defaultExecutorId, slaveOffer.getHostname());
+        new ExecutorKey(offer.getSlaveId(), defaultExecutorId, offer.getHostname());
 
     Query query;
     Predicate<TwitterTaskInfo> postFilter;
@@ -418,8 +411,11 @@ public class SchedulerCoreImpl implements SchedulerCore {
       return null;
     }
 
+    Set<Integer> selectedPorts = Resources.getPorts(offer,
+        Resources.from(assignment.getAssignedTask().getTask()).getNumPorts());
+
     AssignedTask task =
-        stateManager.assignTask(Tasks.id(assignment), hostname, slaveOffer.getSlaveId());
+        stateManager.assignTask(Tasks.id(assignment), hostname, offer.getSlaveId(), selectedPorts);
 
     // There were no PENDING candidates.
     if (task == null) {
@@ -430,11 +426,12 @@ public class SchedulerCoreImpl implements SchedulerCore {
         hostname, task.getSlaveId(), jobKey(task)));
 
     List<Resource> resources = ImmutableList.of(
-        Resources.makeResource(Resources.CPUS, task.getTask().getNumCpus()),
-        Resources.makeResource(Resources.RAM_MB, task.getTask().getRamMb())
+        Resources.makeMesosResource(Resources.CPUS, task.getTask().getNumCpus()),
+        Resources.makeMesosResource(Resources.RAM_MB, task.getTask().getRamMb()),
+        Resources.makeMesosRangeResource(Resources.PORTS, selectedPorts)
     );
 
-    return makeTwitterTask(task, slaveOffer.getSlaveId().getValue(), resources);
+    return makeTwitterTask(task, offer.getSlaveId().getValue(), resources);
   }
 
   @VisibleForTesting

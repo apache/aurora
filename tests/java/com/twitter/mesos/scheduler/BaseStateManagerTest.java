@@ -1,5 +1,6 @@
 package com.twitter.mesos.scheduler;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.common.testing.TearDown;
 
 import org.apache.mesos.Protos.SlaveID;
@@ -43,10 +44,12 @@ public abstract class BaseStateManagerTest extends EasyMockTest {
     return new TwitterTaskInfo()
         .setOwner(new Identity().setRole(owner).setUser(owner))
         .setJobName(job)
-        .setShardId(shard);
+        .setShardId(shard)
+        .setStartCommand("echo");
   }
 
   protected void assignTask(String taskId, String host) {
-    stateManager.assignTask(taskId, host, SlaveID.newBuilder().setValue(host).build());
+    stateManager.assignTask(taskId, host, SlaveID.newBuilder().setValue(host).build(),
+        ImmutableSet.<Integer>of());
   }
 }

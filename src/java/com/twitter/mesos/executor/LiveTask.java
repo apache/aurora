@@ -7,7 +7,6 @@ import java.io.InputStream;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -16,16 +15,12 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Closeables;
 import com.google.common.io.Files;
@@ -35,8 +30,6 @@ import org.apache.commons.lang.StringUtils;
 
 import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
-import com.twitter.common.base.ExceptionalFunctions;
-import com.twitter.common.collections.Pair;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.StateMachine;
@@ -45,7 +38,6 @@ import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
 import com.twitter.mesos.executor.ProcessKiller.KillException;
 import com.twitter.mesos.gen.AssignedTask;
-import com.twitter.mesos.gen.ResourceConsumption;
 import com.twitter.mesos.gen.ScheduleStatus;
 
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
@@ -78,19 +70,12 @@ public class LiveTask extends TaskOnDisk {
   @VisibleForTesting static final String RUN_SCRIPT_NAME = "run.sh";
   @VisibleForTesting static final String STDERR_CAPTURE_FILE = "stderr";
   @VisibleForTesting static final String STDOUT_CAPTURE_FILE = "stdout";
+  @VisibleForTesting static final String HEALTH_CHECK_PORT_NAME = "health";
 
-  private static final Pattern PORT_REQUEST_PATTERN = Pattern.compile("%port:(\\w+)%");
-  private static final String SHARD_ID_REGEXP = "%shard_id%";
-  private static final String TASK_ID_REGEXP = "%task_id%";
-
-  private static final String HEALTH_CHECK_PORT_NAME = "health";
   private static final Amount<Long, Time> LAUNCH_PIDFILE_GRACE_PERIOD = Amount.of(1L, Time.SECONDS);
 
   private final StateMachine<ScheduleStatus> stateMachine;
 
-  private final ResourceConsumption resourceConsumption = new ResourceConsumption();
-
-  private final SocketManager socketManager;
   private final ExceptionalFunction<Integer, Boolean, HealthCheckException> healthChecker;
   private final ExceptionalClosure<KillCommand, KillException> processKiller;
   private final ExceptionalFunction<File, Integer, FileToInt.FetchException> pidFetcher;
@@ -102,15 +87,13 @@ public class LiveTask extends TaskOnDisk {
 
   private int healthCheckPort = -1;
 
-  @VisibleForTesting protected final Map<String, Integer> leasedPorts = Maps.newHashMap();
-
   private Process process;
 
   private int exitCode = 0;
   private final ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier;
   private final boolean multiUser;
 
-  public LiveTask(SocketManager socketManager,
+  public LiveTask(
       ExceptionalFunction<Integer, Boolean, HealthCheckException> healthChecker,
       ExceptionalClosure<KillCommand, KillException> processKiller,
       ExceptionalFunction<File, Integer, FileToInt.FetchException> pidFetcher,
@@ -119,7 +102,6 @@ public class LiveTask extends TaskOnDisk {
       boolean multiUser) {
     super(taskRoot);
 
-    this.socketManager = Preconditions.checkNotNull(socketManager);
     this.healthChecker = Preconditions.checkNotNull(healthChecker);
     this.processKiller = Preconditions.checkNotNull(processKiller);
     this.pidFetcher = Preconditions.checkNotNull(pidFetcher);
@@ -195,93 +177,22 @@ public class LiveTask extends TaskOnDisk {
     return task.deepCopy();
   }
 
-  /**
-   * Performs command-line expansion to assign managed port values where requested.
-   *
-   * @return A pair containing the expanded command line, and a map from port name to assigned
-   *    port number.
-   * @throws SocketManager.SocketLeaseException If there was a problem leasing a socket.
-   * @throws TaskRunException If multiple ports with the same name were requested.
-   */
-  @VisibleForTesting
-  Pair<String, Map<String, Integer>> expandCommandLine()
-      throws SocketManager.SocketLeaseException, TaskRunException {
-    String command = task.getTask().getStartCommand();
-
-    LOG.info("Expanding command line " + command);
-    return Pair.of(commandLineExpander.apply(command), leasedPorts);
-  }
-
-  @SuppressWarnings("unchecked")
-  private final ExceptionalFunction<String, String, TaskRunException> commandLineExpander =
-    ExceptionalFunctions.compose(
-        new ExceptionalFunction<String, String, TaskRunException>() {
-          @Override public String apply(String commandLine) throws TaskRunException {
-            return expandPortRequests(commandLine);
-          }
-        },
-        new ExceptionalFunction<String, String, TaskRunException>() {
-          @Override public String apply(String commandLine) throws TaskRunException {
-            return commandLine.replaceAll(SHARD_ID_REGEXP,
-                String.valueOf(task.getTask().getShardId()));
-          }
-        },
-        new ExceptionalFunction<String, String, TaskRunException>() {
-          @Override public String apply(String commandLine) throws TaskRunException {
-            return commandLine.replaceAll(TASK_ID_REGEXP, String.valueOf(task.getTaskId()));
-          }
-        }
-    );
-
-  private String expandPortRequests(String commandLine) throws TaskRunException {
-    Matcher m = PORT_REQUEST_PATTERN.matcher(commandLine);
-
-    StringBuffer sb = new StringBuffer();
-    while (m.find()) {
-      String portName = m.group(1);
-      if (portName.isEmpty()) {
-        throw new TaskRunException("Port name may not be empty.");
-      }
-
-      try {
-        int portNumber = leasedPorts.containsKey(portName) ? leasedPorts.get(portName)
-            : socketManager.leaseSocket();
-
-        leasedPorts.put(portName, portNumber);
-        m.appendReplacement(sb, String.valueOf(portNumber));
-      } catch (SocketManager.SocketLeaseException e) {
-        throw new TaskRunException("Can't lease socket: ", e);
-      }
-    }
-    m.appendTail(sb);
-    return sb.toString();
-  }
-
   @Override
   public void run() throws TaskRunException {
     LOG.info("Executing from working directory: " + sandboxDir);
 
-    Pair<String, Map<String, Integer>> expansion;
-    try {
-      expansion = expandCommandLine();
-    } catch (SocketManagerImpl.SocketLeaseException e) {
-      LOG.info("Failed to get sockets!");
-      throw new TaskRunException("Failed to obtain requested sockets.", e);
-    }
-
     // Write the start command to a file.
     try {
-      Files.write(expansion.getFirst(), new File(sandboxDir, RUN_SCRIPT_NAME), Charsets.US_ASCII);
+      Files.write(task.getTask().getStartCommand(), new File(sandboxDir, RUN_SCRIPT_NAME),
+          Charsets.US_ASCII);
     } catch (IOException e) {
       LOG.log(Level.SEVERE, "Failed to record run command.", e);
       throw new TaskRunException("Failed build staging directory.", e);
     }
 
-    LOG.info("Obtained leases on ports: " + expansion.getSecond());
-    leasedPorts.putAll(expansion.getSecond());
-
-    if (leasedPorts.containsKey(HEALTH_CHECK_PORT_NAME)) {
-      healthCheckPort = leasedPorts.get(HEALTH_CHECK_PORT_NAME);
+    if ((task.getAssignedPortsSize() > 0)
+        && task.getAssignedPorts().containsKey(HEALTH_CHECK_PORT_NAME)) {
+      healthCheckPort = task.getAssignedPorts().get(HEALTH_CHECK_PORT_NAME);
     }
 
     List<String> commands = Lists.newArrayList();
@@ -352,8 +263,7 @@ public class LiveTask extends TaskOnDisk {
       Thread.currentThread().interrupt();
       throw new TaskRunException("Interrupted while waiting for launch grace period.", e);
     }
-    killCommand = buildKillCommand(
-        supportsHttpSignals() ? leasedPorts.get(HEALTH_CHECK_PORT_NAME) : -1);
+    killCommand = buildKillCommand(supportsHttpSignals() ? healthCheckPort : -1);
 
     setStatus(RUNNING);
   }
@@ -438,12 +348,6 @@ public class LiveTask extends TaskOnDisk {
       }
     }
 
-    // Return leased ports.
-    for (int port : leasedPorts.values()) {
-      socketManager.returnSocket(port);
-    }
-    leasedPorts.clear();
-
     return stateMachine.getState();
   }
 
@@ -514,11 +418,6 @@ public class LiveTask extends TaskOnDisk {
     }
 
     blockUntilTerminated();
-  }
-
-  @Override
-  public ResourceConsumption getResourceConsumption() {
-    return resourceConsumption.setLeasedPorts(ImmutableMap.copyOf(leasedPorts));
   }
 
   private boolean isHealthy() {

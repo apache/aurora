@@ -134,7 +134,7 @@ class Preempter implements Runnable {
    */
   private Predicate<AssignedTask> preemptionFilter(AssignedTask preemptableTask) {
     Predicate<AssignedTask> staticResourceFilter = Predicates.compose(
-        schedulingFilter.staticFilter(preemptableTask.getTask(),
+        schedulingFilter.staticFilter(Resources.from(preemptableTask.getTask()),
             preemptableTask.getSlaveHost()), Tasks.ASSIGNED_TO_INFO);
 
     Predicate<AssignedTask> preemptableIsProduction = preemptableTask.getTask().isProduction()
@@ -203,10 +203,6 @@ class Preempter implements Runnable {
         return input > value;
       }
     };
-  }
-
-  private static Predicate<AssignedTask> lowerPriorityFilter(int priority) {
-    return Predicates.compose(lessThan(priority), GET_PRIORITY);
   }
 
   private static Predicate<AssignedTask> greaterPriorityFilter(int priority) {

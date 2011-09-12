@@ -515,14 +515,17 @@ class StateManager {
    * @param taskId ID of the task to mutate.
    * @param slaveHost Host name that the task is being assigned to.
    * @param slaveId ID of the slave that the task is being assigned to.
+   * @param assignedPorts Ports on the host that are being assigned to the task.
    * @return The updated task record, or {@code null} if the task was not found.
    */
-  synchronized AssignedTask assignTask(String taskId, String slaveHost, SlaveID slaveId) {
+  synchronized AssignedTask assignTask(String taskId, String slaveHost, SlaveID slaveId,
+      Set<Integer> assignedPorts) {
     checkNotBlank(taskId);
     checkNotBlank(slaveHost);
+    checkNotNull(assignedPorts);
 
     final AtomicReference<AssignedTask> returnValue = new AtomicReference<AssignedTask>();
-    changeState(Query.byId(taskId), assignHost(slaveHost, slaveId, returnValue));
+    changeState(Query.byId(taskId), assignHost(slaveHost, slaveId, returnValue, assignedPorts));
 
     return returnValue.get();
   }
@@ -692,10 +695,13 @@ class StateManager {
 
   @SuppressWarnings("unchecked")
   private static Closure<TaskStateMachine> assignHost(final String slaveHost,
-      final SlaveID slaveId, final AtomicReference<AssignedTask> taskReference) {
+      final SlaveID slaveId, final AtomicReference<AssignedTask> taskReference,
+      final Set<Integer> assignedPorts) {
     Closure<ScheduledTask> mutation = new Closure<ScheduledTask>() {
       @Override public void execute(ScheduledTask task) {
-        AssignedTask assigned = task.getAssignedTask();
+        AssignedTask assigned = CommandLineExpander.expand(task.getAssignedTask(), assignedPorts);
+        task.setAssignedTask(assigned);
+
         assigned.setSlaveHost(slaveHost)
             .setSlaveId(slaveId.getValue());
         Preconditions.checkState(

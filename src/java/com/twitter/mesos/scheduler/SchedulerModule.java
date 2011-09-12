@@ -299,8 +299,8 @@ public class SchedulerModule extends AbstractModule {
   ExecutorInfo provideExecutorInfo() {
     return ExecutorInfo.newBuilder().setUri(executorPath.get())
         .setExecutorId(ExecutorID.newBuilder().setValue(TWITTER_EXECUTOR_ID))
-        .addResources(Resources.makeResource(Resources.CPUS, CPUS.get()))
-        .addResources(Resources.makeResource(Resources.RAM_MB, RAM.get().as(Data.MB)))
+        .addResources(Resources.makeMesosResource(Resources.CPUS, CPUS.get()))
+        .addResources(Resources.makeMesosResource(Resources.RAM_MB, RAM.get().as(Data.MB)))
         .build();
   }
 

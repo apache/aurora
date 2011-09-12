@@ -50,8 +50,6 @@ public class TaskHome extends StringTemplateServlet {
         template.setAttribute("id", task.getId());
         template.setAttribute("taskDir", task.getSandboxDir());
         template.setAttribute("status", task.getScheduleStatus());
-        template.setAttribute("resourceConsumption",
-            Util.prettyPrint(task.getResourceConsumption()));
         template.setAttribute("taskPretty", Util.prettyPrint(task.getAssignedTask()));
       }
     });

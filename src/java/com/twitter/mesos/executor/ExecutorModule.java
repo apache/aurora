@@ -76,10 +76,6 @@ public class ExecutorModule extends AbstractModule {
   @CmdLine(name = "multi_user", help = "True to execute tasks as the job owner")
   private static final Arg<Boolean> multiUserMode = Arg.create(true);
 
-  @CmdLine(name = "managed_port_range",
-      help = "Port range that the executor should manage, format: min-max")
-  private static final Arg<String> managedPortRange = Arg.create("50000-60000");
-
   @NotNull
   @CmdLine(name = "hdfs_config", help = "Hadoop configuration path")
   private static final Arg<String> hdfsConfig = Arg.create();
@@ -146,12 +142,6 @@ public class ExecutorModule extends AbstractModule {
     bind(new TypeLiteral<Function<Message, Integer>>() {}).to(DriverImpl.class);
 
     // Bindings needed for TaskFactory.
-    String[] portRange = managedPortRange.get().split("-");
-    Preconditions.checkArgument(portRange.length == 2, "Malformed managed port range value: "
-                                         + managedPortRange);
-    // TODO(William Farner): Clean this up, inject.
-    bind(SocketManager.class).toInstance(new SocketManagerImpl(Integer.parseInt(portRange[0]),
-        Integer.parseInt(portRange[1])));
     bind(new TypeLiteral<ExceptionalFunction<Integer, Boolean, HealthCheckException>>() {})
         .to(HealthChecker.class);
     // processKiller handled in provider method.

@@ -29,8 +29,6 @@ public interface Task {
 
   public ScheduleStatus getScheduleStatus();
 
-  public ResourceConsumption getResourceConsumption();
-
   public static class TaskRunException extends Exception {
 
     // TODO(William Farner): Attach a GUID here (probably via UUID) to allow for automatic stack
