@@ -187,7 +187,7 @@ class MesosSchedulerImpl implements Scheduler {
                   .addAllResources(task.resources)
                   .setData(ByteString.copyFrom(taskInBytes))
                   .build();
-          log(Level.FINE, "Accepted offer: ", assignedTask);
+          LOG.log(Level.FINE, "Accepted offer: " + assignedTask);
           scheduledTasks.add(assignedTask);
         }
       }

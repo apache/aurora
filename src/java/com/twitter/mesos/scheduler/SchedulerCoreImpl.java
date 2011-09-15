@@ -425,13 +425,15 @@ public class SchedulerCoreImpl implements SchedulerCore {
     LOG.info(String.format("Offer on slave %s (id %s) is being assigned task for %s.",
         hostname, task.getSlaveId(), jobKey(task)));
 
-    List<Resource> resources = ImmutableList.of(
-        Resources.makeMesosResource(Resources.CPUS, task.getTask().getNumCpus()),
-        Resources.makeMesosResource(Resources.RAM_MB, task.getTask().getRamMb()),
-        Resources.makeMesosRangeResource(Resources.PORTS, selectedPorts)
-    );
+    ImmutableList.Builder<Resource> resourceBuilder =
+      ImmutableList.<Resource>builder()
+        .add(Resources.makeMesosResource(Resources.CPUS, task.getTask().getNumCpus()))
+        .add(Resources.makeMesosResource(Resources.RAM_MB, task.getTask().getRamMb()));
+    if (selectedPorts.size() > 0) {
+        resourceBuilder.add(Resources.makeMesosRangeResource(Resources.PORTS, selectedPorts));
+    }
 
-    return makeTwitterTask(task, offer.getSlaveId().getValue(), resources);
+    return makeTwitterTask(task, offer.getSlaveId().getValue(), resourceBuilder.build());
   }
 
   @VisibleForTesting

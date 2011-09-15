@@ -1005,11 +1005,14 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       Set<String> portNames, Set<Integer> ports) throws Exception {
     AssignedTask task = getTask(taskId).task.getAssignedTask().deepCopy();
 
-    List<Resource> resources = ImmutableList.of(
-        Resources.makeMesosResource(Resources.CPUS, task.getTask().getNumCpus()),
-        Resources.makeMesosResource(Resources.RAM_MB, task.getTask().getRamMb()),
-        Resources.makeMesosRangeResource(Resources.PORTS, ports)
-    );
+    ImmutableList.Builder<Resource> resource_builder =
+      ImmutableList.<Resource>builder()
+        .add(Resources.makeMesosResource(Resources.CPUS, task.getTask().getNumCpus()))
+        .add(Resources.makeMesosResource(Resources.RAM_MB, task.getTask().getRamMb()));
+    if (ports.size() > 0) {
+        resource_builder.add(Resources.makeMesosRangeResource(Resources.PORTS, ports));
+    }
+    List<Resource> resources = resource_builder.build();
 
     TwitterTask assigned = scheduler.offer(offer, EXECUTOR_ID);
 
