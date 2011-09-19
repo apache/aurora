@@ -14,11 +14,8 @@ import getpass
 import pickle
 import zookeeper
 import errno
-from optparse import OptionParser
 
-from twitter.common import app
-from twitter.common import options
-from twitter.common import log
+from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 
 from twitter.mesos import clusters
@@ -482,22 +479,20 @@ The subcommands and their arguments are:
     help="Local path to use for the app (will copy to the cluster)" + \
           " (default: %default)")
 
-def main(args):
-  values = app.get_options()
-
-  if values.quiet:
-    LogOptions.set_stdout_log_level('NONE')
-  else:
-    if values.verbose:
-      LogOptions.set_stdout_log_level('DEBUG')
-    else:
-      LogOptions.set_stdout_log_level('INFO')
-
+def main(args, options):
   if not args:
     app.help()
     sys.exit(1)
 
-  cli = MesosCLI(values)
+  if options.quiet:
+    LogOptions.set_stdout_log_level('NONE')
+  else:
+    if options.verbose:
+      LogOptions.set_stdout_log_level('DEBUG')
+    else:
+      LogOptions.set_stdout_log_level('INFO')
+
+  cli = MesosCLI(options)
 
   try:
     cli.onecmd(' '.join(args))
