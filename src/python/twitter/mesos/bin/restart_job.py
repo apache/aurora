@@ -30,10 +30,9 @@ import time
 import getpass
 
 from mesos_twitter.ttypes import *
-import twitter.mesos.mesos.scheduler_client
+import twitter.mesos.scheduler_client
 
-import twitter.common.log
-log = twitter.common.log.init("restart_job.%s" % getpass.getuser())
+from twitter.common import log
 
 SCHEDULER_ZK_PATH = "/twitter/service/mesos-scheduler"
 

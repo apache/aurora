@@ -21,13 +21,13 @@ from twitter.common import options
 from twitter.common import log
 from twitter.common.log.options import LogOptions
 
-from twitter.mesos.mesos import clusters
-from twitter.mesos.mesos.location import Location
-from twitter.mesos.mesos.mesos_configuration import MesosConfiguration
-from twitter.mesos.mesos import scheduler_client
-from twitter.mesos.mesos.tunnel_helper import TunnelHelper
-from twitter.mesos.mesos.session_key_helper import SessionKeyHelper
-from twitter.mesos.mesos.updater import *
+from twitter.mesos import clusters
+from twitter.mesos.location import Location
+from twitter.mesos.mesos_configuration import MesosConfiguration
+from twitter.mesos import scheduler_client
+from twitter.mesos.tunnel_helper import TunnelHelper
+from twitter.mesos.session_key_helper import SessionKeyHelper
+from twitter.mesos.updater import Updater
 
 from mesos_twitter.ttypes import *
 
@@ -62,30 +62,25 @@ class MesosCLIHelper:
 
   @staticmethod
   def assert_valid_cluster(cluster):
-    assert cluster, "The --cluster argument is required for this command."
+    assert cluster, "Cluster not specified!"
     if cluster.find('localhost:') == 0:
       scluster = cluster.split(':')
       if len(scluster) == 2:
         try:
           int(scluster[1])
-        except ValueError, e:
+        except ValueError as e:
           _die('The cluster argument is invalid: %s (error: %s)' % (cluster, e))
     else:
       clusters.assert_exists(cluster)
 
   @staticmethod
   def get_cluster(cmd_line_arg_cluster, config_cluster):
-    cluster = None
-    if cmd_line_arg_cluster is not None:
-      cluster = cmd_line_arg_cluster
-    if config_cluster is not None:
-      cluster = config_cluster
-    if cmd_line_arg_cluster is not None and config_cluster is not None:
-      if cmd_line_arg_cluster != config_cluster:
-        log.error(
-        """Warning: --cluster and the cluster in your configuration do not match.
-           Using the cluster specified on the command line. (cluster = %s)""" % cmd_line_arg_cluster)
-        cluster = cmd_line_arg_cluster
+    if config_cluster and cmd_line_arg_cluster and config_cluster != cmd_line_arg_cluster:
+      log.error(
+      """Warning: --cluster and the cluster in your configuration do not match.
+         Using the cluster specified on the command line. (cluster = %s)""" % cmd_line_arg_cluster)
+    cluster = config_cluster
+    cluster = cluster or cmd_line_arg_cluster
     MesosCLIHelper.assert_valid_cluster(cluster)
     return cluster
 
@@ -125,8 +120,6 @@ class MesosCLIHelper:
     MesosCLIHelper.copy_to_hadoop(ssh_proxy, source_path, hdfs_uri)
 
 class requires_arguments(object):
-  import functools
-
   def __init__(self, *args):
      self.expected_args = args
 
@@ -145,10 +138,22 @@ class MesosCLI(cmd.Cmd):
     cmd.Cmd.__init__(self)
     self.options = opts
     zookeeper.set_debug_level(zookeeper.LOG_LEVEL_WARN)
-    # TODO(wickman)  The scheduler should be constructed lazily, and we should
-    # not require --cluster to be passed to every mesos command.
-    MesosCLIHelper.assert_valid_cluster(self.options.cluster)
-    self._construct_scheduler()  # populates ._proxy, ._scheduler, ._client
+    self._cluster = self._config = self._client = self._proxy = self._scheduler = None
+
+  def client(self):
+    if not self._client:
+      self._construct_scheduler(self._config)
+    return self._client
+
+  def proxy(self):
+    if not self._proxy:
+      self._construct_scheduler(self._config)
+    return self._proxy
+
+  def cluster(self):
+    if not self._cluster:
+      self._construct_scheduler(self._config)
+    return self._cluster
 
   @staticmethod
   def get_cron_collision_value(valueStr):
@@ -184,20 +189,28 @@ class MesosCLI(cmd.Cmd):
       return (ssh_proxy_host,
               scheduler_client.ZookeeperSchedulerClient(cluster, ssl=True, **kwargs))
 
-  def _construct_scheduler(self):
-    # TODO(wickman)  This should not come from self.options.cluster, instead from
-    # the config if this command requires one!
+  def _construct_scheduler(self, config=None):
+    """
+      Populates:
+        self._cluster
+        self._proxy (if proxy necessary)
+        self._scheduler
+        self._client
+    """
+    self._cluster = MesosCLIHelper.get_cluster(
+      self.options.cluster, config.get('cluster') if config else None)
     self._proxy, self._scheduler = MesosCLI.get_scheduler_client(
-      self.options.cluster, verbose=self.options.verbose)
-    assert self._scheduler, "Could not find scheduler (cluster = %s)" % self.options.cluster
+      self._cluster, verbose=self.options.verbose)
+    assert self._scheduler, "Could not find scheduler (cluster = %s)" % self._cluster
     self._client = self._scheduler.get_thrift_client()
     assert self._client, "Could not construct thrift client."
 
-  def read_config(self, *line):
+  def get_and_set_config(self, *line):
     (job, config) = line
     query = TaskQuery()
     query.jobName = job
 
+    # populate self._config as well.  this is sort of messy.
     jobs = MesosConfiguration(config).config
 
     if not query.jobName in jobs:
@@ -205,6 +218,7 @@ class MesosCLI(cmd.Cmd):
         query.jobName, config))
 
     job = jobs[query.jobName]
+    self._config = job
     if 'owner' in job:
       if 'role' in job:
         _die('both role and owner specified!')
@@ -245,18 +259,16 @@ class MesosCLI(cmd.Cmd):
   @requires_arguments('job', 'config')
   def do_create(self, *line):
     """create job config"""
-    (job, owner, tasks, cron_collision_policy, _) = self.read_config(*line)
-
-    cluster = MesosCLIHelper.get_cluster(self.options.cluster, job.get('cluster'))
+    (job, owner, tasks, cron_collision_policy, _) = self.get_and_set_config(*line)
 
     if self.options.copy_app_from is not None:
       MesosCLIHelper.copy_app_to_hadoop(self.options.copy_app_from,
-          job['task']['hdfs_path'], cluster, self._proxy)
+          job['task']['hdfs_path'], self.cluster(), self.proxy())
 
     sessionkey = self.acquire_session()
 
     log.info('Creating job %s' % job['name'])
-    resp = self._client.createJob(
+    resp = self.client().createJob(
       JobConfiguration(job['name'], owner, tasks, job['cron_schedule'],
           cron_collision_policy), sessionkey)
     log.info('Response from scheduler: %s (message: %s)'
@@ -267,7 +279,7 @@ class MesosCLI(cmd.Cmd):
     """start_cron role job"""
 
     (role, job) = line
-    resp = self._client.startCronJob(role, job, self.acquire_session())
+    resp = self.client().startCronJob(role, job, self.acquire_session())
     log.info('Response from scheduler: %s (message: %s)'
       % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
 
@@ -283,7 +295,7 @@ class MesosCLI(cmd.Cmd):
 
     sessionkey = self.acquire_session()
 
-    resp = self._client.killTasks(query, sessionkey)
+    resp = self.client().killTasks(query, sessionkey)
     log.info('Response from scheduler: %s (message: %s)'
       % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
 
@@ -316,7 +328,7 @@ class MesosCLI(cmd.Cmd):
                                                         taskInfo.maxTaskFailures)
       return taskString
 
-    resp = self._client.getTasksStatus(query)
+    resp = self.client().getTasksStatus(query)
     log.info('Response from scheduler: %s (message: %s)'
       % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
 
@@ -346,21 +358,19 @@ class MesosCLI(cmd.Cmd):
   def do_update(self, *line):
     """update job config"""
 
-    (job, owner, tasks, cron_collision_policy, update_config) = self.read_config(*line)
-
-    cluster = MesosCLIHelper.get_cluster(self.options.cluster, job.get('cluster'))
+    (job, owner, tasks, cron_collision_policy, update_config) = self.get_and_set_config(*line)
 
     # TODO(William Farner): Add a rudimentary versioning system here so application updates
     #                       don't overwrite original binary.
     if self.options.copy_app_from is not None:
       MesosCLIHelper.copy_app_to_hadoop(self.options.copy_app_from, job['task']['hdfs_path'],
-          cluster, self._proxy)
+          self.cluster(), self.proxy())
 
     sessionkey = self.acquire_session()
 
     log.info('Updating job %s' % job['name'])
 
-    resp = self._client.startUpdate(
+    resp = self.client().startUpdate(
       JobConfiguration(job['name'], owner, tasks, job['cron_schedule'], cron_collision_policy),
           sessionkey)
 
@@ -371,18 +381,18 @@ class MesosCLI(cmd.Cmd):
 
     # TODO(William Farner): Cleanly handle connection failures in case the scheduler
     #                       restarts mid-update.
-    updater = Updater(owner.role, job, self._client, time, resp.updateToken, sessionkey)
+    updater = Updater(owner.role, job, self.client(), time, resp.updateToken, sessionkey)
 
     failed_shards = updater.update(JobConfiguration(job['name'], owner, tasks, job['cron_schedule'],
         cron_collision_policy, update_config))
 
     if failed_shards:
       log.info('Update reverted, failures detected on shards %s' % failed_shards)
-      resp = self._client.finishUpdate(owner.role, job['name'], UpdateResult.FAILED,
+      resp = self.client().finishUpdate(owner.role, job['name'], UpdateResult.FAILED,
           resp.updateToken, sessionkey)
     else:
       log.info('Update Successful')
-      resp = self._client.finishUpdate(owner.role, job['name'], UpdateResult.SUCCESS,
+      resp = self.client().finishUpdate(owner.role, job['name'], UpdateResult.SUCCESS,
           resp.updateToken, sessionkey)
     if resp.responseCode != UpdateResponseCode.OK:
       log.info('Response from scheduler: %s (message: %s)'
@@ -394,10 +404,9 @@ class MesosCLI(cmd.Cmd):
 
     (role, job) = line
     sessionkey = self.acquire_session()
-    cluster = MesosCLIHelper.get_cluster(self.options.cluster, None)
     log.info('Canceling update on job %s' % job)
 
-    resp = self._client.finishUpdate(role, job, UpdateResult.TERMINATE, None, sessionkey)
+    resp = self.client().finishUpdate(role, job, UpdateResult.TERMINATE, None, sessionkey)
     log.info('Response from scheduler: %s (message: %s)'
         % (UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
 
@@ -406,7 +415,7 @@ class MesosCLI(cmd.Cmd):
     """get_quota role"""
 
     role = line[0]
-    resp = self._client.getQuota(role)
+    resp = self.client().getQuota(role)
     quota = resp.quota
 
     quota_fields = [
@@ -431,7 +440,7 @@ class MesosCLI(cmd.Cmd):
     except ValueError:
       log.error('Invalid value')
 
-    resp = self._client.setQuota(role, Quota(cpu, ram_mb, disk_mb), self.acquire_session())
+    resp = self.client().setQuota(role, Quota(cpu, ram_mb, disk_mb), self.acquire_session())
     log.info('Response from scheduler: %s' % resp)
 
 

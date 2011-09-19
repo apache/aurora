@@ -7,7 +7,7 @@ from optparse import OptionParser
 
 from git import *
 
-from twitter.mesos.mesos import clusters
+from twitter.mesos import clusters
 
 __author__ = 'William Farner'
 

@@ -3,7 +3,7 @@ import copy
 import unittest
 import pytest
 from mesos_twitter.ttypes import *
-from twitter.mesos.mesos.updater import Updater
+from twitter.mesos.updater import Updater
 import twitter.common.log
 from fake_scheduler import *
 

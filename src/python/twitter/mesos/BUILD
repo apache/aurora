@@ -1,18 +1,46 @@
+python_library(
+  name = "mesos-lib",
+  sources = rglobs("*.py"),
+  dependencies = [
+    pants('3rdparty/python:zookeeper'),
+    pants('3rdparty/python:paramiko'),
+    pants('src/python/twitter/common_internal/ods'),
+    pants('src/thrift/com/twitter/thrift:py-thrift'),
+    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants('src/python/twitter/common')
+  ]
+)
+
+python_binary(
+  name = "mesos_configuration",
+  source = "mesos_configuration.py"
+)
+
 python_binary(
   name = "mesos_client",
-  source = "mesos_client.py",
+  source = "bin/mesos_client.py",
   dependencies = [
-    pants("src/python/twitter/mesos/mesos:mesos-lib"),
+    pants(":mesos-lib"),
     pants("src/python/twitter/common")
   ]
 )
 
 python_binary(
   name = "deploy_scheduler",
-  source = "deploy_scheduler.py",
+  source = "bin/deploy_scheduler.py",
   dependencies = [
-    pants("src/python/twitter/mesos/mesos:mesos-lib"),
+    pants(":mesos-lib"),
     pants("src/python/twitter/common"),
+    pants("3rdparty/python:git-python")
+  ]
+)
+
+python_binary(
+  name = "restart_job",
+  source = "bin/restart_job.py",
+  dependencies = [
+    pants("src/python/twitter/common"),
+    pants(":mesos-lib"),
     pants("3rdparty/python:git-python")
   ]
 )
