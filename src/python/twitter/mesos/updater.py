@@ -1,6 +1,6 @@
 import collections
 from math import ceil
-from mesos_twitter.ttypes import *
+from gen.twitter.mesos.ttypes import *
 from twitter.common import app, log
 
 app.add_option('--mesos_updater_status_check_interval',
@@ -17,9 +17,9 @@ class Updater(object):
 
   class InvalidConfigError(Exception): pass
 
-  def __init__(self, role, job, scheduler, clock, update_token, session):
+  def __init__(self, role, job_name, scheduler, clock, update_token, session):
     self._role = role
-    self._job = job
+    self._job_name = job_name
     self._scheduler = scheduler
     self._clock = clock
     self._update_token = update_token
@@ -121,7 +121,7 @@ class Updater(object):
     while len(shards_to_rollback) > 0:
       batch_shards = shards_to_rollback[0 : update_config.batchSize]
       shards_to_rollback = list(set(shards_to_rollback) - set(batch_shards))
-      resp = self._scheduler.rollbackShards(self._role, self._job['name'], batch_shards,
+      resp = self._scheduler.rollbackShards(self._role, self._job_name, batch_shards,
           self._update_token, self._session)
       self.watch_tasks(batch_shards, update_config.restartThreshold, update_config.watchSecs)
       log.log(debug_if(resp == UpdateResponseCode.OK),
@@ -138,7 +138,7 @@ class Updater(object):
     Returns a map of the current status of the restarted shards as returned by the scheduler.
     """
     log.info('Restarting shards: %s' % shard_ids)
-    return self._scheduler.updateShards(self._role, self._job['name'], shard_ids,
+    return self._scheduler.updateShards(self._role, self._job_name, shard_ids,
         self._update_token, self._session)
 
   def watch_tasks(self, task_ids, restart_threshold, watch_secs):
@@ -167,7 +167,7 @@ class Updater(object):
       log.debug('Getting status...')
       query = TaskQuery()
       query.owner = Identity(role = self._role)
-      query.jobName = self._job['name']
+      query.jobName = self._job_name
       resp = self._scheduler.getTasksStatus(query)
       log.debug('Response from scheduler: %s (message: %s)'
           % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))

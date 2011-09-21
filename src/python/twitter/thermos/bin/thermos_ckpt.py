@@ -2,7 +2,7 @@ import os
 import sys
 import pprint
 
-from thermos_thrift.ttypes import TaskRunnerState, TaskRunnerCkpt
+from gen.twitter.thermos.ttypes import TaskRunnerState, TaskRunnerCkpt
 
 from twitter.common import app
 from twitter.common.recordio import ThriftRecordReader

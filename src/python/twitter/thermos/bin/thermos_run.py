@@ -6,7 +6,7 @@ import pprint
 from twitter.common import app, log, options
 from twitter.common.recordio import ThriftRecordReader
 from twitter.tcl.loader import ThermosJobLoader, MesosJobLoader
-from tcl_thrift.ttypes import ThermosJob
+from gen.twitter.tcl.ttypes import ThermosJob
 
 from twitter.thermos.runner import TaskRunner
 

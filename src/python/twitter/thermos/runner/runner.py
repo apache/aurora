@@ -17,9 +17,9 @@ from twitter.thermos.runner.muxer   import ProcessMuxer
 from twitter.thermos.runner.ports   import EphemeralPortAllocator
 
 from twitter.tcl.scheduler import Scheduler
+from gen.twitter.tcl.ttypes import ThermosJobHeader
 
-from tcl_thrift.ttypes import ThermosJobHeader
-from thermos_thrift.ttypes import *
+from gen.twitter.thermos.ttypes import *
 
 __author__ = 'wickman@twitter.com (brian wickman)'
 __tested__ = False
@@ -276,8 +276,8 @@ class TaskRunner(object):
     process_failures = filter(
       lambda run: run.run_state == ProcessRunState.FAILED,
       self._state.processes[process.name].runs)
-    return process.max_process_failures != 0 and (
-      len(process_failures) >= process.max_process_failures)
+    return process.max_failures != 0 and (
+      len(process_failures) >= process.max_failures)
 
   def _is_task_failed(self):
     failures = filter(

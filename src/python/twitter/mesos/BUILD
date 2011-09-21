@@ -11,6 +11,13 @@ python_library(
   ]
 )
 
+python_library(
+  name = "thermos-lib",
+  dependencies = [
+    pants('src/python/twitter/tcl:loader')
+  ]
+)
+
 python_binary(
   name = "mesos_configuration",
   source = "mesos_configuration.py"
@@ -21,6 +28,7 @@ python_binary(
   source = "bin/mesos_client.py",
   dependencies = [
     pants(":mesos-lib"),
+    pants(":thermos-lib"),
     pants("src/python/twitter/common")
   ]
 )

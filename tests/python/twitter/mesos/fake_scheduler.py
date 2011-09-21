@@ -1,5 +1,5 @@
 from collections import deque
-from mesos_twitter.ttypes import *
+from gen.twitter.mesos.ttypes import *
 
 class Clock:
   """Simulates time for test cases."""

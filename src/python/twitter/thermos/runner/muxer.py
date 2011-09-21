@@ -5,7 +5,7 @@ import select as fdselect
 from twitter.common import log
 from twitter.common.recordio import ThriftRecordReader
 
-from thermos_thrift.ttypes import *
+from gen.twitter.thermos.ttypes import *
 from twitter.thermos.runner.process import Process
 
 __author__ = 'wickman@twitter.com (brian wickman)'

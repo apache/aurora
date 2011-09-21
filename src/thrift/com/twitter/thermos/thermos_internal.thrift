@@ -39,7 +39,7 @@
 //          if conclusive, update state
 //          if not, set LOST
 
-namespace py thermos_thrift
+namespace py gen.twitter.thermos
 
 enum ProcessRunState {
   // normal state

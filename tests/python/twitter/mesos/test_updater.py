@@ -2,9 +2,10 @@ from math import ceil
 import copy
 import unittest
 import pytest
-from mesos_twitter.ttypes import *
+
+from gen.twitter.mesos.ttypes import *
 from twitter.mesos.updater import Updater
-import twitter.common.log
+
 from fake_scheduler import *
 
 def find_expected_status_calls(watch_secs, sleep_secs):
@@ -23,7 +24,7 @@ class UpdaterTest(unittest.TestCase):
   def setUp(self):
     self._clock = Clock()
     self._scheduler = FakeScheduler()
-    self._updater = Updater('mesos', {'name' : 'sathya'}, self._scheduler, self._clock,
+    self._updater = Updater('mesos', 'sathya', self._scheduler, self._clock,
         'test_update', 'test_update')
     self._update_config = UpdateConfig()
     self._update_config.batchSize = UpdaterTest.BATCH_SIZE

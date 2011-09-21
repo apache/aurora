@@ -11,11 +11,11 @@ from twitter.thermos.runner import TaskRunner
 from twitter.thermos.base import TaskPath
 from twitter.thermos.base import AlaCarteRunnerState
 
-from thermos_thrift.ttypes import TaskState
-from thermos_thrift.ttypes import TaskRunState
-from thermos_thrift.ttypes import TaskRunnerCkpt
-from thermos_thrift.ttypes import TaskRunnerState
-from thermos_thrift.ttypes import ProcessRunState
+from gen.twitter.thermos.ttypes import TaskState
+from gen.twitter.thermos.ttypes import TaskRunState
+from gen.twitter.thermos.ttypes import TaskRunnerCkpt
+from gen.twitter.thermos.ttypes import TaskRunnerState
+from gen.twitter.thermos.ttypes import ProcessRunState
 
 class RunnerMacroTest(unittest.TestCase):
   TEST_JOB_SPEC = """
@@ -36,7 +36,7 @@ tsk = tsk.with_processes([t3, t4])
 tsk = tsk.with_processes(t5, t6)
 
 hello_job = Job(
-  processes   = tsk.replicas(1),
+  tasks   = tsk.replicas(1),
   name    = 'hello_world',
   role    = getpass.getuser(),
   dc      = 'smf1',

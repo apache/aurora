@@ -17,8 +17,8 @@ from twitter.thermos.base import TaskPath
 from twitter.thermos.base import Helper
 from twitter.thermos.base.ckpt import AlaCarteRunnerState
 
-from thermos_thrift.ttypes import *
-from tcl_thrift.ttypes import ThermosJobHeader
+from gen.twitter.thermos.ttypes import *
+from gen.twitter.tcl.ttypes import ThermosJobHeader
 
 __author__ = 'wickman@twitter.com (brian wickman)'
 __tested__ = False

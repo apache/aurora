@@ -17,10 +17,7 @@ See the flags defined in main() for all available options.
 
 __author__ = 'Alex Roetter'
 
-# TODO(wickman):  Does this even still work?
-
 from optparse import OptionParser
-
 import getpass
 import logging
 import Queue
@@ -29,10 +26,9 @@ import threading
 import time
 import getpass
 
-from mesos_twitter.ttypes import *
-import twitter.mesos.scheduler_client
-
 from twitter.common import log
+from twitter.mesos import scheduler_client
+from gen.twitter.mesos.ttypes import *
 
 SCHEDULER_ZK_PATH = "/twitter/service/mesos-scheduler"
 

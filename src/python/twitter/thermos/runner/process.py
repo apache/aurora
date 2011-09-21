@@ -6,7 +6,7 @@ import subprocess
 from twitter.common import log
 from twitter.common.recordio import ThriftRecordWriter
 
-from thermos_thrift.ttypes import *
+from gen.twitter.thermos.ttypes import *
 from twitter.thermos.base.helper   import Helper
 
 __author__ = 'wickman@twitter.com (brian wickman)'

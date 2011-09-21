@@ -24,16 +24,15 @@ import signal
 import zookeeper
 
 from endpoint.ttypes import *
-from mesos_twitter.ttypes import *
-from mesos_twitter import MesosAdmin
 
-from location import Location
-import clusters
+from twitter.mesos import clusters
+from gen.twitter.mesos import MesosAdmin
+from gen.twitter.mesos.ttypes import *
+from twitter.mesos.location import Location
+from twitter.mesos.tunnel_helper import TunnelHelper
+from twitter.mesos.zookeeper_helper import ZookeeperHelper
 
-from tunnel_helper import TunnelHelper
-from zookeeper_helper import ZookeeperHelper
-
-class SchedulerClient:
+class SchedulerClient(object):
   def __init__(self, verbose = False, ssl = False):
     self._client    = None
     self._verbose   = verbose

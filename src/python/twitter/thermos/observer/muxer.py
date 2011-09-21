@@ -6,8 +6,8 @@ import threading
 from twitter.common import log
 from twitter.common.recordio import ThriftRecordReader
 
-from tcl_thrift.ttypes import ThermosJob
-from thermos_thrift.ttypes import *
+from gen.twitter.tcl.ttypes import ThermosJob
+from gen.twitter.thermos.ttypes import *
 
 from twitter.thermos.base import TaskPath
 from twitter.thermos.base import TaskCkptDispatcher

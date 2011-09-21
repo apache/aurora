@@ -2,7 +2,7 @@ import copy
 
 from twitter.common import log
 from twitter.common.recordio import ThriftRecordReader
-from thermos_thrift.ttypes import *
+from gen.twitter.thermos.ttypes import *
 
 class TaskCkptDispatcher(object):
   """
