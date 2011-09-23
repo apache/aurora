@@ -11,7 +11,7 @@ import com.twitter.common.testing.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.storage.db.DbStorageTestUtil;
+import com.twitter.mesos.scheduler.db.testing.DbStorageTestUtil;
 
 /**
  * @author William Farner

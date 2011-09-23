@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler.storage.db;
+package com.twitter.mesos.scheduler.db.testing;
 
 import java.sql.SQLException;
 
@@ -6,6 +6,7 @@ import com.google.common.testing.TearDownAccepter;
 
 import com.twitter.mesos.scheduler.db.DbUtil.DbAccess;
 import com.twitter.mesos.scheduler.db.testing.DbTestUtil;
+import com.twitter.mesos.scheduler.storage.db.DbStorage;
 
 /**
  * Provides utility methods for testing against DbStorage H2 databases.
