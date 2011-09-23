@@ -180,15 +180,19 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     LOG.info("Received kill request for tasks: " + query);
     KillResponse response = new KillResponse();
 
-    try {
-      validateSessionKeyForTasks(session, new Query(query));
-    } catch (AuthFailedException e) {
-      response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
-      return response;
+    if (isAdmin(session)) {
+      LOG.info("Granting kill query to admin user: " + query);
+    } else {
+      try {
+        validateSessionKeyForTasks(session, new Query(query));
+      } catch (AuthFailedException e) {
+        response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
+        return response;
+      }
     }
 
     try {
-      schedulerCore.killTasks(new Query(query));
+      schedulerCore.killTasks(new Query(query), session.getUser());
       response.setResponseCode(OK).setMessage("Tasks will be killed.");
     } catch (ScheduleException e) {
       response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
@@ -327,6 +331,15 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
 
   private void assertAdmin(SessionKey session) throws AuthFailedException {
     sessionValidator.checkAuthenticated(session, ADMIN_ROLE.get());
+  }
+
+  private boolean isAdmin(SessionKey session) {
+    try {
+      assertAdmin(session);
+      return true;
+    } catch (AuthFailedException e) {
+      return false;
+    }
   }
 
   private static final String NOT_ADMIN_MESSAGE = "Only admins may perform this operation.";

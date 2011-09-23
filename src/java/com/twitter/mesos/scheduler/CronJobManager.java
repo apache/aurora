@@ -123,7 +123,7 @@ public class CronJobManager extends JobManager {
           LOG.info("Cron collision policy requires killing existing job.");
           try {
             // TODO(William Farner): This kills the cron job itself, fix that.
-            schedulerCore.killTasks(query);
+            schedulerCore.killTasks(query, "cron");
             runJob = true;
           } catch (ScheduleException e) {
             LOG.log(Level.SEVERE, "Failed to kill job.", e);

@@ -24,6 +24,7 @@ import com.twitter.mesos.scheduler.auth.SessionValidator.AuthFailedException;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 
 import static org.easymock.EasyMock.capture;
+import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
@@ -34,9 +35,10 @@ import static org.junit.Assert.assertEquals;
 public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   private static final String ROLE = "bar_role";
-  private static final Identity ROLE_IDENTITY = new Identity(ROLE, "foo_user");
+  private static final String USER = "foo_user";
+  private static final Identity ROLE_IDENTITY = new Identity(ROLE, USER);
   private static final SessionKey SESSION = new SessionKey()
-      .setUser("foo_user");
+      .setUser(USER);
 
   private SchedulerCore scheduler;
   private SessionValidator sessionValidator;
@@ -98,12 +100,13 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
                     .setOwner(ROLE_IDENTITY))),
         new VolatileTaskState());
 
+    expectAdminAuth(false);
     expectAuth(ROLE, true);
     Capture<Query> queryCapture = new Capture<Query>();
     expect(scheduler.getTasks(capture(queryCapture)))
         .andReturn(ImmutableSet.of(task));
     Capture<Query> killQueryCapture = new Capture<Query>();
-    scheduler.killTasks(capture(killQueryCapture));
+    scheduler.killTasks(capture(killQueryCapture), eq(USER));
 
     control.replay();
 
@@ -125,6 +128,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
                 .setOwner(ROLE_IDENTITY))),
         new VolatileTaskState());
 
+    expectAdminAuth(false);
     expectAuth(ROLE, false);
     Capture<Query> queryCapture = new Capture<Query>();
     expect(scheduler.getTasks(capture(queryCapture)))
@@ -135,6 +139,23 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     KillResponse response = thriftInterface.killTasks(query, SESSION);
     assertEquals(ResponseCode.AUTH_FAILED, response.getResponseCode());
     assertEquals(queryCapture.getValue().base(), query);
+  }
+
+  @Test
+  public void testAdminKillTasks() throws Exception {
+    TaskQuery query = new TaskQuery()
+        .setOwner(ROLE_IDENTITY)
+        .setJobName("foo_job");
+
+    expectAdminAuth(true);
+    Capture<Query> killQueryCapture = new Capture<Query>();
+    scheduler.killTasks(capture(killQueryCapture), eq(USER));
+
+    control.replay();
+
+    KillResponse response = thriftInterface.killTasks(query, SESSION);
+    assertEquals(ResponseCode.OK, response.getResponseCode());
+    assertEquals(killQueryCapture.getValue().base(), query);
   }
 
   @Test

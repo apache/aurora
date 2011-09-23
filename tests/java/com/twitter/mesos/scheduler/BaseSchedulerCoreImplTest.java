@@ -9,7 +9,6 @@ import java.util.Set;
 import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
-import com.google.common.base.Functions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.base.Splitter;
@@ -618,7 +617,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         changeStatus(taskId, status);
       }
 
-      scheduler.killTasks(queryByOwner(OWNER_A));
+      scheduler.killTasks(queryByOwner(OWNER_A), OWNER_A.getUser());
 
       if (!statuses.isEmpty()) {
         // If there was no move out of the PENDING state, the task is deleted outright.
@@ -766,7 +765,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     changeStatus(queryByOwner(OWNER_A), ASSIGNED);
     changeStatus(queryByOwner(OWNER_A), STARTING);
     changeStatus(queryByOwner(OWNER_A), RUNNING);
-    scheduler.killTasks(queryByOwner(OWNER_A));
+    scheduler.killTasks(queryByOwner(OWNER_A), OWNER_A.getUser());
     changeStatus(queryByOwner(OWNER_A), KILLED);
 
     String taskId = Tasks.id(getOnlyTask(queryByOwner(OWNER_A)).task);
@@ -900,7 +899,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     String taskId = Tasks.id(Iterables.get(tasks, 0).task);
 
-    scheduler.killTasks(Query.byId(taskId));
+    scheduler.killTasks(Query.byId(taskId), OWNER_A.getUser());
     assertTaskCount(0);
   }
 
@@ -916,7 +915,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     changeStatus(taskId, ASSIGNED);
     changeStatus(taskId, STARTING);
     changeStatus(taskId, RUNNING);
-    scheduler.killTasks(query(taskId));
+    scheduler.killTasks(query(taskId), OWNER_A.getUser());
     assertThat(getTask(taskId).task.getStatus(), is(KILLING));
     assertThat(getTasks(queryByOwner(OWNER_A)).size(), is(1));
     changeStatus(taskId, KILLED);
@@ -933,7 +932,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(job);
 
     // This will fail if the cron task could not be found.
-    scheduler.killTasks(queryJob(OWNER_A, JOB_A));
+    scheduler.killTasks(queryJob(OWNER_A, JOB_A), OWNER_A.getUser());
   }
 
   @Test
@@ -972,7 +971,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 10));
     assertTaskCount(10);
 
-    scheduler.killTasks(queryJob(OWNER_A, JOB_A));
+    scheduler.killTasks(queryJob(OWNER_A, JOB_A), OWNER_A.getUser());
     assertTaskCount(0);
   }
 
@@ -987,7 +986,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(makeJob(OWNER_A, JOB_A + "2", DEFAULT_TASK, 5));
     assertTaskCount(10);
 
-    scheduler.killTasks(queryJob(OWNER_A, JOB_A + "2"));
+    scheduler.killTasks(queryJob(OWNER_A, JOB_A + "2"), OWNER_A.getUser());
     assertTaskCount(5);
 
     for (TaskState state : scheduler.getTasks(Query.GET_ALL)) {

@@ -186,9 +186,10 @@ public interface SchedulerCore extends Function<Query, Iterable<TwitterTaskInfo>
    * Kills a specific set of tasks.
    *
    * @param query The query to identify tasks
+   * @param user Name of the user performing the kill.
    * @throws ScheduleException If a problem occurs with the kill request.
    */
-  void killTasks(Query query) throws ScheduleException;
+  void killTasks(Query query, String user) throws ScheduleException;
 
   /**
    * Preempts a task in favor of another.

@@ -453,7 +453,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public synchronized void killTasks(final Query query) throws ScheduleException {
+  public synchronized void killTasks(final Query query, String user) throws ScheduleException {
     checkStarted();
     checkNotNull(query);
 
@@ -485,7 +485,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
         }
       }
 
-      stateManager.changeState(query, KILLING, "Manually killed by client.");
+      stateManager.changeState(query, KILLING, "Killed by " + user);
     }
   }
 
