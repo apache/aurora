@@ -22,6 +22,7 @@ import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.CommandLineExpander;
 import com.twitter.mesos.scheduler.configuration.ValueParser.ParseException;
+import com.twitter.mesos.scheduler.ThermosJank;
 
 /**
  * Manages translation from a string-mapped configuration to a concrete configuration type, and
@@ -113,11 +114,17 @@ public class ConfigurationManager {
     return copy;
   }
 
+  @ThermosJank
   @VisibleForTesting
   public static TwitterTaskInfo populateFields(JobConfiguration job, TwitterTaskInfo config)
       throws TaskDescriptionException {
     if (config == null) {
       throw new TaskDescriptionException("Task may not be null.");
+    }
+
+    if (config.isSetThermosConfig()) {
+      config.setConfigParsed(true);
+      return config;
     }
 
     if (config.getConfiguration() == null) {

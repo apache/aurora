@@ -262,5 +262,9 @@ public interface SchedulerCore extends Function<Query, Iterable<TwitterTaskInfo>
           .append(task)
           .toString();
     }
+
+    public boolean isThermosTask() {
+      return task.getTask().isSetThermosConfig();
+    }
   }
 }

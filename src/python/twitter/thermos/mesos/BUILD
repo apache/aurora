@@ -4,7 +4,9 @@ python_binary(
   dependencies = [
     pants('src/python/twitter/tcl:loader'),
     pants('src/python/twitter/thermos:base'),
-    pants('src/python/twitter/thermos:runner')
+    pants('src/python/twitter/thermos:runner'),
+    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants('3rdparty/python.twitter:mesos-68')
   ]
 )
 

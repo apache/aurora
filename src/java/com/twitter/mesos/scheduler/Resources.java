@@ -215,6 +215,7 @@ public class Resources {
       }
     }
 
+    // TODO(wickman)  Is an IllegalStateException the right thing to do here?
     Preconditions.checkState(ports.size() == numPorts,
         "Could not get %s ports from %s", numPorts, offer);
     return ImmutableSet.copyOf(ports);

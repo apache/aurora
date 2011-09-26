@@ -90,6 +90,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
   // Filter to determine whether a task should be scheduled.
   private final SchedulingFilter schedulingFilter;
 
+  // Monitor to determine when we need to send heartbeats to executors to determine their liveness.
   private final PulseMonitor<ExecutorKey> executorPulseMonitor;
   private final Function<TwitterTaskInfo, TwitterTaskInfo> executorResourceAugmenter;
   private final QuotaManager quotaManager;
@@ -365,6 +366,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
     ExecutorKey executorKey =
         new ExecutorKey(offer.getSlaveId(), defaultExecutorId, offer.getHostname());
+
 
     Query query;
     Predicate<TwitterTaskInfo> postFilter;

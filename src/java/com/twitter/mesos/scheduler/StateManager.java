@@ -693,15 +693,22 @@ class StateManager {
     };
   }
 
+  @ThermosJank
   @SuppressWarnings("unchecked")
   private static Closure<TaskStateMachine> assignHost(final String slaveHost,
       final SlaveID slaveId, final AtomicReference<AssignedTask> taskReference,
       final Set<Integer> assignedPorts) {
     Closure<ScheduledTask> mutation = new Closure<ScheduledTask>() {
       @Override public void execute(ScheduledTask task) {
-        AssignedTask assigned = CommandLineExpander.expand(task.getAssignedTask(), assignedPorts);
-        task.setAssignedTask(assigned);
+        AssignedTask assigned;
+        if (task.getAssignedTask().getTask().isSetThermosConfig()) {
+          assigned = task.getAssignedTask();
+        } else {
+          assigned = CommandLineExpander.expand(task.getAssignedTask(),
+              assignedPorts);
+        }
 
+        task.setAssignedTask(assigned);
         assigned.setSlaveHost(slaveHost)
             .setSlaveId(slaveId.getValue());
         Preconditions.checkState(

@@ -75,8 +75,8 @@ class MesosCLIHelper:
       log.error(
       """Warning: --cluster and the cluster in your configuration do not match.
          Using the cluster specified on the command line. (cluster = %s)""" % cmd_line_arg_cluster)
-    cluster = config_cluster
-    cluster = cluster or cmd_line_arg_cluster
+    cluster = cmd_line_arg_cluster
+    cluster = cluster or config_cluster
     MesosCLIHelper.assert_valid_cluster(cluster)
     return cluster
 

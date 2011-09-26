@@ -41,6 +41,7 @@ import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.CanRead;
 import com.twitter.common.args.constraints.NotNull;
+import com.twitter.common.args.constraints.Positive;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Command;
 import com.twitter.common.net.InetSocketAddressHelper;
@@ -81,6 +82,10 @@ public class SchedulerMain extends AbstractApplication {
   @CmdLine(name = "mesos_ssl_keyfile",
            help = "JKS keyfile for operating the Mesos Thrift-over-SSL interface.")
   private static final Arg<File> mesosSSLKeyFile = Arg.create();
+
+  @Positive
+  @CmdLine(name = "thrift_port", help = "Thrift server port.")
+  private static final Arg<Integer> thriftPort = Arg.create(0);
 
   // Security is enforced via file permissions, not via this password, for what it's worth.
   private static final String SSL_KEYFILE_PASSWORD = "MesosKeyStorePassword";
@@ -215,7 +220,7 @@ public class SchedulerMain extends AbstractApplication {
     ctx.init(kmf.getKeyManagers(), null, null);
 
     SSLServerSocketFactory ssf = ctx.getServerSocketFactory();
-    SSLServerSocket serverSocket = (SSLServerSocket) ssf.createServerSocket(0);
+    SSLServerSocket serverSocket = (SSLServerSocket) ssf.createServerSocket(thriftPort.get());
     serverSocket.setEnabledCipherSuites(serverSocket.getSupportedCipherSuites());
     serverSocket.setNeedClientAuth(false);
 

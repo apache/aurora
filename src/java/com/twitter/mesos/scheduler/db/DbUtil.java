@@ -144,6 +144,8 @@ public final class DbUtil {
       shutdownRegistry.addAction(new Command() {
         @Override public void execute() throws RuntimeException {
           // Ensure a prompt shutdown of active connections
+          LOG.info("Calling execute(SHUTDOWN)");
+          System.out.println("Calling execute(SHUTDOWN)");
           jdbcTemplate.execute("SHUTDOWN");
 
           dataSource.close();

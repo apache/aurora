@@ -13,6 +13,8 @@ import com.google.common.collect.Lists;
 import com.google.inject.Inject;
 import com.google.protobuf.ByteString;
 
+import com.twitter.common.base.ExceptionalFunction;
+import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.ExecutorInfo;
 import org.apache.mesos.Protos.FrameworkID;
@@ -44,6 +46,8 @@ import com.twitter.mesos.gen.comm.SchedulerMessage;
 import com.twitter.mesos.gen.comm.StateUpdateResponse;
 import com.twitter.mesos.scheduler.sync.ExecutorWatchdog;
 import com.twitter.mesos.scheduler.sync.ExecutorWatchdog.UpdateRequest;
+
+import javax.annotation.Nullable;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -160,6 +164,32 @@ class MesosSchedulerImpl implements Scheduler {
         });
   }
 
+  TaskDescription twitterTaskToMesosTask(SchedulerCore.TwitterTask twitterTask) throws ScheduleException {
+    checkNotNull(twitterTask);
+    byte[] taskInBytes;
+    try {
+      taskInBytes = ThriftBinaryCodec.encode(twitterTask.task);
+    } catch (ThriftBinaryCodec.CodingException e) {
+      LOG.log(Level.SEVERE, "Unable to serialize task.", e);
+      throw new ScheduleException("Internal error.", e);
+    }
+
+    log(Level.INFO, "Setting task resources to %s", twitterTask.resources);
+    TaskDescription.Builder assignedTaskBuilder =
+        TaskDescription.newBuilder().setName(twitterTask.taskName)
+            .setTaskId(TaskID.newBuilder().setValue(twitterTask.taskId))
+            .setSlaveId(SlaveID.newBuilder().setValue(twitterTask.slaveId))
+            .addAllResources(twitterTask.resources)
+            .setData(ByteString.copyFrom(taskInBytes));
+    if (twitterTask.isThermosTask()) {
+      assignedTaskBuilder.setExecutor(ExecutorInfo.newBuilder()
+      .setExecutorId(ExecutorID.newBuilder().setValue(String.format("thermos-%s",
+          twitterTask.taskId)))
+      .setUri("/tmp/thermos_executor.pex"));
+    }
+    return assignedTaskBuilder.build();
+  }
+
   @Override
   public void resourceOffer(SchedulerDriver driver, OfferID offerId, List<SlaveOffer> slaveOffers) {
     Preconditions.checkState(frameworkID != null, "Must be registered before receiving offers.");
@@ -169,25 +199,11 @@ class MesosSchedulerImpl implements Scheduler {
     try {
       for (SlaveOffer offer : slaveOffers) {
         log(Level.FINE, "Received offer: %s", offer);
+
         SchedulerCore.TwitterTask task = schedulerCore.offer(offer, executorInfo.getExecutorId());
 
         if (task != null) {
-          byte[] taskInBytes;
-          try {
-            taskInBytes = ThriftBinaryCodec.encode(task.task);
-          } catch (ThriftBinaryCodec.CodingException e) {
-            LOG.log(Level.SEVERE, "Unable to serialize task.", e);
-            throw new ScheduleException("Internal error.", e);
-          }
-
-          TaskDescription assignedTask =
-              TaskDescription.newBuilder().setName(task.taskName)
-                  .setTaskId(TaskID.newBuilder().setValue(task.taskId))
-                  .setSlaveId(SlaveID.newBuilder().setValue(task.slaveId))
-                  .addAllResources(task.resources)
-                  .setData(ByteString.copyFrom(taskInBytes))
-                  .build();
-          LOG.log(Level.FINE, "Accepted offer: " + assignedTask);
+          TaskDescription assignedTask = twitterTaskToMesosTask(task);
           scheduledTasks.add(assignedTask);
         }
       }
