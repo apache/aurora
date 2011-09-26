@@ -173,10 +173,10 @@ public final class DbUtil {
       if (dbPath != null) {
         File dbFilePath = new File(dbPath, dbName);
         Files.createParentDirs(dbFilePath);
-        return String.format("jdbc:h2:file:%s;AUTO_SERVER=TRUE;CACHE_SIZE=%d",
+        return String.format("jdbc:h2:file:%s;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1;CACHE_SIZE=%d",
             dbFilePath.getPath(), cacheSize.as(Data.KB));
       } else {
-        return "jdbc:h2:mem:" + dbName;
+        return "jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1";
       }
     }
 
