@@ -156,6 +156,10 @@ class MesosCLI(cmd.Cmd):
       self._construct_scheduler(self._config)
     return self._cluster
 
+  def config(self):
+    assert self._config, 'Config is unset, have you called get_and_set_config?'
+    return self._config
+
   @staticmethod
   def get_scheduler_client(cluster, **kwargs):
     location = Location.get_location()
@@ -207,7 +211,6 @@ class MesosCLI(cmd.Cmd):
   def acquire_session(self):
     return MesosCLIHelper.acquire_session_key_or_die(getpass.getuser())
 
-
   @requires_arguments('job', 'config')
   def do_create(self, *line):
     """create job config"""
@@ -215,7 +218,7 @@ class MesosCLI(cmd.Cmd):
 
     if self.options.copy_app_from is not None:
       MesosCLIHelper.copy_app_to_hadoop(self.options.copy_app_from,
-          job.hdfs_path(), self.cluster(), self.proxy())
+          self.config().hdfs_path(), self.cluster(), self.proxy())
 
     sessionkey = self.acquire_session()
 
@@ -230,8 +233,8 @@ class MesosCLI(cmd.Cmd):
     job = self.get_and_set_config(*line)
 
     if self.options.copy_app_from is not None:
-      if job.hdfs_path():
-        log.info('Detected HDFS package: %s' % job.hdfs_path())
+      if self.config().hdfs_path():
+        log.info('Detected HDFS package: %s' % self.config().hdfs_path())
         log.info('Would copy to %s via %s.' % (self.cluster(), self.proxy()))
 
     sessionkey = self.acquire_session()
@@ -321,7 +324,7 @@ class MesosCLI(cmd.Cmd):
     # TODO(William Farner): Add a rudimentary versioning system here so application updates
     #                       don't overwrite original binary.
     if self.options.copy_app_from is not None:
-      MesosCLIHelper.copy_app_to_hadoop(self.options.copy_app_from, job.hdfs_path(),
+      MesosCLIHelper.copy_app_to_hadoop(self.options.copy_app_from, self.config().hdfs_path(),
           self.cluster(), self.proxy())
 
     sessionkey = self.acquire_session()

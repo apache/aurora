@@ -94,7 +94,7 @@ class ProxyMesosConfig(ProxyConfig):
   def hdfs_path(self, name=None):
     jobname = name or self._job
     assert jobname, "Job name must be specified!"
-    return self._config['task']['hdfs_path']
+    return self._config[jobname]['task'].get('hdfs_path', None)
 
   def cluster(self):
     return self._config.get('cluster')
