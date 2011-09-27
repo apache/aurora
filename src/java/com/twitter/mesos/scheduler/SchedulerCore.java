@@ -11,7 +11,7 @@ import org.apache.commons.lang.builder.EqualsBuilder;
 import org.apache.commons.lang.builder.ToStringBuilder;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.Resource;
-import org.apache.mesos.Protos.SlaveOffer;
+import org.apache.mesos.Protos.Offer;
 
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.ExecutorKey;
@@ -171,7 +171,7 @@ public interface SchedulerCore extends Function<Query, Iterable<TwitterTaskInfo>
    * @throws ScheduleException If an error occurs while attempting to schedule a task.
    */
   @Nullable
-  TwitterTask offer(SlaveOffer offer, ExecutorID defaultExecutorId) throws ScheduleException;
+  TwitterTask offer(Offer offer, ExecutorID defaultExecutorId) throws ScheduleException;
 
   /**
    * Assigns a new state to tasks.

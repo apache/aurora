@@ -14,6 +14,7 @@ import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.ScheduleStatus;
 import org.apache.mesos.ExecutorDriver;
 import org.apache.mesos.Protos.ExecutorArgs;
+import org.apache.mesos.Protos.Status;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskStatus;
 
@@ -111,16 +112,16 @@ public interface Driver extends Function<Message, Integer> {
           }
 
           LOG.info("Sending message to scheduler.");
-          int result = driver.sendFrameworkMessage(data);
-          if (result != 0) {
+          Status status = driver.sendFrameworkMessage(data);
+          if (status != Status.OK) {
             LOG.warning(String.format("Attempt to send executor message returned code %d: %s",
-                result, message));
+                status, message));
             messagesFailed.incrementAndGet();
           } else {
             messagesSent.incrementAndGet();
           }
 
-          return result;
+          return status.getNumber();
         }
       });
 
@@ -146,14 +147,14 @@ public interface Driver extends Function<Message, Integer> {
             msg.setData(ByteString.copyFromUtf8(reason));
           }
 
-          int result = driver.sendStatusUpdate(msg.build());
-          if (result != 0) {
-            LOG.warning("Attempt to send executor message returned code " + result);
+          Status s = driver.sendStatusUpdate(msg.build());
+          if (s != Status.OK) {
+            LOG.warning("Attempt to send executor message returned code " + s);
             statusUpdatesFailed.incrementAndGet();
           } else {
             statusUpdatesSent.incrementAndGet();
           }
-          return result;
+          return s.getNumber();
         }
       });
     }

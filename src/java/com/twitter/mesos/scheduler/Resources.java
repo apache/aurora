@@ -22,7 +22,7 @@ import org.apache.mesos.Protos.Resource.Range;
 import org.apache.mesos.Protos.Resource.Ranges;
 import org.apache.mesos.Protos.Resource.Scalar;
 import org.apache.mesos.Protos.Resource.Type;
-import org.apache.mesos.Protos.SlaveOffer;
+import org.apache.mesos.Protos.Offer;
 
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
@@ -108,7 +108,7 @@ public class Resources {
    * @param offer Offer to get resources from.
    * @return The resources available in the offer.
    */
-  public static Resources from(SlaveOffer offer) {
+  public static Resources from(Offer offer) {
     checkNotNull(offer);
     return new Resources(
         getScalarValue(offer, CPUS),
@@ -116,7 +116,7 @@ public class Resources {
         getNumAvailablePorts(offer));
   }
 
-  private static int getNumAvailablePorts(SlaveOffer offer) {
+  private static int getNumAvailablePorts(Offer offer) {
     int offeredPorts = 0;
     for (Range range : getPortRanges(offer)) {
       offeredPorts += (1 + range.getEnd() - range.getBegin());
@@ -124,7 +124,7 @@ public class Resources {
     return offeredPorts;
   }
 
-  private static double getScalarValue(SlaveOffer offer, String key) {
+  private static double getScalarValue(Offer offer, String key) {
     Resource resource = getResource(offer, key);
     if (resource == null) {
       return 0;
@@ -133,7 +133,7 @@ public class Resources {
     return resource.getScalar().getValue();
   }
 
-  private static Resource getResource(SlaveOffer offer, String key) {
+  private static Resource getResource(Offer offer, String key) {
     return Iterables.find(offer.getResourcesList(), withName(key), null);
   }
 
@@ -145,7 +145,7 @@ public class Resources {
     };
   }
 
-  private static Iterable<Range> getPortRanges(SlaveOffer offer) {
+  private static Iterable<Range> getPortRanges(Offer offer) {
     Resource resource = getResource(offer, Resources.PORTS);
     if (resource == null) {
       return ImmutableList.of();
@@ -196,7 +196,7 @@ public class Resources {
     return Resource.newBuilder().setName(name).setType(Type.RANGES).setRanges(builder).build();
   }
 
-  static Set<Integer> getPorts(SlaveOffer offer, int numPorts) {
+  static Set<Integer> getPorts(Offer offer, int numPorts) {
     checkNotNull(offer);
 
     if (numPorts == 0) {

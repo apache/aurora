@@ -26,6 +26,7 @@ import com.google.inject.Module;
 import com.google.inject.Provider;
 
 import org.apache.mesos.Protos.TaskID;
+import org.apache.mesos.Protos;
 import org.apache.mesos.SchedulerDriver;
 import org.apache.thrift.transport.TTransportException;
 
@@ -188,10 +189,10 @@ public class SchedulerMain extends AbstractApplication {
 
     scheduler.start(new Closure<String>() {
       @Override public void execute(String taskId) throws RuntimeException {
-        int result = driver.killTask(TaskID.newBuilder().setValue(taskId).build());
-        if (result != 0) {
+        Protos.Status status = driver.killTask(TaskID.newBuilder().setValue(taskId).build());
+        if (status != Protos.Status.OK) {
           LOG.severe(String.format("Attempt to kill task %s failed with code %d",
-              taskId, result));
+              taskId, status));
         }
       }
     });
@@ -199,8 +200,8 @@ public class SchedulerMain extends AbstractApplication {
     new ThreadFactoryBuilder().setNameFormat("Driver-Runner-%d").setDaemon(true).build().newThread(
         new Runnable() {
           @Override public void run() {
-            int result = driver.run();
-            LOG.info("Driver completed with exit code " + result);
+            Protos.Status status = driver.run();
+            LOG.info("Driver completed with exit code " + status);
             lifecycle.shutdown();
           }
         }

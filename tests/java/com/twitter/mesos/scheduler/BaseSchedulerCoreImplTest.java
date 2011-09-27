@@ -21,13 +21,15 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 import org.apache.mesos.Protos.ExecutorID;
+import org.apache.mesos.Protos.FrameworkID;
+import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.Resource.Range;
 import org.apache.mesos.Protos.Resource.Ranges;
 import org.apache.mesos.Protos.Resource.Scalar;
 import org.apache.mesos.Protos.Resource.Type;
 import org.apache.mesos.Protos.SlaveID;
-import org.apache.mesos.Protos.SlaveOffer;
+import org.apache.mesos.Protos.Offer;
 import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
@@ -95,7 +97,7 @@ import static org.junit.Assert.fail;
  */
 public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
-  private static final String FRAMEWORK_ID = "framework_id";
+  private static final String FRAMEWORK_ID = "FrameworkId";
 
   private static final Identity OWNER_A = new Identity("Test_Role_A", "Test_User_A");
   private static final String JOB_A = "Test_Job_A";
@@ -116,6 +118,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       new ExecutorKey(SLAVE_ID, EXECUTOR_ID, SLAVE_HOST_1);
   private static final ExecutorKey SLAVE_HOST_2_KEY =
       new ExecutorKey(SLAVE_ID, EXECUTOR_ID, SLAVE_HOST_2);
+
+  private static final OfferID OFFER_ID = OfferID.newBuilder().setValue("OfferId").build();
 
   private SchedulingFilter schedulingFilter;
   private Closure<String> killTask;
@@ -282,8 +286,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     buildScheduler(storage);
 
-    SlaveOffer slaveOffer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
-    TwitterTask launchedTask = scheduler.offer(slaveOffer, EXECUTOR_ID);
+    Offer offer = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
+    TwitterTask launchedTask = scheduler.offer(offer, EXECUTOR_ID);
 
     // Since task fields are backfilled with defaults, the production flag should be filled.
     assertThat(launchedTask.task.getTask(),
@@ -551,11 +555,11 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     assertTaskCount(10);
 
-    SlaveOffer slaveOffer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
+    Offer offer = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
 
-    assertNull(scheduler.offer(slaveOffer, EXECUTOR_ID));
-    assertNull(scheduler.offer(slaveOffer, EXECUTOR_ID));
-    assertNull(scheduler.offer(slaveOffer, EXECUTOR_ID));
+    assertNull(scheduler.offer(offer, EXECUTOR_ID));
+    assertNull(scheduler.offer(offer, EXECUTOR_ID));
+    assertNull(scheduler.offer(offer, EXECUTOR_ID));
 
     // No tasks should have moved out of the pending state.
     assertThat(getTasksByStatus(PENDING).size(), is(10));
@@ -994,13 +998,13 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     }
   }
 
-  private void sendOffer(SlaveOffer offer, String taskId, SlaveID slave, String slaveHost)
+  private void sendOffer(Offer offer, String taskId, SlaveID slave, String slaveHost)
       throws Exception {
     sendOffer(offer, taskId, slave, slaveHost, ImmutableSet.<String>of(),
         ImmutableSet.<Integer>of());
   }
 
-  private void sendOffer(SlaveOffer offer, String taskId, SlaveID slave, String slaveHost,
+  private void sendOffer(Offer offer, String taskId, SlaveID slave, String slaveHost,
       Set<String> portNames, Set<Integer> ports) throws Exception {
     AssignedTask task = getTask(taskId).task.getAssignedTask().deepCopy();
 
@@ -1027,7 +1031,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   public void testExecutorBootstrap() throws Exception {
     expect(executorPulseMonitor.isAlive(SLAVE_HOST_1_KEY)).andReturn(false);
 
-    SlaveOffer offer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 3, 4096);
+    Offer offer = createOffer(SLAVE_ID, SLAVE_HOST_1, 3, 4096);
     final Resources offerResources = Resources.from(offer);
 
     final TwitterTaskInfo augmented = new TwitterTaskInfo().setNumCpus(3.14).setRamMb(1137);
@@ -1059,9 +1063,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     String taskId1 = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)).task);
     String taskId2 = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 1)).task);
 
-    SlaveOffer slaveOffer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
-    sendOffer(slaveOffer, taskId1, SLAVE_ID, SLAVE_HOST_1);
-    sendOffer(slaveOffer, taskId2, SLAVE_ID, SLAVE_HOST_1);
+    Offer offer = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
+    sendOffer(offer, taskId1, SLAVE_ID, SLAVE_HOST_1);
+    sendOffer(offer, taskId2, SLAVE_ID, SLAVE_HOST_1);
 
     changeStatus(taskId1, STARTING);
     changeStatus(taskId1, RUNNING);
@@ -1097,17 +1101,17 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    SlaveOffer slaveOffer1 = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
-    SlaveOffer slaveOffer2 = createSlaveOffer(SLAVE_ID, SLAVE_HOST_2, 4, 4096);
+    Offer offer1 = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
+    Offer offer2 = createOffer(SLAVE_ID, SLAVE_HOST_2, 4, 4096);
 
     // Offer resources for the scheduler to accept.
     scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
     String taskIdA = Tasks.id(Iterables.get(getTasksOwnedBy(OWNER_A), 0).task);
-    sendOffer(slaveOffer1, taskIdA, SLAVE_ID, SLAVE_HOST_1);
+    sendOffer(offer1, taskIdA, SLAVE_ID, SLAVE_HOST_1);
 
     scheduler.createJob(makeJob(OWNER_B, JOB_B, DEFAULT_TASK, 1));
     String taskIdB = Tasks.id(Iterables.get(getTasksOwnedBy(OWNER_B), 0).task);
-    sendOffer(slaveOffer2, taskIdB, SLAVE_ID, SLAVE_HOST_2);
+    sendOffer(offer2, taskIdB, SLAVE_ID, SLAVE_HOST_2);
 
     changeStatus(taskIdA, STARTING);
     changeStatus(taskIdA, RUNNING);
@@ -1139,8 +1143,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    SlaveOffer slaveOffer1 = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
-    SlaveOffer slaveOffer2 = createSlaveOffer(SLAVE_ID, SLAVE_HOST_2, 4, 4096);
+    Offer offer1 = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
+    Offer offer2 = createOffer(SLAVE_ID, SLAVE_HOST_2, 4, 4096);
 
     // Offer resources for the scheduler to accept.
     TwitterTaskInfo daemonTask = new TwitterTaskInfo(DEFAULT_TASK);
@@ -1149,14 +1153,14 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(makeJob(OWNER_A, JOB_A, daemonTask, 2));
     String taskIdA = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)).task);
     String taskIdB = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 1)).task);
-    sendOffer(slaveOffer1, taskIdA, SLAVE_ID, SLAVE_HOST_1);
-    sendOffer(slaveOffer1, taskIdB, SLAVE_ID, SLAVE_HOST_1);
+    sendOffer(offer1, taskIdA, SLAVE_ID, SLAVE_HOST_1);
+    sendOffer(offer1, taskIdB, SLAVE_ID, SLAVE_HOST_1);
 
     scheduler.createJob(makeJob(OWNER_B, JOB_B, DEFAULT_TASK, 2));
     String taskIdC = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_B, JOB_B), 0)).task);
     String taskIdD = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_B, JOB_B), 1)).task);
-    sendOffer(slaveOffer2, taskIdC, SLAVE_ID, SLAVE_HOST_2);
-    sendOffer(slaveOffer2, taskIdD, SLAVE_ID, SLAVE_HOST_2);
+    sendOffer(offer2, taskIdC, SLAVE_ID, SLAVE_HOST_2);
+    sendOffer(offer2, taskIdD, SLAVE_ID, SLAVE_HOST_2);
 
     changeStatus(taskIdA, STARTING);
     changeStatus(taskIdA, RUNNING);
@@ -1212,8 +1216,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    SlaveOffer slaveOffer1 = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
-    SlaveOffer slaveOffer2 = createSlaveOffer(SLAVE_ID, SLAVE_HOST_2, 4, 4096);
+    Offer offer1 = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
+    Offer offer2 = createOffer(SLAVE_ID, SLAVE_HOST_2, 4, 4096);
 
     // Offer resources for the scheduler to accept.
     TwitterTaskInfo daemonTask = new TwitterTaskInfo(DEFAULT_TASK);
@@ -1221,11 +1225,11 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, daemonTask, 1));
     String taskIdA = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)).task);
-    sendOffer(slaveOffer1, taskIdA, SLAVE_ID, SLAVE_HOST_1);
+    sendOffer(offer1, taskIdA, SLAVE_ID, SLAVE_HOST_1);
 
     scheduler.createJob(makeJob(OWNER_B, JOB_B, DEFAULT_TASK, 1));
     String taskIdB = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_B, JOB_B), 0)).task);
-    sendOffer(slaveOffer2, taskIdB, SLAVE_ID, SLAVE_HOST_2);
+    sendOffer(offer2, taskIdB, SLAVE_ID, SLAVE_HOST_2);
 
     changeStatus(taskIdA, STARTING);
 
@@ -1284,13 +1288,13 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     String taskId3a = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_B), 0)).task);
     String taskId3b = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_B), 1)).task);
 
-    SlaveOffer slaveOffer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
-    sendOffer(slaveOffer, taskId2a, SLAVE_ID, SLAVE_HOST_1);
-    sendOffer(slaveOffer, taskId2b, SLAVE_ID, SLAVE_HOST_1);
-    sendOffer(slaveOffer, taskId1a, SLAVE_ID, SLAVE_HOST_1);
-    sendOffer(slaveOffer, taskId1b, SLAVE_ID, SLAVE_HOST_1);
-    sendOffer(slaveOffer, taskId3a, SLAVE_ID, SLAVE_HOST_1);
-    sendOffer(slaveOffer, taskId3b, SLAVE_ID, SLAVE_HOST_1);
+    Offer offer = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
+    sendOffer(offer, taskId2a, SLAVE_ID, SLAVE_HOST_1);
+    sendOffer(offer, taskId2b, SLAVE_ID, SLAVE_HOST_1);
+    sendOffer(offer, taskId1a, SLAVE_ID, SLAVE_HOST_1);
+    sendOffer(offer, taskId1b, SLAVE_ID, SLAVE_HOST_1);
+    sendOffer(offer, taskId3a, SLAVE_ID, SLAVE_HOST_1);
+    sendOffer(offer, taskId3b, SLAVE_ID, SLAVE_HOST_1);
   }
 
   @Test
@@ -1365,13 +1369,13 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.finishUpdate(OWNER_A.getRole(), JOB_A, token, SUCCESS);
   }
 
-  private Function<Integer, String> newCommandFactory = new Function<Integer, String>() {
+  private final Function<Integer, String> newCommandFactory = new Function<Integer, String>() {
     @Override public String apply(Integer shardId) {
       return "updated start command for shard " + shardId;
     }
   };
 
-  private Function<Integer, String> oldCommandFactory = new Function<Integer, String>() {
+  private final Function<Integer, String> oldCommandFactory = new Function<Integer, String>() {
     @Override public String apply(Integer shardId) {
       return "start command for shard " + shardId;
     }
@@ -1756,7 +1760,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(makeJob(OWNER_A, JOB_A, config, 1));
 
     String taskId = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)).task);
-    SlaveOffer offer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
+    Offer offer = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
     sendOffer(offer, taskId, SLAVE_ID, SLAVE_HOST_1);
 
     AssignedTask task = getTask(taskId).task.getAssignedTask();
@@ -1776,7 +1780,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(makeJob(OWNER_A, JOB_A, config, 1));
 
     String taskId = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)).task);
-    SlaveOffer offer = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
+    Offer offer = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
     sendOffer(offer, taskId, SLAVE_ID, SLAVE_HOST_1);
 
     AssignedTask task = getTask(taskId).task.getAssignedTask();
@@ -1798,7 +1802,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     String taskId = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)).task);
 
     Set<Integer> assignedPorts = ImmutableSet.of(80, 81, 82);
-    SlaveOffer threePorts = createSlaveOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096, ImmutableSet.of(Pair.of(80, 82)));
+    Offer threePorts = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096, ImmutableSet.of(Pair.of(80, 82)));
     sendOffer(threePorts, taskId, SLAVE_ID, SLAVE_HOST_1,
         ImmutableSet.of("one", "two", "three"), assignedPorts);
 
@@ -1849,13 +1853,13 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     return job;
   }
 
-  private static SlaveOffer createSlaveOffer(SlaveID slave, String slaveHost, double cpu,
+  private static Offer createOffer(SlaveID slave, String slaveHost, double cpu,
       double ramMb) {
-    return createSlaveOffer(slave, slaveHost, cpu, ramMb,
+    return createOffer(slave, slaveHost, cpu, ramMb,
         ImmutableSet.<Pair<Integer, Integer>>of());
   }
 
-  private static SlaveOffer createSlaveOffer(SlaveID slave, String slaveHost, double cpu,
+  private static Offer createOffer(SlaveID slave, String slaveHost, double cpu,
       double ramMb, Set<Pair<Integer, Integer>> ports) {
 
     Ranges portRanges = Ranges.newBuilder()
@@ -1866,7 +1870,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         }))
         .build();
 
-    return SlaveOffer.newBuilder()
+    return Offer.newBuilder()
         .addResources(Resource.newBuilder().setType(Type.SCALAR).setName(Resources.CPUS)
             .setScalar(Scalar.newBuilder().setValue(cpu)))
         .addResources(Resource.newBuilder().setType(Type.SCALAR).setName(Resources.RAM_MB)
@@ -1875,6 +1879,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
             .setRanges(portRanges))
         .setSlaveId(slave)
         .setHostname(slaveHost)
+        .setFrameworkId(FrameworkID.newBuilder().setValue(FRAMEWORK_ID).build())
+        .setId(OFFER_ID)
         .build();
   }
 

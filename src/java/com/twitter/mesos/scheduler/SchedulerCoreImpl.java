@@ -24,7 +24,7 @@ import com.google.inject.Inject;
 
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.Resource;
-import org.apache.mesos.Protos.SlaveOffer;
+import org.apache.mesos.Protos.Offer;
 
 import com.twitter.common.base.Closure;
 import com.twitter.common.stats.Stats;
@@ -353,7 +353,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
   @Override
   @Nullable
-  public synchronized TwitterTask offer(final SlaveOffer offer, ExecutorID defaultExecutorId)
+  public synchronized TwitterTask offer(final Offer offer, ExecutorID defaultExecutorId)
       throws ScheduleException {
     checkStarted();
     checkNotNull(offer);

@@ -152,6 +152,8 @@ public class SchedulerModule extends AbstractModule {
 
   private static final String TWITTER_EXECUTOR_ID = "twitter";
 
+  private static final String TWITTER_FRAMEWORK_NAME = "TwitterScheduler";
+
   @Override
   protected void configure() {
     // Enable intercepted method timings
@@ -247,11 +249,12 @@ public class SchedulerModule extends AbstractModule {
 
     if (frameworkId != null) {
       LOG.info("Found persisted framework ID: " + frameworkId);
-      return new MesosSchedulerDriver(scheduler, mesosMasterAddress.get(),
-          FrameworkID.newBuilder().setValue(frameworkId).build());
+      return new MesosSchedulerDriver(scheduler, TWITTER_FRAMEWORK_NAME, provideExecutorInfo(),
+          mesosMasterAddress.get(), FrameworkID.newBuilder().setValue(frameworkId).build());
     } else {
       LOG.warning("Did not find a persisted framework ID, connecting as a new framework.");
-      return new MesosSchedulerDriver(scheduler, mesosMasterAddress.get());
+      return new MesosSchedulerDriver(scheduler, TWITTER_FRAMEWORK_NAME, provideExecutorInfo(),
+          mesosMasterAddress.get());
     }
   }
 

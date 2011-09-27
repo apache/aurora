@@ -20,12 +20,13 @@ import org.apache.mesos.Protos.ExecutorInfo;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.SlaveID;
-import org.apache.mesos.Protos.SlaveOffer;
+import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.TaskDescription;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskStatus;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
+import org.apache.mesos.Protos.Status;
 
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.args.Arg;
@@ -102,18 +103,8 @@ class MesosSchedulerImpl implements Scheduler {
   }
 
   @Override
-  public String getFrameworkName(SchedulerDriver driver) {
-    return "TwitterScheduler";
-  }
-
-  @Override
   public void slaveLost(SchedulerDriver schedulerDriver, SlaveID slaveId) {
     LOG.info("Received notification of lost slave: " + slaveId);
-  }
-
-  @Override
-  public ExecutorInfo getExecutorInfo(SchedulerDriver driver) {
-    return executorInfo;
   }
 
   private static void sendMessage(SchedulerDriver driver, ExecutorMessage message, SlaveID slave,
@@ -128,10 +119,10 @@ class MesosSchedulerImpl implements Scheduler {
 
     LOG.info(String.format("Attempting to send message to %s/%s - %s",
         slave.getValue(), executor.getValue(), message));
-    int result = driver.sendFrameworkMessage(slave, executor, data);
-    if (result != 0) {
+    Status status = driver.sendFrameworkMessage(slave, executor, data);
+    if (status != Status.OK) {
       LOG.severe(String.format("Attempt to send message failed with code %d [%s]",
-          result, message));
+          status, message));
     } else {
       LOG.info("Message successfully sent");
     }
@@ -191,33 +182,30 @@ class MesosSchedulerImpl implements Scheduler {
   }
 
   @Override
-  public void resourceOffer(SchedulerDriver driver, OfferID offerId, List<SlaveOffer> slaveOffers) {
+  public void resourceOffers(SchedulerDriver driver, List<Offer> offers) {
     Preconditions.checkState(frameworkID != null, "Must be registered before receiving offers.");
-
-    List<TaskDescription> scheduledTasks = Lists.newLinkedList();
-
     try {
-      for (SlaveOffer offer : slaveOffers) {
+      for (Offer offer : offers) {
         log(Level.FINE, "Received offer: %s", offer);
-
+        List<TaskDescription> scheduledTasks = Lists.newLinkedList();
         SchedulerCore.TwitterTask task = schedulerCore.offer(offer, executorInfo.getExecutorId());
 
         if (task != null) {
           TaskDescription assignedTask = twitterTaskToMesosTask(task);
           scheduledTasks.add(assignedTask);
         }
+
+        if (!scheduledTasks.isEmpty()) {
+          LOG.info(String.format("Accepting offer %s, to launch tasks %s", offer.getId().getValue(),
+              ImmutableSet.copyOf(Iterables.transform(scheduledTasks, TO_STRING))));
+        }
+
+        driver.launchTasks(offer.getId(), scheduledTasks);
       }
     } catch (ScheduleException e) {
-      LOG.log(Level.SEVERE, "Failed to schedule offer.", e);
+      LOG.log(Level.SEVERE, "Failed to schedule offers.", e);
       return;
     }
-
-    if (!scheduledTasks.isEmpty()) {
-      LOG.info(String.format("Accepting offer %s, to launch tasks %s", offerId.getValue(),
-          ImmutableSet.copyOf(Iterables.transform(scheduledTasks, TO_STRING))));
-    }
-
-    driver.replyToOffer(offerId, scheduledTasks);
   }
 
   private static final Function<TaskDescription, String> TO_STRING =
