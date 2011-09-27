@@ -412,6 +412,7 @@ The subcommands and their arguments are:
       usage = usage + '\n    ' + getattr(MesosCLI, method).__doc__
 
   app.set_usage(usage)
+  app.interspersed_args(True)
   app.add_option(
     '-v',
     dest='verbose',
