@@ -17,15 +17,14 @@ from twitter.thermos.runner.muxer   import ProcessMuxer
 from twitter.thermos.runner.ports   import EphemeralPortAllocator
 
 from twitter.tcl.scheduler import Scheduler
-from gen.twitter.tcl.ttypes import ThermosJobHeader
-
+from gen.twitter.tcl.ttypes import ThermosTask
 from gen.twitter.thermos.ttypes import *
+
+from thrift.TSerialization import serialize as thrift_serialize
+from thrift.TSerialization import deserialize as thrift_deserialize
 
 __author__ = 'wickman@twitter.com (brian wickman)'
 __tested__ = False
-__todo__   = """
-  Implement active/finished ThermosJob dump handling.
-"""
 
 class TaskRunnerHelper(object):
   @staticmethod
@@ -39,28 +38,38 @@ class TaskRunnerHelper(object):
       scheduler.run_set_together(process_set.processes)
     return scheduler
 
+  @staticmethod
+  def thriftify_task(thermos_task):
+    """
+      Perform an encode/decode on a ThermosTask.  This is necessary because
+      Thrift serialization is a one-way lossy function.  (However, further
+      ser/der cycles appear to be consistent.)
+    """
+    return thrift_deserialize(ThermosTask(), thrift_serialize(thermos_task))
+
+
 class TaskRunner(object):
   class InternalError(Exception): pass
 
-  def __init__(self, task, sandbox, root_dir, job_uid):
+  def __init__(self, task, sandbox, root_dir, task_id):
     """
       task     = ThermosTask to run
       sandbox  = sandbox in which to run all processes (pathname)
       root_dir = directory to store all log/ckpt data (pathname)
-      job_uid  = uid assigned to the parent job, used to disambiguate cached checkpoints
+      task_id  = uid assigned to the task, used to disambiguate checkpoints
     """
     self._task = copy.deepcopy(task)
-    self._task.job.uid = job_uid
     self._task_processes = {}
+    self._task_id = task_id
     self._watcher = ProcessMuxer()
     if self._task.replica_id is None:
       raise Exception("Task must have a replica_id!")
-    self._pathspec = TaskPath(root = root_dir, job_uid = job_uid)
+    self._pathspec = TaskPath(root = root_dir, task_id = task_id)
     self._recovery = True  # set in recovery mode
     self._port_allocator = EphemeralPortAllocator()
 
-    if self._has_finished_job() is not None:
-      log.info('Already have a finished job.')
+    if self._is_finished():
+      log.info('Found a finished task checkpoint.')
       self.die()
       return
 
@@ -70,7 +79,7 @@ class TaskRunner(object):
     self._planner = Planner(scheduler)
 
     # set up sandbox for running process
-    self._sandbox = TaskChroot(sandbox, job_uid)
+    self._sandbox = TaskChroot(sandbox, task_id)
     self._sandbox.create_if_necessary()
 
     # create runner state
@@ -105,11 +114,9 @@ class TaskRunner(object):
   def _initialize_processes(self):
     if self._state.header is None:
       update = TaskRunnerHeader(
-        job_name      = self._task.job.name,
-        job_uid       = self._task.job.uid,
-        task_name     = self._task.name,
-        task_replica  = self._task.replica_id,
+        task_id       = self._task_id,
         launch_time   = long(time.time()),
+        sandbox       = self._sandbox.path(),
         hostname      = socket.gethostname())
       runner_ckpt = TaskRunnerCkpt(runner_header = update)
       self._dispatcher.update_runner_state(self._state, runner_ckpt)
@@ -215,41 +222,43 @@ class TaskRunner(object):
       # e.g. select.select() and such. -- or write our own OS agnostic FdSelect class
       time.sleep(0.05)
 
-  def _write_job(self):
-    active_job_path = self._pathspec.getpath('active_job_path')
-    fp = Helper.safe_create_file(active_job_path, 'w')
-    rw = ThriftRecordWriter(fp)
-    rw.write(self._task.job)
-    fp.close()
+  def _write_task(self):
+    active_task = self._pathspec.getpath('active_task_path')
+    with Helper.safe_create_file(active_task, 'w') as fp:
+      rw = ThriftRecordWriter(fp)
+      rw.write(self._task)
 
-  def _has_finished_job(self):
-    finished_job_path = self._pathspec.getpath('finished_job_path')
-    if not os.path.exists(finished_job_path): return None
-    fp = file(finished_job_path, "r")
-    rr = ThriftRecordReader(fp, ThermosJobHeader)
-    job = rr.read()
-    fp.close()
-    if job is None: return None
-    return job == self._task.job
+  def _is_finished(self):
+    finished_task = self._pathspec.getpath('finished_task_path')
+    if not os.path.exists(finished_task):
+      return None
+    with open(finished_job_path, "r") as fp:
+      rr = ThriftRecordReader(fp, ThermosTask)
+      task = rr.read()
+    if task is None:
+      return None
+    return task == self._task
 
-  def _enforce_job_active(self):
+  def _enforce_task_active(self):
     # make sure Job is living in 'active' state
-    active_job_path = self._pathspec.getpath('active_job_path')
+    active_task = self._pathspec.getpath('active_task_path')
 
-    if not os.path.exists(active_job_path):
-      self._write_job()
+    if not os.path.exists(active_task):
+      self._write_task()
+      return
     else:
       # make sure it's the same
-      fp = file(active_job_path, "r")
-      rr = ThriftRecordReader(fp, ThermosJobHeader)
-      job = rr.read()
-      fp.close()
-      if job is None:
-        log.error('Corrupt job detected! %s, overwriting...' % active_job_path)
-        self._write_job()
+      with open(active_task, "r") as fp:
+        rr = ThriftRecordReader(fp, ThermosTask)
+        task = rr.read()
+      if task is None:
+        log.error('Corrupt task detected! %s, overwriting...' % active_task)
+        self._write_task()
       else:
-        if self._task.job != job:
-          raise TaskRunner.InternalError("Attempting to launch different jobs with same uid?")
+        if TaskRunnerHelper.thriftify_task(self._task) != task:
+          raise TaskRunner.InternalError(
+            "Attempting to launch different tasks with same task id: new: %s, active: %s" % (
+            self._task, task))
 
   def _save_allocated_ports(self, ports):
     for name in ports:
@@ -287,11 +296,11 @@ class TaskRunner(object):
       len(failures) >= self._task.max_process_failures)
 
   def run(self):
-    if self._has_finished_job() is not None:
+    if self._is_finished() is not None:
       log.info('Run short-circuiting.')
       return
     else:
-      log.info('Run not short-circuiting: has_finished_job = %s' % self._has_finished_job())
+      log.info('Run not short-circuiting: is_finished = %s' % self._is_finished())
 
     # out of recovery mode
     if not self._sandbox.created():
@@ -313,8 +322,8 @@ class TaskRunner(object):
         self._set_task_state(TaskState.SUCCESS)
         break
 
-      # make sure Job is living in 'active' state
-      self._enforce_job_active()
+      # make sure task is living in 'active' state
+      self._enforce_task_active()
 
       # do scheduling run
       runnable = list(self._planner.get_runnable())
@@ -346,25 +355,24 @@ class TaskRunner(object):
     pass
 
   def kill(self):
+    # TODO(wickman): MESOS-127
     log.warning('Need to implement kill()!')
     self.cleanup()
     pass
 
   def cleanup(self):
-    # do stuff here
+    """
+      Close the checkpoint and move the task checkpoint from active => finished paths.
+    """
     self._ckpt.close()
 
-    # make sure Job is living in 'active' state
-    active_job_path   = self._pathspec.getpath('active_job_path')
-    finished_job_path = self._pathspec.getpath('finished_job_path')
-    active_exists     = os.path.exists(active_job_path)
-    finished_exists   = os.path.exists(finished_job_path)
+    active_task_path   = self._pathspec.getpath('active_task_path')
+    finished_task_path = self._pathspec.getpath('finished_task_path')
+    active_exists      = os.path.exists(active_task_path)
+    finished_exists    = os.path.exists(finished_task_path)
 
-    # XXX Do some error handling here?
     if active_exists and not finished_exists:
-      # yay!
-      Helper.safe_create_dir(os.path.dirname(finished_job_path))
-      os.rename(active_job_path, finished_job_path)
+      Helper.safe_create_dir(os.path.dirname(finished_task_path))
+      os.rename(active_task_path, finished_task_path)
     else:
-      # fuck!
       log.error('WARNING: active_exists: %s, finished_exists: %s' % (active_exists, finished_exists))

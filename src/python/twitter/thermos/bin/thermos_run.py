@@ -24,8 +24,8 @@ app.add_option("--sandbox_root", dest = "sandbox_root", metavar = "PATH",
                help = "the path root where we will spawn task sandboxes")
 app.add_option("--checkpoint_root", dest = "checkpoint_root", metavar = "PATH",
                help = "the path where we will store task logs and checkpoints")
-app.add_option("--job_uid", dest = "uid", metavar = "INT64",
-               help = "the uid assigned to this process by the scheduler")
+app.add_option("--task_id", dest = "uid", metavar = "STRING",
+               help = "the uid assigned to this task by the scheduler")
 app.add_option("--action", dest = "action", metavar = "ACTION", default = "run",
                help = "the action for this task runner: run, restart, kill")
 
@@ -45,7 +45,7 @@ def check_invariants(args, values):
   if not (values.task and values.replica_id and values.sandbox_root and (
       values.checkpoint_root and values.uid)):
     log.error("ERROR: must supply all of: %s\n" % (
-      " ".join(["--task", "--replica_id", "--sandbox_root", "--checkpoint_root", "--job_uid"])))
+      " ".join(["--task", "--replica_id", "--sandbox_root", "--checkpoint_root", "--task_id"])))
     app.help()
     sys.exit(1)
 
@@ -98,7 +98,8 @@ def main(args):
     log.fatal("Unable to synthesize task!")
     sys.exit(1)
 
-  task_runner = TaskRunner(thermos_task, opts.sandbox_root, opts.checkpoint_root, long(opts.uid))
+  # TODO(wickman):  Need a general sanitizing suite for uids, job names, etc.
+  task_runner = TaskRunner(thermos_task, opts.sandbox_root, opts.checkpoint_root, opts.uid)
   task_runner.run()
 
 app.main()

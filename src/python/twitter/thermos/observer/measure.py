@@ -10,7 +10,7 @@ from case_class import CaseClass
 __author__ = 'wickman@twitter.com (brian wickman)'
 __tested__ = False
 
-MeasuredTuple = CaseClass('job_uid', 'task_name', 'process_name', 'process_run', 'process_pid')
+MeasuredTuple = CaseClass('task_id', 'process_name', 'process_run', 'process_pid')
 
 class TaskMeasurer(threading.Thread):
   """
@@ -51,11 +51,9 @@ class TaskMeasurer(threading.Thread):
 
       self._ps.refresh()
 
-      for (uid, task_name, process, run) in self._muxer.get_active_processes():
-        tup = MeasuredTuple(job_uid = uid, task_name = task_name,
-                            process_name = process.process,
-                            process_run  = run,
-                            process_pid  = process.pid)
+      for (uid, process, run) in self._muxer.get_active_processes():
+        tup = MeasuredTuple(task_id = uid, process_name = process.process,
+                            process_run = run, process_pid = process.pid)
         if tup not in self._processes:
           self._processes[tup] = SampleVector(process.process)
         children_pids = self._ps.get_children(process.pid)
@@ -64,9 +62,9 @@ class TaskMeasurer(threading.Thread):
           if ph._exists: pcpu += ph.pcpu
         self._processes[tup].add(time_now, pcpu / 100.0)
 
-  def current_cpu_by_uid(self, job_uid):
+  def current_cpu_by_uid(self, task_id):
     processes = filter(
-      lambda process: process.where(job_uid = job_uid) and (
+      lambda process: process.where(task_id = task_id) and (
         self._processes[process].num_samples() > 0),
       self._processes.keys())
 
@@ -81,17 +79,17 @@ class TaskMeasurer(threading.Thread):
       return 0
 
   # TODO(wickman)  Implement the proper O(n) solution.
-  def current_cpu_by_process(self, job_uid, task_name, process_name):
+  def current_cpu_by_process(self, task_id, process_name):
     processes = filter(
-      lambda process: process.where(
-        job_uid = job_uid, task_name = task_name, process_name = process_name) and (
+      lambda process: process.where(task_id = task_id, process_name = process_name) and (
           self._processes[process].num_samples() > 0),
         self._processes.keys())
     if len(processes) == 0: return 0
 
     if len(processes) > 1:
-      raise TaskMeasurer.InternalError("Unexpectedly large number of samples for %s,%s,%s" % (
-        job_uid, task_name, process_name))
+      raise TaskMeasurer.InternalError(
+        "Unexpectedly large number of samples for task %s process %s" % (
+          task_id, process_name))
 
     # TODO(wickman)  Memoize time.time() and get rid of all the hardcoded constants.
     last_sample = self._processes[processes[0]].last_sample()
@@ -100,8 +98,8 @@ class TaskMeasurer(threading.Thread):
     else:
       return 0
 
-  def samples_by_uid(self, job_uid):
+  def samples_by_uid(self, task_id):
     processes = filter(
-      lambda process: process.where(job_uid = job_uid),
+      lambda process: process.where(task_id = task_id),
       self._processes.keys())
     return [self._processes[process] for process in processes]

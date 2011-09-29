@@ -54,9 +54,9 @@ job = ThermosJobLoader('%(filename)s').to_thrift()
 task = job.tasks[0]
 sandbox = '%(sandbox)s'
 root = '%(root)s'
-job_uid = 1337
+task_id = '1337'
 
-TaskRunner(task, sandbox, root, job_uid).run()
+TaskRunner(task, sandbox, root, task_id).run()
 """
 
   @classmethod
@@ -73,7 +73,7 @@ TaskRunner(task, sandbox, root, job_uid).run()
         'sandbox': sandbox,
         'root': cls.tempdir
       }
-    cls.pathspec = TaskPath(root = cls.tempdir, job_uid = 1337)
+    cls.pathspec = TaskPath(root = cls.tempdir, task_id = '1337')
     assert subprocess.call([sys.executable, script_filename]) == 0
     cls.state = AlaCarteRunnerState(cls.pathspec.getpath('runner_checkpoint')).state()
 
@@ -86,11 +86,11 @@ TaskRunner(task, sandbox, root, job_uid).run()
 
   def test_runner_header_populated(self):
     header = self.state.header
-    assert header.job_name == 'hello_world', 'header job name must be set!'
-    assert header.job_uid == 1337, 'header job uid must be set!'
-    assert header.task_name == 'complex', 'header task name must be set!'
-    assert header.task_replica == 0, 'header task replica id must be set!'
-    # can do any reasonable assertions against .launch_time or hostname?
+    assert header.task_id == '1337', 'header task id must be set!'
+    assert header.sandbox == os.path.join(self.tempdir, 'sandbox', header.task_id), \
+      'header sandbox must be set!'
+    assert header.hostname, 'header task replica id must be set!'
+    assert header.launch_time, 'header launch time must be set'
 
   def test_runner_has_allocated_name_ports(self):
     ports = self.state.ports

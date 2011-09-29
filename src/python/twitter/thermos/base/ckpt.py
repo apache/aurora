@@ -318,15 +318,13 @@ class AlaCarteRunnerState(object):
     builder = TaskCkptDispatcher()
 
     try:
-      fp = open(path, "r")
-      rr = ThriftRecordReader(fp, TaskRunnerCkpt)
-      for wrc in rr:
-        builder.update_runner_state(self._state, wrc)
-    except Exception, e:
+      with open(path, "r") as fp:
+        rr = ThriftRecordReader(fp, TaskRunnerCkpt)
+        for wrc in rr:
+          builder.update_runner_state(self._state, wrc)
+    except Exception as e:
       log.error('Error recovering AlaCarteRunnerState(%s): %s' % (path, e))
       self._state = None
-    finally:
-      fp.close()
 
   def state(self):
     return self._state

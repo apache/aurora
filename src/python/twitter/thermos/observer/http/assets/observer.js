@@ -1,29 +1,5 @@
 var Task = new Class({
    data: {},
-   /*
-     from observer.py
-     data: {
-       #     {uid}: {
-       #        uid: int,
-       #        job: { name: string, X owner: string, X group: string }
-       #        name: string,
-       #        replica: int,
-       #        state: string [ACTIVE, SUCCESS, FAILED]
-       #     X  ports: { name1: 'url', name2: 'url2' }
-       #        resource_consumption: {cpu: , ram: , disk:}
-       #     X  timeline: {
-       #           axes: [ 'time', 'cpu', 'ram', 'disk'],
-       #           data: [ (1299534274324, 0.9, 1212492188, 493932999392),
-       #                   (1299534275327, 0.92, 23432423423, 52353252343), ... ]
-       #        }
-       #        processes: {     -> names only
-       #           waiting: [],
-       #           running: [],
-       #           success: [],
-       #           failed:  []
-       #        }
-       #     }
-    */
 
    initialize: function(uid, taskType) {
      this.taskType = taskType
@@ -166,13 +142,11 @@ var TableManager = new Class({
 
   getChildren: function() {
     new Request.JSON({
-      'url': '/uids',
-      'method': 'post',
-      'data': { 'type': this.tableType,
-                'offset': -20 },
+      'url': '/uids/' + this.tableType + '/-20',
+      'method': 'get',
       'onComplete': function(response) {
         if (response) {
-          var newChildren = Array.from(response.data)
+          var newChildren = Array.from(response.uids)
           this.visibleChildren = newChildren
 
           // first set all children to invisible
@@ -204,14 +178,14 @@ var TableManager = new Class({
      // first get visible children
      new Request.JSON({
        'url': '/task',
-       'method': 'post',
+       'method': 'get',
        'data': { 'uid': this.visibleChildren.join() },
        'onComplete': function(response) {
          if (response) {
-           if (!response.data) return;
-           for (uid in response.data) {
-             if (response.data.hasOwnProperty(uid))
-               this.activeTasks[uid].applyUpdate(response.data[uid])
+           if (!response) return;
+           for (uid in response) {
+             if (response.hasOwnProperty(uid))
+               this.activeTasks[uid].applyUpdate(response[uid])
            }
          } else {
            clearInterval(this.dataPoller)

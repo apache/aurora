@@ -101,14 +101,12 @@ struct ProcessHistory {
   3: list<ProcessState> runs
 }
 
-// This is the first framed message in the Ckpt stream.  The rest are ProcessStates.
+// The first framed message in the Ckpt stream.
 struct TaskRunnerHeader {
-  1: string job_name
-  2: i64    job_uid
-  3: string task_name
-  4: i32    task_replica
-  5: i64    launch_time
-  6: string hostname
+  1: string task_id
+  2: i64    launch_time
+  3: string sandbox
+  4: string hostname
 }
 
 struct TaskAllocatedPort {

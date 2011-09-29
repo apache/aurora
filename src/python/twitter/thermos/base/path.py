@@ -14,21 +14,23 @@ class TaskPath(object):
 
                                            which template to acquire
                                                     v
-      pathspec.given(job_uid = 12345).getpath("active_job_path")
+      pathspec.given(task_id = "12345-thermos-wickman-23").getpath("active_task_path")
                          ^
             further substitutions DIR_TEMPLATE
 
-      path_glob = pathspec.given(job_uid = "*").getpath(job_type)
-      path_re   = pathspec.given(job_uid = "(\S+)").getpath(job_type)
 
+    As a detection mechanism:
+      path_glob = pathspec.given(task_id = "*").getpath(task_type)
       matching_paths = glob.glob(path_glob)
-      path_re        = re.compile(path_re)
 
-      uids = []
+      path_re = pathspec.given(task_id = "(\S+)").getpath(task_type)
+      path_re = re.compile(path_re)
+
+      ids = []
       for path in matching_paths:
         matched_blobs = path_re.match(path).groups()
-        uids.append(int(matched_blobs[0]))
-      return uids
+        ids.append(int(matched_blobs[0]))
+      return ids
   """
 
   class UnknownPath(Exception): pass
@@ -36,21 +38,19 @@ class TaskPath(object):
 
   # all keys: root job_uid pid process run
   DIR_TEMPLATE = {
-      'active_job_path': ['%(root)s',        'jobs',      'active', '%(job_uid)s'],
-    'finished_job_path': ['%(root)s',        'jobs',    'finished', '%(job_uid)s'],
-    'runner_checkpoint': ['%(root)s', 'checkpoints', '%(job_uid)s', 'runner'],
-   'process_checkpoint': ['%(root)s', 'checkpoints', '%(job_uid)s', '%(pid)s'],
-       'process_logdir': ['%(root)s',        'logs', '%(job_uid)s', '%(process)s', '%(run)s']
+     'active_task_path': ['%(root)s',       'tasks',      'active', '%(task_id)s'],
+   'finished_task_path': ['%(root)s',       'tasks',    'finished', '%(task_id)s'],
+    'runner_checkpoint': ['%(root)s', 'checkpoints', '%(task_id)s', 'runner'],
+   'process_checkpoint': ['%(root)s', 'checkpoints', '%(task_id)s', '%(pid)s'],
+       'process_logdir': ['%(root)s',        'logs', '%(task_id)s', '%(process)s', '%(run)s']
   }
+
+  KNOWN_KEYS = [ 'root', 'task_id', 'pid', 'process', 'run']
 
   def __init__(self, **kw):
     self._filename = None
-    # this is somewhat of a hack to do self-interpolation
-    self._data = { 'root':    '%(root)s',
-                   'job_uid': '%(job_uid)s',
-                   'pid':     '%(pid)s',
-                   'process': '%(process)s',
-                   'run':     '%(run)s' }
+    # initialize with self-interpolating values
+    self._data = dict((key, '%%(%s)s' % key) for key in TaskPath.KNOWN_KEYS)
     self._data.update(kw)
 
   def given(self, **kw):

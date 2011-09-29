@@ -23,9 +23,11 @@ class TaskMuxer(object):
     task update stream.
   """
 
+  class UnknownTask(Exception): pass
+
   def __init__(self, pathspec):
     self._pathspec      = pathspec
-    self._uids          = set([])
+    self._uids          = set()
     self._ckpt_head     = {}
     self._runnerstate   = {}
     self._dispatcher    = {}
@@ -56,14 +58,20 @@ class TaskMuxer(object):
       there are new ckpt records.  Attempt to read those records and update the
       high watermark for that stream.
     """
-    uid_ckpt = self._pathspec.given(job_uid = uid).getpath('runner_checkpoint')
+    if uid not in self._uids:
+      raise TaskMuxer.UnknownTask('The task id %s is not being monitored!' % uid)
+
+    uid_ckpt = self._pathspec.given(task_id = uid).getpath('runner_checkpoint')
     ckpt_offset = None
     try:
       ckpt_offset = os.stat(uid_ckpt).st_size
     except OSError, e:
-      if e.errno == errno.EEXIST:
-        ckpt_offset = 0
-      else: raise
+      if e.errno == errno.ENOENT:
+        log.error('Error in TaskMuxer: Could not read from discovered task %s' % uid_ckpt)
+        return False
+      else:
+        raise
+
     updated = False
     if self._ckpt_head[uid] < ckpt_offset:
       # TODO(wickman)  Some of this logic should be factored out.  Right now
@@ -77,12 +85,13 @@ class TaskMuxer(object):
         while True:
           runner_update = rr.try_read()
           if runner_update:
-            self._dispatcher[uid].update_runner_state(
-              self._runnerstate[uid], runner_update)
+            self._dispatcher[uid].update_runner_state(self._runnerstate[uid], runner_update)
           else:
             break
-        updated = self._ckpt_head[uid] != fp.tell()
-        if updated: self._ckpt_head[uid] = fp.tell()
+        new_ckpt_head = fp.tell()
+        updated = self._ckpt_head[uid] != new_ckpt_head
+        if updated:
+          self._ckpt_head[uid] = new_ckpt_head
     return updated
 
   def _init_ckpt(self, uid):
@@ -107,7 +116,7 @@ class TaskMuxer(object):
           continue
         last_run = state.processes[process].runs[-1]
         if last_run.run_state == ProcessRunState.RUNNING:
-          tup = (uid, state.header.task_name, last_run, len(state.processes[process].runs)-1)
+          tup = (uid, last_run, len(state.processes[process].runs)-1)
           log.debug('yielding %s' % repr(tup))
           yield tup
     # TODO(wickman)  In the meantime look at all call-sites to verify sanity.
