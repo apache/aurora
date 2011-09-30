@@ -13,6 +13,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.annotation.Nonnegative;
 import javax.annotation.Nullable;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
@@ -84,7 +85,7 @@ public class SchedulerMain extends AbstractApplication {
            help = "JKS keyfile for operating the Mesos Thrift-over-SSL interface.")
   private static final Arg<File> mesosSSLKeyFile = Arg.create();
 
-  @Positive
+  @Nonnegative
   @CmdLine(name = "thrift_port", help = "Thrift server port.")
   private static final Arg<Integer> thriftPort = Arg.create(0);
 
