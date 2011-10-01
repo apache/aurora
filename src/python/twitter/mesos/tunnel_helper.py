@@ -12,7 +12,7 @@ class TunnelHelper:
 
   @staticmethod
   def get_tunnel_host(cluster):
-    return 'nest1.%s.twitter.com' % clusters.get_dc(cluster)
+    return 'nest1.corp.twitter.com'
 
   @staticmethod
   def create_tunnel(tunnel_host, tunnel_port, remote_host, remote_port):
