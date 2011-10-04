@@ -1,6 +1,5 @@
 package com.twitter.mesos.scheduler;
 
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.Collections;
@@ -12,7 +11,6 @@ import java.util.logging.Logger;
 
 import com.google.common.base.Function;
 import com.google.common.base.Supplier;
-import com.google.common.collect.ImmutableList;
 import com.google.inject.AbstractModule;
 import com.google.inject.Key;
 import com.google.inject.Provides;
@@ -27,16 +25,12 @@ import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
 
-import com.twitter.common.application.ActionRegistry;
-import com.twitter.common.application.ShutdownStage;
-import com.twitter.common.application.StartupStage;
 import com.twitter.common.application.http.Registration;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.NotNull;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Closures;
-import com.twitter.common.base.Command;
 import com.twitter.common.inject.TimedInterceptor;
 import com.twitter.common.logging.ScribeLog;
 import com.twitter.common.quantity.Amount;
@@ -49,9 +43,7 @@ import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.common.zookeeper.ZooKeeperClient.Credentials;
 import com.twitter.common.zookeeper.ZooKeeperUtils;
-import com.twitter.common.zookeeper.testing.ZooKeeperTestServer;
 import com.twitter.common_internal.cuckoo.CuckooWriter;
-import com.twitter.common_internal.zookeeper.TwitterZk;
 import com.twitter.mesos.ExecutorKey;
 import com.twitter.mesos.gen.MesosAdmin;
 import com.twitter.mesos.gen.TwitterTaskInfo;
@@ -67,6 +59,7 @@ import com.twitter.mesos.scheduler.httphandlers.SchedulerzRole;
 import com.twitter.mesos.scheduler.quota.QuotaModule;
 import com.twitter.mesos.scheduler.storage.StorageModule;
 import com.twitter.mesos.scheduler.sync.SyncModule;
+import com.twitter.mesos.scheduler.zk.ZooKeeperModule;
 
 
 public class SchedulerModule extends AbstractModule {
@@ -91,18 +84,6 @@ public class SchedulerModule extends AbstractModule {
   @CmdLine(name = "mesos_master_address",
           help ="Mesos address for the master, can be a mesos address or zookeeper path.")
   private static final Arg<String> mesosMasterAddress = Arg.create();
-
-  @CmdLine(name = "zk_in_proc",
-          help ="Launches an embedded zookeeper server for local testing")
-  private static final Arg<Boolean> zooKeeperInProcess = Arg.create(false);
-
-  @CmdLine(name = "zk_endpoints", help ="Endpoint specification for the ZooKeeper servers.")
-  private static final Arg<List<InetSocketAddress>> zooKeeperEndpoints =
-      Arg.<List<InetSocketAddress>>create(ImmutableList.copyOf(TwitterZk.DEFAULT_ZK_ENDPOINTS));
-
-  @CmdLine(name = "zk_session_timeout", help ="The ZooKeeper session timeout.")
-  public static final Arg<Amount<Integer, Time>> zooKeeperSessionTimeout =
-      Arg.create(ZooKeeperUtils.DEFAULT_ZK_SESSION_TIMEOUT);
 
   @NotNull
   @CmdLine(name = "executor_path", help ="Path to the executor launch script.")
@@ -158,6 +139,9 @@ public class SchedulerModule extends AbstractModule {
   protected void configure() {
     // Enable intercepted method timings
     TimedInterceptor.bind(binder());
+
+    // Bind a ZooKeeperClient
+    ZooKeeperModule.bind(binder());
 
     bind(Key.get(String.class, ClusterName.class)).toInstance(CLUSTER_NAME.get());
 
@@ -268,25 +252,6 @@ public class SchedulerModule extends AbstractModule {
 
   @Provides
   @Singleton
-  ZooKeeperClient provideZooKeeperClient(@ShutdownStage ActionRegistry shutdownRegistry,
-      Credentials credentials) {
-
-    if (zooKeeperInProcess.get()) {
-      try {
-        return startLocalZookeeper(shutdownRegistry, credentials);
-      } catch (IOException e) {
-        throw new RuntimeException("Unable to start local zookeeper", e);
-      } catch (InterruptedException e) {
-        throw new RuntimeException("Unable to start local zookeeper", e);
-      }
-    } else {
-      return new ZooKeeperClient(zooKeeperSessionTimeout.get(), credentials,
-          zooKeeperEndpoints.get());
-    }
-  }
-
-  @Provides
-  @Singleton
   Closure<Map<String, ? extends Number>> provideStatSink() throws ThriftFactoryException {
     if (CUCKOO_SCRIBE_ENDPOINTS.get().isEmpty()) {
       LOG.info("No scribe hosts provided, cuckoo stat export disabled.");
@@ -339,12 +304,4 @@ public class SchedulerModule extends AbstractModule {
     return reaper;
   }
   */
-
-  private ZooKeeperClient startLocalZookeeper(ActionRegistry shutdownRegistry,
-      Credentials credentials) throws IOException, InterruptedException {
-    ZooKeeperTestServer zooKeeperServer = new ZooKeeperTestServer(0, shutdownRegistry);
-    zooKeeperServer.startNetwork();
-    LOG.info("Embedded zookeeper cluster started on port " + zooKeeperServer.getPort());
-    return zooKeeperServer.createClient(zooKeeperSessionTimeout.get(), credentials);
-  }
 }

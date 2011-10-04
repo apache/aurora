@@ -51,6 +51,8 @@ import com.twitter.mesos.gen.storage.Snapshot;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.log.Log.Position;
+import com.twitter.mesos.scheduler.log.Log.Stream.InvalidPositionException;
+import com.twitter.mesos.scheduler.log.Log.Stream.StreamAccessException;
 import com.twitter.mesos.scheduler.storage.CheckpointStore;
 import com.twitter.mesos.scheduler.storage.ForwardingStore;
 import com.twitter.mesos.scheduler.storage.JobStore;
@@ -271,6 +273,10 @@ public class LogStorage extends ForwardingStore {
       });
     } catch (CodingException e) {
       throw new IllegalStateException("Failed to recover from the log, cannot continue", e);
+    } catch (InvalidPositionException e) {
+      throw new IllegalStateException("Failed to recover from the log, cannot continue", e);
+    } catch (StreamAccessException e) {
+      throw new IllegalStateException("Failed to recover from the log, cannot continue", e);
     }
   }
 
@@ -379,6 +385,10 @@ public class LogStorage extends ForwardingStore {
           try {
             snapshot();
           } catch (CodingException e) {
+            LOG.log(Level.WARNING, "Failed to encode a snapshot", e);
+          } catch (InvalidPositionException e) {
+            LOG.log(Level.WARNING, "Saved snapshot but failed to truncate entries preceding it", e);
+          } catch (StreamAccessException e) {
             LOG.log(Level.WARNING, "Failed to create a snapshot", e);
           }
         }
@@ -387,9 +397,11 @@ public class LogStorage extends ForwardingStore {
   }
 
   @VisibleForTesting
-  void snapshot()  throws CodingException {
+  void snapshot() throws CodingException, InvalidPositionException, StreamAccessException {
     super.doInTransaction(new Work.NoResult<CodingException>() {
-      @Override protected void execute(StoreProvider unused) throws CodingException {
+      @Override protected void execute(StoreProvider unused)
+          throws CodingException, InvalidPositionException, StreamAccessException {
+
         long timestamp = clock.nowMillis();
         byte[] data = checkpointStore.createSnapshot();
         streamManager.snapshot(new Snapshot(timestamp, ByteBuffer.wrap(data)));
@@ -422,7 +434,9 @@ public class LogStorage extends ForwardingStore {
   };
 
   @Override
-  public synchronized <T, E extends Exception> T doInTransaction(final Work<T, E> work) throws E {
+  public synchronized <T, E extends Exception> T doInTransaction(final Work<T, E> work)
+      throws StorageException, E {
+
     // The log stream transaction has already been setup or is not desired - nothing to do here
     if (!recovered || (transaction != null)) {
       return super.doInTransaction(work);
@@ -438,6 +452,9 @@ public class LogStorage extends ForwardingStore {
           } catch (CodingException e) {
             throw new IllegalStateException(
                 "Problem encoding transaction operations to the log stream", e);
+          } catch (StreamAccessException e) {
+            throw new StorageException(
+                "There was a problem committing the transaction to the log.", e);
           }
           return result;
         }

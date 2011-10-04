@@ -48,7 +48,7 @@ public class ForwardingStore
   }
 
   @Override
-  public <T, E extends Exception> T doInTransaction(Work<T, E> work) throws E {
+  public <T, E extends Exception> T doInTransaction(Work<T, E> work) throws StorageException, E {
     return storage.doInTransaction(work);
   }
 

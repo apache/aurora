@@ -41,10 +41,12 @@ import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TProtocol;
 import org.apache.thrift.transport.TIOStreamTransport;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionCallbackWithoutResult;
@@ -215,25 +217,35 @@ public class DbStorage implements
   }
 
   @Override
-  public <T, E extends Exception> T doInTransaction(final Work<T, E> work) throws E {
+  public <T, E extends Exception> T doInTransaction(final Work<T, E> work)
+      throws StorageException, E {
+
     checkNotNull(work);
 
-    return ExceptionTransporter.guard(new Function<ExceptionTransporter<E>, T>() {
-      @Override public T apply(final ExceptionTransporter<E> transporter) {
-        return transactionTemplate.execute(new TransactionCallback<T>() {
-          @Override public T doInTransaction(TransactionStatus transactionStatus) {
-            try {
-              return work.apply(storeProvider);
-            } catch (Exception e) {
-              // We know work throws E by its signature
-              @SuppressWarnings("unchecked") E exception = (E) e;
-              LOG.log(Level.WARNING, "work failed in transaction", e);
-              throw transporter.transport(exception);
+    try {
+      return ExceptionTransporter.guard(new Function<ExceptionTransporter<E>, T>() {
+        @Override public T apply(final ExceptionTransporter<E> transporter) {
+          return transactionTemplate.execute(new TransactionCallback<T>() {
+            @Override public T doInTransaction(TransactionStatus transactionStatus) {
+              try {
+                return work.apply(storeProvider);
+              } catch (RuntimeException e) {
+                throw e; // no need to transport these
+              } catch (Exception e) {
+                // We know work throws E by its signature
+                @SuppressWarnings("unchecked") E exception = (E) e;
+                LOG.log(Level.WARNING, "work failed in transaction", e);
+                throw transporter.transport(exception);
+              }
             }
-          }
-        });
-      }
-    });
+          });
+        }
+      });
+    } catch (DataAccessException e) {
+      throw new StorageException("Problem reading or writing to stable storage.", e);
+    } catch (TransactionException e) {
+      throw new StorageException("Problem executing transaction.", e);
+    }
   }
 
   @Override

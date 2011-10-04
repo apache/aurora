@@ -75,6 +75,15 @@ public interface Storage {
   }
 
   /**
+   * Indicates a problem reading from or writing to stable storage.
+   */
+  class StorageException extends RuntimeException {
+    public StorageException(String message, Throwable cause) {
+      super(message, cause);
+    }
+  }
+
+  /**
    * Prepares the underlying storage for serving traffic.
    *
    * @param initilizationLogic work to perform after this storage system is ready but before
@@ -88,13 +97,16 @@ public interface Storage {
    * requested are either all committed if the unit of work does not throw or else none of the
    * requested storage operations commit when it does throw.
    *
+   * <p>TODO(John Sirois): Audit usages and handle StorageException appropriately.
+   *
    * @param work The unit of work to execute in a transaction.
    * @param <T> The type of result this unit of work produces.
    * @param <E> The type of exception this unit of work can throw.
    * @return the result when the unit of work completes successfully
+   * @throws StorageException if there was a problem reading from or writing to stable storage.
    * @throws E bubbled transparently when the unit of work throws
    */
-  <T, E extends Exception> T doInTransaction(Work<T, E> work) throws E;
+  <T, E extends Exception> T doInTransaction(Work<T, E> work) throws StorageException, E;
 
   /**
    * Prepares the underlying storage system for clean shutdown.

@@ -11,8 +11,8 @@ import java.util.Iterator;
  * <p>Logs are accessed by {@link #open() opening} a {@link Stream}.  All stream
  * access occurs with references to log entry {@link Position positions} in the stream.  These
  * positions can be remembered between runs of a client application by recording their
- * {@link Position#identity()} and {@link #position(byte[]) exchanging} it later for the original
- * position.
+ * {@link Position#identity()} and {@link Stream#position(byte[]) exchanging} it later for the
+ * original position.
  *
  * @author John Sirois
  */
@@ -53,24 +53,24 @@ public interface Log {
   }
 
   /**
-   * Indicates a {@link Position} that is not (currently) contained in this log stream.  This might
-   * indicate the position id from a different log or that the position was from this log but has
-   * been truncated.
-   */
-  class InvalidPositionException extends RuntimeException {
-    public InvalidPositionException(String message) {
-      super(message);
-    }
-    public InvalidPositionException(String message, Throwable cause) {
-      super(message, cause);
-    }
-  }
-
-  /**
    * An interface to the live {@link Log} stream that allows for appending, reading and writing
    * entries.
    */
   interface Stream extends Closeable {
+
+    /**
+     * Indicates a {@link Position} that is not (currently) contained in this log stream.  This might
+     * indicate the position id from a different log or that the position was from this log but has
+     * been truncated.
+     */
+    class InvalidPositionException extends RuntimeException {
+      public InvalidPositionException(String message) {
+        super(message);
+      }
+      public InvalidPositionException(String message, Throwable cause) {
+        super(message, cause);
+      }
+    }
 
     /**
      * Indicates a {@link Stream} could not be read from, written to or truncated due to some

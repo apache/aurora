@@ -31,6 +31,8 @@ import com.twitter.mesos.scheduler.log.Log;
 import com.twitter.mesos.scheduler.log.Log.Entry;
 import com.twitter.mesos.scheduler.log.Log.Position;
 import com.twitter.mesos.scheduler.log.Log.Stream;
+import com.twitter.mesos.scheduler.log.Log.Stream.InvalidPositionException;
+import com.twitter.mesos.scheduler.log.Log.Stream.StreamAccessException;
 
 /**
  * Manages opening, reading from and writing to a {@link Log}.
@@ -94,9 +96,13 @@ final class LogManager {
      * @param reader A reader that will be handed log entries decoded from the stream.
      * @return The position of the last LogEntry that was read.
      * @throws CodingException if there was a problem decoding a log entry from the stream.
+     * @throws InvalidPositionException if the given position is not found in the log.
+     * @throws StreamAccessException if there is a problem reading from the log.
      */
     @Nullable
-    Position readAfter(@Nullable byte[] position, Closure<LogEntry> reader) throws CodingException {
+    Position readAfter(@Nullable byte[] position, Closure<LogEntry> reader)
+        throws CodingException, InvalidPositionException, StreamAccessException {
+
       Iterator<Entry> entries =
           stream.readFrom(position == null ? stream.beginning() : stream.position(position));
 
@@ -121,7 +127,9 @@ final class LogManager {
      * Truncates all entries in the log stream occuring before the given position.  The entry at the
      * given position becomes the first entry in the stream when this call completes.
      *
-     * @param position The last position to keep in the stream
+     * @param position The last position to keep in the stream.
+     * @throws InvalidPositionException if the specified position does not exist in this log.
+     * @throws StreamAccessException if the stream could not be truncated.
      */
     void truncateBefore(Position position) {
       stream.truncateBefore(position);
@@ -144,10 +152,14 @@ final class LogManager {
      *
      * @param snapshot The snapshot to add.
      * @return The position of the snapshot log entry.
-     * @throws CodingException if the was aproblem encoding the snapshot into a log entry.
+     * @throws CodingException if the was a problem encoding the snapshot into a log entry.
+     * @throws InvalidPositionException if there was a problem truncating before the snapshot.
+     * @throws StreamAccessException if there was a problem appending the snapshot to the log.
      */
     @Timed("scheduler_log_snapshot")
-    Position snapshot(Snapshot snapshot) throws CodingException {
+    Position snapshot(Snapshot snapshot)
+        throws CodingException, InvalidPositionException, StreamAccessException {
+
       Position position = append(LogEntry.snapshot(snapshot));
       vars.logSnapshots.incrementAndGet();
       vars.unSnapshottedTransactions.set(0);
@@ -155,8 +167,16 @@ final class LogManager {
       return position;
     }
 
+    /**
+     * Appends an entry to the log and returns the entry's position in the log if successful.
+     *
+     * @param logEntry The entry to append to the log.
+     * @return The position of the appended log entry.
+     * @throws CodingException if there was a problem encoding the log entry.
+     * @throws StreamAccessException if there was a problem appending to the log.
+     */
     @Timed("scheduler_log_append")
-    Position append(LogEntry logEntry) throws CodingException {
+    Position append(LogEntry logEntry) throws CodingException, StreamAccessException {
       byte[] entry = ThriftBinaryCodec.encodeNonNull(logEntry);
       Position position = stream.append(entry);
       vars.logBytesWritten.addAndGet(entry.length);
@@ -183,7 +203,7 @@ final class LogManager {
        * @return The position of the log entry committed in this transaction, if any.
        * @throws CodingException If there was a problem encoding a log entry for commit.
        */
-      Position commit() throws CodingException {
+      Position commit() throws CodingException, StreamAccessException {
         Preconditions.checkState(!committed.getAndSet(true),
             "Can only call commit once per transaction.");
 
