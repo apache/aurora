@@ -324,11 +324,12 @@ public class DbStorage implements
   @Timed("db_storage_record_checkpoint")
   @Override
   public void checkpoint(final byte[] handle) {
-    updateSchedulerState(ConfiguratonKey.LAST_COMMITTED_LOG_POSITION, new ExceptionalClosure<TProtocol, TException>() {
-      @Override public void execute(TProtocol stream) throws TException {
-        stream.writeBinary(ByteBuffer.wrap(handle));
-      }
-    });
+    updateSchedulerState(ConfiguratonKey.LAST_COMMITTED_LOG_POSITION,
+        new ExceptionalClosure<TProtocol, TException>() {
+          @Override public void execute(TProtocol stream) throws TException {
+            stream.writeBinary(ByteBuffer.wrap(handle));
+          }
+        });
   }
 
   @Timed("db_storage_fetch_checkpoint")
@@ -370,8 +371,8 @@ public class DbStorage implements
         } catch (TException e) {
           throw new IllegalStateException("Failed to serialize thrift data", e);
         }
-        jdbcTemplate.update("MERGE INTO scheduler_state (key, value) KEY(key) VALUES(?, ?)", key
-            .getValue(), data.toByteArray());
+        jdbcTemplate.update("MERGE INTO scheduler_state (key, value) KEY(key) VALUES(?, ?)",
+                            key.getValue(), data.toByteArray());
       }
     });
   }
@@ -717,8 +718,9 @@ public class DbStorage implements
 
   @Nullable
   private Set<ShardUpdateConfiguration> queryShardUpdateConfigs(String role) {
-    return ImmutableSet.copyOf(jdbcTemplate
-        .query("SELECT update_token, config FROM update_store WHERE job_role = ?", SHARD_UPDATE_CONFIG_ROW_MAPPER, role));
+    return ImmutableSet.copyOf(
+        jdbcTemplate.query("SELECT update_token, config FROM update_store WHERE job_role = ?",
+                           SHARD_UPDATE_CONFIG_ROW_MAPPER, role));
   }
 
   @Nullable

@@ -1,7 +1,13 @@
 package com.twitter.mesos.scheduler.storage.log;
 
+import java.sql.SQLException;
+
 import com.google.common.collect.ImmutableSet;
 import com.google.common.testing.junit4.TearDownTestCase;
+
+import org.junit.Before;
+import org.junit.Test;
+
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.TearDownRegistry;
@@ -19,6 +25,7 @@ import com.twitter.mesos.gen.storage.SaveTasks;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.db.DbUtil.DbAccess;
 import com.twitter.mesos.scheduler.db.testing.DbTestUtil;
+import com.twitter.mesos.scheduler.log.Log;
 import com.twitter.mesos.scheduler.log.Log.Position;
 import com.twitter.mesos.scheduler.log.db.DbLogStream;
 import com.twitter.mesos.scheduler.storage.CheckpointStore;
@@ -26,16 +33,13 @@ import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
 import com.twitter.mesos.scheduler.storage.db.DbStorage;
 import com.twitter.mesos.scheduler.storage.log.LogManager.StreamManager.StreamTransaction;
-import org.junit.Before;
-import org.junit.Test;
-
-import java.sql.SQLException;
 
 import static com.google.common.testing.junit4.JUnitAsserts.assertNotEqual;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.fail;
 
 /**
  * @author John Sirois
@@ -119,7 +123,39 @@ public class LogStorageIT extends TearDownTestCase {
   }
 
   @Test
-  public void testCheckpointedRecovery() throws Exception {
+  public void testCheckpointedRecovery_failure() throws Exception {
+    commitTransaction(Op.saveFrameworkId(new SaveFrameworkId("1")));
+
+    ImmutableSet<ScheduledTask> tasks = ImmutableSet.of(createTask("task1"));
+    Position commit = commitTransaction(Op.saveTasks(new SaveTasks(tasks)));
+
+    DbStorage storage2 = createDbStorage("local_db2");
+
+    // Relies on the DbLogStream implementation mapping positions to longs - not enough bytes here.
+    byte[] badCheckpoint = { 0xB, 0xA, 0xD };
+    try {
+      log.position(badCheckpoint);
+      fail("Expected a bad checkpoint");
+    } catch (Log.Stream.InvalidPositionException e) {
+      // expected
+    }
+    LogStorage logStorage2 = createLogStorage(storage2);
+    logStorage2.start(NOOP);
+    storage2.checkpoint(badCheckpoint);
+
+    LogStorage logStorage3 = createLogStorage(storage2);
+    logStorage3.start(NOOP);
+    assertEquals("1", logStorage3.fetchFrameworkId());
+    assertEquals(tasks, logStorage3.fetchTasks(Query.GET_ALL));
+
+    // Check we recovered despite the bad checkpoint.
+    assertArrayEquals(badCheckpoint, storage2.fetchCheckpoint());
+    logStorage3.acceptCheckpoint();
+    assertCheckpoint(storage2, commit);
+  }
+
+  @Test
+  public void testCheckpointedRecovery_success() throws Exception {
     logStorage.saveFrameworkId("1");
     logStorage.saveFrameworkId("2");
     logStorage.saveFrameworkId("3");

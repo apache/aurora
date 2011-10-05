@@ -23,6 +23,8 @@ import com.google.common.collect.ImmutableSet;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
 
+import org.apache.commons.codec.binary.Hex;
+
 import com.twitter.common.application.ActionRegistry;
 import com.twitter.common.application.ShutdownStage;
 import com.twitter.common.base.Closure;
@@ -262,21 +264,41 @@ public class LogStorage extends ForwardingStore {
 
   @Timed("scheduler_log_recover")
   @Nullable
-  Position recover() {
+  Position recover() throws RecoveryFailedException {
+    @Nullable byte[] checkpoint = checkpointStore.fetchCheckpoint();
     try {
-      // TODO(John Sirois): add support for backing up and trying from beginning() if we fail
-      // an attempt to restore from a non-null fetchCheckpoint()
-      return streamManager.readAfter(checkpointStore.fetchCheckpoint(), new Closure<LogEntry>() {
+      return recoverFrom(checkpoint);
+    } catch (RecoveryFailedException e) {
+      if (checkpoint != null) {
+        LOG.log(Level.WARNING,
+            String.format("Failed to recover from checkpoint: 0x%s, attempting to recover using " +
+                          "complete log.", Hex.encodeHexString(checkpoint)),
+            e);
+        return recoverFrom(null);
+      }
+      throw e;
+    }
+  }
+
+  private static class RecoveryFailedException extends RuntimeException {
+    private RecoveryFailedException(Throwable cause) {
+      super(cause);
+    }
+  }
+
+  private Position recoverFrom(@Nullable byte[] checkpoint) throws RecoveryFailedException {
+    try {
+      return streamManager.readAfter(checkpoint, new Closure<LogEntry>() {
         @Override public void execute(LogEntry logEntry) {
           replay(logEntry);
         }
       });
     } catch (CodingException e) {
-      throw new IllegalStateException("Failed to recover from the log, cannot continue", e);
+      throw new RecoveryFailedException(e);
     } catch (InvalidPositionException e) {
-      throw new IllegalStateException("Failed to recover from the log, cannot continue", e);
+      throw new RecoveryFailedException(e);
     } catch (StreamAccessException e) {
-      throw new IllegalStateException("Failed to recover from the log, cannot continue", e);
+      throw new RecoveryFailedException(e);
     }
   }
 
