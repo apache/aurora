@@ -1,21 +1,23 @@
 package com.twitter.mesos.executor.httphandlers;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
-import com.google.inject.Inject;
-import com.twitter.common.base.Closure;
-import com.twitter.common.net.http.handlers.StringTemplateServlet;
-import com.twitter.mesos.executor.ExecutorCore;
-import org.antlr.stringtemplate.StringTemplate;
-
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import com.google.common.collect.ImmutableList;
+import com.google.inject.Inject;
+
+import org.antlr.stringtemplate.StringTemplate;
+
+import com.twitter.common.base.Closure;
+import com.twitter.common.net.http.handlers.StringTemplateServlet;
+import com.twitter.mesos.executor.ExecutorCore;
 
 /**
  * HTTP interface for the executor.

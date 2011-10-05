@@ -21,13 +21,11 @@ import org.antlr.stringtemplate.StringTemplate;
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.mesos.Tasks;
-import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.CronJobManager;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerCore;
-import com.twitter.mesos.scheduler.TaskState;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
@@ -70,13 +68,13 @@ public class SchedulerzHome extends StringTemplateServlet {
               }
             });
 
-        Multimap<String, TaskState> ownerJobs = HashMultimap.create();
+        Multimap<String, ScheduledTask> ownerJobs = HashMultimap.create();
 
-        Set<TaskState> tasks = scheduler.getTasks(Query.GET_ALL);
+        Set<ScheduledTask> tasks = scheduler.getTasks(Query.GET_ALL);
 
-        for (TaskState state : tasks) {
-          Role role = owners.get(state.task.getAssignedTask().getTask().getOwner().getRole());
-          switch (state.task.getStatus()) {
+        for (ScheduledTask task : tasks) {
+          Role role = owners.get(task.getAssignedTask().getTask().getOwner().getRole());
+          switch (task.getStatus()) {
             case PENDING:
               role.pendingTaskCount++;
               break;
@@ -99,16 +97,15 @@ public class SchedulerzHome extends StringTemplateServlet {
               break;
 
             default:
-              throw new IllegalArgumentException("Unsupported status: " + state.task.getStatus());
+              throw new IllegalArgumentException("Unsupported status: " + task.getStatus());
           }
 
-          ownerJobs.put(role.role, state);
+          ownerJobs.put(role.role, task);
         }
 
         for (Role role : owners.values()) {
-          Iterable<ScheduledTask> activeRoleTasks = Iterables.filter(
-              Iterables.transform(ownerJobs.get(role.role), TaskState.STATE_TO_SCHEDULED),
-              Tasks.ACTIVE_FILTER);
+          Iterable<ScheduledTask> activeRoleTasks =
+              Iterables.filter(ownerJobs.get(role.role), Tasks.ACTIVE_FILTER);
           role.jobCount = Sets.newHashSet(Iterables.transform(
               activeRoleTasks, GET_JOB_NAME)).size();
         }

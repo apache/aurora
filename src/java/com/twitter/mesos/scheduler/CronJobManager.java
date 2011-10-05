@@ -1,5 +1,9 @@
 package com.twitter.mesos.scheduler;
 
+import it.sauronsoftware.cron4j.InvalidPatternException;
+import it.sauronsoftware.cron4j.Scheduler;
+import it.sauronsoftware.cron4j.SchedulingPattern;
+
 import java.util.Collections;
 import java.util.Date;
 import java.util.Map;
@@ -21,10 +25,6 @@ import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
-
-import it.sauronsoftware.cron4j.InvalidPatternException;
-import it.sauronsoftware.cron4j.Scheduler;
-import it.sauronsoftware.cron4j.SchedulingPattern;
 
 /**
  * A job scheduler that receives jobs that should be run periodically on a cron schedule.

@@ -26,8 +26,8 @@ import com.google.inject.Inject;
 import com.google.inject.Module;
 import com.google.inject.Provider;
 
-import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos;
+import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.SchedulerDriver;
 import org.apache.thrift.transport.TTransportException;
 

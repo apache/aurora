@@ -1,17 +1,11 @@
 package com.twitter.mesos.scheduler.storage;
 
-import java.util.Arrays;
-
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import com.google.common.testing.junit4.TearDownTestCase;
-
-import org.junit.Before;
-import org.junit.Test;
-
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
@@ -20,6 +14,10 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.Query;
+import org.junit.Before;
+import org.junit.Test;
+
+import java.util.Arrays;
 
 import static com.twitter.mesos.gen.ScheduleStatus.LOST;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;

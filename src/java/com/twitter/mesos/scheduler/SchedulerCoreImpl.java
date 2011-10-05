@@ -18,13 +18,12 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.MapMaker;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
 import org.apache.mesos.Protos.ExecutorID;
-import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.Offer;
+import org.apache.mesos.Protos.Resource;
 
 import com.twitter.common.base.Closure;
 import com.twitter.common.stats.Stats;
@@ -71,13 +70,6 @@ import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.STOPPED;
 public class SchedulerCoreImpl implements SchedulerCore {
 
   private static final Logger LOG = Logger.getLogger(SchedulerCore.class.getName());
-
-  private final Map<String, VolatileTaskState> taskStateById =
-      new MapMaker().makeComputingMap(new Function<String, VolatileTaskState>() {
-        @Override public VolatileTaskState apply(String taskId) {
-          return new VolatileTaskState();
-        }
-      });
 
   private final CronJobManager cronScheduler;
 
@@ -163,23 +155,15 @@ public class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public synchronized Set<TaskState> getTasks(final Query query) {
+  public synchronized Set<ScheduledTask> getTasks(final Query query) {
     checkStarted();
 
-    Set<ScheduledTask> tasks = stateManager.fetchTasks(query);
-    return ImmutableSet.copyOf(Iterables.transform(tasks,
-        new Function<ScheduledTask, TaskState>() {
-          @Override
-          public TaskState apply(ScheduledTask task) {
-            VolatileTaskState volatileTaskState = taskStateById.get(Tasks.id(task));
-            return new TaskState(task, volatileTaskState);
-          }
-        }));
+    return stateManager.fetchTasks(query);
   }
 
   @Override
   public Iterable<TwitterTaskInfo> apply(Query query) {
-    return Iterables.transform(getTasks(query), TaskState.STATE_TO_INFO);
+    return Iterables.transform(getTasks(query), Tasks.SCHEDULED_TO_INFO);
   }
 
   private boolean hasActiveJob(JobConfiguration job) {

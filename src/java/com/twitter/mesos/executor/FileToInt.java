@@ -1,14 +1,15 @@
 package com.twitter.mesos.executor;
 
+import java.io.File;
+import java.io.IOException;
+
 import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.io.Files;
+
 import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.mesos.executor.FileToInt.FetchException;
-
-import java.io.File;
-import java.io.IOException;
 
 /**
  * A function to read a file and interpret its contents as an integer.

@@ -1,8 +1,5 @@
 package com.twitter.mesos.scheduler;
 
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Set;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -12,17 +9,16 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
-import com.google.common.collect.Lists;
 import com.google.common.collect.PeekingIterator;
 import com.google.common.collect.Sets;
 
 import org.apache.commons.lang.builder.EqualsBuilder;
+import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.Resource.Range;
 import org.apache.mesos.Protos.Resource.Ranges;
 import org.apache.mesos.Protos.Resource.Scalar;
 import org.apache.mesos.Protos.Resource.Type;
-import org.apache.mesos.Protos.Offer;
 
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;

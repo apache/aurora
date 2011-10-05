@@ -1,18 +1,20 @@
 package com.twitter.mesos.executor;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.io.Files;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Data;
+
 import org.apache.commons.io.FileUtils;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Data;
 
 /**
  * A wrapper class to interact with the /proc filesystem in linux and gather information about a

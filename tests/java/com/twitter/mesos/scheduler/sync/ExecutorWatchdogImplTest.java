@@ -1,21 +1,19 @@
 package com.twitter.mesos.scheduler.sync;
 
-import java.util.Set;
-
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableSet;
-
-import org.apache.mesos.Protos.ExecutorID;
-import org.apache.mesos.Protos.SlaveID;
-import org.junit.Before;
-import org.junit.Test;
-
 import com.twitter.common.application.ActionRegistry;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.ExecutorKey;
 import com.twitter.mesos.gen.comm.StateUpdateRequest;
 import com.twitter.mesos.scheduler.sync.ExecutorWatchdog.ExecutorWatchdogImpl;
 import com.twitter.mesos.scheduler.sync.ExecutorWatchdog.UpdateRequest;
+import org.apache.mesos.Protos.ExecutorID;
+import org.apache.mesos.Protos.SlaveID;
+import org.junit.Before;
+import org.junit.Test;
+
+import java.util.Set;
 
 import static com.twitter.mesos.scheduler.sync.ExecutorWatchdog.ExecutorWatchdogImpl.NO_POSITION;
 import static org.junit.Assert.assertEquals;

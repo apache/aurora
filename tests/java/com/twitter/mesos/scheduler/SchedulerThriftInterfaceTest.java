@@ -1,11 +1,6 @@
 package com.twitter.mesos.scheduler;
 
 import com.google.common.collect.ImmutableSet;
-
-import org.easymock.Capture;
-import org.junit.Before;
-import org.junit.Test;
-
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.CreateJobResponse;
@@ -22,6 +17,9 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.auth.SessionValidator;
 import com.twitter.mesos.scheduler.auth.SessionValidator.AuthFailedException;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
+import org.easymock.Capture;
+import org.junit.Before;
+import org.junit.Test;
 
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.eq;
@@ -93,12 +91,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     TaskQuery query = new TaskQuery()
         .setOwner(ROLE_IDENTITY)
         .setJobName("foo_job");
-    TaskState task = new TaskState(
-        new ScheduledTask()
-            .setAssignedTask(new AssignedTask()
-                .setTask(new TwitterTaskInfo()
-                    .setOwner(ROLE_IDENTITY))),
-        new VolatileTaskState());
+    ScheduledTask task = new ScheduledTask()
+        .setAssignedTask(new AssignedTask()
+            .setTask(new TwitterTaskInfo()
+                .setOwner(ROLE_IDENTITY)));
 
     expectAdminAuth(false);
     expectAuth(ROLE, true);
@@ -121,12 +117,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     TaskQuery query = new TaskQuery()
         .setOwner(ROLE_IDENTITY)
         .setJobName("foo_job");
-    TaskState task = new TaskState(
-        new ScheduledTask()
-            .setAssignedTask(new AssignedTask()
-                .setTask(new TwitterTaskInfo()
-                .setOwner(ROLE_IDENTITY))),
-        new VolatileTaskState());
+    ScheduledTask task = new ScheduledTask()
+        .setAssignedTask(new AssignedTask()
+            .setTask(new TwitterTaskInfo()
+                .setOwner(ROLE_IDENTITY)));
 
     expectAdminAuth(false);
     expectAuth(ROLE, false);

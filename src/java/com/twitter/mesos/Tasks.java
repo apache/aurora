@@ -3,13 +3,10 @@ package com.twitter.mesos;
 import java.util.EnumSet;
 import java.util.Set;
 
-import javax.annotation.Nullable;
-
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
 
 import com.twitter.mesos.gen.AssignedTask;
@@ -19,7 +16,6 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.gen.comm.LiveTaskInfo;
 
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
@@ -68,11 +64,6 @@ public class Tasks {
 
   public static final Function<ScheduledTask, String> SCHEDULED_TO_ID =
       Functions.compose(ASSIGNED_TO_ID, SCHEDULED_TO_ASSIGNED);
-
-  public static final Function<LiveTaskInfo, String> LIVE_TO_ID =
-      new Function<LiveTaskInfo, String>() {
-        @Override public String apply(LiveTaskInfo info) { return info.getTaskId(); }
-      };
 
   public static final Function<TwitterTaskInfo, Integer> INFO_TO_SHARD_ID =
       new Function<TwitterTaskInfo, Integer>() {
@@ -125,13 +116,6 @@ public class Tasks {
         return isActive(task.getStatus());
       }
     };
-
-  private static final Function<TwitterTaskInfo, Integer> INFO_TO_PRIORITY =
-      new Function<TwitterTaskInfo, Integer>() {
-        @Override public Integer apply(TwitterTaskInfo task) {
-          return task.getPriority();
-        }
-      };
 
   public static final Predicate<TwitterTaskInfo> IS_PRODUCTION =
       new Predicate<TwitterTaskInfo>() {

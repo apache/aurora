@@ -1,14 +1,15 @@
 package com.twitter.mesos.scheduler;
 
-import com.google.common.base.Functions;
-import com.google.common.base.Supplier;
-import com.google.common.collect.MapMaker;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
-
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+
+import com.google.common.base.Functions;
+import com.google.common.base.Supplier;
+import com.google.common.collect.MapMaker;
+
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
 
 /**
  * A pulse monitor to identify when a pulse has not been received for an item beyond a defined

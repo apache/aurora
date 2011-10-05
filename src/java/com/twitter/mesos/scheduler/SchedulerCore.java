@@ -10,14 +10,15 @@ import com.google.common.base.Function;
 import org.apache.commons.lang.builder.EqualsBuilder;
 import org.apache.commons.lang.builder.ToStringBuilder;
 import org.apache.mesos.Protos.ExecutorID;
-import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.Offer;
+import org.apache.mesos.Protos.Resource;
 
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.ExecutorKey;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
+import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.comm.StateUpdateResponse;
@@ -78,7 +79,7 @@ public interface SchedulerCore extends Function<Query, Iterable<TwitterTaskInfo>
    * @param query The query to identify tasks.
    * @return A set of task objects.
    */
-  Set<TaskState> getTasks(Query query);
+  Set<ScheduledTask> getTasks(Query query);
 
   /**
    * Creates a new job, whose tasks will become candidates for scheduling.

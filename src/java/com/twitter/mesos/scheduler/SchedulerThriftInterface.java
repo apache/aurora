@@ -6,9 +6,9 @@ import java.util.logging.Logger;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
@@ -27,6 +27,7 @@ import com.twitter.mesos.gen.ResponseCode;
 import com.twitter.mesos.gen.RestartResponse;
 import com.twitter.mesos.gen.RollbackShardsResponse;
 import com.twitter.mesos.gen.ScheduleStatusResponse;
+import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.SessionKey;
 import com.twitter.mesos.gen.SetQuotaResponse;
 import com.twitter.mesos.gen.StartCronResponse;
@@ -77,9 +78,17 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     this.quotaManager = checkNotNull(quotaManager);
   }
 
+  private static final Function<ScheduledTask, String> GET_ROLE = Functions.compose(
+      new Function<TwitterTaskInfo, String>() {
+        @Override public String apply(TwitterTaskInfo task) {
+          return task.getOwner().getRole();
+        }
+      },
+      Tasks.SCHEDULED_TO_INFO);
+
   private void validateSessionKeyForTasks(SessionKey session, Query taskQuery)
       throws AuthFailedException {
-    Set<TaskState> tasks = schedulerCore.getTasks(taskQuery);
+    Set<ScheduledTask> tasks = schedulerCore.getTasks(taskQuery);
     for (String role : ImmutableSet.copyOf(Iterables.transform(tasks, GET_ROLE))) {
       sessionValidator.checkAuthenticated(session, role);
     }
@@ -146,7 +155,7 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
   public ScheduleStatusResponse getTasksStatus(TaskQuery query) {
     checkNotNull(query);
 
-    Set<TaskState> tasks = schedulerCore.getTasks(new Query(query));
+    Set<ScheduledTask> tasks = schedulerCore.getTasks(new Query(query));
 
     ScheduleStatusResponse response = new ScheduleStatusResponse();
     if (tasks.isEmpty()) {
@@ -154,19 +163,11 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
           .setMessage("No tasks found for query: " + query);
     } else {
       response.setResponseCode(OK)
-          .setTasks(Lists.newArrayList(Iterables.transform(tasks, TaskState.STATE_TO_LIVE)));
+          .setTasks(ImmutableList.copyOf(tasks));
     }
 
     return response;
   }
-
-  private static final Function<TaskState, String> GET_ROLE = Functions.compose(
-      new Function<TwitterTaskInfo, String>() {
-        @Override public String apply(TwitterTaskInfo task) {
-          return task.getOwner().getRole();
-        }
-      },
-      TaskState.STATE_TO_INFO);
 
   @Override
   public KillResponse killTasks(TaskQuery query, SessionKey session) {

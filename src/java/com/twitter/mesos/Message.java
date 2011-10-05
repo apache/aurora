@@ -1,9 +1,10 @@
 package com.twitter.mesos;
 
-import com.google.common.base.Preconditions;
-import org.apache.thrift.TBase;
-
 import javax.annotation.Nullable;
+
+import com.google.common.base.Preconditions;
+
+import org.apache.thrift.TBase;
 
 /**
  * A message in the mesos system, between a scheduler and executor.

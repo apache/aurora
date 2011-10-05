@@ -20,9 +20,8 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.CommandLineExpander;
-import com.twitter.mesos.scheduler.configuration.ValueParser.ParseException;
 import com.twitter.mesos.scheduler.ThermosJank;
+import com.twitter.mesos.scheduler.configuration.ValueParser.ParseException;
 
 /**
  * Manages translation from a string-mapped configuration to a concrete configuration type, and

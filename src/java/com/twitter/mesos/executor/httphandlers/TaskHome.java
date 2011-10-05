@@ -1,18 +1,20 @@
 package com.twitter.mesos.executor.httphandlers;
 
+import java.io.IOException;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
 import com.google.inject.Inject;
+
+import org.antlr.stringtemplate.StringTemplate;
+
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.common.thrift.Util;
 import com.twitter.mesos.executor.ExecutorCore;
 import com.twitter.mesos.executor.Task;
-import com.twitter.mesos.gen.TwitterTaskInfo;
-import org.antlr.stringtemplate.StringTemplate;
-
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
 
 /**
  * HTTP interface to view information about a task.

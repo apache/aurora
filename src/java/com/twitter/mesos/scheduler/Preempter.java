@@ -24,6 +24,7 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.twitter.mesos.Tasks.SCHEDULED_TO_ASSIGNED;
 
 /**
  * A task preempter that tries to find tasks that are waiting to be scheduled, which are of higher
@@ -69,14 +70,14 @@ class Preempter implements Runnable {
   public void run() {
     // We are only interested in preempting in favor of pending tasks.
     List<AssignedTask> pendingTasks = Lists.newArrayList(Iterables.transform(
-        scheduler.getTasks(Query.and(PENDING_QUERY, isIdleTask)), STATE_TO_ASSIGNED));
+        scheduler.getTasks(Query.and(PENDING_QUERY, isIdleTask)), SCHEDULED_TO_ASSIGNED));
     if (Iterables.isEmpty(pendingTasks)) {
       return;
     }
 
     // Only non-pending active tasks may be preempted.
     List<AssignedTask> activeTasks = Lists.newArrayList(
-        Iterables.transform(scheduler.getTasks(ACTIVE_NOT_PENDING_QUERY), STATE_TO_ASSIGNED));
+        Iterables.transform(scheduler.getTasks(ACTIVE_NOT_PENDING_QUERY), SCHEDULED_TO_ASSIGNED));
     if (Iterables.isEmpty(activeTasks)) {
       return;
     }
@@ -175,27 +176,12 @@ class Preempter implements Runnable {
     }
   };
 
-  private static final Function<TaskState, AssignedTask> STATE_TO_ASSIGNED =
-      new Function<TaskState, AssignedTask>() {
-        @Override public AssignedTask apply(TaskState state) {
-          return Tasks.SCHEDULED_TO_ASSIGNED.apply(state.task);
-        }
-      };
-
   private static final Function<AssignedTask, Integer> GET_PRIORITY =
       new Function<AssignedTask, Integer>() {
         @Override public Integer apply(AssignedTask task) {
           return task.getTask().getPriority();
         }
       };
-
-  private static Predicate<Integer> lessThan(final int value) {
-    return new Predicate<Integer>() {
-      @Override public boolean apply(Integer input) {
-        return input < value;
-      }
-    };
-  }
 
   private static Predicate<Integer> greaterThan(final int value) {
     return new Predicate<Integer>() {

@@ -11,7 +11,6 @@ import com.google.inject.Key;
 import com.google.inject.TypeLiteral;
 
 import com.twitter.mesos.ExecutorKey;
-import com.twitter.mesos.scheduler.PulseMonitor;
 import com.twitter.mesos.scheduler.sync.ExecutorWatchdog.ExecutorWatchdogImpl;
 
 /**

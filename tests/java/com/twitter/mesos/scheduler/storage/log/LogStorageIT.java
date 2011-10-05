@@ -1,13 +1,7 @@
 package com.twitter.mesos.scheduler.storage.log;
 
-import java.sql.SQLException;
-
 import com.google.common.collect.ImmutableSet;
 import com.google.common.testing.junit4.TearDownTestCase;
-
-import org.junit.Before;
-import org.junit.Test;
-
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.TearDownRegistry;
@@ -32,6 +26,10 @@ import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
 import com.twitter.mesos.scheduler.storage.db.DbStorage;
 import com.twitter.mesos.scheduler.storage.log.LogManager.StreamManager.StreamTransaction;
+import org.junit.Before;
+import org.junit.Test;
+
+import java.sql.SQLException;
 
 import static com.google.common.testing.junit4.JUnitAsserts.assertNotEqual;
 import static org.junit.Assert.assertArrayEquals;

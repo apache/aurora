@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Ordering;
 import com.google.inject.Inject;
 
 import org.antlr.stringtemplate.StringTemplate;
@@ -25,14 +26,13 @@ import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Identity;
-import com.twitter.mesos.gen.LiveTask;
 import com.twitter.mesos.gen.ScheduleStatus;
+import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerCore;
-import com.twitter.mesos.scheduler.TaskState;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
@@ -70,35 +70,27 @@ public class SchedulerzJob extends StringTemplateServlet {
         .put(FAILED, EnumSet.of(LOST, FAILED))
       .build();
 
-  private static final Comparator<LiveTask> REVERSE_CHRON_COMPARATOR =
-      new Comparator<LiveTask>() {
-          @Override public int compare(LiveTask taskA, LiveTask taskB) {
-            // Sort in reverse chronological order.
-            Iterable<TaskEvent> taskAEvents = taskA.getScheduledTask().getTaskEvents();
-            Iterable<TaskEvent> taskBEvents = taskB.getScheduledTask().getTaskEvents();
+  private static final Comparator<ScheduledTask> REVERSE_CHRON_COMPARATOR =
+      new Comparator<ScheduledTask>() {
+        @Override public int compare(ScheduledTask taskA, ScheduledTask taskB) {
+          // Sort in reverse chronological order.
+          Iterable<TaskEvent> taskAEvents = taskA.getTaskEvents();
+          Iterable<TaskEvent> taskBEvents = taskB.getTaskEvents();
 
-            boolean taskAHasEvents = taskAEvents != null && !Iterables.isEmpty(taskAEvents);
-            boolean taskBHasEvents = taskBEvents != null && !Iterables.isEmpty(taskBEvents);
-            if (taskAHasEvents && taskBHasEvents) {
-              return Long.signum(Iterables.getLast(taskBEvents).getTimestamp()
-                  - Iterables.getLast(taskAEvents).getTimestamp());
-            } else {
-              return 0;
-            }
+          boolean taskAHasEvents = taskAEvents != null && !Iterables.isEmpty(taskAEvents);
+          boolean taskBHasEvents = taskBEvents != null && !Iterables.isEmpty(taskBEvents);
+          if (taskAHasEvents && taskBHasEvents) {
+            return Long.signum(Iterables.getLast(taskBEvents).getTimestamp()
+                - Iterables.getLast(taskAEvents).getTimestamp());
+          } else {
+            return 0;
           }
-      };
-
-  private static final Comparator<LiveTask> SHARD_ID_COMPARATOR =
-      new Comparator<LiveTask>() {
-        @Override public int compare(LiveTask taskA, LiveTask taskB) {
-          return taskA.getScheduledTask().getAssignedTask().getTask().getShardId()
-                 - taskB.getScheduledTask().getAssignedTask().getTask().getShardId();
         }
       };
 
   private final SchedulerCore scheduler;
-  private final String clusterName;
 
+  private final String clusterName;
   @Inject
   public SchedulerzJob(@CacheTemplates boolean cacheTemplates,
       SchedulerCore scheduler,
@@ -130,6 +122,9 @@ public class SchedulerzJob extends StringTemplateServlet {
   private static <T> Iterable<T> offsetAndLimit(Iterable<T> iterable, int offset) {
     return ImmutableList.copyOf(Iterables.limit(Iterables.skip(iterable, offset), PAGE_SIZE));
   }
+
+  private static final Comparator<ScheduledTask> SHARD_ID_COMPARATOR =
+      Ordering.natural().onResultOf(Tasks.SCHEDULED_TO_SHARD_ID);
 
   @Override
   protected void doGet(final HttpServletRequest req, HttpServletResponse resp)
@@ -175,23 +170,20 @@ public class SchedulerzJob extends StringTemplateServlet {
         int offset = getOffset(req);
         boolean hasMore = false;
 
-        Set<TaskState> activeTasks;
+        Set<ScheduledTask> activeTasks;
         if (statusFilter != null) {
           query.setStatuses(FILTER_MAP.get(statusFilter));
           activeTasks = scheduler.getTasks(new Query(query));
         } else {
           activeTasks = scheduler.getTasks(new Query(query, Tasks.ACTIVE_FILTER));
-          List<LiveTask> completedTasks = Lists.newArrayList(Iterables.transform(
-              scheduler.getTasks(new Query(query, Predicates.not(Tasks.ACTIVE_FILTER))),
-              TaskState.STATE_TO_LIVE));
+          List<ScheduledTask> completedTasks = Lists.newArrayList(
+              scheduler.getTasks(new Query(query, Predicates.not(Tasks.ACTIVE_FILTER))));
           Collections.sort(completedTasks, REVERSE_CHRON_COMPARATOR);
           template.setAttribute("completedTasks", offsetAndLimit(completedTasks, offset));
           hasMore = completedTasks.size() > offset + PAGE_SIZE;
         }
 
-        List<LiveTask> liveTasks = Lists.newArrayList(Iterables.transform(activeTasks,
-            TaskState.STATE_TO_LIVE));
-
+        List<ScheduledTask> liveTasks = Lists.newArrayList(activeTasks);
         Collections.sort(liveTasks, SHARD_ID_COMPARATOR);
         template.setAttribute("activeTasks", offsetAndLimit(liveTasks, offset));
         hasMore = hasMore || liveTasks.size() > (offset + PAGE_SIZE);

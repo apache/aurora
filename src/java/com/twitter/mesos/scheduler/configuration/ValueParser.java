@@ -1,6 +1,7 @@
 package com.twitter.mesos.scheduler.configuration;
 
 import com.google.common.collect.ImmutableMap;
+
 import org.apache.commons.lang.StringUtils;
 
 /**

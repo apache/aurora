@@ -1,15 +1,17 @@
 package com.twitter.mesos.executor;
 
-import com.google.common.base.Preconditions;
-import com.google.inject.Inject;
-import com.twitter.common.base.ExceptionalFunction;
-import com.twitter.common_internal.util.HdfsUtils;
-import org.apache.hadoop.conf.Configuration;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import com.google.common.base.Preconditions;
+import com.google.inject.Inject;
+
+import org.apache.hadoop.conf.Configuration;
+
+import com.twitter.common.base.ExceptionalFunction;
+import com.twitter.common_internal.util.HdfsUtils;
 
 /**
  * A file copier that will manage copies of files from HDFS to the local file system.

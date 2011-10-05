@@ -1,10 +1,11 @@
 package com.twitter.mesos.executor;
 
+import java.io.File;
+
 import com.google.common.base.Preconditions;
+
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
-
-import java.io.File;
 
 /**
  * Determines the amount of different consumable resources that are being used by a process.

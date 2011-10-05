@@ -1,12 +1,11 @@
 package com.twitter.mesos.scheduler.identity;
 
-import java.util.Arrays;
-import java.util.List;
-
 import net.lag.crai.Crai;
 import net.lag.craijce.CraiJCE;
-
 import org.junit.Ignore;
+
+import java.util.Arrays;
+import java.util.List;
 
 
 @Ignore("TODO(wfarner): Update this test")

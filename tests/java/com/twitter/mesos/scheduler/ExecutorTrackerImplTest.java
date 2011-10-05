@@ -1,14 +1,13 @@
 package com.twitter.mesos.scheduler;
 
-import java.util.Properties;
-import java.util.Queue;
-
+import com.twitter.common.util.BuildInfo;
+import com.twitter.mesos.gen.comm.ExecutorStatus;
 import org.easymock.IMocksControl;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.twitter.common.util.BuildInfo;
-import com.twitter.mesos.gen.comm.ExecutorStatus;
+import java.util.Properties;
+import java.util.Queue;
 
 import static org.easymock.EasyMock.createControl;
 import static org.easymock.EasyMock.expect;

@@ -2,8 +2,10 @@ package com.twitter.mesos;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.ImmutableBiMap;
-import com.twitter.mesos.gen.ScheduleStatus;
+
 import org.apache.mesos.Protos.TaskState;
+
+import com.twitter.mesos.gen.ScheduleStatus;
 
 /**
  * Translates between mesos {@link TaskState} and the internal {@link ScheduleStatus}.

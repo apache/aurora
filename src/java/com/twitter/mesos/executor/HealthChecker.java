@@ -1,13 +1,14 @@
 package com.twitter.mesos.executor;
 
+import java.util.List;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
+
 import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
 import com.twitter.mesos.executor.HttpSignaler.SignalException;
-
-import java.util.List;
 
 /**
  * Function that checks the health of a process via HTTP signaling.

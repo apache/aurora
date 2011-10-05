@@ -16,7 +16,6 @@ import com.google.common.collect.Sets;
 import org.apache.commons.lang.StringUtils;
 
 import com.twitter.mesos.gen.AssignedTask;
-import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 
 /**
  * Utility class to handle command line expansion.

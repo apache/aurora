@@ -1,17 +1,15 @@
 package com.twitter.mesos.scheduler;
 
-import java.util.Set;
-
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-
+import com.twitter.common.collections.Pair;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.Resource.Range;
 import org.apache.mesos.Protos.Resource.Type;
 import org.junit.Test;
 
-import com.twitter.common.collections.Pair;
+import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 

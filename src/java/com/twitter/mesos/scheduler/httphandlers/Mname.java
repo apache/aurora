@@ -3,7 +3,6 @@ package com.twitter.mesos.scheduler.httphandlers;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -11,15 +10,17 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import com.google.common.base.Functions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
 
 import org.apache.commons.lang.StringUtils;
 
+import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerCore;
-import com.twitter.mesos.scheduler.TaskState;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.mesos.Tasks.jobKey;
@@ -67,37 +68,30 @@ public class Mname extends HttpServlet {
         return;
       }
 
-      Set<TaskState> states = scheduler.getTasks(Query.liveShard(jobKey(role, jobName), shardId));
-
-      if (states.isEmpty()) {
+      ScheduledTask task = Iterables.getOnlyElement(
+          scheduler.getTasks(Query.liveShard(jobKey(role, jobName), shardId)), null);
+      if (task == null) {
         resp.sendError(SC_NOT_FOUND, "No such live shard found.");
         return;
       }
 
-      TaskState state = Iterables.getOnlyElement(states);
-
-      if (state.task.getStatus() != RUNNING) {
-        resp.sendError(SC_NOT_FOUND, "The selected shard is currently in state "
-                                     + state.task.getStatus());
+      if (task.getStatus() != RUNNING) {
+        resp.sendError(SC_NOT_FOUND,
+            "The selected shard is currently in state " + task.getStatus());
         return;
       }
 
-      String slaveHost = state.task.getAssignedTask().getSlaveHost();
-      Map<String, Integer> leasedPorts = state.volatileState.resources.getLeasedPorts();
-      Integer httpPort = null;
-      for (String portName : HTTP_PORT_NAMES) {
-        if (leasedPorts.containsKey(portName)) {
-          httpPort = leasedPorts.get(portName);
-        }
-      }
-
+      String slaveHost = task.getAssignedTask().getSlaveHost();
+      Map<String, Integer> assignedPorts = task.getAssignedTask().isSetAssignedPorts()
+          ? task.getAssignedTask().getAssignedPorts() : ImmutableMap.<String, Integer>of();
+      Integer httpPort = Iterables.getFirst(
+          Iterables.transform(HTTP_PORT_NAMES, Functions.forMap(assignedPorts)), null);
       if (httpPort == null) {
         resp.sendError(SC_NOT_FOUND, "The task does not have a registered http port.");
         return;
       }
 
       String queryString = req.getQueryString();
-
       String redirect = String.format("http://%s:%d", slaveHost, httpPort);
       if (forwardRequest != null) redirect += forwardRequest;
       if (queryString != null) redirect += "?" + queryString;

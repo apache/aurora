@@ -1,13 +1,5 @@
 package com.twitter.mesos.executor;
 
-import com.google.common.base.Preconditions;
-import com.twitter.common.base.Closure;
-import com.twitter.common.base.MorePreconditions;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Data;
-import org.apache.commons.io.FileUtils;
-
-import javax.annotation.Nullable;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
@@ -17,6 +9,17 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import javax.annotation.Nullable;
+
+import com.google.common.base.Preconditions;
+
+import org.apache.commons.io.FileUtils;
+
+import com.twitter.common.base.Closure;
+import com.twitter.common.base.MorePreconditions;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Data;
 
 /**
  * Garbage collector to reclaim disk space consumed by unused files.

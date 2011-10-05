@@ -23,8 +23,6 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 import com.twitter.mesos.ExecutorKey;
-import com.twitter.mesos.gen.comm.ExecutorMessage;
-import com.twitter.mesos.gen.comm.SchedulerMessage;
 import com.twitter.mesos.gen.comm.StateUpdateRequest;
 
 import static com.google.common.base.Preconditions.checkNotNull;

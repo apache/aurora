@@ -3,7 +3,6 @@ package com.twitter.mesos.executor;
 import java.io.File;
 
 import com.twitter.mesos.gen.AssignedTask;
-import com.twitter.mesos.gen.ResourceConsumption;
 import com.twitter.mesos.gen.ScheduleStatus;
 
 /**

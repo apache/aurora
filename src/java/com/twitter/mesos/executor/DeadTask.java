@@ -4,13 +4,8 @@ import java.io.File;
 
 import com.google.common.base.Preconditions;
 
-import org.apache.commons.io.FileUtils;
-
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Data;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
-import com.twitter.mesos.gen.ResourceConsumption;
 import com.twitter.mesos.gen.ScheduleStatus;
 
 /**
@@ -22,9 +17,6 @@ public class DeadTask extends TaskOnDisk {
 
   private final AssignedTask task;
   private final ScheduleStatus state;
-
-  // Lazy-loaded fields.
-  private Amount<Long, Data> diskConsumed = null;
 
   /**
    * Creates a new dead task.

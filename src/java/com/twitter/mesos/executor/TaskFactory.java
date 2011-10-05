@@ -1,8 +1,12 @@
 package com.twitter.mesos.executor;
 
+import java.io.File;
+import java.io.IOException;
+
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
+
 import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.mesos.executor.FileToInt.FetchException;
@@ -10,9 +14,6 @@ import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
 import com.twitter.mesos.executor.ProcessKiller.KillException;
 import com.twitter.mesos.gen.AssignedTask;
-
-import java.io.File;
-import java.io.IOException;
 
 /**
  * A factory that will create new tasks that can be run.

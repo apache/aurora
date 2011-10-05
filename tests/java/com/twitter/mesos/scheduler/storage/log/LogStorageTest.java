@@ -1,20 +1,8 @@
 package com.twitter.mesos.scheduler.storage.log;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
-
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterators;
-
-import org.easymock.Capture;
-import org.easymock.EasyMock;
-import org.easymock.IAnswer;
-import org.junit.Before;
-import org.junit.Test;
-
 import com.twitter.common.application.ActionRegistry;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Closures;
@@ -60,6 +48,16 @@ import com.twitter.mesos.scheduler.storage.Storage.Work;
 import com.twitter.mesos.scheduler.storage.TaskStore;
 import com.twitter.mesos.scheduler.storage.UpdateStore;
 import com.twitter.mesos.scheduler.storage.log.LogStorage.SchedulingService;
+import org.easymock.Capture;
+import org.easymock.EasyMock;
+import org.easymock.IAnswer;
+import org.junit.Before;
+import org.junit.Test;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.easymock.EasyMock.aryEq;
 import static org.easymock.EasyMock.capture;

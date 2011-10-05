@@ -272,11 +272,10 @@ class MesosCLI(cmd.Cmd):
 
     ACTIVE_STATES = set([ScheduleStatus.PENDING, ScheduleStatus.STARTING, ScheduleStatus.RUNNING])
     def is_active(task):
-      return task.scheduledTask.status in ACTIVE_STATES
+      return task.status in ACTIVE_STATES
 
     def print_task(task):
-      scheduledTask = task.scheduledTask
-      assignedTask = scheduledTask.assignedTask
+      assignedTask = task.assignedTask
       taskInfo = assignedTask.task
       taskString = """\tHDFS path: %s
 \tcpus: %s, ram: %s MB, disk: %s MB""" % (taskInfo.hdfsPath,
@@ -285,7 +284,7 @@ class MesosCLI(cmd.Cmd):
                                           taskInfo.diskMb)
       if task.resources is not None:
         taskString += '\n\tports: %s' % task.resources.leasedPorts
-      taskString += '\n\tfailure count: %s (max %s)' % (scheduledTask.failureCount,
+      taskString += '\n\tfailure count: %s (max %s)' % (task.failureCount,
                                                         taskInfo.maxTaskFailures)
       return taskString
 
@@ -294,13 +293,12 @@ class MesosCLI(cmd.Cmd):
 
     def print_tasks(tasks):
       for task in tasks:
-        scheduledTask = task.scheduledTask
-        assignedTask = scheduledTask.assignedTask
+        assignedTask = task.assignedTask
         taskString = print_task(task)
 
         log.info('shard: %s, status: %s on %s\n%s' %
                (assignedTask.task.shardId,
-                ScheduleStatus._VALUES_TO_NAMES[scheduledTask.status],
+                ScheduleStatus._VALUES_TO_NAMES[task.status],
                 assignedTask.slaveHost,
                 taskString))
 

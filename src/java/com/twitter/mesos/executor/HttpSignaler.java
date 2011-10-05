@@ -1,14 +1,5 @@
 package com.twitter.mesos.executor;
 
-import com.google.common.base.Charsets;
-import com.google.common.base.Preconditions;
-import com.google.common.io.Resources;
-import com.twitter.common.base.ExceptionalFunction;
-import com.twitter.common.base.MorePreconditions;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
-import com.twitter.mesos.executor.HttpSignaler.SignalException;
-
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
@@ -19,6 +10,16 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.logging.Logger;
+
+import com.google.common.base.Charsets;
+import com.google.common.base.Preconditions;
+import com.google.common.io.Resources;
+
+import com.twitter.common.base.ExceptionalFunction;
+import com.twitter.common.base.MorePreconditions;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
+import com.twitter.mesos.executor.HttpSignaler.SignalException;
 
 /**
  * Handles HTTP signaling to a process.

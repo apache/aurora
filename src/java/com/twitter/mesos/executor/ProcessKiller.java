@@ -1,8 +1,18 @@
 package com.twitter.mesos.executor;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import com.google.common.base.Preconditions;
 import com.google.common.io.CharStreams;
 import com.google.common.io.Closeables;
+
+import org.apache.commons.lang.builder.EqualsBuilder;
+
 import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.common.quantity.Amount;
@@ -10,14 +20,6 @@ import com.twitter.common.quantity.Time;
 import com.twitter.mesos.executor.HttpSignaler.SignalException;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
 import com.twitter.mesos.executor.ProcessKiller.KillException;
-import org.apache.commons.lang.builder.EqualsBuilder;
-
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Handles escalated killing of a process.
