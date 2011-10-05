@@ -20,6 +20,7 @@ public abstract class BaseStateManagerTest extends EasyMockTest {
 
   protected Closure<String> killTaskCallback;
   protected StateManager stateManager;
+  protected FakeClock clock = new FakeClock();
 
   @Before
   public void stateManagerSetUp() throws Exception {
@@ -29,7 +30,7 @@ public abstract class BaseStateManagerTest extends EasyMockTest {
 
   private StateManager createStateManager() throws Exception {
     final StateManager stateManager =
-        new StateManager(DbStorageTestUtil.setupStorage(this), new FakeClock());
+        new StateManager(DbStorageTestUtil.setupStorage(this), clock);
     stateManager.initialize();
     stateManager.start(killTaskCallback);
     addTearDown(new TearDown() {

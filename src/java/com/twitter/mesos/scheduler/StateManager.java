@@ -1,11 +1,13 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.EnumSet;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
@@ -48,6 +50,8 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TaskEvent;
+import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
@@ -142,7 +146,7 @@ class StateManager {
               // Since the task doesn't exist, its job cannot be updating.
               Suppliers.ofInstance(false),
               workSink,
-              MISSING_TASK_GRACE_PERIOD.get(),
+              taskTimeoutFilter,
               clock,
               INIT,
               noopListener)
@@ -160,6 +164,8 @@ class StateManager {
         }
       };
 
+  private final Predicate<Iterable<TaskEvent>> taskTimeoutFilter;
+
   // Handles all scheduler persistence
   private final Storage storage;
 
@@ -168,9 +174,26 @@ class StateManager {
   private final Clock clock;
 
   @Inject
-  StateManager(Storage storage, Clock clock) {
+  StateManager(Storage storage, final Clock clock) {
     this.storage = checkNotNull(storage);
     this.clock = checkNotNull(clock);
+    this.taskTimeoutFilter = new Predicate<Iterable<TaskEvent>>() {
+      @Override public boolean apply(Iterable<TaskEvent> events) {
+        TaskEvent lastEvent = Iterables.getLast(events, null);
+        if (lastEvent == null) {
+          return true;
+        } else {
+          long lastEventAgeMillis = clock.nowMillis() - lastEvent.getTimestamp();
+          return lastEventAgeMillis > MISSING_TASK_GRACE_PERIOD.get().as(Time.MILLISECONDS);
+        }
+      }
+    };
+
+    this.killTask = new Closure<String>() {
+      @Override public void execute(String taskId) {
+        LOG.log(Level.SEVERE, "Attempted to kill task " + taskId + " before registered.");
+      }
+    };
 
     Stats.export(new StatImpl<Integer>("work_queue_depth") {
       @Override public Integer read() {
@@ -547,6 +570,37 @@ class StateManager {
     });
   }
 
+  private static final Query OUTSTANDING_TASK_QUERY = new Query(new TaskQuery().setStatuses(
+      EnumSet.of(
+          ScheduleStatus.ASSIGNED,
+          ScheduleStatus.STARTING,
+          ScheduleStatus.PREEMPTING,
+          ScheduleStatus.RESTARTING,
+          ScheduleStatus.KILLING)));
+
+  /**
+   * Scans any outstanding tasks and attempts to kill any tasks that have timed out.
+   */
+  synchronized void scanOutstandingTasks() {
+    managerState.checkState(State.STARTED);
+
+    Set<ScheduledTask> outstandingTasks = fetchTasks(OUTSTANDING_TASK_QUERY);
+    if (outstandingTasks.isEmpty()) {
+      return;
+    }
+    LOG.info("Checking " + outstandingTasks.size() + " outstanding tasks.");
+    Predicate<ScheduledTask> missingTaskFilter =
+        Predicates.compose(taskTimeoutFilter, Tasks.GET_TASK_EVENTS);
+    Iterable<ScheduledTask> missingTasks = Iterables.filter(outstandingTasks, missingTaskFilter);
+
+    // Kill any timed out tasks.  This assumes that the mesos core will send a TASK_LOST status
+    // update if we attempt to kill any tasks that the core has no knowledge of.
+    for (String missingTaskId : Iterables.transform(missingTasks, Tasks.SCHEDULED_TO_ID)) {
+      LOG.info("Attempting to kill missing task " + missingTaskId);
+      killTask.execute(missingTaskId);
+    }
+  }
+
   /**
    * Fetches the IDs of all tasks that match a query.
    *
@@ -899,7 +953,7 @@ class StateManager {
         taskSupplier(taskId),
         taskUpdateChecker(role, job),
         workSink,
-        MISSING_TASK_GRACE_PERIOD.get(),
+        taskTimeoutFilter,
         clock,
         initialState,
         transitionListeners.get(jobKey));

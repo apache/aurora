@@ -61,13 +61,14 @@ class TaskReaper {
 
     Runnable poller = new Runnable() {
       @Override public void run() {
-        Set<String> abandonedTasks = getAbandonedTasks(stateManager);
-        if (!abandonedTasks.isEmpty()) {
-          try {
+        try {
+          stateManager.scanOutstandingTasks();
+          Set<String> abandonedTasks = getAbandonedTasks(stateManager);
+          if (!abandonedTasks.isEmpty()) {
             stateManager.abandonTasks(abandonedTasks);
-          } catch (IllegalStateException e) {
-            LOG.log(Level.WARNING, "Failed to abandon tasks.", e);
           }
+        } catch (IllegalStateException e) {
+          LOG.log(Level.WARNING, "Task reaper could not modify state manager.", e);
         }
       }
     };

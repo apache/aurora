@@ -121,15 +121,6 @@ public class SchedulerModule extends AbstractModule {
       help = "The amount of RAM that should be reserved by mesos for the executor.")
   private static final Arg<Amount<Double, Data>> RAM = Arg.create(Amount.of(2d, Data.GB));
 
-  @CmdLine(name = "task_reaper_start_delay", help =
-      "Time to wait after startup before running the task reaper.")
-  private static final Arg<Amount<Long, Time>> TASK_REAPER_START_DELAY =
-      Arg.create(Amount.of(5L, Time.MINUTES));
-
-  @CmdLine(name = "task_reaper_interval", help = "Time to wait between task reaper runs.")
-  private static final Arg<Amount<Long, Time>> TASK_REAPER_INTERVAL =
-      Arg.create(Amount.of(10L, Time.MINUTES));
-
   private static final String TWITTER_EXECUTOR_ID = "twitter";
 
   private static final String TWITTER_FRAMEWORK_NAME = "TwitterScheduler";
@@ -176,6 +167,8 @@ public class SchedulerModule extends AbstractModule {
     // Bindings for StateManager
     bind(Clock.class).toInstance(Clock.SYSTEM_CLOCK);
     bind(StateManager.class).in(Singleton.class);
+
+    bind(TaskReaper.class).in(Singleton.class);
 
     Registration.registerServlet(binder(), "/scheduler", SchedulerzHome.class, false);
     Registration.registerServlet(binder(), "/scheduler/role", SchedulerzRole.class, true);

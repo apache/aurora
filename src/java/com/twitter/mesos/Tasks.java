@@ -3,6 +3,8 @@ package com.twitter.mesos;
 import java.util.EnumSet;
 import java.util.Set;
 
+import javax.annotation.Nullable;
+
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Preconditions;
@@ -15,6 +17,7 @@ import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.comm.LiveTaskInfo;
 
@@ -80,6 +83,13 @@ public class Tasks {
 
   public static final Function<ScheduledTask, Integer> SCHEDULED_TO_SHARD_ID =
       Functions.compose(INFO_TO_SHARD_ID, SCHEDULED_TO_INFO);
+
+  public static final Function<ScheduledTask, Iterable<TaskEvent>> GET_TASK_EVENTS =
+      new Function<ScheduledTask, Iterable<TaskEvent>>() {
+        @Override public Iterable<TaskEvent> apply(ScheduledTask task) {
+          return task.getTaskEvents();
+        }
+      };
 
   public static final Function<TwitterTaskInfo, String> INFO_TO_JOB_KEY =
       new Function<TwitterTaskInfo, String>() {

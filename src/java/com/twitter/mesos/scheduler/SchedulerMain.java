@@ -43,10 +43,11 @@ import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.CanRead;
 import com.twitter.common.args.constraints.NotNull;
-import com.twitter.common.args.constraints.Positive;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Command;
 import com.twitter.common.net.InetSocketAddressHelper;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
 import com.twitter.common.thrift.ThriftServer;
 import com.twitter.common.thrift.ThriftServer.ServerSetup;
 import com.twitter.common.zookeeper.Group;
@@ -70,27 +71,37 @@ public class SchedulerMain extends AbstractApplication {
 
   private static final Logger LOG = Logger.getLogger(SchedulerMain.class.getName());
 
+  @CanRead
+  @NotNull
+  @CmdLine(name = "mesos_ssl_keyfile",
+           help = "JKS keyfile for operating the Mesos Thrift-over-SSL interface.")
+  private static final Arg<File> MESOS_SSL_KEY_FILE = Arg.create();
+
+  @Nonnegative
+  @CmdLine(name = "thrift_port", help = "Thrift server port.")
+  private static final Arg<Integer> THRIFT_PORT = Arg.create(0);
+
+  @CmdLine(name = "task_reaper_start_delay", help =
+      "Time to wait after startup before running the task reaper.")
+  private static final Arg<Amount<Long, Time>> TASK_REAPER_START_DELAY =
+      Arg.create(Amount.of(2L, Time.MINUTES));
+
+  @CmdLine(name = "task_reaper_interval", help = "Time to wait between task reaper runs.")
+  private static final Arg<Amount<Long, Time>> TASK_REAPER_INTERVAL =
+      Arg.create(Amount.of(2L, Time.MINUTES));
+
+  // Security is enforced via file permissions, not via this password, for what it's worth.
+  private static final String SSL_KEYFILE_PASSWORD = "MesosKeyStorePassword";
+
   @Inject private SingletonService schedulerService;
   @Inject private ThriftServer schedulerThriftServer;
   @Inject private MesosAdmin.Iface schedulerThriftInterface;
   @Inject private Provider<SchedulerDriver> driverProvider;
   @Inject private AtomicReference<InetSocketAddress> schedulerThriftPort;
   @Inject private SchedulerCore scheduler;
+  @Inject private TaskReaper taskReaper;
   @Inject private Lifecycle lifecycle;
   @Inject @ShutdownStage ActionRegistry shutdownRegistry;
-
-  @CanRead
-  @NotNull
-  @CmdLine(name = "mesos_ssl_keyfile",
-           help = "JKS keyfile for operating the Mesos Thrift-over-SSL interface.")
-  private static final Arg<File> mesosSSLKeyFile = Arg.create();
-
-  @Nonnegative
-  @CmdLine(name = "thrift_port", help = "Thrift server port.")
-  private static final Arg<Integer> thriftPort = Arg.create(0);
-
-  // Security is enforced via file permissions, not via this password, for what it's worth.
-  private static final String SSL_KEYFILE_PASSWORD = "MesosKeyStorePassword";
 
   private final LeadershipListener leadershipListener = new LeadershipListener() {
     @Override public void onLeading(EndpointStatus status) {
@@ -180,6 +191,8 @@ public class SchedulerMain extends AbstractApplication {
       LOG.log(Level.SEVERE, "Failed to find self host name.", e);
     }
 
+    taskReaper.start(TASK_REAPER_START_DELAY.get(), TASK_REAPER_INTERVAL.get());
+
     lifecycle.awaitShutdown();
   }
 
@@ -217,12 +230,12 @@ public class SchedulerMain extends AbstractApplication {
     ctx = SSLContext.getInstance("TLS");
     KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
     KeyStore ks = KeyStore.getInstance("JKS");
-    ks.load(new FileInputStream(mesosSSLKeyFile.get()), SSL_KEYFILE_PASSWORD.toCharArray());
+    ks.load(new FileInputStream(MESOS_SSL_KEY_FILE.get()), SSL_KEYFILE_PASSWORD.toCharArray());
     kmf.init(ks, SSL_KEYFILE_PASSWORD.toCharArray());
     ctx.init(kmf.getKeyManagers(), null, null);
 
     SSLServerSocketFactory ssf = ctx.getServerSocketFactory();
-    SSLServerSocket serverSocket = (SSLServerSocket) ssf.createServerSocket(thriftPort.get());
+    SSLServerSocket serverSocket = (SSLServerSocket) ssf.createServerSocket(THRIFT_PORT.get());
     serverSocket.setEnabledCipherSuites(serverSocket.getSupportedCipherSuites());
     serverSocket.setNeedClientAuth(false);
 

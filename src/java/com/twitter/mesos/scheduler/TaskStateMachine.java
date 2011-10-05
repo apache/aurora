@@ -8,8 +8,8 @@ import java.util.logging.Logger;
 import javax.annotation.Nullable;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicate;
 import com.google.common.base.Supplier;
-import com.google.common.collect.Iterables;
 
 import org.apache.commons.lang.builder.HashCodeBuilder;
 
@@ -17,8 +17,6 @@ import com.twitter.common.base.Closure;
 import com.twitter.common.base.Closures;
 import com.twitter.common.base.Command;
 import com.twitter.common.base.MorePreconditions;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.Clock;
 import com.twitter.common.util.StateMachine;
@@ -155,8 +153,8 @@ public class TaskStateMachine {
    *     manages.
    * @param isJobUpdating Supplier to test whether the task's job is currently in a rolling update.
    * @param workSink Work sink to receive transition response actions
-   * @param missingTaskGracePeriod Amount of time to allow a task to be in ASSIGNED state before
-   *     considering an {@code UNKNOWN} transition to be a lost task.
+   * @param taskTimeoutFilter Filter to determine if a task has timed out
+   *      (and should be considered lost).
    * @param clock Clock to use for reading the current time.
    * @param initialState The state to begin the state machine at.  All legal transitions will be
    *     added, but this allows the state machine to 'skip' states, for instance when a task is
@@ -168,7 +166,7 @@ public class TaskStateMachine {
       final Supplier<ScheduledTask> taskReader,
       final Supplier<Boolean> isJobUpdating,
       final WorkSink workSink,
-      final Amount<Long, Time> missingTaskGracePeriod,
+      final Predicate<Iterable<TaskEvent>> taskTimeoutFilter,
       final Clock clock,
       final ScheduleStatus initialState,
       final TransitionListener transitionListener) {
@@ -176,7 +174,6 @@ public class TaskStateMachine {
     this.taskId = MorePreconditions.checkNotBlank(taskId);
     checkNotNull(taskReader);
     this.workSink = checkNotNull(workSink);
-    checkNotNull(missingTaskGracePeriod);
     this.clock = checkNotNull(clock);
     checkNotNull(initialState);
 
@@ -307,8 +304,7 @@ public class TaskStateMachine {
 
                           case UNKNOWN:
                             // Determine if we have been waiting too long on this task.
-                            if (isTaskTimedOut(taskReader.get().getTaskEvents(),
-                                missingTaskGracePeriod)) {
+                            if (taskTimeoutFilter.apply(taskReader.get().getTaskEvents())) {
                               updateState(ScheduleStatus.LOST);
                             }
                         }
@@ -475,7 +471,8 @@ public class TaskStateMachine {
         // must be the last chained transition callback.
         .onAnyTransition(
             new Closure<Transition<State>>() {
-              @Override public void execute(final Transition<State> transition) {
+              @Override
+              public void execute(final Transition<State> transition) {
                 ScheduleStatus from = transition.getFrom().state;
                 ScheduleStatus to = transition.getTo().state;
 
@@ -497,17 +494,6 @@ public class TaskStateMachine {
         )
         .throwOnBadTransition(false)
         .build();
-  }
-
-  private boolean isTaskTimedOut(Iterable<TaskEvent> taskEvents,
-      Amount<Long, Time> missingTaskGracePeriod) {
-    if (taskEvents == null || Iterables.isEmpty(taskEvents)) {
-      LOG.warning("Task " + taskId + " had no task events, assuming timed out.");
-      return true;
-    } else {
-      long lastEventAgeMillis = clock.nowMillis() - Iterables.getLast(taskEvents).getTimestamp();
-      return lastEventAgeMillis > missingTaskGracePeriod.as(Time.MILLISECONDS);
-    }
   }
 
   private Closure<Transition<State>> manageUpdatingTask(final boolean rollback) {

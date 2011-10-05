@@ -2,6 +2,7 @@ package com.twitter.mesos.scheduler;
 
 import java.util.Set;
 
+import com.google.common.base.Predicate;
 import com.google.common.base.Supplier;
 
 import org.easymock.EasyMock;
@@ -55,13 +56,12 @@ import static org.junit.Assert.fail;
  */
 public class TaskStateMachineTest extends EasyMockTest {
 
-  private static final Amount<Long, Time> MISSING_GRACE_PERIOD = Amount.of(1L, Time.MINUTES);
-
   private TaskStateMachine stateMachine;
 
   private Supplier<ScheduledTask> taskReader;
   private Supplier<Boolean> isJobUpdating;
   private TransitionListener transitionListener;
+  private Predicate<Iterable<TaskEvent>> taskTimeoutFilter;
   private WorkSink workSink;
   private FakeClock clock;
 
@@ -70,14 +70,15 @@ public class TaskStateMachineTest extends EasyMockTest {
     taskReader = createMock(new Clazz<Supplier<ScheduledTask>>() {});
     isJobUpdating = createMock(new Clazz<Supplier<Boolean>>() {});
     transitionListener = createMock(TransitionListener.class);
+    taskTimeoutFilter = createMock(new Clazz<Predicate<Iterable<TaskEvent>>>() {});
     workSink = createMock(WorkSink.class);
     clock = new FakeClock();
     stateMachine = makeStateMachine("test");
   }
 
   private TaskStateMachine makeStateMachine(String taskId) {
-    return new TaskStateMachine(taskId, taskReader, isJobUpdating, workSink, MISSING_GRACE_PERIOD,
-        clock, INIT, transitionListener);
+    return new TaskStateMachine(taskId, taskReader, isJobUpdating, workSink,
+        taskTimeoutFilter, clock, INIT, transitionListener);
   }
 
   @Test
@@ -146,7 +147,7 @@ public class TaskStateMachineTest extends EasyMockTest {
       control.verify();
       control.reset();
       stateMachine = new TaskStateMachine("test", taskReader, isJobUpdating, workSink,
-          MISSING_GRACE_PERIOD, clock, INIT, transitionListener);
+          taskTimeoutFilter, clock, INIT, transitionListener);
     }
 
     control.replay();  // Needed so the teardown verify doesn't break.
@@ -188,22 +189,25 @@ public class TaskStateMachineTest extends EasyMockTest {
   public void testMissingAssignedRescheduledAfterGracePeriod() {
     expectTransitionCallbacks(INIT, PENDING, ASSIGNED, LOST);
     expectWork(UPDATE_STATE).times(3);
+    expect(taskTimeoutFilter.apply(EasyMock.<Iterable<TaskEvent>>anyObject()))
+        .andReturn(false)
+        .times(2);
+    expect(taskTimeoutFilter.apply(EasyMock.<Iterable<TaskEvent>>anyObject())).andReturn(true);
     expectWork(RESCHEDULE);
 
     ScheduledTask task = makeTask(false);
-    task.addToTaskEvents(new TaskEvent(clock.nowMillis(), ScheduleStatus.PENDING, null));
-
-    clock.waitFor(10);
-    task.addToTaskEvents(new TaskEvent(clock.nowMillis(), ScheduleStatus.ASSIGNED, null));
     expect(taskReader.get()).andReturn(task).times(3);
 
     control.replay();
 
+    // Move the task into ASSIGNED, and simulate two attempts to move it to UNKNOWN.
+    // This could be triggered by an executor sending a full state update that does not include
+    // the task, for example if the executor had not received the task when the message was sent.
     transition(stateMachine, PENDING, ASSIGNED, UNKNOWN);
-    clock.waitFor(MISSING_GRACE_PERIOD.as(Time.MILLISECONDS) - 1);
     transition(stateMachine, UNKNOWN);
     assertThat(stateMachine.getState(), is(ScheduleStatus.ASSIGNED));
-    clock.waitFor(2);
+    // The filter was configured to mark the task as timed out on the third call, the task is
+    // missing.
     transition(stateMachine, UNKNOWN);
     assertThat(stateMachine.getState(), is(ScheduleStatus.LOST));
   }
