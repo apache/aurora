@@ -173,7 +173,7 @@ class Updater(object):
           % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
       if resp.tasks:
         for task in resp.tasks:
-          statuses[task.scheduledTask.assignedTask.task.shardId] = task.scheduledTask.status
+          statuses[task.assignedTask.task.shardId] = task.status
       else:
         log.debug('No tasks found.')
       log.debug('Got statuses: %s' %
