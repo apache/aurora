@@ -21,6 +21,7 @@ import com.twitter.common.collections.Pair;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.zookeeper.ZooKeeperClient;
+import com.twitter.common.zookeeper.ZooKeeperClient.Credentials;
 import com.twitter.common.zookeeper.ZooKeeperUtils;
 import com.twitter.common.zookeeper.testing.ZooKeeperTestServer;
 import com.twitter.common_internal.zookeeper.TwitterZk;
@@ -30,6 +31,7 @@ import com.twitter.common_internal.zookeeper.TwitterZk;
  *
  * <p>Exports the following bindings:
  * <ul>
+ *   <li>{@link Credentials} - zk authentication credentials</li>
  *   <li>{@literal @ZooKeeper} List&lt;InetSocketAddress&gt; - zk cluster addresses</li>
  *   <li>{@literal @ZooKeeper} Amount&lt;Integer, Time&gt; - zk session timeout to use</li>
  *   <li>{@link ZooKeeperClient} - a client connected with the connection info above</li>
@@ -59,9 +61,13 @@ public class ZooKeeperModule extends PrivateModule {
 
   @Override
   protected void configure() {
-    expose(ZooKeeperClient.class);
+    // TODO(John Sirois): get this from /etc/keys/mesos:mesos
+    bind(Credentials.class).toInstance(ZooKeeperClient.digestCredentials("mesos", "mesos"));
+
+    expose(Credentials.class);
     expose(Key.get(new TypeLiteral<List<InetSocketAddress>>() {}, ZooKeeper.class));
     expose(Key.get(new TypeLiteral<Amount<Integer, Time>>() {}, ZooKeeper.class));
+    expose(ZooKeeperClient.class);
   }
 
   @Provides
@@ -89,8 +95,7 @@ public class ZooKeeperModule extends PrivateModule {
   @Provides
   @Singleton
   Pair<? extends List<InetSocketAddress>, ZooKeeperClient> provideZooKeeperClient(
-      @ShutdownStage ActionRegistry shutdownRegistry,
-      ZooKeeperClient.Credentials credentials) {
+      @ShutdownStage ActionRegistry shutdownRegistry, Credentials credentials) {
 
     if (zooKeeperInProcess.get()) {
       try {

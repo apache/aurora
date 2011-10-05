@@ -41,7 +41,6 @@ import com.twitter.common.thrift.ThriftServer;
 import com.twitter.common.util.Clock;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
-import com.twitter.common.zookeeper.ZooKeeperClient.Credentials;
 import com.twitter.common.zookeeper.ZooKeeperUtils;
 import com.twitter.common_internal.cuckoo.CuckooWriter;
 import com.twitter.mesos.ExecutorKey;
@@ -144,9 +143,6 @@ public class SchedulerModule extends AbstractModule {
     ZooKeeperModule.bind(binder());
 
     bind(Key.get(String.class, ClusterName.class)).toInstance(CLUSTER_NAME.get());
-
-    // TODO(John Sirois): get this from /etc/keys/mesos:mesos
-    bind(Credentials.class).toInstance(ZooKeeperClient.digestCredentials("mesos", "mesos"));
 
     // Bindings for MesosSchedulerImpl.
     bind(SessionValidator.class).to(SessionValidatorImpl.class);

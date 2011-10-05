@@ -21,6 +21,7 @@ import com.twitter.common.args.constraints.NotNull;
 import com.twitter.common.net.InetSocketAddressHelper;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.common.zookeeper.ZooKeeperClient.Credentials;
 import com.twitter.mesos.scheduler.zk.ZooKeeper;
 
 /**
@@ -28,6 +29,7 @@ import com.twitter.mesos.scheduler.zk.ZooKeeper;
  *
  * <p>Requires the following bindings:
  * <ul>
+ *   <li>{@link Credentials} - zk authentication credentials</li>
  *   <li>{@literal @ZooKeeper} List&lt;InetSocketAddress&gt; - zk cluster addresses</li>
  *   <li>{@literal @ZooKeeper} Amount&lt;Integer, Time&gt; - zk session timeout to use</li>
  * </ul>
@@ -66,6 +68,7 @@ public class MesosLogStreamModule extends PrivateModule {
 
   @Override
   protected void configure() {
+    requireBinding(Credentials.class);
     requireBinding(Key.get(new TypeLiteral<List<InetSocketAddress>>() {}, ZooKeeper.class));
     requireBinding(Key.get(new TypeLiteral<Amount<Integer, Time>>() {}, ZooKeeper.class));
 
@@ -76,7 +79,7 @@ public class MesosLogStreamModule extends PrivateModule {
   @Provides
   @Singleton
   Log provideLog(@ZooKeeper List<InetSocketAddress> endpoints,
-                 @ZooKeeper Amount<Integer, Time> sessionTimeout) {
+                 Credentials credentials, @ZooKeeper Amount<Integer, Time> sessionTimeout) {
 
     File logFile = logPath.get();
     File parentDir = logFile.getParentFile();
@@ -92,6 +95,8 @@ public class MesosLogStreamModule extends PrivateModule {
                    zkConnectString,
                    sessionTimeout.getValue(),
                    sessionTimeout.getUnit().getTimeUnit(),
-                   zkLogGroupPath.get());
+                   zkLogGroupPath.get(),
+                   credentials.scheme(),
+                   credentials.authToken());
   }
 }
