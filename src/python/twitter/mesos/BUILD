@@ -4,10 +4,11 @@ python_library(
   dependencies = [
     pants('3rdparty/python:zookeeper'),
     pants('3rdparty/python:paramiko'),
+    pants('src/python/twitter/common/app'),
+    pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common_internal/ods'),
     pants('src/thrift/com/twitter/thrift:py-thrift'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
-    pants('src/python/twitter/common')
   ]
 )
 
@@ -38,7 +39,6 @@ python_binary(
   source = "bin/deploy_scheduler.py",
   dependencies = [
     pants(":mesos-lib"),
-    pants("src/python/twitter/common"),
     pants("3rdparty/python:git-python")
   ]
 )
@@ -47,7 +47,7 @@ python_binary(
   name = "restart_job",
   source = "bin/restart_job.py",
   dependencies = [
-    pants("src/python/twitter/common"),
+    pants("src/python/twitter/common/log"),
     pants(":mesos-lib"),
     pants("3rdparty/python:git-python")
   ]
