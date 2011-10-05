@@ -1,28 +1,30 @@
 package com.twitter.mesos.scheduler;
 
-import java.util.Set;
-
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Multimap;
-
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
+import com.twitter.mesos.Tasks;
+import com.twitter.mesos.gen.ScheduleStatus;
 import org.easymock.EasyMock;
 import org.junit.Test;
 
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
-import com.twitter.mesos.gen.ScheduleStatus;
+import java.util.Set;
 
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
+import static com.twitter.mesos.gen.ScheduleStatus.LOST;
+import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.PREEMPTING;
 import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
+import static com.twitter.mesos.gen.ScheduleStatus.UNKNOWN;
 import static org.easymock.EasyMock.expectLastCall;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -40,10 +42,20 @@ public class StateManagerTest extends BaseStateManagerTest {
         makeTask("jim", "myJob", 0),
         makeTask("jack", "otherJob", 0)
     ));
+    assertVarCount("jim", "myJob", PENDING, 1);
+    assertVarCount("jack", "otherJob", PENDING, 1);
+
     String task1 = Iterables.get(taskIds, 0);
     assignTask(task1, HOST_A);
+    assertVarCount("jim", "myJob", PENDING, 0);
+    assertVarCount("jim", "myJob", ASSIGNED, 1);
     changeState(task1, RUNNING);
+    assertVarCount("jim", "myJob", ASSIGNED, 0);
+    assertVarCount("jim", "myJob", RUNNING, 1);
     stateManager.abandonTasks(ImmutableSet.of(task1));
+    assertVarCount("jim", "myJob", RUNNING, 0);
+    assertVarCount("jim", "myJob", LOST, 0);
+    assertVarCount("jim", "myJob", PENDING, 1);
     assertTrue(stateManager.fetchTasks(Query.byId(task1)).isEmpty());
   }
 
@@ -61,6 +73,37 @@ public class StateManagerTest extends BaseStateManagerTest {
     changeState(task1, FINISHED);
     stateManager.abandonTasks(ImmutableSet.of(task1));
     assertTrue(stateManager.fetchTasks(Query.byId(task1)).isEmpty());
+  }
+
+  @Test
+  public void testKillPendingTask() {
+    control.replay();
+
+    String taskId = Iterables.getOnlyElement(stateManager.insertTasks(ImmutableSet.of(
+        makeTask("jim", "myJob", 0)
+    )));
+    assertVarCount("jim", "myJob", PENDING, 1);
+    changeState(taskId, KILLING);
+    assertVarCount("jim", "myJob", PENDING, 0);
+    assertVarCount("jim", "myJob", KILLING, 0);
+  }
+
+  @Test
+  public void testLostKillingTask() {
+    killTaskCallback.execute(EasyMock.<String>anyObject());
+
+    control.replay();
+
+    String taskId = Iterables.getOnlyElement(stateManager.insertTasks(ImmutableSet.of(
+        makeTask("jim", "myJob", 0)
+    )));
+
+    assignTask(taskId, HOST_A);
+    changeState(taskId, RUNNING);
+    changeState(taskId, KILLING);
+    assertVarCount("jim", "myJob", KILLING, 1);
+    changeState(taskId, UNKNOWN);
+    assertVarCount("jim", "myJob", KILLING, 0);
   }
 
   @Test
@@ -92,6 +135,10 @@ public class StateManagerTest extends BaseStateManagerTest {
       clock.advance(Amount.of(1L, Time.MILLISECONDS));
       stateManager.scanOutstandingTasks();
     }
+  }
+
+  private void assertVarCount(String owner, String job, ScheduleStatus status, long expected) {
+    assertEquals(expected, stateManager.getTaskCounter(Tasks.jobKey(owner, job), status));
   }
 
   private void changeState(String taskId, ScheduleStatus status) {

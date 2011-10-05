@@ -1,18 +1,8 @@
 package com.twitter.mesos.scheduler;
 
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
-import javax.annotation.Nullable;
-
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Supplier;
-
-import org.apache.commons.lang.builder.HashCodeBuilder;
-
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Closures;
 import com.twitter.common.base.Command;
@@ -25,6 +15,13 @@ import com.twitter.common.util.StateMachine.Transition;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskEvent;
+import org.apache.commons.lang.builder.HashCodeBuilder;
+
+import javax.annotation.Nullable;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -47,9 +44,11 @@ public class TaskStateMachine {
       Stats.exportLong("scheduler_illegal_task_state_transitions");
 
   private final String taskId;
+  private final String jobKey;
   private final AtomicReference<String> slaveHost = new AtomicReference<String>();
   private final WorkSink workSink;
   private final StateMachine<State> stateMachine;
+  private ScheduleStatus previousState = null;
   private final Clock clock;
 
   /**
@@ -131,24 +130,11 @@ public class TaskStateMachine {
   }
 
   /**
-   * A listener that will be notified of state transitions.
-   *
-   * TODO(wfarner): Work out a better integration for this into the work queue.
-   */
-  public interface TransitionListener {
-    /**
-     * Called after a valid state transition is made.
-     *
-     * @param oldStatus Previous status.
-     * @param newStatus New status.
-     */
-    void transitioned(ScheduleStatus oldStatus, ScheduleStatus newStatus);
-  }
-
-  /**
    * Creates a new task state machine.
    *
    * @param taskId ID of the task managed by this state machine.
+   * @param jobKey Key of the job that this task is associated with, or {@code null} if the
+   *     associated job is unknown.
    * @param taskReader Interface to provide read-only access to the task that this state machine
    *     manages.
    * @param isJobUpdating Supplier to test whether the task's job is currently in a rolling update.
@@ -159,19 +145,19 @@ public class TaskStateMachine {
    * @param initialState The state to begin the state machine at.  All legal transitions will be
    *     added, but this allows the state machine to 'skip' states, for instance when a task is
    *     loaded from a persistent store.
-   * @param transitionListener Callback to notify of transitions made.
    */
   public TaskStateMachine(
       final String taskId,
+      @Nullable String jobKey,
       final Supplier<ScheduledTask> taskReader,
       final Supplier<Boolean> isJobUpdating,
       final WorkSink workSink,
       final Predicate<Iterable<TaskEvent>> taskTimeoutFilter,
       final Clock clock,
-      final ScheduleStatus initialState,
-      final TransitionListener transitionListener) {
+      final ScheduleStatus initialState) {
 
     this.taskId = MorePreconditions.checkNotBlank(taskId);
+    this.jobKey = jobKey;
     checkNotNull(taskReader);
     this.workSink = checkNotNull(workSink);
     this.clock = checkNotNull(clock);
@@ -487,7 +473,7 @@ public class TaskStateMachine {
                 }
 
                 if (transition.isValidStateChange()) {
-                  transitionListener.transitioned(from, to);
+                  previousState = from;
                 }
               }
             }
@@ -646,6 +632,27 @@ public class TaskStateMachine {
    */
   public String getTaskId() {
     return taskId;
+  }
+
+  /**
+   * Gets the task key of this state machine.
+   *
+   * @return The state machine's job key, or {@code null} if no job key is available.
+   */
+  @Nullable
+  public String getJobKey() {
+    return jobKey;
+  }
+
+  /**
+   * Gets the previous state of this state machine.
+   *
+   * @return The state machine's previous state, or {@code null} if the state machine has not
+   *     transitioned since being created.
+   */
+  @Nullable
+  ScheduleStatus getPreviousState() {
+    return previousState;
   }
 
   @Override

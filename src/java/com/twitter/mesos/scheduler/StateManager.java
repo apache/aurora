@@ -1,17 +1,5 @@
 package com.twitter.mesos.scheduler;
 
-import java.util.EnumSet;
-import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
-import javax.annotation.Nullable;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
@@ -28,10 +16,6 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
-
-import org.apache.commons.lang.StringUtils;
-import org.apache.mesos.Protos.SlaveID;
-
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.base.Closure;
@@ -55,7 +39,6 @@ import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
-import com.twitter.mesos.scheduler.TaskStateMachine.TransitionListener;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
@@ -63,6 +46,19 @@ import com.twitter.mesos.scheduler.storage.Storage.Work;
 import com.twitter.mesos.scheduler.storage.Storage.Work.NoResult;
 import com.twitter.mesos.scheduler.storage.TaskStore;
 import com.twitter.mesos.scheduler.storage.UpdateStore;
+import org.apache.commons.lang.StringUtils;
+import org.apache.mesos.Protos.SlaveID;
+
+import javax.annotation.Nullable;
+import java.util.EnumSet;
+import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.transform;
@@ -131,16 +127,11 @@ class StateManager {
       }
     };
 
-  private final TransitionListener noopListener = new TransitionListener() {
-    @Override public void transitioned(ScheduleStatus oldStatus, ScheduleStatus newStatus) {
-      // No-op.
-    }
-  };
-
   private final Map<String, TaskStateMachine> taskStateMachines = new MapMaker().makeComputingMap(
       new Function<String, TaskStateMachine>() {
         @Override public TaskStateMachine apply(String taskId) {
           return new TaskStateMachine(taskId,
+              null,
               // The task is unknown, so there is no matching task to fetch.
               Suppliers.<ScheduledTask>ofInstance(null),
               // Since the task doesn't exist, its job cannot be updating.
@@ -148,8 +139,7 @@ class StateManager {
               workSink,
               taskTimeoutFilter,
               clock,
-              INIT,
-              noopListener)
+              INIT)
               .updateState(UNKNOWN);
         }
       }
@@ -876,6 +866,8 @@ class StateManager {
                     work.mutation.execute(task);
                   }
                 });
+                vars.adjustCount(stateMachine.getJobKey(), stateMachine.getPreviousState(),
+                    stateMachine.getState());
                 break;
 
               case DELETE:
@@ -900,6 +892,11 @@ class StateManager {
   }
 
   private void deleteTasks(TaskStore taskStore, Set<String> taskIds) {
+    for (ScheduledTask task
+        : taskStore.fetchTasks(new Query(new TaskQuery().setTaskIds(taskIds)))) {
+      vars.decrementCount(Tasks.jobKey(task), task.getStatus());
+    }
+
     taskStore.removeTasks(taskIds);
     taskStateMachines.keySet().removeAll(taskIds);
   }
@@ -950,13 +947,13 @@ class StateManager {
     vars.incrementCount(jobKey, initialState);
     TaskStateMachine stateMachine = new TaskStateMachine(
         taskId,
+        jobKey,
         taskSupplier(taskId),
         taskUpdateChecker(role, job),
         workSink,
         taskTimeoutFilter,
         clock,
-        initialState,
-        transitionListeners.get(jobKey));
+        initialState);
 
     String slaveHost = task.getAssignedTask().getSlaveHost();
     if (!StringUtils.isBlank(slaveHost)) {
@@ -966,18 +963,6 @@ class StateManager {
     taskStateMachines.put(taskId, stateMachine);
     return stateMachine;
   }
-
-  private Map<String, TransitionListener> transitionListeners = new MapMaker().makeComputingMap(
-      new Function<String, TransitionListener>() {
-        @Override public TransitionListener apply(final String jobKey) {
-          return new TransitionListener() {
-            @Override public void transitioned(ScheduleStatus from, ScheduleStatus to) {
-              vars.adjustCount(jobKey, from, to);
-            }
-          };
-        }
-      }
-  );
 
   private final class Vars {
     private final Map<Pair<String, ScheduleStatus>, AtomicLong> countersByJobKeyAndStatus =
@@ -1020,14 +1005,14 @@ class StateManager {
     void incrementCount(String jobKey, ScheduleStatus status) {
       if (isAccounted(status)) {
         countersByStatus.get(status).incrementAndGet();
-        countersByJobKeyAndStatus.get(Pair.of(jobKey, status)).incrementAndGet();
+        getCounter(jobKey, status).incrementAndGet();
       }
     }
 
-    private void decrementCount(String jobKey, ScheduleStatus status) {
+    void decrementCount(String jobKey, ScheduleStatus status) {
       if (isAccounted(status)) {
         countersByStatus.get(status).decrementAndGet();
-        countersByJobKeyAndStatus.get(Pair.of(jobKey, status)).decrementAndGet();
+        getCounter(jobKey, status).decrementAndGet();
       }
     }
 
@@ -1035,6 +1020,15 @@ class StateManager {
       decrementCount(jobKey, oldStatus);
       incrementCount(jobKey, newStatus);
     }
+
+    AtomicLong getCounter(String jobKey, ScheduleStatus status) {
+      return countersByJobKeyAndStatus.get(Pair.of(jobKey, status));
+    }
   }
   private final Vars vars = new Vars();
+
+  @VisibleForTesting
+  long getTaskCounter(String jobKey, ScheduleStatus status) {
+    return vars.getCounter(jobKey, status).get();
+  }
 }

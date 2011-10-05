@@ -1,18 +1,8 @@
 package com.twitter.mesos.scheduler;
 
-import java.util.Set;
-
 import com.google.common.base.Predicate;
 import com.google.common.base.Supplier;
-
-import org.easymock.EasyMock;
-import org.easymock.IExpectationSetters;
-import org.junit.Before;
-import org.junit.Test;
-
 import com.twitter.common.base.Closure;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 import com.twitter.mesos.Tasks;
@@ -21,8 +11,13 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.TaskStateMachine.TransitionListener;
 import com.twitter.mesos.scheduler.TaskStateMachine.WorkSink;
+import org.easymock.EasyMock;
+import org.easymock.IExpectationSetters;
+import org.junit.Before;
+import org.junit.Test;
+
+import java.util.Set;
 
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
@@ -48,6 +43,7 @@ import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.hamcrest.CoreMatchers.is;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 
@@ -60,7 +56,6 @@ public class TaskStateMachineTest extends EasyMockTest {
 
   private Supplier<ScheduledTask> taskReader;
   private Supplier<Boolean> isJobUpdating;
-  private TransitionListener transitionListener;
   private Predicate<Iterable<TaskEvent>> taskTimeoutFilter;
   private WorkSink workSink;
   private FakeClock clock;
@@ -69,7 +64,6 @@ public class TaskStateMachineTest extends EasyMockTest {
   public void setUp() {
     taskReader = createMock(new Clazz<Supplier<ScheduledTask>>() {});
     isJobUpdating = createMock(new Clazz<Supplier<Boolean>>() {});
-    transitionListener = createMock(TransitionListener.class);
     taskTimeoutFilter = createMock(new Clazz<Predicate<Iterable<TaskEvent>>>() {});
     workSink = createMock(WorkSink.class);
     clock = new FakeClock();
@@ -77,25 +71,34 @@ public class TaskStateMachineTest extends EasyMockTest {
   }
 
   private TaskStateMachine makeStateMachine(String taskId) {
-    return new TaskStateMachine(taskId, taskReader, isJobUpdating, workSink,
-        taskTimeoutFilter, clock, INIT, transitionListener);
+    return new TaskStateMachine(taskId, taskId /* Job key */, taskReader, isJobUpdating, workSink,
+        taskTimeoutFilter, clock, INIT);
   }
 
   @Test
   public void testSimpleTransition() {
-    expectTransitionCallbacks(INIT, PENDING, ASSIGNED, STARTING, RUNNING, FINISHED, UNKNOWN);
     expectWork(UPDATE_STATE).times(5);
     expect(taskReader.get()).andReturn(makeTask(false));
     expectWork(DELETE);
 
     control.replay();
 
-    transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, FINISHED, UNKNOWN);
+    transition(stateMachine, PENDING);
+    assertEquals(INIT, stateMachine.getPreviousState());
+    transition(stateMachine, ASSIGNED);
+    assertEquals(PENDING, stateMachine.getPreviousState());
+    transition(stateMachine, STARTING);
+    assertEquals(ASSIGNED, stateMachine.getPreviousState());
+    transition(stateMachine, RUNNING);
+    assertEquals(STARTING, stateMachine.getPreviousState());
+    transition(stateMachine, FINISHED);
+    assertEquals(RUNNING, stateMachine.getPreviousState());
+    transition(stateMachine, UNKNOWN);
+    assertEquals(FINISHED, stateMachine.getPreviousState());
   }
 
   @Test
   public void testDaemonRescheduled() {
-    expectTransitionCallbacks(INIT, PENDING, ASSIGNED, STARTING, RUNNING, FINISHED);
     expectWork(UPDATE_STATE).times(5);
     expect(taskReader.get()).andReturn(makeTask(true));
     expectWork(RESCHEDULE);
@@ -110,30 +113,25 @@ public class TaskStateMachineTest extends EasyMockTest {
     Set<ScheduleStatus> terminalStates = Tasks.TERMINAL_STATES;
 
     for (ScheduleStatus endState : terminalStates) {
-      expectTransitionCallbacks(INIT, PENDING, ASSIGNED, STARTING, RUNNING);
       expectWork(UPDATE_STATE).times(5);
 
       switch (endState) {
         case FAILED:
           expectWork(INCREMENT_FAILURES);
           expect(taskReader.get()).andReturn(makeTask(false));
-          expectTransitionCallbacks(RUNNING, endState);
           break;
 
         case FINISHED:
           expect(taskReader.get()).andReturn(makeTask(false));
-          expectTransitionCallbacks(RUNNING, endState);
           break;
 
         case KILLED:
         case LOST:
           expectWork(RESCHEDULE);
-          expectTransitionCallbacks(RUNNING, endState);
           break;
 
         case KILLING:
           expectWork(KILL);
-          expectTransitionCallbacks(RUNNING, endState);
       }
 
       control.replay();
@@ -146,8 +144,8 @@ public class TaskStateMachineTest extends EasyMockTest {
 
       control.verify();
       control.reset();
-      stateMachine = new TaskStateMachine("test", taskReader, isJobUpdating, workSink,
-          taskTimeoutFilter, clock, INIT, transitionListener);
+      stateMachine = new TaskStateMachine("test", "test_key", taskReader, isJobUpdating, workSink,
+          taskTimeoutFilter, clock, INIT);
     }
 
     control.replay();  // Needed so the teardown verify doesn't break.
@@ -155,7 +153,6 @@ public class TaskStateMachineTest extends EasyMockTest {
 
   @Test
   public void testUnknownTask() {
-    expectTransitionCallbacks(INIT, UNKNOWN);
     expectWork(KILL);
 
     control.replay();
@@ -165,7 +162,6 @@ public class TaskStateMachineTest extends EasyMockTest {
 
   @Test
   public void testLostTask() {
-    expectTransitionCallbacks(INIT, PENDING, ASSIGNED, STARTING, RUNNING, LOST);
     expectWork(UPDATE_STATE).times(5);
     expectWork(RESCHEDULE);
 
@@ -176,7 +172,6 @@ public class TaskStateMachineTest extends EasyMockTest {
 
   @Test
   public void testKilledPending() {
-    expectTransitionCallbacks(INIT, PENDING, KILLING);
     expectWork(UPDATE_STATE);
     expectWork(DELETE);
 
@@ -187,7 +182,6 @@ public class TaskStateMachineTest extends EasyMockTest {
 
   @Test
   public void testMissingAssignedRescheduledAfterGracePeriod() {
-    expectTransitionCallbacks(INIT, PENDING, ASSIGNED, LOST);
     expectWork(UPDATE_STATE).times(3);
     expect(taskTimeoutFilter.apply(EasyMock.<Iterable<TaskEvent>>anyObject()))
         .andReturn(false)
@@ -214,11 +208,6 @@ public class TaskStateMachineTest extends EasyMockTest {
 
   @Test
   public void testMissingStartingRescheduledImmediately() {
-    transitionListener.transitioned(INIT, PENDING);
-    transitionListener.transitioned(PENDING, ASSIGNED);
-    transitionListener.transitioned(ASSIGNED, STARTING);
-    transitionListener.transitioned(STARTING, LOST);
-
     ScheduledTask task = makeTask(false);
     task.addToTaskEvents(new TaskEvent(clock.nowMillis(), ScheduleStatus.PENDING, null));
     expectWork(UPDATE_STATE).times(4);
@@ -232,7 +221,6 @@ public class TaskStateMachineTest extends EasyMockTest {
 
   @Test
   public void testMissingRunningRescheduledImmediately() {
-    expectTransitionCallbacks(INIT, PENDING, ASSIGNED, STARTING, RUNNING, LOST);
     expectWork(UPDATE_STATE).times(5);
     expectWork(RESCHEDULE);
 
@@ -247,7 +235,6 @@ public class TaskStateMachineTest extends EasyMockTest {
 
   @Test
   public void testRogueRestartedTask() {
-    expectTransitionCallbacks(INIT, PENDING, ASSIGNED, STARTING, RUNNING, RESTARTING);
     expectWork(UPDATE_STATE).times(5);
     expectWork(KILL).times(2);
 
@@ -258,7 +245,6 @@ public class TaskStateMachineTest extends EasyMockTest {
 
   @Test
   public void testAllowsSkipStartingAndRunning() {
-    expectTransitionCallbacks(INIT, PENDING, ASSIGNED, FINISHED);
     expectWork(UPDATE_STATE).times(3);
     expect(taskReader.get()).andReturn(makeTask(false));
 
@@ -269,7 +255,6 @@ public class TaskStateMachineTest extends EasyMockTest {
 
   @Test
   public void testAllowsSkipRunning() {
-    expectTransitionCallbacks(INIT, PENDING, ASSIGNED, STARTING, FINISHED);
     expectWork(UPDATE_STATE).times(4);
     expect(taskReader.get()).andReturn(makeTask(false));
 
@@ -280,9 +265,6 @@ public class TaskStateMachineTest extends EasyMockTest {
 
   @Test
   public void testHonorsMaxFailures() {
-    expectTransitionCallbacks(INIT, PENDING, ASSIGNED, STARTING, RUNNING, FAILED);
-    expectTransitionCallbacks(INIT, PENDING, ASSIGNED, STARTING, RUNNING, FAILED);
-
     ScheduledTask task = makeTask(false);
     task.getAssignedTask().getTask().setMaxTaskFailures(10);
     task.setFailureCount(8);
@@ -307,8 +289,6 @@ public class TaskStateMachineTest extends EasyMockTest {
 
   @Test
   public void testHonorsUnlimitedFailures() {
-    expectTransitionCallbacks(INIT, PENDING, ASSIGNED, STARTING, RUNNING, FAILED);
-
     ScheduledTask task = makeTask(false);
     task.getAssignedTask().getTask().setMaxTaskFailures(-1);
     task.setFailureCount(1000);
@@ -325,7 +305,6 @@ public class TaskStateMachineTest extends EasyMockTest {
 
   @Test
   public void testUpdate() {
-    expectTransitionCallbacks(INIT, PENDING, ASSIGNED, STARTING, RUNNING, UPDATING, KILLED);
     expectWork(UPDATE_STATE).times(6);
     expect(isJobUpdating.get()).andReturn(true);
     expectWork(UPDATE);
@@ -338,8 +317,6 @@ public class TaskStateMachineTest extends EasyMockTest {
 
   @Test
   public void testRollback() {
-    expectTransitionCallbacks(
-        INIT, PENDING, ASSIGNED, STARTING, RUNNING, UPDATING, ROLLBACK, KILLED);
     expectWork(UPDATE_STATE).times(7);
     expect(isJobUpdating.get()).andReturn(true);
     expectWork(WorkCommand.ROLLBACK);
@@ -352,7 +329,6 @@ public class TaskStateMachineTest extends EasyMockTest {
 
   @Test
   public void testIllegalUpdate() {
-    expectTransitionCallbacks(INIT, PENDING, ASSIGNED, STARTING, RUNNING);
     expectWork(UPDATE_STATE).times(4);
     expect(isJobUpdating.get()).andReturn(false);
 
@@ -368,7 +344,6 @@ public class TaskStateMachineTest extends EasyMockTest {
 
   @Test
   public void testKillingRequest() {
-    expectTransitionCallbacks(INIT, PENDING, ASSIGNED, STARTING, RUNNING, KILLING, KILLED);
     expectWork(UPDATE_STATE).times(6);
     expectWork(KILL);
 
@@ -380,17 +355,6 @@ public class TaskStateMachineTest extends EasyMockTest {
   private static void transition(TaskStateMachine stateMachine, ScheduleStatus... states) {
     for (ScheduleStatus status : states) {
       stateMachine.updateState(status);
-    }
-  }
-
-  private void expectTransitionCallbacks(ScheduleStatus... states) {
-    ScheduleStatus previous = null;
-    for (ScheduleStatus status : states) {
-      if (previous != null) {
-        transitionListener.transitioned(previous, status);
-      }
-
-      previous = status;
     }
   }
 
