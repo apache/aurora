@@ -12,6 +12,7 @@ import com.google.inject.Inject;
 import org.apache.mesos.Log;
 
 import com.twitter.common.base.Function;
+import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.stats.Stats;
 
 /**
@@ -33,23 +34,33 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
   }
 
   private static class LogStream implements com.twitter.mesos.scheduler.log.Log.Stream {
+    private static class OpStats {
+      private static AtomicLong exportLongStat(String template, Object... args) {
+        return Stats.exportLong(String.format(template, args));
+      }
+
+      final String opName;
+      final AtomicLong total;
+      final AtomicLong timeouts;
+      final AtomicLong failures;
+
+      private OpStats(String opName) {
+        this.opName = MorePreconditions.checkNotBlank(opName);
+        total = exportLongStat("scheduler_log_native_%_total", opName);
+        timeouts = exportLongStat("scheduler_log_native_%_timeouts", opName);
+        failures = exportLongStat("scheduler_log_native_%_failures", opName);
+      }
+    }
+
     private static class Vars {
-      final AtomicLong readTimeouts = Stats.exportLong("scheduler_log_native_read_timeouts");
-      final AtomicLong readFailures = Stats.exportLong("scheduler_log_native_read_failures");
-      final AtomicLong appendTimeouts = Stats.exportLong("scheduler_log_native_append_timeouts");
-      final AtomicLong appendFailures = Stats.exportLong("scheduler_log_native_append_failures");
-      final AtomicLong truncateTimeouts =
-          Stats.exportLong("scheduler_log_native_truncate_timeouts");
-      final AtomicLong truncateFailures =
-          Stats.exportLong("scheduler_log_native_truncate_failures");
-      final AtomicLong invalidatedWriters =
-          Stats.exportLong("scheduler_log_native_invalidated_writers");
+      final OpStats read = new OpStats("read");
+      final OpStats append = new OpStats("append");
+      final OpStats truncate = new OpStats("truncate");
     }
     private final Vars vars = new Vars();
 
     private final Log log;
     private final Log.Reader reader;
-    private Log.Writer writer;
 
     LogStream(Log log) {
       this.log = log;
@@ -64,7 +75,7 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
         };
 
     @Override
-    public synchronized Iterator<Entry> readFrom(
+    public Iterator<Entry> readFrom(
         com.twitter.mesos.scheduler.log.Log.Position position) throws StreamAccessException {
 
       Preconditions.checkArgument(position instanceof LogPosition);
@@ -75,33 +86,29 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
         List<Log.Entry> entries = reader.read(from, to);
         return Iterables.<Log.Entry, Entry>transform(entries, MESOS_ENTRY_TO_ENTRY).iterator();
       } catch (TimeoutException e) {
-        vars.readTimeouts.getAndIncrement();
+        vars.read.timeouts.getAndIncrement();
         throw new StreamAccessException("Timeout reading from log.", e);
       } catch (Log.OperationFailedException e) {
-        vars.readFailures.getAndIncrement();
+        vars.read.failures.getAndIncrement();
         throw new StreamAccessException("Problem reading from log", e);
+      } finally {
+        vars.read.total.getAndIncrement();
       }
     }
 
     @Override
-    public synchronized LogPosition append(byte[] contents)
+    public synchronized LogPosition append(final byte[] contents)
         throws StreamAccessException {
 
-      try {
-        Log.Position position = writer().append(contents);
-        return LogPosition.wrap(position);
-      } catch (TimeoutException e) {
-        vars.appendTimeouts.getAndIncrement();
-        throw new StreamAccessException("Timeout appending entry to the log.", e);
-      } catch (Log.WriterFailedException e) {
-        vars.appendFailures.getAndIncrement();
+      Preconditions.checkNotNull(contents);
 
-        // We must throw away a writer on a write failure - this could be because of a coordinator
-        // election in which case we must trigger a new election.
-        invalidateWriter();
-
-        throw new StreamAccessException("Problem appending entry to the log.", e);
-      }
+      Log.Position position = mutate(vars.append, new Mutation<Log.Position>() {
+        @Override public Log.Position apply(Log.Writer writer)
+            throws TimeoutException, Log.WriterFailedException {
+          return writer.append(contents);
+        }
+      });
+      return LogPosition.wrap(position);
     }
 
     @Override
@@ -110,53 +117,64 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
 
       Preconditions.checkArgument(position instanceof LogPosition);
 
-      Log.Position before = ((LogPosition) position).unwrap();
+      final Log.Position before = ((LogPosition) position).unwrap();
+      mutate(vars.truncate, new Mutation<Void>() {
+        @Override public Void apply(Log.Writer writer)
+            throws TimeoutException, Log.WriterFailedException {
+          writer.truncate(before);
+          return null;
+        }
+      });
+    }
+
+    private interface Mutation<T> {
+      T apply(Log.Writer writer) throws TimeoutException, Log.WriterFailedException;
+    }
+
+    private Log.Writer writer;
+
+    private synchronized <T> T mutate(OpStats stats, Mutation<T> mutation) {
+      if (writer == null) {
+        writer = new Log.Writer(log);
+      }
       try {
-        writer().truncate(before);
+        return mutation.apply(writer);
       } catch (TimeoutException e) {
-        vars.truncateTimeouts.getAndIncrement();
-        throw new StreamAccessException("Timeout truncating log.", e);
+        stats.timeouts.getAndIncrement();
+        throw new StreamAccessException("Timeout performing log " + stats.opName, e);
       } catch (Log.WriterFailedException e) {
-        vars.truncateFailures.getAndIncrement();
+        stats.failures.getAndIncrement();
 
-        // We must throw away a writer on a write failure - this could be because of a coordinator
+        // We must throw away a writer on any write failure - this could be because of a coordinator
         // election in which case we must trigger a new election.
-        invalidateWriter();
+        writer = null;
 
-        throw new StreamAccessException("Problem truncating log.", e);
+        throw new StreamAccessException("Problem performing log" + stats.opName, e);
+      } finally {
+        stats.total.getAndIncrement();
       }
     }
 
     @Override
-    public synchronized LogPosition beginning() {
+    public LogPosition beginning() {
       return LogPosition.wrap(reader.beginning());
     }
 
     @Override
-    public synchronized LogPosition end() {
+    public LogPosition end() {
       return LogPosition.wrap(reader.ending());
     }
 
     @Override
-    public synchronized LogPosition position(byte[] identity) {
+    public LogPosition position(byte[] identity) {
+      Preconditions.checkNotNull(identity);
+
       return LogPosition.wrap(log.position(identity));
     }
 
     @Override
     public void close() {
       // noop
-    }
-
-    private Log.Writer writer() {
-      if (writer == null) {
-        writer = new Log.Writer(log);
-      }
-      return writer;
-    }
-
-    private void invalidateWriter() {
-      vars.invalidatedWriters.getAndIncrement();
-      writer = null;
     }
 
     private static class LogPosition implements com.twitter.mesos.scheduler.log.Log.Position {
