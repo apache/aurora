@@ -24,6 +24,7 @@ import org.apache.mesos.Protos.ExecutorInfo;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
+import org.apache.zookeeper.data.ACL;
 
 import com.twitter.common.application.http.Registration;
 import com.twitter.common.args.Arg;
@@ -233,10 +234,8 @@ public class SchedulerModule extends AbstractModule {
 
   @Provides
   @Singleton
-  SingletonService provideSingletonService(ZooKeeperClient zkClient) {
-    // Scheduler service should be closed for membership but open for discovery (by mesos client)
-    return new SingletonService(zkClient, mesosSchedulerNameSpec.get(),
-        ZooKeeperUtils.EVERYONE_READ_CREATOR_ALL);
+  SingletonService provideSingletonService(ZooKeeperClient zkClient, List<ACL> acl) {
+    return new SingletonService(zkClient, mesosSchedulerNameSpec.get(), acl);
   }
 
   @Provides

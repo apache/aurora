@@ -13,6 +13,9 @@ import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 
+import org.apache.zookeeper.ZooDefs;
+import org.apache.zookeeper.data.ACL;
+
 import com.twitter.common.application.ActionRegistry;
 import com.twitter.common.application.ShutdownStage;
 import com.twitter.common.args.Arg;
@@ -32,6 +35,7 @@ import com.twitter.common_internal.zookeeper.TwitterZk;
  * <p>Exports the following bindings:
  * <ul>
  *   <li>{@link Credentials} - zk authentication credentials</li>
+ *   <li>List&lt;ACL&gt; - default zk ACL to use</li>
  *   <li>{@literal @ZooKeeper} List&lt;InetSocketAddress&gt; - zk cluster addresses</li>
  *   <li>{@literal @ZooKeeper} Amount&lt;Integer, Time&gt; - zk session timeout to use</li>
  *   <li>{@link ZooKeeperClient} - a client connected with the connection info above</li>
@@ -61,10 +65,8 @@ public class ZooKeeperModule extends PrivateModule {
 
   @Override
   protected void configure() {
-    // TODO(John Sirois): get this from /etc/keys/mesos:mesos
-    bind(Credentials.class).toInstance(ZooKeeperClient.digestCredentials("mesos", "mesos"));
-
     expose(Credentials.class);
+    expose(Key.get(new TypeLiteral<List<ACL>>() {}));
     expose(Key.get(new TypeLiteral<List<InetSocketAddress>>() {}, ZooKeeper.class));
     expose(Key.get(new TypeLiteral<Amount<Integer, Time>>() {}, ZooKeeper.class));
     expose(ZooKeeperClient.class);
@@ -72,8 +74,27 @@ public class ZooKeeperModule extends PrivateModule {
 
   @Provides
   @Singleton
+  Credentials provideCredentials() {
+    // TODO(John Sirois): get digest credentials from /etc/keys/mesos:mesos
+    return zooKeeperInProcess.get()
+        ? Credentials.NONE
+        : ZooKeeperClient.digestCredentials("mesos", "mesos");
+  }
+
+  @Provides
+  @Singleton
+  List<ACL> provideZooKeeperACL() {
+    // For local runs, a wide open ACL is fine - but in prod our zk nodes should be closed for
+    // membership but open for discovery (by mesos clients).
+    return zooKeeperInProcess.get()
+        ? ZooDefs.Ids.OPEN_ACL_UNSAFE
+        : ZooKeeperUtils.EVERYONE_READ_CREATOR_ALL;
+  }
+
+  @Provides
+  @Singleton
   @ZooKeeper
-  Amount<Integer, Time> provideZookeeperSessionTimeout() {
+  Amount<Integer, Time> provideZooKeeperSessionTimeout() {
     return zooKeeperSessionTimeout.get();
   }
 
@@ -99,7 +120,7 @@ public class ZooKeeperModule extends PrivateModule {
 
     if (zooKeeperInProcess.get()) {
       try {
-        return startLocalZookeeper(shutdownRegistry, credentials);
+        return startLocalZooKeeper(shutdownRegistry, credentials);
       } catch (IOException e) {
         throw new RuntimeException("Unable to start local zookeeper", e);
       } catch (InterruptedException e) {
@@ -112,7 +133,7 @@ public class ZooKeeperModule extends PrivateModule {
     }
   }
 
-  private Pair<? extends List<InetSocketAddress>, ZooKeeperClient> startLocalZookeeper(
+  private Pair<? extends List<InetSocketAddress>, ZooKeeperClient> startLocalZooKeeper(
       ActionRegistry shutdownRegistry, ZooKeeperClient.Credentials credentials)
       throws IOException, InterruptedException {
 
