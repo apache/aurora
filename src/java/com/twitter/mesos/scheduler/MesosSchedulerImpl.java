@@ -1,6 +1,7 @@
 package com.twitter.mesos.scheduler;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -70,6 +71,8 @@ class MesosSchedulerImpl implements Scheduler {
   private final ExecutorInfo executorInfo;
   private final ExecutorWatchdog executorWatchdog;
 
+  private final AtomicInteger registeredFlag = Stats.exportInt("framework_registered");
+
   @Inject
   public MesosSchedulerImpl(SchedulerCore schedulerCore, ExecutorTracker executorTracker,
       ExecutorInfo executorInfo, final Lifecycle lifecycle, ExecutorWatchdog executorWatchdog) {
@@ -127,6 +130,7 @@ class MesosSchedulerImpl implements Scheduler {
   @Override
   public void registered(final SchedulerDriver driver, FrameworkID frameworkID) {
     LOG.info("Registered with ID " + frameworkID);
+    registeredFlag.set(1);
     this.frameworkID = frameworkID;
     schedulerCore.registered(frameworkID.getValue());
 
