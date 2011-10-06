@@ -64,8 +64,8 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
         };
 
     @Override
-    public Iterator<Entry> readFrom(com.twitter.mesos.scheduler.log.Log.Position position)
-        throws StreamAccessException {
+    public synchronized Iterator<Entry> readFrom(
+        com.twitter.mesos.scheduler.log.Log.Position position) throws StreamAccessException {
 
       Preconditions.checkArgument(position instanceof LogPosition);
 
@@ -84,7 +84,7 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
     }
 
     @Override
-    public LogPosition append(byte[] contents)
+    public synchronized LogPosition append(byte[] contents)
         throws StreamAccessException {
 
       try {
@@ -105,7 +105,7 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
     }
 
     @Override
-    public void truncateBefore(com.twitter.mesos.scheduler.log.Log.Position position)
+    public synchronized void truncateBefore(com.twitter.mesos.scheduler.log.Log.Position position)
         throws StreamAccessException {
 
       Preconditions.checkArgument(position instanceof LogPosition);
@@ -128,17 +128,17 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
     }
 
     @Override
-    public LogPosition beginning() {
+    public synchronized LogPosition beginning() {
       return LogPosition.wrap(reader.beginning());
     }
 
     @Override
-    public LogPosition end() {
+    public synchronized LogPosition end() {
       return LogPosition.wrap(reader.ending());
     }
 
     @Override
-    public LogPosition position(byte[] identity) {
+    public synchronized LogPosition position(byte[] identity) {
       return LogPosition.wrap(log.position(identity));
     }
 
@@ -147,14 +147,14 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
       // noop
     }
 
-    private synchronized Log.Writer writer() {
+    private Log.Writer writer() {
       if (writer == null) {
         writer = new Log.Writer(log);
       }
       return writer;
     }
 
-    private synchronized void invalidateWriter() {
+    private void invalidateWriter() {
       vars.invalidatedWriters.getAndIncrement();
       writer = null;
     }
