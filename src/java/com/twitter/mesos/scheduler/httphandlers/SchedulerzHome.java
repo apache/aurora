@@ -1,17 +1,18 @@
 package com.twitter.mesos.scheduler.httphandlers;
 
 import java.io.IOException;
-import java.util.Map;
-import java.util.Set;
+import java.util.Collection;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.google.common.base.Function;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.MapMaker;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
@@ -52,6 +53,14 @@ public class SchedulerzHome extends StringTemplateServlet {
     this.clusterName = checkNotBlank(clusterName);
   }
 
+  private static final Function<String, Role> CREATE_ROLE = new Function<String, Role>() {
+    @Override public Role apply(String ownerRole) {
+      Role role = new Role();
+      role.role = ownerRole;
+      return role;
+    }
+  };
+
   @Override
   protected void doGet(final HttpServletRequest req, HttpServletResponse resp)
       throws ServletException, IOException {
@@ -59,28 +68,21 @@ public class SchedulerzHome extends StringTemplateServlet {
       @Override public void execute(StringTemplate template) {
         template.setAttribute("cluster_name", clusterName);
 
-        Map<String, Role> owners =
-            new MapMaker().makeComputingMap(new Function<String, Role>() {
-              @Override public Role apply(String ownerRole) {
-                Role role = new Role();
-                role.role = ownerRole;
-                return role;
-              }
-            });
-
+        Cache<String, Role> owners = CacheBuilder.newBuilder().build(CacheLoader.from(CREATE_ROLE));
         Multimap<String, ScheduledTask> ownerJobs = HashMultimap.create();
 
-        Set<ScheduledTask> tasks = scheduler.getTasks(Query.GET_ALL);
-
-        for (ScheduledTask task : tasks) {
-          Role role = owners.get(task.getAssignedTask().getTask().getOwner().getRole());
+        for (ScheduledTask task : scheduler.getTasks(Query.GET_ALL)) {
+          Role role = owners.getUnchecked(task.getAssignedTask().getTask().getOwner().getRole());
           switch (task.getStatus()) {
+            case INIT:
             case PENDING:
               role.pendingTaskCount++;
               break;
 
             case ASSIGNED:
             case STARTING:
+            case RESTARTING:
+            case UPDATING:
             case RUNNING:
               role.activeTaskCount++;
               break;
@@ -88,11 +90,14 @@ public class SchedulerzHome extends StringTemplateServlet {
             case KILLING:
             case KILLED:
             case FINISHED:
+            case PREEMPTING:
+            case ROLLBACK:
               role.finishedTaskCount++;
               break;
 
             case LOST:
             case FAILED:
+            case UNKNOWN:
               role.failedTaskCount++;
               break;
 
@@ -103,7 +108,8 @@ public class SchedulerzHome extends StringTemplateServlet {
           ownerJobs.put(role.role, task);
         }
 
-        for (Role role : owners.values()) {
+        Collection<Role> roles = owners.asMap().values();
+        for (Role role : roles) {
           Iterable<ScheduledTask> activeRoleTasks =
               Iterables.filter(ownerJobs.get(role.role), Tasks.ACTIVE_FILTER);
           role.jobCount = Sets.newHashSet(Iterables.transform(
@@ -111,7 +117,7 @@ public class SchedulerzHome extends StringTemplateServlet {
         }
 
         template.setAttribute("owners",
-            DisplayUtils.sort(owners.values(), DisplayUtils.SORT_USERS_BY_NAME));
+            DisplayUtils.sort(roles, DisplayUtils.SORT_USERS_BY_NAME));
 
         template.setAttribute("cronJobs",
             DisplayUtils.sort(cronScheduler.getJobs(), DisplayUtils.SORT_JOB_CONFIG_BY_NAME));
