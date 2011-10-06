@@ -85,12 +85,15 @@ public class SchedulerzRole extends StringTemplateServlet {
           }
 
           switch (task.getStatus()) {
+            case INIT:
             case PENDING:
               job.pendingTaskCount++;
               break;
 
             case ASSIGNED:
             case STARTING:
+            case RESTARTING:
+            case UPDATING:
             case RUNNING:
               job.activeTaskCount++;
               break;
@@ -98,11 +101,14 @@ public class SchedulerzRole extends StringTemplateServlet {
             case KILLING:
             case KILLED:
             case FINISHED:
+            case PREEMPTING:
+            case ROLLBACK:
               job.finishedTaskCount++;
               break;
 
             case LOST:
             case FAILED:
+            case UNKNOWN:
               job.failedTaskCount++;
               break;
 
