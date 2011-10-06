@@ -46,9 +46,9 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
 
       private OpStats(String opName) {
         this.opName = MorePreconditions.checkNotBlank(opName);
-        total = exportLongStat("scheduler_log_native_%_total", opName);
-        timeouts = exportLongStat("scheduler_log_native_%_timeouts", opName);
-        failures = exportLongStat("scheduler_log_native_%_failures", opName);
+        total = exportLongStat("scheduler_log_native_%s_total", opName);
+        timeouts = exportLongStat("scheduler_log_native_%s_timeouts", opName);
+        failures = exportLongStat("scheduler_log_native_%s_failures", opName);
       }
     }
 
