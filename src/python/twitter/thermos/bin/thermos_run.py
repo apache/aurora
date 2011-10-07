@@ -92,9 +92,7 @@ def main(args):
   thermos_job = get_job_from_options(opts)
   thermos_task = get_task_from_job(thermos_job, opts.task, opts.replica_id)
 
-  if thermos_job and thermos_task:
-    log.info("Woop!  Able to find task: %s" % thermos_task)
-  else:
+  if not thermos_job or not thermos_task:
     log.fatal("Unable to synthesize task!")
     sys.exit(1)
 

@@ -1,10 +1,11 @@
 import os
 import mimetypes
 import pkg_resources
+import socket
 
 from twitter.common import log
-
-from server import BottleServer, BottleTemplate
+from twitter.common.http import HttpServer
+from templating import HttpTemplate
 
 # mixins
 # when things settle, discover mixins instead of static
@@ -17,7 +18,6 @@ BottleObserverMixins = [
 ]
 
 __author__ = 'wickman@twitter.com (brian wickman)'
-__tested__ = False
 
 class StaticAssets(object):
   """
@@ -37,11 +37,11 @@ class StaticAssets(object):
         __name__, os.path.join('assets', asset))
     self._assets = cached_assets
 
-  @BottleServer.route("/favicon.ico")
+  @HttpServer.route("/favicon.ico")
   def handle_favicon(self):
-    self.bottle.redirect("/assets/favicon.ico")
+    HttpServer.redirect("/assets/favicon.ico")
 
-  @BottleServer.route("/assets/:filename")
+  @HttpServer.route("/assets/:filename")
   def handle_asset(self, filename):
     # TODO(wickman)  Add static_content to bottle.
     if filename in self._assets:
@@ -49,9 +49,9 @@ class StaticAssets(object):
       header = {}
       if mimetype: header['Content-Type'] = mimetype
       if encoding: header['Content-Encoding'] = encoding
-      return BottleServer.Response(self._assets[filename], header=header)
+      return HttpServer.Response(self._assets[filename], header=header)
     else:
-      return BottleServer.Response(status=404)
+      return HttpServer.Response(status=404)
 
 def _flatten(lists):
   out = []
@@ -67,7 +67,7 @@ class ListExpansionMetaclass(type):
     parents = _flatten(parents)
     return type(name, tuple(parents), attrs)
 
-class BottleObserver(BottleServer, StaticAssets, BottleObserverMixins):
+class BottleObserver(StaticAssets, BottleObserverMixins):
   """
     A bottle wrapper around a Thermos TaskObserver.
   """
@@ -81,11 +81,10 @@ class BottleObserver(BottleServer, StaticAssets, BottleObserverMixins):
     StaticAssets.__init__(self)
     for mixin in BottleObserverMixins:
       mixin.__init__(self)
-    BottleServer.__init__(self)
 
-  @BottleServer.route("/")
-  @BottleServer.view(BottleTemplate.load('index'))
+  @HttpServer.route("/")
+  @HttpServer.view(HttpTemplate.load('index'))
   def handle_index(self):
     return dict(
-      hostname = self.hostname()
+      hostname = socket.gethostname()
     )

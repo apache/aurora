@@ -2,19 +2,17 @@ import sys
 import time
 
 from twitter.common import app
+from twitter.common.http import RootServer
 from twitter.common.metrics import RootMetrics, LambdaGauge
 from twitter.thermos.observer.observer import TaskObserver
 from twitter.thermos.observer.http import BottleObserver
 
 app.add_option("--root", dest = "root", metavar = "DIR",
                help = "root checkpoint directory for thermos task runners")
-app.add_option("--port", dest = "port", type='int', metavar = "PORT", default=8051,
-               help = "port to run observer webserver")
 
 def register_varz():
-  rm = RootMetrics()
   now = time.time()
-  rm.register(LambdaGauge('uptime', lambda: time.time() - now))
+  RootMetrics().register(LambdaGauge('uptime', lambda: time.time() - now))
 
 def main(args):
   opts = app.get_options()
@@ -30,10 +28,15 @@ def main(args):
     app.help()
     sys.exit(1)
 
-  obs = TaskObserver(opts.root)
-  obs.start()
+  task_observer = TaskObserver(opts.root)
+  task_observer.start()
 
-  bo = BottleObserver(obs)
-  bo.run('localhost', opts.port)
+  bottle_wrapper = BottleObserver(task_observer)
+  RootServer().mount_routes(bottle_wrapper)
+
+  # MainThread should just sleep forever.  TODO(wickman) Add something in
+  # app that indicates sleeping forever until e.g.  a signal.
+  while True:
+    time.sleep(10)
 
 app.main()

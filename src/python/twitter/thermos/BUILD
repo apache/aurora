@@ -23,7 +23,8 @@ python_library(
     pants(':base'),
     pants(':monitoring'),
     pants('src/thrift/com/twitter/tcl:py-thrift'),
-    pants('3rdparty/python:bottle')
+    pants('3rdparty/python:bottle'),
+    pants('3rdparty/python:mako')
   ]
 )
 

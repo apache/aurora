@@ -1,6 +1,7 @@
 import os
 import bottle
-from server import BottleServer, BottleTemplate
+from twitter.common.http import HttpServer
+from templating import HttpTemplate
 
 def _read_chunk(filename, offset=None, bytes=None):
   MB = 1024 * 1024
@@ -42,7 +43,7 @@ class TaskObserverFileBrowser(object):
     Mixin for Thermos observer File browser.
   """
 
-  @BottleServer.route("/logs/:uid/:process/:run")
+  @HttpServer.route("/logs/:uid/:process/:run")
   def handle_logs(self, uid, process, run):
     """
       Additional parameters:
@@ -53,8 +54,8 @@ class TaskObserverFileBrowser(object):
     format = self._request.GET.get('fmt', 'html')
     return self._observer.logs(uid, process, int(run), path, format)
 
-  @BottleServer.route("/file/:uid/:path#.+#")
-  @BottleServer.mako_view(BottleTemplate.load('filebrowse'))
+  @HttpServer.route("/file/:uid/:path#.+#")
+  @HttpServer.mako_view(HttpTemplate.load('filebrowse'))
   def handle_file(self, uid, path):
     """
       Additional parameters:
@@ -77,13 +78,13 @@ class TaskObserverFileBrowser(object):
     print 'Setting d to %s' % repr(d)
     return d
 
-  @BottleServer.route("/browse/:uid")
-  @BottleServer.route("/browse/:uid/:path#.+#")
-  @BottleServer.mako_view(BottleTemplate.load('filelist'))
+  @HttpServer.route("/browse/:uid")
+  @HttpServer.route("/browse/:uid/:path#.+#")
+  @HttpServer.mako_view(HttpTemplate.load('filelist'))
   def handle_dir(self, uid, path=None):
     return self._observer.files(uid, path)
 
-  @BottleServer.route("/download/:uid/:path#.+#")
+  @HttpServer.route("/download/:uid/:path#.+#")
   def handle_download(self, uid, path=None):
     root_uid = self._observer.files(uid)
     return bottle.static_file(path, root = root_uid['chroot'], download=True)
