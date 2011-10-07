@@ -97,9 +97,7 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
     }
 
     @Override
-    public synchronized LogPosition append(final byte[] contents)
-        throws StreamAccessException {
-
+    public LogPosition append(final byte[] contents) throws StreamAccessException {
       Preconditions.checkNotNull(contents);
 
       Log.Position position = mutate(vars.append, new Mutation<Log.Position>() {
@@ -112,7 +110,7 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
     }
 
     @Override
-    public synchronized void truncateBefore(com.twitter.mesos.scheduler.log.Log.Position position)
+    public void truncateBefore(com.twitter.mesos.scheduler.log.Log.Position position)
         throws StreamAccessException {
 
       Preconditions.checkArgument(position instanceof LogPosition);
