@@ -28,6 +28,7 @@ class TaskMeasurer(threading.Thread):
     self._interval    = interval
     self._processes   = {}    # MeasuredTuple -> SampleVector
     threading.Thread.__init__(self)
+    self.daemon = True
 
   def join(self):
     self._alive = False

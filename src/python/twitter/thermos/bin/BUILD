@@ -28,7 +28,6 @@ python_binary(
     pants('src/python/twitter/tcl:loader'),
     pants('src/python/twitter/thermos:base'),
     pants('src/python/twitter/thermos:observer'),
-
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/metrics'),
     pants('src/python/twitter/common/metrics:vars'),

@@ -45,6 +45,7 @@ class TaskObserver(threading.Thread):
     self._finishes = set()  # set of finished task_ids
     self._tasks    = {}     # task_id => ThermosTask
     threading.Thread.__init__(self)
+    self.daemon = True
 
   def run(self):
     """

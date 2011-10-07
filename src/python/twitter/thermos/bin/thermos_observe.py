@@ -4,7 +4,7 @@ import time
 from twitter.common import app
 from twitter.common.metrics import RootMetrics, LambdaGauge
 from twitter.thermos.observer.observer import TaskObserver
-from twitter.thermos.observer.http     import ObserverHttpHandler
+from twitter.thermos.observer.http import BottleObserver
 
 app.add_option("--root", dest = "root", metavar = "DIR",
                help = "root checkpoint directory for thermos task runners")
@@ -33,6 +33,7 @@ def main(args):
   obs = TaskObserver(opts.root)
   obs.start()
 
-  ObserverHttpHandler('localhost', opts.port, obs)
+  bo = BottleObserver(obs)
+  bo.run('localhost', opts.port)
 
 app.main()

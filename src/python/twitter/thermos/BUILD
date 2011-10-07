@@ -14,7 +14,7 @@ python_library(
   dependencies = []
 )
 
-OBSERVER_ASSETS = rglobs('observer/assets/*')
+OBSERVER_ASSETS = rglobs('observer/http/assets/*') + rglobs('observer/http/templates/*')
 python_library(
   name = 'observer',
   sources = rglobs('observer/*.py'),
@@ -22,7 +22,8 @@ python_library(
   dependencies = [
     pants(':base'),
     pants(':monitoring'),
-    pants('src/thrift/com/twitter/tcl:py-thrift')
+    pants('src/thrift/com/twitter/tcl:py-thrift'),
+    pants('3rdparty/python:bottle')
   ]
 )
 
