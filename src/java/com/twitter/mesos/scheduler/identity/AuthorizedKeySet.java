@@ -117,7 +117,8 @@ public class AuthorizedKeySet {
         } else if (fields[0].equals("ssh-dss")) {
           key = DSSKey.createFromBase64(fields[1]);
         } else {
-          throw new KeyParseException("Unsupported key type: " + fields[0]);
+          LOG.warning(String.format("Unknown key type: %s", fields[0]));
+          continue;
         }
       } catch (SSHException e) {
         throw new KeyParseException("Failed to create key", e);
