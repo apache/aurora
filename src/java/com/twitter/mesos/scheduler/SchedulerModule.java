@@ -44,6 +44,7 @@ import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.common.zookeeper.ZooKeeperUtils;
 import com.twitter.common_internal.cuckoo.CuckooWriter;
+import com.twitter.common_internal.zookeeper.ZooKeeperModule;
 import com.twitter.mesos.ExecutorKey;
 import com.twitter.mesos.gen.MesosAdmin;
 import com.twitter.mesos.gen.TwitterTaskInfo;
@@ -59,7 +60,6 @@ import com.twitter.mesos.scheduler.httphandlers.SchedulerzRole;
 import com.twitter.mesos.scheduler.quota.QuotaModule;
 import com.twitter.mesos.scheduler.storage.StorageModule;
 import com.twitter.mesos.scheduler.sync.SyncModule;
-import com.twitter.mesos.scheduler.zk.ZooKeeperModule;
 
 
 public class SchedulerModule extends AbstractModule {
@@ -132,7 +132,9 @@ public class SchedulerModule extends AbstractModule {
     TimedInterceptor.bind(binder());
 
     // Bind a ZooKeeperClient
-    ZooKeeperModule.bind(binder());
+    install(new ZooKeeperModule(
+        ZooKeeperClient.digestCredentials("mesos", "mesos"),
+        ZooKeeperUtils.EVERYONE_READ_CREATOR_ALL));
 
     bind(Key.get(String.class, ClusterName.class)).toInstance(CLUSTER_NAME.get());
 

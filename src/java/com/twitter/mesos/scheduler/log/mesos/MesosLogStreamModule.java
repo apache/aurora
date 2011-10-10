@@ -22,7 +22,7 @@ import com.twitter.common.net.InetSocketAddressHelper;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.zookeeper.ZooKeeperClient.Credentials;
-import com.twitter.mesos.scheduler.zk.ZooKeeper;
+import com.twitter.common_internal.zookeeper.ZooKeeper;
 
 /**
  * Binds a native mesos Log implementation.
