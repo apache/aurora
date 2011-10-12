@@ -39,8 +39,11 @@ var Task = new Class({
      this.updateElement()
    },
 
+   /*
+     TODO(wickman)  Instead do the 2-3 necessary transition functions, then make
+     a schema that maps attributes to the appropriate transition function.
+   */
    translateElement: function(dom_id, value) {
-     // should really use a RE here.
      if (dom_id === this.taskStr(['processes', 'running']) ||
          dom_id === this.taskStr(['processes', 'waiting']) ||
          dom_id === this.taskStr(['processes', 'success']) ||
@@ -57,24 +60,34 @@ var Task = new Class({
      return value
    },
 
+   /*
+     TODO(wickman)  Ditto to above.
+   */
    updateElement: function() {
-     for (prefix_attr in this.data) { if (this.data.hasOwnProperty(prefix_attr)) {
-       // special case the "processes" prefix
-       if (instanceOf(this.data[prefix_attr], String) || instanceOf(this.data[prefix_attr], Number)) {
-         this.transitionElement(this.taskStr([prefix_attr]), this.data[prefix_attr])
-       } else if (instanceOf(this.data[prefix_attr], Object)) {
-         for (suffix_attr in this.data[prefix_attr])
-           if (this.data[prefix_attr].hasOwnProperty(suffix_attr))
-             this.transitionElement(this.taskStr([prefix_attr, suffix_attr]),
-                                    this.data[prefix_attr][suffix_attr])
+     for (prefix_attr in this.data) {
+       if (this.data.hasOwnProperty(prefix_attr)) {
+         if (prefix_attr == "uid") {
+           this.transitionElement(this.taskStr([prefix_attr]), this.translateUid(this.data[prefix_attr]))
+         } else if (instanceOf(this.data[prefix_attr], String) || instanceOf(this.data[prefix_attr], Number)) {
+           this.transitionElement(this.taskStr([prefix_attr]), this.data[prefix_attr])
+         } else if (instanceOf(this.data[prefix_attr], Object)) {
+           for (suffix_attr in this.data[prefix_attr])
+             if (this.data[prefix_attr].hasOwnProperty(suffix_attr))
+               this.transitionElement(this.taskStr([prefix_attr, suffix_attr]),
+                                      this.data[prefix_attr][suffix_attr])
+         }
        }
-     }}
+     }
+   },
+
+   translateUid: function(uid) {
+     return "<a href='/task/" + uid + "'>" + uid + "</a>"
    },
 
    setElement: function() {
      this.element = new Element('tr', {
       'id': 'task[' + this.taskType + '][' + this.uid + ']'}).adopt(
-         new Element('td', { 'id': this.taskStr(['uid']), 'html': this.uid }),
+         new Element('td', { 'id': this.taskStr(['uid']), 'html': this.translateUid(this.uid)}),
          new Element('td', { 'id': this.taskStr(['job', 'name']) }),
          new Element('td', { 'id': this.taskStr(['name']) }),
          new Element('td', { 'id': this.taskStr(['replica']) }),
@@ -94,10 +107,7 @@ var TableManager = new Class({
 
   initialize: function(tableType) {
     this.tableType = tableType
-
     this.setElement()
-    $('defaultLayout').adopt(this.element)
-
     this.getChildren()
     this.startPolling()
   },
@@ -142,7 +152,7 @@ var TableManager = new Class({
 
   getChildren: function() {
     new Request.JSON({
-      'url': '/uids/' + this.tableType + '/-20',
+      'url': '/j/uids/' + this.tableType + '/-20',
       'method': 'get',
       'onComplete': function(response) {
         if (response) {
@@ -177,7 +187,7 @@ var TableManager = new Class({
   refreshVisibleChildren: function() {
      // first get visible children
      new Request.JSON({
-       'url': '/task',
+       'url': '/j/task',
        'method': 'get',
        'data': { 'uid': this.visibleChildren.join() },
        'onComplete': function(response) {
@@ -193,10 +203,4 @@ var TableManager = new Class({
        }.bind(this)
      }).send()
    },
-})
-
-activesTableManager = ''
-window.addEvent("domready", function() {
-    activeTableManager = new TableManager('active')
-  finishedTableManager = new TableManager('finished')
 })

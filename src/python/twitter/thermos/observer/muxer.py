@@ -109,7 +109,6 @@ class TaskMuxer(object):
     self.lock()
     for uid in self._runnerstate:
       applied_states = self._apply_states(uid)
-      log.debug('applied_states(%s) = %s' % (uid, applied_states))
       state = self._runnerstate[uid]
       for process in state.processes:
         if len(state.processes[process].runs) == 0:
@@ -117,7 +116,6 @@ class TaskMuxer(object):
         last_run = state.processes[process].runs[-1]
         if last_run.run_state == ProcessRunState.RUNNING:
           tup = (uid, last_run, len(state.processes[process].runs)-1)
-          log.debug('yielding %s' % repr(tup))
           yield tup
     # TODO(wickman)  In the meantime look at all call-sites to verify sanity.
     self.unlock()

@@ -345,7 +345,7 @@ class TaskObserver(threading.Thread):
         reserved: { cpu: float, ram: int bytes, disk: int bytes }
         used: { cpu: float, ram: int bytes, disk: int bytes }
         start_time: (time since epoch in millis (utc))
-        finish_time: (time since epoch in millis (utc))
+        stop_time: (time since epoch in millis (utc))
         state: string [WAITING, FORKED, RUNNING, FINISHED, KILLED, FAILED, LOST]
       }
 
@@ -371,10 +371,10 @@ class TaskObserver(threading.Thread):
     """
       Return
         {
-          waiting:  [process1, ..., processN]
-          running:  [process1, ..., processN]
-          success:  [process1, ..., processN]
-          failed:   [process1, ..., processN]
+          process1: { ... }
+          process2: { ... }
+          ...
+          processN: { ... }
         }
 
       where processK is the latest run of processK and in the schema as
@@ -388,10 +388,10 @@ class TaskObserver(threading.Thread):
       return {}
 
     processes = self._task_processes(uid)
-    d = dict(task_uid = uid)
+    d = dict()
     for process_type in processes:
-      d.update(process_type = [self.process(uid, process_name)
-        for process_name in processes[process_type]])
+      for process_name in processes[process_type]:
+        d.update({ process_name: self.process(uid, process_name) })
     return d
 
   def processes(self, uids):
@@ -399,6 +399,8 @@ class TaskObserver(threading.Thread):
       Given a list of uids, returns a map of uid => processes, where processes
       is defined by the schema in _processes.
     """
+    if not isinstance(uids, (list, tuple)):
+      return {}
     return dict((uid, self._processes(uid)) for uid in uids)
 
   def get_run_number(self, runner_state, process, run = None):

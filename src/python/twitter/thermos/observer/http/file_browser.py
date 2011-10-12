@@ -15,12 +15,22 @@ def _read_chunk(filename, offset=None, bytes=None):
     return None
 
   filelen = fstat.st_size
+  if bytes is not None:
+    try:
+      bytes = long(bytes)
+    except:
+      return None
   if bytes is None or bytes < 0:
     bytes = DEFAULT_CHUNK_LENGTH
   if bytes > MAX_CHUNK_LENGTH:
     bytes = MAX_CHUNK_LENGTH
   if offset is None:
     offset = filelen - bytes
+  else:
+    try:
+      offset = long(offset)
+    except:
+      return None
   if offset < 0: offset = 0
 
   with open(filename, "r") as fp:
@@ -43,16 +53,30 @@ class TaskObserverFileBrowser(object):
     Mixin for Thermos observer File browser.
   """
 
-  @HttpServer.route("/logs/:uid/:process/:run")
-  def handle_logs(self, uid, process, run):
+  @HttpServer.route("/logs/:uid/:process/:run/:logtype")
+  @HttpServer.mako_view(HttpTemplate.load('logbrowse'))
+  def handle_logs(self, uid, process, run, logtype):
     """
       Additional parameters:
-        path=<path within chroot>
-        fmt=<json|html>
+        offset= (default 0)
+        bytes=  (default 1048576)
     """
-    path = self._request.GET.get('path', None)
-    format = self._request.GET.get('fmt', 'html')
-    return self._observer.logs(uid, process, int(run), path, format)
+    offset = self.Request.GET.get('offset', None)
+    bytes = self.Request.GET.get('bytes', None)
+    types = self._observer.logs(uid, process, int(run))
+    if logtype not in types:
+      bottle.abort(404, "No such log type: %s" % logtype)
+    chroot, path = types[logtype]
+    data = _read_chunk(os.path.join(chroot, path), offset, bytes)
+    if not data:
+      bottle.abort(404, "Unable to read %s (%s)" % (logtype, path))
+    data.update(
+      uid = uid,
+      process = process,
+      run = run,
+      logtype = logtype,
+    )
+    return data
 
   @HttpServer.route("/file/:uid/:path#.+#")
   @HttpServer.mako_view(HttpTemplate.load('filebrowse'))
@@ -65,8 +89,8 @@ class TaskObserverFileBrowser(object):
     if path is None:
       bottle.abort(404, "No such file")
 
-    offset = self._request.GET.get('offset', None)
-    bytes = self._request.GET.get('bytes', None)
+    offset = self.Request.GET.get('offset', None)
+    bytes = self.Request.GET.get('bytes', None)
     chroot, path = self._observer.file_path(uid, path)
     if chroot is None or path is None:
       bottle.abort(404, "Invalid file path")
@@ -75,7 +99,6 @@ class TaskObserverFileBrowser(object):
     if not d:
       bottle.abort(404, "Unable to read file")
     d.update(filename = path, uid = uid)
-    print 'Setting d to %s' % repr(d)
     return d
 
   @HttpServer.route("/browse/:uid")

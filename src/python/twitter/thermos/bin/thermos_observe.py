@@ -3,20 +3,15 @@ import time
 
 from twitter.common import app
 from twitter.common.http import RootServer
-from twitter.common.metrics import RootMetrics, LambdaGauge
+from twitter.common.metrics import RootMetrics, LambdaGauge, varz
 from twitter.thermos.observer.observer import TaskObserver
 from twitter.thermos.observer.http import BottleObserver
 
 app.add_option("--root", dest = "root", metavar = "DIR",
                help = "root checkpoint directory for thermos task runners")
 
-def register_varz():
-  now = time.time()
-  RootMetrics().register(LambdaGauge('uptime', lambda: time.time() - now))
-
 def main(args):
   opts = app.get_options()
-  register_varz()
 
   if args:
     print >> sys.stderr, "ERROR: unrecognized arguments: %s\n" % (" ".join(args))

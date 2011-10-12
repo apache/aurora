@@ -32,6 +32,12 @@ class CaseClass(object):
       if attr not in self._attrs: raise Exception("Unknown attribute: %s" % attr)
       self._d[attr] = d[attr]
 
+  def get(self, attr):
+    if attr not in self._attrs: raise Exception("Unknown attribute: %s" % attr)
+    if not hasattr(self, '_d'): raise Exception("Not an instantiated CaseClass.")
+    if attr not in self._d: raise Exception("CaseClass missinga attribute %s" % attr)
+    return self._d[attr]
+
   def __eq__(self, other):
     if self._attrs == other._attrs:
       return self._d == other._d

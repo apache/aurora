@@ -67,7 +67,7 @@ class ListExpansionMetaclass(type):
     parents = _flatten(parents)
     return type(name, tuple(parents), attrs)
 
-class BottleObserver(StaticAssets, BottleObserverMixins):
+class BottleObserver(HttpServer, StaticAssets, BottleObserverMixins):
   """
     A bottle wrapper around a Thermos TaskObserver.
   """
@@ -87,4 +87,34 @@ class BottleObserver(StaticAssets, BottleObserverMixins):
   def handle_index(self):
     return dict(
       hostname = socket.gethostname()
+    )
+
+  @HttpServer.route("/task/:uid")
+  @HttpServer.mako_view(HttpTemplate.load('task'))
+  def handle_task(self, uid):
+    task = self._observer.task([uid])
+    if not task[uid]:
+      return HttpServer.Response(status=404)
+    processes = self._observer.processes([uid])
+    if not processes[uid]:
+      return HttpServer.Response(status=404)
+
+    task = task[uid]
+    processes = processes[uid]
+    job = task['job']
+
+    return dict(
+      hostname = socket.gethostname(),
+      uid = uid,
+      role = job['role'],
+      user = job['user'],
+      job = job['name'],
+      cluster = job['cluster'],
+      replica = task['replica'],
+      status = task['state'],
+      processes = processes,
+      # TODO(wickman)  Fill these in once they become exposed by the
+      # runner/executor.
+      executor_id = "boosh",
+      chroot = "boosh"
     )

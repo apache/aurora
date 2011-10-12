@@ -10,6 +10,8 @@ from case_class import CaseClass
 __author__ = 'wickman@twitter.com (brian wickman)'
 __tested__ = False
 
+# TODO(wickman)  After further consideration, this is probably the wrong tool for
+# the job.  Consider replacing it.
 MeasuredTuple = CaseClass('task_id', 'process_name', 'process_run', 'process_pid')
 
 class TaskMeasurer(threading.Thread):
@@ -38,8 +40,20 @@ class TaskMeasurer(threading.Thread):
   def sleep_until(timestamp):
     time_now = time.time()
     total_sleep = timestamp - time_now
-    log.debug('sleeping: %s' % total_sleep)
-    if total_sleep > 0: time.sleep(total_sleep)
+    if total_sleep > 0:
+      time.sleep(total_sleep)
+
+  def _filter_inactive_processes(self, active_processes):
+    active_processes = set((tup[0], tup[1].process, tup[2]) for tup in active_processes)
+    erase = []
+    for measured_tuple in self._processes.keys():
+      tup = (measured_tuple.get('task_id'), measured_tuple.get('process_name'),
+             measured_tuple.get('process_run'))
+      if tup not in active_processes:
+        log.debug('TaskMeasurer unmonitoring %s' % repr(tup))
+        erase.append(measured_tuple)
+    for measured_tuple in erase:
+      self._processes.pop(measured_tuple)
 
   def run(self):
     start = time.time()
@@ -51,11 +65,14 @@ class TaskMeasurer(threading.Thread):
       time_now = time.time()
 
       self._ps.refresh()
+      active_processes = [tup for tup in self._muxer.get_active_processes()]
+      self._filter_inactive_processes(active_processes)
 
-      for (uid, process, run) in self._muxer.get_active_processes():
+      for (uid, process, run) in active_processes:
         tup = MeasuredTuple(task_id = uid, process_name = process.process,
                             process_run = run, process_pid = process.pid)
         if tup not in self._processes:
+          log.debug('TaskMeasurer monitoring %s' % tup)
           self._processes[tup] = SampleVector(process.process)
         children_pids = self._ps.get_children(process.pid)
         pcpu = 0.0
@@ -89,8 +106,8 @@ class TaskMeasurer(threading.Thread):
 
     if len(processes) > 1:
       raise TaskMeasurer.InternalError(
-        "Unexpectedly large number of samples for task %s process %s" % (
-          task_id, process_name))
+        "Unexpectedly large number of samples for task %s process %s, processes = %s" % (
+          task_id, process_name, processes))
 
     # TODO(wickman)  Memoize time.time() and get rid of all the hardcoded constants.
     last_sample = self._processes[processes[0]].last_sample()

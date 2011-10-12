@@ -3,9 +3,6 @@ import sys
 import tempfile
 import subprocess
 
-import unittest
-import pytest
-
 from twitter.tcl.loader import ThermosJobLoader
 from twitter.thermos.runner import TaskRunner
 from twitter.thermos.base import TaskPath
@@ -17,7 +14,7 @@ from gen.twitter.thermos.ttypes import TaskRunnerCkpt
 from gen.twitter.thermos.ttypes import TaskRunnerState
 from gen.twitter.thermos.ttypes import ProcessRunState
 
-class RunnerMacroTest(unittest.TestCase):
+class TestRunnerBasic(object):
   TEST_JOB_SPEC = """
 import getpass
 hello_template = Process(cmdline = "echo {{task.replica_id}}")
@@ -63,12 +60,12 @@ TaskRunner(task, sandbox, root, task_id).run()
   def setup_class(cls):
     with open(tempfile.mktemp(), "w") as fp:
       job_filename = fp.name
-      print >> fp, RunnerMacroTest.TEST_JOB_SPEC
+      print >> fp, TestRunnerBasic.TEST_JOB_SPEC
     cls.tempdir = tempfile.mkdtemp()
     sandbox = os.path.join(cls.tempdir, 'sandbox')
     with open(tempfile.mktemp(), "w") as fp:
       script_filename = fp.name
-      print >> fp, RunnerMacroTest.RUN_JOB_SCRIPT % {
+      print >> fp, TestRunnerBasic.RUN_JOB_SCRIPT % {
         'filename': job_filename,
         'sandbox': sandbox,
         'root': cls.tempdir

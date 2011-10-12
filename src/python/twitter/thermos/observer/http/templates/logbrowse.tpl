@@ -1,8 +1,10 @@
 <%doc>
  Template arguments:
-   data
    uid
-   filename
+   process
+   run
+   logtype
+   data
    filelen
    read (bytes read)
    offset
@@ -10,16 +12,12 @@
    has_more
 </%doc>
 
-<%def name="download_link()">
-  <a href='/download/${uid}/${filename}'><font size=1>download</font></a>
-</%def>
-
 <%def name="less_link()">
-  <a href='/file/${uid}/${filename}?offset=${offset-bytes}&bytes=${bytes}'>&#171; prev</a>
+  <a href='/logs/${uid}/${process}/${run}/$logtype}?offset=${offset-bytes}&bytes=${bytes}'>&#171; prev</a>
 </%def>
 
 <%def name="greater_link()">
-  <a href='/file/${uid}/${filename}?offset=${offset+bytes}&bytes=${bytes}'>next &#187;</a>
+  <a href='/logs/${uid}/${process}/${run}/$logtype}?offset=${offset+bytes}&bytes=${bytes}'>next &#187;</a>
 </%def>
 
 <html>
@@ -28,15 +26,9 @@
       type="text/css"
       href="/assets/bootstrap.css"/>
 
-<title>file browser ${uid}</title>
-<body>
-  <div class="span16">
-    <strong> path </strong> ${filename}
-  </div>
+<title>log browser ${uid}</title>
 
-  <div class="span4">
-    ${download_link()}
-  </div>
+<body>
   <div class="span4">
     <strong> size </strong> ${filelen}
   </div>

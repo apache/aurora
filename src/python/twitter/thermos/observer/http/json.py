@@ -6,21 +6,21 @@ class TaskObserverJSONBindings(object):
     Mixin for Thermos observer JSON endpoints.
   """
 
-  @HttpServer.route("/uids")
-  @HttpServer.route("/uids/:which")
-  @HttpServer.route("/uids/:which/:offset")
-  @HttpServer.route("/uids/:which/:offset/:num")
+  @HttpServer.route("/j/uids")
+  @HttpServer.route("/j/uids/:which")
+  @HttpServer.route("/j/uids/:which/:offset")
+  @HttpServer.route("/j/uids/:which/:offset/:num")
   def handle_uids(self, which=None, offset=None, num=None):
     return self._observer.uids(
       which,
       int(offset) if offset is not None else 0,
       int(num) if num is not None else 20)
 
-  @HttpServer.route("/uid_count")
+  @HttpServer.route("/j/uid_count")
   def handle_uid_count(self):
     return self._observer.uid_count()
 
-  @HttpServer.route("/task")
+  @HttpServer.route("/j/task")
   def handle_tasks(self):
     """
       Additional parameters:
@@ -31,17 +31,17 @@ class TaskObserverJSONBindings(object):
       uids = urllib.unquote(uids).split(',')
     return self._observer.task(uids)
 
-  @HttpServer.route("/task/:uid")
+  @HttpServer.route("/j/task/:uid")
   def handle_task(self, uid):
     return self._observer.task([uid])
 
-  @HttpServer.route("/process/:uid")
-  @HttpServer.route("/process/:uid/:process")
-  @HttpServer.route("/process/:uid/:process/:run")
+  @HttpServer.route("/j/process/:uid")
+  @HttpServer.route("/j/process/:uid/:process")
+  @HttpServer.route("/j/process/:uid/:process/:run")
   def handle_process(self, uid, process=None, run=None):
     return self._observer.process(uid, process, run)
 
-  @HttpServer.route("/processes")
+  @HttpServer.route("/j/processes")
   def handle_processes(self):
     """
       Additional parameters:

@@ -24,23 +24,25 @@
 
 <html>
 
-<title>Log Printer</title>
+<title>path browser for ${uid}</title>
 <body>
-  <h3>task ${uid}, path ${path}</h3>
-  <table border=0 cellpadding=0 cellspacing=5 align=left>
-    % for dir in dirs:
-      <tr>
-       <td></td>
-       <td> ${directory_link(dir)} </td>
-      </tr>
-    % endfor
-    % for fn in files:
-      <tr>
-       <td> ${download_link(fn)} </td>
-       <td> ${file_link(fn)} </td>
-      </tr>
-    % endfor
-  </table>
+  <h3>${path}</h3>
+  <div class="container">
+    <table border=0 cellpadding=0 cellspacing=5 align=left>
+      % for dir in dirs:
+        <tr>
+         <td></td>
+         <td> ${directory_link(dir)} </td>
+        </tr>
+      % endfor
+      % for fn in files:
+        <tr>
+         <td> ${download_link(fn)} </td>
+         <td> ${file_link(fn)} </td>
+        </tr>
+      % endfor
+    </table>
+  </div>
 </body>
 
 </html>

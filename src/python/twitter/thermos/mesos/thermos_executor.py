@@ -3,6 +3,7 @@ import sys
 import time
 import pprint
 import random
+import time
 from collections import defaultdict
 from optparse import OptionParser
 
@@ -61,13 +62,13 @@ class ThermosExecutor(mesos.Executor):
     except Exception as e:
       log.error('Could not deserialize AssignedTask from launchTask!  Stopping driver...')
       driver.stop()
+      return
 
     self.runner = TaskRunner(
       thermos_task,
       self.sandbox_root,
       self.checkpoint_root,
-      # long(task.task_id.value)
-      random.randint(0, 2**32))
+      task.task_id.value)
     self.runner.run()
     self.runner = None
 
@@ -80,6 +81,7 @@ class ThermosExecutor(mesos.Executor):
     # ephemeral executor
     log.info('Stopping executor.')
     driver.stop()
+    log.info('After driver.stop()')
 
   def killTask(self, driver, taskId):
     log.info('Got killTask %s, ignoring.' % taskId)
@@ -94,11 +96,6 @@ class ThermosExecutor(mesos.Executor):
     log.info('Got error, ignoring: %s, %s' % (code, message))
 
 
-
-
-
-
-
 app.add_option("--sandbox_root", dest = "sandbox_root", metavar = "PATH",
                default = "/tmp/thermos/sandbox",
                help = "the path root where we will spawn workflow sandboxes")
@@ -106,8 +103,12 @@ app.add_option("--checkpoint_root", dest = "checkpoint_root", metavar = "PATH",
                default = "/tmp/thermos",
                help = "the path where we will store workflow logs and checkpoints")
 
+app.set_option('twitter_common_app_debug', True)
 def main(args, options):
   thermos_executor = ThermosExecutor(options)
-  mesos.MesosExecutorDriver(thermos_executor).run()
+  drv = mesos.MesosExecutorDriver(thermos_executor)
+  drv.run()
+  log.info('MesosExecutorDriver.run() has finished.')
+  time.sleep(10) # necessary due to ASF MESOS-36
 
 app.main()
