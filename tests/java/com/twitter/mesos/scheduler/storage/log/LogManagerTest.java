@@ -1,8 +1,16 @@
 package com.twitter.mesos.scheduler.storage.log;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterators;
-import com.twitter.common.application.ActionRegistry;
+
+import org.easymock.Capture;
+import org.junit.Before;
+import org.junit.Test;
+
+import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.testing.EasyMockTest;
@@ -20,12 +28,6 @@ import com.twitter.mesos.scheduler.log.Log.Position;
 import com.twitter.mesos.scheduler.log.Log.Stream;
 import com.twitter.mesos.scheduler.storage.log.LogManager.StreamManager;
 import com.twitter.mesos.scheduler.storage.log.LogManager.StreamManager.StreamTransaction;
-import org.easymock.Capture;
-import org.junit.Before;
-import org.junit.Test;
-
-import java.io.IOException;
-import java.nio.ByteBuffer;
 
 import static org.easymock.EasyMock.aryEq;
 import static org.easymock.EasyMock.capture;
@@ -61,7 +63,7 @@ public class LogManagerTest extends EasyMockTest {
     Log log = createMock(Log.class);
     expect(log.open()).andReturn(stream);
 
-    ActionRegistry shutdownRegistry = createMock(ActionRegistry.class);
+    ShutdownRegistry shutdownRegistry = createMock(ShutdownRegistry.class);
     Capture<ExceptionalCommand<IOException>> shutdownAction =
         new Capture<ExceptionalCommand<IOException>>();
     shutdownRegistry.addAction(capture(shutdownAction));

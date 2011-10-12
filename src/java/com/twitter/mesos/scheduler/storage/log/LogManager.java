@@ -13,8 +13,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
 
-import com.twitter.common.application.ActionRegistry;
-import com.twitter.common.application.ShutdownStage;
+import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.inject.TimedInterceptor.Timed;
@@ -44,10 +43,10 @@ final class LogManager {
   private static final Logger LOG = Logger.getLogger(LogManager.class.getName());
 
   private final Log log;
-  private final ActionRegistry shutdownRegistry;
+  private final ShutdownRegistry shutdownRegistry;
 
   @Inject
-  LogManager(Log log, @ShutdownStage ActionRegistry shutdownRegistry) {
+  LogManager(Log log, ShutdownRegistry shutdownRegistry) {
     this.log = Preconditions.checkNotNull(log);
     this.shutdownRegistry = Preconditions.checkNotNull(shutdownRegistry);
   }

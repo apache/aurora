@@ -10,8 +10,8 @@ import com.google.inject.Inject;
 import com.google.inject.Module;
 
 import com.twitter.common.application.AbstractApplication;
-import com.twitter.common.application.ActionRegistry;
 import com.twitter.common.application.Lifecycle;
+import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.application.ShutdownStage;
 import com.twitter.common.application.modules.HttpModule;
 import com.twitter.common.application.modules.LogModule;
@@ -42,7 +42,7 @@ public class ExecutorMain extends AbstractApplication {
   @Inject private DriverRunner driverRunner;
   @Inject private ExecutorCore executorCore;
   @Inject private Supplier<Iterable<Task>> deadTaskLoader;
-  @Inject @ShutdownStage private ActionRegistry shutdownRegistry;
+  @Inject @ShutdownStage private ShutdownRegistry shutdownRegistry;
   @Inject private Lifecycle lifecycle;
 
   @Override

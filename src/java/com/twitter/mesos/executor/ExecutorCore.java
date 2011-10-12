@@ -26,7 +26,7 @@ import com.google.inject.name.Named;
 
 import org.apache.commons.io.FileSystemUtils;
 
-import com.twitter.common.application.ActionRegistry;
+import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Command;
 import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
@@ -117,7 +117,7 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
    *
    * @param shutdownRegistry to register orderly shutdown of the periodic task scheduler.
    */
-  void startPeriodicTasks(ActionRegistry shutdownRegistry) {
+  void startPeriodicTasks(ShutdownRegistry shutdownRegistry) {
     new ResourceManager(this, executorRootDir, shutdownRegistry).start();
     startStateSync();
     shutdownRegistry.addAction(new Command() {

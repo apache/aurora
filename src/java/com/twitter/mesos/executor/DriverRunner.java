@@ -7,8 +7,7 @@ import com.google.inject.Inject;
 
 import org.apache.mesos.MesosExecutorDriver;
 
-import com.twitter.common.application.ActionRegistry;
-import com.twitter.common.application.ShutdownStage;
+import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -23,12 +22,11 @@ class DriverRunner {
 
   private static final Logger LOG = Logger.getLogger(DriverRunner.class.getName());
 
-  private final ActionRegistry shutdownRegistry;
+  private final ShutdownRegistry shutdownRegistry;
   private final MesosExecutorImpl mesosExecutor;
 
   @Inject
-  DriverRunner(@ShutdownStage ActionRegistry shutdownRegistry,
-      MesosExecutorImpl mesosExecutor) {
+  DriverRunner(ShutdownRegistry shutdownRegistry, MesosExecutorImpl mesosExecutor) {
     this.shutdownRegistry = Preconditions.checkNotNull(shutdownRegistry);
     this.mesosExecutor = Preconditions.checkNotNull(mesosExecutor);
   }

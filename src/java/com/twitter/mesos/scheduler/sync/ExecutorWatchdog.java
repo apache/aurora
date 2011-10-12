@@ -15,8 +15,7 @@ import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 
-import com.twitter.common.application.ActionRegistry;
-import com.twitter.common.application.ShutdownStage;
+import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
@@ -88,11 +87,11 @@ public interface ExecutorWatchdog {
         new LinkedHashMap<ExecutorKey, StateUpdateRequest>(MAP_INITIAL_SIZE, MAP_LOAD_FACTOR,
             true /* access order */);
     private final Supplier<Set<ExecutorKey>> knownExecutorSupplier;
-    private final ActionRegistry shutdownRegistry;
+    private final ShutdownRegistry shutdownRegistry;
 
     @Inject
     ExecutorWatchdogImpl(Supplier<Set<ExecutorKey>> knownExecutorSupplier,
-        @ShutdownStage ActionRegistry shutdownRegistry) {
+        ShutdownRegistry shutdownRegistry) {
       this.shutdownRegistry = checkNotNull(shutdownRegistry);
       this.knownExecutorSupplier = checkNotNull(knownExecutorSupplier);
     }

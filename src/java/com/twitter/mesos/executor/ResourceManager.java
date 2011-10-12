@@ -10,7 +10,7 @@ import java.util.logging.Logger;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
-import com.twitter.common.application.ActionRegistry;
+import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
@@ -32,13 +32,13 @@ public class ResourceManager {
 
   private final File managedDir;
   private final TaskManager taskManager;
-  private final ActionRegistry shutdownRegistry;
+  private final ShutdownRegistry shutdownRegistry;
   // TODO(William Farner): Enable this if we decide to use this instead of pushing it into the mesos
   //    core.
   //private final ResourceScanner resourceScanner;
 
   public ResourceManager(TaskManager taskManager, File managedDir,
-      ActionRegistry shutdownRegistry) {
+      ShutdownRegistry shutdownRegistry) {
     this.managedDir = Preconditions.checkNotNull(managedDir);
     Preconditions.checkArgument(managedDir.exists(),
         "Managed directory does not exist: " + managedDir);

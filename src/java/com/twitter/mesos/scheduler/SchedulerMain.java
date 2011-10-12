@@ -32,9 +32,8 @@ import org.apache.mesos.SchedulerDriver;
 import org.apache.thrift.transport.TTransportException;
 
 import com.twitter.common.application.AbstractApplication;
-import com.twitter.common.application.ActionRegistry;
 import com.twitter.common.application.Lifecycle;
-import com.twitter.common.application.ShutdownStage;
+import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.application.modules.HttpModule;
 import com.twitter.common.application.modules.LogModule;
 import com.twitter.common.application.modules.StatsExportModule;
@@ -101,7 +100,7 @@ public class SchedulerMain extends AbstractApplication {
   @Inject private SchedulerCore scheduler;
   @Inject private TaskReaper taskReaper;
   @Inject private Lifecycle lifecycle;
-  @Inject @ShutdownStage ActionRegistry shutdownRegistry;
+  @Inject ShutdownRegistry shutdownRegistry;
 
   private final LeadershipListener leadershipListener = new LeadershipListener() {
     @Override public void onLeading(EndpointStatus status) {
@@ -205,7 +204,7 @@ public class SchedulerMain extends AbstractApplication {
       @Override public void execute(String taskId) throws RuntimeException {
         Protos.Status status = driver.killTask(TaskID.newBuilder().setValue(taskId).build());
         if (status != Protos.Status.OK) {
-          LOG.severe(String.format("Attempt to kill task %s failed with code %d",
+          LOG.severe(String.format("Attempt to kill task %s failed with code %s",
               taskId, status));
         }
       }

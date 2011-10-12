@@ -9,8 +9,7 @@ import com.google.inject.PrivateBinder;
 import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 
-import com.twitter.common.application.ActionRegistry;
-import com.twitter.common.application.ShutdownStage;
+import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.base.Closure;
@@ -111,7 +110,7 @@ public class LogStorageModule extends AbstractModule {
   @Override
   protected void configure() {
     requireBinding(Clock.class);
-    requireBinding(Key.get(ActionRegistry.class, ShutdownStage.class));
+    requireBinding(ShutdownRegistry.class);
 
     bindInterval(ShutdownGracePeriod.class, shutdownGracePeriod);
     bindInterval(CheckpointInterval.class, checkpointInterval);

@@ -275,23 +275,4 @@ public class SchedulerModule extends AbstractModule {
       }
     };
   }
-
-  // TODO(wfarner): Bind this in a more appropriate way.
-  /*
-  @Provides
-  @Singleton
-  TaskReaper provideTaskReaper(@StartupStage ActionRegistry startupRegistry,
-      final @ShutdownStage ActionRegistry shutdownRegistry,
-      StateManager stateManager,
-      Supplier<Set<ExecutorKey>> knownExecutorSupplier) {
-    final TaskReaper reaper = new TaskReaper(stateManager, knownExecutorSupplier);
-    startupRegistry.addAction(new Command() {
-      @Override public void execute() {
-        shutdownRegistry.addAction(
-            reaper.start(TASK_REAPER_START_DELAY.get(), TASK_REAPER_INTERVAL.get()));
-      }
-    });
-    return reaper;
-  }
-  */
 }

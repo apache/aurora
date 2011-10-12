@@ -25,8 +25,7 @@ import com.google.inject.Inject;
 
 import org.apache.commons.codec.binary.Hex;
 
-import com.twitter.common.application.ActionRegistry;
-import com.twitter.common.application.ShutdownStage;
+import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Closure;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
@@ -127,7 +126,7 @@ public class LogStorage extends ForwardingStore {
   private static class ScheduledExecutorSchedulingService implements SchedulingService {
     private final ScheduledExecutorService scheduledExecutor;
 
-    ScheduledExecutorSchedulingService(ActionRegistry shutdownRegistry,
+    ScheduledExecutorSchedulingService(ShutdownRegistry shutdownRegistry,
         Amount<Long, Time> shutdownGracePeriod) {
       scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
       shutdownRegistry.addAction(
@@ -193,7 +192,7 @@ public class LogStorage extends ForwardingStore {
   @Inject
   LogStorage(LogManager logManager,
       Clock clock,
-      @ShutdownStage ActionRegistry shutdownRegistry,
+      ShutdownRegistry shutdownRegistry,
       @ShutdownGracePeriod Amount<Long, Time> shutdownGracePeriod,
       CheckpointStore checkpointStore,
       @CheckpointInterval Amount<Long, Time> checkpointInterval,

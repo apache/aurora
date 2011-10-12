@@ -15,7 +15,6 @@ import com.google.common.io.Files;
 import com.google.common.io.Resources;
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
-import com.google.inject.Key;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import com.mchange.v2.c3p0.ComboPooledDataSource;
@@ -26,7 +25,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import com.twitter.common.application.ActionRegistry;
+import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.application.ShutdownStage;
 import com.twitter.common.application.http.HttpServletConfig;
 import com.twitter.common.application.http.Registration;
@@ -136,7 +135,7 @@ public final class DbUtil {
      *     database.
      * @throws IOException If there is a problem starting the in-process database.
      */
-    public DbAccess build(ActionRegistry shutdownRegistry) throws IOException {
+    public DbAccess build(ShutdownRegistry shutdownRegistry) throws IOException {
       Preconditions.checkNotNull(shutdownRegistry);
 
       final ComboPooledDataSource dataSource = new ComboPooledDataSource();
@@ -185,7 +184,7 @@ public final class DbUtil {
     /**
      * Binds a {@link TransactionTemplate} and a {@link JdbcTemplate} for the database specified by
      * this builder in {@link Singleton} scope.  Requires a {@link ShutdownStage}
-     * {@link ActionRegistry} be bound.
+     * {@link ShutdownRegistry} be bound.
      *
      * @param binder The binder to bind the database templates against.
      */
@@ -193,11 +192,11 @@ public final class DbUtil {
       Preconditions.checkNotNull(binder);
       binder.install(new AbstractModule() {
         @Override protected void configure() {
-          requireBinding(Key.get(ActionRegistry.class, ShutdownStage.class));
+          requireBinding(ShutdownRegistry.class);
         }
 
         @Provides @Singleton
-        DbAccess provideDataSource(@ShutdownStage ActionRegistry actionRegistry)
+        DbAccess provideDataSource(ShutdownRegistry actionRegistry)
             throws IOException {
           return Builder.this.build(actionRegistry);
         }

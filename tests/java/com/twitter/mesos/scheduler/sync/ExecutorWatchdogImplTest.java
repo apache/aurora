@@ -1,19 +1,21 @@
 package com.twitter.mesos.scheduler.sync;
 
+import java.util.Set;
+
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableSet;
-import com.twitter.common.application.ActionRegistry;
-import com.twitter.common.testing.EasyMockTest;
-import com.twitter.mesos.ExecutorKey;
-import com.twitter.mesos.gen.comm.StateUpdateRequest;
-import com.twitter.mesos.scheduler.sync.ExecutorWatchdog.ExecutorWatchdogImpl;
-import com.twitter.mesos.scheduler.sync.ExecutorWatchdog.UpdateRequest;
+
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.SlaveID;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.util.Set;
+import com.twitter.common.application.ShutdownRegistry;
+import com.twitter.common.testing.EasyMockTest;
+import com.twitter.mesos.ExecutorKey;
+import com.twitter.mesos.gen.comm.StateUpdateRequest;
+import com.twitter.mesos.scheduler.sync.ExecutorWatchdog.ExecutorWatchdogImpl;
+import com.twitter.mesos.scheduler.sync.ExecutorWatchdog.UpdateRequest;
 
 import static com.twitter.mesos.scheduler.sync.ExecutorWatchdog.ExecutorWatchdogImpl.NO_POSITION;
 import static org.junit.Assert.assertEquals;
@@ -36,7 +38,7 @@ public class ExecutorWatchdogImplTest extends EasyMockTest {
   public void setUp() {
     knownExecutorSupplier = createMock(new Clazz<Supplier<Set<ExecutorKey>>>() {});
     watchdog =
-        new ExecutorWatchdogImpl(knownExecutorSupplier, control.createMock(ActionRegistry.class));
+        new ExecutorWatchdogImpl(knownExecutorSupplier, control.createMock(ShutdownRegistry.class));
 
     // This is non-standard, but since we don't actually call the mock, it prevents us from
     // needing to repeat this line in every test.
