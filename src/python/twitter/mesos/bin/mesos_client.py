@@ -282,8 +282,6 @@ class MesosCLI(cmd.Cmd):
                                           taskInfo.numCpus,
                                           taskInfo.ramMb,
                                           taskInfo.diskMb)
-      if task.resources is not None:
-        taskString += '\n\tports: %s' % task.resources.leasedPorts
       taskString += '\n\tfailure count: %s (max %s)' % (task.failureCount,
                                                         taskInfo.maxTaskFailures)
       return taskString
