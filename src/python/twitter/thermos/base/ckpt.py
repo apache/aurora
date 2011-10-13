@@ -209,8 +209,6 @@ class TaskCkptDispatcher(object):
       # produce a transition
       return task_state.seq < process_update.seq
 
-  # TODO(wickman)  Document exceptions; change wts/wth to more suitable variable names.
-  # raises exception if something goes wrong
   def update_runner_state(self, state, runner_ckpt, recovery = False):
     """
       state          = TaskRunnerState to apply process update
@@ -219,8 +217,6 @@ class TaskCkptDispatcher(object):
 
       returns True if process_update was applied to state.
     """
-    wts, wth = None, None
-
     self._check_runner_ckpt_sanity(runner_ckpt)
 
     # case 1: runner_header
@@ -230,6 +226,7 @@ class TaskCkptDispatcher(object):
         raise TaskCkptDispatcher.ErrorRecoveringState(
           "Multiple headers encountered in TaskRunnerState!")
       else:
+        log.debug('Initializing TaskRunner header to %s' % runner_ckpt.runner_header)
         state.header = runner_ckpt.runner_header
         return True
 
@@ -246,6 +243,7 @@ class TaskCkptDispatcher(object):
         else:
           return False
       else:
+        log.debug('Assigning named port %s to %s' % (port_name, port))
         state.ports[port_name] = port
         self._run_port_dispatch(port_name, port)
         return True
@@ -254,7 +252,11 @@ class TaskCkptDispatcher(object):
     #   -> State transition on the task (ACTIVE, FAILED, FINISHED)
     if runner_ckpt.state_update is not None:
       if state.state != runner_ckpt.state_update.state:
+        old_state = state.state
         state.state = runner_ckpt.state_update.state
+        log.debug('Flipping task state from %s to %s' % (
+          TaskState._VALUES_TO_NAMES[old_state] if old_state is not None else '(undefined)',
+          TaskState._VALUES_TO_NAMES[state.state]))
         return True
       return False
 
@@ -264,7 +266,12 @@ class TaskCkptDispatcher(object):
       process_name = runner_ckpt.history_state_update.process
       state_change = runner_ckpt.history_state_update.state
       if state.processes[process_name].state != state_change:
+        old_state = state.processes[process_name].state
         state.processes[process_name].state = state_change
+        log.debug('Flipping process %s history state from %s to %s' % (
+          process_name,
+          TaskRunState._VALUES_TO_NAMES[old_state] if old_state is not None else '(undefined)',
+          TaskRunState._VALUES_TO_NAMES[state_change]))
         return True
       return False
 
@@ -276,37 +283,41 @@ class TaskCkptDispatcher(object):
       log.error(TaskCkptDispatcher.ErrorRecoveringState("Empty TaskRunnerCkpt encountered!"))
       return False
 
-    # TODO(wickman) Change wts/wth to names meaningful since the naming refactor.
     process = process_update.process
     if process not in state.processes:
       # Never seen this process before, create a ProcessHistory for it and initialize run 0.
-      wts = ProcessState(seq = 0, process = process, run_state = ProcessRunState.WAITING)
-      wth = ProcessHistory(process = process, runs = [], state = TaskState.ACTIVE)
-      wth.runs.append(wts)
-      state.processes[process] = wth
-
+      log.debug('Never encountered process (%s), initializing ProcessState' % process)
+      process_state = ProcessState(seq = 0, process = process, run_state = ProcessRunState.WAITING)
+      process_update = process_state
+      process_history = ProcessHistory(process = process, runs = [], state = TaskState.ACTIVE)
+      process_history.runs.append(process_state)
+      state.processes[process] = process_history
     else:
       # We have seen this process, so the state update must pertain to the current run.
-      wth = state.processes[process]
-      wts = wth.runs[-1]
+      process_history = state.processes[process]
+      process_state = process_history.runs[-1]
 
       # Cannot have two consecutive terminal states
       #
       # You can go nonterminal=>nonterminal (normal), nonterminal=>terminal (success), and
       # terminal=>nonterminal (lost/failure) but not terminal=>terminal, so sanity check that.
-      if TaskCkptDispatcher.is_terminal(wth.runs[-1]):
+      if TaskCkptDispatcher.is_terminal(process_state):
         if TaskCkptDispatcher.is_terminal(process_update):
           raise TaskCkptDispatcher.ErrorRecoveringState(
-            "Received two consecutive terminal process states: wts=%s update=%s" % (
-            wts, process_update))
+            "Received two consecutive terminal process states for %s!" % process)
         else:
           # We transitioned from terminal => nonterminal, so finish up the current run and
-          # initialize a new "latest run" for the process.
-          wts = ProcessState(seq = wts.seq, process = process, run_state = ProcessRunState.WAITING)
-          wth.runs.append(wts)
+          # forge a new run.
+          log.debug('Transitioning %s from terminal to nonterminal' % process)
+          process_state = ProcessState(
+            seq = process_state.seq, process = process, run_state = ProcessRunState.WAITING)
+          process_update = copy.deepcopy(process_state)
+          process_update.seq += 1
+          process_history.runs.append(process_state)
 
     # Run the process state machine.
-    return self.update_task_state(wts, process_update, recovery)
+    log.debug('Running state machine for process=%s/seq=%s' % (process_update.process, process_update.seq))
+    return self.update_task_state(process_state, process_update, recovery)
 
 class AlaCarteRunnerState(object):
   """
@@ -320,8 +331,8 @@ class AlaCarteRunnerState(object):
     try:
       with open(path, "r") as fp:
         rr = ThriftRecordReader(fp, TaskRunnerCkpt)
-        for wrc in rr:
-          builder.update_runner_state(self._state, wrc)
+        for process_update in rr:
+          builder.update_runner_state(self._state, process_update)
     except Exception as e:
       log.error('Error recovering AlaCarteRunnerState(%s): %s' % (path, e))
       self._state = None

@@ -46,6 +46,13 @@ class Process(object):
   def _log(self, msg):
     log.debug('[process:%5s=%s]: %s' % (self._pid, self._process.name, msg))
 
+  def __str__(self):
+    return 'Process(%s, seq:%s, pid:%s, logdir:%s)' % (
+      self._process.name,
+      self._seq,
+      self._pid,
+      self._pathspec.with_filename('stdout').getpath('process_logdir'))
+
   def _write_process_update(self, runner_ckpt):
     # indicate that we are running
     self._seq += 1

@@ -26,6 +26,11 @@ from thrift.TSerialization import deserialize as thrift_deserialize
 __author__ = 'wickman@twitter.com (brian wickman)'
 __tested__ = False
 
+# This is a no-op annotation, just for the sake of readability in the code for
+# annotating state transitions that themselves cause checkpoint log writes.
+def state_mutating(f):
+  return f
+
 class TaskRunnerHelper(object):
   @staticmethod
   def scheduler_from_task(task):
@@ -47,8 +52,22 @@ class TaskRunnerHelper(object):
     """
     return thrift_deserialize(ThermosTask(), thrift_serialize(thermos_task))
 
+  @staticmethod
+  def dump_state(state, filename):
+    with open(filename, 'w') as fp:
+      fp.write(thrift_serialize(state))
+
+  @staticmethod
+  def read_state(filename):
+    with open(filename, 'r') as fp:
+      return thrift_deserialize(TaskRunnerState(), fp.read())
+
 
 class TaskRunner(object):
+  """
+    Run a ThermosTask.
+  """
+
   class InternalError(Exception): pass
 
   def __init__(self, task, sandbox, root_dir, task_id):
@@ -94,6 +113,9 @@ class TaskRunner(object):
     self._update_runner_ckpt_to_high_watermarks()
     self._initialize_processes()
 
+  def state(self):
+    return self._state
+
   def _setup_checkpointed_state(self, ckpt_file):
     """ give it: ckpt filename, state object
         returns: ckpt recordwriter, mutates state accordingly
@@ -111,6 +133,7 @@ class TaskRunner(object):
     ckpt.set_sync(True)
     self._ckpt = ckpt
 
+  @state_mutating
   def _initialize_processes(self):
     if self._state.header is None:
       update = TaskRunnerHeader(
@@ -120,21 +143,18 @@ class TaskRunner(object):
         hostname      = socket.gethostname())
       runner_ckpt = TaskRunnerCkpt(runner_header = update)
       self._dispatcher.update_runner_state(self._state, runner_ckpt)
-      self._ckpt.write(runner_ckpt)  # change this if we add dispatches for non-process updates
+      # change this if we add dispatches for non-process updates
+      self._ckpt.write(runner_ckpt)
       self._set_task_state(TaskState.ACTIVE)
 
-    for process in self._task.processes:
-      if process.name not in self._state.processes:
-         update = ProcessState(process = process.name, seq = 0, run_state = ProcessRunState.WAITING)
-         runner_ckpt = TaskRunnerCkpt(process_state = update)
-         self._dispatcher.update_runner_state(self._state, runner_ckpt, recovery = self._recovery)
-
+  @state_mutating
   def _set_task_state(self, state):
     update = TaskStateUpdate(state = state)
     runner_ckpt = TaskRunnerCkpt(state_update = update)
     if self._dispatcher.update_runner_state(self._state, runner_ckpt, recovery = self._recovery):
       self._ckpt.write(runner_ckpt)
 
+  @state_mutating
   def _set_process_history_state(self, process, state):
     update = TaskRunStateUpdate(process = process, state = state)
     runner_ckpt = TaskRunnerCkpt(history_state_update = update)
@@ -142,13 +162,19 @@ class TaskRunner(object):
       self._ckpt.write(runner_ckpt)
 
   # process transitions for the state machine
+  @state_mutating
   def _on_everything(self, process_update):
     if not self._recovery:
       self._ckpt.write(TaskRunnerCkpt(process_state = process_update))
 
+  @state_mutating
+  # TODO(wickman)  Port bindings are going to be dictated from on high, so the state mutation
+  # will eventually disappear from here.  Consider pre-binding the ports prior to state machine
+  # execution.
   def _on_waiting(self, process_update):
     log.debug('_on_waiting %s' % process_update)
-    self._task_processes[process_update.process] = self._task_process_from_process_name(process_update.process)
+    self._task_processes[process_update.process] = self._task_process_from_process_name(
+      process_update.process)
     self._watcher.register(self._task_processes[process_update.process])
     self._planner.forget(process_update.process)
 
@@ -163,6 +189,7 @@ class TaskRunner(object):
     log.debug('_on_running %s' % process_update)
     self._planner.set_running(process_update.process)
 
+  @state_mutating
   def _on_finished(self, process_update):
     log.debug('_on_finished %s' % process_update)
     self._task_processes.pop(process_update.process)
@@ -170,10 +197,23 @@ class TaskRunner(object):
     self._planner.set_finished(process_update.process)
     self._set_process_history_state(process_update.process, TaskRunState.SUCCESS)
 
+  @state_mutating
   def _on_abnormal(self, process_update):
+    log.debug('_on_abnormal %s' % process_update)
     self._task_processes.pop(process_update.process)
     self._watcher.unregister(process_update.process)
-    self._on_waiting(process_update)
+    process_name = process_update.process
+    log.info('Process %s had an abnormal termination' % process_name)
+    if self._is_process_failed(process_name):
+      log.info('Process %s reached maximum failures, marking task failed.' % process_name)
+      self._planner.set_finished(process_name)
+      self._set_process_history_state(process_name, TaskRunState.FAILED)
+    else:
+      log.info('Process %s under maximum failure limit, restarting.' % process_name)
+      self._planner.forget(process_update.process)
+      self._dispatcher.update_runner_state(self._state,
+        TaskRunnerCkpt(process_state = ProcessState(
+          process = process_name, run_state = ProcessRunState.WAITING)))
 
   def _on_failed(self, process_update):
     log.debug('_on_failed %s' % process_update)
@@ -204,7 +244,6 @@ class TaskRunner(object):
         unapplied_process_updates.append(process_update)
       else:
         self._dispatcher.update_runner_state(self._state, process_update, recovery = True)
-
     self._recovery = False
     for process_update in unapplied_process_updates:
       assert self._dispatcher.update_runner_state(self._state, process_update)
@@ -232,7 +271,7 @@ class TaskRunner(object):
     finished_task = self._pathspec.getpath('finished_task_path')
     if not os.path.exists(finished_task):
       return None
-    with open(finished_job_path, "r") as fp:
+    with open(finished_task, "r") as fp:
       rr = ThriftRecordReader(fp, ThermosTask)
       task = rr.read()
     if task is None:
@@ -255,11 +294,13 @@ class TaskRunner(object):
         log.error('Corrupt task detected! %s, overwriting...' % active_task)
         self._write_task()
       else:
-        if TaskRunnerHelper.thriftify_task(self._task) != task:
+        if TaskRunnerHelper.thriftify_task(self._task) != TaskRunnerHelper.thriftify_task(task):
           raise TaskRunner.InternalError(
             "Attempting to launch different tasks with same task id: new: %s, active: %s" % (
-            self._task, task))
+            TaskRunnerHelper.thriftify_task(self._task),
+            TaskRunnerHelper.thriftify_task(task)))
 
+  @state_mutating
   def _save_allocated_ports(self, ports):
     for name in ports:
       wap = TaskAllocatedPort(port_name = name, port = ports[name])
@@ -267,26 +308,41 @@ class TaskRunner(object):
       if self._dispatcher.update_runner_state(self._state, runner_ckpt, self._recovery):
         self._ckpt.write(runner_ckpt)
 
+  @staticmethod
+  def _current_process_run_number(task_state, process_name):
+    return 0 if process_name not in task_state.processes else (
+      len(task_state.processes[process_name].runs) - 1)
+
+  @state_mutating
   def _task_process_from_process_name(self, process_name):
     pathspec = self._pathspec.given(
-      process = process_name, run = Helper.process_run_number(self._state, process_name))
+      process = process_name,
+      run = self._current_process_run_number(self._state, process_name))
     process = Helper.process_from_task(self._task, process_name)
     (new_cmdline, allocated_ports) = self._port_allocator.synthesize(process.cmdline)
-    log.info('allocated ports: %s' % allocated_ports)
+    log.debug('allocated ports: %s' % allocated_ports)
+    # This is what causes the state mutation.  Please, please move it out of this loop.
     self._save_allocated_ports(allocated_ports)
+    # We need to deepcopy the process because this technically mutates the self._task
+    # and then causes assert_active_task to fail on pre- vs. post-interpolated cmdlines.
+    process = copy.deepcopy(process)
     process.cmdline = new_cmdline
     return Process(
-      pathspec, process,
+      pathspec,
+      process,
       Helper.process_sequence_number(self._state, process_name),
       self._sandbox.path())
 
-  def _is_process_failed(self, process_name):
-    process = Helper.process_from_name(self._task, process_name)
+  def _count_process_failures(self, process_name):
     process_failures = filter(
       lambda run: run.run_state == ProcessRunState.FAILED,
-      self._state.processes[process.name].runs)
-    return process.max_failures != 0 and (
-      len(process_failures) >= process.max_failures)
+      self._state.processes[process_name].runs)
+    return len(process_failures)
+
+  def _is_process_failed(self, process_name):
+    process = Helper.process_from_name(self._task, process_name)
+    process_failures = self._count_process_failures(process_name)
+    return process.max_failures != 0 and process_failures >= process.max_failures
 
   def _is_task_failed(self):
     failures = filter(
@@ -314,11 +370,13 @@ class TaskRunner(object):
       time_now = time.time()
 
       if self._is_task_failed():
+        log.info('Setting task state to FAILED')
         self._set_task_state(TaskState.FAILED)
         self.kill()
         return
 
       if self._planner.is_complete():
+        log.info('Setting task state to SUCCESS')
         self._set_task_state(TaskState.SUCCESS)
         break
 
@@ -331,21 +389,21 @@ class TaskRunner(object):
       log.info('finished: %s' % ' '.join(list(self._planner.finished)))
       log.info('running:  %s' % ' '.join(list(self._planner.running)))
 
-      scheduled = False
+      launched = []
       for process_name in runnable:
-        if self._is_process_failed(process_name):
-          log.warning('Process failed: %s' % process_name)
-          self._set_process_history_state(process_name, TaskRunState.FAILED)
-          self._planner.set_finished(process_name)
-          continue
+        if process_name not in self._task_processes:
+          # This task has never been seen before.  Initialize and set into WAITING state.
+          self._dispatcher.update_runner_state(self._state,
+            TaskRunnerCkpt(process_state = ProcessState(
+              process = process_name, run_state = ProcessRunState.WAITING)))
 
         log.info('Forking Process(%s)' % process_name)
-        wt = self._task_processes[process_name]
-        wt.fork()
-        scheduled = True
+        tp = self._task_processes[process_name]
+        tp.fork()
+        launched.append(tp)
 
       # gather and apply state transitions
-      if self._planner.get_running() or scheduled:
+      if self._planner.get_running() or len(launched) > 0:
         self._get_updates_from_processes()
 
     self.cleanup()

@@ -1,21 +1,14 @@
 import os
-import sys
-import tempfile
-import subprocess
+from runner_base import RunnerTestBase
 
-from twitter.tcl.loader import ThermosJobLoader
-from twitter.thermos.runner import TaskRunner
-from twitter.thermos.base import TaskPath
-from twitter.thermos.base import AlaCarteRunnerState
+from gen.twitter.thermos.ttypes import (
+  TaskState,
+  TaskRunState,
+  ProcessRunState
+)
 
-from gen.twitter.thermos.ttypes import TaskState
-from gen.twitter.thermos.ttypes import TaskRunState
-from gen.twitter.thermos.ttypes import TaskRunnerCkpt
-from gen.twitter.thermos.ttypes import TaskRunnerState
-from gen.twitter.thermos.ttypes import ProcessRunState
-
-class TestRunnerBasic(object):
-  TEST_JOB_SPEC = """
+class TestRunnerBasic(RunnerTestBase):
+  JOB_SPEC = """
 import getpass
 hello_template = Process(cmdline = "echo {{task.replica_id}}")
 
@@ -41,49 +34,19 @@ hello_job = Job(
 
 hello_job.export()
 """
-
-  # unittest/pytest, Y U NO WORK WITH os.fork?!?!?!
-  RUN_JOB_SCRIPT = """
-from twitter.tcl.loader import ThermosJobLoader
-from twitter.thermos.runner import TaskRunner
-
-job = ThermosJobLoader('%(filename)s').to_thrift()
-task = job.tasks[0]
-sandbox = '%(sandbox)s'
-root = '%(root)s'
-task_id = '1337'
-
-TaskRunner(task, sandbox, root, task_id).run()
-"""
-
   @classmethod
-  def setup_class(cls):
-    with open(tempfile.mktemp(), "w") as fp:
-      job_filename = fp.name
-      print >> fp, TestRunnerBasic.TEST_JOB_SPEC
-    cls.tempdir = tempfile.mkdtemp()
-    sandbox = os.path.join(cls.tempdir, 'sandbox')
-    with open(tempfile.mktemp(), "w") as fp:
-      script_filename = fp.name
-      print >> fp, TestRunnerBasic.RUN_JOB_SCRIPT % {
-        'filename': job_filename,
-        'sandbox': sandbox,
-        'root': cls.tempdir
-      }
-    cls.pathspec = TaskPath(root = cls.tempdir, task_id = '1337')
-    assert subprocess.call([sys.executable, script_filename]) == 0
-    cls.state = AlaCarteRunnerState(cls.pathspec.getpath('runner_checkpoint')).state()
+  def job_specification(cls):
+    return TestRunnerBasic.JOB_SPEC
 
-  @classmethod
-  def teardown_class(cls):
-    print >> sys.stderr, 'Do cleanup here: %s' % cls.tempdir
+  def test_runner_state_reconstruction(self):
+    assert self.state == self.reconstructed_state
 
   def test_runner_state_success(self):
     assert self.state.state == TaskState.SUCCESS
 
   def test_runner_header_populated(self):
     header = self.state.header
-    assert header.task_id == '1337', 'header task id must be set!'
+    assert header.task_id == self.task_id, 'header task id must be set!'
     assert header.sandbox == os.path.join(self.tempdir, 'sandbox', header.task_id), \
       'header sandbox must be set!'
     assert header.hostname, 'header task replica id must be set!'
@@ -99,8 +62,6 @@ TaskRunner(task, sandbox, root, task_id).run()
     process_names = set(['t%d'%k for k in range(1,7)])
     actual_process_names = set(processes.keys())
     assert process_names == actual_process_names, "runner didn't run expected set of processes!"
-
-    # egh
     for process in processes:
       assert processes[process].process == process
 
@@ -108,14 +69,13 @@ TaskRunner(task, sandbox, root, task_id).run()
     processes = self.state.processes
     for process in processes:
       history = processes[process]
-      assert history.state == TaskRunState.SUCCESS, "runner didn't succeed!"
+      assert history.state == TaskRunState.SUCCESS, (
+        "runner didn't succeed!  instead state = %s" % (history.state))
       if len(history.runs) > 1:
         for run in range(len(history.runs)-1):
-          # WorkflowTaskRunState=>ProcessRunState
           assert history.runs[run].run_state != ProcessRunState.FINISHED, \
             "nonterminal processes must not be in FINISHED state!"
       last_run = history.runs[-1]
-      # WorkflowTaskRunState=>ProcessRunState
       assert last_run.run_state == ProcessRunState.FINISHED, \
         "terminal processes must be in FINISHED state!"
       assert last_run.process == process, "process (%s) had unexpected checkpointed name: %s!" % (

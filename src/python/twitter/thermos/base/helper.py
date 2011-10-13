@@ -49,10 +49,3 @@ class Helper(object):
     else:
       wts = task_state.processes[process_name].runs[-1]
       return wts.seq
-
-  @staticmethod
-  def process_run_number(task_state, process_name):
-    if process_name not in task_state.processes:
-      return 0
-    else:
-      return len(task_state.processes[process_name].runs) - 1
