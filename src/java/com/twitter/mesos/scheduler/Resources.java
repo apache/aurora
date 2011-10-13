@@ -3,7 +3,6 @@ package com.twitter.mesos.scheduler;
 import java.util.Set;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -192,7 +191,24 @@ public class Resources {
     return Resource.newBuilder().setName(name).setType(Type.RANGES).setRanges(builder).build();
   }
 
-  static Set<Integer> getPorts(Offer offer, int numPorts) {
+  /**
+   * Thrown when there are insufficient resources to satisfy a request.
+   */
+  static class InsufficientResourcesException extends RuntimeException {
+    public InsufficientResourcesException(String message) {
+      super(message);
+    }
+  }
+
+  /**
+   * Attempts to grab {@code numPorts} from the given resource {@code offer}.
+   *
+   * @param offer The offer to grab ports from.
+   * @param numPorts The number of ports to grab.
+   * @return The set of ports grabbed.
+   * @throws InsufficientResourcesException if not enough ports were available.
+   */
+  static Set<Integer> getPorts(Offer offer, int numPorts) throws InsufficientResourcesException {
     checkNotNull(offer);
 
     if (numPorts == 0) {
@@ -202,7 +218,7 @@ public class Resources {
     Set<Integer> ports = Sets.newHashSet();
     for (Range range : getPortRanges(offer)) {
       for (long port = range.getBegin(); port <= (range.getEnd())
-          && (ports.size() <= numPorts); port++) {
+          && (ports.size() < numPorts); port++) {
         ports.add((int) port);
       }
 
@@ -211,9 +227,10 @@ public class Resources {
       }
     }
 
-    // TODO(wickman)  Is an IllegalStateException the right thing to do here?
-    Preconditions.checkState(ports.size() == numPorts,
-        "Could not get %s ports from %s", numPorts, offer);
+    if (ports.size() != numPorts) {
+      throw new InsufficientResourcesException(
+          String.format("Could not get %d ports from %s", numPorts, offer));
+    }
     return ImmutableSet.copyOf(ports);
   }
 }

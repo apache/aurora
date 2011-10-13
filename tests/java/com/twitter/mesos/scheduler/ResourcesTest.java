@@ -1,15 +1,20 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Set;
+
 import com.google.common.base.Function;
+import com.google.common.collect.DiscreteDomains;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.twitter.common.collections.Pair;
+import com.google.common.collect.Ranges;
+
+import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.Resource.Range;
 import org.apache.mesos.Protos.Resource.Type;
 import org.junit.Test;
 
-import java.util.Set;
+import com.twitter.common.collections.Pair;
 
 import static org.junit.Assert.assertEquals;
 
@@ -19,6 +24,40 @@ import static org.junit.Assert.assertEquals;
 public class ResourcesTest {
 
   private static final String NAME = "resource_name";
+
+  @Test
+  public void testPortRange_exact() {
+    Resource portsResource = createPortRange(1, 5);
+    Set<Integer> ports = Resources.getPorts(createOffer(portsResource), 5);
+    assertEquals(5, ports.size());
+  }
+
+  @Test
+  public void testPortRange_abundance() {
+    Resource portsResource = createPortRange(1, 10);
+    Set<Integer> ports = Resources.getPorts(createOffer(portsResource), 5);
+    assertEquals(5, ports.size());
+  }
+
+  @Test(expected = Resources.InsufficientResourcesException.class)
+  public void testPortRange_scarcity() {
+    Resource portsResource = createPortRange(1, 2);
+    Resources.getPorts(createOffer(portsResource), 5);
+  }
+
+  private Resource createPortRange(int lower, int upper) {
+    return Resources.makeMesosRangeResource(Resources.PORTS,
+        Ranges.closed(lower, upper).asSet(DiscreteDomains.integers()));
+  }
+
+  private Protos.Offer createOffer(Resource resources) {
+    return Protos.Offer.newBuilder()
+        .setId(Protos.OfferID.newBuilder().setValue("offer-id"))
+        .setFrameworkId(Protos.FrameworkID.newBuilder().setValue("framework-id"))
+        .setSlaveId(Protos.SlaveID.newBuilder().setValue("slave-id"))
+        .setHostname("hostname")
+        .addResources(resources).build();
+  }
 
   @Test
   public void testRangeResourceEmpty() {
