@@ -68,6 +68,12 @@ public class DiskGarbageCollector implements Runnable {
     this(name, scanDirectory, fileFilter, Amount.of(0L, Data.BYTES), gcCallback);
   }
 
+  private static FileFilter ACCEPT_ALL = new FileFilter() {
+    @Override public boolean accept(File pathname) {
+      return true;
+    }
+  };
+
   public static long recursiveLastModified(File file) {
     Preconditions.checkNotNull(file);
 
@@ -76,12 +82,25 @@ public class DiskGarbageCollector implements Runnable {
     }
 
     long highestLastModified = file.lastModified();
-    for (File f : file.listFiles()) {
+    for (File f : safeListFiles(file, ACCEPT_ALL)) {
       long lastModified = recursiveLastModified(f);
       if (lastModified > highestLastModified) highestLastModified = lastModified;
     }
 
     return highestLastModified;
+  }
+
+  public static final File[] NO_FILES = new File[0];
+
+  private static File[] safeListFiles(File file, FileFilter filter) {
+    if (file.exists() && file.isDirectory()) {
+      File[] children = file.listFiles(filter);
+      // Guard against a race - if the dir is deleted out from under us we can get null here.
+      if (children != null) {
+        return children;
+      }
+    }
+    return NO_FILES;
   }
 
   @Override
@@ -103,7 +122,7 @@ public class DiskGarbageCollector implements Runnable {
       if (bytesToReclaim > 0) {
         LOG.info("Triggering " + name + " GC, need to reclaim: "
                  + Amount.of(bytesToReclaim, Data.BYTES).as(Data.MB) + " MB.");
-        List<File> files = Arrays.asList(scanDirectory.listFiles(fileFilter));
+        List<File> files = Arrays.asList(safeListFiles(scanDirectory, fileFilter));
         Collections.sort(files, LAST_MODIFIED_COMPARATOR);
 
         LOG.info(name + " found " + files.size() + " GC candidates.");

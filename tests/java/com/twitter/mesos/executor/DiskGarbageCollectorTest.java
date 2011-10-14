@@ -1,22 +1,23 @@
 package com.twitter.mesos.executor;
 
-import com.google.common.base.Charsets;
-import com.google.common.collect.Sets;
-import com.google.common.io.Files;
-import com.twitter.common.base.Closure;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Data;
-import org.apache.commons.io.FileUtils;
-import org.easymock.IMocksControl;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Test;
-
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
 import java.util.Set;
+
+import com.google.common.base.Charsets;
+import com.google.common.collect.Sets;
+import com.google.common.io.Files;
+
+import org.apache.commons.io.FileUtils;
+import org.easymock.IMocksControl;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+
+import com.twitter.common.base.Closure;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Data;
 
 import static org.easymock.EasyMock.createControl;
 import static org.easymock.EasyMock.expect;
@@ -73,7 +74,6 @@ public class DiskGarbageCollectorTest {
   }
 
   @Test
-  @Ignore("// TODO(William Farner): Flakes when run on machines in the data center.")
   public void testSimpleGc() throws Exception {
     expect(fileFilter.accept(fileA)).andReturn(true);
     expect(fileFilter.accept(fileB)).andReturn(true);
@@ -134,7 +134,6 @@ public class DiskGarbageCollectorTest {
   }
 
   @Test
-  @Ignore("// TODO(William Farner): Flakes when run on machines in the data center.")
   public void testRecursiveGc() throws Exception {
     File fileA1 = new File(fileA, "1");
     File fileA2 = new File(fileA, "2");
