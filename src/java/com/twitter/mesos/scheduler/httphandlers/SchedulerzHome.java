@@ -2,18 +2,23 @@ package com.twitter.mesos.scheduler.httphandlers;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.Map;
 
+import javax.annotation.Nullable;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.google.common.base.Function;
+import com.google.common.base.Functions;
+import com.google.common.base.Suppliers;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
@@ -22,6 +27,7 @@ import org.antlr.stringtemplate.StringTemplate;
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.mesos.Tasks;
+import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.CronJobManager;
@@ -119,8 +125,11 @@ public class SchedulerzHome extends StringTemplateServlet {
         template.setAttribute("owners",
             DisplayUtils.sort(roles, DisplayUtils.SORT_USERS_BY_NAME));
 
-        template.setAttribute("cronJobs",
-            DisplayUtils.sort(cronScheduler.getJobs(), DisplayUtils.SORT_JOB_CONFIG_BY_NAME));
+        // Add cron job counts for each role.
+        for (Map.Entry<String, Collection<JobConfiguration>> entry
+            : Multimaps.index(cronScheduler.getJobs(), GET_CRON_OWNER).asMap().entrySet()) {
+          owners.getUnchecked(entry.getKey()).cronJobCount = entry.getValue().size();
+        }
       }
     });
   }
@@ -132,9 +141,17 @@ public class SchedulerzHome extends StringTemplateServlet {
         }
       };
 
+  private static final Function<JobConfiguration, String> GET_CRON_OWNER =
+      new Function<JobConfiguration, String>() {
+        @Override public String apply(JobConfiguration job) {
+          return job.getOwner().getRole();
+        }
+      };
+
   static class Role {
     String role;
     int jobCount;
+    int cronJobCount;
     private int pendingTaskCount = 0;
     private int activeTaskCount = 0;
     private int finishedTaskCount = 0;
@@ -146,6 +163,10 @@ public class SchedulerzHome extends StringTemplateServlet {
 
     public int getJobCount() {
       return jobCount;
+    }
+
+    public int getCronJobCount() {
+      return cronJobCount;
     }
 
     public int getPendingTaskCount() {

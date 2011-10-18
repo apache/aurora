@@ -57,6 +57,7 @@ public class SchedulerzJob extends StringTemplateServlet {
   private static final String JOB_PARAM = "job";
   // TODO(William Farner): Allow filtering by task status.
   private static final String STATUS_FILTER_PARAM = "status";
+  private static final String ADMIN_VIEW_PARAM = "admin";
 
   // Pagination controls.
   private static final String OFFSET_PARAM = "o";
@@ -132,6 +133,8 @@ public class SchedulerzJob extends StringTemplateServlet {
     writeTemplate(resp, new Closure<StringTemplate>() {
       @Override public void execute(StringTemplate template) {
         template.setAttribute("cluster_name", clusterName);
+
+        template.setAttribute(ADMIN_VIEW_PARAM, req.getParameter(ADMIN_VIEW_PARAM) != null);
 
         String user = req.getParameter(USER_PARAM);
         String role = req.getParameter(ROLE_PARAM);
