@@ -1,7 +1,6 @@
 python_test_suite(name = 'all',
   dependencies = [
     pants(':updater'),
-    pants('tests/python/twitter/mesos/angrybird:all')
   ]
 )
 
