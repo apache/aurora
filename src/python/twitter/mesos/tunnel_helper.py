@@ -3,8 +3,6 @@ import os
 import signal
 import subprocess
 
-import clusters
-
 from twitter.common import log
 
 class TunnelHelper:
@@ -32,7 +30,7 @@ class TunnelHelper:
                     tunnel_host,
                     'sleep %d' % TunnelHelper.SSH_TUNNEL_LIFETIME_SECS)
     subprocess.check_call(ssh_cmd_args)
-    return ('localhost', tunnel_port)
+    return 'localhost', tunnel_port
 
   @staticmethod
   def free_tunnel_ports(ports):

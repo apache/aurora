@@ -1,13 +1,16 @@
 #!/usr/bin/env python2.6
 import os
 import subprocess
+import sys
 import time
-from time import gmtime, strftime
-from optparse import OptionParser
 
 from git import *
 
+from optparse import OptionParser
+from time import gmtime, strftime
+
 from twitter.mesos import clusters
+from twitter.mesos.tunnel_helper import TunnelHelper
 
 __author__ = 'William Farner'
 
@@ -53,8 +56,32 @@ def get_cluster_name():
   return clusters.get_local_name(options.cluster)
 
 
-def get_scheduler_machine():
-  return clusters.get_scheduler_host(options.cluster)
+def get_scheduler_role():
+  return clusters.get_scheduler_role(options.cluster)
+
+
+def get_cluster_dc():
+  return clusters.get_dc(options.cluster)
+
+
+def get_scheduler_machines():
+  if options.all_hosts:
+    if options.really_push:
+      params = dict(
+        dc = get_cluster_dc(),
+        role = get_scheduler_role()
+      )
+      result, (output, _) = run_cmd([
+        'ssh', TunnelHelper.get_tunnel_host(options.cluster),
+        'loony --dc=%(dc)s --group=role:%(role)s --one-column' % params
+      ])
+      if result != 0:
+        sys.exit("Failed to determine scheduler hosts for dc: %(dc)s role: %(role)s" % params)
+      return [host.strip() for host in output.splitlines()]
+    else:
+      return ['[dummy-host1]', '[dummy-host2]', '[dummy-host3]']
+  else:
+    return [clusters.get_scheduler_host(options.cluster)]
 
 
 def read_bool_stdin(prompt, default=None):
@@ -94,16 +121,16 @@ def run_cmd(cmd):
   return maybe_run_command(fork_join, cmd)
 
 
-def ssh_target():
-  return '%s@%s' % (REMOTE_USER, get_scheduler_machine())
+def ssh_target(host):
+  return '%s@%s' % (REMOTE_USER, host)
 
 
-def remote_call(cmd):
-  return run_cmd(['ssh', ssh_target()] + cmd)
+def remote_call(host, cmd):
+  return run_cmd(['ssh', ssh_target(host)] + cmd)
 
 
-def fetch_scheduler_http(endpoint):
-  result = remote_call(['curl', '--silent', '%s/%s' % (SCHEDULER_HTTP, endpoint)])
+def fetch_scheduler_http(host, endpoint):
+  result = remote_call(host, ['curl', '--silent', '%s/%s' % (SCHEDULER_HTTP, endpoint)])
   if result is not None:
     return result[1][0].strip()
 
@@ -127,8 +154,8 @@ def check_output(cmd):
     return output
 
 
-def remote_check_call(cmd):
-  check_output(['ssh', ssh_target()] + cmd)
+def remote_check_call(host, cmd):
+  check_output(['ssh', ssh_target(host)] + cmd)
 
 
 def build():
@@ -140,33 +167,41 @@ def build():
     check_call((BUILD_DEPLOY_CMD % build_target).split(' '))
 
 
-def find_current_build():
-  # the linux machines do not have realpath installed - this is at least portable
-  command = [
-    'ssh',
-    ssh_target(),
-    """"python -c 'import os; print os.path.realpath(\\"%s\\")'" """ % LIVE_BUILD_PATH
-  ]
-  # TODO(John Sirois): get this to work via remote_call
-  result = maybe_run_command(lambda cmd: os.popen(' '.join(cmd)).read(), command)
-  if result:
-    current_build = result.strip()
-    if current_build == LIVE_BUILD_PATH:
-      current_build = None
-    print 'Found current build: %s' % current_build
-    return current_build
+def find_current_build(hosts):
+  # TODO(John Sirois): consider loony -t
+  current_builds = set()
+  for host in hosts:
+    # the linux machines do not have realpath installed - this is at least portable
+    command = [
+      'ssh',
+      ssh_target(host),
+      """"python -c 'import os; print os.path.realpath(\\"%s\\")'" """ % LIVE_BUILD_PATH
+    ]
+    # TODO(John Sirois): get this to work via remote_call
+    result = maybe_run_command(lambda cmd: os.popen(' '.join(cmd)).read(), command)
+    if result:
+      current_build = result.strip()
+      if current_build != LIVE_BUILD_PATH:
+        current_builds.add(current_build)
+
+  current_builds = filter(bool, current_builds)
+  if options.really_push and len(current_builds) != 1:
+    sys.exit('Found conflicting current builds: %s please resolve manually' % current_builds)
+  current_build = current_builds.pop() if options.really_push else None
+  print 'Found current build: %s' % current_build
+  return current_build
 
 
-def replace_hdfs_file(local_file, hdfs_path):
+def replace_hdfs_file(host, local_file, hdfs_path):
   HADOOP_CONF_DIR = '/etc/hadoop/hadoop-conf-%s' % get_cluster_dc()
   BASE_HADOOP_CMD = ['hadoop', '--config', HADOOP_CONF_DIR, 'fs']
 
-  remote_call(BASE_HADOOP_CMD + ['-mkdir', os.path.dirname(hdfs_path)])
-  remote_call(BASE_HADOOP_CMD + ['-rm', hdfs_path])
-  remote_check_call(BASE_HADOOP_CMD + ['-put', local_file, hdfs_path])
+  remote_call(host, BASE_HADOOP_CMD + ['-mkdir', os.path.dirname(hdfs_path)])
+  remote_call(host, BASE_HADOOP_CMD + ['-rm', hdfs_path])
+  remote_check_call(host, BASE_HADOOP_CMD + ['-put', local_file, hdfs_path])
 
 
-def stage_build():
+def stage_build(hosts):
   result = cmd_output(['bash', '-c',
     'unzip -c %s build.properties | grep build.git.revision' % BUILD_SCHEDULER_JAR_PATH
   ])
@@ -176,21 +211,24 @@ def stage_build():
     sha = '[sha]'
   release_scheduler_path = '%s/%s-%s' % (RELEASES_DIR, strftime("%Y%m%d%H%M%S", gmtime()), sha)
 
-  print 'Staging the build on the scheduler machine at: %s' % release_scheduler_path
-  remote_check_call(['mkdir', '-p', STAGE_DIR])
-  check_output(['scp', BUILD_SCHEDULER_PACKAGE_PATH, '%s:%s' % (ssh_target(), STAGED_PACKAGE_PATH)])
-  remote_check_call(['bash', '-c',
-    '"mkdir -p %(release_dir)s &&'
-    ' unzip -d %(release_dir)s %(staged_package)s &&'
-    ' chmod +x %(release_dir)s/scripts/*.sh"' % {
-      'release_dir': release_scheduler_path,
-      'staged_package': STAGED_PACKAGE_PATH,
-    },
-  ])
-  return release_scheduler_path
+  print 'Staging the build at: %s on:\n\t%s' % (release_scheduler_path, '\n\t'.join(hosts))
 
+  # Stage release dirs on all hosts
+  for host in hosts:
+    remote_check_call(host, ['mkdir', '-p', STAGE_DIR])
+    check_output(['scp', BUILD_SCHEDULER_PACKAGE_PATH, '%s:%s' % (ssh_target(host),
+                                                                  STAGED_PACKAGE_PATH)])
+    remote_check_call(host, ['bash', '-c',
+      '"mkdir -p %(release_dir)s &&'
+      ' unzip -d %(release_dir)s %(staged_package)s &&'
+      ' chmod +x %(release_dir)s/scripts/*.sh"' % {
+        'release_dir': release_scheduler_path,
+        'staged_package': STAGED_PACKAGE_PATH,
+      },
+    ])
 
-def set_live_build(build_path):
+  # Finally stage the HDFS artifacts
+  host = hosts[0]
   wildcards = {
     DC_WILDCARD: get_cluster_dc(),
     CLUSTER_WILDCARD: get_cluster_name()
@@ -201,11 +239,15 @@ def set_live_build(build_path):
       hdfs_target = hdfs_target.replace(wildcard, value)
     print 'Sending local file from %s to HDFS %s' % (local_file, hdfs_target)
     stage_file = os.path.join(STAGE_DIR, os.path.basename(local_file))
-    check_output(['scp', local_file, '%s:%s' % (ssh_target(), stage_file)])
-    replace_hdfs_file(stage_file, hdfs_target)
+    check_output(['scp', local_file, '%s:%s' % (ssh_target(host), stage_file)])
+    replace_hdfs_file(host, stage_file, hdfs_target)
 
+  return release_scheduler_path
+
+
+def set_live_build(host, build_path):
   print 'Linking the new build on the scheduler'
-  remote_check_call(['bash', '-c',
+  remote_check_call(host, ['bash', '-c',
     '"rm -f %(live_build)s &&'
     ' ln -s %(build)s %(live_build)s"' % {
       'live_build': LIVE_BUILD_PATH,
@@ -214,16 +256,16 @@ def set_live_build(build_path):
   ])
 
 
-def start_scheduler():
+def start_scheduler(host):
   print 'Starting the scheduler'
-  remote_check_call(['sudo', 'monit', 'start', 'mesos-scheduler'])
+  remote_check_call(host, ['sudo', 'monit', 'start', 'mesos-scheduler'])
   if options.really_push:
     print 'Waiting for the scheduler to start'
     time.sleep(5)
 
 
-def get_scheduler_uptime_secs():
-  vars = fetch_scheduler_http('vars')
+def get_scheduler_uptime_secs(host):
+  vars = fetch_scheduler_http(host, 'vars')
   if options.really_push:
     assert vars is not None, 'Failed to fetch vars from scheduler'
   elif vars is None:
@@ -234,26 +276,28 @@ def get_scheduler_uptime_secs():
       return int(keyValue[1])
 
 
-def is_scheduler_healthy():
+def is_scheduler_healthy(host):
   if options.really_push:
-    return fetch_scheduler_http('health') == 'OK'
+    return fetch_scheduler_http(host, 'health') == 'OK'
   else:
     return True
 
 
-def stop_scheduler():
-  print 'Stopping the scheduler'
-  print 'Temporarily disabling monit for the scheduler'
-  remote_check_call(['sudo', 'monit', 'unmonitor', 'mesos-scheduler'])
-  fetch_scheduler_http('quitquitquit')
-  print 'Waiting for scheduler to stop cleanly'
-  if options.really_push:
-    time.sleep(5)
-  print 'Stopping scheduler via monit'
-  remote_check_call(['sudo', 'monit', 'stop', 'mesos-scheduler'])
+def stop_scheduler(hosts):
+  # TODO(John Sirois): consider loony -t
+  for host in hosts:
+    print 'Stopping the scheduler'
+    print 'Temporarily disabling monit for the scheduler'
+    remote_check_call(host, ['sudo', 'monit', 'unmonitor', 'mesos-scheduler'])
+    fetch_scheduler_http(host, 'quitquitquit')
+    print 'Waiting for scheduler to stop cleanly'
+    if options.really_push:
+      time.sleep(5)
+    print 'Stopping scheduler via monit'
+    remote_check_call(host, ['sudo', 'monit', 'stop', 'mesos-scheduler'])
 
 
-def watch_scheduler():
+def watch_scheduler(host, up_min_secs):
   print 'Watching scheduler'
   started = False
   watch_start = time.time()
@@ -261,8 +305,8 @@ def watch_scheduler():
   last_uptime = 0
   # Wait at most three minutes.
   while started or (time.time() - watch_start) < 180:
-    if is_scheduler_healthy():
-      uptime = get_scheduler_uptime_secs()
+    if is_scheduler_healthy(host):
+      uptime = get_scheduler_uptime_secs(host)
       if not options.really_push:
         print 'Skipping further health checks, since we are not pushing.'
         return True
@@ -272,8 +316,8 @@ def watch_scheduler():
         if uptime < last_uptime:
           print 'Detected scheduler process restart after update (uptime %s)!' % uptime
           return False
-        elif time.time() - start_detected_at > 45:
-          print 'Scheduler has been up for at least 45 seconds'
+        elif time.time() - start_detected_at > up_min_secs:
+          print 'Scheduler has been up for at least %d seconds' % up_min_secs
           return True
       else:
         start_detected_at = time.time()
@@ -287,11 +331,10 @@ def watch_scheduler():
   return False
 
 
-def rollback(rollback_build):
+def rollback(host, rollback_build):
   print 'Initiating rollback'
-  stop_scheduler()
-  set_live_build(rollback_build)
-  start_scheduler()
+  set_live_build(host, rollback_build)
+  start_scheduler(host)
 
 
 def main():
@@ -303,6 +346,15 @@ def main():
     action='store_true',
     help='Verbose logging. (default: %default)')
 
+  # TODO(John Sirois): Make default and kill option once all environments are stably deployed on
+  # vert releases.
+  parser.add_option(
+    '--vert',
+    dest='use_vert',
+    default=False,
+    action='store_true',
+    help='Deploy scheduler using a vert release. (default: %default)')
+
   cluster_list = list(clusters.get_clusters())
   cluster_list.sort()
   parser.add_option(
@@ -312,12 +364,21 @@ def main():
     dest='cluster',
     help='Cluster to deploy the scheduler in (one of: %s)' % ', '.join(cluster_list))
 
+  # TODO(John Sirois): Make this the default once HA log rolls out.
+  parser.add_option(
+    '--all-hosts',
+    dest='all_hosts',
+    default=False,
+    action='store_true',
+    help='Deploy scheduler to all hosts designated in loony. (default: %default)')
+
   parser.add_option(
     '--skip_build',
     dest='skip_build',
     default=False,
     action='store_true',
     help='Skip build and test, use the existing build. (default: %default)')
+
   parser.add_option(
     '--really_push',
     dest='really_push',
@@ -342,31 +403,58 @@ def main():
            % cluster_list)
     return
 
-  deploy_branch = clusters.get_deploy_branch(options.cluster)
   repo = Repo()
-  if repo.active_branch.name != deploy_branch:
-    if not read_bool_stdin(
-        'The standard deploy branch for the %s cluster is %s, currently on branch %s, are you sure '
-        'you want to continue?' % (options.cluster, deploy_branch, repo.active_branch.name), False):
-      return
+  if options.use_vert:
+    # TODO(John Sirois): beef this up - we should really ask for a release number and verify:
+    # 1) we're @ that sha
+    # 2) that sha is on origin
+    if repo.active_branch.name != 'master':
+      print >> sys.stderr, 'When using vert deploys must be from master'
+      exit(1)
+  else:
+    deploy_branch = clusters.get_deploy_branch(options.cluster)
+    if repo.active_branch.name != deploy_branch:
+      if not read_bool_stdin(
+          'The standard deploy branch for the %s cluster is %s, currently on branch %s, are you sure '
+          'you want to continue?' % (options.cluster, deploy_branch, repo.active_branch.name), False):
+        return
 
   if options.skip_build:
     print 'Warning - skipping build, using existing build at %s' % BUILD_SCHEDULER_PACKAGE_PATH
   else:
     build()
 
-  current_build = find_current_build()
-  new_build = stage_build()
-  stop_scheduler()
-  set_live_build(new_build)
-  start_scheduler()
-  if not watch_scheduler():
-    print 'scheduler not healthy'
-    if current_build:
-      rollback(current_build)
-    else:
-      print 'Push failed - no previous builds to roll back to.'
-  elif options.really_push:
+  all_schedulers = get_scheduler_machines()
+
+  # Stage the build on all machines and shut all the schedulers down
+  current_build = find_current_build(all_schedulers)
+  new_build = stage_build(all_schedulers)
+  stop_scheduler(all_schedulers)
+
+  # Canary the new build on 1 host at a time, but only check the 1st - the leader - extensively
+  check_for_secs = [5] * len(all_schedulers)
+  check_for_secs[0] = 45
+
+  for i, canary in enumerate(all_schedulers):
+    set_live_build(canary, new_build)
+    start_scheduler(canary)
+
+    if not watch_scheduler(canary, up_min_secs=check_for_secs[i]):
+      print 'scheduler[%d] on %s not healthy' % (i, canary)
+      stop_scheduler(all_schedulers[:i])
+
+      # We did not set the live build on the rest, so we can just restart and let one lead on the
+      # old build
+      for not_deployed in all_schedulers[i+1:]:
+        start_scheduler(not_deployed)
+
+      if current_build:
+        for deployed in all_schedulers[:i]:
+          rollback(deployed, current_build)
+      else:
+        print 'Push failed - no previous builds to roll back to.'
+
+  if options.really_push:
     print 'Push successful!'
   else:
     print 'Fake push completed'
