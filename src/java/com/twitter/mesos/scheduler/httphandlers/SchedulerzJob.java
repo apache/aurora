@@ -12,6 +12,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import com.google.common.base.Optional;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -31,6 +32,7 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.ClusterName;
+import com.twitter.mesos.scheduler.LeaderRedirect;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerCore;
 
@@ -92,13 +94,17 @@ public class SchedulerzJob extends StringTemplateServlet {
   private final SchedulerCore scheduler;
 
   private final String clusterName;
+  private final LeaderRedirect redirector;
+
   @Inject
   public SchedulerzJob(@CacheTemplates boolean cacheTemplates,
       SchedulerCore scheduler,
-      @ClusterName String clusterName) {
+      @ClusterName String clusterName,
+      LeaderRedirect redirector) {
     super("schedulerzjob", cacheTemplates);
     this.scheduler = checkNotNull(scheduler);
     this.clusterName = checkNotBlank(clusterName);
+    this.redirector = checkNotNull(redirector);
   }
 
   /**
@@ -130,6 +136,12 @@ public class SchedulerzJob extends StringTemplateServlet {
   @Override
   protected void doGet(final HttpServletRequest req, HttpServletResponse resp)
       throws ServletException, IOException {
+    Optional<String> leaderRedirect = redirector.getRedirectTarget(req);
+    if (leaderRedirect.isPresent()) {
+      resp.sendRedirect(leaderRedirect.get());
+      return;
+    }
+
     writeTemplate(resp, new Closure<StringTemplate>() {
       @Override public void execute(StringTemplate template) {
         template.setAttribute("cluster_name", clusterName);

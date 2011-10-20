@@ -4,14 +4,12 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Map;
 
-import javax.annotation.Nullable;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.google.common.base.Function;
-import com.google.common.base.Functions;
-import com.google.common.base.Suppliers;
+import com.google.common.base.Optional;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -31,6 +29,7 @@ import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.CronJobManager;
+import com.twitter.mesos.scheduler.LeaderRedirect;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerCore;
 
@@ -47,16 +46,19 @@ public class SchedulerzHome extends StringTemplateServlet {
   private final SchedulerCore scheduler;
   private final CronJobManager cronScheduler;
   private final String clusterName;
+  private final LeaderRedirect redirector;
 
   @Inject
   public SchedulerzHome(@CacheTemplates boolean cacheTemplates,
       SchedulerCore scheduler,
       CronJobManager cronScheduler,
-      @ClusterName String clusterName) {
+      @ClusterName String clusterName,
+      LeaderRedirect redirector) {
     super("schedulerzhome", cacheTemplates);
     this.scheduler = checkNotNull(scheduler);
     this.cronScheduler = checkNotNull(cronScheduler);
     this.clusterName = checkNotBlank(clusterName);
+    this.redirector = checkNotNull(redirector);
   }
 
   private static final Function<String, Role> CREATE_ROLE = new Function<String, Role>() {
@@ -70,6 +72,12 @@ public class SchedulerzHome extends StringTemplateServlet {
   @Override
   protected void doGet(final HttpServletRequest req, HttpServletResponse resp)
       throws ServletException, IOException {
+    Optional<String> leaderRedirect = redirector.getRedirectTarget(req);
+    if (leaderRedirect.isPresent()) {
+      resp.sendRedirect(leaderRedirect.get());
+      return;
+    }
+
     writeTemplate(resp, new Closure<StringTemplate>() {
       @Override public void execute(StringTemplate template) {
         template.setAttribute("cluster_name", clusterName);

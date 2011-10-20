@@ -11,6 +11,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.google.common.base.Functions;
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -19,6 +20,7 @@ import com.google.inject.Inject;
 import org.apache.commons.lang.StringUtils;
 
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.scheduler.LeaderRedirect;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerCore;
 
@@ -41,14 +43,22 @@ public class Mname extends HttpServlet {
       "health", "http", "HTTP", "web");
 
   private final SchedulerCore scheduler;
+  private final LeaderRedirect redirector;
 
   @Inject
-  public Mname(SchedulerCore scheduler) {
+  public Mname(SchedulerCore scheduler, LeaderRedirect redirector) {
     this.scheduler = checkNotNull(scheduler);
+    this.redirector = checkNotNull(redirector);
   }
 
   @Override
   protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+    Optional<String> leaderRedirect = redirector.getRedirectTarget(req);
+    if (leaderRedirect.isPresent()) {
+      resp.sendRedirect(leaderRedirect.get());
+      return;
+    }
+
     if (StringUtils.isBlank(req.getPathInfo())) {
       sendUsageError(resp);
     }

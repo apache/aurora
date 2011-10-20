@@ -25,7 +25,6 @@ import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
 import org.apache.zookeeper.data.ACL;
 
-import com.twitter.common.application.http.Registration;
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
@@ -52,11 +51,7 @@ import com.twitter.mesos.scheduler.PulseMonitor.PulseMonitorImpl;
 import com.twitter.mesos.scheduler.SchedulingFilter.SchedulingFilterImpl;
 import com.twitter.mesos.scheduler.auth.SessionValidator;
 import com.twitter.mesos.scheduler.auth.SessionValidator.SessionValidatorImpl;
-import com.twitter.mesos.scheduler.httphandlers.CreateJob;
-import com.twitter.mesos.scheduler.httphandlers.Mname;
-import com.twitter.mesos.scheduler.httphandlers.SchedulerzHome;
-import com.twitter.mesos.scheduler.httphandlers.SchedulerzJob;
-import com.twitter.mesos.scheduler.httphandlers.SchedulerzRole;
+import com.twitter.mesos.scheduler.httphandlers.ServletModule;
 import com.twitter.mesos.scheduler.quota.QuotaModule;
 import com.twitter.mesos.scheduler.storage.StorageModule;
 import com.twitter.mesos.scheduler.sync.SyncModule;
@@ -171,17 +166,13 @@ public class SchedulerModule extends AbstractModule {
 
     bind(TaskReaper.class).in(Singleton.class);
 
-    Registration.registerServlet(binder(), "/scheduler", SchedulerzHome.class, false);
-    Registration.registerServlet(binder(), "/scheduler/role", SchedulerzRole.class, true);
-    Registration.registerServlet(binder(), "/scheduler/job", SchedulerzJob.class, true);
-    Registration.registerServlet(binder(), "/mname", Mname.class, false);
-    Registration.registerServlet(binder(), "/create_job", CreateJob.class, true);
-
     LifecycleModule.bindServiceLauncher(binder(), ThriftServerLauncher.THRIFT_PORT_NAME,
         ThriftServerLauncher.class);
 
     QuotaModule.bind(binder());
     SyncModule.bind(binder());
+
+    install(new ServletModule());
   }
 
   @Provides
