@@ -1,26 +1,11 @@
 package com.twitter.mesos.scheduler;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
-import java.security.GeneralSecurityException;
-import java.security.KeyStore;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.annotation.Nonnegative;
 import javax.annotation.Nullable;
-import javax.net.ssl.KeyManagerFactory;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLServerSocket;
-import javax.net.ssl.SSLServerSocketFactory;
 
-import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 import com.google.inject.Module;
@@ -29,33 +14,25 @@ import com.google.inject.Provider;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.SchedulerDriver;
-import org.apache.thrift.transport.TTransportException;
 
 import com.twitter.common.application.AbstractApplication;
 import com.twitter.common.application.Lifecycle;
-import com.twitter.common.application.ShutdownRegistry;
+import com.twitter.common.application.LocalServiceRegistry;
 import com.twitter.common.application.modules.HttpModule;
 import com.twitter.common.application.modules.LogModule;
 import com.twitter.common.application.modules.StatsExportModule;
 import com.twitter.common.application.modules.StatsModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
-import com.twitter.common.args.constraints.CanRead;
-import com.twitter.common.args.constraints.NotNull;
 import com.twitter.common.base.Closure;
-import com.twitter.common.base.Command;
-import com.twitter.common.net.InetSocketAddressHelper;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
-import com.twitter.common.thrift.ThriftServer;
-import com.twitter.common.thrift.ThriftServer.ServerSetup;
 import com.twitter.common.zookeeper.Group;
 import com.twitter.common.zookeeper.ServerSet.EndpointStatus;
 import com.twitter.common.zookeeper.ServerSet.UpdateException;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.SingletonService.LeadershipListener;
 import com.twitter.common_internal.webassets.Blueprint;
-import com.twitter.mesos.gen.MesosAdmin;
 import com.twitter.thrift.Status;
 
 /**
@@ -70,16 +47,6 @@ public class SchedulerMain extends AbstractApplication {
 
   private static final Logger LOG = Logger.getLogger(SchedulerMain.class.getName());
 
-  @CanRead
-  @NotNull
-  @CmdLine(name = "mesos_ssl_keyfile",
-           help = "JKS keyfile for operating the Mesos Thrift-over-SSL interface.")
-  private static final Arg<File> MESOS_SSL_KEY_FILE = Arg.create();
-
-  @Nonnegative
-  @CmdLine(name = "thrift_port", help = "Thrift server port.")
-  private static final Arg<Integer> THRIFT_PORT = Arg.create(0);
-
   @CmdLine(name = "task_reaper_start_delay", help =
       "Time to wait after startup before running the task reaper.")
   private static final Arg<Amount<Long, Time>> TASK_REAPER_START_DELAY =
@@ -89,18 +56,12 @@ public class SchedulerMain extends AbstractApplication {
   private static final Arg<Amount<Long, Time>> TASK_REAPER_INTERVAL =
       Arg.create(Amount.of(2L, Time.MINUTES));
 
-  // Security is enforced via file permissions, not via this password, for what it's worth.
-  private static final String SSL_KEYFILE_PASSWORD = "MesosKeyStorePassword";
-
   @Inject private SingletonService schedulerService;
-  @Inject private ThriftServer schedulerThriftServer;
-  @Inject private MesosAdmin.Iface schedulerThriftInterface;
   @Inject private Provider<SchedulerDriver> driverProvider;
-  @Inject private AtomicReference<InetSocketAddress> schedulerThriftPort;
   @Inject private SchedulerCore scheduler;
   @Inject private TaskReaper taskReaper;
   @Inject private Lifecycle lifecycle;
-  @Inject ShutdownRegistry shutdownRegistry;
+  @Inject private LocalServiceRegistry serviceRegistry;
 
   private final LeadershipListener leadershipListener = new LeadershipListener() {
     @Override public void onLeading(EndpointStatus status) {
@@ -150,44 +111,15 @@ public class SchedulerMain extends AbstractApplication {
 
   @Override
   public void run() {
-    int port = -1;
     try {
-      port = startThriftServer();
-    } catch (IOException e) {
-      LOG.log(Level.SEVERE, "Failed to start thrift server.", e);
-    } catch (TTransportException e) {
-      LOG.log(Level.SEVERE, "Failed to start thrift server.", e);
-    } catch (Group.JoinException e) {
-      LOG.log(Level.SEVERE, "Failed to join mesos scheduler server set in ZooKeeper.", e);
-    } catch (InterruptedException e) {
-      LOG.log(Level.SEVERE, "Interrupted while starting thrift server.", e);
-    } catch (GeneralSecurityException e) {
-      LOG.log(Level.SEVERE, "Failed to initialize SSL context for thrift server.", e);
-    }
-    if (port == -1) {
-      return;
-    }
-
-    // TODO(William Farner): This is a bit of a hack, clean it up, maybe by exposing the thrift
-    //     interface.
-    try {
-      schedulerThriftPort.set(InetSocketAddressHelper.getLocalAddress(port));
-    } catch (UnknownHostException e) {
-      LOG.severe("Unable to get local host address.");
-      throw Throwables.propagate(e);
-    }
-
-    try {
-      schedulerService.lead(InetSocketAddressHelper.getLocalAddress(port),
-          Collections.<String, InetSocketAddress>emptyMap(), Status.STARTING, leadershipListener);
+      schedulerService.lead(serviceRegistry.getPrimarySocket(),
+          serviceRegistry.getAuxiliarySockets(), Status.STARTING, leadershipListener);
     } catch (Group.WatchException e) {
       LOG.log(Level.SEVERE, "Failed to watch group and lead service.", e);
     } catch (Group.JoinException e) {
       LOG.log(Level.SEVERE, "Failed to join scheduler service group.", e);
     } catch (InterruptedException e) {
       LOG.log(Level.SEVERE, "Interrupted while joining scheduler service group.", e);
-    } catch (UnknownHostException e) {
-      LOG.log(Level.SEVERE, "Failed to find self host name.", e);
     }
 
     taskReaper.start(TASK_REAPER_START_DELAY.get(), TASK_REAPER_INTERVAL.get());
@@ -219,39 +151,5 @@ public class SchedulerMain extends AbstractApplication {
           }
         }
     ).start();
-  }
-
-  private int startThriftServer() throws IOException, TTransportException,
-      Group.JoinException, InterruptedException, GeneralSecurityException {
-    // TODO(wickman): Add helper to science thrift to perform this keyfile import.
-    SSLContext ctx;
-
-    ctx = SSLContext.getInstance("TLS");
-    KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
-    KeyStore ks = KeyStore.getInstance("JKS");
-    ks.load(new FileInputStream(MESOS_SSL_KEY_FILE.get()), SSL_KEYFILE_PASSWORD.toCharArray());
-    kmf.init(ks, SSL_KEYFILE_PASSWORD.toCharArray());
-    ctx.init(kmf.getKeyManagers(), null, null);
-
-    SSLServerSocketFactory ssf = ctx.getServerSocketFactory();
-    SSLServerSocket serverSocket = (SSLServerSocket) ssf.createServerSocket(THRIFT_PORT.get());
-    serverSocket.setEnabledCipherSuites(serverSocket.getSupportedCipherSuites());
-    serverSocket.setNeedClientAuth(false);
-
-    ServerSetup setup = new ServerSetup(
-        0,  // TODO(John Sirois): unused, fix ServerSetup constructors
-        new MesosAdmin.Processor(schedulerThriftInterface),
-        ThriftServer.BINARY_PROTOCOL.get());
-    setup.setSocket(serverSocket);
-    schedulerThriftServer.start(setup);
-
-    shutdownRegistry.addAction(new Command() {
-      @Override public void execute() {
-        LOG.info("Stopping thrift server.");
-        schedulerThriftServer.shutdown();
-      }
-    });
-
-    return schedulerThriftServer.getListeningPort();
   }
 }
