@@ -117,7 +117,7 @@ public class LeaderRedirect {
           .append(target.getHostText())
           .append(":")
           .append(target.getPort())
-          .append(req.getPathInfo());
+          .append(req.getRequestURI());
 
       String queryString = req.getQueryString();
       if (queryString != null) {
