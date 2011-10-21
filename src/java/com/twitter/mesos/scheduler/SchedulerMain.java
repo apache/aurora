@@ -72,6 +72,7 @@ public class SchedulerMain extends AbstractApplication {
       } catch (UpdateException e) {
         LOG.log(Level.SEVERE, "Failed to update endpoint status.", e);
       }
+      taskReaper.start(TASK_REAPER_START_DELAY.get(), TASK_REAPER_INTERVAL.get());
     }
 
     @Override public void onDefeated(@Nullable EndpointStatus status) {
@@ -121,8 +122,6 @@ public class SchedulerMain extends AbstractApplication {
     } catch (InterruptedException e) {
       LOG.log(Level.SEVERE, "Interrupted while joining scheduler service group.", e);
     }
-
-    taskReaper.start(TASK_REAPER_START_DELAY.get(), TASK_REAPER_INTERVAL.get());
 
     lifecycle.awaitShutdown();
   }
