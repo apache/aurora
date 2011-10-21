@@ -82,6 +82,7 @@ class MesosSchedulerImpl implements Scheduler {
     this.executorWatchdog = checkNotNull(executorWatchdog);
 
     // TODO(William Farner): Clean this up.
+    LOG.info(String.format("Waiting up to %s for scheduler registration.", MAX_REGISTRATION_DELAY));
     Thread registrationChecker = new Thread() {
       @Override public void run() {
         try {

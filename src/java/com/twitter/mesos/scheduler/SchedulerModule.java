@@ -8,6 +8,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.logging.Logger;
 
+import javax.annotation.Nullable;
+import javax.inject.Provider;
+
 import com.google.common.base.Function;
 import com.google.common.base.Supplier;
 import com.google.inject.AbstractModule;
@@ -180,19 +183,24 @@ public class SchedulerModule extends AbstractModule {
 
   @Provides
   @Singleton
-  SchedulerDriver provideMesosSchedulerDriver(Scheduler scheduler, SchedulerCore schedulerCore) {
-    String frameworkId = schedulerCore.initialize();
-    LOG.info("Connecting to mesos master: " + MESOS_MASTER_ADDRESS.get());
+  Function<String, SchedulerDriver> provideMesosSchedulerDriverFactory(
+      final Provider<Scheduler> scheduler, final ExecutorInfo executorInfo) {
 
-    if (frameworkId != null) {
-      LOG.info("Found persisted framework ID: " + frameworkId);
-      return new MesosSchedulerDriver(scheduler, TWITTER_FRAMEWORK_NAME, provideExecutorInfo(),
-          MESOS_MASTER_ADDRESS.get(), FrameworkID.newBuilder().setValue(frameworkId).build());
-    } else {
-      LOG.warning("Did not find a persisted framework ID, connecting as a new framework.");
-      return new MesosSchedulerDriver(scheduler, TWITTER_FRAMEWORK_NAME, provideExecutorInfo(),
-          MESOS_MASTER_ADDRESS.get());
-    }
+    return new Function<String, SchedulerDriver>() {
+      @Override public SchedulerDriver apply(@Nullable String frameworkId) {
+        LOG.info("Connecting to mesos master: " + MESOS_MASTER_ADDRESS.get());
+
+        if (frameworkId != null) {
+          LOG.info("Found persisted framework ID: " + frameworkId);
+          return new MesosSchedulerDriver(scheduler.get(), TWITTER_FRAMEWORK_NAME, executorInfo,
+              MESOS_MASTER_ADDRESS.get(), FrameworkID.newBuilder().setValue(frameworkId).build());
+        } else {
+          LOG.warning("Did not find a persisted framework ID, connecting as a new framework.");
+          return new MesosSchedulerDriver(scheduler.get(), TWITTER_FRAMEWORK_NAME, executorInfo,
+              MESOS_MASTER_ADDRESS.get());
+        }
+      }
+    };
   }
 
   @Provides

@@ -6,10 +6,12 @@ import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 
+import com.google.common.base.Function;
+import com.google.common.base.Supplier;
+import com.google.common.base.Suppliers;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 import com.google.inject.Module;
-import com.google.inject.Provider;
 
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.TaskID;
@@ -57,7 +59,7 @@ public class SchedulerMain extends AbstractApplication {
       Arg.create(Amount.of(2L, Time.MINUTES));
 
   @Inject private SingletonService schedulerService;
-  @Inject private Provider<SchedulerDriver> driverProvider;
+  @Inject private Function<String, SchedulerDriver> driverFactory;
   @Inject private SchedulerCore scheduler;
   @Inject private TaskReaper taskReaper;
   @Inject private Lifecycle lifecycle;
@@ -127,13 +129,17 @@ public class SchedulerMain extends AbstractApplication {
   }
 
   private void runMesosDriver() {
-    // Initialize the driver just in time
-    // TODO(John Sirois): control this lifecycle in a more explicit - non Guice specific way
-    final SchedulerDriver driver = driverProvider.get();
+    @Nullable final String frameworkId = scheduler.initialize();
+    final Supplier<SchedulerDriver> driver = Suppliers.memoize(new Supplier<SchedulerDriver>() {
+      @Override public SchedulerDriver get() {
+        // Initialize the driver just in time
+        return driverFactory.apply(frameworkId);
+      }
+    });
 
     scheduler.start(new Closure<String>() {
       @Override public void execute(String taskId) throws RuntimeException {
-        Protos.Status status = driver.killTask(TaskID.newBuilder().setValue(taskId).build());
+        Protos.Status status = driver.get().killTask(TaskID.newBuilder().setValue(taskId).build());
         if (status != Protos.Status.OK) {
           LOG.severe(String.format("Attempt to kill task %s failed with code %s",
               taskId, status));
@@ -144,7 +150,7 @@ public class SchedulerMain extends AbstractApplication {
     new ThreadFactoryBuilder().setNameFormat("Driver-Runner-%d").setDaemon(true).build().newThread(
         new Runnable() {
           @Override public void run() {
-            Protos.Status status = driver.run();
+            Protos.Status status = driver.get().run();
             LOG.info("Driver completed with exit code " + status);
             lifecycle.shutdown();
           }
