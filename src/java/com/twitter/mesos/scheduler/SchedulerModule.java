@@ -33,12 +33,14 @@ import com.twitter.common.base.Closure;
 import com.twitter.common.base.Closures;
 import com.twitter.common.inject.TimedInterceptor;
 import com.twitter.common.logging.ScribeLog;
+import com.twitter.common.net.pool.DynamicHostSet;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.thrift.ThriftFactory.ThriftFactoryException;
 import com.twitter.common.thrift.ThriftServer;
 import com.twitter.common.util.Clock;
+import com.twitter.common.zookeeper.ServerSetImpl;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.common.zookeeper.ZooKeeperUtils;
@@ -55,6 +57,7 @@ import com.twitter.mesos.scheduler.httphandlers.ServletModule;
 import com.twitter.mesos.scheduler.quota.QuotaModule;
 import com.twitter.mesos.scheduler.storage.StorageModule;
 import com.twitter.mesos.scheduler.sync.SyncModule;
+import com.twitter.thrift.ServiceInstance;
 
 /**
  * Binding module for the twitter mesos scheduler.
@@ -196,6 +199,12 @@ public class SchedulerModule extends AbstractModule {
   @Singleton
   SingletonService provideSingletonService(ZooKeeperClient zkClient, List<ACL> acl) {
     return new SingletonService(zkClient, MESOS_SCHEDULER_NAME_SPEC.get(), acl);
+  }
+
+  @Provides
+  @Singleton
+  DynamicHostSet<ServiceInstance> provideSchedulerHostSet(ZooKeeperClient zkClient, List<ACL> acl) {
+    return new ServerSetImpl(zkClient, acl, MESOS_SCHEDULER_NAME_SPEC.get());
   }
 
   @Provides
