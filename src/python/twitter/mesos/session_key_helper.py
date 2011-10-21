@@ -1,3 +1,4 @@
+import os
 import time
 import base64
 
@@ -51,7 +52,15 @@ class SessionKeyHelper(object):
         if ldap_key.verify_ssh_sig(message, signed_message):
           return key
 
-    return None
+    if os.getenv('SSH_AUTH_SOCK') is None:
+      raise SessionKeyHelper.AgentError(
+      """Cannot talk to your ssh-agent because your SSH_AUTH_SOCK environment variable is
+         not set up properly.  Make sure you have ssh agent forwarding set up correctly in
+         your ssh config.""")
+    else:
+      raise SessionKeyHelper.AgentError(
+      """Unable to find any signable SSH keys.  Make sure you've generated your SSH
+         keys and uploaded them to ods.twitter.com.""")
 
   @staticmethod
   def sign_session(session_key, username):
