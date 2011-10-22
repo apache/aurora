@@ -27,7 +27,7 @@ app.add_option("--checkpoint_root", dest = "checkpoint_root", metavar = "PATH",
 app.add_option("--task_id", dest = "uid", metavar = "STRING",
                help = "the uid assigned to this task by the scheduler")
 app.add_option("--action", dest = "action", metavar = "ACTION", default = "run",
-               help = "the action for this task runner: run, restart, kill")
+               help = "the action for this task runner: run, kill")
 
 
 def check_invariants(args, values):
@@ -84,8 +84,7 @@ def get_task_from_job(thermos_job, task, replica):
   log.info('known task/replicas:')
   log.info(pprint.pformat(known_tasks))
 
-def main(args):
-  opts = app.get_options()
+def main(args, opts):
   check_invariants(args, opts)
 
   thermos_replica = opts.replica_id
@@ -98,6 +97,9 @@ def main(args):
 
   # TODO(wickman):  Need a general sanitizing suite for uids, job names, etc.
   task_runner = TaskRunner(thermos_task, opts.sandbox_root, opts.checkpoint_root, opts.uid)
-  task_runner.run()
+  if opts.action == 'run':
+    task_runner.run()
+  elif opts.action == 'kill':
+    task_runner.kill()
 
 app.main()

@@ -86,6 +86,7 @@ class TaskCkptDispatcher(object):
     TERMINAL_STATES = [
       ProcessRunState.FINISHED,
       ProcessRunState.FAILED,
+      ProcessRunState.KILLED,
       ProcessRunState.LOST]
     return process_state_update.run_state in TERMINAL_STATES
 
@@ -120,6 +121,13 @@ class TaskCkptDispatcher(object):
       if process_state_update.seq != process_state.seq + 1:
         log.error("WARNING: Noncontiguous sequence number: %s => %s" % (
           process_state, process_state_update))
+
+    if process_state_update.run_state is not None:
+      if process_state.run_state == process_state_update.run_state:
+        raise TaskCkptDispatcher.InvalidStateTransition(
+          "Must transition between states: Got %s=>%s, %s vs %s" % (
+            process_state.run_state, process_state_update.run_state,
+            process_state, process_state_update))
 
     # see thrift/thermos_runner.thrift for more explanation of the state transitions
     if process_state_update.run_state is not None:
@@ -160,6 +168,14 @@ class TaskCkptDispatcher(object):
         required_fields = ['seq', 'run_state', 'stop_time', 'return_code']
         TaskCkptDispatcher.copy_fields(process_state, process_state_update, required_fields)
 
+      # {FORKED, RUNNING} => KILLED
+      elif process_state_update.run_state == ProcessRunState.KILLED:
+        if process_state.run_state not in (ProcessRunState.FORKED, ProcessRunState.RUNNING):
+          raise TaskCkptDispatcher.InvalidStateTransition(
+            "%s => %s" % (process_state, process_state_update))
+        required_fields = ['seq', 'run_state', 'stop_time']
+        TaskCkptDispatcher.copy_fields(process_state, process_state_update, required_fields)
+
       # {FORKED, RUNNING} => LOST
       elif process_state_update.run_state == ProcessRunState.LOST:
         if process_state.run_state not in (ProcessRunState.FORKED, ProcessRunState.RUNNING):
@@ -167,7 +183,6 @@ class TaskCkptDispatcher(object):
             "%s => %s" % (process_state, process_state_update))
         required_fields = ['seq', 'run_state']
         TaskCkptDispatcher.copy_fields(process_state, process_state_update, required_fields)
-
       else:
         raise TaskCkptDispatcher.ErrorRecoveringState(
           "Unknown run_state = %s" % process_state_update.run_state)
@@ -283,14 +298,19 @@ class TaskCkptDispatcher(object):
       log.error(TaskCkptDispatcher.ErrorRecoveringState("Empty TaskRunnerCkpt encountered!"))
       return False
 
+    def transition_to_waiting(process, process_history, seq=0):
+      process_state = ProcessState(seq = seq, process = process, run_state = None)
+      process_update = copy.deepcopy(process_state)
+      process_update.run_state = ProcessRunState.WAITING
+      process_history.runs.append(process_state)
+      return process_state, process_update
+
     process = process_update.process
     if process not in state.processes:
       # Never seen this process before, create a ProcessHistory for it and initialize run 0.
       log.debug('Never encountered process (%s), initializing ProcessState' % process)
-      process_state = ProcessState(seq = 0, process = process, run_state = ProcessRunState.WAITING)
-      process_update = process_state
       process_history = ProcessHistory(process = process, runs = [], state = TaskState.ACTIVE)
-      process_history.runs.append(process_state)
+      process_state, process_update = transition_to_waiting(process, process_history)
       state.processes[process] = process_history
     else:
       # We have seen this process, so the state update must pertain to the current run.
@@ -309,14 +329,13 @@ class TaskCkptDispatcher(object):
           # We transitioned from terminal => nonterminal, so finish up the current run and
           # forge a new run.
           log.debug('Transitioning %s from terminal to nonterminal' % process)
-          process_state = ProcessState(
-            seq = process_state.seq, process = process, run_state = ProcessRunState.WAITING)
-          process_update = copy.deepcopy(process_state)
-          process_update.seq += 1
-          process_history.runs.append(process_state)
+          process_state, process_update = transition_to_waiting(process, process_history,
+              seq=process_history.runs[-1].seq)
+          process_update.seq = process_update.seq + 1
 
     # Run the process state machine.
-    log.debug('Running state machine for process=%s/seq=%s' % (process_update.process, process_update.seq))
+    log.debug('Running state machine for process=%s/seq=%s' % (process_update.process,
+        process_update.seq))
     return self.update_task_state(process_state, process_update, recovery)
 
 class AlaCarteRunnerState(object):

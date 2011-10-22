@@ -22,7 +22,10 @@ class Planner(object):
     return set(runnable) - self.running
 
   def get_running(self):
-    return [r for r in self.running]
+    return list(self.running)
+
+  def get_finished(self):
+    return list(self.finished)
 
   # TODO(wickman) regression tests here.
   def forget(self, process):

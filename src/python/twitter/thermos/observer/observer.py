@@ -4,6 +4,7 @@ import time
 import json
 import urllib
 import threading
+from collections import defaultdict
 
 from twitter.common import log
 from twitter.common.recordio import ThriftRecordReader
@@ -61,7 +62,6 @@ class TaskObserver(threading.Thread):
       active_tasks   = self._detector.get_active_uids()
       finished_tasks = self._detector.get_finished_uids()
 
-      self._muxer.lock()
       for active in active_tasks:
         if active in self._finishes:
           log.error('Found an active (%s) in finished tasks?' % active)
@@ -76,7 +76,6 @@ class TaskObserver(threading.Thread):
           self._actives.remove(finished) # remove from actives
           self._muxer.pop(finished)      # remove from checkpoint monitor
         self._finishes.add(finished)
-      self._muxer.unlock()
 
   def _read_task(self, uid):
     """
@@ -191,22 +190,24 @@ class TaskObserver(threading.Thread):
     if state is None:
       return {}
 
-    waiting, running, success, failed = [], [], [], []
+    waiting, running, success, failed, killed = [], [], [], [], []
     for process in state.processes:
       runs = state.processes[process].runs
       # No runs ==> nothing started.
       if len(runs) == 0:
         waiting.append(process)
       else:
-        if state.processes[process].state == TaskState.ACTIVE:
+        if state.processes[process].state == TaskRunState.ACTIVE:
           if runs[-1].run_state == ProcessRunState.WAITING:
             waiting.append(process)
           else:
             running.append(process)
-        elif state.processes[process].state == TaskState.SUCCESS:
+        elif state.processes[process].state == TaskRunState.SUCCESS:
           success.append(process)
-        elif state.processes[process].state == TaskState.FAILED:
+        elif state.processes[process].state == TaskRunState.FAILED:
           failed.append(process)
+        elif state.processes[process].state == TaskRunState.KILLED:
+          killed.append(process)
         else:
           # TODO(wickman)  Consider log.error instead of raising.
           raise TaskObserver.UnexpectedState(
@@ -216,9 +217,9 @@ class TaskObserver(threading.Thread):
       waiting = waiting,
       running = running,
       success = success,
-      failed = failed
+      failed = failed,
+      killed = killed
     )
-
 
   def _task(self, uid):
     """

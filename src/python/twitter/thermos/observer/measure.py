@@ -2,8 +2,8 @@ import time
 import threading
 
 from twitter.common import log
-from twitter.thermos.monitoring.pstree import ProcessSetFactory
-from twitter.thermos.monitoring.sample_vector import SampleVector
+from twitter.common.process import ProcessProviderFactory
+from twitter.thermos.observer.sample_vector import SampleVector
 
 from case_class import CaseClass
 
@@ -25,7 +25,7 @@ class TaskMeasurer(threading.Thread):
 
   def __init__(self, muxer, interval = SAMPLE_INTERVAL):
     self._muxer       = muxer
-    self._ps          = ProcessSetFactory.get()
+    self._ps          = ProcessProviderFactory.get()
     self._alive       = True
     self._interval    = interval
     self._processes   = {}    # MeasuredTuple -> SampleVector
@@ -64,7 +64,7 @@ class TaskMeasurer(threading.Thread):
       TaskMeasurer.sleep_until(last_interval + self._interval)
       time_now = time.time()
 
-      self._ps.refresh()
+      self._ps.collect_all()
       active_processes = [tup for tup in self._muxer.get_active_processes()]
       self._filter_inactive_processes(active_processes)
 
@@ -74,47 +74,40 @@ class TaskMeasurer(threading.Thread):
         if tup not in self._processes:
           log.debug('TaskMeasurer monitoring %s' % tup)
           self._processes[tup] = SampleVector(process.process)
-        children_pids = self._ps.get_children(process.pid)
-        pcpu = 0.0
-        for ph in children_pids:
-          if ph._exists: pcpu += ph.pcpu
-        self._processes[tup].add(time_now, pcpu / 100.0)
+        if process.pid in self._ps.pids():
+          children_pids = self._ps.children_of(process.pid)
+          pcpu = 0.0
+          for pid in children_pids:
+            ph = self._ps.get_handle(pid)
+            if ph.exists():
+              pcpu += ph.cpu_time()
+          self._processes[tup].add(time_now, pcpu)
 
-  def current_cpu_by_uid(self, task_id):
+  def current_cpu_by_clause(self, **clause):
     processes = filter(
-      lambda process: process.where(task_id = task_id) and (
-        self._processes[process].num_samples() > 0),
+      lambda process: process.where(**clause) and (
+        self._processes[process].num_samples() > 1),
       self._processes.keys())
 
-    # TODO(wickman)  Figure out better abstraction here.
-    last_samples = map(lambda process: self._processes[process].last_sample(), processes)
+    def cpu_percentage(process):
+      ((t0,s0), (t1,s1)) = self._processes[process].last_sample(2)
+      return (t1, float((s1-s0) / (t1-t0)))
+    last_samples = map(cpu_percentage, processes)
     if len(last_samples) == 0: return 0
     max_sample_time = max([s[0] for s in last_samples])
     pcpu = sum([s[1] for s in last_samples if s[0] == max_sample_time])
-    if (time.time() - max_sample_time < 10): # arbitrary: 10seconds old
+    # TODO(wickman)  Why is this 10 second delay there?
+    if (time.time() - max_sample_time < 10):
       return pcpu
     else:
       return 0
 
+  def current_cpu_by_uid(self, task_id):
+    return self.current_cpu_by_clause(task_id = task_id)
+
   # TODO(wickman)  Implement the proper O(n) solution.
   def current_cpu_by_process(self, task_id, process_name):
-    processes = filter(
-      lambda process: process.where(task_id = task_id, process_name = process_name) and (
-          self._processes[process].num_samples() > 0),
-        self._processes.keys())
-    if len(processes) == 0: return 0
-
-    if len(processes) > 1:
-      raise TaskMeasurer.InternalError(
-        "Unexpectedly large number of samples for task %s process %s, processes = %s" % (
-          task_id, process_name, processes))
-
-    # TODO(wickman)  Memoize time.time() and get rid of all the hardcoded constants.
-    last_sample = self._processes[processes[0]].last_sample()
-    if (time.time() - last_sample[0] < 10): # arbitrary time here
-      return last_sample[1]
-    else:
-      return 0
+    return self.current_cpu_by_clause(task_id = task_id, process_name = process_name)
 
   def samples_by_uid(self, task_id):
     processes = filter(

@@ -137,6 +137,9 @@ class Process(object):
       runner_pid = self._pid)
     self._initial_update = TaskRunnerCkpt(process_state = initial_update)
 
+  def has_initial_update(self):
+    return self._initial_update != None
+
   def initial_update(self):
     update = self._initial_update
     self._initial_update = None

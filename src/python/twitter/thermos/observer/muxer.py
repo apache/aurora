@@ -19,8 +19,7 @@ __tested__ = False
 # TODO(wickman) Properly pydoc this all.
 class TaskMuxer(object):
   """
-    Class responsible for multiplexing incoming process checkpoint streams into a coherent
-    task update stream.
+    Class responsible for monitoring TaskRunner checkpoints from actively running tasks.
   """
 
   class UnknownTask(Exception): pass
@@ -33,24 +32,20 @@ class TaskMuxer(object):
     self._dispatcher    = {}
     self._lock          = threading.Lock()
 
-  def lock(self):
-    self._lock.acquire()
-
-  def unlock(self):
-    self._lock.release()
-
   # add a monitored uid
   def add(self, uid):
-    self._uids.add(uid)
-    self._ckpt_head[uid] = 0
-    self._dispatcher[uid] = TaskCkptDispatcher()
-    self._init_ckpt(uid)
+    with self._lock:
+      self._uids.add(uid)
+      self._ckpt_head[uid] = 0
+      self._dispatcher[uid] = TaskCkptDispatcher()
+      self._init_ckpt(uid)
 
   def pop(self, uid):
-    self._uids.remove(uid)
-    self._ckpt_head.pop(uid, None)
-    self._runnerstate.pop(uid, None)
-    self._dispatcher.pop(uid, None)
+    with self._lock:
+      self._uids.remove(uid)
+      self._ckpt_head.pop(uid, None)
+      self._runnerstate.pop(uid, None)
+      self._dispatcher.pop(uid, None)
 
   def _apply_states(self, uid):
     """
@@ -65,6 +60,28 @@ class TaskMuxer(object):
     ckpt_offset = None
     try:
       ckpt_offset = os.stat(uid_ckpt).st_size
+
+      updated = False
+      if self._ckpt_head[uid] < ckpt_offset:
+        # TODO(wickman)  Some of this logic should be factored out.  Right now
+        # the select interface on Mac is broken, so we have to open/close on every
+        # read, whereas on Linux you can keep persistent filehandles and reset eof.
+        #
+        # TODO(wickman)  Consider using an inotify wrapper.
+        with open(uid_ckpt, 'r') as fp:
+          fp.seek(self._ckpt_head[uid])
+          rr = ThriftRecordReader(fp, TaskRunnerCkpt)
+          while True:
+            runner_update = rr.try_read()
+            if runner_update:
+              self._dispatcher[uid].update_runner_state(self._runnerstate[uid], runner_update)
+            else:
+              break
+          new_ckpt_head = fp.tell()
+          updated = self._ckpt_head[uid] != new_ckpt_head
+          if updated:
+            self._ckpt_head[uid] = new_ckpt_head
+      return updated
     except OSError, e:
       if e.errno == errno.ENOENT:
         log.error('Error in TaskMuxer: Could not read from discovered task %s' % uid_ckpt)
@@ -72,50 +89,32 @@ class TaskMuxer(object):
       else:
         raise
 
-    updated = False
-    if self._ckpt_head[uid] < ckpt_offset:
-      # TODO(wickman)  Some of this logic should be factored out.  Right now
-      # the select interface on Mac is broken, so we have to open/close on every
-      # read, whereas on Linux you can keep persistent filehandles and reset eof.
-      #
-      # TODO(wickman)  Implement this using inotify on Linux platforms.
-      with file(uid_ckpt, 'r') as fp:
-        fp.seek(self._ckpt_head[uid])
-        rr = ThriftRecordReader(fp, TaskRunnerCkpt)
-        while True:
-          runner_update = rr.try_read()
-          if runner_update:
-            self._dispatcher[uid].update_runner_state(self._runnerstate[uid], runner_update)
-          else:
-            break
-        new_ckpt_head = fp.tell()
-        updated = self._ckpt_head[uid] != new_ckpt_head
-        if updated:
-          self._ckpt_head[uid] = new_ckpt_head
-    return updated
-
   def _init_ckpt(self, uid):
     self._runnerstate[uid] = TaskRunnerState(processes = {})
     self._apply_states(uid)
 
   # grab an intermediate runnerstate
   def get_state(self, uid):
-    if uid in self._runnerstate:
-      return copy.deepcopy(self._runnerstate[uid])
-    return None
+    with self._lock:
+      if uid in self._runnerstate:
+        return copy.deepcopy(self._runnerstate[uid])
+      return None
 
-  # TODO(wickman)  Yielding with the lock is unsafe, fix this.
   def get_active_processes(self):
-    self.lock()
-    for uid in self._runnerstate:
-      applied_states = self._apply_states(uid)
-      state = self._runnerstate[uid]
-      for process in state.processes:
-        if len(state.processes[process].runs) == 0:
-          continue
-        last_run = state.processes[process].runs[-1]
-        if last_run.run_state == ProcessRunState.RUNNING:
-          tup = (uid, last_run, len(state.processes[process].runs)-1)
-          yield tup
-    # TODO(wickman)  In the meantime look at all call-sites to verify sanity.
-    self.unlock()
+    """
+      Get active processes.  Returned is a list of tuples of the form:
+        (task_id, ProcessState object of running object, its run number)
+    """
+    active_processes = []
+    with self._lock:
+      for uid in self._runnerstate:
+        applied_states = self._apply_states(uid)
+        state = self._runnerstate[uid]
+        for process in state.processes:
+          runs = state.processes[process].runs
+          if len(runs) == 0:
+            continue
+          last_run = runs[-1]
+          if last_run.run_state == ProcessRunState.RUNNING:
+            active_processes.append((uid, last_run, len(runs) - 1))
+    return active_processes

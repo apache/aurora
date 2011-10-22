@@ -1,9 +1,11 @@
 import os
 import time
 import select as fdselect
+import errno
 
 from twitter.common import log
 from twitter.common.recordio import ThriftRecordReader
+from twitter.common.quantity import Amount, Time
 
 from gen.twitter.thermos.ttypes import *
 from twitter.thermos.runner.process import Process
@@ -15,145 +17,106 @@ class ProcessMuxer(object):
   class ProcessExists(Exception): pass
   class ProcessNotFound(Exception): pass
 
-  LOST_TIMEOUT = 60.0  # if the pidfile hasn't shown up after this long, consider the process LOST
-
   def __init__(self):
-    self._unbound_processes = []
-    self._pid_to_process   = {}
-    self._pid_to_fp     = {}
-    self._pid_to_offset = {}
-    self._lost_pids     = set([])
+    self._processes = {} # process_name => Process()
+    self._fps = {}       # process_name => fp
 
   def register(self, task_process):
     log.debug('registering %s' % task_process)
-
-    pid = task_process.pid()
-    if not pid:
-      self._unbound_processes.append(task_process)
-    elif pid in self._pid_to_process:
-      raise ProcessMuxer.ProcessExists("Pid %s is already registered" % pid)
-    else:
-      self._pid_to_process[pid] = task_process
-
-  def _bind_processes(self):
-    new_unbound_processes = []
-    for process in self._unbound_processes:
-      if process.pid() is not None:
-        self._pid_to_process[process.pid()] = process
-      else:
-        new_unbound_processes.append(process)
-    self._unbound_processes = new_unbound_processes
-
-  def _try_register_pid_fp(self, pid):
-    pidfile = self._pid_to_process[pid].ckpt_file()
-    if os.path.exists(pidfile):
-      try:
-        self._pid_to_fp[pid] = file(pidfile, "r")
-        self._pid_to_offset[pid] = 0
-        return True
-      except OSError, e:
-        log.error("Unable to open pidfile %s (%s)" % (pidfile, e))
-    return False
-
-  def _try_open_pid_files(self):
-    registered_pids = set(self._pid_to_process.keys())
-    opened_pids     = set(self._pid_to_fp.keys())
-    # wait for pid files to come into existence.
-    # if they haven't come into existence fast enough, processes are LOST
-    time_now = time.time()
-    for pid in (registered_pids - opened_pids):
-      if not self._try_register_pid_fp(pid):
-        if (time_now - self._pid_to_process[pid].fork_time()) > ProcessMuxer.LOST_TIMEOUT:
-          if pid not in self._lost_pids:
-            self._lost_pids.add(pid)
-            # TODO(wickman) XXX - LOST state updates are not yet enqueued onto the
-            # checkpoint stream.
-
-  # This is needlessly complicated because of http://bugs.python.org/issue1706039
-  # Should work w/o it on Linux, but necessary on OS X.
-  def _try_reopen_pid_files(self, broken):
-    for (pid, fp) in self._pid_to_fp.iteritems():
-      if fp in broken:
-        fp.close()
-        log.debug("undoing EOF for %s" % self._pid_to_process[pid].ckpt_file())
-        # TODO(wickman) XXX - This should be wrapped in a try/except
-        self._pid_to_fp[pid] = file(self._pid_to_process[pid].ckpt_file(), "r")
-        self._pid_to_fp[pid].seek(self._pid_to_offset[pid])
-
-  def _find_pid_by_fp(self, fp):
-    for (pid, filep) in self._pid_to_fp.iteritems():
-      if fp == filep: return pid
-    return None
-
-  def _select_local_updates(self):
-    updates = []
-    for pid, process in self._pid_to_process.iteritems():
-      update = process.initial_update()
-      if update: updates.append(update)
-    log.debug('fdselect._local = %s' % updates)
-    return updates
-
-  # TODO(wickman)  pydoc this.
-  def select(self, timeout = 1.0):
-    self._bind_processes()
-    self._try_open_pid_files()
-
-    # get fds with data ready
-    pid_files = self._pid_to_fp.values()
-    log.debug('fdselect.select(%s)' % pid_files)
-    ready, _, broken = fdselect.select(pid_files, [], pid_files, timeout)
-
-    ready_pids = map(lambda fp: self._find_pid_by_fp(fp), ready)
-
-    log.debug('ready: %s' % ' '.join(map(lambda f: f.name, ready)))
-    if len(broken) > 0:
-      log.debug('ERROR! broken fds = %s' % ' '.join(map(lambda f: f.name, broken)))
-      self._try_reopen_pid_files(broken)
-
-    local_updates = self._select_local_updates()
-    updates = []
-    for pid in ready_pids:
-      ckpt = self._pid_to_fp[pid]
-      rr = ThriftRecordReader(ckpt, TaskRunnerCkpt)
-      while True:
-        wts = rr.try_read()
-        if wts:
-          updates.append(wts)
-        else:
-          self._pid_to_offset[pid] = ckpt.tell()
-          break
-    log.debug('watcher returning %s [%s local, %s out-of-process] updates ' % (
-      len(local_updates) + len(updates), len(local_updates), len(updates)))
-    updates = list(local_updates) + updates
-    return updates
-
-  def lost(self):
-    self._try_open_pid_files()
-    return map(lambda p: self._pid_to_process[p].name(), self._lost_pids)
-
-  def _find_pid_by_process(self, process):
-    pid = None
-    for find_pid in self._pid_to_process:
-      if self._pid_to_process[find_pid].name() == process:
-        pid = find_pid
-        break
-    return pid
+    if task_process.name() in self._processes:
+      raise ProcessMuxer.ProcessExists("Process %s is already registered" % task_process.name())
+    self._processes[task_process.name()] = task_process
 
   def unregister(self, process_name):
-    pid = self._find_pid_by_process(process_name)
-    if pid is not None:
-      for d in (self._pid_to_fp, self._pid_to_process, self._pid_to_offset):
-        d.pop(pid, None)
-      if pid in self._lost_pids:
-        self._lost_pids.remove(pid)
-    else:
-      found_process = None
-      for process in self._unbound_processes:
-        if process.name() == process_name:
-          found_process = process
-          break
-      if found_process is None:
-        raise ProcessMuxer.ProcessNotFound("No trace of process: %s" % process_name)
-      else:
-        self._unbound_processes.remove(found_process)
-    return pid
+    if process_name not in self._processes:
+      raise ProcessMuxer.ProcessNotFound("No trace of process: %s" % process_name)
+    self._processes.pop(process_name)
+    if process_name in self._fps:
+      self._fps[process_name].close()
+      self._fps.pop(process_name)
+
+  def _bind_processes(self):
+    for process in self._processes.values():
+      if process.name() not in self._fps and process.pid() is not None:
+        try:
+          self._fps[process.name()] = open(process.ckpt_file(), 'r')
+        except IOError as e:
+          if e.errno == errno.EEXIST:
+            pass
+        except:
+          log.error("Unexpected inability to open %s! %s" % (process.ckpt_file(), e))
+
+  def _select_local_updates(self, from_processes=None):
+    updates = []
+    if from_processes is None:
+      from_processes = self._processes.keys()
+    for process_name, process in self._processes.items():
+      if process_name not in from_processes: continue
+      update = process.initial_update()
+      if update:
+        updates.append(update)
+    return updates
+
+  def has_data(self, process):
+    """
+      Return true if we think that there are updates available from the supplied process.
+    """
+    if process in self._processes and self._processes[process].has_initial_update():
+      return True
+    if process not in self._fps:
+      return False
+    fp = self._fps[process]
+    rr = ThriftRecordReader(fp, TaskRunnerCkpt)
+    old_pos = fp.tell()
+    try:
+      expected_new_pos = os.fstat(fp.fileno()).st_size
+    except OSError as e:
+      pass
+    update = rr.try_read()
+    if update:
+      fp.seek(old_pos)
+      return True
+    return False
+
+  def select(self, from_processes=None):
+    """
+      Read and multiplex checkpoint records from all the forked off process managers.
+
+      Checkpoint records can come from one of two places:
+        in-process: checkpoint records synthesized for FORKED and LOST events
+        out-of-process: checkpoint records from from file descriptors of forked managers
+
+      Returns a list of TaskRunnerCkpt objects that were successfully read, or an empty
+      list if none were read.
+    """
+    self._bind_processes()
+    if from_processes is None:
+      from_processes = self._fps.keys()
+
+    updates = []
+    for (process, fp) in self._fps.items():
+      if process not in from_processes: continue
+      try:
+        fstat = os.fstat(fp.fileno())
+      except OSError as e:
+        log.error('Unable to fstat %s!' % fp.name)
+        continue
+      if fp.tell() > fstat.st_size:
+        log.error('Truncated checkpoint record detected on %s!' % fp.name)
+      elif fp.tell() < fstat.st_size:
+        rr = ThriftRecordReader(fp, TaskRunnerCkpt)
+        while True:
+          process_update = rr.try_read()
+          if process_update:
+            updates.append(process_update)
+          else:
+            break
+    local_updates = list(self._select_local_updates(from_processes))
+    if len(local_updates) > 0 or len(updates) > 0:
+      log.debug('select() returning %s local, %s out-of-process updates:' % (
+        len(local_updates), len(updates)))
+      for update in local_updates:
+        log.debug('  local: %s' % update)
+      for update in updates:
+        log.debug('  o-o-p: %s' % update)
+    return list(local_updates) + updates

@@ -47,7 +47,7 @@ enum ProcessRunState {
   FORKED    = 1   // starting, need to wait for signal from Process that it's running
   RUNNING   = 2   // currently running
   FINISHED  = 3   // ProcessWatcher has finished and updated process state
-  KILLED    = 4   // Killed by user action // not implemented yet
+  KILLED    = 4   // Killed by user action
 
   // abnormal states
   FAILED    = 5   // returncode != 0
@@ -73,7 +73,7 @@ struct ProcessState {
   6: double          start_time
   7: i32             pid
 
-  // RUNNING -> {FINISHED, FAILED}
+  // RUNNING -> {FINISHED, FAILED, KILLED}
   8: double          stop_time
   9: i32             return_code
 
@@ -87,12 +87,14 @@ enum TaskRunState {
   ACTIVE   = 0
   SUCCESS  = 1
   FAILED   = 2
+  KILLED   = 3
 }
 
 enum TaskState {
   ACTIVE   = 0
   SUCCESS  = 1
   FAILED   = 2
+  KILLED   = 3
 }
 
 struct ProcessHistory {
@@ -107,6 +109,7 @@ struct TaskRunnerHeader {
   2: i64    launch_time
   3: string sandbox
   4: string hostname
+  5: string user
 }
 
 struct TaskAllocatedPort {

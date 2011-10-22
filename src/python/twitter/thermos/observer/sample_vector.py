@@ -14,9 +14,9 @@ class SampleVector(object):
   def num_samples(self):
     return len(self._samples)
 
-  def last_sample(self):
-    if len(self._samples) > 0:
-      return self._samples[-1]
+  def last_sample(self, N=1):
+    if len(self._samples) >= N:
+      return self._samples[-N:]
     else:
       return None
 

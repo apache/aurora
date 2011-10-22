@@ -8,12 +8,6 @@ python_library(
   ]
 )
 
-python_library(
-  name = 'monitoring',
-  sources = rglobs('monitoring/*.py'),
-  dependencies = []
-)
-
 OBSERVER_ASSETS = rglobs('observer/http/assets/*') + rglobs('observer/http/templates/*')
 python_library(
   name = 'observer',
@@ -21,7 +15,7 @@ python_library(
   resources = OBSERVER_ASSETS,
   dependencies = [
     pants(':base'),
-    pants(':monitoring'),
+    pants('src/python/twitter/common/process'),
     pants('src/thrift/com/twitter/tcl:py-thrift'),
     pants('3rdparty/python:bottle'),
     pants('3rdparty/python:mako')
@@ -33,6 +27,8 @@ python_library(
   sources = rglobs('runner/*.py'),
   dependencies = [
     pants(':base'),
+    pants('src/python/twitter/common/process'),
+    pants('src/python/twitter/common/quantity'),
     pants('src/python/twitter/tcl:scheduler'),
     pants('src/thrift/com/twitter/tcl:py-thrift')
   ]

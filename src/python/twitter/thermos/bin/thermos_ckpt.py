@@ -2,7 +2,7 @@ import os
 import sys
 import pprint
 
-from gen.twitter.thermos.ttypes import TaskRunnerState, TaskRunnerCkpt
+from gen.twitter.thermos.ttypes import TaskRunnerState, TaskRunnerCkpt, TaskState
 
 from twitter.common import app
 from twitter.common.recordio import ThriftRecordReader
@@ -40,7 +40,7 @@ def main(args):
     pprint.pprint(wrs.header)
 
     print '\nRecovered Task State'
-    pprint.pprint(wrs.state)
+    pprint.pprint(TaskState._VALUES_TO_NAMES[wrs.state])
 
     print '\nRecovered Allocated Ports'
     pprint.pprint(wrs.ports)
