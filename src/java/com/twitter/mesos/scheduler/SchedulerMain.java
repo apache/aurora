@@ -18,6 +18,7 @@ import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.SchedulerDriver;
 
 import com.twitter.common.application.AbstractApplication;
+import com.twitter.common.application.AppLauncher;
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.application.LocalServiceRegistry;
 import com.twitter.common.application.modules.HttpModule;
@@ -25,6 +26,7 @@ import com.twitter.common.application.modules.LogModule;
 import com.twitter.common.application.modules.StatsExportModule;
 import com.twitter.common.application.modules.StatsModule;
 import com.twitter.common.args.Arg;
+import com.twitter.common.args.ArgFilters;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.base.Closure;
 import com.twitter.common.quantity.Amount;
@@ -39,9 +41,6 @@ import com.twitter.thrift.Status;
 
 /**
  * Launcher for the twitter mesos scheduler.
- *
- * TODO(William Farner): Include information in /schedulerz about who is the current scheduler
- * leader.
  *
  * @author William Farner
  */
@@ -156,5 +155,9 @@ public class SchedulerMain extends AbstractApplication {
           }
         }
     ).start();
+  }
+
+  public static void main(String[] args) {
+    AppLauncher.launch(new SchedulerMain(), ArgFilters.SELECT_ALL, args);
   }
 }
