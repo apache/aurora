@@ -31,6 +31,7 @@ import com.twitter.common.application.Lifecycle;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.base.Closure;
+import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
@@ -182,6 +183,7 @@ class MesosSchedulerImpl implements Scheduler {
     return assignedTaskBuilder.build();
   }
 
+  @Timed("scheduler_resource_offers")
   @Override
   public void resourceOffers(SchedulerDriver driver, List<Offer> offers) {
     Preconditions.checkState(frameworkID != null, "Must be registered before receiving offers.");
@@ -221,6 +223,7 @@ class MesosSchedulerImpl implements Scheduler {
     LOG.info("Offer rescinded but we don't care " + offerID);
   }
 
+  @Timed("scheduler_status_update")
   @Override
   public void statusUpdate(SchedulerDriver driver, TaskStatus status) {
     String info = status.hasData() ? status.getData().toStringUtf8() : null;
@@ -250,6 +253,7 @@ class MesosSchedulerImpl implements Scheduler {
     System.exit(1);
   }
 
+  @Timed("scheduler_framework_message")
   @Override
   public void frameworkMessage(SchedulerDriver driver, SlaveID slave, ExecutorID executor,
       byte[] data) {
