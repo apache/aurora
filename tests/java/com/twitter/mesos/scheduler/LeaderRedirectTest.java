@@ -115,7 +115,7 @@ public class LeaderRedirectTest extends EasyMockTest {
   }
 
   private static HostAndPort localPort(int port) throws UnknownHostException {
-    return HostAndPort.fromParts(InetAddress.getLocalHost().getHostAddress(), port);
+    return HostAndPort.fromParts(InetAddress.getLocalHost().getHostName(), port);
   }
 
   private static final Function<HostAndPort, ServiceInstance> CREATE_INSTANCE =

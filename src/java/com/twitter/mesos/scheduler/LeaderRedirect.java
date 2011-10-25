@@ -74,8 +74,7 @@ public class LeaderRedirect {
   private Optional<HostAndPort> getLocalHttp() {
     InetSocketAddress localHttp = serviceRegistry.getAuxiliarySockets().get(HTTP_PORT_NAME);
     return (localHttp == null) ? Optional.<HostAndPort>absent()
-        : Optional.of(HostAndPort.fromParts(localHttp.getAddress().getHostAddress(),
-                                            localHttp.getPort()));
+        : Optional.of(HostAndPort.fromParts(localHttp.getHostName(), localHttp.getPort()));
   }
 
   /**
