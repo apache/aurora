@@ -1,5 +1,6 @@
 package com.twitter.mesos.scheduler;
 
+import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -7,6 +8,7 @@ import java.util.logging.Logger;
 import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
+import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
