@@ -11,6 +11,7 @@ import javax.annotation.Nullable;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
+import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
@@ -462,11 +463,13 @@ public class SchedulerCoreImpl implements SchedulerCore {
       if (query.specifiesJobOnly()) {
         try {
           stateManager.finishUpdate(
-              query.base().getOwner().getRole(), query.base().getJobName(), null,
+              query.base().getOwner().getRole(), query.base().getJobName(),
+              Optional.<String>absent(),
               UpdateResult.TERMINATE);
         } catch (UpdateException e) {
           LOG.log(Level.WARNING,
-              "Exception while killing job update associated with " + query.getJobKey(), e);
+              "Failed to kill the job update associated with " + query.getJobKey(),
+              e.getMessage());
         }
       }
 
@@ -581,7 +584,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public synchronized void finishUpdate(String role, String jobName, @Nullable String updateToken,
+  public synchronized void finishUpdate(String role, String jobName, Optional<String> updateToken,
       UpdateResult result) throws ScheduleException {
     checkStarted();
 

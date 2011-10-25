@@ -6,6 +6,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
+import com.google.common.base.Optional;
 
 import org.apache.commons.lang.builder.EqualsBuilder;
 import org.apache.commons.lang.builder.ToStringBuilder;
@@ -153,12 +154,12 @@ public interface SchedulerCore extends Function<Query, Iterable<TwitterTaskInfo>
    * @param role The job owner.
    * @param jobName Name of the job being updated.
    * @param updateToken The update token provided from {@link #startUpdate(JobConfiguration)}, or
-   *     {@code null} if the update is being forcibly terminated.
+   *     not present if the update is being forcibly terminated.
    * @param result {@code true} if the update was successful, {@code false} otherwise.
    * @throws ScheduleException If an update for the job does not exist or if the update token is
    *     invalid.
    */
-  void finishUpdate(String role, String jobName, @Nullable String updateToken, UpdateResult result)
+  void finishUpdate(String role, String jobName, Optional<String> updateToken, UpdateResult result)
       throws ScheduleException;
 
   /**

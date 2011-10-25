@@ -14,6 +14,7 @@ import javax.annotation.Nullable;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
+import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
@@ -358,14 +359,14 @@ class StateManager {
    *
    * @param role Role owning the update to finish.
    * @param job Job to finish updating.
-   * @param updateToken Token associated with the update.  If non-null, the token must match the
+   * @param updateToken Token associated with the update.  If not present, the token must match the
    *     the stored token for the update.
    * @param result The result of the update.
    * @throws UpdateException If an update is not in-progress for the job, or the non-null token
    *     does not match the stored token.
    */
   synchronized void finishUpdate(final String role, final String job,
-      @Nullable final String updateToken, final UpdateResult result) throws UpdateException {
+      final Optional<String> updateToken, final UpdateResult result) throws UpdateException {
     checkNotBlank(role);
     checkNotBlank(job);
 
@@ -383,7 +384,7 @@ class StateManager {
           throw new UpdateException("Update does not exist for " + jobKey);
         }
 
-        if ((updateToken != null) && !updateToken.equals(updateConfig.getUpdateToken())) {
+        if ((updateToken.isPresent()) && !updateToken.get().equals(updateConfig.getUpdateToken())) {
           throw new UpdateException("Invalid update token for " + jobKey);
         }
 

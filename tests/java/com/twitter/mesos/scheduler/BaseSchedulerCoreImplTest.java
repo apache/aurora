@@ -1,6 +1,7 @@
 package com.twitter.mesos.scheduler;
 
 import com.google.common.base.Function;
+import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.base.Splitter;
@@ -1302,7 +1303,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1);
     scheduler.createJob(job);
     String updateToken = scheduler.startUpdate(job);
-    scheduler.finishUpdate(OWNER_A.getRole(), job.getName(), updateToken, SUCCESS);
+    scheduler.finishUpdate(OWNER_A.getRole(), job.getName(), Optional.of(updateToken), SUCCESS);
 
     // If the finish update succeeded internally, we should be able to start a new update.
     scheduler.startUpdate(job);
@@ -1314,14 +1315,14 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     buildScheduler();
 
     try {
-      scheduler.finishUpdate("foo", "foo", "foo", SUCCESS);
+      scheduler.finishUpdate("foo", "foo", Optional.of("foo"), SUCCESS);
       fail("Call should have failed.");
     } catch (ScheduleException e) {
       // Expected.
     }
 
     try {
-      scheduler.finishUpdate("foo", "foo", null, SUCCESS);
+      scheduler.finishUpdate("foo", "foo", Optional.<String>absent(), SUCCESS);
       fail("Call should have failed.");
     } catch (ScheduleException e) {
       // Expected.
@@ -1338,13 +1339,13 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     String token = scheduler.startUpdate(job);
 
     try {
-      scheduler.finishUpdate(OWNER_B.getRole(), job.getName(), "foo", SUCCESS);
+      scheduler.finishUpdate(OWNER_B.getRole(), job.getName(), Optional.of("foo"), SUCCESS);
       fail("Finish update should have failed.");
     } catch (ScheduleException e) {
       // expected.
     }
 
-    scheduler.finishUpdate(OWNER_A.getRole(), job.getName(), token, SUCCESS);
+    scheduler.finishUpdate(OWNER_A.getRole(), job.getName(), Optional.of(token), SUCCESS);
   }
 
   @Test
@@ -1363,7 +1364,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       // expected.
     }
 
-    scheduler.finishUpdate(OWNER_A.getRole(), JOB_A, token, SUCCESS);
+    scheduler.finishUpdate(OWNER_A.getRole(), JOB_A, Optional.of(token), SUCCESS);
   }
 
   private final Function<Integer, String> newCommandFactory = new Function<Integer, String>() {
@@ -1417,7 +1418,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       Set<ScheduledTask> tasks = getTasks(Query.byStatus(RUNNING));
       verify(tasks, job, updatedJob);
 
-      scheduler.finishUpdate(OWNER_A.role, JOB_A, updateToken, result);
+      scheduler.finishUpdate(OWNER_A.role, JOB_A, Optional.of(updateToken), result);
       scheduler.startUpdate(job);
     }
 

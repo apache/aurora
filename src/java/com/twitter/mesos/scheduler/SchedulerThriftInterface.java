@@ -6,6 +6,7 @@ import java.util.logging.Logger;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -315,7 +316,9 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     FinishUpdateResponse response = new FinishUpdateResponse();
     try {
       schedulerCore.finishUpdate(role, jobName,
-          updateResult == UpdateResult.TERMINATE ? null : updateToken, updateResult);
+          updateResult == UpdateResult.TERMINATE ?
+              Optional.<String>absent() : Optional.of(updateToken),
+          updateResult);
       response.setResponseCode(UpdateResponseCode.OK);
     } catch (ScheduleException e) {
       response.setResponseCode(UpdateResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
