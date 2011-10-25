@@ -148,7 +148,8 @@ class StateManager {
       }
   );
 
-  private final Function<TwitterTaskInfo, ScheduledTask> taskCreator =
+  @VisibleForTesting
+  final Function<TwitterTaskInfo, ScheduledTask> taskCreator =
       new Function<TwitterTaskInfo, ScheduledTask>() {
         @Override public ScheduledTask apply(TwitterTaskInfo task) {
           return new ScheduledTask()
@@ -1001,22 +1002,14 @@ class StateManager {
       });
     }
 
-    private boolean isAccounted(ScheduleStatus status) {
-      return (status != INIT) && (status != UNKNOWN);
-    }
-
     void incrementCount(String jobKey, ScheduleStatus status) {
-      if (isAccounted(status)) {
-        countersByStatus.get(status).incrementAndGet();
-        getCounter(jobKey, status).incrementAndGet();
-      }
+      countersByStatus.get(status).incrementAndGet();
+      getCounter(jobKey, status).incrementAndGet();
     }
 
     void decrementCount(String jobKey, ScheduleStatus status) {
-      if (isAccounted(status)) {
-        countersByStatus.get(status).decrementAndGet();
-        getCounter(jobKey, status).decrementAndGet();
-      }
+      countersByStatus.get(status).decrementAndGet();
+      getCounter(jobKey, status).decrementAndGet();
     }
 
     void adjustCount(String jobKey, ScheduleStatus oldStatus, ScheduleStatus newStatus) {

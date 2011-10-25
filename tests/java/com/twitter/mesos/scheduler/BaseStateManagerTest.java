@@ -8,6 +8,8 @@ import com.twitter.common.util.testing.FakeClock;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.db.testing.DbStorageTestUtil;
+import com.twitter.mesos.scheduler.storage.Storage;
+
 import org.apache.mesos.Protos.SlaveID;
 import org.junit.Before;
 
@@ -19,6 +21,7 @@ public abstract class BaseStateManagerTest extends EasyMockTest {
   protected Closure<String> killTaskCallback;
   protected StateManager stateManager;
   protected FakeClock clock = new FakeClock();
+  protected Storage storage;
 
   @Before
   public void stateManagerSetUp() throws Exception {
@@ -26,9 +29,9 @@ public abstract class BaseStateManagerTest extends EasyMockTest {
     stateManager = createStateManager();
   }
 
-  private StateManager createStateManager() throws Exception {
-    final StateManager stateManager =
-        new StateManager(DbStorageTestUtil.setupStorage(this), clock);
+  protected StateManager createStateManager(Storage storage) {
+    this.storage = storage;
+    final StateManager stateManager = new StateManager(storage, clock);
     stateManager.initialize();
     stateManager.start(killTaskCallback);
     addTearDown(new TearDown() {
@@ -37,6 +40,14 @@ public abstract class BaseStateManagerTest extends EasyMockTest {
       }
     });
     return stateManager;
+  }
+
+  private StateManager createStateManager() throws Exception {
+    return createStateManager(createStorage());
+  }
+
+  protected Storage createStorage() throws Exception {
+    return DbStorageTestUtil.setupStorage(this);
   }
 
   protected static TwitterTaskInfo makeTask(String owner, String job, int shard) {

@@ -6,8 +6,15 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.conversions.storage;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduleStatus;
+import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
+import com.twitter.mesos.scheduler.storage.Storage.Work;
+import com.twitter.mesos.scheduler.storage.Storage.Work.NoResult;
+
 import org.easymock.EasyMock;
 import org.junit.Test;
 
@@ -15,6 +22,7 @@ import java.util.Set;
 
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
+import static com.twitter.mesos.gen.ScheduleStatus.INIT;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
 import static com.twitter.mesos.gen.ScheduleStatus.LOST;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
@@ -38,10 +46,9 @@ public class StateManagerTest extends BaseStateManagerTest {
   public void testAbandonRunningTask() {
     control.replay();
 
-    Set<String> taskIds = stateManager.insertTasks(ImmutableSet.of(
+    Set<String> taskIds = insertTasks(
         makeTask("jim", "myJob", 0),
-        makeTask("jack", "otherJob", 0)
-    ));
+        makeTask("jack", "otherJob", 0));
     assertVarCount("jim", "myJob", PENDING, 1);
     assertVarCount("jack", "otherJob", PENDING, 1);
 
@@ -56,6 +63,7 @@ public class StateManagerTest extends BaseStateManagerTest {
     assertVarCount("jim", "myJob", RUNNING, 0);
     assertVarCount("jim", "myJob", LOST, 0);
     assertVarCount("jim", "myJob", PENDING, 1);
+    assertVarCount("jim", "myJob", UNKNOWN, 0);
     assertTrue(stateManager.fetchTasks(Query.byId(task1)).isEmpty());
   }
 
@@ -63,15 +71,16 @@ public class StateManagerTest extends BaseStateManagerTest {
   public void testAbandonFinishedTask() {
     control.replay();
 
-    Set<String> taskIds = stateManager.insertTasks(ImmutableSet.of(
+    Set<String> taskIds = insertTasks(
         makeTask("jim", "myJob", 0),
-        makeTask("jack", "otherJob", 0)
-    ));
+        makeTask("jack", "otherJob", 0));
     String task1 = Iterables.get(taskIds, 0);
     assignTask(task1, HOST_A);
     changeState(task1, RUNNING);
     changeState(task1, FINISHED);
+    assertVarCount("jim", "myJob", FINISHED, 1);
     stateManager.abandonTasks(ImmutableSet.of(task1));
+    assertVarCount("jim", "myJob", FINISHED, 0);
     assertTrue(stateManager.fetchTasks(Query.byId(task1)).isEmpty());
   }
 
@@ -79,13 +88,12 @@ public class StateManagerTest extends BaseStateManagerTest {
   public void testKillPendingTask() {
     control.replay();
 
-    String taskId = Iterables.getOnlyElement(stateManager.insertTasks(ImmutableSet.of(
-        makeTask("jim", "myJob", 0)
-    )));
+    String taskId = insertTask(makeTask("jim", "myJob", 0));
     assertVarCount("jim", "myJob", PENDING, 1);
     changeState(taskId, KILLING);
     assertVarCount("jim", "myJob", PENDING, 0);
     assertVarCount("jim", "myJob", KILLING, 0);
+    assertVarCount("jim", "myJob", UNKNOWN, 0);
   }
 
   @Test
@@ -94,9 +102,7 @@ public class StateManagerTest extends BaseStateManagerTest {
 
     control.replay();
 
-    String taskId = Iterables.getOnlyElement(stateManager.insertTasks(ImmutableSet.of(
-        makeTask("jim", "myJob", 0)
-    )));
+    String taskId = insertTask(makeTask("jim", "myJob", 0));
 
     assignTask(taskId, HOST_A);
     changeState(taskId, RUNNING);
@@ -104,6 +110,7 @@ public class StateManagerTest extends BaseStateManagerTest {
     assertVarCount("jim", "myJob", KILLING, 1);
     changeState(taskId, UNKNOWN);
     assertVarCount("jim", "myJob", KILLING, 0);
+    assertVarCount("jim", "myJob", UNKNOWN, 0);
   }
 
   @Test
@@ -123,9 +130,7 @@ public class StateManagerTest extends BaseStateManagerTest {
     control.replay();
 
     for (ScheduleStatus finalState : testCases.keySet()) {
-      String taskId = Iterables.getOnlyElement(stateManager.insertTasks(ImmutableSet.of(
-          makeTask("jim", "lost_" + finalState, 0)
-      )));
+      String taskId = insertTask(makeTask("jim", "lost_" + finalState, 0));
 
       for (ScheduleStatus prepState : testCases.get(finalState)) {
         changeState(taskId, prepState);
@@ -135,6 +140,61 @@ public class StateManagerTest extends BaseStateManagerTest {
       clock.advance(Amount.of(1L, Time.MILLISECONDS));
       stateManager.scanOutstandingTasks();
     }
+  }
+
+  @Test
+  public void testInitNormallyHidden() throws Exception {
+    control.replay();
+
+    insertTask(makeTask("jim", "myJob", 0));
+    assertVarCount("jim", "myJob", PENDING, 1);
+  }
+
+  @Test
+  public void testTracksInit() throws Exception {
+    final TwitterTaskInfo task = makeTask("jim", "myJob", 0);
+
+    // Insert a task in the INIT state, and restart the state manager.
+    storage.doInTransaction(new Work.NoResult.Quiet() {
+      @Override
+      protected void execute(StoreProvider storeProvider) {
+        storeProvider.getTaskStore()
+            .saveTasks(ImmutableSet.of(stateManager.taskCreator.apply(task)));
+      }
+    });
+    stateManager = createStateManager(storage);
+
+    control.replay();
+
+    assertVarCount("jim", "myJob", INIT, 1);
+  }
+
+  @Test
+  public void testTracksUnknown() throws Exception {
+    final TwitterTaskInfo task = makeTask("jim", "myJob", 0);
+
+    // Insert a task in the INIT state, and restart the state manager.
+    storage.doInTransaction(new Work.NoResult.Quiet() {
+      @Override protected void execute(StoreProvider storeProvider) {
+        ScheduledTask scheduledTask = stateManager.taskCreator.apply(task);
+        scheduledTask.setStatus(UNKNOWN);
+        storeProvider.getTaskStore()
+            .saveTasks(ImmutableSet.of(scheduledTask));
+      }
+    });
+    stateManager = createStateManager(storage);
+
+    control.replay();
+
+    assertVarCount("jim", "myJob", UNKNOWN, 1);
+  }
+
+  private String insertTask(TwitterTaskInfo task) {
+    return Iterables.getOnlyElement(insertTasks(task));
+  }
+
+  private Set<String> insertTasks(TwitterTaskInfo... tasks) {
+    return stateManager.insertTasks(ImmutableSet.copyOf(tasks));
   }
 
   private void assertVarCount(String owner, String job, ScheduleStatus status, long expected) {
