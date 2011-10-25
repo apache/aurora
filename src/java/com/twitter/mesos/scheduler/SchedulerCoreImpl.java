@@ -345,22 +345,20 @@ public class SchedulerCoreImpl implements SchedulerCore {
     vars.resourceOffers.incrementAndGet();
 
     final String hostname = offer.getHostname();
-    Predicate<TwitterTaskInfo> hostResourcesFilter =
-        schedulingFilter.staticFilter(Resources.from(offer), hostname);
-
     ExecutorKey executorKey =
         new ExecutorKey(offer.getSlaveId(), defaultExecutorId, offer.getHostname());
-
 
     Query query;
     Predicate<TwitterTaskInfo> postFilter;
     if (!executorPulseMonitor.isAlive(executorKey)) {
       TwitterTaskInfo bootstrapTask = makeBootstrapTask();
+      Predicate<TwitterTaskInfo> resourceFilter =
+          schedulingFilter.staticFilter(Resources.from(offer), null);
 
       // Mesos core does not account for the resources the executor itself will use up when it has
       // not yet started - do that accounting here and fail fast if we can't both run the executor
       // and the bootstrap task on the given host.
-      if (!hostResourcesFilter.apply(executorResourceAugmenter.apply(bootstrapTask))) {
+      if (!resourceFilter.apply(executorResourceAugmenter.apply(bootstrapTask))) {
         LOG.severe(String.format(
             "Insufficient resources on host %s to start executor plus a bootstrap task", hostname));
         return null;
@@ -374,7 +372,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
     } else {
       query = Query.and(
           Query.byStatus(PENDING),
-          Predicates.compose(hostResourcesFilter, Tasks.SCHEDULED_TO_INFO));
+          Predicates.compose(schedulingFilter.staticFilter(Resources.from(offer), hostname),
+              Tasks.SCHEDULED_TO_INFO));
       // Perform the (more expensive) check to find tasks matching the dynamic state of the machine.
       postFilter = schedulingFilter.dynamicHostFilter(this, hostname);
     }

@@ -1038,7 +1038,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     final Predicate<TwitterTaskInfo> staticFilter =
         createMock(new Clazz<Predicate<TwitterTaskInfo>>() {});
     expect(staticFilter.apply(augmented)).andReturn(false);
-    expect(schedulingFilter.staticFilter(offerResources, SLAVE_HOST_1)).andReturn(staticFilter);
+    expect(schedulingFilter.staticFilter(offerResources, null)).andReturn(staticFilter);
 
     control.replay();
 

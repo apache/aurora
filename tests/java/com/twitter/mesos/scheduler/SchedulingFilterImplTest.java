@@ -62,7 +62,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   public void testMeetsOffer() throws Exception {
     control.replay();
 
-    Predicate<TwitterTaskInfo> filter = defaultFilter.staticFilter(DEFAULT_OFFER, HOST_A);
+    Predicate<TwitterTaskInfo> filter = defaultFilter.staticFilter(DEFAULT_OFFER, null);
     assertThat(filter.apply(makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)), is(true));
     assertThat(filter.apply(makeTask(DEFAULT_CPUS - 1, DEFAULT_RAM - 1, DEFAULT_DISK - 1)),
         is(true));
@@ -74,7 +74,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
     Resources twoPorts = new Resources(DEFAULT_CPUS, Amount.of(DEFAULT_RAM, Data.MB), 2);
 
-    Predicate<TwitterTaskInfo> filter = defaultFilter.staticFilter(twoPorts, HOST_A);
+    Predicate<TwitterTaskInfo> filter = defaultFilter.staticFilter(twoPorts, null);
 
     TwitterTaskInfo noPortTask = makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
         .setStartCommand("%task_id%");
@@ -94,7 +94,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   public void testInsufficientResources() throws Exception {
     control.replay();
 
-    Predicate<TwitterTaskInfo> filter = defaultFilter.staticFilter(DEFAULT_OFFER, HOST_A);
+    Predicate<TwitterTaskInfo> filter = defaultFilter.staticFilter(DEFAULT_OFFER, null);
     assertThat(filter.apply(makeTask(DEFAULT_CPUS + 1, DEFAULT_RAM + 1, DEFAULT_DISK + 1)),
         is(false));
     assertThat(filter.apply(makeTask(DEFAULT_CPUS + 1, DEFAULT_RAM, DEFAULT_DISK)),

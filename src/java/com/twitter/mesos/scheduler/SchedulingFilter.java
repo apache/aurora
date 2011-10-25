@@ -4,6 +4,8 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
 
+import javax.annotation.Nullable;
+
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
@@ -36,10 +38,12 @@ public interface SchedulingFilter {
    * any dynamic state.
    *
    * @param resourceOffer The resource offer to check against tasks.
-   * @param slaveHost The slave host that the resource offer is associated with.
+   * @param slaveHost The slave host that the resource offer is associated with, or {@code null} if
+   * the machine restrictions should be ignored.
    * @return A new predicate that can be used to find tasks satisfied by the offer.
    */
-  public Predicate<TwitterTaskInfo> staticFilter(Resources resourceOffer, String slaveHost);
+  public Predicate<TwitterTaskInfo> staticFilter(
+      Resources resourceOffer, @Nullable String slaveHost);
 
   /**
    * Creates a filter that will make decisions about whether tasks are allowed to run on a machine,
@@ -156,19 +160,11 @@ public interface SchedulingFilter {
 
     @Override
     public Predicate<TwitterTaskInfo> staticFilter(Resources resourceOffer,
-        String slaveHost) {
-      final Predicate<TwitterTaskInfo> offerSatisfiesTask = offerSatisfiesTask(resourceOffer);
-      final Predicate<TwitterTaskInfo> isPairAllowed = meetsMachineReservation(slaveHost);
-
-      return new Predicate<TwitterTaskInfo>() {
-        @Override public boolean apply(TwitterTaskInfo task) {
-          return Predicates.and(ImmutableList.<Predicate<TwitterTaskInfo>>builder()
-              .add(offerSatisfiesTask)
-              .add(isPairAllowed)
-              .build())
-              .apply(task);
-        }
-      };
+        @Nullable String slaveHost) {
+      if (slaveHost == null) {
+        return offerSatisfiesTask(resourceOffer);
+      }
+      return Predicates.and(offerSatisfiesTask(resourceOffer), meetsMachineReservation(slaveHost));
     }
 
     @Override
