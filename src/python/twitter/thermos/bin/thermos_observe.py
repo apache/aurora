@@ -2,8 +2,7 @@ import sys
 import time
 
 from twitter.common import app
-from twitter.common.http import RootServer
-from twitter.common.metrics import RootMetrics, LambdaGauge, varz
+from twitter.common.app.modules.http import RootServer
 from twitter.thermos.observer.observer import TaskObserver
 from twitter.thermos.observer.http import BottleObserver
 
