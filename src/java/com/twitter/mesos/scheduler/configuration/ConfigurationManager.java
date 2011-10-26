@@ -214,6 +214,22 @@ public class ConfigurationManager {
     }
   }
 
+  private static final String START_COMMAND_FIELD = "start_command";
+
+  /**
+   * Resets the {@code start_command} to the original value in the task's configuration.  This can be used
+   * to undo any command-line expansion in a previous iteration of a task.
+   *
+   * @param task Task whose {@code start_command} should be reset.
+   */
+  public static void resetStartCommand(TwitterTaskInfo task) {
+    Preconditions.checkNotNull(task);
+    // This condition realistically only fails in unit tests.
+    if (task.isSetConfiguration()) {
+      task.setStartCommand(task.getConfiguration().get(START_COMMAND_FIELD));
+    }
+  }
+
   private static final List<Field<?>> FIELDS = ImmutableList.of(
       new TypedField<String>(String.class, "hdfs_path", null) {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetHdfsPath(); }
@@ -222,7 +238,7 @@ public class ConfigurationManager {
           task.setHdfsPath(value);
         }
       },
-      new TypedField<String>(String.class, "start_command") {
+      new TypedField<String>(String.class, START_COMMAND_FIELD) {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetStartCommand(); }
 
         @Override void apply(TwitterTaskInfo task, String value) throws TaskDescriptionException {

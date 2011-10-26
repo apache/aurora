@@ -1302,8 +1302,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1);
     scheduler.createJob(job);
-    String updateToken = scheduler.startUpdate(job);
-    scheduler.finishUpdate(OWNER_A.getRole(), job.getName(), Optional.of(updateToken), SUCCESS);
+    Optional<String> updateToken = Optional.of(scheduler.startUpdate(job));
+    scheduler.finishUpdate(OWNER_A.getRole(), job.getName(), updateToken, SUCCESS);
 
     // If the finish update succeeded internally, we should be able to start a new update.
     scheduler.startUpdate(job);
@@ -1336,7 +1336,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1);
     scheduler.createJob(job);
-    String token = scheduler.startUpdate(job);
+    Optional<String> token = Optional.of(scheduler.startUpdate(job));
 
     try {
       scheduler.finishUpdate(OWNER_B.getRole(), job.getName(), Optional.of("foo"), SUCCESS);
@@ -1345,7 +1345,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       // expected.
     }
 
-    scheduler.finishUpdate(OWNER_A.getRole(), job.getName(), Optional.of(token), SUCCESS);
+    scheduler.finishUpdate(OWNER_A.getRole(), job.getName(), token, SUCCESS);
   }
 
   @Test
@@ -1801,7 +1801,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     String taskId = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)));
 
     Set<Integer> assignedPorts = ImmutableSet.of(80, 81, 82);
-    Offer threePorts = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096, ImmutableSet.of(Pair.of(80, 82)));
+    Offer threePorts = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096,
+        ImmutableSet.of(Pair.of(80, 82)));
     sendOffer(threePorts, taskId, SLAVE_ID, SLAVE_HOST_1,
         ImmutableSet.of("one", "two", "three"), assignedPorts);
 
@@ -1809,6 +1810,45 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     assertThat(ImmutableSet.copyOf(Splitter.on(" ").split(task.getTask().getStartCommand())),
         is(ImmutableSet.of("80", "81", "82")));
+  }
+
+  @Test
+  public void testPortResourceResetAfterReschedule() throws Exception {
+    expectOffer(true);
+    expectOffer(true);
+
+    control.replay();
+    buildScheduler();
+
+    TwitterTaskInfo config = new TwitterTaskInfo(DEFAULT_TASK);
+    config.putToConfiguration("start_command", "%port:one%");
+
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, config, 1));
+
+    String taskId = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)));
+
+    Set<Integer> assignedPorts = ImmutableSet.of(80);
+    Offer threePorts = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096,
+        ImmutableSet.of(Pair.of(80, 82)));
+    sendOffer(threePorts, taskId, SLAVE_ID, SLAVE_HOST_1, ImmutableSet.of("one"), assignedPorts);
+
+    AssignedTask task = getTask(taskId).getAssignedTask();
+    assertThat(task.getTask().getStartCommand(), is("80"));
+
+    // The task should be rescheduled.
+    changeStatus(taskId, LOST);
+
+    String newTaskId = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)));
+    assertThat(getTask(newTaskId).getAssignedTask().getTask().getStartCommand(), is("%port:one%"));
+
+    assignedPorts = ImmutableSet.of(86);
+    Offer threeOtherPorts = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096,
+        ImmutableSet.of(Pair.of(86, 88)));
+    sendOffer(threeOtherPorts, newTaskId, SLAVE_ID, SLAVE_HOST_1, ImmutableSet.of("one"),
+        assignedPorts);
+
+    task = getTask(newTaskId).getAssignedTask();
+    assertThat(task.getTask().getStartCommand(), is("86"));
   }
 
   @Test

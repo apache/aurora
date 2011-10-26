@@ -846,6 +846,8 @@ class StateManager {
                     Iterables.getOnlyElement(taskStore.fetchTasks(idQuery)).deepCopy();
                 task.getAssignedTask().unsetSlaveId();
                 task.getAssignedTask().unsetSlaveHost();
+                task.getAssignedTask().unsetAssignedPorts();
+                ConfigurationManager.resetStartCommand(task.getAssignedTask().getTask());
                 task.unsetTaskEvents();
                 task.setAncestorId(taskId);
                 String newTaskId = generateTaskId(task.getAssignedTask().getTask());

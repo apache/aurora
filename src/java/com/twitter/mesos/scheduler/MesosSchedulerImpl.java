@@ -1,5 +1,6 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -8,9 +9,9 @@ import java.util.logging.Logger;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import com.google.inject.Inject;
 import com.google.protobuf.ByteString;
 
@@ -157,7 +158,9 @@ class MesosSchedulerImpl implements Scheduler {
         });
   }
 
-  TaskDescription twitterTaskToMesosTask(SchedulerCore.TwitterTask twitterTask) throws ScheduleException {
+  TaskDescription twitterTaskToMesosTask(SchedulerCore.TwitterTask twitterTask)
+      throws ScheduleException {
+
     checkNotNull(twitterTask);
     byte[] taskInBytes;
     try {
@@ -176,9 +179,9 @@ class MesosSchedulerImpl implements Scheduler {
             .setData(ByteString.copyFrom(taskInBytes));
     if (twitterTask.isThermosTask()) {
       assignedTaskBuilder.setExecutor(ExecutorInfo.newBuilder()
-      .setExecutorId(ExecutorID.newBuilder().setValue(String.format("thermos-%s",
-          twitterTask.taskId)))
-      .setUri("/tmp/thermos_executor.pex"));
+          .setExecutorId(ExecutorID.newBuilder().setValue(String.format("thermos-%s",
+              twitterTask.taskId)))
+          .setUri("/tmp/thermos_executor.pex"));
     }
     return assignedTaskBuilder.build();
   }
@@ -190,12 +193,14 @@ class MesosSchedulerImpl implements Scheduler {
     try {
       for (Offer offer : offers) {
         log(Level.FINE, "Received offer: %s", offer);
-        List<TaskDescription> scheduledTasks = Lists.newLinkedList();
         SchedulerCore.TwitterTask task = schedulerCore.offer(offer, executorInfo.getExecutorId());
 
+        List<TaskDescription> scheduledTasks;
         if (task != null) {
           TaskDescription assignedTask = twitterTaskToMesosTask(task);
-          scheduledTasks.add(assignedTask);
+          scheduledTasks = ImmutableList.of(assignedTask);
+        } else {
+          scheduledTasks = Collections.emptyList();
         }
 
         if (!scheduledTasks.isEmpty()) {
