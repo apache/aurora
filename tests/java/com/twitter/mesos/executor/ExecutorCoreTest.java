@@ -4,9 +4,8 @@ import java.io.File;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 
-import javax.annotation.Nullable;
-
 import com.google.common.base.Function;
+import com.google.common.base.Optional;
 
 import org.easymock.Capture;
 import org.junit.Before;
@@ -182,10 +181,14 @@ public class ExecutorCoreTest extends EasyMockTest {
   }
 
   private void stateChange(String taskId, ScheduleStatus status) {
-    stateChange(taskId, status, null);
+    stateChange(taskId, status, Optional.<String>absent());
   }
 
-  private void stateChange(String taskId, ScheduleStatus status, @Nullable String message) {
+  private void stateChange(String taskId, ScheduleStatus status, String message) {
+    stateChange(taskId, status, Optional.of(message));
+  }
+
+  private void stateChange(String taskId, ScheduleStatus status, Optional<String> message) {
     stateChangeListener.changedState(taskId, status, message);
   }
 }

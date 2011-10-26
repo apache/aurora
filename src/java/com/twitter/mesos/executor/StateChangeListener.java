@@ -1,7 +1,6 @@
 package com.twitter.mesos.executor;
 
-import javax.annotation.Nullable;
-
+import com.google.common.base.Optional;
 import com.google.inject.Inject;
 
 import com.twitter.mesos.executor.sync.SyncBuffer;
@@ -24,7 +23,7 @@ public interface StateChangeListener {
    * @param status Updated status.
    * @param message Optional message to associated with the transition.
    */
-  void changedState(String taskId, ScheduleStatus status, @Nullable String message);
+  void changedState(String taskId, ScheduleStatus status, Optional<String> message);
 
   /**
    * Notifies the listener that a task has been deleted.
@@ -48,7 +47,7 @@ public interface StateChangeListener {
     }
 
     @Override
-    public void changedState(String taskId, ScheduleStatus status, @Nullable String message) {
+    public void changedState(String taskId, ScheduleStatus status, Optional<String> message) {
       syncBuffer.add(taskId, new TaskStateUpdate().setStatus(status));
       driver.sendStatusUpdate(taskId, status, message);
     }

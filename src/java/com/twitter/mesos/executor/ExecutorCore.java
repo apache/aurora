@@ -14,6 +14,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.common.base.Function;
+import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Supplier;
@@ -150,16 +151,16 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
     final Task task = taskFactory.apply(assignedTask);
     tasks.put(taskId, task);
 
-    stateChangeListener.changedState(taskId, STARTING, null);
+    stateChangeListener.changedState(taskId, STARTING, Optional.<String>absent());
     try {
       task.stage();
-      stateChangeListener.changedState(taskId, RUNNING, null);
+      stateChangeListener.changedState(taskId, RUNNING, Optional.<String>absent());
       task.run();
     } catch (TaskRunException e) {
       LOG.log(Level.SEVERE, "Failed to stage or run task " + taskId, e);
       taskFailures.incrementAndGet();
       task.terminate(FAILED);
-      stateChangeListener.changedState(taskId, FAILED, e.getMessage());
+      stateChangeListener.changedState(taskId, FAILED, Optional.of(e.getMessage()));
       deleteCompletedTask(taskId);
       return;
     }
@@ -169,7 +170,7 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
         LOG.info("Waiting for task " + taskId + " to complete.");
         ScheduleStatus state = task.blockUntilTerminated();
         LOG.info("Task " + taskId + " completed in state " + state);
-        stateChangeListener.changedState(taskId, state, null);
+        stateChangeListener.changedState(taskId, state, Optional.<String>absent());
       }
     });
   }
