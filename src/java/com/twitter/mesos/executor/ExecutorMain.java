@@ -1,12 +1,10 @@
 package com.twitter.mesos.executor;
 
 import java.io.File;
-import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.logging.Logger;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
 import com.google.inject.Inject;
 import com.google.inject.Module;

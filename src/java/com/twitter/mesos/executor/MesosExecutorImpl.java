@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
 
@@ -13,14 +14,14 @@ import org.apache.mesos.ExecutorDriver;
 import org.apache.mesos.Protos.ExecutorArgs;
 import org.apache.mesos.Protos.TaskDescription;
 import org.apache.mesos.Protos.TaskID;
-import org.apache.mesos.Protos.TaskState;
-import org.apache.mesos.Protos.TaskStatus;
 
+import com.twitter.common.application.Lifecycle;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.executor.sync.SyncBuffer;
 import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.comm.ExecutorMessage;
 import com.twitter.mesos.gen.comm.SchedulerMessage;
 import com.twitter.mesos.gen.comm.StateUpdateRequest;
@@ -37,12 +38,16 @@ public class MesosExecutorImpl implements Executor {
   private final ExecutorCore executorCore;
   private final Driver driver;
   private final SyncBuffer syncBuffer;
+  private final Lifecycle lifecycle;
 
   @Inject
-  public MesosExecutorImpl(ExecutorCore executorCore, Driver driver, SyncBuffer syncBuffer) {
+  public MesosExecutorImpl(ExecutorCore executorCore, Driver driver, SyncBuffer syncBuffer,
+      Lifecycle lifecycle) {
+
     this.executorCore = checkNotNull(executorCore);
     this.driver = checkNotNull(driver);
     this.syncBuffer = checkNotNull(syncBuffer);
+    this.lifecycle = checkNotNull(lifecycle);
   }
 
   @Override
@@ -67,10 +72,11 @@ public class MesosExecutorImpl implements Executor {
     } catch (ThriftBinaryCodec.CodingException e) {
       LOG.log(Level.SEVERE, "Error deserializing task object.", e);
       driver.sendStatusUpdate(task.getTaskId().getValue(), FAILED,
-          "Failed to decode task description.");
+          Optional.of("Failed to decode task description."));
       return;
     }
 
+    Preconditions.checkNotNull(assignedTask, "No task found in task description " + task);
     Preconditions.checkArgument(task.getTaskId().getValue().equals(assignedTask.getTaskId()),
         "Fatal - task IDs do not match: " + task.getTaskId() + ", " + assignedTask.getTaskId());
 
@@ -78,20 +84,23 @@ public class MesosExecutorImpl implements Executor {
   }
 
   @Override
-  public void killTask(ExecutorDriver executorDriver, TaskID taskID) {
+  public void killTask(ExecutorDriver driverDoNotUse, TaskID taskID) {
     LOG.info("Received killTask request for " + taskID);
     executorCore.stopLiveTask(taskID.getValue());
   }
 
   @Override
-  public void shutdown(ExecutorDriver driver) {
+  public void shutdown(ExecutorDriver driverDoNotUse) {
     LOG.info("Received shutdown command, terminating...");
-    for (Task killedTask : executorCore.shutdownCore()) {
-      driver.sendStatusUpdate(TaskStatus.newBuilder()
-          .setTaskId(TaskID.newBuilder().setValue(killedTask.getId()))
-          .setState(TaskState.TASK_KILLED).build());
+    try {
+      for (Task killedTask : executorCore.shutdownCore()) {
+        driver.sendStatusUpdate(
+            killedTask.getId(), ScheduleStatus.KILLED, Optional.<String>absent());
+      }
+      driver.stop();
+    } finally {
+      lifecycle.shutdown();
     }
-    driver.stop();
   }
 
   @Override

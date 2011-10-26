@@ -5,10 +5,10 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.annotation.Nullable;
-
 import com.google.common.base.Function;
+import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.Atomics;
 import com.google.inject.Inject;
 import com.google.protobuf.ByteString;
 
@@ -40,12 +40,11 @@ public interface Driver extends Function<Message, Integer> {
    *
    * @param taskId Task to update the status for.
    * @param status New status of thet task.
-   * @param reason The reason for the state change, or {@code null} if there is no information
-   *    relevant to the state transition.
+   * @param reason The optional reason for the state change.
    * @return zero if the status was successfully sent (but not necessarily received), or non-zero
    *    if the status could not be sent.
    */
-  public int sendStatusUpdate(String taskId, ScheduleStatus status, @Nullable String reason);
+  int sendStatusUpdate(String taskId, ScheduleStatus status, Optional<String> reason);
 
   /**
    * Sets the underlying driver.
@@ -53,13 +52,19 @@ public interface Driver extends Function<Message, Integer> {
    * @param driver Real driver.
    * @param executorArgs executor args.
    */
-  public void init(ExecutorDriver driver, ExecutorArgs executorArgs);
+  void init(ExecutorDriver driver, ExecutorArgs executorArgs);
+
+  /**
+   * Stops the driver immediately.
+   */
+  void stop();
+
 
   public static class DriverImpl implements Driver {
 
     private static final Logger LOG = Logger.getLogger(DriverImpl.class.getName());
 
-    private final AtomicReference<ExecutorDriver> driverRef = new AtomicReference<ExecutorDriver>();
+    private final AtomicReference<ExecutorDriver> driverRef = Atomics.newReference();
 
     private final AtomicLong statusUpdatesSent = Stats.exportLong("executor_status_updates_sent");
     private final AtomicLong statusUpdatesFailed =
@@ -115,7 +120,7 @@ public interface Driver extends Function<Message, Integer> {
           LOG.info("Sending message to scheduler.");
           Status status = driver.sendFrameworkMessage(data);
           if (status != Status.OK) {
-            LOG.warning(String.format("Attempt to send executor message returned code %d: %s",
+            LOG.warning(String.format("Attempt to send executor message returned code %s: %s",
                 status, message));
             messagesFailed.incrementAndGet();
           } else {
@@ -135,7 +140,7 @@ public interface Driver extends Function<Message, Integer> {
     }
 
     @Override public int sendStatusUpdate(final String taskId, final ScheduleStatus status,
-        final String reason) {
+        final Optional<String> reason) {
       Preconditions.checkNotNull(status);
 
       return doWorkWithDriver(new Function<ExecutorDriver, Integer>() {
@@ -144,8 +149,8 @@ public interface Driver extends Function<Message, Integer> {
           TaskStatus.Builder msg = TaskStatus.newBuilder()
               .setTaskId(TaskID.newBuilder().setValue(taskId))
               .setState(StateTranslator.get(status));
-          if (reason != null) {
-            msg.setData(ByteString.copyFromUtf8(reason));
+          if (reason.isPresent()) {
+            msg.setData(ByteString.copyFromUtf8(reason.get()));
           }
 
           Status s = driver.sendStatusUpdate(msg.build());
@@ -158,6 +163,12 @@ public interface Driver extends Function<Message, Integer> {
           return s.getNumber();
         }
       });
+    }
+
+    @Override
+    public void stop() {
+      LOG.info("Stopping executor driver.");
+      driverRef.get().stop();
     }
   }
 }
