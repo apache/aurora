@@ -1,5 +1,7 @@
 package com.twitter.mesos.scheduler.log.mesos;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
@@ -7,6 +9,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
+import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
 
 import org.apache.mesos.Log;
@@ -15,22 +18,37 @@ import com.twitter.common.base.Function;
 import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.stats.Stats;
 
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
 /**
  * A {@code Log} implementation backed by a true distributed log in mesos core.
  *
  * @author John Sirois
  */
 public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
+
+  /**
+   * Binding annotation for the opaque value of a log noop entry.
+   */
+  @BindingAnnotation
+  @Retention(RUNTIME)
+  @Target({PARAMETER, METHOD})
+  public @interface NoopEntry { }
+
   private final Log log;
+  private final byte[] noopEntry;
 
   @Inject
-  public MesosLog(Log log) {
+  public MesosLog(Log log, @NoopEntry byte[] noopEntry) {
     this.log = Preconditions.checkNotNull(log);
+    this.noopEntry = Preconditions.checkNotNull(noopEntry);
   }
 
   @Override
   public Stream open() {
-    return new LogStream(log);
+    return new LogStream(log, noopEntry);
   }
 
   private static class LogStream implements com.twitter.mesos.scheduler.log.Log.Stream {
@@ -60,10 +78,12 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
     private final Vars vars = new Vars();
 
     private final Log log;
+    private final byte[] noopEntry;
     private final Log.Reader reader;
 
-    LogStream(Log log) {
+    LogStream(Log log, byte[] noopEntry) {
       this.log = log;
+      this.noopEntry = noopEntry;
       this.reader = new Log.Reader(log);
     }
 
@@ -79,6 +99,16 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
         com.twitter.mesos.scheduler.log.Log.Position position) throws StreamAccessException {
 
       Preconditions.checkArgument(position instanceof LogPosition);
+
+      // TODO(John Sirois): Currently we must be the coordinator to ensure we get the 'full read'
+      // of log entries expected by the users of the com.twitter.mesos.scheduler.log.Log interface.
+      // Switch to another method of ensuring this when it becomes available in mesos' log
+      // interface.
+      try {
+        append(noopEntry);
+      } catch (StreamAccessException e) {
+        throw new StreamAccessException("Error writing noop prior to a read", e);
+      }
 
       Log.Position from = ((LogPosition) position).unwrap();
       Log.Position to = end().unwrap();

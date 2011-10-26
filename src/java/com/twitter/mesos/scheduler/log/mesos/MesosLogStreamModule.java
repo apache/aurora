@@ -23,6 +23,8 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.zookeeper.ZooKeeperClient.Credentials;
 import com.twitter.common_internal.zookeeper.ZooKeeper;
+import com.twitter.mesos.codec.ThriftBinaryCodec;
+import com.twitter.mesos.gen.storage.LogEntry;
 
 /**
  * Binds a native mesos Log implementation.
@@ -98,5 +100,12 @@ public class MesosLogStreamModule extends PrivateModule {
                    zkLogGroupPath.get(),
                    credentials.scheme(),
                    credentials.authToken());
+  }
+
+  @Provides
+  @Singleton
+  @MesosLog.NoopEntry
+  byte[] provideNoopEntry() throws ThriftBinaryCodec.CodingException {
+    return ThriftBinaryCodec.encodeNonNull(LogEntry.noop(true));
   }
 }

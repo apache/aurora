@@ -315,6 +315,10 @@ public class LogStorage extends ForwardingStore {
         }
         break;
 
+      case NOOP:
+        // Nothing to do here
+        break;
+
       default:
         throw new IllegalStateException("Unknown log entry type: " + logEntry);
     }
