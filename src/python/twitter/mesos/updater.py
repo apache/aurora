@@ -100,7 +100,7 @@ class Updater(object):
       remaining_shards += failed_shards
       remaining_shards.sort()
       self.update_failure_counts(failed_shards)
-      update_in_progress = len(remaining_shards) == 0 and not self.is_failed_update()
+      update_in_progress = len(remaining_shards) == 0 and not self.is_failed_update(failed_shards)
 
     if failed_shards:
       shards_to_rollback = [shard for shard in set(initial_shards).difference(remaining_shards)] + (
@@ -166,7 +166,7 @@ class Updater(object):
     while True:
       log.debug('Getting status...')
       query = TaskQuery()
-      query.owner = Identity(role = self._role)
+      query.owner = Identity(role=self._role)
       query.jobName = self._job_name
       resp = self._scheduler.getTasksStatus(query)
       log.debug('Response from scheduler: %s (message: %s)'
@@ -177,8 +177,8 @@ class Updater(object):
       else:
         log.debug('No tasks found.')
       log.debug('Got statuses: %s' %
-          dict([(task,ScheduleStatus._VALUES_TO_NAMES[status])
-          for task,status in statuses.iteritems()]))
+          dict([(task, ScheduleStatus._VALUES_TO_NAMES[status])
+          for task, status in statuses.iteritems()]))
       now = self._clock.time()
       for task_id, status in statuses.items():
         if status is ScheduleStatus.RUNNING and task_id not in (
