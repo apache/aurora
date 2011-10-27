@@ -97,10 +97,10 @@ class ThermosExecutor(mesos.Executor):
 
 
 app.add_option("--sandbox_root", dest = "sandbox_root", metavar = "PATH",
-               default = "/tmp/thermos/sandbox",
+               default = "/tmp/thermos",
                help = "the path root where we will spawn workflow sandboxes")
 app.add_option("--checkpoint_root", dest = "checkpoint_root", metavar = "PATH",
-               default = "/tmp/thermos",
+               default = "/var/run/thermos",
                help = "the path where we will store workflow logs and checkpoints")
 
 app.set_option('twitter_common_app_debug', True)

@@ -31,6 +31,7 @@ import org.apache.mesos.SchedulerDriver;
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
+import com.twitter.common.args.constraints.NotNull;
 import com.twitter.common.base.Closure;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
@@ -64,6 +65,11 @@ class MesosSchedulerImpl implements Scheduler {
   @CmdLine(name = "executor_poll_interval", help = "Interval between executor update requests.")
   private static final Arg<Amount<Long, Time>> EXECUTOR_POLL_INTERVAL =
       Arg.create(Amount.of(10L, Time.SECONDS));
+
+  // TODO(wickman):  This belongs in SchedulerModule eventually.
+  @NotNull
+  @CmdLine(name = "thermos_executor_path", help = "Path to the thermos executor launch script.")
+  private static final Arg<String> THERMOS_EXECUTOR_PATH = Arg.create();
 
   // Stores scheduler state and handles actual scheduling decisions.
   private final SchedulerCore schedulerCore;
@@ -181,7 +187,7 @@ class MesosSchedulerImpl implements Scheduler {
       assignedTaskBuilder.setExecutor(ExecutorInfo.newBuilder()
           .setExecutorId(ExecutorID.newBuilder().setValue(String.format("thermos-%s",
               twitterTask.taskId)))
-          .setUri("/tmp/thermos_executor.pex"));
+          .setUri(THERMOS_EXECUTOR_PATH.get()));
     }
     return assignedTaskBuilder.build();
   }

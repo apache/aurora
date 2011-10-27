@@ -20,6 +20,7 @@ import com.twitter.mesos.scheduler.LeaderRedirect;
 import com.twitter.mesos.scheduler.SchedulerCore;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 import com.twitter.thrift.ServiceInstance;
+import com.twitter.mesos.scheduler.httphandlers.ImageAssets.HttpAssetModule;
 
 /**
  * Binding module for scheduler HTTP servlets.
@@ -45,6 +46,7 @@ public class ServletModule extends AbstractModule {
 
     bind(LeaderRedirect.class).in(Singleton.class);
     LifecycleModule.bindStartupAction(binder(), RedirectMonitor.class);
+    install(new HttpAssetModule());
   }
 
   static class RedirectMonitor implements ExceptionalCommand<MonitorException> {
