@@ -29,7 +29,6 @@ import org.apache.commons.io.FileSystemUtils;
 
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Command;
-import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.BuildInfo;
 import com.twitter.mesos.Message;
@@ -93,11 +92,7 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
     this.messageHandler = checkNotNull(messageHandler);
     this.stateChangeListener = checkNotNull(stateChangeListener);
 
-    Stats.export(new StatImpl<Integer>("executor_tasks_stored") {
-      @Override public Integer read() {
-        return tasks.size();
-      }
-    });
+    Stats.exportSize("executor_tasks_stored", tasks);
   }
 
   /**

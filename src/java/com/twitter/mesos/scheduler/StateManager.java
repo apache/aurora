@@ -45,7 +45,6 @@ import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.collections.Pair;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
-import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.Clock;
 import com.twitter.common.util.StateMachine;
@@ -192,11 +191,7 @@ class StateManager {
       }
     };
 
-    Stats.export(new StatImpl<Integer>("work_queue_depth") {
-      @Override public Integer read() {
-        return workQueue.size();
-      }
-    });
+    Stats.exportSize("work_queue_depth", workQueue);
   }
 
   /**
@@ -1005,11 +1000,7 @@ class StateManager {
         countersByStatus.getUnchecked(status);
       }
 
-      Stats.export(new StatImpl<Long>("num_task_state_machines") {
-        @Override public Long read() {
-          return taskStateMachines.size();
-        }
-      });
+      Stats.exportSize("num_task_state_machines", taskStateMachines);
     }
 
     void incrementCount(String jobKey, ScheduleStatus status) {
