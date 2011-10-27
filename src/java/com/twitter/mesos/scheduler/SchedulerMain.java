@@ -12,7 +12,6 @@ import com.twitter.common.application.modules.HttpModule;
 import com.twitter.common.application.modules.LogModule;
 import com.twitter.common.application.modules.StatsExportModule;
 import com.twitter.common.application.modules.StatsModule;
-import com.twitter.common.args.ArgFilters;
 import com.twitter.common.zookeeper.Group;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common_internal.webassets.Blueprint;
@@ -60,6 +59,6 @@ public class SchedulerMain extends AbstractApplication {
   }
 
   public static void main(String[] args) {
-    AppLauncher.launch(new SchedulerMain(), ArgFilters.SELECT_ALL, args);
+    AppLauncher.launch(new SchedulerMain(), args);
   }
 }

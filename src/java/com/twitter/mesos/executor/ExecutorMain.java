@@ -18,7 +18,6 @@ import com.twitter.common.application.modules.LogModule;
 import com.twitter.common.application.modules.StatsExportModule;
 import com.twitter.common.application.modules.StatsModule;
 import com.twitter.common.args.Arg;
-import com.twitter.common.args.ArgFilters;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
@@ -91,6 +90,6 @@ public class ExecutorMain extends AbstractApplication {
   }
 
   public static void main(String[] args) {
-    AppLauncher.launch(new ExecutorMain(), ArgFilters.SELECT_ALL, args);
+    AppLauncher.launch(new ExecutorMain(), args);
   }
 }
