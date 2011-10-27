@@ -20,10 +20,12 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import com.google.common.collect.MapMaker;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
@@ -131,9 +133,9 @@ class StateManager {
       }
     };
 
-  private final Map<String, TaskStateMachine> taskStateMachines = new MapMaker().makeComputingMap(
-      new Function<String, TaskStateMachine>() {
-        @Override public TaskStateMachine apply(String taskId) {
+  private final Cache<String, TaskStateMachine> taskStateMachines =
+      CacheBuilder.newBuilder().build(new CacheLoader<String, TaskStateMachine>() {
+        @Override public TaskStateMachine load(String taskId) {
           return new TaskStateMachine(taskId,
               null,
               // The task is unknown, so there is no matching task to fetch.
@@ -671,7 +673,7 @@ class StateManager {
    */
   synchronized Multimap<String, String> getHostAssignedTasks() {
     return Multimaps.transformValues(
-        Multimaps.index(Iterables.filter(taskStateMachines.values(), HAS_HOST), GET_HOST),
+        Multimaps.index(Iterables.filter(taskStateMachines.asMap().values(), HAS_HOST), GET_HOST),
         GET_TASK_ID);
   }
 
@@ -690,7 +692,7 @@ class StateManager {
     processWorkQueueAfter(new Command() {
       @Override public void execute() {
         for (String taskId : taskIds) {
-          TaskStateMachine stateMachine = taskStateMachines.get(taskId);
+          TaskStateMachine stateMachine = taskStateMachines.getUnchecked(taskId);
           if (stateMachine != null) {
             stateMachine.updateState(ScheduleStatus.UNKNOWN, "Dead executor.");
           } else {
@@ -720,7 +722,7 @@ class StateManager {
   private void changeStateInTransaction(Set<String> taskIds,
       final Closure<TaskStateMachine> stateChange) {
     for (String taskId : taskIds) {
-      stateChange.execute(taskStateMachines.get(taskId));
+      stateChange.execute(taskStateMachines.getUnchecked(taskId));
     }
   }
 
@@ -912,7 +914,7 @@ class StateManager {
     }
 
     taskStore.removeTasks(taskIds);
-    taskStateMachines.keySet().removeAll(taskIds);
+    taskStateMachines.asMap().keySet().removeAll(taskIds);
   }
 
   private void maybeRescheduleForUpdate(Storage.StoreProvider storeProvider, String taskId,
@@ -974,15 +976,14 @@ class StateManager {
       stateMachine.setSlaveHost(slaveHost);
     }
 
-    taskStateMachines.put(taskId, stateMachine);
+    taskStateMachines.asMap().put(taskId, stateMachine);
     return stateMachine;
   }
 
   private final class Vars {
-    private final Map<Pair<String, ScheduleStatus>, AtomicLong> countersByJobKeyAndStatus =
-        new MapMaker().makeComputingMap(
-            new Function<Pair<String, ScheduleStatus>, AtomicLong>() {
-              @Override public AtomicLong apply(Pair<String, ScheduleStatus> jobAndStatus) {
+    private final Cache<Pair<String, ScheduleStatus>, AtomicLong> countersByJobKeyAndStatus =
+        CacheBuilder.newBuilder().build(new CacheLoader<Pair<String,ScheduleStatus>, AtomicLong>() {
+              @Override public AtomicLong load(Pair<String, ScheduleStatus> jobAndStatus) {
                 String jobKey = jobAndStatus.getFirst();
                 ScheduleStatus status = jobAndStatus.getSecond();
                 return Stats.exportLong("job_" + jobKey + "_tasks_" + status.name());
@@ -990,10 +991,9 @@ class StateManager {
             }
         );
 
-    private final Map<ScheduleStatus, AtomicLong> countersByStatus =
-        new MapMaker().makeComputingMap(
-            new Function<ScheduleStatus, AtomicLong>() {
-              @Override public AtomicLong apply(ScheduleStatus status) {
+    private final Cache<ScheduleStatus, AtomicLong> countersByStatus =
+        CacheBuilder.newBuilder().build(new CacheLoader<ScheduleStatus, AtomicLong>() {
+              @Override public AtomicLong load(ScheduleStatus status) {
                 return Stats.exportLong("task_store_" + status);
               }
             }
@@ -1002,23 +1002,23 @@ class StateManager {
     Vars() {
       // Initialize by-status counters.
       for (ScheduleStatus status : ScheduleStatus.values()) {
-        countersByStatus.get(status);
+        countersByStatus.getUnchecked(status);
       }
 
-      Stats.export(new StatImpl<Integer>("num_task_state_machines") {
-        @Override public Integer read() {
+      Stats.export(new StatImpl<Long>("num_task_state_machines") {
+        @Override public Long read() {
           return taskStateMachines.size();
         }
       });
     }
 
     void incrementCount(String jobKey, ScheduleStatus status) {
-      countersByStatus.get(status).incrementAndGet();
+      countersByStatus.getUnchecked(status).incrementAndGet();
       getCounter(jobKey, status).incrementAndGet();
     }
 
     void decrementCount(String jobKey, ScheduleStatus status) {
-      countersByStatus.get(status).decrementAndGet();
+      countersByStatus.getUnchecked(status).decrementAndGet();
       getCounter(jobKey, status).decrementAndGet();
     }
 
@@ -1028,7 +1028,7 @@ class StateManager {
     }
 
     AtomicLong getCounter(String jobKey, ScheduleStatus status) {
-      return countersByJobKeyAndStatus.get(Pair.of(jobKey, status));
+      return countersByJobKeyAndStatus.getUnchecked(Pair.of(jobKey, status));
     }
   }
   private final Vars vars = new Vars();

@@ -1,13 +1,13 @@
 package com.twitter.mesos.util;
 
-import java.util.Map;
 import java.util.logging.Formatter;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
 
-import com.google.common.base.Function;
 import com.google.common.base.Throwables;
-import com.google.common.collect.MapMaker;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
 
 import org.apache.commons.lang.StringUtils;
 import org.joda.time.DateTime;
@@ -31,9 +31,9 @@ public class LogFormatter extends Formatter {
   /**
    * Build a level 'label' by taking the first character of the level name and making uppercase.
    */
-  private static final Map<Level, String> LEVEL_LABELS = new MapMaker().makeComputingMap(
-      new Function<Level, String>() {
-        public String apply(Level level) {
+  private static final Cache<Level, String> LEVEL_LABELS = CacheBuilder.newBuilder().build(
+      new CacheLoader<Level, String>() {
+        public String load(Level level) {
           return String.valueOf(level.getName().charAt(0)).toUpperCase();
         }
       }
@@ -65,7 +65,7 @@ public class LogFormatter extends Formatter {
     }
 
     StringBuilder sb = new StringBuilder(messageLength)
-        .append(LEVEL_LABELS.get(record.getLevel()))
+        .append(LEVEL_LABELS.getUnchecked(record.getLevel()))
         .append(DATE_TIME_FORMATTER.print(record.getMillis()))
         .append(" THREAD")
         .append(record.getThreadID());

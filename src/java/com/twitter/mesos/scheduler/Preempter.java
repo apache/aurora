@@ -2,16 +2,17 @@ package com.twitter.mesos.scheduler;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import com.google.common.collect.MapMaker;
 import com.google.inject.Inject;
 
 import com.twitter.common.quantity.Amount;
@@ -83,9 +84,9 @@ class Preempter implements Runnable {
     }
 
     // Memoize filters.
-    Map<String, Predicate<AssignedTask>> filtersByHost = new MapMaker().makeComputingMap(
-        new Function<String, Predicate<AssignedTask>>() {
-          @Override public Predicate<AssignedTask> apply(String host) {
+    Cache<String, Predicate<AssignedTask>> filtersByHost = CacheBuilder.newBuilder().build(
+        new CacheLoader<String, Predicate<AssignedTask>>() {
+          @Override public Predicate<AssignedTask> load(String host) {
             return Predicates.compose(
                 schedulingFilter.dynamicHostFilter(scheduler, host), Tasks.ASSIGNED_TO_INFO);
           }
@@ -108,7 +109,7 @@ class Preempter implements Runnable {
       // operate scheduling and preemption in an independent loop.
       Predicate<AssignedTask> preemptionFilter = Predicates.and(
           preemptionFilter(preemptableTask),
-          filtersByHost.get(preemptableTask.getSlaveHost()));
+          filtersByHost.getUnchecked(preemptableTask.getSlaveHost()));
       AssignedTask preempting =
           Iterables.get(Iterables.filter(pendingTasks, preemptionFilter), 0, null);
       if (preempting != null) {

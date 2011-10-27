@@ -50,8 +50,10 @@ public interface PulseMonitor<T> extends Supplier<Set<T>> {
      * @param expiration Time after which an entry is considered dead.
      */
     public PulseMonitorImpl(Amount<Long, Time> expiration) {
-      // TODO(William Farner) : Consider using timestamps instead and allowing exposure of live
+      // TODO(William Farner): Consider using timestamps instead and allowing exposure of live
       // entries and the time since their last pulse.
+      // TODO(William Farner): Upgrade this to CacheBuilder.  Current use case will not cleanly
+      // translate to CacheBuilder until Guava R11, which will introduce CacheBuilder#build().
       pulses = new MapMaker()
           .expireAfterWrite(expiration.as(Time.MILLISECONDS), TimeUnit.MILLISECONDS)
           .makeComputingMap(Functions.<T>identity());
