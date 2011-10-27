@@ -20,9 +20,12 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 
 import static org.easymock.EasyMock.createControl;
+import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
+import static org.easymock.EasyMock.or;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 
 /**
  * @author William Farner
@@ -78,7 +81,7 @@ public class DiskGarbageCollectorTest {
     expect(fileFilter.accept(fileA)).andReturn(true);
     expect(fileFilter.accept(fileB)).andReturn(true);
     expect(fileFilter.accept(fileC)).andReturn(true);
-    gcCallback.execute(fileA);
+    gcCallback.execute(or(eq(fileA), or(eq(fileB), eq(fileC))));
 
     control.replay();
 
@@ -150,9 +153,10 @@ public class DiskGarbageCollectorTest {
     assertThat(fileA.mkdir(), is(true));
     populateFile(fileA1, Amount.of(10, Data.KB));
     populateFile(fileA2, Amount.of(10, Data.KB));
+
     gc.run();
 
-    assertDirContents(root, "b", "c");
+    assertTrue(FileUtils.sizeOfDirectory(root) < GC_THRESHOLD.as(Data.BYTES));
   }
 
   private void populateFile(File file, Amount<Integer, Data> bytes) throws Exception {
