@@ -43,6 +43,11 @@ public class ForwardingStore
   }
 
   @Override
+  public void prepare() {
+    storage.prepare();
+  }
+
+  @Override
   public void start(Quiet initilizationLogic) {
     storage.start(initilizationLogic);
   }

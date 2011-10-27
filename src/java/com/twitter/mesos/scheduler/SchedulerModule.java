@@ -175,6 +175,8 @@ public class SchedulerModule extends AbstractModule {
     LifecycleModule.bindServiceLauncher(binder(), ThriftServerLauncher.THRIFT_PORT_NAME,
         ThriftServerLauncher.class);
 
+    bind(SchedulerLifecycle.class).in(Singleton.class);
+
     QuotaModule.bind(binder());
     SyncModule.bind(binder());
 

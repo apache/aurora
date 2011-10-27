@@ -198,6 +198,13 @@ class StateManager {
   }
 
   /**
+   * Prompts the state manager to prepare for possible activation in the leading scheduler process.
+   */
+  void prepare() {
+    storage.prepare();
+  }
+
+  /**
    * Initializes the state manager, by starting the storage and fetching the persisted framework ID.
    *
    * @return The persisted framework ID, or {@code null} if no framework ID exists in the store.

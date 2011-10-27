@@ -223,6 +223,7 @@ public class LogStorageTest extends EasyMockTest {
 
     control.replay();
 
+    logStorage.prepare();
     logStorage.start(initializationLogic);
     assertTrue(initialized.get());
 
@@ -286,6 +287,7 @@ public class LogStorageTest extends EasyMockTest {
       control.replay();
 
       // Start the system.
+      logStorage.prepare();
       logStorage.start(initializationLogic);
 
       // Exercise the system.

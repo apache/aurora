@@ -60,6 +60,7 @@ import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
 import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.CONSTRUCTED;
 import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.INITIALIZED;
+import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.STANDING_BY;
 import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.STARTED;
 import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.STOPPED;
 
@@ -90,6 +91,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
   enum State {
     CONSTRUCTED,
+    STANDING_BY,
     INITIALIZED,
     STARTED,
     STOPPED
@@ -124,15 +126,23 @@ public class SchedulerCoreImpl implements SchedulerCore {
    // methods out of schedulerCore save for stop.
    stateMachine = StateMachine.<State>builder("scheduler-core")
        .initialState(CONSTRUCTED)
-       .addState(CONSTRUCTED, INITIALIZED)
+       .addState(CONSTRUCTED, STANDING_BY)
+       .addState(STANDING_BY, INITIALIZED)
        .addState(INITIALIZED, STARTED)
        .addState(STARTED, STOPPED)
        .build();
   }
 
   @Override
-  public synchronized String initialize() {
+  public synchronized void prepare() {
     checkLifecycleState(CONSTRUCTED);
+    stateManager.prepare();
+    stateMachine.transition(STANDING_BY);
+  }
+
+  @Override
+  public synchronized String initialize() {
+    checkLifecycleState(STANDING_BY);
     String storedFrameworkId = stateManager.initialize();
     stateMachine.transition(INITIALIZED);
     return storedFrameworkId;

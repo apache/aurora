@@ -79,8 +79,7 @@ public class LogStorageIT extends TearDownTestCase {
     clock = new FakeClock();
 
     dbStorage = createDbStorage("local_db1");
-    logStorage = createLogStorage(dbStorage);
-    logStorage.start(INITIALIZATION_LOGIC);
+    logStorage = createLogStorage(dbStorage, INITIALIZATION_LOGIC);
   }
 
   private DbStorage createDbStorage(String dbName) throws SQLException {
@@ -88,15 +87,19 @@ public class LogStorageIT extends TearDownTestCase {
     return new DbStorage(dbAccess.jdbcTemplate, dbAccess.transactionTemplate);
   }
 
-  private LogStorage createLogStorage(DbStorage storage) {
-    return new LogStorage(logManager,
-        clock,
-        shutdownRegistry,
-        NO_TIME,
-        storage,
-        NO_TIME,
-        NO_TIME,
-        storage, storage, storage, storage, storage, storage);
+  private LogStorage createLogStorage(DbStorage storage, Work.NoResult.Quiet initializationLogic) {
+    LogStorage logStorage =
+        new LogStorage(logManager,
+                       clock,
+                       shutdownRegistry,
+                       NO_TIME,
+                       storage,
+                       NO_TIME,
+                       NO_TIME,
+                       storage, storage, storage, storage, storage, storage);
+    logStorage.prepare();
+    logStorage.start(initializationLogic);
+    return logStorage;
   }
 
   @Test
@@ -112,8 +115,7 @@ public class LogStorageIT extends TearDownTestCase {
     Position commit = commitTransaction(Op.saveTasks(new SaveTasks(tasks)));
 
     DbStorage storage2 = createDbStorage("local_db2");
-    LogStorage logStorage2 = createLogStorage(storage2);
-    logStorage2.start(NOOP);
+    LogStorage logStorage2 = createLogStorage(storage2, NOOP);
     assertEquals("1", logStorage2.fetchFrameworkId());
     assertEquals(tasks, logStorage2.fetchTasks(Query.GET_ALL));
 
@@ -139,12 +141,10 @@ public class LogStorageIT extends TearDownTestCase {
     } catch (Log.Stream.InvalidPositionException e) {
       // expected
     }
-    LogStorage logStorage2 = createLogStorage(storage2);
-    logStorage2.start(NOOP);
+    createLogStorage(storage2, NOOP);
     storage2.checkpoint(badCheckpoint);
 
-    LogStorage logStorage3 = createLogStorage(storage2);
-    logStorage3.start(NOOP);
+    LogStorage logStorage3 = createLogStorage(storage2, NOOP);
     assertEquals("1", logStorage3.fetchFrameworkId());
     assertEquals(tasks, logStorage3.fetchTasks(Query.GET_ALL));
 
@@ -173,8 +173,7 @@ public class LogStorageIT extends TearDownTestCase {
     assertNotEqual(log.position(checkpoint), commit);
 
     DbStorage storage2 = createDbStorage("local_db2");
-    LogStorage logStorage2 = createLogStorage(storage2);
-    logStorage2.start(NOOP);
+    LogStorage logStorage2 = createLogStorage(storage2, NOOP);
     logStorage2.acceptCheckpoint();
 
     assertEquals("5", logStorage2.fetchFrameworkId());
@@ -188,8 +187,7 @@ public class LogStorageIT extends TearDownTestCase {
     logStorage.saveFrameworkId("post-snapshot");
 
     DbStorage storage2 = createDbStorage("local_db2");
-    LogStorage logStorage2 = createLogStorage(storage2);
-    logStorage2.start(NOOP);
+    LogStorage logStorage2 = createLogStorage(storage2, NOOP);
 
     assertEquals("post-snapshot", logStorage2.fetchFrameworkId());
   }
@@ -205,8 +203,7 @@ public class LogStorageIT extends TearDownTestCase {
     });
 
     DbStorage storage2 = createDbStorage("local_db2");
-    LogStorage logStorage2 = createLogStorage(storage2);
-    logStorage2.start(NOOP);
+    LogStorage logStorage2 = createLogStorage(storage2, NOOP);
 
     assertEquals("42", logStorage2.fetchFrameworkId());
     assertEquals(quota, logStorage2.fetchQuota("jake"));

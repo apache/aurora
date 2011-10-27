@@ -167,6 +167,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         executorPulseMonitor, executorResourceAugmenter, quotaManager);
     cron.schedulerCore = scheduler;
     immediateManager.schedulerCore = scheduler;
+    scheduler.prepare();
     scheduler.initialize();
     scheduler.start(killTask);
 

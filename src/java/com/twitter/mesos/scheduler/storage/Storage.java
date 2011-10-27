@@ -84,6 +84,12 @@ public interface Storage {
   }
 
   /**
+   * Requests the underlying storage prepare its data set; ie: initialize schemas, begin syncing out
+   * of date data, etc.  This method should not block.
+   */
+  void prepare();
+
+  /**
    * Prepares the underlying storage for serving traffic.
    *
    * @param initilizationLogic work to perform after this storage system is ready but before

@@ -186,6 +186,11 @@ public class DbStorage implements
   }
 
   @Override
+  public void prepare() {
+    // Nothing to do.
+  }
+
+  @Override
   public void start(final Work.NoResult.Quiet initilizationLogic) {
     checkNotNull(initilizationLogic);
 

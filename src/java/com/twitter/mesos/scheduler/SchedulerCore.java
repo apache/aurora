@@ -40,6 +40,7 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
  * This interface imposes the following lifecycle:
  * <ol>
  * <li>[construct]
+ * <li>{@link #prepare()}
  * <li>{@link #initialize()}
  * <li>{@link #start(com.twitter.common.base.Closure)}
  * <li>serve clients via other methods (normal usage)
@@ -49,6 +50,12 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
  * @author William Farner
  */
 public interface SchedulerCore extends Function<Query, Iterable<TwitterTaskInfo>> {
+
+  /**
+   * Prompts the scheduler to prepare for possible activation as the leading scheduler.  This
+   * method should not block.
+   */
+  void prepare();
 
   /**
    * Initializes the scheduler's storage system and returns the last framework ID assigned to this

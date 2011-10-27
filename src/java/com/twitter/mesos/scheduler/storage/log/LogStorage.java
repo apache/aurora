@@ -236,13 +236,20 @@ public class LogStorage extends ForwardingStore {
   private boolean recovered = false;
 
   @Override
-  public synchronized void start(final Work.NoResult.Quiet initilizationLogic) {
+  public synchronized void prepare() {
+    // Open the log to make a log replica available to the scheduler group.
     try {
       streamManager = logManager.open();
     } catch (IOException e) {
       throw new IllegalStateException("Failed to open the log, cannot continue", e);
     }
 
+    // TODO(John Sirois): start incremental recovery here from the log and do a final recovery
+    // catchup in start after shutting down the incremental syncer.
+  }
+
+  @Override
+  public synchronized void start(final Work.NoResult.Quiet initilizationLogic) {
     super.start(new Work.NoResult.Quiet() {
       @Override protected void execute(StoreProvider unused) {
         // Must have the underlying storage started so we can query it for the last checkpoint.
