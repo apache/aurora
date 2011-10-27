@@ -16,6 +16,8 @@ import org.apache.mesos.Log;
 
 import com.twitter.common.base.Function;
 import com.twitter.common.base.MorePreconditions;
+import com.twitter.common.inject.TimedInterceptor.Timed;
+import com.twitter.common.stats.RequestStats;
 import com.twitter.common.stats.Stats;
 
 import static java.lang.annotation.ElementType.METHOD;
@@ -94,6 +96,7 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
           }
         };
 
+    @Timed("scheduler_log_native_read_from")
     @Override
     public Iterator<Entry> readFrom(
         com.twitter.mesos.scheduler.log.Log.Position position) throws StreamAccessException {
@@ -126,6 +129,7 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
       }
     }
 
+    @Timed("scheduler_log_native_append")
     @Override
     public LogPosition append(final byte[] contents) throws StreamAccessException {
       Preconditions.checkNotNull(contents);
@@ -139,6 +143,7 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
       return LogPosition.wrap(position);
     }
 
+    @Timed("scheduler_log_native_truncate_before")
     @Override
     public void truncateBefore(com.twitter.mesos.scheduler.log.Log.Position position)
         throws StreamAccessException {

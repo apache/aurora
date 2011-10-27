@@ -428,6 +428,7 @@ public class LogStorage extends ForwardingStore {
     }
   }
 
+  @Timed("scheduler_log_snapshot")
   @VisibleForTesting
   void snapshot() throws CodingException, InvalidPositionException, StreamAccessException {
     super.doInTransaction(new Work.NoResult<CodingException>() {
@@ -496,6 +497,7 @@ public class LogStorage extends ForwardingStore {
     }
   }
 
+  @Timed("scheduler_log_save_framework_id")
   @Override
   public void saveFrameworkId(final String frameworkId) {
     doInTransaction(new Work.NoResult.Quiet() {
@@ -506,6 +508,7 @@ public class LogStorage extends ForwardingStore {
     });
   }
 
+  @Timed("scheduler_log_job_save")
   @Override
   public void saveAcceptedJob(final String managerId, final JobConfiguration jobConfig) {
     doInTransaction(new Work.NoResult.Quiet() {
@@ -516,6 +519,7 @@ public class LogStorage extends ForwardingStore {
     });
   }
 
+  @Timed("scheduler_log_job_remove")
   @Override
   public void removeJob(final String jobKey) {
     doInTransaction(new Work.NoResult.Quiet() {
@@ -526,6 +530,7 @@ public class LogStorage extends ForwardingStore {
     });
   }
 
+  @Timed("scheduler_log_tasks_save")
   @Override
   public void saveTasks(final Set<ScheduledTask> newTasks) throws IllegalStateException {
     doInTransaction(new Work.NoResult.Quiet() {
@@ -547,6 +552,7 @@ public class LogStorage extends ForwardingStore {
     });
   }
 
+  @Timed("scheduler_log_tasks_remove")
   @Override
   public void removeTasks(final Set<String> taskIds) {
     doInTransaction(new Work.NoResult.Quiet() {
@@ -557,6 +563,7 @@ public class LogStorage extends ForwardingStore {
     });
   }
 
+  @Timed("scheduler_log_tasks_mutate")
   @Override
   public ImmutableSet<ScheduledTask> mutateTasks(final Query query,
       final Closure<ScheduledTask> mutator) {
@@ -569,6 +576,7 @@ public class LogStorage extends ForwardingStore {
     });
   }
 
+  @Timed("scheduler_log_jobupdate_save")
   @Override
   public void saveShardUpdateConfigs(final String role, final String job, final String updateToken,
       final Set<TaskUpdateConfiguration> delta) {
@@ -580,6 +588,7 @@ public class LogStorage extends ForwardingStore {
     });
   }
 
+  @Timed("scheduler_log_jobupdate_remove")
   @Override
   public void removeShardUpdateConfigs(final String role, final String job) {
     doInTransaction(new Work.NoResult.Quiet() {
@@ -590,6 +599,7 @@ public class LogStorage extends ForwardingStore {
     });
   }
 
+  @Timed("scheduler_log_quota_remove")
   @Override
   public void removeQuota(final String role) {
     doInTransaction(new Work.NoResult.Quiet() {
@@ -600,6 +610,7 @@ public class LogStorage extends ForwardingStore {
     });
   }
 
+  @Timed("scheduler_log_quota_save")
   @Override
   public void saveQuota(final String role, final Quota quota) {
     doInTransaction(new Work.NoResult.Quiet() {
