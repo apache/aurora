@@ -22,6 +22,7 @@ import com.twitter.common.quantity.Data;
 import static org.easymock.EasyMock.createControl;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
+import static org.easymock.EasyMock.expectLastCall;
 import static org.easymock.EasyMock.or;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
@@ -144,7 +145,6 @@ public class DiskGarbageCollectorTest {
     expect(fileFilter.accept(fileB)).andReturn(true);
     expect(fileFilter.accept(fileC)).andReturn(true);
     expect(fileFilter.accept(fileA)).andReturn(true);
-    gcCallback.execute(fileA);
 
     control.replay();
 
