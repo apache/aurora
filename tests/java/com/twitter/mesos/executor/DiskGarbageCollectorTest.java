@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.util.Set;
 
 import com.google.common.base.Charsets;
+import com.google.common.base.Joiner;
 import com.google.common.collect.Sets;
 import com.google.common.io.Files;
 
@@ -22,7 +23,6 @@ import com.twitter.common.quantity.Data;
 import static org.easymock.EasyMock.createControl;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
-import static org.easymock.EasyMock.expectLastCall;
 import static org.easymock.EasyMock.or;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
@@ -156,7 +156,14 @@ public class DiskGarbageCollectorTest {
 
     gc.run();
 
-    assertTrue(FileUtils.sizeOfDirectory(root) < GC_THRESHOLD.as(Data.BYTES));
+    long actual = FileUtils.sizeOfDirectory(root);
+    @SuppressWarnings("unchecked")
+    Iterable<File> files =
+        FileUtils.listFiles(root, null /* no extension filter */, true /* recursive */);
+    long threshold = GC_THRESHOLD.as(Data.BYTES);
+    assertTrue(String.format("Expected size of %s in bytes to be <= %d, found %d:\n\t%s",
+                             root, threshold, actual, Joiner.on("\n\t").join(files)),
+               actual <= threshold);
   }
 
   private void populateFile(File file, Amount<Integer, Data> bytes) throws Exception {
