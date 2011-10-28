@@ -23,6 +23,12 @@ public interface Storage {
    */
   interface Work<T, E extends Exception> {
 
+    public static final NoResult.Quiet NOOP = new NoResult.Quiet() {
+      @Override protected void execute(Storage.StoreProvider storeProvider) {
+        // No-op.
+      }
+    };
+
     /**
      * Abstracts a unit of work that should either commit a set of changes to storage as a side
      * effect of successful completion or else commit no changes at all when an exception is thrown.

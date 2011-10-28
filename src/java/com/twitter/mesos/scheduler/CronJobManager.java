@@ -7,6 +7,8 @@ import it.sauronsoftware.cron4j.SchedulingPattern;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -14,11 +16,18 @@ import java.util.logging.Logger;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 
 import org.apache.commons.lang.StringUtils;
 
+import com.twitter.common.args.Arg;
+import com.twitter.common.args.CmdLine;
+import com.twitter.common.base.Supplier;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
+import com.twitter.common.util.BackoffHelper;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.CronCollisionPolicy;
 import com.twitter.mesos.gen.JobConfiguration;
@@ -40,6 +49,19 @@ public class CronJobManager extends JobManager {
 
   private static final String MANAGER_KEY = "CRON";
 
+  @VisibleForTesting
+  static final String CRON_USER = "cron";
+
+  @CmdLine(name = "cron_start_initial_backoff", help =
+      "Initial backoff delay while waiting for a previous cron run to start.")
+  private static final Arg<Amount<Long, Time>> CRON_START_INITIAL_BACKOFF =
+      Arg.create(Amount.of(1L, Time.SECONDS));
+
+  @CmdLine(name = "cron_start_max_backoff", help =
+      "Max backoff delay while waiting for a previous cron run to start.")
+  private static final Arg<Amount<Long, Time>> CRON_START_MAX_BACKOFF =
+      Arg.create(Amount.of(1L, Time.MINUTES));
+
   // Cron manager.
   private final Scheduler scheduler = new Scheduler();
 
@@ -50,14 +72,28 @@ public class CronJobManager extends JobManager {
   private final Map<String, String> scheduledJobs =
       Collections.synchronizedMap(Maps.<String, String>newHashMap());
 
+  // Prevents runs from dogpiling while waiting for a run to transition out of the KILLING state.
+  // This is necessary because killing a job (if dictated by cron collision policy) is an
+  // asynchronous operation.
+  private final Map<String, JobConfiguration> pendingRuns =
+      Collections.synchronizedMap(Maps.<String, JobConfiguration>newHashMap());
+  private final BackoffHelper delayedStartBackoff;
+  private final ExecutorService delayedRunExecutor;
+
   private final Storage storage;
 
   @Inject
   public CronJobManager(Storage storage) {
     this.storage = Preconditions.checkNotNull(storage);
+    this.delayedStartBackoff =
+        new BackoffHelper(CRON_START_INITIAL_BACKOFF.get(), CRON_START_MAX_BACKOFF.get());
+    this.delayedRunExecutor = Executors.newCachedThreadPool(
+        new ThreadFactoryBuilder().setDaemon(true).setNameFormat("CronDelay-%d").build());
 
     scheduler.setDaemon(true);
     scheduler.start();
+
+    Stats.exportSize("cron_num_pending_runs", pendingRuns);
   }
 
   private void mapScheduledJob(JobConfiguration job, String scheduledJobKey) {
@@ -95,6 +131,46 @@ public class CronJobManager extends JobManager {
     cronTriggered(job);
   }
 
+  private void delayedRun(final Query query, final JobConfiguration job) {
+    final String jobKey = Tasks.jobKey(job);
+    LOG.info("Waiting for job to terminate before launching cron job " + jobKey);
+    if (pendingRuns.put(jobKey, job) == null) {
+      // There was no run already pending for this job, launch a task to delay launch until the
+      // existing run has terminated.
+      delayedRunExecutor.submit(new Runnable() {
+        @Override public void run() {
+          runWhenTerminated(query, jobKey);
+        }
+      });
+    }
+  }
+
+  private void runWhenTerminated(final Query query, final String jobKey) {
+    try {
+      delayedStartBackoff.doUntilSuccess(new Supplier<Boolean>() {
+        @Override public Boolean get() {
+          if (!hasTasks(query)) {
+            LOG.info("Initiating delayed launch of cron " + jobKey);
+            JobConfiguration job = pendingRuns.remove(jobKey);
+            Preconditions.checkNotNull(job, "Failed to fetch job for delayed run of " + jobKey);
+            schedulerCore.runJob(job);
+            return true;
+          } else {
+            LOG.info("Not yet safe to run cron " + jobKey);
+            return false;
+          }
+        }
+      });
+    } catch (InterruptedException e) {
+      LOG.log(Level.WARNING, "Interrupted while trying to launch cron " + jobKey, e);
+      Thread.currentThread().interrupt();
+    }
+  }
+
+  private boolean hasTasks(Query query) {
+    return !schedulerCore.getTasks(query).isEmpty();
+  }
+
   /**
    * Triggers execution of a cron job, depending on the cron collision policy for the job.
    *
@@ -110,21 +186,26 @@ public class CronJobManager extends JobManager {
     Query query = new Query(new TaskQuery().setOwner(job.getOwner()).setJobName(job.getName())
         .setStatuses(Tasks.ACTIVE_STATES));
 
-    if (schedulerCore.getTasks(query).isEmpty()) {
+    if (!hasTasks(query)) {
       runJob = true;
     } else {
       // Assign a default collision policy.
-      if (job.getCronCollisionPolicy() == null) {
-        job.setCronCollisionPolicy(CronCollisionPolicy.KILL_EXISTING);
-      }
+      CronCollisionPolicy collisionPolicy = (job.getCronCollisionPolicy() == null)
+          ? CronCollisionPolicy.KILL_EXISTING
+          : job.getCronCollisionPolicy();
 
-      switch (job.getCronCollisionPolicy()) {
+      switch (collisionPolicy) {
         case KILL_EXISTING:
           LOG.info("Cron collision policy requires killing existing job.");
           try {
-            // TODO(William Farner): This kills the cron job itself, fix that.
-            schedulerCore.killTasks(query, "cron");
-            runJob = true;
+            schedulerCore.killTasks(query, CRON_USER);
+            // Check immediately if the tasks are gone.  This could happen if the existing tasks
+            // were pending.
+            if (!hasTasks(query)) {
+              runJob = true;
+            } else {
+              delayedRun(query, job);
+            }
           } catch (ScheduleException e) {
             LOG.log(Level.SEVERE, "Failed to kill job.", e);
           }
@@ -167,7 +248,6 @@ public class CronJobManager extends JobManager {
     String scheduledJobKey = scheduleJob(job);
     storage.doInTransaction(new Work.NoResult.Quiet() {
       @Override protected void execute(Storage.StoreProvider storeProvider) {
-
         storeProvider.getJobStore().saveAcceptedJob(MANAGER_KEY, job);
       }
     });

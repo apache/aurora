@@ -249,12 +249,9 @@ public class LogStorageTest extends EasyMockTest {
 
       // Replay the log and perform and supplied initializationWork.
       // Simulate NOOP initialization work
-      Work.NoResult.Quiet initializationLogic = new Work.NoResult.Quiet() {
-        @Override protected void execute(StoreProvider storeProvider) {
-          // Creating a mock and expecting apply(storeProvider) does not work here for whatever
-          // reason.
-        }
-      };
+      // Creating a mock and expecting apply(storeProvider) does not work here for whatever
+      // reason.
+      Work.NoResult.Quiet initializationLogic = Work.NOOP;
 
       final Capture<Work.NoResult.Quiet> recoverAndInitializeWork = createCapture();
       storage.start(capture(recoverAndInitializeWork));

@@ -56,12 +56,6 @@ public class LogStorageIT extends TearDownTestCase {
     }
   };
 
-  private static final Work.NoResult.Quiet NOOP = new Work.NoResult.Quiet() {
-    @Override protected void execute(StoreProvider storeProvider) {
-      // nooop
-    }
-  };
-
   private LogStorage logStorage;
   private LogManager logManager;
   private Clock clock;
@@ -115,7 +109,7 @@ public class LogStorageIT extends TearDownTestCase {
     Position commit = commitTransaction(Op.saveTasks(new SaveTasks(tasks)));
 
     DbStorage storage2 = createDbStorage("local_db2");
-    LogStorage logStorage2 = createLogStorage(storage2, NOOP);
+    LogStorage logStorage2 = createLogStorage(storage2, Work.NOOP);
     assertEquals("1", logStorage2.fetchFrameworkId());
     assertEquals(tasks, logStorage2.fetchTasks(Query.GET_ALL));
 
@@ -141,10 +135,10 @@ public class LogStorageIT extends TearDownTestCase {
     } catch (Log.Stream.InvalidPositionException e) {
       // expected
     }
-    createLogStorage(storage2, NOOP);
+    createLogStorage(storage2, Work.NOOP);
     storage2.checkpoint(badCheckpoint);
 
-    LogStorage logStorage3 = createLogStorage(storage2, NOOP);
+    LogStorage logStorage3 = createLogStorage(storage2, Work.NOOP);
     assertEquals("1", logStorage3.fetchFrameworkId());
     assertEquals(tasks, logStorage3.fetchTasks(Query.GET_ALL));
 
@@ -173,7 +167,7 @@ public class LogStorageIT extends TearDownTestCase {
     assertNotEqual(log.position(checkpoint), commit);
 
     DbStorage storage2 = createDbStorage("local_db2");
-    LogStorage logStorage2 = createLogStorage(storage2, NOOP);
+    LogStorage logStorage2 = createLogStorage(storage2, Work.NOOP);
     logStorage2.acceptCheckpoint();
 
     assertEquals("5", logStorage2.fetchFrameworkId());
@@ -187,7 +181,7 @@ public class LogStorageIT extends TearDownTestCase {
     logStorage.saveFrameworkId("post-snapshot");
 
     DbStorage storage2 = createDbStorage("local_db2");
-    LogStorage logStorage2 = createLogStorage(storage2, NOOP);
+    LogStorage logStorage2 = createLogStorage(storage2, Work.NOOP);
 
     assertEquals("post-snapshot", logStorage2.fetchFrameworkId());
   }
@@ -203,7 +197,7 @@ public class LogStorageIT extends TearDownTestCase {
     });
 
     DbStorage storage2 = createDbStorage("local_db2");
-    LogStorage logStorage2 = createLogStorage(storage2, NOOP);
+    LogStorage logStorage2 = createLogStorage(storage2, Work.NOOP);
 
     assertEquals("42", logStorage2.fetchFrameworkId());
     assertEquals(quota, logStorage2.fetchQuota("jake"));

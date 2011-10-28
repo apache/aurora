@@ -35,11 +35,7 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
   @Override
   protected DbStorage createTaskStore() throws SQLException {
     DbStorage dbStorage = DbStorageTestUtil.setupStorage(this);
-    dbStorage.start(new Work.NoResult.Quiet() {
-      @Override protected void execute(Storage.StoreProvider storeProvider) {
-        // noop
-      }
-    });
+    dbStorage.start(Work.NOOP);
     return dbStorage;
   }
 

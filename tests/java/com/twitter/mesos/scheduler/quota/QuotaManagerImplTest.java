@@ -37,9 +37,7 @@ public class QuotaManagerImplTest extends TearDownTestCase {
   public void setUp() throws Exception {
     storage = DbStorageTestUtil.setupStorage(this);
     quotaManager = new QuotaManagerImpl(storage);
-    storage.start(new NoResult.Quiet() {
-      @Override protected void execute(Storage.StoreProvider storeProvider) {}
-    });
+    storage.start(Work.NOOP);
   }
 
   @Test

@@ -38,6 +38,7 @@ import com.twitter.mesos.scheduler.quota.QuotaManager;
 import com.twitter.mesos.scheduler.quota.QuotaManager.QuotaManagerImpl;
 import com.twitter.mesos.scheduler.quota.Quotas;
 import com.twitter.mesos.scheduler.storage.Storage;
+import com.twitter.mesos.scheduler.storage.Storage.Work;
 import com.twitter.mesos.scheduler.storage.Storage.Work.NoResult;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.FrameworkID;
@@ -257,11 +258,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     Storage storage = createStorage();
 
-    storage.start(new NoResult.Quiet() {
-      @Override
-      protected void execute(Storage.StoreProvider storeProvider) {
-      }
-    });
+    storage.start(Work.NOOP);
 
     final TwitterTaskInfo storedTask = new TwitterTaskInfo()
         .setOwner(OWNER_A)
