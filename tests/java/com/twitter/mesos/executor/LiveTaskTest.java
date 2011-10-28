@@ -8,6 +8,8 @@ import com.google.common.base.Charsets;
 import com.google.common.collect.Sets;
 import com.google.common.io.Files;
 
+import org.easymock.EasyMock;
+import org.easymock.IAnswer;
 import org.easymock.IMocksControl;
 import org.junit.After;
 import org.junit.Before;
@@ -24,17 +26,12 @@ import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 
-import static com.twitter.mesos.executor.LiveTask.PIDFILE_NAME;
-import static com.twitter.mesos.executor.LiveTask.RUN_SCRIPT_NAME;
-import static com.twitter.mesos.executor.LiveTask.SANDBOX_DIR_NAME;
-import static com.twitter.mesos.executor.LiveTask.STDERR_CAPTURE_FILE;
-import static com.twitter.mesos.executor.LiveTask.STDOUT_CAPTURE_FILE;
+import static com.twitter.mesos.executor.LiveTask.*;
 import static com.twitter.mesos.executor.TaskOnDisk.TASK_DUMP_FILE;
 import static com.twitter.mesos.executor.TaskOnDisk.TASK_STATUS_FILE;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
-import static org.easymock.EasyMock.anyObject;
-import static org.easymock.EasyMock.createControl;
-import static org.easymock.EasyMock.expect;
+import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
+import static org.easymock.EasyMock.*;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 
@@ -165,36 +162,20 @@ public class LiveTaskTest {
   }
 
   @Test
-  // TODO(William Farner): This test is flaky when running from the command line - figure out
-  // a better way to do this.
-  public void testKill() throws Exception {
-    /** TODO(William Farner): Fix this flaky test.
-    taskObj.getTask().setStartCommand("touch b.txt; sleep 10");
+  public void testShutdown() throws Exception {
+    final int customPort = 4634;
+    expect(pidFetcher.apply((File) anyObject())).andReturn(PID);
+    processKiller.execute(EasyMock.<KillCommand>anyObject());
+
+    control.replay();
+
+    taskObj.getTask().setStartCommand("sleep 1");
+    final LiveTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
-    taskA.launch();
+    taskA.run();
 
-    final AtomicReference<TaskState> state = new AtomicReference<TaskState>();
-
-    final TaskRunner taskCopy = taskA;
-    Thread waitThread = new Thread() {
-      @Override public void run() {
-        state.set(taskCopy.waitFor());
-      }
-    };
-    waitThread.start();
-
-    // Wait for the task to start running.
-    while (!taskA.isRunning()) {
-      Thread.sleep(100);
-    }
-
-    taskA.kill();
-    waitThread.join(1000);
-    assertThat(waitThread.isAlive(), is(false));
-    assertThat(state.get(), is(TaskState.TASK_KILLED));
-    assertDirContents(taskA.getRootDir(), "b.txt", STDERR_CAPTURE_FILE, STDOUT_CAPTURE_FILE,
-     PIDFILE_NAME);
-    */
+    taskA.terminate(KILLED);
+    assertThat(taskA.blockUntilTerminated(), is(ScheduleStatus.KILLED));
   }
 
   @Test

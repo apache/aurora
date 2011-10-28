@@ -302,7 +302,8 @@ public class LiveTask extends TaskOnDisk {
 
   private KillCommand buildKillCommand(int healthCheckPort) throws TaskRunException {
     try {
-      return new KillCommand(pidFetcher.apply(new File(taskRoot, PIDFILE_NAME)), healthCheckPort);
+      return new KillCommand(pidFetcher.apply(new File(taskRoot, PIDFILE_NAME)),
+          this, healthCheckPort);
     } catch (FileToInt.FetchException e) {
       LOG.log(Level.WARNING, "Failed to read pidfile for " + this, e);
       throw new TaskRunException("Failed to read pidfile.", e);

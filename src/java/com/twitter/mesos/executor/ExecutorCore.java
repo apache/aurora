@@ -2,9 +2,13 @@ package com.twitter.mesos.executor;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -20,6 +24,7 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
@@ -29,6 +34,8 @@ import org.apache.commons.io.FileSystemUtils;
 
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Command;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.BuildInfo;
 import com.twitter.mesos.Message;
@@ -40,9 +47,7 @@ import com.twitter.mesos.gen.comm.ExecutorStatus;
 import com.twitter.mesos.gen.comm.SchedulerMessage;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
-import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
-import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
+import static com.twitter.mesos.gen.ScheduleStatus.*;
 
 /**
  * ExecutorCore
@@ -59,6 +64,8 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
    */
   public static final String TASK_EXECUTOR =
       "com.twitter.mesos.executor.ExecutorCore.TASK_EXECUTOR";
+
+  private static final long SHUTDOWN_TIMEOUT_MS = Amount.of(20L, Time.SECONDS).as(Time.MILLISECONDS);
 
   private final Map<String, Task> tasks = Maps.newConcurrentMap();
 
@@ -170,10 +177,10 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
     });
   }
 
-  public void stopLiveTask(String taskId) {
+  public Task stopLiveTask(String taskId) {
     Task task = tasks.get(taskId);
 
-    if (task != null && task.isRunning()) {
+    if (task != null && Tasks.isActive(task.getScheduleStatus())) {
       LOG.info("Killing task: " + task);
       tasksKilled.incrementAndGet();
       task.terminate(ScheduleStatus.KILLED);
@@ -182,6 +189,7 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
     } else {
       LOG.info("Kill request for task in state " + task.getScheduleStatus() + " ignored.");
     }
+    return task;
   }
 
   public Task getTask(String taskId) {
@@ -236,11 +244,45 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
   public Iterable<Task> shutdownCore() {
     LOG.info("Shutting down executor core.");
     Iterable<Task> liveTasks = getLiveTasks();
-    for (Task task : liveTasks) {
-      stopLiveTask(task.getId());
+
+    List<Future<Task>> results = stopLiveTasks();
+    List<Task> killed = Lists.newArrayList();
+    for (Future<Task> result : results) {
+      try {
+        Task task = result.get();
+        if (!result.isCancelled() && task != null
+            && task.getScheduleStatus() == ScheduleStatus.KILLED) {
+          killed.add(task);
+        }
+      } catch (InterruptedException e) {
+        // This can't happen since invokeAll returns when all tasks are completed or cancelled.
+        Thread.currentThread().interrupt();
+      } catch (ExecutionException e) {
+        LOG.warning("Exception killing task: " + e.getCause());
+      }
     }
 
-    return liveTasks;
+    return killed;
+  }
+
+  private List<Future<Task>> stopLiveTasks() {
+    try {
+      return taskExecutor.invokeAll(Lists.newArrayList(Iterables.transform(getLiveTasks(),
+          new Function<Task, Callable<Task>>() {
+            @Override public Callable<Task> apply(final Task task) {
+              return new Callable<Task>() {
+                @Override public Task call() {
+                  return stopLiveTask(task.getId());
+                }
+              };
+            }
+          })),
+          SHUTDOWN_TIMEOUT_MS,
+          TimeUnit.MILLISECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      return Lists.newArrayList();
+    }
   }
 
   private void startStateSync() {

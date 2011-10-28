@@ -17,9 +17,11 @@ import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.mesos.Tasks;
 import com.twitter.mesos.executor.HttpSignaler.SignalException;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
 import com.twitter.mesos.executor.ProcessKiller.KillException;
+import com.twitter.mesos.gen.ScheduleStatus;
 
 /**
  * Handles escalated killing of a process.
@@ -56,12 +58,18 @@ public class ProcessKiller implements ExceptionalClosure<KillCommand, KillExcept
     if (command.httpSignalPort != -1) {
       signal(command.httpSignalPort, PROCESS_TERM_ENDPOINT);
       wait(escalationDelay);
+      if (Tasks.isTerminated(command.task.getScheduleStatus())) {
+        return;
+      }
     }
 
     // Attempt to force shutdown by signaling.
     if (command.httpSignalPort != -1) {
       signal(command.httpSignalPort, PROCESS_KILL_ENDPOINT);
       wait(escalationDelay);
+      if (Tasks.isTerminated(command.task.getScheduleStatus())) {
+        return;
+      }
     }
 
     killTree(command.pid);
@@ -118,14 +126,12 @@ public class ProcessKiller implements ExceptionalClosure<KillCommand, KillExcept
 
   public static class KillCommand {
     private final int pid;
+    private final Task task;
     private final int httpSignalPort;
 
-    public KillCommand(int pid) {
-      this(pid, -1);
-    }
-
-    public KillCommand(int pid, int httpSignalPort) {
+    public KillCommand(int pid, Task task, int httpSignalPort) {
       this.pid = pid;
+      this.task = task;
       this.httpSignalPort = httpSignalPort;
     }
 
@@ -142,6 +148,7 @@ public class ProcessKiller implements ExceptionalClosure<KillCommand, KillExcept
 
       return new EqualsBuilder()
           .append(pid, other.pid)
+          .append(task, other.task)
           .append(httpSignalPort, other.httpSignalPort)
           .isEquals();
     }
