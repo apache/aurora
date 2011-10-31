@@ -23,6 +23,11 @@ class FakeScheduler:
     self._restart_calls = deque()
     self._rollback_calls = deque()
 
+  def verify(self):
+    assert not self._status_calls, 'Expected status calls not made: %s' % self._status_calls
+    assert not self._restart_calls, 'Expected restart calls not made: %s' % self._restart_calls
+    assert not self._rollback_calls, 'Exepcted rollback calls not made: %s' % self._rollback_calls
+
   def getTasksStatus(self, query):
     """Check input paramters with expected paramters queued by expect_get_statuses
 

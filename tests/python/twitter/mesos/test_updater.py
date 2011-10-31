@@ -52,24 +52,33 @@ class UpdaterTest(unittest.TestCase):
     for x in range(num_calls):
       self._scheduler.expect_getTasksStatus(statuses)
 
+  def verify(self):
+    self._scheduler.verify()
+
   def test_case_pass(self):
     """All tasks complete and update succeeds"""
     self.expect_restart([0, 1, 2])
     self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS,
-        {0: ScheduleStatus.RUNNING, 1: ScheduleStatus.RUNNING, 2: ScheduleStatus.RUNNING})
+                             {0: ScheduleStatus.RUNNING,
+                              1: ScheduleStatus.RUNNING,
+                              2: ScheduleStatus.RUNNING})
     self.expect_restart([3, 4, 5])
     self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS,
-        {3: ScheduleStatus.RUNNING, 4: ScheduleStatus.RUNNING, 5: ScheduleStatus.RUNNING})
+                             {3: ScheduleStatus.RUNNING,
+                              4: ScheduleStatus.RUNNING,
+                              5: ScheduleStatus.RUNNING})
     self.expect_restart([6, 7, 8])
     self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS,
-        {6: ScheduleStatus.RUNNING, 7: ScheduleStatus.RUNNING, 8: ScheduleStatus.RUNNING})
+                             {6: ScheduleStatus.RUNNING,
+                              7: ScheduleStatus.RUNNING,
+                              8: ScheduleStatus.RUNNING})
     self.expect_restart([9])
-    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS,
-        {9: ScheduleStatus.RUNNING})
+    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS, {9: ScheduleStatus.RUNNING})
     shards_expected = []
     shards_returned = self._updater.update(self._job_config)
     assert shards_expected == shards_returned, ('Expected shards (%s) : Returned shards (%s)' %
         (shards_expected, shards_returned))
+    self.verify()
 
   def test_tasks_stuck_in_starting(self):
     """Tasks 1, 2, 3 fail to move into RUNNING when restarted - Complete rollback performed."""
@@ -88,6 +97,7 @@ class UpdaterTest(unittest.TestCase):
     shards_returned = self._updater.update(self._job_config)
     assert shards_expected == shards_returned, ('Expected shards (%s) : Returned shards (%s)' %
         (shards_expected, shards_returned))
+    self.verify()
 
   def test_single_failed_shard(self):
     """All tasks fail to move into running state when re-started - Complete rollback performed."""
@@ -115,6 +125,7 @@ class UpdaterTest(unittest.TestCase):
     shards_returned = self._updater.update(self._job_config)
     assert shards_expected == shards_returned, ('Expected shards (%s) : Returned shards (%s)' %
         (shards_expected, shards_returned))
+    self.verify()
 
   def test_shard_state_transition(self):
     """All tasks move into running state at the end of restart threshold."""
@@ -142,6 +153,7 @@ class UpdaterTest(unittest.TestCase):
     shards_returned = self._updater.update(self._job_config)
     assert shards_expected == shards_returned, ('Expected shards (%s) : Returned shards (%s)' %
         (shards_expected, shards_returned))
+    self.verify()
 
   def test_case_unknown_state(self):
     """All tasks move into an unexpected state - Complete rollback performed."""
@@ -160,21 +172,25 @@ class UpdaterTest(unittest.TestCase):
     shards_returned = self._updater.update(self._job_config)
     assert shards_expected == shards_returned, ('Expected shards (%s) : Returned shards (%s)' %
         (shards_expected, shards_returned))
+    self.verify()
 
   def test_invalid_batch_size(self):
     """Test for out of range error for batch size"""
     self._update_config.batchSize = 0
     with pytest.raises(Updater.InvalidConfigError):
       self._updater.update(self._job_config)
+    self.verify()
 
   def test_invalid_restart_threshold(self):
     """Test for out of range error for restart threshold"""
     self._update_config.restartThreshold = 0
     with pytest.raises(Updater.InvalidConfigError):
       self._updater.update(self._job_config)
+    self.verify()
 
   def test_invalid_watch_secs(self):
     """Test for out of range error for watch secs"""
     self._update_config.watchSecs = 0
     with pytest.raises(Updater.InvalidConfigError):
       self._updater.update(self._job_config)
+    self.verify()

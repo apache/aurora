@@ -83,13 +83,12 @@ class Updater(object):
     self._max_shard_failures = update_config.maxPerShardFailures
     initial_shards = sorted(map(lambda config: config.shardId, job_config.taskConfigs))
     remaining_shards = initial_shards[:]
-    update_in_progress = True
 
     log.info('Starting job update...')
-    while update_in_progress:
+    while remaining_shards and not self.is_failed_update(failed_shards):
       batch_shards = remaining_shards[0 : update_config.batchSize]
       remaining_shards = list(set(remaining_shards) - set(batch_shards))
-      resp = self.restart_shards(batch_shards, update_config)
+      resp = self.restart_shards(batch_shards)
       log.log(debug_if(resp.responseCode == UpdateResponseCode.OK),
         'Response from scheduler: %s (message: %s)' % (
           UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
@@ -100,7 +99,6 @@ class Updater(object):
       remaining_shards += failed_shards
       remaining_shards.sort()
       self.update_failure_counts(failed_shards)
-      update_in_progress = len(remaining_shards) == 0 and not self.is_failed_update(failed_shards)
 
     if failed_shards:
       shards_to_rollback = [shard for shard in set(initial_shards).difference(remaining_shards)] + (
@@ -118,7 +116,7 @@ class Updater(object):
     """
     log.info('Reverting update for %s' % shards_to_rollback)
     shards_to_rollback.sort()
-    while len(shards_to_rollback) > 0:
+    while shards_to_rollback:
       batch_shards = shards_to_rollback[0 : update_config.batchSize]
       shards_to_rollback = list(set(shards_to_rollback) - set(batch_shards))
       resp = self._scheduler.rollbackShards(self._role, self._job_name, batch_shards,
@@ -128,12 +126,11 @@ class Updater(object):
         'Response from scheduler: %s (message: %s)'
           % (UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
 
-  def restart_shards(self, shard_ids, update_config):
+  def restart_shards(self, shard_ids):
     """Performs a scheduler call for restart.
 
     Arguments:
     shard_ids -- set of shards to be restarted by the scheduler.
-    update_config -- update configuration object that describes how the restart is performed.
 
     Returns a map of the current status of the restarted shards as returned by the scheduler.
     """
