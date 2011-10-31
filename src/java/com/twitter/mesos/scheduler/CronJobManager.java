@@ -21,8 +21,10 @@ import com.google.inject.Inject;
 
 import org.apache.commons.lang.StringUtils;
 
+import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
+import com.twitter.common.base.Command;
 import com.twitter.common.base.Supplier;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -83,7 +85,7 @@ public class CronJobManager extends JobManager {
   private final Storage storage;
 
   @Inject
-  public CronJobManager(Storage storage) {
+  public CronJobManager(Storage storage, ShutdownRegistry shutdownRegistry) {
     this.storage = Preconditions.checkNotNull(storage);
     this.delayedStartBackoff =
         new BackoffHelper(CRON_START_INITIAL_BACKOFF.get(), CRON_START_MAX_BACKOFF.get());
@@ -92,6 +94,11 @@ public class CronJobManager extends JobManager {
 
     scheduler.setDaemon(true);
     scheduler.start();
+    shutdownRegistry.addAction(new Command() {
+      @Override public void execute() {
+        scheduler.stop();
+      }
+    });
 
     Stats.exportSize("cron_num_pending_runs", pendingRuns);
   }

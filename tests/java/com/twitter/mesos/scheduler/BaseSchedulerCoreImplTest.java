@@ -1,5 +1,13 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import javax.annotation.Nullable;
+
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
@@ -12,9 +20,25 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+
+import org.apache.mesos.Protos.ExecutorID;
+import org.apache.mesos.Protos.FrameworkID;
+import org.apache.mesos.Protos.Offer;
+import org.apache.mesos.Protos.OfferID;
+import org.apache.mesos.Protos.Resource;
+import org.apache.mesos.Protos.Resource.Range;
+import org.apache.mesos.Protos.Resource.Ranges;
+import org.apache.mesos.Protos.Resource.Scalar;
+import org.apache.mesos.Protos.Resource.Type;
+import org.apache.mesos.Protos.SlaveID;
+import org.easymock.EasyMock;
+import org.junit.Before;
+import org.junit.Test;
+
 import com.twitter.common.base.Closure;
 import com.twitter.common.collections.Pair;
 import com.twitter.common.testing.EasyMockTest;
+import com.twitter.common.testing.TearDownRegistry;
 import com.twitter.common.util.testing.FakeClock;
 import com.twitter.mesos.ExecutorKey;
 import com.twitter.mesos.Tasks;
@@ -40,26 +64,6 @@ import com.twitter.mesos.scheduler.quota.Quotas;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
 import com.twitter.mesos.scheduler.storage.Storage.Work.NoResult;
-import org.apache.mesos.Protos.ExecutorID;
-import org.apache.mesos.Protos.FrameworkID;
-import org.apache.mesos.Protos.Offer;
-import org.apache.mesos.Protos.OfferID;
-import org.apache.mesos.Protos.Resource;
-import org.apache.mesos.Protos.Resource.Range;
-import org.apache.mesos.Protos.Resource.Ranges;
-import org.apache.mesos.Protos.Resource.Scalar;
-import org.apache.mesos.Protos.Resource.Type;
-import org.apache.mesos.Protos.SlaveID;
-import org.easymock.EasyMock;
-import org.junit.Before;
-import org.junit.Test;
-
-import javax.annotation.Nullable;
-import java.util.Arrays;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
@@ -161,7 +165,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   private void buildScheduler(Storage storage) throws Exception {
     ImmediateJobManager immediateManager = new ImmediateJobManager();
-    cron = new CronJobManager(storage);
+    cron = new CronJobManager(storage, new TearDownRegistry(this));
     StateManager stateManager = new StateManager(storage, clock);
     quotaManager = new QuotaManagerImpl(storage);
     scheduler = new SchedulerCoreImpl(cron, immediateManager, stateManager, schedulingFilter,
