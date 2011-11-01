@@ -257,7 +257,10 @@ class MesosCLI(cmd.Cmd):
     query = TaskQuery()
     query.owner = Identity(role = role)
     query.jobName = job
-    log_scheduler(self.client().killTasks(query, self.acquire_session()))
+    response = self.client().killTasks(query, self.acquire_session())
+    log_scheduler(response)
+    if response.responseCode != ResponseCode.OK:
+      sys.exit(1)
 
 
   @requires_arguments('role', 'job')

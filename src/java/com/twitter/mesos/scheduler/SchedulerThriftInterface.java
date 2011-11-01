@@ -16,6 +16,10 @@ import com.google.inject.Inject;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.NotEmpty;
+import com.twitter.common.base.Supplier;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
+import com.twitter.common.util.BackoffHelper;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.CreateJobResponse;
 import com.twitter.mesos.gen.FinishUpdateResponse;
@@ -64,6 +68,16 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
   @CmdLine(name = "admin_role",
       help ="Auth role that is premitted to run administrative functions.")
   static final Arg<String> ADMIN_ROLE = Arg.create("mesos");
+
+  @CmdLine(name = "kill_task_initial_backoff", help =
+      "Initial backoff delay while waiting for the tasks to transition to KILLED.")
+  private static final Arg<Amount<Long, Time>> KILL_TASK_INITIAL_BACKOFF =
+      Arg.create(Amount.of(1L, Time.SECONDS));
+
+  @CmdLine(name = "kill_task_max_backoff", help =
+      "Max backoff delay while waiting for the tasks to transition to KILLED.")
+  private static final Arg<Amount<Long, Time>> KILL_TASK_MAX_BACKOFF =
+      Arg.create(Amount.of(30L, Time.SECONDS));
 
   private static final Logger LOG = Logger.getLogger(SchedulerThriftInterface.class.getName());
 
@@ -171,13 +185,17 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
   }
 
   @Override
-  public KillResponse killTasks(TaskQuery query, SessionKey session) {
+  public KillResponse killTasks(final TaskQuery query, SessionKey session) {
     checkNotNull(query);
     checkNotNull(session, "Session must be set.");
     checkNotNull(session.getUser(), "Session user must be set.");
 
     // TODO(wfarner): Determine whether this is a useful function, or if it should simply be
     //     switched to 'killJob'.
+
+    if (!query.isSetStatuses()) {
+      query.setStatuses(Tasks.ACTIVE_STATES);
+    }
 
     LOG.info("Received kill request for tasks: " + query);
     KillResponse response = new KillResponse();
@@ -193,16 +211,39 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
       }
     }
 
+    final Query wrappedQuery = new Query(query);
     try {
-      schedulerCore.killTasks(new Query(query), session.getUser());
-      response.setResponseCode(OK).setMessage("Tasks will be killed.");
+      schedulerCore.killTasks(wrappedQuery, session.getUser());
     } catch (ScheduleException e) {
       response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
+      return response;
     }
 
+    BackoffHelper backoff = new BackoffHelper(KILL_TASK_INITIAL_BACKOFF.get(),
+        KILL_TASK_MAX_BACKOFF.get(), true);
+
+    try {
+      backoff.doUntilSuccess(new Supplier<Boolean>() {
+        @Override public Boolean get() {
+          if (schedulerCore.getTasks(wrappedQuery).isEmpty()) {
+            LOG.info("Tasks all killed, done waiting.");
+            return true;
+          } else {
+            LOG.info("Jobs not yet killed, waiting...");
+            return false;
+          }
+        }
+      });
+      response.setResponseCode(OK).setMessage("Tasks killed.");
+    } catch (InterruptedException e) {
+      LOG.warning("Interrupted while trying to kill tasks: " + e);
+      Thread.currentThread().interrupt();
+      response.setResponseCode(ResponseCode.ERROR).setMessage("killTasks thread was interrupted.");
+    } catch (BackoffHelper.BackoffStoppedException e) {
+      response.setResponseCode(ResponseCode.ERROR).setMessage("Tasks were not killed in time.");
+    }
     return response;
   }
-
 
   // TODO(William Farner); This should address a job/shard and not task IDs, and should check to
   //     ensure that the shards requested exist (reporting failure and ignoring request otherwise).

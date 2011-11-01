@@ -87,7 +87,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
-  public void testKillTasks() throws Exception {
+  public void testKillTasksImmediate() throws Exception {
     TaskQuery query = new TaskQuery()
         .setOwner(ROLE_IDENTITY)
         .setJobName("foo_job");
@@ -103,7 +103,37 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .andReturn(ImmutableSet.of(task));
     Capture<Query> killQueryCapture = new Capture<Query>();
     scheduler.killTasks(capture(killQueryCapture), eq(USER));
+    expect(scheduler.getTasks(capture(queryCapture)))
+        .andReturn(ImmutableSet.<ScheduledTask>of());
+    control.replay();
 
+    KillResponse response = thriftInterface.killTasks(query, SESSION);
+    assertEquals(ResponseCode.OK, response.getResponseCode());
+    assertEquals(queryCapture.getValue().base(), query);
+    assertEquals(killQueryCapture.getValue().base(), query);
+  }
+
+  @Test
+  public void testKillTasksDelayed() throws Exception {
+    TaskQuery query = new TaskQuery()
+        .setOwner(ROLE_IDENTITY)
+        .setJobName("foo_job");
+    ScheduledTask task = new ScheduledTask()
+        .setAssignedTask(new AssignedTask()
+            .setTask(new TwitterTaskInfo()
+                .setOwner(ROLE_IDENTITY)));
+
+    expectAdminAuth(false);
+    expectAuth(ROLE, true);
+    Capture<Query> queryCapture = new Capture<Query>();
+    expect(scheduler.getTasks(capture(queryCapture)))
+        .andReturn(ImmutableSet.of(task));
+    Capture<Query> killQueryCapture = new Capture<Query>();
+    scheduler.killTasks(capture(killQueryCapture), eq(USER));
+    expect(scheduler.getTasks(capture(queryCapture)))
+        .andReturn(ImmutableSet.of(task)).times(2);
+    expect(scheduler.getTasks(capture(queryCapture)))
+        .andReturn(ImmutableSet.<ScheduledTask>of());
     control.replay();
 
     KillResponse response = thriftInterface.killTasks(query, SESSION);
@@ -144,7 +174,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAdminAuth(true);
     Capture<Query> killQueryCapture = new Capture<Query>();
     scheduler.killTasks(capture(killQueryCapture), eq(USER));
-
+    expect(scheduler.getTasks(capture(killQueryCapture)))
+        .andReturn(ImmutableSet.<ScheduledTask>of());
     control.replay();
 
     KillResponse response = thriftInterface.killTasks(query, SESSION);
