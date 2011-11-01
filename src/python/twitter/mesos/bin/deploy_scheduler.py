@@ -185,7 +185,7 @@ def find_current_build(hosts):
         current_builds.add(current_build)
 
   current_builds = filter(bool, current_builds)
-  if options.really_push and len(current_builds) != 1:
+  if not options.ignore_conflicting_builds and options.really_push and len(current_builds) != 1:
     sys.exit('Found conflicting current builds: %s please resolve manually' % current_builds)
   current_build = current_builds.pop() if options.really_push else None
   print 'Found current build: %s' % current_build
@@ -386,6 +386,13 @@ def main():
     action='store_true',
     help='Safeguard to prevent fat-fingering.  When false, only show commands but do not run them. '
          '(default: %default)')
+
+  parser.add_option(
+    '--ignore_conflicting_builds',
+    dest='ignore_conflicting_builds',
+    default=False,
+    action='store_true',
+    help='Ignores conflicting builds')
 
   global options
   (options, args) = parser.parse_args()
