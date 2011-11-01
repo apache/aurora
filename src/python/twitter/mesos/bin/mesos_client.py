@@ -262,7 +262,6 @@ class MesosCLI(cmd.Cmd):
     if response.responseCode != ResponseCode.OK:
       sys.exit(1)
 
-
   @requires_arguments('role', 'job')
   def do_status(self, *line):
     """status role job"""
@@ -277,15 +276,17 @@ class MesosCLI(cmd.Cmd):
     def is_active(task):
       return task.status in ACTIVE_STATES
 
-    def print_task(task):
-      assignedTask = task.assignedTask
-      taskInfo = assignedTask.task
+    def print_task(scheduled_task):
+      assigned_task = scheduled_task.assignedTask
+      taskInfo = assigned_task.task
       taskString = """\tHDFS path: %s
 \tcpus: %s, ram: %s MB, disk: %s MB""" % (taskInfo.hdfsPath,
                                           taskInfo.numCpus,
                                           taskInfo.ramMb,
                                           taskInfo.diskMb)
-      taskString += '\n\tfailure count: %s (max %s)' % (task.failureCount,
+      if assigned_task.assignedPorts:
+        taskString += '\n\tports: %s' % assigned_task.assignedPorts
+      taskString += '\n\tfailure count: %s (max %s)' % (scheduled_task.failureCount,
                                                         taskInfo.maxTaskFailures)
       return taskString
 
@@ -294,13 +295,12 @@ class MesosCLI(cmd.Cmd):
 
     def print_tasks(tasks):
       for task in tasks:
-        assignedTask = task.assignedTask
         taskString = print_task(task)
 
         log.info('shard: %s, status: %s on %s\n%s' %
-               (assignedTask.task.shardId,
+               (task.assignedTask.task.shardId,
                 ScheduleStatus._VALUES_TO_NAMES[task.status],
-                assignedTask.slaveHost,
+                task.assignedTask.slaveHost,
                 taskString))
 
     if resp.tasks:
