@@ -29,7 +29,7 @@ class ZookeeperHelper:
     host = clusters.get_zk_host(cluster)
     port = ZookeeperHelper.ZOOKEEPER_PORT
 
-    if Location.get_location() is Location.CORP:
+    if Location.is_corp():
       host, port = ZookeeperHelper.create_zookeeper_tunnel(cluster)
 
     return zookeeper.init('%s:%d' % (host, port))

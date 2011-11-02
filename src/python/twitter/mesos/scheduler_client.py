@@ -115,7 +115,7 @@ class ZookeeperSchedulerClient(SchedulerClient):
     host, port = ZookeeperSchedulerClient._parse_endpoint(data)
 
     # Open a tunnel to the scheduler if necessary
-    if Location.get_location() is Location.CORP:
+    if Location.is_corp():
       host, port = ZookeeperSchedulerClient._open_scheduler_tunnel(cluster, host, port)
 
     zookeeper.set_debug_level(zookeeper.LOG_LEVEL_WARN)

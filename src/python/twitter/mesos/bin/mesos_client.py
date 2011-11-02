@@ -90,9 +90,7 @@ class MesosCLIHelper:
 
     assert os.path.exists(abs_src), 'App file does not exist, cannot continue - %s' % abs_src
 
-    location = Location.get_location()
-
-    hdfs_src = abs_src if location != Location.CORP else os.path.basename(abs_src)
+    hdfs_src = abs_src if Location.is_prod() else os.path.basename(abs_src)
 
     if ssh_proxy_host:
       log.info('Running in corp, copy will be done via %s' % ssh_proxy_host)
@@ -165,17 +163,14 @@ class MesosCLI(cmd.Cmd):
 
   @staticmethod
   def get_scheduler_client(cluster, **kwargs):
-    location = Location.get_location()
-    assert location is not None, 'Failed to detect location, unable to continue.'
-
-    log.info('Auto-detected location: %s' % location)
+    log.info('Auto-detected location: %s' % 'prod' if Location.is_prod() else 'corp')
 
     if cluster.find('localhost:') == 0:
       log.info('Attempting to talk to local scheduler.')
       port = int(cluster.split(':')[1])
       return (None, LocalSchedulerClient(port, ssl=True))
     else:
-      ssh_proxy_host = TunnelHelper.get_tunnel_host(cluster) if location == Location.CORP else None
+      ssh_proxy_host = TunnelHelper.get_tunnel_host(cluster) if Location.is_corp() else None
       if ssh_proxy_host is not None:
         log.info('Proxying through %s' % ssh_proxy_host)
 

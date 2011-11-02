@@ -4,17 +4,23 @@ import socket
 class Location(object):
   """Determine which cluster the code is running in, or CORP if we are not in prod."""
 
-  CORP = "corp"
+  PROD_SUFFIXES = [
+    '.corpdc.twitter.com',
+    '.prod.twitter.com',
+  ]
 
   @staticmethod
-  def get_location():
+  def is_corp():
+    """
+      Returns true if this job is in corp and requires an ssh tunnel for
+      scheduler RPCs.
+    """
     hostname = socket.gethostname()
-    prod_matcher = re.match('^(\w{3}\d+).*\.twitter\.com$', hostname)
-    prod_host = prod_matcher.group(1) if prod_matcher else None
-    if hostname.endswith('.local') or hostname.endswith('.office.twttr.net') or 'sfo0' == prod_host:
-      return Location.CORP
-    elif prod_host:
-      return prod_host
-    else:
-      print 'Can\'t determine location (prod vs. corp). Hostname=%s' % hostname
-      return None
+    for suffix in Location.PROD_SUFFIXES:
+      if hostname.endswith(suffix):
+        return False
+    return True
+
+  @staticmethod
+  def is_prod():
+    return not Location.is_corp()
