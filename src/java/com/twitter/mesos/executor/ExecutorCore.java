@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -21,8 +22,10 @@ import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
+import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -33,13 +36,22 @@ import com.google.inject.name.Named;
 import org.apache.commons.io.FileSystemUtils;
 
 import com.twitter.common.application.ShutdownRegistry;
+import com.twitter.common.args.Arg;
+import com.twitter.common.args.CmdLine;
+import com.twitter.common.args.constraints.CanExecute;
+import com.twitter.common.args.constraints.CanRead;
+import com.twitter.common.args.constraints.Exists;
+import com.twitter.common.args.constraints.NotNull;
 import com.twitter.common.base.Command;
+import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.BuildInfo;
 import com.twitter.mesos.Message;
 import com.twitter.mesos.Tasks;
+import com.twitter.mesos.executor.ProcessKiller.KillCommand;
+import com.twitter.mesos.executor.ProcessKiller.KillException;
 import com.twitter.mesos.executor.Task.TaskRunException;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduleStatus;
@@ -59,20 +71,35 @@ import static com.twitter.mesos.gen.ScheduleStatus.*;
 public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleStatus>> {
   private static final Logger LOG = Logger.getLogger(MesosExecutorImpl.class.getName());
 
+  @CmdLine(name = "kill_orphan_task_schedule_interval",
+           help = "the schedule interval of executing kill orphan task")
+  private static final Arg<Amount<Integer, Time>> KILL_ORPHAN_TASK_SCHEDULE_INTERVAL =
+      Arg.create(Amount.of(10, Time.MINUTES));
+
+  @NotNull
+  @Exists
+  @CanRead
+  @CanExecute
+  @CmdLine(name = "process_scraper_script_path",
+           help = "the path of the script for killing orphan task")
+  private static final Arg<File> PROCESS_SCRAPER_SCRIPT = Arg.create(null);
+
   /**
    * {@literal @Named} binding key for the task executor service.
    */
   public static final String TASK_EXECUTOR =
       "com.twitter.mesos.executor.ExecutorCore.TASK_EXECUTOR";
 
-  private static final long SHUTDOWN_TIMEOUT_MS = Amount.of(20L, Time.SECONDS).as(Time.MILLISECONDS);
+  private static final long SHUTDOWN_TIMEOUT_MS =
+      Amount.of(20L, Time.SECONDS).as(Time.MILLISECONDS);
 
   private final Map<String, Task> tasks = Maps.newConcurrentMap();
 
   private final File executorRootDir;
 
-  private final ScheduledExecutorService syncExecutor = new ScheduledThreadPoolExecutor(1,
-        new ThreadFactoryBuilder().setDaemon(true).setNameFormat("ExecutorSync-%d").build());
+  private final ScheduledExecutorService scheduledExecutorService =
+      new ScheduledThreadPoolExecutor(1,
+          new ThreadFactoryBuilder().setDaemon(true).setNameFormat("ExecutorSync-%d").build());
 
   private final AtomicReference<String> slaveId = new AtomicReference<String>();
 
@@ -81,24 +108,36 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
   private final ExecutorService taskExecutor;
   private final Function<Message, Integer> messageHandler;
   private final StateChangeListener stateChangeListener;
+  private final ExceptionalClosure<KillCommand, KillException> processKiller;
+  private final ProcessScanner processScanner;
+  private final Predicate<String> isActiveTask;
 
   private final AtomicLong tasksReceived = Stats.exportLong("executor_tasks_received");
   private final AtomicLong taskFailures = Stats.exportLong("executor_task_launch_failures");
   private final AtomicLong tasksKilled = Stats.exportLong("executor_tasks_killed");
+
 
   @Inject
   public ExecutorCore(@ExecutorRootDir File executorRootDir, BuildInfo buildInfo,
       Function<AssignedTask, Task> taskFactory,
       @Named(TASK_EXECUTOR) ExecutorService taskExecutor,
       Function<Message, Integer> messageHandler,
-      StateChangeListener stateChangeListener) {
+      StateChangeListener stateChangeListener,
+      ExceptionalClosure<KillCommand, KillException> processKiller) {
     this.executorRootDir = checkNotNull(executorRootDir);
     this.buildInfo = checkNotNull(buildInfo);
     this.taskFactory = checkNotNull(taskFactory);
     this.taskExecutor = checkNotNull(taskExecutor);
     this.messageHandler = checkNotNull(messageHandler);
     this.stateChangeListener = checkNotNull(stateChangeListener);
-
+    this.processKiller = checkNotNull(processKiller);
+    this.processScanner = new ProcessScanner(PROCESS_SCRAPER_SCRIPT.get());
+    this.isActiveTask = new Predicate<String>() {
+      @Override public boolean apply(String taskId) {
+        Task task = tasks.get(taskId);
+        return (task != null) && task.isRunning();
+      }
+    };
     Stats.exportSize("executor_tasks_stored", tasks);
   }
 
@@ -123,10 +162,11 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
   void startPeriodicTasks(ShutdownRegistry shutdownRegistry) {
     new ResourceManager(this, executorRootDir, shutdownRegistry).start();
     startStateSync();
+    startKillOrphanTask();
     shutdownRegistry.addAction(new Command() {
       @Override public void execute() {
         LOG.info("Shutting down sync executor.");
-        syncExecutor.shutdownNow();
+        scheduledExecutorService.shutdownNow();
       }
     });
   }
@@ -321,6 +361,32 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
     };
 
     // TODO(William Farner): Make sync interval configurable.
-    syncExecutor.scheduleAtFixedRate(syncer, 30, 30, TimeUnit.SECONDS);
+    scheduledExecutorService.scheduleAtFixedRate(syncer, 30, 30, TimeUnit.SECONDS);
+  }
+
+  private void startKillOrphanTask() {
+    Runnable killOrphanTask = new Runnable() {
+      @Override public void run() {
+        Map<String, Integer> runningProcesses = processScanner.getRunningProcesses();
+        // Kill running tasks that we don't think they are running.
+        Set<String> orphanTaskIds = ImmutableSet.copyOf(
+            Iterables.filter(runningProcesses.keySet(), Predicates.not(isActiveTask)));
+        LOG.info("Found orphan tasks: " + orphanTaskIds);
+        for (String taskId : orphanTaskIds) {
+          int pid = runningProcesses.get(taskId);
+          LOG.info(String.format("Killing orphan task pid:%d task id: %s.", pid, taskId));
+          try {
+            processKiller.execute(new KillCommand(pid));
+          } catch (KillException e) {
+            LOG.warning(String.format(
+                "Failed to kill orphan task pid:%d task id: %s.", pid, taskId));
+          }
+        }
+      }
+    };
+
+    int scheduleInterval = KILL_ORPHAN_TASK_SCHEDULE_INTERVAL.get().as(Time.SECONDS);
+    scheduledExecutorService.scheduleAtFixedRate(
+        killOrphanTask, scheduleInterval, scheduleInterval, TimeUnit.SECONDS);
   }
 }

@@ -52,3 +52,12 @@ python_binary(
     pants("3rdparty/python:git-python")
   ]
 )
+
+python_binary(
+  name = "process_scraper",
+  source = "process_scraper.py",
+  dependencies = [
+    pants('src/python/twitter/common/app'),
+    pants("src/python/twitter/common/process"),
+  ]
+)

@@ -11,9 +11,12 @@ import org.easymock.Capture;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.common.util.BuildInfo;
 import com.twitter.mesos.Message;
+import com.twitter.mesos.executor.ProcessKiller.KillCommand;
+import com.twitter.mesos.executor.ProcessKiller.KillException;
 import com.twitter.mesos.executor.Task.TaskRunException;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
@@ -43,7 +46,7 @@ public class ExecutorCoreTest extends EasyMockTest {
   private Function<Message, Integer> messageHandler;
   private StateChangeListener stateChangeListener;
   private Task runningTask;
-
+  private ExceptionalClosure<KillCommand, KillException> processKiller;
   private ExecutorCore executor;
 
   @Before
@@ -54,6 +57,7 @@ public class ExecutorCoreTest extends EasyMockTest {
     messageHandler = createMock(Function.class);
     stateChangeListener = createMock(StateChangeListener.class);
     runningTask = createMock(Task.class);
+    processKiller = createMock(ExceptionalClosure.class);
 
     executor = new ExecutorCore(
         new File("/dev/null"),
@@ -61,7 +65,8 @@ public class ExecutorCoreTest extends EasyMockTest {
         taskFactory,
         taskExecutor,
         messageHandler,
-        stateChangeListener);
+        stateChangeListener,
+        processKiller);
   }
 
   @Test

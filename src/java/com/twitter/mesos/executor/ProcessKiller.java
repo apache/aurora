@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.annotation.Nullable;
+
 import com.google.common.base.Preconditions;
 import com.google.common.io.CharStreams;
 import com.google.common.io.Closeables;
@@ -129,7 +131,11 @@ public class ProcessKiller implements ExceptionalClosure<KillCommand, KillExcept
     private final Task task;
     private final int httpSignalPort;
 
-    public KillCommand(int pid, Task task, int httpSignalPort) {
+    public KillCommand(int pid) {
+      this(pid, null, -1);
+    }
+
+    public KillCommand(int pid, @Nullable Task task, int httpSignalPort) {
       this.pid = pid;
       this.task = task;
       this.httpSignalPort = httpSignalPort;
