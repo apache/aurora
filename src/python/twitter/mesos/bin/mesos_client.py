@@ -130,9 +130,12 @@ class requires_arguments(object):
     wrapped_fn.__doc__ = fn.__doc__
     return wrapped_fn
 
-def log_scheduler(rc):
+def check_and_log_response(resp):
   log.info('Response from scheduler: %s (message: %s)'
-      % (ResponseCode._VALUES_TO_NAMES[rc.responseCode], rc.message))
+      % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
+  if resp.responseCode != ResponseCode.OK:
+    sys.exit(1)
+
 
 class MesosCLI(cmd.Cmd):
   def __init__(self, opts):
@@ -223,7 +226,8 @@ class MesosCLI(cmd.Cmd):
     sessionkey = self.acquire_session()
 
     log.info('Creating job %s' % job.name)
-    log_scheduler(self.client().createJob(job, sessionkey))
+    resp = self.client().createJob(job, sessionkey)
+    check_and_log_response(resp)
 
 
   @requires_arguments('job', 'config')
@@ -245,7 +249,8 @@ class MesosCLI(cmd.Cmd):
   def do_start_cron(self, *line):
     """start_cron role job"""
     (role, job) = line
-    log_scheduler(self.client().startCronJob(role, job, self.acquire_session()))
+    resp = self.client().startCronJob(role, job, self.acquire_session())
+    check_and_log_response(resp)
 
 
   @requires_arguments('role', 'job')
@@ -257,10 +262,8 @@ class MesosCLI(cmd.Cmd):
     query = TaskQuery()
     query.owner = Identity(role = role)
     query.jobName = job
-    response = self.client().killTasks(query, self.acquire_session())
-    log_scheduler(response)
-    if response.responseCode != ResponseCode.OK:
-      sys.exit(1)
+    resp = self.client().killTasks(query, self.acquire_session())
+    check_and_log_response(resp)
 
   @requires_arguments('role', 'job')
   def do_status(self, *line):
@@ -291,7 +294,7 @@ class MesosCLI(cmd.Cmd):
       return taskString
 
     resp = self.client().getTasksStatus(query)
-    log_scheduler(resp)
+    check_and_log_response(resp)
 
     def print_tasks(tasks):
       for task in tasks:
@@ -331,10 +334,7 @@ class MesosCLI(cmd.Cmd):
     log.info('Updating job %s' % job.name)
 
     resp = self.client().startUpdate(job, sessionkey)
-    if resp.responseCode != ResponseCode.OK:
-      log.warning('Response from scheduler: %s (message: %s)'
-          % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
-      return
+    check_and_log_response(resp)
 
     # TODO(William Farner): Cleanly handle connection failures in case the scheduler
     #                       restarts mid-update.
@@ -348,10 +348,7 @@ class MesosCLI(cmd.Cmd):
     resp = self.client().finishUpdate(
       job.owner.role, job.name, UpdateResult.FAILED if failed_shards else UpdateResult.SUCCESS,
       resp.updateToken, sessionkey)
-
-    if resp.responseCode != UpdateResponseCode.OK:
-      log.info('Response from scheduler: %s (message: %s)'
-        % (UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
+    check_and_log_response(resp)
 
 
   @requires_arguments('role', 'job')
@@ -360,8 +357,8 @@ class MesosCLI(cmd.Cmd):
 
     (role, job) = line
     log.info('Canceling update on job %s' % job)
-    log_scheduler(
-      self.client().finishUpdate(role, job, UpdateResult.TERMINATE, None, self.acquire_session()))
+    resp = self.client().finishUpdate(role, job, UpdateResult.TERMINATE, None, self.acquire_session())
+    check_and_log_response(resp)
 
 
   @requires_arguments('role')
@@ -396,7 +393,7 @@ class MesosCLI(cmd.Cmd):
       log.error('Invalid value')
 
     resp = self.client().setQuota(role, Quota(cpu, ram_mb, disk_mb), self.acquire_session())
-    log.info('Response from scheduler: %s' % resp)
+    check_and_log_response(resp)
 
 
 def initialize_options():
