@@ -216,11 +216,11 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
 
     BackoffHelper backoff = new BackoffHelper(KILL_TASK_INITIAL_BACKOFF.get(),
         KILL_TASK_MAX_BACKOFF.get(), true);
-
+    final Query activeQuery = new Query(query.setStatuses(Tasks.ACTIVE_STATES));
     try {
       backoff.doUntilSuccess(new Supplier<Boolean>() {
         @Override public Boolean get() {
-          if (schedulerCore.getTasks(wrappedQuery).isEmpty()) {
+          if (schedulerCore.getTasks(activeQuery).isEmpty()) {
             LOG.info("Tasks all killed, done waiting.");
             return true;
           } else {
