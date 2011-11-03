@@ -18,9 +18,6 @@ except ImportError, e:
   log.fatal("Local thrift imports failed: %s" % e)
   sys.exit(1)
 
-import subprocess
-import time
-import signal
 import zookeeper
 
 from endpoint.ttypes import *
@@ -81,7 +78,7 @@ class ZookeeperSchedulerClient(SchedulerClient):
     protocolIn = TBinaryProtocol.TBinaryProtocol(transportIn)
     si = ServiceInstance()
     si.read(protocolIn)
-    return (si.serviceEndpoint.host, si.serviceEndpoint.port)
+    return si.serviceEndpoint.host, si.serviceEndpoint.port
 
   @staticmethod
   def _open_scheduler_tunnel(cluster, remote_host, remote_port):

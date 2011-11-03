@@ -4,16 +4,12 @@
 """
 
 import cmd
-import copy
-import logging
 import os
 import subprocess
 import sys
 import time
 import getpass
-import pickle
 import zookeeper
-import errno
 
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
@@ -168,16 +164,13 @@ class MesosCLI(cmd.Cmd):
     if cluster.find('localhost:') == 0:
       log.info('Attempting to talk to local scheduler.')
       port = int(cluster.split(':')[1])
-      return (None, LocalSchedulerClient(port, ssl=True))
+      return None, LocalSchedulerClient(port, ssl=True)
     else:
       ssh_proxy_host = TunnelHelper.get_tunnel_host(cluster) if Location.is_corp() else None
       if ssh_proxy_host is not None:
         log.info('Proxying through %s' % ssh_proxy_host)
 
-      zk_host = clusters.get_zk_host(cluster)
-      scheduler_path = clusters.get_scheduler_zk_path(cluster)
-
-      return (ssh_proxy_host, ZookeeperSchedulerClient(cluster, ssl=True, **kwargs))
+      return ssh_proxy_host, ZookeeperSchedulerClient(cluster, ssl=True, **kwargs)
 
   def _construct_scheduler(self, config=None):
     """
@@ -277,8 +270,10 @@ class MesosCLI(cmd.Cmd):
     def print_task(scheduled_task):
       assigned_task = scheduled_task.assignedTask
       taskInfo = assigned_task.task
-      taskString = """\tHDFS path: %s
-\tcpus: %s, ram: %s MB, disk: %s MB""" % (taskInfo.hdfsPath,
+      taskString = ''
+      if taskInfo:
+        taskString += '''\tHDFS path: %s
+\tcpus: %s, ram: %s MB, disk: %s MB''' % (taskInfo.hdfsPath,
                                           taskInfo.numCpus,
                                           taskInfo.ramMb,
                                           taskInfo.diskMb)
