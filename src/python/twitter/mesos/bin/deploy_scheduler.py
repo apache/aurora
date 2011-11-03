@@ -19,10 +19,10 @@ REMOTE_USER = 'mesos'
 TEST_CMD = './pants %s clean-all test'
 TEST_TARGETS = ['tests/java/com/twitter/mesos:all-tests!']
 
-BUILD_DEPLOY_CMD = './pants %s zip'
-BUILD_TARGETS = [
-  'src/java/com/twitter/mesos/scheduler!',
-  'src/java/com/twitter/mesos/executor!',
+BUILD_TARGET_CMDS = [
+  './pants src/java/com/twitter/mesos/scheduler! zip',
+  './pants src/java/com/twitter/mesos/executor! zip',
+  './pants src/python/twitter/mesos:process_scraper!'
 ]
 
 STAGE_DIR = '~/release_staging'
@@ -38,6 +38,7 @@ HDFS_BIN_DIR = '/mesos/pkg/mesos/bin'
 HDFS_BIN_FILES = {
   'mesos/scripts/executor.sh': '%s/$cluster/$dc-$cluster-executor.sh' % HDFS_BIN_DIR,
   'dist/mesos-executor.zip':  '%s/$cluster/mesos-executor.zip' % HDFS_BIN_DIR,
+  'dist/process_scraper.pex':  '%s/$cluster/process_scraper.pex' % HDFS_BIN_DIR,
 }
 
 MESOS_HOME = '/usr/local/mesos'
@@ -162,9 +163,9 @@ def build():
   for test_target in TEST_TARGETS:
     print 'Executing test target: %s' % test_target
     check_call((TEST_CMD % test_target).split(' '))
-  for build_target in BUILD_TARGETS:
-    print 'Executing build target: %s' % build_target
-    check_call((BUILD_DEPLOY_CMD % build_target).split(' '))
+  for build_target_cmd in BUILD_TARGET_CMDS:
+    print 'Executing build target: %s' % build_target_cmd
+    check_call(build_target_cmd.split(' '))
 
 
 def find_current_build(hosts):
