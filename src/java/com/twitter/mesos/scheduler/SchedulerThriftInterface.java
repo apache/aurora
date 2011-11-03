@@ -192,11 +192,6 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
 
     // TODO(wfarner): Determine whether this is a useful function, or if it should simply be
     //     switched to 'killJob'.
-
-    if (!query.isSetStatuses()) {
-      query.setStatuses(Tasks.ACTIVE_STATES);
-    }
-
     LOG.info("Received kill request for tasks: " + query);
     KillResponse response = new KillResponse();
 
