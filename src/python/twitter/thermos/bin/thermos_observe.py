@@ -1,3 +1,4 @@
+import socket
 import sys
 import time
 
@@ -6,19 +7,20 @@ from twitter.common.app.modules.http import RootServer
 from twitter.thermos.observer.observer import TaskObserver
 from twitter.thermos.observer.http import BottleObserver
 
-app.add_option("--root", dest = "root", metavar = "DIR",
-               help = "root checkpoint directory for thermos task runners")
+app.add_option("--root",
+               dest="root",
+               metavar="DIR",
+               default="/var/run/thermos",
+               help="root checkpoint directory for thermos task runners")
 
-def main(args):
-  opts = app.get_options()
+app.configure(module='twitter.common.app.modules.http',
+    port=1338, host=socket.gethostname(), enable=True)
+app.configure(module='twitter.common.app.modules.exception_handler',
+    enable=True, category='thermos_observer_exceptions')
 
+def main(args, opts):
   if args:
     print >> sys.stderr, "ERROR: unrecognized arguments: %s\n" % (" ".join(args))
-    app.help()
-    sys.exit(1)
-
-  if not opts.root:
-    print >> sys.stderr, "ERROR: must supply --root directory"
     app.help()
     sys.exit(1)
 

@@ -103,7 +103,7 @@ app.add_option("--checkpoint_root", dest = "checkpoint_root", metavar = "PATH",
                default = "/var/run/thermos",
                help = "the path where we will store workflow logs and checkpoints")
 
-app.set_option('twitter_common_app_debug', True)
+app.configure(debug=True)
 def main(args, options):
   thermos_executor = ThermosExecutor(options)
   drv = mesos.MesosExecutorDriver(thermos_executor)
