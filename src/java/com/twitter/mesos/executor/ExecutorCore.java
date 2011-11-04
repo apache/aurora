@@ -116,6 +116,8 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
   private final AtomicLong tasksReceived = Stats.exportLong("executor_tasks_received");
   private final AtomicLong taskFailures = Stats.exportLong("executor_task_launch_failures");
   private final AtomicLong tasksKilled = Stats.exportLong("executor_tasks_killed");
+  private final AtomicLong orphansCount = Stats.exportLong("executor_orphans_count");
+  private final AtomicLong orphansKilled = Stats.exportLong("executor_orphans_killed");
 
 
   @Inject
@@ -376,9 +378,11 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
         for (Entry<Integer, String> entry : orphanTasks.entrySet()) {
           int pid = entry.getKey();
           String taskId = entry.getValue();
+          orphansCount.incrementAndGet();
           LOG.info(String.format("Killing orphan task pid:%d task id: %s.", pid, taskId));
           try {
             processKiller.execute(new KillCommand(pid));
+            orphansKilled.incrementAndGet();
           } catch (KillException e) {
             LOG.warning(String.format(
                 "Failed to kill orphan task pid:%d task id: %s.", pid, taskId));
