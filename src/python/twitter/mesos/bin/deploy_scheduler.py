@@ -159,6 +159,38 @@ def remote_check_call(host, cmd):
   check_output(['ssh', ssh_target(host)] + cmd)
 
 
+def check_tag(tag, check_on_master=True):
+  """
+    Checks that the given tag is valid on origin to enable repeatable builds and returns the sha
+    the tag points to.
+  """
+  repo = Repo()
+  if check_on_master:
+    if repo.active_branch.name != 'master':
+      print >> sys.stderr, 'Deploys must be from master'
+      sys.exit(1)
+
+  # TODO(John Sirois): leverage the repo api here where possible
+  failed, _ = run_cmd(['git', 'ls-remote', '--exit-code', '--tags', 'origin', tag])
+  if failed:
+    print >> sys.stderr, 'The tag %s must be on origin' % tag
+    sys.exit(1)
+
+  # Find the sha of the commit this heavy-weight tag points to.
+  failed, (sha, _) = run_cmd(['git', 'rev-list', '%(tag)s^..%(tag)s' % dict(tag = tag)])
+  if failed:
+    print >> sys.stderr, 'Failed to find the commit %s points to' % tag
+    sys.exit(1)
+  tag_sha = sha.strip()
+
+  head_sha = repo.head.commit.hexsha
+  if head_sha != tag_sha:
+    print >> sys.stderr, 'Local repo is not at the expected sha, found %s - please reset' % head_sha
+    sys.exit(1)
+
+  return tag_sha
+
+
 def build():
   for test_target in TEST_TARGETS:
     print 'Executing test target: %s' % test_target
@@ -246,35 +278,51 @@ def stage_build(hosts):
   return release_scheduler_path
 
 
-def set_live_build(host, build_path):
+def set_live_build(hosts, build_path):
   print 'Linking the new build on the scheduler'
-  remote_check_call(host, ['bash', '-c',
-    '"rm -f %(live_build)s &&'
-    ' ln -s %(build)s %(live_build)s"' % {
-      'live_build': LIVE_BUILD_PATH,
-      'build': build_path
-    }
-  ])
+  # TODO(John Sirois): consider loony
+  for host in hosts:
+    remote_check_call(host, ['bash', '-c',
+      '"rm -f %(live_build)s &&'
+      ' ln -s %(build)s %(live_build)s"' % {
+        'live_build': LIVE_BUILD_PATH,
+        'build': build_path
+      }
+    ])
 
 
-def start_scheduler(host):
-  print 'Starting the scheduler'
-  remote_check_call(host, ['sudo', 'monit', 'start', 'mesos-scheduler'])
+def start_scheduler(hosts):
+  print 'Starting the scheduler on %s' % hosts
+  # TODO(John Sirois): consider loony
+  for host in hosts:
+    remote_check_call(host, ['sudo', 'monit', 'start', 'mesos-scheduler'])
   if options.really_push:
     print 'Waiting for the scheduler to start'
     time.sleep(5)
 
 
-def get_scheduler_uptime_secs(host):
-  vars = fetch_scheduler_http(host, 'vars')
-  if options.really_push:
-    assert vars is not None, 'Failed to fetch vars from scheduler'
-  elif vars is None:
-    return
-  for var in vars.split('\n'):
-    keyValue = var.split(' ')
-    if keyValue[0] == 'jvm_uptime_secs':
-      return int(keyValue[1])
+def get_scheduler_uptime_secs(host, sha):
+  """Checks that the scheduler is up at the expected sha and returns the uptime in seconds if so."""
+
+  if not options.really_push:
+    return 0
+
+  vars_blob = fetch_scheduler_http(host, 'vars')
+  assert vars_blob is not None, 'Failed to fetch vars from scheduler'
+
+  vars = {}
+  for kv in (line.split(' ', 1) for line in vars_blob.split('\n')):
+    if len(kv) == 2:
+      k, v = kv
+      vars[k] = v
+    else:
+      vars[kv] = None
+
+  if sha:
+    deployed_sha = vars.get('build_git_revision')
+    assert deployed_sha == sha, \
+        'Host %s is not on current build %s, has %s' % (host, sha, deployed_sha)
+  return int(vars.get('jvm_uptime_secs', 0))
 
 
 def is_scheduler_healthy(host):
@@ -298,7 +346,7 @@ def stop_scheduler(hosts):
     remote_check_call(host, ['sudo', 'monit', 'stop', 'mesos-scheduler'])
 
 
-def watch_scheduler(host, up_min_secs):
+def watch_scheduler(host, sha, up_min_secs):
   print 'Watching scheduler'
   started = False
   watch_start = time.time()
@@ -307,7 +355,7 @@ def watch_scheduler(host, up_min_secs):
   # Wait at most three minutes.
   while started or (time.time() - watch_start) < 180:
     if is_scheduler_healthy(host):
-      uptime = get_scheduler_uptime_secs(host)
+      uptime = get_scheduler_uptime_secs(host, sha)
       if not options.really_push:
         print 'Skipping further health checks, since we are not pushing.'
         return True
@@ -332,29 +380,20 @@ def watch_scheduler(host, up_min_secs):
   return False
 
 
-def rollback(host, rollback_build):
+def rollback(hosts, rollback_build):
   print 'Initiating rollback'
-  set_live_build(host, rollback_build)
-  start_scheduler(host)
+  set_live_build(hosts, rollback_build)
+  start_scheduler(hosts)
 
 
 def main():
-  parser = OptionParser()
+  parser = OptionParser(usage = '%prog [options] tag')
   parser.add_option(
     '-v',
     dest='verbose',
     default=False,
     action='store_true',
     help='Verbose logging. (default: %default)')
-
-  # TODO(John Sirois): Make default and kill option once all environments are stably deployed on
-  # vert releases.
-  parser.add_option(
-    '--vert',
-    dest='use_vert',
-    default=False,
-    action='store_true',
-    help='Deploy scheduler using a vert release. (default: %default)')
 
   cluster_list = list(clusters.get_clusters())
   cluster_list.sort()
@@ -389,6 +428,20 @@ def main():
          '(default: %default)')
 
   parser.add_option(
+    '--ignore_release',
+    dest='ignore_release',
+    default=False,
+    action='store_true',
+    help='Ignores the vert release protocol (can only be used in test)')
+
+  parser.add_option(
+    '--hotfix',
+    dest='hotfix',
+    default=False,
+    action='store_true',
+    help='Indicates this is a hotfix deploy from a temporary release branch instead of a vert tag')
+
+  parser.add_option(
     '--ignore_conflicting_builds',
     dest='ignore_conflicting_builds',
     default=False,
@@ -411,21 +464,16 @@ def main():
            % cluster_list)
     return
 
-  repo = Repo()
-  if options.use_vert:
-    # TODO(John Sirois): beef this up - we should really ask for a release number and verify:
-    # 1) we're @ that sha
-    # 2) that sha is on origin
-    if repo.active_branch.name != 'master':
-      print >> sys.stderr, 'When using vert deploys must be from master'
-      exit(1)
+  if options.ignore_release and options.cluster == 'smf1-test':
+    sha = None
   else:
-    deploy_branch = clusters.get_deploy_branch(options.cluster)
-    if repo.active_branch.name != deploy_branch:
-      if not read_bool_stdin(
-          'The standard deploy branch for the %s cluster is %s, currently on branch %s, are you sure '
-          'you want to continue?' % (options.cluster, deploy_branch, repo.active_branch.name), False):
-        return
+    if len(args) != 1:
+      print 'You must specify the tag you intend to push'
+      sys.exit(1)
+
+    sha = check_tag(args[0], check_on_master=not options.hotfix)
+    if not sha:
+      sys.exit(1)
 
   if options.skip_build:
     print 'Warning - skipping build, using existing build at %s' % BUILD_SCHEDULER_PACKAGE_PATH
@@ -439,28 +487,23 @@ def main():
   new_build = stage_build(all_schedulers)
   stop_scheduler(all_schedulers)
 
-  # Canary the new build on 1 host at a time, but only check the 1st - the leader - extensively
-  check_for_secs = [5] * len(all_schedulers)
-  check_for_secs[0] = 45
+  # Point to the new build and start all schedulers up
+  # TODO(John Sirois): support a rolling restart once multi-scheduler is used in all enviornments
+  set_live_build(all_schedulers, new_build)
+  start_scheduler(all_schedulers)
 
-  for i, canary in enumerate(all_schedulers):
-    set_live_build(canary, new_build)
-    start_scheduler(canary)
-
-    if not watch_scheduler(canary, up_min_secs=check_for_secs[i]):
-      print 'scheduler[%d] on %s not healthy' % (i, canary)
-      stop_scheduler(all_schedulers[:i])
-
-      # We did not set the live build on the rest, so we can just restart and let one lead on the
-      # old build
-      for not_deployed in all_schedulers[i+1:]:
-        start_scheduler(not_deployed)
+  # TODO(John Sirois): find the leader and health check it for 45 seconds instead
+  for scheduler in all_schedulers:
+    if not watch_scheduler(scheduler, sha=sha, up_min_secs=15):
+      print 'scheduler on %s not healthy' % leader
+      stop_scheduler(all_schedulers)
 
       if current_build:
-        for deployed in all_schedulers[:i]:
-          rollback(deployed, current_build)
+        rollback(all_schedulers, current_build)
+        print 'Push rolled back.'
       else:
         print 'Push failed - no previous builds to roll back to.'
+      sys.exit(1)
 
   if options.really_push:
     print 'Push successful!'
