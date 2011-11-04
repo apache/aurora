@@ -13,13 +13,13 @@ public class TasksControllerTest {
 
   @Test
   public void testValidInput() {
-    Map<String, Integer> result;
+    Map<Integer, String> result;
 
     // test valid input
     result = ProcessScanner.parseOutput("123 abc\n456 zxc");
-    Map<String, Integer> expected = ImmutableMap.of(
-        "abc", 123,
-        "zxc", 456
+    Map<Integer, String> expected = ImmutableMap.of(
+        123, "abc",
+        456, "zxc"
     );
     assertEquals(expected, result);
 
@@ -30,11 +30,19 @@ public class TasksControllerTest {
     // test good and bad input interleaved on separate lines
     result = ProcessScanner.parseOutput("123 abc\nbcfh 123\n456 zxc\n\n123 abc 123");
     assertEquals(expected, result);
+
+    // test a mesos task has multiple process
+    result = ProcessScanner.parseOutput("123 abc\n456 abc");
+    expected = ImmutableMap.of(
+        123, "abc",
+        456, "abc"
+    );
+    assertEquals(expected, result);
   }
 
   @Test
   public void testInvalidInput() {
-    Map<String, Integer> result;
+    Map<Integer, String> result;
     // test bad input
     result = ProcessScanner.parseOutput("fndslagdfjsg fndsogajn \njfiosd");
     assertEquals(0, result.size());

@@ -68,8 +68,8 @@ public class ProcessScanner {
   }
 
   @VisibleForTesting
-  static Map<String, Integer> parseOutput(String output) {
-    ImmutableMap.Builder<String, Integer> builder = ImmutableMap.builder();
+  static Map<Integer, String> parseOutput(String output) {
+    ImmutableMap.Builder<Integer, String> builder = ImmutableMap.builder();
     Iterable<String> lines = Splitter.on('\n').omitEmptyStrings().split(output);
     for (String line : lines) {
       ImmutableList<String> components =
@@ -85,7 +85,7 @@ public class ProcessScanner {
         LOG.warning(String.format("Failed to parse script line: %s.", line));
         continue;
       }
-      builder.put(components.get(1), pid);
+      builder.put(pid, components.get(1));
     }
     return builder.build();
   }
@@ -93,9 +93,12 @@ public class ProcessScanner {
   /**
    * Gather all the valid mesos process information running on the machine.
    *
-   * @return a map of mesos task id to pid
+   * The reason of using pid as key is that a mesos task might have multiple processes, so
+   * pid is the only unique identifier when handling the output.
+   *
+   * @return a map of pid to mesos task
    */
-  public Map<String, Integer> getRunningProcesses() {
+  public Map<Integer, String> getRunningProcesses() {
     LOG.fine("Executing script from " + processScraperScript);
     String output;
     try {

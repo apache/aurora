@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -133,8 +134,8 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
     this.processKiller = checkNotNull(processKiller);
     this.processScanner = new ProcessScanner(PROCESS_SCRAPER_SCRIPT.get());
     this.isActiveTask = new Predicate<String>() {
-      @Override public boolean apply(String taskId) {
-        Task task = tasks.get(taskId);
+      @Override public boolean apply(String entry) {
+        Task task = tasks.get(entry);
         return (task != null) && task.isRunning();
       }
     };
@@ -367,13 +368,14 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
   private void startKillOrphanTask() {
     Runnable killOrphanTask = new Runnable() {
       @Override public void run() {
-        Map<String, Integer> runningProcesses = processScanner.getRunningProcesses();
+        Map<Integer, String> runningProcesses = processScanner.getRunningProcesses();
         // Kill running tasks that we don't think they are running.
-        Set<String> orphanTaskIds = ImmutableSet.copyOf(
-            Iterables.filter(runningProcesses.keySet(), Predicates.not(isActiveTask)));
-        LOG.info("Found orphan tasks: " + orphanTaskIds);
-        for (String taskId : orphanTaskIds) {
-          int pid = runningProcesses.get(taskId);
+        Map<Integer, String> orphanTasks =
+            Maps.filterValues(runningProcesses, Predicates.not(isActiveTask));
+        LOG.info("Found orphan tasks: " + orphanTasks);
+        for (Entry<Integer, String> entry : orphanTasks.entrySet()) {
+          int pid = entry.getKey();
+          String taskId = entry.getValue();
           LOG.info(String.format("Killing orphan task pid:%d task id: %s.", pid, taskId));
           try {
             processKiller.execute(new KillCommand(pid));
@@ -386,6 +388,7 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
     };
 
     int scheduleInterval = KILL_ORPHAN_TASK_SCHEDULE_INTERVAL.get().as(Time.SECONDS);
+    LOG.info("Scheduled kill orphan task with interval(seconds):" + scheduleInterval);
     scheduledExecutorService.scheduleAtFixedRate(
         killOrphanTask, scheduleInterval, scheduleInterval, TimeUnit.SECONDS);
   }
