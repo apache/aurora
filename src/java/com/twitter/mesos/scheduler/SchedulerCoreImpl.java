@@ -469,22 +469,20 @@ public class SchedulerCoreImpl implements SchedulerCore {
       }
     }
 
-    if (!matchingScheduler) {
-      if (query.specifiesJobOnly()) {
-        try {
-          stateManager.finishUpdate(
-              query.base().getOwner().getRole(), query.base().getJobName(),
-              Optional.<String>absent(),
-              UpdateResult.TERMINATE);
-        } catch (UpdateException e) {
-          LOG.log(Level.WARNING,
-              "Failed to kill the job update associated with " + query.getJobKey(),
-              e.getMessage());
-        }
+    if (!matchingScheduler && query.specifiesJobOnly()) {
+      try {
+        stateManager.finishUpdate(
+            query.base().getOwner().getRole(), query.base().getJobName(),
+            Optional.<String>absent(),
+            UpdateResult.TERMINATE);
+      } catch (UpdateException e) {
+        LOG.log(Level.WARNING,
+            "Failed to kill the job update associated with " + query.getJobKey(),
+            e.getMessage());
       }
-
-      stateManager.changeState(query, KILLING, "Killed by " + user);
     }
+
+    stateManager.changeState(query, KILLING, "Killed by " + user);
   }
 
   @Override
