@@ -312,11 +312,9 @@ def get_scheduler_uptime_secs(host, sha):
 
   vars = {}
   for kv in (line.split(' ', 1) for line in vars_blob.split('\n')):
-    if len(kv) == 2:
-      k, v = kv
-      vars[k] = v
-    else:
-      vars[kv] = None
+    # TODO(John Sirois): yet another sign to support /vars.json export in the science app stack
+    k, v = kv if len(kv) == 2 else kv[0], None
+    vars[k] = v
 
   if sha:
     deployed_sha = vars.get('build_git_revision')
