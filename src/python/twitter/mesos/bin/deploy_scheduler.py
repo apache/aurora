@@ -181,7 +181,7 @@ def check_tag(tag, check_on_master=True):
   if failed:
     print >> sys.stderr, 'Failed to find the commit %s points to' % tag
     sys.exit(1)
-  tag_sha = sha.strip()
+  tag_sha = sha.splitlines()[0].strip()
 
   head_sha = repo.head.commit.hexsha
   if head_sha != tag_sha:
@@ -301,26 +301,32 @@ def start_scheduler(hosts):
     time.sleep(5)
 
 
-def get_scheduler_uptime_secs(host, sha):
-  """Checks that the scheduler is up at the expected sha and returns the uptime in seconds if so."""
-
-  if not options.really_push:
-    return 0
-
+def scrape_vars(host):
   vars_blob = fetch_scheduler_http(host, 'vars')
   assert vars_blob is not None, 'Failed to fetch vars from scheduler'
 
   vars = {}
   for kv in (line.split(' ', 1) for line in vars_blob.split('\n')):
     # TODO(John Sirois): yet another sign to support /vars.json export in the science app stack
-    k, v = kv if len(kv) == 2 else kv[0], None
+    k, v = kv if len(kv) == 2 else (kv[0], None)
     vars[k] = v
+  return vars
 
-  if sha:
-    deployed_sha = vars.get('build_git_revision')
-    assert deployed_sha == sha, \
-        'Host %s is not on current build %s, has %s' % (host, sha, deployed_sha)
-  return int(vars.get('jvm_uptime_secs', 0))
+
+def get_scheduler_uptime_secs(host):
+  """Returns the scheduler's uptime in seconds."""
+
+  if not options.really_push:
+    return 0
+  return int((scrape_vars(host)).get('jvm_uptime_secs', 0))
+
+
+def get_scheduler_sha(host):
+  """Returns the sha the deployed scheduler is built from."""
+
+  if options.really_push:
+    vars = scrape_vars(host)
+    return vars.get('build_git_revision')
 
 
 def is_scheduler_healthy(host):
@@ -353,7 +359,7 @@ def watch_scheduler(host, sha, up_min_secs):
   # Wait at most three minutes.
   while started or (time.time() - watch_start) < 180:
     if is_scheduler_healthy(host):
-      uptime = get_scheduler_uptime_secs(host, sha)
+      uptime = get_scheduler_uptime_secs(host)
       if not options.really_push:
         print 'Skipping further health checks, since we are not pushing.'
         return True
@@ -364,8 +370,13 @@ def watch_scheduler(host, sha, up_min_secs):
           print 'Detected scheduler process restart after update (uptime %s)!' % uptime
           return False
         elif time.time() - start_detected_at > up_min_secs:
-          print 'Scheduler has been up for at least %d seconds' % up_min_secs
-          return True
+          deployed_sha = get_scheduler_sha(host)
+          if deployed_sha != sha:
+            print 'Host %s is not on current build %s, has %s' % (host, sha, deployed_sha)
+            return False
+          else:
+            print 'Host %s has been up for at least %d seconds' % (host, up_min_secs)
+            return True
       else:
         start_detected_at = time.time()
 
@@ -493,7 +504,7 @@ def main():
   # TODO(John Sirois): find the leader and health check it for 45 seconds instead
   for scheduler in all_schedulers:
     if not watch_scheduler(scheduler, sha=sha, up_min_secs=15):
-      print 'scheduler on %s not healthy' % leader
+      print 'scheduler on %s not healthy' % scheduler
       stop_scheduler(all_schedulers)
 
       if current_build:
