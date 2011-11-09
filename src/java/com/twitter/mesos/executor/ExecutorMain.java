@@ -84,7 +84,6 @@ public class ExecutorMain extends AbstractApplication {
         new LogModule(),
         new HttpModule(),
         new StatsModule(),
-        new StatsExportModule(),
         new ExecutorModule()
     );
   }

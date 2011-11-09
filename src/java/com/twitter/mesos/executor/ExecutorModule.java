@@ -94,21 +94,6 @@ public class ExecutorModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> killEscalationDelay =
       Arg.create(Amount.of(5L, Time.SECONDS));
 
-  @CmdLine(name = "cuckoo_scribe_endpoints",
-      help = "Cuckoo endpoints for stat export.  Leave empty to disable stat export.")
-  private static final Arg<List<InetSocketAddress>> CUCKOO_SCRIBE_ENDPOINTS = Arg.create(
-      Arrays.asList(InetSocketAddress.createUnresolved("localhost", 1463)));
-
-  @CmdLine(name = "cuckoo_scribe_category", help = "Scribe category to send cuckoo stats to.")
-  private static final Arg<String> CUCKOO_SCRIBE_CATEGORY =
-      Arg.create(CuckooWriter.DEFAULT_SCRIBE_CATEGORY);
-
-  @CmdLine(name = "cuckoo_service_id", help = "Cuckoo service ID.")
-  private static final Arg<String> CUCKOO_SERVICE_ID = Arg.create();
-
-  @CmdLine(name = "cuckoo_source_id", help = "Cuckoo stat source ID.")
-  private static final Arg<String> CUCKOO_SOURCE_ID = Arg.create();
-
   @CmdLine(name = "state_sync_buffer_limit", help = "Maximum number of state changes to buffer.")
   private static final Arg<Integer> STATE_SYNC_BUFFER_LIMIT = Arg.create(10000);
 
@@ -179,19 +164,5 @@ public class ExecutorModule extends AbstractModule {
       ExceptionalFunction<String, List<String>, SignalException> httpSignaler) throws IOException {
 
     return new ProcessKiller(httpSignaler, killTreePath.get(), killEscalationDelay.get());
-  }
-
-  @Provides
-  @Singleton
-  Closure<Map<String, ? extends Number>> provideStatSink() throws ThriftFactoryException {
-    if (CUCKOO_SCRIBE_ENDPOINTS.get().isEmpty() || CUCKOO_SERVICE_ID.get() == null
-        || CUCKOO_SOURCE_ID.get() == null) {
-      LOG.info("Cuckoo stat exort disabled since endpoints, service ID,"
-          + " and source ID were not all specified.");
-      return Closures.noop();
-    } else {
-      return new CuckooWriter(new ScribeLog(CUCKOO_SCRIBE_ENDPOINTS.get()),
-          CUCKOO_SCRIBE_CATEGORY.get(), CUCKOO_SERVICE_ID.get(), CUCKOO_SOURCE_ID.get());
-    }
   }
 }

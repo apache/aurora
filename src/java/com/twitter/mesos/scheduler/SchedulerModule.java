@@ -88,22 +88,6 @@ public class SchedulerModule extends AbstractModule {
   @CmdLine(name = "executor_path", help ="Path to the executor launch script.")
   private static final Arg<String> EXECUTOR_PATH = Arg.create();
 
-  @CmdLine(name = "cuckoo_scribe_endpoints",
-      help = "Cuckoo endpoints for stat export.  Leave empty to disable stat export.")
-  private static final Arg<List<InetSocketAddress>> CUCKOO_SCRIBE_ENDPOINTS = Arg.create(
-      Arrays.asList(InetSocketAddress.createUnresolved("localhost", 1463)));
-
-  @CmdLine(name = "cuckoo_scribe_category", help = "Scribe category to send cuckoo stats to.")
-  private static final Arg<String> CUCKOO_SCRIBE_CATEGORY =
-      Arg.create(CuckooWriter.DEFAULT_SCRIBE_CATEGORY);
-
-  @NotNull
-  @CmdLine(name = "cuckoo_service_id", help = "Cuckoo service ID.")
-  private static final Arg<String> CUCKOO_SERVICE_ID = Arg.create();
-
-  @CmdLine(name = "cuckoo_source_id", help = "Cuckoo stat source ID.")
-  private static final Arg<String> CUCKOO_SOURCE_ID = Arg.create("mesos_scheduler");
-
   @CmdLine(name = "executor_dead_threashold", help =
       "Time after which the scheduler will consider an executor dead and attempt to revive it.")
   private static final Arg<Amount<Long, Time>> EXECUTOR_DEAD_THRESHOLD =
@@ -215,18 +199,6 @@ public class SchedulerModule extends AbstractModule {
   @Singleton
   DynamicHostSet<ServiceInstance> provideSchedulerHostSet(ZooKeeperClient zkClient, List<ACL> acl) {
     return new ServerSetImpl(zkClient, acl, MESOS_SCHEDULER_NAME_SPEC.get());
-  }
-
-  @Provides
-  @Singleton
-  Closure<Map<String, ? extends Number>> provideStatSink() throws ThriftFactoryException {
-    if (CUCKOO_SCRIBE_ENDPOINTS.get().isEmpty()) {
-      LOG.info("No scribe hosts provided, cuckoo stat export disabled.");
-      return Closures.noop();
-    } else {
-      return new CuckooWriter(new ScribeLog(CUCKOO_SCRIBE_ENDPOINTS.get()),
-          CUCKOO_SCRIBE_CATEGORY.get(), CUCKOO_SERVICE_ID.get(), CUCKOO_SOURCE_ID.get());
-    }
   }
 
   @Provides
