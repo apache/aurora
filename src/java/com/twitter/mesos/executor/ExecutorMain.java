@@ -90,6 +90,6 @@ public class ExecutorMain extends AbstractApplication {
   }
 
   public static void main(String[] args) {
-    AppLauncher.launch(new ExecutorMain(), args);
+    AppLauncher.launch(ExecutorMain.class, args);
   }
 }

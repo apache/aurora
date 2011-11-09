@@ -59,6 +59,6 @@ public class SchedulerMain extends AbstractApplication {
   }
 
   public static void main(String[] args) {
-    AppLauncher.launch(new SchedulerMain(), args);
+    AppLauncher.launch(SchedulerMain.class, args);
   }
 }

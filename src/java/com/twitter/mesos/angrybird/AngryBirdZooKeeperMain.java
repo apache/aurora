@@ -91,6 +91,6 @@ public class AngryBirdZooKeeperMain extends AbstractApplication {
   }
 
   public static void main(String[] args) {
-    AppLauncher.launch(new AngryBirdZooKeeperMain(), args);
+    AppLauncher.launch(AngryBirdZooKeeperMain.class, args);
   }
 }
