@@ -2,6 +2,7 @@ package com.twitter.mesos.scheduler;
 
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -49,6 +50,7 @@ import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
@@ -80,8 +82,10 @@ import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.hamcrest.CoreMatchers.is;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /**
@@ -1863,6 +1867,33 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(makeJob(OWNER_A, "foo", task, 1));
   }
 
+  @Test
+  public void testAuditMessage() throws Exception {
+    control.replay();
+    buildScheduler();
+
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
+
+    String taskId = Tasks.id(getOnlyTask(queryByOwner(OWNER_A)));
+    changeStatus(taskId, ASSIGNED);
+    changeStatus(taskId, STARTING);
+    changeStatus(taskId, FAILED, "bad stuff happened");
+
+    Iterator<Pair<ScheduleStatus, String>> expectedEvents =
+        ImmutableList.<Pair<ScheduleStatus, String>>builder()
+            .add(Pair.<ScheduleStatus, String>of(PENDING, null))
+            .add(Pair.<ScheduleStatus, String>of(ASSIGNED, null))
+            .add(Pair.<ScheduleStatus, String>of(STARTING, null))
+            .add(Pair.<ScheduleStatus, String>of(FAILED, "bad stuff happened"))
+            .build()
+        .iterator();
+    for (TaskEvent event : getTask(taskId).getTaskEvents()) {
+      Pair<ScheduleStatus, String> expected = expectedEvents.next();
+      assertEquals(expected.getFirst(), event.getStatus());
+      assertEquals(expected.getSecond(), event.getMessage());
+    }
+  }
+
   // TODO(William Farner): Inject a task ID generation function into StateManager so that we can
   //     expect specific task IDs to be killed here.
   private void expectKillTask(int numTasks) {
@@ -1992,12 +2023,20 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     return new Query(query);
   }
 
+  public void changeStatus(Query query, ScheduleStatus status, @Nullable String message) {
+    scheduler.setTaskStatus(query, status, message);
+  }
+
   public void changeStatus(Query query, ScheduleStatus status) {
-    scheduler.setTaskStatus(query, status, null);
+    changeStatus(query, status, null);
   }
 
   public void changeStatus(String taskId, ScheduleStatus status) {
-    scheduler.setTaskStatus(query(Arrays.asList(taskId)), status, null);
+    changeStatus(taskId, status, null);
+  }
+
+  public void changeStatus(String taskId, ScheduleStatus status, @Nullable String message) {
+    changeStatus(query(Arrays.asList(taskId)), status, message);
   }
 
   private void expectOffer(boolean passFilter) {

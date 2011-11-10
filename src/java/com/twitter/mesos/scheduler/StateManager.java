@@ -526,7 +526,8 @@ class StateManager {
    * @param newState State to move the resulting tasks into.
    * @param auditMessage Audit message to apply along with the state change.
    */
-  synchronized void changeState(Query taskQuery, ScheduleStatus newState, String auditMessage) {
+  synchronized void changeState(Query taskQuery, ScheduleStatus newState,
+      @Nullable String auditMessage) {
     changeState(taskQuery, stateUpdaterWithAuditMessage(newState, auditMessage));
   }
 
@@ -738,7 +739,7 @@ class StateManager {
   }
 
   private static Closure<TaskStateMachine> stateUpdaterWithAuditMessage(final ScheduleStatus state,
-      final String auditMessage) {
+      final @Nullable String auditMessage) {
     return new Closure<TaskStateMachine>() {
       @Override public void execute(TaskStateMachine stateMachine) {
         stateMachine.updateState(state, auditMessage);

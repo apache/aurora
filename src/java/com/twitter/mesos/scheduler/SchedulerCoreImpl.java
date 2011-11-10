@@ -445,7 +445,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     checkNotNull(rawQuery);
     checkNotNull(status);
 
-    stateManager.changeState(rawQuery, status);
+    stateManager.changeState(rawQuery, status, message);
   }
 
   @Override
