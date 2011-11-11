@@ -1,5 +1,7 @@
 package com.twitter.mesos.scheduler;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.Iterator;
@@ -14,6 +16,7 @@ import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.base.Splitter;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -1879,6 +1882,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     changeStatus(taskId, STARTING);
     changeStatus(taskId, FAILED, "bad stuff happened");
 
+    String hostname = getLocalHost();
+
     Iterator<Pair<ScheduleStatus, String>> expectedEvents =
         ImmutableList.<Pair<ScheduleStatus, String>>builder()
             .add(Pair.<ScheduleStatus, String>of(PENDING, null))
@@ -1891,6 +1896,15 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       Pair<ScheduleStatus, String> expected = expectedEvents.next();
       assertEquals(expected.getFirst(), event.getStatus());
       assertEquals(expected.getSecond(), event.getMessage());
+      assertEquals(hostname, event.getScheduler());
+    }
+  }
+
+  private static String getLocalHost() {
+    try {
+      return InetAddress.getLocalHost().getHostName();
+    } catch (UnknownHostException e) {
+      throw Throwables.propagate(e);
     }
   }
 

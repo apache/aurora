@@ -1,5 +1,7 @@
 package com.twitter.mesos.scheduler;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
@@ -10,6 +12,8 @@ import javax.annotation.Nullable;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Supplier;
+import com.google.common.base.Suppliers;
+import com.google.common.base.Throwables;
 
 import org.apache.commons.lang.builder.HashCodeBuilder;
 
@@ -589,7 +593,11 @@ public class TaskStateMachine {
       Closure<ScheduledTask> operation = Closures.combine(mutation,
           new Closure<ScheduledTask>() {
             @Override public void execute(ScheduledTask task) {
-              task.addToTaskEvents(new TaskEvent(clock.nowMillis(), status, auditMessage));
+              task.addToTaskEvents(new TaskEvent()
+                  .setTimestamp(clock.nowMillis())
+                  .setStatus(status)
+                  .setMessage(auditMessage)
+                  .setScheduler(LOCAL_HOST_SUPPLIER.get()));
             }
           });
       stateMachine.transition(State.create(status, operation));
@@ -597,6 +605,18 @@ public class TaskStateMachine {
 
     return this;
   }
+
+  private static final Supplier<String> LOCAL_HOST_SUPPLIER = Suppliers.memoize(
+      new Supplier<String>() {
+        @Override public String get() {
+          try {
+            return InetAddress.getLocalHost().getHostName();
+          } catch (UnknownHostException e) {
+            LOG.log(Level.SEVERE, "Failed to get self hostname.");
+            throw Throwables.propagate(e);
+          }
+        }
+      });
 
   /**
    * Sets the slave host that this task is assigned to. The host may only be assigned once,

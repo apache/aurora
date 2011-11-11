@@ -308,7 +308,7 @@ public class PreempterTest extends EasyMockTest {
   }
 
   private void addEvent(ScheduledTask task, ScheduleStatus status) {
-    task.addToTaskEvents(new TaskEvent(clock.nowMillis(), status, null));
+    task.addToTaskEvents(new TaskEvent(clock.nowMillis(), status));
   }
 
   private void runOnHost(ScheduledTask task, String host) {
