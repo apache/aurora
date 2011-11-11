@@ -44,7 +44,8 @@ class Process(object):
         raise
 
   def _log(self, msg):
-    log.debug('[process:%5s=%s]: %s' % (self._pid, self._process.name, msg))
+    if not self._owner:
+      log.debug('[process:%5s=%s]: %s' % (self._pid, self._process.name, msg))
 
   def __str__(self):
     return 'Process(%s, seq:%s, pid:%s, logdir:%s)' % (

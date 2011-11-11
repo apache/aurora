@@ -6,6 +6,7 @@ import socket
 import getpass
 import signal
 import errno
+import threading
 
 from twitter.common import log
 from twitter.common.recordio import ThriftRecordReader, ThriftRecordWriter
@@ -39,13 +40,18 @@ def state_mutating(f):
 class TaskRunnerHelper(object):
   @staticmethod
   def scheduler_from_task(task):
+    log.debug('Constructing scheduler from %s' % task)
     scheduler = Scheduler()
     for process in task.processes:
+      log.debug('   - adding process %s' % process.name)
       scheduler.add(process.name)
     for execution_dependency in task.before_constraints:
       scheduler.run_before(execution_dependency.first, execution_dependency.second)
+      log.debug('   - adding constraint %s < %s' % (execution_dependency.first,
+          execution_dependency.second))
     for process_set in task.together_constraints:
       scheduler.run_set_together(process_set.processes)
+      log.debug('   - adding constraint %s' % ' = '.join(map(str, process_set.processes)))
     return scheduler
 
   @staticmethod
@@ -88,6 +94,9 @@ class TaskRunner(object):
   # a task with coincidentally the same PID but just wrapped around.)
   MAX_START_TIME_DRIFT = Amount(10, Time.SECONDS)
 
+  # Wait time between iterations.
+  MIN_ITERATION_TIME = Amount(0.1, Time.SECONDS)
+
   # Maximum amount of time we spend waiting for new updates from the checkpoint streams
   # before doing housecleaning (checking for LOST tasks, dead PIDs.)
   MAX_ITERATION_TIME = Amount(10, Time.SECONDS)
@@ -107,21 +116,18 @@ class TaskRunner(object):
     self._task_processes = {}
     self._task_id = task_id
     self._watcher = ProcessMuxer()
+    self._pause_event = threading.Event()
+    self._control = threading.Lock()
     if self._task.replica_id is None:
       raise Exception("Task must have a replica_id!")
     self._pathspec = TaskPath(root = root_dir, task_id = task_id)
     self._recovery = True  # set in recovery mode
     self._port_allocator = EphemeralPortAllocator()
-    self._dead = False
     self._ps = ProcessProviderFactory.get()
-
-    if self._is_finished():
-      log.info('Found a finished task checkpoint.')
-      self._dead = True
-      return
 
     # create scheduler from process task
     scheduler = TaskRunnerHelper.scheduler_from_task(task)
+
     # create planner from scheduler
     self._planner = Planner(scheduler)
 
@@ -135,20 +141,43 @@ class TaskRunner(object):
     self._register_handlers()
 
     # recover checkpointed state and update plan
-    self._setup_checkpointed_state(self._pathspec.getpath('runner_checkpoint'))
+    self._read_ckpt()
 
-    # for any task process that hasn't yet been initialized into ._state, initialize
-    self._update_runner_ckpt_to_high_watermarks()
-    self._initialize_processes()
-    self._run_task_state_machine()
+    # if the state is active, open the checkpoint log and multiplex outstanding
+    # fractional checkpoint streams.
+    if self._state.state in (TaskState.ACTIVE, None):
+      self._initialize_ckpt()
+      self._update_runner_ckpt_to_high_watermarks()
+      self._initialize_processes()
+      self._run_task_state_machine()
 
   def state(self):
     return self._state
 
-  def _setup_checkpointed_state(self, ckpt_file):
-    """ give it: ckpt filename, state object
-        returns: ckpt recordwriter, mutates state accordingly
+  def is_paused(self):
+    return self._pause_event.is_set()
+
+  def pause(self):
     """
+      Signal the run-loop to stop and return once it's exited.
+    """
+    self._pause_event.set()
+    with self._control:
+      return True
+
+  def unpause(self):
+    """
+      Unpause the runner.  Must call run() method following this for the event loop
+      to start back up.
+    """
+    self._pause_event.unset()
+
+  def _read_ckpt(self):
+    """
+      If the runner checkpoint associated with this task exists, replay the state.
+    """
+    ckpt_file = self._pathspec.getpath('runner_checkpoint')
+
     # Replay messages in the checkpoint
     if os.path.exists(ckpt_file):
       fp = file(ckpt_file, "r")
@@ -157,7 +186,12 @@ class TaskRunner(object):
         self._dispatcher.update_runner_state(self._state, wrc, recovery = self._recovery)
       ckpt_recover.close()
 
-    # Initialize checkpoint log
+  def _initialize_ckpt(self):
+    """
+      Bind to the checkpoint associated with this task, position to the end of the log if
+      it exists, or create it if it doesn't.
+    """
+    ckpt_file = self._pathspec.getpath('runner_checkpoint')
     fp = Helper.safe_create_file(ckpt_file, "a")
     ckpt = ThriftRecordWriter(fp)
     ckpt.set_sync(True)
@@ -420,7 +454,7 @@ class TaskRunner(object):
 
   def _is_task_failed(self):
     failures = filter(
-      lambda history: history.state == TaskState.FAILED,
+      lambda history: history.state == TaskRunState.FAILED,
       self._state.processes.values())
     return self._task.max_process_failures != 0 and (
       len(failures) >= self._task.max_process_failures)
@@ -479,57 +513,66 @@ class TaskRunner(object):
     """
       Run the Task Runner, if necessary.  Can resume from interrupted runs.
     """
-    if self._dead:
-      log.info('Task is already complete, run short-circuiting.')
+    if self._state.state != TaskState.ACTIVE:
+      log.error('Cannot run task in terminal state.')
       return
 
-    while True:
-      log.debug('Schedule pass:')
-      if self._run_task_state_machine():
-        break
-      self._enforce_task_active()
+    with self._control:
+      # grab the running semaphore
 
-      running  = self._planner.get_running()
-      finished = self._planner.get_finished()
-      log.debug('running: %s' % ' '.join(running))
-      log.debug('finished: %s' % ' '.join(finished))
-
-      launched = []
-      for process_name in running:
-        self._set_lost_task_if_necessary(process_name)
-
-      runnable = list(self._planner.get_runnable())
-      log.debug('runnable: %s' % runnable)
-      for process_name in runnable:
-        if process_name not in self._task_processes:
-          self._dispatcher.update_runner_state(self._state,
-            TaskRunnerCkpt(process_state = ProcessState(
-              process = process_name, run_state = ProcessRunState.WAITING)))
-
-        log.info('Forking Process(%s)' % process_name)
-        tp = self._task_processes[process_name]
-        tp.fork()
-        launched.append(tp)
-
-      # gather and apply state transitions
-      if self._planner.get_running() or len(launched) > 0:
-        self._get_updates_from_processes(timeout=TaskRunner.MAX_ITERATION_TIME.as_(Time.SECONDS))
-
-      # Call waitpid on terminating forked tasks to prevent zombies.
       while True:
-        try:
-          pid, status, rusage = os.wait3(os.WNOHANG)
-          if pid == 0:
-            break
-          # TODO(wickman)  Consider using this to:
-          #   1) speed up detection of LOST tasks should the runner fail for any reason
-          #   2) collect aggregate resource usage of forked tasks to checkpoint
-          log.debug('Detected terminated process: pid=%s, status=%s, rusage=%s' % (
-            pid, status, rusage))
-        except OSError as e:
-          if e.errno != errno.ECHILD:
-            log.warning('Unexpected error when calling waitpid: %s' % e)
+        self._pause_event.wait(timeout=TaskRunner.MIN_ITERATION_TIME.as_(Time.SECONDS))
+        if self._pause_event.is_set():
+          log.info('Detected pause event.  Breaking out of loop.')
           break
+
+        log.debug('Schedule pass:')
+        if self._run_task_state_machine():
+          break
+
+        self._enforce_task_active()
+
+        running  = self._planner.get_running()
+        finished = self._planner.get_finished()
+        log.debug('running: %s' % ' '.join(running))
+        log.debug('finished: %s' % ' '.join(finished))
+
+        launched = []
+        for process_name in running:
+          self._set_lost_task_if_necessary(process_name)
+
+        runnable = list(self._planner.get_runnable())
+        log.debug('runnable: %s' % runnable)
+        for process_name in runnable:
+          if process_name not in self._task_processes:
+            self._dispatcher.update_runner_state(self._state,
+              TaskRunnerCkpt(process_state = ProcessState(
+                process = process_name, run_state = ProcessRunState.WAITING)))
+
+          log.info('Forking Process(%s)' % process_name)
+          tp = self._task_processes[process_name]
+          tp.fork()
+          launched.append(tp)
+
+        # gather and apply state transitions
+        if self._planner.get_running() or len(launched) > 0:
+          self._get_updates_from_processes(timeout=TaskRunner.MAX_ITERATION_TIME.as_(Time.SECONDS))
+
+        # Call waitpid on terminating forked tasks to prevent zombies.
+        while True:
+          try:
+            pid, status, rusage = os.wait3(os.WNOHANG)
+            if pid == 0:
+              break
+            # TODO(wickman)  Consider using this to:
+            #   1) speed up detection of LOST tasks should the runner fail for any reason
+            #   2) collect aggregate resource usage of forked tasks to checkpoint
+            log.debug('Detected terminated process: pid=%s, status=%s, rusage=%s' % (
+              pid, status, rusage))
+          except OSError as e:
+            if e.errno != errno.ECHILD:
+              log.warning('Unexpected error when calling waitpid: %s' % e)
+            break
 
 
   @staticmethod
@@ -547,11 +590,11 @@ class TaskRunner(object):
     """
       Kill all processes associated with this task and set task/process states as KILLED.
     """
-    if self._dead:
-      log.info('Task is already complete, cannot kill.')
-      return
-    self._set_task_state(TaskState.KILLED)
-    self._kill()
+    with self._control:
+      if self._state.state != TaskState.ACTIVE:
+        log.warning('Task is not in ACTIVE state, cannot issue kill.')
+        return
+      self._kill()
 
   def _set_process_kill_state(self, process_state):
     assert process_state.run_state in (ProcessRunState.RUNNING, ProcessRunState.FORKED)
@@ -563,6 +606,7 @@ class TaskRunner(object):
 
   def _kill(self):
     log.info('Killing ThermosRunner.')
+    self._set_task_state(TaskState.KILLED)
     self._ps.collect_all()
 
     runner_pids = []
@@ -622,5 +666,3 @@ class TaskRunner(object):
       os.rename(active_task_path, finished_task_path)
     else:
       log.error('WARNING: active_exists: %s, finished_exists: %s' % (active_exists, finished_exists))
-
-    self._dead = True

@@ -6,14 +6,14 @@ import pprint
 from twitter.common import app, log, options
 from twitter.common.recordio import ThriftRecordReader
 from twitter.tcl.loader import ThermosJobLoader, MesosJobLoader
-from gen.twitter.tcl.ttypes import ThermosJob
+from gen.twitter.tcl.ttypes import ThermosTask
 
 from twitter.thermos.runner import TaskRunner
 
 app.add_option("--thermos", dest = "thermos",
                help = "read thermos job description from .thermos file")
 app.add_option("--thermos_thrift", dest = "thermos_thrift",
-               help = "read thermos job description from stored thrift ThermosJob")
+               help = "read ThermosTask from a serialized thrift blob")
 app.add_option("--mesos", dest = "mesos",
                help = "translate from mesos job description")
 app.add_option("--task", dest = "task", metavar = "TASK",
@@ -32,45 +32,18 @@ app.add_option("--action", dest = "action", metavar = "ACTION", default = "run",
 
 def check_invariants(args, values):
   if args:
-    log.error("unrecognized arguments: %s\n" % (" ".join(args)))
-    app.help()
-    sys.exit(1)
+    app.error("unrecognized arguments: %s\n" % (" ".join(args)))
 
   # check invariants
   if values.thermos is None and values.thermos_thrift is None and values.mesos is None:
-    log.error("must supply either one of --thermos, --thermos_thrift or --mesos!\n")
-    app.help()
-    sys.exit(1)
+    app.error("must supply either one of --thermos, --thermos_thrift or --mesos!\n")
 
-  if not (values.task and values.replica_id and values.sandbox_root and (
-      values.checkpoint_root and values.uid)):
-    log.error("ERROR: must supply all of: %s\n" % (
-      " ".join(["--task", "--replica_id", "--sandbox_root", "--checkpoint_root", "--task_id"])))
-    app.help()
-    sys.exit(1)
+  if (values.mesos is not None or values.thermos is not None) and (
+      values.task is None or values.replica_id is None):
+    app.error('If specifying a Mesos or Thermos job, must also specify task and replica.')
 
-def get_job_from_options(opts):
-  thermos_job = None
-
-  if opts.thermos_thrift:
-    thermos_file    = opts.thermos_thrift
-    thermos_file_fd = file(thermos_file, "r")
-    rr              = ThriftRecordReader(thermos_file_fd, ThermosJob)
-    thermos_job     = rr.read()
-
-  elif opts.thermos:
-    thermos_file   = opts.thermos
-    thermos_job    = ThermosJobLoader(thermos_file).to_thrift()
-
-  elif opts.mesos:
-    mesos_file     = opts.mesos
-    thermos_job    = MesosJobLoader(mesos_file).to_thrift()
-
-  if not thermos_job:
-    log.fatal("Unable to read Thermos job!")
-    sys.exit(1)
-
-  return thermos_job
+  if not (values.sandbox_root and values.checkpoint_root and values.uid):
+    app.error("ERROR: must supply sandbox_root, checkpoint_root and task_id")
 
 def get_task_from_job(thermos_job, task, replica):
   for tsk in thermos_job.tasks:
@@ -84,16 +57,38 @@ def get_task_from_job(thermos_job, task, replica):
   log.info('known task/replicas:')
   log.info(pprint.pformat(known_tasks))
 
+def get_task_from_options(opts):
+  thermos_job = None
+
+  if opts.thermos_thrift:
+    with open(opts.thermos_thrift) as thermos_fd:
+      rr = ThriftRecordReader(thermos_fd, ThermosTask)
+      thermos_task = rr.read()
+    if thermos_task is None:
+      log.fatal("Unable to read Thermos task from thrift blob!")
+      sys.exit(1)
+    return thermos_task
+
+  if opts.thermos:
+    thermos_job = ThermosJobLoader(opts.thermos).to_thrift()
+  elif opts.mesos:
+    thermos_job = MesosJobLoader(opts.mesos).to_thrift()
+
+  if thermos_job is None:
+    log.fatal("Unable to read Thermos job!")
+    sys.exit(1)
+
+  thermos_task = get_task_from_job(thermos_job, opts.task, opts.replica_id)
+  if thermos_task is None:
+    log.fatal("Unable to get Thermos task from job!")
+    sys.exit(1)
+
+  return thermos_task
+
 def main(args, opts):
   check_invariants(args, opts)
 
-  thermos_replica = opts.replica_id
-  thermos_job = get_job_from_options(opts)
-  thermos_task = get_task_from_job(thermos_job, opts.task, opts.replica_id)
-
-  if not thermos_job or not thermos_task:
-    log.fatal("Unable to synthesize task!")
-    sys.exit(1)
+  thermos_task = get_task_from_options(opts)
 
   # TODO(wickman):  Need a general sanitizing suite for uids, job names, etc.
   task_runner = TaskRunner(thermos_task, opts.sandbox_root, opts.checkpoint_root, opts.uid)

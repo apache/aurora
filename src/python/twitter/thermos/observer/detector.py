@@ -1,4 +1,5 @@
-import re, glob
+import re
+import glob
 from twitter.thermos.base import TaskPath
 
 __author__ = 'wickman@twitter.com (brian wickman)'

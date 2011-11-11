@@ -10,8 +10,8 @@ from twitter.common import log
 from twitter.common.recordio import ThriftRecordReader
 
 from twitter.thermos.observer.detector import TaskDetector
-from twitter.thermos.observer.muxer    import TaskMuxer
-from twitter.thermos.observer.measure  import TaskMeasurer
+from twitter.thermos.observer.muxer import TaskMuxer
+from twitter.thermos.observer.measure import TaskMeasurer
 
 from twitter.thermos.base import TaskPath
 from twitter.thermos.base import Helper
@@ -74,7 +74,7 @@ class TaskObserver(threading.Thread):
         if finished in self._actives:
           log.debug('pid %s active -> finished' % finished)
           self._actives.remove(finished) # remove from actives
-          self._muxer.pop(finished)      # remove from checkpoint monitor
+          self._muxer.remove(finished)   # remove from checkpoint monitor
         self._finishes.add(finished)
 
   def _read_task(self, uid):

@@ -13,11 +13,12 @@ python_binary(
   source = 'thermos_run.py',
   dependencies = [
     pants('src/python/twitter/common/app'),
+    pants('src/python/twitter/common/app/modules:exceptions'),
     pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/common/metrics'),
     pants('src/python/twitter/tcl:loader'),
     pants('src/python/twitter/thermos:base'),
     pants('src/python/twitter/thermos:runner'),
-    pants('src/python/twitter/common/metrics')
   ]
 )
 
