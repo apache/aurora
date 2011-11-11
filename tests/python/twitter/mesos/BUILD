@@ -1,8 +1,7 @@
 python_test_suite(name = 'all',
   dependencies = [
     pants(':updater'),
-    # TODO(vinod)  Uncomment when Angrybird tests are ready for prime-time.
-    # pants('tests/python/twitter/mesos/angrybird:tests'),
+    pants('tests/python/twitter/mesos/angrybird:tests'),
   ]
 )
 
