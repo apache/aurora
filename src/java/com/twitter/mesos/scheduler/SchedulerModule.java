@@ -1,7 +1,5 @@
 package com.twitter.mesos.scheduler;
 
-import java.net.InetSocketAddress;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -32,22 +30,17 @@ import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.NotNull;
-import com.twitter.common.base.Closure;
-import com.twitter.common.base.Closures;
 import com.twitter.common.inject.TimedInterceptor;
-import com.twitter.common.logging.ScribeLog;
 import com.twitter.common.net.pool.DynamicHostSet;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
-import com.twitter.common.thrift.ThriftFactory.ThriftFactoryException;
 import com.twitter.common.thrift.ThriftServer;
 import com.twitter.common.util.Clock;
 import com.twitter.common.zookeeper.ServerSetImpl;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.common.zookeeper.ZooKeeperUtils;
-import com.twitter.common_internal.cuckoo.CuckooWriter;
 import com.twitter.common_internal.zookeeper.ZooKeeperModule;
 import com.twitter.mesos.ExecutorKey;
 import com.twitter.mesos.gen.MesosAdmin;
@@ -58,7 +51,7 @@ import com.twitter.mesos.scheduler.auth.SessionValidator;
 import com.twitter.mesos.scheduler.auth.SessionValidator.SessionValidatorImpl;
 import com.twitter.mesos.scheduler.httphandlers.ServletModule;
 import com.twitter.mesos.scheduler.quota.QuotaModule;
-import com.twitter.mesos.scheduler.storage.StorageModule;
+import com.twitter.mesos.scheduler.storage.log.LogStorageModule;
 import com.twitter.mesos.scheduler.sync.SyncModule;
 import com.twitter.thrift.ServiceInstance;
 
@@ -143,7 +136,7 @@ public class SchedulerModule extends AbstractModule {
     bind(MesosAdmin.Iface.class).to(SchedulerThriftInterface.class).in(Singleton.class);
     bind(ThriftServer.class).to(SchedulerThriftServer.class).in(Singleton.class);
 
-    install(new StorageModule());
+    LogStorageModule.bind(binder());
 
     bind(SchedulingFilter.class).to(SchedulingFilterImpl.class);
 

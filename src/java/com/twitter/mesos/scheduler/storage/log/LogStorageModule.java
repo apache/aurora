@@ -16,7 +16,6 @@ import com.twitter.common.base.Closure;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Clock;
-import com.twitter.mesos.scheduler.log.db.DbLogStreamModule;
 import com.twitter.mesos.scheduler.log.mesos.MesosLogStreamModule;
 import com.twitter.mesos.scheduler.storage.CheckpointStore;
 import com.twitter.mesos.scheduler.storage.JobStore;
@@ -30,6 +29,7 @@ import com.twitter.mesos.scheduler.storage.db.DbStorageModule;
 import com.twitter.mesos.scheduler.storage.log.LogStorage.CheckpointInterval;
 import com.twitter.mesos.scheduler.storage.log.LogStorage.ShutdownGracePeriod;
 import com.twitter.mesos.scheduler.storage.log.LogStorage.SnapshotInterval;
+
 
 /**
  * Bindings for scheduler distributed log based storage.
@@ -54,10 +54,6 @@ public class LogStorageModule extends AbstractModule {
                   + "written to the log.")
   private static final Arg<Amount<Long, Time>> snapshotInterval =
       Arg.create(Amount.of(1L, Time.MINUTES));
-
-  @CmdLine(name = "native_log",
-           help = "Binds the native mesos distributed log, otherwise a local H2 log is used.")
-  private static final Arg<Boolean> isNativeLog = Arg.create(false);
 
   private static <T> Key<T> createKey(Class<T> clazz) {
     return Key.get(clazz, LogStorage.WriteBehind.class);
@@ -98,12 +94,7 @@ public class LogStorageModule extends AbstractModule {
       }
     });
 
-    if (isNativeLog.get()) {
-      MesosLogStreamModule.bind(binder);
-    } else {
-      DbLogStreamModule.bind(binder);
-    }
-
+    MesosLogStreamModule.bind(binder);
     binder.install(new LogStorageModule());
   }
 
