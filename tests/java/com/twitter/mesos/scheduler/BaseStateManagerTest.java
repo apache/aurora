@@ -31,7 +31,7 @@ public abstract class BaseStateManagerTest extends EasyMockTest {
 
   protected StateManager createStateManager(Storage storage) {
     this.storage = storage;
-    final StateManager stateManager = new StateManager(storage, clock);
+    final StateManager stateManager = new StateManager(storage, clock, true);
     stateManager.initialize();
     stateManager.start(killTaskCallback);
     addTearDown(new TearDown() {

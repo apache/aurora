@@ -526,8 +526,9 @@ public class DbStorage implements
     final Iterator<ScheduledTask> tasks = newTasks.iterator();
     try {
       jdbcTemplate.batchUpdate("MERGE INTO task_state (task_id, job_role, job_user, job_name,"
-                               + " job_key, slave_host, shard_id, status, scheduled_task)"
-                               + " KEY(task_id) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                               + " job_key, slave_host, rack_name, shard_id, status,"
+                               + " scheduled_task) KEY(task_id)"
+                               + " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
           new BatchPreparedStatementSetter() {
             @Override public void setValues(PreparedStatement preparedStatement, int batchItemIndex)
                 throws SQLException {
@@ -843,8 +844,8 @@ public class DbStorage implements
       long startNanos = System.nanoTime();
       final Iterator<ScheduledTask> tasks = tasksToUpdate.iterator();
       jdbcTemplate.batchUpdate("UPDATE task_state SET job_role = ?, job_user = ?, job_name = ?,"
-                               + " job_key = ?, slave_host = ?, shard_id = ?, status = ?,"
-                               + " scheduled_task = ? WHERE task_id = ?",
+                               + " job_key = ?, slave_host = ?, rack_name = ?, shard_id = ?,"
+                               + " status = ?, scheduled_task = ? WHERE task_id = ?",
           new BatchPreparedStatementSetter() {
             @Override public void setValues(PreparedStatement preparedStatement, int batchItemIndex)
                 throws SQLException {
@@ -1057,6 +1058,7 @@ public class DbStorage implements
     setString(preparedStatement, col++, scheduledTask.assignedTask.task.jobName);
     setString(preparedStatement, col++, Tasks.jobKey(scheduledTask));
     setString(preparedStatement, col++, scheduledTask.assignedTask.slaveHost);
+    setString(preparedStatement, col++, scheduledTask.assignedTask.rackName);
     preparedStatement.setInt(col++, scheduledTask.assignedTask.task.shardId);
     preparedStatement.setInt(col++, scheduledTask.status.getValue());
     setBytes(preparedStatement, col++, scheduledTask);

@@ -105,6 +105,11 @@ public class SchedulerModule extends AbstractModule {
       help = "The amount of RAM that should be reserved by mesos for the executor.")
   private static final Arg<Amount<Double, Data>> EXECUTOR_RAM = Arg.create(Amount.of(2d, Data.GB));
 
+  @CmdLine(name = "back_filling_rack_name",
+      help = "A boolean indicate whether we should back filling the rack name"
+          + "based on the slave host")
+  static final Arg<Boolean> BACK_FILLING_RACK_NAME = Arg.create(false);
+
   private static final String TWITTER_EXECUTOR_ID = "twitter";
 
   private static final String TWITTER_FRAMEWORK_NAME = "TwitterScheduler";
@@ -160,6 +165,9 @@ public class SchedulerModule extends AbstractModule {
         ThriftServerLauncher.class);
 
     bind(SchedulerLifecycle.class).in(Singleton.class);
+
+    bind(boolean.class).annotatedWith(Names.named(StateManager.SHOULD_BACK_FILL_RACK))
+        .toInstance(BACK_FILLING_RACK_NAME.get());
 
     QuotaModule.bind(binder());
     SyncModule.bind(binder());

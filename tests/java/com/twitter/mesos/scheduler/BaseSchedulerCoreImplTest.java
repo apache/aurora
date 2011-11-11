@@ -170,7 +170,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private void buildScheduler(Storage storage) throws Exception {
     ImmediateJobManager immediateManager = new ImmediateJobManager();
     cron = new CronJobManager(storage, new TearDownRegistry(this));
-    StateManager stateManager = new StateManager(storage, clock);
+    StateManager stateManager = new StateManager(storage, clock, false);
     quotaManager = new QuotaManagerImpl(storage);
     scheduler = new SchedulerCoreImpl(cron, immediateManager, stateManager, schedulingFilter,
         executorPulseMonitor, executorResourceAugmenter, quotaManager);

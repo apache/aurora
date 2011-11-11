@@ -11,6 +11,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
+import javax.inject.Named;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
@@ -18,11 +19,13 @@ import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
+import com.google.common.base.Splitter;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -82,8 +85,12 @@ import static com.twitter.mesos.scheduler.storage.UpdateStore.ShardUpdateConfigu
  * @author William Farner
  */
 class StateManager {
+  // A flag to indicate whether we should back fill the rack name based on the existing slave host.
+  public static final String SHOULD_BACK_FILL_RACK =
+      "com.twitter.mesos.scheduler.SHOULD_BACK_FILL_RACK";
 
   private static final Logger LOG = Logger.getLogger(StateManager.class.getName());
+  private final boolean backFillingRackName;
 
   @VisibleForTesting
   @CmdLine(name = "missing_task_grace_period",
@@ -170,9 +177,11 @@ class StateManager {
   private final Clock clock;
 
   @Inject
-  StateManager(Storage storage, final Clock clock) {
+  StateManager(Storage storage, final Clock clock,
+               @Named(SHOULD_BACK_FILL_RACK) boolean backFillingRackName) {
     this.storage = checkNotNull(storage);
     this.clock = checkNotNull(clock);
+    this.backFillingRackName = backFillingRackName;
     this.taskTimeoutFilter = new Predicate<Iterable<TaskEvent>>() {
       @Override public boolean apply(Iterable<TaskEvent> events) {
         TaskEvent lastEvent = Iterables.getLast(events, null);
@@ -212,12 +221,26 @@ class StateManager {
 
     storage.start(new Work.NoResult.Quiet() {
       @Override protected void execute(Storage.StoreProvider storeProvider) {
+        final ImmutableSet.Builder<ScheduledTask> updatedTask = ImmutableSet.builder();
         storeProvider.getTaskStore().mutateTasks(Query.GET_ALL, new Closure<ScheduledTask>() {
           @Override public void execute(ScheduledTask task) {
-            ConfigurationManager.applyDefaultsIfUnset(task.getAssignedTask().getTask());
+            AssignedTask assignedTask = task.getAssignedTask();
+            if (backFillingRackName && assignedTask.isSetSlaveHost()
+                && !assignedTask.isSetRackName()) {
+              ImmutableList<String> components = ImmutableList.copyOf(
+                  Splitter.on('-').omitEmptyStrings().split(assignedTask.getSlaveHost()));
+              if (components.size() != 4) {
+                LOG.warning("Invalid host format: " + assignedTask.getSlaveHost());
+              } else {
+                assignedTask.setRackName(components.get(1));
+                updatedTask.add(task);
+              }
+            }
+            ConfigurationManager.applyDefaultsIfUnset(assignedTask.getTask());
             createStateMachine(task, task.getStatus());
           }
         });
+        storeProvider.getTaskStore().saveTasks(updatedTask.build());
       }
     });
 
