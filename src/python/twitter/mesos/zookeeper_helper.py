@@ -8,8 +8,7 @@ from tunnel_helper import TunnelHelper
 
 from twitter.common import log
 
-class ZookeeperHelper:
-  ZOOKEEPER_PORT = 2181
+class ZookeeperHelper(object):
   LOCAL_ZK_TUNNEL_PORT = 9999
 
   @staticmethod
@@ -22,14 +21,13 @@ class ZookeeperHelper:
     return (host, port)
 
   @staticmethod
-  def get_zookeeper_handle(cluster):
+  def get_zookeeper_handle(cluster, port=2181):
     """ Get a zookeeper connection reachable from this machine.
     by location. Sets up ssh tunnels as appropriate.
     """
     host = clusters.get_zk_host(cluster)
-    port = ZookeeperHelper.ZOOKEEPER_PORT
 
-    if Location.is_corp():
+    if host is not 'localhost' and Location.is_corp():
       host, port = ZookeeperHelper.create_zookeeper_tunnel(cluster)
 
     return zookeeper.init('%s:%d' % (host, port))
@@ -42,14 +40,18 @@ class ZookeeperHelper:
     not being fully live yet. We make several attemps, and sleep in between each
     one. We fail after several attemps.
     """
-    NUM_ATTEMPTS=10
+    NUM_ATTEMPTS = 10
     for i in range(NUM_ATTEMPTS):
-      log.debug('Reading children from zookeeper (Attempt %d/%d).' % (
-          i+1, NUM_ATTEMPTS))
+      log.debug('Reading children from zookeeper path %s (Attempt %d/%d).' % (
+          path, i + 1, NUM_ATTEMPTS))
       try:
-        return zookeeper.get_children(zh, path)
+        children = zookeeper.get_children(zh, path)
+        if children:
+          return children
+        else:
+          log.debug("Empty children list: retrying...")
       except Exception, e:
         log.debug("Can't get children from zookeper [%s]. Retrying..." % e)
-        time.sleep(1)
+      time.sleep(1)
     log.fatal("Can't talk to zookeeper.")
     sys.exit(1)

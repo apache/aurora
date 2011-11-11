@@ -30,10 +30,10 @@ from twitter.mesos.tunnel_helper import TunnelHelper
 from twitter.mesos.zookeeper_helper import ZookeeperHelper
 
 class SchedulerClient(object):
-  def __init__(self, verbose = False, ssl = False):
-    self._client    = None
-    self._verbose   = verbose
-    self._ssl       = ssl
+  def __init__(self, verbose=False, ssl=False):
+    self._client = None
+    self._verbose = verbose
+    self._ssl = ssl
 
   def get_thrift_client(self):
     if self._client is None:
@@ -46,11 +46,12 @@ class SchedulerClient(object):
     return None
 
   @staticmethod
-  def _connect_scheduler(host, port, with_ssl = False):
+  def _connect_scheduler(host, port, with_ssl=False):
     if with_ssl:
-      socket = TSSLSocket.TSSLSocket(host, port, validate = False)
+      socket = TSSLSocket.TSSLSocket(host, port, validate=False)
     else:
       socket = TSocket.TSocket(host, port)
+
     transport = TTransport.TBufferedTransport(socket)
     protocol = TBinaryProtocol.TBinaryProtocol(transport)
     schedulerClient = MesosAdmin.Client(protocol)
@@ -61,14 +62,16 @@ class ZookeeperSchedulerClient(SchedulerClient):
   LOCAL_SCHEDULER_TUNNEL_PORT = 8888
   SCHEDULER_ZK_PATH = '/twitter/service/mesos-scheduler'
 
-  def __init__(self, cluster, ssl=False, verbose=False):
+  def __init__(self, cluster, port=2181, force_notunnel=False, ssl=False, verbose=False):
     SchedulerClient.__init__(self, verbose=verbose, ssl=ssl)
     self._cluster = cluster
+    self._zkport = port
+    self._notunnel = force_notunnel
 
   def _connect(self):
-    self._zh = ZookeeperHelper.get_zookeeper_handle(self._cluster)
+    self._zh = ZookeeperHelper.get_zookeeper_handle(self._cluster, self._zkport)
     (host, port) = ZookeeperSchedulerClient._get_scheduler_host_port(
-      self._zh, self._cluster, verbose=self._verbose)
+      self._zh, self._cluster, self._notunnel, verbose=self._verbose)
     zookeeper.close(self._zh)
     return SchedulerClient._connect_scheduler(host, port, self._ssl)
 
@@ -90,7 +93,7 @@ class ZookeeperSchedulerClient(SchedulerClient):
     return host, port
 
   @staticmethod
-  def _get_scheduler_host_port(zh, cluster, verbose=False):
+  def _get_scheduler_host_port(zh, cluster, no_tunnel, verbose=False):
     """ Use Zookeeper to determine the host and port of the scheduler.
     Returns a host/port reachable from either corp or prod, depending on
     the argument location. Sets up ssh tunnels as appropriate."""
@@ -112,7 +115,7 @@ class ZookeeperSchedulerClient(SchedulerClient):
     host, port = ZookeeperSchedulerClient._parse_endpoint(data)
 
     # Open a tunnel to the scheduler if necessary
-    if Location.is_corp():
+    if Location.is_corp() and not no_tunnel:
       host, port = ZookeeperSchedulerClient._open_scheduler_tunnel(cluster, host, port)
 
     zookeeper.set_debug_level(zookeeper.LOG_LEVEL_WARN)
@@ -125,5 +128,5 @@ class LocalSchedulerClient(SchedulerClient):
     self._port = port
 
   def _connect(self):
-    return SchedulerClient._connect_scheduler(self._host, self._port, with_ssl = self._ssl)
+    return SchedulerClient._connect_scheduler(self._host, self._port, with_ssl=self._ssl)
 
