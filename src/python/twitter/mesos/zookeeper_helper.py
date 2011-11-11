@@ -29,7 +29,7 @@ class ZookeeperHelper(object):
 
     if host is not 'localhost' and Location.is_corp():
       host, port = ZookeeperHelper.create_zookeeper_tunnel(cluster)
-
+    log.info('Initialzing zookeeper client')
     return zookeeper.init('%s:%d' % (host, port))
 
   @staticmethod
