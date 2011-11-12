@@ -2,6 +2,7 @@ package com.twitter.mesos.scheduler;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -12,6 +13,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
 import com.google.inject.Inject;
 import com.google.protobuf.ByteString;
 
@@ -71,6 +73,10 @@ class MesosSchedulerImpl implements Scheduler {
   @CmdLine(name = "thermos_executor_path", help = "Path to the thermos executor launch script.")
   private static final Arg<String> THERMOS_EXECUTOR_PATH = Arg.create();
 
+  // TODO(bmahler): Expose this in a servlet.
+  // We accept a trivial memory "leak" by not removing when a slave machine is decommissioned.
+  private final Map<String, SlaveID> executorSlaves = Maps.newConcurrentMap();
+
   // Stores scheduler state and handles actual scheduling decisions.
   private final SchedulerCore schedulerCore;
 
@@ -115,13 +121,19 @@ class MesosSchedulerImpl implements Scheduler {
     LOG.info("Received notification of lost slave: " + slaveId);
   }
 
-  private static void sendMessage(SchedulerDriver driver, ExecutorMessage message, SlaveID slave,
+  private void sendMessage(SchedulerDriver driver, ExecutorMessage message, String hostName,
       ExecutorID executor) {
     byte[] data;
     try {
       data = ThriftBinaryCodec.encode(message);
     } catch (CodingException e) {
       LOG.log(Level.SEVERE, "Failed to send restart request.", e);
+      return;
+    }
+
+    SlaveID slave = executorSlaves.get(hostName);
+    if (slave == null) {
+      LOG.severe("Cannot send message, no SlaveID for hostname: " + hostName);
       return;
     }
 
@@ -145,13 +157,12 @@ class MesosSchedulerImpl implements Scheduler {
 
     // TODO(wfarner): Build this into ExecutorWatchdog.
     executorTracker.start(new Closure<String>() {
-      @Override public void execute(String slaveId) {
-        LOG.info("Sending restart request to executor " + slaveId);
+      @Override public void execute(String hostName) {
+        LOG.info("Sending restart request to executor " + hostName);
         ExecutorMessage message = new ExecutorMessage();
         message.setRestartExecutor(new RestartExecutor());
 
-        sendMessage(driver, message, SlaveID.newBuilder().setValue(slaveId).build(),
-            executorInfo.getExecutorId());
+        sendMessage(driver, message, hostName, executorInfo.getExecutorId());
       }
     });
 
@@ -159,7 +170,7 @@ class MesosSchedulerImpl implements Scheduler {
         new Closure<UpdateRequest>() {
           @Override public void execute(UpdateRequest request) {
             ExecutorMessage message = ExecutorMessage.stateUpdateRequest(request.request);
-            sendMessage(driver, message, request.executor.slave, request.executor.executor);
+            sendMessage(driver, message, request.executor.hostname, request.executor.executor);
           }
         });
   }
@@ -199,6 +210,7 @@ class MesosSchedulerImpl implements Scheduler {
     try {
       for (Offer offer : offers) {
         log(Level.FINE, "Received offer: %s", offer);
+        executorSlaves.put(offer.getHostname(), offer.getSlaveId());
         SchedulerCore.TwitterTask task = schedulerCore.offer(offer, executorInfo.getExecutorId());
 
         List<TaskDescription> scheduledTasks;
@@ -294,7 +306,7 @@ class MesosSchedulerImpl implements Scheduler {
 
         case STATE_UPDATE_RESPONSE:
           StateUpdateResponse stateUpdate = schedulerMsg.getStateUpdateResponse();
-          ExecutorKey executorKey = new ExecutorKey(slave, executor, stateUpdate.getSlaveHost());
+          ExecutorKey executorKey = new ExecutorKey(executor, stateUpdate.getSlaveHost());
           LOG.info("Applying state update " + stateUpdate);
           schedulerCore.stateUpdate(executorKey, stateUpdate);
           executorWatchdog.stateUpdated(executorKey,

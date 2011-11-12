@@ -125,9 +125,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private static final String SLAVE_HOST_1 = "SlaveHost1";
   private static final String SLAVE_HOST_2 = "SlaveHost2";
   private static final ExecutorKey SLAVE_HOST_1_KEY =
-      new ExecutorKey(SLAVE_ID, EXECUTOR_ID, SLAVE_HOST_1);
+      new ExecutorKey(EXECUTOR_ID, SLAVE_HOST_1);
   private static final ExecutorKey SLAVE_HOST_2_KEY =
-      new ExecutorKey(SLAVE_ID, EXECUTOR_ID, SLAVE_HOST_2);
+      new ExecutorKey(EXECUTOR_ID, SLAVE_HOST_2);
 
   private static final OfferID OFFER_ID = OfferID.newBuilder().setValue("OfferId").build();
 

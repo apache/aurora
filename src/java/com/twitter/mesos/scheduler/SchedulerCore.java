@@ -13,6 +13,7 @@ import org.apache.commons.lang.builder.ToStringBuilder;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.Resource;
+import org.apache.mesos.Protos.SlaveID;
 
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.ExecutorKey;
@@ -221,7 +222,13 @@ public interface SchedulerCore extends Function<Query, Iterable<TwitterTaskInfo>
    */
   void restartTasks(Set<String> taskIds) throws RestartException;
 
-  void stateUpdate(ExecutorKey executorHost, StateUpdateResponse update);
+  /**
+   * Updates the scheduler to reflect an executor's state.
+   *
+   * @param executor Executor providing the state update.
+   * @param update Update to apply.
+   */
+  void stateUpdate(ExecutorKey executor, StateUpdateResponse update);
 
   /**
    * Should be called to allow the scheduler to gracefully shut down.

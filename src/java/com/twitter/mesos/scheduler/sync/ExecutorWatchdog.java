@@ -83,9 +83,11 @@ public interface ExecutorWatchdog {
     @VisibleForTesting
     static final StateUpdateRequest NO_POSITION = new StateUpdateRequest(null, 0);
 
+    // TODO(bmahler): Expose in servlet.
     private final Map<ExecutorKey, StateUpdateRequest> knownPositions =
         new LinkedHashMap<ExecutorKey, StateUpdateRequest>(MAP_INITIAL_SIZE, MAP_LOAD_FACTOR,
             true /* access order */);
+
     private final Supplier<Set<ExecutorKey>> knownExecutorSupplier;
     private final ShutdownRegistry shutdownRegistry;
 

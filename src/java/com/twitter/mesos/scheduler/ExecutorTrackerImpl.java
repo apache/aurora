@@ -31,7 +31,7 @@ public class ExecutorTrackerImpl implements ExecutorTracker {
 
   private static final Amount<Long, Time> EXECUTOR_RESTART_INTERVAL = Amount.of(30L, Time.SECONDS);
 
-  private final Queue<String> restartQueue;
+  private final Queue<String> restartHosts;
 
   private final Properties buildProperties;
   private final boolean enableSync;
@@ -52,7 +52,7 @@ public class ExecutorTrackerImpl implements ExecutorTracker {
       enableSync = true;
     }
 
-    this.restartQueue = restartQueue;
+    this.restartHosts = restartQueue;
 
     Stats.exportSize("executor_restarts_pending", restartQueue);
   }
@@ -66,13 +66,13 @@ public class ExecutorTrackerImpl implements ExecutorTracker {
 
     Runnable updater = new Runnable() {
       @Override public void run() {
-        if (restartQueue.isEmpty()) {
+        if (restartHosts.isEmpty()) {
           return;
         }
 
-        String slaveId = restartQueue.remove();
-        LOG.info("Requesting that slave be restarted: " + slaveId);
-        restartCallback.execute(slaveId);
+        String host = restartHosts.remove();
+        LOG.info("Requesting that slave be restarted: " + host);
+        restartCallback.execute(host);
       }
     };
 
@@ -88,7 +88,7 @@ public class ExecutorTrackerImpl implements ExecutorTracker {
   @Override
   public void addStatus(ExecutorStatus status) {
     Preconditions.checkNotNull(status);
-    Preconditions.checkNotNull(status.getSlaveId());
+    Preconditions.checkNotNull(status.getHost());
 
     String localBuild = buildProperties.getProperty(BuildInfo.Key.GIT_REVISION.value);
     String executorBuild = status.getBuildGitRevision();
@@ -100,9 +100,9 @@ public class ExecutorTrackerImpl implements ExecutorTracker {
       restart = true;
     }
 
-    if (restart && !restartQueue.contains(status.getSlaveId())) {
+    if (restart && !restartHosts.contains(status.getHost())) {
       vars.executorRestartsRequested.incrementAndGet();
-      restartQueue.add(status.getSlaveId());
+      restartHosts.add(status.getHost());
     }
   }
 

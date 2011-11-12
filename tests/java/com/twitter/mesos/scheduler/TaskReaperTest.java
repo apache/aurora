@@ -95,7 +95,6 @@ public class TaskReaperTest extends BaseStateManagerTest {
 
   private static ExecutorKey makeExecutorKey(String hostname) {
     return new ExecutorKey(
-        SlaveID.newBuilder().setValue("slave_id_" + hostname).build(),
         ExecutorID.newBuilder().setValue("executor_id_" + hostname).build(),
         hostname);
   }

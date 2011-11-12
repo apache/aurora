@@ -25,18 +25,18 @@ import static org.junit.Assert.assertEquals;
  */
 public class ExecutorWatchdogImplTest extends EasyMockTest {
 
-  private static final ExecutorKey A = key("a", "a", "a");
-  private static final ExecutorKey B = key("b", "b", "b");
-  private static final ExecutorKey C = key("c", "c", "c");
-  private static final ExecutorKey D = key("d", "d", "d");
+  private static final ExecutorKey A = key("a", "a");
+  private static final ExecutorKey B = key("b", "b");
+  private static final ExecutorKey C = key("c", "c");
+  private static final ExecutorKey D = key("d", "d");
   private static final Set<ExecutorKey> EXECUTORS = ImmutableSet.of(A, B, C);
 
-  private Supplier<Set<ExecutorKey>> knownExecutorSupplier;
   private ExecutorWatchdogImpl watchdog;
 
   @Before
   public void setUp() {
-    knownExecutorSupplier = createMock(new Clazz<Supplier<Set<ExecutorKey>>>() {});
+    Supplier<Set<ExecutorKey>> knownExecutorSupplier =
+        createMock(new Clazz<Supplier<Set<ExecutorKey>>>() {});
     watchdog =
         new ExecutorWatchdogImpl(knownExecutorSupplier, control.createMock(ShutdownRegistry.class));
 
@@ -146,9 +146,8 @@ public class ExecutorWatchdogImplTest extends EasyMockTest {
     assertEquals(expected, request.request);
   }
 
-  private static ExecutorKey key(String slaveId, String executorId, String hostname) {
+  private static ExecutorKey key(String executorId, String hostname) {
     return new ExecutorKey(
-        SlaveID.newBuilder().setValue(slaveId).build(),
         ExecutorID.newBuilder().setValue(executorId).build(),
         hostname);
   }
