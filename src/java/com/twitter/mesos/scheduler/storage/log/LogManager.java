@@ -10,6 +10,7 @@ import java.util.logging.Logger;
 import javax.annotation.Nullable;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
 
@@ -20,6 +21,7 @@ import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.stats.Stats;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
+import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.storage.LogEntry;
 import com.twitter.mesos.gen.storage.Op;
 import com.twitter.mesos.gen.storage.RemoveTasks;
@@ -223,7 +225,7 @@ final class LogManager {
       void add(Op op) {
         Preconditions.checkState(!committed.get());
 
-        Op prior = transaction.isSetOps() ? Iterables.getFirst(transaction.getOps(), null) : null;
+        Op prior = transaction.isSetOps() ? Iterables.getLast(transaction.getOps(), null) : null;
         if (prior == null || !coalesce(prior, op)) {
           transaction.addToOps(op);
         }
@@ -279,7 +281,10 @@ final class LogManager {
       private void coalesce(SaveTasks prior, SaveTasks next) {
         if (next.isSetTasks()) {
           if (prior.isSetTasks()) {
-            prior.getTasks().addAll(next.getTasks());
+            prior.setTasks(ImmutableSet.<ScheduledTask>builder()
+                .addAll(prior.getTasks())
+                .addAll(next.getTasks())
+                .build());
           } else {
             prior.setTasks(next.getTasks());
           }
@@ -289,7 +294,10 @@ final class LogManager {
       private void coalesce(RemoveTasks prior, RemoveTasks next) {
         if (next.isSetTaskIds()) {
           if (prior.isSetTaskIds()) {
-            prior.getTaskIds().addAll(next.getTaskIds());
+            prior.setTaskIds(ImmutableSet.<String>builder()
+                .addAll(prior.getTaskIds())
+                .addAll(next.getTaskIds())
+                .build());
           } else {
             prior.setTaskIds(next.getTaskIds());
           }
