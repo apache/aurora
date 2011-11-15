@@ -69,6 +69,30 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
   }
 
   @Test
+  public void testSchemeRackUpgrade() {
+    store.jdbcTemplate.execute("DROP TABLE IF EXISTS task_state");
+    store.jdbcTemplate.execute("DROP INDEX IF EXISTS task_state_rack_name_idx");
+    // Add the old version of the task_state(without rack_name).
+    store.jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS task_state (" +
+        "  task_id VARCHAR(1020) NOT NULL PRIMARY KEY," +
+        "  job_role VARCHAR(255) NOT NULL," +
+        "  job_user VARCHAR(255) NOT NULL," +
+        "  job_name VARCHAR(255) NOT NULL," +
+        "  job_key VARCHAR(511) NOT NULL," +
+        "  slave_host VARCHAR(255) NULL," +
+        "  shard_id INT NOT NULL," +
+        "  status TINYINT NOT NULL," +
+        "  scheduled_task BINARY(100000) NOT NULL);");
+    store.upgradeTaskStorage();
+    assertFalse(store.jdbcTemplate.queryForList(
+        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'TASK_STATE'"
+            + " AND COLUMN_NAME = 'RACK_NAME'", String.class).isEmpty());
+    assertFalse(store.jdbcTemplate.queryForList(
+        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.INDEXES WHERE TABLE_NAME = 'TASK_STATE'"
+            + " AND INDEX_NAME = 'TASK_STATE_RACK_NAME_IDX'", String.class).isEmpty());
+  }
+
+  @Test
   public void testFrameworkStorage() {
     assertNull(store.fetchFrameworkId());
 

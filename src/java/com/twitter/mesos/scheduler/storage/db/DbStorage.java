@@ -900,6 +900,19 @@ public class DbStorage implements
     return fetched;
   }
 
+  @Timed("db_storage_upgrade_task_storage")
+  @Override
+  public void upgradeTaskStorage() {
+    transactionTemplate.execute(new TransactionCallbackWithoutResult() {
+      @Override protected void doInTransactionWithoutResult(TransactionStatus status) {
+        jdbcTemplate.update(
+            "ALTER TABLE task_state ADD IF NOT EXISTS rack_name VARCHAR(255) NULL;");
+        jdbcTemplate.update(
+            "CREATE INDEX IF NOT EXISTS task_state_rack_name_idx ON task_state(rack_name);");
+      }
+    });
+  }
+
   private static boolean isEmpty(@Nullable Collection<?> items) {
     return (items == null) || items.isEmpty();
   }

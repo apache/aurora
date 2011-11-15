@@ -221,6 +221,7 @@ class StateManager {
 
     storage.start(new Work.NoResult.Quiet() {
       @Override protected void execute(Storage.StoreProvider storeProvider) {
+        storeProvider.getTaskStore().upgradeTaskStorage();
         final ImmutableSet.Builder<ScheduledTask> updatedTask = ImmutableSet.builder();
         storeProvider.getTaskStore().mutateTasks(Query.GET_ALL, new Closure<ScheduledTask>() {
           @Override public void execute(ScheduledTask task) {
