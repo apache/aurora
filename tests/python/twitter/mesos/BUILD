@@ -1,7 +1,7 @@
 python_test_suite(name = 'all',
   dependencies = [
     pants(':updater'),
-    # Commented out till we fix the zk import problem
+    # Commented out till we fix the zookeeper import problem
     #pants('tests/python/twitter/mesos/angrybird:tests'),
   ]
 )
