@@ -7,7 +7,7 @@ import it.sauronsoftware.cron4j.SchedulingPattern;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -80,17 +80,23 @@ public class CronJobManager extends JobManager {
   private final Map<String, JobConfiguration> pendingRuns =
       Collections.synchronizedMap(Maps.<String, JobConfiguration>newHashMap());
   private final BackoffHelper delayedStartBackoff;
-  private final ExecutorService delayedRunExecutor;
+  private final Executor delayedRunExecutor;
 
   private final Storage storage;
 
   @Inject
   public CronJobManager(Storage storage, ShutdownRegistry shutdownRegistry) {
+    this(storage, shutdownRegistry, Executors.newCachedThreadPool(
+        new ThreadFactoryBuilder().setDaemon(true).setNameFormat("CronDelay-%d").build()));
+  }
+
+  @VisibleForTesting
+  CronJobManager(Storage storage, ShutdownRegistry shutdownRegistry,
+      Executor delayedRunExecutor) {
     this.storage = Preconditions.checkNotNull(storage);
     this.delayedStartBackoff =
         new BackoffHelper(CRON_START_INITIAL_BACKOFF.get(), CRON_START_MAX_BACKOFF.get());
-    this.delayedRunExecutor = Executors.newCachedThreadPool(
-        new ThreadFactoryBuilder().setDaemon(true).setNameFormat("CronDelay-%d").build());
+    this.delayedRunExecutor = Preconditions.checkNotNull(delayedRunExecutor);
 
     scheduler.setDaemon(true);
     scheduler.start();
@@ -142,9 +148,11 @@ public class CronJobManager extends JobManager {
     final String jobKey = Tasks.jobKey(job);
     LOG.info("Waiting for job to terminate before launching cron job " + jobKey);
     if (pendingRuns.put(jobKey, job) == null) {
+      LOG.info("Launching a task to wait for job to finish: " + jobKey);
+
       // There was no run already pending for this job, launch a task to delay launch until the
       // existing run has terminated.
-      delayedRunExecutor.submit(new Runnable() {
+      delayedRunExecutor.execute(new Runnable() {
         @Override public void run() {
           runWhenTerminated(query, jobKey);
         }
