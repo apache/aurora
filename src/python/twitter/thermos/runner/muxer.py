@@ -41,9 +41,13 @@ class ProcessMuxer(object):
         try:
           self._fps[process.name()] = open(process.ckpt_file(), 'r')
         except IOError as e:
-          if e.errno == errno.EEXIST:
-            pass
-        except:
+          if e.errno == errno.ENOENT:
+            log.debug('ProcessMuxer._bind_processes(%s) failed, checkpoint not available yet.' %
+              process.name())
+            continue
+          else:
+            log.error("Unexpected inability to open %s! %s" % (process.ckpt_file(), e))
+        except Exception as e:
           log.error("Unexpected inability to open %s! %s" % (process.ckpt_file(), e))
 
   def _select_local_updates(self, from_processes=None):
@@ -71,7 +75,8 @@ class ProcessMuxer(object):
     try:
       expected_new_pos = os.fstat(fp.fileno()).st_size
     except OSError as e:
-      pass
+      log.debug('ProcessMuxer.has_data could not fstat for process %s' % process)
+      return False
     update = rr.try_read()
     if update:
       fp.seek(old_pos)

@@ -63,11 +63,12 @@ class Process(object):
     log.debug('[process:%5s=%s]: %s' % (self._pid, self._process.name, msg))
 
   def __str__(self):
-    return 'Process(%s, seq:%s, pid:%s, logdir:%s)' % (
+    return 'Process(%s, seq:%s, pid:%s, logdir:%s, ckpt:%s)' % (
       self._process.name,
       self._seq,
       self._pid,
-      self._pathspec.with_filename('stdout').getpath('process_logdir'))
+      self._pathspec.with_filename('stdout').getpath('process_logdir'),
+      'None' if self._pid is None else self.ckpt_file())
 
   def _write_process_update(self, runner_ckpt):
     assert self._ckpt_writer
@@ -133,8 +134,10 @@ class Process(object):
     assert self._stdout_fd
 
     # create checkpoint file and zero it out before we chroot/setuid
+    self._log('initializing checkpoint file: %s' % self.ckpt_file())
     ckpt_fp = Helper.safe_create_file(self.ckpt_file(), "w")
     self._ckpt_writer = ThriftRecordWriter(ckpt_fp)
+    self._ckpt_writer.set_sync(True)
 
     os.setsid()
     if self._use_chroot:
@@ -223,7 +226,10 @@ class Process(object):
     return self._process.name
 
   def ckpt_file(self):
-    return self._pathspec.given(pid = self._pid).getpath('process_checkpoint')
+    assert self._pid is not None
+    assert self._fork_time is not None
+    return (self._pathspec.given(pid = self._pid, fork_time = int(self._fork_time))
+                          .getpath('process_checkpoint'))
 
   def die(self):
     self._log('die() called, sending SIGKILL to children.')

@@ -41,11 +41,11 @@ class TaskPath(object):
      'active_task_path': ['%(root)s',       'tasks',      'active', '%(task_id)s'],
    'finished_task_path': ['%(root)s',       'tasks',    'finished', '%(task_id)s'],
     'runner_checkpoint': ['%(root)s', 'checkpoints', '%(task_id)s', 'runner'],
-   'process_checkpoint': ['%(root)s', 'checkpoints', '%(task_id)s', '%(pid)s'],
+   'process_checkpoint': ['%(root)s', 'checkpoints', '%(task_id)s', '%(fork_time)s.%(pid)s'],
        'process_logdir': ['%(root)s',        'logs', '%(task_id)s', '%(process)s', '%(run)s']
   }
 
-  KNOWN_KEYS = [ 'root', 'task_id', 'pid', 'process', 'run']
+  KNOWN_KEYS = [ 'root', 'task_id', 'pid', 'process', 'run', 'fork_time' ]
 
   def __init__(self, **kw):
     self._filename = None
