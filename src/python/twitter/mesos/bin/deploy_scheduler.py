@@ -9,6 +9,7 @@ from git import *
 from optparse import OptionParser
 from time import gmtime, strftime
 
+from twitter.common import app
 from twitter.mesos import clusters
 from twitter.mesos.tunnel_helper import TunnelHelper
 
@@ -47,42 +48,42 @@ RELEASES_DIR = '%s/releases' % MESOS_HOME
 
 SCHEDULER_HTTP = 'http://localhost:8081'
 
-options = None
-
 def get_cluster_dc():
-  return clusters.get_dc(options.cluster)
+  return clusters.get_dc(app.get_options().cluster)
 
 
 def get_cluster_name():
-  return clusters.get_local_name(options.cluster)
+  return clusters.get_local_name(app.get_options().cluster)
 
 
 def get_scheduler_role():
-  return clusters.get_scheduler_role(options.cluster)
+  return clusters.get_scheduler_role(app.get_options().cluster)
 
 
-def get_cluster_dc():
-  return clusters.get_dc(options.cluster)
+def cluster_is_colonized():
+  return clusters.is_colonized(app.get_options().cluster)
 
 
 def get_scheduler_machines():
-  if options.all_hosts:
-    if options.really_push:
+  if app.get_options().all_hosts:
+    if app.get_options().really_push:
       params = dict(
         dc = get_cluster_dc(),
         role = get_scheduler_role()
       )
-      result, (output, _) = run_cmd([
-        'ssh', TunnelHelper.get_tunnel_host(options.cluster),
-        'loony --dc=%(dc)s --group=role:%(role)s --one-column' % params
-      ])
+      if cluster_is_colonized():
+        cmd = "colony 'membersOf audubon.role.%(role)s'" % params
+      else:
+        cmd = 'loony --dc=%(dc)s --group=role:%(role)s --one-column' % params
+
+      result, (output, _) = run_cmd(['ssh', TunnelHelper.get_tunnel_host(app.get_options().cluster), cmd])
       if result != 0:
         sys.exit("Failed to determine scheduler hosts for dc: %(dc)s role: %(role)s" % params)
       return [host.strip() for host in output.splitlines()]
     else:
       return ['[dummy-host1]', '[dummy-host2]', '[dummy-host3]']
   else:
-    return [clusters.get_scheduler_host(options.cluster)]
+    return [clusters.get_scheduler_host(app.get_options().cluster)]
 
 
 def read_bool_stdin(prompt, default=None):
@@ -102,9 +103,9 @@ def read_bool_stdin(prompt, default=None):
 
 
 def maybe_run_command(runner, cmd):
-  if options.verbose or not options.really_push:
-    print '%s command: %s' % ('Executing' if options.really_push else 'Would run', ' '.join(cmd))
-  if options.really_push:
+  if app.get_options().verbose or not app.get_options().really_push:
+    print '%s command: %s' % ('Executing' if app.get_options().really_push else 'Would run', ' '.join(cmd))
+  if app.get_options().really_push:
     return runner(cmd)
 
 
@@ -218,9 +219,9 @@ def find_current_build(hosts):
         current_builds.add(current_build)
 
   current_builds = filter(bool, current_builds)
-  if not options.ignore_conflicting_builds and options.really_push and len(current_builds) != 1:
+  if not app.get_options().ignore_conflicting_builds and app.get_options().really_push and len(current_builds) != 1:
     sys.exit('Found conflicting current builds: %s please resolve manually' % current_builds)
-  current_build = current_builds.pop() if options.really_push else None
+  current_build = current_builds.pop() if app.get_options().really_push else None
   print 'Found current build: %s' % current_build
   return current_build
 
@@ -238,7 +239,7 @@ def stage_build(hosts):
   result = cmd_output(['bash', '-c',
     'unzip -c %s build.properties | grep build.git.revision' % BUILD_SCHEDULER_JAR_PATH
   ])
-  if options.really_push:
+  if app.get_options().really_push:
     _, sha = result.split('=')
   else:
     sha = '[sha]'
@@ -296,7 +297,7 @@ def start_scheduler(hosts):
   # TODO(John Sirois): consider loony
   for host in hosts:
     remote_check_call(host, ['sudo', 'monit', 'start', 'mesos-scheduler'])
-  if options.really_push:
+  if app.get_options().really_push:
     print 'Waiting for the scheduler to start'
     time.sleep(5)
 
@@ -316,7 +317,7 @@ def scrape_vars(host):
 def get_scheduler_uptime_secs(host):
   """Returns the scheduler's uptime in seconds."""
 
-  if not options.really_push:
+  if not app.get_options().really_push:
     return 0
   return int((scrape_vars(host)).get('jvm_uptime_secs', 0))
 
@@ -324,13 +325,13 @@ def get_scheduler_uptime_secs(host):
 def get_scheduler_sha(host):
   """Returns the sha the deployed scheduler is built from."""
 
-  if options.really_push:
+  if app.get_options().really_push:
     vars = scrape_vars(host)
     return vars.get('build_git_revision')
 
 
 def is_scheduler_healthy(host):
-  if options.really_push:
+  if app.get_options().really_push:
     return fetch_scheduler_http(host, 'health') == 'OK'
   else:
     return True
@@ -344,7 +345,7 @@ def stop_scheduler(hosts):
     remote_check_call(host, ['sudo', 'monit', 'unmonitor', 'mesos-scheduler'])
     fetch_scheduler_http(host, 'quitquitquit')
     print 'Waiting for scheduler to stop cleanly'
-    if options.really_push:
+    if app.get_options().really_push:
       time.sleep(5)
     print 'Stopping scheduler via monit'
     remote_check_call(host, ['sudo', 'monit', 'stop', 'mesos-scheduler'])
@@ -360,7 +361,7 @@ def watch_scheduler(host, sha, up_min_secs):
   while started or (time.time() - watch_start) < 180:
     if is_scheduler_healthy(host):
       uptime = get_scheduler_uptime_secs(host)
-      if not options.really_push:
+      if not app.get_options().really_push:
         print 'Skipping further health checks, since we are not pushing.'
         return True
       print 'Up and healthy for %s seconds' % uptime
@@ -395,71 +396,70 @@ def rollback(hosts, rollback_build):
   start_scheduler(hosts)
 
 
-def main():
-  parser = OptionParser(usage = '%prog [options] tag')
-  parser.add_option(
-    '-v',
-    dest='verbose',
-    default=False,
-    action='store_true',
-    help='Verbose logging. (default: %default)')
+app.set_usage('%prog [options] tag')
 
-  cluster_list = list(clusters.get_clusters())
-  cluster_list.sort()
-  parser.add_option(
-    '--cluster',
-    type = 'choice',
-    choices = cluster_list,
-    dest='cluster',
-    help='Cluster to deploy the scheduler in (one of: %s)' % ', '.join(cluster_list))
+app.add_option(
+  '-v',
+  dest='verbose',
+  default=False,
+  action='store_true',
+  help='Verbose logging. (default: %default)')
 
-  # TODO(John Sirois): Make this the default once HA log rolls out.
-  parser.add_option(
-    '--all-hosts',
-    dest='all_hosts',
-    default=False,
-    action='store_true',
-    help='Deploy scheduler to all hosts designated in loony. (default: %default)')
+cluster_list = list(clusters.get_clusters())
+cluster_list.sort()
+app.add_option(
+  '--cluster',
+  type = 'choice',
+  choices = cluster_list,
+  dest='cluster',
+  help='Cluster to deploy the scheduler in (one of: %s)' % ', '.join(cluster_list))
 
-  parser.add_option(
-    '--skip_build',
-    dest='skip_build',
-    default=False,
-    action='store_true',
-    help='Skip build and test, use the existing build. (default: %default)')
+# TODO(John Sirois): Make this the default once HA log rolls out.
+app.add_option(
+  '--all-hosts',
+  dest='all_hosts',
+  default=False,
+  action='store_true',
+  help='Deploy scheduler to all hosts designated in loony. (default: %default)')
 
-  parser.add_option(
-    '--really_push',
-    dest='really_push',
-    default=False,
-    action='store_true',
-    help='Safeguard to prevent fat-fingering.  When false, only show commands but do not run them. '
-         '(default: %default)')
+app.add_option(
+  '--skip_build',
+  dest='skip_build',
+  default=False,
+  action='store_true',
+  help='Skip build and test, use the existing build. (default: %default)')
 
-  parser.add_option(
-    '--ignore_release',
-    dest='ignore_release',
-    default=False,
-    action='store_true',
-    help='Ignores the vert release protocol (can only be used in test)')
+app.add_option(
+  '--really_push',
+  dest='really_push',
+  default=False,
+  action='store_true',
+  help='Safeguard to prevent fat-fingering.  When false, only show commands but do not run them. '
+       '(default: %default)')
 
-  parser.add_option(
-    '--hotfix',
-    dest='hotfix',
-    default=False,
-    action='store_true',
-    help='Indicates this is a hotfix deploy from a temporary release branch instead of a vert tag')
+app.add_option(
+  '--ignore_release',
+  dest='ignore_release',
+  default=False,
+  action='store_true',
+  help='Ignores the vert release protocol (can only be used in test)')
 
-  parser.add_option(
-    '--ignore_conflicting_builds',
-    dest='ignore_conflicting_builds',
-    default=False,
-    action='store_true',
-    help='Ignores conflicting builds')
+app.add_option(
+  '--hotfix',
+  dest='hotfix',
+  default=False,
+  action='store_true',
+  help='Indicates this is a hotfix deploy from a temporary release branch instead of a vert tag')
 
-  global options
-  (options, args) = parser.parse_args()
+app.add_option(
+  '--ignore_conflicting_builds',
+  dest='ignore_conflicting_builds',
+  default=False,
+  action='store_true',
+  help='Ignores conflicting builds')
 
+
+def main(args, options):
   if not options.really_push:
     print '****************************************************************************************'
     print 'You are running in pretend mode.  None of the commands are actually executed!'
@@ -519,5 +519,4 @@ def main():
   else:
     print 'Fake push completed'
 
-if __name__ == '__main__':
-  main()
+app.main()

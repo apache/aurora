@@ -3,14 +3,23 @@ import os
 import signal
 import subprocess
 
-from twitter.common import log
+from twitter.common import app, log
+
+
+app.add_option(
+  '--tunnel_host',
+  type='string',
+  dest='tunnel_host',
+  default='nest1.corp.twitter.com',
+  help='Host to tunnel commands through (default: %default)')
+
 
 class TunnelHelper:
   SSH_TUNNEL_LIFETIME_SECS = 60
 
   @staticmethod
   def get_tunnel_host(cluster):
-    return 'nest1.corp.twitter.com'
+    return app.get_options().tunnel_host
 
   @staticmethod
   def create_tunnel(tunnel_host, tunnel_port, remote_host, remote_port):
