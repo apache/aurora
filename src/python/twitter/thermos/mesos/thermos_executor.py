@@ -115,15 +115,17 @@ class TaskRunnerProcess(object):
     options = app.get_options()
     params = dict(log_dir = LogOptions.log_dir(),
                   checkpoint_root = options.checkpoint_root,
-                  sandbox_root = options.sandbox_root,
+                  sandbox = self._sandbox,
                   task_id = self._task_id,
-                  thermos_thrift = self._task_filename)
+                  thermos_thrift = self._task_filename,
+                  setuid = self._role)
     # TODO(wickman)  Implement chroot+setuid inside thermos_run.
     cmdline_args = [self._runner_pex.filename()]
     cmdline_args.extend('--%s=%s' % (flag, value) for flag, value in params.items())
     cmdline_args.extend([
       '--enable_scribe_exception_hook',
-      '--scribe_exception_category=thermos_runner_exceptions'])
+      '--scribe_exception_category=thermos_runner_exceptions',
+      '--enable_chroot'])
     log.info('Forking off runner with cmdline: %s' % ' '.join(cmdline_args))
     self._popen = subprocess.Popen(cmdline_args)
 

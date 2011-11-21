@@ -1,22 +1,22 @@
-import os
 import copy
-import time
+import errno
+import getpass
+import os
 import random
 import socket
-import getpass
 import signal
-import errno
 import threading
+import time
 
 from twitter.common import log
-from twitter.common.recordio import ThriftRecordReader, ThriftRecordWriter
+from twitter.common.dirutil import safe_mkdir
 from twitter.common.process import ProcessProviderFactory
 from twitter.common.quantity import Amount, Time
+from twitter.common.recordio import ThriftRecordReader, ThriftRecordWriter
 
 from twitter.thermos.base.helper    import Helper
 from twitter.thermos.base.path      import TaskPath
 from twitter.thermos.base.ckpt      import TaskCkptDispatcher
-from twitter.thermos.runner.chroot  import TaskChroot
 from twitter.thermos.runner.planner import Planner
 from twitter.thermos.runner.process import Process
 from twitter.thermos.runner.muxer   import ProcessMuxer
@@ -24,7 +24,18 @@ from twitter.thermos.runner.ports   import EphemeralPortAllocator
 
 from twitter.tcl.scheduler import Scheduler
 from gen.twitter.tcl.ttypes import ThermosTask
-from gen.twitter.thermos.ttypes import *
+from gen.twitter.thermos.ttypes import (
+  ProcessRunState,
+  ProcessState,
+  TaskAllocatedPort,
+  TaskRunnerCkpt,
+  TaskRunnerHeader,
+  TaskRunState,
+  TaskRunnerState,
+  TaskRunStateUpdate,
+  TaskState,
+  TaskStateUpdate,
+)
 
 from thrift.TSerialization import serialize as thrift_serialize
 from thrift.TSerialization import deserialize as thrift_deserialize
@@ -105,12 +116,17 @@ class TaskRunner(object):
   # exec'ed the child process.
   LOST_TIMEOUT = Amount(60, Time.SECONDS)
 
-  def __init__(self, task, sandbox, root_dir, task_id):
+  def __init__(self, task, sandbox, root_dir, task_id, user=None, chroot=False):
     """
-      task     = ThermosTask to run
-      sandbox  = sandbox in which to run all processes (pathname)
-      root_dir = directory to store all log/ckpt data (pathname)
-      task_id  = uid assigned to the task, used to disambiguate checkpoints
+      required:
+        task (ThermosTask) = the task to run
+        sandbox (path) = sandbox in which to run all processes (pathname)
+        root_dir (path) = directory to store all log/ckpt data (pathname)
+        task_id (str) = uid assigned to the task, used to disambiguate checkpoints
+
+      optional:
+        user (str) = the user to run the job as.  if specified, you must have setuid privileges.
+        chroot (bool) = whether or not to run chrooted to the sandbox (default False)
     """
     self._task = copy.deepcopy(task)
     self._task_processes = {}
@@ -119,11 +135,13 @@ class TaskRunner(object):
     self._pause_event = threading.Event()
     self._control = threading.Lock()
     if self._task.replica_id is None:
-      raise Exception("Task must have a replica_id!")
+      raise ValueError("Task must have a replica_id!")
     self._pathspec = TaskPath(root = root_dir, task_id = task_id)
     self._recovery = True  # set in recovery mode
     self._port_allocator = EphemeralPortAllocator()
     self._ps = ProcessProviderFactory.get()
+    self._user = user
+    self._chroot = chroot
 
     # create scheduler from process task
     scheduler = TaskRunnerHelper.scheduler_from_task(task)
@@ -132,8 +150,8 @@ class TaskRunner(object):
     self._planner = Planner(scheduler)
 
     # set up sandbox for running process
-    self._sandbox = TaskChroot(sandbox, task_id)
-    self._sandbox.create_if_necessary()
+    self._sandbox = sandbox
+    safe_mkdir(self._sandbox)
 
     # create runner state
     self._state      = TaskRunnerState(processes = {})
@@ -180,10 +198,10 @@ class TaskRunner(object):
 
     # Replay messages in the checkpoint
     if os.path.exists(ckpt_file):
-      fp = file(ckpt_file, "r")
+      fp = open(ckpt_file, "r")
       ckpt_recover = ThriftRecordReader(fp, TaskRunnerCkpt)
-      for wrc in ckpt_recover:
-        self._dispatcher.update_runner_state(self._state, wrc, recovery = self._recovery)
+      for record in ckpt_recover:
+        self._dispatcher.update_runner_state(self._state, record, recovery=self._recovery)
       ckpt_recover.close()
 
   def _initialize_ckpt(self):
@@ -208,12 +226,10 @@ class TaskRunner(object):
   def _initialize_processes(self):
     if self._state.header is None:
       update = TaskRunnerHeader(
-        task_id     = self._task_id,
-        launch_time = long(time.time()),
-        sandbox     = self._sandbox.path(),
-        hostname    = socket.gethostname(),
-        user        = TaskRunnerHelper.get_actual_user())
-      runner_ckpt = TaskRunnerCkpt(runner_header = update)
+        task_id=self._task_id, launch_time=long(time.time()),
+        sandbox=self._sandbox, hostname=socket.gethostname(),
+        user=self._user or TaskRunnerHelper.get_actual_user())
+      runner_ckpt = TaskRunnerCkpt(runner_header=update)
       self._dispatcher.update_runner_state(self._state, runner_ckpt)
       # change this if we add dispatches for non-process updates
       self._ckpt_write(runner_ckpt)
@@ -406,8 +422,8 @@ class TaskRunner(object):
   @state_mutating
   def _save_allocated_ports(self, ports):
     for name in ports:
-      wap = TaskAllocatedPort(port_name = name, port = ports[name])
-      runner_ckpt = TaskRunnerCkpt(allocated_port = wap)
+      tap = TaskAllocatedPort(port_name = name, port = ports[name])
+      runner_ckpt = TaskRunnerCkpt(allocated_port=tap)
       if self._dispatcher.update_runner_state(self._state, runner_ckpt, self._recovery):
         self._ckpt.write(runner_ckpt)
 
@@ -435,11 +451,8 @@ class TaskRunner(object):
     # and then causes assert_active_task to fail on pre- vs. post-interpolated cmdlines.
     process = copy.deepcopy(process)
     process.cmdline = new_cmdline
-    return Process(
-      pathspec,
-      process,
-      Helper.process_sequence_number(self._state, process_name),
-      self._sandbox.path())
+    return Process(pathspec, process, Helper.process_sequence_number(self._state, process_name),
+      self._sandbox, self._user, self._chroot)
 
   def _count_process_failures(self, process_name):
     process_failures = filter(
@@ -582,7 +595,8 @@ class TaskRunner(object):
       because of pid-space wrapping.  We don't want to go and kill processes we don't own,
       especially if the killer is running as root.
     """
-    if pid_handle.user() != user: return False
+    if pid_handle.user() != user:
+      return False
     estimated_start_time = time.time() - pid_handle.wall_time()
     return abs(start_time - estimated_start_time) < TaskRunner.MAX_START_TIME_DRIFT.as_(Time.SECONDS)
 

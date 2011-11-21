@@ -18,6 +18,7 @@ from gen.twitter.thermos.ttypes import (
 
 class RunnerTestBase(object):
   RUN_JOB_SCRIPT = """
+import os
 from twitter.tcl.loader import ThermosJobLoader
 from twitter.thermos.runner import TaskRunner
 from twitter.thermos.runner.runner import TaskRunnerHelper
@@ -27,6 +28,7 @@ task = job.tasks[0]
 sandbox = '%(sandbox)s'
 root = '%(root)s'
 task_id = '%(task_id)s'
+sandbox = os.path.join(sandbox, task_id)
 
 runner = TaskRunner(task, sandbox, root, task_id)
 runner.run()

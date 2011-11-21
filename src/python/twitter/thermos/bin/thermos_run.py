@@ -20,15 +20,18 @@ app.add_option("--task", dest = "task", metavar = "TASK",
                help = "run the task by name of TASK")
 app.add_option("--replica", dest = "replica_id", metavar = "ID",
                help = "run the replica number ID, from 0 .. number of replicas.")
-app.add_option("--sandbox_root", dest = "sandbox_root", metavar = "PATH",
-               help = "the path root where we will spawn task sandboxes")
+app.add_option("--sandbox", dest = "sandbox", metavar = "PATH",
+               help = "the sandbox in which this task should run")
 app.add_option("--checkpoint_root", dest = "checkpoint_root", metavar = "PATH",
                help = "the path where we will store task logs and checkpoints")
 app.add_option("--task_id", dest = "uid", metavar = "STRING",
                help = "the uid assigned to this task by the scheduler")
 app.add_option("--action", dest = "action", metavar = "ACTION", default = "run",
                help = "the action for this task runner: run, kill")
-
+app.add_option("--setuid", dest = "setuid", metavar = "USER", default = None,
+               help = "setuid tasks to this user, requires superuser privileges.")
+app.add_option("--enable_chroot", dest = "chroot", default = False, action='store_true',
+               help = "chroot tasks to the sandbox before executing them.")
 
 def check_invariants(args, values):
   if args:
@@ -42,8 +45,8 @@ def check_invariants(args, values):
       values.task is None or values.replica_id is None):
     app.error('If specifying a Mesos or Thermos job, must also specify task and replica.')
 
-  if not (values.sandbox_root and values.checkpoint_root and values.uid):
-    app.error("ERROR: must supply sandbox_root, checkpoint_root and task_id")
+  if not (values.sandbox and values.checkpoint_root and values.uid):
+    app.error("ERROR: must supply sandbox, checkpoint_root and task_id")
 
 def get_task_from_job(thermos_job, task, replica):
   for tsk in thermos_job.tasks:
@@ -91,7 +94,8 @@ def main(args, opts):
   thermos_task = get_task_from_options(opts)
 
   # TODO(wickman):  Need a general sanitizing suite for uids, job names, etc.
-  task_runner = TaskRunner(thermos_task, opts.sandbox_root, opts.checkpoint_root, opts.uid)
+  task_runner = TaskRunner(thermos_task, opts.sandbox, opts.checkpoint_root, opts.uid,
+    opts.setuid, opts.chroot)
   if opts.action == 'run':
     task_runner.run()
   elif opts.action == 'kill':
