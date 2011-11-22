@@ -31,7 +31,7 @@ public class SyncModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    requireBinding(Key.get(new TypeLiteral<Supplier<Set<ExecutorKey>>>() {}));
+    requireBinding(Key.get(new TypeLiteral<Supplier<Set<ExecutorKey>>>() { }));
 
     bind(ExecutorWatchdog.class).to(ExecutorWatchdogImpl.class);
     bind(ExecutorWatchdogImpl.class).in(Singleton.class);

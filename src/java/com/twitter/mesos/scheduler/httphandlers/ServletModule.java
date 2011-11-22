@@ -39,6 +39,7 @@ public class ServletModule extends AbstractModule {
     requireBinding(LocalServiceRegistry.class);
     requireBinding(Key.get(new TypeLiteral<DynamicHostSet<ServiceInstance>>() { }));
 
+    Registration.registerServlet(binder(), "/executors", ExecutorsHome.class, false);
     Registration.registerServlet(binder(), "/scheduler", SchedulerzHome.class, false);
     Registration.registerServlet(binder(), "/scheduler/role", SchedulerzRole.class, true);
     Registration.registerServlet(binder(), "/scheduler/job", SchedulerzJob.class, true);

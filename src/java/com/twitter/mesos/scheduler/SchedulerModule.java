@@ -22,7 +22,6 @@ import org.apache.mesos.MesosSchedulerDriver;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.ExecutorInfo;
 import org.apache.mesos.Protos.FrameworkID;
-import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
 import org.apache.zookeeper.data.ACL;
@@ -46,6 +45,7 @@ import com.twitter.common_internal.zookeeper.ZooKeeperModule;
 import com.twitter.mesos.ExecutorKey;
 import com.twitter.mesos.gen.MesosAdmin;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHosts;
 import com.twitter.mesos.scheduler.PulseMonitor.PulseMonitorImpl;
 import com.twitter.mesos.scheduler.SchedulingFilter.SchedulingFilterImpl;
 import com.twitter.mesos.scheduler.auth.SessionValidator;
@@ -147,7 +147,10 @@ public class SchedulerModule extends AbstractModule {
     bind(Key.get(new TypeLiteral<Map<String, String>>() {},
         Names.named(SchedulingFilterImpl.MACHINE_RESTRICTIONS)))
         .toInstance(MACHINE_RESTRICTIONS.get());
-    bind(Scheduler.class).to(MesosSchedulerImpl.class).in(Singleton.class);
+
+    bind(SlaveHosts.class).in(Singleton.class);
+    bind(Scheduler.class).to(MesosSchedulerImpl.class);
+    bind(MesosSchedulerImpl.class).in(Singleton.class);
 
     // Bindings for StateManager
     bind(Clock.class).toInstance(Clock.SYSTEM_CLOCK);

@@ -4,7 +4,6 @@ import org.apache.commons.lang.builder.EqualsBuilder;
 import org.apache.commons.lang.builder.HashCodeBuilder;
 import org.apache.commons.lang.builder.ToStringBuilder;
 import org.apache.mesos.Protos.ExecutorID;
-import org.apache.mesos.Protos.SlaveID;
 
 import com.twitter.common.base.MorePreconditions;
 
@@ -16,6 +15,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * @author William Farner
  */
 public class ExecutorKey {
+  public static final String THERMOS_EXECUTOR_ID_PREFIX = "thermos-";
 
   public final ExecutorID executor;
   public final String hostname;
@@ -29,6 +29,17 @@ public class ExecutorKey {
   public ExecutorKey(ExecutorID executor, String hostname) {
     this.executor = checkNotNull(executor);
     this.hostname = MorePreconditions.checkNotBlank(hostname);
+  }
+
+  /**
+   * Returns the http port for the executor.
+   *
+   * <p>NOTE: this is used by {@code executors.st}
+   *
+   * @return http port
+   */
+  public int getExecutorHttpPort() {
+    return executor.getValue().startsWith(THERMOS_EXECUTOR_ID_PREFIX) ? 1338 : 1337;
   }
 
   @Override

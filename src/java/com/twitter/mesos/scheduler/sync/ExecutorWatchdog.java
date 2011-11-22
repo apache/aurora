@@ -10,6 +10,7 @@ import javax.annotation.Nullable;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Supplier;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -49,6 +50,13 @@ public interface ExecutorWatchdog {
    * @param requestHandler Callback to send update requests.
    */
   void startRequestLoop(Amount<Long, Time> pollInterval, Closure<UpdateRequest> requestHandler);
+
+  /**
+   * Returns the executor positions tracked by the watchdog.
+   *
+   * @return the executor state syncing positions
+   */
+  Map<ExecutorKey, StateUpdateRequest> getExecutorPositions();
 
   public static class UpdateRequest {
     public final ExecutorKey executor;
@@ -130,6 +138,11 @@ public interface ExecutorWatchdog {
     public synchronized void stateUpdated(ExecutorKey executor, String executorUUID,
         int position) {
       knownPositions.put(executor, new StateUpdateRequest(executorUUID, position));
+    }
+
+    @Override
+    public Map<ExecutorKey, StateUpdateRequest> getExecutorPositions() {
+      return ImmutableMap.copyOf(knownPositions);
     }
 
     @VisibleForTesting

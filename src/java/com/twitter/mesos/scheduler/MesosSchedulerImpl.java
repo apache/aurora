@@ -11,6 +11,7 @@ import java.util.logging.Logger;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
@@ -59,7 +60,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  *
  * @author William Farner
  */
-class MesosSchedulerImpl implements Scheduler {
+public class MesosSchedulerImpl implements Scheduler {
   private static final Logger LOG = Logger.getLogger(MesosSchedulerImpl.class.getName());
 
   private static final Amount<Long, Time> MAX_REGISTRATION_DELAY = Amount.of(1L, Time.MINUTES);
@@ -73,9 +74,8 @@ class MesosSchedulerImpl implements Scheduler {
   @CmdLine(name = "thermos_executor_path", help = "Path to the thermos executor launch script.")
   private static final Arg<String> THERMOS_EXECUTOR_PATH = Arg.create();
 
-  // TODO(bmahler): Expose this in a servlet.
   // We accept a trivial memory "leak" by not removing when a slave machine is decommissioned.
-  private final Map<String, SlaveID> executorSlaves = Maps.newConcurrentMap();
+  private final SlaveHosts executorSlaves;
 
   // Stores scheduler state and handles actual scheduling decisions.
   private final SchedulerCore schedulerCore;
@@ -89,11 +89,13 @@ class MesosSchedulerImpl implements Scheduler {
 
   @Inject
   public MesosSchedulerImpl(SchedulerCore schedulerCore, ExecutorTracker executorTracker,
-      ExecutorInfo executorInfo, final Lifecycle lifecycle, ExecutorWatchdog executorWatchdog) {
+      ExecutorInfo executorInfo, final Lifecycle lifecycle, ExecutorWatchdog executorWatchdog,
+      SlaveHosts slaveHosts) {
     this.schedulerCore = checkNotNull(schedulerCore);
     this.executorTracker = checkNotNull(executorTracker);
     this.executorInfo = checkNotNull(executorInfo);
     this.executorWatchdog = checkNotNull(executorWatchdog);
+    this.executorSlaves = checkNotNull(slaveHosts);
 
     // TODO(William Farner): Clean this up.
     LOG.info(String.format("Waiting up to %s for scheduler registration.", MAX_REGISTRATION_DELAY));
@@ -131,7 +133,7 @@ class MesosSchedulerImpl implements Scheduler {
       return;
     }
 
-    SlaveID slave = executorSlaves.get(hostName);
+    SlaveID slave = executorSlaves.getSlave(hostName);
     if (slave == null) {
       LOG.severe("Cannot send message, no SlaveID for hostname: " + hostName);
       return;
@@ -196,7 +198,8 @@ class MesosSchedulerImpl implements Scheduler {
             .setData(ByteString.copyFrom(taskInBytes));
     if (twitterTask.isThermosTask()) {
       assignedTaskBuilder.setExecutor(ExecutorInfo.newBuilder()
-          .setExecutorId(ExecutorID.newBuilder().setValue(String.format("thermos-%s",
+          .setExecutorId(ExecutorID.newBuilder().setValue(String.format("%s%s",
+              ExecutorKey.THERMOS_EXECUTOR_ID_PREFIX,
               twitterTask.taskId)))
           .setUri(THERMOS_EXECUTOR_PATH.get()));
     }
@@ -210,7 +213,7 @@ class MesosSchedulerImpl implements Scheduler {
     try {
       for (Offer offer : offers) {
         log(Level.FINE, "Received offer: %s", offer);
-        executorSlaves.put(offer.getHostname(), offer.getSlaveId());
+        executorSlaves.addSlave(offer.getHostname(), offer.getSlaveId());
         SchedulerCore.TwitterTask task = schedulerCore.offer(offer, executorInfo.getExecutorId());
 
         List<TaskDescription> scheduledTasks;
@@ -331,4 +334,23 @@ class MesosSchedulerImpl implements Scheduler {
     final AtomicLong executorStatusUpdates = Stats.exportLong("executor_status_updates");
   }
   private final Vars vars = new Vars();
+
+  /**
+   * Maintains a mapping between hosts and slave ids.
+   */
+  public static class SlaveHosts {
+    private final Map<String, SlaveID> executorSlaves = Maps.newConcurrentMap();
+
+    SlaveID getSlave(String host) {
+      return executorSlaves.get(host);
+    }
+
+    void addSlave(String host, SlaveID slaveId) {
+      executorSlaves.put(host, slaveId);
+    }
+
+    public Map<String, SlaveID> getSlaves() {
+      return ImmutableMap.copyOf(executorSlaves);
+    }
+  }
 }
