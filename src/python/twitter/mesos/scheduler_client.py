@@ -20,7 +20,7 @@ except ImportError, e:
 
 import zookeeper
 
-from endpoint.ttypes import *
+from gen.twitter.thrift.endpoint.ttypes import *
 
 from twitter.mesos import clusters
 from gen.twitter.mesos import MesosAdmin
