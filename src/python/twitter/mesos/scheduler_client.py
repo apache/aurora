@@ -20,11 +20,10 @@ except ImportError, e:
 
 import zookeeper
 
-from gen.twitter.thrift.endpoint.ttypes import *
+from gen.twitter.thrift.endpoint.ttypes import ServiceInstance
 
 from twitter.mesos import clusters
 from gen.twitter.mesos import MesosAdmin
-from gen.twitter.mesos.ttypes import *
 from twitter.mesos.location import Location
 from twitter.mesos.tunnel_helper import TunnelHelper
 from twitter.mesos.zookeeper_helper import ZookeeperHelper
