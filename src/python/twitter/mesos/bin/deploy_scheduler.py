@@ -65,25 +65,22 @@ def cluster_is_colonized():
 
 
 def get_scheduler_machines():
-  if app.get_options().all_hosts:
-    if app.get_options().really_push:
-      params = dict(
-        dc = get_cluster_dc(),
-        role = get_scheduler_role()
-      )
-      if cluster_is_colonized():
-        cmd = "colony 'membersOf audubon.role.%(role)s'" % params
-      else:
-        cmd = 'loony --dc=%(dc)s --group=role:%(role)s --one-column' % params
-
-      result, (output, _) = run_cmd(['ssh', TunnelHelper.get_tunnel_host(app.get_options().cluster), cmd])
-      if result != 0:
-        sys.exit("Failed to determine scheduler hosts for dc: %(dc)s role: %(role)s" % params)
-      return [host.strip() for host in output.splitlines()]
+  if app.get_options().really_push:
+    params = dict(
+      dc = get_cluster_dc(),
+      role = get_scheduler_role()
+    )
+    if cluster_is_colonized():
+      cmd = "colony 'membersOf audubon.role.%(role)s'" % params
     else:
-      return ['[dummy-host1]', '[dummy-host2]', '[dummy-host3]']
+      cmd = 'loony --dc=%(dc)s --group=role:%(role)s --one-column' % params
+
+    result, (output, _) = run_cmd(['ssh', TunnelHelper.get_tunnel_host(app.get_options().cluster), cmd])
+    if result != 0:
+      sys.exit("Failed to determine scheduler hosts for dc: %(dc)s role: %(role)s" % params)
+    return [host.strip() for host in output.splitlines()]
   else:
-    return [clusters.get_scheduler_host(app.get_options().cluster)]
+    return ['[dummy-host1]', '[dummy-host2]', '[dummy-host3]']
 
 
 def read_bool_stdin(prompt, default=None):
@@ -413,14 +410,6 @@ app.add_option(
   choices = cluster_list,
   dest='cluster',
   help='Cluster to deploy the scheduler in (one of: %s)' % ', '.join(cluster_list))
-
-# TODO(John Sirois): Make this the default once HA log rolls out.
-app.add_option(
-  '--all-hosts',
-  dest='all_hosts',
-  default=False,
-  action='store_true',
-  help='Deploy scheduler to all hosts designated in loony. (default: %default)')
 
 app.add_option(
   '--skip_build',
