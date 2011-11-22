@@ -20,6 +20,13 @@ public interface Task {
 
   public boolean isRunning();
 
+  /**
+   * Whether underlying process is terminated after completion.
+   *
+   * @return {@code true} iff the underlying process is completed
+   */
+  public boolean isCompleted();
+
   public void terminate(ScheduleStatus terminalState);
 
   public File getSandboxDir();

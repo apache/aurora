@@ -85,11 +85,12 @@ public class LiveTask extends TaskOnDisk {
 
   private final AssignedTask task;
 
-  private int healthCheckPort = -1;
+  private volatile int healthCheckPort = -1;
 
   private Process process;
 
-  private int exitCode = 0;
+  private volatile int exitCode = 0;
+  private volatile boolean completed = false;
   private final ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier;
   private final boolean multiUser;
 
@@ -345,6 +346,7 @@ public class LiveTask extends TaskOnDisk {
         LOG.log(Level.WARNING,
             "Warning, Thread interrupted while waiting for process to finish.", e);
       } finally {
+        completed = true;
         cleanUp(process);
       }
     }
@@ -361,6 +363,11 @@ public class LiveTask extends TaskOnDisk {
   @Override
   public boolean isRunning() {
     return RUNNING_STATES.contains(stateMachine.getState());
+  }
+
+  @Override
+  public boolean isCompleted() {
+    return completed;
   }
 
   public ScheduleStatus getStatus() {

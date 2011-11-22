@@ -48,6 +48,11 @@ public class DeadTask extends TaskOnDisk {
   }
 
   @Override
+  public boolean isCompleted() {
+    return true;
+  }
+
+  @Override
   public void stage() throws TaskRunException {
     throw new UnsupportedOperationException("A dead task cannot be staged.");
   }

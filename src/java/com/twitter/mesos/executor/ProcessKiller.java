@@ -19,7 +19,6 @@ import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
-import com.twitter.mesos.Tasks;
 import com.twitter.mesos.executor.HttpSignaler.SignalException;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
 import com.twitter.mesos.executor.ProcessKiller.KillException;
@@ -56,11 +55,12 @@ public class ProcessKiller implements ExceptionalClosure<KillCommand, KillExcept
   public void execute(KillCommand command) throws KillException {
     Preconditions.checkNotNull(command);
 
+    // TODO(bmahler): Add vars or log of role/job so we can spot badly behaved services.
     // Start by requesting clean shutdown.
     if (command.httpSignalPort != -1) {
       signal(command.httpSignalPort, PROCESS_TERM_ENDPOINT);
       wait(escalationDelay);
-      if (Tasks.isTerminated(command.task.getScheduleStatus())) {
+      if (command.task.isCompleted()) {
         return;
       }
     }
@@ -69,7 +69,7 @@ public class ProcessKiller implements ExceptionalClosure<KillCommand, KillExcept
     if (command.httpSignalPort != -1) {
       signal(command.httpSignalPort, PROCESS_KILL_ENDPOINT);
       wait(escalationDelay);
-      if (Tasks.isTerminated(command.task.getScheduleStatus())) {
+      if (command.task.isCompleted()) {
         return;
       }
     }

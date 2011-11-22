@@ -9,7 +9,6 @@ import com.google.common.collect.Sets;
 import com.google.common.io.Files;
 
 import org.easymock.EasyMock;
-import org.easymock.IAnswer;
 import org.easymock.IMocksControl;
 import org.junit.After;
 import org.junit.Before;
@@ -33,7 +32,9 @@ import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
 import static org.easymock.EasyMock.*;
 import static org.hamcrest.CoreMatchers.is;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 
 /**
  * @author William Farner
@@ -157,8 +158,10 @@ public class LiveTaskTest {
     LiveTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
     taskA.run();
+    assertFalse(taskA.isCompleted());
     assertThat(taskA.blockUntilTerminated(), is(ScheduleStatus.FAILED));
     assertThat(taskA.getExitCode(), is(2));
+    assertTrue(taskA.isCompleted());
   }
 
   @Test
@@ -174,6 +177,7 @@ public class LiveTaskTest {
     taskA.stage();
     taskA.run();
 
+    assertFalse(taskA.isCompleted());
     taskA.terminate(KILLED);
     assertThat(taskA.blockUntilTerminated(), is(ScheduleStatus.KILLED));
   }
