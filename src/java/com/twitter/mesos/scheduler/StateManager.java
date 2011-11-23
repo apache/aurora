@@ -222,6 +222,7 @@ class StateManager {
     storage.start(new Work.NoResult.Quiet() {
       @Override protected void execute(Storage.StoreProvider storeProvider) {
         storeProvider.getTaskStore().upgradeTaskStorage();
+        LOG.info("Upgraded the task storage from StateManager.");
         final ImmutableSet.Builder<ScheduledTask> updatedTask = ImmutableSet.builder();
         storeProvider.getTaskStore().mutateTasks(Query.GET_ALL, new Closure<ScheduledTask>() {
           @Override public void execute(ScheduledTask task) {
@@ -233,6 +234,8 @@ class StateManager {
               if (components.size() != 4) {
                 LOG.warning("Invalid host format: " + assignedTask.getSlaveHost());
               } else {
+                LOG.info("Backfilled the rack name for task: " +
+                    task.getAssignedTask().getTaskId());
                 assignedTask.setRackName(components.get(1));
                 updatedTask.add(task);
               }

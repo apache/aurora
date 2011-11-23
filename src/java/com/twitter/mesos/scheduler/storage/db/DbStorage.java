@@ -909,6 +909,8 @@ public class DbStorage implements
             "ALTER TABLE task_state ADD IF NOT EXISTS rack_name VARCHAR(255) NULL;");
         jdbcTemplate.update(
             "CREATE INDEX IF NOT EXISTS task_state_rack_name_idx ON task_state(rack_name);");
+        LOG.info("Finish upgrade the task storage. Added rack name and rack name index" +
+            " in the task state table");
       }
     });
   }
