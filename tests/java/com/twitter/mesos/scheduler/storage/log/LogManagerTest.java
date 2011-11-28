@@ -36,8 +36,14 @@ import com.twitter.mesos.scheduler.log.Log.Stream;
 import com.twitter.mesos.scheduler.storage.log.LogManager.StreamManager;
 import com.twitter.mesos.scheduler.storage.log.LogManager.StreamManager.StreamTransaction;
 
-import static org.easymock.EasyMock.*;
-import static org.junit.Assert.*;
+import static org.easymock.EasyMock.aryEq;
+import static org.easymock.EasyMock.capture;
+import static org.easymock.EasyMock.expect;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 
 /**
  * @author John Sirois

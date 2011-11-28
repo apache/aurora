@@ -1,7 +1,15 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Set;
+
 import com.google.common.base.Predicate;
 import com.google.common.base.Supplier;
+
+import org.easymock.EasyMock;
+import org.easymock.IExpectationSetters;
+import org.junit.Before;
+import org.junit.Test;
+
 import com.twitter.common.base.Closure;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
@@ -12,12 +20,6 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.TaskStateMachine.WorkSink;
-import org.easymock.EasyMock;
-import org.easymock.IExpectationSetters;
-import org.junit.Before;
-import org.junit.Test;
-
-import java.util.Set;
 
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;

@@ -10,7 +10,6 @@ import com.twitter.common.application.AppLauncher;
 import com.twitter.common.application.LocalServiceRegistry;
 import com.twitter.common.application.modules.HttpModule;
 import com.twitter.common.application.modules.LogModule;
-import com.twitter.common.application.modules.StatsExportModule;
 import com.twitter.common.application.modules.StatsModule;
 import com.twitter.common.zookeeper.Group;
 import com.twitter.common.zookeeper.SingletonService;

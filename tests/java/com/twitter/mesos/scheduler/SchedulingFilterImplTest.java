@@ -1,11 +1,18 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Map;
+import java.util.Set;
+
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
+
+import org.junit.Before;
+import org.junit.Test;
+
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.testing.EasyMockTest;
@@ -14,11 +21,6 @@ import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.SchedulingFilter.SchedulingFilterImpl;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
-import org.junit.Before;
-import org.junit.Test;
-
-import java.util.Map;
-import java.util.Set;
 
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.expect;

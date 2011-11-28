@@ -6,7 +6,6 @@ import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.mesos.Protos.ExecutorID;
-import org.apache.mesos.Protos.SlaveID;
 import org.junit.Before;
 import org.junit.Test;
 

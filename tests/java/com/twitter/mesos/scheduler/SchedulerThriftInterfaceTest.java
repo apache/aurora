@@ -1,6 +1,11 @@
 package com.twitter.mesos.scheduler;
 
 import com.google.common.collect.ImmutableSet;
+
+import org.easymock.Capture;
+import org.junit.Before;
+import org.junit.Test;
+
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.CreateJobResponse;
@@ -17,9 +22,6 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.auth.SessionValidator;
 import com.twitter.mesos.scheduler.auth.SessionValidator.AuthFailedException;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
-import org.easymock.Capture;
-import org.junit.Before;
-import org.junit.Test;
 
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.eq;

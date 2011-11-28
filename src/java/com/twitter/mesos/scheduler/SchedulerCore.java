@@ -13,7 +13,6 @@ import org.apache.commons.lang.builder.ToStringBuilder;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.Resource;
-import org.apache.mesos.Protos.SlaveID;
 
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.ExecutorKey;

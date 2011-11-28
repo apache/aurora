@@ -1,26 +1,23 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Set;
+
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
 
-import com.twitter.common.base.Closure;
+import org.easymock.EasyMock;
+import org.junit.Test;
+
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
-import com.twitter.conversions.storage;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
-import com.twitter.mesos.scheduler.storage.Storage.Work.NoResult;
-
-import org.easymock.EasyMock;
-import org.junit.Test;
-
-import java.util.Set;
 
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;

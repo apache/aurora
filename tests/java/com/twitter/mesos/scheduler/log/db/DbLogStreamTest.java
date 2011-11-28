@@ -1,25 +1,27 @@
 package com.twitter.mesos.scheduler.log.db;
 
+import java.io.IOException;
+import java.sql.SQLException;
+import java.util.Iterator;
+import java.util.List;
+
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Ordering;
 import com.google.common.testing.TearDown;
 import com.google.common.testing.junit4.TearDownTestCase;
+
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
+
 import com.twitter.mesos.scheduler.db.DbUtil.DbAccess;
 import com.twitter.mesos.scheduler.db.testing.DbTestUtil;
 import com.twitter.mesos.scheduler.log.Log;
 import com.twitter.mesos.scheduler.log.Log.Entry;
 import com.twitter.mesos.scheduler.log.Log.Position;
 import com.twitter.mesos.scheduler.log.Log.Stream;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-
-import java.io.IOException;
-import java.sql.SQLException;
-import java.util.Iterator;
-import java.util.List;
 
 import static com.google.common.testing.junit4.JUnitAsserts.assertContentsInOrder;
 import static junit.framework.Assert.assertEquals;

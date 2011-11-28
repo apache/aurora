@@ -1,7 +1,5 @@
 package com.twitter.mesos.scheduler.httphandlers;
 
-import it.sauronsoftware.cron4j.Predictor;
-
 import java.io.IOException;
 import java.util.Map;
 
@@ -18,6 +16,8 @@ import com.google.common.collect.Maps;
 import com.google.inject.Inject;
 
 import org.antlr.stringtemplate.StringTemplate;
+
+import it.sauronsoftware.cron4j.Predictor;
 
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;

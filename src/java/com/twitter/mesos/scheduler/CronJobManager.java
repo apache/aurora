@@ -1,9 +1,5 @@
 package com.twitter.mesos.scheduler;
 
-import it.sauronsoftware.cron4j.InvalidPatternException;
-import it.sauronsoftware.cron4j.Scheduler;
-import it.sauronsoftware.cron4j.SchedulingPattern;
-
 import java.util.Collections;
 import java.util.Date;
 import java.util.Map;
@@ -20,6 +16,10 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 
 import org.apache.commons.lang.StringUtils;
+
+import it.sauronsoftware.cron4j.InvalidPatternException;
+import it.sauronsoftware.cron4j.Scheduler;
+import it.sauronsoftware.cron4j.SchedulingPattern;
 
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.args.Arg;

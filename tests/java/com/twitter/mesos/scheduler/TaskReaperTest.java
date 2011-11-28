@@ -1,15 +1,16 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Set;
+
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.twitter.mesos.ExecutorKey;
+
 import org.apache.mesos.Protos.ExecutorID;
-import org.apache.mesos.Protos.SlaveID;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.util.Set;
+import com.twitter.mesos.ExecutorKey;
 
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;

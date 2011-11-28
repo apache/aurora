@@ -1,35 +1,24 @@
 package com.twitter.mesos.scheduler.httphandlers;
 
 import java.io.IOException;
-import java.util.Map;
-import java.util.Map.Entry;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import com.google.inject.Inject;
 
 import org.antlr.stringtemplate.StringTemplate;
-import org.apache.mesos.Protos.SlaveID;
 
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
-import com.twitter.mesos.ExecutorKey;
-import com.twitter.mesos.gen.comm.StateUpdateRequest;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.LeaderRedirect;
-import com.twitter.mesos.scheduler.MesosSchedulerImpl;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHosts;
 import com.twitter.mesos.scheduler.sync.ExecutorWatchdog;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**

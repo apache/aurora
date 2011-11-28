@@ -2,6 +2,10 @@ package com.twitter.mesos.scheduler;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.testing.TearDown;
+
+import org.apache.mesos.Protos.SlaveID;
+import org.junit.Before;
+
 import com.twitter.common.base.Closure;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
@@ -9,9 +13,6 @@ import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.db.testing.DbStorageTestUtil;
 import com.twitter.mesos.scheduler.storage.Storage;
-
-import org.apache.mesos.Protos.SlaveID;
-import org.junit.Before;
 
 /**
  * @author William Farner

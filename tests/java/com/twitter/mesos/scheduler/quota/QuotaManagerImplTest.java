@@ -1,7 +1,13 @@
 package com.twitter.mesos.scheduler.quota;
 
+import java.util.Set;
+
 import com.google.common.collect.ImmutableSet;
 import com.google.common.testing.junit4.TearDownTestCase;
+
+import org.junit.Before;
+import org.junit.Test;
+
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.Quota;
@@ -13,11 +19,6 @@ import com.twitter.mesos.scheduler.quota.QuotaManager.QuotaManagerImpl;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
-import com.twitter.mesos.scheduler.storage.Storage.Work.NoResult;
-import org.junit.Before;
-import org.junit.Test;
-
-import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;

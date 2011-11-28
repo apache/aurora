@@ -1,13 +1,15 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Set;
+
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+
+import org.junit.Test;
+
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
-import org.junit.Test;
-
-import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 

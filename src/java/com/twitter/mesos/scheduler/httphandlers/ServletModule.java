@@ -18,9 +18,9 @@ import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.CronJobManager;
 import com.twitter.mesos.scheduler.LeaderRedirect;
 import com.twitter.mesos.scheduler.SchedulerCore;
+import com.twitter.mesos.scheduler.httphandlers.ImageAssets.HttpAssetModule;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 import com.twitter.thrift.ServiceInstance;
-import com.twitter.mesos.scheduler.httphandlers.ImageAssets.HttpAssetModule;
 
 /**
  * Binding module for scheduler HTTP servlets.
