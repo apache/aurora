@@ -16,10 +16,14 @@ import com.google.common.collect.Sets;
 
 import org.apache.commons.lang.StringUtils;
 
+import com.twitter.common.args.Arg;
+import com.twitter.common.args.CmdLine;
+import com.twitter.common.args.constraints.Positive;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.ScheduleException;
 import com.twitter.mesos.scheduler.ThermosJank;
 import com.twitter.mesos.scheduler.configuration.ValueParser.ParseException;
 
@@ -35,6 +39,11 @@ public class ConfigurationManager {
 
   private static final Pattern GOOD_IDENTIFIER_PATTERN = Pattern.compile("[\\w\\-\\.]+");
   private static final int MAX_IDENTIFIED_LENGTH = 255;
+
+  @VisibleForTesting
+  @Positive
+  @CmdLine(name = "max_tasks_per_job", help = "Maximum number of allowed tasks in a single job.")
+  public static final Arg<Integer> MAX_TASKS_PER_JOB = Arg.create(500);
 
   private static boolean isGoodIdentifier(String identifier) {
     return GOOD_IDENTIFIER_PATTERN.matcher(identifier).matches()
@@ -66,6 +75,10 @@ public class ConfigurationManager {
   public static JobConfiguration validateAndPopulate(JobConfiguration job)
       throws TaskDescriptionException {
     Preconditions.checkNotNull(job);
+
+    if (job.getTaskConfigsSize() > MAX_TASKS_PER_JOB.get()) {
+      throw new TaskDescriptionException("Job exceeds task limit of " + MAX_TASKS_PER_JOB.get());
+    }
 
     JobConfiguration copy = job.deepCopy();
 

@@ -13,6 +13,7 @@ import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.base.Splitter;
@@ -111,7 +112,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private static final Identity OWNER_A = new Identity("Test_Role_A", "Test_User_A");
   private static final String JOB_A = "Test_Job_A";
   private static final String JOB_A_KEY = Tasks.jobKey(OWNER_A, JOB_A);
-  private static final TwitterTaskInfo DEFAULT_TASK = defaultTask();
   private static final Quota DEFAULT_TASK_QUOTA = new Quota(1.0, 1024, 1024);
   private static final int DEFAULT_TASKS_IN_QUOTA = 10;
 
@@ -183,10 +183,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.start(killTask);
 
     // Apply a default quota for users so we don't have to give quota for every test.
-    quotaManager.setQuota(OWNER_A.getRole(),
-        scale(DEFAULT_TASK_QUOTA, DEFAULT_TASKS_IN_QUOTA));
-    quotaManager.setQuota(OWNER_B.getRole(),
-        scale(DEFAULT_TASK_QUOTA, DEFAULT_TASKS_IN_QUOTA));
+    quotaManager.setQuota(OWNER_A.getRole(), scale(DEFAULT_TASK_QUOTA, DEFAULT_TASKS_IN_QUOTA));
+    quotaManager.setQuota(OWNER_B.getRole(), scale(DEFAULT_TASK_QUOTA, DEFAULT_TASKS_IN_QUOTA));
   }
 
   @Test(expected = TaskDescriptionException.class)
@@ -194,7 +192,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
+    TwitterTaskInfo task = productionTask().deepCopy();
     task.getConfiguration().remove("num_cpus");
     task.getConfiguration().remove("ram_mb");
     task.getConfiguration().remove("disk_mb");
@@ -210,7 +208,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     quotaManager.setQuota(OWNER_A.getRole(), Quotas.NO_QUOTA);
 
-    JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1);
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, 1);
     scheduler.createJob(job);
   }
 
@@ -219,10 +217,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    TwitterTaskInfo task = DEFAULT_TASK.deepCopy();
-    task.putToConfiguration("production", "false");
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, task, 1000));
-    assertThat(getTasks(Query.byRole(OWNER_A.getRole())).size(), is(1000));
+    TwitterTaskInfo task = nonProductionTask();
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, task, 100));
+    assertThat(getTasks(Query.byRole(OWNER_A.getRole())).size(), is(100));
   }
 
   @Test(expected = ScheduleException.class)
@@ -230,8 +227,32 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, DEFAULT_TASKS_IN_QUOTA + 1);
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASKS_IN_QUOTA + 1);
     scheduler.createJob(job);
+  }
+
+  @Test(expected = TaskDescriptionException.class)
+  public void testCreateJobExceedsTaskLimit() throws Exception {
+    control.replay();
+    buildScheduler();
+
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, nonProductionTask(),
+        ConfigurationManager.MAX_TASKS_PER_JOB.get() + 1);
+    scheduler.createJob(job);
+  }
+
+  @Test(expected = TaskDescriptionException.class)
+  public void testUpdateJobExceedsTaskLimit() throws Exception {
+    control.replay();
+    buildScheduler();
+
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, nonProductionTask(),
+        ConfigurationManager.MAX_TASKS_PER_JOB.get());
+    scheduler.createJob(job);
+
+    job = makeJob(OWNER_A, JOB_A, nonProductionTask(),
+        ConfigurationManager.MAX_TASKS_PER_JOB.get() + 1);
+    scheduler.startUpdate(job);
   }
 
   @Test
@@ -241,7 +262,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, numTasks);
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, numTasks);
     scheduler.createJob(job);
     assertTaskCount(numTasks);
 
@@ -254,7 +275,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       // Need to clear shard ID since that was assigned in our makeJob function.
       assertThat(state.getAssignedTask().getTask().setShardId(0),
           is(ConfigurationManager.populateFields(job,
-              new TwitterTaskInfo(DEFAULT_TASK).setShardId(0))));
+              productionTask().setShardId(0))));
     }
   }
 
@@ -365,7 +386,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   private void expectRejected(Identity owner, String jobName) throws ScheduleException {
     try {
-      scheduler.createJob(makeJob(owner, jobName, DEFAULT_TASK, 1));
+      scheduler.createJob(makeJob(owner, jobName, 1));
       fail("Job owner/name should have been rejected.");
     } catch (TaskDescriptionException e) {
       // Expected.
@@ -387,10 +408,10 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, 1));
     assertTaskCount(1);
 
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, 1));
   }
 
   @Test(expected = ScheduleException.class)
@@ -400,11 +421,11 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     // Cron jobs are scheduled on a delay, so this job's tasks will not be scheduled immediately,
     // but duplicate jobs should still be rejected.
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1)
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, 1)
         .setCronSchedule("1 1 1 1 1"));
     assertTaskCount(0);
 
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, 1));
   }
 
   @Test
@@ -414,7 +435,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1)
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, 1)
         .setCronSchedule("1 1 1 1 1"));
     assertTaskCount(0);
 
@@ -438,7 +459,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, 1));
     String taskId = Tasks.id(getOnlyTask(queryJob(OWNER_A,JOB_A)));
 
     try {
@@ -459,7 +480,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1)
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, 1)
         .setCronSchedule("1 1 1 1 1"));
     assertTaskCount(0);
 
@@ -473,7 +494,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1)
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, 1)
         .setCronSchedule("1 1 1 1 1")
         .setCronCollisionPolicy(CronCollisionPolicy.KILL_EXISTING);
 
@@ -509,10 +530,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    TwitterTaskInfo nonProduction = DEFAULT_TASK.deepCopy();
-    nonProduction.putToConfiguration("production", "false");
-    TwitterTaskInfo production = DEFAULT_TASK.deepCopy();
-    production.putToConfiguration("production", "true");
+    TwitterTaskInfo nonProduction = nonProductionTask();
+    TwitterTaskInfo production = productionTask();
     scheduler.createJob(makeJob(OWNER_A, JOB_A,
         ImmutableList.of(nonProduction, production)));
   }
@@ -523,7 +542,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     buildScheduler();
 
     scheduler.createJob(new JobConfiguration().setOwner(OWNER_A).setName(JOB_A).setTaskConfigs(
-        ImmutableSet.of(new TwitterTaskInfo(DEFAULT_TASK))));
+        ImmutableSet.of(productionTask())));
   }
 
   @Test(expected = TaskDescriptionException.class)
@@ -533,8 +552,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     scheduler.createJob(new JobConfiguration().setOwner(OWNER_A).setName(JOB_A).setTaskConfigs(
         ImmutableSet.of(
-            new TwitterTaskInfo(DEFAULT_TASK).setShardId(0).setStartCommand("foo"),
-            new TwitterTaskInfo(DEFAULT_TASK).setShardId(0).setStartCommand("bar"))));
+            productionTask().setShardId(0).setStartCommand("foo"),
+            productionTask().setShardId(0).setStartCommand("bar"))));
   }
 
   @Test(expected = TaskDescriptionException.class)
@@ -544,8 +563,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     scheduler.createJob(new JobConfiguration().setOwner(OWNER_A).setName(JOB_A).setTaskConfigs(
         ImmutableSet.of(
-            new TwitterTaskInfo(DEFAULT_TASK).setShardId(0),
-            new TwitterTaskInfo(DEFAULT_TASK).setShardId(2))));
+            productionTask().setShardId(0),
+            productionTask().setShardId(2))));
   }
 
   @Test
@@ -557,7 +576,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 10));
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, 10));
 
     assertTaskCount(10);
 
@@ -579,7 +598,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     buildScheduler();
 
     scheduler.registered(FRAMEWORK_ID);
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, 1));
     changeStatus(queryByOwner(OWNER_A), ASSIGNED);
     changeStatus(queryByOwner(OWNER_A), STARTING);
     changeStatus(queryByOwner(OWNER_A), RUNNING);
@@ -620,7 +639,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         EnumSet.of(ASSIGNED, STARTING),
         EnumSet.of(ASSIGNED, STARTING, RUNNING))) {
 
-      scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
+      scheduler.createJob(makeJob(OWNER_A, JOB_A, 1));
       String taskId = Tasks.id(getOnlyTask(Query.activeQuery(OWNER_A, JOB_A)));
 
       for (ScheduleStatus status : statuses) {
@@ -646,7 +665,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, 1));
     changeStatus(queryByOwner(OWNER_A), ASSIGNED);
     changeStatus(queryByOwner(OWNER_A), STARTING);
     changeStatus(queryByOwner(OWNER_A), RUNNING);
@@ -662,7 +681,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, 1));
     changeStatus(queryByOwner(OWNER_A), ASSIGNED);
     changeStatus(queryByOwner(OWNER_A), STARTING);
     changeStatus(queryByOwner(OWNER_A), RUNNING);
@@ -679,9 +698,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     buildScheduler();
 
     // Schedule 5 daemon and 5 non-daemon tasks.
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 5));
-    TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
-    task.putToConfiguration("daemon", "true");
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, 5));
+    TwitterTaskInfo task = productionTask("daemon", "true");
     scheduler.createJob(makeJob(OWNER_A, JOB_A + "daemon", task, 5));
 
     assertThat(getTasksByStatus(PENDING).size(), is(10));
@@ -713,9 +731,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     int totalFailures = 10;
 
     // Schedule a daemon task.
-    TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
-    task.putToConfiguration("max_task_failures", String.valueOf(maxFailures));
-    task.putToConfiguration("daemon", "true");
+    TwitterTaskInfo task = productionTask(
+        "max_task_failures", String.valueOf(maxFailures),
+        "daemon", "true");
     scheduler.createJob(makeJob(OWNER_A, JOB_A, task, 1));
     assertTaskCount(1);
 
@@ -744,9 +762,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     buildScheduler();
 
     // Create 5 non-daemon and 5 daemon tasks.
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 5));
-    TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
-    task.putToConfiguration("daemon", "true");
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, 5));
+    TwitterTaskInfo task = productionTask("daemon", "true");
     scheduler.createJob(makeJob(OWNER_A, JOB_A + "daemon", task, 5));
 
     assertThat(getTasksByStatus(PENDING).size(), is(10));
@@ -771,7 +788,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     buildScheduler();
 
     scheduler.registered(FRAMEWORK_ID);
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, 1));
     changeStatus(queryByOwner(OWNER_A), ASSIGNED);
     changeStatus(queryByOwner(OWNER_A), STARTING);
     changeStatus(queryByOwner(OWNER_A), RUNNING);
@@ -792,8 +809,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
-    task.putToConfiguration("max_task_failures", String.valueOf(maxFailures));
+    TwitterTaskInfo task = productionTask("max_task_failures", String.valueOf(maxFailures));
     JobConfiguration job = makeJob(OWNER_A, JOB_A, task, 1);
     scheduler.createJob(job);
     assertTaskCount(1);
@@ -828,7 +844,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 10);
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, 10);
     job.setCronSchedule("1 1 1 1 1");
     scheduler.createJob(job);
     assertTaskCount(0);
@@ -856,7 +872,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 10);
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, 10);
     job.setCronSchedule("1 1 1 1 1")
         .setCronCollisionPolicy(CronCollisionPolicy.KILL_EXISTING);
     scheduler.createJob(job);
@@ -900,7 +916,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1);
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, 1);
     scheduler.createJob(job);
     assertTaskCount(1);
 
@@ -920,7 +936,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, 1));
     String taskId = Tasks.id(getOnlyTask(queryByOwner(OWNER_A)));
     changeStatus(taskId, ASSIGNED);
     changeStatus(taskId, STARTING);
@@ -937,7 +953,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1);
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, 1);
     job.setCronSchedule("1 1 1 1 1");
     scheduler.createJob(job);
 
@@ -951,8 +967,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     buildScheduler();
 
     int maxFailures = 5;
-    TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
-    task.putToConfiguration("max_task_failures", String.valueOf(maxFailures));
+    TwitterTaskInfo task = productionTask("max_task_failures", String.valueOf(maxFailures));
     JobConfiguration job = makeJob(OWNER_A, JOB_A, task, 1);
     scheduler.createJob(job);
     assertTaskCount(1);
@@ -978,7 +993,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 10));
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, 10));
     assertTaskCount(10);
 
     scheduler.killTasks(queryJob(OWNER_A, JOB_A), OWNER_A.getUser());
@@ -990,10 +1005,10 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 5));
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, 5));
     assertTaskCount(5);
 
-    scheduler.createJob(makeJob(OWNER_A, JOB_A + "2", DEFAULT_TASK, 5));
+    scheduler.createJob(makeJob(OWNER_A, JOB_A + "2", 5));
     assertTaskCount(10);
 
     scheduler.killTasks(queryJob(OWNER_A, JOB_A + "2"), OWNER_A.getUser());
@@ -1064,7 +1079,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 2));
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, 2));
 
     String taskId1 = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)));
     String taskId2 = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 1)));
@@ -1111,11 +1126,11 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     Offer offer2 = createOffer(SLAVE_ID, SLAVE_HOST_2, 4, 4096);
 
     // Offer resources for the scheduler to accept.
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, 1));
     String taskIdA = Tasks.id(Iterables.get(getTasksOwnedBy(OWNER_A), 0));
     sendOffer(offer1, taskIdA, SLAVE_ID, SLAVE_HOST_1);
 
-    scheduler.createJob(makeJob(OWNER_B, JOB_B, DEFAULT_TASK, 1));
+    scheduler.createJob(makeJob(OWNER_B, JOB_B, 1));
     String taskIdB = Tasks.id(Iterables.get(getTasksOwnedBy(OWNER_B), 0));
     sendOffer(offer2, taskIdB, SLAVE_ID, SLAVE_HOST_2);
 
@@ -1153,8 +1168,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     Offer offer2 = createOffer(SLAVE_ID, SLAVE_HOST_2, 4, 4096);
 
     // Offer resources for the scheduler to accept.
-    TwitterTaskInfo daemonTask = new TwitterTaskInfo(DEFAULT_TASK);
-    daemonTask.putToConfiguration("daemon", "true");
+    TwitterTaskInfo daemonTask = productionTask("daemon", "true");
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, daemonTask, 2));
     String taskIdA = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)));
@@ -1162,7 +1176,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     sendOffer(offer1, taskIdA, SLAVE_ID, SLAVE_HOST_1);
     sendOffer(offer1, taskIdB, SLAVE_ID, SLAVE_HOST_1);
 
-    scheduler.createJob(makeJob(OWNER_B, JOB_B, DEFAULT_TASK, 2));
+    scheduler.createJob(makeJob(OWNER_B, JOB_B, 2));
     String taskIdC = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_B, JOB_B), 0)));
     String taskIdD = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_B, JOB_B), 1)));
     sendOffer(offer2, taskIdC, SLAVE_ID, SLAVE_HOST_2);
@@ -1226,14 +1240,13 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     Offer offer2 = createOffer(SLAVE_ID, SLAVE_HOST_2, 4, 4096);
 
     // Offer resources for the scheduler to accept.
-    TwitterTaskInfo daemonTask = new TwitterTaskInfo(DEFAULT_TASK);
-    daemonTask.putToConfiguration("daemon", "true");
+    TwitterTaskInfo daemonTask = productionTask("daemon", "true");
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, daemonTask, 1));
     String taskIdA = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)));
     sendOffer(offer1, taskIdA, SLAVE_ID, SLAVE_HOST_1);
 
-    scheduler.createJob(makeJob(OWNER_B, JOB_B, DEFAULT_TASK, 1));
+    scheduler.createJob(makeJob(OWNER_B, JOB_B, 1));
     String taskIdB = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_B, JOB_B), 0)));
     sendOffer(offer2, taskIdB, SLAVE_ID, SLAVE_HOST_2);
 
@@ -1274,14 +1287,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    TwitterTaskInfo task1 = new TwitterTaskInfo(DEFAULT_TASK);
-    task1.putToConfiguration("priority", "10");
-    task1.putToConfiguration("production", "false");
-    TwitterTaskInfo task2 = new TwitterTaskInfo(DEFAULT_TASK);
-    task2.putToConfiguration("priority", "0");
-    TwitterTaskInfo task3 = new TwitterTaskInfo(DEFAULT_TASK);
-    task3.putToConfiguration("priority", "11");
-    task3.putToConfiguration("production", "false");
+    TwitterTaskInfo task1 = nonProductionTask("priority", "10");
+    TwitterTaskInfo task2 = productionTask("priority", "0");
+    TwitterTaskInfo task3 = nonProductionTask("priority", "11");
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, task1, 2));
     scheduler.createJob(makeJob(OWNER_B, JOB_A, task2, 2));
@@ -1308,7 +1316,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1);
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, 1);
     scheduler.createJob(job);
     Optional<String> updateToken = Optional.of(scheduler.startUpdate(job));
     scheduler.finishUpdate(OWNER_A.getRole(), job.getName(), updateToken, SUCCESS);
@@ -1342,7 +1350,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1);
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, 1);
     scheduler.createJob(job);
     Optional<String> token = Optional.of(scheduler.startUpdate(job));
 
@@ -1361,7 +1369,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1);
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, 1);
     scheduler.createJob(job);
     String token = scheduler.startUpdate(job);
 
@@ -1404,14 +1412,14 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       control.replay();
       buildScheduler();
 
-      JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, numTasks);
+      JobConfiguration job = makeJob(OWNER_A, JOB_A, productionTask().deepCopy(), numTasks);
       for (TwitterTaskInfo config : job.getTaskConfigs()) {
         config.putToConfiguration("start_command", oldCommandFactory.apply(config.getShardId()));
       }
       scheduler.createJob(job);
 
       JobConfiguration updatedJob =
-          makeJob(OWNER_A, JOB_A, DEFAULT_TASK, numTasks + additionalTasks);
+          makeJob(OWNER_A, JOB_A, productionTask().deepCopy(), numTasks + additionalTasks);
       for (TwitterTaskInfo config : updatedJob.getTaskConfigs()) {
         config.putToConfiguration("start_command", newCommandFactory.apply(config.getShardId()));
       }
@@ -1700,14 +1708,14 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    JobConfiguration job = makeJob(OWNER_A, JOB_A, DEFAULT_TASK, numTasks);
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, productionTask().deepCopy(), numTasks);
     for (TwitterTaskInfo config : job.getTaskConfigs()) {
       config.putToConfiguration("start_command", oldCommandFactory.apply(config.getShardId()));
     }
     scheduler.createJob(job);
 
     JobConfiguration updatedJob =
-        makeJob(OWNER_A, JOB_A, DEFAULT_TASK, numTasks + additionalTasks);
+        makeJob(OWNER_A, JOB_A, productionTask().deepCopy(), numTasks + additionalTasks);
     for (TwitterTaskInfo config : updatedJob.getTaskConfigs()) {
       config.putToConfiguration("start_command", newCommandFactory.apply(config.getShardId()));
     }
@@ -1761,8 +1769,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    TwitterTaskInfo config = new TwitterTaskInfo(DEFAULT_TASK);
-    config.putToConfiguration("start_command", "%task_id%");
+    TwitterTaskInfo config = productionTask("start_command", "%task_id%");
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, config, 1));
 
@@ -1781,8 +1788,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    TwitterTaskInfo config = new TwitterTaskInfo(DEFAULT_TASK);
-    config.putToConfiguration("start_command", "%shard_id%");
+    TwitterTaskInfo config = productionTask("start_command", "%shard_id%");
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, config, 1));
 
@@ -1801,8 +1807,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    TwitterTaskInfo config = new TwitterTaskInfo(DEFAULT_TASK);
-    config.putToConfiguration("start_command", "%port:one% %port:two% %port:three%");
+    TwitterTaskInfo config = productionTask("start_command", "%port:one% %port:two% %port:three%");
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, config, 1));
 
@@ -1828,8 +1833,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    TwitterTaskInfo config = new TwitterTaskInfo(DEFAULT_TASK);
-    config.putToConfiguration("start_command", "%port:one%");
+    TwitterTaskInfo config = productionTask("start_command", "%port:one%");
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, config, 1));
 
@@ -1864,8 +1868,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    TwitterTaskInfo task = new TwitterTaskInfo(DEFAULT_TASK);
-    task.putToConfiguration("start_command", "%port%");
+    TwitterTaskInfo task = productionTask("start_command", "%port%");
     scheduler.createJob(makeJob(OWNER_A, "foo", task, 1));
   }
 
@@ -1874,7 +1877,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, DEFAULT_TASK, 1));
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, 1));
 
     String taskId = Tasks.id(getOnlyTask(queryByOwner(OWNER_A)));
     changeStatus(taskId, ASSIGNED);
@@ -1927,6 +1930,10 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     return makeJob(owner, jobName, tasks);
   }
 
+  private static JobConfiguration makeJob(Identity owner, String jobName, int numDefaultTasks) {
+    return makeJob(owner, jobName, productionTask(), numDefaultTasks);
+  }
+
   private static JobConfiguration makeJob(Identity owner, String jobName,
       Iterable<TwitterTaskInfo> tasks) {
     JobConfiguration job = new JobConfiguration();
@@ -1969,15 +1976,32 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .build();
   }
 
-  private static TwitterTaskInfo defaultTask() {
-    return new TwitterTaskInfo().setConfiguration(ImmutableMap.<String, String>builder()
+  private static TwitterTaskInfo defaultTask(boolean production, String... additionalParams) {
+    Preconditions.checkArgument((additionalParams.length % 2) == 0,
+        "Additional params count must be even.");
+
+    Map<String, String> params = Maps.newHashMap(ImmutableMap.<String, String>builder()
         .put("start_command", "date")
         .put("num_cpus", "1.0")
         .put("ram_mb", "1024")
         .put("disk_mb", "1024")
         .put("hdfs_path", "/fake/path")
-        .put("production", "true")
+        .put("production", Boolean.toString(production))
         .build());
+
+    for (int i = 0; i < additionalParams.length; i += 2) {
+      params.put(additionalParams[i], additionalParams[i + 1]);
+    }
+
+    return new TwitterTaskInfo().setConfiguration(ImmutableMap.copyOf(params));
+  }
+
+  private static TwitterTaskInfo productionTask(String... additionalParams) {
+    return defaultTask(true, additionalParams);
+  }
+
+  private static TwitterTaskInfo nonProductionTask(String... additionalParams) {
+    return defaultTask(false, additionalParams);
   }
 
   private ScheduledTask getTask(String taskId) {

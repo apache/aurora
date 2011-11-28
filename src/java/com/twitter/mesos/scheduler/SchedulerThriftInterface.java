@@ -66,16 +66,16 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
   @VisibleForTesting
   @NotEmpty
   @CmdLine(name = "admin_role",
-      help ="Auth role that is premitted to run administrative functions.")
+      help = "Auth role that is premitted to run administrative functions.")
   static final Arg<String> ADMIN_ROLE = Arg.create("mesos");
 
-  @CmdLine(name = "kill_task_initial_backoff", help =
-      "Initial backoff delay while waiting for the tasks to transition to KILLED.")
+  @CmdLine(name = "kill_task_initial_backoff",
+      help = "Initial backoff delay while waiting for the tasks to transition to KILLED.")
   private static final Arg<Amount<Long, Time>> KILL_TASK_INITIAL_BACKOFF =
       Arg.create(Amount.of(1L, Time.SECONDS));
 
-  @CmdLine(name = "kill_task_max_backoff", help =
-      "Max backoff delay while waiting for the tasks to transition to KILLED.")
+  @CmdLine(name = "kill_task_max_backoff",
+      help = "Max backoff delay while waiting for the tasks to transition to KILLED.")
   private static final Arg<Amount<Long, Time>> KILL_TASK_MAX_BACKOFF =
       Arg.create(Amount.of(30L, Time.SECONDS));
 
