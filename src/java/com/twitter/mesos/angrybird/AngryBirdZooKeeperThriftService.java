@@ -4,6 +4,8 @@ import java.io.IOException;
 
 import com.twitter.mesos.angrybird.gen.ExpireResponse;
 import com.twitter.mesos.angrybird.gen.ExpireRequest;
+import com.twitter.mesos.angrybird.gen.ExpireCandidateRequest;
+import com.twitter.mesos.angrybird.gen.Candidate;
 import com.twitter.mesos.angrybird.gen.ServerPortResponse;
 import com.twitter.mesos.angrybird.gen.ShutdownResponse;
 import com.twitter.mesos.angrybird.gen.StartupResponse;
@@ -12,6 +14,7 @@ import com.twitter.mesos.angrybird.gen.ZooKeeperThriftServer;
 
 import static com.twitter.mesos.angrybird.gen.ResponseCode.OK;
 import static com.twitter.mesos.angrybird.gen.ResponseCode.ERROR;
+import static com.twitter.mesos.angrybird.gen.Candidate.LEADER;
 
 import com.twitter.util.Future;
 
@@ -39,14 +42,28 @@ public class AngryBirdZooKeeperThriftService implements ZooKeeperThriftServer.Se
   public Future<ExpireResponse> expireSession(ExpireRequest expireRequest) {
     ExpireResponse response = new ExpireResponse();
 
-    String sessionId = zk_server.expireClientSession(expireRequest.host, expireRequest.port);
+    Long sessionId = zk_server.expireSession(expireRequest.host, expireRequest.port);
 
     if (sessionId != null) {
-      response.setResponseCode(OK)
-          .setSessionid(sessionId);
+      response.setResponseCode(OK).setSessionid(sessionId.longValue());
     } else {
-      response.setResponseCode(ERROR)
-          .setSessionid("");
+      response.setResponseCode(ERROR).setSessionid(0);
+    }
+
+    return Future.value(response);
+  }
+
+  @Override
+  public Future<ExpireResponse> expireCandidateSession(ExpireCandidateRequest request) {
+    ExpireResponse response = new ExpireResponse();
+
+    Long sessionId = zk_server.expireCandidateSession(request.zk_path,
+        request.candidate == LEADER);
+
+    if (sessionId != null) {
+      response.setResponseCode(OK).setSessionid(sessionId.longValue());
+    } else {
+      response.setResponseCode(ERROR).setSessionid(0);
     }
 
     return Future.value(response);
