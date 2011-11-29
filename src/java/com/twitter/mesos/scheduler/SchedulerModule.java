@@ -48,6 +48,7 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHosts;
 import com.twitter.mesos.scheduler.PulseMonitor.PulseMonitorImpl;
 import com.twitter.mesos.scheduler.SchedulingFilter.SchedulingFilterImpl;
+import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.auth.SessionValidator;
 import com.twitter.mesos.scheduler.auth.SessionValidator.SessionValidatorImpl;
 import com.twitter.mesos.scheduler.httphandlers.ServletModule;
@@ -153,6 +154,7 @@ public class SchedulerModule extends AbstractModule {
     bind(MesosSchedulerImpl.class).in(Singleton.class);
 
     // Bindings for StateManager
+    bind(MutableState.class).in(Singleton.class);
     bind(Clock.class).toInstance(Clock.SYSTEM_CLOCK);
     bind(StateManager.class).in(Singleton.class);
 

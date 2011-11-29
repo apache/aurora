@@ -52,7 +52,6 @@ public class TaskStateMachine {
 
   private final String taskId;
   private final String jobKey;
-  private final AtomicReference<String> slaveHost = new AtomicReference<String>();
   private final WorkSink workSink;
   private final StateMachine<State> stateMachine;
   private ScheduleStatus previousState = null;
@@ -142,8 +141,7 @@ public class TaskStateMachine {
    * @param taskId ID of the task managed by this state machine.
    * @param jobKey Key of the job that this task is associated with, or {@code null} if the
    *     associated job is unknown.
-   * @param taskReader Interface to provide read-only access to the task that this state machine
-   *     manages.
+   * @param task Read-only task that this state machine manages.
    * @param isJobUpdating Supplier to test whether the task's job is currently in a rolling update.
    * @param workSink Work sink to receive transition response actions
    * @param taskTimeoutFilter Filter to determine if a task has timed out
@@ -156,7 +154,7 @@ public class TaskStateMachine {
   public TaskStateMachine(
       final String taskId,
       @Nullable String jobKey,
-      final Supplier<ScheduledTask> taskReader,
+      final ScheduledTask task,
       final Supplier<Boolean> isJobUpdating,
       final WorkSink workSink,
       final Predicate<Iterable<TaskEvent>> taskTimeoutFilter,
@@ -165,7 +163,6 @@ public class TaskStateMachine {
 
     this.taskId = MorePreconditions.checkNotBlank(taskId);
     this.jobKey = jobKey;
-    checkNotNull(taskReader);
     this.workSink = checkNotNull(workSink);
     this.clock = checkNotNull(clock);
     checkNotNull(initialState);
@@ -192,7 +189,7 @@ public class TaskStateMachine {
     // To be called on a task transitioning into the FINISHED state.
     final Command rescheduleIfDaemon = new Command() {
       @Override public void execute() {
-        if (taskReader.get().getAssignedTask().getTask().isIsDaemon()) {
+        if (task.getAssignedTask().getTask().isIsDaemon()) {
           addWork(WorkCommand.RESCHEDULE);
         }
       }
@@ -201,7 +198,6 @@ public class TaskStateMachine {
     // To be called on a task transitioning into the FAILED state.
     final Command incrementFailuresMaybeReschedule = new Command() {
       @Override public void execute() {
-        ScheduledTask task = taskReader.get();
         addWork(WorkCommand.INCREMENT_FAILURES);
 
         // Max failures is ignored for daemon task.
@@ -297,7 +293,7 @@ public class TaskStateMachine {
 
                           case UNKNOWN:
                             // Determine if we have been waiting too long on this task.
-                            if (taskTimeoutFilter.apply(taskReader.get().getTaskEvents())) {
+                            if (taskTimeoutFilter.apply(task.getTaskEvents())) {
                               updateState(ScheduleStatus.LOST);
                             }
                         }
@@ -617,27 +613,6 @@ public class TaskStateMachine {
           }
         }
       });
-
-  /**
-   * Sets the slave host that this task is assigned to. The host may only be assigned once,
-   * subsequent attempts will fail.
-   *
-   * @param slaveHost Host to associate with this tatk.
-   */
-  public void setSlaveHost(String slaveHost) {
-    Preconditions.checkState(
-        this.slaveHost.compareAndSet(null, slaveHost),
-        "Slave for task %s was already set to %s", taskId, this.slaveHost.get());
-  }
-
-  /**
-   * Gets the slave host that this task is assigned to.
-   *
-   * @return Host this slave is assigned to, or {@code null} if the slave has not been set.
-   */
-  public String getSlaveHost() {
-    return slaveHost.get();
-  }
 
   /**
    * Fetch the current state from the state machine.

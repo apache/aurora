@@ -54,33 +54,29 @@ import static org.junit.Assert.fail;
  */
 public class TaskStateMachineTest extends EasyMockTest {
 
-  private TaskStateMachine stateMachine;
-
-  private Supplier<ScheduledTask> taskReader;
   private Supplier<Boolean> isJobUpdating;
   private Predicate<Iterable<TaskEvent>> taskTimeoutFilter;
   private WorkSink workSink;
   private FakeClock clock;
+  private TaskStateMachine stateMachine;
 
   @Before
   public void setUp() {
-    taskReader = createMock(new Clazz<Supplier<ScheduledTask>>() {});
     isJobUpdating = createMock(new Clazz<Supplier<Boolean>>() {});
     taskTimeoutFilter = createMock(new Clazz<Predicate<Iterable<TaskEvent>>>() {});
     workSink = createMock(WorkSink.class);
     clock = new FakeClock();
-    stateMachine = makeStateMachine("test");
+    stateMachine = makeStateMachine("test", makeTask(false));
   }
 
-  private TaskStateMachine makeStateMachine(String taskId) {
-    return new TaskStateMachine(taskId, taskId /* Job key */, taskReader, isJobUpdating, workSink,
-        taskTimeoutFilter, clock, INIT);
+  private TaskStateMachine makeStateMachine(String taskId, ScheduledTask task) {
+    return new TaskStateMachine(taskId, taskId /* Job key */, task,
+        isJobUpdating, workSink, taskTimeoutFilter, clock, INIT);
   }
 
   @Test
   public void testSimpleTransition() {
     expectWork(UPDATE_STATE).times(5);
-    expect(taskReader.get()).andReturn(makeTask(false));
     expectWork(DELETE);
 
     control.replay();
@@ -101,8 +97,8 @@ public class TaskStateMachineTest extends EasyMockTest {
 
   @Test
   public void testDaemonRescheduled() {
+    stateMachine = makeStateMachine("test", makeTask(true));
     expectWork(UPDATE_STATE).times(5);
-    expect(taskReader.get()).andReturn(makeTask(true));
     expectWork(RESCHEDULE);
 
     control.replay();
@@ -115,16 +111,15 @@ public class TaskStateMachineTest extends EasyMockTest {
     Set<ScheduleStatus> terminalStates = Tasks.TERMINAL_STATES;
 
     for (ScheduleStatus endState : terminalStates) {
+      stateMachine = makeStateMachine("test", makeTask(false));
       expectWork(UPDATE_STATE).times(5);
 
       switch (endState) {
         case FAILED:
           expectWork(INCREMENT_FAILURES);
-          expect(taskReader.get()).andReturn(makeTask(false));
           break;
 
         case FINISHED:
-          expect(taskReader.get()).andReturn(makeTask(false));
           break;
 
         case KILLED:
@@ -134,6 +129,7 @@ public class TaskStateMachineTest extends EasyMockTest {
 
         case KILLING:
           expectWork(KILL);
+          break;
       }
 
       control.replay();
@@ -146,8 +142,6 @@ public class TaskStateMachineTest extends EasyMockTest {
 
       control.verify();
       control.reset();
-      stateMachine = new TaskStateMachine("test", "test_key", taskReader, isJobUpdating, workSink,
-          taskTimeoutFilter, clock, INIT);
     }
 
     control.replay();  // Needed so the teardown verify doesn't break.
@@ -191,9 +185,6 @@ public class TaskStateMachineTest extends EasyMockTest {
     expect(taskTimeoutFilter.apply(EasyMock.<Iterable<TaskEvent>>anyObject())).andReturn(true);
     expectWork(RESCHEDULE);
 
-    ScheduledTask task = makeTask(false);
-    expect(taskReader.get()).andReturn(task).times(3);
-
     control.replay();
 
     // Move the task into ASSIGNED, and simulate two attempts to move it to UNKNOWN.
@@ -212,6 +203,8 @@ public class TaskStateMachineTest extends EasyMockTest {
   public void testMissingStartingRescheduledImmediately() {
     ScheduledTask task = makeTask(false);
     task.addToTaskEvents(new TaskEvent(clock.nowMillis(), ScheduleStatus.PENDING));
+    stateMachine = makeStateMachine("test", task);
+
     expectWork(UPDATE_STATE).times(4);
     expectWork(RESCHEDULE);
 
@@ -223,11 +216,12 @@ public class TaskStateMachineTest extends EasyMockTest {
 
   @Test
   public void testMissingRunningRescheduledImmediately() {
-    expectWork(UPDATE_STATE).times(5);
-    expectWork(RESCHEDULE);
-
     ScheduledTask task = makeTask(false);
     task.addToTaskEvents(new TaskEvent(clock.nowMillis(), ScheduleStatus.PENDING));
+    stateMachine = makeStateMachine("test", task);
+
+    expectWork(UPDATE_STATE).times(5);
+    expectWork(RESCHEDULE);
 
     control.replay();
 
@@ -248,7 +242,6 @@ public class TaskStateMachineTest extends EasyMockTest {
   @Test
   public void testAllowsSkipStartingAndRunning() {
     expectWork(UPDATE_STATE).times(3);
-    expect(taskReader.get()).andReturn(makeTask(false));
 
     control.replay();
 
@@ -258,7 +251,6 @@ public class TaskStateMachineTest extends EasyMockTest {
   @Test
   public void testAllowsSkipRunning() {
     expectWork(UPDATE_STATE).times(4);
-    expect(taskReader.get()).andReturn(makeTask(false));
 
     control.replay();
 
@@ -270,22 +262,22 @@ public class TaskStateMachineTest extends EasyMockTest {
     ScheduledTask task = makeTask(false);
     task.getAssignedTask().getTask().setMaxTaskFailures(10);
     task.setFailureCount(8);
+    stateMachine = makeStateMachine("test", task);
 
     expectWork(UPDATE_STATE).times(5);
-    expect(taskReader.get()).andReturn(task);
     expectWork(RESCHEDULE);
     expectWork(INCREMENT_FAILURES);
 
-    TaskStateMachine rescheduledMachine = makeStateMachine("test2");
     ScheduledTask rescheduled = task.deepCopy();
+    TaskStateMachine rescheduledMachine = makeStateMachine("test2", rescheduled);
     rescheduled.setFailureCount(9);
     expectWork(UPDATE_STATE, rescheduledMachine).times(5);
-    expect(taskReader.get()).andReturn(rescheduled);
     expectWork(INCREMENT_FAILURES, rescheduledMachine);
 
     control.replay();
 
     transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, FAILED);
+
     transition(rescheduledMachine, PENDING, ASSIGNED, STARTING, RUNNING, FAILED);
   }
 
@@ -294,9 +286,9 @@ public class TaskStateMachineTest extends EasyMockTest {
     ScheduledTask task = makeTask(false);
     task.getAssignedTask().getTask().setMaxTaskFailures(-1);
     task.setFailureCount(1000);
+    stateMachine = makeStateMachine("test", task);
 
     expectWork(UPDATE_STATE).times(5);
-    expect(taskReader.get()).andReturn(task);
     expectWork(RESCHEDULE);
     expectWork(INCREMENT_FAILURES);
 

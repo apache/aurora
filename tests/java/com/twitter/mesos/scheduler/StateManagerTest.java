@@ -1,12 +1,15 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Iterator;
 import java.util.Set;
 
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
 
+import org.apache.mesos.Protos;
 import org.easymock.EasyMock;
 import org.junit.Test;
 
@@ -16,6 +19,7 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.storage.Storage.StorageException;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
 
@@ -33,6 +37,7 @@ import static com.twitter.mesos.gen.ScheduleStatus.UNKNOWN;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * @author William Farner
@@ -144,6 +149,7 @@ public class StateManagerTest extends BaseStateManagerTest {
   @Test
   public void testInitNormallyHidden() throws Exception {
     control.replay();
+    stateManager = createStateManager(storage);
 
     insertTask(makeTask("jim", "myJob", 0));
     assertVarCount("jim", "myJob", PENDING, 1);
@@ -188,7 +194,6 @@ public class StateManagerTest extends BaseStateManagerTest {
     assertVarCount("jim", "myJob", UNKNOWN, 1);
   }
 
-
   @Test
   public void testUpdateRackName() throws Exception {
     final TwitterTaskInfo task = makeTask("jim", "myJob", 0);
@@ -216,6 +221,66 @@ public class StateManagerTest extends BaseStateManagerTest {
     control.replay();
   }
 
+  @Test
+  public void testGetHostAssignedTasks() throws Exception {
+    control.replay();
+
+    assertTrue(stateManager.getHostAssignedTasks().isEmpty());
+
+    // Put two jobs in the map, make sure they get placed in the task hosts once assigned.
+    Set<String> taskIds = insertTasks(
+        makeTask("jim", "myJob", 0),
+        makeTask("jack", "otherJob", 0));
+
+    ImmutableMultimap.Builder<String, String> builder = ImmutableMultimap.builder();
+    for (String taskId : taskIds) {
+      stateManager.assignTask(
+          taskId, "localhost",
+          Protos.SlaveID.newBuilder().setValue(taskId + "-slaveId").build(),
+          ImmutableSet.of(1, 2, 3));
+      builder.put("localhost", taskId);
+    }
+
+    assertEquals(HashMultimap.create(builder.build()), stateManager.getHostAssignedTasks());
+
+    // Restart the state manager, ensure it has the task hosts mapping intact.
+    stateManager = createStateManager(storage);
+    assertEquals(HashMultimap.create(builder.build()), stateManager.getHostAssignedTasks());
+
+    // Remove a task, ensure it's gone from the task hosts.
+    builder = ImmutableMultimap.builder();
+    Iterator<String> it = taskIds.iterator();
+    stateManager.abandonTasks(ImmutableSet.of(it.next()));
+    builder.put("localhost", it.next());
+
+    assertEquals(HashMultimap.create(builder.build()), stateManager.getHostAssignedTasks());
+  }
+
+  @Test
+  public void testTransactionalStateTransitions() throws Exception {
+    control.replay();
+
+    failNthTransaction(1);
+
+    try {
+      insertTask(makeTask("jim", "myJob", 0));
+      fail("Insert should have failed.");
+    } catch (StorageException e) {
+      // Expected.
+    }
+
+    Set<ScheduledTask> tasks = storage.doInTransaction(new Work.Quiet<Set<ScheduledTask>>() {
+      @Override public Set<ScheduledTask> apply(StoreProvider storeProvider) {
+        return storeProvider.getTaskStore().fetchTasks(Query.GET_ALL);
+      }
+    });
+    assertTrue(tasks.isEmpty());
+    assertTrue(stateManager.fetchTasks(Query.GET_ALL).isEmpty());
+
+    assertVarCount("jim", "myJob", INIT, 0);
+    assertVarCount("jim", "myJob", PENDING, 0);
+  }
+
   private String insertTask(TwitterTaskInfo task) {
     return Iterables.getOnlyElement(insertTasks(task));
   }
@@ -225,7 +290,7 @@ public class StateManagerTest extends BaseStateManagerTest {
   }
 
   private void assertVarCount(String owner, String job, ScheduleStatus status, long expected) {
-    assertEquals(expected, stateManager.getTaskCounter(Tasks.jobKey(owner, job), status));
+    assertEquals(expected, mutableState.vars.getCounter(Tasks.jobKey(owner, job), status).get());
   }
 
   private void changeState(String taskId, ScheduleStatus status) {
