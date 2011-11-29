@@ -192,6 +192,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     checkNotNull(update);
 
     executorPulseMonitor.pulse(executor);
+    vars.taskUpdates.incrementAndGet();
 
     final Map<String, TaskStateUpdate> remoteUpdate = update.getState();
     if (update.isIncrementalUpdate()) {
@@ -637,8 +638,12 @@ public class SchedulerCoreImpl implements SchedulerCore {
   private final class Vars {
     final AtomicLong resourceOffers = Stats.exportLong("scheduler_resource_offers");
     final AtomicLong executorBootstraps = Stats.exportLong("executor_bootstraps");
-    final AtomicLong incrementalTaskUpdates = Stats.exportLong("executor_incremental_task_updates");
-    final AtomicLong fullTaskUpdates = Stats.exportLong("executor_full_task_updates");
+    final AtomicLong taskUpdates =
+        Stats.exportLong("executor_task_updates_total");
+    final AtomicLong incrementalTaskUpdates =
+        Stats.exportLong("executor_task_updates_incremental");
+    final AtomicLong fullTaskUpdates =
+        Stats.exportLong("executor_task_updates_full");
   }
   private final Vars vars = new Vars();
 }
