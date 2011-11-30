@@ -94,10 +94,11 @@ public class StateManagerTest extends BaseStateManagerTest {
 
     String taskId = insertTask(makeTask("jim", "myJob", 0));
     assertVarCount("jim", "myJob", PENDING, 1);
-    changeState(taskId, KILLING);
+    assertEquals(1, changeState(taskId, KILLING));
     assertVarCount("jim", "myJob", PENDING, 0);
     assertVarCount("jim", "myJob", KILLING, 0);
     assertVarCount("jim", "myJob", UNKNOWN, 0);
+    assertEquals(0, changeState(taskId, KILLING));
   }
 
   @Test
@@ -293,7 +294,7 @@ public class StateManagerTest extends BaseStateManagerTest {
     assertEquals(expected, mutableState.vars.getCounter(Tasks.jobKey(owner, job), status).get());
   }
 
-  private void changeState(String taskId, ScheduleStatus status) {
-    stateManager.changeState(Query.byId(taskId), status);
+  private int changeState(String taskId, ScheduleStatus status) {
+    return stateManager.changeState(Query.byId(taskId), status);
   }
 }

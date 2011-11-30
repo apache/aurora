@@ -535,9 +535,9 @@ public class TaskStateMachine {
    * Same as {@link #updateState(ScheduleStatus, Closure)}, but uses a noop mutation.
    *
    * @param status Status to apply to the task.
-   * @return A reference to the state machine.
+   * @return {@code true} if the state change was allowed, {@code false} otherwise.
    */
-  public synchronized TaskStateMachine updateState(ScheduleStatus status) {
+  public synchronized boolean updateState(ScheduleStatus status) {
     return updateState(status, Closures.<ScheduledTask>noop());
   }
 
@@ -546,9 +546,9 @@ public class TaskStateMachine {
    *
    * @param status Status to apply to the task.
    * @param auditMessage The (optional) audit message to associate with the transition.
-   * @return A reference to the state machine.
+   * @return {@code true} if the state change was allowed, {@code false} otherwise.
    */
-  public synchronized TaskStateMachine updateState(ScheduleStatus status,
+  public synchronized boolean updateState(ScheduleStatus status,
       @Nullable String auditMessage) {
     return updateState(status, Closures.<ScheduledTask>noop(), auditMessage);
   }
@@ -558,9 +558,9 @@ public class TaskStateMachine {
    *
    * @param status Status to apply to the task.
    * @param mutation Mutate operation to perform while updating the task.
-   * @return A reference to the state machine.
+   * @return {@code true} if the state change was allowed, {@code false} otherwise.
    */
-  public synchronized TaskStateMachine updateState(ScheduleStatus status,
+  public synchronized boolean updateState(ScheduleStatus status,
       Closure<ScheduledTask> mutation) {
     return updateState(status, mutation, null);
   }
@@ -573,9 +573,9 @@ public class TaskStateMachine {
    * @param status Status to apply to the task.
    * @param auditMessage The (optional) audit message to associate with the transition.
    * @param mutation Mutate operation to perform while updating the task.
-   * @return A reference to the state machine.
+   * @return {@code true} if the state change was allowed, {@code false} otherwise.
    */
-  public synchronized TaskStateMachine updateState(final ScheduleStatus status,
+  public synchronized boolean updateState(final ScheduleStatus status,
       Closure<ScheduledTask> mutation,
       @Nullable final String auditMessage) {
     checkNotNull(status);
@@ -596,10 +596,10 @@ public class TaskStateMachine {
                   .setScheduler(LOCAL_HOST_SUPPLIER.get()));
             }
           });
-      stateMachine.transition(State.create(status, operation));
+      return stateMachine.transition(State.create(status, operation));
     }
 
-    return this;
+    return false;
   }
 
   private static final Supplier<String> LOCAL_HOST_SUPPLIER = Suppliers.memoize(

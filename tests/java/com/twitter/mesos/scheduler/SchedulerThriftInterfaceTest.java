@@ -3,9 +3,13 @@ package com.twitter.mesos.scheduler;
 import com.google.common.collect.ImmutableSet;
 
 import org.easymock.Capture;
+import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.twitter.common.args.Arg;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.CreateJobResponse;
@@ -50,7 +54,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     scheduler = createMock(SchedulerCore.class);
     sessionValidator = createMock(SessionValidator.class);
     quotaManager = createMock(QuotaManager.class);
-    thriftInterface = new SchedulerThriftInterface(scheduler, sessionValidator, quotaManager);
+    thriftInterface = new SchedulerThriftInterface(scheduler, sessionValidator, quotaManager,
+        Amount.of(1L, Time.MILLISECONDS), Amount.of(1L, Time.SECONDS));
   }
 
   @Test
@@ -183,6 +188,23 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     KillResponse response = thriftInterface.killTasks(query, SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
     assertEquals(killQueryCapture.getValue().base(), query);
+  }
+
+  @Test
+  public void testKillNonExistentTasks() throws Exception {
+    TaskQuery query = new TaskQuery()
+        .setOwner(ROLE_IDENTITY)
+        .setJobName("foo_job");
+
+    expectAdminAuth(true);
+
+    Capture<Query> killQueryCapture = new Capture<Query>();
+    scheduler.killTasks(capture(killQueryCapture), eq(USER));
+    expectLastCall().andThrow(new ScheduleException("No jobs matching query"));
+    control.replay();
+
+    KillResponse response = thriftInterface.killTasks(query, SESSION);
+    assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
 
   @Test

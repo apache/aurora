@@ -15,6 +15,7 @@ import javax.inject.Named;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
+import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
@@ -615,9 +616,10 @@ class StateManager {
    *
    * @param taskQuery Query to perform, the results of which will be modified.
    * @param newState State to move the resulting tasks into.
+   * @return the number of successful state changes.
    */
-  synchronized void changeState(Query taskQuery, ScheduleStatus newState) {
-    changeState(taskQuery, stateUpdater(newState));
+  synchronized int changeState(Query taskQuery, ScheduleStatus newState) {
+    return changeState(taskQuery, stateUpdater(newState));
   }
 
   /**
@@ -627,10 +629,11 @@ class StateManager {
    * @param taskQuery Query to perform, the results of which will be modified.
    * @param newState State to move the resulting tasks into.
    * @param auditMessage Audit message to apply along with the state change.
+   * @return the number of successful state changes.
    */
-  synchronized void changeState(Query taskQuery, ScheduleStatus newState,
-        @Nullable String auditMessage) {
-    changeState(taskQuery, stateUpdaterWithAuditMessage(newState, auditMessage));
+  synchronized int changeState(Query taskQuery, ScheduleStatus newState,
+      @Nullable String auditMessage) {
+    return changeState(taskQuery, stateUpdaterWithAuditMessage(newState, auditMessage));
   }
 
   /**
@@ -781,44 +784,50 @@ class StateManager {
     });
   }
 
-  private void changeStateInTransaction(
-      Set<String> taskIds, Closure<TaskStateMachine> stateChange) {
+  private int changeStateInTransaction(
+      Set<String> taskIds, Function<TaskStateMachine, Boolean> stateChange) {
+    int count = 0;
     for (TaskStateMachine stateMachine : getStateMachines(taskIds).values()) {
-      stateChange.execute(stateMachine);
+      if (stateChange.apply(stateMachine)) {
+        ++count;
+      }
     }
+    return count;
   }
 
-  private void changeState(final Query taskQuery, final Closure<TaskStateMachine> stateChange) {
-    transactionalStorage.doInTransaction(new Work.NoResult.Quiet() {
-      @Override protected void execute(Storage.StoreProvider storeProvider) {
-        changeStateInTransaction(storeProvider.getTaskStore().fetchTaskIds(taskQuery), stateChange);
+  private int changeState(
+      final Query taskQuery, final Function<TaskStateMachine, Boolean> stateChange) {
+    return transactionalStorage.doInTransaction(new Work.Quiet<Integer>() {
+      @Override public Integer apply(StoreProvider storeProvider) {
+        return changeStateInTransaction(
+            storeProvider.getTaskStore().fetchTaskIds(taskQuery), stateChange);
       }
     });
   }
 
-  private static Closure<TaskStateMachine> stateUpdater(final ScheduleStatus state) {
-    return new Closure<TaskStateMachine>() {
-      @Override public void execute(TaskStateMachine stateMachine) {
-        stateMachine.updateState(state);
+  private static Function<TaskStateMachine, Boolean> stateUpdater(final ScheduleStatus state) {
+    return new Function<TaskStateMachine, Boolean>() {
+      @Override public Boolean apply(TaskStateMachine stateMachine) {
+        return stateMachine.updateState(state);
       }
     };
   }
 
-  private static Closure<TaskStateMachine> stateUpdaterWithAuditMessage(final ScheduleStatus state,
-      @Nullable final String auditMessage) {
-    return new Closure<TaskStateMachine>() {
-      @Override public void execute(TaskStateMachine stateMachine) {
-        stateMachine.updateState(state, auditMessage);
+  private static Function<TaskStateMachine, Boolean> stateUpdaterWithAuditMessage(
+      final ScheduleStatus state, @Nullable final String auditMessage) {
+    return new Function<TaskStateMachine, Boolean>() {
+      @Override public Boolean apply(TaskStateMachine stateMachine) {
+        return stateMachine.updateState(state, auditMessage);
       }
     };
   }
 
   @ThermosJank
   @SuppressWarnings("unchecked")
-  private Closure<TaskStateMachine> assignHost(
+  private Function<TaskStateMachine, Boolean> assignHost(
       final String slaveHost, final SlaveID slaveId,
       final AtomicReference<AssignedTask> taskReference, final Set<Integer> assignedPorts) {
-    Closure<ScheduledTask> mutation = new Closure<ScheduledTask>() {
+    final Closure<ScheduledTask> mutation = new Closure<ScheduledTask>() {
       @Override public void execute(ScheduledTask task) {
         AssignedTask assigned;
         if (task.getAssignedTask().getTask().isSetThermosConfig()) {
@@ -837,24 +846,23 @@ class StateManager {
       }
     };
 
-    return Closures.combine(
-        stateUpdaterWithMutation(ScheduleStatus.ASSIGNED, mutation),
-        new Closure<TaskStateMachine>() {
-          @Override public void execute(final TaskStateMachine stateMachine) {
-            transactionalStorage.addSideEffect(new SideEffect() {
-              @Override public void mutate(MutableState state) {
-                state.taskHosts.put(stateMachine.getTaskId(), slaveHost);
-              }
-            });
+    return new Function<TaskStateMachine, Boolean>() {
+      @Override public Boolean apply(final TaskStateMachine stateMachine) {
+        transactionalStorage.addSideEffect(new SideEffect() {
+          @Override public void mutate(MutableState state) {
+            state.taskHosts.put(stateMachine.getTaskId(), slaveHost);
           }
         });
+        return stateUpdaterWithMutation(ScheduleStatus.ASSIGNED, mutation).apply(stateMachine);
+      }
+    };
   }
 
-  private static Closure<TaskStateMachine> stateUpdaterWithMutation(final ScheduleStatus state,
-      final Closure<ScheduledTask> mutation) {
-    return new Closure<TaskStateMachine>() {
-      @Override public void execute(TaskStateMachine stateMachine) {
-        stateMachine.updateState(state, mutation);
+  private static Function<TaskStateMachine, Boolean> stateUpdaterWithMutation(
+      final ScheduleStatus state, final Closure<ScheduledTask> mutation) {
+    return new Function<TaskStateMachine, Boolean>() {
+      @Override public Boolean apply(TaskStateMachine stateMachine) {
+        return stateMachine.updateState(state, mutation);
       }
     };
   }
@@ -1062,7 +1070,7 @@ class StateManager {
     }
 
     // The task is unknown, not present in storage.
-    return new TaskStateMachine(
+    TaskStateMachine stateMachine = new TaskStateMachine(
         taskId,
         null,
         // The task is unknown, so there is no matching task to fetch.
@@ -1072,8 +1080,9 @@ class StateManager {
         workSink,
         taskTimeoutFilter,
         clock,
-        INIT)
-        .updateState(UNKNOWN);
+        INIT);
+    stateMachine.updateState(UNKNOWN);
+    return stateMachine;
   }
 
   private TaskStateMachine createStateMachine(ScheduledTask task) {

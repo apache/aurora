@@ -452,7 +452,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
   public synchronized void killTasks(final Query query, String user) throws ScheduleException {
     checkStarted();
     checkNotNull(query);
-
     LOG.info("Killing tasks matching " + query);
 
     // If this looks like a query for all tasks in a job, instruct the scheduler modules to
@@ -469,12 +468,14 @@ public class SchedulerCoreImpl implements SchedulerCore {
       }
     }
 
+    boolean updateFinished = false;
     if (!matchingScheduler && query.specifiesJobOnly()) {
       try {
         stateManager.finishUpdate(
             query.base().getOwner().getRole(), query.base().getJobName(),
             Optional.<String>absent(),
             UpdateResult.TERMINATE);
+        updateFinished = true;
       } catch (UpdateException e) {
         LOG.log(Level.WARNING,
             "Failed to kill the job update associated with " + query.getJobKey(),
@@ -482,7 +483,10 @@ public class SchedulerCoreImpl implements SchedulerCore {
       }
     }
 
-    stateManager.changeState(query, KILLING, "Killed by " + user);
+    int tasksAffected = stateManager.changeState(query, KILLING, "Killed by " + user);
+    if (!matchingScheduler && !updateFinished && (tasksAffected == 0)) {
+      throw new ScheduleException("No jobs to kill");
+    }
   }
 
   @Override

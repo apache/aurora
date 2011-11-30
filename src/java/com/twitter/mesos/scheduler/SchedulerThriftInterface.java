@@ -62,6 +62,7 @@ import static com.twitter.mesos.gen.ResponseCode.WARNING;
  * @author William Farner
  */
 public class SchedulerThriftInterface implements MesosAdmin.Iface {
+  private static final Logger LOG = Logger.getLogger(SchedulerThriftInterface.class.getName());
 
   @VisibleForTesting
   @NotEmpty
@@ -79,18 +80,28 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
   private static final Arg<Amount<Long, Time>> KILL_TASK_MAX_BACKOFF =
       Arg.create(Amount.of(30L, Time.SECONDS));
 
-  private static final Logger LOG = Logger.getLogger(SchedulerThriftInterface.class.getName());
-
   private final SchedulerCore schedulerCore;
   private final SessionValidator sessionValidator;
   private final QuotaManager quotaManager;
 
+  private final Amount<Long, Time> killTaskInitialBackoff;
+  private final Amount<Long, Time> killTaskMaxBackoff;
+
   @Inject
   public SchedulerThriftInterface(SchedulerCore schedulerCore, SessionValidator sessionValidator,
       QuotaManager quotaManager) {
+    this(schedulerCore, sessionValidator, quotaManager,
+        KILL_TASK_INITIAL_BACKOFF.get(), KILL_TASK_MAX_BACKOFF.get());
+  }
+
+  @VisibleForTesting
+  SchedulerThriftInterface(SchedulerCore schedulerCore, SessionValidator sessionValidator,
+      QuotaManager quotaManager, Amount<Long, Time> initialBackoff, Amount<Long, Time> maxBackoff) {
     this.schedulerCore = checkNotNull(schedulerCore);
     this.sessionValidator = checkNotNull(sessionValidator);
     this.quotaManager = checkNotNull(quotaManager);
+    this.killTaskInitialBackoff = checkNotNull(initialBackoff);
+    this.killTaskMaxBackoff = checkNotNull(maxBackoff);
   }
 
   private static final Function<ScheduledTask, String> GET_ROLE = Functions.compose(
@@ -206,16 +217,14 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
       }
     }
 
-    final Query wrappedQuery = new Query(query);
     try {
-      schedulerCore.killTasks(wrappedQuery, session.getUser());
+      schedulerCore.killTasks(new Query(query), session.getUser());
     } catch (ScheduleException e) {
       response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
       return response;
     }
 
-    BackoffHelper backoff = new BackoffHelper(KILL_TASK_INITIAL_BACKOFF.get(),
-        KILL_TASK_MAX_BACKOFF.get(), true);
+    BackoffHelper backoff = new BackoffHelper(killTaskInitialBackoff, killTaskMaxBackoff, true);
     final Query activeQuery = new Query(query.setStatuses(Tasks.ACTIVE_STATES));
     try {
       backoff.doUntilSuccess(new Supplier<Boolean>() {
