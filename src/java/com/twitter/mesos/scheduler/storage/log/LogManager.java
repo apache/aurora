@@ -2,6 +2,8 @@ package com.twitter.mesos.scheduler.storage.log;
 
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -9,9 +11,14 @@ import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 
+import com.google.common.base.Functions;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicate;
+import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
 import com.twitter.common.application.ShutdownRegistry;
@@ -19,6 +26,7 @@ import com.twitter.common.base.Closure;
 import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.stats.Stats;
+import com.twitter.mesos.Tasks;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.ScheduledTask;
@@ -281,10 +289,14 @@ final class LogManager {
       private void coalesce(SaveTasks prior, SaveTasks next) {
         if (next.isSetTasks()) {
           if (prior.isSetTasks()) {
-            prior.setTasks(ImmutableSet.<ScheduledTask>builder()
-                .addAll(prior.getTasks())
-                .addAll(next.getTasks())
-                .build());
+            // It is an expected invariant that an operation may reference a task (identified by
+            // task ID) no more than one time.  Therefore, to coalesce two SaveTasks operations,
+            // the most recent task definition overrides the prior operation.
+            Map<String, ScheduledTask> coalesced =
+                Maps.newHashMap(Maps.uniqueIndex(prior.getTasks(), Tasks.SCHEDULED_TO_ID));
+            coalesced.putAll(Maps.uniqueIndex(next.getTasks(), Tasks.SCHEDULED_TO_ID));
+
+            prior.setTasks(ImmutableSet.copyOf(coalesced.values()));
           } else {
             prior.setTasks(next.getTasks());
           }

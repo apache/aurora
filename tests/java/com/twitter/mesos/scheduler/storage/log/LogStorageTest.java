@@ -26,6 +26,7 @@ import com.twitter.common.testing.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
+import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduleStatus;
@@ -351,7 +352,7 @@ public class LogStorageTest extends EasyMockTest {
   public void testSaveTasks() throws Exception {
     new MutationFixture() {
       private Set<ScheduledTask> tasks =
-          ImmutableSet.of(new ScheduledTask().setStatus(ScheduleStatus.INIT));
+          ImmutableSet.of(task("a", ScheduleStatus.INIT));
 
       @Override protected void setupExpectations() throws Exception {
         expectStorageTransactionNoResult();
@@ -372,7 +373,7 @@ public class LogStorageTest extends EasyMockTest {
       private Query query = Query.byId("fred");
       private Closure<ScheduledTask> mutation = Closures.noop();
       private ImmutableSet<ScheduledTask> mutated =
-          ImmutableSet.of(new ScheduledTask().setStatus(ScheduleStatus.STARTING));
+          ImmutableSet.of(task("a", ScheduleStatus.STARTING));
 
       @Override protected void setupExpectations() throws Exception {
         expectStorageTransactionWithResult(mutated);
@@ -382,6 +383,81 @@ public class LogStorageTest extends EasyMockTest {
 
       @Override protected void performMutations() {
         assertEquals(mutated, logStorage.mutateTasks(query, mutation));
+      }
+    }.runTest();
+  }
+
+  @Test
+  public void testSaveAndMutateTasks() throws Exception {
+    new MutationFixture() {
+
+      private Query query = Query.byId("fred");
+      private Closure<ScheduledTask> mutation = Closures.noop();
+      private Set<ScheduledTask> saved = ImmutableSet.of(task("a", ScheduleStatus.INIT));
+      private ImmutableSet<ScheduledTask> mutated =
+          ImmutableSet.of(task("a", ScheduleStatus.PENDING));
+
+      @Override protected void setupExpectations() throws Exception {
+        // Outer transaction.
+        expectStorageTransactionNoResult();
+
+        // Nested transaction and save.
+        expectStorageTransactionNoResult();
+        taskStore.saveTasks(saved);
+
+        // Nested transaction with result.
+        expectStorageTransactionWithResult(mutated);
+        expect(taskStore.mutateTasks(query, mutation)).andReturn(mutated);
+
+        // Resulting stream operation.
+        expectStreamTransaction(Op.saveTasks(new SaveTasks(mutated)));
+      }
+
+      @Override protected void performMutations() {
+        logStorage.doInTransaction(new Work.NoResult.Quiet() {
+          @Override protected void execute(StoreProvider storeProvider) {
+            logStorage.saveTasks(saved);
+            assertEquals(mutated, logStorage.mutateTasks(query, mutation));
+          }
+        });
+      }
+    }.runTest();
+  }
+
+  @Test
+  public void testSaveAndMutateTasks_noCoalesceUniqueIds() throws Exception {
+    new MutationFixture() {
+
+      private Query query = Query.byId("fred");
+      private Closure<ScheduledTask> mutation = Closures.noop();
+      private Set<ScheduledTask> saved = ImmutableSet.of(task("b", ScheduleStatus.INIT));
+      private ImmutableSet<ScheduledTask> mutated =
+          ImmutableSet.of(task("a", ScheduleStatus.PENDING));
+
+      @Override protected void setupExpectations() throws Exception {
+        // Outer transaction.
+        expectStorageTransactionNoResult();
+
+        // Nested transaction and save.
+        expectStorageTransactionNoResult();
+        taskStore.saveTasks(saved);
+
+        // Nested transaction with result.
+        expectStorageTransactionWithResult(mutated);
+        expect(taskStore.mutateTasks(query, mutation)).andReturn(mutated);
+
+        // Resulting stream operation.
+        expectStreamTransaction(Op.saveTasks(new SaveTasks(
+            ImmutableSet.<ScheduledTask>builder().addAll(saved).addAll(mutated).build())));
+      }
+
+      @Override protected void performMutations() {
+        logStorage.doInTransaction(new Work.NoResult.Quiet() {
+          @Override protected void execute(StoreProvider storeProvider) {
+            logStorage.saveTasks(saved);
+            assertEquals(mutated, logStorage.mutateTasks(query, mutation));
+          }
+        });
       }
     }.runTest();
   }
@@ -526,5 +602,12 @@ public class LogStorageTest extends EasyMockTest {
         return result;
       }
     });
+  }
+
+  private static ScheduledTask task(String id, ScheduleStatus status) {
+    return new ScheduledTask()
+        .setStatus(status)
+        .setAssignedTask(new AssignedTask()
+            .setTaskId(id));
   }
 }

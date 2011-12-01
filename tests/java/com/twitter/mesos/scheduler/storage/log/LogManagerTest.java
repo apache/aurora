@@ -216,12 +216,13 @@ public class LogManagerTest extends EasyMockTest {
   @Test
   public void testCoalesce() throws CodingException {
     SaveTasks saveTasks1 = createSaveTasks("1", "2");
-    SaveTasks saveTasks2 = createSaveTasks("3");
+    SaveTasks nonTrumpedSaveTasks1 = createSaveTasks("2");
+    SaveTasks saveTasks2 = createSaveTasks("1", "3");
     SaveTasks saveTasks3 = createSaveTasks("4", "5");
 
-    SaveTasks coalescedSaves =
-        new SaveTasks(ImmutableSet.copyOf(Iterables.concat(saveTasks1.getTasks(),
-            saveTasks2.getTasks())));
+    // saveTasks1 is unrepresented because both of its operations were trumped.
+    // saveTasks3 is unrepresented because its operations were deleted.
+    SaveTasks coalescedSaves = createSaveTasks("3", "2", "1");
 
     RemoveTasks removeTasks1 = createRemoveTasks("1", "2");
     RemoveTasks removeTasks2 = createRemoveTasks("3");
