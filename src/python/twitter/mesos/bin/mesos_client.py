@@ -32,6 +32,8 @@ def _die(msg):
   sys.exit(1)
 
 class MesosCLIHelper:
+  _DEFAULT_USER = getpass.getuser()
+
   @staticmethod
   def acquire_session_key_or_die(owner):
     key = SessionKey(user=owner)
@@ -39,16 +41,16 @@ class MesosCLIHelper:
     return key
 
   @staticmethod
-  def call(cmd, host):
+  def call(cmd, host, user=_DEFAULT_USER):
     if host is not None:
-      return subprocess.call(['ssh', host, ' '.join(cmd)])
+      return subprocess.call(['ssh', '%s@%s' % (user, host), ' '.join(cmd)])
     else:
       return subprocess.call(cmd)
 
   @staticmethod
-  def check_call(cmd, host):
+  def check_call(cmd, host, user=_DEFAULT_USER):
     if host is not None:
-      return subprocess.check_call(['ssh', host, ' '.join(cmd)])
+      return subprocess.check_call(['ssh', '%s@%s' % (user, host), ' '.join(cmd)])
     else:
       return subprocess.check_call(cmd)
 
@@ -81,7 +83,7 @@ class MesosCLIHelper:
     return cluster
 
   @staticmethod
-  def copy_to_hadoop(ssh_proxy_host, src, dst):
+  def copy_to_hadoop(user, ssh_proxy_host, src, dst):
     """Copy the local file src to a hadoop path dst. Should be used in
     conjunction with starting new mesos jobs
     """
@@ -93,30 +95,30 @@ class MesosCLIHelper:
     hdfs_src = abs_src if Location.is_prod() else os.path.basename(abs_src)
 
     if ssh_proxy_host:
-      log.info('Running in corp, copy will be done via %s' % ssh_proxy_host)
-      subprocess.check_call(['scp', abs_src, '%s:' % ssh_proxy_host])
+      log.info('Running in corp, copy will be done via %s@%s' % (user, ssh_proxy_host))
+      subprocess.check_call(['scp', abs_src, '%s@%s:' % (user, ssh_proxy_host)])
 
-    if not MesosCLIHelper.call(['hadoop', 'fs', '-test', '-e', dst], ssh_proxy_host):
+    if not MesosCLIHelper.call(['hadoop', 'fs', '-test', '-e', dst], ssh_proxy_host, user=user):
       log.info("Deleting existing file at %s" % dst)
-      MesosCLIHelper.check_call(['hadoop', 'fs', '-rm', dst], ssh_proxy_host)
-    elif MesosCLIHelper.call(['hadoop', 'fs', '-test', '-e', dst_dir], ssh_proxy_host):
+      MesosCLIHelper.check_call(['hadoop', 'fs', '-rm', dst], ssh_proxy_host, user=user)
+    elif MesosCLIHelper.call(['hadoop', 'fs', '-test', '-e', dst_dir], ssh_proxy_host, user=user):
       log.info('Creating directory %s' % dst_dir)
-      MesosCLIHelper.check_call(['hadoop', 'fs', '-mkdir', dst_dir], ssh_proxy_host)
+      MesosCLIHelper.check_call(['hadoop', 'fs', '-mkdir', dst_dir], ssh_proxy_host, user=user)
 
     log.info('Copying %s -> %s' % (hdfs_src, dst))
-    MesosCLIHelper.check_call(['hadoop', 'fs', '-put', hdfs_src, dst], ssh_proxy_host)
+    MesosCLIHelper.check_call(['hadoop', 'fs', '-put', hdfs_src, dst], ssh_proxy_host, user=user)
 
   @staticmethod
-  def copy_app_to_hadoop(source_path, hdfs_path, cluster, ssh_proxy):
+  def copy_app_to_hadoop(user, source_path, hdfs_path, cluster, ssh_proxy):
     assert hdfs_path is not None, 'No target HDFS path specified'
     hdfs = clusters.get_hadoop_uri(cluster)
     hdfs_uri = '%s%s' % (hdfs, hdfs_path)
-    MesosCLIHelper.copy_to_hadoop(ssh_proxy, source_path, hdfs_uri)
+    MesosCLIHelper.copy_to_hadoop(user, ssh_proxy, source_path, hdfs_uri)
 
 
 class requires_arguments(object):
   def __init__(self, *args):
-     self.expected_args = args
+    self.expected_args = args
 
   def __call__(self, fn):
     def wrapped_fn(obj, line):
@@ -160,6 +162,9 @@ class MesosCLI(cmd.Cmd):
   def config(self):
     assert self._config, 'Config is unset, have you called get_and_set_config?'
     return self._config
+
+  def _tunnel_user(self, job):
+    return self.options.tunnel_as or job.owner.role
 
   @staticmethod
   def get_scheduler_client(cluster, **kwargs):
@@ -232,7 +237,7 @@ class MesosCLI(cmd.Cmd):
     job = self.get_and_set_config(*line)
 
     if self.options.copy_app_from is not None:
-      MesosCLIHelper.copy_app_to_hadoop(self.options.copy_app_from,
+      MesosCLIHelper.copy_app_to_hadoop(self._tunnel_user(job), self.options.copy_app_from,
           self.config().hdfs_path(), self.cluster(), self.proxy())
 
     sessionkey = self.acquire_session()
@@ -340,8 +345,8 @@ class MesosCLI(cmd.Cmd):
     # TODO(William Farner): Add a rudimentary versioning system here so application updates
     #                       don't overwrite original binary.
     if self.options.copy_app_from is not None:
-      MesosCLIHelper.copy_app_to_hadoop(self.options.copy_app_from, self.config().hdfs_path(),
-          self.cluster(), self.proxy())
+      MesosCLIHelper.copy_app_to_hadoop(self._tunnel_user(job), self.options.copy_app_from,
+          self.config().hdfs_path(), self.cluster(), self.proxy())
 
     sessionkey = self.acquire_session()
 
@@ -448,6 +453,10 @@ The subcommands and their arguments are:
     default=None,
     help="Local path to use for the app (will copy to the cluster)" + \
           " (default: %default)")
+  app.add_option(
+    '--tunnel_as',
+    default=None,
+    help='User to tunnel as (defaults to job role)')
 
 def main(args, options):
   if not args:
