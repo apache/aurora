@@ -68,7 +68,7 @@ public abstract class BaseStateManagerTest extends EasyMockTest {
       }
     };
     this.mutableState = new MutableState();
-    final StateManager stateManager = new StateManager(storage, clock, mutableState, true);
+    final StateManager stateManager = new StateManager(storage, clock, mutableState);
     stateManager.initialize();
     stateManager.start(killTaskCallback);
     addTearDown(new TearDown() {

@@ -64,9 +64,4 @@ public interface TaskStore {
    * @return IDs of the matching tasks.
    */
   Set<String> fetchTaskIds(Query query);
-
-  /**
-   * Upgrade the task information in the task states table.
-   */
-  void upgradeTaskStorage();
 }

@@ -170,9 +170,4 @@ public class ForwardingStore
   public Quota fetchQuota(String role) {
     return quotaStore.fetchQuota(role);
   }
-
-  @Override
-  public void upgradeTaskStorage() {
-    taskStore.upgradeTaskStorage();
-  }
 }

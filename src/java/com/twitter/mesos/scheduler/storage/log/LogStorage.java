@@ -621,17 +621,6 @@ public class LogStorage extends ForwardingStore {
     });
   }
 
-  @Timed("scheduler_log_upgrade_task_storage")
-  @Override
-  public void upgradeTaskStorage() {
-    doInTransaction(new Work.NoResult.Quiet() {
-      @Override
-      protected void execute(StoreProvider unused) {
-        LogStorage.super.upgradeTaskStorage(); // schema upgrade in the forwarded store (DbStorage)
-      }
-    });
-  }
-
   private void log(Op op) {
     if (recovered) {
       transaction.add(op);

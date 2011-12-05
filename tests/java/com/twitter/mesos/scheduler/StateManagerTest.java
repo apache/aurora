@@ -196,33 +196,6 @@ public class StateManagerTest extends BaseStateManagerTest {
   }
 
   @Test
-  public void testUpdateRackName() throws Exception {
-    final TwitterTaskInfo task = makeTask("jim", "myJob", 0);
-
-    // Insert a task in the INIT state, and set a fake slave host.
-    storage.doInTransaction(new Work.NoResult.Quiet() {
-      @Override protected void execute(StoreProvider storeProvider) {
-        ScheduledTask scheduledTask = stateManager.taskCreator.apply(task);
-        scheduledTask.getAssignedTask().setSlaveHost("slca-aaa-01-sr1");
-        storeProvider.getTaskStore().saveTasks(ImmutableSet.of(scheduledTask));
-      }
-    });
-    stateManager = createStateManager(storage);
-
-    // Check if the rack name is updated after the state manger restarts.
-    storage.doInTransaction(new Work.NoResult.Quiet() {
-      @Override
-      protected void execute(StoreProvider storeProvider) {
-        ScheduledTask result = Iterables.getOnlyElement(
-            storeProvider.getTaskStore().fetchTasks(Query.GET_ALL));
-
-        assertEquals("aaa", result.getAssignedTask().getRackName());
-      }
-    });
-    control.replay();
-  }
-
-  @Test
   public void testGetHostAssignedTasks() throws Exception {
     control.replay();
 

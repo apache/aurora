@@ -83,12 +83,7 @@ import static com.twitter.mesos.scheduler.storage.UpdateStore.ShardUpdateConfigu
  * @author William Farner
  */
 class StateManager {
-  // A flag to indicate whether we should back fill the rack name based on the existing slave host.
-  public static final String SHOULD_BACK_FILL_RACK =
-      "com.twitter.mesos.scheduler.SHOULD_BACK_FILL_RACK";
-
   private static final Logger LOG = Logger.getLogger(StateManager.class.getName());
-  private final boolean backFillingRackName;
 
   @VisibleForTesting
   @CmdLine(name = "missing_task_grace_period",
@@ -253,14 +248,11 @@ class StateManager {
   private final Clock clock;
 
   @Inject
-  StateManager(Storage storage, final Clock clock, MutableState mutableState,
-               @Named(SHOULD_BACK_FILL_RACK) boolean backFillingRackName) {
+  StateManager(Storage storage, final Clock clock, MutableState mutableState) {
     checkNotNull(storage);
     this.clock = checkNotNull(clock);
 
     transactionalStorage = new TransactionalStorage(storage, mutableState);
-
-    this.backFillingRackName = backFillingRackName;
 
     this.taskTimeoutFilter = new Predicate<Iterable<TaskEvent>>() {
       @Override public boolean apply(Iterable<TaskEvent> events) {
@@ -301,30 +293,12 @@ class StateManager {
 
     transactionalStorage.start(new Work.NoResult.Quiet() {
       @Override protected void execute(Storage.StoreProvider storeProvider) {
-        storeProvider.getTaskStore().upgradeTaskStorage();
-        LOG.info("Upgraded the task storage from StateManager.");
-        final ImmutableSet.Builder<ScheduledTask> updatedTask = ImmutableSet.builder();
         storeProvider.getTaskStore().mutateTasks(Query.GET_ALL, new Closure<ScheduledTask>() {
           @Override public void execute(ScheduledTask task) {
-            AssignedTask assignedTask = task.getAssignedTask();
-            if (backFillingRackName && assignedTask.isSetSlaveHost()
-                && !assignedTask.isSetRackName()) {
-              ImmutableList<String> components = ImmutableList.copyOf(
-                  Splitter.on('-').omitEmptyStrings().split(assignedTask.getSlaveHost()));
-              if (components.size() != 4) {
-                LOG.warning("Invalid host format: " + assignedTask.getSlaveHost());
-              } else {
-                LOG.info("Backfilled the rack name for task: " +
-                    task.getAssignedTask().getTaskId());
-                assignedTask.setRackName(components.get(1));
-                updatedTask.add(task);
-              }
-            }
-            ConfigurationManager.applyDefaultsIfUnset(assignedTask.getTask());
+            ConfigurationManager.applyDefaultsIfUnset(task.getAssignedTask().getTask());
             createStateMachine(task, task.getStatus());
           }
         });
-        storeProvider.getTaskStore().saveTasks(updatedTask.build());
       }
     });
 

@@ -526,9 +526,9 @@ public class DbStorage implements
     final Iterator<ScheduledTask> tasks = newTasks.iterator();
     try {
       jdbcTemplate.batchUpdate("MERGE INTO task_state (task_id, job_role, job_user, job_name,"
-                               + " job_key, slave_host, rack_name, shard_id, status,"
+                               + " job_key, slave_host, shard_id, status,"
                                + " scheduled_task) KEY(task_id)"
-                               + " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                               + " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)",
           new BatchPreparedStatementSetter() {
             @Override public void setValues(PreparedStatement preparedStatement, int batchItemIndex)
                 throws SQLException {
@@ -844,7 +844,7 @@ public class DbStorage implements
       long startNanos = System.nanoTime();
       final Iterator<ScheduledTask> tasks = tasksToUpdate.iterator();
       jdbcTemplate.batchUpdate("UPDATE task_state SET job_role = ?, job_user = ?, job_name = ?,"
-                               + " job_key = ?, slave_host = ?, rack_name = ?, shard_id = ?,"
+                               + " job_key = ?, slave_host = ?, shard_id = ?,"
                                + " status = ?, scheduled_task = ? WHERE task_id = ?",
           new BatchPreparedStatementSetter() {
             @Override public void setValues(PreparedStatement preparedStatement, int batchItemIndex)
@@ -898,21 +898,6 @@ public class DbStorage implements
     });
     vars.taskIdsFetched.addAndGet(fetched.size());
     return fetched;
-  }
-
-  @Timed("db_storage_upgrade_task_storage")
-  @Override
-  public void upgradeTaskStorage() {
-    transactionTemplate.execute(new TransactionCallbackWithoutResult() {
-      @Override protected void doInTransactionWithoutResult(TransactionStatus status) {
-        jdbcTemplate.update(
-            "ALTER TABLE task_state ADD IF NOT EXISTS rack_name VARCHAR(255) NULL;");
-        jdbcTemplate.update(
-            "CREATE INDEX IF NOT EXISTS task_state_rack_name_idx ON task_state(rack_name);");
-        LOG.info("Finish upgrade the task storage. Added rack name and rack name index" +
-            " in the task state table");
-      }
-    });
   }
 
   private static boolean isEmpty(@Nullable Collection<?> items) {
@@ -1073,7 +1058,6 @@ public class DbStorage implements
     setString(preparedStatement, col++, scheduledTask.assignedTask.task.jobName);
     setString(preparedStatement, col++, Tasks.jobKey(scheduledTask));
     setString(preparedStatement, col++, scheduledTask.assignedTask.slaveHost);
-    setString(preparedStatement, col++, scheduledTask.assignedTask.rackName);
     preparedStatement.setInt(col++, scheduledTask.assignedTask.task.shardId);
     preparedStatement.setInt(col++, scheduledTask.status.getValue());
     setBytes(preparedStatement, col++, scheduledTask);
