@@ -16,6 +16,8 @@ import org.apache.mesos.Protos.TaskDescription;
 import org.apache.mesos.Protos.TaskID;
 
 import com.twitter.common.application.Lifecycle;
+import com.twitter.common.application.ShutdownRegistry;
+import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
@@ -29,6 +31,7 @@ import com.twitter.mesos.gen.comm.StateUpdateResponse;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
+import static com.twitter.mesos.gen.ScheduleStatus.LOST;
 
 public class MesosExecutorImpl implements Executor {
 
@@ -40,14 +43,17 @@ public class MesosExecutorImpl implements Executor {
   private final SyncBuffer syncBuffer;
   private final Lifecycle lifecycle;
 
+  private volatile boolean shuttingDown = false;
+  private final ShutdownRegistry shutdownRegistry;
+
   @Inject
   public MesosExecutorImpl(ExecutorCore executorCore, Driver driver, SyncBuffer syncBuffer,
-      Lifecycle lifecycle) {
-
+      Lifecycle lifecycle, ShutdownRegistry shutdownRegistry) {
     this.executorCore = checkNotNull(executorCore);
     this.driver = checkNotNull(driver);
     this.syncBuffer = checkNotNull(syncBuffer);
     this.lifecycle = checkNotNull(lifecycle);
+    this.shutdownRegistry = checkNotNull(shutdownRegistry);
   }
 
   @Override
@@ -55,6 +61,11 @@ public class MesosExecutorImpl implements Executor {
     LOG.info("Initialized with driver " + executorDriver + " and args " + executorArgs);
     executorCore.setSlaveId(executorArgs.getSlaveId().getValue());
     driver.init(executorDriver, executorArgs);
+    shutdownRegistry.addAction(new ExceptionalCommand<RuntimeException>() {
+      @Override public void execute() {
+        shuttingDown = true;
+      }
+    });
     initialized.countDown();
   }
 
@@ -64,7 +75,15 @@ public class MesosExecutorImpl implements Executor {
 
   @Override
   public void launchTask(ExecutorDriver driverDoNotUse, TaskDescription task) {
-    LOG.info(String.format("Running task %s with ID %s.", task.getName(), task.getTaskId()));
+    if (shuttingDown) {
+      LOG.warning(String.format("Rejecting task %s with ID %s since the executor is shutting down.",
+          task.getName(), task.getTaskId()));
+      driver.sendStatusUpdate(task.getTaskId().getValue(), LOST,
+          Optional.of("Executor shutting down."));
+      return;
+    }
+
+    LOG.info(String.format("Running task %s.", task.getTaskId()));
 
     final AssignedTask assignedTask;
     try {
@@ -91,6 +110,7 @@ public class MesosExecutorImpl implements Executor {
 
   @Override
   public void shutdown(ExecutorDriver driverDoNotUse) {
+    shuttingDown = true;
     LOG.info("Received shutdown command, terminating...");
     try {
       for (Task killedTask : executorCore.shutdownCore()) {
