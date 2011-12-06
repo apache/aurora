@@ -9,9 +9,11 @@ import java.util.concurrent.ScheduledExecutorService;
 import javax.annotation.Nullable;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
@@ -117,7 +119,7 @@ public interface ExecutorWatchdog {
 
       Runnable poller = new Runnable() {
         @Override public void run() {
-          UpdateRequest request = getNextUpdateRequest(knownExecutorSupplier.get());
+          UpdateRequest request = nextUpdateForLiveExecutors(knownExecutorSupplier.get());
           if (!request.isNone()) {
             requestHandler.execute(request);
           }
@@ -146,7 +148,10 @@ public interface ExecutorWatchdog {
     }
 
     @VisibleForTesting
-    synchronized UpdateRequest getNextUpdateRequest(Set<ExecutorKey> executors) {
+    synchronized UpdateRequest nextUpdateForLiveExecutors(Set<ExecutorKey> executors) {
+      // Remove record of executors that are no longer reported.
+      Iterables.removeIf(knownPositions.keySet(), Predicates.not(Predicates.in(executors)));
+
       // Give priority to any executors that we have no record of (new executors).
       Set<ExecutorKey> newExecutors =
           Sets.difference(executors, ImmutableSet.copyOf(knownPositions.keySet()));

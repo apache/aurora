@@ -52,11 +52,11 @@ class SchedulerLifecycle {
   @CmdLine(name = "task_reaper_start_delay", help =
       "Time to wait after startup before running the task reaper.")
   private static final Arg<Amount<Long, Time>> TASK_REAPER_START_DELAY =
-      Arg.create(Amount.of(2L, Time.MINUTES));
+      Arg.create(Amount.of(5L, Time.MINUTES));
 
   @CmdLine(name = "task_reaper_interval", help = "Time to wait between task reaper runs.")
   private static final Arg<Amount<Long, Time>> TASK_REAPER_INTERVAL =
-      Arg.create(Amount.of(2L, Time.MINUTES));
+      Arg.create(Amount.of(5L, Time.MINUTES));
 
   private static final Logger LOG = Logger.getLogger(SchedulerLifecycle.class.getName());
 

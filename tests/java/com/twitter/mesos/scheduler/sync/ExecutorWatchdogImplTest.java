@@ -84,9 +84,7 @@ public class ExecutorWatchdogImplTest extends EasyMockTest {
     checkOutput(B, NO_POSITION);
     checkOutput(executorRemoved, C, NO_POSITION);
     checkOutput(executorRemoved, A, NO_POSITION);
-
-    // Even though we lost track of B, we continue to try to revive it.
-    checkOutput(executorRemoved, B, NO_POSITION);
+    checkOutput(executorRemoved, C, NO_POSITION);
   }
 
   @Test
@@ -140,7 +138,7 @@ public class ExecutorWatchdogImplTest extends EasyMockTest {
 
   private void checkOutput(Set<ExecutorKey> executors, ExecutorKey executor,
       StateUpdateRequest expected) {
-    UpdateRequest request = watchdog.getNextUpdateRequest(executors);
+    UpdateRequest request = watchdog.nextUpdateForLiveExecutors(executors);
     assertEquals(executor, request.executor);
     assertEquals(expected, request.request);
   }
