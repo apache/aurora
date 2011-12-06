@@ -11,7 +11,7 @@ from gen.twitter.mesos.ttypes import (
   TwitterTaskInfo,
   UpdateConfig
 )
-from twitter.tcl.loader import ThermosJobLoader
+from twitter.tcl.loader import MesosJobLoader, ThermosJobLoader
 from gen.twitter.tcl.ttypes import ThermosJob, ThermosTask, ThermosProcess
 
 
@@ -25,11 +25,15 @@ class ProxyConfig(object):
   def from_thermos(filename):
     assert filename.endswith('.thermos'), (
       "ProxyConfig.from_thermos must be called with .thermos filename")
-    return ProxyThermosConfig(filename)
+    return ProxyThermosConfig.from_thermos(filename)
 
   @staticmethod
   def from_mesos(filename):
     return ProxyMesosConfig(filename)
+
+  @staticmethod
+  def from_mesos_as_thermos(filename):
+    return ProxyThermosConfig.from_mesos(filename)
 
   def __init__(self):
     self._job = None
@@ -59,7 +63,7 @@ class ProxyMesosConfig(ProxyConfig):
 
     if 'role' not in config:
       _die('role must be specified!')
-    owner = Identity(role = config['role'], user = getpass.getuser())
+    owner = Identity(role=config['role'], user=getpass.getuser())
 
     # Force configuration map to be all strings.
     task = TwitterTaskInfo()
@@ -101,17 +105,24 @@ class ProxyMesosConfig(ProxyConfig):
 
 
 class ProxyThermosConfig(ProxyConfig):
-  def __init__(self, filename):
-    self._config = ThermosJobLoader(filename).to_thrift()
+  @staticmethod
+  def from_mesos(filename):
+    return ProxyThermosConfig(MesosJobLoader(filename).to_thrift())
+
+  @staticmethod
+  def from_thermos(filename):
+    return ProxyThermosConfig(ThermosJobLoader(filename).to_thrift())
+
+  def __init__(self, thrift_blob):
+    self._config = thrift_blob
     ProxyConfig.__init__(self)
 
   def job(self, name=None):
     jobname = name or self._job
     assert jobname, "Job name not supplied!"
-
     assert self._config.job.name == jobname, """Thermos configurations only contain one job
       and the supplied job name does not match."""
-    owner = Identity(role = self._config.job.role, user = getpass.getuser())
+    owner = Identity(role=self._config.job.role, user=getpass.getuser())
 
     MB = 1024 * 1024
 

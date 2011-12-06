@@ -41,6 +41,14 @@ class MesosCLIHelper:
     return key
 
   @staticmethod
+  def is_admin():
+    try:
+      MesosCLIHelper.acquire_session_key_or_die('mesos')
+    except SessionKeyHelper.AuthorizationError:
+      return False
+    return True
+
+  @staticmethod
   def call(cmd, host, user=_DEFAULT_USER):
     if host is not None:
       return subprocess.call(['ssh', '%s@%s' % (user, host), ' '.join(cmd)])
@@ -223,7 +231,15 @@ class MesosCLI(cmd.Cmd):
     if config.endswith('.thermos'):
       config = ProxyConfig.from_thermos(config)
     else:
-      config = ProxyConfig.from_mesos(config)
+      if self.options.force_thermos:
+        assert MesosCLIHelper.is_admin(), ("--force_thermos is currently only allowed"
+                                           " for users in the mesos group.")
+        assert config.endswith('.mesos') , ("Job is not configured in mesos format."
+                                            " Try removing --force_thermos option")
+        config = ProxyConfig.from_mesos_as_thermos(config)
+      else:
+        config = ProxyConfig.from_mesos(config)
+
     config.set_job(job)
     self._config = config
     return config.job()
@@ -457,6 +473,13 @@ The subcommands and their arguments are:
     '--tunnel_as',
     default=None,
     help='User to tunnel as (defaults to job role)')
+  app.add_option(
+    '-t',
+    '--force_thermos',
+    default=False,
+    action='store_true',
+    help="Run jobs configured in mesos format as thermos jobs.")
+
 
 def main(args, options):
   if not args:
