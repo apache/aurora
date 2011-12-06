@@ -139,11 +139,13 @@ class ProxyThermosConfig(ProxyConfig):
       tti.owner = owner
       tasks.add(tti)
 
+    cron_schedule = self._config.cron_schedule if self._config.cron_schedule else None
+
     config = JobConfiguration(
       jobname,
       owner,
       tasks,
-      None, # cron schedule
+      cron_schedule, # cron schedule
       None, # cron collision policy
       None) # update config
 

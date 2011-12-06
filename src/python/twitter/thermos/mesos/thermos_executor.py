@@ -1,3 +1,4 @@
+import getpass
 import os
 import pwd
 import signal
@@ -28,23 +29,30 @@ from thrift.TSerialization import deserialize as thrift_deserialize
 from gen.twitter.mesos.ttypes import AssignedTask
 from gen.twitter.thermos.ttypes import TaskState
 
-app.add_option("--sandbox_root", dest = "sandbox_root", metavar = "PATH",
-               default = "/var/lib/thermos",
-               help = "the path root where we will spawn workflow sandboxes")
-app.add_option("--checkpoint_root", dest = "checkpoint_root", metavar = "PATH",
-               default = "/var/run/thermos",
-               help = "the path where we will store workflow logs and checkpoints")
+app.add_option("--sandbox_root", dest="sandbox_root", metavar="PATH",
+               default="/var/lib/thermos",
+               help="the path root where we will spawn workflow sandboxes")
+app.add_option("--checkpoint_root", dest="checkpoint_root", metavar="PATH",
+               default="/var/run/thermos",
+               help="the path where we will store workflow logs and checkpoints")
 
 app.configure(module='twitter.common.app.modules.exception_handler',
     enable=True, category='thermos_executor_exceptions')
 app.configure(debug=True)
+
+class LocalFile(object):
+  def __init__(self, filename):
+    self._name = filename
+
+  def filename(self):
+    return self._name
 
 # TODO(wickman):  Factor this out into a separate file
 class TaskRunnerProcess(object):
   SVN_REPO = 'svn.twitter.biz'
   SVN_PATH = '/science-binaries/home/thermos'
   PEX_NAME = 'thermos_run.pex'
-  TEMPDIR  = None
+  TEMPDIR = None
 
   class SandboxCreationError(Exception):
     pass
@@ -54,6 +62,17 @@ class TaskRunnerProcess(object):
 
   def __init__(self, task):
     self._popen = None
+    self._is_angrybird = 'ANGRYBIRD_HOME' in os.environ
+
+    if self._is_angrybird:
+      self._angrybird_home = os.environ['ANGRYBIRD_HOME']
+      self._sandbox_root = os.path.join(self._angrybird_home, 'logs/thermos/lib')
+      self._checkpoint_root = os.path.join(self._angrybird_home, 'logs/thermos/run')
+    else:
+      self._angrybird_home = None
+      self._sandbox_root = app.get_options().sandbox_root
+      self._checkpoint_root = app.get_options().checkpoint_root
+
     self._setup_task(task)    # set ._task, .task_id, ._role, and ._monitor
     self._make_sandbox()      # set ._sandbox
     self._setup_runner()      # set ._runner_pex
@@ -61,13 +80,23 @@ class TaskRunnerProcess(object):
   def _setup_runner(self):
     if TaskRunnerProcess.TEMPDIR is None:
       TaskRunnerProcess.TEMPDIR = tempfile.mkdtemp()
-    self._runner_pex = MirrorFile(
+
+    # If its running as angrybird just use the local copy of the runner
+    if self._is_angrybird:
+      log.info('AngryBird run detected...using a local copy of the runner')
+      self._runner_pex = LocalFile(os.path.join(self._angrybird_home,
+                                                'science/dist',
+                                                TaskRunnerProcess.PEX_NAME))
+    else:
+      self._runner_pex = MirrorFile(
         TaskRunnerProcess.SVN_REPO,
         os.path.join(TaskRunnerProcess.SVN_PATH, TaskRunnerProcess.PEX_NAME),
         os.path.join(TaskRunnerProcess.TEMPDIR, TaskRunnerProcess.PEX_NAME),
         https=True)
-    log.info('Acquiring runner pex: %s' % (
-      'Success' if self._runner_pex.refresh() else 'Already up to date'))
+
+      log.info('Acquiring runner pex: %s' % (
+        'Success' if self._runner_pex.refresh() else 'Already up to date'))
+
     chmod_plus_x(self._runner_pex.filename())
 
   def _setup_task(self, task):
@@ -85,7 +114,7 @@ class TaskRunnerProcess(object):
     self._task = thermos_task
     self._task_id = task.task_id.value
     self._role = thermos_task.job.role
-    self._monitor = TaskMonitor(TaskPath(root=app.get_options().checkpoint_root), self._task_id)
+    self._monitor = TaskMonitor(TaskPath(root=self._checkpoint_root), self._task_id)
     # write serialized task to disk
     with temporary_file(cleanup=False) as fp:
       self._task_filename = fp.name
@@ -94,7 +123,7 @@ class TaskRunnerProcess(object):
       rw.close()
 
   def _make_sandbox(self):
-    sandbox = os.path.join(app.get_options().sandbox_root, self._task_id)
+    sandbox = os.path.join(self._sandbox_root, self._task_id)
     safe_mkdir(sandbox)
     # TODO(wickman)  app-app integration ......HERE
     try:
@@ -113,19 +142,20 @@ class TaskRunnerProcess(object):
       Fork the task runner.
     """
     options = app.get_options()
-    params = dict(log_dir = LogOptions.log_dir(),
-                  checkpoint_root = options.checkpoint_root,
-                  sandbox = self._sandbox,
-                  task_id = self._task_id,
-                  thermos_thrift = self._task_filename,
-                  setuid = self._role)
-    # TODO(wickman)  Implement chroot+setuid inside thermos_run.
+    params = dict(log_dir=LogOptions.log_dir(),
+                  checkpoint_root=self._checkpoint_root,
+                  sandbox=self._sandbox,
+                  task_id=self._task_id,
+                  thermos_thrift=self._task_filename)
+
+    if getpass.getuser() == 'root':
+      params.update(setuid=self._role)
+
     cmdline_args = [self._runner_pex.filename()]
     cmdline_args.extend('--%s=%s' % (flag, value) for flag, value in params.items())
     cmdline_args.extend([
       '--enable_scribe_exception_hook',
-      '--scribe_exception_category=thermos_runner_exceptions',
-      '--enable_chroot'])
+      '--scribe_exception_category=thermos_runner_exceptions'])
     log.info('Forking off runner with cmdline: %s' % ' '.join(cmdline_args))
     self._popen = subprocess.Popen(cmdline_args)
 
@@ -152,8 +182,8 @@ class TaskRunnerProcess(object):
   def quitquitquit(self):
     """Bind to the process tree of a Thermos task and kill it with impunity."""
     runner = TaskRunner(self._task,
-        app.get_options().sandbox_root,
-        app.get_options().checkpoint_root,
+        self._sandbox_root,
+        self._checkpoint_root,
         self._task_id)
     runner.kill()
 
