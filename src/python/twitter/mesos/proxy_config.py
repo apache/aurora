@@ -1,15 +1,22 @@
-import sys
 import copy
+import exceptions
 import getpass
+import sys
 
 from twitter.common import log
 from twitter.mesos.mesos_configuration import MesosConfiguration
 from gen.twitter.mesos.ttypes import (
+  Constraint,
   CronCollisionPolicy,
   Identity,
   JobConfiguration,
+  LimitConstraint,
+  ListConstraint,
+  TaskConstraint,
   TwitterTaskInfo,
-  UpdateConfig
+  UpdateConfig,
+  Value,
+  ValueConstraint,
 )
 from twitter.tcl.loader import MesosJobLoader, ThermosJobLoader
 from gen.twitter.tcl.ttypes import ThermosJob, ThermosTask, ThermosProcess
@@ -55,6 +62,48 @@ class ProxyMesosConfig(ProxyConfig):
     self._config = MesosConfiguration(filename).config
     ProxyConfig.__init__(self)
 
+  @staticmethod
+  def parse_constraints(constraints_dict):
+    result = set()
+    for attribute, constraint_value in constraints_dict.items():
+      assert isinstance(attribute, basestring) and isinstance(constraint_value, basestring), (
+        "Both attribute name and value in constraints must be string")
+      constraint = Constraint()
+      constraint.attribute = attribute
+      taskConstraint = TaskConstraint()
+      if constraint_value.startswith('limit:'):
+        taskConstraint.limitConstraint = LimitConstraint()
+        try:
+          taskConstraint.limitConstraint.limit = int(constraint_value.replace('limit:', ''))
+        except ValueError:
+          print '%s is not a valid limit value, must be integer' % constraint_value
+          raise
+      else:
+        negated = constraint_value.startswith('!')
+        if negated:
+          constraint_value=constraint_value[1:]
+        values = constraint_value.split(',')
+        if len(values) > 1:
+          taskConstraint.listConstraint = ListConstraint()
+          taskConstraint.listConstraint.negated = negated
+          taskConstraint.listConstraint.values = values
+        else:
+          taskConstraint.valueConstraint = ValueConstraint()
+          taskConstraint.valueConstraint.negated = negated
+          value = Value()
+          try:
+            value.intValue = int(constraint_value)
+          except exceptions.ValueError:
+            try:
+              value.doubleValue = float(constraint_value)
+            except exceptions.ValueError:
+              value.stringValue = constraint_value
+          taskConstraint.valueConstraint.value = value
+      constraint.constraint = taskConstraint
+      result.add(constraint)
+
+    return result
+
   def job(self, name=None):
     jobname = name or self._job
     assert jobname, "Job name not supplied!"
@@ -67,7 +116,12 @@ class ProxyMesosConfig(ProxyConfig):
 
     # Force configuration map to be all strings.
     task = TwitterTaskInfo()
-    task.configuration = dict((k, str(v)) for k, v in config['task'].items())
+    task_constraints = {}
+    if 'constraints' in config:
+      task_constraints['constraints'] = ProxyMesosConfig.parse_constraints(config['constraints'])
+      del config['constraints']
+    task_configuration = dict((k, str(v)) for k, v in config['task'].items())
+    task.configuration = dict(task_configuration.items() + task_constraints.items())
 
     # Replicate task objects to reflect number of instances.
     tasks = []
