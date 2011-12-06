@@ -138,10 +138,18 @@ class requires_arguments(object):
     wrapped_fn.__doc__ = fn.__doc__
     return wrapped_fn
 
+
 def check_and_log_response(resp):
   log.info('Response from scheduler: %s (message: %s)'
       % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
   if resp.responseCode != ResponseCode.OK:
+    sys.exit(1)
+
+
+def check_and_log_update_response(resp):
+  log.info('Update response from scheduler: %s (message: %s)'
+      % (UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
+  if resp.responseCode != UpdateResponseCode.OK:
     sys.exit(1)
 
 
@@ -383,7 +391,7 @@ class MesosCLI(cmd.Cmd):
     resp = self.client().finishUpdate(
       job.owner.role, job.name, UpdateResult.FAILED if failed_shards else UpdateResult.SUCCESS,
       resp.updateToken, sessionkey)
-    check_and_log_response(resp)
+    check_and_log_update_response(resp)
 
 
   @requires_arguments('role', 'job')
@@ -393,7 +401,7 @@ class MesosCLI(cmd.Cmd):
     (role, job) = line
     log.info('Canceling update on job %s' % job)
     resp = self.client().finishUpdate(role, job, UpdateResult.TERMINATE, None, self.acquire_session())
-    check_and_log_response(resp)
+    check_and_log_update_response(resp)
 
 
   @requires_arguments('role')

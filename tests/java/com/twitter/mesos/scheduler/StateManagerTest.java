@@ -3,6 +3,7 @@ package com.twitter.mesos.scheduler;
 import java.util.Iterator;
 import java.util.Set;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
@@ -19,6 +20,7 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.scheduler.storage.Storage.StorageException;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
@@ -154,6 +156,17 @@ public class StateManagerTest extends BaseStateManagerTest {
 
     insertTask(makeTask("jim", "myJob", 0));
     assertVarCount("jim", "myJob", PENDING, 1);
+  }
+
+  @Test
+  public void testUpdate() throws Exception {
+    control.replay();
+    TwitterTaskInfo taskInfo = makeTask("jim", "myJob", 0);
+
+    insertTask(taskInfo);
+
+    String token = stateManager.registerUpdate("jim", "myJob", ImmutableSet.of(taskInfo));
+    stateManager.finishUpdate("jim", "myJob", Optional.of(token), UpdateResult.SUCCESS);
   }
 
   @Test

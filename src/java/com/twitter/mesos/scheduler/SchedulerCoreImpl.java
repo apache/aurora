@@ -551,7 +551,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
           populated.getTaskConfigs());
     } catch (StateManager.UpdateException e) {
       LOG.log(Level.INFO, "Failed to start update.", e);
-      throw new ScheduleException(e);
+      throw new ScheduleException(e.getMessage(), e);
     }
   }
 
@@ -604,7 +604,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
       stateManager.finishUpdate(role, jobName, updateToken, result);
     } catch (StateManager.UpdateException e) {
       LOG.log(Level.INFO, "Failed to finish update.", e);
-      throw new ScheduleException(e);
+      throw new ScheduleException(e.getMessage(), e);
     }
   }
 
