@@ -53,7 +53,6 @@ public class LogManagerTest extends EasyMockTest {
   private Stream stream;
   private Position position1;
   private Position position2;
-  private Position position3;
   private StreamManager streamManager;
 
   @Before
@@ -61,7 +60,6 @@ public class LogManagerTest extends EasyMockTest {
     stream = createMock(Stream.class);
     position1 = createMock(Position.class);
     position2 = createMock(Position.class);
-    position3 = createMock(Position.class);
 
     streamManager = new StreamManager(stream);
   }
@@ -89,82 +87,28 @@ public class LogManagerTest extends EasyMockTest {
 
   @Test
   public void testStreamManager_readFromUnknown_none() throws CodingException {
-    expect(stream.beginning()).andReturn(position1);
-    expect(stream.readFrom(position1)).andReturn(Iterators.<Log.Entry>emptyIterator());
+    expect(stream.readAll()).andReturn(Iterators.<Log.Entry>emptyIterator());
 
     Closure<LogEntry> reader = createMock(new Clazz<Closure<LogEntry>>() {});
 
     control.replay();
 
-    streamManager.readAfter(null /* unknown */, reader);
+    streamManager.readFromBeginning(reader);
   }
 
   @Test
   public void testStreamManager_readFromUnknown_some() throws CodingException {
-    expect(stream.beginning()).andReturn(position1);
-
     LogEntry transaction1 = createLogEntry(Op.removeJob(new RemoveJob("job1")));
     Entry entry1 = createMock(Entry.class);
-    expect(entry1.position()).andReturn(position2);
     expect(entry1.contents()).andReturn(ThriftBinaryCodec.encode(transaction1));
-    expect(stream.readFrom(position1)).andReturn(Iterators.singletonIterator(entry1));
+    expect(stream.readAll()).andReturn(Iterators.singletonIterator(entry1));
 
     Closure<LogEntry> reader = createMock(new Clazz<Closure<LogEntry>>() {});
     reader.execute(transaction1);
 
     control.replay();
 
-    assertSame(position2, streamManager.readAfter(null /* unknown */, reader));
-  }
-
-  @Test
-  public void testStreamManager_readFromKnown_none() throws CodingException {
-    byte[] identity2 = identity("position2");
-    expect(stream.position(identity2)).andReturn(position2);
-    expect(stream.readFrom(position2)).andReturn(Iterators.<Log.Entry>emptyIterator());
-
-    Closure<LogEntry> reader = createMock(new Clazz<Closure<LogEntry>>() {});
-
-    control.replay();
-
-    assertNull(streamManager.readAfter(identity2, reader));
-  }
-
-  @Test
-  public void testStreamManager_readFromKnown_one() throws CodingException {
-    byte[] identity2 = identity("position2");
-    expect(stream.position(identity2)).andReturn(position2);
-
-    Entry entry2 = createMock(Entry.class);
-    expect(stream.readFrom(position2)).andReturn(Iterators.singletonIterator(entry2));
-
-    Closure<LogEntry> reader = createMock(new Clazz<Closure<LogEntry>>() {});
-
-    control.replay();
-
-    assertNull(streamManager.readAfter(identity2, reader));
-  }
-
-  @Test
-  public void testStreamManager_readFromKnown_some() throws CodingException {
-    byte[] identity2 = identity("position2");
-    expect(stream.position(identity2)).andReturn(position2);
-
-    Entry entry2 = createMock(Entry.class);
-
-    LogEntry snapshot3 = LogEntry.snapshot(createSnapshot("snapshot3"));
-    Entry entry3 = createMock(Entry.class);
-    expect(entry3.position()).andReturn(position3);
-    expect(entry3.contents()).andReturn(ThriftBinaryCodec.encode(snapshot3));
-
-    expect(stream.readFrom(position2)).andReturn(Iterators.forArray(entry2, entry3));
-
-    Closure<LogEntry> reader = createMock(new Clazz<Closure<LogEntry>>() {});
-    reader.execute(snapshot3);
-
-    control.replay();
-
-    assertSame(position3, streamManager.readAfter(identity2, reader));
+    streamManager.readFromBeginning(reader);
   }
 
   @Test
@@ -265,9 +209,7 @@ public class LogManagerTest extends EasyMockTest {
 
     control.replay();
 
-    Position position = streamManager.snapshot(snapshot);
-
-    assertSame(position1, position);
+    streamManager.snapshot(snapshot);
   }
 
   @Test
@@ -284,10 +226,6 @@ public class LogManagerTest extends EasyMockTest {
 
     Position position = transaction.commit();
     assertSame(position1, position);
-  }
-
-  private byte[] identity(String name) {
-    return name.getBytes();
   }
 
   private Snapshot createSnapshot(String snapshotData) {

@@ -23,7 +23,6 @@ import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.EasyMockTest;
-import com.twitter.common.util.testing.FakeClock;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.AssignedTask;
@@ -51,10 +50,10 @@ import com.twitter.mesos.scheduler.log.Log;
 import com.twitter.mesos.scheduler.log.Log.Entry;
 import com.twitter.mesos.scheduler.log.Log.Position;
 import com.twitter.mesos.scheduler.log.Log.Stream;
-import com.twitter.mesos.scheduler.storage.CheckpointStore;
 import com.twitter.mesos.scheduler.storage.JobStore;
 import com.twitter.mesos.scheduler.storage.QuotaStore;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
+import com.twitter.mesos.scheduler.storage.SnapshotStore;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
@@ -76,7 +75,6 @@ import static org.junit.Assert.assertTrue;
  */
 public class LogStorageTest extends EasyMockTest {
 
-  private static final Amount<Long, Time> CHECKPOINT_INTERVAL = Amount.of(1L, Time.SECONDS);
   private static final Amount<Long, Time> SNAPSHOT_INTERVAL = Amount.of(1L, Time.MINUTES);
   private static final long NOW = 42L;
 
@@ -84,9 +82,8 @@ public class LogStorageTest extends EasyMockTest {
   private Log log;
   private Stream stream;
   private ShutdownRegistry shutdownRegistry;
-  private FakeClock clock;
   private SchedulingService schedulingService;
-  private CheckpointStore checkpointStore;
+  private SnapshotStore<Snapshot> snapshotStore;
   private Storage storage;
   private SchedulerStore schedulerStore;
   private JobStore jobStore;
@@ -102,11 +99,8 @@ public class LogStorageTest extends EasyMockTest {
     shutdownRegistry = createMock(ShutdownRegistry.class);
     LogManager logManager = new LogManager(log, shutdownRegistry);
 
-    clock = new FakeClock();
-    clock.setNowMillis(NOW);
-
     schedulingService = createMock(SchedulingService.class);
-    checkpointStore = createMock(CheckpointStore.class);
+    snapshotStore = createMock(new Clazz<SnapshotStore<Snapshot>>() {});
     storage = createMock(Storage.class);
     schedulerStore = createMock(SchedulerStore.class);
     jobStore = createMock(JobStore.class);
@@ -117,10 +111,8 @@ public class LogStorageTest extends EasyMockTest {
 
     logStorage =
         new LogStorage(logManager,
-            clock,
             schedulingService,
-            checkpointStore,
-            CHECKPOINT_INTERVAL,
+            snapshotStore,
             SNAPSHOT_INTERVAL,
             storage,
             schedulerStore,
@@ -161,25 +153,17 @@ public class LogStorageTest extends EasyMockTest {
       }
     });
 
-    // The last known good log entry should be read and skipped
-    Entry lastKnownGood = createMock(Entry.class);
-    byte[] checkpoint = "last-known-good".getBytes();
-    expect(checkpointStore.fetchCheckpoint()).andReturn(checkpoint);
-    Position checkpointPosition = createMock(Position.class);
-    expect(stream.position(checkpoint)).andReturn(checkpointPosition);
-
-    // But the next entry should be read and applied.
-    Entry recovered = createMock(Entry.class);
-    Position recoveredEntryPosition = createMock(Position.class);
-    byte[] recoveredEntryIdentity = "recovered-entry".getBytes();
-    expect(recoveredEntryPosition.identity()).andReturn(recoveredEntryIdentity);
-    expect(recovered.position()).andReturn(recoveredEntryPosition);
-    String frameworkId = "bob";
-    LogEntry recoveredLogEntry =
-        createTransaction(Op.saveFrameworkId(new SaveFrameworkId(frameworkId)));
-    expect(recovered.contents()).andReturn(ThriftBinaryCodec.encodeNonNull(recoveredLogEntry));
-    expect(stream.readFrom(checkpointPosition))
-        .andReturn(Iterators.<Entry>forArray(lastKnownGood, recovered));
+    Entry entry1 = createMock(Entry.class);
+    Entry entry2 = createMock(Entry.class);
+    String frameworkId1 = "bob";
+    LogEntry recoveredEntry1 =
+        createTransaction(Op.saveFrameworkId(new SaveFrameworkId(frameworkId1)));
+    String frameworkId2 = "jim";
+    LogEntry recoveredEntry2 =
+        createTransaction(Op.saveFrameworkId(new SaveFrameworkId(frameworkId2)));
+    expect(entry1.contents()).andReturn(ThriftBinaryCodec.encodeNonNull(recoveredEntry1));
+    expect(entry2.contents()).andReturn(ThriftBinaryCodec.encodeNonNull(recoveredEntry2));
+    expect(stream.readAll()).andReturn(Iterators.<Entry>forArray(entry1, entry2));
 
     final Capture<Work<Void, RuntimeException>> recoveryWork = createCapture();
     expect(storage.doInTransaction(capture(recoveryWork))).andAnswer(new IAnswer<Void>() {
@@ -188,7 +172,8 @@ public class LogStorageTest extends EasyMockTest {
         return null;
       }
     });
-    schedulerStore.saveFrameworkId(frameworkId);
+    schedulerStore.saveFrameworkId(frameworkId1);
+    schedulerStore.saveFrameworkId(frameworkId2);
 
     final Capture<Work<Void, RuntimeException>> initializationWork = createCapture();
     expect(storage.doInTransaction(capture(initializationWork))).andAnswer(new IAnswer<Void>() {
@@ -198,19 +183,13 @@ public class LogStorageTest extends EasyMockTest {
       }
     });
 
-    // We should pick up a checkpoint for the recovered entry when the checkpoint thread runs.
-    Capture<Runnable> checkpointAction = createCapture();
-    schedulingService.doEvery(eq(CHECKPOINT_INTERVAL), capture(checkpointAction));
-    checkpointStore.checkpoint(recoveredEntryIdentity);
-
     // We should perform a snapshot when the snapshot thread runs.
     Capture<Runnable> snapshotAction = createCapture();
     schedulingService.doEvery(eq(SNAPSHOT_INTERVAL), capture(snapshotAction));
-    byte[] snapshotContents = "snapshot".getBytes();
-    expect(checkpointStore.createSnapshot()).andReturn(snapshotContents);
+    Snapshot snapshotContents = new Snapshot(NOW, ByteBuffer.wrap("snapshot".getBytes()));
+    expect(snapshotStore.createSnapshot()).andReturn(snapshotContents);
     Position snapshotPosition = createMock(Position.class);
-    LogEntry snapshot =
-        LogEntry.snapshot(new Snapshot(NOW, ByteBuffer.wrap(snapshotContents)));
+    LogEntry snapshot = LogEntry.snapshot(snapshotContents);
     expect(stream.append(aryEq(ThriftBinaryCodec.encodeNonNull(snapshot))))
         .andReturn(snapshotPosition);
     stream.truncateBefore(snapshotPosition);
@@ -220,17 +199,13 @@ public class LogStorageTest extends EasyMockTest {
         snapshotWork.getValue().apply(storeProvider);
         return null;
       }
-    });
+    }).times(2);
 
     control.replay();
 
     logStorage.prepare();
     logStorage.start(initializationLogic);
     assertTrue(initialized.get());
-
-    assertTrue(checkpointAction.hasCaptured());
-    // Run the checkpoint thread.
-    checkpointAction.getValue().run();
 
     assertTrue(snapshotAction.hasCaptured());
     // Run the snapshot thread.
@@ -263,10 +238,7 @@ public class LogStorageTest extends EasyMockTest {
         }
       });
 
-      expect(checkpointStore.fetchCheckpoint()).andReturn(null);
-      Position beginning = createMock(Position.class);
-      expect(stream.beginning()).andReturn(beginning);
-      expect(stream.readFrom(beginning)).andReturn(Iterators.<Entry>emptyIterator());
+      expect(stream.readAll()).andReturn(Iterators.<Entry>emptyIterator());
       final Capture<Work<Void, RuntimeException>> recoveryWork = createCapture();
       expect(storage.doInTransaction(capture(recoveryWork))).andAnswer(new IAnswer<Void>() {
         @Override public Void answer() {
@@ -275,8 +247,7 @@ public class LogStorageTest extends EasyMockTest {
         }
       });
 
-      // Schedule checkpoints and snapshots.
-      schedulingService.doEvery(eq(CHECKPOINT_INTERVAL), notNull(Runnable.class));
+      // Schedule snapshots.
       schedulingService.doEvery(eq(SNAPSHOT_INTERVAL), notNull(Runnable.class));
 
       // Setup custom test expectations.

@@ -9,10 +9,7 @@ import java.util.Iterator;
  * {@link Position}.
  *
  * <p>Logs are accessed by {@link #open() opening} a {@link Stream}.  All stream
- * access occurs with references to log entry {@link Position positions} in the stream.  These
- * positions can be remembered between runs of a client application by recording their
- * {@link Position#identity()} and {@link Stream#position(byte[]) exchanging} it later for the
- * original position.
+ * access occurs with references to log entry {@link Position positions} in the stream.
  *
  * @author John Sirois
  */
@@ -22,29 +19,12 @@ public interface Log {
    * An opaque ordered handle to a log entry's position in the log stream.
    */
   interface Position extends Comparable<Position> {
-
-    /**
-     * A unique value that can be exchanged with the {@link Log} for this position.  Useful for
-     * saving checkpoints.
-     *
-     * @return this position's unique identity
-     */
-    byte[] identity();
-
   }
 
   /**
    * Represents a single entry in the log stream.
    */
   interface Entry {
-
-    /**
-     * All entries are guaranteed to have a position between {@link Stream#beginning()} and
-     * {@link Stream#end()}.
-     *
-     * @return the position of this entry on the log stream
-     */
-    Position position();
 
     /**
      * @return the data stored in this log entry
@@ -92,56 +72,28 @@ public interface Log {
     Position append(byte[] contents) throws StreamAccessException;
 
     /**
-     * Allows reading log entries from a given {@code position}. To read all log entries, pass
-     * {@link #beginning()}.  Implementations may materialize all entries after the the given
-     * position at once or the may provide some form of streaming to back the returned entry
-     * iterator.  If the implementation does use some form of streaming or batching, it may throw a
+     * Allows reading all entries from the log stream.  Implementations may
+     * materialize all entries at once or the may provide some form of streaming to back the
+     * returned entry iterator.  If the implementation does use some form of streaming or batching,
+     * it may throw a
      * {@code StreamAccessException} on any call to {@link Iterator#hasNext()} or
      * {@link Iterator#next()}.
      *
-     * @param position the position to read from
      * @return an iterator that ranges from the entry from the given {@code position} to the last
      *     entry in the log.
      * @throws InvalidPositionException if the specified position does not exist in this log
      * @throws StreamAccessException if the stream could not be read from
      */
-    Iterator<Entry> readFrom(Position position)
-        throws InvalidPositionException, StreamAccessException;
+    Iterator<Entry> readAll() throws InvalidPositionException, StreamAccessException;
 
     /**
-     * Removes all log entries preceding the log entry at the given {@code position}. To
-     * truncate all log entries, pass {@link #end()}.
+     * Removes all log entries preceding the log entry at the given {@code position}.
      *
      * @param position the position of the latest entry to remove
      * @throws InvalidPositionException if the specified position does not exist in this log
      * @throws StreamAccessException if the stream could not be truncated
      */
     void truncateBefore(Position position) throws InvalidPositionException, StreamAccessException;
-
-    /**
-     * Returns a position of the first (oldest) log entry.
-     *
-     * @return the position of the first stream log entry
-     */
-    Position beginning();
-
-    /**
-     * Returns a position that never points to any entry but is guaranteed to immediately follow
-     * the last (newest) log entry.
-     *
-     * @return the position immediately following the last stream log entry
-     */
-    Position end();
-
-    /**
-     * Exchanges an {@code identity} obtained from {@link Position#identity()} for the position
-     * uniquely associated with it.  Useful for restoring saved checkpoints.
-     *
-     * @param identity the identity obtained from a prior call to {@link Position#identity()}
-     * @return the corresponding position
-     * @throws InvalidPositionException if identity does not represent a position in this stream
-     */
-    Position position(byte[] identity) throws InvalidPositionException;
   }
 
   /**

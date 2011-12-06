@@ -3,7 +3,6 @@ package com.twitter.mesos.scheduler.storage.db;
 import java.sql.SQLException;
 import java.util.Set;
 
-import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -147,28 +146,14 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
   }
 
   @Test
-  public void testCheckpointing() {
-    assertNull(store.fetchCheckpoint());
-
-    store.checkpoint(createCheckpoint("bob"));
-    store.checkpoint(createCheckpoint("fred"));
-    assertEquals("fred", decodeCheckpoint(store.fetchCheckpoint()));
-
-    store.checkpoint(createCheckpoint("bob"));
-    assertEquals("bob", decodeCheckpoint(store.fetchCheckpoint()));
-  }
-
-  @Test
   public void testSnapshotting() {
     String frameworkId = "framework";
-    String user = "jim";
     String role = "jake";
     String job = "fortune";
     String token = "please";
     byte[] snapshot1 = store.createSnapshot();
 
     store.saveFrameworkId(frameworkId);
-    store.checkpoint(createCheckpoint("1"));
     byte[] snapshot2 = store.createSnapshot();
 
     JobConfiguration fortuneCron = createJobConfig(job, role, job);
@@ -183,18 +168,15 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
         new TaskUpdateConfiguration(originalTaskInfo, newTaskInfo);
     store.saveShardUpdateConfigs(role, job, token,
         ImmutableSet.<TaskUpdateConfiguration>of(updateConfiguration));
-    store.checkpoint(createCheckpoint("2"));
     byte[] snapshot3 = store.createSnapshot();
 
     store.applySnapshot(snapshot1);
-    assertNull(store.fetchCheckpoint());
     assertNull(store.fetchFrameworkId());
     assertTrue(Iterables.isEmpty(store.fetchJobs("CRON")));
     assertTrue(store.fetchTaskIds(Query.GET_ALL).isEmpty());
     assertTrue(store.fetchShardUpdateConfigs(role).isEmpty());
 
     store.applySnapshot(snapshot3);
-    assertEquals("2", decodeCheckpoint(store.fetchCheckpoint()));
     assertEquals(frameworkId, store.fetchFrameworkId());
     assertEquals(ImmutableList.of(fortuneCron), ImmutableList.copyOf(store.fetchJobs("CRON")));
     assertEquals("42", Iterables.getOnlyElement(store.fetchTaskIds(Query.GET_ALL)));
@@ -206,7 +188,6 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
     assertEquals(newTaskInfo, config.getNewConfig());
 
     store.applySnapshot(snapshot2);
-    assertEquals("1", decodeCheckpoint(store.fetchCheckpoint()));
     assertEquals(frameworkId, store.fetchFrameworkId());
     assertTrue(Iterables.isEmpty(store.fetchJobs("CRON")));
     assertTrue(store.fetchTaskIds(Query.GET_ALL).isEmpty());
@@ -215,13 +196,5 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
 
   private JobConfiguration createJobConfig(String name, String role, String user) {
     return new JobConfiguration().setOwner(new Identity(role, user)).setName(name);
-  }
-
-  private byte[] createCheckpoint(String checkpoint) {
-    return checkpoint.getBytes(Charsets.UTF_8);
-  }
-
-  private String decodeCheckpoint(byte[] data) {
-    return new String(data, Charsets.UTF_8);
   }
 }

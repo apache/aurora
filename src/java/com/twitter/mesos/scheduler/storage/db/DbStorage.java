@@ -4,7 +4,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -36,7 +35,6 @@ import com.google.inject.Inject;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.thrift.TBase;
-import org.apache.thrift.TBaseHelper;
 import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TProtocol;
 import org.apache.thrift.transport.TIOStreamTransport;
@@ -73,11 +71,9 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.storage.ConfiguratonKey;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
-import com.twitter.mesos.gen.storage.migration.StorageMigrationResult;
-import com.twitter.mesos.gen.storage.migration.StorageMigrationResults;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.db.DbUtil;
-import com.twitter.mesos.scheduler.storage.CheckpointStore;
+import com.twitter.mesos.scheduler.storage.SnapshotStore;
 import com.twitter.mesos.scheduler.storage.JobStore;
 import com.twitter.mesos.scheduler.storage.QuotaStore;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
@@ -95,7 +91,7 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
  * @author John Sirois
  */
 public class DbStorage implements
-    CheckpointStore,
+    SnapshotStore<byte[]>,
     Storage,
     SchedulerStore,
     JobStore,
@@ -195,30 +191,14 @@ public class DbStorage implements
     checkNotNull(initilizationLogic);
 
     doInTransaction(new Work.NoResult.Quiet() {
-      @Override protected void execute(StoreProvider storeProvider) {
+      @Override
+      protected void execute(StoreProvider storeProvider) {
         ensureInitialized();
 
         initilizationLogic.apply(storeProvider);
         LOG.info("Applied initialization logic.");
       }
     });
-  }
-
-  /**
-   * Records a successful migration result.
-   *
-   * @param result The result to record.
-   */
-  @Timed("db_storage_mark_migration")
-  public void markMigration(final StorageMigrationResult result) {
-    checkNotNull(result);
-
-    updateSchedulerState(ConfiguratonKey.MIGRATION_RESULTS, new StorageMigrationResults(),
-        new Closure<StorageMigrationResults>() {
-          @Override public void execute(StorageMigrationResults fetched) {
-            fetched.putToResult(result.getPath(), result);
-          }
-        });
   }
 
   @Override
@@ -324,28 +304,6 @@ public class DbStorage implements
     } catch (IOException e) {
       throw new IllegalStateException(e);
     }
-  }
-
-  @Timed("db_storage_record_checkpoint")
-  @Override
-  public void checkpoint(final byte[] handle) {
-    updateSchedulerState(ConfiguratonKey.LAST_COMMITTED_LOG_POSITION,
-        new ExceptionalClosure<TProtocol, TException>() {
-          @Override public void execute(TProtocol stream) throws TException {
-            stream.writeBinary(ByteBuffer.wrap(handle));
-          }
-        });
-  }
-
-  @Timed("db_storage_fetch_checkpoint")
-  @Override
-  public byte[] fetchCheckpoint() {
-    return fetchSchedulerState(ConfiguratonKey.LAST_COMMITTED_LOG_POSITION,
-        new ExceptionalFunction<TProtocol, byte[], TException>() {
-          @Override public byte[] apply(TProtocol stream) throws TException {
-            return TBaseHelper.byteBufferToByteArray(stream.readBinary());
-          }
-        }, null);
   }
 
   private <T extends TBase<?, ?>> void updateSchedulerState(final ConfiguratonKey key,

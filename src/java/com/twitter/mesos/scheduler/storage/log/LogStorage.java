@@ -5,33 +5,24 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.nio.ByteBuffer;
 import java.util.Date;
 import java.util.Set;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.annotation.Nullable;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
 
-import org.apache.commons.codec.binary.Hex;
-
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Closure;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
-import com.twitter.common.util.Clock;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.JobConfiguration;
@@ -51,14 +42,13 @@ import com.twitter.mesos.gen.storage.SaveTasks;
 import com.twitter.mesos.gen.storage.Snapshot;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 import com.twitter.mesos.scheduler.Query;
-import com.twitter.mesos.scheduler.log.Log.Position;
 import com.twitter.mesos.scheduler.log.Log.Stream.InvalidPositionException;
 import com.twitter.mesos.scheduler.log.Log.Stream.StreamAccessException;
-import com.twitter.mesos.scheduler.storage.CheckpointStore;
 import com.twitter.mesos.scheduler.storage.ForwardingStore;
 import com.twitter.mesos.scheduler.storage.JobStore;
 import com.twitter.mesos.scheduler.storage.QuotaStore;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
+import com.twitter.mesos.scheduler.storage.SnapshotStore;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.TaskStore;
 import com.twitter.mesos.scheduler.storage.UpdateStore;
@@ -107,7 +97,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 public class LogStorage extends ForwardingStore {
 
-
   /**
    * A service that can schedule an action to be executed periodically.
    */
@@ -147,11 +136,9 @@ public class LogStorage extends ForwardingStore {
   private static final Logger LOG = Logger.getLogger(LogStorage.class.getName());
 
   private final LogManager logManager;
-  private final Clock clock;
   private final SchedulingService schedulingService;
-  private final CheckpointStore checkpointStore;
+  private final SnapshotStore<Snapshot> snapshotStore;
   private final Amount<Long, Time> snapshotInterval;
-  private final Amount<Long, Time> checkpointInterval;
 
   private StreamManager streamManager;
 
@@ -163,14 +150,6 @@ public class LogStorage extends ForwardingStore {
   @Target({ElementType.PARAMETER, ElementType.METHOD})
   @BindingAnnotation
   public @interface ShutdownGracePeriod {}
-
-  /**
-   * Identifies the interval between checkpoints of the log position to local storage.
-   */
-  @Retention(RetentionPolicy.RUNTIME)
-  @Target({ElementType.PARAMETER, ElementType.METHOD})
-  @BindingAnnotation
-  public @interface CheckpointInterval {}
 
   /**
    * Identifies the interval between snapshots of local storage truncating the log.
@@ -191,11 +170,9 @@ public class LogStorage extends ForwardingStore {
 
   @Inject
   LogStorage(LogManager logManager,
-      Clock clock,
       ShutdownRegistry shutdownRegistry,
       @ShutdownGracePeriod Amount<Long, Time> shutdownGracePeriod,
-      CheckpointStore checkpointStore,
-      @CheckpointInterval Amount<Long, Time> checkpointInterval,
+      SnapshotStore<Snapshot> snapshotStore,
       @SnapshotInterval Amount<Long, Time> snapshotInterval,
       @WriteBehind Storage storage,
       @WriteBehind SchedulerStore schedulerStore,
@@ -204,18 +181,22 @@ public class LogStorage extends ForwardingStore {
       @WriteBehind UpdateStore updateStore,
       @WriteBehind QuotaStore quotaStore) {
 
-    this(logManager, clock,
+    this(logManager,
         new ScheduledExecutorSchedulingService(shutdownRegistry, shutdownGracePeriod),
-        checkpointStore, checkpointInterval, snapshotInterval, storage, schedulerStore, jobStore,
-        taskStore, updateStore, quotaStore);
+        snapshotStore,
+        snapshotInterval,
+        storage,
+        schedulerStore,
+        jobStore,
+        taskStore,
+        updateStore,
+        quotaStore);
   }
 
   @VisibleForTesting
   LogStorage(LogManager logManager,
-      Clock clock,
       SchedulingService schedulingService,
-      CheckpointStore checkpointStore,
-      Amount<Long, Time> checkpointInterval,
+      SnapshotStore<Snapshot> snapshotStore,
       Amount<Long, Time> snapshotInterval,
       Storage storage,
       SchedulerStore schedulerStore,
@@ -226,10 +207,8 @@ public class LogStorage extends ForwardingStore {
 
     super(storage, schedulerStore, jobStore, taskStore, updateStore, quotaStore);
     this.logManager = checkNotNull(logManager);
-    this.clock = checkNotNull(clock);
     this.schedulingService = checkNotNull(schedulingService);
-    this.checkpointStore = checkNotNull(checkpointStore);
-    this.checkpointInterval = checkNotNull(checkpointInterval);
+    this.snapshotStore = checkNotNull(snapshotStore);
     this.snapshotInterval = checkNotNull(snapshotInterval);
   }
 
@@ -255,7 +234,7 @@ public class LogStorage extends ForwardingStore {
         // Must have the underlying storage started so we can query it for the last checkpoint.
         // We replay these entries in the forwarded storage system's transactions but not ours - we
         // do not want to re-record these ops to the log.
-        checkpoint(recover());
+        recover();
         recovered = true;
 
         // Now that we're recovered we should let any mutations done in initializationLogic append
@@ -264,37 +243,13 @@ public class LogStorage extends ForwardingStore {
       }
     });
 
-    scheduleCheckpoints();
     scheduleSnapshots();
   }
 
   @Timed("scheduler_log_recover")
-  @Nullable
-  Position recover() throws RecoveryFailedException {
-    @Nullable byte[] checkpoint = checkpointStore.fetchCheckpoint();
+  void recover() throws RecoveryFailedException {
     try {
-      return recoverFrom(checkpoint);
-    } catch (RecoveryFailedException e) {
-      if (checkpoint != null) {
-        LOG.log(Level.WARNING,
-            String.format("Failed to recover from checkpoint: 0x%s, attempting to recover using " +
-                          "complete log.", Hex.encodeHexString(checkpoint)),
-            e);
-        return recoverFrom(null);
-      }
-      throw e;
-    }
-  }
-
-  private static class RecoveryFailedException extends RuntimeException {
-    private RecoveryFailedException(Throwable cause) {
-      super(cause);
-    }
-  }
-
-  private Position recoverFrom(@Nullable byte[] checkpoint) throws RecoveryFailedException {
-    try {
-      return streamManager.readAfter(checkpoint, new Closure<LogEntry>() {
+      streamManager.readFromBeginning(new Closure<LogEntry>() {
         @Override public void execute(LogEntry logEntry) {
           replay(logEntry);
         }
@@ -308,12 +263,18 @@ public class LogStorage extends ForwardingStore {
     }
   }
 
+  private static class RecoveryFailedException extends RuntimeException {
+    private RecoveryFailedException(Throwable cause) {
+      super(cause);
+    }
+  }
+
   void replay(final LogEntry logEntry) {
     switch (logEntry.getSetField()) {
       case SNAPSHOT:
         Snapshot snapshot = logEntry.getSnapshot();
         LOG.info("Applying snapshot taken on " + new Date(snapshot.getTimestamp()));
-        checkpointStore.applySnapshot(snapshot.getData());
+        snapshotStore.applySnapshot(snapshot);
         break;
 
       case TRANSACTION:
@@ -379,37 +340,6 @@ public class LogStorage extends ForwardingStore {
     }
   }
 
-  // We use a single slot queue to allow the emitter side to be unaware of period policy, offered
-  // checkpoints will just be silently dropped while the 1st in line awaits storage.
-  private final BlockingQueue<Position> checkpoints = new ArrayBlockingQueue<Position>(1);
-
-  @VisibleForTesting
-  void checkpoint(@Nullable Position position) {
-    if (position != null) {
-      checkpoints.offer(position);
-    }
-  }
-
-  private void scheduleCheckpoints() {
-    if (checkpointInterval.getValue() > 0) {
-      schedulingService.doEvery(checkpointInterval, new Runnable() {
-        @Override public void run() {
-          acceptCheckpoint();
-        }
-      });
-    }
-  }
-
-  @VisibleForTesting
-  void acceptCheckpoint() {
-    try {
-      checkpointStore.checkpoint(checkpoints.take().identity());
-    } catch (InterruptedException e) {
-      LOG.warning("Interrupted while waiting to accepting the next checkpoint");
-      Thread.currentThread().interrupt();
-    }
-  }
-
   private void scheduleSnapshots() {
     if (snapshotInterval.getValue() > 0) {
       schedulingService.doEvery(snapshotInterval, new Runnable() {
@@ -435,10 +365,7 @@ public class LogStorage extends ForwardingStore {
       @Override protected void execute(StoreProvider unused)
           throws CodingException, InvalidPositionException, StreamAccessException {
 
-        long timestamp = clock.nowMillis();
-        byte[] data = checkpointStore.createSnapshot();
-        streamManager.snapshot(new Snapshot(timestamp, ByteBuffer.wrap(data)));
-        LOG.info("Snapshot taken consuming " + Amount.of(data.length, Data.BYTES));
+        streamManager.snapshot(snapshotStore.createSnapshot());
       }
     });
   }
@@ -481,7 +408,7 @@ public class LogStorage extends ForwardingStore {
         @Override public T apply(StoreProvider unused) throws E {
           T result = work.apply(logStoreProvider);
           try {
-            checkpoint(transaction.commit());
+            transaction.commit();
           } catch (CodingException e) {
             throw new IllegalStateException(
                 "Problem encoding transaction operations to the log stream", e);

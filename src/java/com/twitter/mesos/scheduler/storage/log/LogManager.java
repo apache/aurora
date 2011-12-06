@@ -3,22 +3,15 @@ package com.twitter.mesos.scheduler.storage.log;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
-import javax.annotation.Nullable;
-
-import com.google.common.base.Functions;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
 import com.twitter.common.application.ShutdownRegistry;
@@ -73,8 +66,8 @@ final class LogManager {
 
   /**
    * Manages interaction with the log stream.  Log entries can be
-   * {@link #readAfter(byte[], com.twitter.common.base.Closure) read after} a last known good
-   * position, a {@link #startTransaction() transaction} consisting of one or more local storage
+   * {@link #readFromBeginning(com.twitter.common.base.Closure) read from} the beginning,
+   * a {@link #startTransaction() transaction} consisting of one or more local storage
    * operations can be committed atomically, or the log can be compacted by
    * {@link #snapshot(com.twitter.mesos.gen.storage.Snapshot) snapshotting}.
    */
@@ -101,35 +94,23 @@ final class LogManager {
      * Reads all entries in the log stream after the given position.  If the position
      * supplied is {@code null} then all log entries in the stream will be read.
      *
-     * @param position The position immediately before the first position to read.
      * @param reader A reader that will be handed log entries decoded from the stream.
-     * @return The position of the last LogEntry that was read.
      * @throws CodingException if there was a problem decoding a log entry from the stream.
      * @throws InvalidPositionException if the given position is not found in the log.
      * @throws StreamAccessException if there is a problem reading from the log.
      */
-    @Nullable
-    Position readAfter(@Nullable byte[] position, Closure<LogEntry> reader)
+    void readFromBeginning(Closure<LogEntry> reader)
         throws CodingException, InvalidPositionException, StreamAccessException {
 
-      Iterator<Entry> entries =
-          stream.readFrom(position == null ? stream.beginning() : stream.position(position));
+      Iterator<Entry> entries = stream.readAll();
 
-      if (position != null && entries.hasNext()) {
-        // Discard the known position.
-        entries.next();
-      }
-
-      Position last = null;
       while (entries.hasNext()) {
         Entry entry = entries.next();
-        last = entry.position();
         byte[] contents = entry.contents();
         reader.execute(ThriftBinaryCodec.decodeNonNull(LogEntry.class, contents));
         vars.logBytesRead.addAndGet(contents.length);
         vars.logEntriesRead.incrementAndGet();
       }
-      return last;
     }
 
     /**
@@ -160,32 +141,22 @@ final class LogManager {
      * snapshot.
      *
      * @param snapshot The snapshot to add.
-     * @return The position of the snapshot log entry.
      * @throws CodingException if the was a problem encoding the snapshot into a log entry.
      * @throws InvalidPositionException if there was a problem truncating before the snapshot.
      * @throws StreamAccessException if there was a problem appending the snapshot to the log.
      */
     @Timed("scheduler_log_snapshot")
-    Position snapshot(Snapshot snapshot)
+    void snapshot(Snapshot snapshot)
         throws CodingException, InvalidPositionException, StreamAccessException {
 
-      Position position = append(LogEntry.snapshot(snapshot));
+      Position position = appendAndGetPosition(LogEntry.snapshot(snapshot));
       vars.logSnapshots.incrementAndGet();
       vars.unSnapshottedTransactions.set(0);
       stream.truncateBefore(position);
-      return position;
     }
 
-    /**
-     * Appends an entry to the log and returns the entry's position in the log if successful.
-     *
-     * @param logEntry The entry to append to the log.
-     * @return The position of the appended log entry.
-     * @throws CodingException if there was a problem encoding the log entry.
-     * @throws StreamAccessException if there was a problem appending to the log.
-     */
     @Timed("scheduler_log_append")
-    Position append(LogEntry logEntry) throws CodingException, StreamAccessException {
+    private Position appendAndGetPosition(LogEntry logEntry) throws CodingException {
       byte[] entry = ThriftBinaryCodec.encodeNonNull(logEntry);
       Position position = stream.append(entry);
       vars.logBytesWritten.addAndGet(entry.length);
@@ -212,7 +183,7 @@ final class LogManager {
        * @return The position of the log entry committed in this transaction, if any.
        * @throws CodingException If there was a problem encoding a log entry for commit.
        */
-      Position commit() throws CodingException, StreamAccessException {
+      Position commit() throws CodingException {
         Preconditions.checkState(!committed.getAndSet(true),
             "Can only call commit once per transaction.");
 
@@ -220,7 +191,7 @@ final class LogManager {
           return null;
         }
 
-        Position position = append(LogEntry.transaction(transaction));
+        Position position = appendAndGetPosition(LogEntry.transaction(transaction));
         vars.unSnapshottedTransactions.incrementAndGet();
         return position;
       }

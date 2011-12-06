@@ -16,8 +16,9 @@ import com.twitter.common.base.Closure;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Clock;
+import com.twitter.mesos.gen.storage.Snapshot;
 import com.twitter.mesos.scheduler.log.mesos.MesosLogStreamModule;
-import com.twitter.mesos.scheduler.storage.CheckpointStore;
+import com.twitter.mesos.scheduler.storage.SnapshotStore;
 import com.twitter.mesos.scheduler.storage.JobStore;
 import com.twitter.mesos.scheduler.storage.QuotaStore;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
@@ -26,7 +27,6 @@ import com.twitter.mesos.scheduler.storage.TaskStore;
 import com.twitter.mesos.scheduler.storage.UpdateStore;
 import com.twitter.mesos.scheduler.storage.db.DbStorage;
 import com.twitter.mesos.scheduler.storage.db.DbStorageModule;
-import com.twitter.mesos.scheduler.storage.log.LogStorage.CheckpointInterval;
 import com.twitter.mesos.scheduler.storage.log.LogStorage.ShutdownGracePeriod;
 import com.twitter.mesos.scheduler.storage.log.LogStorage.SnapshotInterval;
 
@@ -43,11 +43,6 @@ public class LogStorageModule extends AbstractModule {
                   + "actions to complete before forcibly shutting down.")
   private static final Arg<Amount<Long, Time>> shutdownGracePeriod =
       Arg.create(Amount.of(2L, Time.SECONDS));
-
-  @CmdLine(name = "dlog_checkpoint_interval",
-           help = "Specifies the frequency at which log checkpoints are written to local storage.")
-  private static final Arg<Amount<Long, Time>> checkpointInterval =
-      Arg.create(Amount.of(1L, Time.SECONDS));
 
   @CmdLine(name = "dlog_snapshot_interval",
            help = "Specifies the frequency at which snapshots of local storage are taken and "
@@ -69,8 +64,12 @@ public class LogStorageModule extends AbstractModule {
     // the core log exposing its listener interface.  No need to store twice.
     DbStorageModule.bind(binder, LogStorage.WriteBehind.class, new Closure<PrivateBinder>() {
       @Override public void execute(PrivateBinder binder) {
-        binder.bind(CheckpointStore.class).to(DbStorage.class);
-        binder.expose(CheckpointStore.class);
+        binder.bind(new TypeLiteral<SnapshotStore<byte[]>>() {}).to(DbStorage.class);
+
+        TypeLiteral<SnapshotStore<Snapshot>> snapshotStoreType =
+            new TypeLiteral<SnapshotStore<Snapshot>>() {};
+        binder.bind(snapshotStoreType).to(SnapshotStoreImpl.class);
+        binder.expose(snapshotStoreType);
 
         Key<SchedulerStore> SCHEDULER_STORE_KEY = createKey(SchedulerStore.class);
         binder.bind(SCHEDULER_STORE_KEY).to(DbStorage.class);
@@ -104,7 +103,6 @@ public class LogStorageModule extends AbstractModule {
     requireBinding(ShutdownRegistry.class);
 
     bindInterval(ShutdownGracePeriod.class, shutdownGracePeriod);
-    bindInterval(CheckpointInterval.class, checkpointInterval);
     bindInterval(SnapshotInterval.class, snapshotInterval);
 
     bind(LogManager.class).in(Singleton.class);

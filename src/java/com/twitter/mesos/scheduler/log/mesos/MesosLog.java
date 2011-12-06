@@ -17,7 +17,6 @@ import org.apache.mesos.Log;
 import com.twitter.common.base.Function;
 import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.inject.TimedInterceptor.Timed;
-import com.twitter.common.stats.RequestStats;
 import com.twitter.common.stats.Stats;
 
 import static java.lang.annotation.ElementType.METHOD;
@@ -98,10 +97,7 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
 
     @Timed("scheduler_log_native_read_from")
     @Override
-    public Iterator<Entry> readFrom(
-        com.twitter.mesos.scheduler.log.Log.Position position) throws StreamAccessException {
-
-      Preconditions.checkArgument(position instanceof LogPosition);
+    public Iterator<Entry> readAll() throws StreamAccessException {
 
       // TODO(John Sirois): Currently we must be the coordinator to ensure we get the 'full read'
       // of log entries expected by the users of the com.twitter.mesos.scheduler.log.Log interface.
@@ -113,7 +109,7 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
         throw new StreamAccessException("Error writing noop prior to a read", e);
       }
 
-      Log.Position from = ((LogPosition) position).unwrap();
+      Log.Position from = reader.beginning();
       Log.Position to = end().unwrap();
       try {
         List<Log.Entry> entries = reader.read(from, to);
@@ -188,21 +184,8 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
       }
     }
 
-    @Override
-    public LogPosition beginning() {
-      return LogPosition.wrap(reader.beginning());
-    }
-
-    @Override
-    public LogPosition end() {
+    private LogPosition end() {
       return LogPosition.wrap(reader.ending());
-    }
-
-    @Override
-    public LogPosition position(byte[] identity) {
-      Preconditions.checkNotNull(identity);
-
-      return LogPosition.wrap(log.position(identity));
     }
 
     @Override
@@ -225,10 +208,6 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
         return underlying;
       }
 
-      @Override public byte[] identity() {
-        return underlying.identity();
-      }
-
       @Override public int compareTo(Position o) {
         Preconditions.checkArgument(o instanceof LogPosition);
         return underlying.compareTo(((LogPosition) o).underlying);
@@ -240,11 +219,6 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
 
       public LogEntry(Log.Entry entry) {
         this.underlying = entry;
-      }
-
-      @Override
-      public LogPosition position() {
-        return LogPosition.wrap(underlying.position);
       }
 
       @Override
