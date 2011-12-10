@@ -443,29 +443,34 @@ class StateManager {
    *
    * @param role Role owning the update to finish.
    * @param job Job to finish updating.
-   * @param updateToken Token associated with the update.  If not present, the token must match the
+   * @param updateToken Token associated with the update.  If present, the token must match the
    *     the stored token for the update.
    * @param result The result of the update.
+   * @param throwIfMissing If {@code true}, this throws UpdateException when the update is missing.
+   * @return {@code true} if the update was finished, false if nonexistent.
    * @throws UpdateException If an update is not in-progress for the job, or the non-null token
    *     does not match the stored token.
    */
-  synchronized void finishUpdate(final String role, final String job,
-      final Optional<String> updateToken, final UpdateResult result) throws UpdateException {
+  synchronized boolean finishUpdate(final String role, final String job,
+      final Optional<String> updateToken, final UpdateResult result, final boolean throwIfMissing)
+      throws UpdateException {
     checkNotBlank(role);
     checkNotBlank(job);
 
-    transactionalStorage.doInTransaction(new NoResult<UpdateException>() {
-      @Override protected void execute(Storage.StoreProvider storeProvider) throws UpdateException {
+    return transactionalStorage.doInTransaction(new Work<Boolean, UpdateException>() {
+      @Override public Boolean apply(StoreProvider storeProvider) throws UpdateException {
         UpdateStore updateStore = storeProvider.getUpdateStore();
 
         String jobKey = Tasks.jobKey(role, job);
 
         // Since we store all shards in a job with the same token, we can just check shard 0,
         // which is always guaranteed to exist for a job.
-        UpdateStore.ShardUpdateConfiguration updateConfig =
-            updateStore.fetchShardUpdateConfig(role, job, 0);
+        ShardUpdateConfiguration updateConfig = updateStore.fetchShardUpdateConfig(role, job, 0);
         if (updateConfig == null) {
-          throw new UpdateException("Update does not exist for " + jobKey);
+          if (throwIfMissing) {
+            throw new UpdateException("Update does not exist for " + jobKey);
+          }
+          return false;
         }
 
         if ((updateToken.isPresent()) && !updateToken.get().equals(updateConfig.getUpdateToken())) {
@@ -479,6 +484,7 @@ class StateManager {
         }
 
         updateStore.removeShardUpdateConfigs(role, job);
+        return true;
       }
     });
   }

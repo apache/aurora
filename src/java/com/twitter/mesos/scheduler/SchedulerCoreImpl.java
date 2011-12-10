@@ -454,32 +454,26 @@ public class SchedulerCoreImpl implements SchedulerCore {
     checkNotNull(query);
     LOG.info("Killing tasks matching " + query);
 
-    // If this looks like a query for all tasks in a job, instruct the scheduler modules to
-    // delete the job.
     boolean matchingScheduler = false;
+    boolean updateFinished = false;
 
     if (query.specifiesJobOnly()) {
-      String jobKey = query.getJobKey();
-
+      // If this looks like a query for all tasks in a job, instruct the scheduler modules to
+      // delete the job.
       for (JobManager manager : jobManagers) {
-        if (manager.deleteJob(jobKey)) {
-          matchingScheduler = true;
-        }
+        matchingScheduler = manager.deleteJob(query.getJobKey()) || matchingScheduler;
       }
-    }
 
-    boolean updateFinished = false;
-    if (!matchingScheduler && query.specifiesJobOnly()) {
-      try {
-        stateManager.finishUpdate(
-            query.base().getOwner().getRole(), query.base().getJobName(),
-            Optional.<String>absent(),
-            UpdateResult.TERMINATE);
-        updateFinished = true;
-      } catch (UpdateException e) {
-        LOG.log(Level.WARNING,
-            "Failed to kill the job update associated with " + query.getJobKey(),
-            e.getMessage());
+      String role = query.base().getOwner().getRole();
+      String job = query.base().getJobName();
+      if (!matchingScheduler) {
+        try {
+          updateFinished = stateManager.finishUpdate(
+              role, job, Optional.<String>absent(), UpdateResult.TERMINATE, false);
+        } catch (UpdateException e) {
+          LOG.severe(String.format("Could not terminate job update for %s\n%s",
+              query.getJobKey(), e.getMessage()));
+        }
       }
     }
 
@@ -601,7 +595,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     checkStarted();
 
     try {
-      stateManager.finishUpdate(role, jobName, updateToken, result);
+      stateManager.finishUpdate(role, jobName, updateToken, result, true);
     } catch (StateManager.UpdateException e) {
       LOG.log(Level.INFO, "Failed to finish update.", e);
       throw new ScheduleException(e.getMessage(), e);

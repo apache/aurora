@@ -36,8 +36,10 @@ import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.UNKNOWN;
+import static com.twitter.mesos.scheduler.StateManager.UpdateException;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -165,8 +167,18 @@ public class StateManagerTest extends BaseStateManagerTest {
 
     insertTask(taskInfo);
 
+    try {
+      stateManager.finishUpdate(
+          "jim", "myJob", Optional.<String>absent(), UpdateResult.SUCCESS, true);
+    } catch (UpdateException e) {
+      // expected
+    }
+
     String token = stateManager.registerUpdate("jim", "myJob", ImmutableSet.of(taskInfo));
-    stateManager.finishUpdate("jim", "myJob", Optional.of(token), UpdateResult.SUCCESS);
+    assertTrue(stateManager.finishUpdate(
+        "jim", "myJob", Optional.of(token), UpdateResult.SUCCESS, true));
+    assertFalse(stateManager.finishUpdate(
+        "jim", "myJob", Optional.of(token), UpdateResult.SUCCESS, false));
   }
 
   @Test
