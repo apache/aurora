@@ -9,6 +9,7 @@ import org.junit.Before;
 import org.springframework.transaction.TransactionException;
 
 import com.twitter.common.base.Closure;
+import com.twitter.common.stats.Stats;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 import com.twitter.mesos.gen.Identity;
@@ -33,11 +34,22 @@ public abstract class BaseStateManagerTest extends EasyMockTest {
 
   @Before
   public void stateManagerSetUp() throws Exception {
+    resetStats();
+
     killTaskCallback = createMock(new Clazz<Closure<String>>() {});
     stateManager = createStateManager();
   }
 
+  /**
+   * Flush residual stats from different tests, and stats exported by StateManager creation during
+   * test setup methods.
+   */
+  protected void resetStats() {
+    Stats.flush();
+  }
+
   protected StateManager createStateManager(final Storage wrappedStorage) {
+    resetStats();
     this.storage = new Storage() {
       @Override public void prepare() {
         wrappedStorage.prepare();
@@ -84,7 +96,7 @@ public abstract class BaseStateManagerTest extends EasyMockTest {
     transactionsUntilFailure = n;
   }
 
-  private StateManager createStateManager() throws Exception {
+  protected StateManager createStateManager() throws Exception {
     return createStateManager(createStorage());
   }
 

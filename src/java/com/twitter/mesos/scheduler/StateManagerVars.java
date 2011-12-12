@@ -1,14 +1,20 @@
 package com.twitter.mesos.scheduler;
 
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
 
+import javax.annotation.Nullable;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Function;
+import com.google.common.base.Functions;
+import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.collect.Maps;
 
 import com.twitter.common.collections.Pair;
+import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
 import com.twitter.mesos.gen.ScheduleStatus;
 
@@ -26,39 +32,85 @@ class StateManagerVars {
     final Vars vars = new Vars();
   }
 
-  static final class Vars {
-    private final Cache<Pair<String, ScheduleStatus>, AtomicLong> countersByJobKeyAndStatus =
-        CacheBuilder.newBuilder().build(
-            new CacheLoader<Pair<String, ScheduleStatus>, AtomicLong>() {
-              @Override public AtomicLong load(Pair<String, ScheduleStatus> jobAndStatus) {
-                String jobKey = jobAndStatus.getFirst();
-                ScheduleStatus status = jobAndStatus.getSecond();
-                return Stats.exportLong("job_" + jobKey + "_tasks_" + status.name());
-              }
-            });
+  /**
+   * Custom stat class so that we can delay stat export.  This allows us to prevent
+   * false values reported while the database is being loaded.
+   */
+  private static class Var extends StatImpl<Long> {
+    private volatile long value = 0;
 
-    private final Cache<ScheduleStatus, AtomicLong> countersByStatus =
-        CacheBuilder.newBuilder().build(new CacheLoader<ScheduleStatus, AtomicLong>() {
-          @Override public AtomicLong load(ScheduleStatus status) {
-            return Stats.exportLong("task_store_" + status);
-          }
-        });
+    public Var(String name) {
+      super(name);
+    }
+
+    @Override public Long read() {
+      return value;
+    }
+
+    void increment() {
+      value++;
+    }
+
+    void decrement() {
+      value--;
+    }
+  }
+
+  static final class Vars {
+    private volatile boolean exporting = false;
+    private final Function<Var, Var> maybeExport = new Function<Var, Var>() {
+      @Override public Var apply(Var var) {
+        if (exporting) {
+          Stats.export(var);
+        }
+        return var;
+      }
+    };
+
+    private final Cache<Pair<String, ScheduleStatus>, Var> varsByJobKeyAndStatus =
+        CacheBuilder.newBuilder().build(
+            CacheLoader.from(Functions.compose(maybeExport,
+                new Function<Pair<String, ScheduleStatus>, Var>() {
+                  @Override public Var apply(Pair<String, ScheduleStatus> jobAndStatus) {
+                    String jobKey = jobAndStatus.getFirst();
+                    ScheduleStatus status = jobAndStatus.getSecond();
+                    return new Var(getVarName(jobKey, status));
+                  }
+                })));
+
+    private final Cache<ScheduleStatus, Var> varsByStatus = CacheBuilder.newBuilder().build(
+        CacheLoader.from(Functions.compose(maybeExport,
+            new Function<ScheduleStatus, Var>() {
+              @Override public Var apply(ScheduleStatus status) {
+                return new Var(getVarName(status));
+              }
+            })));
 
     Vars() {
       // Initialize by-status counters.
       for (ScheduleStatus status : ScheduleStatus.values()) {
-        countersByStatus.getUnchecked(status);
+        varsByStatus.getUnchecked(status);
       }
     }
 
+    @VisibleForTesting
+    String getVarName(String jobKey, ScheduleStatus status) {
+      return "job_" + jobKey + "_tasks_" + status.name();
+    }
+
+    @VisibleForTesting
+    String getVarName(ScheduleStatus status) {
+      return "task_store_" + status;
+    }
+
     public void incrementCount(String jobKey, ScheduleStatus status) {
-      countersByStatus.getUnchecked(status).incrementAndGet();
-      getCounter(jobKey, status).incrementAndGet();
+      varsByStatus.getUnchecked(status).increment();
+      varsByJobKeyAndStatus.getUnchecked(Pair.of(jobKey, status)).increment();
     }
 
     public void decrementCount(String jobKey, ScheduleStatus status) {
-      countersByStatus.getUnchecked(status).decrementAndGet();
-      getCounter(jobKey, status).decrementAndGet();
+      varsByStatus.getUnchecked(status).decrement();
+      varsByJobKeyAndStatus.getUnchecked(Pair.of(jobKey, status)).decrement();
     }
 
     public void adjustCount(String jobKey, ScheduleStatus oldStatus, ScheduleStatus newStatus) {
@@ -66,8 +118,15 @@ class StateManagerVars {
       incrementCount(jobKey, newStatus);
     }
 
-    public AtomicLong getCounter(String jobKey, ScheduleStatus status) {
-      return countersByJobKeyAndStatus.getUnchecked(Pair.of(jobKey, status));
+    public void beginExporting() {
+      Preconditions.checkState(!exporting, "Exporting has already started.");
+      exporting = true;
+      for (Var var : varsByStatus.asMap().values()) {
+        Stats.export(var);
+      }
+      for (Var var : varsByJobKeyAndStatus.asMap().values()) {
+        Stats.export(var);
+      }
     }
   }
 }

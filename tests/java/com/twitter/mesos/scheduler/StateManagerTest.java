@@ -1,5 +1,6 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.Set;
 
@@ -16,11 +17,14 @@ import org.junit.Test;
 
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.common.stats.Stat;
+import com.twitter.common.stats.Stats;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
+import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.storage.Storage.StorageException;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
@@ -40,6 +44,7 @@ import static com.twitter.mesos.scheduler.StateManager.UpdateException;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -59,19 +64,28 @@ public class StateManagerTest extends BaseStateManagerTest {
         makeTask("jack", "otherJob", 0));
     assertVarCount("jim", "myJob", PENDING, 1);
     assertVarCount("jack", "otherJob", PENDING, 1);
+    assertVarCount(PENDING, 2);
 
     String task1 = Iterables.get(taskIds, 0);
     assignTask(task1, HOST_A);
     assertVarCount("jim", "myJob", PENDING, 0);
     assertVarCount("jim", "myJob", ASSIGNED, 1);
+    assertVarCount(PENDING, 1);
+    assertVarCount(ASSIGNED, 1);
     changeState(task1, RUNNING);
     assertVarCount("jim", "myJob", ASSIGNED, 0);
     assertVarCount("jim", "myJob", RUNNING, 1);
+    assertVarCount(ASSIGNED, 0);
+    assertVarCount(RUNNING, 1);
     stateManager.abandonTasks(ImmutableSet.of(task1));
     assertVarCount("jim", "myJob", RUNNING, 0);
     assertVarCount("jim", "myJob", LOST, 0);
     assertVarCount("jim", "myJob", PENDING, 1);
     assertVarCount("jim", "myJob", UNKNOWN, 0);
+    assertVarCount(RUNNING, 0);
+    assertVarCount(LOST, 0);
+    assertVarCount(PENDING, 2);
+    assertVarCount(UNKNOWN, 0);
     assertTrue(stateManager.fetchTasks(Query.byId(task1)).isEmpty());
   }
 
@@ -87,8 +101,10 @@ public class StateManagerTest extends BaseStateManagerTest {
     changeState(task1, RUNNING);
     changeState(task1, FINISHED);
     assertVarCount("jim", "myJob", FINISHED, 1);
+    assertVarCount(FINISHED, 1);
     stateManager.abandonTasks(ImmutableSet.of(task1));
     assertVarCount("jim", "myJob", FINISHED, 0);
+    assertVarCount(FINISHED, 0);
     assertTrue(stateManager.fetchTasks(Query.byId(task1)).isEmpty());
   }
 
@@ -98,10 +114,14 @@ public class StateManagerTest extends BaseStateManagerTest {
 
     String taskId = insertTask(makeTask("jim", "myJob", 0));
     assertVarCount("jim", "myJob", PENDING, 1);
+    assertVarCount(PENDING, 1);
     assertEquals(1, changeState(taskId, KILLING));
     assertVarCount("jim", "myJob", PENDING, 0);
     assertVarCount("jim", "myJob", KILLING, 0);
     assertVarCount("jim", "myJob", UNKNOWN, 0);
+    assertVarCount(PENDING, 0);
+    assertVarCount(KILLING, 0);
+    assertVarCount(UNKNOWN, 0);
     assertEquals(0, changeState(taskId, KILLING));
   }
 
@@ -117,16 +137,19 @@ public class StateManagerTest extends BaseStateManagerTest {
     changeState(taskId, RUNNING);
     changeState(taskId, KILLING);
     assertVarCount("jim", "myJob", KILLING, 1);
+    assertVarCount(KILLING, 1);
     changeState(taskId, UNKNOWN);
     assertVarCount("jim", "myJob", KILLING, 0);
     assertVarCount("jim", "myJob", UNKNOWN, 0);
+    assertVarCount(KILLING, 0);
+    assertVarCount(UNKNOWN, 0);
   }
 
   @Test
   public void testTimedoutTask() {
     Multimap<ScheduleStatus, ScheduleStatus> testCases =
         ImmutableMultimap.<ScheduleStatus, ScheduleStatus>builder()
-            .putAll(ASSIGNED)
+            .putAll(ASSIGNED, Collections.<ScheduleStatus>emptyList())
             .putAll(STARTING, ASSIGNED)
             .putAll(PREEMPTING, ASSIGNED, RUNNING)
             .putAll(RESTARTING, ASSIGNED, RUNNING)
@@ -154,10 +177,11 @@ public class StateManagerTest extends BaseStateManagerTest {
   @Test
   public void testInitNormallyHidden() throws Exception {
     control.replay();
-    stateManager = createStateManager(storage);
 
     insertTask(makeTask("jim", "myJob", 0));
     assertVarCount("jim", "myJob", PENDING, 1);
+    assertVarCount(INIT, 0);
+    assertVarCount(PENDING, 1);
   }
 
   @Test
@@ -198,6 +222,7 @@ public class StateManagerTest extends BaseStateManagerTest {
     control.replay();
 
     assertVarCount("jim", "myJob", INIT, 1);
+    assertVarCount(INIT, 1);
   }
 
   @Test
@@ -218,6 +243,7 @@ public class StateManagerTest extends BaseStateManagerTest {
     control.replay();
 
     assertVarCount("jim", "myJob", UNKNOWN, 1);
+    assertVarCount(UNKNOWN, 1);
   }
 
   @Test
@@ -278,6 +304,29 @@ public class StateManagerTest extends BaseStateManagerTest {
 
     assertVarCount("jim", "myJob", INIT, 0);
     assertVarCount("jim", "myJob", PENDING, 0);
+    assertVarCount(INIT, 0);
+    assertVarCount(PENDING, 0);
+  }
+
+  @Test
+  public void testDelayedStatExport() throws Exception {
+    resetStats();
+
+    control.replay();
+
+    mutableState = new MutableState();
+    stateManager = new StateManager(storage, clock, mutableState);
+
+    // The database has not yet been loaded, so stats should be missing.
+    for (ScheduleStatus status : ScheduleStatus.values()) {
+      assertNull(Stats.getVariable(mutableState.vars.getVarName(status)));
+    }
+    stateManager.initialize();
+
+    // Now that we are initialized, all stats should be present.
+    for (ScheduleStatus status : ScheduleStatus.values()) {
+      assertVarCount(status, 0);
+    }
   }
 
   private String insertTask(TwitterTaskInfo task) {
@@ -289,7 +338,18 @@ public class StateManagerTest extends BaseStateManagerTest {
   }
 
   private void assertVarCount(String owner, String job, ScheduleStatus status, long expected) {
-    assertEquals(expected, mutableState.vars.getCounter(Tasks.jobKey(owner, job), status).get());
+    Stat<?> stat = getVar(mutableState.vars.getVarName(Tasks.jobKey(owner, job), status));
+    if ((expected != 0) || (stat != null)) {
+      assertEquals(expected, stat.read());
+    }
+  }
+
+  private void assertVarCount(ScheduleStatus status, long expected) {
+    assertEquals(expected, getVar(mutableState.vars.getVarName(status)).read());
+  }
+
+  private Stat<?> getVar(String name) {
+    return Stats.getVariable(Stats.normalizeName(name));
   }
 
   private int changeState(String taskId, ScheduleStatus status) {

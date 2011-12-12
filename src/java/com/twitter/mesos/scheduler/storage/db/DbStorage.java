@@ -1060,18 +1060,9 @@ public class DbStorage implements
     private final AtomicLong tasksAdded = Stats.exportLong("task_store_tasks_added");
     private final AtomicLong tasksRemoved = Stats.exportLong("task_store_tasks_removed");
     private final AtomicLong tasksMutated = Stats.exportLong("task_store_tasks_mutated");
-    private final AtomicLong tasksUpdated = Stats.exportLong("task_store_tasks_updated");
     private final AtomicLong tasksFetched = Stats.exportLong("task_store_tasks_fetched");
     private final AtomicLong taskIdsFetched = Stats.exportLong("task_store_task_ids_fetched");
     private final AtomicLong jobsFetched = Stats.exportLong("job_store_jobs_fetched");
-
-    Vars() {
-      Stats.export(new StatImpl<Integer>("task_store_size") {
-        @Override public Integer read() {
-          return getTaskStoreSize();
-        }
-      });
-    }
   }
 
   private final Vars vars = new Vars();
