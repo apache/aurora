@@ -145,7 +145,7 @@ public class SchedulerzRole extends StringTemplateServlet {
                 cronJob.name = job.getName();
                 cronJob.pendingTaskCount = job.getTaskConfigsSize();
                 cronJob.cronSchedule = job.getCronSchedule();
-                cronJob.nextRun = new Predictor(cronJob.cronSchedule).nextMatchingDate().toString();
+                cronJob.nextRun = new Predictor(cronJob.cronSchedule).nextMatchingDate().getTime();
                 return cronJob;
               }
             });
@@ -187,13 +187,13 @@ public class SchedulerzRole extends StringTemplateServlet {
 
   class CronJob extends Job {
     String cronSchedule;
-    String nextRun;
+    long nextRun;
 
     public String getCronSchedule() {
       return cronSchedule;
     }
 
-    public String getNextRun() {
+    public long getNextRun() {
       return nextRun;
     }
   }

@@ -18,7 +18,6 @@ import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.CronJobManager;
 import com.twitter.mesos.scheduler.LeaderRedirect;
 import com.twitter.mesos.scheduler.SchedulerCore;
-import com.twitter.mesos.scheduler.httphandlers.ImageAssets.HttpAssetModule;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 import com.twitter.thrift.ServiceInstance;
 
@@ -45,9 +44,14 @@ public class ServletModule extends AbstractModule {
     Registration.registerServlet(binder(), "/scheduler/job", SchedulerzJob.class, true);
     Registration.registerServlet(binder(), "/mname", Mname.class, false);
 
+    // Static assets.
+    Registration.registerHttpAsset(binder(), "/js/util.js", ServletModule.class,
+        "assets/util.js", "application/javascript", true);
+    Registration.registerHttpAsset(binder(), "/assets/thermos.png", ServletModule.class,
+        "assets/thermos.png", "image/png", true);
+
     bind(LeaderRedirect.class).in(Singleton.class);
     LifecycleModule.bindStartupAction(binder(), RedirectMonitor.class);
-    install(new HttpAssetModule());
   }
 
   static class RedirectMonitor implements ExceptionalCommand<MonitorException> {
