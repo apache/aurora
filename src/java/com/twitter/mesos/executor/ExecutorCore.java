@@ -45,6 +45,7 @@ import com.twitter.common.args.constraints.Exists;
 import com.twitter.common.args.constraints.NotNull;
 import com.twitter.common.base.Command;
 import com.twitter.common.base.ExceptionalClosure;
+import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
@@ -75,7 +76,7 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
   @CmdLine(name = "kill_orphan_task_schedule_interval",
            help = "the schedule interval of executing kill orphan task")
   private static final Arg<Amount<Integer, Time>> KILL_ORPHAN_TASK_SCHEDULE_INTERVAL =
-      Arg.create(Amount.of(10, Time.MINUTES));
+      Arg.create(Amount.of(2, Time.MINUTES));
 
   @NotNull
   @Exists
@@ -367,33 +368,35 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
     scheduledExecutorService.scheduleAtFixedRate(syncer, 30, 30, TimeUnit.SECONDS);
   }
 
-  private void startKillOrphanTask() {
-    Runnable killOrphanTask = new Runnable() {
-      @Override public void run() {
-        Map<Integer, String> runningProcesses = processScanner.getRunningProcesses();
-        // Kill running tasks that we don't think they are running.
-        Map<Integer, String> orphanTasks =
-            Maps.filterValues(runningProcesses, Predicates.not(isActiveTask));
-        LOG.info("Found orphan tasks: " + orphanTasks);
-        for (Entry<Integer, String> entry : orphanTasks.entrySet()) {
-          int pid = entry.getKey();
-          String taskId = entry.getValue();
-          orphansCount.incrementAndGet();
-          LOG.info(String.format("Killing orphan task pid:%d task id: %s.", pid, taskId));
-          try {
-            processKiller.execute(new KillCommand(pid));
-            orphansKilled.incrementAndGet();
-          } catch (KillException e) {
-            LOG.warning(String.format(
-                "Failed to kill orphan task pid:%d task id: %s.", pid, taskId));
-          }
-        }
+  @Timed("executor_kill_orphans")
+  private void killOrphanTasks() {
+    Map<Integer, String> runningProcesses = processScanner.getRunningProcesses();
+    // Kill running tasks that we don't think they are running.
+    Map<Integer, String> orphanTasks =
+        Maps.filterValues(runningProcesses, Predicates.not(isActiveTask));
+    LOG.info("Found orphan tasks: " + orphanTasks);
+    for (Entry<Integer, String> entry : orphanTasks.entrySet()) {
+      int pid = entry.getKey();
+      String taskId = entry.getValue();
+      orphansCount.incrementAndGet();
+      LOG.info(String.format("Killing orphan task pid:%d task id: %s.", pid, taskId));
+      try {
+        processKiller.execute(new KillCommand(pid));
+        orphansKilled.incrementAndGet();
+      } catch (KillException e) {
+        LOG.warning(String.format(
+            "Failed to kill orphan task pid:%d task id: %s.", pid, taskId));
       }
-    };
+    }
+  }
 
+  private void startKillOrphanTask() {
     int scheduleInterval = KILL_ORPHAN_TASK_SCHEDULE_INTERVAL.get().as(Time.SECONDS);
     LOG.info("Scheduled kill orphan task with interval(seconds):" + scheduleInterval);
-    scheduledExecutorService.scheduleAtFixedRate(
-        killOrphanTask, scheduleInterval, scheduleInterval, TimeUnit.SECONDS);
+    scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
+      @Override public void run() {
+        killOrphanTasks();
+      }
+    }, scheduleInterval, scheduleInterval, TimeUnit.SECONDS);
   }
 }
