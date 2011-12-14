@@ -21,6 +21,7 @@ import com.twitter.common.base.Closures;
 import com.twitter.common.base.Command;
 import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
@@ -97,7 +98,7 @@ public class LogStorageTest extends EasyMockTest {
     log = createMock(Log.class);
 
     shutdownRegistry = createMock(ShutdownRegistry.class);
-    LogManager logManager = new LogManager(log, shutdownRegistry);
+    LogManager logManager = new LogManager(log, Amount.of(1, Data.GB), shutdownRegistry);
 
     schedulingService = createMock(SchedulingService.class);
     snapshotStore = createMock(new Clazz<SnapshotStore<Snapshot>>() {});

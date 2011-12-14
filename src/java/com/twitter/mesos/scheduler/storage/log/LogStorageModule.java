@@ -14,19 +14,21 @@ import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.base.Closure;
 import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Clock;
 import com.twitter.mesos.gen.storage.Snapshot;
 import com.twitter.mesos.scheduler.log.mesos.MesosLogStreamModule;
-import com.twitter.mesos.scheduler.storage.SnapshotStore;
 import com.twitter.mesos.scheduler.storage.JobStore;
 import com.twitter.mesos.scheduler.storage.QuotaStore;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
+import com.twitter.mesos.scheduler.storage.SnapshotStore;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.TaskStore;
 import com.twitter.mesos.scheduler.storage.UpdateStore;
 import com.twitter.mesos.scheduler.storage.db.DbStorage;
 import com.twitter.mesos.scheduler.storage.db.DbStorageModule;
+import com.twitter.mesos.scheduler.storage.log.LogManager.MaxEntrySize;
 import com.twitter.mesos.scheduler.storage.log.LogStorage.ShutdownGracePeriod;
 import com.twitter.mesos.scheduler.storage.log.LogStorage.SnapshotInterval;
 
@@ -48,7 +50,13 @@ public class LogStorageModule extends AbstractModule {
            help = "Specifies the frequency at which snapshots of local storage are taken and "
                   + "written to the log.")
   private static final Arg<Amount<Long, Time>> snapshotInterval =
-      Arg.create(Amount.of(1L, Time.MINUTES));
+      Arg.create(Amount.of(5L, Time.MINUTES));
+
+  @CmdLine(name = "dlog_max_entry_size",
+           help = "Specifies the maximum entry size to append to the log. Larger entries will be "
+                  + "split across entry Frames.")
+  private static final Arg<Amount<Integer, Data>> maxLogEntrySize =
+      Arg.create(Amount.of(512, Data.KB));
 
   private static <T> Key<T> createKey(Class<T> clazz) {
     return Key.get(clazz, LogStorage.WriteBehind.class);
@@ -105,6 +113,8 @@ public class LogStorageModule extends AbstractModule {
     bindInterval(ShutdownGracePeriod.class, shutdownGracePeriod);
     bindInterval(SnapshotInterval.class, snapshotInterval);
 
+    bind(new TypeLiteral<Amount<Integer, Data>>() {}).annotatedWith(MaxEntrySize.class)
+        .toInstance(maxLogEntrySize.get());
     bind(LogManager.class).in(Singleton.class);
 
     bind(Storage.class).to(LogStorage.class);

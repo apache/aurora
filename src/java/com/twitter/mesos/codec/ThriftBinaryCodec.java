@@ -69,6 +69,9 @@ public class ThriftBinaryCodec {
   }
 
   public static class CodingException extends Exception {
+    public CodingException(String message) {
+      super(message);
+    }
     public CodingException(String msg, Throwable cause) {
       super(msg, cause);
     }

@@ -2,11 +2,15 @@ package com.twitter.mesos.scheduler.storage.log;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.security.MessageDigest;
+import java.util.List;
 
+import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
+import com.google.common.collect.Lists;
 
 import org.easymock.Capture;
 import org.junit.Before;
@@ -15,12 +19,16 @@ import org.junit.Test;
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.ExceptionalCommand;
-import com.twitter.common.base.Function;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Data;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.storage.Frame;
+import com.twitter.mesos.gen.storage.FrameChunk;
+import com.twitter.mesos.gen.storage.FrameHeader;
 import com.twitter.mesos.gen.storage.LogEntry;
 import com.twitter.mesos.gen.storage.Op;
 import com.twitter.mesos.gen.storage.RemoveJob;
@@ -50,18 +58,26 @@ import static org.junit.Assert.assertTrue;
  */
 public class LogManagerTest extends EasyMockTest {
 
+  private static final Amount<Integer, Data> NO_FRAMES_EVER_SIZE =
+      Amount.of(Integer.MAX_VALUE, Data.GB);
+
   private Stream stream;
   private Position position1;
   private Position position2;
-  private StreamManager streamManager;
 
   @Before
   public void setUp() {
     stream = createMock(Stream.class);
     position1 = createMock(Position.class);
     position2 = createMock(Position.class);
+  }
 
-    streamManager = new StreamManager(stream);
+  private StreamManager createNoMessagesStreamManager() {
+    return createStreamManager(NO_FRAMES_EVER_SIZE);
+  }
+
+  private StreamManager createStreamManager(Amount<Integer, Data> maxEntrySize) {
+    return new StreamManager(stream, maxEntrySize);
   }
 
   @Test
@@ -79,7 +95,7 @@ public class LogManagerTest extends EasyMockTest {
 
     control.replay();
 
-    new LogManager(log, shutdownRegistry).open();
+    new LogManager(log, NO_FRAMES_EVER_SIZE, shutdownRegistry).open();
 
     assertTrue(shutdownAction.hasCaptured());
     shutdownAction.getValue().execute();
@@ -93,14 +109,14 @@ public class LogManagerTest extends EasyMockTest {
 
     control.replay();
 
-    streamManager.readFromBeginning(reader);
+    createNoMessagesStreamManager().readFromBeginning(reader);
   }
 
   @Test
   public void testStreamManager_readFromUnknown_some() throws CodingException {
     LogEntry transaction1 = createLogEntry(Op.removeJob(new RemoveJob("job1")));
     Entry entry1 = createMock(Entry.class);
-    expect(entry1.contents()).andReturn(ThriftBinaryCodec.encode(transaction1));
+    expect(entry1.contents()).andReturn(encode(transaction1));
     expect(stream.readAll()).andReturn(Iterators.singletonIterator(entry1));
 
     Closure<LogEntry> reader = createMock(new Clazz<Closure<LogEntry>>() {});
@@ -108,7 +124,7 @@ public class LogManagerTest extends EasyMockTest {
 
     control.replay();
 
-    streamManager.readFromBeginning(reader);
+    createNoMessagesStreamManager().readFromBeginning(reader);
   }
 
   @Test
@@ -117,13 +133,14 @@ public class LogManagerTest extends EasyMockTest {
 
     control.replay();
 
-    streamManager.truncateBefore(position2);
+    createNoMessagesStreamManager().truncateBefore(position2);
   }
 
   @Test
   public void testStreamManager_successiveCommits() throws CodingException {
     control.replay();
 
+    StreamManager streamManager = createNoMessagesStreamManager();
     StreamTransaction streamTransaction = streamManager.startTransaction();
     streamTransaction.commit();
 
@@ -135,7 +152,7 @@ public class LogManagerTest extends EasyMockTest {
   public void testTransaction_empty() throws CodingException {
     control.replay();
 
-    Position position = streamManager.startTransaction().commit();
+    Position position = createNoMessagesStreamManager().startTransaction().commit();
     assertNull(position);
   }
 
@@ -143,7 +160,7 @@ public class LogManagerTest extends EasyMockTest {
   public void testTransaction_doubleCommit() throws CodingException {
     control.replay();
 
-    StreamTransaction streamTransaction = streamManager.startTransaction();
+    StreamTransaction streamTransaction = createNoMessagesStreamManager().startTransaction();
     streamTransaction.commit();
     streamTransaction.commit();
   }
@@ -152,7 +169,7 @@ public class LogManagerTest extends EasyMockTest {
   public void testTransaction_addAfterCommit() throws CodingException {
     control.replay();
 
-    StreamTransaction streamTransaction = streamManager.startTransaction();
+    StreamTransaction streamTransaction = createNoMessagesStreamManager().startTransaction();
     streamTransaction.commit();
     streamTransaction.add(Op.saveFrameworkId(new SaveFrameworkId("don't allow this")));
   }
@@ -160,7 +177,7 @@ public class LogManagerTest extends EasyMockTest {
   @Test
   public void testCoalesce() throws CodingException {
     SaveTasks saveTasks1 = createSaveTasks("1", "2");
-    SaveTasks nonTrumpedSaveTasks1 = createSaveTasks("2");
+    createSaveTasks("2");
     SaveTasks saveTasks2 = createSaveTasks("1", "3");
     SaveTasks saveTasks3 = createSaveTasks("4", "5");
 
@@ -185,7 +202,7 @@ public class LogManagerTest extends EasyMockTest {
 
     control.replay();
 
-    StreamTransaction streamTransaction = streamManager.startTransaction();
+    StreamTransaction streamTransaction = createNoMessagesStreamManager().startTransaction();
 
     // The next 2 saves should coalesce
     streamTransaction.add(Op.saveTasks(saveTasks1));
@@ -209,7 +226,7 @@ public class LogManagerTest extends EasyMockTest {
 
     control.replay();
 
-    streamManager.snapshot(snapshot);
+    createNoMessagesStreamManager().snapshot(snapshot);
   }
 
   @Test
@@ -220,12 +237,120 @@ public class LogManagerTest extends EasyMockTest {
 
     control.replay();
 
-    StreamTransaction transaction = streamManager.startTransaction();
+    StreamTransaction transaction = createNoMessagesStreamManager().startTransaction();
     transaction.add(saveFrameworkId);
     transaction.add(deleteJob);
 
     Position position = transaction.commit();
     assertSame(position1, position);
+  }
+
+  static class Message {
+    final Amount<Integer, Data> chunkSize;
+    final LogEntry header;
+    final ImmutableList<LogEntry> chunks;
+
+    public Message(Amount<Integer, Data> chunkSize, Frame header, Iterable<Frame> chunks) {
+      this.chunkSize = chunkSize;
+      this.header = LogEntry.frame(header);
+      this.chunks = ImmutableList.copyOf(Iterables.transform(chunks,
+          new Function<Frame, LogEntry>() {
+            @Override public LogEntry apply(Frame frame) {
+              return LogEntry.frame(frame);
+            }
+          }));
+    }
+  }
+
+  static Message frame(LogEntry logEntry) throws Exception {
+    byte[] entry = encode(logEntry);
+
+    double chunkBytes = entry.length / 2.0;
+    Amount<Integer, Data> chunkSize = Amount.of((int) Math.floor(chunkBytes), Data.BYTES);
+    int chunkLength = chunkSize.getValue();
+    int chunkCount = (int) Math.ceil(entry.length / (double) chunkSize.getValue());
+
+    Frame header = Frame.header(new FrameHeader(chunkCount,
+        ByteBuffer.wrap(MessageDigest.getInstance("MD5").digest(entry))));
+
+    List<Frame> chunks = Lists.newArrayList();
+    for (int i = 0; i < chunkCount; i++) {
+      int offset = i * chunkLength;
+      ByteBuffer data =
+          ByteBuffer.wrap(entry, offset, Math.min(chunkLength, entry.length - offset));
+      chunks.add(Frame.chunk(new FrameChunk(data)));
+    }
+
+    return new Message(chunkSize, header, chunks);
+  }
+
+  @Test
+  public void testTransaction_frames() throws Exception {
+    Op saveFrameworkId = Op.saveFrameworkId(new SaveFrameworkId("jake"));
+
+    Message message = frame(createLogEntry(saveFrameworkId));
+    expectFrames(position1, message);
+
+    control.replay();
+
+    StreamManager streamManager = createStreamManager(message.chunkSize);
+    StreamTransaction transaction = streamManager.startTransaction();
+    transaction.add(saveFrameworkId);
+
+    Position position = transaction.commit();
+    assertSame(position1, position);
+  }
+
+  @Test
+  public void testStreamManager_readFrames() throws Exception {
+    LogEntry transaction1 = createLogEntry(Op.removeJob(new RemoveJob("job1")));
+    LogEntry transaction2 = createLogEntry(Op.removeJob(new RemoveJob("job2")));
+
+    Message message = frame(transaction1);
+
+    List<Entry> entries = Lists.newArrayList();
+
+    // Should be read and skipped.
+    Entry orphanChunkEntry = createMock(Entry.class);
+    expect(orphanChunkEntry.contents()).andReturn(encode(message.chunks.get(0)));
+    entries.add(orphanChunkEntry);
+
+    // Should be read and skipped.
+    Entry headerEntry = createMock(Entry.class);
+    expect(headerEntry.contents()).andReturn(encode(message.header));
+    entries.add(headerEntry);
+
+    // We start a valid message, these frames should be read as 1 entry.
+    expect(headerEntry.contents()).andReturn(encode(message.header));
+    entries.add(headerEntry);
+    for (LogEntry chunk : message.chunks) {
+      Entry chunkEntry = createMock(Entry.class);
+      expect(chunkEntry.contents()).andReturn(encode(chunk));
+      entries.add(chunkEntry);
+    }
+
+    // Should be read and skipped.
+    expect(orphanChunkEntry.contents()).andReturn(encode(message.chunks.get(0)));
+    entries.add(orphanChunkEntry);
+
+    // Should be read and skipped.
+    expect(headerEntry.contents()).andReturn(encode(message.header));
+    entries.add(headerEntry);
+
+    // Should be read as 1 entry.
+    Entry standardEntry = createMock(Entry.class);
+    expect(standardEntry.contents()).andReturn(encode(transaction2));
+    entries.add(standardEntry);
+
+    expect(stream.readAll()).andReturn(entries.iterator());
+
+    Closure<LogEntry> reader = createMock(new Clazz<Closure<LogEntry>>() {});
+    reader.execute(transaction1);
+    reader.execute(transaction2);
+
+    control.replay();
+
+    createStreamManager(message.chunkSize).readFromBeginning(reader);
   }
 
   private Snapshot createSnapshot(String snapshotData) {
@@ -246,6 +371,14 @@ public class LogManagerTest extends EasyMockTest {
     return new RemoveTasks(ImmutableSet.copyOf(taskIds));
   }
 
+  private void expectFrames(Position position, Message message) throws CodingException {
+    expect(stream.append(aryEq(encode(message.header)))).andReturn(position);
+    for (LogEntry chunk : message.chunks) {
+      // Only return a valid position for the header.
+      expect(stream.append(aryEq(encode(chunk)))).andReturn(null);
+    }
+  }
+
   private void expectTransaction(Position position, Op... ops) throws CodingException {
     expectAppend(position, createLogEntry(ops));
   }
@@ -255,6 +388,10 @@ public class LogManagerTest extends EasyMockTest {
   }
 
   private void expectAppend(Position position, LogEntry logEntry) throws CodingException {
-    expect(stream.append(aryEq(ThriftBinaryCodec.encode(logEntry)))).andReturn(position);
+    expect(stream.append(aryEq(encode(logEntry)))).andReturn(position);
+  }
+
+  private static byte[] encode(LogEntry logEntry) throws CodingException {
+    return ThriftBinaryCodec.encode(logEntry);
   }
 }

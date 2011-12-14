@@ -1,6 +1,14 @@
 package com.twitter.mesos.scheduler.storage.log;
 
 import java.io.IOException;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+import java.nio.ByteBuffer;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -8,21 +16,30 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
+import javax.annotation.Nullable;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
+import com.google.common.primitives.Bytes;
+import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
 
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.inject.TimedInterceptor.Timed;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Data;
 import com.twitter.common.stats.Stats;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.storage.Frame;
+import com.twitter.mesos.gen.storage.FrameChunk;
+import com.twitter.mesos.gen.storage.FrameHeader;
 import com.twitter.mesos.gen.storage.LogEntry;
 import com.twitter.mesos.gen.storage.Op;
 import com.twitter.mesos.gen.storage.RemoveTasks;
@@ -43,14 +60,25 @@ import com.twitter.mesos.scheduler.log.Log.Stream.StreamAccessException;
  */
 final class LogManager {
 
+  /**
+   * Identifies the maximum log entry size to permit before chunking entries into frames.
+   */
+  @Retention(RetentionPolicy.RUNTIME)
+  @Target({ElementType.PARAMETER, ElementType.METHOD})
+  @BindingAnnotation
+  public @interface MaxEntrySize {}
+
   private static final Logger LOG = Logger.getLogger(LogManager.class.getName());
 
   private final Log log;
+  private final Amount<Integer, Data> maxEntrySize;
   private final ShutdownRegistry shutdownRegistry;
 
   @Inject
-  LogManager(Log log, ShutdownRegistry shutdownRegistry) {
+  LogManager(Log log, @MaxEntrySize Amount<Integer, Data> maxEntrySize,
+      ShutdownRegistry shutdownRegistry) {
     this.log = Preconditions.checkNotNull(log);
+    this.maxEntrySize = Preconditions.checkNotNull(maxEntrySize);
     this.shutdownRegistry = Preconditions.checkNotNull(shutdownRegistry);
   }
 
@@ -61,7 +89,7 @@ final class LogManager {
         stream.close();
       }
     });
-    return new StreamManager(stream);
+    return new StreamManager(stream, maxEntrySize);
   }
 
   /**
@@ -76,18 +104,27 @@ final class LogManager {
     private static class Vars {
       final AtomicInteger unSnapshottedTransactions =
           Stats.exportInt("scheduler_log_un_snapshotted_transactions");
-      final AtomicLong logBytesWritten = Stats.exportLong("scheduler_log_bytes_written");
-      final AtomicLong logEntriesWritten = Stats.exportLong("scheduler_log_entries_written");
-      final AtomicLong logBytesRead = Stats.exportLong("scheduler_log_bytes_read");
-      final AtomicLong logEntriesRead = Stats.exportLong("scheduler_log_entries_read");
-      final AtomicLong logSnapshots = Stats.exportLong("scheduler_log_snapshots");
+      final AtomicLong bytesWritten = Stats.exportLong("scheduler_log_bytes_written");
+      final AtomicLong entriesWritten = Stats.exportLong("scheduler_log_entries_written");
+      final AtomicLong badFramesRead = Stats.exportLong("scheduler_log_bad_frames_read");
+      final AtomicLong bytesRead = Stats.exportLong("scheduler_log_bytes_read");
+      final AtomicLong entriesRead = Stats.exportLong("scheduler_log_entries_read");
+      final AtomicLong snapshots = Stats.exportLong("scheduler_log_snapshots");
     }
     private final Vars vars = new Vars();
 
     private final Stream stream;
+    private final int maxEntrySizeBytes;
+    private final MessageDigest messageDigest;
 
-    StreamManager(Stream stream) {
+    StreamManager(Stream stream, Amount<Integer, Data> maxEntrySize) {
       this.stream = Preconditions.checkNotNull(stream);
+      maxEntrySizeBytes = Preconditions.checkNotNull(maxEntrySize).as(Data.BYTES);
+      try {
+        messageDigest = MessageDigest.getInstance("MD5");
+      } catch (NoSuchAlgorithmException e) {
+        throw new IllegalStateException("Could not find provider for standard algorithm 'MD5'", e);
+      }
     }
 
     /**
@@ -105,12 +142,78 @@ final class LogManager {
       Iterator<Entry> entries = stream.readAll();
 
       while (entries.hasNext()) {
-        Entry entry = entries.next();
-        byte[] contents = entry.contents();
-        reader.execute(ThriftBinaryCodec.decodeNonNull(LogEntry.class, contents));
-        vars.logBytesRead.addAndGet(contents.length);
-        vars.logEntriesRead.incrementAndGet();
+        LogEntry logEntry = decodeLogEntry(entries.next());
+        while (logEntry != null && isFrame(logEntry)) {
+          logEntry = tryDecodeFrame(logEntry.getFrame(), entries);
+        }
+        if (logEntry != null) {
+          reader.execute(logEntry);
+          vars.entriesRead.incrementAndGet();
+        }
       }
+    }
+
+    @Nullable
+    private LogEntry tryDecodeFrame(Frame frame, Iterator<Entry> entries) throws CodingException {
+      if (!isHeader(frame)) {
+        LOG.warning("Found a frame with no preceding header, skipping.");
+        return null;
+      }
+      FrameHeader header = frame.getHeader();
+      byte[][] chunks = new byte[header.chunkCount][];
+
+      messageDigest.reset();
+      for (int i = 0; i < header.chunkCount; i ++) {
+        if (!entries.hasNext()) {
+          logBadFrame(header, i);
+          return null;
+        }
+        LogEntry logEntry = decodeLogEntry(entries.next());
+        if (!isFrame(logEntry)) {
+          logBadFrame(header, i);
+          return logEntry;
+        }
+        Frame chunkFrame = logEntry.getFrame();
+        if (!isChunk(chunkFrame)) {
+          logBadFrame(header, i);
+          return logEntry;
+        }
+        byte[] chunkData = chunkFrame.getChunk().getData();
+        messageDigest.update(chunkData);
+        chunks[i] = chunkData;
+      }
+      if (!Arrays.equals(header.getChecksum(), messageDigest.digest())) {
+        throw new CodingException("Read back a framed log entry that failed its checksum");
+      }
+      return decodeLogEntry(Bytes.concat(chunks));
+    }
+
+    private static boolean isFrame(LogEntry logEntry) {
+      return logEntry.getSetField() == LogEntry._Fields.FRAME;
+    }
+
+    private static boolean isChunk(Frame frame) {
+      return frame.getSetField() == Frame._Fields.CHUNK;
+    }
+
+    private static boolean isHeader(Frame frame) {
+      return frame.getSetField() == Frame._Fields.HEADER;
+    }
+
+    private void logBadFrame(FrameHeader header, int chunkIndex) {
+      LOG.info(String.format("Found an aborted transaction, required %d frames and found %d",
+          header.chunkCount, chunkIndex));
+      vars.badFramesRead.incrementAndGet();
+    }
+
+    private LogEntry decodeLogEntry(Entry entry) throws CodingException {
+      byte[] contents = entry.contents();
+      vars.bytesRead.addAndGet(contents.length);
+      return decodeLogEntry(contents);
+    }
+
+    private LogEntry decodeLogEntry(byte[] contents) throws CodingException {
+      return ThriftBinaryCodec.decodeNonNull(LogEntry.class, contents);
     }
 
     /**
@@ -150,18 +253,55 @@ final class LogManager {
         throws CodingException, InvalidPositionException, StreamAccessException {
 
       Position position = appendAndGetPosition(LogEntry.snapshot(snapshot));
-      vars.logSnapshots.incrementAndGet();
+      vars.snapshots.incrementAndGet();
       vars.unSnapshottedTransactions.set(0);
       stream.truncateBefore(position);
     }
 
     @Timed("scheduler_log_append")
     private Position appendAndGetPosition(LogEntry logEntry) throws CodingException {
-      byte[] entry = ThriftBinaryCodec.encodeNonNull(logEntry);
-      Position position = stream.append(entry);
-      vars.logBytesWritten.addAndGet(entry.length);
-      vars.logEntriesWritten.incrementAndGet();
-      return position;
+      Position firstPosition = null;
+      byte[] fullEntry = encode(logEntry);
+      for (byte[] entry : createEntries(fullEntry)) {
+        Position position = stream.append(entry);
+        if (firstPosition == null) {
+          firstPosition = position;
+        }
+        vars.bytesWritten.addAndGet(entry.length);
+      }
+      vars.entriesWritten.incrementAndGet();
+      return firstPosition;
+    }
+
+    private byte[][] createEntries(byte[] entry) throws CodingException {
+      if (entry.length <= maxEntrySizeBytes) {
+        return new byte[][] { entry };
+      }
+
+      int chunks = (int) Math.ceil(entry.length / (double) maxEntrySizeBytes);
+      byte[][] frames = new byte[chunks + 1][];
+
+      frames[0] = encode(Frame.header(new FrameHeader(chunks, ByteBuffer.wrap(checksum(entry)))));
+      for (int i = 0; i < chunks; i++) {
+        int offset = i * maxEntrySizeBytes;
+        ByteBuffer chunk =
+            ByteBuffer.wrap(entry, offset, Math.min(maxEntrySizeBytes, entry.length - offset));
+        frames[i + 1] = encode(Frame.chunk(new FrameChunk(chunk)));
+      }
+      return frames;
+    }
+
+    private byte[] checksum(byte[] data) {
+      messageDigest.reset();
+      return messageDigest.digest(data);
+    }
+
+    private byte[] encode(Frame frame) throws CodingException {
+      return encode(LogEntry.frame(frame));
+    }
+
+    private byte[] encode(LogEntry entry) throws CodingException {
+      return ThriftBinaryCodec.encodeNonNull(entry);
     }
 
     /**
