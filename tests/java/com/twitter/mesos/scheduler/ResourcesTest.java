@@ -3,20 +3,21 @@ package com.twitter.mesos.scheduler;
 import java.util.Set;
 
 import com.google.common.base.Function;
-import com.google.common.collect.DiscreteDomains;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Ranges;
 
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.Resource.Range;
+import org.apache.mesos.Protos.Resource.Ranges;
 import org.apache.mesos.Protos.Resource.Type;
 import org.junit.Test;
 
 import com.twitter.common.collections.Pair;
+import com.twitter.mesos.scheduler.Resources.InsufficientResourcesException;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
 /**
  * @author William Farner
@@ -27,27 +28,60 @@ public class ResourcesTest {
 
   @Test
   public void testPortRange_exact() {
-    Resource portsResource = createPortRange(1, 5);
+    Resource portsResource = createPortRanges(Pair.of(1, 5));
     Set<Integer> ports = Resources.getPorts(createOffer(portsResource), 5);
     assertEquals(5, ports.size());
   }
 
   @Test
+  public void testOnePortAvailable() {
+    Resource portsResource = createPortRanges(Pair.of(3, 3));
+    Set<Integer> ports = Resources.getPorts(createOffer(portsResource), 1);
+    assertEquals(1, ports.size());
+  }
+
+  @Test
   public void testPortRange_abundance() {
-    Resource portsResource = createPortRange(1, 10);
+    Resource portsResource = createPortRanges(Pair.of(1, 10));
     Set<Integer> ports = Resources.getPorts(createOffer(portsResource), 5);
     assertEquals(5, ports.size());
   }
 
+  @Test
+  public void testPortRange_exhaust() {
+    Resource portsResource = createPortRanges(Pair.of(1, 2), Pair.of(10, 15));
+
+    Set<Integer> ports = Resources.getPorts(createOffer(portsResource), 7);
+    assertEquals(7, ports.size());
+
+    ports = Resources.getPorts(createOffer(portsResource), 8);
+    assertEquals(8, ports.size());
+
+    try {
+      ports = Resources.getPorts(createOffer(portsResource), 9);
+      fail("Ports should not have been sufficient");
+    } catch (InsufficientResourcesException e) {
+      // Expected.
+    }
+  }
+
   @Test(expected = Resources.InsufficientResourcesException.class)
   public void testPortRange_scarcity() {
-    Resource portsResource = createPortRange(1, 2);
+    Resource portsResource = createPortRanges(Pair.of(1, 2));
     Resources.getPorts(createOffer(portsResource), 5);
   }
 
-  private Resource createPortRange(int lower, int upper) {
-    return Resources.makeMesosRangeResource(Resources.PORTS,
-        Ranges.closed(lower, upper).asSet(DiscreteDomains.integers()));
+  private Resource createPortRanges(Pair<Integer, Integer>... ports) {
+    Ranges.Builder ranges = Ranges.newBuilder();
+    for (Pair<Integer, Integer> range : ports) {
+      ranges.addRange(Range.newBuilder().setBegin(range.getFirst()).setEnd(range.getSecond()));
+    }
+
+    return Resource.newBuilder()
+        .setName(Resources.PORTS)
+        .setType(Type.RANGES)
+        .setRanges(ranges)
+        .build();
   }
 
   private Protos.Offer createOffer(Resource resources) {

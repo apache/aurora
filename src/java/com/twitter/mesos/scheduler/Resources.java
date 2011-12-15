@@ -1,13 +1,18 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Function;
 import com.google.common.base.Predicate;
+import com.google.common.collect.DiscreteDomains;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
+import com.google.common.collect.Lists;
 import com.google.common.collect.PeekingIterator;
 import com.google.common.collect.Sets;
 
@@ -200,6 +205,14 @@ public class Resources {
     }
   }
 
+  private static final Function<Range, Set<Integer>> RANGE_TO_MEMBERS =
+      new Function<Range, Set<Integer>>() {
+        @Override public Set<Integer> apply(Range range) {
+          return com.google.common.collect.Ranges.closed(
+              (int) range.getBegin(), (int) range.getEnd()).asSet(DiscreteDomains.integers());
+        }
+      };
+
   /**
    * Attempts to grab {@code numPorts} from the given resource {@code offer}.
    *
@@ -215,22 +228,15 @@ public class Resources {
       return ImmutableSet.of();
     }
 
-    Set<Integer> ports = Sets.newHashSet();
-    for (Range range : getPortRanges(offer)) {
-      for (long port = range.getBegin(); port <= (range.getEnd())
-          && (ports.size() < numPorts); port++) {
-        ports.add((int) port);
-      }
+    List<Integer> availablePorts = Lists.newArrayList(Sets.newHashSet(
+        Iterables.concat(Iterables.transform(getPortRanges(offer), RANGE_TO_MEMBERS))));
 
-      if (ports.size() >= numPorts) {
-        break;
-      }
-    }
-
-    if (ports.size() != numPorts) {
+    if (availablePorts.size() < numPorts) {
       throw new InsufficientResourcesException(
           String.format("Could not get %d ports from %s", numPorts, offer));
     }
-    return ImmutableSet.copyOf(ports);
+
+    Collections.shuffle(availablePorts);
+    return ImmutableSet.copyOf(availablePorts.subList(0, numPorts));
   }
 }

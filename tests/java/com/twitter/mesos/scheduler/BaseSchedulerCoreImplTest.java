@@ -1842,7 +1842,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     Set<Integer> assignedPorts = ImmutableSet.of(80);
     Offer threePorts = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096,
-        ImmutableSet.of(Pair.of(80, 82)));
+        ImmutableSet.of(Pair.of(80, 80)));
     sendOffer(threePorts, taskId, SLAVE_ID, SLAVE_HOST_1, ImmutableSet.of("one"), assignedPorts);
 
     AssignedTask task = getTask(taskId).getAssignedTask();
@@ -1856,7 +1856,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     assignedPorts = ImmutableSet.of(86);
     Offer threeOtherPorts = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096,
-        ImmutableSet.of(Pair.of(86, 88)));
+        ImmutableSet.of(Pair.of(86, 86)));
     sendOffer(threeOtherPorts, newTaskId, SLAVE_ID, SLAVE_HOST_1, ImmutableSet.of("one"),
         assignedPorts);
 
