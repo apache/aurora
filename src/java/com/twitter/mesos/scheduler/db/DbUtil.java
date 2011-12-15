@@ -21,6 +21,8 @@ import com.mchange.v2.c3p0.ComboPooledDataSource;
 
 import org.h2.server.web.WebServlet;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -144,9 +146,11 @@ public final class DbUtil {
         @Override public void execute() throws RuntimeException {
           // Ensure a prompt shutdown of active connections
           LOG.info("Calling execute(SHUTDOWN)");
-          System.out.println("Calling execute(SHUTDOWN)");
-          jdbcTemplate.execute("SHUTDOWN");
-
+          try {
+            jdbcTemplate.execute("SHUTDOWN");
+          } catch (DataAccessException e) {
+            // Db may already be shut down - this is fine.
+          }
           dataSource.close();
         }
       });
