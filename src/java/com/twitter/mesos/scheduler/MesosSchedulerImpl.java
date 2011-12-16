@@ -254,8 +254,9 @@ public class MesosSchedulerImpl implements Scheduler {
   public void statusUpdate(SchedulerDriver driver, TaskStatus status) {
     String info = status.hasData() ? status.getData().toStringUtf8() : null;
     String infoMsg = info != null ? " with info " + info : "";
+    String coreMsg = status.hasMessage() ? " with core message " + status.getMessage() : "";
     LOG.info("Received status update for task " + status.getTaskId().getValue()
-        + " in state " + status.getState() + infoMsg);
+        + " in state " + status.getState() + infoMsg + coreMsg);
 
     Query query = Query.byId(status.getTaskId().getValue());
 
