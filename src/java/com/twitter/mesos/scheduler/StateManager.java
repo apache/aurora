@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -879,6 +880,16 @@ class StateManager {
         .toString().replaceAll("[^\\w-]", "-");  // Constrain character set.
   }
 
+  private final AtomicLong shardSanityCheckFails = Stats.exportLong("shard_sanity_check_failures");
+
+  private static Set<String> activeShards(TaskStore taskStore, String jobKey, int shardId) {
+    TaskQuery query = new TaskQuery()
+        .setStatuses(Tasks.ACTIVE_STATES)
+        .setJobKey(jobKey)
+        .setShardIds(ImmutableSet.of(shardId));
+    return taskStore.fetchTaskIds(new Query(query));
+  }
+
   private void processWorkQueueInTransaction(StoreProvider storeProvider) {
     managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
     for (final WorkEntry work : Iterables.consumingIterable(workQueue)) {
@@ -904,11 +915,21 @@ class StateManager {
             String newTaskId = generateTaskId(task.getAssignedTask().getTask());
             task.getAssignedTask().setTaskId(newTaskId);
 
-            LOG.info("Task being rescheduled: " + taskId);
+            Set<String> activeTasksInShard = activeShards(
+                taskStore, Tasks.jobKey(task), Tasks.SCHEDULED_TO_SHARD_ID.apply(task));
+            // We expect at most one active shard here, since the RESCHEDULE work comes before the
+            // UPDATE_STATE for the previous task generation.
+            if (activeTasksInShard.size() > 1) {
+              shardSanityCheckFails.incrementAndGet();
+              LOG.severe("Active shard sanity check failed when rescheduling " + taskId
+                  + ", active tasks found: " + activeTasksInShard);
+            } else {
+              LOG.info("Task being rescheduled: " + taskId);
 
-            taskStore.saveTasks(ImmutableSet.of(task));
+              taskStore.saveTasks(ImmutableSet.of(task));
 
-            createStateMachine(task).updateState(PENDING, "Rescheduled");
+              createStateMachine(task).updateState(PENDING, "Rescheduled");
+            }
             break;
 
           case UPDATE:
