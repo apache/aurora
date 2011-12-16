@@ -2,6 +2,7 @@ package com.twitter.mesos.executor;
 
 import java.io.File;
 import java.io.FileFilter;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -160,8 +161,8 @@ public class DiskGarbageCollector implements Runnable {
     }
   }
 
-  private static long fileSize(File f) {
-    return f.isFile() ? f.length() : FileUtils.sizeOfDirectory(f);
+  private static long fileSize(File f) throws IOException {
+    return f.isFile() ? f.length() : sizeOfDirectory(f);
   }
 
   private static final Comparator<File> LAST_MODIFIED_COMPARATOR = new Comparator<File>() {
@@ -178,4 +179,58 @@ public class DiskGarbageCollector implements Runnable {
       }
     }
   };
+
+  // TODO(wfarner): Figure out a better long-term plan for the code below.  Right now, it is
+  //     a shameless copy from org.apache.commons.io.FileUtils to quickly plug an issue caused
+  //     by symlinks present in a directory.
+  public static long sizeOf(File file) throws IOException {
+    if (FileUtils.isSymlink(file)) {
+      LOG.warning("Skipping symlink " + file);
+      return 0;
+    }
+
+    if (!file.exists()) {
+      String message = file + " does not exist";
+      throw new FileNotFoundException(message);
+    }
+
+    if (file.isDirectory()) {
+      return sizeOfDirectory(file);
+    } else {
+      return file.length();
+    }
+  }
+
+  public static long sizeOfDirectory(File directory) throws IOException {
+    if (FileUtils.isSymlink(directory)) {
+      LOG.warning("Skipping symlink " + directory);
+      return 0;
+    }
+
+    if (!directory.exists()) {
+      String message = directory + " does not exist";
+      throw new FileNotFoundException(message);
+    }
+
+    if (!directory.isDirectory()) {
+      String message = directory + " is not a directory";
+      throw new IllegalArgumentException(message);
+    }
+
+    long size = 0;
+
+    File[] files = directory.listFiles();
+    if (files == null) {  // null if security restricted
+      return 0L;
+    }
+    for (File file : files) {
+      try {
+        size += sizeOf(file);
+      } catch (IOException e) {
+        LOG.warning("Failed to calculate size of " + file +  ", " + e.getMessage());
+      }
+    }
+
+    return size;
+  }
 }
