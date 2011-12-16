@@ -13,6 +13,7 @@ import com.google.common.net.HostAndPort;
 
 import org.easymock.Capture;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.twitter.common.application.LocalServiceRegistry;
@@ -50,6 +51,7 @@ public class LeaderRedirectTest extends EasyMockTest {
     leaderRedirector.monitor();
   }
 
+  @Ignore("http://jira.local.twitter.com/browse/MESOS-323")
   @Test
   public void testLeader() throws Exception {
     serviceRegistry.announce(HTTP_PORT_NAME, 500, false);
