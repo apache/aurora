@@ -1,5 +1,7 @@
 package com.twitter.mesos.scheduler.storage;
 
+import com.twitter.mesos.scheduler.SchedulerException;
+
 /**
  * Manages scheduler storage operations providing an interface to perform atomic changes.
  *
@@ -83,7 +85,7 @@ public interface Storage {
   /**
    * Indicates a problem reading from or writing to stable storage.
    */
-  class StorageException extends RuntimeException {
+  class StorageException extends SchedulerException {
     public StorageException(String message, Throwable cause) {
       super(message, cause);
     }

@@ -155,7 +155,12 @@ public class MesosSchedulerImpl implements Scheduler {
     LOG.info("Registered with ID " + frameworkID);
     registeredFlag.set(1);
     this.frameworkID = frameworkID;
-    schedulerCore.registered(frameworkID.getValue());
+    try {
+      schedulerCore.registered(frameworkID.getValue());
+    } catch (SchedulerException e) {
+      LOG.log(Level.SEVERE, "Problem registering", e);
+      driver.abort();
+    }
 
     // TODO(wfarner): Build this into ExecutorWatchdog.
     executorTracker.start(new Closure<String>() {
@@ -178,7 +183,7 @@ public class MesosSchedulerImpl implements Scheduler {
   }
 
   TaskDescription twitterTaskToMesosTask(SchedulerCore.TwitterTask twitterTask)
-      throws ScheduleException {
+      throws SchedulerException {
 
     checkNotNull(twitterTask);
     byte[] taskInBytes;
@@ -186,7 +191,7 @@ public class MesosSchedulerImpl implements Scheduler {
       taskInBytes = ThriftBinaryCodec.encode(twitterTask.task);
     } catch (ThriftBinaryCodec.CodingException e) {
       LOG.log(Level.SEVERE, "Unable to serialize task.", e);
-      throw new ScheduleException("Internal error.", e);
+      throw new SchedulerException("Internal error.", e);
     }
 
     log(Level.INFO, "Setting task resources to %s", twitterTask.resources);
@@ -210,30 +215,33 @@ public class MesosSchedulerImpl implements Scheduler {
   @Override
   public void resourceOffers(SchedulerDriver driver, List<Offer> offers) {
     Preconditions.checkState(frameworkID != null, "Must be registered before receiving offers.");
-    try {
-      for (Offer offer : offers) {
-        log(Level.FINE, "Received offer: %s", offer);
-        executorSlaves.addSlave(offer.getHostname(), offer.getSlaveId());
-        SchedulerCore.TwitterTask task = schedulerCore.offer(offer, executorInfo.getExecutorId());
+    for (Offer offer : offers) {
+      log(Level.FINE, "Received offer: %s", offer);
+      executorSlaves.addSlave(offer.getHostname(), offer.getSlaveId());
 
-        List<TaskDescription> scheduledTasks;
+      List<TaskDescription> scheduledTasks = Collections.emptyList();
+      try {
+        SchedulerCore.TwitterTask task = schedulerCore.offer(offer, executorInfo.getExecutorId());
         if (task != null) {
           TaskDescription assignedTask = twitterTaskToMesosTask(task);
           scheduledTasks = ImmutableList.of(assignedTask);
-        } else {
-          scheduledTasks = Collections.emptyList();
         }
 
         if (!scheduledTasks.isEmpty()) {
           LOG.info(String.format("Accepting offer %s, to launch tasks %s", offer.getId().getValue(),
               ImmutableSet.copyOf(Iterables.transform(scheduledTasks, TO_STRING))));
         }
-
-        driver.launchTasks(offer.getId(), scheduledTasks);
+      } catch (SchedulerException e) {
+        LOG.log(Level.WARNING, "Failed to schedule offers.", e);
+        vars.failedOffers.incrementAndGet();
+      } catch (ScheduleException e) {
+        LOG.log(Level.WARNING, "Failed to schedule offers.", e);
+        vars.failedOffers.incrementAndGet();
       }
-    } catch (ScheduleException e) {
-      LOG.log(Level.SEVERE, "Failed to schedule offers.", e);
-      return;
+
+      // For a given offer, if we fail to process it we can always launch with an empty set of tasks
+      // to signal the core we have processed the offer and just not used any of it.
+      driver.launchTasks(offer.getId(), scheduledTasks);
     }
   }
 
@@ -260,16 +268,23 @@ public class MesosSchedulerImpl implements Scheduler {
 
     Query query = Query.byId(status.getTaskId().getValue());
 
-    if (schedulerCore.getTasks(query).isEmpty()) {
-      LOG.severe("Failed to find task id " + status.getTaskId());
-    } else {
-      ScheduleStatus translatedState = StateTranslator.get(status.getState());
-      if (translatedState == null) {
-        LOG.log(Level.SEVERE, "Failed to look up task state translation for: " + status.getState());
-        return;
-      }
+    try {
+      if (schedulerCore.getTasks(query).isEmpty()) {
+        LOG.severe("Failed to find task id " + status.getTaskId());
+      } else {
+        ScheduleStatus translatedState = StateTranslator.get(status.getState());
+        if (translatedState == null) {
+          LOG.log(Level.SEVERE,
+              "Failed to look up task state translation for: " + status.getState());
+          return;
+        }
 
-      schedulerCore.setTaskStatus(query, translatedState, info);
+        schedulerCore.setTaskStatus(query, translatedState, info);
+      }
+    } catch (SchedulerException e) {
+      // We assume here that a subsequent RegisteredTaskUpdate will inform us of this tasks status.
+      LOG.log(Level.WARNING, "Failed to update status for: " + status, e);
+      vars.failedStatusUpdates.incrementAndGet();
     }
   }
 
@@ -312,9 +327,14 @@ public class MesosSchedulerImpl implements Scheduler {
           StateUpdateResponse stateUpdate = schedulerMsg.getStateUpdateResponse();
           ExecutorKey executorKey = new ExecutorKey(executor, stateUpdate.getSlaveHost());
           LOG.info("Applying state update " + stateUpdate);
-          schedulerCore.stateUpdate(executorKey, stateUpdate);
-          executorWatchdog.stateUpdated(executorKey,
-              stateUpdate.getExecutorUUID(), stateUpdate.getPosition());
+          try {
+            schedulerCore.stateUpdate(executorKey, stateUpdate);
+            executorWatchdog.stateUpdated(executorKey,
+                stateUpdate.getExecutorUUID(), stateUpdate.getPosition());
+          } catch (SchedulerException e) {
+            LOG.log(Level.WARNING, "Failed to process a state update response: " + stateUpdate, e);
+            vars.failedExecutorStatusUpdates.incrementAndGet();
+          }
           break;
 
         default:
@@ -333,6 +353,10 @@ public class MesosSchedulerImpl implements Scheduler {
 
   private static class Vars {
     final AtomicLong executorStatusUpdates = Stats.exportLong("executor_status_updates");
+    final AtomicLong failedExecutorStatusUpdates =
+        Stats.exportLong("executor_status_updates_failed");
+    final AtomicLong failedOffers = Stats.exportLong("scheduler_failed_offers");
+    final AtomicLong failedStatusUpdates = Stats.exportLong("scheduler_failed_status_updates");
   }
   private final Vars vars = new Vars();
 

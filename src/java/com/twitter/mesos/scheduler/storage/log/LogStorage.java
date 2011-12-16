@@ -42,6 +42,7 @@ import com.twitter.mesos.gen.storage.SaveTasks;
 import com.twitter.mesos.gen.storage.Snapshot;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 import com.twitter.mesos.scheduler.Query;
+import com.twitter.mesos.scheduler.SchedulerException;
 import com.twitter.mesos.scheduler.log.Log.Stream.InvalidPositionException;
 import com.twitter.mesos.scheduler.log.Log.Stream.StreamAccessException;
 import com.twitter.mesos.scheduler.storage.ForwardingStore;
@@ -263,7 +264,7 @@ public class LogStorage extends ForwardingStore {
     }
   }
 
-  private static class RecoveryFailedException extends RuntimeException {
+  private static class RecoveryFailedException extends SchedulerException {
     private RecoveryFailedException(Throwable cause) {
       super(cause);
     }
