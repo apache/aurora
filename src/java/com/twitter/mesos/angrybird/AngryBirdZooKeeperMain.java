@@ -48,7 +48,7 @@ public class AngryBirdZooKeeperMain extends AbstractApplication {
 
   @Override
   public void run() {
-    LOG.log(Level.INFO, "Starting ZooKeeper Test Server");
+    LOG.log(Level.INFO, "Starting AngryBird ZooKeeper Server");
 
     try {
       zooKeeperServer = new AngryBirdZooKeeperServer(ZK_PORT.get(), shutdownRegistry);
