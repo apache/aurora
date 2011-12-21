@@ -6,6 +6,8 @@ import java.util.concurrent.TimeUnit;
 
 import com.google.common.base.Functions;
 import com.google.common.base.Supplier;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.MapMaker;
 
 import com.twitter.common.quantity.Amount;
@@ -52,11 +54,10 @@ public interface PulseMonitor<T> extends Supplier<Set<T>> {
     public PulseMonitorImpl(Amount<Long, Time> expiration) {
       // TODO(William Farner): Consider using timestamps instead and allowing exposure of live
       // entries and the time since their last pulse.
-      // TODO(William Farner): Upgrade this to CacheBuilder.  Current use case will not cleanly
-      // translate to CacheBuilder until Guava R11, which will introduce CacheBuilder#build().
-      pulses = new MapMaker()
+      pulses = CacheBuilder.newBuilder()
           .expireAfterWrite(expiration.as(Time.MILLISECONDS), TimeUnit.MILLISECONDS)
-          .makeComputingMap(Functions.<T>identity());
+          .<T, T>build()
+          .asMap();
     }
 
     @Override
