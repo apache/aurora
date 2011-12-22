@@ -131,9 +131,11 @@ public class ExecutorModule extends AbstractModule {
     bind(Key.get(ExecutorService.class, Names.named(ExecutorCore.TASK_EXECUTOR)))
         .toInstance(Executors.newCachedThreadPool(threadFactory));
     bind(new TypeLiteral<Function<Message, Integer>>() {}).to(DriverImpl.class);
-    bind(Key.get(Amount.class, Names.named(ExecutorCore.PROCESS_SCANNER_TASK_SCHEDULE_INTERVAL)))
+    bind(new TypeLiteral<Amount<Integer, Time>>() {})
+        .annotatedWith(Names.named(ExecutorCore.PROCESS_SCANNER_TASK_SCHEDULE_INTERVAL))
         .toInstance(PROCESS_SCANNER_TASK_SCHEDULE_INTERVAL.get());
-    bind(Key.get(Range.class, Names.named(ExecutorCore.TASK_PORT_RANGE)))
+    bind(new TypeLiteral<Range<Integer>>() {})
+        .annotatedWith(Names.named(ExecutorCore.TASK_PORT_RANGE))
         .toInstance(TASK_PORT_RANGE.get());
 
     // Bindings needed for TaskFactory.
