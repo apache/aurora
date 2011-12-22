@@ -15,6 +15,8 @@ import java.util.logging.Logger;
 import com.google.common.base.Function;
 import com.google.common.base.Supplier;
 import com.google.common.base.Throwables;
+import com.google.common.collect.Range;
+import com.google.common.collect.Ranges;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
 import com.google.inject.Key;
@@ -92,6 +94,16 @@ public class ExecutorModule extends AbstractModule {
   @CmdLine(name = "state_sync_buffer_limit", help = "Maximum number of state changes to buffer.")
   private static final Arg<Integer> STATE_SYNC_BUFFER_LIMIT = Arg.create(10000);
 
+  @CmdLine(name = "process_scanner_task_schedule_interval",
+      help = "the schedule interval of executing process scanner task, use to check tasks" +
+          " using unallocated port and kill orphan tasks")
+  private static final Arg<Amount<Integer, Time>> PROCESS_SCANNER_TASK_SCHEDULE_INTERVAL =
+      Arg.create(Amount.of(2, Time.MINUTES));
+
+  @CmdLine(name = "valid_task_port_range", help = "The port range that can assign to tasks.")
+  private static final Arg<Range<Integer>> TASK_PORT_RANGE =
+      Arg.create(Ranges.closed(30000, 32000));
+
   @Override
   protected void configure() {
 
@@ -119,6 +131,10 @@ public class ExecutorModule extends AbstractModule {
     bind(Key.get(ExecutorService.class, Names.named(ExecutorCore.TASK_EXECUTOR)))
         .toInstance(Executors.newCachedThreadPool(threadFactory));
     bind(new TypeLiteral<Function<Message, Integer>>() {}).to(DriverImpl.class);
+    bind(Key.get(Amount.class, Names.named(ExecutorCore.PROCESS_SCANNER_TASK_SCHEDULE_INTERVAL)))
+        .toInstance(PROCESS_SCANNER_TASK_SCHEDULE_INTERVAL.get());
+    bind(Key.get(Range.class, Names.named(ExecutorCore.TASK_PORT_RANGE)))
+        .toInstance(TASK_PORT_RANGE.get());
 
     // Bindings needed for TaskFactory.
     bind(new TypeLiteral<ExceptionalFunction<Integer, Boolean, HealthCheckException>>() {})

@@ -6,12 +6,15 @@ import java.util.concurrent.ExecutorService;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
+import com.google.common.collect.Ranges;
 
 import org.easymock.Capture;
 import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.common.base.ExceptionalClosure;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.common.util.BuildInfo;
 import com.twitter.mesos.Message;
@@ -66,7 +69,9 @@ public class ExecutorCoreTest extends EasyMockTest {
         taskExecutor,
         messageHandler,
         stateChangeListener,
-        processKiller);
+        processKiller,
+        Amount.of(2, Time.MINUTES),
+        Ranges.closed(30000, 32000));
   }
 
   @Test
