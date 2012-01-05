@@ -59,7 +59,6 @@ import com.twitter.common.io.FileUtils;
 import com.twitter.common.io.FileUtils.Temporary;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
-import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
@@ -73,10 +72,10 @@ import com.twitter.mesos.gen.storage.ConfiguratonKey;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.db.DbUtil;
-import com.twitter.mesos.scheduler.storage.SnapshotStore;
 import com.twitter.mesos.scheduler.storage.JobStore;
 import com.twitter.mesos.scheduler.storage.QuotaStore;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
+import com.twitter.mesos.scheduler.storage.SnapshotStore;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.TaskStore;
 import com.twitter.mesos.scheduler.storage.UpdateStore;
@@ -215,8 +214,11 @@ public class DbStorage implements
               try {
                 return work.apply(storeProvider);
               } catch (RuntimeException e) {
+                LOG.log(Level.WARNING, "work failed in transaction", e);
                 throw e; // no need to transport these
               } catch (Exception e) {
+                // TODO(wfarner): We may never actually enter this since StorageException is the
+                // most common, and it now extends RuntimeException.
                 // We know work throws E by its signature
                 @SuppressWarnings("unchecked") E exception = (E) e;
                 LOG.log(Level.WARNING, "work failed in transaction", e);
@@ -306,22 +308,6 @@ public class DbStorage implements
     }
   }
 
-  private <T extends TBase<?, ?>> void updateSchedulerState(final ConfiguratonKey key,
-      final T blank, final Closure<T> mutator) {
-
-    transactionTemplate.execute(new TransactionCallbackWithoutResult() {
-      @Override protected void doInTransactionWithoutResult(TransactionStatus transactionStatus) {
-        final T state = fetchSchedulerState(key, blank);
-        mutator.execute(state);
-        updateSchedulerState(key, new ExceptionalClosure<TProtocol, TException>() {
-          @Override public void execute(TProtocol data) throws TException {
-            state.write(data);
-          }
-        });
-      }
-    });
-  }
-
   private void updateSchedulerState(final ConfiguratonKey key,
       final ExceptionalClosure<TProtocol, TException> serializationOp) {
 
@@ -338,15 +324,6 @@ public class DbStorage implements
                             key.getValue(), data.toByteArray());
       }
     });
-  }
-
-  private <T extends TBase<?, ?>> T fetchSchedulerState(ConfiguratonKey key, final T blank) {
-    return fetchSchedulerState(key, new ExceptionalFunction<TProtocol, T, TException>() {
-      @Override public T apply(TProtocol data) throws TException {
-        blank.read(data);
-        return blank;
-      }
-    }, blank);
   }
 
   private <T> T fetchSchedulerState(final ConfiguratonKey key,

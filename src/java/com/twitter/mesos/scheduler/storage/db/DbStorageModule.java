@@ -1,6 +1,5 @@
 package com.twitter.mesos.scheduler.storage.db;
 
-import java.io.File;
 import java.lang.annotation.Annotation;
 import java.util.logging.Logger;
 
@@ -13,11 +12,6 @@ import com.google.inject.Singleton;
 
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
-import com.twitter.common.args.constraints.CanRead;
-import com.twitter.common.args.constraints.CanWrite;
-import com.twitter.common.args.constraints.Exists;
-import com.twitter.common.args.constraints.IsDirectory;
-import com.twitter.common.args.constraints.NotNull;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Closures;
 import com.twitter.common.quantity.Amount;
@@ -31,15 +25,6 @@ import com.twitter.mesos.scheduler.storage.Storage;
  * @author John Sirois
  */
 public class DbStorageModule extends PrivateModule {
-
-  @NotNull
-  @Exists
-  @CanRead
-  @CanWrite
-  @IsDirectory
-  @CmdLine(name = "scheduler_db_file_path",
-          help ="The path of the H2 db files.")
-  private static final Arg<File> dbFilePath = Arg.create();
 
   @CmdLine(name = "scheduler_db_cache_size",
           help ="The size to use for the H2 in-memory db cache.")
@@ -107,7 +92,7 @@ public class DbStorageModule extends PrivateModule {
 
     // TODO(John Sirois): Consider switching to inMemory(...) when we are successfully running on
     // the mesos-core log.
-    DbUtil.fileSystem(dbFilePath.get(), "h2-v1", dbCacheSize.get())
+    DbUtil.inMemory("h2-v1")
         .secured("scheduler", "ep1nephrin3")
         .bind(binder());
 

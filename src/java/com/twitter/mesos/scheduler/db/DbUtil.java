@@ -1,17 +1,13 @@
 package com.twitter.mesos.scheduler.db;
 
 import java.beans.PropertyVetoException;
-import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.util.logging.Logger;
 
-import javax.annotation.Nullable;
-
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.io.Files;
 import com.google.common.io.Resources;
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
@@ -22,7 +18,6 @@ import com.mchange.v2.c3p0.ComboPooledDataSource;
 import org.h2.server.web.WebServlet;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.dao.DataAccessException;
-import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -33,9 +28,6 @@ import com.twitter.common.application.http.HttpServletConfig;
 import com.twitter.common.application.http.Registration;
 import com.twitter.common.base.Command;
 import com.twitter.common.base.MorePreconditions;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Data;
-
 
 /**
  * Utilities for dealing with database operations.
@@ -104,16 +96,12 @@ public final class DbUtil {
    */
   public static class Builder {
     private final String dbName;
-    private final File dbPath;
-    private final Amount<Long, Data> cacheSize;
 
     private String username;
     private String password;
 
-    private Builder(String dbName, @Nullable File dbPath, @Nullable Amount<Long, Data> cacheSize) {
+    private Builder(String dbName) {
       this.dbName = MorePreconditions.checkNotBlank(dbName);
-      this.dbPath = dbPath;
-      this.cacheSize = cacheSize;
     }
 
     /**
@@ -175,14 +163,7 @@ public final class DbUtil {
     }
 
     private String createJdbcUrl() throws IOException {
-      if (dbPath != null) {
-        File dbFilePath = new File(dbPath, dbName);
-        Files.createParentDirs(dbFilePath);
-        return String.format("jdbc:h2:file:%s;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1;CACHE_SIZE=%d",
-            dbFilePath.getPath(), cacheSize.as(Data.KB));
-      } else {
-        return "jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1";
-      }
+      return "jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1";
     }
 
     /**
@@ -227,26 +208,7 @@ public final class DbUtil {
    *     the database accessors.
    */
   public static Builder inMemory(String dbName) {
-    return new Builder(dbName, null, null);
-  }
-
-  /**
-   * Creates a builder that can be used to create an in-process database with a filesystem based
-   * backing store.
-   *
-   * @param dbPath The path to store database files under.
-   * @param dbName A unique name for the database files.
-   * @param cacheSize The amount of data to try to keep in memory for fast queries.
-   * @return A builder that can be used to further specify database parameters and to finally create
-   *     the database accessors.
-   */
-  public static Builder fileSystem(File dbPath, String dbName, Amount<Long, Data> cacheSize) {
-    Preconditions.checkNotNull(dbPath);
-    Preconditions.checkNotNull(cacheSize);
-    Preconditions.checkArgument(cacheSize.as(Data.KB) > 0,
-        "Must have at least 1KB of cache, given: %s", cacheSize);
-
-    return new Builder(dbName, dbPath, cacheSize);
+    return new Builder(dbName);
   }
 
   /**
