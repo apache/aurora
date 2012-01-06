@@ -138,7 +138,7 @@ class MesosClientBase(object):
     self.force_cluster = cluster
     self.verbose = verbose
 
-  def with_scheduler(self, method):
+  def with_scheduler(method):
     """Decorator magic to make sure a connection is made to the scheduler"""
     def _wrapper(self, *args, **kwargs):
       if not self._scheduler:
