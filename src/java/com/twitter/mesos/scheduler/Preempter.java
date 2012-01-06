@@ -8,9 +8,9 @@ import java.util.logging.Logger;
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
-import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.inject.Inject;
@@ -84,7 +84,7 @@ class Preempter implements Runnable {
     }
 
     // Memoize filters.
-    Cache<String, Predicate<AssignedTask>> filtersByHost = CacheBuilder.newBuilder().build(
+    LoadingCache<String, Predicate<AssignedTask>> filtersByHost = CacheBuilder.newBuilder().build(
         new CacheLoader<String, Predicate<AssignedTask>>() {
           @Override public Predicate<AssignedTask> load(String host) {
             return Predicates.compose(

@@ -10,9 +10,9 @@ import javax.servlet.http.HttpServletResponse;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
-import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
@@ -82,7 +82,8 @@ public class SchedulerzHome extends StringTemplateServlet {
       @Override public void execute(StringTemplate template) {
         template.setAttribute("cluster_name", clusterName);
 
-        Cache<String, Role> owners = CacheBuilder.newBuilder().build(CacheLoader.from(CREATE_ROLE));
+        LoadingCache<String, Role> owners =
+            CacheBuilder.newBuilder().build(CacheLoader.from(CREATE_ROLE));
         Multimap<String, ScheduledTask> ownerJobs = HashMultimap.create();
 
         for (ScheduledTask task : scheduler.getTasks(Query.GET_ALL)) {

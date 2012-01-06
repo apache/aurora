@@ -2,15 +2,13 @@ package com.twitter.mesos.scheduler;
 
 import java.util.Map;
 
-import javax.annotation.Nullable;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Preconditions;
-import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Maps;
 
 import com.twitter.common.collections.Pair;
@@ -67,7 +65,7 @@ class StateManagerVars {
       }
     };
 
-    private final Cache<Pair<String, ScheduleStatus>, Var> varsByJobKeyAndStatus =
+    private final LoadingCache<Pair<String, ScheduleStatus>, Var> varsByJobKeyAndStatus =
         CacheBuilder.newBuilder().build(
             CacheLoader.from(Functions.compose(maybeExport,
                 new Function<Pair<String, ScheduleStatus>, Var>() {
@@ -78,7 +76,7 @@ class StateManagerVars {
                   }
                 })));
 
-    private final Cache<ScheduleStatus, Var> varsByStatus = CacheBuilder.newBuilder().build(
+    private final LoadingCache<ScheduleStatus, Var> varsByStatus = CacheBuilder.newBuilder().build(
         CacheLoader.from(Functions.compose(maybeExport,
             new Function<ScheduleStatus, Var>() {
               @Override public Var apply(ScheduleStatus status) {

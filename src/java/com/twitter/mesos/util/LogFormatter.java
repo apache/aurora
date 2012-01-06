@@ -5,9 +5,9 @@ import java.util.logging.Level;
 import java.util.logging.LogRecord;
 
 import com.google.common.base.Throwables;
-import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 
 import org.apache.commons.lang.StringUtils;
 import org.joda.time.DateTime;
@@ -31,7 +31,7 @@ public class LogFormatter extends Formatter {
   /**
    * Build a level 'label' by taking the first character of the level name and making uppercase.
    */
-  private static final Cache<Level, String> LEVEL_LABELS = CacheBuilder.newBuilder().build(
+  private static final LoadingCache<Level, String> LEVEL_LABELS = CacheBuilder.newBuilder().build(
       new CacheLoader<Level, String>() {
         public String load(Level level) {
           return String.valueOf(level.getName().charAt(0)).toUpperCase();
