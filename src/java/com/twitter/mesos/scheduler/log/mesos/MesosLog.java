@@ -4,8 +4,11 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
+
+import javax.inject.Provider;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
@@ -17,6 +20,8 @@ import org.apache.mesos.Log;
 import com.twitter.common.base.Function;
 import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.inject.TimedInterceptor.Timed;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
 
 import static java.lang.annotation.ElementType.METHOD;
@@ -38,18 +43,47 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
   @Target({PARAMETER, METHOD})
   public @interface NoopEntry { }
 
-  private final Log log;
+  /**
+   * Binding annotation for log read timeouts.
+   */
+  @BindingAnnotation
+  @Retention(RUNTIME)
+  @Target({PARAMETER, METHOD})
+  public @interface ReadTimeout { }
+
+  /**
+   * Binding annotation for log write timeouts - used for truncates and appends.
+   */
+  @BindingAnnotation
+  @Retention(RUNTIME)
+  @Target({PARAMETER, METHOD})
+  public @interface WriteTimeout { }
+
+  private final Provider<Log.Reader> readerFactory;
+  private final Amount<Long, Time> readTimeout;
+
+  private final Provider<Log.Writer> writerFactory;
+  private final Amount<Long, Time> writeTimeout;
+
   private final byte[] noopEntry;
 
   @Inject
-  public MesosLog(Log log, @NoopEntry byte[] noopEntry) {
-    this.log = Preconditions.checkNotNull(log);
+  public MesosLog(Provider<Log.Reader> readerFactory, @ReadTimeout Amount<Long, Time> readTimeout,
+      Provider<Log.Writer> writerFactory, @WriteTimeout Amount<Long, Time> writeTimeout,
+      @NoopEntry byte[] noopEntry) {
+
+    this.readerFactory = Preconditions.checkNotNull(readerFactory);
+    this.readTimeout = readTimeout;
+
+    this.writerFactory = Preconditions.checkNotNull(writerFactory);
+    this.writeTimeout = writeTimeout;
+
     this.noopEntry = Preconditions.checkNotNull(noopEntry);
   }
 
   @Override
   public Stream open() {
-    return new LogStream(log, noopEntry);
+    return new LogStream(readerFactory.get(), readTimeout, writerFactory, writeTimeout, noopEntry);
   }
 
   private static class LogStream implements com.twitter.mesos.scheduler.log.Log.Stream {
@@ -78,14 +112,29 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
     }
     private final Vars vars = new Vars();
 
-    private final Log log;
-    private final byte[] noopEntry;
     private final Log.Reader reader;
+    private final long readTimeout;
+    private final TimeUnit readTimeUnit;
 
-    LogStream(Log log, byte[] noopEntry) {
-      this.log = log;
+    private final Provider<Log.Writer> writerFactory;
+    private final long writeTimeout;
+    private final TimeUnit writeTimeUnit;
+
+    private final byte[] noopEntry;
+
+    LogStream(Log.Reader reader, Amount<Long, Time> readTimeout,
+        Provider<Log.Writer> writerFactory, Amount<Long, Time> writeTimeout,
+        byte[] noopEntry) {
+
+      this.reader = reader;
+      this.readTimeout = readTimeout.getValue();
+      this.readTimeUnit = readTimeout.getUnit().getTimeUnit();
+
+      this.writerFactory = writerFactory;
+      this.writeTimeout = writeTimeout.getValue();
+      this.writeTimeUnit = writeTimeout.getUnit().getTimeUnit();
+
       this.noopEntry = noopEntry;
-      this.reader = new Log.Reader(log);
     }
 
     private static final Function<Log.Entry, LogEntry> MESOS_ENTRY_TO_ENTRY =
@@ -112,7 +161,7 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
       Log.Position from = reader.beginning();
       Log.Position to = end().unwrap();
       try {
-        List<Log.Entry> entries = reader.read(from, to);
+        List<Log.Entry> entries = reader.read(from, to, readTimeout, readTimeUnit);
         return Iterables.<Log.Entry, Entry>transform(entries, MESOS_ENTRY_TO_ENTRY).iterator();
       } catch (TimeoutException e) {
         vars.read.timeouts.getAndIncrement();
@@ -133,7 +182,7 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
       Log.Position position = mutate(vars.append, new Mutation<Log.Position>() {
         @Override public Log.Position apply(Log.Writer writer)
             throws TimeoutException, Log.WriterFailedException {
-          return writer.append(contents);
+          return writer.append(contents, writeTimeout, writeTimeUnit);
         }
       });
       return LogPosition.wrap(position);
@@ -150,7 +199,7 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
       mutate(vars.truncate, new Mutation<Void>() {
         @Override public Void apply(Log.Writer writer)
             throws TimeoutException, Log.WriterFailedException {
-          writer.truncate(before);
+          writer.truncate(before, writeTimeout, writeTimeUnit);
           return null;
         }
       });
@@ -164,7 +213,7 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
 
     private synchronized <T> T mutate(OpStats stats, Mutation<T> mutation) {
       if (writer == null) {
-        writer = new Log.Writer(log);
+        writer = writerFactory.get();
       }
       try {
         return mutation.apply(writer);

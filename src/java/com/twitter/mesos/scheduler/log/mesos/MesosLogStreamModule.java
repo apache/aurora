@@ -58,6 +58,28 @@ public class MesosLogStreamModule extends PrivateModule {
            help = "A zookeeper node for use by the native log to track the master coordinator.")
   private static final Arg<String> zkLogGroupPath = Arg.create();
 
+  // TODO(John Sirois): the combo of retires + timeout for becoming coordinator is slightly odd,
+  // but the way the timeout is actually used in the Coordinator.elect code seems more odd - ask Ben
+  // for guidance on this.
+  @CmdLine(name = "native_log_election_timeout",
+           help = "The timeout for attempting to obtain a new log writer.")
+  private static final Arg<Amount<Long, Time>> coordinatorElectionTimeout =
+      Arg.create(Amount.of(1L, Time.SECONDS));
+
+  @CmdLine(name = "native_log_election_retries",
+           help = "The maximum number of retries to obtain a new log writer.")
+  private static final Arg<Integer> coordinatorElectionRetries = Arg.create(3);
+
+  @CmdLine(name = "native_log_read_timeout",
+           help = "The timeout for doing log reads.")
+  private static final Arg<Amount<Long, Time>> readTimeout =
+      Arg.create(Amount.of(5L, Time.SECONDS));
+
+  @CmdLine(name = "native_log_write_timeout",
+           help = "The timeout for doing log appends and truncations.")
+  private static final Arg<Amount<Long, Time>> writeTimeout =
+      Arg.create(Amount.of(1L, Time.SECONDS));
+
   /**
    * Binds a distributed {@link com.twitter.mesos.scheduler.log.Log} that uses the mesos core native
    * log implementation.
@@ -73,6 +95,11 @@ public class MesosLogStreamModule extends PrivateModule {
     requireBinding(Credentials.class);
     requireBinding(Key.get(new TypeLiteral<List<InetSocketAddress>>() {}, ZooKeeper.class));
     requireBinding(Key.get(new TypeLiteral<Amount<Integer, Time>>() {}, ZooKeeper.class));
+
+    bind(new TypeLiteral<Amount<Long, Time>>() {}).annotatedWith(MesosLog.ReadTimeout.class)
+        .toInstance(readTimeout.get());
+    bind(new TypeLiteral<Amount<Long, Time>>() {}).annotatedWith(MesosLog.WriteTimeout.class)
+        .toInstance(writeTimeout.get());
 
     bind(com.twitter.mesos.scheduler.log.Log.class).to(MesosLog.class).in(Singleton.class);
     expose(com.twitter.mesos.scheduler.log.Log.class);
@@ -100,6 +127,18 @@ public class MesosLogStreamModule extends PrivateModule {
                    zkLogGroupPath.get(),
                    credentials.scheme(),
                    credentials.authToken());
+  }
+
+  @Provides
+  Log.Reader provideReader(Log log) {
+    return new Log.Reader(log);
+  }
+
+  @Provides
+  Log.Writer provideWriter(Log log) {
+    Amount<Long, Time> electionTimeout = coordinatorElectionTimeout.get();
+    return new Log.Writer(log, electionTimeout.getValue(), electionTimeout.getUnit().getTimeUnit(),
+        coordinatorElectionRetries.get());
   }
 
   @Provides
