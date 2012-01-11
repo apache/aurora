@@ -19,10 +19,10 @@ import com.google.common.collect.Sets;
 import org.apache.commons.lang.builder.EqualsBuilder;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.Resource;
-import org.apache.mesos.Protos.Resource.Range;
-import org.apache.mesos.Protos.Resource.Ranges;
-import org.apache.mesos.Protos.Resource.Scalar;
-import org.apache.mesos.Protos.Resource.Type;
+import org.apache.mesos.Protos.Value.Range;
+import org.apache.mesos.Protos.Value.Ranges;
+import org.apache.mesos.Protos.Value.Scalar;
+import org.apache.mesos.Protos.Value.Type;
 
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;

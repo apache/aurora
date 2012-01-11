@@ -8,9 +8,9 @@ import com.google.common.collect.Iterables;
 
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.Resource;
-import org.apache.mesos.Protos.Resource.Range;
-import org.apache.mesos.Protos.Resource.Ranges;
-import org.apache.mesos.Protos.Resource.Type;
+import org.apache.mesos.Protos.Value.Range;
+import org.apache.mesos.Protos.Value.Ranges;
+import org.apache.mesos.Protos.Value.Type;
 import org.junit.Test;
 
 import com.twitter.common.collections.Pair;
