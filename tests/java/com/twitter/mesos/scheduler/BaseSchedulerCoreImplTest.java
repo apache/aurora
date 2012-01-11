@@ -132,7 +132,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private static final OfferID OFFER_ID = OfferID.newBuilder().setValue("OfferId").build();
 
   private SchedulingFilter schedulingFilter;
-  private Closure<String> killTask;
+  private Driver driver;
   private SchedulerCoreImpl scheduler;
   private CronJobManager cron;
   private PulseMonitor<ExecutorKey> executorPulseMonitor;
@@ -143,7 +143,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   @Before
   public void setUp() throws Exception {
     schedulingFilter = createMock(SchedulingFilter.class);
-    killTask = createMock(new Clazz<Closure<String>>() {});
+    driver = createMock(Driver.class);
     executorPulseMonitor = createMock(new Clazz<PulseMonitor<ExecutorKey>>() {});
     executorResourceAugmenter =
         createMock(new Clazz<Function<TwitterTaskInfo, TwitterTaskInfo>>() {});
@@ -181,7 +181,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     immediateManager.schedulerCore = scheduler;
     scheduler.prepare();
     scheduler.initialize();
-    scheduler.start(killTask);
+    scheduler.start(driver);
 
     // Apply a default quota for users so we don't have to give quota for every test.
     quotaManager.setQuota(OWNER_A.getRole(), scale(DEFAULT_TASK_QUOTA, DEFAULT_TASKS_IN_QUOTA));
@@ -625,7 +625,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testKillTask() throws Exception {
-    killTask.execute((String) anyObject());
+    driver.killTask(EasyMock.<String>anyObject());
     // We only expect three kills because the first test does not move out of PENDING.
     expectLastCall().times(3);
 
@@ -1914,7 +1914,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   // TODO(William Farner): Inject a task ID generation function into StateManager so that we can
   //     expect specific task IDs to be killed here.
   private void expectKillTask(int numTasks) {
-    killTask.execute((String) anyObject());
+    driver.killTask(EasyMock.<String>anyObject());
     expectLastCall().times(numTasks);
   }
 

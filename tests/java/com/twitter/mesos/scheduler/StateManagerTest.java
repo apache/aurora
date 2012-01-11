@@ -1,17 +1,14 @@
 package com.twitter.mesos.scheduler;
 
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.Set;
 
 import com.google.common.base.Optional;
-import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
 
-import org.apache.mesos.Protos;
 import org.easymock.EasyMock;
 import org.junit.Test;
 
@@ -127,7 +124,7 @@ public class StateManagerTest extends BaseStateManagerTest {
 
   @Test
   public void testLostKillingTask() {
-    killTaskCallback.execute(EasyMock.<String>anyObject());
+    driver.killTask(EasyMock.<String>anyObject());
 
     control.replay();
 
@@ -156,7 +153,7 @@ public class StateManagerTest extends BaseStateManagerTest {
             .putAll(KILLING, ASSIGNED, RUNNING)
             .build();
 
-    killTaskCallback.execute(EasyMock.<String>anyObject());
+    driver.killTask(EasyMock.<String>anyObject());
     expectLastCall().times(testCases.keySet().size());
 
     control.replay();
@@ -244,41 +241,6 @@ public class StateManagerTest extends BaseStateManagerTest {
 
     assertVarCount("jim", "myJob", UNKNOWN, 1);
     assertVarCount(UNKNOWN, 1);
-  }
-
-  @Test
-  public void testGetHostAssignedTasks() throws Exception {
-    control.replay();
-
-    assertTrue(stateManager.getHostAssignedTasks().isEmpty());
-
-    // Put two jobs in the map, make sure they get placed in the task hosts once assigned.
-    Set<String> taskIds = insertTasks(
-        makeTask("jim", "myJob", 0),
-        makeTask("jack", "otherJob", 0));
-
-    ImmutableMultimap.Builder<String, String> builder = ImmutableMultimap.builder();
-    for (String taskId : taskIds) {
-      stateManager.assignTask(
-          taskId, "localhost",
-          Protos.SlaveID.newBuilder().setValue(taskId + "-slaveId").build(),
-          ImmutableSet.of(1, 2, 3));
-      builder.put("localhost", taskId);
-    }
-
-    assertEquals(HashMultimap.create(builder.build()), stateManager.getHostAssignedTasks());
-
-    // Restart the state manager, ensure it has the task hosts mapping intact.
-    stateManager = createStateManager(storage);
-    assertEquals(HashMultimap.create(builder.build()), stateManager.getHostAssignedTasks());
-
-    // Remove a task, ensure it's gone from the task hosts.
-    builder = ImmutableMultimap.builder();
-    Iterator<String> it = taskIds.iterator();
-    stateManager.abandonTasks(ImmutableSet.of(it.next()));
-    builder.put("localhost", it.next());
-
-    assertEquals(HashMultimap.create(builder.build()), stateManager.getHostAssignedTasks());
   }
 
   @Test

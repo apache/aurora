@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
@@ -21,18 +22,15 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
+import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.SlaveID;
 
 import com.twitter.common.args.Arg;
@@ -52,6 +50,7 @@ import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
+import com.twitter.mesos.gen.comm.ExecutorMessage;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
@@ -113,8 +112,8 @@ class StateManager {
     private final MutableState mutableState;
 
     TransactionalStorage(Storage storage, MutableState mutableState) {
-      this.storage = Preconditions.checkNotNull(storage);
-      this.mutableState = Preconditions.checkNotNull(mutableState);
+      this.storage = checkNotNull(storage);
+      this.mutableState = checkNotNull(mutableState);
     }
 
     void addSideEffect(SideEffect sideEffect) {
@@ -159,11 +158,6 @@ class StateManager {
     void stop() {
       Preconditions.checkState(!inTransaction);
       storage.stop();
-    }
-
-    Multimap<String, String> getHostAssignedTasks() {
-      return HashMultimap.create(Multimaps.invertFrom(Multimaps.forMap(mutableState.taskHosts),
-          ArrayListMultimap.<String, String>create()));
     }
 
     private <T, E extends Exception> T execute(final Work<T, E> work) throws E {
@@ -239,8 +233,7 @@ class StateManager {
 
   private final Predicate<Iterable<TaskEvent>> taskTimeoutFilter;
 
-  // Kills the task with the id passed into execute.
-  private Closure<String> killTask;
+  private Driver driver;
   private final Clock clock;
 
   @Inject
@@ -262,9 +255,14 @@ class StateManager {
       }
     };
 
-    this.killTask = new Closure<String>() {
-      @Override public void execute(String taskId) {
+    this.driver = new Driver() {
+      @Override public void killTask(String taskId) {
         LOG.log(Level.SEVERE, "Attempted to kill task " + taskId + " before registered.");
+      }
+
+      @Override public void sendMessage(ExecutorMessage message, SlaveID slave,
+          ExecutorID executor) {
+        LOG.log(Level.SEVERE, "Attempted to send message" + message+ " before registered.");
       }
     };
 
@@ -338,12 +336,12 @@ class StateManager {
    * Instructs the state manager to start, providing a callback that can be used to kill active
    * tasks.
    *
-   * @param killTask Task killer callback.
+   * @param driver Driver to interact with the framework.
    */
-  synchronized void start(Closure<String> killTask) {
+  synchronized void start(Driver driver) {
     managerState.transition(State.STARTED);
 
-    this.killTask = checkNotNull(killTask);
+    this.driver = checkNotNull(driver);
   }
 
   /**
@@ -666,6 +664,7 @@ class StateManager {
 
   /**
    * Scans any outstanding tasks and attempts to kill any tasks that have timed out.
+   *
    */
   synchronized void scanOutstandingTasks() {
     managerState.checkState(State.STARTED);
@@ -683,7 +682,7 @@ class StateManager {
     // update if we attempt to kill any tasks that the core has no knowledge of.
     for (String missingTaskId : Iterables.transform(missingTasks, Tasks.SCHEDULED_TO_ID)) {
       LOG.info("Attempting to kill missing task " + missingTaskId);
-      killTask.execute(missingTaskId);
+      driver.killTask(missingTaskId);
     }
   }
 
@@ -727,16 +726,6 @@ class StateManager {
         });
 
     return ImmutableSet.copyOf(Iterables.transform(configs, Shards.GET_NEW_CONFIG));
-  }
-
-  /**
-   * Generates a mapping from slave hostname to task IDs, including only tasks that have been
-   * assigned to a host.
-   *
-   * @return Map from slave hosts to task IDs.
-   */
-  synchronized Multimap<String, String> getHostAssignedTasks() {
-    return transactionalStorage.getHostAssignedTasks();
   }
 
   /**
@@ -804,7 +793,6 @@ class StateManager {
   }
 
   @ThermosJank
-  @SuppressWarnings("unchecked")
   private Function<TaskStateMachine, Boolean> assignHost(
       final String slaveHost, final SlaveID slaveId,
       final AtomicReference<AssignedTask> taskReference, final Set<Integer> assignedPorts) {
@@ -829,11 +817,6 @@ class StateManager {
 
     return new Function<TaskStateMachine, Boolean>() {
       @Override public Boolean apply(final TaskStateMachine stateMachine) {
-        transactionalStorage.addSideEffect(new SideEffect() {
-          @Override public void mutate(MutableState state) {
-            state.taskHosts.put(stateMachine.getTaskId(), slaveHost);
-          }
-        });
         return stateUpdaterWithMutation(ScheduleStatus.ASSIGNED, mutation).apply(stateMachine);
       }
     };
@@ -896,7 +879,7 @@ class StateManager {
       final TaskStateMachine stateMachine = work.stateMachine;
 
       if (work.command == WorkCommand.KILL) {
-        killTask.execute(stateMachine.getTaskId());
+        driver.killTask(stateMachine.getTaskId());
       } else {
         TaskStore taskStore = storeProvider.getTaskStore();
         String taskId = stateMachine.getTaskId();
@@ -972,7 +955,15 @@ class StateManager {
     }
   }
 
-  private void deleteTasks(final Set<String> taskIds) {
+  /**
+   * Deletes records of tasks from the task store.
+   * This will not perform any state checking or state transitions, but will immediately remove
+   * the tasks from the store.  It will also silently ignore attempts to delete task IDs that do
+   * not exist.
+   *
+   * @param taskIds IDs of tasks to delete.
+   */
+  void deleteTasks(final Set<String> taskIds) {
     transactionalStorage.doInTransaction(new Work.NoResult.Quiet() {
       @Override protected void execute(final StoreProvider storeProvider) {
         final TaskStore taskStore = storeProvider.getTaskStore();
@@ -988,12 +979,6 @@ class StateManager {
         });
 
         taskStore.removeTasks(taskIds);
-
-        transactionalStorage.addSideEffect(new SideEffect() {
-          @Override public void mutate(MutableState state) {
-            state.taskHosts.keySet().removeAll(taskIds);
-          }
-        });
       }
     });
   }
@@ -1109,10 +1094,6 @@ class StateManager {
 
     transactionalStorage.addSideEffect(new SideEffect() {
       @Override public void mutate(MutableState state) {
-        String host = task.getAssignedTask().getSlaveHost();
-        if (host != null) {
-          state.taskHosts.put(taskId, task.getAssignedTask().getSlaveHost());
-        }
         state.vars.incrementCount(jobKey, initialState);
       }
     });

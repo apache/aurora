@@ -45,7 +45,11 @@ import com.twitter.common_internal.zookeeper.ZooKeeperModule;
 import com.twitter.mesos.ExecutorKey;
 import com.twitter.mesos.gen.MesosAdmin;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.HistoryPruner.HistoryPrunerImpl;
+import com.twitter.mesos.scheduler.HistoryPruner.HistoryPrunerImpl.PruneThreshold;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHosts;
+import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHostsImpl;
+import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveMapper;
 import com.twitter.mesos.scheduler.PulseMonitor.PulseMonitorImpl;
 import com.twitter.mesos.scheduler.SchedulingFilter.SchedulingFilterImpl;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
@@ -54,7 +58,6 @@ import com.twitter.mesos.scheduler.auth.SessionValidator.SessionValidatorImpl;
 import com.twitter.mesos.scheduler.httphandlers.ServletModule;
 import com.twitter.mesos.scheduler.quota.QuotaModule;
 import com.twitter.mesos.scheduler.storage.log.LogStorageModule;
-import com.twitter.mesos.scheduler.sync.SyncModule;
 import com.twitter.thrift.ServiceInstance;
 
 /**
@@ -109,6 +112,9 @@ public class SchedulerModule extends AbstractModule {
     // Enable intercepted method timings
     TimedInterceptor.bind(binder());
 
+    bind(ExecutorID.class)
+        .toInstance(ExecutorID.newBuilder().setValue(TWITTER_EXECUTOR_ID).build());
+
     // Bind a ZooKeeperClient
     install(new ZooKeeperModule(
         ZooKeeperClient.digestCredentials("mesos", "mesos"),
@@ -119,7 +125,6 @@ public class SchedulerModule extends AbstractModule {
     // Bindings for MesosSchedulerImpl.
     bind(SessionValidator.class).to(SessionValidatorImpl.class);
     bind(SchedulerCore.class).to(SchedulerCoreImpl.class).in(Singleton.class);
-    bind(ExecutorTracker.class).to(ExecutorTrackerImpl.class).in(Singleton.class);
 
     // Bindings for SchedulerCoreImpl.
     bind(CronJobManager.class).in(Singleton.class);
@@ -144,7 +149,9 @@ public class SchedulerModule extends AbstractModule {
         Names.named(SchedulingFilterImpl.MACHINE_RESTRICTIONS)))
         .toInstance(MACHINE_RESTRICTIONS.get());
 
-    bind(SlaveHosts.class).in(Singleton.class);
+    bind(SlaveHosts.class).to(SlaveHostsImpl.class);
+    bind(SlaveMapper.class).to(SlaveHostsImpl.class);
+    bind(SlaveHostsImpl.class).in(Singleton.class);
     bind(Scheduler.class).to(MesosSchedulerImpl.class);
     bind(MesosSchedulerImpl.class).in(Singleton.class);
 
@@ -153,15 +160,13 @@ public class SchedulerModule extends AbstractModule {
     bind(Clock.class).toInstance(Clock.SYSTEM_CLOCK);
     bind(StateManager.class).in(Singleton.class);
 
-    bind(TaskReaper.class).in(Singleton.class);
-
     LifecycleModule.bindServiceLauncher(binder(), ThriftServerLauncher.THRIFT_PORT_NAME,
         ThriftServerLauncher.class);
 
     bind(SchedulerLifecycle.class).in(Singleton.class);
 
     QuotaModule.bind(binder());
-    SyncModule.bind(binder());
+    PeriodicTaskModule.bind(binder());
 
     install(new ServletModule());
   }
@@ -202,9 +207,9 @@ public class SchedulerModule extends AbstractModule {
 
   @Provides
   @Singleton
-  ExecutorInfo provideExecutorInfo() {
+  ExecutorInfo provideExecutorInfo(ExecutorID defaultExecutorId) {
     return ExecutorInfo.newBuilder().setUri(EXECUTOR_PATH.get())
-        .setExecutorId(ExecutorID.newBuilder().setValue(TWITTER_EXECUTOR_ID))
+        .setExecutorId(defaultExecutorId)
         .addResources(Resources.makeMesosResource(Resources.CPUS, EXECUTOR_CPUS.get()))
         .addResources(Resources.makeMesosResource(Resources.RAM_MB, EXECUTOR_RAM.get().as(Data.MB)))
         .build();

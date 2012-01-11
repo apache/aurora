@@ -16,19 +16,19 @@ import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.LeaderRedirect;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHosts;
-import com.twitter.mesos.scheduler.sync.ExecutorWatchdog;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**
- * HTTP interface to serve as a HUD for the mesos executors tracked in the scheduler.
+ * HTTP interface to serve as a HUD for the mesos slaves tracked in the scheduler.
+ *
+ * TODO(William Farner): Wrap up common redirecting logic in a filter or wrapper/super class.
  *
  * @author Benjamin Mahler
  */
-public class ExecutorsHome extends StringTemplateServlet {
+public class Slaves extends StringTemplateServlet {
   private final String clusterName;
-  private final ExecutorWatchdog watchdog;
   private final SlaveHosts slaveHosts;
   private LeaderRedirect redirector;
 
@@ -37,16 +37,14 @@ public class ExecutorsHome extends StringTemplateServlet {
    *
    * @param cacheTemplates whether to cache templates
    * @param clusterName cluster name
-   * @param watchdog the executor watchdog
-   * @param slaveHosts executor slave hosts
+   * @param slaveHosts slave hosts
    * @param redirector leader redirector
    */
   @Inject
-  public ExecutorsHome(@CacheTemplates boolean cacheTemplates, @ClusterName String clusterName,
-      ExecutorWatchdog watchdog, SlaveHosts slaveHosts, LeaderRedirect redirector) {
-    super("executors", cacheTemplates);
+  public Slaves(@CacheTemplates boolean cacheTemplates, @ClusterName String clusterName,
+      SlaveHosts slaveHosts, LeaderRedirect redirector) {
+    super("slaves", cacheTemplates);
     this.clusterName = checkNotBlank(clusterName);
-    this.watchdog = checkNotNull(watchdog);
     this.slaveHosts = checkNotNull(slaveHosts);
     this.redirector = checkNotNull(redirector);
   }
@@ -63,7 +61,6 @@ public class ExecutorsHome extends StringTemplateServlet {
     writeTemplate(resp, new Closure<StringTemplate>() {
       @Override public void execute(StringTemplate template) {
         template.setAttribute("cluster_name", clusterName);
-        template.setAttribute("executorPositions", watchdog.getExecutorPositions());
         template.setAttribute("slaves", slaveHosts.getSlaves());
       }
     });

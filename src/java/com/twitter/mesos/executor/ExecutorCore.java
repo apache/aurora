@@ -4,7 +4,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -18,6 +17,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.annotation.Nullable;
+
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Optional;
@@ -27,6 +28,7 @@ import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -35,8 +37,6 @@ import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 import com.google.inject.name.Named;
-
-import org.apache.commons.io.FileSystemUtils;
 
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.args.Arg;
@@ -51,7 +51,6 @@ import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
-import com.twitter.common.util.BuildInfo;
 import com.twitter.mesos.Message;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
@@ -60,11 +59,12 @@ import com.twitter.mesos.executor.ProcessScanner.ProcessInfo;
 import com.twitter.mesos.executor.Task.TaskRunException;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduleStatus;
-import com.twitter.mesos.gen.comm.ExecutorStatus;
-import com.twitter.mesos.gen.comm.SchedulerMessage;
+import com.twitter.mesos.gen.comm.DeletedTasks;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.twitter.mesos.gen.ScheduleStatus.*;
+import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
+import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
+import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 
 /**
  * ExecutorCore
@@ -116,15 +116,14 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
 
   private final AtomicReference<String> slaveId = new AtomicReference<String>();
 
-  private final BuildInfo buildInfo;
   private final Function<AssignedTask, Task> taskFactory;
   private final ExecutorService taskExecutor;
-  private final Function<Message, Integer> messageHandler;
-  private final StateChangeListener stateChangeListener;
+  private final Driver driver;
   private final ExceptionalClosure<KillCommand, KillException> processKiller;
   private final ProcessScanner processScanner;
   private final Amount<Integer, Time> processScannerTaskScheduleInterval;
   private final Range<Integer> taskPortRange;
+  private final FileDeleter fileDeleter;
 
   private static final AtomicLong tasksReceived = Stats.exportLong("executor_tasks_received");
   private static final AtomicLong taskFailures = Stats.exportLong("executor_task_launch_failures");
@@ -133,27 +132,27 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
   private static final AtomicLong orphansKilled = Stats.exportLong("executor_orphans_killed");
   private static final AtomicLong numUnallocatedPortsProcesses =
       Stats.exportLong("executor_num_unallocated_ports_processes");
-
+  private static final AtomicLong numBadDeleteAttempts =
+      Stats.exportLong("executor_bad_delete_attempts");
 
   @Inject
-  public ExecutorCore(@ExecutorRootDir File executorRootDir, BuildInfo buildInfo,
+  public ExecutorCore(@ExecutorRootDir File executorRootDir,
       Function<AssignedTask, Task> taskFactory,
       @Named(TASK_EXECUTOR) ExecutorService taskExecutor,
-      Function<Message, Integer> messageHandler,
-      StateChangeListener stateChangeListener,
+      Driver driver,
       ExceptionalClosure<KillCommand, KillException> processKiller,
       @Named(PROCESS_SCANNER_TASK_SCHEDULE_INTERVAL) Amount<Integer, Time> interval,
-      @Named(TASK_PORT_RANGE) Range<Integer> taskPortRange) {
+      @Named(TASK_PORT_RANGE) Range<Integer> taskPortRange,
+      FileDeleter fileDeleter) {
     this.executorRootDir = checkNotNull(executorRootDir);
-    this.buildInfo = checkNotNull(buildInfo);
     this.taskFactory = checkNotNull(taskFactory);
     this.taskExecutor = checkNotNull(taskExecutor);
-    this.messageHandler = checkNotNull(messageHandler);
-    this.stateChangeListener = checkNotNull(stateChangeListener);
+    this.driver = checkNotNull(driver);
     this.processKiller = checkNotNull(processKiller);
     this.processScanner = new ProcessScanner(PROCESS_SCRAPER_SCRIPT.get());
-    this.processScannerTaskScheduleInterval = interval;
-    this.taskPortRange = taskPortRange;
+    this.processScannerTaskScheduleInterval = checkNotNull(interval);
+    this.taskPortRange = checkNotNull(taskPortRange);
+    this.fileDeleter = checkNotNull(fileDeleter);
     Stats.exportSize("executor_tasks_stored", tasks);
   }
 
@@ -176,8 +175,7 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
    * @param shutdownRegistry to register orderly shutdown of the periodic task scheduler.
    */
   void startPeriodicTasks(ShutdownRegistry shutdownRegistry) {
-    new ResourceManager(this, executorRootDir, shutdownRegistry).start();
-    startStateSync();
+    new ResourceManager(this, executorRootDir, shutdownRegistry, fileDeleter).start();
     startProcessScannerTask();
     shutdownRegistry.addAction(new Command() {
       @Override
@@ -210,17 +208,16 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
     final Task task = taskFactory.apply(assignedTask);
     tasks.put(taskId, task);
 
-    stateChangeListener.changedState(taskId, STARTING, Optional.<String>absent());
+    driver.sendStatusUpdate(taskId, STARTING, Optional.<String>absent());
     try {
       task.stage();
-      stateChangeListener.changedState(taskId, RUNNING, Optional.<String>absent());
+      driver.sendStatusUpdate(taskId, RUNNING, Optional.<String>absent());
       task.run();
     } catch (TaskRunException e) {
       LOG.log(Level.SEVERE, "Failed to stage or run task " + taskId, e);
       taskFailures.incrementAndGet();
       task.terminate(FAILED);
-      stateChangeListener.changedState(taskId, FAILED, Optional.of(e.getMessage()));
-      deleteCompletedTask(taskId);
+      driver.sendStatusUpdate(taskId, FAILED, Optional.of(e.getMessage()));
       return;
     }
 
@@ -229,7 +226,7 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
         LOG.info("Waiting for task " + taskId + " to complete.");
         ScheduleStatus state = task.blockUntilTerminated();
         LOG.info("Task " + taskId + " completed in state " + state);
-        stateChangeListener.changedState(taskId, state, Optional.<String>absent());
+        driver.sendStatusUpdate(taskId, state, Optional.<String>absent());
       }
     });
   }
@@ -261,7 +258,8 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
   public Iterable<Task> getLiveTasks() {
     return Iterables.unmodifiableIterable(Iterables.filter(tasks.values(),
         new Predicate<Task>() {
-          @Override public boolean apply(Task task) {
+          @Override
+          public boolean apply(Task task) {
             return task.isRunning();
           }
         }));
@@ -277,11 +275,61 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
     return hasTask(taskId) && tasks.get(taskId).isRunning();
   }
 
+  private Predicate<String> taskIdRunningFilter() {
+    return Predicates.compose(IS_RUNNING_TASK, Functions.forMap(tasks));
+  }
+
   @Override
-  public void deleteCompletedTask(String taskId) {
-    Preconditions.checkState(!isRunning(taskId), "Task " + taskId + " is still running!");
-    tasks.remove(taskId);
-    stateChangeListener.deleted(taskId);
+  public void deleteCompletedTasks(Set<String> taskIds) {
+    Set<String> deletedTasks;
+    synchronized (tasks) {
+      Set<String> runningTasks =
+          ImmutableSet.copyOf(Iterables.filter(taskIds, taskIdRunningFilter()));
+      if (!runningTasks.isEmpty()) {
+        LOG.severe("Attempted to delete running tasks " + runningTasks);
+        numBadDeleteAttempts.addAndGet(runningTasks.size());
+      }
+
+      deletedTasks = ImmutableSet.copyOf(Sets.difference(taskIds, runningTasks));
+      tasks.keySet().removeAll(deletedTasks);
+    }
+
+    if (!deletedTasks.isEmpty()) {
+      driver.apply(new Message(new DeletedTasks(deletedTasks)));
+    }
+  }
+
+  @Override
+  public void adjustRetainedTasks(Set<String> retainedTaskIds) {
+    LOG.info("Adjusting task retention to match " + retainedTaskIds);
+
+    synchronized (tasks) {
+      Set<String> unknownTasks = Sets.difference(retainedTaskIds, tasks.keySet());
+      if (!unknownTasks.isEmpty()) {
+        LOG.severe("Asked to retain unknown tasks " + unknownTasks);
+      }
+
+      Set<String> deleteTasks = Sets.difference(tasks.keySet(), retainedTaskIds);
+      Set<String> runningTasks =
+          ImmutableSet.copyOf(Iterables.filter(deleteTasks, taskIdRunningFilter()));
+      if (!runningTasks.isEmpty()) {
+        LOG.warning("Retained tasks excluded locally-active tasks " + runningTasks);
+        for (String runningTask : runningTasks) {
+          tasks.get(runningTask).terminate(ScheduleStatus.KILLED);
+        }
+      }
+
+      for (String deleteTask : deleteTasks) {
+        File sandbox = tasks.get(deleteTask).getSandboxDir();
+        try {
+          fileDeleter.execute(sandbox);
+        } catch (IOException e) {
+          LOG.log(Level.WARNING, "Failed to delete sandbox " + sandbox, e);
+        }
+      }
+
+      tasks.keySet().removeAll(deleteTasks);
+    }
   }
 
   @Override
@@ -300,7 +348,6 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
    */
   public Iterable<Task> shutdownCore() {
     LOG.info("Shutting down executor core.");
-    Iterable<Task> liveTasks = getLiveTasks();
 
     List<Future<Task>> results = stopLiveTasks();
     List<Task> killed = Lists.newArrayList();
@@ -342,45 +389,6 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
     }
   }
 
-  private void startStateSync() {
-    // TODO(wfarner): Integrate this with the incremental sync messages.
-    final Properties buildProperties = buildInfo.getProperties();
-
-    final String DEFAULT = "unknown";
-    final ExecutorStatus baseStatus = new ExecutorStatus()
-        .setHost(Util.getHostName())
-        .setBuildUser(buildProperties.getProperty(BuildInfo.Key.USER.value, DEFAULT))
-        .setBuildMachine(buildProperties.getProperty(BuildInfo.Key.MACHINE.value, DEFAULT))
-        .setBuildPath(buildProperties.getProperty(BuildInfo.Key.PATH.value, DEFAULT))
-        .setBuildGitTag(buildProperties.getProperty(BuildInfo.Key.GIT_TAG.value, DEFAULT))
-        .setBuildGitRevision(buildProperties.getProperty(BuildInfo.Key.GIT_REVISION.value, DEFAULT))
-        .setBuildTimestamp(buildProperties.getProperty(BuildInfo.Key.TIMESTAMP.value, DEFAULT));
-
-    Runnable syncer = new Runnable() {
-      @Override public void run() {
-        if (slaveId.get() == null) {
-          LOG.severe("slaveID not set, can't send executor status to scheduler.");
-          return;
-        }
-
-        ExecutorStatus status = new ExecutorStatus(baseStatus).setSlaveId(slaveId.get());
-
-        try {
-          status.setDiskFreeKb(FileSystemUtils.freeSpaceKb(executorRootDir.getAbsolutePath()));
-        } catch (IOException e) {
-          LOG.log(Level.INFO, "Failed to get disk free space.", e);
-        }
-
-        SchedulerMessage message = new SchedulerMessage();
-        message.setExecutorStatus(status);
-        messageHandler.apply(new Message(message));
-      }
-    };
-
-    // TODO(William Farner): Make sync interval configurable.
-    scheduledExecutorService.scheduleAtFixedRate(syncer, 30, 30, TimeUnit.SECONDS);
-  }
-
   private static final Function<ProcessInfo, String> GET_TASK_ID_FUNCTION =
       new Function<ProcessInfo, String>() {
     @Override public String apply(ProcessInfo input) {
@@ -389,8 +397,8 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
   };
 
   private static final Predicate<Task> IS_RUNNING_TASK = new Predicate<Task>() {
-    @Override public boolean apply(Task input) {
-      return input.isRunning();
+    @Override public boolean apply(@Nullable Task task) {
+      return (task != null) && task.isRunning();
     }
   };
 

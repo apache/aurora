@@ -5,15 +5,12 @@ import java.io.FileFilter;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.annotation.Nullable;
-
-import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 
 import org.apache.commons.io.FileUtils;
 
@@ -21,6 +18,8 @@ import com.twitter.common.base.Closure;
 import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Garbage collector to reclaim disk space consumed by unused files.
@@ -34,7 +33,7 @@ public class DiskGarbageCollector implements Runnable {
   private final File scanDirectory;
   private final FileFilter fileFilter;
   private final Amount<Long, Data> gcThreshold;
-  private final Closure<File> gcCallback;
+  private final Closure<Set<File>> gcCallback;
 
   /**
    * Creates a new disk garbage collector that will scan the first level of a directory and
@@ -45,14 +44,17 @@ public class DiskGarbageCollector implements Runnable {
    * @param scanDirectory Directory to scan (only the first level will be scanned).
    * @param fileFilter Filter to determine which files are candidate for garbage collection.
    * @param gcThreshold Minimum size of the directory before a GC is performed.
-   * @param gcCallback Optional callback to be notified when a file is garbage collected.
+   * @param gcCallback Callback to be notified when files are garbage collected.
    */
-  public DiskGarbageCollector(String name, File scanDirectory, FileFilter fileFilter,
-      Amount<Long, Data> gcThreshold, @Nullable Closure<File> gcCallback) {
+  public DiskGarbageCollector(String name,
+      File scanDirectory,
+      FileFilter fileFilter,
+      Amount<Long, Data> gcThreshold,
+      Closure<Set<File>> gcCallback) {
     this.name = MorePreconditions.checkNotBlank(name);
-    this.scanDirectory = Preconditions.checkNotNull(scanDirectory);
-    this.fileFilter = Preconditions.checkNotNull(fileFilter);
-    this.gcThreshold = Preconditions.checkNotNull(gcThreshold);
+    this.scanDirectory = checkNotNull(scanDirectory);
+    this.fileFilter = checkNotNull(fileFilter);
+    this.gcThreshold = checkNotNull(gcThreshold);
     this.gcCallback = gcCallback;
   }
 
@@ -62,33 +64,13 @@ public class DiskGarbageCollector implements Runnable {
    * @param name THe name of the garbage collector.
    * @param scanDirectory Directory to scan (only the first level will be scanned).
    * @param fileFilter Filter to determine which files are candidate for garbage collection.
-   * @param gcCallback Optional callback to be notified when a file is garbage collected.
+   * @param gcCallback Callback to be notified when files are garbage collected.
    */
-  public DiskGarbageCollector(String name, File scanDirectory, FileFilter fileFilter,
-      @Nullable Closure<File> gcCallback) {
+  public DiskGarbageCollector(String name,
+      File scanDirectory,
+      FileFilter fileFilter,
+      Closure<Set<File>> gcCallback) {
     this(name, scanDirectory, fileFilter, Amount.of(0L, Data.BYTES), gcCallback);
-  }
-
-  private static FileFilter ACCEPT_ALL = new FileFilter() {
-    @Override public boolean accept(File pathname) {
-      return true;
-    }
-  };
-
-  public static long recursiveLastModified(File file) {
-    Preconditions.checkNotNull(file);
-
-    if (file.isFile()) {
-      return file.lastModified();
-    }
-
-    long highestLastModified = file.lastModified();
-    for (File f : safeListFiles(file, ACCEPT_ALL)) {
-      long lastModified = recursiveLastModified(f);
-      if (lastModified > highestLastModified) highestLastModified = lastModified;
-    }
-
-    return highestLastModified;
   }
 
   public static final File[] NO_FILES = new File[0];
@@ -124,9 +106,10 @@ public class DiskGarbageCollector implements Runnable {
         LOG.info("Triggering " + name + " GC, need to reclaim: "
                  + Amount.of(bytesToReclaim, Data.BYTES).as(Data.MB) + " MB.");
         List<File> files = Arrays.asList(safeListFiles(scanDirectory, fileFilter));
-        Collections.sort(files, LAST_MODIFIED_COMPARATOR);
 
         LOG.info(name + " found " + files.size() + " GC candidates.");
+
+        ImmutableSet.Builder<File> deletedBuilder = ImmutableSet.builder();
 
         long bytesReclaimed = 0;
         for (File file : files) {
@@ -138,18 +121,13 @@ public class DiskGarbageCollector implements Runnable {
 
           LOG.info(name + " GC reclaiming " + Amount.of(fileSize, Data.BYTES).as(Data.MB)
                    + " MB from " + file);
+          bytesReclaimed += fileSize;
+          deletedBuilder.add(file);
+        }
 
-          try {
-            if (file.isFile()) {
-              file.delete();
-            } else {
-              FileUtils.deleteDirectory(file);
-            }
-            bytesReclaimed += fileSize;
-            if (gcCallback != null) gcCallback.execute(file);
-          } catch (IOException e) {
-            LOG.log(Level.WARNING, "Failed to GC " + file, e);
-          }
+        Set<File> deletedFiles = deletedBuilder.build();
+        if (!deletedFiles.isEmpty()) {
+          gcCallback.execute(deletedFiles);
         }
 
         if (bytesReclaimed < bytesToReclaim) {
@@ -164,21 +142,6 @@ public class DiskGarbageCollector implements Runnable {
   private static long fileSize(File f) throws IOException {
     return f.isFile() ? f.length() : sizeOfDirectory(f);
   }
-
-  private static final Comparator<File> LAST_MODIFIED_COMPARATOR = new Comparator<File>() {
-    @Override public int compare(File file1, File file2) {
-      long lastModified1 = recursiveLastModified(file1);
-      long lastModified2 = recursiveLastModified(file2);
-
-      if (lastModified1 < lastModified2) {
-        return -1;
-      } else if (lastModified1 > lastModified2) {
-        return 1;
-      } else {
-        return 0;
-      }
-    }
-  };
 
   // TODO(wfarner): Figure out a better long-term plan for the code below.  Right now, it is
   //     a shameless copy from org.apache.commons.io.FileUtils to quickly plug an issue caused

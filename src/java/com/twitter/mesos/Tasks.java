@@ -98,7 +98,7 @@ public class Tasks {
   /**
    * Different states that an active task may be in.
    */
-  public static final Set<ScheduleStatus> ACTIVE_STATES = EnumSet.of(
+  public static final EnumSet<ScheduleStatus> ACTIVE_STATES = EnumSet.of(
       PENDING, ASSIGNED, STARTING, RUNNING, KILLING, RESTARTING, UPDATING, ROLLBACK, PREEMPTING);
 
   /**

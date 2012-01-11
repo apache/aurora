@@ -26,7 +26,6 @@ import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.Resource;
 
-import com.twitter.common.base.Closure;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.StateMachine;
 import com.twitter.mesos.ExecutorKey;
@@ -149,9 +148,9 @@ public class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public synchronized void start(Closure<String> killTask) {
+  public synchronized void start(Driver driver) {
     checkLifecycleState(INITIALIZED);
-    stateManager.start(killTask);
+    stateManager.start(driver);
     stateMachine.transition(STARTED);
 
     for (JobManager jobManager : jobManagers) {

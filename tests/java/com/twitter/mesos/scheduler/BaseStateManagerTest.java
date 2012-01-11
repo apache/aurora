@@ -24,7 +24,7 @@ import com.twitter.mesos.scheduler.storage.Storage.Work.NoResult.Quiet;
  */
 public abstract class BaseStateManagerTest extends EasyMockTest {
 
-  protected Closure<String> killTaskCallback;
+  protected Driver driver;
   protected StateManager stateManager;
   protected MutableState mutableState;
   protected FakeClock clock = new FakeClock();
@@ -36,7 +36,7 @@ public abstract class BaseStateManagerTest extends EasyMockTest {
   public void stateManagerSetUp() throws Exception {
     resetStats();
 
-    killTaskCallback = createMock(new Clazz<Closure<String>>() {});
+    driver = createMock(Driver.class);
     stateManager = createStateManager();
   }
 
@@ -82,7 +82,7 @@ public abstract class BaseStateManagerTest extends EasyMockTest {
     this.mutableState = new MutableState();
     final StateManager stateManager = new StateManager(storage, clock, mutableState);
     stateManager.initialize();
-    stateManager.start(killTaskCallback);
+    stateManager.start(driver);
     addTearDown(new TearDown() {
       @Override public void tearDown() {
         stateManager.stop();

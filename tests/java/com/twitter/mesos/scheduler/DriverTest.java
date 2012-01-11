@@ -8,6 +8,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.common.testing.EasyMockTest;
+import com.twitter.mesos.scheduler.Driver.DriverImpl;
 
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
@@ -17,8 +18,8 @@ import static org.junit.Assert.assertEquals;
  */
 public class DriverTest extends EasyMockTest {
 
-  private static final Protos.TaskID TASK_1 = createTaskId("1");
-  private static final Protos.TaskID TASK_2 = createTaskId("2");
+  private static final String TASK_1 = "1";
+  private static final String TASK_2 = "2";
 
   private static Protos.TaskID createTaskId(String taskId) {
     return Protos.TaskID.newBuilder().setValue(taskId).build();
@@ -26,13 +27,13 @@ public class DriverTest extends EasyMockTest {
 
   private SchedulerDriver schedulerDriver;
   private Supplier<SchedulerDriver> driverSupplier;
-  private Driver driver;
+  private DriverImpl driver;
 
   @Before
   public void setUp() {
     schedulerDriver = createMock(SchedulerDriver.class);
     driverSupplier = createMock(new Clazz<Supplier<SchedulerDriver>>() { });
-    driver = new Driver(driverSupplier);
+    driver = new DriverImpl(driverSupplier);
   }
 
   @Test
@@ -69,14 +70,14 @@ public class DriverTest extends EasyMockTest {
   public void testNormalLifecycle() {
     expect(driverSupplier.get()).andReturn(schedulerDriver);
     expect(schedulerDriver.run()).andReturn(Protos.Status.OK);
-    expect(schedulerDriver.killTask(TASK_1)).andReturn(Protos.Status.OK);
-    expect(schedulerDriver.killTask(TASK_2)).andReturn(Protos.Status.OK);
+    expect(schedulerDriver.killTask(createTaskId(TASK_1))).andReturn(Protos.Status.OK);
+    expect(schedulerDriver.killTask(createTaskId(TASK_2))).andReturn(Protos.Status.OK);
     expect(schedulerDriver.stop(true)).andReturn(Protos.Status.DRIVER_ABORTED);
     control.replay();
 
     assertEquals(Protos.Status.OK, driver.run());
-    assertEquals(Protos.Status.OK, driver.killTask(TASK_1));
-    assertEquals(Protos.Status.OK, driver.killTask(TASK_2));
+    driver.killTask(TASK_1);
+    driver.killTask(TASK_2);
     driver.stop();
   }
 

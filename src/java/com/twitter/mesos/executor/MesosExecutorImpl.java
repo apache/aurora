@@ -1,5 +1,6 @@
 package com.twitter.mesos.executor;
 
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -21,13 +22,10 @@ import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
-import com.twitter.mesos.executor.sync.SyncBuffer;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduleStatus;
+import com.twitter.mesos.gen.comm.AdjustRetainedTasks;
 import com.twitter.mesos.gen.comm.ExecutorMessage;
-import com.twitter.mesos.gen.comm.SchedulerMessage;
-import com.twitter.mesos.gen.comm.StateUpdateRequest;
-import com.twitter.mesos.gen.comm.StateUpdateResponse;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
@@ -40,18 +38,16 @@ public class MesosExecutorImpl implements Executor {
   private final CountDownLatch initialized = new CountDownLatch(1);
   private final ExecutorCore executorCore;
   private final Driver driver;
-  private final SyncBuffer syncBuffer;
   private final Lifecycle lifecycle;
 
   private volatile boolean shuttingDown = false;
   private final ShutdownRegistry shutdownRegistry;
 
   @Inject
-  public MesosExecutorImpl(ExecutorCore executorCore, Driver driver, SyncBuffer syncBuffer,
+  public MesosExecutorImpl(ExecutorCore executorCore, Driver driver,
       Lifecycle lifecycle, ShutdownRegistry shutdownRegistry) {
     this.executorCore = checkNotNull(executorCore);
     this.driver = checkNotNull(driver);
-    this.syncBuffer = checkNotNull(syncBuffer);
     this.lifecycle = checkNotNull(lifecycle);
     this.shutdownRegistry = checkNotNull(shutdownRegistry);
   }
@@ -154,17 +150,29 @@ public class MesosExecutorImpl implements Executor {
           break;
 
         case STATE_UPDATE_REQUEST:
-          LOG.info("Received executor state update request.");
-          StateUpdateRequest request = executorMsg.getStateUpdateRequest();
-          StateUpdateResponse response =
-              syncBuffer.stateSince(request.getExecutorUUID(), request.getLastKnownPosition());
-          response.setSlaveHost(Util.getHostName());
-          SchedulerMessage message = SchedulerMessage.stateUpdateResponse(response);
-          driver.sendFrameworkMessage(ThriftBinaryCodec.encode(message));
+          LOG.warning("Received deprecated state update request, ignoring.");
+          break;
+
+        case ADJUST_RETAINED_TASKS:
+          AdjustRetainedTasks adjustment = executorMsg.getAdjustRetainedTasks();
+          if (adjustment == null) {
+            LOG.severe("Ignoring empty task adjustment.");
+            return;
+          }
+
+          Set<String> tasks = adjustment.getRetainedTaskIds();
+          if (tasks == null) {
+            LOG.severe("Ignoring empty tasks set in task adjustment");
+            return;
+          }
+
+          LOG.info("Received request to adjust retained tasks to " + tasks);
+          executorCore.adjustRetainedTasks(tasks);
           break;
 
         default:
-        LOG.warning("Received unhandled executor message type: " + executorMsg.getSetField());
+          LOG.warning("Received unhandled executor message type: " + executorMsg.getSetField());
+          break;
       }
     } catch (ThriftBinaryCodec.CodingException e) {
       LOG.log(Level.SEVERE, "Failed to decode framework message.", e);

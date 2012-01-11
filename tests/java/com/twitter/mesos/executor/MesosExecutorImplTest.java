@@ -20,7 +20,6 @@ import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.application.ShutdownRegistry.ShutdownRegistryImpl;
 import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.testing.EasyMockTest;
-import com.twitter.mesos.executor.sync.SyncBuffer;
 import com.twitter.mesos.gen.ScheduleStatus;
 
 import static org.easymock.EasyMock.capture;
@@ -32,10 +31,9 @@ import static org.easymock.EasyMock.expect;
  */
 public class MesosExecutorImplTest extends EasyMockTest {
   public static final String TASK_ID = "TASK_ID";
-  
+
   private ExecutorCore executorCore;
   private Driver driver;
-  private SyncBuffer syncBuffer;
   private Lifecycle lifecycle;
   private ShutdownRegistry shutdownRegistry;
   private MesosExecutorImpl mesosExecutor;
@@ -44,7 +42,6 @@ public class MesosExecutorImplTest extends EasyMockTest {
   @SuppressWarnings("unchecked")
   public void setUp() {
     driver = createMock(Driver.class);
-    syncBuffer = createMock(SyncBuffer.class);
     lifecycle = new Lifecycle(
         new ShutdownRegistryImpl(),
         new UncaughtExceptionHandler() {
@@ -56,7 +53,6 @@ public class MesosExecutorImplTest extends EasyMockTest {
     mesosExecutor = new MesosExecutorImpl(
         executorCore,
         driver,
-        syncBuffer,
         lifecycle,
         shutdownRegistry);
   }

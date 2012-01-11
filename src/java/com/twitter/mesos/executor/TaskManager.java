@@ -1,5 +1,7 @@
 package com.twitter.mesos.executor;
 
+import java.util.Set;
+
 /**
  * Defines a task manager that provides information about running tasks and minimal mutating
  * operations.
@@ -13,7 +15,7 @@ public interface TaskManager {
    *
    * @return Running tasks.
    */
-  public Iterable<Task> getLiveTasks();
+  Iterable<Task> getLiveTasks();
 
   /**
    * Checks whether the manager has a task with the given id.
@@ -21,7 +23,7 @@ public interface TaskManager {
    * @param taskId The task to check for.
    * @return {@code true} if the manager has a task wth the id, {@code false} otherwise.
    */
-  public boolean hasTask(String taskId);
+  boolean hasTask(String taskId);
 
   /**
    * Checks if a task with {@code taskId} is running.
@@ -30,13 +32,20 @@ public interface TaskManager {
    * @return {@code true} if the manager has a task with the id that is currently in a runnable
    *     state, {@code false} otherwise.
    */
-  public boolean isRunning(String taskId);
+  boolean isRunning(String taskId);
 
   /**
-   * Deletes record of a completed task.  It is expected that the referenced task not be currently
-   * running (as defined by {@link #isRunning(int)}.
+   * Deletes record of completed tasks.  It is expected that the referenced tasks not be currently
+   * running (as defined by {@link #isRunning(String)}.
    *
-   * @param taskId Id of the task to delete.
+   * @param taskIds Ids of the task to delete.
    */
-  public void deleteCompletedTask(String taskId);
+  void deleteCompletedTasks(Set<String> taskIds);
+
+  /**
+   * Adjusts the locally-retained tasks to include only the specified task IDs.
+   *
+   * @param retainedTaskIds IDs of tasks to retain.
+   */
+  void adjustRetainedTasks(Set<String> retainedTaskIds);
 }

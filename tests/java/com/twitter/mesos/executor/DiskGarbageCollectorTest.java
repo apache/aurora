@@ -6,13 +6,12 @@ import java.io.IOException;
 import java.util.Set;
 
 import com.google.common.base.Charsets;
-import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.common.io.Files;
 
 import org.apache.commons.io.FileUtils;
 import org.easymock.EasyMock;
-import org.easymock.IMocksControl;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -20,20 +19,19 @@ import org.junit.Test;
 import com.twitter.common.base.Closure;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
+import com.twitter.common.testing.EasyMockTest;
 
-import static org.easymock.EasyMock.createControl;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.easymock.EasyMock.or;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
 
 /**
  * @author William Farner
  */
-public class DiskGarbageCollectorTest {
+public class DiskGarbageCollectorTest extends EasyMockTest {
 
   private File root;
   private File fileA;
@@ -42,13 +40,11 @@ public class DiskGarbageCollectorTest {
 
   private static final Amount<Long, Data> GC_THRESHOLD = Amount.of(10L, Data.KB);
 
-  private IMocksControl control;
   private FileFilter fileFilter;
-  private Closure<File> gcCallback;
+  private Closure<Set<File>> gcCallback;
   private DiskGarbageCollector gc;
 
   @Before
-  @SuppressWarnings("unchecked")
   public void setUp() {
     root = Files.createTempDir();
 
@@ -56,10 +52,13 @@ public class DiskGarbageCollectorTest {
     fileB = new File(root, "b");
     fileC = new File(root, "c");
 
-    control = createControl();
-    fileFilter = control.createMock(FileFilter.class);
-    gcCallback = control.createMock(Closure.class);
-    gc = new DiskGarbageCollector("Test", root, fileFilter, GC_THRESHOLD, gcCallback);
+    fileFilter = createMock(FileFilter.class);
+    gcCallback = createMock(new Clazz<Closure<Set<File>>>() {});
+    gc = new DiskGarbageCollector("Test",
+        root,
+        fileFilter,
+        GC_THRESHOLD,
+        gcCallback);
   }
 
   @After
@@ -84,7 +83,8 @@ public class DiskGarbageCollectorTest {
     expect(fileFilter.accept(fileA)).andReturn(true);
     expect(fileFilter.accept(fileB)).andReturn(true);
     expect(fileFilter.accept(fileC)).andReturn(true);
-    gcCallback.execute(or(eq(fileA), or(eq(fileB), eq(fileC))));
+    gcCallback.execute(
+        or(eq(ImmutableSet.of(fileA)), or(eq(ImmutableSet.of(fileB)), eq(ImmutableSet.of(fileC)))));
 
     control.replay();
 
@@ -92,33 +92,6 @@ public class DiskGarbageCollectorTest {
     populateFile(fileB, Amount.of(5, Data.KB));
     populateFile(fileC, Amount.of(5, Data.KB));
     gc.run();
-
-    assertThat(root.exists(), is(true));
-    assertThat(root.isDirectory(), is(true));
-    Set<String> dirContents = Sets.newHashSet(root.list());
-    assertThat(dirContents.size(), is(2));
-
-    // Since all three files were essentially populated simultaneously, it's uncertain which
-    // one will be determined to be oldest by modification time.
-    assertThat(Sets.intersection(Sets.newHashSet("a", "b", "c"), dirContents).size(), is(2));
-  }
-
-  @Test
-  public void testReclaimsOldestFirst() throws Exception {
-    expect(fileFilter.accept(fileB)).andReturn(true);
-    expect(fileFilter.accept(fileA)).andReturn(true);
-    expect(fileFilter.accept(fileC)).andReturn(true);
-    gcCallback.execute(fileB);
-
-    control.replay();
-
-    populateFile(fileB, Amount.of(5, Data.KB));
-    Thread.sleep(1000);  // Needed to guarantee clock moves.
-    populateFile(fileA, Amount.of(3, Data.KB));
-    populateFile(fileC, Amount.of(3, Data.KB));
-    gc.run();
-
-    assertDirContents(root, "a", "c");
   }
 
   @Test
@@ -126,8 +99,7 @@ public class DiskGarbageCollectorTest {
     expect(fileFilter.accept(fileA)).andReturn(true);
     expect(fileFilter.accept(fileB)).andReturn(true);
     expect(fileFilter.accept(fileC)).andReturn(false);
-    gcCallback.execute(fileA);
-    gcCallback.execute(fileB);
+    gcCallback.execute(ImmutableSet.of(fileA, fileB));
 
     control.replay();
 
@@ -135,8 +107,6 @@ public class DiskGarbageCollectorTest {
     populateFile(fileB, Amount.of(11, Data.KB));
     populateFile(fileC, Amount.of(11, Data.KB));
     gc.run();
-
-    assertDirContents(root, "c");
   }
 
   @Test
@@ -149,7 +119,7 @@ public class DiskGarbageCollectorTest {
     expect(fileFilter.accept(fileA)).andReturn(true);
 
     // At least one of the 3 top-level items will need to be gc'd
-    gcCallback.execute(EasyMock.<File>notNull());
+    gcCallback.execute(EasyMock.<Set<File>>anyObject());
     expectLastCall().atLeastOnce();
 
     control.replay();
@@ -161,15 +131,6 @@ public class DiskGarbageCollectorTest {
     populateFile(fileA2, Amount.of(10, Data.KB));
 
     gc.run();
-
-    long actual = FileUtils.sizeOfDirectory(root);
-    @SuppressWarnings("unchecked")
-    Iterable<File> files =
-        FileUtils.listFiles(root, null /* no extension filter */, true /* recursive */);
-    long threshold = GC_THRESHOLD.as(Data.BYTES);
-    assertTrue(String.format("Expected size of %s in bytes to be <= %d, found %d:\n\t%s",
-                             root, threshold, actual, Joiner.on("\n\t").join(files)),
-               actual <= threshold);
   }
 
   private void populateFile(File file, Amount<Integer, Data> bytes) throws Exception {

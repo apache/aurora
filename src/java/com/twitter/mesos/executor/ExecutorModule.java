@@ -2,8 +2,6 @@ package com.twitter.mesos.executor;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -41,18 +39,15 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common_internal.util.HdfsUtils;
 import com.twitter.mesos.Message;
 import com.twitter.mesos.executor.Driver.DriverImpl;
+import com.twitter.mesos.executor.FileDeleter.FileDeleterImpl;
 import com.twitter.mesos.executor.FileToInt.FetchException;
 import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
 import com.twitter.mesos.executor.HttpSignaler.SignalException;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
 import com.twitter.mesos.executor.ProcessKiller.KillException;
-import com.twitter.mesos.executor.StateChangeListener.StateChangeListenerImpl;
 import com.twitter.mesos.executor.httphandlers.ExecutorHome;
 import com.twitter.mesos.executor.httphandlers.TaskHome;
 import com.twitter.mesos.executor.migrations.DeadTaskMigratorModule;
-import com.twitter.mesos.executor.sync.SyncBuffer;
-import com.twitter.mesos.executor.sync.SyncBuffer.SyncBufferImpl;
-import com.twitter.mesos.executor.sync.SyncBufferSize;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduleStatus;
 
@@ -115,16 +110,11 @@ public class ExecutorModule extends AbstractModule {
         .to(DeadTaskLoader.class).in(Singleton.class);
 
     // Bindings for MesosExecutorImpl.
-    bind(Integer.class).annotatedWith(SyncBufferSize.class)
-        .toInstance(STATE_SYNC_BUFFER_LIMIT.get());
     bind(new TypeLiteral<Supplier<Map<String, ScheduleStatus>>>() {}).to(ExecutorCore.class);
-    bind(SyncBuffer.class).to(SyncBufferImpl.class);
-    bind(SyncBufferImpl.class).in(Singleton.class);
     bind(Driver.class).to(DriverImpl.class);
     bind(DriverImpl.class).in(Singleton.class);
 
     // Bindings needed for ExecutorCore.
-    bind(StateChangeListener.class).to(StateChangeListenerImpl.class);
     bind(new TypeLiteral<Function<AssignedTask, Task>>() {}).to(TaskFactory.class);
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
         .setDaemon(true).setNameFormat("MesosExecutor-[%d]").build();
@@ -137,6 +127,7 @@ public class ExecutorModule extends AbstractModule {
     bind(new TypeLiteral<Range<Integer>>() {})
         .annotatedWith(Names.named(ExecutorCore.TASK_PORT_RANGE))
         .toInstance(TASK_PORT_RANGE.get());
+    bind(FileDeleter.class).to(FileDeleterImpl.class);
 
     // Bindings needed for TaskFactory.
     bind(new TypeLiteral<ExceptionalFunction<Integer, Boolean, HealthCheckException>>() {})

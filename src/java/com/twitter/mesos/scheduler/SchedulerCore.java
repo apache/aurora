@@ -14,7 +14,6 @@ import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.Resource;
 
-import com.twitter.common.base.Closure;
 import com.twitter.mesos.ExecutorKey;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.JobConfiguration;
@@ -42,7 +41,7 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
  * <li>[construct]
  * <li>{@link #prepare()}
  * <li>{@link #initialize()}
- * <li>{@link #start(com.twitter.common.base.Closure)}
+ * <li>{@link #start(Driver)}
  * <li>serve clients via other methods (normal usage)
  * <li>{@link #stop()}
  * </ol>
@@ -69,9 +68,9 @@ public interface SchedulerCore extends Function<Query, Iterable<TwitterTaskInfo>
   /**
    * Prepares the scheduler for serving traffic.
    *
-   * @param killTask A closure that will kill the task with the id passed to its execute method.
+   * @param driver A driver reference that may be used to interact with the rest of the framework.
    */
-  void start(Closure<String> killTask);
+  void start(Driver driver);
 
   /**
    * Assigns a framework ID to the scheduler, should be called when the scheduler implementation

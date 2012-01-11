@@ -1,7 +1,5 @@
 package com.twitter.mesos.scheduler;
 
-import java.util.Map;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
@@ -9,7 +7,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-import com.google.common.collect.Maps;
 
 import com.twitter.common.collections.Pair;
 import com.twitter.common.stats.StatImpl;
@@ -25,8 +22,6 @@ class StateManagerVars {
    * Mutable state of the StateManager.
    */
   static class MutableState {
-    // Maps from task ID to assigned host name.
-    final Map<String, String> taskHosts = Maps.newHashMap();
     final Vars vars = new Vars();
   }
 

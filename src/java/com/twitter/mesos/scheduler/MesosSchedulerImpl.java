@@ -24,7 +24,6 @@ import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.SlaveID;
-import org.apache.mesos.Protos.Status;
 import org.apache.mesos.Protos.TaskDescription;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskStatus;
@@ -35,7 +34,6 @@ import com.twitter.common.application.Lifecycle;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.NotNull;
-import com.twitter.common.base.Closure;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -43,15 +41,10 @@ import com.twitter.common.stats.Stats;
 import com.twitter.mesos.ExecutorKey;
 import com.twitter.mesos.StateTranslator;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
-import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.ScheduleStatus;
-import com.twitter.mesos.gen.comm.ExecutorMessage;
 import com.twitter.mesos.gen.comm.RegisteredTaskUpdate;
-import com.twitter.mesos.gen.comm.RestartExecutor;
 import com.twitter.mesos.gen.comm.SchedulerMessage;
 import com.twitter.mesos.gen.comm.StateUpdateResponse;
-import com.twitter.mesos.scheduler.sync.ExecutorWatchdog;
-import com.twitter.mesos.scheduler.sync.ExecutorWatchdog.UpdateRequest;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -65,37 +58,29 @@ public class MesosSchedulerImpl implements Scheduler {
 
   private static final Amount<Long, Time> MAX_REGISTRATION_DELAY = Amount.of(1L, Time.MINUTES);
 
-  @CmdLine(name = "executor_poll_interval", help = "Interval between executor update requests.")
-  private static final Arg<Amount<Long, Time>> EXECUTOR_POLL_INTERVAL =
-      Arg.create(Amount.of(10L, Time.SECONDS));
-
   // TODO(wickman):  This belongs in SchedulerModule eventually.
   @NotNull
   @CmdLine(name = "thermos_executor_path", help = "Path to the thermos executor launch script.")
   private static final Arg<String> THERMOS_EXECUTOR_PATH = Arg.create();
 
-  // We accept a trivial memory "leak" by not removing when a slave machine is decommissioned.
-  private final SlaveHosts executorSlaves;
+  private final SlaveMapper slaveMapper;
 
   // Stores scheduler state and handles actual scheduling decisions.
   private final SchedulerCore schedulerCore;
 
-  private final ExecutorTracker executorTracker;
   private volatile FrameworkID frameworkID = null;
   private final ExecutorInfo executorInfo;
-  private final ExecutorWatchdog executorWatchdog;
 
   private final AtomicInteger registeredFlag = Stats.exportInt("framework_registered");
 
   @Inject
-  public MesosSchedulerImpl(SchedulerCore schedulerCore, ExecutorTracker executorTracker,
-      ExecutorInfo executorInfo, final Lifecycle lifecycle, ExecutorWatchdog executorWatchdog,
-      SlaveHosts slaveHosts) {
+  public MesosSchedulerImpl(SchedulerCore schedulerCore,
+      ExecutorInfo executorInfo,
+      final Lifecycle lifecycle,
+      SlaveMapper slaveMapper) {
     this.schedulerCore = checkNotNull(schedulerCore);
-    this.executorTracker = checkNotNull(executorTracker);
     this.executorInfo = checkNotNull(executorInfo);
-    this.executorWatchdog = checkNotNull(executorWatchdog);
-    this.executorSlaves = checkNotNull(slaveHosts);
+    this.slaveMapper = checkNotNull(slaveMapper);
 
     // TODO(William Farner): Clean this up.
     LOG.info(String.format("Waiting up to %s for scheduler registration.", MAX_REGISTRATION_DELAY));
@@ -123,33 +108,6 @@ public class MesosSchedulerImpl implements Scheduler {
     LOG.info("Received notification of lost slave: " + slaveId);
   }
 
-  private void sendMessage(SchedulerDriver driver, ExecutorMessage message, String hostName,
-      ExecutorID executor) {
-    byte[] data;
-    try {
-      data = ThriftBinaryCodec.encode(message);
-    } catch (CodingException e) {
-      LOG.log(Level.SEVERE, "Failed to send restart request.", e);
-      return;
-    }
-
-    SlaveID slave = executorSlaves.getSlave(hostName);
-    if (slave == null) {
-      LOG.severe("Cannot send message, no SlaveID for hostname: " + hostName);
-      return;
-    }
-
-    LOG.info(String.format("Attempting to send message to %s/%s - %s",
-        slave.getValue(), executor.getValue(), message));
-    Status status = driver.sendFrameworkMessage(slave, executor, data);
-    if (status != Status.OK) {
-      LOG.severe(String.format("Attempt to send message failed with code %d [%s]",
-          status, message));
-    } else {
-      LOG.info("Message successfully sent");
-    }
-  }
-
   @Override
   public void registered(final SchedulerDriver driver, FrameworkID frameworkID) {
     LOG.info("Registered with ID " + frameworkID);
@@ -161,25 +119,6 @@ public class MesosSchedulerImpl implements Scheduler {
       LOG.log(Level.SEVERE, "Problem registering", e);
       driver.abort();
     }
-
-    // TODO(wfarner): Build this into ExecutorWatchdog.
-    executorTracker.start(new Closure<String>() {
-      @Override public void execute(String hostName) {
-        LOG.info("Sending restart request to executor " + hostName);
-        ExecutorMessage message = new ExecutorMessage();
-        message.setRestartExecutor(new RestartExecutor());
-
-        sendMessage(driver, message, hostName, executorInfo.getExecutorId());
-      }
-    });
-
-    executorWatchdog.startRequestLoop(EXECUTOR_POLL_INTERVAL.get(),
-        new Closure<UpdateRequest>() {
-          @Override public void execute(UpdateRequest request) {
-            ExecutorMessage message = ExecutorMessage.stateUpdateRequest(request.request);
-            sendMessage(driver, message, request.executor.hostname, request.executor.executor);
-          }
-        });
   }
 
   TaskDescription twitterTaskToMesosTask(SchedulerCore.TwitterTask twitterTask)
@@ -217,7 +156,7 @@ public class MesosSchedulerImpl implements Scheduler {
     Preconditions.checkState(frameworkID != null, "Must be registered before receiving offers.");
     for (Offer offer : offers) {
       log(Level.FINE, "Received offer: %s", offer);
-      executorSlaves.addSlave(offer.getHostname(), offer.getSlaveId());
+      slaveMapper.addSlave(offer.getHostname(), offer.getSlaveId());
 
       List<TaskDescription> scheduledTasks = Collections.emptyList();
       try {
@@ -319,8 +258,7 @@ public class MesosSchedulerImpl implements Scheduler {
           break;
 
         case EXECUTOR_STATUS:
-          vars.executorStatusUpdates.incrementAndGet();
-          executorTracker.addStatus(schedulerMsg.getExecutorStatus());
+          LOG.info("Received deprecated executor status message, ignoring.");
           break;
 
         case STATE_UPDATE_RESPONSE:
@@ -329,8 +267,6 @@ public class MesosSchedulerImpl implements Scheduler {
           LOG.info("Applying state update " + stateUpdate);
           try {
             schedulerCore.stateUpdate(executorKey, stateUpdate);
-            executorWatchdog.stateUpdated(executorKey,
-                stateUpdate.getExecutorUUID(), stateUpdate.getPosition());
           } catch (SchedulerException e) {
             LOG.log(Level.WARNING, "Failed to process a state update response: " + stateUpdate, e);
             vars.failedExecutorStatusUpdates.incrementAndGet();
@@ -352,7 +288,6 @@ public class MesosSchedulerImpl implements Scheduler {
   }
 
   private static class Vars {
-    final AtomicLong executorStatusUpdates = Stats.exportLong("executor_status_updates");
     final AtomicLong failedExecutorStatusUpdates =
         Stats.exportLong("executor_status_updates_failed");
     final AtomicLong failedOffers = Stats.exportLong("scheduler_failed_offers");
@@ -363,17 +298,54 @@ public class MesosSchedulerImpl implements Scheduler {
   /**
    * Maintains a mapping between hosts and slave ids.
    */
-  public static class SlaveHosts {
+  public static interface SlaveHosts {
+
+    /**
+     * Gets the slave ID associated with a host name.
+     *
+     * @param host The host to look up.
+     * @return The host's slave ID, or {@code null} if the host was not found.
+     */
+    SlaveID getSlave(String host);
+
+    /**
+     * Gets all slave ID mappings.
+     *
+     * @return all string to slave ID mappings.
+     */
+    Map<String, SlaveID> getSlaves();
+  }
+
+  /**
+   * Records slave host names and their associated slave IDs.
+   *
+   * We accept a trivial memory "leak" by not removing when a slave machine is decommissioned.
+   */
+  public static interface SlaveMapper {
+
+    /**
+     * Records a host to slave ID mapping.
+     *
+     * @param host Host name.
+     * @param slaveId Slave ID.
+     */
+    void addSlave(String host, SlaveID slaveId);
+  }
+
+  static class SlaveHostsImpl implements SlaveHosts, SlaveMapper {
     private final Map<String, SlaveID> executorSlaves = Maps.newConcurrentMap();
 
-    SlaveID getSlave(String host) {
+    @Override
+    public SlaveID getSlave(String host) {
       return executorSlaves.get(host);
     }
 
-    void addSlave(String host, SlaveID slaveId) {
+    @Override
+    public void addSlave(String host, SlaveID slaveId) {
       executorSlaves.put(host, slaveId);
     }
 
+    @Override
     public Map<String, SlaveID> getSlaves() {
       return ImmutableMap.copyOf(executorSlaves);
     }
