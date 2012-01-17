@@ -1,69 +1,65 @@
 import socket
-import re
 import random
 import time
 import errno
 
 from twitter.common import log
 
-class EntityParser(object):
-  PORT_RE = r'%port:(\w+)%'
-
-  @staticmethod
-  def match_ports(str):
-    matcher = re.compile(EntityParser.PORT_RE)
-    matched = matcher.findall(str)
-    return matched
-
-class EphemeralPortAllocator(object):
-  PORT_SPEC = "%%port:%s%%"
-  SOCKET_RANGE = [32768, 65535]
+class PortAllocator(object):
+  PORT_RANGE = [32768, 61000]
 
   class CannotAllocate(Exception): pass
-  class RecoveryError(Exception): pass
 
-  def __init__(self):
-    self._ports = {}
+  def __init__(self, prebound=None):
+    """
+      Construct a port allocator.
 
-  def allocate_port(self, name, port = None):
-    # if a port is provided, it is presumed during recovery step
-    if port is not None:
-      if name in self._ports and self._ports[name] != port:
-        raise EphemeralPortAllocator.RecoveryError(
-          "Recovered port binding %s=>%s conflicts with current binding %s=>%s" % (
-          name, port, name, self._ports[name]))
-      else:
-        self._ports[name] = port
-        return port
+      Required:
+        :ports => An iterable containing the list of all port names we need.
 
-    if name in self._ports: return self._ports[name]
+      Optional:
+        :prebound => A mapping from name => port number for pre-specified port numbers
+        :recovery => If in recovery mode, fail-soft if we fail to bind to a given port.
+          If not in recovery mode, fail hard since the ports are already in use.
+    """
+    if prebound:
+      assert isinstance(prebound, dict)
+      self._ports = prebound
+    else:
+      self._ports = {}
 
+  def allocate(self, name, port=None):
+    """
+      Given a port name, allocate the named port associated with it.  If
+      a port number > 0 is supplied, bind to that port number.
+
+      Returns a tuple of (allocated, port #) where allocated is True if the
+      port is a newly allocated port.
+    """
+    allocated = False
+    if isinstance(port, int) and port <= 0:
+      raise ValueError('Port must be a positive integer or None.')
+    if name not in self._ports:
+      self._ports[name] = self._allocate_port() if port is None else port
+      allocated = True
+    if port:
+      assert self._ports[name] == port
+    return (allocated, self._ports[name])
+
+  def _allocate_port(self):
     while True:
-      rand_port = random.randint(*EphemeralPortAllocator.SOCKET_RANGE)
-      if rand_port in self._ports.values(): continue
+      rand_port = random.randint(*PortAllocator.PORT_RANGE)
+      if rand_port in self._ports.values():
+        continue
       try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.bind(('localhost', rand_port))
         s.close()
-        self._ports[name] = rand_port
-        break
+        return rand_port
       except OSError as e:
         if e.errno in (errno.EADDRINUSE, errno.EINVAL):
           log.error('Could not bind port: %s' % e)
-          time.sleep(1)
+          time.sleep(0.2)
           continue
         else:
-          # this is dangerous until we know all the possible failure scenarios
-          raise EphemeralPortAllocator.CannotAllocate(
-            'Could not allocate a port due to %s' % e)
-    return self._ports[name]
-
-  def synthesize(self, cmdline):
-    ports = EntityParser.match_ports(cmdline)
-    newly_allocated_ports = {}
-    for port in ports:
-      if port not in self._ports:
-        self.allocate_port(port)
-        newly_allocated_ports[port] = self._ports[port]
-      cmdline = cmdline.replace(EphemeralPortAllocator.PORT_SPEC % port, str(self._ports[port]))
-    return (cmdline, newly_allocated_ports)
+          raise PortAllocator.CannotAllocate('Could not allocate a port due to %s' % e)

@@ -1,6 +1,9 @@
 import os
+import pytest
 from runner_base import RunnerTestBase
 
+from twitter.thermos.config.schema import Task, Process, Resources
+from twitter.thermos.config.dsl import with_schedule
 from gen.twitter.thermos.ttypes import (
   TaskState,
   TaskRunState,
@@ -8,35 +11,22 @@ from gen.twitter.thermos.ttypes import (
 )
 
 class TestRunnerBasic(RunnerTestBase):
-  JOB_SPEC = """
-import getpass
-hello_template = Process(cmdline = "echo {{task.replica_id}}")
-
-# create special process with named port
-t1 = hello_template(name = "t1")(cmdline = "echo {{task.replica_id}} port %port:named_port%")
-t2 = hello_template(name = "t2")
-t3 = hello_template(name = "t3")
-t4 = hello_template(name = "t4")
-t5 = hello_template(name = "t5")
-t6 = hello_template(name = "t6")
-
-tsk = Task(name = "complex")
-tsk = tsk.with_processes(t1, t2)
-tsk = tsk.with_processes([t3, t4])
-tsk = tsk.with_processes(t5, t6)
-
-hello_job = Job(
-  tasks   = tsk.replicas(1),
-  name    = 'hello_world',
-  role    = getpass.getuser(),
-  dc      = 'smf1',
-  cluster = 'smf-test')
-
-hello_job.export()
-"""
   @classmethod
-  def job_specification(cls):
-    return TestRunnerBasic.JOB_SPEC
+  def task(cls):
+    hello_template = Process(cmdline = "echo 1")
+    t1 = hello_template(name = "t1", cmdline = "echo 1 port {{thermos.ports[named_port]}}")
+    t2 = hello_template(name = "t2")
+    t3 = hello_template(name = "t3")
+    t4 = hello_template(name = "t4")
+    t5 = hello_template(name = "t5")
+    t6 = hello_template(name = "t6")
+    tsk = with_schedule(Task(
+      name = "complex",
+      processes = [t1, t2, t3, t4, t5, t6],
+      resources = Resources(cpu = 1.0, ram = 16*1024*1024, disk = 16*1024)),
+      "t1 before t3", "t1 before t4", "t2 before t3", "t2 before t4",
+      "t3 before t5", "t3 before t6", "t4 before t5", "t4 before t6")
+    return tsk
 
   def test_runner_state_reconstruction(self):
     assert self.state == self.reconstructed_state
@@ -46,6 +36,7 @@ hello_job.export()
 
   def test_runner_header_populated(self):
     header = self.state.header
+    assert header is not None, 'header should be populated.'
     assert header.task_id == self.task_id, 'header task id must be set!'
     assert header.sandbox == os.path.join(self.tempdir, 'sandbox', header.task_id), \
       'header sandbox must be set!'

@@ -1,4 +1,5 @@
 import errno
+import getpass
 import grp
 import os
 import pwd
@@ -7,7 +8,7 @@ import sys
 import time
 
 from twitter.common import log
-from twitter.common.dirutil import safe_mkdir
+from twitter.common.dirutil import safe_mkdir, safe_open
 from twitter.common.recordio import ThriftRecordWriter
 
 from gen.twitter.thermos.ttypes import (
@@ -29,7 +30,7 @@ class Process(object):
     """
       required:
         pathspec    = TaskPath object for synthesizing path names
-        process     = the process in the ThermosTask thrift blob to run
+        process     = the process in the ThermosTask thrift blob to run  PYSTACHIO(wickman)
         sequence    = the current sequence number for ProcessState updates
         sandbox_dir = the sandbox in which to run the process
 
@@ -60,11 +61,13 @@ class Process(object):
     self._use_chroot = bool(chroot)
 
   def _log(self, msg):
-    log.debug('[process:%5s=%s]: %s' % (self._pid, self._process.name, msg))
+    # PSYTACHIO(wickman)
+    log.debug('[process:%5s=%s]: %s' % (self._pid, self.name(), msg))
 
   def __str__(self):
-    return 'Process(%s, seq:%s, pid:%s, logdir:%s, ckpt:%s)' % (
-      self._process.name,
+    # PSYTACHIO(wickman)
+    return 'Process(%s, seq:%s, pid:%s, stdout:%s, ckpt:%s)' % (
+      self.name(),
       self._seq,
       self._pid,
       self._pathspec.with_filename('stdout').getpath('process_logdir'),
@@ -74,28 +77,14 @@ class Process(object):
     assert self._ckpt_writer
     self._seq += 1
     runner_ckpt.process_state.seq  = self._seq
-    runner_ckpt.process_state.process = self._process.name
+    # PSYTACHIO(wickman)
+    runner_ckpt.process_state.process = self.name()
 
     self._log("child state transition [%s] <= %s" % (self.ckpt_file(), runner_ckpt))
     if not self._ckpt_writer.write(runner_ckpt):
       self._log("failed to write status, dying.")
       self.die()
 
-  def wait(self):
-    assert self._owner
-
-    # wait for job to finish
-    self._popen.wait()
-    rc = self._popen.returncode
-
-    # indicate that we have finished/failed
-    run_state = ProcessRunState.FINISHED if (rc == 0) else ProcessRunState.FAILED
-    runner_ckpt = TaskRunnerCkpt(process_state = ProcessState(
-      run_state = run_state, return_code = rc, stop_time = time.time()))
-    self._write_process_update(runner_ckpt)
-
-    # normal exit
-    sys.exit(0)
 
   def _chroot(self):
     """
@@ -135,19 +124,19 @@ class Process(object):
 
     # create checkpoint file and zero it out before we chroot/setuid
     self._log('initializing checkpoint file: %s' % self.ckpt_file())
-    ckpt_fp = Helper.safe_create_file(self.ckpt_file(), "w")
+    ckpt_fp = safe_open(self.ckpt_file(), "w")
     self._ckpt_writer = ThriftRecordWriter(ckpt_fp)
     self._ckpt_writer.set_sync(True)
 
     os.setsid()
     if self._use_chroot:
       self._chroot()
-    if self._user:
+    if self._user and self._user != getpass.getuser():
       self._setuid()
 
     # start process
     self._start_time = time.time()
-    self._popen = subprocess.Popen(["/bin/sh", "-c", self._process.cmdline],
+    self._popen = subprocess.Popen(["/bin/sh", "-c", self.cmdline()],
                      stderr = self._stderr_fd,
                      stdout = self._stdout_fd,
                      cwd    = self._sandbox if not self._use_chroot else '/')
@@ -158,8 +147,21 @@ class Process(object):
     wrc = TaskRunnerCkpt(process_state = wts)
     self._write_process_update(wrc)
 
-    # wait until finished
-    self.wait()
+    # wait for job to finish
+    self._popen.wait()
+    rc = self._popen.returncode
+
+    # indicate that we have finished/failed
+    run_state = ProcessRunState.FINISHED if (rc == 0) else ProcessRunState.FAILED
+    runner_ckpt = TaskRunnerCkpt(process_state = ProcessState(
+      run_state = run_state, return_code = rc, stop_time = time.time()))
+    self._write_process_update(runner_ckpt)
+
+    # normal exit
+    sys.exit(0)
+
+
+
 
   # Process.fork() returns in parent process, does not return in child process.
   def fork(self):
@@ -171,8 +173,8 @@ class Process(object):
       process runner process.
     """
     # open file handles for child process (potentially out of the chroot)
-    self._stdout_fd = Helper.safe_create_file(self._stdout, "w")
-    self._stderr_fd = Helper.safe_create_file(self._stderr, "w")
+    self._stdout_fd = safe_open(self._stdout, "w")
+    self._stderr_fd = safe_open(self._stderr, "w")
     self._fork_time = time.time()
     self._pid       = os.fork()
     self._owner     = (self._pid == 0)
@@ -183,7 +185,7 @@ class Process(object):
 
   def _set_initial_update(self):
     initial_update = ProcessState(seq = self._seq,
-      process    = self._process.name,
+      process    = self.name(),
       run_state  = ProcessRunState.FORKED,
       fork_time  = self._fork_time,
       runner_pid = self._pid)
@@ -198,14 +200,14 @@ class Process(object):
     return update
 
   def running(self):
-    if self._popen: self._popen.poll()
-    if self._popen is None: return True
-    if self._popen.returncode is None: return True
+    if self._popen:
+      self._popen.poll()
+    if self._popen is None or self._popen.returncode is None:
+      return True
     return False
 
   def rc(self):
-    if self.running(): return None
-    return self._popen.returncode
+    return self._popen.returncode if not self.running() else None
 
   # this is the pid of the runner
   def pid(self):
@@ -222,8 +224,11 @@ class Process(object):
   def set_fork_time(self, fork_time):
     self._fork_time = fork_time
 
+  def cmdline(self):
+    return self._process.cmdline().get()
+
   def name(self):
-    return self._process.name
+    return self._process.name().get()
 
   def ckpt_file(self):
     assert self._pid is not None

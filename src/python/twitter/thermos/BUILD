@@ -29,7 +29,6 @@ python_library(
     pants(':base'),
     pants('src/python/twitter/common/process'),
     pants('src/python/twitter/common/quantity'),
-    pants('src/python/twitter/tcl:scheduler'),
-    pants('src/thrift/com/twitter/tcl:py-thrift')
+    pants('src/python/twitter/thermos/config:schema')
   ]
 )

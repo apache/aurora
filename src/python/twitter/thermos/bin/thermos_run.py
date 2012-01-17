@@ -4,98 +4,108 @@ import time
 import pprint
 
 from twitter.common import app, log, options
-from twitter.common.recordio import ThriftRecordReader
-from twitter.tcl.loader import ThermosJobLoader, MesosJobLoader
-from gen.twitter.tcl.ttypes import ThermosTask
-
+from twitter.thermos.config.loader import ThermosConfigLoader
 from twitter.thermos.runner import TaskRunner
 
 app.add_option("--thermos", dest = "thermos",
                help = "read thermos job description from .thermos file")
-app.add_option("--thermos_thrift", dest = "thermos_thrift",
-               help = "read ThermosTask from a serialized thrift blob")
-app.add_option("--mesos", dest = "mesos",
-               help = "translate from mesos job description")
-app.add_option("--task", dest = "task", metavar = "TASK",
-               help = "run the task by name of TASK")
-app.add_option("--replica", dest = "replica_id", metavar = "ID",
-               help = "run the replica number ID, from 0 .. number of replicas.")
+app.add_option("--thermos_json", dest = "thermos_json",
+               help = "read a thermos Task from a serialized json blob")
+
+app.add_option("--task", dest = "task", metavar = "NAME", default=None,
+               help = "run the task by the name of NAME")
+
 app.add_option("--sandbox", dest = "sandbox", metavar = "PATH",
                help = "the sandbox in which this task should run")
 app.add_option("--checkpoint_root", dest = "checkpoint_root", metavar = "PATH",
                help = "the path where we will store task logs and checkpoints")
-app.add_option("--task_id", dest = "uid", metavar = "STRING",
-               help = "the uid assigned to this task by the scheduler")
+
+app.add_option("--task_id", dest = "uid", metavar = "STRING", default = None,
+               help = "The id to which this task should be bound, created if it does not exist.")
+
 app.add_option("--action", dest = "action", metavar = "ACTION", default = "run",
                help = "the action for this task runner: run, kill")
+
 app.add_option("--setuid", dest = "setuid", metavar = "USER", default = None,
                help = "setuid tasks to this user, requires superuser privileges.")
 app.add_option("--enable_chroot", dest = "chroot", default = False, action='store_true',
                help = "chroot tasks to the sandbox before executing them.")
+
+def add_port_callback(option, opt, value, parser):
+  if not hasattr(parser.values, 'prebound_ports'):
+    parser.values.prebound_ports = []
+  parser.values.prebound_ports.append(value)
+app.add_option("--port", type='string', nargs=1,
+               action='callback', callback=add_port_callback,
+               metavar = "NAME:PORT",
+               help = "an indication to bind a numbered port PORT to name NAME")
 
 def check_invariants(args, values):
   if args:
     app.error("unrecognized arguments: %s\n" % (" ".join(args)))
 
   # check invariants
-  if values.thermos is None and values.thermos_thrift is None and values.mesos is None:
-    app.error("must supply either one of --thermos, --thermos_thrift or --mesos!\n")
+  if values.thermos is None and values.thermos_json is None:
+    app.error("must supply either one of --thermos, --thermos_json!\n")
 
-  if (values.mesos is not None or values.thermos is not None) and (
-      values.task is None or values.replica_id is None):
-    app.error('If specifying a Mesos or Thermos job, must also specify task and replica.')
-
-  if not (values.sandbox and values.checkpoint_root and values.uid):
+  if not (values.sandbox and values.checkpoint_root):
     app.error("ERROR: must supply sandbox, checkpoint_root and task_id")
 
-def get_task_from_job(thermos_job, task, replica):
-  for tsk in thermos_job.tasks:
-    if tsk.name == task and tsk.replica_id == int(replica):
-      return tsk
-  log.error('unable to find task: %s and replica: %s!\n' % (task, replica))
-  known_tasks = {}
-  for tsk in thermos_job.tasks:
-    if tsk.name not in known_tasks: known_tasks[tsk.name] = []
-    known_tasks[tsk.name].append(tsk.replica_id)
-  log.info('known task/replicas:')
-  log.info(pprint.pformat(known_tasks))
 
 def get_task_from_options(opts):
-  thermos_job = None
+  if opts.thermos_json:
+    tasks = ThermosConfigLoader.load_json(opts.thermos_json)
+  else:
+    tasks = ThermosConfigLoader.load(opts.thermos)
 
-  if opts.thermos_thrift:
-    with open(opts.thermos_thrift) as thermos_fd:
-      rr = ThriftRecordReader(thermos_fd, ThermosTask)
-      thermos_task = rr.read()
-    if thermos_task is None:
-      log.fatal("Unable to read Thermos task from thrift blob!")
-      sys.exit(1)
-    return thermos_task
+  if len(tasks.tasks()) == 0:
+    app.error("No tasks specified!")
 
-  if opts.thermos:
-    thermos_job = ThermosJobLoader(opts.thermos).to_thrift()
-  elif opts.mesos:
-    thermos_job = MesosJobLoader(opts.mesos).to_thrift()
+  if opts.task is None and len(tasks.tasks()) > 1:
+    app.error("Multiple tasks in config but no task name specified!")
 
-  if thermos_job is None:
-    log.fatal("Unable to read Thermos job!")
-    sys.exit(1)
+  task = None
+  if opts.task is not None:
+    for t in tasks.tasks():
+      if t.name() == opts.task:
+        task = t
+        break
+    app.error("Could not find task %s!" % opts.task)
+  else:
+    task = tasks.tasks()[0]
 
-  thermos_task = get_task_from_job(thermos_job, opts.task, opts.replica_id)
-  if thermos_task is None:
-    log.fatal("Unable to get Thermos task from job!")
-    sys.exit(1)
+  if not task.check().ok():
+    app.error(task.check().message())
 
-  return thermos_task
+  return task
+
+def get_prebound_ports(opts):
+  ports = {}
+  for value in opts.prebound_ports:
+    try:
+      name, port = value.split(':')
+    except (ValueError, TypeError):
+      app.error('Invalid value for --port: %s, should be of form NAME:PORT' % value)
+    try:
+      port = int(port)
+    except ValueError:
+      app.error('Invalid value for --port: %s, could not coerce port number to integer.' % value)
+    ports[name] = port
+  return ports
+
 
 def main(args, opts):
   check_invariants(args, opts)
 
   thermos_task = get_task_from_options(opts)
+  prebound_ports = get_prebound_ports(opts)
+  missing_ports = set(thermos_task.ports()) - set(prebound_ports.keys())
+  if missing_ports:
+    app.error('ERROR!  Unbound ports: %s' % ' '.join(port for port in missing_ports))
 
-  # TODO(wickman):  Need a general sanitizing suite for uids, job names, etc.
-  task_runner = TaskRunner(thermos_task, opts.sandbox, opts.checkpoint_root, opts.uid,
-    opts.setuid, opts.chroot)
+  task_runner = TaskRunner(thermos_task.task, opts.checkpoint_root, opts.sandbox,
+    task_id=opts.uid, user=opts.setuid, portmap=prebound_ports, chroot=opts.chroot)
+
   if opts.action == 'run':
     task_runner.run()
   elif opts.action == 'kill':

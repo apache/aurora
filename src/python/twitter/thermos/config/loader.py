@@ -25,15 +25,24 @@ from twitter.thermos.config.dsl import *
 def deposit_schema(environment):
   exec_function(compile(SCHEMA_PREAMBLE, "<exec_function>", "exec"), environment)
 
-"""
-  statements = []
-  statements.append(compile(
-    "from pystachio import *", "<exec_function>", "exec"))
-  statements.append(compile(
-    "from twitter.thermos.config.schema import *", "<exec_function>", "exec"))
-  for stmt in statements:
-    exec_function(stmt, environment)
-"""
+
+class ThermosProcessWrapper(object):
+  class InvalidProcess(Exception): pass
+
+  def __init__(self, process):
+    self._process = process
+
+  def ports(self):
+    port_scope = Ref.from_address('thermos.ports')
+    _, uninterp = self._process.interpolate()
+    ports = []
+    for ref in uninterp:
+      subscope = port_scope.scoped_to(ref)
+      if subscope is not None:
+        assert subscope.is_index()
+        ports.append(subscope.action().value)
+    return ports
+
 
 class ThermosTaskWrapper(object):
   class InvalidTask(Exception): pass
@@ -48,14 +57,11 @@ class ThermosTaskWrapper(object):
     return self._task
 
   def ports(self):
-    port_scope = Ref.from_address('thermos.ports')
-    ti, uninterp = self._task.interpolate()
-    ports = []
-    for ref in uninterp:
-      subscope = port_scope.scoped_to(ref)
-      if subscope is not None:
-        assert subscope.is_index()
-        ports.append(subscope.action().value)
+    ti, _ = self._task.interpolate()
+    ports = set()
+    if ti.has_processes():
+      for process in ti.processes():
+        ports.update(ThermosProcessWrapper(process).ports())
     return ports
 
   def to_json(self):

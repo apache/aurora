@@ -4,9 +4,11 @@ import tempfile
 import subprocess
 import time
 
-from twitter.tcl.loader import ThermosJobLoader
-from twitter.thermos.runner.runner import TaskRunnerHelper
+from twitter.common import log
+from twitter.common.contextutil import temporary_file
 from twitter.thermos.base import TaskPath, AlaCarteRunnerState
+from twitter.thermos.config.loader import ThermosTaskWrapper
+from twitter.thermos.runner.runner import TaskRunnerHelper
 
 from gen.twitter.thermos.ttypes import (
   TaskState,
@@ -16,51 +18,71 @@ from gen.twitter.thermos.ttypes import (
   ProcessRunState
 )
 
+# TODO(wickman) setup_class / teardown_class don't behave like you'd want here.
+
 class RunnerTestBase(object):
   RUN_JOB_SCRIPT = """
 import os
-from twitter.tcl.loader import ThermosJobLoader
+from twitter.common import log
+from twitter.common.log.options import LogOptions
+from twitter.thermos.config.loader import ThermosConfigLoader
 from twitter.thermos.runner import TaskRunner
 from twitter.thermos.runner.runner import TaskRunnerHelper
 
-job = ThermosJobLoader('%(filename)s').to_thrift()
-task = job.tasks[0]
-sandbox = '%(sandbox)s'
-root = '%(root)s'
-task_id = '%(task_id)s'
-sandbox = os.path.join(sandbox, task_id)
+log.init('runner_base')
+LogOptions.set_disk_log_level('DEBUG')
 
-runner = TaskRunner(task, sandbox, root, task_id)
+task = ThermosConfigLoader.load_json('%(filename)s')
+task = task.tasks()[0].task
+
+sandbox = os.path.join('%(sandbox)s', '%(task_id)s')
+args = {}
+args['task_id'] = '%(task_id)s'
+if %(portmap)s:
+  args['portmap'] = %(portmap)s
+
+runner = TaskRunner(task, '%(root)s', sandbox, **args)
 runner.run()
+
 TaskRunnerHelper.dump_state(runner.state(), '%(state_filename)s')
 """
 
   @classmethod
-  def job_specification(cls):
+  def task(cls):
     raise NotImplementedError
 
   @classmethod
   def setup_class(cls):
     if hasattr(cls, 'initialized') and cls.initialized:
       return
-    with open(tempfile.mktemp(), "w") as fp:
+
+    with temporary_file(cleanup=False) as fp:
       cls.job_filename = fp.name
-      print >> fp, cls.job_specification()
+      fp.write(ThermosTaskWrapper(cls.task()).to_json())
+
     cls.state_filename = tempfile.mktemp()
     cls.tempdir = tempfile.mkdtemp()
     cls.task_id = '%s-runner-base' % int(time.time()*1000000)
     cls.sandbox = os.path.join(cls.tempdir, 'sandbox')
-    with open(tempfile.mktemp(), "w") as fp:
+
+    with temporary_file(cleanup=False) as fp:
       cls.script_filename = fp.name
-      print >> fp, cls.RUN_JOB_SCRIPT % {
+      fp.write(cls.RUN_JOB_SCRIPT % {
         'filename': cls.job_filename,
         'sandbox': cls.sandbox,
         'root': cls.tempdir,
         'task_id': cls.task_id,
         'state_filename': cls.state_filename,
-      }
+        'portmap': repr({} if not hasattr(cls, 'portmap') else cls.portmap)
+      })
+
     cls.pathspec = TaskPath(root = cls.tempdir, task_id = cls.task_id)
-    assert subprocess.call([sys.executable, cls.script_filename]) == 0
+    po = subprocess.Popen([sys.executable, cls.script_filename],
+      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    so, se = po.communicate()
+    assert po.returncode == 0, 'Runner failed!  stdout:%s\n\n\nstderr:%s\n\n\n' % (so, se)
+
+
     try:
       cls.state = TaskRunnerHelper.read_state(cls.state_filename)
     except:
@@ -81,4 +103,5 @@ TaskRunnerHelper.dump_state(runner.state(), '%(state_filename)s')
       os.unlink(cls.job_filename)
       os.unlink(cls.script_filename)
       shutil.rmtree(cls.tempdir, ignore_errors=True)
+    cls.exit_handler = cleanup_handler
     atexit.register(cleanup_handler)

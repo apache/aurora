@@ -21,6 +21,10 @@ class ProcessMuxer(object):
     self._processes = {} # process_name => Process()
     self._fps = {}       # process_name => fp
 
+  def __del__(self):
+    for fp in self._fps.values():
+      fp.close()
+
   def register(self, task_process):
     log.debug('registering %s' % task_process)
     if task_process.name() in self._processes:
@@ -116,7 +120,9 @@ class ProcessMuxer(object):
             updates.append(process_update)
           else:
             break
-    local_updates = list(self._select_local_updates(from_processes))
+    # N.B. wickman: Restricting select_local_updates to from_processes is the wrong thing
+    #  and created a subtle race condition bug.
+    local_updates = list(self._select_local_updates())
     if len(local_updates) > 0 or len(updates) > 0:
       log.debug('select() returning %s local, %s out-of-process updates:' % (
         len(local_updates), len(updates)))

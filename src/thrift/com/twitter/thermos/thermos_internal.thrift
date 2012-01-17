@@ -114,7 +114,7 @@ struct TaskRunnerHeader {
 
 struct TaskAllocatedPort {
   1: string port_name
-  2: i32    port
+  2: i32 port
 }
 
 struct TaskRunStateUpdate {
@@ -126,7 +126,7 @@ struct TaskStateUpdate {
   1: TaskState state
 }
 
-struct TaskRunnerCkpt {
+union TaskRunnerCkpt {
   1: TaskRunnerHeader   runner_header
   2: ProcessState       process_state
   3: TaskAllocatedPort  allocated_port

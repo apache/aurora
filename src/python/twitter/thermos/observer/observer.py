@@ -290,7 +290,7 @@ class TaskObserver(threading.Thread):
   def _get_process_resource_reservation(self, uid, process_name):
     task = self._read_task(uid)
     if task is None: return {}
-    process = Helper.process_from_task(task, process_name)
+    process = Helper.process_from_name(task, process_name)
     if process is None: return {}
     return dict(
       cpu = process.footprint.cpu,

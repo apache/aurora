@@ -33,7 +33,7 @@ class TaskCkptDispatcher(object):
 
   def register_port_handler(self, function):
     """
-      Register a function callback to handle when a port is allocated by the runner.
+       Register a function callback to handle when a port is allocated by the runner.
     """
     self._port_handlers.append(function)
 
@@ -191,20 +191,6 @@ class TaskCkptDispatcher(object):
     self._run_state_dispatch(process_state_update.run_state, process_state_update)
     return True
 
-  @staticmethod
-  def _check_runner_ckpt_sanity(runner_ckpt):
-    # Check sanity
-    changes = 0
-    if runner_ckpt.runner_header is not None: changes += 1
-    if runner_ckpt.process_state is not None: changes += 1
-    if runner_ckpt.allocated_port is not None: changes += 1
-    if runner_ckpt.history_state_update is not None: changes += 1
-    if runner_ckpt.state_update is not None: changes += 1
-    if changes > 1:
-      raise TaskCkptDispatcher.InvalidStateTransition(
-        "Multiple checkpoint types in the same message! %s" % runner_ckpt)
-
-
   def would_update(self, state, runner_ckpt):
     """
       Provided a ProcessState, would this perform a transition and update state?
@@ -232,14 +218,12 @@ class TaskCkptDispatcher(object):
 
       returns True if process_update was applied to state.
     """
-    self._check_runner_ckpt_sanity(runner_ckpt)
-
     # case 1: runner_header
     #   -> Initialization of the task stream.
     if runner_ckpt.runner_header is not None:
       if state.header is not None:
         raise TaskCkptDispatcher.ErrorRecoveringState(
-          "Multiple headers encountered in TaskRunnerState!")
+          "Attempting to rebind task with different parameters!")
       else:
         log.debug('Initializing TaskRunner header to %s' % runner_ckpt.runner_header)
         state.header = runner_ckpt.runner_header
@@ -337,6 +321,7 @@ class TaskCkptDispatcher(object):
     log.debug('Running state machine for process=%s/seq=%s' % (process_update.process,
         process_update.seq))
     return self.update_task_state(process_state, process_update, recovery)
+
 
 class AlaCarteRunnerState(object):
   """

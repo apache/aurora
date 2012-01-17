@@ -1,47 +1,36 @@
 from runner_base import RunnerTestBase
 
+from twitter.thermos.config.schema import Task, Resources, Process
 from gen.twitter.thermos.ttypes import (
   TaskState,
   ProcessRunState
 )
 
 class TestFailingRunner(RunnerTestBase):
-  JOB_SPEC = """
-import getpass
-ping_template = Process(
-  max_failures=5,
-  cmdline = "echo {{process.name}} pinging;                                       "
-            "echo ping >> {{process.name}};                                       "
-            "if [ $(cat {{process.name}} | wc -l) -eq {{params.num_runs}} ]; then "
-            "  exit 0;                                                             "
-            "else                                                                 "
-            "  exit 1;                                                            "
-            "fi                                                                   ")
-
-# TODO(wickman)  Fix the bug with params propagation that prevents us from
-# passing params via ping_template.
-p1 = ping_template(name = "p1")
-p1._params={'num_runs':1}
-p2 = ping_template(name = "p2")
-p2._params={'num_runs':2}
-p3 = ping_template(name = "p3")
-p3._params={'num_runs':3}
-
-tsk = Task(name = "pingping").with_processes(p1, p2, p3)
-
-hello_job = Job(
-  tasks   = tsk.replicas(1),
-  name    = 'hello_world',
-  role    = getpass.getuser(),
-  dc      = 'smf1',
-  cluster = 'smf1-test')
-
-hello_job.export()
-"""
-
   @classmethod
-  def job_specification(cls):
-    return TestFailingRunner.JOB_SPEC
+  def task(cls):
+    ping_template = Process(
+      name="{{name}}",
+      max_failures=5,
+      cmdline = "echo {{name}} pinging;                                "
+                "echo ping >> {{name}};                                "
+                "echo current count $(cat {{name}} | wc -l);           "
+                "if [ $(cat {{name}} | wc -l) -eq {{num_runs}} ]; then "
+                "  exit 0;                                             "
+                "else                                                  "
+                "  exit 1;                                             "
+                "fi                                                    ")
+    tsk = Task(
+      name = "pingping",
+      resources = Resources(cpu = 1.0, ram = 16*1024*1024, disk = 16*1024),
+      processes = [
+        ping_template.bind(name = "p1", num_runs = 1),
+        ping_template.bind(name = "p2", num_runs = 2),
+        ping_template.bind(name = "p3", num_runs = 3),
+      ]
+    )
+    return tsk.interpolate()[0]
+
 
   def test_runner_state_reconstruction(self):
     assert self.state == self.reconstructed_state
