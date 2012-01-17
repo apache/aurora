@@ -1,5 +1,6 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -10,9 +11,12 @@ import javax.annotation.Nullable;
 import javax.inject.Provider;
 
 import com.google.common.base.Function;
+import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
+import com.google.common.collect.Iterables;
 import com.google.inject.AbstractModule;
+import com.google.inject.Inject;
 import com.google.inject.Key;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
@@ -27,10 +31,12 @@ import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
 import org.apache.zookeeper.data.ACL;
 
+import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.NotNull;
+import com.twitter.common.base.Command;
 import com.twitter.common.inject.TimedInterceptor;
 import com.twitter.common.net.pool.DynamicHostSet;
 import com.twitter.common.quantity.Amount;
@@ -43,6 +49,7 @@ import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.common.zookeeper.ZooKeeperUtils;
 import com.twitter.common_internal.zookeeper.ZooKeeperModule;
+import com.twitter.conversions.thread;
 import com.twitter.mesos.ExecutorKey;
 import com.twitter.mesos.gen.MesosAdmin;
 import com.twitter.mesos.gen.TwitterTaskInfo;
@@ -169,6 +176,7 @@ public class SchedulerModule extends AbstractModule {
 
     LifecycleModule.bindServiceLauncher(binder(), ThriftServerLauncher.THRIFT_PORT_NAME,
         ThriftServerLauncher.class);
+    LifecycleModule.bindStartupAction(binder(), RegisterShutdownStackPrinter.class);
 
     bind(SchedulerLifecycle.class).in(Singleton.class);
 
@@ -176,6 +184,41 @@ public class SchedulerModule extends AbstractModule {
     PeriodicTaskModule.bind(binder());
 
     install(new ServletModule());
+  }
+
+  private static class RegisterShutdownStackPrinter implements Command {
+    private static final Function<StackTraceElement, String> STACK_ELEMENT_TOSTRING =
+        new Function<StackTraceElement, String>() {
+          @Override public String apply(StackTraceElement element) {
+            return element.getClassName() + "." + element.getMethodName()
+                + "(" + element.getFileName() + ":" + element.getLineNumber() + ")";
+          }
+        };
+
+    private final ShutdownRegistry shutdownRegistry;
+
+    @Inject
+    RegisterShutdownStackPrinter(ShutdownRegistry shutdownRegistry) {
+      this.shutdownRegistry = shutdownRegistry;
+    }
+
+    @Override
+    public void execute() {
+      shutdownRegistry.addAction(new Command() {
+        @Override public void execute() {
+          Thread thread = Thread.currentThread();
+          String message = new StringBuilder()
+              .append("Thread: ").append(thread.getName())
+              .append(" (id ").append(thread.getId()).append(")")
+              .append("\n")
+              .append(Joiner.on("\n  ").join(
+                  Iterables.transform(Arrays.asList(thread.getStackTrace()), STACK_ELEMENT_TOSTRING)))
+              .toString();
+
+          LOG.info("Shutdown initiated by: " + message);
+        }
+      });
+    }
   }
 
   @Provides
