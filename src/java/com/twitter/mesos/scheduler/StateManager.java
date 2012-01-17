@@ -6,10 +6,8 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
@@ -30,7 +28,6 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
-import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.SlaveID;
 
 import com.twitter.common.args.Arg;
@@ -50,7 +47,6 @@ import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
-import com.twitter.mesos.gen.comm.ExecutorMessage;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
@@ -233,11 +229,11 @@ class StateManager {
 
   private final Predicate<Iterable<TaskEvent>> taskTimeoutFilter;
 
-  private Driver driver;
+  private final Driver driver;
   private final Clock clock;
 
   @Inject
-  StateManager(Storage storage, final Clock clock, MutableState mutableState) {
+  StateManager(Storage storage, final Clock clock, MutableState mutableState, Driver driver) {
     checkNotNull(storage);
     this.clock = checkNotNull(clock);
 
@@ -255,16 +251,7 @@ class StateManager {
       }
     };
 
-    this.driver = new Driver() {
-      @Override public void killTask(String taskId) {
-        LOG.log(Level.SEVERE, "Attempted to kill task " + taskId + " before registered.");
-      }
-
-      @Override public void sendMessage(ExecutorMessage message, SlaveID slave,
-          ExecutorID executor) {
-        LOG.log(Level.SEVERE, "Attempted to send message" + message+ " before registered.");
-      }
-    };
+    this.driver = driver;
 
     Stats.exportSize("work_queue_depth", workQueue);
   }
@@ -338,10 +325,8 @@ class StateManager {
    *
    * @param driver Driver to interact with the framework.
    */
-  synchronized void start(Driver driver) {
+  synchronized void start() {
     managerState.transition(State.STARTED);
-
-    this.driver = checkNotNull(driver);
   }
 
   /**

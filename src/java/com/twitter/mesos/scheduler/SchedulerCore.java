@@ -67,10 +67,8 @@ public interface SchedulerCore extends Function<Query, Iterable<TwitterTaskInfo>
 
   /**
    * Prepares the scheduler for serving traffic.
-   *
-   * @param driver A driver reference that may be used to interact with the rest of the framework.
    */
-  void start(Driver driver);
+  void start();
 
   /**
    * Assigns a framework ID to the scheduler, should be called when the scheduler implementation

@@ -1,5 +1,6 @@
 package com.twitter.mesos.scheduler;
 
+import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
 
 import org.apache.mesos.Protos;
@@ -26,13 +27,13 @@ public class DriverTest extends EasyMockTest {
   }
 
   private SchedulerDriver schedulerDriver;
-  private Supplier<SchedulerDriver> driverSupplier;
+  private Supplier<Optional<SchedulerDriver>>  driverSupplier;
   private DriverImpl driver;
 
   @Before
   public void setUp() {
     schedulerDriver = createMock(SchedulerDriver.class);
-    driverSupplier = createMock(new Clazz<Supplier<SchedulerDriver>>() { });
+    driverSupplier = createMock(new Clazz<Supplier<Optional<SchedulerDriver>>>() { });
     driver = new DriverImpl(driverSupplier);
   }
 
@@ -45,7 +46,7 @@ public class DriverTest extends EasyMockTest {
 
   @Test
   public void testMultipleStops() {
-    expect(driverSupplier.get()).andReturn(schedulerDriver);
+    expect(driverSupplier.get()).andReturn(Optional.of(schedulerDriver)).times(2);
     expect(schedulerDriver.run()).andReturn(Protos.Status.OK);
     expect(schedulerDriver.stop(true)).andReturn(Protos.Status.DRIVER_ABORTED);
     control.replay();
@@ -57,7 +58,7 @@ public class DriverTest extends EasyMockTest {
 
   @Test
   public void testStop() {
-    expect(driverSupplier.get()).andReturn(schedulerDriver);
+    expect(driverSupplier.get()).andReturn(Optional.of(schedulerDriver)).times(2);
     expect(schedulerDriver.run()).andReturn(Protos.Status.OK);
     expect(schedulerDriver.stop(true)).andReturn(Protos.Status.DRIVER_ABORTED);
     control.replay();
@@ -68,7 +69,7 @@ public class DriverTest extends EasyMockTest {
 
   @Test
   public void testNormalLifecycle() {
-    expect(driverSupplier.get()).andReturn(schedulerDriver);
+    expect(driverSupplier.get()).andReturn(Optional.of(schedulerDriver)).times(4);
     expect(schedulerDriver.run()).andReturn(Protos.Status.OK);
     expect(schedulerDriver.killTask(createTaskId(TASK_1))).andReturn(Protos.Status.OK);
     expect(schedulerDriver.killTask(createTaskId(TASK_2))).andReturn(Protos.Status.OK);
@@ -90,7 +91,7 @@ public class DriverTest extends EasyMockTest {
 
   @Test(expected = IllegalStateException.class)
   public void testOnlyOneRunAllowed() {
-    expect(driverSupplier.get()).andReturn(schedulerDriver);
+    expect(driverSupplier.get()).andReturn(Optional.of(schedulerDriver));
     expect(schedulerDriver.run()).andReturn(Protos.Status.OK);
     control.replay();
 

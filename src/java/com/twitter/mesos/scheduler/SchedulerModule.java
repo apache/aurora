@@ -10,6 +10,7 @@ import javax.annotation.Nullable;
 import javax.inject.Provider;
 
 import com.google.common.base.Function;
+import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
 import com.google.inject.AbstractModule;
 import com.google.inject.Key;
@@ -45,12 +46,12 @@ import com.twitter.common_internal.zookeeper.ZooKeeperModule;
 import com.twitter.mesos.ExecutorKey;
 import com.twitter.mesos.gen.MesosAdmin;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.HistoryPruner.HistoryPrunerImpl;
-import com.twitter.mesos.scheduler.HistoryPruner.HistoryPrunerImpl.PruneThreshold;
+import com.twitter.mesos.scheduler.Driver.DriverImpl;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHosts;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHostsImpl;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveMapper;
 import com.twitter.mesos.scheduler.PulseMonitor.PulseMonitorImpl;
+import com.twitter.mesos.scheduler.SchedulerLifecycle.DriverReference;
 import com.twitter.mesos.scheduler.SchedulingFilter.SchedulingFilterImpl;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.auth.SessionValidator;
@@ -121,6 +122,12 @@ public class SchedulerModule extends AbstractModule {
         ZooKeeperUtils.EVERYONE_READ_CREATOR_ALL));
 
     bind(Key.get(String.class, ClusterName.class)).toInstance(CLUSTER_NAME.get());
+
+    bind(Driver.class).to(DriverImpl.class);
+    bind(DriverImpl.class).in(Singleton.class);
+
+    bind(new TypeLiteral<Supplier<Optional<SchedulerDriver>>>() {}).to(DriverReference.class);
+    bind(DriverReference.class).in(Singleton.class);
 
     // Bindings for MesosSchedulerImpl.
     bind(SessionValidator.class).to(SessionValidatorImpl.class);

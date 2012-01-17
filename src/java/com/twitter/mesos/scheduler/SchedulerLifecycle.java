@@ -6,6 +6,7 @@ import java.util.logging.Logger;
 import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
+import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -49,13 +50,20 @@ class SchedulerLifecycle {
   private final SchedulerCore scheduler;
   private final Lifecycle lifecycle;
 
+  private final Driver driver;
+  private final DriverReference driverRef;
+
   @Inject
   SchedulerLifecycle(Function<String, SchedulerDriver> driverFactory,
       SchedulerCore scheduler,
-      Lifecycle lifecycle) {
+      Lifecycle lifecycle,
+      Driver driver,
+      DriverReference driverRef) {
     this.driverFactory = Preconditions.checkNotNull(driverFactory);
     this.scheduler = Preconditions.checkNotNull(scheduler);
     this.lifecycle = Preconditions.checkNotNull(lifecycle);
+    this.driver  = Preconditions.checkNotNull(driver);
+    this.driverRef = Preconditions.checkNotNull(driverRef);
   }
 
   /**
@@ -71,8 +79,20 @@ class SchedulerLifecycle {
     return new SchedulerCandidateImpl();
   }
 
-  class SchedulerCandidateImpl implements SchedulerCandidate {
-    @Nullable private volatile DriverImpl driver;
+  static class DriverReference implements Supplier<Optional<SchedulerDriver>> {
+    private volatile Optional<SchedulerDriver> driver = Optional.absent();
+
+    @Override
+    public Optional<SchedulerDriver> get() {
+      return driver;
+    }
+
+    private void set(SchedulerDriver driver) {
+      this.driver = Optional.of(driver);
+    }
+  }
+
+  private class SchedulerCandidateImpl implements SchedulerCandidate {
 
     @Override public void onLeading(ServerSet.EndpointStatus status) {
       LOG.info("Elected as leading scheduler!");
@@ -90,13 +110,10 @@ class SchedulerLifecycle {
 
     private void lead() {
       @Nullable final String frameworkId = scheduler.initialize();
-      driver = new DriverImpl(new Supplier<SchedulerDriver>() {
-        @Override public SchedulerDriver get() {
-          return driverFactory.apply(frameworkId);
-        }
-      });
 
-      scheduler.start(driver);
+      driverRef.set(driverFactory.apply(frameworkId));
+
+      scheduler.start();
 
       new ThreadFactoryBuilder()
           .setNameFormat("Driver-Runner-%d")

@@ -148,9 +148,9 @@ public class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public synchronized void start(Driver driver) {
+  public synchronized void start() {
     checkLifecycleState(INITIALIZED);
-    stateManager.start(driver);
+    stateManager.start();
     stateMachine.transition(STARTED);
 
     for (JobManager jobManager : jobManagers) {

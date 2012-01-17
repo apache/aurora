@@ -173,7 +173,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private void buildScheduler(Storage storage) throws Exception {
     ImmediateJobManager immediateManager = new ImmediateJobManager();
     cron = new CronJobManager(storage, new TearDownRegistry(this));
-    StateManager stateManager = new StateManager(storage, clock, new MutableState());
+    StateManager stateManager = new StateManager(storage, clock, new MutableState(), driver);
     quotaManager = new QuotaManagerImpl(storage);
     scheduler = new SchedulerCoreImpl(cron, immediateManager, stateManager, schedulingFilter,
         executorPulseMonitor, executorResourceAugmenter, quotaManager);
@@ -181,7 +181,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     immediateManager.schedulerCore = scheduler;
     scheduler.prepare();
     scheduler.initialize();
-    scheduler.start(driver);
+    scheduler.start();
 
     // Apply a default quota for users so we don't have to give quota for every test.
     quotaManager.setQuota(OWNER_A.getRole(), scale(DEFAULT_TASK_QUOTA, DEFAULT_TASKS_IN_QUOTA));

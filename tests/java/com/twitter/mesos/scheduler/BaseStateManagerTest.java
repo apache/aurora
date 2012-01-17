@@ -80,9 +80,9 @@ public abstract class BaseStateManagerTest extends EasyMockTest {
       }
     };
     this.mutableState = new MutableState();
-    final StateManager stateManager = new StateManager(storage, clock, mutableState);
+    final StateManager stateManager = new StateManager(storage, clock, mutableState, driver);
     stateManager.initialize();
-    stateManager.start(driver);
+    stateManager.start();
     addTearDown(new TearDown() {
       @Override public void tearDown() {
         stateManager.stop();

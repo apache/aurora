@@ -277,7 +277,7 @@ public class StateManagerTest extends BaseStateManagerTest {
     control.replay();
 
     mutableState = new MutableState();
-    stateManager = new StateManager(storage, clock, mutableState);
+    stateManager = new StateManager(storage, clock, mutableState, driver);
 
     // The database has not yet been loaded, so stats should be missing.
     for (ScheduleStatus status : ScheduleStatus.values()) {

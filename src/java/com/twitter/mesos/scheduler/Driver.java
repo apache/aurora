@@ -4,10 +4,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.annotation.Nullable;
-
+import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
+import com.google.inject.Inject;
 
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.ExecutorID;
@@ -49,6 +49,18 @@ interface Driver {
    */
   void sendMessage(ExecutorMessage message, SlaveID slave, ExecutorID executor);
 
+  /**
+   * Stops the underlying driver if it is running, otherwise does nothing.
+   */
+  void stop();
+
+  /**
+   * Runs the underlying driver.  Can only be called once.
+   *
+   * @return The status of the underlying driver run request.
+   */
+  Protos.Status run();
+
   static class DriverImpl implements Driver {
     private static final Logger LOG = Logger.getLogger(Driver.class.getName());
 
@@ -59,8 +71,7 @@ interface Driver {
     }
 
     private final StateMachine<State> stateMachine;
-    private final Supplier<SchedulerDriver> driverSupplier;
-    @Nullable private SchedulerDriver schedulerDriver;
+    private final Supplier<Optional<SchedulerDriver>> driverSupplier;
     private final AtomicLong killFailures = Stats.exportLong("scheduler_driver_kill_failures");
     private final AtomicLong messageFailures =
         Stats.exportLong("scheduler_driver_message_failures");
@@ -71,7 +82,8 @@ interface Driver {
      *
      * @param driverSupplier A factory for the underlying driver.
      */
-    DriverImpl(Supplier<SchedulerDriver> driverSupplier) {
+    @Inject
+    DriverImpl(Supplier<Optional<SchedulerDriver>> driverSupplier) {
       this.driverSupplier = driverSupplier;
       this.stateMachine =
           StateMachine.<State>builder("scheduler_driver")
@@ -85,10 +97,8 @@ interface Driver {
 
     private synchronized SchedulerDriver get(State expected) {
       stateMachine.checkState(expected);
-      if (schedulerDriver == null) {
-        schedulerDriver = driverSupplier.get();
-      }
-      return schedulerDriver;
+      // This will and should fail if the driver is not present.
+      return driverSupplier.get().get();
     }
 
     /**
@@ -96,7 +106,7 @@ interface Driver {
      *
      * @return The status of the underlying driver run request.
      */
-    Protos.Status run() {
+    public Protos.Status run() {
       SchedulerDriver driver = get(State.INIT);
       stateMachine.transition(State.RUNNING);
       return driver.run();
@@ -105,10 +115,10 @@ interface Driver {
     /**
      * Stops the underlying driver if it is running, otherwise does nothing.
      */
-    synchronized void stop() {
-      if (schedulerDriver != null) {
-        schedulerDriver.stop(true /* failover */);
-        schedulerDriver = null;
+    public synchronized void stop() {
+      if (stateMachine.getState() == State.RUNNING) {
+        SchedulerDriver driver = get(State.RUNNING);
+        driver.stop(true /* failover */);
         stateMachine.transition(State.STOPPED);
       }
     }
