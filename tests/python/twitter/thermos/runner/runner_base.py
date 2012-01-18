@@ -18,8 +18,11 @@ from gen.twitter.thermos.ttypes import (
   ProcessRunState
 )
 
+import pytest
+
 # TODO(wickman) setup_class / teardown_class don't behave like you'd want here.
 
+@pytest.mark.xfail(reason = 'Jenkins needs to be upgraded to Python 2.6.7')
 class RunnerTestBase(object):
   RUN_JOB_SCRIPT = """
 import os
