@@ -80,8 +80,15 @@ TaskRunnerHelper.dump_state(runner.state(), '%(state_filename)s')
     po = subprocess.Popen([sys.executable, cls.script_filename],
       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     so, se = po.communicate()
-    assert po.returncode == 0, 'Runner failed!  stdout:%s\n\n\nstderr:%s\n\n\n' % (so, se)
+    assert po.returncode == 0,\
+    """
+      Runner failed!
 
+      config:%s\n\n\n
+      stdout:%s\n\n\n
+      stderr:%s\n\n\n
+    """ % (open(cls.job_filename).read() if os.path.exists(cls.job_filename) else 'Nonexistent!',
+           so, se)
 
     try:
       cls.state = TaskRunnerHelper.read_state(cls.state_filename)
