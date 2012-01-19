@@ -1,5 +1,16 @@
 import os
+import re
 import sys
+
+class EntityParser(object):
+  PORT_RE = re.compile(r'%port:(\w+)%')
+
+  @staticmethod
+  def match_ports(str):
+    matcher = EntityParser.PORT_RE
+    matched = matcher.findall(str)
+    return set(matched)
+
 
 class MesosConfiguration(object):
   def __init__(self, configFile):
@@ -10,6 +21,9 @@ class MesosConfiguration(object):
     self._configfile = configFile
     env = self._execute(self._configfile)
     self.config = self._validate(env)
+
+  def ports(self, jobname):
+    return EntityParser.match_ports(self.config['task']['start_command'])
 
   def _execute(self, configFile):
     """

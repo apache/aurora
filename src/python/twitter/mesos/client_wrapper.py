@@ -1,5 +1,6 @@
 import getpass
 import os
+import pprint
 import subprocess
 import time
 
@@ -14,7 +15,7 @@ from twitter.mesos.updater import Updater
 
 from gen.twitter.mesos.ttypes import *
 
-class MesosHelper:
+class MesosHelper(object):
   _DEFAULT_USER = getpass.getuser()
 
   @staticmethod
@@ -108,18 +109,15 @@ class MesosHelper:
     MesosHelper.copy_to_hadoop(user, ssh_proxy, source_path, hdfs_uri)
 
   @staticmethod
-  def get_config(jobname, config_file, force_thermos):
-    if config_file.endswith('.thermos'):
-      config = ProxyConfig.from_thermos(config_file)
+  def get_config(jobname, config_file, new_mesos):
+    """Returns the proxy config."""
+    if new_mesos:
+      assert MesosHelper.is_admin(), ("--new_mesos is currently only allowed"
+                                      " for users in the mesos group.")
+
+      config = ProxyConfig.from_new_mesos(config_file)
     else:
-      if force_thermos:
-        assert MesosHelper.is_admin(), ("--force_thermos is currently only allowed"
-                                           " for users in the mesos group.")
-        assert config_file.endswith('.mesos') , ("Job is not configured in mesos format."
-                                                 " Try removing --force_thermos option")
-        config = ProxyConfig.from_mesos_as_thermos(config_file)
-      else:
-        config = ProxyConfig.from_mesos(config_file)
+      config = ProxyConfig.from_mesos(config_file)
 
     config.set_job(jobname)
 
@@ -245,6 +243,8 @@ class MesosClientAPI(MesosClientBase):
       if self.config().hdfs_path():
         log.info('Detected HDFS package: %s' % self.config().hdfs_path())
         log.info('Would copy to %s via %s.' % (self.cluster(), self.proxy()))
+
+    pprint.pprint(config.job(jobname))
 
     sessionkey = self.acquire_session()
     log.info('Parsed job: %s' % jobname)

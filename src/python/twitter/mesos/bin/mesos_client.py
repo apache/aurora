@@ -57,13 +57,14 @@ class MesosCLI(cmd.Cmd):
     cmd.Cmd.__init__(self)
     zookeeper.set_debug_level(zookeeper.LOG_LEVEL_WARN)
     self.options = opts
+
     self.api = MesosClientAPI(cluster=self.options.cluster, verbose=self.options.verbose)
 
   @requires_arguments('job', 'config')
   def do_create(self, *line):
     """create job config"""
     (jobname, config_file) = line
-    config = MesosHelper.get_config(jobname, config_file, self.options.force_thermos)
+    config = MesosHelper.get_config(jobname, config_file, self.options.new_mesos)
 
     resp = self.api.create_job(jobname, config, self.options.copy_app_from)
     check_and_log_response(resp)
@@ -72,7 +73,7 @@ class MesosCLI(cmd.Cmd):
   def do_inspect(self, *line):
     """inspect job config"""
     (jobname, config_file) = line
-    config = MesosHelper.get_config(jobname, config_file, self.options.force_thermos)
+    config = MesosHelper.get_config(jobname, config_file, self.options.new_mesos)
 
     self.api.inspect(jobname, config, self.options.copy_app_from)
 
@@ -145,7 +146,7 @@ class MesosCLI(cmd.Cmd):
   def do_update(self, *line):
     """update job config"""
     (jobname, config_file) = line
-    config = MesosHelper.get_config(jobname, config_file, self.options.force_thermos)
+    config = MesosHelper.get_config(jobname, config_file, self.options.new_mesos)
 
     resp = self.api.update_job(jobname, config, self.options.copy_app_from)
     check_and_log_update_response(resp)
@@ -235,11 +236,11 @@ The subcommands and their arguments are:
     default=None,
     help='User to tunnel as (defaults to job role)')
   app.add_option(
-    '-t',
-    '--force_thermos',
+    '-n',
+    '--new_mesos',
     default=False,
     action='store_true',
-    help="Run jobs configured in mesos format as thermos jobs.")
+    help="Run jobs configured using the new mesos config format.")
 
 
 def main(args, options):

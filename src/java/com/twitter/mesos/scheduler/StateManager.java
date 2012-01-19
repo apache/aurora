@@ -786,6 +786,8 @@ class StateManager {
         AssignedTask assigned;
         if (task.getAssignedTask().getTask().isSetThermosConfig()) {
           assigned = task.getAssignedTask();
+          assigned.setAssignedPorts(CommandLineExpander.getNameMappedPorts(
+            assigned.getTask().getRequestedPorts(), assignedPorts));
         } else {
           assigned = CommandLineExpander.expand(task.getAssignedTask(),
               assignedPorts);

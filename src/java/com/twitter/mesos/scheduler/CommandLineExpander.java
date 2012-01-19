@@ -47,6 +47,26 @@ public final class CommandLineExpander {
     return getPortNames(commandLine).size();
   }
 
+  public static Map<String,Integer> getNameMappedPorts(Set<String> portNames, Set<Integer> allocatedPorts) {
+    // Expand ports.
+    Map<String, Integer> ports = Maps.newHashMap();
+    Set<Integer> portsRemaining = Sets.newHashSet(allocatedPorts);
+    Iterator<Integer> portConsumer = Iterables.consumingIterable(portsRemaining).iterator();
+
+    for (String portName : portNames) {
+      Preconditions.checkArgument(portConsumer.hasNext(),
+          "Allocated ports %s were not sufficient to expand task.", allocatedPorts);
+      int portNumber = portConsumer.next();
+      ports.put(portName, portNumber);
+    }
+
+    if (!portsRemaining.isEmpty()) {
+      LOG.warning("Not all allocated ports were used to map ports!");
+    }
+    
+    return ports;
+  }
+
   /**
    * Expands the command line in a task, applying the provided allocated ports.
    *
@@ -69,24 +89,11 @@ public final class CommandLineExpander {
     commandLine = commandLine.replaceAll(TASK_ID_REGEXP, task.getTaskId());
 
     // Expand ports.
-    Map<String, Integer> ports = Maps.newHashMap();
-    Set<Integer> portsRemaining = Sets.newHashSet(allocatedPorts);
-    Iterator<Integer> portConsumer = Iterables.consumingIterable(portsRemaining).iterator();
+    Map<String, Integer> ports = getNameMappedPorts(getPortNames(commandLine), allocatedPorts);
 
-    Set<String> portNames = getPortNames(commandLine);
-    for (String portName : portNames) {
-      Preconditions.checkArgument(portConsumer.hasNext(),
-          "Allocated ports %s were not sufficient to expand %s", allocatedPorts, immutableTask);
-      int portNumber = portConsumer.next();
-      ports.put(portName, portNumber);
-
+    for (Map.Entry<String, Integer> portEntry : ports.entrySet()) {
       commandLine = commandLine.replaceAll(
-          String.format(PORT_FORMAT, portName),
-          String.valueOf(portNumber));
-    }
-
-    if (!portsRemaining.isEmpty()) {
-      LOG.warning(String.format(""));
+          String.format(PORT_FORMAT, portEntry.getKey()), String.valueOf(portEntry.getValue()));
     }
 
     task.getTask().setStartCommand(commandLine);

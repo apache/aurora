@@ -4,6 +4,7 @@ import getpass
 import sys
 
 from twitter.common import log
+from twitter.mesos.config.loader import MesosConfigLoader
 from twitter.mesos.mesos_configuration import MesosConfiguration
 from gen.twitter.mesos.ttypes import (
   Constraint,
@@ -18,9 +19,6 @@ from gen.twitter.mesos.ttypes import (
   Value,
   ValueConstraint,
 )
-from twitter.tcl.loader import MesosJobLoader, ThermosJobLoader
-from gen.twitter.tcl.ttypes import ThermosJob, ThermosTask, ThermosProcess
-
 
 def _die(msg):
   log.fatal(msg)
@@ -29,18 +27,12 @@ def _die(msg):
 
 class ProxyConfig(object):
   @staticmethod
-  def from_thermos(filename):
-    assert filename.endswith('.thermos'), (
-      "ProxyConfig.from_thermos must be called with .thermos filename")
-    return ProxyThermosConfig.from_thermos(filename)
+  def from_new_mesos(filename):
+    return ProxyNewMesosConfig(filename)
 
   @staticmethod
   def from_mesos(filename):
     return ProxyMesosConfig(filename)
-
-  @staticmethod
-  def from_mesos_as_thermos(filename):
-    return ProxyThermosConfig.from_mesos(filename)
 
   def __init__(self):
     self._job = None
@@ -57,10 +49,18 @@ class ProxyConfig(object):
   def cluster(self):
     raise NotImplementedError
 
+  def ports(self):
+    return set()
+
+
 class ProxyMesosConfig(ProxyConfig):
   def __init__(self, filename):
-    self._config = MesosConfiguration(filename).config
+    self._mesos_config = MesosConfiguration(filename)
+    self._config = self._mesos_config.config
     ProxyConfig.__init__(self)
+
+  def ports(self):
+    return self._mesos_config.ports()
 
   @staticmethod
   def parse_constraints(constraints_dict):
@@ -81,7 +81,7 @@ class ProxyMesosConfig(ProxyConfig):
       else:
         negated = constraint_value.startswith('!')
         if negated:
-          constraint_value=constraint_value[1:]
+          constraint_value = constraint_value[1:]
         values = constraint_value.split(',')
         if len(values) > 1:
           taskConstraint.listConstraint = ListConstraint()
@@ -122,6 +122,7 @@ class ProxyMesosConfig(ProxyConfig):
       del config['constraints']
     task_configuration = dict((k, str(v)) for k, v in config['task'].items())
     task.configuration = dict(task_configuration.items() + task_constraints.items())
+    task.requestedPorts = self.ports()
 
     # Replicate task objects to reflect number of instances.
     tasks = []
@@ -158,55 +159,78 @@ class ProxyMesosConfig(ProxyConfig):
     return self._config.get('cluster')
 
 
-class ProxyThermosConfig(ProxyConfig):
-  @staticmethod
-  def from_mesos(filename):
-    return ProxyThermosConfig(MesosJobLoader(filename).to_thrift())
-
-  @staticmethod
-  def from_thermos(filename):
-    return ProxyThermosConfig(ThermosJobLoader(filename).to_thrift())
-
-  def __init__(self, thrift_blob):
-    self._config = thrift_blob
+class ProxyNewMesosConfig(ProxyConfig):
+  def __init__(self, filename):
+    self._config = MesosConfigLoader.load(filename)
     ProxyConfig.__init__(self)
 
-  def job(self, name=None):
+  def _get_wrap_job(self, name=None):
+    """Returns the wrapped job."""
     jobname = name or self._job
     assert jobname, "Job name not supplied!"
-    assert self._config.job.name == jobname, """Thermos configurations only contain one job
-      and the supplied job name does not match."""
-    owner = Identity(role=self._config.job.role, user=getpass.getuser())
+
+    job_wrap = self._config.job(jobname)
+    assert job_wrap, "Job %s is not specified in the config file." % jobname
+
+    return job_wrap
+
+  def job(self, name=None):
+    """Returns the mesos thrift job configuration."""
+    job_wrap = self._get_wrap_job(name)
+    job_raw = job_wrap.job()
+
+    if not job_raw.role().check().ok():
+      _die('role must be specified!')
+
+    owner = Identity(role=job_raw.role().get(), user=getpass.getuser())
+
+    task_wrap = job_wrap.task()
+    task_raw = task_wrap.task()
 
     MB = 1024 * 1024
 
-    tasks = set()
-    for task in self._config.tasks:
-      tti = TwitterTaskInfo()
-      tti.thermosConfig = task
-      tti.jobName = self._config.job.name
-      tti.numCpus = task.footprint.cpu
-      tti.ramMb = task.footprint.ram / MB
-      tti.diskMb = task.footprint.disk / MB
-      tti.shardId = task.replica_id
-      tti.maxTaskFailures = self._config.max_task_failures
-      tti.owner = owner
-      tasks.add(tti)
+    task = TwitterTaskInfo()
+    task.jobName = task_raw.name().get()
+    task.numCpus = task_raw.resources().cpu().get()
+    task.ramMb = task_raw.resources().ram().get() / MB
+    task.diskMb = task_raw.resources().disk().get() / MB
+    task.maxTaskFailures = task_raw.max_failures().get()
+    task.owner = owner
+    task.requestedPorts = set(task_wrap.ports())
 
-    cron_schedule = self._config.cron_schedule if self._config.cron_schedule else None
+    # Replicate task objects to reflect number of instances.
+    tasks = []
+    for k in range(job_raw.instances().get()):
+      taskCopy = copy.deepcopy(task)
+      taskCopy.shardId = k
+      taskCopy.thermosConfig = job_wrap.task_instance_json(k)
+      tasks.append(taskCopy)
 
-    config = JobConfiguration(
-      jobname,
+    cron_schedule = job_raw.cron_schedule().get() if job_raw.has_cron_schedule() else ''
+    cron_policy = job_raw.cron_policy().get() # TODO(vinod): Check if its a valid collision policy
+
+    update = UpdateConfig()
+    update.batchSize = job_raw.update_config().batch_size().get()
+    update.restartThreshold = job_raw.update_config().restart_threshold().get()
+    update.watchSecs = job_raw.update_config().watch_secs().get()
+    update.maxPerShardFailures = job_raw.update_config().failures_per_shard().get()
+    update.maxTotalFailures = job_raw.update_config().total_failures().get()
+
+    return JobConfiguration(
+      job_raw.name().get(),
       owner,
       tasks,
-      cron_schedule, # cron schedule
-      None, # cron collision policy
-      None) # update config
-
-    return config
+      cron_schedule,
+      cron_policy,
+      update)
 
   def hdfs_path(self):
     return None
 
   def cluster(self):
-    return self._config.job.cluster
+    job_raw = self._get_wrap_job().job()
+
+    if job_raw.cluster().check().ok():
+      return job_raw.cluster().get()
+    else:
+      return None

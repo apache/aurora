@@ -4,17 +4,8 @@ import sys
 
 from pystachio import Ref
 from twitter.common.dirutil import safe_open
+from twitter.common.lang.compatibility import *
 from twitter.thermos.config.schema import Task
-
-if sys.version_info[0] == 3:
-  def exec_function(ast, globals_map):
-    exec(ast, globals_map)
-else:
-  eval(compile("""\
-def exec_function(ast, globals_map):
-  exec ast in globals_map
-""", "<exec_function>", "exec"))
-
 
 SCHEMA_PREAMBLE = """
 from pystachio import *

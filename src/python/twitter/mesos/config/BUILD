@@ -1,6 +1,6 @@
 python_library(
   name = "schema",
-  sources = ['schema.py'],
+  sources = globs('*.py'),
   dependencies = [
     pants("src/python/twitter/thermos/config:schema")
   ]

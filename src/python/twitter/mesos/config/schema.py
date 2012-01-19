@@ -15,13 +15,13 @@ class Service(Struct):
   config = String
 
 class Layout(Struct):
-  packages = List(Package)
-  services = List(Service)
+  packages = Default(List(Package), [])
+  services = Default(List(Service), [])
 
 DEFAULT_LAYOUT = Layout(
-  packages = [
-    Package(name = "centos-5.5-x86_64"),
-    Package(name = "centos-5.5-util-x86_64"),
+  packages=[
+    Package(name="centos-5.5-x86_64"),
+    Package(name="centos-5.5-util-x86_64"),
   ]
 )
 
@@ -66,23 +66,36 @@ jobs = [fizzbuzzer, buzzfizzer]
 
 
 class MesosContext(Struct):
-  role = String
-  cluster = String
+  role = Required(String)
+  cluster = Required(String)
+  instance = Required(Integer)
+
 
 class UpdateConfig(Struct):
-  batch_size         = Default(Integer, 3)
-  restart_threshold  = Default(Integer, 10)
-  watch_secs         = Default(Integer, 30)
+  batch_size = Default(Integer, 3)
+  restart_threshold = Default(Integer, 10)
+  watch_secs = Default(Integer, 30)
   failures_per_shard = Default(Integer, 0)
-  total_failures     = Default(Integer, 0)
+  total_failures = Default(Integer, 0)
 
 
-@Provided(mesos = MesosContext)
+# The thermosConfig populated inside of TwitterTaskInfo.
+@Provided(mesos=MesosContext)
+class MesosTaskInstance(Struct):
+  task = Required(Task)
+  layout = Required(Layout)
+  instance = Required(Integer)
+  role = Required(String)
+
+
+@Provided(mesos=MesosContext)
 class MesosJob(Struct):
-  name          = Required(String)
-  role          = Default(String, '{{mesos.role}}')
-  cluster       = Default(String, '{{mesos.cluster}}')
-  instances     = Default(Integer, 1)
-  task          = Required(Task)
-  layout        = Default(Layout, DEFAULT_LAYOUT)
+  name = Required(String)
+  role = Default(String, '{{mesos.role}}')
+  cluster = Default(String, '{{mesos.cluster}}')
+  instances = Default(Integer, 1)
+  task = Required(Task)
+  cron_schedule = String
+  cron_policy = Default(String, 'KILL_EXISTING')
+  layout = Default(Layout, DEFAULT_LAYOUT)
   update_config = Default(UpdateConfig, UpdateConfig())
