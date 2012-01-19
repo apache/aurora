@@ -2,6 +2,7 @@ python_test_suite(name = 'all',
   dependencies = [
     pants(':updater'),
     pants(':proxy_config'),
+    pants('tests/python/twitter/mesos/executor:all')
     # Commented out till we fix the zookeeper import problem
     #pants('tests/python/twitter/mesos/angrybird:tests'),
   ]

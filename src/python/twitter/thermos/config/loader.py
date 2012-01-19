@@ -1,5 +1,6 @@
 import copy
 import json
+import os
 import sys
 
 from pystachio import Ref
@@ -59,23 +60,18 @@ class ThermosTaskWrapper(object):
     return json.dumps(self._task.get())
 
   def to_file(self, filename):
+    ti, _ = self._task.interpolate()
     with safe_open(filename, 'w') as fp:
-      json.dump(self._task.get(), fp)
+      json.dump(ti.get(), fp)
 
   @staticmethod
   def from_file(filename):
-    # TODO(wickman)  Less open catch.
     try:
       with safe_open(filename) as fp:
         js = json.load(fp)
       return ThermosTaskWrapper(Task(js))
-    except:
+    except Exception as e:
       return None
-
-  def validate(self):
-    # TODO(wickman):
-    #   Make sure that the TaskWrapper typechecks modulo ThermosTaskContext
-    return True
 
 
 class ThermosConfigLoader(object):

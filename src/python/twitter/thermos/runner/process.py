@@ -1,4 +1,3 @@
-import errno
 import getpass
 import grp
 import os
@@ -15,7 +14,6 @@ from gen.twitter.thermos.ttypes import (
   ProcessRunState,
   ProcessState,
   TaskRunnerCkpt)
-from twitter.thermos.base.helper import Helper
 
 __author__ = 'wickman@twitter.com (brian wickman)'
 __tested__ = False

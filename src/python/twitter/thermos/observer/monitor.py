@@ -5,9 +5,9 @@ import threading
 
 from twitter.common import log
 from twitter.common.recordio import ThriftRecordReader
-from twitter.thermos.base import TaskPath
 from twitter.thermos.base import TaskCkptDispatcher
 from gen.twitter.thermos.ttypes import (
+  ProcessRunState,
   TaskRunnerCkpt,
   TaskRunnerState)
 

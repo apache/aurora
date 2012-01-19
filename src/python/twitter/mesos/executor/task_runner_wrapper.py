@@ -1,7 +1,21 @@
+import getpass
 import os
-from twitter.common import app
+import signal
+import subprocess
+import tempfile
+
+from twitter.common import app, log
+from twitter.common.log.options import LogOptions
+from twitter.common.contextutil import temporary_file
+from twitter.common.dirutil import chmod_plus_x
 from twitter.common.http.mirror_file import MirrorFile
-from twitter.thermos.config.schema.loader import ThermosTaskWrapper
+
+from twitter.thermos.base import TaskPath
+from twitter.thermos.runner import TaskRunner
+from twitter.thermos.observer import TaskMonitor
+from twitter.thermos.config.loader import ThermosTaskWrapper
+
+from twitter.mesos.executor.sandbox_manager import SandboxManager, DirectorySandbox
 
 app.add_option("--checkpoint_root", dest="checkpoint_root", metavar="PATH",
                default="/var/run/thermos",
@@ -27,7 +41,7 @@ class TaskRunnerWrapper(object):
   class TaskError(Exception):
     pass
 
-  def __init__(self, task_id, thermos_task, mesos_ports, checkpoint_root=None):
+  def __init__(self, task_id, thermos_task, role, mesos_ports, checkpoint_root=None):
     """
       :task_id       => task_id assigned by scheduler
       :thermos_task  => twitter.thermos.config.schema.Task object
@@ -40,6 +54,7 @@ class TaskRunnerWrapper(object):
     self._ports = mesos_ports
     self._checkpoint_root = checkpoint_root or app.get_options().checkpoint_root
     self._enable_chroot = False
+    self._role = role
     if TaskRunnerWrapper.TEMPDIR is None:
       TaskRunnerWrapper.TEMPDIR = tempfile.mkdtemp()
 
@@ -68,12 +83,11 @@ class TaskRunnerWrapper(object):
     self._monitor = TaskMonitor(TaskPath(root=self._checkpoint_root), self._task_id)
 
     try:
-      self._sandbox.create(thermos_task)
+      self._sandbox.create(self._task)
     except Exception as e:
       log.fatal('Could not construct sandbox: %s' % e)
       raise TaskRunnerWrapper.TaskError('Could not construct sandbox: %s' % e)
 
-    options = app.get_options()
     params = dict(log_dir=LogOptions.log_dir(),
                   checkpoint_root=self._checkpoint_root,
                   sandbox=self._sandbox.root(),
@@ -123,8 +137,8 @@ class ProductionTaskRunner(TaskRunnerWrapper):
   SVN_REPO = 'svn.twitter.biz'
   SVN_PATH = '/science-binaries/home/thermos'
 
-  def __init__(self, *args, **kwargs):
-    TaskRunnerWrapper.__init__(self, *args, **kwargs)
+  def __init__(self, task_id, *args, **kwargs):
+    TaskRunnerWrapper.__init__(self, task_id, *args, **kwargs)
     self._sandbox = SandboxManager.get(task_id)
     self._runner_pex = MirrorFile(
       ProductionTaskRunner.SVN_REPO,
@@ -134,12 +148,13 @@ class ProductionTaskRunner(TaskRunnerWrapper):
     self._enable_chroot = True
 
 
-class AngrybirdTaskRunner(object):
-  def __init__(self, *args, **kwargs):
-    TaskRunnerWrapper.__init__(self, *args, **kwargs)
+class AngrybirdTaskRunner(TaskRunnerWrapper):
+  def __init__(self, task_id, *args, **kwargs):
+    TaskRunnerWrapper.__init__(self, task_id, *args, **kwargs)
     self._angrybird_home = os.environ['ANGRYBIRD_HOME']
     self._sandbox_root = os.path.join(self._angrybird_home, 'logs/thermos/lib')
     self._checkpoint_root = os.path.join(self._angrybird_home, 'logs/thermos/run')
     self._runner_pex = LocalFile(os.path.join(self._angrybird_home,
                                               'science/dist',
                                               TaskRunnerWrapper.PEX_NAME))
+    self._sandbox = DirectorySandbox(task_id, self._sandbox_root)

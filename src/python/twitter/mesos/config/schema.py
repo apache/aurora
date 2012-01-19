@@ -5,13 +5,12 @@ from twitter.thermos.config.schema import (
   Resources,
   ThermosContext)
 
-
 class Package(Struct):
-  name = Required(String)
+  name    = Required(String)
   version = Default(String, 'latest')
 
 class Service(Struct):
-  name = Required(String)
+  name   = Required(String)
   config = String
 
 class Layout(Struct):
@@ -25,77 +24,34 @@ DEFAULT_LAYOUT = Layout(
   ]
 )
 
-
-"""
-Example from the tutorial
-
-fizzbuzzer = {
-  'name': 'fizzbuzzer',
-  'role': 'john_doe',
-  'cluster': 'smf1-foobar',
-  'instances': 2,
-  'task': {
-     'daemon': True,
-     'hdfs_path': '/user/mesos/john_doe/fizzbuzzer.tar.gz',
-     'start_command': 'tar xzf fizzbuzzer.tar.gz; sh run_fizzbuzzer.sh',
-     'num_cpus': 1,
-     'ram_mb': 1024,
-     'disk_mb': 1024
-   },
-   'update_config': {
-     'batchSize': 3,
-     'restartThreshold': 10,
-     'watchSecs': 30,
-     'maxPerShardFailures': 0,
-     'maxTotalFailures': 0
-   }
-}
-
-buzzfizzer = {
-  'name': 'buzzfizzer',
-  'role': 'john_doe',
-  'cluster': 'smf1-foobar',
-  'task': {
-     'hdfs_path': '/user/mesos/john_doe/buzzfizzer.tar.gz',
-     'start_command': 'tar xzf buzzfizzer.tar.gz; sh buzzfizzer.sh'
-  }
-}
-
-jobs = [fizzbuzzer, buzzfizzer]
-"""
-
-
 class MesosContext(Struct):
-  role = Required(String)
-  cluster = Required(String)
+  role     = Required(String)
+  cluster  = Required(String)
   instance = Required(Integer)
-
 
 class UpdateConfig(Struct):
-  batch_size = Default(Integer, 3)
-  restart_threshold = Default(Integer, 10)
-  watch_secs = Default(Integer, 30)
+  batch_size         = Default(Integer, 3)
+  restart_threshold  = Default(Integer, 10)
+  watch_secs         = Default(Integer, 30)
   failures_per_shard = Default(Integer, 0)
-  total_failures = Default(Integer, 0)
-
+  total_failures     = Default(Integer, 0)
 
 # The thermosConfig populated inside of TwitterTaskInfo.
-@Provided(mesos=MesosContext)
+@Provided(mesos = MesosContext)
 class MesosTaskInstance(Struct):
-  task = Required(Task)
-  layout = Required(Layout)
+  task     = Required(Task)
+  layout   = Required(Layout)
   instance = Required(Integer)
-  role = Required(String)
-
+  role     = Required(String)
 
 @Provided(mesos=MesosContext)
 class MesosJob(Struct):
-  name = Required(String)
-  role = Default(String, '{{mesos.role}}')
-  cluster = Default(String, '{{mesos.cluster}}')
-  instances = Default(Integer, 1)
-  task = Required(Task)
+  name          = Required(String)
+  role          = Default(String, '{{mesos.role}}')
+  cluster       = Default(String, '{{mesos.cluster}}')
+  instances     = Default(Integer, 1)
+  task          = Required(Task)
   cron_schedule = String
-  cron_policy = Default(String, 'KILL_EXISTING')
-  layout = Default(Layout, DEFAULT_LAYOUT)
+  cron_policy   = Default(String, 'KILL_EXISTING')
+  layout        = Default(Layout, DEFAULT_LAYOUT)
   update_config = Default(UpdateConfig, UpdateConfig())

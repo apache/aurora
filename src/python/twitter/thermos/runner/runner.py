@@ -1,14 +1,12 @@
-import copy
 import errno
 import getpass
 import os
-import random
 import socket
 import signal
 import threading
 import time
 
-from pystachio import Integer, Ref, Environment
+from pystachio import Integer, Environment
 
 from twitter.common import log
 from twitter.common.dirutil import safe_mkdir, safe_open
@@ -123,7 +121,7 @@ class TaskRunner(object):
     if self._user != current_user:
       if os.geteuid() != 0:
         raise ValueError('task specifies user as %s, but %s does not have setuid permission!' % (
-          header.user, current_user))
+          self._user, current_user))
 
     self._chroot = chroot
     self._planner = Planner.from_task(task)
@@ -213,7 +211,7 @@ class TaskRunner(object):
       Unpause the runner.  Must call run() method following this for the event loop
       to start back up.
     """
-    self._pause_event.unset()
+    self._pause_event.clear()
 
   def _replay_runner_ckpt(self):
     """

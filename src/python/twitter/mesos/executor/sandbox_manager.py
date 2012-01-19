@@ -1,6 +1,6 @@
 from abc import ABCMeta, abstractmethod
-import copy
 import os
+import sys
 
 try:
   import app as appapp
@@ -9,16 +9,11 @@ except ImportError:
   has_appapp = False
 
 from twitter.common import app, log
-from twitter.common.dirutil import safe_mkdir
-
-app.add_option('--sandbox_manager', dest='sandbox_manager', default='DirectorySandbox',
-               help="The sandbox creation mechanism to use for the Thermos executor.  Can be one "
-                    "of DirectorySandbox (for standard directory-based apps) or AppAppSandbox for "
-                    "AppApp layouts.")
+from twitter.common.dirutil import safe_mkdir, safe_rmtree
 
 app.add_option('--sandbox_root', dest='sandbox_root', metavar='PATH',
                default='/var/lib/thermos',
-               help="The path where we will create DirectorySandbox sandboxes.")
+               help="The path where we will create DirectorySandbox sandboxes. [default: %default]")
 
 
 class SandboxBase(object):
@@ -29,8 +24,8 @@ class SandboxBase(object):
   class DeletionError(Exception):
     pass
 
-  def __init__(self):
-    pass
+  def __init__(self, task_id, sandbox_root=None):
+    self._sandbox_root = sandbox_root or app.get_options().sandbox_root
 
   @abstractmethod
   def root(self):
@@ -49,8 +44,9 @@ class SandboxBase(object):
 
 
 class DirectorySandbox(SandboxBase):
-  def __init__(self, task_id):
-    self._dir = os.path.join(app.get_options().sandbox_root, task_id)
+  def __init__(self, task_id, sandbox_root=None):
+    SandboxBase.__init__(self, task_id, sandbox_root)
+    self._dir = os.path.join(self._sandbox_root, task_id)
 
   def root(self):
     return self._dir
@@ -68,18 +64,19 @@ class DirectorySandbox(SandboxBase):
 
 class AppAppSandbox(SandboxBase):
   def __init__(self, task_id):
-    SandboxBase.__init__(self)
+    SandboxBase.__init__(self, task_id)
 
     if not has_appapp:
-      raise SandboxBase.CreationError("AppApp is unavailable: %s" % repr(os.uname()))
+      raise SandboxBase.CreationError("AppApp is unavailable: %r, PATH: %r" % (
+        os.uname(), sys.path))
 
     self._task_id = task_id
     self._app = appapp.App()
     self._layout = None
     self._layouts = self._app.layout_list(layout_name=task_id)
 
-    if len(layouts) > 0:
-      self._layout = layouts[0]
+    if len(self._layouts) > 0:
+      self._layout = self._layouts[0]
 
   @staticmethod
   def layout_create_args_from_task(appobj, task_id, mesos_task):
@@ -93,7 +90,7 @@ class AppAppSandbox(SandboxBase):
     layout = mesos_task.layout()
     for service in layout().services():
       service_name = service.name().get()
-      if service_name not in a.service_backends():
+      if service_name not in appobj.service_backends():
         raise SandboxBase.CreationError('Could not create layout: unknown Service: %s' % (
           service_name))
       kw['services'][appobj.service_backends()[service_name]] = (
@@ -152,3 +149,10 @@ class SandboxManager(object):
       return SandboxManager.MANAGERS[manager](*args, **kw)
     raise SandboxManager.UnknownError('Unknown sandbox manager: %s' %
       app.get_options().sandbox_manager)
+
+app.add_option('--sandbox_manager', dest='sandbox_manager',
+               type="choice", choices=SandboxManager.MANAGERS.keys(),
+               default='DirectorySandbox',
+               help="The sandbox creation mechanism to use for the Thermos executor.  Can be one "
+                    "of DirectorySandbox (for standard directory-based apps) or AppAppSandbox for "
+                    "AppApp layouts. [default: %default]")

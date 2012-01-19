@@ -12,19 +12,11 @@ import mesos
 import mesos_pb2 as mesos_pb
 
 from twitter.common import app, log
-from twitter.common.contextutil import temporary_file
-from twitter.common.dirutil import chmod_plus_x, safe_mkdir
-from twitter.common.http.mirror_file import MirrorFile
 from twitter.common.log.options import LogOptions
 from twitter.common.quantity import Amount, Time
-from twitter.common.recordio import ThriftRecordWriter
 
 # thermos
-from twitter.thermos.base import TaskPath
-from twitter.thermos.runner import TaskRunner
-from twitter.thermos.observer import TaskMonitor
 from twitter.mesos.config.schema import MesosTaskInstance
-
 from twitter.mesos.executor.task_runner_wrapper import (
   ProductionTaskRunner,
   AngrybirdTaskRunner)
@@ -90,6 +82,7 @@ class ThermosExecutor(mesos.Executor):
     self._slave_id = None
     self._task_id = None
     self._poller = None
+    mesos.Executor.__init__(self)
 
   def init(self, driver, args):
     self._log('init()')
@@ -110,9 +103,7 @@ class ThermosExecutor(mesos.Executor):
   def deserialize_assigned_task(task):
     """
       Deserialize task from a launchTask task protocol buffer.
-
-      Returns:
-        (task, portmap)
+      Returns AssignedTask
     """
     try:
       assigned_task = thrift_deserialize(AssignedTask(), task.data)
@@ -122,6 +113,11 @@ class ThermosExecutor(mesos.Executor):
 
   @staticmethod
   def deserialize_thermos_task(assigned_task):
+    """
+      Deserialize MesosTaskInstance from a AssignedTask thrift.
+      Returns twitter.mesos.config.schema.MesosTaskInstance and the map of
+      assigned by the scheduler.
+    """
     thermos_task = assigned_task.task.thermosConfig
     if not thermos_task:
       raise ValueError('Task did not have a thermosConfig!')
@@ -145,7 +141,7 @@ class ThermosExecutor(mesos.Executor):
 
     try:
       assigned_task = ThermosExecutor.deserialize_assigned_task(task)
-      thermos_task = ThermosExecutor.deserialize_thermos_task(assigned_task)
+      mesos_task, portmap = ThermosExecutor.deserialize_thermos_task(assigned_task)
     except Exception as e:
       log.fatal('Could not deserialize AssignedTask: %s' % e)
       driver.sendStatusUpdate(self.task_update(self._task_id, mesos_pb.TASK_FAILED,
@@ -153,7 +149,7 @@ class ThermosExecutor(mesos.Executor):
       driver.stop()
       return
 
-    self._runner = RUNNER_CLASS(self._task_id, thermos_task, assigned_task.requestedPorts)
+    self._runner = RUNNER_CLASS(self._task_id, mesos_task.task(), mesos_task.role().get(), portmap)
     self._runner.start()
     log.debug('Waiting for task to start.')
 
@@ -190,6 +186,7 @@ class ThermosExecutor(mesos.Executor):
     self._log('frameworkMessage() - message: %s' % message)
 
   def shutdown(self, driver):
+    # TODO(wickman) Should this be implemented?
     self._log('shutdown()')
 
   def error(self, driver, code, message):

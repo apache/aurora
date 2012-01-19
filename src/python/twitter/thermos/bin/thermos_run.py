@@ -37,7 +37,7 @@ def add_port_callback(option, opt, value, parser):
   parser.values.prebound_ports.append(value)
 app.add_option("--port", type='string', nargs=1,
                action='callback', callback=add_port_callback,
-               metavar = "NAME:PORT",
+               default=[], metavar = "NAME:PORT",
                help = "an indication to bind a numbered port PORT to name NAME")
 
 def check_invariants(args, values):
@@ -74,23 +74,24 @@ def get_task_from_options(opts):
   else:
     task = tasks.tasks()[0]
 
-  if not task.check().ok():
-    app.error(task.check().message())
+  if not task.task.check().ok():
+    app.error(task.task.check().message())
 
   return task
 
 def get_prebound_ports(opts):
   ports = {}
-  for value in opts.prebound_ports:
-    try:
-      name, port = value.split(':')
-    except (ValueError, TypeError):
-      app.error('Invalid value for --port: %s, should be of form NAME:PORT' % value)
-    try:
-      port = int(port)
-    except ValueError:
-      app.error('Invalid value for --port: %s, could not coerce port number to integer.' % value)
-    ports[name] = port
+  if hasattr(opts, 'prebound_ports'):
+    for value in opts.prebound_ports:
+      try:
+        name, port = value.split(':')
+      except (ValueError, TypeError):
+        app.error('Invalid value for --port: %s, should be of form NAME:PORT' % value)
+      try:
+        port = int(port)
+      except ValueError:
+        app.error('Invalid value for --port: %s, could not coerce port number to integer.' % value)
+      ports[name] = port
   return ports
 
 
