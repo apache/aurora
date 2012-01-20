@@ -21,18 +21,18 @@ public class CommandLineExpanderTest {
   private static final String TASK_ID = "my_task_id";
   private static final int SHARD_ID = 3;
 
-  private static AssignedTask makeTask(String startCommand) {
+  private static AssignedTask makeTask(String startCommand, Set<String> requestedPorts) {
     return new AssignedTask()
         .setTaskId(TASK_ID)
         .setTask(new TwitterTaskInfo()
             .setStartCommand(startCommand)
+            .setRequestedPorts(requestedPorts)
             .setShardId(SHARD_ID));
   }
 
   private static AssignedTask checkAndExpand(AssignedTask task, Set<Integer> ports)
       throws TaskDescriptionException {
-    String command = task.getTask().getStartCommand();
-    assertEquals(ports.size(), CommandLineExpander.getNumPortsRequested(command));
+    assertEquals(ports.size(), task.getTask().getRequestedPortsSize());
     return CommandLineExpander.expand(task, ports);
   }
 
@@ -40,7 +40,7 @@ public class CommandLineExpanderTest {
   public void testExpandPort() throws TaskDescriptionException {
     Set<Integer> ports = ImmutableSet.of(5);
 
-    AssignedTask task = makeTask("echo '%port:http%'");
+    AssignedTask task = makeTask("echo '%port:http%'", ImmutableSet.of("http"));
     task = checkAndExpand(task, ports);
     assertEquals("echo '5'", task.getTask().getStartCommand());
     assertEquals(ImmutableMap.of("http", 5), task.getAssignedPorts());
@@ -50,7 +50,8 @@ public class CommandLineExpanderTest {
   public void testExpandPortDuplicate() throws TaskDescriptionException {
     Set<Integer> ports = ImmutableSet.of(5);
 
-    AssignedTask task = makeTask("echo '%port:http%'; echo '%port:http%';");
+    AssignedTask task = makeTask("echo '%port:http%'; echo '%port:http%';",
+        ImmutableSet.of("http"));
     task = checkAndExpand(task, ports);
     assertEquals("echo '5'; echo '5';", task.getTask().getStartCommand());
     assertEquals(ImmutableMap.of("http", 5), task.getAssignedPorts());
@@ -60,7 +61,8 @@ public class CommandLineExpanderTest {
   public void testExpandPorts() throws TaskDescriptionException {
     Set<Integer> ports = ImmutableSet.of(20, 30, 50);
 
-    AssignedTask task = makeTask("echo '%port:http%'; echo '%port:thrift%'; echo '%port:mail%'");
+    AssignedTask task = makeTask("echo '%port:http%'; echo '%port:thrift%'; echo '%port:mail%'",
+        ImmutableSet.of("http", "thrift", "mail"));
     task = checkAndExpand(task, ports);
     assertEquals(ImmutableSet.of("http", "thrift", "mail"), task.getAssignedPorts().keySet());
   }
@@ -69,7 +71,7 @@ public class CommandLineExpanderTest {
   public void testExpandPortsTooManyRequested() throws TaskDescriptionException {
     Set<Integer> ports = ImmutableSet.of(5);
 
-    AssignedTask task = makeTask("echo '%port:http% %port:web%'");
+    AssignedTask task = makeTask("echo '%port:http% %port:web%'", ImmutableSet.of("http", "web"));
     CommandLineExpander.expand(task, ports);
   }
 
@@ -77,7 +79,7 @@ public class CommandLineExpanderTest {
   public void testGetShardId() throws TaskDescriptionException {
     Set<Integer> ports = ImmutableSet.of();
 
-    AssignedTask task = makeTask("echo %shard_id%");
+    AssignedTask task = makeTask("echo %shard_id%", ImmutableSet.<String>of());
     task = checkAndExpand(task, ports);
     assertEquals("echo " + SHARD_ID, task.getTask().getStartCommand());
   }
@@ -86,7 +88,7 @@ public class CommandLineExpanderTest {
   public void testGetTaskId() throws TaskDescriptionException {
     Set<Integer> ports = ImmutableSet.of();
 
-    AssignedTask task = makeTask("echo %task_id%");
+    AssignedTask task = makeTask("echo %task_id%", ImmutableSet.<String>of());
     task = checkAndExpand(task, ports);
     assertEquals("echo " + TASK_ID, task.getTask().getStartCommand());
   }
@@ -95,7 +97,7 @@ public class CommandLineExpanderTest {
   public void testPortNameWithSpace() throws TaskDescriptionException {
     Set<Integer> ports = ImmutableSet.of();
 
-    AssignedTask task = makeTask("echo %port: foo %");
+    AssignedTask task = makeTask("echo %port: foo %", ImmutableSet.<String>of());
     task = checkAndExpand(task, ports);
     assertEquals("echo %port: foo %", task.getTask().getStartCommand());
   }

@@ -15,6 +15,7 @@ public interface Storage {
     TaskStore getTaskStore();
     UpdateStore getUpdateStore();
     QuotaStore getQuotaStore();
+    AttributeStore getAttributeStore();
   }
 
   /**

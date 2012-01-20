@@ -1,6 +1,7 @@
 package com.twitter.mesos.scheduler.storage.log;
 
 import java.lang.annotation.Annotation;
+import java.util.Set;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
@@ -17,8 +18,11 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Clock;
+import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.storage.Snapshot;
 import com.twitter.mesos.scheduler.log.mesos.MesosLogStreamModule;
+import com.twitter.mesos.scheduler.storage.AttributeStore.AttributeStoreImpl;
+import com.twitter.mesos.scheduler.storage.SnapshotStore;
 import com.twitter.mesos.scheduler.storage.JobStore;
 import com.twitter.mesos.scheduler.storage.QuotaStore;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
@@ -73,6 +77,8 @@ public class LogStorageModule extends AbstractModule {
     DbStorageModule.bind(binder, LogStorage.WriteBehind.class, new Closure<PrivateBinder>() {
       @Override public void execute(PrivateBinder binder) {
         binder.bind(new TypeLiteral<SnapshotStore<byte[]>>() {}).to(DbStorage.class);
+        binder.bind(
+            new TypeLiteral<SnapshotStore<Set<HostAttributes>>>() {}).to(AttributeStoreImpl.class);
 
         TypeLiteral<SnapshotStore<Snapshot>> snapshotStoreType =
             new TypeLiteral<SnapshotStore<Snapshot>>() {};

@@ -37,17 +37,9 @@ public final class CommandLineExpander {
   private static final String SHARD_ID_REGEXP = "%shard_id%";
   private static final String TASK_ID_REGEXP = "%task_id%";
 
-  /**
-   * Gets the number of ports requested in a command line.
-   *
-   * @param commandLine Command line to search for port requests.
-   * @return Number of ports requested.
-   */
-  public static int getNumPortsRequested(String commandLine) {
-    return getPortNames(commandLine).size();
-  }
+  public static Map<String, Integer> getNameMappedPorts(Set<String> portNames,
+      Set<Integer> allocatedPorts) {
 
-  public static Map<String,Integer> getNameMappedPorts(Set<String> portNames, Set<Integer> allocatedPorts) {
     // Expand ports.
     Map<String, Integer> ports = Maps.newHashMap();
     Set<Integer> portsRemaining = Sets.newHashSet(allocatedPorts);
@@ -63,7 +55,7 @@ public final class CommandLineExpander {
     if (!portsRemaining.isEmpty()) {
       LOG.warning("Not all allocated ports were used to map ports!");
     }
-    
+
     return ports;
   }
 
@@ -89,7 +81,8 @@ public final class CommandLineExpander {
     commandLine = commandLine.replaceAll(TASK_ID_REGEXP, task.getTaskId());
 
     // Expand ports.
-    Map<String, Integer> ports = getNameMappedPorts(getPortNames(commandLine), allocatedPorts);
+    Map<String, Integer> ports =
+        getNameMappedPorts(immutableTask.getTask().getRequestedPorts(), allocatedPorts);
 
     for (Map.Entry<String, Integer> portEntry : ports.entrySet()) {
       commandLine = commandLine.replaceAll(
@@ -99,18 +92,5 @@ public final class CommandLineExpander {
     task.getTask().setStartCommand(commandLine);
     task.setAssignedPorts(ports);
     return task;
-  }
-
-  private static Set<String> getPortNames(String commandLine) {
-    if (StringUtils.isBlank(commandLine)) {
-      return ImmutableSet.of();
-    }
-
-    ImmutableSet.Builder<String> ports = ImmutableSet.builder();
-    Matcher m = PORT_REQUEST_PATTERN.matcher(commandLine);
-    while (m.find()) {
-      ports.add(m.group(1));
-    }
-    return ports.build();
   }
 }

@@ -5,6 +5,7 @@ import java.sql.SQLException;
 import com.google.common.testing.TearDownAccepter;
 
 import com.twitter.mesos.scheduler.db.DbUtil.DbAccess;
+import com.twitter.mesos.scheduler.storage.AttributeStore.AttributeStoreImpl;
 import com.twitter.mesos.scheduler.storage.db.DbStorage;
 
 /**
@@ -25,7 +26,8 @@ public final class DbStorageTestUtil {
    */
   public static DbStorage setupStorage(TearDownAccepter tearDownAccepter) throws SQLException {
     DbAccess dbAccess = DbTestUtil.setupStorage(tearDownAccepter);
-    return new DbStorage(dbAccess.jdbcTemplate, dbAccess.transactionTemplate);
+    return new DbStorage(
+        dbAccess.jdbcTemplate, dbAccess.transactionTemplate, new AttributeStoreImpl());
   }
 
   private DbStorageTestUtil() {

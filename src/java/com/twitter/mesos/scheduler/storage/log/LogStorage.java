@@ -14,6 +14,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
@@ -25,6 +26,8 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
+import com.twitter.mesos.gen.Attribute;
+import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduledTask;
@@ -36,6 +39,7 @@ import com.twitter.mesos.gen.storage.RemoveQuota;
 import com.twitter.mesos.gen.storage.RemoveTasks;
 import com.twitter.mesos.gen.storage.SaveAcceptedJob;
 import com.twitter.mesos.gen.storage.SaveFrameworkId;
+import com.twitter.mesos.gen.storage.SaveHostAttributes;
 import com.twitter.mesos.gen.storage.SaveJobUpdate;
 import com.twitter.mesos.gen.storage.SaveQuota;
 import com.twitter.mesos.gen.storage.SaveTasks;
@@ -45,6 +49,7 @@ import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerException;
 import com.twitter.mesos.scheduler.log.Log.Stream.InvalidPositionException;
 import com.twitter.mesos.scheduler.log.Log.Stream.StreamAccessException;
+import com.twitter.mesos.scheduler.storage.AttributeStore;
 import com.twitter.mesos.scheduler.storage.ForwardingStore;
 import com.twitter.mesos.scheduler.storage.JobStore;
 import com.twitter.mesos.scheduler.storage.QuotaStore;
@@ -171,16 +176,17 @@ public class LogStorage extends ForwardingStore {
 
   @Inject
   LogStorage(LogManager logManager,
-      ShutdownRegistry shutdownRegistry,
-      @ShutdownGracePeriod Amount<Long, Time> shutdownGracePeriod,
-      SnapshotStore<Snapshot> snapshotStore,
-      @SnapshotInterval Amount<Long, Time> snapshotInterval,
-      @WriteBehind Storage storage,
-      @WriteBehind SchedulerStore schedulerStore,
-      @WriteBehind JobStore jobStore,
-      @WriteBehind TaskStore taskStore,
-      @WriteBehind UpdateStore updateStore,
-      @WriteBehind QuotaStore quotaStore) {
+             ShutdownRegistry shutdownRegistry,
+             @ShutdownGracePeriod Amount<Long, Time> shutdownGracePeriod,
+             SnapshotStore<Snapshot> snapshotStore,
+             @SnapshotInterval Amount<Long, Time> snapshotInterval,
+             @WriteBehind Storage storage,
+             @WriteBehind SchedulerStore schedulerStore,
+             @WriteBehind JobStore jobStore,
+             @WriteBehind TaskStore taskStore,
+             @WriteBehind UpdateStore updateStore,
+             @WriteBehind QuotaStore quotaStore,
+             AttributeStore attributeStore) {
 
     this(logManager,
         new ScheduledExecutorSchedulingService(shutdownRegistry, shutdownGracePeriod),
@@ -191,22 +197,24 @@ public class LogStorage extends ForwardingStore {
         jobStore,
         taskStore,
         updateStore,
-        quotaStore);
+        quotaStore,
+        attributeStore);
   }
 
   @VisibleForTesting
   LogStorage(LogManager logManager,
-      SchedulingService schedulingService,
-      SnapshotStore<Snapshot> snapshotStore,
-      Amount<Long, Time> snapshotInterval,
-      Storage storage,
-      SchedulerStore schedulerStore,
-      JobStore jobStore,
-      TaskStore taskStore,
-      UpdateStore updateStore,
-      QuotaStore quotaStore) {
+             SchedulingService schedulingService,
+             SnapshotStore<Snapshot> snapshotStore,
+             Amount<Long, Time> snapshotInterval,
+             Storage storage,
+             SchedulerStore schedulerStore,
+             JobStore jobStore,
+             TaskStore taskStore,
+             UpdateStore updateStore,
+             QuotaStore quotaStore,
+             AttributeStore attributeStore) {
 
-    super(storage, schedulerStore, jobStore, taskStore, updateStore, quotaStore);
+    super(storage, schedulerStore, jobStore, taskStore, updateStore, quotaStore, attributeStore);
     this.logManager = checkNotNull(logManager);
     this.schedulingService = checkNotNull(schedulingService);
     this.snapshotStore = checkNotNull(snapshotStore);
@@ -336,6 +344,10 @@ public class LogStorage extends ForwardingStore {
         removeQuota(op.getRemoveQuota().getRole());
         break;
 
+      case SAVE_HOST_ATTRIBUTES:
+        saveHostAttribute(op.getSaveHostAttributes().hostAttributes);
+        break;
+
       default:
         throw new IllegalStateException("Unknown transaction op: " + op);
     }
@@ -390,6 +402,10 @@ public class LogStorage extends ForwardingStore {
     }
 
     @Override public QuotaStore getQuotaStore() {
+      return LogStorage.this;
+    }
+
+    @Override public AttributeStore getAttributeStore() {
       return LogStorage.this;
     }
   };
@@ -545,6 +561,18 @@ public class LogStorage extends ForwardingStore {
       @Override protected void execute(StoreProvider unused) {
         log(Op.saveQuota(new SaveQuota(role, quota)));
         LogStorage.super.saveQuota(role, quota);
+      }
+    });
+  }
+
+
+  @Timed("scheduler_save_host_attribute")
+  @Override
+  public void saveHostAttribute(final HostAttributes hostAttributes) {
+        doInTransaction(new Work.NoResult.Quiet() {
+      @Override protected void execute(StoreProvider unused) {
+        log(Op.saveHostAttributes(new SaveHostAttributes(hostAttributes)));
+        LogStorage.super.saveHostAttribute(hostAttributes);
       }
     });
   }

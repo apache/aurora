@@ -99,7 +99,7 @@ public class Resources {
     return new Resources(
         task.getNumCpus(),
         Amount.of(task.getRamMb(), Data.MB),
-        task.getRequestedPorts().size());
+        task.getRequestedPortsSize());
   }
 
   /**

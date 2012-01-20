@@ -4,11 +4,12 @@ import java.util.Set;
 
 import javax.annotation.Nullable;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 
 import com.twitter.common.base.Closure;
+import com.twitter.mesos.gen.Attribute;
+import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduledTask;
@@ -16,14 +17,22 @@ import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.storage.Storage.Work.NoResult.Quiet;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 /**
  * A store that forwards all its operations to underlying storage systems.  Useful for decorating
  * an existing storage system.
  *
  * @author John Sirois
  */
-public class ForwardingStore
-    implements Storage, SchedulerStore, JobStore, TaskStore, UpdateStore, QuotaStore {
+public class ForwardingStore implements
+    Storage,
+    SchedulerStore,
+    JobStore,
+    TaskStore,
+    UpdateStore,
+    QuotaStore,
+    AttributeStore {
 
   private final Storage storage;
   private final SchedulerStore schedulerStore;
@@ -31,15 +40,24 @@ public class ForwardingStore
   private final TaskStore taskStore;
   private final UpdateStore updateStore;
   private final QuotaStore quotaStore;
+  private final AttributeStore attributeStore;
 
-  public ForwardingStore(Storage storage, SchedulerStore schedulerStore, JobStore jobStore,
-      TaskStore taskStore, UpdateStore updateStore, QuotaStore quotaStore) {
-    this.storage = Preconditions.checkNotNull(storage);
-    this.schedulerStore = Preconditions.checkNotNull(schedulerStore);
-    this.jobStore = Preconditions.checkNotNull(jobStore);
-    this.taskStore = Preconditions.checkNotNull(taskStore);
-    this.updateStore = Preconditions.checkNotNull(updateStore);
-    this.quotaStore = Preconditions.checkNotNull(quotaStore);
+  public ForwardingStore(
+      Storage storage,
+      SchedulerStore schedulerStore,
+      JobStore jobStore,
+      TaskStore taskStore,
+      UpdateStore updateStore,
+      QuotaStore quotaStore,
+      AttributeStore attributeStore) {
+
+    this.storage = checkNotNull(storage);
+    this.schedulerStore = checkNotNull(schedulerStore);
+    this.jobStore = checkNotNull(jobStore);
+    this.taskStore = checkNotNull(taskStore);
+    this.updateStore = checkNotNull(updateStore);
+    this.quotaStore = checkNotNull(quotaStore);
+    this.attributeStore = checkNotNull(attributeStore);
   }
 
   @Override
@@ -169,5 +187,15 @@ public class ForwardingStore
   @Override
   public Quota fetchQuota(String role) {
     return quotaStore.fetchQuota(role);
+  }
+
+  @Override
+  public void saveHostAttribute(HostAttributes hostAttribute) {
+    attributeStore.saveHostAttribute(hostAttribute);
+  }
+
+  @Override
+  public Iterable<Attribute> getAttributeForHost(String host) {
+    return attributeStore.getAttributeForHost(host);
   }
 }

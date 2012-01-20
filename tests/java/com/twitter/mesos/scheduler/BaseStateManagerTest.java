@@ -109,7 +109,8 @@ public abstract class BaseStateManagerTest extends EasyMockTest {
         .setOwner(new Identity().setRole(owner).setUser(owner))
         .setJobName(job)
         .setShardId(shard)
-        .setStartCommand("echo");
+        .setStartCommand("echo")
+        .setRequestedPorts(ImmutableSet.<String>of());
   }
 
   protected void assignTask(String taskId, String host) {

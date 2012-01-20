@@ -87,8 +87,7 @@ class Preempter implements Runnable {
     LoadingCache<String, Predicate<AssignedTask>> filtersByHost = CacheBuilder.newBuilder().build(
         new CacheLoader<String, Predicate<AssignedTask>>() {
           @Override public Predicate<AssignedTask> load(String host) {
-            return Predicates.compose(
-                schedulingFilter.dynamicHostFilter(scheduler, host), Tasks.ASSIGNED_TO_INFO);
+            return Predicates.compose(schedulingFilter.dynamicFilter(host), Tasks.ASSIGNED_TO_INFO);
           }
         }
     );

@@ -358,6 +358,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
     final String hostname = offer.getHostname();
     ExecutorKey executorKey = new ExecutorKey(defaultExecutorId, offer.getHostname());
 
+    stateManager.saveAttributesFromOffer(hostname, offer.getAttributesList());
+
     Query query;
     Predicate<TwitterTaskInfo> postFilter;
     if (!executorPulseMonitor.isAlive(executorKey)) {
@@ -385,7 +387,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
           Predicates.compose(schedulingFilter.staticFilter(Resources.from(offer), hostname),
               Tasks.SCHEDULED_TO_INFO));
       // Perform the (more expensive) check to find tasks matching the dynamic state of the machine.
-      postFilter = schedulingFilter.dynamicHostFilter(this, hostname);
+      postFilter = schedulingFilter.dynamicFilter(hostname);
     }
 
     final ImmutableSortedSet<ScheduledTask> candidates = ImmutableSortedSet.copyOf(
@@ -406,8 +408,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
       return null;
     }
 
-    Set<Integer> selectedPorts = Resources.getPorts(offer,
-        Resources.from(assignment.getAssignedTask().getTask()).getNumPorts());
+    Set<Integer> selectedPorts =
+        Resources.getPorts(offer, assignment.getAssignedTask().getTask().getRequestedPortsSize());
 
     AssignedTask task =
         stateManager.assignTask(Tasks.id(assignment), hostname, offer.getSlaveId(), selectedPorts);

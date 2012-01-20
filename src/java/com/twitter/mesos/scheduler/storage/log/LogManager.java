@@ -43,6 +43,7 @@ import com.twitter.mesos.gen.storage.FrameHeader;
 import com.twitter.mesos.gen.storage.LogEntry;
 import com.twitter.mesos.gen.storage.Op;
 import com.twitter.mesos.gen.storage.RemoveTasks;
+import com.twitter.mesos.gen.storage.SaveHostAttributes;
 import com.twitter.mesos.gen.storage.SaveTasks;
 import com.twitter.mesos.gen.storage.Snapshot;
 import com.twitter.mesos.gen.storage.Transaction;
@@ -390,7 +391,8 @@ final class LogManager {
           case REMOVE_TASKS:
             coalesce(prior.getRemoveTasks(), next.getRemoveTasks());
             return true;
-
+          case SAVE_HOST_ATTRIBUTES:
+            return coalesce(prior.getSaveHostAttributes(), next.getSaveHostAttributes());
           default:
             LOG.warning("Unoptimized op: " + priorType);
             return false;
@@ -425,6 +427,14 @@ final class LogManager {
             prior.setTaskIds(next.getTaskIds());
           }
         }
+      }
+
+      private boolean coalesce(SaveHostAttributes prior, SaveHostAttributes next) {
+        if (prior.getHostAttributes().getHost().equals(next.getHostAttributes().getHost())) {
+          prior.getHostAttributes().setAttributes(next.getHostAttributes().getAttributes());
+          return true;
+        }
+        return false;
       }
     }
   }

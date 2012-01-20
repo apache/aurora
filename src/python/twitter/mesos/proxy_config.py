@@ -12,11 +12,9 @@ from gen.twitter.mesos.ttypes import (
   Identity,
   JobConfiguration,
   LimitConstraint,
-  ListConstraint,
   TaskConstraint,
   TwitterTaskInfo,
   UpdateConfig,
-  Value,
   ValueConstraint,
 )
 
@@ -79,26 +77,11 @@ class ProxyMesosConfig(ProxyConfig):
           print '%s is not a valid limit value, must be integer' % constraint_value
           raise
       else:
+        # Strip off the leading negation if present.
         negated = constraint_value.startswith('!')
         if negated:
           constraint_value = constraint_value[1:]
-        values = constraint_value.split(',')
-        if len(values) > 1:
-          taskConstraint.listConstraint = ListConstraint()
-          taskConstraint.listConstraint.negated = negated
-          taskConstraint.listConstraint.values = values
-        else:
-          taskConstraint.valueConstraint = ValueConstraint()
-          taskConstraint.valueConstraint.negated = negated
-          value = Value()
-          try:
-            value.intValue = int(constraint_value)
-          except exceptions.ValueError:
-            try:
-              value.doubleValue = float(constraint_value)
-            except exceptions.ValueError:
-              value.stringValue = constraint_value
-          taskConstraint.valueConstraint.value = value
+        taskConstraint.value = ValueConstraint(negated, set(constraint_value.split(',')))
       constraint.constraint = taskConstraint
       result.add(constraint)
 

@@ -2,12 +2,14 @@ package com.twitter.mesos.scheduler.storage.log;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterators;
+import com.google.common.collect.Sets;
 
 import org.easymock.Capture;
 import org.easymock.EasyMock;
@@ -27,6 +29,7 @@ import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduleStatus;
@@ -51,6 +54,7 @@ import com.twitter.mesos.scheduler.log.Log;
 import com.twitter.mesos.scheduler.log.Log.Entry;
 import com.twitter.mesos.scheduler.log.Log.Position;
 import com.twitter.mesos.scheduler.log.Log.Stream;
+import com.twitter.mesos.scheduler.storage.AttributeStore;
 import com.twitter.mesos.scheduler.storage.JobStore;
 import com.twitter.mesos.scheduler.storage.QuotaStore;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
@@ -92,6 +96,7 @@ public class LogStorageTest extends EasyMockTest {
   private UpdateStore updateStore;
   private StoreProvider storeProvider;
   private QuotaStore quotaStore;
+  private AttributeStore attributeStore;
 
   @Before
   public void setUp() {
@@ -109,6 +114,7 @@ public class LogStorageTest extends EasyMockTest {
     updateStore = createMock(UpdateStore.class);
     storeProvider = createMock(StoreProvider.class);
     quotaStore = createMock(QuotaStore.class);
+    attributeStore = createMock(AttributeStore.class);
 
     logStorage =
         new LogStorage(logManager,
@@ -120,7 +126,8 @@ public class LogStorageTest extends EasyMockTest {
             jobStore,
             taskStore,
             updateStore,
-            quotaStore);
+            quotaStore,
+            attributeStore);
 
     stream = createMock(Stream.class);
   }
@@ -187,7 +194,8 @@ public class LogStorageTest extends EasyMockTest {
     // We should perform a snapshot when the snapshot thread runs.
     Capture<Runnable> snapshotAction = createCapture();
     schedulingService.doEvery(eq(SNAPSHOT_INTERVAL), capture(snapshotAction));
-    Snapshot snapshotContents = new Snapshot(NOW, ByteBuffer.wrap("snapshot".getBytes()));
+    Snapshot snapshotContents = new Snapshot(NOW,
+        ByteBuffer.wrap("snapshot".getBytes()), ImmutableSet.<HostAttributes>of());
     expect(snapshotStore.createSnapshot()).andReturn(snapshotContents);
     Position snapshotPosition = createMock(Position.class);
     LogEntry snapshot = LogEntry.snapshot(snapshotContents);

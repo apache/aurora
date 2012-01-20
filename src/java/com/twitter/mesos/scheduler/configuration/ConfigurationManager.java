@@ -3,10 +3,12 @@ package com.twitter.mesos.scheduler.configuration;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicate;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -19,11 +21,14 @@ import org.apache.commons.lang.StringUtils;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.Positive;
+import com.twitter.common.base.MorePreconditions;
 import com.twitter.mesos.Tasks;
+import com.twitter.mesos.gen.Constraint;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.LimitConstraint;
+import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.ScheduleException;
 import com.twitter.mesos.scheduler.ThermosJank;
 import com.twitter.mesos.scheduler.configuration.ValueParser.ParseException;
 
@@ -37,7 +42,10 @@ import com.twitter.mesos.scheduler.configuration.ValueParser.ParseException;
  */
 public class ConfigurationManager {
 
+  private static final Logger LOG = Logger.getLogger(ConfigurationManager.class.getName());
+
   private static final Pattern GOOD_IDENTIFIER_PATTERN = Pattern.compile("[\\w\\-\\.]+");
+  private static final String HOST_CONSTRAINT = "host";
   private static final int MAX_IDENTIFIED_LENGTH = 255;
 
   @VisibleForTesting
@@ -147,6 +155,10 @@ public class ConfigurationManager {
       throw new TaskDescriptionException("Tasks must have a shard ID.");
     }
 
+    if (!config.isSetRequestedPorts()) {
+      config.setRequestedPorts(ImmutableSet.<String>of());
+    }
+
     config.setOwner(job.getOwner());
     config.setJobName(job.getName());
 
@@ -243,64 +255,64 @@ public class ConfigurationManager {
     }
   }
 
-  private static final List<Field<?>> FIELDS = ImmutableList.of(
-      new TypedField<String>(String.class, "hdfs_path", null) {
+  private static final List<Field<?>> FIELDS = ImmutableList.<Field<?>>builder()
+      .add(new TypedField<String>(String.class, "hdfs_path", null) {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetHdfsPath(); }
 
         @Override void apply(TwitterTaskInfo task, String value) throws TaskDescriptionException {
           task.setHdfsPath(value);
         }
-      },
-      new TypedField<String>(String.class, START_COMMAND_FIELD) {
+      })
+      .add(new TypedField<String>(String.class, START_COMMAND_FIELD) {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetStartCommand(); }
 
         @Override void apply(TwitterTaskInfo task, String value) throws TaskDescriptionException {
           task.setStartCommand(value);
         }
-      },
-      new TypedField<Boolean>(Boolean.class, "daemon", false) {
+      })
+      .add(new TypedField<Boolean>(Boolean.class, "daemon", false) {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetIsDaemon(); }
 
         @Override void apply(TwitterTaskInfo task, Boolean value) throws TaskDescriptionException {
           task.setIsDaemon(value);
         }
-      },
-      new TypedField<Double>(Double.class, "num_cpus") {
+      })
+      .add(new TypedField<Double>(Double.class, "num_cpus") {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetNumCpus(); }
 
         @Override void apply(TwitterTaskInfo task, Double value) throws TaskDescriptionException {
           task.setNumCpus(value);
         }
-      },
-      new TypedField<Integer>(Integer.class, "ram_mb") {
+      })
+      .add(new TypedField<Integer>(Integer.class, "ram_mb") {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetRamMb(); }
 
         @Override void apply(TwitterTaskInfo task, Integer value) throws TaskDescriptionException {
           task.setRamMb(value);
         }
-      },
-      new TypedField<Integer>(Integer.class, "disk_mb") {
+      })
+      .add(new TypedField<Integer>(Integer.class, "disk_mb") {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetDiskMb(); }
 
         @Override void apply(TwitterTaskInfo task, Integer value) throws TaskDescriptionException {
           task.setDiskMb(value);
         }
-      },
-      new TypedField<Integer>(Integer.class, "priority", 0) {
+      })
+      .add(new TypedField<Integer>(Integer.class, "priority", 0) {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetPriority(); }
 
         @Override void apply(TwitterTaskInfo task, Integer value) throws TaskDescriptionException {
           task.setPriority(value);
         }
-      },
-      new TypedField<Boolean>(Boolean.class, "production", false) {
+      })
+      .add(new TypedField<Boolean>(Boolean.class, "production", false) {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetProduction(); }
 
         @Override void apply(TwitterTaskInfo task, Boolean value) throws TaskDescriptionException {
           task.setProduction(value);
         }
-      },
-      new TypedField<Integer>(Integer.class, "health_check_interval_secs", 30) {
+      })
+      .add(new TypedField<Integer>(Integer.class, "health_check_interval_secs", 30) {
         @Override boolean isSet(TwitterTaskInfo task) {
           return task.isSetHealthCheckIntervalSecs();
         }
@@ -308,22 +320,35 @@ public class ConfigurationManager {
         @Override void apply(TwitterTaskInfo task, Integer value) throws TaskDescriptionException {
           task.setHealthCheckIntervalSecs(value);
         }
-      },
-      new TypedField<Integer>(Integer.class, "max_task_failures", 1) {
+      })
+      .add(new TypedField<Integer>(Integer.class, "max_task_failures", 1) {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetMaxTaskFailures(); }
 
         @Override void apply(TwitterTaskInfo task, Integer value) throws TaskDescriptionException {
           task.setMaxTaskFailures(value);
         }
-      },
-      new TypedField<Integer>(Integer.class, "max_per_host", 1) {
+      })
+      .add(new TypedField<Integer>(Integer.class, "max_per_host", 1) {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetMaxPerHost(); }
 
         @Override void apply(TwitterTaskInfo task, Integer value) throws TaskDescriptionException {
           task.setMaxPerHost(value);
+          if (!task.isSetConstraints()) {
+            task.setConstraints(Sets.<Constraint>newHashSet());
+          }
+
+          Constraint hostConstraint =
+              Iterables.find(task.getConstraints(), hasName(HOST_CONSTRAINT), null);
+          if (hostConstraint == null) {
+            LOG.info("Task configuration uses deprecated max_per_host.");
+
+            // TODO(wfarner): Remove this once the mesos client is updated to supply it.
+            task.addToConstraints(new Constraint(HOST_CONSTRAINT,
+                TaskConstraint.limit(new LimitConstraint(value))));
+          }
         }
-      },
-      new Field<Set<String>>("avoid_jobs", ImmutableSet.<String>of()) {
+      })
+      .add(new Field<Set<String>>("avoid_jobs", ImmutableSet.<String>of()) {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetAvoidJobs(); }
 
         @Override Set<String> parse(String raw) throws ParseException {
@@ -334,8 +359,17 @@ public class ConfigurationManager {
             throws TaskDescriptionException {
           task.setAvoidJobs(value);
         }
+      })
+      .build();
+
+  private static Predicate<Constraint> hasName(final String name) {
+    MorePreconditions.checkNotBlank(name);
+    return new Predicate<Constraint>() {
+      @Override public boolean apply(Constraint constraint) {
+        return name.equals(constraint.getName());
       }
-  );
+    };
+  }
 
   public static void assertUnset(TwitterTaskInfo task) throws TaskDescriptionException {
     for (Field<?> field : FIELDS) {

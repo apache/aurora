@@ -25,6 +25,7 @@ import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.storage.Frame;
 import com.twitter.mesos.gen.storage.FrameChunk;
@@ -354,7 +355,8 @@ public class LogManagerTest extends EasyMockTest {
   }
 
   private Snapshot createSnapshot(String snapshotData) {
-    return new Snapshot(1L, ByteBuffer.wrap(snapshotData.getBytes()));
+    return new Snapshot(
+        1L, ByteBuffer.wrap(snapshotData.getBytes()), ImmutableSet.<HostAttributes>of());
   }
 
   private SaveTasks createSaveTasks(String... taskIds) {

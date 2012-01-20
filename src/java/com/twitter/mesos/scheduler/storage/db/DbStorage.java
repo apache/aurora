@@ -72,6 +72,7 @@ import com.twitter.mesos.gen.storage.ConfiguratonKey;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.db.DbUtil;
+import com.twitter.mesos.scheduler.storage.AttributeStore;
 import com.twitter.mesos.scheduler.storage.JobStore;
 import com.twitter.mesos.scheduler.storage.QuotaStore;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
@@ -107,6 +108,7 @@ public class DbStorage implements
   private final TransactionTemplate transactionTemplate;
   private final Temporary temporary = FileUtils.SYSTEM_TMP;
   private boolean initialized;
+  private final AttributeStore attributeStore;
 
   private final DbStorage self = this;
   private final StoreProvider storeProvider = new StoreProvider() {
@@ -125,17 +127,26 @@ public class DbStorage implements
     @Override public QuotaStore getQuotaStore() {
       return self;
     }
+    @Override public AttributeStore getAttributeStore() {
+      // When we run as a server, this will never be executed; however, if we run as a unittest,
+      // we will need to have it here because it use DBStorage instead of the LogStorage.
+      // TODO(wfarner): refactor the code and remove the attributeStore binding here.
+      return attributeStore;
+    }
   };
 
   /**
    * @param jdbcTemplate The {@code JdbcTemplate} object to execute database operation against.
    * @param transactionTemplate The {@code TransactionTemplate} object that provides transaction
    *     scope for database operations.
+   * @param attributeStore The {@code TransactionTemplate} object provides host attributes.
    */
   @Inject
-  public DbStorage(JdbcTemplate jdbcTemplate, TransactionTemplate transactionTemplate) {
+  public DbStorage(JdbcTemplate jdbcTemplate, TransactionTemplate transactionTemplate,
+      AttributeStore attributeStore) {
     this.jdbcTemplate = checkNotNull(jdbcTemplate);
     this.transactionTemplate = checkNotNull(transactionTemplate);
+    this.attributeStore = checkNotNull(attributeStore);
   }
 
   // TODO(wfarner): Remove this code once schema has been updated in all clusters.

@@ -299,6 +299,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setRamMb(1024)
         .setShardId(0)
         .setStartCommand("ls")
+        .setRequestedPorts(ImmutableSet.<String>of())
         .setAvoidJobs(ImmutableSet.<String>of());
 
     storage.doInTransaction(new NoResult.Quiet() {
@@ -1046,7 +1047,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     assertThat(assigned.task.getSlaveHost(), is(slaveHost));
     Map<String, Integer> assignedPorts = assigned.task.getAssignedPorts();
     assertThat(assignedPorts.keySet(), is(portNames));
-    assertThat(ImmutableSet.copyOf(assignedPorts.values()), is(ports));
+    assertEquals(ports, ImmutableSet.copyOf(assignedPorts.values()));
   }
 
   @Test
@@ -1804,11 +1805,11 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   @Test
   public void testPortResource() throws Exception {
     expectOffer(true);
-
     control.replay();
     buildScheduler();
 
-    TwitterTaskInfo config = productionTask("start_command", "%port:one% %port:two% %port:three%");
+    TwitterTaskInfo config = productionTask("start_command", "%port:one% %port:two% %port:three%")
+        .setRequestedPorts(ImmutableSet.of("one", "two", "three"));
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, config, 1));
 
@@ -1834,7 +1835,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    TwitterTaskInfo config = productionTask("start_command", "%port:one%");
+    TwitterTaskInfo config = productionTask("start_command", "%port:one%")
+        .setRequestedPorts(ImmutableSet.of("one"));
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, config, 1));
 
@@ -1948,8 +1950,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   private static Offer createOffer(SlaveID slave, String slaveHost, double cpu,
       double ramMb) {
-    return createOffer(slave, slaveHost, cpu, ramMb,
-        ImmutableSet.<Pair<Integer, Integer>>of());
+    return createOffer(slave, slaveHost, cpu, ramMb, ImmutableSet.<Pair<Integer, Integer>>of());
   }
 
   private static Offer createOffer(SlaveID slave, String slaveHost, double cpu,
@@ -2083,11 +2084,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         EasyMock.<String>anyObject()))
         .andReturn(passFilter ? Predicates.<TwitterTaskInfo> alwaysTrue()
             : Predicates.<TwitterTaskInfo> alwaysFalse());
-    @SuppressWarnings("unchecked")
-    Function<Query, Iterable<TwitterTaskInfo>> anyTaskFetcher =
-        (Function<Query, Iterable<TwitterTaskInfo>>) anyObject();
-    expect(schedulingFilter.dynamicHostFilter(
-        anyTaskFetcher, (String) anyObject()))
+    expect(schedulingFilter.dynamicFilter((String) anyObject()))
         .andReturn(passFilter ? Predicates.<TwitterTaskInfo> alwaysTrue()
             : Predicates.<TwitterTaskInfo> alwaysFalse());
   }

@@ -138,7 +138,7 @@ public class PreempterTest extends EasyMockTest {
     expectGetTasks().times(2);
 
     expectStaticFiltering();
-    expect(schedulingFilter.dynamicHostFilter(scheduler, HOST_A)).andReturn(dynamicHostFilter);
+    expect(schedulingFilter.dynamicFilter(HOST_A)).andReturn(dynamicHostFilter);
     expect(dynamicHostFilter.apply(highPriority.getAssignedTask().getTask())).andReturn(false);
 
     control.replay();
@@ -253,8 +253,7 @@ public class PreempterTest extends EasyMockTest {
 
   private void expectFiltering() {
     expectStaticFiltering();
-    expect(schedulingFilter.dynamicHostFilter(
-        EasyMock.<SchedulerCore>anyObject(), EasyMock.<String>anyObject()))
+    expect(schedulingFilter.dynamicFilter(EasyMock.<String>anyObject()))
         .andReturn(Predicates.<TwitterTaskInfo>alwaysTrue())
         .anyTimes();
   }

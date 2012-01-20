@@ -49,7 +49,6 @@ import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.common.zookeeper.ZooKeeperUtils;
 import com.twitter.common_internal.zookeeper.ZooKeeperModule;
-import com.twitter.conversions.thread;
 import com.twitter.mesos.ExecutorKey;
 import com.twitter.mesos.gen.MesosAdmin;
 import com.twitter.mesos.gen.TwitterTaskInfo;
@@ -59,12 +58,13 @@ import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHostsImpl;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveMapper;
 import com.twitter.mesos.scheduler.PulseMonitor.PulseMonitorImpl;
 import com.twitter.mesos.scheduler.SchedulerLifecycle.DriverReference;
-import com.twitter.mesos.scheduler.SchedulingFilter.SchedulingFilterImpl;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.auth.SessionValidator;
 import com.twitter.mesos.scheduler.auth.SessionValidator.SessionValidatorImpl;
 import com.twitter.mesos.scheduler.httphandlers.ServletModule;
 import com.twitter.mesos.scheduler.quota.QuotaModule;
+import com.twitter.mesos.scheduler.storage.AttributeStore;
+import com.twitter.mesos.scheduler.storage.AttributeStore.AttributeStoreImpl;
 import com.twitter.mesos.scheduler.storage.log.LogStorageModule;
 import com.twitter.thrift.ServiceInstance;
 
@@ -179,6 +179,7 @@ public class SchedulerModule extends AbstractModule {
     LifecycleModule.bindStartupAction(binder(), RegisterShutdownStackPrinter.class);
 
     bind(SchedulerLifecycle.class).in(Singleton.class);
+    bind(AttributeStore.class).to(AttributeStoreImpl.class);
 
     QuotaModule.bind(binder());
     PeriodicTaskModule.bind(binder());

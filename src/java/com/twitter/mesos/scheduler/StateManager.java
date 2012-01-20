@@ -1,8 +1,10 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
@@ -25,9 +27,12 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
+import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.SlaveID;
 
 import com.twitter.common.args.Arg;
@@ -41,6 +46,8 @@ import com.twitter.common.util.Clock;
 import com.twitter.common.util.StateMachine;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.Attribute;
+import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskEvent;
@@ -322,8 +329,6 @@ class StateManager {
   /**
    * Instructs the state manager to start, providing a callback that can be used to kill active
    * tasks.
-   *
-   * @param driver Driver to interact with the framework.
    */
   synchronized void start() {
     managerState.transition(State.STARTED);
@@ -491,6 +496,69 @@ class StateManager {
     return ImmutableSet.copyOf(Iterables.transform(Iterables.filter(
         updateStore.fetchShardUpdateConfigs(role, job), SELECT_SHARDS_TO_KILL),
         GET_ORIGINAL_SHARD_ID));
+  }
+
+  private static final Function<Protos.Attribute, String>
+      VALUE_CONVERTER = new Function<Protos.Attribute, String>() {
+    @Override public String apply(Protos.Attribute attribute) {
+      switch (attribute.getType()) {
+        case SCALAR:
+          return String.valueOf(attribute.getScalar().getValue());
+
+        case TEXT:
+          return attribute.getText().getValue();
+
+        default:
+          LOG.finest("Unrecognized attribute type:" + attribute.getType() + " , ignoring.");
+          return null;
+      }
+    }
+  };
+
+  private static final Function<Protos.Attribute, String> ATTRIBUTE_NAME =
+      new Function<org.apache.mesos.Protos.Attribute, String>() {
+        @Override public String apply(Protos.Attribute attr) {
+          return attr.getName();
+        }
+      };
+
+  // Typedef to make anonymous implementation more concise.
+  private static abstract class AttributeConverter
+      implements Function<Entry<String, Collection<Protos.Attribute>>, Attribute> {}
+
+  private static final AttributeConverter ATTRIBUTE_CONVERTER = new AttributeConverter() {
+    @Override public Attribute apply(Entry<String, Collection<Protos.Attribute>> entry) {
+      // Convert values and filter any that were ignored.
+      Iterable<String> values = Iterables.filter(
+          Iterables.transform(entry.getValue(), VALUE_CONVERTER), Predicates.notNull());
+
+      return new Attribute(entry.getKey(), ImmutableSet.copyOf(values));
+    }
+  };
+
+  /**
+   * Persists the attributes associated with a host.
+   *
+   * @param slaveHost Host to save attributes for.
+   * @param attributes Attributes associated with the host.
+   */
+  void saveAttributesFromOffer(final String slaveHost, List<Protos.Attribute> attributes) {
+    MorePreconditions.checkNotBlank(slaveHost);
+    Preconditions.checkNotNull(attributes);
+
+    // Group by attribute name.
+    final Multimap<String, Protos.Attribute> valuesByName =
+        Multimaps.index(attributes, ATTRIBUTE_NAME);
+
+    // Convert groups into individual attributes.
+    final Set<Attribute> attrs = Sets.newHashSet(
+        Iterables.transform(valuesByName.asMap().entrySet(), ATTRIBUTE_CONVERTER));
+
+    transactionalStorage.execute(new NoResult.Quiet() {
+      @Override protected void execute(StoreProvider storeProvider) throws RuntimeException {
+        storeProvider.getAttributeStore().saveHostAttribute(new HostAttributes(slaveHost, attrs));
+      }
+    });
   }
 
   /**
@@ -787,10 +855,9 @@ class StateManager {
         if (task.getAssignedTask().getTask().isSetThermosConfig()) {
           assigned = task.getAssignedTask();
           assigned.setAssignedPorts(CommandLineExpander.getNameMappedPorts(
-            assigned.getTask().getRequestedPorts(), assignedPorts));
+              assigned.getTask().getRequestedPorts(), assignedPorts));
         } else {
-          assigned = CommandLineExpander.expand(task.getAssignedTask(),
-              assignedPorts);
+          assigned = CommandLineExpander.expand(task.getAssignedTask(), assignedPorts);
         }
 
         task.setAssignedTask(assigned);
