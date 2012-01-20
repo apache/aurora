@@ -1,7 +1,6 @@
 package com.twitter.mesos.executor;
 
 import java.io.File;
-import java.io.IOException;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
@@ -25,7 +24,7 @@ public class TaskFactory implements Function<AssignedTask, Task> {
   private final ExceptionalFunction<Integer, Boolean, HealthCheckException> healthChecker;
   private final ExceptionalClosure<KillCommand, KillException> processKiller;
   private final ExceptionalFunction<File, Integer, FetchException> pidFetcher;
-  private final ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier;
+  private final FileCopier fileCopier;
   private final File executorRootDir;
   private final boolean multiUser;
 
@@ -34,7 +33,7 @@ public class TaskFactory implements Function<AssignedTask, Task> {
       ExceptionalFunction<Integer, Boolean, HealthCheckException> healthChecker,
       ExceptionalClosure<KillCommand, KillException> processKiller,
       ExceptionalFunction<File, Integer, FileToInt.FetchException> pidFetcher,
-      ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier,
+      FileCopier fileCopier,
       @MultiUserMode boolean multiUser) {
 
     this.executorRootDir = Preconditions.checkNotNull(executorRootDir);

@@ -39,6 +39,7 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common_internal.util.HdfsUtils;
 import com.twitter.mesos.Message;
 import com.twitter.mesos.executor.Driver.DriverImpl;
+import com.twitter.mesos.executor.FileCopier.HdfsFileCopier;
 import com.twitter.mesos.executor.FileDeleter.FileDeleterImpl;
 import com.twitter.mesos.executor.FileToInt.FetchException;
 import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
@@ -135,8 +136,8 @@ public class ExecutorModule extends AbstractModule {
     // processKiller handled in provider method.
     bind(new TypeLiteral<ExceptionalFunction<File, Integer, FetchException>>() {})
         .to(FileToInt.class);
-    bind(new TypeLiteral<ExceptionalFunction<FileCopyRequest, File, IOException>>() {})
-        .to(HdfsFileCopier.class).in(Singleton.class);
+    bind(FileCopier.class).to(HdfsFileCopier.class);
+    bind(FileCopier.HdfsFileCopier.class).in(Singleton.class);
     bind(Key.get(boolean.class, MultiUserMode.class)).toInstance(multiUserMode.get());
 
     // Bindings needed for HealthChecker.
@@ -148,7 +149,7 @@ public class ExecutorModule extends AbstractModule {
         .toInstance(new HttpSignaler(Executors.newCachedThreadPool(httpSignalThreadFactory),
             httpSignalTimeout.get()));
 
-    // Bindings needed for HdfsFileCopier
+    // Bindings needed for FileCopier
     try {
       bind(Configuration.class).toInstance(HdfsUtils.getHdfsConfiguration(hdfsConfig.get()));
     } catch (IOException e) {

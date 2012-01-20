@@ -213,10 +213,9 @@ public class LiveTaskTest {
     assertThat(Sets.newHashSet(dir.list()), is(Sets.newHashSet(children)));
   }
 
-  private static final ExceptionalFunction<FileCopyRequest, File, IOException> COPIER =
-      new ExceptionalFunction<FileCopyRequest, File, IOException>() {
-        @Override public File apply(FileCopyRequest copy) throws IOException {
-          return new File(copy.getDestPath());
-        }
-      };
+  private static final FileCopier COPIER = new FileCopier() {
+      @Override public File apply(FileCopyRequest copy) {
+        return new File(copy.getDestPath());
+      }
+  };
 }

@@ -40,6 +40,7 @@ import com.twitter.mesos.executor.ProcessKiller.KillException;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduleStatus;
 
+import static com.twitter.mesos.executor.FileCopier.FileCopyException;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
@@ -91,7 +92,7 @@ public class LiveTask extends TaskOnDisk {
 
   private volatile int exitCode = 0;
   private volatile boolean completed = false;
-  private final ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier;
+  private final FileCopier fileCopier;
   private final boolean multiUser;
 
   public LiveTask(
@@ -99,7 +100,7 @@ public class LiveTask extends TaskOnDisk {
       ExceptionalClosure<KillCommand, KillException> processKiller,
       ExceptionalFunction<File, Integer, FileToInt.FetchException> pidFetcher,
       File taskRoot, AssignedTask task,
-      ExceptionalFunction<FileCopyRequest, File, IOException> fileCopier,
+      FileCopier fileCopier,
       boolean multiUser) {
     super(taskRoot);
 
@@ -148,7 +149,7 @@ public class LiveTask extends TaskOnDisk {
       try {
         payload = fileCopier.apply(
             new FileCopyRequest(task.getTask().getHdfsPath(), sandboxDir.getAbsolutePath()));
-      } catch (IOException e) {
+      } catch (FileCopyException e) {
         throw new TaskRunException("Failed to fetch task binary from "
             + task.getTask().getHdfsPath(), e);
       }
