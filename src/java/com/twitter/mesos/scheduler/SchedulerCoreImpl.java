@@ -343,6 +343,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
         .setNumCpus(0.25)
         .setRamMb(1)
         .setShardId(0)
+        .setRequestedPorts(ImmutableSet.<String>of())
         .setStartCommand("echo \"Bootstrapping\"");
   }
 

@@ -15,7 +15,10 @@ from twitter.thermos.runner import TaskRunner
 from twitter.thermos.observer import TaskMonitor
 from twitter.thermos.config.loader import ThermosTaskWrapper
 
-from twitter.mesos.executor.sandbox_manager import SandboxManager, DirectorySandbox
+from twitter.mesos.executor.sandbox_manager import (
+  AppAppSandbox,
+  SandboxManager,
+  DirectorySandbox)
 
 app.add_option("--checkpoint_root", dest="checkpoint_root", metavar="PATH",
                default="/var/run/thermos",
@@ -41,15 +44,16 @@ class TaskRunnerWrapper(object):
   class TaskError(Exception):
     pass
 
-  def __init__(self, task_id, thermos_task, role, mesos_ports, checkpoint_root=None):
+  def __init__(self, task_id, mesos_task, role, mesos_ports, checkpoint_root=None):
     """
       :task_id       => task_id assigned by scheduler
-      :thermos_task  => twitter.thermos.config.schema.Task object
+      :mesos_task  => twitter.mesos.config.schema.MesosTaskInstance object
       :mesos_ports   => { name => port } dictionary
     """
     self._popen = None
     self._task_id = task_id
-    self._task = thermos_task
+    self._mesos_task = mesos_task
+    self._task = mesos_task.task()
     self._task_filename = TaskRunnerWrapper.dump_task(self._task)
     self._ports = mesos_ports
     self._checkpoint_root = checkpoint_root or app.get_options().checkpoint_root
@@ -83,7 +87,8 @@ class TaskRunnerWrapper(object):
     self._monitor = TaskMonitor(TaskPath(root=self._checkpoint_root), self._task_id)
 
     try:
-      self._sandbox.create(self._task)
+      log.info('Creating sandbox.')
+      self._sandbox.create(self._mesos_task)
     except Exception as e:
       log.fatal('Could not construct sandbox: %s' % e)
       raise TaskRunnerWrapper.TaskError('Could not construct sandbox: %s' % e)
@@ -104,6 +109,8 @@ class TaskRunnerWrapper(object):
       '--scribe_exception_category=thermos_runner_exceptions'])
     if self._enable_chroot:
       cmdline_args.extend(['--enable_chroot'])
+    for name, port in self._ports.items():
+      cmdline_args.extend(['--port=%s:%s' % (name, port)])
     log.info('Forking off runner with cmdline: %s' % ' '.join(cmdline_args))
     self._popen = subprocess.Popen(cmdline_args)
 
@@ -139,12 +146,12 @@ class ProductionTaskRunner(TaskRunnerWrapper):
 
   def __init__(self, task_id, *args, **kwargs):
     TaskRunnerWrapper.__init__(self, task_id, *args, **kwargs)
-    self._sandbox = SandboxManager.get(task_id)
     self._runner_pex = MirrorFile(
       ProductionTaskRunner.SVN_REPO,
       os.path.join(ProductionTaskRunner.SVN_PATH, TaskRunnerWrapper.PEX_NAME),
       os.path.join(ProductionTaskRunner.TEMPDIR, TaskRunnerWrapper.PEX_NAME),
       https=True)
+    self._sandbox = AppAppSandbox(task_id)
     self._enable_chroot = True
 
 

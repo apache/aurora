@@ -38,6 +38,8 @@ public final class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
   @Override public void applySnapshot(Snapshot snapshot) {
     Preconditions.checkNotNull(snapshot);
     binarySnapshotStore.applySnapshot(snapshot.getData());
-    hostAttributeSnapshotStore.applySnapshot(snapshot.getHostAttributes());
+    if (snapshot.isSetHostAttributes()) {
+      hostAttributeSnapshotStore.applySnapshot(snapshot.getHostAttributes());
+    }
   }
 }

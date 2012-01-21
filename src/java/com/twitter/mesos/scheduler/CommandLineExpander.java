@@ -39,6 +39,7 @@ public final class CommandLineExpander {
 
   public static Map<String, Integer> getNameMappedPorts(Set<String> portNames,
       Set<Integer> allocatedPorts) {
+    Preconditions.checkNotNull(portNames);
 
     // Expand ports.
     Map<String, Integer> ports = Maps.newHashMap();
@@ -81,8 +82,13 @@ public final class CommandLineExpander {
     commandLine = commandLine.replaceAll(TASK_ID_REGEXP, task.getTaskId());
 
     // Expand ports.
-    Map<String, Integer> ports =
-        getNameMappedPorts(immutableTask.getTask().getRequestedPorts(), allocatedPorts);
+    Set<String> requestedPorts;
+    if (immutableTask.getTask().isSetRequestedPorts()) {
+      requestedPorts = immutableTask.getTask().getRequestedPorts();
+    } else {
+      requestedPorts = ImmutableSet.<String>of();
+    }
+    Map<String, Integer> ports = getNameMappedPorts(requestedPorts, allocatedPorts);
 
     for (Map.Entry<String, Integer> portEntry : ports.entrySet()) {
       commandLine = commandLine.replaceAll(

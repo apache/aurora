@@ -1,4 +1,5 @@
 import getpass
+import json
 import os
 import pwd
 import signal
@@ -32,6 +33,7 @@ app.configure(debug=True)
 
 if 'ANGRYBIRD_HOME' in os.environ:
   RUNNER_CLASS = AngrybirdTaskRunner
+  LogOptions.set_log_dir(os.path.join(os.environ['ANGRYBIRD_HOME'], 'logs/thermos/log'))
 else:
   RUNNER_CLASS = ProductionTaskRunner
 
@@ -62,18 +64,18 @@ class ExecutorPollingThread(threading.Thread):
       log.error("Runner died but task is expectedly in KILLED state!")
       finish_state = mesos_pb.TASK_KILLED
     else:
-      log.error("Unknown task state!")
+      log.error("Unknown task state! %s" % TaskState._VALUES_TO_NAMES[state.state])
       finish_state = mesos_pb.TASK_FAILED
 
     update = mesos_pb.TaskStatus()
     update.task_id.value = self._task_id
     update.state = finish_state
     log.info('Sending terminal state update.')
-    driver.sendStatusUpdate(update)
+    self._driver.sendStatusUpdate(update)
 
     # the executor is ephemeral and we just submitted a terminal task state, so shutdown
     log.info('Stopping executor.')
-    driver.stop()
+    self._driver.stop()
 
 
 class ThermosExecutor(mesos.Executor):
@@ -82,7 +84,6 @@ class ThermosExecutor(mesos.Executor):
     self._slave_id = None
     self._task_id = None
     self._poller = None
-    mesos.Executor.__init__(self)
 
   def init(self, driver, args):
     self._log('init()')
@@ -149,7 +150,7 @@ class ThermosExecutor(mesos.Executor):
       driver.stop()
       return
 
-    self._runner = RUNNER_CLASS(self._task_id, mesos_task.task(), mesos_task.role().get(), portmap)
+    self._runner = RUNNER_CLASS(self._task_id, mesos_task, mesos_task.role().get(), portmap)
     self._runner.start()
     log.debug('Waiting for task to start.')
 
@@ -173,9 +174,10 @@ class ThermosExecutor(mesos.Executor):
     if self._runner is None:
       log.error('Got killTask but no task running!')
       return
-    if task_id != self._task_id:
+    if task_id.value != self._task_id:
       log.error('Got killTask for a different task than what we are running!')
       return
+    # TODO(wickman) This check isn't correct.
     if self._runner.state().state != TaskState.ACTIVE:
       log.error('Got killTask for task in terminal state!')
       return

@@ -53,9 +53,11 @@ class DirectorySandbox(SandboxBase):
 
   def create(self, mesos_task):
     if len(mesos_task.layout().packages().get()) > 0:
-      log.warning('DirectorySandbox got task with packages: %s' % mesos_task.layout().packages())
+      log.warning('DirectorySandbox got task with packages: %s'
+                  % mesos_task.layout().packages())
     if len(mesos_task.layout().services().get()) > 0:
-      log.warning('DirectorySandbox got task with services: %s' % mesos_task.layout().services())
+      log.warning('DirectorySandbox got task with services: %s'
+                  % mesos_task.layout().services())
     safe_mkdir(self._dir)
 
   def destroy(self):
@@ -98,14 +100,21 @@ class AppAppSandbox(SandboxBase):
 
     for package in layout().packages():
       package_name, package_version = package.name().get(), package.version().get()
-      if package_version == 'latest':
-        found_packages = appobj.package_list(package_name=package_name, repo=True, limit=1)
-      else:
-        found_packages = appobj.package_list(package_name=package_name,
-          package_revision=package_version, repo=True, limit=1)
-      if len(found_packages) != 1:
-        return SandboxBase.CreationError('Ambiguous package specification: %s' % package)
-      kw['packages'].append(found_packages[0])
+      while True:
+        if package_version == 'latest':
+          found_packages = appobj.package_list(package_name=package_name, repo=True, limit=1)
+        else:
+          found_packages = appobj.package_list(package_name=package_name,
+            package_revision=package_version, repo=True, limit=1)
+        if len(found_packages) != 1:
+          return SandboxBase.CreationError('Ambiguous package specification: %s' % package)
+        pkg = found_packages[0]
+        if pkg.package_path and not pkg.verify():
+          log.warning('Package is cached locally but appears to be corrupt, uninstalling!')
+          appobj.package_uninstall([pkg])
+        else:
+          break
+      kw['packages'].append(pkg)
 
     return kw
 
@@ -118,7 +127,11 @@ class AppAppSandbox(SandboxBase):
     if self._layout:
       raise SandboxBase.CreationError('Layout %s already exists!' % self._layout)
     kw = AppAppSandbox.layout_create_args_from_task(self._app, self._task_id, mesos_task)
-    self._layout = self._app.layout_create(**kw)
+    try:
+      self._layout, _ = self._app.layout_create(**kw)
+    except Exception as e:
+      log.fatal('Could not create layout!')
+      raise SandboxBase.CreationError('Could not create layout!  %s' % e)
     self._layouts = [self._layout]
 
   def destroy(self):

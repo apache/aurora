@@ -109,14 +109,15 @@ class MesosHelper(object):
     MesosHelper.copy_to_hadoop(user, ssh_proxy, source_path, hdfs_uri)
 
   @staticmethod
-  def get_config(jobname, config_file, new_mesos):
+  def get_config(jobname, config_file, new_mesos, is_json):
     """Returns the proxy config."""
     if new_mesos:
       assert MesosHelper.is_admin(), ("--new_mesos is currently only allowed"
                                       " for users in the mesos group.")
-
-      config = ProxyConfig.from_new_mesos(config_file)
+      config = ProxyConfig.from_new_mesos_json(config_file) if is_json \
+        else ProxyConfig.from_new_mesos(config_file)
     else:
+      assert not is_json, "--json only supported with pystachio jobs"
       config = ProxyConfig.from_mesos(config_file)
 
     config.set_job(jobname)

@@ -2,6 +2,8 @@ package com.twitter.mesos.scheduler;
 
 import java.util.Collection;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 
@@ -33,6 +35,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
  *     for a task not being scheduled.
  */
 public class SchedulingFilterImpl implements SchedulingFilter {
+
+  private static final Logger LOG = Logger.getLogger(SchedulingFilterImpl.class.getName());
 
   /**
    * {@literal @Named} binding key for the machine reservation map.
@@ -107,7 +111,12 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   private static Predicate<TwitterTaskInfo> offerSatisfiesTask(final Resources offer) {
     return new Predicate<TwitterTaskInfo>() {
       @Override public boolean apply(TwitterTaskInfo task) {
-        return offer.greaterThanOrEqual(Resources.from(task));
+        if (offer.greaterThanOrEqual(Resources.from(task))) {
+          LOG.log(Level.FINEST, "Offer " + offer.toString() + " satisfies task " + task.toString());
+          return true;
+        }
+
+        return false;
       }
     };
   }

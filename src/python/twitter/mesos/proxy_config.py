@@ -26,7 +26,12 @@ def _die(msg):
 class ProxyConfig(object):
   @staticmethod
   def from_new_mesos(filename):
-    return ProxyNewMesosConfig(filename)
+    return ProxyNewMesosConfig.load_file(filename)
+
+  @staticmethod
+  def from_new_mesos_json(filename):
+    return ProxyNewMesosConfig.load_json(filename)
+
 
   @staticmethod
   def from_mesos(filename):
@@ -58,7 +63,7 @@ class ProxyMesosConfig(ProxyConfig):
     ProxyConfig.__init__(self)
 
   def ports(self):
-    return self._mesos_config.ports()
+    return self._mesos_config.ports(self.name())
 
   @staticmethod
   def parse_constraints(constraints_dict):
@@ -143,8 +148,16 @@ class ProxyMesosConfig(ProxyConfig):
 
 
 class ProxyNewMesosConfig(ProxyConfig):
-  def __init__(self, filename):
-    self._config = MesosConfigLoader.load(filename)
+  @staticmethod
+  def load_file(filename):
+    return ProxyNewMesosConfig(MesosConfigLoader.load(filename))
+
+  @staticmethod
+  def load_json(filename):
+    return ProxyNewMesosConfig(MesosConfigLoader.load_json(filename))
+
+  def __init__(self, config):
+    self._config = config
     ProxyConfig.__init__(self)
 
   def _get_wrap_job(self, name=None):
@@ -190,7 +203,9 @@ class ProxyNewMesosConfig(ProxyConfig):
       tasks.append(taskCopy)
 
     cron_schedule = job_raw.cron_schedule().get() if job_raw.has_cron_schedule() else ''
-    cron_policy = job_raw.cron_policy().get() # TODO(vinod): Check if its a valid collision policy
+
+    cron_policy = CronCollisionPolicy._NAMES_TO_VALUES.get(job_raw.cron_policy().get(), None)
+    assert cron_policy is not None, "Invalid cron policy: %s" % job_raw.cron_policy().get()
 
     update = UpdateConfig()
     update.batchSize = job_raw.update_config().batch_size().get()

@@ -27,6 +27,7 @@ class PortAllocator(object):
       self._ports = prebound
     else:
       self._ports = {}
+    self._bindings = set()
 
   def allocate(self, name, port=None):
     """
@@ -41,9 +42,11 @@ class PortAllocator(object):
       raise ValueError('Port must be a positive integer or None.')
     if name not in self._ports:
       self._ports[name] = self._allocate_port() if port is None else port
-      allocated = True
     if port:
       assert self._ports[name] == port
+    allocated = port not in self._bindings
+    if not allocated:
+      self._bindings.add(port)
     return (allocated, self._ports[name])
 
   def _allocate_port(self):

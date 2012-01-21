@@ -64,7 +64,7 @@ class MesosCLI(cmd.Cmd):
   def do_create(self, *line):
     """create job config"""
     (jobname, config_file) = line
-    config = MesosHelper.get_config(jobname, config_file, self.options.new_mesos)
+    config = MesosHelper.get_config(jobname, config_file, self.options.new_mesos, self.options.json)
 
     resp = self.api.create_job(jobname, config, self.options.copy_app_from)
     check_and_log_response(resp)
@@ -73,7 +73,7 @@ class MesosCLI(cmd.Cmd):
   def do_inspect(self, *line):
     """inspect job config"""
     (jobname, config_file) = line
-    config = MesosHelper.get_config(jobname, config_file, self.options.new_mesos)
+    config = MesosHelper.get_config(jobname, config_file, self.options.new_mesos, self.options.json)
 
     self.api.inspect(jobname, config, self.options.copy_app_from)
 
@@ -146,7 +146,7 @@ class MesosCLI(cmd.Cmd):
   def do_update(self, *line):
     """update job config"""
     (jobname, config_file) = line
-    config = MesosHelper.get_config(jobname, config_file, self.options.new_mesos)
+    config = MesosHelper.get_config(jobname, config_file, self.options.new_mesos, self.options.json)
 
     resp = self.api.update_job(jobname, config, self.options.copy_app_from)
     check_and_log_update_response(resp)
@@ -241,6 +241,12 @@ The subcommands and their arguments are:
     default=False,
     action='store_true',
     help="Run jobs configured using the new mesos config format.")
+  app.add_option(
+    '-j',
+    '--json',
+    default=False,
+    action='store_true',
+    help="Jobs are written in json.")
 
 
 def main(args, options):

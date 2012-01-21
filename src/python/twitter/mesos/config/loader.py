@@ -5,7 +5,7 @@ import sys
 from pystachio import Ref
 from twitter.common.dirutil import safe_open
 from twitter.common.lang.compatibility import *
-from twitter.mesos.config.schema import MesosTaskInstance
+from twitter.mesos.config.schema import MesosJob, MesosTaskInstance
 from twitter.thermos.config.loader import ThermosTaskWrapper
 
 SCHEMA_PREAMBLE = """
@@ -86,6 +86,15 @@ class MesosConfigLoader(object):
     for job in job_list:
       tc._add_job(job)
 
+    return tc
+
+  @staticmethod
+  def load_json(filename):
+    tc = MesosConfigLoader()
+    with open(filename) as fp:
+        js = json.load(fp)
+
+    tc._add_job(MesosJob(js))
     return tc
 
   def __init__(self):

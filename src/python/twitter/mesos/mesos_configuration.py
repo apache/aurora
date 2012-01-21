@@ -23,7 +23,7 @@ class MesosConfiguration(object):
     self.config = self._validate(env)
 
   def ports(self, jobname):
-    return EntityParser.match_ports(self.config['task']['start_command'])
+    return EntityParser.match_ports(self.config[jobname]['task']['start_command'])
 
   def _execute(self, configFile):
     """
