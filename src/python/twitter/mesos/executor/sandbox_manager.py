@@ -107,7 +107,7 @@ class AppAppSandbox(SandboxBase):
           found_packages = appobj.package_list(package_name=package_name,
             package_revision=package_version, repo=True, limit=1)
         if len(found_packages) != 1:
-          return SandboxBase.CreationError('Ambiguous package specification: %s' % package)
+          raise SandboxBase.CreationError('Ambiguous package specification: %s' % package)
         pkg = found_packages[0]
         if pkg.package_path and not pkg.verify():
           log.warning('Package is cached locally but appears to be corrupt, uninstalling!')
