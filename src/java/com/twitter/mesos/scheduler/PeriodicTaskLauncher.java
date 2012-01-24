@@ -4,6 +4,8 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.BindingAnnotation;
@@ -11,6 +13,7 @@ import com.google.inject.Inject;
 
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Command;
+import com.twitter.common.logging.Log;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
@@ -27,6 +30,8 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * @author William Farner
  */
 public class PeriodicTaskLauncher implements Command, Runnable {
+
+  private static final Logger LOG = Logger.getLogger(PeriodicTaskLauncher.class.getName());
 
   /**
    * Binding annotation for the periodic task execution interval.
@@ -78,7 +83,15 @@ public class PeriodicTaskLauncher implements Command, Runnable {
 
   @Override
   public void run() {
-    pruneRunner.run();
-    stateManager.scanOutstandingTasks();
+    try {
+      if (stateManager.isStarted()) {
+        pruneRunner.run();
+        stateManager.scanOutstandingTasks();
+      } else {
+        LOG.fine("Skipping periodic task run since state manager is not started.");
+      }
+    } catch (RuntimeException e) {
+      LOG.log(Level.WARNING, "Periodic task failed.", e);
+    }
   }
 }

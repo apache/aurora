@@ -335,6 +335,15 @@ class StateManager {
   }
 
   /**
+   * Checks whether the state manager is currently in the STARTED state.
+   *
+   * @return {@code true} if in the STARTED state, {@code false} otherwise.
+   */
+  synchronized boolean isStarted() {
+    return managerState.getState() == State.STARTED;
+  }
+
+  /**
    * Instructs the state manager to stop, and shut down the backing storage.
    */
   synchronized void stop() {
