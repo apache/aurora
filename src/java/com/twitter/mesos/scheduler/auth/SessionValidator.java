@@ -49,7 +49,7 @@ public interface SessionValidator {
    */
   public static class SessionValidatorImpl implements SessionValidator {
 
-    private static final Amount<Long, Time> MAXIMUM_NONCE_DRIFT = Amount.of(10L, Time.SECONDS);
+    private static final Amount<Long, Time> MAXIMUM_NONCE_DRIFT = Amount.of(60L, Time.SECONDS);
 
     private final Ods ods;
     private final Clock clock;
