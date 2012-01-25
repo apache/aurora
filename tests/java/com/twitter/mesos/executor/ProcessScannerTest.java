@@ -1,11 +1,7 @@
 package com.twitter.mesos.executor;
 
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
 import org.junit.Test;
@@ -13,7 +9,6 @@ import org.junit.Test;
 import com.twitter.mesos.executor.ProcessScanner.ProcessInfo;
 
 import static junit.framework.Assert.assertEquals;
-import static junit.framework.Assert.assertSame;
 
 public class ProcessScannerTest {
 
@@ -24,8 +19,8 @@ public class ProcessScannerTest {
     // test valid input
     result = ProcessScanner.parseOutput("123 abc 100,200\n456 zxc 300");
     Set<ProcessInfo> expected = ImmutableSet.of(
-        new ProcessInfo(123, "abc", ImmutableList.of(100, 200)),
-        new ProcessInfo(456, "zxc", ImmutableList.of(300))
+        new ProcessInfo(123, "abc", ImmutableSet.of(100, 200)),
+        new ProcessInfo(456, "zxc", ImmutableSet.of(300))
     );
     assertEquals(expected, result);
 
@@ -41,15 +36,15 @@ public class ProcessScannerTest {
     // test a mesos task has multiple process
     result = ProcessScanner.parseOutput("123 abc 123\n456 abc 456");
     expected = ImmutableSet.of(
-        new ProcessInfo(123, "abc", ImmutableList.of(123)),
-        new ProcessInfo(456, "abc", ImmutableList.of(456)));
+        new ProcessInfo(123, "abc", ImmutableSet.of(123)),
+        new ProcessInfo(456, "abc", ImmutableSet.of(456)));
     assertEquals(expected, result);
 
     // test a mesos task that is not listening on any port
-    result = ProcessScanner.parseOutput("123 abc -1\n456 abc 456");
+    result = ProcessScanner.parseOutput("123 abc \n456 abc 456");
     expected = ImmutableSet.of(
-        new ProcessInfo(123, "abc", ImmutableList.<Integer>of()),
-        new ProcessInfo(456, "abc", ImmutableList.of(456)));
+        new ProcessInfo(123, "abc", ImmutableSet.<Integer>of()),
+        new ProcessInfo(456, "abc", ImmutableSet.of(456)));
     assertEquals(expected, result);
   }
 

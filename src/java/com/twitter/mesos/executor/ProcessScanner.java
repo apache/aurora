@@ -3,50 +3,55 @@ package com.twitter.mesos.executor;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.URL;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import javax.annotation.Nullable;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableList.Builder;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.io.CharStreams;
 import com.google.common.io.Closeables;
-import com.google.common.io.Resources;
 
 import org.apache.commons.lang.builder.EqualsBuilder;
 import org.apache.commons.lang.builder.HashCodeBuilder;
 
 import com.twitter.common.base.MorePreconditions;
-import com.twitter.common.inject.TimedInterceptor.Timed;
+import com.twitter.common.stats.Stats;
 
 /**
- * Process scanner to collect mesos task ids running on the machine.
- *
- * It will expect the output from given script in this format:
- * PID Mesos_TaskID, for example:
- * 20141 13196-abc.
+ * A function that invokes an external script to gather information about active processes.
  */
 public class ProcessScanner {
   private static final Logger LOG = Logger.getLogger(ProcessScanner.class.getName());
-  private static final int INVALID_PORT = -1;
+
+  private static final AtomicLong sciptRunFailures =
+      Stats.exportLong("process_scraper_run_failures");
+
   private final File processScraperScript;
 
+  /**
+   * Creates a process scanner that will invoke and parse data from the provided scraper script.
+   *
+   * When invoked, the script should return information about running mesos tasks in the following
+   * format:
+   *
+   * <pre>
+   * pid1 task_id1 port1,port2
+   * pid2 task_id2
+   * </pre>
+   *
+   * Where pids are the OS process IDs, task_ids are mesos task IDs, and ports are IP ports that
+   * the process is currently listening on.
+   *
+   * @param processScraperScript Process scraping script file.
+   */
   ProcessScanner(File processScraperScript) {
     this.processScraperScript = processScraperScript;
   }
@@ -94,18 +99,17 @@ public class ProcessScanner {
       Optional<ProcessInfo> processInfo = ProcessInfo.parseLine(line);
       if (processInfo.isPresent()) {
         builder.add(processInfo.get());
+      } else {
+        LOG.warning("Failed to parse line " + line);
       }
     }
     return builder.build();
   }
 
   /**
-   * Gather all the valid mesos process information running on the machine.
+   * Gathers information about all running mesos task processes.
    *
-   * The reason of using pid as key is that a mesos task might have multiple processes, so
-   * pid is the only unique identifier when handling the output.
-   *
-   * @return a map of pid to mesos task
+   * @return information about all processes discovered during the scan.
    */
   public Set<ProcessInfo> getRunningProcesses() {
     LOG.fine("Executing script from " + processScraperScript);
@@ -114,6 +118,7 @@ public class ProcessScanner {
       output = runShellCommand(processScraperScript.getAbsolutePath());
     } catch (CommandFailedException e) {
       LOG.log(Level.SEVERE, "Failed to fetch running processes.", e);
+      sciptRunFailures.incrementAndGet();
       return ImmutableSet.of();
     }
 
@@ -130,64 +135,82 @@ public class ProcessScanner {
     }
   }
 
-  public static class ProcessInfo {
-    private static final int NUM_COMPONENTS = 3;
+  /**
+   * Information about a single running process.
+   */
+  static class ProcessInfo {
+    private static final Splitter SPLIT_SPACE = Splitter.on(" ").omitEmptyStrings();
+    private static final Splitter SPLIT_COMMA = Splitter.on(",").omitEmptyStrings();
+
     private final int pid;
-    private final String taskID;
-    private final List<Integer> listenPorts;
+    private final String taskId;
+    private final Set<Integer> listenPorts;
 
-    private static final Predicate<Integer> REJECT_INVALID_PORT =
-        Predicates.not(Predicates.equalTo(INVALID_PORT));
-
-    private static final Function<String, Integer> STRING_TO_INT = new Function<String, Integer>() {
+    private static final Function<String, Integer> A_TO_I = new Function<String, Integer>() {
       @Override public Integer apply(String input) {
         return Integer.parseInt(input);
       }
     };
 
     private static Optional<ProcessInfo> parseLine(String line) {
-      ImmutableList<String> components =
-          ImmutableList.copyOf(Splitter.on(' ').omitEmptyStrings().split(line));
-      if (components.size() != NUM_COMPONENTS) {
+      ImmutableList<String> parts = ImmutableList.copyOf(SPLIT_SPACE.split(line));
+      if (parts.size() != 2 && parts.size() != 3) {
         return Optional.absent();
       }
-      ImmutableList<String> portStrings =
-          ImmutableList.copyOf(Splitter.on(',').omitEmptyStrings().split(components.get(2)));
+
       try {
-        return Optional.of(new ProcessInfo(Integer.parseInt(components.get(0)), components.get(1),
-            ImmutableList.copyOf(Iterables.filter(
-                Iterables.transform(portStrings, STRING_TO_INT), REJECT_INVALID_PORT))));
+        Set<Integer> listenPorts = (parts.size() == 2)
+            ? ImmutableSet.<Integer>of()
+            : ImmutableSet.copyOf(Iterables.transform(SPLIT_COMMA.split(parts.get(2)), A_TO_I));
+
+        return Optional.of(
+            new ProcessInfo(Integer.parseInt(parts.get(0)), parts.get(1), listenPorts));
       } catch (NumberFormatException e) {
         LOG.warning(String.format("Failed to parse process info line: %s.", line));
         return Optional.absent();
       }
     }
 
-    @VisibleForTesting ProcessInfo(int pid, String taskID, List<Integer> listenPorts) {
-      Preconditions.checkState(pid > 0);
+    @VisibleForTesting ProcessInfo(int pid, String taskId, Set<Integer> listenPorts) {
+      Preconditions.checkArgument(pid > 0, "pid must be greater than zero: " + pid);
       this.listenPorts = Preconditions.checkNotNull(listenPorts);
-      this.taskID = MorePreconditions.checkNotBlank(taskID);
+      this.taskId = MorePreconditions.checkNotBlank(taskId);
       this.pid = pid;
     }
 
+    /**
+     * Gets the ID of the process.
+     *
+     * @return The OS process ID (pid).
+     */
     public int getPid() {
       return pid;
     }
 
-    public String getTaskID() {
-      return taskID;
+    /**
+     * Gets the task ID of the mesos task that spawned the process.
+     *
+     * @return Mesos task ID.
+     */
+    public String getTaskId() {
+      return taskId;
     }
 
-    public List<Integer> getListenPorts() {
+    /**
+     * Gets any ports that the process is listening on.
+     *
+     * @return A possibly-empty list of ports that the process is listening on.
+     */
+    public Set<Integer> getListenPorts() {
       return listenPorts;
     }
 
-    public boolean isSetListenPorts() {
-      return !listenPorts.isEmpty();
+    @Override public String toString() {
+      return "pid=" + pid + ", task=" + taskId + ", ports=" + listenPorts;
     }
 
     @Override public int hashCode() {
-      return new HashCodeBuilder().append(pid).append(taskID).append(listenPorts).toHashCode();
+      return new HashCodeBuilder().append(pid).append(taskId).append(listenPorts).toHashCode();
     }
 
     @Override public boolean equals(Object other) {
@@ -202,7 +225,7 @@ public class ProcessScanner {
       ProcessInfo that = (ProcessInfo) other;
       return new EqualsBuilder()
           .append(pid, that.pid)
-          .append(taskID, that.taskID)
+          .append(taskId, that.taskId)
           .append(listenPorts, that.listenPorts)
           .isEquals();
     }

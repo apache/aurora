@@ -58,7 +58,8 @@ python_binary(
   name = "process_scraper",
   source = "process_scraper.py",
   dependencies = [
-    pants('src/python/twitter/common/app'),
+    pants("3rdparty/python:psutil"),
+    pants("src/python/twitter/common/app"),
     pants("src/python/twitter/common/process"),
   ]
 )

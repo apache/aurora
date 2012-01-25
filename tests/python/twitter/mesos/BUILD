@@ -17,7 +17,6 @@ python_tests(name = 'updater',
   ]
 )
 
-
 python_tests(name = 'proxy_config',
   sources = ['test_proxy_config.py'],
   dependencies = [

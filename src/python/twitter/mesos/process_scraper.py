@@ -1,65 +1,42 @@
+"""Scans running processes and prints to stdout one line per process of the form:
+
+[process id] [mesos task id] [comma-delimited list of listening ports]
+"""
+
 import os
+import psutil
 import re
 import subprocess
 from collections import defaultdict
 from twitter.common import app
 from twitter.common.process import ProcessProviderFactory
 
-app.add_option("--mesos_task_id_regex", dest = "mesos_task_id_regex", default = "/var/run/nexus/(?P<task_id>[^/]*)",
-               help = "the regular expression of getting the mesos task id from path. " +
-                      "The group name in regex has to be task_id. For example:/var/run/nexus/(?P<task_id>[^/]*)")
-app.add_option("--ignore_user_name", dest = "ignore_user_name", default = "root",
-              help = "Ignore the username, split by comma")
-
-
-def get_running_mesos_processes(mesos_task_id_regex, ignore_users):
-  task_info = {}
-  ps = ProcessProviderFactory.get()
-  ps.collect_all()
-  p = re.compile(mesos_task_id_regex)
-  for pid in ps.pids():
-    handle = ps.get_handle(pid)
-    if handle.user() in ignore_users:
-      continue
-
-    path = handle.cwd()
-    if not path:
-      continue
-
-    matches = p.search(path)
-    if not matches:
-      continue
-
-    task_id = matches.group('task_id')
-    if not task_id:
-      continue
-
-    task_info[str(pid)] = task_id
-  return task_info
-
-
-def get_open_ports():
-  port_info = defaultdict(set)
-  netstat_cmd = 'netstat -lnp --protocol=inet,inet6'
-  netstat = subprocess.Popen(netstat_cmd.split(),
-    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-  stdout, stderr = netstat.communicate()
-  for line in stdout.split('\n'):
-    components = line.split()
-    port = components[3].split(':')[-1]
-    pid = components[-1].split('/')[0]
-    port_info[pid].add(port)
-  return port_info
-
+app.add_option('--mesos_task_id_regex',
+               dest = 'mesos_task_id_regex',
+               default = '/var/run/nexus/(?P<task_id>[^/]*)',
+               help = 'the regular expression to extract the mesos task ID from a path. ' +
+                      'A capture group named "task_id" must be present in the expression. ')
+app.add_option('--ignore_user_name',
+               dest = 'ignore_user_name',
+               default = 'root',
+               help = 'Process owner user names to avoid reporting.')
 
 def main(args, opts):
-  task_info = get_running_mesos_processes(
-    opts.mesos_task_id_regex, opts.ignore_user_name.split(","))
-  port_info = get_open_ports()
+  id_matcher = re.compile(opts.mesos_task_id_regex)
+  ignore_users = opts.ignore_user_name.split(',')
 
-  for pid, task_id in task_info.items():
-    ports = ['-1'] if pid not in port_info else port_info[pid]
-    print "%s %s %s" % (pid, task_id, ','.join(ports))
+  procs = [proc for proc in psutil.process_iter() if proc.username not in ignore_users]
+
+  def get_taskid(cwd):
+    match = id_matcher.match(cwd)
+    return None if not match else match.group('task_id')
+
+  procs_with_ids = [(proc, get_taskid(proc.getcwd())) for proc in procs]
+
+  for proc_with_id in [p for p in procs_with_ids if p[1] is not None]:
+    listen_ports = [conn.local_address[1] for conn in proc_with_id[0].get_connections()
+                    if conn.status == 'LISTEN']
+    print '%s %s %s' % (proc_with_id[0].pid, proc_with_id[1], ','.join(map(str, listen_ports)))
 
 
 app.main()

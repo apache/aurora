@@ -17,12 +17,10 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.annotation.Nullable;
-
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Optional;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
@@ -106,7 +104,6 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
       Amount.of(20L, Time.SECONDS).as(Time.MILLISECONDS);
 
   private final Map<String, Task> tasks = Maps.newConcurrentMap();
-  private final Function<String, Task> idToTask = Functions.forMap(tasks);
 
   private final File executorRootDir;
 
@@ -127,11 +124,15 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
 
   private static final AtomicLong tasksReceived = Stats.exportLong("executor_tasks_received");
   private static final AtomicLong taskFailures = Stats.exportLong("executor_task_launch_failures");
+  private static final AtomicLong unrecognizedProcessesEncountered =
+      Stats.exportLong("executor_unrecognized_processes_encountered");
+  private static final AtomicLong orphansEncountered =
+      Stats.exportLong("executor_orphan_processes_encountered");
   private static final AtomicLong tasksKilled = Stats.exportLong("executor_tasks_killed");
-  private static final AtomicLong orphansCount = Stats.exportLong("executor_orphans_count");
-  private static final AtomicLong orphansKilled = Stats.exportLong("executor_orphans_killed");
-  private static final AtomicLong numUnallocatedPortsProcesses =
-      Stats.exportLong("executor_num_unallocated_ports_processes");
+  private static final AtomicLong numUnallocatedPortsProcessesEncountered =
+      Stats.exportLong("executor_unallocated_port_processes_encountered");
+  private static final AtomicLong badProcessesKilled =
+      Stats.exportLong("executor_bad_processes_killed");
   private static final AtomicLong numBadDeleteAttempts =
       Stats.exportLong("executor_bad_delete_attempts");
 
@@ -176,10 +177,9 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
    */
   void startPeriodicTasks(ShutdownRegistry shutdownRegistry) {
     new ResourceManager(this, executorRootDir, shutdownRegistry, fileDeleter).start();
-    startProcessScannerTask();
+    startProcessScanner();
     shutdownRegistry.addAction(new Command() {
-      @Override
-      public void execute() {
+      @Override public void execute() {
         LOG.info("Shutting down sync executor.");
         scheduledExecutorService.shutdownNow();
       }
@@ -254,15 +254,15 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
     return Iterables.unmodifiableIterable(tasks.values());
   }
 
+  private static final Predicate<Task> IS_RUNNING_TASK = new Predicate<Task>() {
+    @Override public boolean apply(Task task) {
+      return task.isRunning();
+    }
+  };
+
   @Override
   public Iterable<Task> getLiveTasks() {
-    return Iterables.unmodifiableIterable(Iterables.filter(tasks.values(),
-        new Predicate<Task>() {
-          @Override
-          public boolean apply(Task task) {
-            return task.isRunning();
-          }
-        }));
+    return Iterables.unmodifiableIterable(Iterables.filter(tasks.values(), IS_RUNNING_TASK));
   }
 
   @Override
@@ -389,89 +389,55 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
     }
   }
 
-  private static final Function<ProcessInfo, String> GET_TASK_ID_FUNCTION =
-      new Function<ProcessInfo, String>() {
-    @Override public String apply(ProcessInfo input) {
-      return input.getTaskID();
-    }
-  };
+  @VisibleForTesting
+  @Timed("executor_check_processes")
+  void checkProcesses(Set<ProcessInfo> runningProcesses) {
+    Predicate<ProcessInfo> shouldKill = new Predicate<ProcessInfo>() {
+      @Override public boolean apply(ProcessInfo proc) {
+        Task task = tasks.get(proc.getTaskId());
+        if (task == null) {
+          LOG.info("Unrecognized process " + proc);
+          unrecognizedProcessesEncountered.incrementAndGet();
+          return true;
+        }
 
-  private static final Predicate<Task> IS_RUNNING_TASK = new Predicate<Task>() {
-    @Override public boolean apply(@Nullable Task task) {
-      return (task != null) && task.isRunning();
-    }
-  };
+        if (!task.isRunning()) {
+          LOG.info("Found running process for non-running task: " + proc);
+          orphansEncountered.incrementAndGet();
+          return true;
+        }
 
-  private static final class UnallocatedPortsTasksFilter implements Predicate<ProcessInfo> {
-    private final Function<String, Task> idToTask;
-    private final Range<Integer> taskPortRange;
+        AssignedTask assignedTask = task.getAssignedTask();
+        Set<Integer> assignedPorts = assignedTask.isSetAssignedPorts()
+            ? ImmutableSet.copyOf(assignedTask.getAssignedPorts().values())
+            : ImmutableSet.<Integer>of();
 
-    private UnallocatedPortsTasksFilter(
-        Function<String, Task> idToTask, Range<Integer> taskPortRange) {
-      this.idToTask = idToTask;
-      this.taskPortRange = taskPortRange;
-    }
+        Iterable<Integer> unallocatedProtectedPorts=
+            Iterables.filter(Sets.difference(proc.getListenPorts(), assignedPorts), taskPortRange);
 
-    @Override
-    public boolean apply(ProcessInfo processInfo) {
-      AssignedTask assignedTask = idToTask.apply(processInfo.getTaskID()).getAssignedTask();
-      Set<Integer> assignedPorts = Sets.newHashSet();
-      Set<Integer> listenPorts = Sets.newHashSet();
-      if (assignedTask.isSetAssignedPorts()) {
-        assignedPorts.addAll(assignedTask.getAssignedPorts().values());
+        if (!Iterables.isEmpty(unallocatedProtectedPorts)) {
+          LOG.warning("Process listening on unallocated ports " + unallocatedProtectedPorts
+              + ": " + proc);
+          numUnallocatedPortsProcessesEncountered.incrementAndGet();
+        }
+
+        return false;
       }
-      if (processInfo.isSetListenPorts()) {
-        listenPorts.addAll(ImmutableList.copyOf(
-            Iterables.filter(processInfo.getListenPorts(), taskPortRange)));
-      }
-      return assignedPorts.containsAll(listenPorts);
-    }
-  }
+    };
 
-  @Timed("executor_kill_orphans")
-  private void killOrphanTasks(ExceptionalClosure<KillCommand, KillException> processKiller,
-      Set<ProcessInfo> runningProcesses) {
-    // Kill running tasks that we don't think they are running.
-    Iterable<Task> runningTasks = Iterables.transform(
-        Iterables.transform(runningProcesses, GET_TASK_ID_FUNCTION), idToTask);
-    Iterable<Task> orphanTasks = Iterables.filter(runningTasks, Predicates.not(IS_RUNNING_TASK));
+    Iterable<ProcessInfo> badProcesses =
+        ImmutableList.copyOf(Iterables.filter(runningProcesses, shouldKill));
 
-    LOG.info("Found orphan tasks: " + orphanTasks);
-    int orphansKilledCounter = 0;
-    for (Task task : orphanTasks) {
-      String taskId = task.getId();
-      int pid = Iterables.getOnlyElement(Iterables.filter(runningProcesses,
-              Predicates.compose(Predicates.equalTo(taskId), GET_TASK_ID_FUNCTION))).getPid();
-      LOG.info(String.format("Killing orphan task pid:%d task id: %s.", pid, taskId));
+    for (ProcessInfo proc : badProcesses) {
+      LOG.info("Killing process " + proc);
+
       try {
-        processKiller.execute(new KillCommand(pid));
-        orphansKilledCounter++;
+        processKiller.execute(new KillCommand(proc.getPid()));
+        badProcessesKilled.incrementAndGet();
       } catch (KillException e) {
-        LOG.warning(String.format(
-            "Failed to kill orphan task pid:%d task id: %s.", pid, taskId));
+        LOG.warning("Failed to kill process " + proc.getPid());
       }
     }
-    orphansCount.set(Iterables.size(orphanTasks));
-    orphansKilled.set(orphansKilledCounter);
-  }
-
-  @Timed("executor_check_unallocated_ports")
-  private Iterable<ProcessInfo> checkUnallocatedPorts(Set<ProcessInfo> runningProcesses) {
-    Iterable<ProcessInfo> badProcesses = Iterables.filter(runningProcesses,
-            Predicates.and(new Predicate<ProcessInfo>() {
-              @Override public boolean apply(ProcessInfo processInfo) {
-                return idToTask.apply(processInfo.getTaskID()).isRunning();
-              }
-            }, new UnallocatedPortsTasksFilter(idToTask, taskPortRange)));
-    for (ProcessInfo info : badProcesses) {
-      LOG.warning(String.format(
-          "Found task using unallocated ports! TaskID:%s, Assigned Ports:%s, ListenOnPorts:%s",
-          info.getTaskID(),
-          idToTask.apply(info.getTaskID()).getAssignedTask().getAssignedPorts(),
-          info.getListenPorts()));
-    }
-    numUnallocatedPortsProcesses.set(Iterables.size(badProcesses));
-    return badProcesses;
   }
 
   @Timed("process_scanner_get_running_processes")
@@ -479,14 +445,12 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
     return processScanner.getRunningProcesses();
   }
 
-  private void startProcessScannerTask() {
+  private void startProcessScanner() {
     int scheduleInterval = processScannerTaskScheduleInterval.as(Time.SECONDS);
     LOG.info("Scheduled process scanner task with interval(seconds):" + scheduleInterval);
     scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
       @Override public void run() {
-        Set<ProcessInfo> runningProcesses = fetchRunningProcesses();
-        killOrphanTasks(processKiller, runningProcesses);
-        checkUnallocatedPorts(runningProcesses);
+        checkProcesses(fetchRunningProcesses());
       }
     }, scheduleInterval, scheduleInterval, TimeUnit.SECONDS);
   }

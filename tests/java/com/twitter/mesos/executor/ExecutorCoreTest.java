@@ -1,12 +1,15 @@
 package com.twitter.mesos.executor;
 
 import java.io.File;
+import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Range;
 import com.google.common.collect.Ranges;
 
 import org.easymock.Capture;
@@ -20,6 +23,7 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
 import com.twitter.mesos.executor.ProcessKiller.KillException;
+import com.twitter.mesos.executor.ProcessScanner.ProcessInfo;
 import com.twitter.mesos.executor.Task.TaskRunException;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
@@ -36,7 +40,6 @@ import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.fail;
 
 /**
  * @author William Farner
@@ -48,6 +51,8 @@ public class ExecutorCoreTest extends EasyMockTest {
   private static final String JOB_A = "job-a";
 
   private static final File DEVNULL = new File("/dev/null");
+
+  private static final Range<Integer> RESERVED_PORT_RANGE = Ranges.closed(30000, 32000);
 
   private Function<AssignedTask, Task> taskFactory;
   private ExecutorService taskExecutor;
@@ -73,7 +78,7 @@ public class ExecutorCoreTest extends EasyMockTest {
         driver,
         processKiller,
         Amount.of(2, Time.MINUTES),
-        Ranges.closed(30000, 32000),
+        RESERVED_PORT_RANGE,
         fileDeleter);
   }
 
@@ -263,6 +268,108 @@ public class ExecutorCoreTest extends EasyMockTest {
     executor.adjustRetainedTasks(ImmutableSet.of(running.getTaskId(), finished.getTaskId()));
     assertNotNull(executor.getTask(finished.getTaskId()));
     assertNotNull(executor.getTask(running.getTaskId()));
+  }
+
+  @Test
+  public void testScanNoProcesses() throws Exception {
+    control.replay();
+
+    executor.checkProcesses(ImmutableSet.<ProcessInfo>of());
+  }
+
+  @Test
+  public void testScanNoBadProcesses() throws Exception {
+    AssignedTask running = setupRunningTask();
+    expect(runningTask.isRunning()).andReturn(true);
+    expect(runningTask.getAssignedTask())
+        .andReturn(new AssignedTask().setAssignedPorts(ImmutableMap.<String, Integer>of()));
+
+    control.replay();
+
+    executor.executeTask(running);
+
+    executor.checkProcesses(ImmutableSet.of(
+        new ProcessInfo(1, running.getTaskId(), ImmutableSet.<Integer>of())));
+  }
+
+  @Test
+  public void testScanUnrecognizedProcess() throws Exception {
+    processKiller.execute(new KillCommand(1));
+    processKiller.execute(new KillCommand(2));
+
+    control.replay();
+
+    executor.checkProcesses(ImmutableSet.of(
+        new ProcessInfo(1, "foo", ImmutableSet.<Integer>of()),
+        new ProcessInfo(2, "bar", ImmutableSet.of(5, 6))));
+  }
+
+  @Test
+  public void testScanNotRunningTask() throws Exception {
+    AssignedTask finished = setupKilledTask();
+    expect(runningTask.isRunning()).andReturn(false);
+
+    processKiller.execute(new KillCommand(2));
+
+    control.replay();
+
+    executor.executeTask(finished);
+
+    executor.checkProcesses(ImmutableSet.of(
+        new ProcessInfo(2, finished.getTaskId(), ImmutableSet.of(5, 6))));
+  }
+
+  @Test
+  public void testScanAllocatedReservedPort() throws Exception {
+    int allocatedPort = RESERVED_PORT_RANGE.lowerEndpoint() + 5;
+
+    AssignedTask running = setupRunningTask();
+    expect(runningTask.isRunning()).andReturn(true);
+    expect(runningTask.getAssignedTask()).andReturn(
+        new AssignedTask().setAssignedPorts(ImmutableMap.of("http", allocatedPort)));
+
+    control.replay();
+
+    executor.executeTask(running);
+
+    executor.checkProcesses(ImmutableSet.of(
+        new ProcessInfo(1, running.getTaskId(), ImmutableSet.of(allocatedPort))));
+  }
+
+  @Test
+  public void testScanUnallocatedReservedPort() throws Exception {
+    int unallocatedPort = RESERVED_PORT_RANGE.lowerEndpoint() + 5;
+
+    AssignedTask running = setupRunningTask();
+    expect(runningTask.isRunning()).andReturn(true);
+    expect(runningTask.getAssignedTask()).andReturn(
+        new AssignedTask().setAssignedPorts(ImmutableMap.<String, Integer>of()));
+
+    // Eventually we will probably kill here, but for now we only log a warning.
+
+    control.replay();
+
+    executor.executeTask(running);
+
+    executor.checkProcesses(ImmutableSet.of(
+        new ProcessInfo(1, running.getTaskId(), ImmutableSet.of(unallocatedPort))));
+  }
+
+  @Test
+  public void testScanUnallocatedUnreservedPort() throws Exception {
+    int unallocatedUnreservedPort = RESERVED_PORT_RANGE.upperEndpoint() + 5;
+
+    AssignedTask running = setupRunningTask();
+    expect(runningTask.isRunning()).andReturn(true);
+    expect(runningTask.getAssignedTask()).andReturn(
+        new AssignedTask().setAssignedPorts(ImmutableMap.<String, Integer>of()));
+
+    control.replay();
+
+    executor.executeTask(running);
+
+    executor.checkProcesses(ImmutableSet.of(
+        new ProcessInfo(1, running.getTaskId(), ImmutableSet.of(unallocatedUnreservedPort))));
   }
 
   private static AssignedTask makeTask(Identity owner, String jobName) {
