@@ -395,7 +395,7 @@ public class ConfigurationManager {
         field.parseAndApply(task, rawValue);
       }
     }
-
+    maybeFillThermosConfig(task);
     return task;
   }
 
@@ -405,7 +405,15 @@ public class ConfigurationManager {
         field.applyDefault(task);
       }
     }
+    maybeFillThermosConfig(task);
     return task;
+  }
+
+  private static void maybeFillThermosConfig(TwitterTaskInfo task) {
+    if (!task.isSetThermosConfig()) {
+      // Workaround for thrift 0.5.0 NPE.  See MESOS-370.
+      task.setThermosConfig(new byte[] {});
+    }
   }
 
   public static class TaskDescriptionException extends Exception {

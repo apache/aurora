@@ -293,6 +293,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setJobName(JOB_A)
         .setNumCpus(1.0)
         .setRamMb(1024)
+        .setDiskMb(500)
         .setShardId(0)
         .setStartCommand("ls")
         .setRequestedPorts(ImmutableSet.<String>of())
@@ -314,9 +315,10 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     Offer offer = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
     TwitterTask launchedTask = scheduler.offer(offer, EXECUTOR_ID);
 
-    // Since task fields are backfilled with defaults, the production flag should be filled.
+    // Since task fields are backfilled with defaults, the production flag and thermos config
+    // should be filled.
     assertThat(launchedTask.task.getTask(),
-        is(new TwitterTaskInfo(storedTask).setProduction(false)));
+        is(new TwitterTaskInfo(storedTask).setProduction(false).setThermosConfig(new byte[] {})));
 
     assertThat(getTask(storedTaskId).getStatus(), is(ASSIGNED));
   }

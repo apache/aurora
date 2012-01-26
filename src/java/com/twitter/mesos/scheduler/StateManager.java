@@ -861,7 +861,10 @@ class StateManager {
     final Closure<ScheduledTask> mutation = new Closure<ScheduledTask>() {
       @Override public void execute(ScheduledTask task) {
         AssignedTask assigned;
-        if (task.getAssignedTask().getTask().isSetThermosConfig()) {
+        TwitterTaskInfo info = task.getAssignedTask().getTask();
+        // Length check is an artifact of thrift 0.5.0 NPE workaround from ConfigurationManager.
+        // See MESOS-370.
+        if (info.isSetThermosConfig() && (info.getThermosConfig().length > 0)) {
           assigned = task.getAssignedTask();
           assigned.setAssignedPorts(CommandLineExpander.getNameMappedPorts(
               assigned.getTask().getRequestedPorts(), assignedPorts));

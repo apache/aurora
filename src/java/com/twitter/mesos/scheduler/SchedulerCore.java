@@ -273,7 +273,9 @@ public interface SchedulerCore extends Function<Query, Iterable<TwitterTaskInfo>
     }
 
     public boolean isThermosTask() {
-      return task.getTask().isSetThermosConfig();
+      // Length check is an artifact of thrift 0.5.0 NPE workaround from ConfigurationManager.
+      // See MESOS-370.
+      return task.getTask().isSetThermosConfig() && (task.getTask().getThermosConfig().length > 0);
     }
   }
 }
