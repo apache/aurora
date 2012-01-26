@@ -40,7 +40,14 @@ def main(args, opts):
     match = id_matcher.match(cwd)
     return None if not match else match.group('task_id')
 
-  procs_with_ids = [(proc, get_taskid(proc.getcwd())) for proc in procs]
+  procs_with_ids = []
+  for proc in procs:
+    try:
+      procs_with_ids.append((proc, get_taskid(proc.getcwd())))
+    except psutil.error.NoSuchProcess:
+      # This can occur if the process terminated while the scan was in progress,
+      # or if the process is defunct.
+      pass
 
   for proc_with_id in [p for p in procs_with_ids if p[1] is not None]:
     listen_ports = [conn.local_address[1] for conn in proc_with_id[0].get_connections()
