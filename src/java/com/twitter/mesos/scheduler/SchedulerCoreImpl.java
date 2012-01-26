@@ -1,7 +1,6 @@
 package com.twitter.mesos.scheduler;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -36,11 +35,8 @@ import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
-import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
-import com.twitter.mesos.gen.comm.StateUpdateResponse;
-import com.twitter.mesos.gen.comm.TaskStateUpdate;
 import com.twitter.mesos.scheduler.StateManager.StateChanger;
 import com.twitter.mesos.scheduler.StateManager.StateMutation;
 import com.twitter.mesos.scheduler.StateManager.UpdateException;
@@ -184,72 +180,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
     return !getTasks(Query.activeQuery(job)).isEmpty();
   }
 
-  @Override
-  public void stateUpdate(final ExecutorKey executor, final StateUpdateResponse update) {
-    checkStarted();
-    checkNotNull(executor);
-    checkNotNull(update);
-
-    executorPulseMonitor.pulse(executor);
-    vars.taskUpdates.incrementAndGet();
-
-    final Map<String, TaskStateUpdate> remoteUpdate = update.getState();
-    if (update.isIncrementalUpdate()) {
-      vars.incrementalTaskUpdates.incrementAndGet();
-
-      if (update.getState().isEmpty()) {
-        return;
-      }
-
-      // TODO(wfarner): If the number of queries made here becomes large, a slight improvement
-      //     would be to group task IDs by update state.
-      stateManager.taskOperation(new StateMutation.Quiet() {
-        @Override public void execute(Set<ScheduledTask> tasks, StateChanger changer) {
-          for (Map.Entry<String, TaskStateUpdate> entry : remoteUpdate.entrySet()) {
-            ScheduleStatus remoteStatus = entry.getValue().isDeleted()
-                ? ScheduleStatus.UNKNOWN : entry.getValue().getStatus();
-            changer.changeState(ImmutableSet.of(entry.getKey()), remoteStatus);
-          }
-        }
-      });
-    } else {
-      vars.fullTaskUpdates.incrementAndGet();
-
-      // TODO(William Farner): Have the scheduler only retain configurations for live jobs,
-      //    and acquire all other state from slaves.
-      //    This will allow the scheduler to only persist active tasks.
-
-      stateManager.taskOperation(new StateMutation.Quiet() {
-        @Override public void execute(Set<ScheduledTask> tasks, StateChanger changer) {
-          // Look for any tasks that we don't know about, or this slave should not be modifying.
-          Set<String> tasksForHost = stateManager.fetchTaskIds(
-              new Query(new TaskQuery().setSlaveHost(executor.hostname)));
-
-          Set<String> tasksForOtherHosts = stateManager.fetchTaskIds(
-              new Query(new TaskQuery().setTaskIds(remoteUpdate.keySet()),
-                  new Predicate<ScheduledTask>() {
-                    @Override public boolean apply(ScheduledTask task) {
-                      return !executor.hostname.equals(task.getAssignedTask().getSlaveHost());
-                    }
-                  })
-          );
-          if (!tasksForOtherHosts.isEmpty()) {
-            LOG.log(Level.SEVERE, "Slave " + executor
-                + " sent an update for task(s) not assigned to it: " + update);
-          }
-
-          // We will only take action on tasks that we believe to be running on the host, or tasks
-          // that were reported by the slave so long as they are not allocated to a different slave.
-          Set<String> tasksToActOn = Sets.union(tasksForHost,
-              Sets.difference(remoteUpdate.keySet(), tasksForOtherHosts));
-          for (String taskId : tasksToActOn) {
-            TaskStateUpdate update = remoteUpdate.get(taskId);
-            changer.changeState(ImmutableSet.of(taskId),
-                update == null ? ScheduleStatus.UNKNOWN : update.getStatus());
-          }
-        }
-      });
-    }
+  public synchronized void tasksDeleted(Set<String> taskIds) {
+    setTaskStatus(Query.byId(taskIds), ScheduleStatus.UNKNOWN, null);
   }
 
   @Override
@@ -638,12 +570,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
   private final class Vars {
     final AtomicLong resourceOffers = Stats.exportLong("scheduler_resource_offers");
     final AtomicLong executorBootstraps = Stats.exportLong("executor_bootstraps");
-    final AtomicLong taskUpdates =
-        Stats.exportLong("executor_task_updates_total");
-    final AtomicLong incrementalTaskUpdates =
-        Stats.exportLong("executor_task_updates_incremental");
-    final AtomicLong fullTaskUpdates =
-        Stats.exportLong("executor_task_updates_full");
   }
   private final Vars vars = new Vars();
 }

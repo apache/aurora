@@ -149,10 +149,6 @@ public class MesosExecutorImpl implements Executor {
           shutdown(driver);
           break;
 
-        case STATE_UPDATE_REQUEST:
-          LOG.warning("Received deprecated state update request, ignoring.");
-          break;
-
         case ADJUST_RETAINED_TASKS:
           AdjustRetainedTasks adjustment = executorMsg.getAdjustRetainedTasks();
           if (adjustment == null) {

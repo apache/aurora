@@ -42,9 +42,7 @@ import com.twitter.mesos.ExecutorKey;
 import com.twitter.mesos.StateTranslator;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.ScheduleStatus;
-import com.twitter.mesos.gen.comm.RegisteredTaskUpdate;
 import com.twitter.mesos.gen.comm.SchedulerMessage;
-import com.twitter.mesos.gen.comm.StateUpdateResponse;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -252,29 +250,13 @@ public class MesosSchedulerImpl implements Scheduler {
       }
 
       switch (schedulerMsg.getSetField()) {
-        case TASK_UPDATE:
-          RegisteredTaskUpdate update = schedulerMsg.getTaskUpdate();
-          LOG.info("Ignoring registered task from " + update.getSlaveHost());
-          break;
-
-        case EXECUTOR_STATUS:
-          LOG.info("Received deprecated executor status message, ignoring.");
-          break;
-
-        case STATE_UPDATE_RESPONSE:
-          StateUpdateResponse stateUpdate = schedulerMsg.getStateUpdateResponse();
-          ExecutorKey executorKey = new ExecutorKey(executor, stateUpdate.getSlaveHost());
-          LOG.info("Applying state update " + stateUpdate);
-          try {
-            schedulerCore.stateUpdate(executorKey, stateUpdate);
-          } catch (SchedulerException e) {
-            LOG.log(Level.WARNING, "Failed to process a state update response: " + stateUpdate, e);
-            vars.failedExecutorStatusUpdates.incrementAndGet();
-          }
+        case DELETED_TASKS:
+          schedulerCore.tasksDeleted(schedulerMsg.getDeletedTasks().getTaskIds());
           break;
 
         default:
-        LOG.warning("Received unhandled scheduler message type: " + schedulerMsg.getSetField());
+          LOG.warning("Received unhandled scheduler message type: " + schedulerMsg.getSetField());
+          break;
       }
     } catch (ThriftBinaryCodec.CodingException e) {
       LOG.log(Level.SEVERE, "Failed to decode framework message.", e);

@@ -31,11 +31,11 @@ import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.Resource;
+import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.Value.Range;
 import org.apache.mesos.Protos.Value.Ranges;
 import org.apache.mesos.Protos.Value.Scalar;
 import org.apache.mesos.Protos.Value.Type;
-import org.apache.mesos.Protos.SlaveID;
 import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
@@ -58,8 +58,6 @@ import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
-import com.twitter.mesos.gen.comm.StateUpdateResponse;
-import com.twitter.mesos.gen.comm.TaskStateUpdate;
 import com.twitter.mesos.scheduler.SchedulerCore.RestartException;
 import com.twitter.mesos.scheduler.SchedulerCore.TwitterTask;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
@@ -126,8 +124,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private static final String SLAVE_HOST_2 = "SlaveHost2";
   private static final ExecutorKey SLAVE_HOST_1_KEY =
       new ExecutorKey(EXECUTOR_ID, SLAVE_HOST_1);
-  private static final ExecutorKey SLAVE_HOST_2_KEY =
-      new ExecutorKey(EXECUTOR_ID, SLAVE_HOST_2);
 
   private static final OfferID OFFER_ID = OfferID.newBuilder().setValue("OfferId").build();
 
@@ -1073,10 +1069,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   }
 
   @Test
-  public void testSlaveAdjustsSchedulerScheduledTask() throws Exception {
+  public void testSlaveDeletesTasks() throws Exception {
     expectOffer(true);
     expectOffer(true);
-    executorPulseMonitor.pulse(SLAVE_HOST_1_KEY);
 
     control.replay();
     buildScheduler();
@@ -1093,188 +1088,18 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     changeStatus(taskId1, STARTING);
     changeStatus(taskId1, RUNNING);
     changeStatus(taskId2, STARTING);
-    changeStatus(taskId2, RUNNING);
+    changeStatus(taskId2, FINISHED);
 
-    // Simulate state update from the executor telling the scheduler that the task is dead.
-    // This can happen if the entire cluster goes down - the scheduler has persisted state
-    // listing the task as running, and the executor reads the task state in and marks it as KILLED.
-    scheduler.stateUpdate(SLAVE_HOST_1_KEY,
-        new StateUpdateResponse().setIncrementalUpdate(false)
-            .setExecutorUUID("foo")
-            .setState(ImmutableMap.of(
-                taskId1, new TaskStateUpdate().setStatus(ScheduleStatus.LOST),
-                taskId2, new TaskStateUpdate().setStatus(ScheduleStatus.FINISHED))));
+    scheduler.tasksDeleted(ImmutableSet.of(taskId1, taskId2));
 
-    // The expected outcome is that one task is rescheduled, and the old task is moved into the
-    // LOST state. The FINISHED task's state is updated on the scheduler.
-    assertTaskCount(3);
+    // The expected outcome is that one task is moved into the LOST state and rescheduled.
+    // The FINISHED task's state is deleted.
+    assertTaskCount(2);
     assertThat(getOnlyTask(Query.byId(taskId1)).getStatus(), is(LOST));
-    assertThat(getOnlyTask(Query.byId(taskId2)).getStatus(), is(FINISHED));
+    assertThat(getTasks(Query.byId(taskId2)).size(), is(0));
 
     ScheduledTask rescheduled = Iterables.getOnlyElement(getTasksByStatus(PENDING));
     assertThat(rescheduled.getAncestorId(), is(taskId1));
-  }
-
-  @Test
-  public void testSlaveCannotModifyTasksForOtherSlave() throws Exception {
-    expectOffer(true);
-    expectOffer(true);
-    executorPulseMonitor.pulse(SLAVE_HOST_2_KEY);
-
-    control.replay();
-    buildScheduler();
-
-    Offer offer1 = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
-    Offer offer2 = createOffer(SLAVE_ID, SLAVE_HOST_2, 4, 4096);
-
-    // Offer resources for the scheduler to accept.
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, 1));
-    String taskIdA = Tasks.id(Iterables.get(getTasksOwnedBy(OWNER_A), 0));
-    sendOffer(offer1, taskIdA, SLAVE_ID, SLAVE_HOST_1);
-
-    scheduler.createJob(makeJob(OWNER_B, JOB_B, 1));
-    String taskIdB = Tasks.id(Iterables.get(getTasksOwnedBy(OWNER_B), 0));
-    sendOffer(offer2, taskIdB, SLAVE_ID, SLAVE_HOST_2);
-
-    changeStatus(taskIdA, STARTING);
-    changeStatus(taskIdA, RUNNING);
-    changeStatus(taskIdB, STARTING);
-    changeStatus(taskIdB, RUNNING);
-
-    assertThat(getTask(taskIdA).getAssignedTask().getSlaveHost(), is(SLAVE_HOST_1));
-
-    scheduler.stateUpdate(SLAVE_HOST_2_KEY,
-        new StateUpdateResponse().setIncrementalUpdate(false)
-            .setExecutorUUID("foo")
-            .setState(ImmutableMap.of(
-                taskIdA, new TaskStateUpdate().setStatus(FAILED),
-                taskIdB, new TaskStateUpdate().setStatus(RUNNING))));
-
-    assertThat(getTasksByStatus(RUNNING).size(), is(2));
-    assertTaskCount(2);
-  }
-
-  @Test
-  public void testSlaveStopsReportingRunningTask() throws Exception {
-    expectOffer(true);
-    expectOffer(true);
-    expectOffer(true);
-    expectOffer(true);
-    executorPulseMonitor.pulse(SLAVE_HOST_1_KEY);
-    executorPulseMonitor.pulse(SLAVE_HOST_2_KEY);
-
-    control.replay();
-    buildScheduler();
-
-    Offer offer1 = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
-    Offer offer2 = createOffer(SLAVE_ID, SLAVE_HOST_2, 4, 4096);
-
-    // Offer resources for the scheduler to accept.
-    TwitterTaskInfo daemonTask = productionTask("daemon", "true");
-
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, daemonTask, 2));
-    String taskIdA = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)));
-    String taskIdB = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 1)));
-    sendOffer(offer1, taskIdA, SLAVE_ID, SLAVE_HOST_1);
-    sendOffer(offer1, taskIdB, SLAVE_ID, SLAVE_HOST_1);
-
-    scheduler.createJob(makeJob(OWNER_B, JOB_B, 2));
-    String taskIdC = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_B, JOB_B), 0)));
-    String taskIdD = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_B, JOB_B), 1)));
-    sendOffer(offer2, taskIdC, SLAVE_ID, SLAVE_HOST_2);
-    sendOffer(offer2, taskIdD, SLAVE_ID, SLAVE_HOST_2);
-
-    changeStatus(taskIdA, STARTING);
-    changeStatus(taskIdA, RUNNING);
-    changeStatus(taskIdB, STARTING);
-    changeStatus(taskIdB, FINISHED);
-    assertThat(getTasks(new Query(new TaskQuery().setOwner(OWNER_A).setJobName(JOB_A)
-            .setStatuses(EnumSet.of(PENDING)))).size(),
-        is(1));
-
-    changeStatus(taskIdC, STARTING);
-    changeStatus(taskIdC, RUNNING);
-    changeStatus(taskIdD, FAILED);
-
-    Function<ScheduledTask, String> getAncestorId = new Function<ScheduledTask, String>() {
-      @Override public String apply(ScheduledTask state) { return state.getAncestorId(); }
-    };
-
-    // Since job A is a daemon, its missing RUNNING task should be rescheduled.
-    scheduler.stateUpdate(SLAVE_HOST_1_KEY,
-        new StateUpdateResponse().setIncrementalUpdate(false)
-            .setExecutorUUID("foo")
-            .setState(ImmutableMap.<String, TaskStateUpdate>of()));
-    Set<ScheduledTask> rescheduledTasks = getTasks(new Query(new TaskQuery()
-        .setOwner(OWNER_A).setJobName(JOB_A).setStatuses(EnumSet.of(PENDING))));
-    assertThat(rescheduledTasks.size(), is(2));
-    Set<String> rescheduledTaskAncestors = Sets.newHashSet(Iterables.transform(rescheduledTasks,
-        getAncestorId));
-    assertThat(rescheduledTaskAncestors, is((Set<String>) Sets.newHashSet(taskIdA, taskIdB)));
-
-    // Send an update from host 2 that does not include the FAILED task.
-    scheduler.stateUpdate(SLAVE_HOST_2_KEY,
-        new StateUpdateResponse().setIncrementalUpdate(false)
-            .setExecutorUUID("foo")
-            .setState(ImmutableMap.<String, TaskStateUpdate>of()));
-    rescheduledTasks = getTasks(new Query(new TaskQuery()
-        .setOwner(OWNER_B).setJobName(JOB_B).setStatuses(EnumSet.of(PENDING))));
-    assertThat(rescheduledTasks.size(), is(1));
-    rescheduledTaskAncestors = Sets.newHashSet(Iterables.transform(rescheduledTasks,
-        getAncestorId));
-    assertThat(rescheduledTaskAncestors, is((Set<String>) Sets.newHashSet(taskIdC)));
-    assertThat(Iterables.isEmpty(getTasks(taskIdD)), is(true));
-  }
-
-  @Test
-  public void testIncrementalStateUpdates() throws Exception {
-    expectOffer(true);
-    expectOffer(true);
-    expectKillTask(1);  // Rogue task gets killed.
-    executorPulseMonitor.pulse(SLAVE_HOST_1_KEY);
-    executorPulseMonitor.pulse(SLAVE_HOST_2_KEY);
-    expectLastCall().times(2);
-
-    control.replay();
-    buildScheduler();
-
-    Offer offer1 = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
-    Offer offer2 = createOffer(SLAVE_ID, SLAVE_HOST_2, 4, 4096);
-
-    // Offer resources for the scheduler to accept.
-    TwitterTaskInfo daemonTask = productionTask("daemon", "true");
-
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, daemonTask, 1));
-    String taskIdA = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)));
-    sendOffer(offer1, taskIdA, SLAVE_ID, SLAVE_HOST_1);
-
-    scheduler.createJob(makeJob(OWNER_B, JOB_B, 1));
-    String taskIdB = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_B, JOB_B), 0)));
-    sendOffer(offer2, taskIdB, SLAVE_ID, SLAVE_HOST_2);
-
-    changeStatus(taskIdA, STARTING);
-
-    scheduler.stateUpdate(SLAVE_HOST_1_KEY,
-        new StateUpdateResponse().setIncrementalUpdate(true)
-            .setExecutorUUID("foo")
-            .setState(ImmutableMap.of(
-                taskIdA, new TaskStateUpdate().setStatus(RUNNING),
-                "rogue_task", new TaskStateUpdate().setStatus(RUNNING))));
-    assertThat(getTask(taskIdA).getStatus(), is(RUNNING));
-
-    scheduler.stateUpdate(SLAVE_HOST_2_KEY,
-        new StateUpdateResponse().setIncrementalUpdate(true)
-            .setExecutorUUID("foo")
-            .setState(ImmutableMap.of(taskIdB, new TaskStateUpdate().setStatus(STARTING))));
-    assertThat(getTask(taskIdB).getStatus(), is(STARTING));
-
-    scheduler.stateUpdate(SLAVE_HOST_2_KEY,
-        new StateUpdateResponse().setIncrementalUpdate(true)
-            .setExecutorUUID("foo")
-            .setState(ImmutableMap.of(taskIdB, new TaskStateUpdate().setDeleted(true))));
-    assertThat(getTask(taskIdB).getStatus(), is(LOST));
-    // Lost task should be restarted.
-    assertThat(getTasks(Query.activeQuery(Tasks.jobKey(OWNER_B, JOB_B))).size(), is(1));
   }
 
   @Test

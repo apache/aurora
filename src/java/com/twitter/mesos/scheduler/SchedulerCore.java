@@ -14,14 +14,12 @@ import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.Resource;
 
-import com.twitter.mesos.ExecutorKey;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
-import com.twitter.mesos.gen.comm.StateUpdateResponse;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -41,7 +39,7 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
  * <li>[construct]
  * <li>{@link #prepare()}
  * <li>{@link #initialize()}
- * <li>{@link #start(Driver)}
+ * <li>{@link #start()}
  * <li>serve clients via other methods (normal usage)
  * <li>{@link #stop()}
  * </ol>
@@ -219,12 +217,11 @@ public interface SchedulerCore extends Function<Query, Iterable<TwitterTaskInfo>
   void restartTasks(Set<String> taskIds) throws RestartException;
 
   /**
-   * Updates the scheduler to reflect an executor's state.
+   * Indicates to the scheduler that tasks were deleted on the assigned host.
    *
-   * @param executor Executor providing the state update.
-   * @param update Update to apply.
+   * @param taskIds IDs of tasks that were deleted.
    */
-  void stateUpdate(ExecutorKey executor, StateUpdateResponse update);
+  void tasksDeleted(Set<String> taskIds);
 
   /**
    * Should be called to allow the scheduler to gracefully shut down.
