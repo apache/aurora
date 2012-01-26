@@ -25,7 +25,16 @@ def main(args, opts):
   id_matcher = re.compile(opts.mesos_task_id_regex)
   ignore_users = opts.ignore_user_name.split(',')
 
-  procs = [proc for proc in psutil.process_iter() if proc.username not in ignore_users]
+  procs = []
+  for proc in psutil.process_iter():
+    try:
+      if proc.username not in ignore_users:
+        procs.append(proc)
+    except KeyError as e:
+      # This can be caused if the process UID has no mapped username on the system.
+      # We will add the process anyways in this case, since ignored user names need
+      # to be mapped to work.
+      procs.append(proc)
 
   def get_taskid(cwd):
     match = id_matcher.match(cwd)
