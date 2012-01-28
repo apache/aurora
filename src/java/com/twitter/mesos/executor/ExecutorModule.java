@@ -63,32 +63,29 @@ public class ExecutorModule extends AbstractModule {
   @NotNull
   @Exists
   @CmdLine(name = "task_root_dir", help = "Mesos task working directory root.")
-  private static final Arg<File> taskRootDir = Arg.create();
+  private static final Arg<File> TASK_ROOT_DIR = Arg.create();
 
   @CmdLine(name = "multi_user", help = "True to execute tasks as the job owner")
-  private static final Arg<Boolean> multiUserMode = Arg.create(true);
+  private static final Arg<Boolean> MULTI_USER_MODE = Arg.create(true);
 
   @NotNull
   @CmdLine(name = "hdfs_config", help = "Hadoop configuration path")
-  private static final Arg<String> hdfsConfig = Arg.create();
+  private static final Arg<String> HDFS_CONFIG = Arg.create();
 
   @CmdLine(name = "http_signal_timeout", help = "Timeout for HTTP signals to tasks.")
-  private static final Arg<Amount<Long, Time>> httpSignalTimeout =
+  private static final Arg<Amount<Long, Time>> HTTP_SIGNAL_TIMEOUT =
       Arg.create(Amount.of(1L, Time.SECONDS));
 
   @Exists
   @CanRead
   @CmdLine(name = "kill_tree_path", help = "Path to kill tree shell script")
-  private static final Arg<File> killTreePath =
-      Arg.create(new File("/usr/local/mesos/bin/killtree.sh"));
+  private static final Arg<File> KILLTREE_PATH =
+      Arg.create(new File("/usr/local/libexec/mesos/killtree.sh"));
 
   @CmdLine(name = "kill_escalation_delay_ms",
       help = "Time to wait before escalating between task kill procedures.")
-  private static final Arg<Amount<Long, Time>> killEscalationDelay =
+  private static final Arg<Amount<Long, Time>> KILL_ESCALATION_DELAY =
       Arg.create(Amount.of(5L, Time.SECONDS));
-
-  @CmdLine(name = "state_sync_buffer_limit", help = "Maximum number of state changes to buffer.")
-  private static final Arg<Integer> STATE_SYNC_BUFFER_LIMIT = Arg.create(10000);
 
   @CmdLine(name = "process_scanner_task_schedule_interval",
       help = "the schedule interval of executing process scanner task, use to check tasks" +
@@ -104,7 +101,7 @@ public class ExecutorModule extends AbstractModule {
   protected void configure() {
 
     // Bindings needed for ExecutorMain.
-    bind(File.class).annotatedWith(ExecutorRootDir.class).toInstance(taskRootDir.get());
+    bind(File.class).annotatedWith(ExecutorRootDir.class).toInstance(TASK_ROOT_DIR.get());
     bind(Executor.class).to(MesosExecutorImpl.class).in(Singleton.class);
     bind(ExecutorCore.class).in(Singleton.class);
     bind(new TypeLiteral<Supplier<Iterable<Task>>>() {})
@@ -138,7 +135,7 @@ public class ExecutorModule extends AbstractModule {
         .to(FileToInt.class);
     bind(FileCopier.class).to(HdfsFileCopier.class);
     bind(FileCopier.HdfsFileCopier.class).in(Singleton.class);
-    bind(Key.get(boolean.class, MultiUserMode.class)).toInstance(multiUserMode.get());
+    bind(Key.get(boolean.class, MultiUserMode.class)).toInstance(MULTI_USER_MODE.get());
 
     // Bindings needed for HealthChecker.
     ThreadFactory httpSignalThreadFactory = new ThreadFactoryBuilder()
@@ -147,11 +144,11 @@ public class ExecutorModule extends AbstractModule {
         .build();
     bind(new TypeLiteral<ExceptionalFunction<String, List<String>, SignalException>>() {})
         .toInstance(new HttpSignaler(Executors.newCachedThreadPool(httpSignalThreadFactory),
-            httpSignalTimeout.get()));
+            HTTP_SIGNAL_TIMEOUT.get()));
 
     // Bindings needed for FileCopier
     try {
-      bind(Configuration.class).toInstance(HdfsUtils.getHdfsConfiguration(hdfsConfig.get()));
+      bind(Configuration.class).toInstance(HdfsUtils.getHdfsConfiguration(HDFS_CONFIG.get()));
     } catch (IOException e) {
       LOG.log(Level.SEVERE, "Failed to create HDFS fileSystem.", e);
       Throwables.propagate(e);
@@ -168,6 +165,6 @@ public class ExecutorModule extends AbstractModule {
   public ExceptionalClosure<KillCommand, KillException> provideProcessKiller(
       ExceptionalFunction<String, List<String>, SignalException> httpSignaler) throws IOException {
 
-    return new ProcessKiller(httpSignaler, killTreePath.get(), killEscalationDelay.get());
+    return new ProcessKiller(httpSignaler, KILLTREE_PATH.get(), KILL_ESCALATION_DELAY.get());
   }
 }
