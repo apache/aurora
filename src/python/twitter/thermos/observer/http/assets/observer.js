@@ -1,16 +1,16 @@
 var Task = new Class({
    data: {},
 
-   initialize: function(uid, taskType) {
+   initialize: function(taskId, taskType) {
      this.taskType = taskType
-     this.uid      = uid
+     this.taskId  = taskId
      this.visible  = false
      this.setElement()
    },
 
-   // task[active.uid.processes.waiting]
+   // task[active.task_id.processes.waiting]
    taskStr: function(components) {
-     return 'task[' + ([this.taskType, this.uid].append(components).join()) + ']'
+     return 'task[' + ([this.taskType, this.taskId].append(components).join()) + ']'
    },
 
    transitionElement: function(dom_id, newval) {
@@ -66,7 +66,7 @@ var Task = new Class({
    updateElement: function() {
      for (prefix_attr in this.data) {
        if (this.data.hasOwnProperty(prefix_attr)) {
-         if (prefix_attr == "uid") {
+         if (prefix_attr == "task_id") {
            this.transitionElement(this.taskStr([prefix_attr]), this.translateUid(this.data[prefix_attr]))
          } else if (instanceOf(this.data[prefix_attr], String) || instanceOf(this.data[prefix_attr], Number)) {
            this.transitionElement(this.taskStr([prefix_attr]), this.data[prefix_attr])
@@ -80,17 +80,15 @@ var Task = new Class({
      }
    },
 
-   translateUid: function(uid) {
-     return "<a href='/task/" + uid + "'>" + uid + "</a>"
+   translateUid: function(taskId) {
+     return "<a href='/task/" + taskId + "'>" + taskId + "</a>"
    },
 
    setElement: function() {
      this.element = new Element('tr', {
-      'id': 'task[' + this.taskType + '][' + this.uid + ']'}).adopt(
-         new Element('td', { 'id': this.taskStr(['uid']), 'html': this.translateUid(this.uid)}),
-         new Element('td', { 'id': this.taskStr(['job', 'name']) }),
+      'id': 'task[' + this.taskType + '][' + this.taskId + ']'}).adopt(
+         new Element('td', { 'id': this.taskStr(['task_id']), 'html': this.translateUid(this.taskId)}),
          new Element('td', { 'id': this.taskStr(['name']) }),
-         new Element('td', { 'id': this.taskStr(['replica']) }),
          new Element('td', { 'id': this.taskStr(['resource_consumption', 'cpu']) }),
          new Element('td', { 'id': this.taskStr(['resource_consumption', 'ram']) }),
          new Element('td', { 'id': this.taskStr(['resource_consumption', 'disk']) }),
@@ -117,16 +115,14 @@ var TableManager = new Class({
     this.element.adopt(
       new Element('thead').
         adopt(new Element('tr', { 'id': 'task[' + this.tableType + '][superheader]', 'class': 'meta-headers' })
-          .adopt(new Element('th', { 'html': "", 'colspan': 4 }),
+          .adopt(new Element('th', { 'html': "", 'colspan': 2 }),
                  new Element('th', { 'html': "consumed", 'colspan': 3 }),
                  new Element('th', { 'html': "processes", 'colspan': 4 })
                 )
               )
         .adopt(new Element('tr', { 'id': 'task[' + this.tableType + '][header]' })
-          .adopt(new Element('th', { 'id': 'task[' + this.tableType + '][header][uid]',       'html': "uid" }),
-                 new Element('th', { 'id': 'task[' + this.tableType + '][header][job][name]', 'html': "job" }),
-                 new Element('th', { 'id': 'task[' + this.tableType + '][header][name]',      'html': "task" }),
-                 new Element('th', { 'id': 'task[' + this.tableType + '][header][replica]',   'html': "replica" }),
+          .adopt(new Element('th', { 'id': 'task[' + this.tableType + '][header][task_id]',   'html': "task_id" }),
+                 new Element('th', { 'id': 'task[' + this.tableType + '][header][name]',      'html': "name" }),
                  new Element('th', { 'id': 'task[' + this.tableType + '][header][resource_consumption][cpu]', 'html': "cpu" }),
                  new Element('th', { 'id': 'task[' + this.tableType + '][header][resource_consumption][ram]', 'html': "ram" }),
                  new Element('th', { 'id': 'task[' + this.tableType + '][header][resource_consumption][disk]','html': "disk" }),
@@ -146,22 +142,22 @@ var TableManager = new Class({
   },
 
   startPolling: function() {
-    this.uidPoller = setInterval(this.tableType + 'TableManager.getChildren();', 2500)
+    this.taskIdPoller = setInterval(this.tableType + 'TableManager.getChildren();', 2500)
     this.dataPoller = setInterval(this.tableType + 'TableManager.refreshVisibleChildren();', 5300)
   },
 
   getChildren: function() {
     new Request.JSON({
-      'url': '/j/uids/' + this.tableType + '/-20',
+      'url': '/j/task_ids/' + this.tableType + '/-20',
       'method': 'get',
       'onComplete': function(response) {
         if (response) {
-          var newChildren = Array.from(response.uids)
+          var newChildren = Array.from(response.task_ids)
           this.visibleChildren = newChildren
 
           // first set all children to invisible
-          for (uid in this.activeTasks) {
-            this.activeTasks[uid].visible = false
+          for (taskId in this.activeTasks) {
+            this.activeTasks[taskId].visible = false
           }
 
           // set new children visible
@@ -178,7 +174,7 @@ var TableManager = new Class({
           for (var k = 0; k < newChildren.length; k++)
             this.tbody.adopt(this.activeTasks[newChildren[k]].element)
         } else {
-          clearInterval(this.uidPoller)
+          clearInterval(this.taskIdPoller)
         }
       }.bind(this)
     }).send()
@@ -189,13 +185,13 @@ var TableManager = new Class({
      new Request.JSON({
        'url': '/j/task',
        'method': 'get',
-       'data': { 'uid': this.visibleChildren.join() },
+       'data': { 'task_id': this.visibleChildren.join() },
        'onComplete': function(response) {
          if (response) {
            if (!response) return;
-           for (uid in response) {
-             if (response.hasOwnProperty(uid))
-               this.activeTasks[uid].applyUpdate(response[uid])
+           for (taskId in response) {
+             if (response.hasOwnProperty(taskId))
+               this.activeTasks[taskId].applyUpdate(response[taskId])
            }
          } else {
            clearInterval(this.dataPoller)

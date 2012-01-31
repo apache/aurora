@@ -48,7 +48,11 @@ class TaskMonitor(object):
             runner_update = rr.try_read()
             if not runner_update:
               break
-            self._dispatcher.update_runner_state(self._runnerstate, runner_update)
+            try:
+              self._dispatcher.update_runner_state(self._runnerstate, runner_update)
+            except TaskCkptDispatcher.InvalidSequenceNumber as e:
+              log.error('Checkpoint stream is corrupt: %s' % e)
+              break
           new_ckpt_head = fp.tell()
           updated = self._ckpt_head != new_ckpt_head
           self._ckpt_head = new_ckpt_head

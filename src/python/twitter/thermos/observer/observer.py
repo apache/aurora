@@ -17,8 +17,16 @@ from twitter.thermos.base import TaskPath
 from twitter.thermos.base import Helper
 from twitter.thermos.base.ckpt import AlaCarteRunnerState
 
+
+from twitter.thermos.config.schema import (
+  Environment,
+  ThermosContext)
+from twitter.thermos.config.loader import (
+  ThermosTaskWrapper,
+  ThermosProcessWrapper)
+
 from gen.twitter.thermos.ttypes import *
-from gen.twitter.tcl.ttypes import ThermosTask
+
 
 __author__ = 'wickman@twitter.com (brian wickman)'
 __tested__ = False
@@ -59,8 +67,8 @@ class TaskObserver(threading.Thread):
     while True:
       time.sleep(1)
       total_seconds += 1
-      active_tasks   = self._detector.get_active_uids()
-      finished_tasks = self._detector.get_finished_uids()
+      active_tasks   = self._detector.get_active_task_ids()
+      finished_tasks = self._detector.get_finished_task_ids()
 
       for active in active_tasks:
         if active in self._finishes:
@@ -77,116 +85,121 @@ class TaskObserver(threading.Thread):
           self._muxer.remove(finished)   # remove from checkpoint monitor
         self._finishes.add(finished)
 
-  def _read_task(self, uid):
+  def _read_task(self, task_id):
     """
       Given a task id, read it.  Memoize already-read tasks.
     """
-    task = self._tasks.get(uid, None)
-    if task: return task
+    task = self._tasks.get(task_id, None)
+    if task:
+      return task.task()
 
-    uid_map = {
+    task_id_map = {
       'active_task_path': self._actives,
       'finished_task_path': self._finishes
     }
 
-    for path_type, uidset in uid_map.iteritems():
-      if uid in uidset:
-        path = self._pathspec.given(task_id = uid).getpath(path_type)
-        try:
-          if os.path.exists(path):
-            with open(path, "r") as fp:
-              rr = ThriftRecordReader(fp, ThermosTask)
-              task = rr.read()
-              if task:
-                self._tasks[uid] = task
-                return task
-        except Exception as e:
-          log.error('Error reading ThermosTask from %s in observer: %s' % (
-            path, e))
-
+    for path_type, task_idset in task_id_map.iteritems():
+      if task_id in task_idset:
+        path = self._pathspec.given(task_id = task_id).getpath(path_type)
+        if os.path.exists(path):
+          task = ThermosTaskWrapper.from_file(path)
+          if task is None:
+            log.error('Error reading ThermosTask from %s in observer.' % path)
+          else:
+            self._tasks[task_id] = task
+            return task.task()
     return None
 
-  def uid_count(self):
+  def task_id_count(self):
     """
-      Return the list of active and finished uids.
+      Return the list of active and finished task_ids.
     """
     return dict(
       active = len(self._actives),
       finished = len(self._finishes)
     )
 
-  def uids(self, type=None, offset=None, num=None):
+  def task_ids(self, type=None, offset=None, num=None):
     """
-      Return the list of uids in a browser-friendly format.
+      Return the list of task_ids in a browser-friendly format.
 
       type = (all|active|finished|None) [default: all]
-      offset = offset into the list of uids [default: 0]
+      offset = offset into the list of task_ids [default: 0]
       num = number of results to return [default: return rest]
     """
-    uidlist = []
+    task_idlist = []
     if type is None or type == 'all':
-      uidlist += self._actives
-      uidlist += self._finishes
+      task_idlist += self._actives
+      task_idlist += self._finishes
     elif type == 'active':
-      uidlist += self._actives
+      task_idlist += self._actives
     elif type == 'finished':
-      uidlist += self._finishes
-    uidlist.sort()
+      task_idlist += self._finishes
+    task_idlist.sort()
 
     offset = offset if offset is not None else 0
     if offset < 0:
-      if len(uidlist) > abs(offset):
-        offset = offset % len(uidlist)
+      if len(task_idlist) > abs(offset):
+        offset = offset % len(task_idlist)
       else:
         offset = 0
     if num:
       num += offset
     return dict(
-      uids = uidlist[offset:num]
+      task_ids = task_idlist[offset:num]
     )
 
-  def _state(self, uid):
+  def context(self, task_id):
+    state = self._state(task_id)
+    if state is None:
+      return None
+    return ThermosContext(
+      ports = state.ports if state.ports is not None else {},
+      task_id = state.header.task_id,
+      user = state.header.user,
+    )
+
+  def state(self, task_id):
+    real_state = self._state(task_id)
+    if real_state is None or real_state.header is None:
+      return {}
+    else:
+      return dict(
+        task_id = real_state.header.task_id,
+        launch_time = real_state.header.launch_time,
+        sandbox = real_state.header.sandbox,
+        hostname = real_state.header.hostname,
+        user = real_state.header.user
+      )
+
+  def _state(self, task_id):
     """
       Return the current runner state of a given task id
     """
-    if uid in self._actives:
+    if task_id in self._actives:
       # TODO(wickman)  Protect this call
-      return self._muxer.get_state(uid)
-    elif uid in self._states:
+      return self._muxer.get_state(task_id)
+    elif task_id in self._states:
       # memoized finished state
-      return self._states[uid]
+      return self._states[task_id]
     else:
       # unread finished state, let's read and memoize.
-      path = self._pathspec.given(task_id = uid).getpath('runner_checkpoint')
-      self._states[uid] = AlaCarteRunnerState(path).state()
-      return self._states[uid]
-    log.error(TaskObserver.UnexpectedError("Could not find uid: %s" % uid))
+      path = self._pathspec.given(task_id = task_id).getpath('runner_checkpoint')
+      self._states[task_id] = AlaCarteRunnerState(path).state()
+      return self._states[task_id]
+    log.error(TaskObserver.UnexpectedError("Could not find task_id: %s" % task_id))
     return None
 
-  def _job_stub(self, uid):
+  def _task_processes(self, task_id):
     """
-      Return the job header of the given task id.
-    """
-    task = self._read_task(uid)
-    if task is None: return {}
-    return dict(
-      name = task.job.name,
-      role = task.job.role,
-      user = task.job.user,
-      datacenter = task.job.datacenter,
-      cluster = task.job.cluster
-    )
-
-  def _task_processes(self, uid):
-    """
-      Return the processes of a task given its uid.
+      Return the processes of a task given its task_id.
 
       Returns a map from state to processes in that state, where possible
       states are: waiting, running, success, failed.
     """
-    if uid not in self._actives and uid not in self._finishes:
+    if task_id not in self._actives and task_id not in self._finishes:
       return {}
-    state = self._state(uid)
+    state = self._state(task_id)
     if state is None:
       return {}
 
@@ -221,16 +234,15 @@ class TaskObserver(threading.Thread):
       killed = killed
     )
 
-  def _task(self, uid):
+  def _task(self, task_id):
     """
-      Return composite information about a particular task uid, given the below
+      Return composite information about a particular task task_id, given the below
       schema.
 
       X denotes currently unimplemented fields.
 
       {
-         uid: string,
-         job: { see _job_stub() }
+         task_id: string,
          name: string,
          replica: int,
          state: string [ACTIVE, SUCCESS, FAILED]
@@ -250,57 +262,48 @@ class TaskObserver(threading.Thread):
       }
     """
 
-    # Unknown uid.
-    if uid not in self._actives and uid not in self._finishes:
+    # Unknown task_id.
+    if task_id not in self._actives and task_id not in self._finishes:
       return {}
 
-    task = self._read_task(uid)
+    task = self._read_task(task_id)
     if task is None:
       # TODO(wickman)  Can this happen?
-      log.error('Could not find task: %s' % uid)
+      log.error('Could not find task: %s' % task_id)
       return {}
 
-    state = self._state(uid)
+    state = self._state(task_id)
     if state is None:
       # TODO(wickman)  Can this happen?
       return {}
 
+    context = self.context(task_id)
+    task = task % Environment(thermos = context)
+
     return dict(
-       uid = uid,
-       job = self._job_stub(uid),
-       name = task.name,
-       replica = task.replica_id,
+       task_id = task_id,
+       name = task.name().get(),
        state = TaskState._VALUES_TO_NAMES[state.state],
+       user = task.user().get(),
        # ports
        resource_consumption = dict(
-         cpu = self._measurer.current_cpu_by_uid(uid),
+         cpu = self._measurer.current_cpu_by_task_id(task_id),
          ram = 0,   # TODO(wickman)
          disk = 0   # TODO(wickman)
        ),
        # timeline
-       processes = self._task_processes(uid)
+       processes = self._task_processes(task_id)
     )
 
-  def task(self, uids):
+  def task(self, task_ids):
     """
-      Return a map from uid => task, given the task schema from _task.
+      Return a map from task_id => task, given the task schema from _task.
     """
-    return dict((uid, self._task(uid)) for uid in uids)
+    return dict((task_id, self._task(task_id)) for task_id in task_ids)
 
-  def _get_process_resource_reservation(self, uid, process_name):
-    task = self._read_task(uid)
-    if task is None: return {}
-    process = Helper.process_from_name(task, process_name)
-    if process is None: return {}
+  def _get_process_resource_consumption(self, task_id, process_name):
     return dict(
-      cpu = process.footprint.cpu,
-      ram = process.footprint.ram,
-      disk = process.footprint.disk
-    )
-
-  def _get_process_resource_consumption(self, uid, process_name):
-    return dict(
-      cpu = self._measurer.current_cpu_by_process(uid, process_name),
+      cpu = self._measurer.current_cpu_by_process(task_id, process_name),
       ram = 0, # implement
       disk = 0 # implement
     )
@@ -336,14 +339,13 @@ class TaskObserver(threading.Thread):
         d.update(stop_time = process_run.stop_time * 1000)
       return d
 
-  def process(self, uid, process, run = None):
+  def process(self, task_id, process, run = None):
     """
       Returns a process run, where the schema is given below:
 
       {
         process_name: string
         process_run: int
-        reserved: { cpu: float, ram: int bytes, disk: int bytes }
         used: { cpu: float, ram: int bytes, disk: int bytes }
         start_time: (time since epoch in millis (utc))
         stop_time: (time since epoch in millis (utc))
@@ -352,7 +354,7 @@ class TaskObserver(threading.Thread):
 
       If run is None, return the latest run.
     """
-    state = self._state(uid)
+    state = self._state(task_id)
     if state is None:
       return {}
     if process not in state.processes: return {}
@@ -363,12 +365,11 @@ class TaskObserver(threading.Thread):
     if not tup:
       return {}
 
-    tup.update(reserved = self._get_process_resource_reservation(uid, process))
     if tup.get('state') == 'RUNNING':
-      tup.update(used = self._get_process_resource_consumption(uid, process))
+      tup.update(used = self._get_process_resource_consumption(task_id, process))
     return tup
 
-  def _processes(self, uid):
+  def _processes(self, task_id):
     """
       Return
         {
@@ -382,27 +383,27 @@ class TaskObserver(threading.Thread):
       defined by process().
     """
 
-    if uid not in self._actives and uid not in self._finishes:
+    if task_id not in self._actives and task_id not in self._finishes:
       return {}
-    state = self._state(uid)
+    state = self._state(task_id)
     if state is None:
       return {}
 
-    processes = self._task_processes(uid)
+    processes = self._task_processes(task_id)
     d = dict()
     for process_type in processes:
       for process_name in processes[process_type]:
-        d.update({ process_name: self.process(uid, process_name) })
+        d.update({ process_name: self.process(task_id, process_name) })
     return d
 
-  def processes(self, uids):
+  def processes(self, task_ids):
     """
-      Given a list of uids, returns a map of uid => processes, where processes
+      Given a list of task_ids, returns a map of task_id => processes, where processes
       is defined by the schema in _processes.
     """
-    if not isinstance(uids, (list, tuple)):
+    if not isinstance(task_ids, (list, tuple)):
       return {}
-    return dict((uid, self._processes(uid)) for uid in uids)
+    return dict((task_id, self._processes(task_id)) for task_id in task_ids)
 
   def get_run_number(self, runner_state, process, run = None):
     if runner_state is not None:
@@ -411,9 +412,9 @@ class TaskObserver(threading.Thread):
         if len(runner_state.processes[process].runs) > 0:
           return run % len(runner_state.processes[process].runs)
 
-  def logs(self, uid, process, run = None):
+  def logs(self, task_id, process, run = None):
     """
-      Given a uid and a process and (optional) run number, return a dict:
+      Given a task_id and a process and (optional) run number, return a dict:
       {
         stderr: [dir, filename]
         stdout: [dir, filename]
@@ -423,13 +424,13 @@ class TaskObserver(threading.Thread):
 
       TODO(wickman)  Just return the filenames directly?
     """
-    runner_state = self._state(uid)
+    runner_state = self._state(task_id)
     if runner_state is None:
       return {}
     run = self.get_run_number(runner_state, process, run)
     if run is None:
       return {}
-    log_path = self._pathspec.given(task_id = uid, process = process, run = run).getpath('process_logdir')
+    log_path = self._pathspec.given(task_id = task_id, process = process, run = run).getpath('process_logdir')
     return dict(
       stdout = [log_path, 'stdout'],
       stderr = [log_path, 'stderr']
@@ -449,14 +450,14 @@ class TaskObserver(threading.Thread):
       return (normalized_base, os.path.relpath(normalized, normalized_base))
     return (None, None)
 
-  def file_path(self, uid, path):
+  def file_path(self, task_id, path):
     """
-      Given a uid and a path within that uid's sandbox, verify:
+      Given a task_id and a path within that task_id's sandbox, verify:
         (1) it's actually in the sandbox and not outside
         (2) it's a valid, existing _file_ within that path
       Returns chroot and the pathname relative to that chroot.
     """
-    runner_state = self._state(uid)
+    runner_state = self._state(task_id)
     if runner_state is None:
       return None, None
     try:
@@ -469,7 +470,7 @@ class TaskObserver(threading.Thread):
         return chroot, path
     return None, None
 
-  def files(self, uid, path = None):
+  def files(self, task_id, path = None):
     """
       Returns dictionary
       {
@@ -480,7 +481,7 @@ class TaskObserver(threading.Thread):
       }
     """
     path = path if path is not None else '.'
-    runner_state = self._state(uid)
+    runner_state = self._state(task_id)
     if runner_state is None:
       return {}
     try:
@@ -500,7 +501,7 @@ class TaskObserver(threading.Thread):
       else:
         files.append(name)
     return dict(
-      uid = uid,
+      task_id = task_id,
       chroot = chroot,
       path = path,
       dirs = dirs,

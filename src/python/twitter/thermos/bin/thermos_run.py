@@ -20,7 +20,7 @@ app.add_option("--sandbox", dest = "sandbox", metavar = "PATH",
 app.add_option("--checkpoint_root", dest = "checkpoint_root", metavar = "PATH",
                help = "the path where we will store task logs and checkpoints")
 
-app.add_option("--task_id", dest = "uid", metavar = "STRING", default = None,
+app.add_option("--task_id", dest = "task_id", metavar = "STRING", default = None,
                help = "The id to which this task should be bound, created if it does not exist.")
 
 app.add_option("--action", dest = "action", metavar = "ACTION", default = "run",
@@ -105,7 +105,7 @@ def main(args, opts):
     app.error('ERROR!  Unbound ports: %s' % ' '.join(port for port in missing_ports))
 
   task_runner = TaskRunner(thermos_task.task, opts.checkpoint_root, opts.sandbox,
-    task_id=opts.uid, user=opts.setuid, portmap=prebound_ports, chroot=opts.chroot)
+    task_id=opts.task_id, user=opts.setuid, portmap=prebound_ports, chroot=opts.chroot)
 
   if opts.action == 'run':
     task_runner.run()

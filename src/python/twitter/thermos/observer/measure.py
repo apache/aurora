@@ -68,8 +68,8 @@ class TaskMeasurer(threading.Thread):
       active_processes = [tup for tup in self._muxer.get_active_processes()]
       self._filter_inactive_processes(active_processes)
 
-      for (uid, process, run) in active_processes:
-        tup = MeasuredTuple(task_id = uid, process_name = process.process,
+      for (task_id, process, run) in active_processes:
+        tup = MeasuredTuple(task_id = task_id, process_name = process.process,
                             process_run = run, process_pid = process.pid)
         if tup not in self._processes:
           log.debug('TaskMeasurer monitoring %s' % tup)
@@ -102,14 +102,14 @@ class TaskMeasurer(threading.Thread):
     else:
       return 0
 
-  def current_cpu_by_uid(self, task_id):
+  def current_cpu_by_task_id(self, task_id):
     return self.current_cpu_by_clause(task_id = task_id)
 
   # TODO(wickman)  Implement the proper O(n) solution.
   def current_cpu_by_process(self, task_id, process_name):
     return self.current_cpu_by_clause(task_id = task_id, process_name = process_name)
 
-  def samples_by_uid(self, task_id):
+  def samples_by_task_id(self, task_id):
     processes = filter(
       lambda process: process.where(task_id = task_id),
       self._processes.keys())

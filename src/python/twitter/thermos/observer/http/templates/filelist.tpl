@@ -1,6 +1,6 @@
 <%doc>
  Template arguments:
-   uid
+   task_id
    path
    dirs
    files
@@ -11,20 +11,20 @@
 %>
 
 <%def name="download_link(filename)">
-  <a href='/download/${uid}/${os.path.join(path, filename)}'><font size=1>dl</font></a>
+  <a href='/download/${task_id}/${os.path.join(path, filename)}'><font size=1>dl</font></a>
 </%def>
 
 <%def name="directory_link(dirname)">
-  <a href='/browse/${uid}/${os.path.join(path, dirname)}'>${dirname}</a>
+  <a href='/browse/${task_id}/${os.path.join(path, dirname)}'>${dirname}</a>
 </%def>
 
 <%def name="file_link(filename)">
-  <a href='/file/${uid}/${os.path.join(path, filename)}'>${filename}</a>
+  <a href='/file/${task_id}/${os.path.join(path, filename)}'>${filename}</a>
 </%def>
 
 <html>
 
-<title>path browser for ${uid}</title>
+<title>path browser for ${task_id}</title>
 <body>
   <h3>${path}</h3>
   <div class="container">

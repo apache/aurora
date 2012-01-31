@@ -1,6 +1,6 @@
 <%doc>
  Template arguments:
-   uid
+   task_id
    process
    run
    logtype
@@ -13,11 +13,11 @@
 </%doc>
 
 <%def name="less_link()">
-  <a href='/logs/${uid}/${process}/${run}/$logtype}?offset=${offset-bytes}&bytes=${bytes}'>&#171; prev</a>
+  <a href='/logs/${task_id}/${process}/${run}/$logtype}?offset=${offset-bytes}&bytes=${bytes}'>&#171; prev</a>
 </%def>
 
 <%def name="greater_link()">
-  <a href='/logs/${uid}/${process}/${run}/$logtype}?offset=${offset+bytes}&bytes=${bytes}'>next &#187;</a>
+  <a href='/logs/${task_id}/${process}/${run}/$logtype}?offset=${offset+bytes}&bytes=${bytes}'>next &#187;</a>
 </%def>
 
 <html>
@@ -26,7 +26,7 @@
       type="text/css"
       href="/assets/bootstrap.css"/>
 
-<title>log browser ${uid}</title>
+<title>log browser ${task_id}</title>
 
 <body>
   <div class="span4">

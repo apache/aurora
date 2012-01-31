@@ -89,32 +89,26 @@ class BottleObserver(HttpServer, StaticAssets, BottleObserverMixins):
       hostname = socket.gethostname()
     )
 
-  @HttpServer.route("/task/:uid")
+  @HttpServer.route("/task/:task_id")
   @HttpServer.mako_view(HttpTemplate.load('task'))
-  def handle_task(self, uid):
-    task = self._observer.task([uid])
-    if not task[uid]:
+  def handle_task(self, task_id):
+    task = self._observer.task([task_id])
+    if not task[task_id]:
       return HttpServer.Response(status=404)
-    processes = self._observer.processes([uid])
-    if not processes[uid]:
+    processes = self._observer.processes([task_id])
+    if not processes[task_id]:
       return HttpServer.Response(status=404)
-
-    task = task[uid]
-    processes = processes[uid]
-    job = task['job']
+    context = self._observer.context(task_id)
+    processes = processes[task_id]
+    task = task[task_id]
+    state = self._observer.state(task_id)
 
     return dict(
-      hostname = socket.gethostname(),
-      uid = uid,
-      role = job['role'],
-      user = job['user'],
-      job = job['name'],
-      cluster = job['cluster'],
-      replica = task['replica'],
+      task_id = task_id,
       status = task['state'],
+      user = task['user'],
       processes = processes,
-      # TODO(wickman)  Fill these in once they become exposed by the
-      # runner/executor.
-      executor_id = "boosh",
-      chroot = "boosh"
+      chroot = state.get('sandbox', ''),
+      launch_time = state.get('launch_time', 0),
+      hostname = state.get('hostname', 'localhost')
     )

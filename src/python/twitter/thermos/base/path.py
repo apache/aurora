@@ -36,7 +36,7 @@ class TaskPath(object):
   class UnknownPath(Exception): pass
   class UnderspecifiedPath(Exception): pass
 
-  # all keys: root job_uid pid process run
+  # all keys: root task_id pid process run
   DIR_TEMPLATE = {
      'active_task_path': ['%(root)s',       'tasks',      'active', '%(task_id)s'],
    'finished_task_path': ['%(root)s',       'tasks',    'finished', '%(task_id)s'],

@@ -15,8 +15,8 @@ python_library(
   resources = OBSERVER_ASSETS,
   dependencies = [
     pants(':base'),
+    pants('src/python/twitter/thermos/config:schema'),
     pants('src/python/twitter/common/process'),
-    pants('src/thrift/com/twitter/tcl:py-thrift'),
     pants('3rdparty/python:bottle'),
     pants('3rdparty/python:mako')
   ]

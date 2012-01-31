@@ -22,7 +22,6 @@ python_tests(name = 'proxy_config',
   dependencies = [
     pants('src/python/twitter/common'),
     pants('src/python/twitter/mesos:mesos-lib'),
-    pants('src/python/twitter/mesos:thermos-lib'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
   ]
 )

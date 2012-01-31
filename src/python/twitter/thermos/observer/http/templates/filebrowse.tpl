@@ -1,7 +1,7 @@
 <%doc>
  Template arguments:
    data
-   uid
+   task_id
    filename
    filelen
    read (bytes read)
@@ -11,15 +11,15 @@
 </%doc>
 
 <%def name="download_link()">
-  <a href='/download/${uid}/${filename}'><font size=1>download</font></a>
+  <a href='/download/${task_id}/${filename}'><font size=1>download</font></a>
 </%def>
 
 <%def name="less_link()">
-  <a href='/file/${uid}/${filename}?offset=${offset-bytes}&bytes=${bytes}'>&#171; prev</a>
+  <a href='/file/${task_id}/${filename}?offset=${offset-bytes}&bytes=${bytes}'>&#171; prev</a>
 </%def>
 
 <%def name="greater_link()">
-  <a href='/file/${uid}/${filename}?offset=${offset+bytes}&bytes=${bytes}'>next &#187;</a>
+  <a href='/file/${task_id}/${filename}?offset=${offset+bytes}&bytes=${bytes}'>next &#187;</a>
 </%def>
 
 <html>
@@ -28,7 +28,7 @@
       type="text/css"
       href="/assets/bootstrap.css"/>
 
-<title>file browser ${uid}</title>
+<title>file browser ${task_id}</title>
 <body>
   <div class="span16">
     <strong> path </strong> ${filename}

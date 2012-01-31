@@ -53,9 +53,9 @@ class TaskObserverFileBrowser(object):
     Mixin for Thermos observer File browser.
   """
 
-  @HttpServer.route("/logs/:uid/:process/:run/:logtype")
+  @HttpServer.route("/logs/:task_id/:process/:run/:logtype")
   @HttpServer.mako_view(HttpTemplate.load('logbrowse'))
-  def handle_logs(self, uid, process, run, logtype):
+  def handle_logs(self, task_id, process, run, logtype):
     """
       Additional parameters:
         offset= (default 0)
@@ -63,7 +63,7 @@ class TaskObserverFileBrowser(object):
     """
     offset = self.Request.GET.get('offset', None)
     bytes = self.Request.GET.get('bytes', None)
-    types = self._observer.logs(uid, process, int(run))
+    types = self._observer.logs(task_id, process, int(run))
     if logtype not in types:
       bottle.abort(404, "No such log type: %s" % logtype)
     chroot, path = types[logtype]
@@ -71,16 +71,16 @@ class TaskObserverFileBrowser(object):
     if not data:
       bottle.abort(404, "Unable to read %s (%s)" % (logtype, path))
     data.update(
-      uid = uid,
+      task_id = task_id,
       process = process,
       run = run,
       logtype = logtype,
     )
     return data
 
-  @HttpServer.route("/file/:uid/:path#.+#")
+  @HttpServer.route("/file/:task_id/:path#.+#")
   @HttpServer.mako_view(HttpTemplate.load('filebrowse'))
-  def handle_file(self, uid, path):
+  def handle_file(self, task_id, path):
     """
       Additional parameters:
         offset= (default 0)
@@ -91,23 +91,23 @@ class TaskObserverFileBrowser(object):
 
     offset = self.Request.GET.get('offset', None)
     bytes = self.Request.GET.get('bytes', None)
-    chroot, path = self._observer.file_path(uid, path)
+    chroot, path = self._observer.file_path(task_id, path)
     if chroot is None or path is None:
       bottle.abort(404, "Invalid file path")
 
     d = _read_chunk(os.path.join(chroot, path), offset, bytes)
     if not d:
       bottle.abort(404, "Unable to read file")
-    d.update(filename = path, uid = uid)
+    d.update(filename = path, task_id = task_id)
     return d
 
-  @HttpServer.route("/browse/:uid")
-  @HttpServer.route("/browse/:uid/:path#.+#")
+  @HttpServer.route("/browse/:task_id")
+  @HttpServer.route("/browse/:task_id/:path#.+#")
   @HttpServer.mako_view(HttpTemplate.load('filelist'))
-  def handle_dir(self, uid, path=None):
-    return self._observer.files(uid, path)
+  def handle_dir(self, task_id, path=None):
+    return self._observer.files(task_id, path)
 
-  @HttpServer.route("/download/:uid/:path#.+#")
-  def handle_download(self, uid, path=None):
-    root_uid = self._observer.files(uid)
-    return bottle.static_file(path, root = root_uid['chroot'], download=True)
+  @HttpServer.route("/download/:task_id/:path#.+#")
+  def handle_download(self, task_id, path=None):
+    root_task_id = self._observer.files(task_id)
+    return bottle.static_file(path, root = root_task_id['chroot'], download=True)
