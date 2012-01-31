@@ -14,7 +14,7 @@ app.add_option("--root",
                help="root checkpoint directory for thermos task runners")
 
 app.configure(module='twitter.common.app.modules.http',
-    port=1338, host=socket.gethostname(), enable=True)
+    port=1338, host=socket.gethostname(), enable=True, framework='tornado')
 app.configure(module='twitter.common.app.modules.exception_handler',
     enable=True, category='thermos_observer_exceptions')
 

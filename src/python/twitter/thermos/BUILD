@@ -18,7 +18,8 @@ python_library(
     pants('src/python/twitter/thermos/config:schema'),
     pants('src/python/twitter/common/process'),
     pants('3rdparty/python:bottle'),
-    pants('3rdparty/python:mako')
+    pants('3rdparty/python:mako'),
+    pants('3rdparty/python:tornado')
   ]
 )
 
