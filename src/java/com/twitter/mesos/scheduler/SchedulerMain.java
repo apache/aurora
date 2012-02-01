@@ -13,7 +13,7 @@ import com.twitter.common.application.modules.LogModule;
 import com.twitter.common.application.modules.StatsModule;
 import com.twitter.common.zookeeper.Group;
 import com.twitter.common.zookeeper.SingletonService;
-import com.twitter.common_internal.webassets.Blueprint;
+import com.twitter.common_internal.webassets.BlueprintModule;
 import com.twitter.thrift.Status;
 
 /**
@@ -34,7 +34,7 @@ public class SchedulerMain extends AbstractApplication {
         new LogModule(),
         new SchedulerModule(),
         new StatsModule(),
-        new Blueprint.HttpAssetModule()
+        new BlueprintModule()
     );
   }
 
