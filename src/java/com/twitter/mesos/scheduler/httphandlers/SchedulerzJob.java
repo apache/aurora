@@ -12,6 +12,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
@@ -22,10 +23,12 @@ import com.google.common.collect.Ordering;
 import com.google.inject.Inject;
 
 import org.antlr.stringtemplate.StringTemplate;
+import org.antlr.stringtemplate.AttributeRenderer;
 
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.mesos.Tasks;
+import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
@@ -90,6 +93,33 @@ public class SchedulerzJob extends StringTemplateServlet {
           }
         }
       };
+
+  private static final Function<ScheduledTask, Map<String, Object>> TASK_TO_STRING_MAP =
+      new Function<ScheduledTask, Map<String, Object>>() {
+        @Override public Map<String, Object> apply(ScheduledTask scheduledTask) {
+          AssignedTask task = scheduledTask.getAssignedTask();
+          ImmutableMap.Builder<String, Object> builder = ImmutableMap.<String, Object>builder()
+            .put("taskId", task.getTaskId())
+            .put("shardId", task.getTask().getShardId())
+            .put("slaveHost", task.isSetSlaveHost() ? task.getSlaveHost() : "")
+            .put("taskEvents", scheduledTask.isSetTaskEvents() ?
+               scheduledTask.getTaskEvents() : Lists.newArrayList());
+          if (task.isSetAssignedPorts()
+              && task.getAssignedPorts().containsKey("health")) {
+            builder.put("healthPort", task.getAssignedPorts().get("health"));
+          } else {
+            builder.put("healthPort", "");
+          }
+          if (task.getTask().isSetThermosConfig()
+              && task.getTask().getThermosConfig().length != 0) {
+            builder.put("executorPort", 1338);
+          } else {
+            builder.put("executorPort", 1337);
+          }
+          return builder.build();
+        }
+      };
+
 
   private final SchedulerCore scheduler;
 
@@ -185,6 +215,8 @@ public class SchedulerzJob extends StringTemplateServlet {
         int offset = getOffset(req);
         boolean hasMore = false;
 
+
+
         Set<ScheduledTask> activeTasks;
         if (statusFilter != null) {
           query.setStatuses(FILTER_MAP.get(statusFilter));
@@ -194,13 +226,17 @@ public class SchedulerzJob extends StringTemplateServlet {
           List<ScheduledTask> completedTasks = Lists.newArrayList(
               scheduler.getTasks(new Query(query, Predicates.not(Tasks.ACTIVE_FILTER))));
           Collections.sort(completedTasks, REVERSE_CHRON_COMPARATOR);
-          template.setAttribute("completedTasks", offsetAndLimit(completedTasks, offset));
+          template.setAttribute("completedTasks",
+            ImmutableList.copyOf(
+              Iterables.transform(offsetAndLimit(completedTasks, offset), TASK_TO_STRING_MAP)));
           hasMore = completedTasks.size() > offset + PAGE_SIZE;
         }
 
         List<ScheduledTask> liveTasks = Lists.newArrayList(activeTasks);
         Collections.sort(liveTasks, SHARD_ID_COMPARATOR);
-        template.setAttribute("activeTasks", offsetAndLimit(liveTasks, offset));
+        template.setAttribute("activeTasks",
+          ImmutableList.copyOf(
+            Iterables.transform(offsetAndLimit(liveTasks, offset), TASK_TO_STRING_MAP)));
         hasMore = hasMore || liveTasks.size() > (offset + PAGE_SIZE);
 
         if (offset > 0) {
