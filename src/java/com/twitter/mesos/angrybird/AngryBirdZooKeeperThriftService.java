@@ -100,6 +100,7 @@ public class AngryBirdZooKeeperThriftService implements ZooKeeperThriftServer.Se
     RestartResponse response = new RestartResponse();
 
     try {
+      zk_server.shutdownNetwork();
       zk_server.restartNetwork();
       response.setResponseCode(OK);
     } catch (IOException e) {
