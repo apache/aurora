@@ -52,12 +52,8 @@ class DirectorySandbox(SandboxBase):
     return self._dir
 
   def create(self, mesos_task):
-    if len(mesos_task.layout().packages().get()) > 0:
-      log.warning('DirectorySandbox got task with packages: %s'
-                  % mesos_task.layout().packages())
-    if len(mesos_task.layout().services().get()) > 0:
-      log.warning('DirectorySandbox got task with services: %s'
-                  % mesos_task.layout().services())
+    if mesos_task.has_layout():
+      log.warning('DirectorySandbox got task with layout! %s' % mesos_task.layout())
     safe_mkdir(self._dir)
 
   def destroy(self):

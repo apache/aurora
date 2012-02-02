@@ -17,13 +17,6 @@ class Layout(Struct):
   packages = Default(List(Package), [])
   services = Default(List(Service), [])
 
-DEFAULT_LAYOUT = Layout(
-  packages=[
-    Package(name="centos-5.5-x86_64"),
-    Package(name="centos-5.5-util-x86_64"),
-  ]
-)
-
 class MesosContext(Struct):
   role     = Required(String)
   cluster  = Required(String)
@@ -53,5 +46,5 @@ class MesosJob(Struct):
   task          = Required(Task)
   cron_schedule = String
   cron_policy   = Default(String, 'KILL_EXISTING')
-  layout        = Default(Layout, DEFAULT_LAYOUT)
+  layout        = Layout
   update_config = Default(UpdateConfig, UpdateConfig())

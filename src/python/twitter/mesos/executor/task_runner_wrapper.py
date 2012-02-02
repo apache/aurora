@@ -24,6 +24,10 @@ app.add_option("--checkpoint_root", dest="checkpoint_root", metavar="PATH",
                default="/var/run/thermos",
                help="the path where we will store workflow logs and checkpoints")
 
+app.add_option("--sandbox_root", dest="sandbox_root", metavar="PATH",
+               default="/var/run/thermos/sandbox",
+               help="the path where we will store non-appapp sandboxes.")
+
 class LocalFile(object):
   """
     Local analogue of MirrorFile.
@@ -144,15 +148,20 @@ class ProductionTaskRunner(TaskRunnerWrapper):
   SVN_REPO = 'svn.twitter.biz'
   SVN_PATH = '/science-binaries/home/thermos'
 
-  def __init__(self, task_id, *args, **kwargs):
+  def __init__(self, task_id, mesos_task, *args, **kwargs):
     TaskRunnerWrapper.__init__(self, task_id, *args, **kwargs)
     self._runner_pex = MirrorFile(
       ProductionTaskRunner.SVN_REPO,
       os.path.join(ProductionTaskRunner.SVN_PATH, TaskRunnerWrapper.PEX_NAME),
       os.path.join(ProductionTaskRunner.TEMPDIR, TaskRunnerWrapper.PEX_NAME),
       https=True)
-    self._sandbox = AppAppSandbox(task_id)
-    self._enable_chroot = True
+    if mesos_task.has_layout():
+      self._sandbox = AppAppSandbox(task_id)
+      self._enable_chroot = True
+    else:
+      self._sandbox = DirectorySandbox(task_id, app.get_options().sandbox_root)
+      self._enable_chroot = False
+
 
 
 class AngrybirdTaskRunner(TaskRunnerWrapper):
