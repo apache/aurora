@@ -326,8 +326,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testShardUniquenessCorrection() throws Exception {
-    expectKillTask(9);
-
     control.replay();
 
     Storage storage = createStorage();

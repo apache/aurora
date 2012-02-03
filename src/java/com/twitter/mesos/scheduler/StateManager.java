@@ -45,6 +45,7 @@ import com.twitter.common.stats.Stats;
 import com.twitter.common.util.Clock;
 import com.twitter.common.util.StateMachine;
 import com.twitter.mesos.Tasks;
+import com.twitter.mesos.executor.Task;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Attribute;
 import com.twitter.mesos.gen.HostAttributes;
@@ -270,14 +271,6 @@ class StateManager {
     transactionalStorage.prepare();
   }
 
-  private static Set<String> activeShards(TaskStore taskStore, String jobKey, int shardId) {
-    TaskQuery query = new TaskQuery()
-        .setStatuses(Tasks.ACTIVE_STATES)
-        .setJobKey(jobKey)
-        .setShardIds(ImmutableSet.of(shardId));
-    return taskStore.fetchTaskIds(new Query(query));
-  }
-
   /**
    * Initializes the state manager, by starting the storage and fetching the persisted framework ID.
    *
@@ -293,27 +286,6 @@ class StateManager {
           @Override public void execute(ScheduledTask task) {
             ConfigurationManager.applyDefaultsIfUnset(task.getAssignedTask().getTask());
             createStateMachine(task, task.getStatus());
-
-            // Perform a sanity check on the number of active shards.
-            Set<String> activeTasksInShard = activeShards(
-                storeProvider.getTaskStore(),
-                Tasks.jobKey(task),
-                Tasks.SCHEDULED_TO_SHARD_ID.apply(task));
-
-            if (activeTasksInShard.size() > 1) {
-              shardSanityCheckFails.incrementAndGet();
-              LOG.severe("Active shard sanity check failed when loading " + Tasks.id(task)
-                  + ", active tasks found: " + activeTasksInShard);
-
-              // We want to keep exactly one task from this shard, so sort the IDs and keep the
-              // highest (newest) in the hopes that it is legitimately running.
-              if (!Tasks.id(task).equals(Iterables.getLast(Sets.newTreeSet(activeTasksInShard)))) {
-                task.setStatus(ScheduleStatus.KILLED);
-                driver.killTask(Tasks.id(task));
-              } else {
-                LOG.info("Retaining task " + Tasks.id(task));
-              }
-            }
           }
         });
         transactionalStorage.addSideEffect(new SideEffect() {
@@ -332,7 +304,8 @@ class StateManager {
     managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
 
     return transactionalStorage.doInTransaction(new Work<String, RuntimeException>() {
-      @Override public String apply(Storage.StoreProvider storeProvider) {
+      @Override
+      public String apply(Storage.StoreProvider storeProvider) {
         return storeProvider.getSchedulerStore().fetchFrameworkId();
       }
     });
@@ -355,12 +328,61 @@ class StateManager {
     });
   }
 
+  private static Set<String> activeShards(TaskStore taskStore, String jobKey, int shardId) {
+    TaskQuery query = new TaskQuery()
+        .setStatuses(Tasks.ACTIVE_STATES)
+        .setJobKey(jobKey)
+        .setShardIds(ImmutableSet.of(shardId));
+    return taskStore.fetchTaskIds(new Query(query));
+  }
+
   /**
-   * Instructs the state manager to start, providing a callback that can be used to kill active
-   * tasks.
+   * Instructs the state manager to start.
    */
   synchronized void start() {
     managerState.transition(State.STARTED);
+
+    LOG.info("Performing shard uniqueness sanity check.");
+    transactionalStorage.doInTransaction(new Work.NoResult.Quiet() {
+      @Override protected void execute(final StoreProvider storeProvider) {
+        storeProvider.getTaskStore().mutateTasks(Query.GET_ALL, new Closure<ScheduledTask>() {
+          @Override public void execute(final ScheduledTask task) {
+            // Perform a sanity check on the number of active shards.
+            Set<String> activeTasksInShard = activeShards(
+                storeProvider.getTaskStore(),
+                Tasks.jobKey(task),
+                Tasks.SCHEDULED_TO_SHARD_ID.apply(task));
+
+            if (activeTasksInShard.size() > 1) {
+              shardSanityCheckFails.incrementAndGet();
+              LOG.severe("Active shard sanity check failed when loading " + Tasks.id(task)
+                  + ", active tasks found: " + activeTasksInShard);
+
+              // We want to keep exactly one task from this shard, so sort the IDs and keep the
+              // highest (newest) in the hopes that it is legitimately running.
+              if (!Tasks.id(task).equals(Iterables.getLast(Sets.newTreeSet(activeTasksInShard)))) {
+                task.setStatus(ScheduleStatus.KILLED);
+                // TODO(wfarner); Circle back if this is necessary.  Currently there's a race
+                // condition between the time the scheduler is actually available without hitting
+                // IllegalStateException (see DriverImpl).
+                // driver.killTask(Tasks.id(task));
+
+                transactionalStorage.addSideEffect(new SideEffect() {
+                  @Override public void mutate(MutableState state) {
+                    state.vars.adjustCount(
+                        Tasks.jobKey(task),
+                        task.getStatus(),
+                        ScheduleStatus.KILLED);
+                  }
+                });
+              } else {
+                LOG.info("Retaining task " + Tasks.id(task));
+              }
+            }
+          }
+        });
+      }
+    });
   }
 
   /**
@@ -612,14 +634,6 @@ class StateManager {
      * @param auditMessage Audit message to associate with the transition.
      */
     void changeState(Set<String> taskIds, ScheduleStatus state, String auditMessage);
-
-    /**
-     * Changes the state of tasks, using an empty audit message.
-     *
-     * @param taskIds IDs of the tasks to modify.
-     * @param state New state to apply to the tasks.
-     */
-    void changeState(Set<String> taskIds, ScheduleStatus state);
   }
 
   /**
@@ -659,24 +673,9 @@ class StateManager {
               String auditMessage) {
             changeStateInTransaction(taskIds, stateUpdaterWithAuditMessage(state, auditMessage));
           }
-
-          @Override public void changeState(Set<String> taskIds, ScheduleStatus state) {
-            changeStateInTransaction(taskIds, stateUpdater(state));
-          }
         });
       }
     });
-  }
-
-  /**
-   * Convenience method to {@link #taskOperation(Query, StateMutation)} with a {@code null} query.
-   *
-   * @param operation Operation to be performed.
-   * @param <E> Type of exception thrown by the state change.
-   * @throws E If the operation fails.
-   */
-  synchronized <E extends Exception> void taskOperation(StateMutation<E> operation) throws E {
-    taskOperation(null, operation);
   }
 
   /**

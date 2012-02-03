@@ -361,13 +361,13 @@ def watch_scheduler(host, sha, up_min_secs):
       if not app.get_options().really_push:
         print 'Skipping further health checks, since we are not pushing.'
         return True
-      print 'Up and healthy for %s seconds' % uptime
+      print '%s up and healthy for %s seconds' % (host, uptime)
 
       if started:
         if uptime < last_uptime:
           print 'Detected scheduler process restart after update (uptime %s)!' % uptime
           return False
-        elif time.time() - start_detected_at > up_min_secs:
+        elif (time.time() - start_detected_at) > up_min_secs:
           deployed_sha = get_scheduler_sha(host)
           if deployed_sha != sha:
             print 'Host %s is not on current build %s, has %s' % (host, sha, deployed_sha)
@@ -381,7 +381,7 @@ def watch_scheduler(host, sha, up_min_secs):
       started = True
       last_uptime = uptime
     elif started:
-      print 'Scheduler stopped responding to health checks!'
+      print 'Scheduler %s stopped responding to health checks!' % host
       return False
     time.sleep(2)
   return False

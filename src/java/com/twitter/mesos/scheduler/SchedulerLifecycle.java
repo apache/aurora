@@ -18,7 +18,6 @@ import org.apache.mesos.SchedulerDriver;
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.zookeeper.ServerSet;
 import com.twitter.common.zookeeper.SingletonService;
-import com.twitter.mesos.scheduler.Driver.DriverImpl;
 import com.twitter.thrift.Status;
 
 /**
@@ -126,10 +125,6 @@ class SchedulerLifecycle {
               lifecycle.shutdown();
             }
           }).start();
-    }
-
-    private Protos.TaskID asProto(String taskId) {
-      return Protos.TaskID.newBuilder().setValue(taskId).build();
     }
 
     @Override

@@ -101,20 +101,14 @@ interface Driver {
       return driverSupplier.get().get();
     }
 
-    /**
-     * Runs the underlying driver.  Can only be called once.
-     *
-     * @return The status of the underlying driver run request.
-     */
+    @Override
     public Protos.Status run() {
       SchedulerDriver driver = get(State.INIT);
       stateMachine.transition(State.RUNNING);
       return driver.run();
     }
 
-    /**
-     * Stops the underlying driver if it is running, otherwise does nothing.
-     */
+    @Override
     public synchronized void stop() {
       if (stateMachine.getState() == State.RUNNING) {
         SchedulerDriver driver = get(State.RUNNING);
