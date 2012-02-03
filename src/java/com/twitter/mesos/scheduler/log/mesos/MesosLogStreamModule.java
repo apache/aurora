@@ -64,7 +64,7 @@ public class MesosLogStreamModule extends PrivateModule {
   @CmdLine(name = "native_log_election_timeout",
            help = "The timeout for attempting to obtain a new log writer.")
   private static final Arg<Amount<Long, Time>> coordinatorElectionTimeout =
-      Arg.create(Amount.of(1L, Time.SECONDS));
+      Arg.create(Amount.of(15L, Time.SECONDS));
 
   @CmdLine(name = "native_log_election_retries",
            help = "The maximum number of retries to obtain a new log writer.")
@@ -78,7 +78,7 @@ public class MesosLogStreamModule extends PrivateModule {
   @CmdLine(name = "native_log_write_timeout",
            help = "The timeout for doing log appends and truncations.")
   private static final Arg<Amount<Long, Time>> writeTimeout =
-      Arg.create(Amount.of(1L, Time.SECONDS));
+      Arg.create(Amount.of(3L, Time.SECONDS));
 
   /**
    * Binds a distributed {@link com.twitter.mesos.scheduler.log.Log} that uses the mesos core native
