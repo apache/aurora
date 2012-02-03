@@ -29,6 +29,7 @@ import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.LimitConstraint;
 import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.CommandLineExpander;
 import com.twitter.mesos.scheduler.ThermosJank;
 import com.twitter.mesos.scheduler.configuration.ValueParser.ParseException;
 
@@ -406,6 +407,10 @@ public class ConfigurationManager {
       }
     }
     maybeFillThermosConfig(task);
+
+    // TODO(wfarner): Remove this when new client is fully deployed and all tasks are backfilled.
+    maybeFillRequestedPorts(task);
+
     return task;
   }
 
@@ -413,6 +418,12 @@ public class ConfigurationManager {
     if (!task.isSetThermosConfig()) {
       // Workaround for thrift 0.5.0 NPE.  See MESOS-370.
       task.setThermosConfig(new byte[] {});
+    }
+  }
+
+  private static void maybeFillRequestedPorts(TwitterTaskInfo task) {
+    if (!task.isSetRequestedPorts()) {
+      task.setRequestedPorts(CommandLineExpander.getPortNames(task.getStartCommand()));
     }
   }
 

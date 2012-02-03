@@ -324,6 +324,47 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   }
 
   @Test
+  public void testBackfillRequestedPorts() throws Exception {
+    final String storedTaskId = "task_on_disk";
+
+    expectOffer(true);
+
+    control.replay();
+
+    Storage storage = createStorage();
+
+    storage.start(Work.NOOP);
+
+    final TwitterTaskInfo storedTask = new TwitterTaskInfo()
+        .setOwner(OWNER_A)
+        .setJobName(JOB_A)
+        .setNumCpus(1.0)
+        .setRamMb(1024)
+        .setDiskMb(500)
+        .setShardId(0)
+        .setStartCommand("ls %port:foo%")
+        .setAvoidJobs(ImmutableSet.<String>of());
+
+    storage.doInTransaction(new NoResult.Quiet() {
+      @Override protected void execute(Storage.StoreProvider storeProvider) {
+        storeProvider.getTaskStore().saveTasks(ImmutableSet.of(new ScheduledTask()
+            .setStatus(PENDING)
+            .setAssignedTask(
+                new AssignedTask()
+                    .setTaskId(storedTaskId)
+                    .setTask(storedTask))));
+      }
+    });
+
+    buildScheduler(storage);
+
+    Offer offer = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096, ImmutableSet.of(Pair.of(80, 81)));
+    TwitterTask launchedTask = scheduler.offer(offer, EXECUTOR_ID);
+
+    assertEquals(ImmutableSet.of("foo"), launchedTask.task.getTask().getRequestedPorts());
+  }
+
+  @Test
   public void testCreateJobNoHdfs() throws Exception {
     control.replay();
     buildScheduler();

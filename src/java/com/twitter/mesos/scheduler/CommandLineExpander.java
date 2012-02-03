@@ -99,4 +99,17 @@ public final class CommandLineExpander {
     task.setAssignedPorts(ports);
     return task;
   }
+
+  public static Set<String> getPortNames(String commandLine) {
+    if (StringUtils.isBlank(commandLine)) {
+      return ImmutableSet.of();
+    }
+
+    ImmutableSet.Builder<String> ports = ImmutableSet.builder();
+    Matcher m = PORT_REQUEST_PATTERN.matcher(commandLine);
+    while (m.find()) {
+      ports.add(m.group(1));
+    }
+    return ports.build();
+  }
 }
