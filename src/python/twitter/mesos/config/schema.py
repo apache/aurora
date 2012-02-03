@@ -30,10 +30,10 @@ class UpdateConfig(Struct):
   total_failures     = Default(Integer, 0)
 
 # The thermosConfig populated inside of TwitterTaskInfo.
-@Provided(mesos = MesosContext)
+@Provided(mesos=MesosContext)
 class MesosTaskInstance(Struct):
   task     = Required(Task)
-  layout   = Required(Layout)
+  layout   = Layout
   instance = Required(Integer)
   role     = Required(String)
 

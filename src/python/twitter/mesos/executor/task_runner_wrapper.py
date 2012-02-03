@@ -24,10 +24,6 @@ app.add_option("--checkpoint_root", dest="checkpoint_root", metavar="PATH",
                default="/var/run/thermos",
                help="the path where we will store workflow logs and checkpoints")
 
-app.add_option("--sandbox_root", dest="sandbox_root", metavar="PATH",
-               default="/var/run/thermos/sandbox",
-               help="the path where we will store non-appapp sandboxes.")
-
 class LocalFile(object):
   """
     Local analogue of MirrorFile.
@@ -159,7 +155,7 @@ class ProductionTaskRunner(TaskRunnerWrapper):
       self._sandbox = AppAppSandbox(task_id)
       self._enable_chroot = True
     else:
-      self._sandbox = DirectorySandbox(task_id, app.get_options().sandbox_root)
+      self._sandbox = DirectorySandbox(task_id)
       self._enable_chroot = False
 
 
