@@ -45,7 +45,6 @@ import com.twitter.common.stats.Stats;
 import com.twitter.common.util.Clock;
 import com.twitter.common.util.StateMachine;
 import com.twitter.mesos.Tasks;
-import com.twitter.mesos.executor.Task;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Attribute;
 import com.twitter.mesos.gen.HostAttributes;
