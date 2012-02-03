@@ -313,6 +313,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     buildScheduler(storage);
 
+    // Check that the missing event was synthesized.
+    assertThat(Iterables.getLast(getTask(storedTaskId).getTaskEvents()).getStatus(), is(PENDING));
+
     Offer offer = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, 4096);
     TwitterTask launchedTask = scheduler.offer(offer, EXECUTOR_ID);
 

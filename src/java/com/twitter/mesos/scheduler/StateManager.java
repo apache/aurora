@@ -34,6 +34,7 @@ import com.google.inject.Inject;
 
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.SlaveID;
+import org.apache.mesos.Protos.TaskStatus;
 
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
@@ -361,6 +362,8 @@ class StateManager {
               // highest (newest) in the hopes that it is legitimately running.
               if (!Tasks.id(task).equals(Iterables.getLast(Sets.newTreeSet(activeTasksInShard)))) {
                 task.setStatus(ScheduleStatus.KILLED);
+                task.addToTaskEvents(new TaskEvent(clock.nowMillis(), ScheduleStatus.KILLED)
+                    .setMessage("Killed duplicate shard."));
                 // TODO(wfarner); Circle back if this is necessary.  Currently there's a race
                 // condition between the time the scheduler is actually available without hitting
                 // IllegalStateException (see DriverImpl).
@@ -376,6 +379,14 @@ class StateManager {
                 });
               } else {
                 LOG.info("Retaining task " + Tasks.id(task));
+              }
+            } else {
+              TaskEvent latestEvent = task.isSetTaskEvents()
+                  ? Iterables.getLast(task.getTaskEvents(), null) : null;
+              if ((latestEvent == null) || (latestEvent.getStatus() != task.getStatus())) {
+                LOG.severe("Task " + Tasks.id(task) + " has no event for current status.");
+                task.addToTaskEvents(new TaskEvent(clock.nowMillis(), task.getStatus())
+                    .setMessage("Synthesized missing event."));
               }
             }
           }
