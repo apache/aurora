@@ -31,11 +31,13 @@ app.configure(module='twitter.common.app.modules.exception_handler',
     enable=True, category='thermos_executor_exceptions')
 app.configure(debug=True)
 
+
 if 'ANGRYBIRD_HOME' in os.environ:
   RUNNER_CLASS = AngrybirdTaskRunner
   LogOptions.set_log_dir(os.path.join(os.environ['ANGRYBIRD_HOME'], 'logs/thermos/log'))
 else:
   RUNNER_CLASS = ProductionTaskRunner
+
 
 class ExecutorPollingThread(threading.Thread):
   def __init__(self, runner, driver, task_id):
@@ -79,6 +81,16 @@ class ExecutorPollingThread(threading.Thread):
 
 
 class ThermosExecutor(mesos.Executor):
+  # Why doesn't pb2 provide this for us?
+  _STATES = {
+    mesos_pb.TASK_STARTING: 'STARTING',
+    mesos_pb.TASK_RUNNING:  'RUNNING',
+    mesos_pb.TASK_FINISHED: 'FINISHED',
+    mesos_pb.TASK_FAILED:   'FAILED',
+    mesos_pb.TASK_KILLED:   'KILLED',
+    mesos_pb.TASK_LOST:     'LOST',
+  }
+
   def __init__(self):
     self._runner = None
     self._slave_id = None
@@ -91,14 +103,15 @@ class ThermosExecutor(mesos.Executor):
   def _log(self, msg):
     log.info('Executor [%s]: %s' % (self._slave_id, msg))
 
-  @staticmethod
-  def task_update(task_id, state, message=None):
+  def send_update(self, driver, task_id, state, message=None):
+    assert state in ThermosExecutor._STATES
     update = mesos_pb.TaskStatus()
     update.task_id.value = task_id
     update.state = state
-    if message:
-      update.message = message
-    return update
+    update.message = str(message)
+    self._log('Updating %s => %s' % (task_id, ThermosExecutor._STATES[state]))
+    self._log('   Reason: %s' % message)
+    driver.sendStatusUpdate(update)
 
   @staticmethod
   def deserialize_assigned_task(task):
@@ -129,56 +142,53 @@ class ThermosExecutor(mesos.Executor):
     return (MesosTaskInstance(json_blob), assigned_task.assignedPorts)
 
   def launchTask(self, driver, task):
+    self._log('launchTask got task: %s:%s' % (task.name, task.task_id.value))
+
     if self._runner:
+      # TODO(wickman) Send LOST immediately for both tasks?
       log.error('Error!  Already running a task! %s' % self._runner)
-      driver.sendStatusUpdate(
-        self.task_update(self._task_id, mesos_pb.TASK_LOST,
-          "Task already running on this executor: %s" % self._task_id))
+      self.send_update(driver, self._task_id, mesos_pb.TASK_LOST,
+          "Task already running on this executor: %s" % self._task_id)
       return
 
     self._slave_id = task.slave_id.value
     self._task_id = task.task_id.value
-    self._log('launchTask() - Got task: %s:%s' % (task.name, task.task_id.value))
 
     try:
       assigned_task = ThermosExecutor.deserialize_assigned_task(task)
       mesos_task, portmap = ThermosExecutor.deserialize_thermos_task(assigned_task)
     except Exception as e:
       log.fatal('Could not deserialize AssignedTask: %s' % e)
-      driver.sendStatusUpdate(self.task_update(self._task_id, mesos_pb.TASK_FAILED,
-        "Could not deserialize task: %s" % e))
+      self.send_update(driver, self._task_id, mesos_pb.TASK_FAILED,
+        "Could not deserialize task: %s" % e)
       driver.stop()
       return
 
+    self.send_update(driver, self._task_id, mesos_pb.TASK_STARTING, 'Initializing sandbox.')
+
     self._runner = RUNNER_CLASS(self._task_id, mesos_task, mesos_task.role().get(), portmap)
     self._runner.start()
-    log.debug('Waiting for task to start.')
 
     # TODO(wickman)  This should be able to timeout.  Send TASK_LOST after 60 seconds of trying?
+    log.debug('Waiting for task to start.')
     while self._runner.state() is None:
       log.debug('   - sleeping...')
       time.sleep(Amount(250, Time.MILLISECONDS).as_(Time.SECONDS))
     log.debug('Task started.')
-
-    update = mesos_pb.TaskStatus()
-    update.task_id.value = task.task_id.value
-    update.state = mesos_pb.TASK_RUNNING
-    log.debug('Sending TASK_RUNNING update.')
-    driver.sendStatusUpdate(update)
+    self.send_update(driver, self._task_id, mesos_pb.TASK_RUNNING)
 
     self._poller = ExecutorPollingThread(self._runner, driver, self._task_id)
     self._poller.start()
 
   def killTask(self, driver, task_id):
-    self._log('killTask() - Got task_id: %s' % task_id)
+    self._log('killTask() got task_id: %s' % task_id)
     if self._runner is None:
       log.error('Got killTask but no task running!')
       return
     if task_id.value != self._task_id:
       log.error('Got killTask for a different task than what we are running!')
       return
-    # TODO(wickman) This check isn't correct.
-    if self._runner.state().state != TaskState.ACTIVE:
+    if self._runner.state().state in (TaskState.SUCCESS, TaskState.FAILED, TaskState.KILLED):
       log.error('Got killTask for task in terminal state!')
       return
     log.info('Issuing kills.')
@@ -188,8 +198,9 @@ class ThermosExecutor(mesos.Executor):
     self._log('frameworkMessage() - message: %s' % message)
 
   def shutdown(self, driver):
-    # TODO(wickman) Should this be implemented?
     self._log('shutdown()')
+    if self._task_id:
+      self.killTask(driver, self._task_id)
 
   def error(self, driver, code, message):
     self._log('error() - code: %s, message: %s' % (code, message))
@@ -201,6 +212,6 @@ def main():
   drv = mesos.MesosExecutorDriver(thermos_executor)
   drv.run()
   log.info('MesosExecutorDriver.run() has finished.')
-  time.sleep(10) # necessary due to ASF MESOS-36
+
 
 app.main()
