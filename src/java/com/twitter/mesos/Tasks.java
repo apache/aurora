@@ -124,6 +124,13 @@ public class Tasks {
         }
       };
 
+  public static final Function<ScheduledTask, ScheduleStatus> GET_STATUS =
+      new Function<ScheduledTask, ScheduleStatus>() {
+        @Override public ScheduleStatus apply(ScheduledTask task) {
+          return task.getStatus();
+        }
+      };
+
   /**
    * Order by production flag (true, then false), subsorting by task ID.
    */

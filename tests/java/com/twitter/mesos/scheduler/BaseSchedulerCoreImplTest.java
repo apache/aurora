@@ -8,6 +8,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.annotation.Nullable;
 
@@ -321,6 +322,43 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         is(new TwitterTaskInfo(storedTask).setProduction(false).setThermosConfig(new byte[] {})));
 
     assertThat(getTask(storedTaskId).getStatus(), is(ASSIGNED));
+  }
+
+  @Test
+  public void testShardUniquenessCorrection() throws Exception {
+    expectKillTask(9);
+
+    control.replay();
+
+    Storage storage = createStorage();
+
+    storage.start(Work.NOOP);
+
+    final AtomicInteger taskId = new AtomicInteger();
+
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, 10);
+    final Set<ScheduledTask> badTasks = ImmutableSet.copyOf(Iterables.transform(job.getTaskConfigs(),
+        new Function<TwitterTaskInfo, ScheduledTask>() {
+          @Override public ScheduledTask apply(TwitterTaskInfo task) {
+            return new ScheduledTask()
+                .setStatus(RUNNING)
+                .setAssignedTask(
+                    new AssignedTask()
+                      .setTaskId("task-" + taskId.incrementAndGet())
+                      .setTask(task.setShardId(0)));
+          }
+        }));
+
+    storage.doInTransaction(new NoResult.Quiet() {
+      @Override protected void execute(Storage.StoreProvider storeProvider) {
+        storeProvider.getTaskStore().saveTasks(badTasks);
+      }
+    });
+
+    buildScheduler(storage);
+
+    assertThat(getTasks(Query.byStatus(RUNNING)).size(), is(1));
+    assertThat(getTasks(Query.byStatus(KILLED)).size(), is(9));
   }
 
   @Test

@@ -6,6 +6,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.util.Date;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -14,8 +15,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Maps;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
 
@@ -25,11 +26,12 @@ import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
+import com.twitter.mesos.Tasks;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
-import com.twitter.mesos.gen.Attribute;
 import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.Quota;
+import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.storage.LogEntry;
 import com.twitter.mesos.gen.storage.Op;
@@ -514,6 +516,11 @@ public class LogStorage extends ForwardingStore {
     return doInTransaction(new Work.Quiet<ImmutableSet<ScheduledTask>>() {
       @Override public ImmutableSet<ScheduledTask> apply(StoreProvider unused) {
         ImmutableSet<ScheduledTask> mutated = LogStorage.super.mutateTasks(query, mutator);
+
+        Map<String, ScheduledTask> tasksById = Maps.uniqueIndex(mutated, Tasks.SCHEDULED_TO_ID);
+        LOG.info("Storing updated tasks to log: "
+            + Maps.transformValues(tasksById, Tasks.GET_STATUS));
+
         log(Op.saveTasks(new SaveTasks(mutated)));
         return mutated;
       }

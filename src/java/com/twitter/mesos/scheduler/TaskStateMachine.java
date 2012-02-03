@@ -3,7 +3,6 @@ package com.twitter.mesos.scheduler;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -62,18 +61,20 @@ public class TaskStateMachine {
    * States must be equal for them to be considered equal.
    */
   private static class State {
-    ScheduleStatus state;
-    Closure<ScheduledTask> mutation;
+    final ScheduleStatus state;
+    final Closure<ScheduledTask> mutation;
+
+    State(ScheduleStatus state, @Nullable Closure<ScheduledTask> mutation) {
+      this.state = state;
+      this.mutation = mutation;
+    }
 
     static State create(ScheduleStatus status) {
       return create(status, null);
     }
 
     static State create(ScheduleStatus status, @Nullable Closure<ScheduledTask> mutation) {
-      State state = new State();
-      state.state = status;
-      state.mutation = mutation;
-      return state;
+      return new State(status, mutation);
     }
 
     @Override

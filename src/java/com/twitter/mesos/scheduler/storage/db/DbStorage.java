@@ -11,6 +11,7 @@ import java.sql.Types;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -26,6 +27,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
@@ -317,6 +319,10 @@ public class DbStorage implements
     } catch (IOException e) {
       throw new IllegalStateException(e);
     }
+
+    Map<String, ScheduledTask> tasksById =
+        Maps.uniqueIndex(fetchTasks(Query.GET_ALL), Tasks.SCHEDULED_TO_ID);
+    LOG.info("Recovered tasks from storage: " + Maps.transformValues(tasksById, Tasks.GET_STATUS));
   }
 
   private void updateSchedulerState(final ConfiguratonKey key,
@@ -785,7 +791,9 @@ public class DbStorage implements
     }
     final ImmutableSet<ScheduledTask> tasksToUpdate = tasksToUpdateBuilder.build();
     if (!tasksToUpdate.isEmpty()) {
-      LOG.info(String.format("Updating %d tasks", tasksToUpdate.size()));
+      Map<String, ScheduledTask> tasksById = Maps.uniqueIndex(tasksToUpdate, Tasks.SCHEDULED_TO_ID);
+      LOG.info("Storing updated tasks to database: "
+          + Maps.transformValues(tasksById, Tasks.GET_STATUS));
 
       long startNanos = System.nanoTime();
       final Iterator<ScheduledTask> tasks = tasksToUpdate.iterator();

@@ -270,6 +270,14 @@ class StateManager {
     transactionalStorage.prepare();
   }
 
+  private static Set<String> activeShards(TaskStore taskStore, String jobKey, int shardId) {
+    TaskQuery query = new TaskQuery()
+        .setStatuses(Tasks.ACTIVE_STATES)
+        .setJobKey(jobKey)
+        .setShardIds(ImmutableSet.of(shardId));
+    return taskStore.fetchTaskIds(new Query(query));
+  }
+
   /**
    * Initializes the state manager, by starting the storage and fetching the persisted framework ID.
    *
@@ -280,11 +288,32 @@ class StateManager {
     managerState.transition(State.INITIALIZED);
 
     transactionalStorage.start(new Work.NoResult.Quiet() {
-      @Override protected void execute(Storage.StoreProvider storeProvider) {
+      @Override protected void execute(final Storage.StoreProvider storeProvider) {
         storeProvider.getTaskStore().mutateTasks(Query.GET_ALL, new Closure<ScheduledTask>() {
           @Override public void execute(ScheduledTask task) {
             ConfigurationManager.applyDefaultsIfUnset(task.getAssignedTask().getTask());
             createStateMachine(task, task.getStatus());
+
+            // Perform a sanity check on the number of active shards.
+            Set<String> activeTasksInShard = activeShards(
+                storeProvider.getTaskStore(),
+                Tasks.jobKey(task),
+                Tasks.SCHEDULED_TO_SHARD_ID.apply(task));
+
+            if (activeTasksInShard.size() > 1) {
+              shardSanityCheckFails.incrementAndGet();
+              LOG.severe("Active shard sanity check failed when loading " + Tasks.id(task)
+                  + ", active tasks found: " + activeTasksInShard);
+
+              // We want to keep exactly one task from this shard, so sort the IDs and keep the
+              // highest (newest) in the hopes that it is legitimately running.
+              if (!Tasks.id(task).equals(Iterables.getLast(Sets.newTreeSet(activeTasksInShard)))) {
+                task.setStatus(ScheduleStatus.KILLED);
+                driver.killTask(Tasks.id(task));
+              } else {
+                LOG.info("Retaining task " + Tasks.id(task));
+              }
+            }
           }
         });
         transactionalStorage.addSideEffect(new SideEffect() {
@@ -931,14 +960,6 @@ class StateManager {
 
   private final AtomicLong shardSanityCheckFails = Stats.exportLong("shard_sanity_check_failures");
 
-  private static Set<String> activeShards(TaskStore taskStore, String jobKey, int shardId) {
-    TaskQuery query = new TaskQuery()
-        .setStatuses(Tasks.ACTIVE_STATES)
-        .setJobKey(jobKey)
-        .setShardIds(ImmutableSet.of(shardId));
-    return taskStore.fetchTaskIds(new Query(query));
-  }
-
   private void processWorkQueueInTransaction(StoreProvider storeProvider) {
     managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
     for (final WorkEntry work : Iterables.consumingIterable(workQueue)) {
@@ -964,21 +985,11 @@ class StateManager {
             String newTaskId = generateTaskId(task.getAssignedTask().getTask());
             task.getAssignedTask().setTaskId(newTaskId);
 
-            Set<String> activeTasksInShard = activeShards(
-                taskStore, Tasks.jobKey(task), Tasks.SCHEDULED_TO_SHARD_ID.apply(task));
-            // We expect at most one active shard here, since the RESCHEDULE work comes before the
-            // UPDATE_STATE for the previous task generation.
-            if (activeTasksInShard.size() > 1) {
-              shardSanityCheckFails.incrementAndGet();
-              LOG.severe("Active shard sanity check failed when rescheduling " + taskId
-                  + ", active tasks found: " + activeTasksInShard);
-            } else {
-              LOG.info("Task being rescheduled: " + taskId);
+            LOG.info("Task being rescheduled: " + taskId);
 
-              taskStore.saveTasks(ImmutableSet.of(task));
+            taskStore.saveTasks(ImmutableSet.of(task));
 
-              createStateMachine(task).updateState(PENDING, "Rescheduled");
-            }
+            createStateMachine(task).updateState(PENDING, "Rescheduled");
             break;
 
           case UPDATE:
