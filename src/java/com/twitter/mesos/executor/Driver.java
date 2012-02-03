@@ -155,8 +155,8 @@ public interface Driver extends Function<Message, Integer> {
 
           Status s = driver.sendStatusUpdate(msg.build());
           if (s != Status.OK) {
-            LOG.warning("Attempt to send executor message returned code " + s);
-            statusUpdatesFailed.incrementAndGet();
+            LOG.warning("Status update failed with " + s + ", committing suicide.");
+            lifecycle.shutdown();
           } else {
             statusUpdatesSent.incrementAndGet();
           }

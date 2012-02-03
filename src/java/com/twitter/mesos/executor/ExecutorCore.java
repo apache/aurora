@@ -240,8 +240,11 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
       task.terminate(ScheduleStatus.KILLED);
     } else if (task == null) {
       LOG.severe("No such task found: " + taskId);
+      driver.sendStatusUpdate(taskId, ScheduleStatus.LOST, Optional.of("Task not found on slave."));
     } else {
       LOG.info("Kill request for task in state " + task.getScheduleStatus() + " ignored.");
+      driver.sendStatusUpdate(taskId, task.getScheduleStatus(),
+          Optional.of("Repeating lost update."));
     }
     return task;
   }

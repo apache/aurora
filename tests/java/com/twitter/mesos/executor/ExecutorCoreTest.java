@@ -190,23 +190,21 @@ public class ExecutorCoreTest extends EasyMockTest {
     return running;
   }
 
-  private AssignedTask setupKilledTask() throws Exception {
-    AssignedTask killed = setupRunningTask();
-    executor.stopLiveTask(killed.getTaskId());
-    return killed;
-  }
-
   @Test
   public void testRetainRunningTask() throws Exception {
-    AssignedTask killed = setupKilledTask();
     expect(runningTask.isRunning()).andReturn(false);
     expect(runningTask.getSandboxDir()).andReturn(DEVNULL);
     fileDeleter.execute(DEVNULL);
     AssignedTask running = setupRunningTask();
 
+    AssignedTask killed = setupRunningTask();
+    expect(runningTask.getScheduleStatus()).andReturn(RUNNING);
+    runningTask.terminate(KILLED);
+
     control.replay();
 
     executor.executeTask(killed);
+    executor.stopLiveTask(killed.getTaskId());
     executor.executeTask(running);
 
     executor.adjustRetainedTasks(ImmutableSet.of(running.getTaskId()));
@@ -216,7 +214,10 @@ public class ExecutorCoreTest extends EasyMockTest {
 
   @Test
   public void testRetainKilledTask() throws Exception {
-    AssignedTask killed = setupKilledTask();
+    AssignedTask killed = setupRunningTask();
+    expect(runningTask.getScheduleStatus()).andReturn(RUNNING);
+    runningTask.terminate(KILLED);
+
     AssignedTask running = setupRunningTask();
     expect(runningTask.isRunning()).andReturn(true);
     expect(runningTask.getSandboxDir()).andReturn(DEVNULL);
@@ -226,6 +227,7 @@ public class ExecutorCoreTest extends EasyMockTest {
     control.replay();
 
     executor.executeTask(killed);
+    executor.stopLiveTask(killed.getTaskId());
     executor.executeTask(running);
 
     executor.adjustRetainedTasks(ImmutableSet.of(killed.getTaskId()));
@@ -235,7 +237,10 @@ public class ExecutorCoreTest extends EasyMockTest {
 
   @Test
   public void testRetainNoTasks() throws Exception {
-    AssignedTask killed = setupKilledTask();
+    AssignedTask killed = setupRunningTask();
+    expect(runningTask.getScheduleStatus()).andReturn(RUNNING);
+    runningTask.terminate(KILLED);
+
     expect(runningTask.isRunning()).andReturn(false);
     expect(runningTask.getSandboxDir()).andReturn(DEVNULL);
     fileDeleter.execute(DEVNULL);
@@ -248,6 +253,7 @@ public class ExecutorCoreTest extends EasyMockTest {
     control.replay();
 
     executor.executeTask(killed);
+    executor.stopLiveTask(killed.getTaskId());
     executor.executeTask(running);
 
     executor.adjustRetainedTasks(ImmutableSet.<String>of());
@@ -257,16 +263,20 @@ public class ExecutorCoreTest extends EasyMockTest {
 
   @Test
   public void testRetainAllTasks() throws Exception {
-    AssignedTask finished = setupKilledTask();
+    AssignedTask killed = setupRunningTask();
+    expect(runningTask.getScheduleStatus()).andReturn(RUNNING);
+    runningTask.terminate(KILLED);
+
     AssignedTask running = setupRunningTask();
 
     control.replay();
 
-    executor.executeTask(finished);
+    executor.executeTask(killed);
+    executor.stopLiveTask(killed.getTaskId());
     executor.executeTask(running);
 
-    executor.adjustRetainedTasks(ImmutableSet.of(running.getTaskId(), finished.getTaskId()));
-    assertNotNull(executor.getTask(finished.getTaskId()));
+    executor.adjustRetainedTasks(ImmutableSet.of(running.getTaskId(), killed.getTaskId()));
+    assertNotNull(executor.getTask(killed.getTaskId()));
     assertNotNull(executor.getTask(running.getTaskId()));
   }
 
@@ -306,17 +316,20 @@ public class ExecutorCoreTest extends EasyMockTest {
 
   @Test
   public void testScanNotRunningTask() throws Exception {
-    AssignedTask finished = setupKilledTask();
+    AssignedTask killed = setupRunningTask();
+    expect(runningTask.getScheduleStatus()).andReturn(RUNNING);
+    runningTask.terminate(KILLED);
     expect(runningTask.isRunning()).andReturn(false);
 
     processKiller.execute(new KillCommand(2));
 
     control.replay();
 
-    executor.executeTask(finished);
+    executor.executeTask(killed);
+    executor.stopLiveTask(killed.getTaskId());
 
     executor.checkProcesses(ImmutableSet.of(
-        new ProcessInfo(2, finished.getTaskId(), ImmutableSet.of(5, 6))));
+        new ProcessInfo(2, killed.getTaskId(), ImmutableSet.of(5, 6))));
   }
 
   @Test
