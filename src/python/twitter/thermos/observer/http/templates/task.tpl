@@ -63,7 +63,7 @@
          <td> ${pretty_time(float(proc["start_time"])/1000.0) if "start_time" in proc else ""} </td>
          <td> ${pretty_time(float(proc["stop_time"])/1000.0) if "stop_time" in proc else ""} </td>
          <td> ${'%.3f' % proc["used"]["cpu"] if "used" in proc else ""} </td>
-         <td> ${'%dMB' % (proc["used"]["ram"] / 1048576) if "used" in proc else ""} </td>
+         <td> ${'%dMB' % (proc["used"]["ram"] / 1024 / 1024) if "used" in proc else ""} </td>
          <td> <a href="/logs/${task_id}/${proc["process_name"]}/${proc["process_run"]}/stdout">stdout</a> </td>
          <td> <a href="/logs/${task_id}/${proc["process_name"]}/${proc["process_run"]}/stderr">stderr</a> </td>
        </tr>

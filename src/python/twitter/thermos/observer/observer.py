@@ -279,6 +279,9 @@ class TaskObserver(threading.Thread):
 
     context = self.context(task_id)
     task = task % Environment(thermos = context)
+    sample = self._measurer.sample_by_task_id(task_id).to_dict()
+    sample['disk'] = 0
+    log.debug('Resource consumption (%s, *) => %s' % (task_id, sample))
 
     return dict(
        task_id = task_id,
@@ -286,11 +289,7 @@ class TaskObserver(threading.Thread):
        state = TaskState._VALUES_TO_NAMES[state.state],
        user = task.user().get(),
        # ports
-       resource_consumption = dict(
-         cpu = self._measurer.current_cpu_by_task_id(task_id),
-         ram = 0,   # TODO(wickman)
-         disk = 0   # TODO(wickman)
-       ),
+       resource_consumption = sample,
        # timeline
        processes = self._task_processes(task_id)
     )
@@ -302,11 +301,10 @@ class TaskObserver(threading.Thread):
     return dict((task_id, self._task(task_id)) for task_id in task_ids)
 
   def _get_process_resource_consumption(self, task_id, process_name):
-    return dict(
-      cpu = self._measurer.current_cpu_by_process(task_id, process_name),
-      ram = 0, # implement
-      disk = 0 # implement
-    )
+    sample = self._measurer.sample_by_process(task_id, process_name).to_dict()
+    sample['disk'] = 0
+    log.debug('Resource consumption (%s, %s) => %s' % (task_id, process_name, sample))
+    return sample
 
   def _get_process_tuple(self, history, run):
     """

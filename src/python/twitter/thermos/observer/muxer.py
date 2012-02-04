@@ -1,9 +1,11 @@
+import threading
+from twitter.common.lang.synchronizable import Lockable
 from twitter.thermos.observer.monitor import TaskMonitor
 
 __author__ = 'wickman@twitter.com (brian wickman)'
 __tested__ = False
 
-class TaskMuxer(object):
+class TaskMuxer(Lockable):
   """
     Class responsible for monitoring multiple tasks.
   """
@@ -14,7 +16,9 @@ class TaskMuxer(object):
   def __init__(self, pathspec):
     self._pathspec = pathspec
     self._tasks = {}
+    Lockable.__init__(self)
 
+  @Lockable.sync
   def add(self, task_id):
     """
       Add a task_id to the monitored collection.
@@ -25,6 +29,7 @@ class TaskMuxer(object):
       raise TaskMuxer.TaskExistsError('Already monitoring %s' % task_id)
     self._tasks[task_id] = TaskMonitor(self._pathspec, task_id)
 
+  @Lockable.sync
   def remove(self, task_id):
     """
       Remove a task_id from the monitored collection.
@@ -35,6 +40,7 @@ class TaskMuxer(object):
       raise TaskMuxer.UnknownTaskError('Tried to remove unmonitored task %s' % task_id)
     self._tasks.pop(task_id)
 
+  @Lockable.sync
   def get_state(self, task_id):
     """
       Get the latest state of the task_id.
@@ -45,6 +51,7 @@ class TaskMuxer(object):
       raise TaskMuxer.UnknownTaskError('Not monitoring %s' % task_id)
     return self._tasks[task_id].get_state()
 
+  @Lockable.sync
   def get_active_processes(self):
     """
       Get active processes.  Returned is a list of tuples of the form:
