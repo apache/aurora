@@ -212,7 +212,7 @@ class MesosClientAPI(MesosClientBase):
     # TODO(William Farner): Cleanly handle connection failures in case the scheduler
     #                       restarts mid-update.
     updater = Updater(config.role(), config.name(), self.client(), time, resp.updateToken,
-      self._session_key)
+                      self._session_key)
     failed_shards = updater.update(config.job())
 
     if failed_shards:
@@ -225,10 +225,10 @@ class MesosClientAPI(MesosClientBase):
       resp.updateToken, self._session_key)
 
     if resp.responseCode != ResponseCode.OK:
-	  log.info("Error doing finish update: %s" % resp.message)
+      log.info("Error doing finish update: %s" % resp.message)
 
-	  # Create a update response and return it
-	  update_resp = FinishUpdateResponse()
+      # Create a update response and return it
+      update_resp = FinishUpdateResponse()
       update_resp.responseCode = ResponseCode.INVALID_REQUEST
       update_resp.message = resp.message
       return update_resp
@@ -247,17 +247,17 @@ class MesosClientAPI(MesosClientBase):
         None, self._session_key)
 
     if resp.responseCode != ResponseCode.OK:
-	  log.info("Error cancelling the update: %s" % resp.message)
+      log.info("Error cancelling the update: %s" % resp.message)
 
-	  # Create a update response and return it
-	  update_resp = FinishUpdateResponse()
-	  update_resp.responseCode = ResponseCode.INVALID_REQUEST
-	  update_resp.message = resp.message
-	  return update_resp
+      # Create a update response and return it
+      update_resp = FinishUpdateResponse()
+      update_resp.responseCode = ResponseCode.INVALID_REQUEST
+      update_resp.message = resp.message
+      return update_resp
 
-	resp = FinishUpdateResponse()
-	resp.responseCode = ResponseCode.OK
-	resp.message = "Update Cancelled"
+    resp = FinishUpdateResponse()
+    resp.responseCode = ResponseCode.OK
+    resp.message = "Update Cancelled"
 
     return resp
 
