@@ -7,8 +7,8 @@ import time
 from twitter.common import log
 from twitter.mesos import clusters
 from twitter.mesos.location import Location
-from twitter.mesos.proxy_config import ProxyConfig
-from twitter.mesos.scheduler_client import LocalSchedulerClient, ZookeeperSchedulerClient
+
+from twitter.mesos.scheduler_client import SchedulerClient
 from twitter.mesos.session_key_helper import SessionKeyHelper
 from twitter.mesos.tunnel_helper import TunnelHelper
 from twitter.mesos.updater import Updater
@@ -23,14 +23,6 @@ class MesosHelper(object):
     key = SessionKey(user=owner)
     SessionKeyHelper.sign_session(key, owner)
     return key
-
-  @staticmethod
-  def is_admin():
-    try:
-      MesosHelper.acquire_session_key_or_die('mesos')
-    except SessionKeyHelper.AuthorizationError:
-      return False
-    return True
 
   @staticmethod
   def call(cmd, host, user=_DEFAULT_USER):
@@ -63,16 +55,6 @@ class MesosHelper(object):
           assert False, 'Invalid cluster argument: %s' % cluster
     else:
       clusters.assert_exists(cluster)
-
-  @staticmethod
-  def get_cluster(cmd_line_arg_cluster, config_cluster):
-    if config_cluster and cmd_line_arg_cluster and config_cluster != cmd_line_arg_cluster:
-      log.error(
-      """Warning: --cluster and the cluster in your configuration do not match.
-         Using the cluster specified on the command line. (cluster = %s)""" % cmd_line_arg_cluster)
-    cluster = cmd_line_arg_cluster or config_cluster
-    MesosHelper.assert_valid_cluster(cluster)
-    return cluster
 
   @staticmethod
   def copy_to_hadoop(user, ssh_proxy_host, src, dst):
@@ -108,23 +90,6 @@ class MesosHelper(object):
     hdfs_uri = '%s%s' % (hdfs, hdfs_path)
     MesosHelper.copy_to_hadoop(user, ssh_proxy, source_path, hdfs_uri)
 
-  @staticmethod
-  def get_config(jobname, config_file, new_mesos, is_json):
-    """Returns the proxy config."""
-    if new_mesos:
-      assert MesosHelper.is_admin(), ("--new_mesos is currently only allowed"
-                                      " for users in the mesos group.")
-      config = ProxyConfig.from_new_mesos_json(config_file) if is_json \
-        else ProxyConfig.from_new_mesos(config_file)
-    else:
-      assert not is_json, "--json only supported with pystachio jobs"
-      config = ProxyConfig.from_mesos(config_file)
-
-    config.set_job(jobname)
-
-    return config
-
-
 class MesosClientBase(object):
   """
   This class is responsible for creating a thrift client
@@ -132,16 +97,17 @@ class MesosClientBase(object):
   needed by the MesosClientAPI.
   """
 
-  def __init__(self, cluster=None, verbose=False):
-    self._cluster = self._config = self._client = self._proxy = self._scheduler = None
-    self.force_cluster = cluster
+  def __init__(self, cluster, verbose=False):
+    self._cluster = cluster
+    self._session_key = self._client = self._proxy = self._scheduler = None
     self.verbose = verbose
+    MesosHelper.assert_valid_cluster(cluster)
 
   def with_scheduler(method):
     """Decorator magic to make sure a connection is made to the scheduler"""
     def _wrapper(self, *args, **kwargs):
       if not self._scheduler:
-        self._construct_scheduler(self._config)
+        self._construct_scheduler()
       return method(self, *args, **kwargs)
     return _wrapper
 
@@ -157,60 +123,14 @@ class MesosClientBase(object):
   def cluster(self):
     return self._cluster
 
-  def config(self):
-    assert self._config, 'Config is unset, have you called get_config?'
-    return self._config
-
-  def _tunnel_user(self, job, tunnel_as):
-    return tunnel_as or job.owner.role
-
-  @staticmethod
-  def get_scheduler_client(cluster, **kwargs):
-    log.info('Auto-detected location: %s' % 'prod' if Location.is_prod() else 'corp')
-
-    # TODO(vinod) : Clear up the convention of what --cluster <arg> means
-    # Currently arg can be any one of
-    # 'localhost:<scheduler port>'
-    # '<cluster name>'
-    # '<cluster name>: <zk port>'
-    # Instead of encoding zk port inside the <arg> string make it explicit.
-    if cluster.find('localhost:') == 0:
-      log.info('Attempting to talk to local scheduler.')
-      port = int(cluster.split(':')[1])
-      return None, LocalSchedulerClient(port, ssl=True)
-    else:
-      if cluster.find(':') > -1:
-        cluster, zk_port = cluster.split(':')
-        zk_port = int(zk_port)
-      else:
-        zk_port = 2181
-
-      force_notunnel = True
-
-      if cluster == 'angrybird-local':
-        ssh_proxy_host = None
-      else:
-        ssh_proxy_host = TunnelHelper.get_tunnel_host(cluster) if Location.is_corp() else None
-
-      if ssh_proxy_host is not None:
-        log.info('Proxying through %s' % ssh_proxy_host)
-        force_notunnel = False
-
-      return ssh_proxy_host, ZookeeperSchedulerClient(cluster, zk_port,
-                                                      force_notunnel, ssl=True, **kwargs)
-
-  def _construct_scheduler(self, config=None):
+  def _construct_scheduler(self):
     """
       Populates:
-        self._cluster
         self._proxy (if proxy necessary)
         self._scheduler
         self._client
     """
-    self._cluster = MesosHelper.get_cluster(
-      self.force_cluster, config.cluster() if config else None)
-    self._proxy, self._scheduler = self.get_scheduler_client(
-      self._cluster, verbose=self.verbose)
+    self._proxy, self._scheduler = SchedulerClient.get(self._cluster, verbose=self.verbose)
     assert self._scheduler, "Could not find scheduler (cluster = %s)" % self._cluster
     self._client = self._scheduler.get_thrift_client()
     assert self._client, "Could not construct thrift client."
@@ -225,37 +145,31 @@ class MesosClientAPI(MesosClientBase):
   def __init__(self, **kwargs):
     super(MesosClientAPI, self).__init__(**kwargs)
 
-  def create_job(self, jobname, config, copy_app_from=None, tunnel_as=None):
-    sessionkey = self.acquire_session()
+  def requires_auth(method):
+    def _wrapper(self, *args, **kwargs):
+      if not self._session_key:
+        self._session_key = self.acquire_session()
+      return method(self, *args, **kwargs)
+    return _wrapper
 
-    job = config.job(jobname)
-    self._config = config
-
+  @requires_auth
+  def create_job(self, config, copy_app_from=None):
     if copy_app_from is not None:
-      MesosHelper.copy_app_to_hadoop(self._tunnel_user(job, tunnel_as), copy_app_from,
-          self.config().hdfs_path(), self.cluster(), self.proxy())
+      MesosHelper.copy_app_to_hadoop(config.role(), copy_app_from,
+          config.hdfs_path(), self.cluster(), self.proxy())
 
-    log.info('Creating job %s' % job.name)
-    resp = self.client().createJob(job, sessionkey)
+    log.info('Creating job %s' % config.name())
+    resp = self.client().createJob(config.job(), self._session_key)
     return resp
 
-  def inspect(self, jobname, config, copy_app_from=None):
-    if copy_app_from is not None:
-      if self.config().hdfs_path():
-        log.info('Detected HDFS package: %s' % self.config().hdfs_path())
-        log.info('Would copy to %s via %s.' % (self.cluster(), self.proxy()))
-
-    pprint.pprint(config.job(jobname))
-
-    sessionkey = self.acquire_session()
-    log.info('Parsed job: %s' % jobname)
-
+  @requires_auth
   def start_cronjob(self, role, jobname):
     log.info("Starting cron job: %s" % jobname)
 
-    resp = self.client().startCronJob(role, jobname, self.acquire_session())
+    resp = self.client().startCronJob(role, jobname, self._session_key)
     return resp
 
+  @requires_auth
   def kill_job(self, role, jobname):
     log.info("Killing tasks for job: %s" % jobname)
 
@@ -263,7 +177,7 @@ class MesosClientAPI(MesosClientBase):
     query.owner = Identity(role=role)
     query.jobName = jobname
 
-    resp = self.client().killTasks(query, self.acquire_session())
+    resp = self.client().killTasks(query, self._session_key)
     return resp
 
   def check_status(self, role, jobname):
@@ -276,21 +190,15 @@ class MesosClientAPI(MesosClientBase):
     resp = self.client().getTasksStatus(query)
     return resp
 
-  def update_job(self, jobname, config, copy_app_from=None, tunnel_as=None):
-    log.info("Updating job: %s" % jobname)
+  @requires_auth
+  def update_job(self, config, copy_app_from=None):
+    log.info("Updating job: %s" % config.name())
 
-    sessionkey = self.acquire_session()
-
-    job = config.job(jobname)
-    self._config = config
-
-    # TODO(William Farner): Add a rudimentary versioning system here so application updates
-    #                       don't overwrite original binary.
     if copy_app_from is not None:
-      MesosHelper.copy_app_to_hadoop(self._tunnel_user(job, tunnel_as), copy_app_from,
-          self.config().hdfs_path(), self.cluster(), self.proxy())
+      MesosHelper.copy_app_to_hadoop(config.role(), copy_app_from,
+          config().hdfs_path(), self.cluster(), self.proxy())
 
-    resp = self.client().startUpdate(job, sessionkey)
+    resp = self.client().startUpdate(config.job(), self._session_key)
 
     if resp.responseCode != ResponseCode.OK:
       log.info("Error doing start update: %s" % resp.message)
@@ -303,8 +211,9 @@ class MesosClientAPI(MesosClientBase):
 
     # TODO(William Farner): Cleanly handle connection failures in case the scheduler
     #                       restarts mid-update.
-    updater = Updater(job.owner.role, job.name, self.client(), time, resp.updateToken, sessionkey)
-    failed_shards = updater.update(job)
+    updater = Updater(config.role(), config.name(), self.client(), time, resp.updateToken,
+      self._session_key)
+    failed_shards = updater.update(config.job())
 
     if failed_shards:
       log.info('Update reverted, failures detected on shards %s' % failed_shards)
@@ -312,16 +221,17 @@ class MesosClientAPI(MesosClientBase):
       log.info('Update Successful')
 
     resp = self.client().finishUpdate(
-      job.owner.role, job.name, UpdateResult.FAILED if failed_shards else UpdateResult.SUCCESS,
-      resp.updateToken, sessionkey)
+      config.role(), config.name(), UpdateResult.FAILED if failed_shards else UpdateResult.SUCCESS,
+      resp.updateToken, self._session_key)
 
     return resp
 
+  @requires_auth
   def cancel_update(self, jobname):
     log.info("Canceling update on job: %s" % jobname)
 
     resp = self.client().finishUpdate(role, jobname, UpdateResult.TERMINATE,
-                                      None, self.acquire_session())
+                                      None, self._session_key)
     return resp
 
   def get_quota(self, role):
@@ -330,9 +240,10 @@ class MesosClientAPI(MesosClientBase):
     resp = self.client().getQuota(role)
     return resp
 
+  @requires_auth
   def set_quota(self, role, cpu, ram_mb, disk_mb):
     log.info("Setting quota for user:%s cpu:%f ram_mb:%d disk_mb: %d"
               % (role, cpu, ram_mb, disk_mb))
 
-    resp = self.client().setQuota(role, Quota(cpu, ram_mb, disk_mb), self.acquire_session())
+    resp = self.client().setQuota(role, Quota(cpu, ram_mb, disk_mb), self._session_key)
     return resp

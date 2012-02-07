@@ -9,7 +9,6 @@ import re
 import subprocess
 from collections import defaultdict
 from twitter.common import app
-from twitter.common.process import ProcessProviderFactory
 
 app.add_option('--mesos_task_id_regex',
                dest = 'mesos_task_id_regex',

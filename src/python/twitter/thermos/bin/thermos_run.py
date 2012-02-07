@@ -67,10 +67,11 @@ def get_task_from_options(opts):
   task = None
   if opts.task is not None:
     for t in tasks.tasks():
-      if t.name() == opts.task:
+      if t.task().name().get() == opts.task:
         task = t
         break
-    app.error("Could not find task %s!" % opts.task)
+    if task is None:
+      app.error("Could not find task %s!" % opts.task)
   else:
     task = tasks.tasks()[0]
 

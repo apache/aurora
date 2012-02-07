@@ -14,11 +14,6 @@ python_library(
 )
 
 python_binary(
-  name = "mesos_configuration",
-  source = "mesos_configuration.py"
-)
-
-python_binary(
   name = "mesos_client",
   source = "bin/mesos_client.py",
   dependencies = [
@@ -52,6 +47,5 @@ python_binary(
   dependencies = [
     pants("3rdparty/python:psutil"),
     pants("src/python/twitter/common/app"),
-    pants("src/python/twitter/common/process"),
   ]
 )

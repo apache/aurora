@@ -7,20 +7,58 @@
 import cmd
 import sys
 import zookeeper
+from pystachio import Ref
 
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
-
 from twitter.mesos.client_wrapper import MesosClientAPI, MesosHelper
-from gen.twitter.mesos.ttypes import *
+from twitter.mesos.parsers.mesos_config import MesosConfig
+from twitter.mesos.parsers.pystachio_config import PystachioConfig
+
+from gen.twitter.mesos.ttypes import (
+  ResponseCode,
+  ScheduleStatus,
+  UpdateResponseCode
+)
 
 __authors__ = ['William Farner',
                'Travis Crawford',
                'Alex Roetter']
 
+
 def _die(msg):
   log.fatal(msg)
   sys.exit(1)
+
+
+def choose_cluster(config):
+  cmdline_cluster = app.get_options().cluster
+  if config.cluster() and cmdline_cluster and config.cluster() != cmdline_cluster:
+    log.error(
+      """Warning: --cluster and the cluster in your configuration do not match.
+         Using the cluster specified on the command line. (cluster = %s)""" % cmdline_cluster)
+  return cmdline_cluster or config.cluster()
+
+
+def is_admin():
+  try:
+    MesosHelper.acquire_session_key_or_die('mesos')
+  except:
+    return False
+  return True
+
+
+def get_config(jobname, config_file, new_mesos, is_json, bindings=None):
+  """Returns the proxy config."""
+  if new_mesos:
+    assert is_admin(), ("--new_mesos is currently only allowed"
+                        " for users in the mesos group.")
+    loader = PystachioConfig.load_json if is_json else PystachioConfig.load
+    config = loader(config_file, jobname, bindings)
+  else:
+    assert not is_json, "--json only supported with pystachio jobs"
+    config = MesosConfig(config_file, jobname)
+  return config
 
 
 def check_and_log_response(resp):
@@ -55,34 +93,36 @@ class requires_arguments(object):
 class MesosCLI(cmd.Cmd):
   def __init__(self, opts):
     cmd.Cmd.__init__(self)
-    zookeeper.set_debug_level(zookeeper.LOG_LEVEL_WARN)
     self.options = opts
-
-    self.api = MesosClientAPI(cluster=self.options.cluster, verbose=self.options.verbose)
 
   @requires_arguments('job', 'config')
   def do_create(self, *line):
     """create job config"""
     (jobname, config_file) = line
-    config = MesosHelper.get_config(jobname, config_file, self.options.new_mesos, self.options.json)
-
-    resp = self.api.create_job(jobname, config, self.options.copy_app_from)
+    config = get_config(jobname, config_file, self.options.new_mesos, self.options.json,
+                        getattr(self.options, 'bindings', None))
+    api = MesosClientAPI(cluster=choose_cluster(config), verbose=self.options.verbose)
+    resp = api.create_job(config, self.options.copy_app_from)
     check_and_log_response(resp)
 
   @requires_arguments('job', 'config')
   def do_inspect(self, *line):
     """inspect job config"""
     (jobname, config_file) = line
-    config = MesosHelper.get_config(jobname, config_file, self.options.new_mesos, self.options.json)
-
-    self.api.inspect(jobname, config, self.options.copy_app_from)
+    config = get_config(jobname, config_file, self.options.new_mesos, self.options.json,
+                         getattr(self.options, 'bindings', None))
+    if self.options.copy_app_from and config.hdfs_path():
+      log.info('Detected HDFS package: %s' % config.hdfs_path())
+      log.info('Would copy to %s via %s.' % (self.cluster(), self.proxy()))
+    log.info('Parsed job config: %s' % config.job())
 
   @requires_arguments('role', 'job')
   def do_start_cron(self, *line):
     """start_cron role job"""
     (role, jobname) = line
 
-    resp = self.api.start_cronjob(role, jobname)
+    api = MesosClientAPI(cluster=self.options.cluster, verbose=self.options.verbose)
+    resp = api.start_cronjob(role, jobname)
     check_and_log_response(resp)
 
   @requires_arguments('role', 'job')
@@ -90,7 +130,8 @@ class MesosCLI(cmd.Cmd):
     """kill role job"""
     (role, jobname) = line
 
-    resp = self.api.kill_job(role, jobname)
+    api = MesosClientAPI(cluster=self.options.cluster, verbose=self.options.verbose)
+    resp = api.kill_job(role, jobname)
     check_and_log_response(resp)
 
   @requires_arguments('role', 'job')
@@ -129,7 +170,8 @@ class MesosCLI(cmd.Cmd):
 
     (role, jobname) = line
 
-    resp = self.api.check_status(role, jobname)
+    api = MesosClientAPI(cluster=self.options.cluster, verbose=self.options.verbose)
+    resp = api.check_status(role, jobname)
     check_and_log_response(resp)
 
     if resp.tasks:
@@ -146,9 +188,11 @@ class MesosCLI(cmd.Cmd):
   def do_update(self, *line):
     """update job config"""
     (jobname, config_file) = line
-    config = MesosHelper.get_config(jobname, config_file, self.options.new_mesos, self.options.json)
+    config = get_config(jobname, config_file, self.options.new_mesos, self.options.json,
+                        getattr(self.options, 'bindings', None))
 
-    resp = self.api.update_job(jobname, config, self.options.copy_app_from)
+    api = MesosClientAPI(cluster=choose_cluster(config), verbose=self.options.verbose)
+    resp = api.update_job(config, self.options.copy_app_from)
     check_and_log_update_response(resp)
 
   @requires_arguments('role', 'job')
@@ -156,14 +200,16 @@ class MesosCLI(cmd.Cmd):
     """cancel_update role job"""
     (role, jobname) = line
 
-    resp = self.api.cancel_update(role, jobname)
+    api = MesosClientAPI(cluster=self.options.cluster, verbose=self.options.verbose)
+    resp = api.cancel_update(role, jobname)
     check_and_log_update_response(resp)
 
   @requires_arguments('role')
   def do_get_quota(self, *line):
     """get_quota role"""
     role = line[0]
-    resp = self.api.get_quota(role)
+    api = MesosClientAPI(cluster=self.options.cluster, verbose=self.options.verbose)
+    resp = api.get_quota(role)
     quota = resp.quota
 
     quota_fields = [
@@ -187,7 +233,8 @@ class MesosCLI(cmd.Cmd):
     except ValueError:
       log.error('Invalid value')
 
-    resp = self.api.set_quota(role, cpu, ram_mb, disk_mb)
+    api = MesosClientAPI(cluster=self.options.cluster, verbose=self.options.verbose)
+    resp = api.set_quota(role, cpu, ram_mb, disk_mb)
     check_and_log_response(resp)
 
 
@@ -207,46 +254,38 @@ The subcommands and their arguments are:
 
   app.set_usage(usage)
   app.interspersed_args(True)
-  app.add_option(
-    '-v',
-    dest='verbose',
-    default=False,
-    action='store_true',
-    help='Verbose logging. (default: %default)')
-  app.add_option(
-    '-q',
-    dest='quiet',
-    default=False,
-    action='store_true',
-    help='Minimum logging. (default: %default)')
-  app.add_option(
-    '--cluster',
-    dest='cluster',
-    default=None,
-    help="Cluster to launch the job in (e.g. sjc1, smf1-prod, smf1-nonprod)." + \
-         " NOTE: If specified, this option overrides the cluster specified in the config file")
-  app.add_option(
-    '--copy_app_from',
-    dest='copy_app_from',
-    default=None,
-    help="Local path to use for the app (will copy to the cluster)" + \
-          " (default: %default)")
-  app.add_option(
-    '--tunnel_as',
-    default=None,
-    help='User to tunnel as (defaults to job role)')
-  app.add_option(
-    '-n',
-    '--new_mesos',
-    default=False,
-    action='store_true',
-    help="Run jobs configured using the new mesos config format.")
-  app.add_option(
-    '-j',
-    '--json',
-    default=False,
-    action='store_true',
-    help="Jobs are written in json.")
+  app.add_option('-v', dest='verbose', default=False, action='store_true',
+                 help='Verbose logging. (default: %default)')
+  app.add_option('-q', dest='quiet', default=False, action='store_true',
+                  help='Minimum logging. (default: %default)')
+  app.add_option('--cluster', dest='cluster', default=None,
+                  help="Cluster to launch the job in (e.g. sjc1, smf1-prod, smf1-nonprod)."
+                        " NOTE: If specified, this option overrides the cluster specified "
+                        "in the config file. ")
+  app.add_option('--copy_app_from', dest='copy_app_from', default=None,
+                  help="Local path to use for the app (will copy to the cluster)"
+                       " (default: %default)")
+  app.add_option('-n', '--new_mesos', default=False, action='store_true',
+                 help="Run jobs configured using the new mesos config format.")
+  app.add_option('-j', '--json', default=False, action='store_true',
+                 help="Jobs are written in json.")
+
+  def add_binding_callback(option, opt, value, parser):
+    if not hasattr(parser.values, 'bindings'):
+      parser.values.bindings = []
+    assert len(value.split('='))==2, 'Bindings must be of the form name=value!'
+    name, value = value.split('=')
+    try:
+      ref = Ref.from_address(name)
+    except Ref.InvalidRefError as e:
+      print('Could not parse ref %s: %s' % (name, e))
+      raise
+    parser.values.bindings.append({ref: value})
+
+  app.add_option('-E', type='string', nargs=1, action='callback',
+                 callback=add_binding_callback,
+                 default=[], metavar='NAME:VALUE',
+                 help='bind an environment name to a value.')
 
 
 def main(args, options):
@@ -256,11 +295,14 @@ def main(args, options):
 
   if options.quiet:
     LogOptions.set_stdout_log_level('NONE')
+    zookeeper.set_debug_level(zookeeper.LOG_LEVEL_ERROR)
   else:
     if options.verbose:
       LogOptions.set_stdout_log_level('DEBUG')
+      zookeeper.set_debug_level(zookeeper.LOG_LEVEL_DEBUG)
     else:
       LogOptions.set_stdout_log_level('INFO')
+      zookeeper.set_debug_level(zookeeper.LOG_LEVEL_INFO)
 
   cli = MesosCLI(options)
 

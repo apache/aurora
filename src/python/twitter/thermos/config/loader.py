@@ -39,8 +39,8 @@ class ThermosProcessWrapper(object):
 class ThermosTaskWrapper(object):
   class InvalidTask(Exception): pass
 
-  def __init__(self, task):
-    if not task.check().ok():
+  def __init__(self, task, strict=True):
+    if not task.check().ok() and strict:
       raise ThermosTaskWrapper.InvalidTask(task.check().message())
     self._task = task
 

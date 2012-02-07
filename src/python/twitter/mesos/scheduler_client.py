@@ -29,6 +29,42 @@ from twitter.mesos.tunnel_helper import TunnelHelper
 from twitter.mesos.zookeeper_helper import ZookeeperHelper
 
 class SchedulerClient(object):
+  @staticmethod
+  def get(cluster, **kwargs):
+    log.info('Auto-detected location: %s' % 'prod' if Location.is_prod() else 'corp')
+
+    # TODO(vinod) : Clear up the convention of what --cluster <arg> means
+    # Currently arg can be any one of
+    # 'localhost:<scheduler port>'
+    # '<cluster name>'
+    # '<cluster name>: <zk port>'
+    # Instead of encoding zk port inside the <arg> string make it explicit.
+    if cluster.find('localhost:') == 0:
+      log.info('Attempting to talk to local scheduler.')
+      port = int(cluster.split(':')[1])
+      return None, LocalSchedulerClient(port, ssl=True)
+    else:
+      if cluster.find(':') > -1:
+        cluster, zk_port = cluster.split(':')
+        zk_port = int(zk_port)
+      else:
+        zk_port = 2181
+
+      force_notunnel = True
+
+      if cluster == 'angrybird-local':
+        ssh_proxy_host = None
+      else:
+        ssh_proxy_host = TunnelHelper.get_tunnel_host(cluster) if Location.is_corp() else None
+
+      if ssh_proxy_host is not None:
+        log.info('Proxying through %s' % ssh_proxy_host)
+        force_notunnel = False
+
+      return ssh_proxy_host, ZookeeperSchedulerClient(cluster, zk_port,
+                                                      force_notunnel, ssl=True, **kwargs)
+
+
   def __init__(self, verbose=False, ssl=False):
     self._client = None
     self._verbose = verbose
