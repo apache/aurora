@@ -364,9 +364,9 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
           updateResult == UpdateResult.TERMINATE ?
               Optional.<String>absent() : Optional.of(updateToken),
           updateResult);
-      response.setResponseCode(UpdateResponseCode.OK).setMessage("Update successfully finished.");
+      response.setResponseCode(ResponseCode.OK).setMessage("Update successfully finished.");
     } catch (ScheduleException e) {
-      response.setResponseCode(UpdateResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
+      response.setResponseCode(ResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
     }
 
     return response;

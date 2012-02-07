@@ -205,7 +205,7 @@ class MesosClientAPI(MesosClientBase):
 
       # Create a update response and return it
       update_resp = FinishUpdateResponse()
-      update_resp.responseCode = UpdateResponseCode.INVALID_REQUEST
+      update_resp.responseCode = ResponseCode.INVALID_REQUEST
       update_resp.message = resp.message
       return update_resp
 
@@ -224,6 +224,19 @@ class MesosClientAPI(MesosClientBase):
       config.role(), config.name(), UpdateResult.FAILED if failed_shards else UpdateResult.SUCCESS,
       resp.updateToken, self._session_key)
 
+    if resp.responseCode != ResponseCode.OK:
+	  log.info("Error doing finish update: %s" % resp.message)
+
+	  # Create a update response and return it
+	  update_resp = FinishUpdateResponse()
+      update_resp.responseCode = ResponseCode.INVALID_REQUEST
+      update_resp.message = resp.message
+      return update_resp
+
+    resp = FinishUpdateResponse()
+    resp.responseCode = ResponseCode.WARNING if failed_shards else ResponseCode.OK
+    resp.message = "Update Unsuccessful" if failed_shards else "Update Successful"
+
     return resp
 
   @requires_auth
@@ -231,7 +244,21 @@ class MesosClientAPI(MesosClientBase):
     log.info("Canceling update on job: %s" % jobname)
 
     resp = self.client().finishUpdate(role, jobname, UpdateResult.TERMINATE,
-                                      None, self._session_key)
+        None, self._session_key)
+
+    if resp.responseCode != ResponseCode.OK:
+	  log.info("Error cancelling the update: %s" % resp.message)
+
+	  # Create a update response and return it
+	  update_resp = FinishUpdateResponse()
+	  update_resp.responseCode = ResponseCode.INVALID_REQUEST
+	  update_resp.message = resp.message
+	  return update_resp
+
+	resp = FinishUpdateResponse()
+	resp.responseCode = ResponseCode.OK
+	resp.message = "Update Cancelled"
+
     return resp
 
   def get_quota(self, role):
