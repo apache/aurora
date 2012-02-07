@@ -120,9 +120,11 @@ class PystachioConfig(ProxyConfig):
     update.maxPerShardFailures = job.update_config().failures_per_shard().get()
     update.maxTotalFailures = job.update_config().total_failures().get()
 
-    if uninterpolated_vars:
+    # NOTE: Un-interpolated vars are dangerous only when they are not going
+    # to be provided by the thermos context!
+    if not job.check().ok():
       raise PystachioConfig.InvalidConfig(
-        'Missing environment bindings:\n%s' % '\n'.join(map(str, uninterpolated_vars)))
+        'Invalid Job Config: %s' % job.check().message())
 
     return JobConfiguration(
       str(job.name()),
@@ -159,7 +161,7 @@ class PystachioConfig(ProxyConfig):
 
   def cluster(self):
     if self._job.cluster().check().ok():
-      return job.cluster().get()
+      return self._job.cluster().get()
     else:
       return None
 
