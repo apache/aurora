@@ -280,14 +280,14 @@ class StateManager {
   synchronized String initialize() {
     managerState.transition(State.INITIALIZED);
 
+    // Note: Do not attempt to mutate tasks here.  Any task mutations made here will be
+    // overwritten if a snapshot is applied.
+
     transactionalStorage.start(new Work.NoResult.Quiet() {
       @Override protected void execute(final Storage.StoreProvider storeProvider) {
-        storeProvider.getTaskStore().mutateTasks(Query.GET_ALL, new Closure<ScheduledTask>() {
-          @Override public void execute(ScheduledTask task) {
-            ConfigurationManager.applyDefaultsIfUnset(task.getAssignedTask().getTask());
-            createStateMachine(task, task.getStatus());
-          }
-        });
+        for (ScheduledTask task : storeProvider.getTaskStore().fetchTasks(Query.GET_ALL)) {
+          createStateMachine(task, task.getStatus());
+        }
         transactionalStorage.addSideEffect(new SideEffect() {
           @Override public void mutate(MutableState state) {
             state.vars.beginExporting();
@@ -304,8 +304,7 @@ class StateManager {
     managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
 
     return transactionalStorage.doInTransaction(new Work<String, RuntimeException>() {
-      @Override
-      public String apply(Storage.StoreProvider storeProvider) {
+      @Override public String apply(Storage.StoreProvider storeProvider) {
         return storeProvider.getSchedulerStore().fetchFrameworkId();
       }
     });
@@ -347,6 +346,8 @@ class StateManager {
       @Override protected void execute(final StoreProvider storeProvider) {
         storeProvider.getTaskStore().mutateTasks(Query.GET_ALL, new Closure<ScheduledTask>() {
           @Override public void execute(final ScheduledTask task) {
+            ConfigurationManager.applyDefaultsIfUnset(task.getAssignedTask().getTask());
+
             // Perform a sanity check on the number of active shards.
             Set<String> activeTasksInShard = activeShards(
                 storeProvider.getTaskStore(),
