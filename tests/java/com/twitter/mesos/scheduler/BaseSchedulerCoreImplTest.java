@@ -15,8 +15,6 @@ import javax.annotation.Nullable;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
 import com.google.common.base.Splitter;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
@@ -38,6 +36,8 @@ import org.apache.mesos.Protos.Value.Ranges;
 import org.apache.mesos.Protos.Value.Scalar;
 import org.apache.mesos.Protos.Value.Type;
 import org.easymock.EasyMock;
+import org.easymock.IAnswer;
+import org.easymock.IExpectationSetters;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -49,6 +49,7 @@ import com.twitter.common.util.testing.FakeClock;
 import com.twitter.mesos.ExecutorKey;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.Constraint;
 import com.twitter.mesos.gen.CronCollisionPolicy;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
@@ -61,6 +62,7 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.scheduler.SchedulerCore.RestartException;
 import com.twitter.mesos.scheduler.SchedulerCore.TwitterTask;
+import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
@@ -82,11 +84,11 @@ import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.UPDATING;
 import static com.twitter.mesos.gen.UpdateResult.SUCCESS;
-import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
@@ -122,7 +124,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private static final ExecutorID EXECUTOR_ID =
       ExecutorID.newBuilder().setValue("ExecutorId").build();
   private static final String SLAVE_HOST_1 = "SlaveHost1";
-  private static final String SLAVE_HOST_2 = "SlaveHost2";
   private static final ExecutorKey SLAVE_HOST_1_KEY =
       new ExecutorKey(EXECUTOR_ID, SLAVE_HOST_1);
 
@@ -133,7 +134,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private SchedulerCoreImpl scheduler;
   private CronJobManager cron;
   private PulseMonitor<ExecutorKey> executorPulseMonitor;
-  private Function<TwitterTaskInfo, TwitterTaskInfo> executorResourceAugmenter;
   private QuotaManager quotaManager;
   private FakeClock clock;
 
@@ -142,8 +142,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     schedulingFilter = createMock(SchedulingFilter.class);
     driver = createMock(Driver.class);
     executorPulseMonitor = createMock(new Clazz<PulseMonitor<ExecutorKey>>() {});
-    executorResourceAugmenter =
-        createMock(new Clazz<Function<TwitterTaskInfo, TwitterTaskInfo>>() {});
     clock = new FakeClock();
   }
 
@@ -173,7 +171,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     StateManager stateManager = new StateManager(storage, clock, new MutableState(), driver);
     quotaManager = new QuotaManagerImpl(storage);
     scheduler = new SchedulerCoreImpl(cron, immediateManager, stateManager, schedulingFilter,
-        executorPulseMonitor, executorResourceAugmenter, quotaManager);
+        executorPulseMonitor, quotaManager);
     cron.schedulerCore = scheduler;
     immediateManager.schedulerCore = scheduler;
     scheduler.prepare();
@@ -298,7 +296,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setShardId(0)
         .setStartCommand("ls")
         .setRequestedPorts(ImmutableSet.<String>of())
-        .setAvoidJobs(ImmutableSet.<String>of());
+        .setAvoidJobs(ImmutableSet.<String>of())
+        .setConstraints(ImmutableSet.<Constraint>of());
 
     storage.doInTransaction(new NoResult.Quiet() {
       @Override protected void execute(Storage.StoreProvider storeProvider) {
@@ -421,7 +420,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     assertTaskCount(1);
 
     TwitterTaskInfo task2 = new TwitterTaskInfo().setConfiguration(
-        ImmutableMap.<String, String> builder()
+        ImmutableMap.<String, String>builder()
             .put("start_command", "date")
             .put("hdfs_path", "")
             .put("num_cpus", "1.0")
@@ -649,9 +648,10 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testHonorsScheduleFilter() throws Exception {
-    expectOffer(false);
-    expectOffer(false);
-    expectOffer(false);
+    expect(executorPulseMonitor.isAlive(SLAVE_HOST_1_KEY)).andReturn(true);
+    expectFiltering(true).anyTimes();
+    expect(executorPulseMonitor.isAlive(SLAVE_HOST_1_KEY)).andReturn(true);
+    expect(executorPulseMonitor.isAlive(SLAVE_HOST_1_KEY)).andReturn(true);
 
     control.replay();
     buildScheduler();
@@ -1131,23 +1131,18 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   @Test
   public void testExecutorBootstrap() throws Exception {
     expect(executorPulseMonitor.isAlive(SLAVE_HOST_1_KEY)).andReturn(false);
+    executorPulseMonitor.pulse(EasyMock.<ExecutorKey>anyObject());
+    expectFiltering(false);
 
     Offer offer = createOffer(SLAVE_ID, SLAVE_HOST_1, 3, 4096);
     final Resources offerResources = Resources.from(offer);
 
-    final TwitterTaskInfo augmented = new TwitterTaskInfo().setNumCpus(3.14).setRamMb(1137);
-    expect(executorResourceAugmenter.apply(EasyMock.<TwitterTaskInfo>notNull()))
-        .andReturn(augmented);
-
-    final Predicate<TwitterTaskInfo> staticFilter =
-        createMock(new Clazz<Predicate<TwitterTaskInfo>>() {});
-    expect(staticFilter.apply(augmented)).andReturn(false);
-    expect(schedulingFilter.staticFilter(offerResources, null)).andReturn(staticFilter);
-
     control.replay();
 
     buildScheduler();
-    assertNull(scheduler.offer(offer, EXECUTOR_ID));
+    TwitterTask scheduledTask =  scheduler.offer(offer, EXECUTOR_ID);
+    assertNotNull(scheduledTask);
+    assertEquals(scheduledTask.task.getTask().getJobName(), "executor_bootstrap");
   }
 
   @Test
@@ -1925,10 +1920,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     return scheduler.getTasks(query);
   }
 
-  private Set<ScheduledTask> getTasks(String... taskIds) {
-    return scheduler.getTasks(query(taskIds));
-  }
-
   private Set<ScheduledTask> getTasksByStatus(ScheduleStatus status) {
     return scheduler.getTasks(Query.byStatus(status));
   }
@@ -1985,14 +1976,25 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     changeStatus(query(Arrays.asList(taskId)), status, message);
   }
 
+  private static final ImmutableSet<Veto> ALWAYS_VETO = ImmutableSet.of(new Veto("Fake veto"));
+
+  private static final ImmutableSet<Veto> NO_VETO = ImmutableSet.of();
+
   private void expectOffer(boolean passFilter) {
     expect(executorPulseMonitor.isAlive(EasyMock.<ExecutorKey>anyObject())).andReturn(true);
-    expect(schedulingFilter.staticFilter(EasyMock.<Resources>anyObject(),
-        EasyMock.<String>anyObject()))
-        .andReturn(passFilter ? Predicates.<TwitterTaskInfo> alwaysTrue()
-            : Predicates.<TwitterTaskInfo> alwaysFalse());
-    expect(schedulingFilter.dynamicFilter((String) anyObject()))
-        .andReturn(passFilter ? Predicates.<TwitterTaskInfo> alwaysTrue()
-            : Predicates.<TwitterTaskInfo> alwaysFalse());
+    expect(schedulingFilter.filter(EasyMock.<Resources>anyObject(), EasyMock.<Optional<String>>anyObject(), EasyMock.<TwitterTaskInfo>anyObject())).
+        andReturn(passFilter ? NO_VETO : ALWAYS_VETO);
+  }
+
+  private IExpectationSetters<Set<Veto>> expectFiltering(final boolean filter) {
+    return expect(schedulingFilter.filter(EasyMock.<Resources>anyObject(),
+        EasyMock.<Optional<String>>anyObject(),
+        EasyMock.<TwitterTaskInfo>anyObject())).andAnswer(
+        new IAnswer<Set<Veto>>() {
+          @Override public Set<Veto> answer() {
+            return filter? ALWAYS_VETO : NO_VETO;
+          }
+        }
+    );
   }
 }

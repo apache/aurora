@@ -2,6 +2,7 @@ package com.twitter.mesos.scheduler;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -39,39 +40,20 @@ public class Resources {
 
   public static final String CPUS = "cpus";
   public static final String RAM_MB = "mem";
+  public static final String DISK_MB = "disk";
   public static final String PORTS = "ports";
 
-  private final double numCpus;
-  private final Amount<Long, Data> ram;
-  private final int numPorts;
+  final double numCpus;
+  final Amount<Long, Data> disk;
+  final Amount<Long, Data> ram;
+  final int numPorts;
 
   @VisibleForTesting
-  Resources(double numCpus, Amount<Long, Data> ram, int numPorts) {
+  Resources(double numCpus, Amount<Long, Data> ram, Amount<Long, Data> disk, int numPorts) {
     this.numCpus = numCpus;
     this.ram = checkNotNull(ram);
+    this.disk = checkNotNull(disk);
     this.numPorts = numPorts;
-  }
-
-  /**
-   * Tests whether this bundle of resources is greater than or equal to another bundle of resources.
-   *
-   * @param other Resources being compared to.
-   * @return {@code true} if all resources in this bundle are greater than or equal to the
-   *    equivalents from {@code other}, otherwise {@code false}.
-   */
-  public boolean greaterThanOrEqual(Resources other) {
-    return (numCpus >= other.numCpus)
-        && (ram.as(Data.MB) >= other.ram.as(Data.MB))
-        && (numPorts >= other.numPorts);
-  }
-
-  /**
-   * Gets the number of ports in the resources.
-   *
-   * @return Number of ports.
-   */
-  public int getNumPorts() {
-    return numPorts;
   }
 
   @Override
@@ -84,6 +66,7 @@ public class Resources {
     return new EqualsBuilder()
         .append(numCpus, other.numCpus)
         .append(ram, other.ram)
+        .append(disk, other.disk)
         .append(numPorts, other.numPorts)
         .isEquals();
   }
@@ -99,6 +82,7 @@ public class Resources {
     return new Resources(
         task.getNumCpus(),
         Amount.of(task.getRamMb(), Data.MB),
+        Amount.of(task.getDiskMb(), Data.MB),
         task.getRequestedPortsSize());
   }
 
@@ -113,6 +97,7 @@ public class Resources {
     return new Resources(
         getScalarValue(offer, CPUS),
         Amount.of((long) getScalarValue(offer, RAM_MB), Data.MB),
+        Amount.of((long) getScalarValue(offer, DISK_MB), Data.MB),
         getNumAvailablePorts(offer));
   }
 

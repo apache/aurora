@@ -37,6 +37,7 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
+import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
 import com.twitter.mesos.scheduler.StateManager.StateChanger;
 import com.twitter.mesos.scheduler.StateManager.StateMutation;
 import com.twitter.mesos.scheduler.StateManager.UpdateException;
@@ -81,7 +82,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
   // Monitor to determine when we need to send heartbeats to executors to determine their liveness.
   private final PulseMonitor<ExecutorKey> executorPulseMonitor;
-  private final Function<TwitterTaskInfo, TwitterTaskInfo> executorResourceAugmenter;
   private final QuotaManager quotaManager;
 
   enum State {
@@ -100,7 +100,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
       StateManager stateManager,
       SchedulingFilter schedulingFilter,
       PulseMonitor<ExecutorKey> executorPulseMonitor,
-      Function<TwitterTaskInfo, TwitterTaskInfo> executorResourceAugmenter,
       QuotaManager quotaManager) {
 
     // The immediate scheduler will accept any job, so it's important that other schedulers are
@@ -111,7 +110,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
     this.schedulingFilter = checkNotNull(schedulingFilter);
     this.executorPulseMonitor = checkNotNull(executorPulseMonitor);
-    this.executorResourceAugmenter = checkNotNull(executorResourceAugmenter);
     this.quotaManager = checkNotNull(quotaManager);
 
    // TODO(John Sirois): Add a method to StateMachine or write a wrapper that allows for a
@@ -289,38 +287,23 @@ public class SchedulerCoreImpl implements SchedulerCore {
     vars.resourceOffers.incrementAndGet();
 
     final String hostname = offer.getHostname();
-    ExecutorKey executorKey = new ExecutorKey(defaultExecutorId, offer.getHostname());
-
     stateManager.saveAttributesFromOffer(hostname, offer.getAttributesList());
 
     Query query;
-    Predicate<TwitterTaskInfo> postFilter;
+    Optional<String> hostCheck;
+
+    ExecutorKey executorKey = new ExecutorKey(defaultExecutorId, offer.getHostname());
     if (!executorPulseMonitor.isAlive(executorKey)) {
-      TwitterTaskInfo bootstrapTask = makeBootstrapTask();
-      Predicate<TwitterTaskInfo> resourceFilter =
-          schedulingFilter.staticFilter(Resources.from(offer), null);
-
-      // Mesos core does not account for the resources the executor itself will use up when it has
-      // not yet started - do that accounting here and fail fast if we can't both run the executor
-      // and the bootstrap task on the given host.
-      if (!resourceFilter.apply(executorResourceAugmenter.apply(bootstrapTask))) {
-        LOG.severe(String.format(
-            "Insufficient resources on host %s to start executor plus a bootstrap task", hostname));
-        return null;
-      }
-
-      LOG.info("Pulse monitor considers executor dead, launching bootstrap task on: " + hostname);
+      LOG.info("Pulse monitor considers executor dead, attempting to launch bootstrap task on: "
+          + hostname);
       executorPulseMonitor.pulse(executorKey);
-      query = Query.byId(Iterables.getOnlyElement(launchTasks(ImmutableSet.of(bootstrapTask))));
-      postFilter = Predicates.alwaysTrue();
       vars.executorBootstraps.incrementAndGet();
+      query = Query.byId(Iterables.getOnlyElement(
+          launchTasks(ImmutableSet.of(makeBootstrapTask()))));
+      hostCheck = Optional.absent();
     } else {
-      query = Query.and(
-          Query.byStatus(PENDING),
-          Predicates.compose(schedulingFilter.staticFilter(Resources.from(offer), hostname),
-              Tasks.SCHEDULED_TO_INFO));
-      // Perform the (more expensive) check to find tasks matching the dynamic state of the machine.
-      postFilter = schedulingFilter.dynamicFilter(hostname);
+      query = Query.byStatus(PENDING);
+      hostCheck = Optional.of(hostname);
     }
 
     final ImmutableSortedSet<ScheduledTask> candidates = ImmutableSortedSet.copyOf(
@@ -329,14 +312,22 @@ public class SchedulerCoreImpl implements SchedulerCore {
     if (candidates.isEmpty()) {
       return null;
     }
-    log(Level.FINEST, "Candidates for offer: %s", new Object() {
-      @Override public String toString() {
-        return Iterables.transform(candidates, Tasks.SCHEDULED_TO_ID).toString();
-      }
-    });
+    LOG.fine("Candidates for offer: " + Iterables.transform(candidates, Tasks.SCHEDULED_TO_ID));
 
-    ScheduledTask assignment = Iterables.get(Iterables.filter(
-        candidates, Predicates.compose(postFilter, Tasks.SCHEDULED_TO_INFO)), 0, null);
+    ScheduledTask assignment = null;
+    for (ScheduledTask task : candidates) {
+      Set<Veto> vetoes = schedulingFilter.filter(
+          Resources.from(offer), hostCheck, task.getAssignedTask().getTask());
+      if (vetoes.isEmpty()) {
+        assignment = task;
+        break;
+      } else {
+        // TODO(wfarner): Surface this information into the scheduler web UI.
+        LOG.fine("Task " + Tasks.id(task) + " was vetoed: " + vetoes);
+      }
+    }
+
+    // There were no satisfied candidates.
     if (assignment == null) {
       return null;
     }
@@ -346,11 +337,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
     AssignedTask task =
         stateManager.assignTask(Tasks.id(assignment), hostname, offer.getSlaveId(), selectedPorts);
-
-    // There were no PENDING candidates.
-    if (task == null) {
-      return null;
-    }
 
     LOG.info(String.format("Offer on slave %s (id %s) is being assigned task for %s.",
         hostname, task.getSlaveId(), jobKey(task)));
@@ -559,12 +545,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
   private void checkLifecycleState(State state) {
     Preconditions.checkState(stateMachine.getState() == state);
-  }
-
-  private static void log(Level level, String message, Object... args) {
-    if (LOG.isLoggable(level)) {
-      LOG.log(level, String.format(message, args));
-    }
   }
 
   private final class Vars {

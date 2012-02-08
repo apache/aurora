@@ -265,18 +265,4 @@ public class SchedulerModule extends AbstractModule {
         .addResources(Resources.makeMesosResource(Resources.RAM_MB, EXECUTOR_RAM.get().as(Data.MB)))
         .build();
   }
-
-  @Provides
-  @Singleton
-  Function<TwitterTaskInfo, TwitterTaskInfo> provideExecutorResourceAugmenter() {
-    final Double executorCpus = EXECUTOR_CPUS.get();
-    final long executorRam = EXECUTOR_RAM.get().as(Data.MB).longValue();
-    return new Function<TwitterTaskInfo, TwitterTaskInfo>() {
-      @Override public TwitterTaskInfo apply(TwitterTaskInfo task) {
-        return task.deepCopy()
-            .setNumCpus(task.getNumCpus() + executorCpus)
-            .setRamMb(task.getRamMb() + executorRam);
-      }
-    };
-  }
 }

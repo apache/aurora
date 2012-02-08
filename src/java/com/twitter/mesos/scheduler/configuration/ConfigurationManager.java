@@ -334,9 +334,6 @@ public class ConfigurationManager {
 
         @Override void apply(TwitterTaskInfo task, Integer value) throws TaskDescriptionException {
           task.setMaxPerHost(value);
-          if (!task.isSetConstraints()) {
-            task.setConstraints(Sets.<Constraint>newHashSet());
-          }
 
           Constraint hostConstraint =
               Iterables.find(task.getConstraints(), hasName(HOST_CONSTRAINT), null);
@@ -384,6 +381,8 @@ public class ConfigurationManager {
       throws TaskDescriptionException {
     Map<String, String> config = task.getConfiguration();
 
+    fillDataFields(task);
+
     for (Field<?> field : FIELDS) {
       String rawValue = config.get(field.key);
       if (rawValue == null) {
@@ -396,17 +395,18 @@ public class ConfigurationManager {
         field.parseAndApply(task, rawValue);
       }
     }
-    maybeFillThermosConfig(task);
+
     return task;
   }
 
   public static TwitterTaskInfo applyDefaultsIfUnset(TwitterTaskInfo task) {
+    fillDataFields(task);
+
     for (Field<?> field : FIELDS) {
       if (!field.isSet(task)) {
         field.applyDefault(task);
       }
     }
-    maybeFillThermosConfig(task);
 
     // TODO(wfarner): Remove this when new client is fully deployed and all tasks are backfilled.
     maybeFillRequestedPorts(task);
@@ -414,10 +414,14 @@ public class ConfigurationManager {
     return task;
   }
 
-  private static void maybeFillThermosConfig(TwitterTaskInfo task) {
+  private static void fillDataFields(TwitterTaskInfo task) {
     if (!task.isSetThermosConfig()) {
       // Workaround for thrift 0.5.0 NPE.  See MESOS-370.
       task.setThermosConfig(new byte[] {});
+    }
+
+    if (!task.isSetConstraints()) {
+      task.setConstraints(Sets.<Constraint>newHashSet());
     }
   }
 

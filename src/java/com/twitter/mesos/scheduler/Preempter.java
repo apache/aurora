@@ -2,15 +2,18 @@ package com.twitter.mesos.scheduler;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.common.base.Function;
+import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.inject.Inject;
@@ -23,6 +26,7 @@ import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
+import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.mesos.Tasks.SCHEDULED_TO_ASSIGNED;
@@ -83,15 +87,6 @@ class Preempter implements Runnable {
       return;
     }
 
-    // Memoize filters.
-    LoadingCache<String, Predicate<AssignedTask>> filtersByHost = CacheBuilder.newBuilder().build(
-        new CacheLoader<String, Predicate<AssignedTask>>() {
-          @Override public Predicate<AssignedTask> load(String host) {
-            return Predicates.compose(schedulingFilter.dynamicFilter(host), Tasks.ASSIGNED_TO_INFO);
-          }
-        }
-    );
-
     // Arrange the pending tasks in scheduling order.
     Collections.sort(pendingTasks, Tasks.SCHEDULING_ORDER);
 
@@ -106,11 +101,19 @@ class Preempter implements Runnable {
       // still not be scheduled.  This implies that a preempter would need to be in the resource
       // offer flow, or that we should make accepting of resource offers asynchronous, so that we
       // operate scheduling and preemption in an independent loop.
-      Predicate<AssignedTask> preemptionFilter = Predicates.and(
-          preemptionFilter(preemptableTask),
-          filtersByHost.getUnchecked(preemptableTask.getSlaveHost()));
-      AssignedTask preempting =
-          Iterables.get(Iterables.filter(pendingTasks, preemptionFilter), 0, null);
+      Predicate<AssignedTask> preemptionFilter = preemptionFilter(preemptableTask);
+
+      Resources slot = Resources.from(preemptableTask.getTask());
+      String host = preemptableTask.getSlaveHost();
+
+      AssignedTask preempting = null;
+      for (AssignedTask task : Iterables.filter(pendingTasks, preemptionFilter)) {
+        if (schedulingFilter.filter(slot, Optional.of(host), task.getTask()).isEmpty()) {
+          preempting = task;
+          break;
+        }
+      }
+
       if (preempting != null) {
         pendingTasks.remove(preempting);
         try {
@@ -134,21 +137,16 @@ class Preempter implements Runnable {
    *     with {@code preemptableTask}.
    */
   private Predicate<AssignedTask> preemptionFilter(AssignedTask preemptableTask) {
-    Predicate<AssignedTask> staticResourceFilter = Predicates.compose(
-        schedulingFilter.staticFilter(Resources.from(preemptableTask.getTask()),
-            preemptableTask.getSlaveHost()), Tasks.ASSIGNED_TO_INFO);
-
     Predicate<AssignedTask> preemptableIsProduction = preemptableTask.getTask().isProduction()
         ? Predicates.<AssignedTask>alwaysTrue()
         : Predicates.<AssignedTask>alwaysFalse();
 
     Predicate<AssignedTask> priorityFilter =
         greaterPriorityFilter(GET_PRIORITY.apply(preemptableTask));
-    return Predicates.and(staticResourceFilter,
-        Predicates.or(
-            Predicates.and(Predicates.not(preemptableIsProduction), IS_PRODUCTION),
-            Predicates.and(isOwnedBy(getRole(preemptableTask)), priorityFilter)
-        ));
+    return Predicates.or(
+        Predicates.and(Predicates.not(preemptableIsProduction), IS_PRODUCTION),
+        Predicates.and(isOwnedBy(getRole(preemptableTask)), priorityFilter)
+    );
   }
 
   private static final Predicate<AssignedTask> IS_PRODUCTION = new Predicate<AssignedTask>() {
