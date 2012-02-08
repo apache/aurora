@@ -31,7 +31,6 @@ import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.Quota;
-import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.storage.LogEntry;
 import com.twitter.mesos.gen.storage.Op;
@@ -416,9 +415,20 @@ public class LogStorage extends ForwardingStore {
   public synchronized <T, E extends Exception> T doInTransaction(final Work<T, E> work)
       throws StorageException, E {
 
-    // The log stream transaction has already been setup or is not desired - nothing to do here
-    if (!recovered || (transaction != null)) {
+    // We don't want to use the log when recovering from it, we just want to update the underlying
+    // store - so pass mutations straight through to the underlying storage.
+    if (!recovered) {
       return super.doInTransaction(work);
+    }
+
+    // The log stream transaction has already been set up so we just need to delegate with our
+    // store provider so any mutations performed by work get logged.
+    if (transaction != null) {
+      return super.doInTransaction(new Work<T, E>() {
+        @Override public T apply(StoreProvider unused) throws E {
+          return work.apply(logStoreProvider);
+        }
+      });
     }
 
     transaction = streamManager.startTransaction();

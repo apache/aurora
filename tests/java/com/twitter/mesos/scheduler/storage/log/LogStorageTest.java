@@ -2,14 +2,12 @@ package com.twitter.mesos.scheduler.storage.log;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterators;
-import com.google.common.collect.Sets;
 
 import org.easymock.Capture;
 import org.easymock.EasyMock;
@@ -363,6 +361,44 @@ public class LogStorageTest extends EasyMockTest {
 
       @Override protected void performMutations() {
         assertEquals(mutated, logStorage.mutateTasks(query, mutation));
+      }
+    }.runTest();
+  }
+
+  @Test
+  public void testNestedTransactions() throws Exception {
+    new MutationFixture() {
+
+      private Query query = Query.byId("fred");
+      private Closure<ScheduledTask> mutation = Closures.noop();
+      private ImmutableSet<ScheduledTask> mutated =
+          ImmutableSet.of(task("a", ScheduleStatus.STARTING));
+      private ImmutableSet<String> tasksToRemove = ImmutableSet.of("b");
+
+      @Override protected void setupExpectations() throws Exception {
+        expectStorageTransactionNoResult();
+        expectStorageTransactionWithResult(mutated);
+        expect(taskStore.mutateTasks(query, mutation)).andReturn(mutated);
+
+        expectStorageTransactionNoResult();
+        expectStorageTransactionNoResult();
+        taskStore.removeTasks(tasksToRemove);
+
+        expectStreamTransaction(Op.saveTasks(new SaveTasks(mutated)),
+            Op.removeTasks(new RemoveTasks(tasksToRemove)));
+      }
+
+      @Override protected void performMutations() {
+        logStorage.doInTransaction(new Work.NoResult.Quiet() {
+          @Override protected void execute(StoreProvider storeProvider) {
+            assertEquals(mutated, storeProvider.getTaskStore().mutateTasks(query, mutation));
+            logStorage.doInTransaction(new Work.NoResult.Quiet() {
+              @Override protected void execute(StoreProvider storeProvider) {
+                storeProvider.getTaskStore().removeTasks(tasksToRemove);
+              }
+            });
+          }
+        });
       }
     }.runTest();
   }
