@@ -31,6 +31,11 @@ app.add_option("--setuid", dest = "setuid", metavar = "USER", default = None,
 app.add_option("--enable_chroot", dest = "chroot", default = False, action='store_true',
                help = "chroot tasks to the sandbox before executing them.")
 
+app.add_option("--force", dest = "force", default = False, action='store_true',
+               help = "If another runner owns the checkpoint, force kill it in order to take over "
+                      "runner duties.")
+
+
 def add_port_callback(option, opt, value, parser):
   if not hasattr(parser.values, 'prebound_ports'):
     parser.values.prebound_ports = []
@@ -109,9 +114,12 @@ def main(args, opts):
   task_runner = TaskRunner(thermos_task.task, opts.checkpoint_root, opts.sandbox,
     task_id=opts.task_id, user=opts.setuid, portmap=prebound_ports, chroot=opts.chroot)
 
-  if opts.action == 'run':
-    task_runner.run()
-  elif opts.action == 'kill':
-    task_runner.kill()
+  try:
+    if opts.action == 'run':
+      task_runner.run(opts.force)
+    elif opts.action == 'kill':
+      task_runner.kill(opts.force)
+  except TaskRunner.StateError:
+    app.error('Task appears to already be in a terminal state.')
 
 app.main()

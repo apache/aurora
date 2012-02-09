@@ -165,7 +165,7 @@ class TaskObserver(threading.Thread):
     else:
       return dict(
         task_id = real_state.header.task_id,
-        launch_time = real_state.header.launch_time,
+        launch_time = real_state.header.launch_time_ms/1000.0,
         sandbox = real_state.header.sandbox,
         hostname = real_state.header.hostname,
         user = real_state.header.user
@@ -285,7 +285,7 @@ class TaskObserver(threading.Thread):
     return dict(
        task_id = task_id,
        name = task.name().get(),
-       state = TaskState._VALUES_TO_NAMES[state.state],
+       state = TaskState._VALUES_TO_NAMES[state.statuses[-1].state],
        user = task.user().get(),
        # ports
        resource_consumption = sample,

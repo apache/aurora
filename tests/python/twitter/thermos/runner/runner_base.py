@@ -14,8 +14,8 @@ from twitter.thermos.runner.runner import TaskRunnerHelper
 from gen.twitter.thermos.ttypes import (
   TaskState,
   TaskRunState,
-  TaskRunnerCkpt,
-  TaskRunnerState,
+  RunnerCkpt,
+  RunnerState,
   ProcessRunState
 )
 
@@ -94,7 +94,7 @@ TaskRunnerHelper.dump_state(runner.state(), '%(state_filename)s')
     try:
       cls.state = TaskRunnerHelper.read_state(cls.state_filename)
     except:
-      cls.state = TaskRunnerState()
+      cls.state = RunnerState()
     try:
       cls.reconstructed_state = TaskCkptDispatcher.from_file(cls.pathspec.getpath('runner_checkpoint'))
     except:

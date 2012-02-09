@@ -1,8 +1,9 @@
 import os
 import sys
 import pprint
+import time
 
-from gen.twitter.thermos.ttypes import TaskRunnerState, TaskRunnerCkpt, TaskState
+from gen.twitter.thermos.ttypes import RunnerState, RunnerCkpt, TaskState
 
 from twitter.common import app
 from twitter.common.recordio import ThriftRecordReader
@@ -27,25 +28,27 @@ def main(args):
     sys.exit(1)
 
   fp = file(values.ckpt, "r")
-  rr = ThriftRecordReader(fp, TaskRunnerCkpt)
-  wrs = TaskRunnerState(processes = {})
+  rr = ThriftRecordReader(fp, RunnerCkpt)
+  wrs = RunnerState(processes = {})
   dispatcher = TaskCkptDispatcher()
   for wts in rr:
     print 'Recovering: ', wts
     if values.assemble is True:
-       dispatcher.update_runner_state(wrs, wts)
+       dispatcher.dispatch(wrs, wts)
   print '\n\n\n'
   if values.assemble:
-    print 'Recovered Task'
-    pprint.pprint(wrs.header)
+    print 'Recovered Task Header'
+    pprint.pprint(wrs.header, indent=4)
 
-    print '\nRecovered Task State'
-    pprint.pprint(TaskState._VALUES_TO_NAMES[wrs.state])
+    print '\nRecovered Task States'
+    for task_status in wrs.statuses:
+      print '  %s [pid: %d] => %s' % (time.asctime(time.localtime(task_status.timestamp_ms/1000.0)),
+        task_status.runner_pid, TaskState._VALUES_TO_NAMES[task_status.state])
 
     print '\nRecovered Allocated Ports'
-    pprint.pprint(wrs.ports)
+    pprint.pprint(wrs.ports, indent=4)
 
     print '\nRecovered Processes'
-    pprint.pprint(wrs.processes)
+    pprint.pprint(wrs.processes, indent=4)
 
 app.main()

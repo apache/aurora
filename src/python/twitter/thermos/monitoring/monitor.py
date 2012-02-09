@@ -8,8 +8,8 @@ from twitter.common.recordio import ThriftRecordReader
 from twitter.thermos.base import TaskCkptDispatcher
 from gen.twitter.thermos.ttypes import (
   ProcessRunState,
-  TaskRunnerCkpt,
-  TaskRunnerState)
+  RunnerCkpt,
+  RunnerState)
 
 __author__ = 'wickman@twitter.com (brian wickman)'
 __tested__ = False
@@ -22,7 +22,7 @@ class TaskMonitor(object):
   def __init__(self, pathspec, task_id):
     self._task_id = task_id
     self._dispatcher = TaskCkptDispatcher()
-    self._runnerstate = TaskRunnerState(processes = {})
+    self._runnerstate = RunnerState(processes = {})
     self._runner_ckpt = pathspec.given(task_id = task_id).getpath('runner_checkpoint')
     self._ckpt_head = 0
     self._apply_states()
@@ -43,13 +43,13 @@ class TaskMonitor(object):
       if self._ckpt_head < ckpt_offset:
         with open(self._runner_ckpt, 'r') as fp:
           fp.seek(self._ckpt_head)
-          rr = ThriftRecordReader(fp, TaskRunnerCkpt)
+          rr = ThriftRecordReader(fp, RunnerCkpt)
           while True:
             runner_update = rr.try_read()
             if not runner_update:
               break
             try:
-              self._dispatcher.update_runner_state(self._runnerstate, runner_update)
+              self._dispatcher.dispatch(self._runnerstate, runner_update)
             except TaskCkptDispatcher.InvalidSequenceNumber as e:
               log.error('Checkpoint stream is corrupt: %s' % e)
               break

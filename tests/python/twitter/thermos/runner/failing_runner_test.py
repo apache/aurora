@@ -36,7 +36,7 @@ class TestFailingRunner(RunnerTestBase):
     assert self.state == self.reconstructed_state
 
   def test_runner_state_success(self):
-    assert self.state.state == TaskState.SUCCESS
+    assert self.state.statuses[-1].state == TaskState.SUCCESS
 
   def test_runner_processes_have_expected_runs(self):
     processes = self.state.processes

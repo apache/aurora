@@ -73,7 +73,7 @@ class ProcessMuxer(object):
     if process not in self._fps:
       return False
     fp = self._fps[process]
-    rr = ThriftRecordReader(fp, TaskRunnerCkpt)
+    rr = ThriftRecordReader(fp, RunnerCkpt)
     old_pos = fp.tell()
     try:
       expected_new_pos = os.fstat(fp.fileno()).st_size
@@ -94,7 +94,7 @@ class ProcessMuxer(object):
         in-process: checkpoint records synthesized for FORKED and LOST events
         out-of-process: checkpoint records from from file descriptors of forked managers
 
-      Returns a list of TaskRunnerCkpt objects that were successfully read, or an empty
+      Returns a list of RunnerCkpt objects that were successfully read, or an empty
       list if none were read.
     """
     self._bind_processes()
@@ -112,7 +112,7 @@ class ProcessMuxer(object):
       if fp.tell() > fstat.st_size:
         log.error('Truncated checkpoint record detected on %s!' % fp.name)
       elif fp.tell() < fstat.st_size:
-        rr = ThriftRecordReader(fp, TaskRunnerCkpt)
+        rr = ThriftRecordReader(fp, RunnerCkpt)
         while True:
           process_update = rr.try_read()
           if process_update:

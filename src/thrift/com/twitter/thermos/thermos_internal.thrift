@@ -51,7 +51,7 @@ enum ProcessRunState {
 
   // abnormal states
   FAILED    = 5   // returncode != 0
-  LOST      = 6   // the runner_pid either died or some condition caused us to lose it.
+  LOST      = 6   // the coordinator_pid either died or some condition caused us to lose it.
 }
 
 // Sent as a stream of diffs
@@ -66,7 +66,7 @@ struct ProcessState {
   5: ProcessRunState run_state
 
   // WAITING -> FORKED
- 10: i32             runner_pid
+ 10: i32             coordinator_pid
  11: double          fork_time
 
   // FORKED -> RUNNING
@@ -104,9 +104,9 @@ struct ProcessHistory {
 }
 
 // The first framed message in the Ckpt stream.
-struct TaskRunnerHeader {
+struct RunnerHeader {
   1: string task_id
-  2: i64    launch_time
+  2: i64    launch_time_ms
   3: string sandbox
   4: string hostname
   5: string user
@@ -122,21 +122,23 @@ struct TaskRunStateUpdate {
   2: TaskRunState state
 }
 
-struct TaskStateUpdate {
+struct TaskStatus {
   1: TaskState state
+  2: i64       timestamp_ms
+  3: i32       runner_pid
 }
 
-union TaskRunnerCkpt {
-  1: TaskRunnerHeader   runner_header
+union RunnerCkpt {
+  1: RunnerHeader       runner_header
   2: ProcessState       process_state
   3: TaskAllocatedPort  allocated_port
   4: TaskRunStateUpdate history_state_update
-  5: TaskStateUpdate    state_update
+  5: TaskStatus         status_update
 }
 
-struct TaskRunnerState {
-  1: TaskRunnerHeader header
-  2: TaskState state
+struct RunnerState {
+  1: RunnerHeader header
+  2: list<TaskStatus> statuses
   3: map<string, ProcessHistory> processes
   4: map<string, i32> ports
 }

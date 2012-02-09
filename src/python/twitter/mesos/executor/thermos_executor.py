@@ -53,20 +53,21 @@ class ExecutorPollingThread(threading.Thread):
 
     state = self._runner.state()
 
+    last_state = state.statuses[-1].state
     finish_state = None
-    if state.state == TaskState.ACTIVE:
+    if last_state == TaskState.ACTIVE:
       log.error("Runner is dead but task state unexpectedly ACTIVE!")
       self._runner.quitquitquit()
       finish_state = mesos_pb.TASK_FAILED
-    elif state.state == TaskState.SUCCESS:
+    elif last_state == TaskState.SUCCESS:
       finish_state = mesos_pb.TASK_FINISHED
-    elif state.state == TaskState.FAILED:
+    elif last_state == TaskState.FAILED:
       finish_state = mesos_pb.TASK_FAILED
-    elif state.state == TaskState.KILLED:
+    elif last_state == TaskState.KILLED:
       log.error("Runner died but task is expectedly in KILLED state!")
       finish_state = mesos_pb.TASK_KILLED
     else:
-      log.error("Unknown task state! %s" % TaskState._VALUES_TO_NAMES[state.state])
+      log.error("Unknown task state! %s" % TaskState._VALUES_TO_NAMES.get(last_state, '(unknown)'))
       finish_state = mesos_pb.TASK_FAILED
 
     update = mesos_pb.TaskStatus()

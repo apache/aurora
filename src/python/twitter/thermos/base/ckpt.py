@@ -4,6 +4,63 @@ from twitter.common import log
 from twitter.common.recordio import ThriftRecordReader
 from gen.twitter.thermos.ttypes import *
 
+
+class UniversalStateHandler(object):
+  def on_process_transition(self, state, process_update):
+    pass
+
+  def on_process_history_transition(self, state, process_history_update):
+    pass
+
+  def on_task_transition(self, state, task_update):
+    pass
+
+  def on_port_allocation(self, name, port):
+    pass
+
+  def on_initialization(self, header):
+    pass
+
+
+class ProcessStateHandler(object):
+  def on_waiting(self, process_update):
+    pass
+
+  def on_forked(self, process_update):
+    pass
+
+  def on_running(self, process_update):
+    pass
+
+  def on_finished(self, process_update):
+    pass
+
+  def on_failed(self, process_update):
+    pass
+
+  def on_lost(self, process_update):
+    pass
+
+
+class TaskStateHandler(object):
+  def on_active(self, task_update):
+    pass
+
+  def on_success(self, task_update):
+    pass
+
+  def on_failed(self, task_update):
+    pass
+
+  def on_killed(self, task_update):
+    pass
+
+
+class PortHandler(object):
+  def on_allocation(self, name, port):
+    pass
+
+
 class TaskCkptDispatcher(object):
   """
     The reconstruction / dispatching mechanism for logic triggered on
@@ -19,55 +76,75 @@ class TaskCkptDispatcher(object):
   class ErrorRecoveringState(Error): pass
   class InvalidStateTransition(Error): pass
   class InvalidSequenceNumber(Error): pass
+  class InvalidHandler(Error): pass
 
   @staticmethod
   def from_file(filename):
-    state = TaskRunnerState(processes = {})
+    state = RunnerState(processes = {})
     builder = TaskCkptDispatcher()
     with open(filename, 'r') as fp:
-      rr = ThriftRecordReader(fp, TaskRunnerCkpt)
+      rr = ThriftRecordReader(fp, RunnerCkpt)
       try:
         for process_update in rr:
-          builder.update_runner_state(state, process_update)
+          builder.dispatch(state, process_update)
         return state
-      except TaskCkptDispatcher.Error:
+      except TaskCkptDispatcher.Error as e:
+        log.error('Failed to recover from %s: %s' % (filename, e))
         return None
 
   def __init__(self):
-    self._state_handlers = {}
-    self._universal_handlers = []
+    self._task_handlers = []
+    self._process_handlers = []
     self._port_handlers = []
+    self._universal_handlers = []
 
-  def register_state_handler(self, run_state, function):
-    """
-      Register a function callback for when a process transitions its run state.
-      Current run states: WAITING, FORKED, RUNNING, FINISHED, KILLED, FAILED, LOST.
-    """
-    if run_state not in self._state_handlers:
-      self._state_handlers[run_state] = []
-    self._state_handlers[run_state].append(function)
+  def register_handler(self, handler):
+    HANDLER_MAP = {
+      TaskStateHandler: self._task_handlers,
+      ProcessStateHandler: self._process_handlers,
+      PortHandler: self._port_handlers,
+      UniversalStateHandler: self._universal_handlers
+    }
 
-  def register_port_handler(self, function):
-    """
-       Register a function callback to handle when a port is allocated by the runner.
-    """
-    self._port_handlers.append(function)
+    found = False
+    for handler_type, handler_list in HANDLER_MAP.items():
+      if isinstance(handler, handler_type):
+        handler_list.append(handler)
+        found = True
+        break
 
-  def register_universal_handler(self, function):
-    """
-      Register a function callback that gets called on every process state transition.
-    """
-    self._universal_handlers.append(function)
+    if not found:
+      raise TaskCkptDispatcher.InvalidHandler("Unknown handler type %s" % type(handler))
 
-  def _run_state_dispatch(self, state, process_update):
+  def _run_process_dispatch(self, state, process_update):
     for handler in self._universal_handlers:
-      handler(process_update)
-    for handler in self._state_handlers.get(state, []):
-      handler(process_update)
+      handler.on_process_transition(state, process_update)
+    for handler in self._process_handlers:
+      handler_function = 'on_' + ProcessRunState._VALUES_TO_NAMES[state].lower()
+      getattr(handler, handler_function)(process_update)
+
+  # Does it merit having a ProcessHistoryStateHandler?
+  def _run_process_history_dispatch(self, process, process_history_update):
+    for handler in self._universal_handlers:
+      handler.on_process_history_transition(process, process_history_update)
+
+  def _run_task_dispatch(self, state, task_update):
+    for handler in self._universal_handlers:
+      handler.on_task_transition(state, task_update)
+    for handler in self._task_handlers:
+      handler_function = 'on_' + TaskState._VALUES_TO_NAMES[state].lower()
+      getattr(handler, handler_function)(task_update)
 
   def _run_port_dispatch(self, name, port):
+    for handler in self._universal_handlers:
+      handler.on_port_allocation(name, port)
     for handler in self._port_handlers:
-      handler(name, port)
+      handler.on_allocation(name, port)
+
+  def _run_header_dispatch(self, header):
+    log.debug('_run_header_dispatch has universal_handlers: %s' % self._universal_handlers)
+    for handler in self._universal_handlers:
+      handler.on_initialization(header)
 
   @staticmethod
   def check_empty_fields(process_state, fields):
@@ -106,7 +183,7 @@ class TaskCkptDispatcher(object):
       ProcessRunState.LOST]
     return process_state_update.run_state in TERMINAL_STATES
 
-  def update_task_state(self, process_state, process_state_update, recovery):
+  def update_process_state(self, process_state, process_state_update, recovery):
     """
       Apply process_state_update against process_state.
 
@@ -157,7 +234,7 @@ class TaskCkptDispatcher(object):
         if process_state.run_state != ProcessRunState.WAITING:
           raise TaskCkptDispatcher.InvalidStateTransition(
             "%s => %s" % (process_state, process_state_update))
-        required_fields = ['seq', 'run_state', 'fork_time', 'runner_pid']
+        required_fields = ['seq', 'run_state', 'fork_time', 'coordinator_pid']
         TaskCkptDispatcher.copy_fields(process_state, process_state_update, required_fields)
 
       # FORKED => RUNNING
@@ -204,7 +281,7 @@ class TaskCkptDispatcher(object):
           "Unknown run_state = %s" % process_state_update.run_state)
 
     # dispatch state change to consumer
-    self._run_state_dispatch(process_state_update.run_state, process_state_update)
+    self._run_process_dispatch(process_state_update.run_state, process_state_update)
     return True
 
   def would_update(self, state, runner_ckpt):
@@ -226,11 +303,12 @@ class TaskCkptDispatcher(object):
       # produce a transition
       return task_state.seq < process_update.seq
 
-  def update_runner_state(self, state, runner_ckpt, recovery = False):
+  def dispatch(self, state, runner_ckpt, recovery=False):
     """
-      state          = TaskRunnerState to apply process update
-      process_update = TaskRunnerCkpt update
-      recovery       => Pass in as true if you are in recovery mode
+      state          = RunnerState to apply process update
+      process_update = RunnerCkpt update
+      recovery       = Pass in as true if you are in recovery mode
+                       (accept out-of-order sequence updates)
 
       returns True if process_update was applied to state.
     """
@@ -243,6 +321,7 @@ class TaskCkptDispatcher(object):
       else:
         log.debug('Initializing TaskRunner header to %s' % runner_ckpt.runner_header)
         state.header = runner_ckpt.runner_header
+        self._run_header_dispatch(runner_ckpt.runner_header)
         return True
 
     # case 2: allocated_port
@@ -263,17 +342,21 @@ class TaskCkptDispatcher(object):
         self._run_port_dispatch(port_name, port)
         return True
 
-    # case 3: state_update
+    # case 3: status_update
     #   -> State transition on the task (ACTIVE, FAILED, FINISHED)
-    if runner_ckpt.state_update is not None:
-      if state.state != runner_ckpt.state_update.state:
-        old_state = state.state
-        state.state = runner_ckpt.state_update.state
-        log.debug('Flipping task state from %s to %s' % (
-          TaskState._VALUES_TO_NAMES[old_state] if old_state is not None else '(undefined)',
-          TaskState._VALUES_TO_NAMES[state.state]))
-        return True
-      return False
+    if runner_ckpt.status_update is not None:
+      if state.statuses is None:
+        state.statuses = []
+        old_state = None
+      else:
+        old_state = state.statuses[-1].state
+      state.statuses.append(runner_ckpt.status_update)
+      new_state = runner_ckpt.status_update.state
+      log.debug('Flipping task state from %s to %s' % (
+        TaskState._VALUES_TO_NAMES.get(old_state, '(undefined)'),
+        TaskState._VALUES_TO_NAMES.get(new_state, '(undefined)')))
+      self._run_task_dispatch(new_state, runner_ckpt.status_update)
+      return True
 
     # case 4: history_state_update
     #   -> State transition on the run of a process within the task (ACTIVE, FAILED, FINISHED)
@@ -287,6 +370,7 @@ class TaskCkptDispatcher(object):
           process_name,
           TaskRunState._VALUES_TO_NAMES[old_state] if old_state is not None else '(undefined)',
           TaskRunState._VALUES_TO_NAMES[state_change]))
+        self._run_process_history_dispatch(process_name, runner_ckpt.history_state_update)
         return True
       return False
 
@@ -295,8 +379,7 @@ class TaskCkptDispatcher(object):
     #        (WAITING, FORKED, RUNNING, FINISHED, KILLED, FAILED, LOST)
     process_update = runner_ckpt.process_state
     if process_update is None:
-      log.error(TaskCkptDispatcher.ErrorRecoveringState("Empty TaskRunnerCkpt encountered!"))
-      return False
+      raise TaskCkptDispatcher.ErrorRecoveringState("Empty RunnerCkpt encountered!")
 
     def transition_to_waiting(process, process_history, seq=0):
       process_state = ProcessState(seq = seq, process = process, run_state = None)
@@ -336,4 +419,4 @@ class TaskCkptDispatcher(object):
     # Run the process state machine.
     log.debug('Running state machine for process=%s/seq=%s' % (process_update.process,
         process_update.seq))
-    return self.update_task_state(process_state, process_update, recovery)
+    return self.update_process_state(process_state, process_update, recovery)

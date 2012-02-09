@@ -32,7 +32,7 @@ class TestRunnerBasic(RunnerTestBase):
     assert self.state == self.reconstructed_state
 
   def test_runner_state_success(self):
-    assert self.state.state == TaskState.SUCCESS
+    assert self.state.statuses[-1].state == TaskState.SUCCESS
 
   def test_runner_header_populated(self):
     header = self.state.header
@@ -41,7 +41,7 @@ class TestRunnerBasic(RunnerTestBase):
     assert header.sandbox == os.path.join(self.tempdir, 'sandbox', header.task_id), \
       'header sandbox must be set!'
     assert header.hostname, 'header task replica id must be set!'
-    assert header.launch_time, 'header launch time must be set'
+    assert header.launch_time_ms, 'header launch time must be set'
 
   def test_runner_has_allocated_name_ports(self):
     ports = self.state.ports

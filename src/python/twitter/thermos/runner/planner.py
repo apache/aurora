@@ -77,9 +77,10 @@ class Planner(object):
       raise Planner.InvalidSchedule("Cycles detected in the task schedule!")
     self._running = set()
     self._finished = set()
+    self._broken = set()
 
   def get_runnable(self):
-    return Planner.runnable(self._processes - self._running - self._finished,
+    return Planner.runnable(self._processes - self._broken - self._running - self._finished,
       Planner.filter_dependencies(self._dependencies, given=self._finished))
 
   def get_running(self):
@@ -91,6 +92,10 @@ class Planner(object):
   def forget(self, process):
     self._finished.discard(process)
     self._running.discard(process)
+
+  def set_broken(self, process):
+    self.forget(process)
+    self._broken.add(process)
 
   def set_running(self, process):
     self._finished.discard(process)
@@ -107,4 +112,4 @@ class Planner(object):
     return process in self._running
 
   def is_complete(self):
-    return self._finished == self._processes
+    return self._finished == (self._processes - self._broken)
