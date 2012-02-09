@@ -95,7 +95,7 @@ public class ExecutorModule extends AbstractModule {
 
   @CmdLine(name = "valid_task_port_range", help = "The port range that can assign to tasks.")
   private static final Arg<Range<Integer>> TASK_PORT_RANGE =
-      Arg.create(Ranges.closed(30000, 32000));
+      Arg.create(Ranges.closed(31000, 32000));
 
   @Override
   protected void configure() {
