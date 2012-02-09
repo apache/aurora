@@ -8,7 +8,6 @@ from twitter.common.recordio import ThriftRecordReader
 from twitter.common.quantity import Amount, Time
 
 from gen.twitter.thermos.ttypes import *
-from twitter.thermos.runner.process import Process
 
 __author__ = 'wickman@twitter.com (brian wickman)'
 __tested__ = False

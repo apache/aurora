@@ -7,7 +7,7 @@ python_test_suite(name = 'all',
 
 python_library(name = 'runner_baselibs',
   dependencies = [
-    pants('src/python/twitter/thermos:runner'),
+    pants('src/python/twitter/thermos/runner'),
   ]
 )
 

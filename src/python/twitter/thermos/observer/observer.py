@@ -14,8 +14,7 @@ from twitter.thermos.observer.muxer import TaskMuxer
 from twitter.thermos.observer.measure import TaskMeasurer
 
 from twitter.thermos.base import TaskPath
-from twitter.thermos.base import Helper
-from twitter.thermos.base.ckpt import AlaCarteRunnerState
+from twitter.thermos.base.ckpt import TaskCkptDispatcher
 
 
 from twitter.thermos.config.schema import (
@@ -67,9 +66,9 @@ class TaskObserver(threading.Thread):
     while True:
       time.sleep(1)
       total_seconds += 1
-      active_tasks   = self._detector.get_active_task_ids()
-      finished_tasks = self._detector.get_finished_task_ids()
 
+      active_tasks   = [task_id for _, task_id in self._detector.get_task_ids(state='active')]
+      finished_tasks = [task_id for _, task_id in self._detector.get_task_ids(state='finished')]
       for active in active_tasks:
         if active in self._finishes:
           log.error('Found an active (%s) in finished tasks?' % active)
@@ -94,13 +93,13 @@ class TaskObserver(threading.Thread):
       return task.task()
 
     task_id_map = {
-      'active_task_path': self._actives,
-      'finished_task_path': self._finishes
+      'active': self._actives,
+      'finished': self._finishes
     }
 
-    for path_type, task_idset in task_id_map.iteritems():
+    for state_type, task_idset in task_id_map.iteritems():
       if task_id in task_idset:
-        path = self._pathspec.given(task_id = task_id).getpath(path_type)
+        path = self._pathspec.given(task_id=task_id, state=state_type).getpath('task_path')
         if os.path.exists(path):
           task = ThermosTaskWrapper.from_file(path)
           if task is None:
@@ -185,7 +184,7 @@ class TaskObserver(threading.Thread):
     else:
       # unread finished state, let's read and memoize.
       path = self._pathspec.given(task_id = task_id).getpath('runner_checkpoint')
-      self._states[task_id] = AlaCarteRunnerState(path).state()
+      self._states[task_id] = TaskCkptDispatcher.from_file(path)
       return self._states[task_id]
     log.error(TaskObserver.UnexpectedError("Could not find task_id: %s" % task_id))
     return None
@@ -224,7 +223,7 @@ class TaskObserver(threading.Thread):
         else:
           # TODO(wickman)  Consider log.error instead of raising.
           raise TaskObserver.UnexpectedState(
-            "Unexpected TaskState: %s" % state.processes[process].state)
+            "Unexpected TaskRunState: %s" % state.processes[process].state)
 
     return dict(
       waiting = waiting,

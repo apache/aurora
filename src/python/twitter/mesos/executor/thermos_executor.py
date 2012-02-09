@@ -206,6 +206,7 @@ class ThermosExecutor(mesos.Executor):
     self._log('error() - code: %s, message: %s' % (code, message))
 
 
+LogOptions.set_log_dir('/var/log/thermos')
 def main():
   LogOptions.set_disk_log_level('DEBUG')
   thermos_executor = ThermosExecutor()

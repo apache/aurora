@@ -1,13 +1,13 @@
 import threading
 from twitter.common.lang.synchronizable import Lockable
-from twitter.thermos.observer.monitor import TaskMonitor
+from twitter.thermos.monitoring.monitor import TaskMonitor
 
 __author__ = 'wickman@twitter.com (brian wickman)'
 __tested__ = False
 
 class TaskMuxer(Lockable):
   """
-    Class responsible for monitoring multiple tasks.
+    Compose multiple TaskMonitors together into a TaskMuxer.
   """
 
   class UnknownTaskError(Exception): pass

@@ -33,6 +33,11 @@ class SandboxBase(object):
     pass
 
   @abstractmethod
+  def exists(self):
+    """Returns true if the sandbox appears to exist."""
+    pass
+
+  @abstractmethod
   def create(self, *args, **kw):
     """Create the sandbox."""
     pass
@@ -50,6 +55,9 @@ class DirectorySandbox(SandboxBase):
 
   def root(self):
     return self._dir
+
+  def exists(self):
+    return os.path.exists(self._dir)
 
   def create(self, mesos_task):
     if mesos_task.has_layout():
@@ -75,6 +83,9 @@ class AppAppSandbox(SandboxBase):
 
     if len(self._layouts) > 0:
       self._layout = self._layouts[0]
+
+  def exists(self):
+    return len(self._layouts) > 0
 
   @staticmethod
   def layout_create_args_from_task(appobj, task_id, mesos_task):

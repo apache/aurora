@@ -6,7 +6,8 @@ import time
 
 from twitter.common import log
 from twitter.common.contextutil import temporary_file
-from twitter.thermos.base import TaskPath, AlaCarteRunnerState
+from twitter.thermos.base import TaskPath
+from twitter.thermos.base.ckpt import TaskCkptDispatcher
 from twitter.thermos.config.loader import ThermosTaskWrapper
 from twitter.thermos.runner.runner import TaskRunnerHelper
 
@@ -95,7 +96,7 @@ TaskRunnerHelper.dump_state(runner.state(), '%(state_filename)s')
     except:
       cls.state = TaskRunnerState()
     try:
-      cls.reconstructed_state = AlaCarteRunnerState(cls.pathspec.getpath('runner_checkpoint')).state()
+      cls.reconstructed_state = TaskCkptDispatcher.from_file(cls.pathspec.getpath('runner_checkpoint'))
     except:
       cls.reconstructed_state = None
     cls.initialized = True

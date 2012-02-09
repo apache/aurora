@@ -14,7 +14,6 @@ from twitter.common.process import ProcessProviderFactory
 from twitter.common.quantity import Amount, Time
 from twitter.common.recordio import ThriftRecordReader, ThriftRecordWriter
 
-from twitter.thermos.base.helper    import Helper
 from twitter.thermos.base.path      import TaskPath
 from twitter.thermos.base.ckpt      import TaskCkptDispatcher
 from twitter.thermos.config.loader  import ThermosTaskWrapper, ThermosProcessWrapper
@@ -63,6 +62,14 @@ class TaskRunnerHelper(object):
       return getpass.getuser()
     return pwd_entry[0]
 
+  @staticmethod
+  def process_from_name(task, process_name):
+    if task.has_processes():
+      for process in task.processes():
+        if process.name().get() == process_name:
+          return process
+    return None
+
 
 class TaskRunner(object):
   """
@@ -78,7 +85,7 @@ class TaskRunner(object):
   MAX_START_TIME_DRIFT = Amount(10, Time.SECONDS)
 
   # Wait time between iterations.
-  MIN_ITERATION_TIME = Amount(0.1, Time.SECONDS)
+  MIN_ITERATION_TIME = Amount(100, Time.MILLISECONDS)
 
   # Maximum amount of time we spend waiting for new updates from the checkpoint streams
   # before doing housecleaning (checking for LOST tasks, dead PIDs.)
@@ -152,6 +159,10 @@ class TaskRunner(object):
     self._recovery = True
     self._replay_runner_ckpt()
     unapplied_updates = self._replay_process_ckpts()
+
+    # TODO(wickman) => If is_terminal(self._state.state), return
+    # if not:
+    #   steal the mutation lock.
 
     # Turn off recovery mode and start mutating stuff.
     self._recovery = False
@@ -402,12 +413,6 @@ class TaskRunner(object):
       total_time += STAT_INTERVAL_SLEEP.as_(Time.SECONDS)
       time.sleep(STAT_INTERVAL_SLEEP.as_(Time.SECONDS))
 
-  def _write_task(self):
-    """Write a sentinel indicating that this TaskRunner is active."""
-    # PYSTACHIO(wickman)
-    active_task = self._pathspec.getpath('active_task_path')
-    ThermosTaskWrapper(self._task).to_file(active_task)
-
   @staticmethod
   def tasks_equal(filename, reified_task):
     if not os.path.exists(filename):
@@ -417,9 +422,14 @@ class TaskRunner(object):
       return False
     return task.task == reified_task
 
+  def _write_task(self):
+    """Write a sentinel indicating that this TaskRunner is active."""
+    active_task = self._pathspec.given(state='active').getpath('task_path')
+    ThermosTaskWrapper(self._task).to_file(active_task)
+
   def _enforce_task_active(self):
     """Enforce that an active sentinel is around for this task."""
-    active_task = self._pathspec.getpath('active_task_path')
+    active_task = self._pathspec.given(state='active').getpath('task_path')
 
     if not os.path.exists(active_task):
       self._write_task()
@@ -455,7 +465,7 @@ class TaskRunner(object):
     pathspec = self._pathspec.given(
       process = process_name,
       run = self._current_process_run_number(self._state, process_name))
-    process = Helper.process_from_name(self._task, process_name)
+    process = TaskRunnerHelper.process_from_name(self._task, process_name)
     ports = ThermosProcessWrapper(process).ports()
     portmap = {}
     for port_name in ports:
@@ -479,7 +489,7 @@ class TaskRunner(object):
     return len(process_failures)
 
   def _is_process_failed(self, process_name):
-    process = Helper.process_from_name(self._task, process_name)
+    process = TaskRunnerHelper.process_from_name(self._task, process_name)
     # TODO(wickman) Should pystachio coerce for __gt__/__lt__ ?
     process_failures = Integer(self._count_process_failures(process_name))
     log.debug('process_name: %s, process = %s, process_failures = %s' % (
@@ -690,8 +700,8 @@ class TaskRunner(object):
     """
     self._ckpt.close()
 
-    active_task_path   = self._pathspec.getpath('active_task_path')
-    finished_task_path = self._pathspec.getpath('finished_task_path')
+    active_task_path   = self._pathspec.given(state='active').getpath('task_path')
+    finished_task_path = self._pathspec.given(state='finished').getpath('task_path')
     active_exists      = os.path.exists(active_task_path)
     finished_exists    = os.path.exists(finished_task_path)
 

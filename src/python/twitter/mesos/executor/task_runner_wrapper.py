@@ -12,7 +12,7 @@ from twitter.common.http.mirror_file import MirrorFile
 
 from twitter.thermos.base import TaskPath
 from twitter.thermos.runner import TaskRunner
-from twitter.thermos.observer import TaskMonitor
+from twitter.thermos.monitoring.monitor import TaskMonitor
 from twitter.thermos.config.loader import ThermosTaskWrapper
 
 from twitter.mesos.executor.sandbox_manager import (

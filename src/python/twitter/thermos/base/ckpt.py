@@ -13,9 +13,25 @@ class TaskCkptDispatcher(object):
     TaskCkptDispatcher.
   """
 
-  class ErrorRecoveringState(Exception): pass
-  class InvalidStateTransition(Exception): pass
-  class InvalidSequenceNumber(Exception): pass
+  class Error(Exception):
+    pass
+
+  class ErrorRecoveringState(Error): pass
+  class InvalidStateTransition(Error): pass
+  class InvalidSequenceNumber(Error): pass
+
+  @staticmethod
+  def from_file(filename):
+    state = TaskRunnerState(processes = {})
+    builder = TaskCkptDispatcher()
+    with open(filename, 'r') as fp:
+      rr = ThriftRecordReader(fp, TaskRunnerCkpt)
+      try:
+        for process_update in rr:
+          builder.update_runner_state(state, process_update)
+        return state
+      except TaskCkptDispatcher.Error:
+        return None
 
   def __init__(self):
     self._state_handlers = {}
@@ -321,25 +337,3 @@ class TaskCkptDispatcher(object):
     log.debug('Running state machine for process=%s/seq=%s' % (process_update.process,
         process_update.seq))
     return self.update_task_state(process_state, process_update, recovery)
-
-
-class AlaCarteRunnerState(object):
-  """
-    Helper class to reconstruct a TaskRunnerCkpt from its checkpoint file without any fuss.
-  """
-
-  def __init__(self, path):
-    self._state = TaskRunnerState(processes = {})
-    builder = TaskCkptDispatcher()
-
-    try:
-      with open(path, "r") as fp:
-        rr = ThriftRecordReader(fp, TaskRunnerCkpt)
-        for process_update in rr:
-          builder.update_runner_state(self._state, process_update)
-    except Exception as e:
-      log.error('Error recovering AlaCarteRunnerState(%s): %s' % (path, e))
-      self._state = None
-
-  def state(self):
-    return self._state

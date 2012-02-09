@@ -17,9 +17,9 @@ python_library(
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/dirutil'),
     pants('src/python/twitter/common/http'),
-    pants('src/python/twitter/thermos:base'),
-    pants('src/python/twitter/thermos:runner'),
-    pants('src/python/twitter/thermos:observer'),
+    pants('src/python/twitter/thermos/base'),
+    pants('src/python/twitter/thermos/runner'),
+    pants('src/python/twitter/thermos/monitoring:monitor'),
     pants('src/python/twitter/thermos/config:schema'),
   ]
 )

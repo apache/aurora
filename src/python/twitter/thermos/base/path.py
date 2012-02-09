@@ -14,7 +14,7 @@ class TaskPath(object):
 
                                            which template to acquire
                                                     v
-      pathspec.given(task_id = "12345-thermos-wickman-23").getpath("active_task_path")
+      pathspec.given(task_id = "12345-thermos-wickman-23", state='active').getpath("task_path")
                          ^
             further substitutions DIR_TEMPLATE
 
@@ -36,16 +36,15 @@ class TaskPath(object):
   class UnknownPath(Exception): pass
   class UnderspecifiedPath(Exception): pass
 
-  # all keys: root task_id pid process run
+  KNOWN_KEYS = [ 'root', 'task_id', 'state', 'pid', 'process', 'run', 'fork_time' ]
+
   DIR_TEMPLATE = {
-     'active_task_path': ['%(root)s',       'tasks',      'active', '%(task_id)s'],
-   'finished_task_path': ['%(root)s',       'tasks',    'finished', '%(task_id)s'],
+            'task_path': ['%(root)s',       'tasks',   '%(state)s', '%(task_id)s'],
+      'checkpoint_path': ['%(root)s', 'checkpoints', '%(task_id)s'],
     'runner_checkpoint': ['%(root)s', 'checkpoints', '%(task_id)s', 'runner'],
    'process_checkpoint': ['%(root)s', 'checkpoints', '%(task_id)s', '%(fork_time)s.%(pid)s'],
        'process_logdir': ['%(root)s',        'logs', '%(task_id)s', '%(process)s', '%(run)s']
   }
-
-  KNOWN_KEYS = [ 'root', 'task_id', 'pid', 'process', 'run', 'fork_time' ]
 
   def __init__(self, **kw):
     self._filename = None
