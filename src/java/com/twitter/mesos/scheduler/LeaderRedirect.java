@@ -15,7 +15,7 @@ import com.google.common.net.HostAndPort;
 import com.google.common.util.concurrent.Atomics;
 import com.google.inject.Inject;
 
-import com.twitter.common.application.LocalServiceRegistry;
+import com.twitter.common.application.modules.LocalServiceRegistry;
 import com.twitter.common.net.pool.DynamicHostSet;
 import com.twitter.common.net.pool.DynamicHostSet.HostChangeMonitor;
 import com.twitter.common.net.pool.DynamicHostSet.MonitorException;

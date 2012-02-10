@@ -8,7 +8,7 @@ import com.google.inject.Inject;
 import com.google.inject.Key;
 import com.google.inject.TypeLiteral;
 
-import com.twitter.common.application.LocalServiceRegistry;
+import com.twitter.common.application.modules.LocalServiceRegistry;
 import com.twitter.common.application.http.Registration;
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.base.ExceptionalCommand;

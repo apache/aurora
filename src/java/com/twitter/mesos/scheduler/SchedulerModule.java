@@ -174,8 +174,7 @@ public class SchedulerModule extends AbstractModule {
     bind(Clock.class).toInstance(Clock.SYSTEM_CLOCK);
     bind(StateManager.class).in(Singleton.class);
 
-    LifecycleModule.bindServiceLauncher(binder(), ThriftServerLauncher.THRIFT_PORT_NAME,
-        ThriftServerLauncher.class);
+    LifecycleModule.bindServiceRunner(binder(), ThriftServerLauncher.class);
     LifecycleModule.bindStartupAction(binder(), RegisterShutdownStackPrinter.class);
 
     bind(SchedulerLifecycle.class).in(Singleton.class);
