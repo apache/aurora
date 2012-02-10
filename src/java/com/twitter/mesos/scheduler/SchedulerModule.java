@@ -51,7 +51,6 @@ import com.twitter.common.zookeeper.ZooKeeperUtils;
 import com.twitter.common_internal.zookeeper.ZooKeeperModule;
 import com.twitter.mesos.ExecutorKey;
 import com.twitter.mesos.gen.MesosAdmin;
-import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.Driver.DriverImpl;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHosts;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHostsImpl;
@@ -66,6 +65,7 @@ import com.twitter.mesos.scheduler.quota.QuotaModule;
 import com.twitter.mesos.scheduler.storage.AttributeStore;
 import com.twitter.mesos.scheduler.storage.AttributeStore.AttributeStoreImpl;
 import com.twitter.mesos.scheduler.storage.log.LogStorageModule;
+import com.twitter.mesos.scheduler.periodic.PeriodicTaskModule;
 import com.twitter.thrift.ServiceInstance;
 
 /**

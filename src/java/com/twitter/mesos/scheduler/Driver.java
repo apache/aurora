@@ -31,7 +31,7 @@ import com.twitter.mesos.gen.comm.ExecutorMessage;
  *
  * @author John Sirois
  */
-interface Driver {
+public interface Driver {
 
   /**
    * Sends a kill task request for the given {@code taskId} to the mesos master.

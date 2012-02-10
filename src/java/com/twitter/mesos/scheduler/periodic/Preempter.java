@@ -1,8 +1,7 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.periodic;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -10,10 +9,6 @@ import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.inject.Inject;
@@ -26,7 +21,11 @@ import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
-import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
+import com.twitter.mesos.scheduler.Query;
+import com.twitter.mesos.scheduler.Resources;
+import com.twitter.mesos.scheduler.ScheduleException;
+import com.twitter.mesos.scheduler.SchedulerCore;
+import com.twitter.mesos.scheduler.SchedulingFilter;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.mesos.Tasks.SCHEDULED_TO_ASSIGNED;

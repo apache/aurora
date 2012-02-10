@@ -80,7 +80,7 @@ import static com.twitter.mesos.scheduler.storage.UpdateStore.ShardUpdateConfigu
  *
  * @author William Farner
  */
-class StateManager {
+public class StateManager {
   private static final Logger LOG = Logger.getLogger(StateManager.class.getName());
 
   @VisibleForTesting
@@ -413,7 +413,7 @@ class StateManager {
    *
    * @return {@code true} if in the STARTED state, {@code false} otherwise.
    */
-  synchronized boolean isStarted() {
+  public synchronized boolean isStarted() {
     return managerState.getState() == State.STARTED;
   }
 
@@ -758,7 +758,7 @@ class StateManager {
    * @param query Query to perform.
    * @return A read-only view of the tasks matching the query.
    */
-  synchronized Set<ScheduledTask> fetchTasks(final Query query) {
+  public synchronized Set<ScheduledTask> fetchTasks(final Query query) {
     checkNotNull(query);
     managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
 
@@ -781,7 +781,7 @@ class StateManager {
    * Scans any outstanding tasks and attempts to kill any tasks that have timed out.
    *
    */
-  synchronized void scanOutstandingTasks() {
+  public synchronized void scanOutstandingTasks() {
     managerState.checkState(State.STARTED);
 
     Set<ScheduledTask> outstandingTasks = fetchTasks(OUTSTANDING_TASK_QUERY);
@@ -807,7 +807,7 @@ class StateManager {
    * @param query Query to perform.
    * @return The IDs of all tasks matching the query.
    */
-  synchronized Set<String> fetchTaskIds(final Query query) {
+  public synchronized Set<String> fetchTaskIds(final Query query) {
     checkNotNull(query);
     managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
 
@@ -1064,7 +1064,7 @@ class StateManager {
    *
    * @param taskIds IDs of tasks to delete.
    */
-  synchronized void deleteTasks(final Set<String> taskIds) {
+  public synchronized void deleteTasks(final Set<String> taskIds) {
     transactionalStorage.doInTransaction(new Work.NoResult.Quiet() {
       @Override protected void execute(final StoreProvider storeProvider) {
         final TaskStore taskStore = storeProvider.getTaskStore();

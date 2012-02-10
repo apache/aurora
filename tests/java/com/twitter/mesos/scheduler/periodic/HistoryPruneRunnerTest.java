@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.periodic;
 
 import java.util.Map;
 import java.util.Set;
@@ -23,7 +23,10 @@ import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.comm.AdjustRetainedTasks;
 import com.twitter.mesos.gen.comm.ExecutorMessage;
+import com.twitter.mesos.scheduler.BaseStateManagerTest;
+import com.twitter.mesos.scheduler.Driver;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHosts;
+import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
 

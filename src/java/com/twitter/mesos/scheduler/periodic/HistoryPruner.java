@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.periodic;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;

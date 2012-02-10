@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.periodic;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
@@ -10,16 +10,16 @@ import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
-import com.twitter.mesos.scheduler.HistoryPruner.HistoryPrunerImpl;
-import com.twitter.mesos.scheduler.HistoryPruner.HistoryPrunerImpl.PruneThreshold;
-import com.twitter.mesos.scheduler.PeriodicTaskLauncher.PeriodicTaskInterval;
+import com.twitter.mesos.scheduler.periodic.HistoryPruner.HistoryPrunerImpl;
+import com.twitter.mesos.scheduler.periodic.HistoryPruner.HistoryPrunerImpl.PruneThreshold;
+import com.twitter.mesos.scheduler.periodic.PeriodicTaskLauncher.PeriodicTaskInterval;
 
 /**
  * Binding module that configures periodic scheduler tasks.
  *
  * @author William Farner
  */
-class PeriodicTaskModule extends AbstractModule {
+public class PeriodicTaskModule extends AbstractModule {
 
   @CmdLine(name = "periodic_task_interval",
       help = "Interval on which to run task garbage collection tasks.")
@@ -56,7 +56,7 @@ class PeriodicTaskModule extends AbstractModule {
    *
    * @param binder a guice binder to bind with.
    */
-  static void bind(Binder binder) {
+  public static void bind(Binder binder) {
     binder.install(new PeriodicTaskModule());
   }
 }

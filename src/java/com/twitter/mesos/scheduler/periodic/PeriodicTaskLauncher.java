@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.periodic;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
@@ -13,10 +13,10 @@ import com.google.inject.Inject;
 
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Command;
-import com.twitter.common.logging.Log;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
+import com.twitter.mesos.scheduler.StateManager;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static java.lang.annotation.ElementType.FIELD;
