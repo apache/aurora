@@ -414,6 +414,12 @@ public class ConfigurationManager {
     return task;
   }
 
+  public static void applyDefaultsIfUnset(JobConfiguration job) {
+    for (TwitterTaskInfo task : job.getTaskConfigs()) {
+      ConfigurationManager.applyDefaultsIfUnset(task);
+    }
+  }
+
   private static void fillDataFields(TwitterTaskInfo task) {
     if (!task.isSetThermosConfig()) {
       // Workaround for thrift 0.5.0 NPE.  See MESOS-370.

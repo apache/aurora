@@ -48,6 +48,7 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Attribute;
 import com.twitter.mesos.gen.HostAttributes;
+import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskEvent;
@@ -353,9 +354,15 @@ public class StateManager {
   synchronized void start() {
     managerState.transition(State.STARTED);
 
-    LOG.info("Performing shard uniqueness sanity check.");
     transactionalStorage.doInTransaction(new Work.NoResult.Quiet() {
       @Override protected void execute(final StoreProvider storeProvider) {
+        for (String id : storeProvider.getJobStore().fetchManagerIds()) {
+          for (JobConfiguration job : storeProvider.getJobStore().fetchJobs(id)) {
+            ConfigurationManager.applyDefaultsIfUnset(job);
+            storeProvider.getJobStore().saveAcceptedJob(id, job);
+          }
+        }
+        LOG.info("Performing shard uniqueness sanity check.");
         storeProvider.getTaskStore().mutateTasks(Query.GET_ALL, new Closure<ScheduledTask>() {
           @Override public void execute(final ScheduledTask task) {
             ConfigurationManager.applyDefaultsIfUnset(task.getAssignedTask().getTask());

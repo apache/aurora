@@ -403,6 +403,42 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   }
 
   @Test
+  public void testBackfillRequestedPortsForCronJob() throws Exception {
+
+    control.replay();
+
+    Storage storage = createStorage();
+
+    storage.start(Work.NOOP);
+
+    final TwitterTaskInfo storedTask = new TwitterTaskInfo()
+        .setOwner(OWNER_A)
+        .setJobName(JOB_A)
+        .setNumCpus(1.0)
+        .setRamMb(1024)
+        .setDiskMb(500)
+        .setShardId(0)
+        .setStartCommand("ls %port:foo%")
+        .setAvoidJobs(ImmutableSet.<String>of());
+
+    storage.doInTransaction(new NoResult.Quiet() {
+      @Override protected void execute(Storage.StoreProvider storeProvider) {
+        storeProvider.getJobStore().saveAcceptedJob(
+            CronJobManager.MANAGER_KEY, makeJob(OWNER_A, JOB_A, storedTask, 1).setCronSchedule("1 1 1 1 1"));
+      }
+    });
+
+    buildScheduler(storage);
+
+    assertTaskCount(0);
+
+    scheduler.startCronJob(OWNER_A.getRole(), JOB_A);
+
+    assertEquals(
+        ImmutableSet.of("foo"), getOnlyTask(queryJob(OWNER_A, JOB_A)).getAssignedTask().getTask().getRequestedPorts());
+  }
+
+  @Test
   public void testCreateJobNoHdfs() throws Exception {
     control.replay();
     buildScheduler();

@@ -49,7 +49,8 @@ import com.twitter.mesos.scheduler.storage.Storage.Work;
 public class CronJobManager extends JobManager {
   private static Logger LOG = Logger.getLogger(CronJobManager.class.getName());
 
-  private static final String MANAGER_KEY = "CRON";
+  @VisibleForTesting
+  static final String MANAGER_KEY = "CRON";
 
   @VisibleForTesting
   static final String CRON_USER = "cron";

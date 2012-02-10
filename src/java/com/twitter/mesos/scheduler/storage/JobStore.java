@@ -4,6 +4,8 @@ import javax.annotation.Nullable;
 
 import com.twitter.mesos.gen.JobConfiguration;
 
+import java.util.Set;
+
 /**
  * Stores job configuration data.
  *
@@ -35,7 +37,8 @@ public interface JobStore {
   @Nullable JobConfiguration fetchJob(String managerId, String jobKey);
 
   /**
-   * Saves the job configuration for a job that has been accepted by the scheduler.
+   * Saves the job configuration for a job that has been accepted by the scheduler. Acts as an update if the
+   * managerId already exists.
    *
    * @param managerId The unique id of the {@link com.twitter.mesos.scheduler.JobManager} that
    *     accepted the job.
@@ -50,4 +53,10 @@ public interface JobStore {
    * @param jobKey the key identifying the job to delete.
    */
   void removeJob(String jobKey);
+
+  /**
+   * Fetches all the unique manager ids that are present in the job store.
+   * @return
+   */
+  Set<String> fetchManagerIds();
 }

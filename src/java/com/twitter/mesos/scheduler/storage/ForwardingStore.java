@@ -113,6 +113,11 @@ public class ForwardingStore implements
   }
 
   @Override
+  public Set<String> fetchManagerIds() {
+    return jobStore.fetchManagerIds();
+  }
+
+  @Override
   public void saveTasks(Set<ScheduledTask> tasks) throws IllegalStateException {
     taskStore.saveTasks(tasks);
   }

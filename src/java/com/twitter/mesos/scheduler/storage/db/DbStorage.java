@@ -450,6 +450,23 @@ public class DbStorage implements
     });
   }
 
+  private static final RowMapper<String> MANAGER_ID_ROW_MAPPER = new RowMapper<String>() {
+        @Override public String mapRow(ResultSet resultSet, int rowIndex) throws SQLException {
+            return resultSet.getString(1);
+        }
+      };
+
+  @Timed("db_storage_fetch_manager_ids")
+  @Override
+  public Set<String> fetchManagerIds() {
+    return transactionTemplate.execute(new TransactionCallback<Set<String>>() {
+      @Override public Set<String> doInTransaction(TransactionStatus transactionStatus) {
+        return ImmutableSet.copyOf(
+            jdbcTemplate.query("SELECT DISTINCT manager_id FROM job_state", MANAGER_ID_ROW_MAPPER));
+      }
+    });
+  }
+
   @Timed("db_storage_add_tasks")
   @Override
   public void saveTasks(final Set<ScheduledTask> tasks) {
@@ -658,7 +675,7 @@ public class DbStorage implements
         }
       };
 
-  @Timed("dbOstorage_fetch_shard_update_configs_by_role")
+  @Timed("db_storage_fetch_shard_update_configs_by_role")
   @Override
   public Multimap<String, ShardUpdateConfiguration> fetchShardUpdateConfigs(final String role) {
     checkNotBlank(role);
