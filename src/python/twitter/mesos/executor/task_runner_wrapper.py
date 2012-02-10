@@ -117,6 +117,9 @@ class TaskRunnerWrapper(object):
   def state(self):
     return self._monitor.get_state()
 
+  def task_state(self):
+    return self._monitor.task_state()
+
   def is_alive(self):
     """
       Is the process underlying the Thermos task runner alive?

@@ -22,8 +22,8 @@ class TaskMonitor(object):
   def __init__(self, pathspec, task_id):
     self._task_id = task_id
     self._dispatcher = TaskCkptDispatcher()
-    self._runnerstate = RunnerState(processes = {})
-    self._runner_ckpt = pathspec.given(task_id = task_id).getpath('runner_checkpoint')
+    self._runnerstate = RunnerState(processes={})
+    self._runner_ckpt = pathspec.given(task_id=task_id).getpath('runner_checkpoint')
     self._ckpt_head = 0
     self._apply_states()
     self._lock = threading.Lock()
@@ -80,6 +80,10 @@ class TaskMonitor(object):
     with self._lock:
       self._apply_states()
       return copy.deepcopy(self._runnerstate)
+
+  def task_state(self):
+    state = self.get_state()
+    return state.statuses[-1].state if state.statuses else TaskState.ACTIVE
 
   def get_active_processes(self):
     """

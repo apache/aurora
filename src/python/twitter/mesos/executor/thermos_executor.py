@@ -36,6 +36,7 @@ if 'ANGRYBIRD_HOME' in os.environ:
   RUNNER_CLASS = AngrybirdTaskRunner
   LogOptions.set_log_dir(os.path.join(os.environ['ANGRYBIRD_HOME'], 'logs/thermos/log'))
 else:
+  LogOptions.set_log_dir('/var/log/thermos')
   RUNNER_CLASS = ProductionTaskRunner
 
 
@@ -189,7 +190,7 @@ class ThermosExecutor(mesos.Executor):
     if task_id.value != self._task_id:
       log.error('Got killTask for a different task than what we are running!')
       return
-    if self._runner.state().state in (TaskState.SUCCESS, TaskState.FAILED, TaskState.KILLED):
+    if self._runner.task_state() in (TaskState.SUCCESS, TaskState.FAILED, TaskState.KILLED):
       log.error('Got killTask for task in terminal state!')
       return
     log.info('Issuing kills.')
@@ -207,7 +208,6 @@ class ThermosExecutor(mesos.Executor):
     self._log('error() - code: %s, message: %s' % (code, message))
 
 
-LogOptions.set_log_dir('/var/log/thermos')
 def main():
   LogOptions.set_disk_log_level('DEBUG')
   thermos_executor = ThermosExecutor()
