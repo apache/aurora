@@ -34,7 +34,6 @@ import com.google.inject.Inject;
 
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.SlaveID;
-import org.apache.mesos.Protos.TaskStatus;
 
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
@@ -125,7 +124,20 @@ class StateManager {
       sideEffects.add(sideEffect);
     }
 
-    <T, E extends Exception> T doInTransaction(Work<T, E> work) throws E {
+    /**
+     * Perform a unit of work in a transaction.  This supports nesting/reentrancy.
+     *
+     * Note: It is not strictly necessary for this method to be synchronized, provided that calling
+     * code in StateManager is also properly synchronized.  However, we acquire an additional lock
+     * here as a safeguard in the event that a new package-visible unsynchronized method is added.
+     *
+     * @param work Work to perform.
+     * @param <T> Work return type
+     * @param <E> Work exception type.
+     * @return The work return value.
+     * @throws E The work exception.
+     */
+    synchronized <T, E extends Exception> T doInTransaction(Work<T, E> work) throws E {
       if (inTransaction) {
         return execute(work);
       }
@@ -613,7 +625,9 @@ class StateManager {
    * @param slaveHost Host to save attributes for.
    * @param attributes Attributes associated with the host.
    */
-  void saveAttributesFromOffer(final String slaveHost, List<Protos.Attribute> attributes) {
+  synchronized void saveAttributesFromOffer(final String slaveHost,
+      List<Protos.Attribute> attributes) {
+
     MorePreconditions.checkNotBlank(slaveHost);
     Preconditions.checkNotNull(attributes);
 
@@ -1050,7 +1064,7 @@ class StateManager {
    *
    * @param taskIds IDs of tasks to delete.
    */
-  void deleteTasks(final Set<String> taskIds) {
+  synchronized void deleteTasks(final Set<String> taskIds) {
     transactionalStorage.doInTransaction(new Work.NoResult.Quiet() {
       @Override protected void execute(final StoreProvider storeProvider) {
         final TaskStore taskStore = storeProvider.getTaskStore();
