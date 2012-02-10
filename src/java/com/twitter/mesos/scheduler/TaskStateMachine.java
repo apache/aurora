@@ -176,16 +176,25 @@ public class TaskStateMachine {
         // Remove a terminated task that is remotely removed.
         Closures.filter(Transition.to(UNKNOWN), addWorkClosure(WorkCommand.DELETE)));
 
-    final Closure<Transition<State>> restart = new Closure<Transition<State>>() {
+    final Closure<Transition<State>> manageRestartingTask = new Closure<Transition<State>>() {
       @Override public void execute(Transition<State> transition) {
-        addWork(WorkCommand.RESCHEDULE, transition.getTo().mutation);
+        switch (transition.getTo().state) {
+          case ASSIGNED:
+          case STARTING:
+          case RUNNING:
+            addWork(WorkCommand.KILL);
+            break;
+
+          case LOST:
+          case KILLED:
+            addWork(WorkCommand.RESCHEDULE, transition.getTo().mutation);
+            break;
+
+          case UNKNOWN:
+            updateState(ScheduleStatus.LOST);
+        }
       }
     };
-
-    @SuppressWarnings("unchecked")
-    final Closure<Transition<State>> manageRestartingTask = Closures.combine(
-        manageTerminatedTasks,
-        Closures.filter(Transition.to(KILLED), restart));
 
     // To be called on a task transitioning into the FINISHED state.
     final Command rescheduleIfDaemon = new Command() {
@@ -404,30 +413,10 @@ public class TaskStateMachine {
         .addState(
             Rule.from(PREEMPTING)
                 .to(FINISHED, FAILED, KILLING, KILLED, LOST)
-                .withCallback(
-                    new Closure<Transition<State>>() {
-                      @Override public void execute(Transition<State> transition) {
-                        switch (transition.getTo().state) {
-                          case ASSIGNED:
-                          case STARTING:
-                          case RUNNING:
-                            addWork(WorkCommand.KILL);
-                            break;
-
-                          case LOST:
-                          case KILLED:
-                            addWork(WorkCommand.RESCHEDULE);
-                            break;
-
-                          case UNKNOWN:
-                            updateState(ScheduleStatus.LOST);
-                        }
-                      }
-                    }
-                ))
+                .withCallback(manageRestartingTask))
         .addState(
             Rule.from(RESTARTING)
-                .to(KILLED, UNKNOWN)
+                .to(FINISHED, FAILED, KILLING, KILLED, LOST)
                 .withCallback(manageRestartingTask))
         .addState(
             Rule.from(UPDATING)

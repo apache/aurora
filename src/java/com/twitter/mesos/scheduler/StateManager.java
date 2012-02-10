@@ -786,7 +786,6 @@ public class StateManager {
 
   /**
    * Scans any outstanding tasks and attempts to kill any tasks that have timed out.
-   *
    */
   public synchronized void scanOutstandingTasks() {
     managerState.checkState(State.STARTED);
@@ -800,12 +799,14 @@ public class StateManager {
         Predicates.compose(taskTimeoutFilter, Tasks.GET_TASK_EVENTS);
     Iterable<ScheduledTask> missingTasks = Iterables.filter(outstandingTasks, missingTaskFilter);
 
-    // Kill any timed out tasks.  This assumes that the mesos core will send a TASK_LOST status
-    // update if we attempt to kill any tasks that the core has no knowledge of.
-    for (String missingTaskId : Iterables.transform(missingTasks, Tasks.SCHEDULED_TO_ID)) {
+    // Kill any timed out tasks.
+    Set<String> missingTaskIds =
+        ImmutableSet.copyOf(Iterables.transform(missingTasks, Tasks.SCHEDULED_TO_ID));
+    for (String missingTaskId : missingTaskIds) {
       LOG.info("Attempting to kill missing task " + missingTaskId);
       driver.killTask(missingTaskId);
     }
+    changeState(Query.byId(missingTaskIds), ScheduleStatus.LOST, "Task timed out.");
   }
 
   /**

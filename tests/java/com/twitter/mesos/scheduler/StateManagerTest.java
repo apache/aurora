@@ -146,7 +146,7 @@ public class StateManagerTest extends BaseStateManagerTest {
   public void testTimedoutTask() {
     Multimap<ScheduleStatus, ScheduleStatus> testCases =
         ImmutableMultimap.<ScheduleStatus, ScheduleStatus>builder()
-            .putAll(ASSIGNED, Collections.<ScheduleStatus>emptyList())
+            .putAll(ASSIGNED, PENDING)
             .putAll(STARTING, ASSIGNED)
             .putAll(PREEMPTING, ASSIGNED, RUNNING)
             .putAll(RESTARTING, ASSIGNED, RUNNING)
@@ -154,7 +154,9 @@ public class StateManagerTest extends BaseStateManagerTest {
             .build();
 
     driver.killTask(EasyMock.<String>anyObject());
-    expectLastCall().times(testCases.keySet().size());
+    // Three extra kills that are encountered while transition during test prep:
+    // PREEMPTING, RESTARTING, KILLING.
+    expectLastCall().times(testCases.keySet().size() + 3);
 
     control.replay();
 
@@ -164,6 +166,8 @@ public class StateManagerTest extends BaseStateManagerTest {
       for (ScheduleStatus prepState : testCases.get(finalState)) {
         changeState(taskId, prepState);
       }
+
+      changeState(taskId, finalState);
 
       clock.advance(StateManager.MISSING_TASK_GRACE_PERIOD.get());
       clock.advance(Amount.of(1L, Time.MILLISECONDS));

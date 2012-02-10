@@ -131,6 +131,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   private SchedulingFilter schedulingFilter;
   private Driver driver;
+  private StateManager stateManager;
   private SchedulerCoreImpl scheduler;
   private CronJobManager cron;
   private PulseMonitor<ExecutorKey> executorPulseMonitor;
@@ -168,7 +169,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private void buildScheduler(Storage storage) throws Exception {
     ImmediateJobManager immediateManager = new ImmediateJobManager();
     cron = new CronJobManager(storage, new TearDownRegistry(this));
-    StateManager stateManager = new StateManager(storage, clock, new MutableState(), driver);
+    stateManager = new StateManager(storage, clock, new MutableState(), driver);
     quotaManager = new QuotaManagerImpl(storage);
     scheduler = new SchedulerCoreImpl(cron, immediateManager, stateManager, schedulingFilter,
         executorPulseMonitor, quotaManager);
@@ -1841,6 +1842,49 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       assertEquals(expected.getSecond(), event.getMessage());
       assertEquals(hostname, event.getScheduler());
     }
+  }
+
+  @Test
+  public void testStuckInKilling() throws Exception {
+    // One kill from transition to KILLING, another when the task is observed stuck.
+    expectKillTask(2);
+
+    control.replay();
+    buildScheduler();
+
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, 1));
+    String taskId = Tasks.id(getOnlyTask(queryByOwner(OWNER_A)));
+    changeStatus(taskId, ASSIGNED);
+    changeStatus(taskId, STARTING);
+    changeStatus(taskId, KILLING);
+
+    clock.advance(StateManager.MISSING_TASK_GRACE_PERIOD.get());
+    clock.advance(StateManager.MISSING_TASK_GRACE_PERIOD.get());
+
+    stateManager.scanOutstandingTasks();
+
+    assertEquals(1, getTasksByStatus(LOST).size());
+  }
+
+  @Test
+  public void testStuckInAssigned() throws Exception {
+    expectKillTask(1);
+
+    control.replay();
+    buildScheduler();
+
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, 1));
+    String taskId = Tasks.id(getOnlyTask(queryByOwner(OWNER_A)));
+    changeStatus(taskId, ASSIGNED);
+
+    clock.advance(StateManager.MISSING_TASK_GRACE_PERIOD.get());
+    clock.advance(StateManager.MISSING_TASK_GRACE_PERIOD.get());
+
+    stateManager.scanOutstandingTasks();
+
+    assertTaskCount(2);
+    assertEquals(1, getTasksByStatus(PENDING).size());
+    assertEquals(1, getTasksByStatus(LOST).size());
   }
 
   private static String getLocalHost() {
