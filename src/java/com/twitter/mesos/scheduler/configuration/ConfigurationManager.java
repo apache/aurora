@@ -46,7 +46,7 @@ public class ConfigurationManager {
   private static final Logger LOG = Logger.getLogger(ConfigurationManager.class.getName());
 
   private static final Pattern GOOD_IDENTIFIER_PATTERN = Pattern.compile("[\\w\\-\\.]+");
-  private static final String HOST_CONSTRAINT = "host";
+  @VisibleForTesting public static final String HOST_CONSTRAINT = "host";
   private static final int MAX_IDENTIFIED_LENGTH = 255;
 
   @VisibleForTesting
@@ -341,8 +341,7 @@ public class ConfigurationManager {
             LOG.info("Task configuration uses deprecated max_per_host.");
 
             // TODO(wfarner): Remove this once the mesos client is updated to supply it.
-            task.addToConstraints(new Constraint(HOST_CONSTRAINT,
-                TaskConstraint.limit(new LimitConstraint(value))));
+            task.addToConstraints(hostLimitConstraint(1));
           }
         }
       })
@@ -359,6 +358,11 @@ public class ConfigurationManager {
         }
       })
       .build();
+
+  @VisibleForTesting
+  public static Constraint hostLimitConstraint(int limit) {
+    return new Constraint(HOST_CONSTRAINT, TaskConstraint.limit(new LimitConstraint(limit)));
+  }
 
   private static Predicate<Constraint> hasName(final String name) {
     MorePreconditions.checkNotBlank(name);

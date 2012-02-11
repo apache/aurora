@@ -30,6 +30,7 @@ import com.twitter.common.util.StateMachine;
 import com.twitter.mesos.ExecutorKey;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.Constraint;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.Quota;
@@ -274,6 +275,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
         .setRamMb(1)
         .setShardId(0)
         .setRequestedPorts(ImmutableSet.<String>of())
+        .setConstraints(ImmutableSet.<Constraint>of())
         .setStartCommand("echo \"Bootstrapping\"");
   }
 
