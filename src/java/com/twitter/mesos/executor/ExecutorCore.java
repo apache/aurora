@@ -135,6 +135,8 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
       Stats.exportLong("executor_bad_processes_killed");
   private static final AtomicLong numBadDeleteAttempts =
       Stats.exportLong("executor_bad_delete_attempts");
+  private static final AtomicLong unknownRetainedTasks =
+      Stats.exportLong("executor_unknown_retained_tasks");
 
   @Inject
   public ExecutorCore(@ExecutorRootDir File executorRootDir,
@@ -257,15 +259,19 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
     return Iterables.unmodifiableIterable(tasks.values());
   }
 
-  private static final Predicate<Task> IS_RUNNING_TASK = new Predicate<Task>() {
-    @Override public boolean apply(Task task) {
-      return task.isRunning();
-    }
-  };
+  private static final Function<Task, ScheduleStatus> GET_STATUS =
+      new Function<Task, ScheduleStatus>() {
+        @Override public ScheduleStatus apply(Task task) {
+          return task.getScheduleStatus();
+        }
+      };
+
+  private static final Predicate<Task> IS_ACTIVE =
+      Predicates.compose(Predicates.in(Tasks.ACTIVE_STATES), GET_STATUS);
 
   @Override
   public Iterable<Task> getLiveTasks() {
-    return Iterables.unmodifiableIterable(Iterables.filter(tasks.values(), IS_RUNNING_TASK));
+    return Iterables.unmodifiableIterable(Iterables.filter(tasks.values(), IS_ACTIVE));
   }
 
   @Override
@@ -278,8 +284,8 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
     return hasTask(taskId) && tasks.get(taskId).isRunning();
   }
 
-  private Predicate<String> taskIdRunningFilter() {
-    return Predicates.compose(IS_RUNNING_TASK, Functions.forMap(tasks));
+  private Predicate<String> taskIdActiveFilter() {
+    return Predicates.compose(IS_ACTIVE, Functions.forMap(tasks));
   }
 
   @Override
@@ -287,7 +293,7 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
     Set<String> deletedTasks;
     synchronized (tasks) {
       Set<String> runningTasks =
-          ImmutableSet.copyOf(Iterables.filter(taskIds, taskIdRunningFilter()));
+          ImmutableSet.copyOf(Iterables.filter(taskIds, taskIdActiveFilter()));
       if (!runningTasks.isEmpty()) {
         LOG.severe("Attempted to delete running tasks " + runningTasks);
         numBadDeleteAttempts.addAndGet(runningTasks.size());
@@ -303,35 +309,72 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
   }
 
   @Override
-  public void adjustRetainedTasks(Set<String> retainedTaskIds) {
-    LOG.info("Adjusting task retention to match " + retainedTaskIds);
+  public void adjustRetainedTasks(Map<String, ScheduleStatus> retainedTasks) {
+    LOG.info("Adjusting task retention to match " + retainedTasks);
 
     synchronized (tasks) {
-      Set<String> unknownTasks = Sets.difference(retainedTaskIds, tasks.keySet());
+      Set<String> unknownTasks = Sets.difference(retainedTasks.keySet(), tasks.keySet());
       if (!unknownTasks.isEmpty()) {
         LOG.severe("Asked to retain unknown tasks " + unknownTasks);
+        // TODO(wfarner): We probably want to react to this, though some care must be given in case
+        // there is a race between receiving this message and a launchTasks message.  Exposing a
+        // counter for now.
+        unknownRetainedTasks.addAndGet(unknownTasks.size());
       }
 
-      Set<String> deleteTasks = Sets.difference(tasks.keySet(), retainedTaskIds);
-      Set<String> runningTasks =
-          ImmutableSet.copyOf(Iterables.filter(deleteTasks, taskIdRunningFilter()));
-      if (!runningTasks.isEmpty()) {
-        LOG.warning("Retained tasks excluded locally-active tasks " + runningTasks);
-        for (String runningTask : runningTasks) {
-          tasks.get(runningTask).terminate(ScheduleStatus.KILLED);
-        }
-      }
+      // Tasks that are in the task map but not in the retained map have been deleted remotely.
+      Map<String, Task> deleted =
+          Maps.filterKeys(tasks, Predicates.not(Predicates.in(retainedTasks.keySet())));
+      cleanupTasks(deleted);
+      tasks.keySet().removeAll(deleted.keySet());
 
-      for (String deleteTask : deleteTasks) {
-        File sandbox = tasks.get(deleteTask).getSandboxDir();
-        try {
-          fileDeleter.execute(sandbox);
-        } catch (IOException e) {
-          LOG.log(Level.WARNING, "Failed to delete sandbox " + sandbox, e);
-        }
-      }
+      // Reconcile state with tasks that are known both locally and remotely, but may have different
+      // states.
+      reconcileStates(Maps.filterKeys(retainedTasks, Predicates.in(tasks.keySet())));
+    }
+  }
 
-      tasks.keySet().removeAll(deleteTasks);
+  private void cleanupTasks(Map<String, Task> tasks) {
+    // Tasks that are still active.
+    Map<String, Task> runningTasks = Maps.filterValues(tasks, IS_ACTIVE);
+    if (!runningTasks.isEmpty()) {
+      LOG.warning("Retained tasks excluded locally-active tasks " + runningTasks.keySet());
+      for (Task task : runningTasks.values()) {
+        task.terminate(ScheduleStatus.KILLED);
+      }
+    }
+
+    for (Task task : tasks.values()) {
+      File sandbox = task.getSandboxDir();
+      try {
+        fileDeleter.execute(sandbox);
+      } catch (IOException e) {
+        LOG.log(Level.WARNING, "Failed to delete sandbox " + sandbox, e);
+      }
+    }
+  }
+
+  private final AtomicLong localActiveMismatch = Stats.exportLong("executor_local_active_mismatch");
+  private final AtomicLong localInactiveMismatch =
+      Stats.exportLong("executor_local_inactive_mismatch");
+
+  @VisibleForTesting static final String REPLAY_STATUS_MSG = "Replaying lost status update";
+
+  private void reconcileStates(Map<String, ScheduleStatus> expectedStatuses) {
+    for (Map.Entry<String, ScheduleStatus> expected : expectedStatuses.entrySet()) {
+      String taskId = expected.getKey();
+      Task local = tasks.get(taskId);
+      boolean activeLocally = IS_ACTIVE.apply(local);
+      boolean activeRemotely = Tasks.ACTIVE_STATES.contains(expected.getValue());
+      if (activeLocally && !activeRemotely) {
+        LOG.warning("Terminating locally-active task with mismatched state: " + taskId);
+        localActiveMismatch.incrementAndGet();
+        local.terminate(ScheduleStatus.KILLED);
+      } else if (activeRemotely && !activeLocally) {
+        LOG.warning("Task considered active remotely but not locally: " + taskId);
+        localInactiveMismatch.incrementAndGet();
+        driver.sendStatusUpdate(taskId, local.getScheduleStatus(), Optional.of(REPLAY_STATUS_MSG));
+      }
     }
   }
 

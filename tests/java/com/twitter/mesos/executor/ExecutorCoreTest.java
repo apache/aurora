@@ -1,9 +1,8 @@
 package com.twitter.mesos.executor;
 
 import java.io.File;
-import java.util.Map;
-import java.util.Random;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
@@ -57,7 +56,8 @@ public class ExecutorCoreTest extends EasyMockTest {
   private Function<AssignedTask, Task> taskFactory;
   private ExecutorService taskExecutor;
   private Driver driver;
-  private Task runningTask;
+  private Task task1;
+  private Task task2;
   private ExceptionalClosure<KillCommand, KillException> processKiller;
   private FileDeleter fileDeleter;
   private ExecutorCore executor;
@@ -67,7 +67,8 @@ public class ExecutorCoreTest extends EasyMockTest {
     taskFactory = createMock(new Clazz<Function<AssignedTask,Task>>() {});
     taskExecutor = createMock(ExecutorService.class);
     driver = createMock(Driver.class);
-    runningTask = createMock(Task.class);
+    task1 = createMock(Task.class);
+    task2 = createMock(Task.class);
     processKiller = createMock(new Clazz<ExceptionalClosure<KillCommand, KillException>>() {});
     fileDeleter = createMock(FileDeleter.class);
 
@@ -86,12 +87,12 @@ public class ExecutorCoreTest extends EasyMockTest {
   public void testRunTask() throws Exception {
     AssignedTask task = makeTask(OWNER_A, JOB_A);
 
-    expect(taskFactory.apply(task)).andReturn(runningTask);
+    expect(taskFactory.apply(task)).andReturn(task1);
     stateChange(task.getTaskId(), STARTING);
-    runningTask.stage();
+    task1.stage();
     stateChange(task.getTaskId(), RUNNING);
-    runningTask.run();
-    expect(runningTask.blockUntilTerminated()).andReturn(FINISHED);
+    task1.run();
+    expect(task1.blockUntilTerminated()).andReturn(FINISHED);
     Capture<Runnable> taskCapture = new Capture<Runnable>();
     taskExecutor.execute(capture(taskCapture));
     stateChange(task.getTaskId(), FINISHED);
@@ -106,12 +107,12 @@ public class ExecutorCoreTest extends EasyMockTest {
   public void testTaskFails() throws Exception {
     AssignedTask task = makeTask(OWNER_A, JOB_A);
 
-    expect(taskFactory.apply(task)).andReturn(runningTask);
+    expect(taskFactory.apply(task)).andReturn(task1);
     stateChange(task.getTaskId(), STARTING);
-    runningTask.stage();
+    task1.stage();
     stateChange(task.getTaskId(), RUNNING);
-    runningTask.run();
-    expect(runningTask.blockUntilTerminated()).andReturn(FAILED);
+    task1.run();
+    expect(task1.blockUntilTerminated()).andReturn(FAILED);
     Capture<Runnable> taskCapture = new Capture<Runnable>();
     taskExecutor.execute(capture(taskCapture));
     stateChange(task.getTaskId(), FAILED);
@@ -126,12 +127,12 @@ public class ExecutorCoreTest extends EasyMockTest {
   public void testStagingFails() throws Exception {
     AssignedTask task = makeTask(OWNER_A, JOB_A);
 
-    expect(taskFactory.apply(task)).andReturn(runningTask);
+    expect(taskFactory.apply(task)).andReturn(task1);
     stateChange(task.getTaskId(), STARTING);
-    runningTask.stage();
+    task1.stage();
     expectLastCall().andThrow(new TaskRunException("Staging failed."));
     stateChange(task.getTaskId(), FAILED, "Staging failed.");
-    runningTask.terminate(FAILED);
+    task1.terminate(FAILED);
 
     control.replay();
 
@@ -142,14 +143,14 @@ public class ExecutorCoreTest extends EasyMockTest {
   public void testRunFails() throws Exception {
     AssignedTask task = makeTask(OWNER_A, JOB_A);
 
-    expect(taskFactory.apply(task)).andReturn(runningTask);
+    expect(taskFactory.apply(task)).andReturn(task1);
     stateChange(task.getTaskId(), STARTING);
-    runningTask.stage();
+    task1.stage();
     stateChange(task.getTaskId(), RUNNING);
-    runningTask.run();
+    task1.run();
     expectLastCall().andThrow(new TaskRunException("Failed to start."));
     stateChange(task.getTaskId(), FAILED, "Failed to start.");
-    runningTask.terminate(FAILED);
+    task1.terminate(FAILED);
 
     control.replay();
 
@@ -160,13 +161,13 @@ public class ExecutorCoreTest extends EasyMockTest {
   public void testDeleteActiveTask() throws Exception {
     AssignedTask task = makeTask(OWNER_A, JOB_A);
 
-    expect(taskFactory.apply(task)).andReturn(runningTask);
+    expect(taskFactory.apply(task)).andReturn(task1);
     stateChange(task.getTaskId(), STARTING);
-    runningTask.stage();
+    task1.stage();
     stateChange(task.getTaskId(), RUNNING);
-    runningTask.run();
-    expect(runningTask.isRunning()).andReturn(true);
-    expect(runningTask.blockUntilTerminated()).andReturn(FINISHED);
+    task1.run();
+    expectGetStatus(task1, RUNNING);
+    expect(task1.blockUntilTerminated()).andReturn(FINISHED);
     Capture<Runnable> taskCapture = new Capture<Runnable>();
     taskExecutor.execute(capture(taskCapture));
     stateChange(task.getTaskId(), FINISHED);
@@ -179,103 +180,142 @@ public class ExecutorCoreTest extends EasyMockTest {
     taskCapture.getValue().run();
   }
 
-  private AssignedTask setupRunningTask() throws Exception {
+  private AssignedTask setupRunningTask(Task task) throws Exception {
     AssignedTask running = makeTask(OWNER_A, JOB_A);
-    expect(taskFactory.apply(running)).andReturn(runningTask);
+    expect(taskFactory.apply(running)).andReturn(task);
     stateChange(running.getTaskId(), STARTING);
-    runningTask.stage();
+    task.stage();
     stateChange(running.getTaskId(), RUNNING);
-    runningTask.run();
+    task.run();
     taskExecutor.execute(EasyMock.<Runnable>anyObject());
     return running;
   }
 
+  private void expectGetStatus(Task task, ScheduleStatus returnedStatsus) {
+    expect(task.getScheduleStatus()).andReturn(returnedStatsus).anyTimes();
+  }
+
+  private void expectDelete(Task task) throws Exception {
+    expect(task.getSandboxDir()).andReturn(DEVNULL);
+    fileDeleter.execute(DEVNULL);
+  }
+
   @Test
   public void testRetainRunningTask() throws Exception {
-    expect(runningTask.isRunning()).andReturn(false);
-    expect(runningTask.getSandboxDir()).andReturn(DEVNULL);
-    fileDeleter.execute(DEVNULL);
-    AssignedTask running = setupRunningTask();
+    AssignedTask running = setupRunningTask(task1);
+    expectGetStatus(task1, RUNNING);
 
-    AssignedTask killed = setupRunningTask();
-    expect(runningTask.getScheduleStatus()).andReturn(RUNNING);
-    runningTask.terminate(KILLED);
+    AssignedTask killed = setupRunningTask(task2);
+    expectGetStatus(task2, KILLED);
+    expectDelete(task2);
 
     control.replay();
 
     executor.executeTask(killed);
-    executor.stopLiveTask(killed.getTaskId());
     executor.executeTask(running);
 
-    executor.adjustRetainedTasks(ImmutableSet.of(running.getTaskId()));
+    executor.adjustRetainedTasks(ImmutableMap.of(running.getTaskId(), ScheduleStatus.RUNNING));
     assertNotNull(executor.getTask(running.getTaskId()));
     assertNull(executor.getTask(killed.getTaskId()));
   }
 
   @Test
-  public void testRetainKilledTask() throws Exception {
-    AssignedTask killed = setupRunningTask();
-    expect(runningTask.getScheduleStatus()).andReturn(RUNNING);
-    runningTask.terminate(KILLED);
+  public void testRetainRunningRemoteStarting() throws Exception {
+    AssignedTask running = setupRunningTask(task1);
+    expectGetStatus(task1, RUNNING);
 
-    AssignedTask running = setupRunningTask();
-    expect(runningTask.isRunning()).andReturn(true);
-    expect(runningTask.getSandboxDir()).andReturn(DEVNULL);
-    runningTask.terminate(KILLED);
-    fileDeleter.execute(DEVNULL);
+    control.replay();
+
+    executor.executeTask(running);
+
+    executor.adjustRetainedTasks(ImmutableMap.of(running.getTaskId(), STARTING));
+    assertNotNull(executor.getTask(running.getTaskId()));
+  }
+
+  @Test
+  public void testRetainLocallyRunningMismatch() throws Exception {
+    AssignedTask running = setupRunningTask(task1);
+    expectGetStatus(task1, RUNNING);
+    task1.terminate(KILLED);
+
+    control.replay();
+
+    executor.executeTask(running);
+
+    executor.adjustRetainedTasks(ImmutableMap.of(running.getTaskId(), FINISHED));
+    assertNotNull(executor.getTask(running.getTaskId()));
+  }
+
+  @Test
+  public void testRetainLocallyDeadMismatch() throws Exception {
+    AssignedTask running = setupRunningTask(task1);
+    expectGetStatus(task1, FAILED);
+    stateChange(running.getTaskId(), FAILED, Optional.of(ExecutorCore.REPLAY_STATUS_MSG));
+
+    control.replay();
+
+    executor.executeTask(running);
+
+    executor.adjustRetainedTasks(ImmutableMap.of(running.getTaskId(), RUNNING));
+    assertNotNull(executor.getTask(running.getTaskId()));
+  }
+
+  @Test
+  public void testRetainKilledTask() throws Exception {
+    AssignedTask killed = setupRunningTask(task2);
+    expectGetStatus(task2, KILLED);
+
+    AssignedTask running = setupRunningTask(task1);
+    expectGetStatus(task1, RUNNING);
+    task1.terminate(KILLED);
+    expectDelete(task1);
 
     control.replay();
 
     executor.executeTask(killed);
-    executor.stopLiveTask(killed.getTaskId());
     executor.executeTask(running);
 
-    executor.adjustRetainedTasks(ImmutableSet.of(killed.getTaskId()));
+    executor.adjustRetainedTasks(ImmutableMap.of(killed.getTaskId(), KILLED));
     assertNotNull(executor.getTask(killed.getTaskId()));
     assertNull(executor.getTask(running.getTaskId()));
   }
 
   @Test
   public void testRetainNoTasks() throws Exception {
-    AssignedTask killed = setupRunningTask();
-    expect(runningTask.getScheduleStatus()).andReturn(RUNNING);
-    runningTask.terminate(KILLED);
+    AssignedTask killed = setupRunningTask(task1);
+    expectGetStatus(task1, KILLED);
+    expectDelete(task1);
 
-    expect(runningTask.isRunning()).andReturn(false);
-    expect(runningTask.getSandboxDir()).andReturn(DEVNULL);
-    fileDeleter.execute(DEVNULL);
-    AssignedTask running = setupRunningTask();
-    expect(runningTask.isRunning()).andReturn(true);
-    expect(runningTask.getSandboxDir()).andReturn(DEVNULL);
-    runningTask.terminate(KILLED);
-    fileDeleter.execute(DEVNULL);
+    AssignedTask running = setupRunningTask(task2);
+    expectGetStatus(task2, RUNNING);
+    task2.terminate(KILLED);
+    expectDelete(task2);
 
     control.replay();
 
     executor.executeTask(killed);
-    executor.stopLiveTask(killed.getTaskId());
     executor.executeTask(running);
 
-    executor.adjustRetainedTasks(ImmutableSet.<String>of());
+    executor.adjustRetainedTasks(ImmutableMap.<String, ScheduleStatus>of());
     assertNull(executor.getTask(killed.getTaskId()));
     assertNull(executor.getTask(running.getTaskId()));
   }
 
   @Test
   public void testRetainAllTasks() throws Exception {
-    AssignedTask killed = setupRunningTask();
-    expect(runningTask.getScheduleStatus()).andReturn(RUNNING);
-    runningTask.terminate(KILLED);
+    AssignedTask killed = setupRunningTask(task1);
+    expectGetStatus(task1, KILLED);
 
-    AssignedTask running = setupRunningTask();
+    AssignedTask running = setupRunningTask(task2);
+    expectGetStatus(task2, RUNNING);
 
     control.replay();
 
     executor.executeTask(killed);
-    executor.stopLiveTask(killed.getTaskId());
     executor.executeTask(running);
 
-    executor.adjustRetainedTasks(ImmutableSet.of(running.getTaskId(), killed.getTaskId()));
+    executor.adjustRetainedTasks(
+        ImmutableMap.of(running.getTaskId(), RUNNING, killed.getTaskId(), KILLED));
     assertNotNull(executor.getTask(killed.getTaskId()));
     assertNotNull(executor.getTask(running.getTaskId()));
   }
@@ -289,9 +329,9 @@ public class ExecutorCoreTest extends EasyMockTest {
 
   @Test
   public void testScanNoBadProcesses() throws Exception {
-    AssignedTask running = setupRunningTask();
-    expect(runningTask.isRunning()).andReturn(true);
-    expect(runningTask.getAssignedTask())
+    AssignedTask running = setupRunningTask(task1);
+    expect(task1.isRunning()).andReturn(true);
+    expect(task1.getAssignedTask())
         .andReturn(new AssignedTask().setAssignedPorts(ImmutableMap.<String, Integer>of()));
 
     control.replay();
@@ -316,10 +356,10 @@ public class ExecutorCoreTest extends EasyMockTest {
 
   @Test
   public void testScanNotRunningTask() throws Exception {
-    AssignedTask killed = setupRunningTask();
-    expect(runningTask.getScheduleStatus()).andReturn(RUNNING);
-    runningTask.terminate(KILLED);
-    expect(runningTask.isRunning()).andReturn(false);
+    AssignedTask killed = setupRunningTask(task1);
+    expectGetStatus(task1, RUNNING);
+    task1.terminate(KILLED);
+    expect(task1.isRunning()).andReturn(false);
 
     processKiller.execute(new KillCommand(2));
 
@@ -336,9 +376,9 @@ public class ExecutorCoreTest extends EasyMockTest {
   public void testScanAllocatedReservedPort() throws Exception {
     int allocatedPort = RESERVED_PORT_RANGE.lowerEndpoint() + 5;
 
-    AssignedTask running = setupRunningTask();
-    expect(runningTask.isRunning()).andReturn(true);
-    expect(runningTask.getAssignedTask()).andReturn(
+    AssignedTask running = setupRunningTask(task1);
+    expect(task1.isRunning()).andReturn(true);
+    expect(task1.getAssignedTask()).andReturn(
         new AssignedTask().setAssignedPorts(ImmutableMap.of("http", allocatedPort)));
 
     control.replay();
@@ -353,9 +393,9 @@ public class ExecutorCoreTest extends EasyMockTest {
   public void testScanUnallocatedReservedPort() throws Exception {
     int unallocatedPort = RESERVED_PORT_RANGE.lowerEndpoint() + 5;
 
-    AssignedTask running = setupRunningTask();
-    expect(runningTask.isRunning()).andReturn(true);
-    expect(runningTask.getAssignedTask()).andReturn(
+    AssignedTask running = setupRunningTask(task1);
+    expect(task1.isRunning()).andReturn(true);
+    expect(task1.getAssignedTask()).andReturn(
         new AssignedTask().setAssignedPorts(ImmutableMap.<String, Integer>of()));
 
     // Eventually we will probably kill here, but for now we only log a warning.
@@ -372,9 +412,9 @@ public class ExecutorCoreTest extends EasyMockTest {
   public void testScanUnallocatedUnreservedPort() throws Exception {
     int unallocatedUnreservedPort = RESERVED_PORT_RANGE.upperEndpoint() + 5;
 
-    AssignedTask running = setupRunningTask();
-    expect(runningTask.isRunning()).andReturn(true);
-    expect(runningTask.getAssignedTask()).andReturn(
+    AssignedTask running = setupRunningTask(task1);
+    expect(task1.isRunning()).andReturn(true);
+    expect(task1.getAssignedTask()).andReturn(
         new AssignedTask().setAssignedPorts(ImmutableMap.<String, Integer>of()));
 
     control.replay();
@@ -385,13 +425,15 @@ public class ExecutorCoreTest extends EasyMockTest {
         new ProcessInfo(1, running.getTaskId(), ImmutableSet.of(unallocatedUnreservedPort))));
   }
 
+  private static final AtomicLong taskIdCounter = new AtomicLong();
+
   private static AssignedTask makeTask(Identity owner, String jobName) {
     TwitterTaskInfo task = new TwitterTaskInfo()
         .setOwner(owner)
         .setJobName(jobName);
 
     return new AssignedTask()
-        .setTaskId(String.valueOf(new Random().nextInt(10000)))
+        .setTaskId("task-" + taskIdCounter.incrementAndGet())
         .setTask(task);
   }
 

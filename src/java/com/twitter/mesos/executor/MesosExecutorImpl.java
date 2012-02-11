@@ -1,5 +1,6 @@
 package com.twitter.mesos.executor;
 
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -156,7 +157,7 @@ public class MesosExecutorImpl implements Executor {
             return;
           }
 
-          Set<String> tasks = adjustment.getRetainedTaskIds();
+          Map<String, ScheduleStatus> tasks = adjustment.getRetainedTasks();
           if (tasks == null) {
             LOG.severe("Ignoring empty tasks set in task adjustment");
             return;

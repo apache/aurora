@@ -11,6 +11,7 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
@@ -21,6 +22,7 @@ import org.apache.mesos.Protos.SlaveID;
 
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.mesos.Tasks;
+import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.comm.AdjustRetainedTasks;
@@ -119,13 +121,19 @@ class HistoryPruneRunner implements Runnable {
         : Multimaps.filterKeys(pruneByHosts, Predicates.not(unknownFilter)).asMap().entrySet()) {
 
       String host = pruneByHost.getKey();
-      Set<String> taskIds = stateManager.fetchTaskIds(hostQuery(host));
-      Set<String> retainedTaskIds = Sets.difference(taskIds, taskIds(pruneByHost.getValue()));
+      Map<String, ScheduledTask> tasksOnHost =
+          Maps.uniqueIndex(stateManager.fetchTasks(hostQuery(host)), Tasks.SCHEDULED_TO_ID);
 
-      LOG.info("Instructing executor " + host + " to retain only tasks " + retainedTaskIds);
+      Predicate<String> retain = Predicates.not(Predicates.in(taskIds(pruneByHost.getValue())));
+      Map<String, ScheduledTask> retainedTasks = Maps.filterKeys(tasksOnHost, retain);
+      Map<String, ScheduleStatus> retainedWithStatus =
+          Maps.transformValues(retainedTasks, Tasks.GET_STATUS);
 
+      LOG.info("Instructing executor " + host + " to retain only tasks " + retainedWithStatus);
+
+      AdjustRetainedTasks message = new AdjustRetainedTasks().setRetainedTasks(retainedWithStatus);
       driver.sendMessage(
-          ExecutorMessage.adjustRetainedTasks(new AdjustRetainedTasks(retainedTaskIds)),
+          ExecutorMessage.adjustRetainedTasks(message),
           knownHosts.get(host),
           defaultExecutorId);
     }

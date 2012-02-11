@@ -1,6 +1,9 @@
 package com.twitter.mesos.executor;
 
+import java.util.Map;
 import java.util.Set;
+
+import com.twitter.mesos.gen.ScheduleStatus;
 
 /**
  * Defines a task manager that provides information about running tasks and minimal mutating
@@ -43,9 +46,10 @@ public interface TaskManager {
   void deleteCompletedTasks(Set<String> taskIds);
 
   /**
-   * Adjusts the locally-retained tasks to include only the specified task IDs.
+   * Adjusts the locally-retained tasks to include only the specified task IDs, with the expectation
+   * that they are in the associated states.
    *
-   * @param retainedTaskIds IDs of tasks to retain.
+   * @param retainedTaskIds tasks to retain and their states.
    */
-  void adjustRetainedTasks(Set<String> retainedTaskIds);
+  void adjustRetainedTasks(Map<String, ScheduleStatus> retainedTaskIds);
 }

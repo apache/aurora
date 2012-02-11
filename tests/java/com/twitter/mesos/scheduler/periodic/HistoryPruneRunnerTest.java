@@ -7,6 +7,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
 
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.SlaveID;
@@ -185,11 +186,11 @@ public class HistoryPruneRunnerTest extends BaseStateManagerTest {
   }
 
   private void expectRetainTasks(String host, ScheduledTask... tasks) {
-    Set<String> taskIds = ids(tasks);
+    Map<String, ScheduledTask> byId = Maps.uniqueIndex(
+        ImmutableSet.<ScheduledTask>builder().add(tasks).build(), Tasks.SCHEDULED_TO_ID);
+    Map<String, ScheduleStatus> idToStatus = Maps.transformValues(byId, Tasks.GET_STATUS);
 
-    driver.sendMessage(
-        ExecutorMessage.adjustRetainedTasks(new AdjustRetainedTasks(taskIds)),
-        slaveId(host),
-        EXECUTOR);
+    AdjustRetainedTasks message = new AdjustRetainedTasks().setRetainedTasks(idToStatus);
+    driver.sendMessage(ExecutorMessage.adjustRetainedTasks(message), slaveId(host), EXECUTOR);
   }
 }
