@@ -23,6 +23,7 @@ import com.twitter.common.util.BackoffHelper;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.CreateJobResponse;
 import com.twitter.mesos.gen.FinishUpdateResponse;
+import com.twitter.mesos.gen.ForceTaskStateResponse;
 import com.twitter.mesos.gen.GetQuotaResponse;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.KillResponse;
@@ -31,6 +32,7 @@ import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ResponseCode;
 import com.twitter.mesos.gen.RestartResponse;
 import com.twitter.mesos.gen.RollbackShardsResponse;
+import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduleStatusResponse;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.SessionKey;
@@ -272,8 +274,7 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     try {
       schedulerCore.restartTasks(taskIds);
     } catch (RestartException e) {
-      response.setResponseCode(INVALID_REQUEST)
-          .setMessage(e.getMessage());
+      response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
     }
     if (!taskIds.equals(tasksRestarting)) {
       response.setResponseCode(WARNING)
@@ -342,8 +343,8 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     RollbackShardsResponse response = new RollbackShardsResponse();
     try {
       schedulerCore.rollbackShards(role, jobName, shards, updateToken);
-      response.setResponseCode(UpdateResponseCode.OK).
-          setMessage("Successful rollback of shards: " + shards);
+      response.setResponseCode(UpdateResponseCode.OK)
+          .setMessage("Successful rollback of shards: " + shards);
     } catch (ScheduleException e) {
       response.setResponseCode(UpdateResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
     }
@@ -364,7 +365,7 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
           updateResult == UpdateResult.TERMINATE ?
               Optional.<String>absent() : Optional.of(updateToken),
           updateResult);
-      response.setResponseCode(ResponseCode.OK).setMessage("Update successfully finished.");
+      response.setResponseCode(OK).setMessage("Update successfully finished.");
     } catch (ScheduleException e) {
       response.setResponseCode(ResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
     }
@@ -403,11 +404,36 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     try {
       assertAdmin(session);
       quotaManager.setQuota(ownerRole, quota);
-      response.setResponseCode(ResponseCode.OK).setMessage("Quota applied.");
+      response.setResponseCode(OK).setMessage("Quota applied.");
     } catch (AuthFailedException e) {
       response.setResponseCode(ResponseCode.AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
     }
 
     return response;
+  }
+
+  @Override
+  public ForceTaskStateResponse forceTaskState(String taskId, ScheduleStatus status,
+      SessionKey session) {
+
+    checkNotBlank(taskId, "Task ID must not be blank.");
+    checkNotNull(status, "Schedule status must not be null.");
+    checkNotNull(session, "Session must be set.");
+
+    ForceTaskStateResponse response = new ForceTaskStateResponse();
+    try {
+      assertAdmin(session);
+      schedulerCore.setTaskStatus(Query.byId(taskId), status, transitionMessage(session.getUser()));
+      response.setResponseCode(OK).setMessage("Transition attempted.");
+    } catch (AuthFailedException e) {
+      response.setResponseCode(ResponseCode.AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
+    }
+
+    return response;
+  }
+
+  @VisibleForTesting
+  static String transitionMessage(String user) {
+    return "Transition forced by " + user;
   }
 }

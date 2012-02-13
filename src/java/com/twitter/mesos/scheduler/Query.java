@@ -6,6 +6,8 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableSet;
 
+import org.apache.commons.lang.builder.EqualsBuilder;
+
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
@@ -127,6 +129,19 @@ public class Query {
 
     return isEmpty(base().getJobKey())
           ? Tasks.jobKey(base().getOwner(), base().getJobName()) : base().getJobKey();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (!(o instanceof Query)) {
+      return false;
+    }
+
+    Query that = (Query) o;
+    return new EqualsBuilder()
+        .append(this.baseQuery, that.baseQuery)
+        .append(this.filter, that.filter)
+        .isEquals();
   }
 
   @Override

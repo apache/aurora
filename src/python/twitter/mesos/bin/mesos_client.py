@@ -237,6 +237,20 @@ class MesosCLI(cmd.Cmd):
     resp = api.set_quota(role, cpu, ram_mb, disk_mb)
     check_and_log_response(resp)
 
+  @requires_arguments('task_id', 'state')
+  def do_force_task_state(self, *line):
+    """force_state task_id state"""
+    (task_id, state) = line
+    status = ScheduleStatus._NAMES_TO_VALUES.get(state)
+    if status is None:
+      log.error('Unrecognized status "%s", must be one of [%s]'
+                % (state, ', '.join(ScheduleStatus._NAMES_TO_VALUES.keys())))
+      sys.exit(1)
+
+    api = MesosClientAPI(cluster=self.options.cluster, verbose=self.options.verbose)
+    resp = api.force_task_state(task_id, status)
+    check_and_log_response(resp)
+
 
 def initialize_options():
   usage = """Mesos command-line interface.

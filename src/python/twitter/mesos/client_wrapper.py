@@ -274,3 +274,9 @@ class MesosClientAPI(MesosClientBase):
 
     resp = self.client().setQuota(role, Quota(cpu, ram_mb, disk_mb), self._session_key)
     return resp
+
+  @requires_auth
+  def force_task_state(self, task_id, status):
+    log.info("Requesting that task %s transition to state %s" % (task_id, status))
+    resp = self.client().forceTaskState(task_id, status, self._session_key)
+

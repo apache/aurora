@@ -11,13 +11,16 @@ import com.twitter.common.args.Arg;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.EasyMockTest;
+import com.twitter.concurrent.IVar.Schedule;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.CreateJobResponse;
+import com.twitter.mesos.gen.ForceTaskStateResponse;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.KillResponse;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ResponseCode;
+import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.SessionKey;
 import com.twitter.mesos.gen.SetQuotaResponse;
@@ -27,6 +30,7 @@ import com.twitter.mesos.scheduler.auth.SessionValidator;
 import com.twitter.mesos.scheduler.auth.SessionValidator.AuthFailedException;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 
+import static com.twitter.mesos.scheduler.SchedulerThriftInterface.transitionMessage;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
@@ -233,6 +237,32 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     SetQuotaResponse response = thriftInterface.setQuota(ROLE, quota, SESSION);
+    assertEquals(ResponseCode.AUTH_FAILED, response.getResponseCode());
+  }
+
+  @Test
+  public void testForceTaskState() throws Exception {
+    String taskId = "task_id_foo";
+    ScheduleStatus status = ScheduleStatus.FAILED;
+
+    scheduler.setTaskStatus(Query.byId(taskId), status, transitionMessage(SESSION.getUser()));
+    expectAdminAuth(true);
+
+    control.replay();
+
+    ForceTaskStateResponse response =
+        thriftInterface.forceTaskState(taskId, status, SESSION);
+    assertEquals(ResponseCode.OK, response.getResponseCode());
+  }
+
+  @Test
+  public void testForceTaskStateAuthFailure() throws Exception {
+    expectAdminAuth(false);
+
+    control.replay();
+
+    ForceTaskStateResponse response =
+        thriftInterface.forceTaskState("task", ScheduleStatus.FAILED, SESSION);
     assertEquals(ResponseCode.AUTH_FAILED, response.getResponseCode());
   }
 
