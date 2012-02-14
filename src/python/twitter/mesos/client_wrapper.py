@@ -159,15 +159,13 @@ class MesosClientAPI(MesosClientBase):
           config.hdfs_path(), self.cluster(), self.proxy())
 
     log.info('Creating job %s' % config.name())
-    resp = self.client().createJob(config.job(), self._session_key)
-    return resp
+    return self.client().createJob(config.job(), self._session_key)
 
   @requires_auth
   def start_cronjob(self, role, jobname):
     log.info("Starting cron job: %s" % jobname)
 
-    resp = self.client().startCronJob(role, jobname, self._session_key)
-    return resp
+    return self.client().startCronJob(role, jobname, self._session_key)
 
   @requires_auth
   def kill_job(self, role, jobname):
@@ -177,8 +175,7 @@ class MesosClientAPI(MesosClientBase):
     query.owner = Identity(role=role)
     query.jobName = jobname
 
-    resp = self.client().killTasks(query, self._session_key)
-    return resp
+    return self.client().killTasks(query, self._session_key)
 
   def check_status(self, role, jobname):
     log.info("Checking status of job: %s" % jobname)
@@ -187,8 +184,7 @@ class MesosClientAPI(MesosClientBase):
     query.owner = Identity(role=role)
     query.jobName = jobname
 
-    resp = self.client().getTasksStatus(query)
-    return resp
+    return self.client().getTasksStatus(query)
 
   @requires_auth
   def update_job(self, config, copy_app_from=None):
@@ -236,7 +232,6 @@ class MesosClientAPI(MesosClientBase):
     resp = FinishUpdateResponse()
     resp.responseCode = ResponseCode.WARNING if failed_shards else ResponseCode.OK
     resp.message = "Update Unsuccessful" if failed_shards else "Update Successful"
-
     return resp
 
   @requires_auth
@@ -258,25 +253,23 @@ class MesosClientAPI(MesosClientBase):
     resp = FinishUpdateResponse()
     resp.responseCode = ResponseCode.OK
     resp.message = "Update Cancelled"
-
     return resp
 
   def get_quota(self, role):
     log.info("Getting quota for: %s" % role)
 
-    resp = self.client().getQuota(role)
-    return resp
+    return self.client().getQuota(role)
 
   @requires_auth
   def set_quota(self, role, cpu, ram_mb, disk_mb):
     log.info("Setting quota for user:%s cpu:%f ram_mb:%d disk_mb: %d"
               % (role, cpu, ram_mb, disk_mb))
 
-    resp = self.client().setQuota(role, Quota(cpu, ram_mb, disk_mb), self._session_key)
-    return resp
+    return self.client().setQuota(role, Quota(cpu, ram_mb, disk_mb), self._session_key)
 
   @requires_auth
   def force_task_state(self, task_id, status):
     log.info("Requesting that task %s transition to state %s" % (task_id, status))
-    resp = self.client().forceTaskState(task_id, status, self._session_key)
+    return self.client().forceTaskState(task_id, status, self._session_key)
+
 
