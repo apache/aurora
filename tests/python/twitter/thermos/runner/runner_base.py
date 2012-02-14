@@ -7,19 +7,15 @@ import time
 from twitter.common import log
 from twitter.common.contextutil import temporary_file
 from twitter.thermos.base import TaskPath
-from twitter.thermos.base.ckpt import TaskCkptDispatcher
+from twitter.thermos.base.ckpt import CheckpointDispatcher
 from twitter.thermos.config.loader import ThermosTaskWrapper
-from twitter.thermos.runner.runner import TaskRunnerHelper
+from thrift.TSerialization import deserialize as thrift_deserialize
 
 from gen.twitter.thermos.ttypes import (
   TaskState,
-  TaskRunState,
   RunnerCkpt,
   RunnerState,
-  ProcessRunState
 )
-
-# TODO(wickman) setup_class / teardown_class don't behave like you'd want here.
 
 class RunnerTestBase(object):
   RUN_JOB_SCRIPT = """
@@ -29,6 +25,7 @@ from twitter.common.log.options import LogOptions
 from twitter.thermos.config.loader import ThermosConfigLoader
 from twitter.thermos.runner import TaskRunner
 from twitter.thermos.runner.runner import TaskRunnerHelper
+from thrift.TSerialization import serialize as thrift_serialize
 
 log.init('runner_base')
 LogOptions.set_disk_log_level('DEBUG')
@@ -45,7 +42,8 @@ if %(portmap)s:
 runner = TaskRunner(task, '%(root)s', sandbox, **args)
 runner.run()
 
-TaskRunnerHelper.dump_state(runner.state(), '%(state_filename)s')
+with open('%(state_filename)s', 'w') as fp:
+  fp.write(thrift_serialize(runner.state()))
 """
 
   @classmethod
@@ -92,11 +90,14 @@ TaskRunnerHelper.dump_state(runner.state(), '%(state_filename)s')
            so, se)
 
     try:
-      cls.state = TaskRunnerHelper.read_state(cls.state_filename)
-    except:
+      with open(cls.state_filename, 'r') as fp:
+        cls.state = thrift_deserialize(RunnerState(), fp.read())
+    except Exception as e:
+      print >> sys.stderr, 'Couldnt load runner staaaaaate: %s' % e
       cls.state = RunnerState()
     try:
-      cls.reconstructed_state = TaskCkptDispatcher.from_file(cls.pathspec.getpath('runner_checkpoint'))
+      cls.reconstructed_state = CheckpointDispatcher.from_file(
+        cls.pathspec.getpath('runner_checkpoint'))
     except:
       cls.reconstructed_state = None
     cls.initialized = True

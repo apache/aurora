@@ -32,13 +32,13 @@ class TaskDetector(object):
     return self._pathspec.given(task_id = task_id).getpath('runner_checkpoint')
 
   def get_process_checkpoints(self, task_id):
-    matching_paths = glob.glob(self._pathspec.given(task_id=task_id, fork_time='*', pid='*')
+    matching_paths = glob.glob(self._pathspec.given(task_id=task_id, process='*')
                                              .getpath('process_checkpoint'))
-    path_re = re.compile(self._pathspec.given(task_id=task_id, fork_time='(\d+)', pid='(\d+)')
-                                 .getpath('process_checkpoint'))
+    path_re = re.compile(self._pathspec.given(task_id=task_id, process='(\S+)')
+                                       .getpath('process_checkpoint'))
     for path in matching_paths:
       try:
-        fork_time, pid = path_re.match(path).groups()
+        process, = path_re.match(path).groups()
       except:
         continue
       yield path

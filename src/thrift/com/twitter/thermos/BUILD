@@ -1,4 +1,4 @@
 python_thrift_library(
   name = 'py-thrift',
-  sources = rglobs('*.thrift')
+  sources = ['thermos_internal.thrift']
 )

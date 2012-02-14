@@ -3,7 +3,7 @@ from runner_base import RunnerTestBase
 from twitter.thermos.config.schema import Task, Resources, Process
 from gen.twitter.thermos.ttypes import (
   TaskState,
-  ProcessRunState
+  ProcessState
 )
 
 class TestFailingRunner(RunnerTestBase):
@@ -43,7 +43,7 @@ class TestFailingRunner(RunnerTestBase):
     for k in range(1,4):
       process_name = 'p%d' % k
       assert process_name in processes
-      assert len(processes[process_name].runs) == k
+      assert len(processes[process_name]) == k
       for j in range(k-1):
-        assert processes[process_name].runs[j].run_state == ProcessRunState.FAILED
-      assert processes[process_name].runs[k-1].run_state == ProcessRunState.FINISHED
+        assert processes[process_name][j].state == ProcessState.FAILED
+      assert processes[process_name][k-1].state == ProcessState.SUCCESS

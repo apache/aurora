@@ -1,7 +1,8 @@
-import getpass
-import time
 from pystachio import Empty
-from twitter.thermos.config.schema import *
+from twitter.thermos.config.schema import (
+  ProcessConstraint,
+  ProcessPair,
+)
 
 
 class ConstraintFunctions(object):

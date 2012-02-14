@@ -55,7 +55,7 @@ class TaskMuxer(Lockable):
   def get_active_processes(self):
     """
       Get active processes.  Returned is a list of tuples of the form:
-        (task_id, ProcessState object of running object, its run number)
+        (task_id, ProcessStatus object of running object, its run number)
     """
     active_processes = []
     for task_id in self._tasks:

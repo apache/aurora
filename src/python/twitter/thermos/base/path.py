@@ -36,13 +36,13 @@ class TaskPath(object):
   class UnknownPath(Exception): pass
   class UnderspecifiedPath(Exception): pass
 
-  KNOWN_KEYS = [ 'root', 'task_id', 'state', 'pid', 'process', 'run', 'fork_time' ]
+  KNOWN_KEYS = [ 'root', 'task_id', 'state', 'process', 'run' ]
 
   DIR_TEMPLATE = {
             'task_path': ['%(root)s',       'tasks',   '%(state)s', '%(task_id)s'],
       'checkpoint_path': ['%(root)s', 'checkpoints', '%(task_id)s'],
     'runner_checkpoint': ['%(root)s', 'checkpoints', '%(task_id)s', 'runner'],
-   'process_checkpoint': ['%(root)s', 'checkpoints', '%(task_id)s', '%(fork_time)s.%(pid)s'],
+   'process_checkpoint': ['%(root)s', 'checkpoints', '%(task_id)s', 'coordinator.%(process)s'],
        'process_logdir': ['%(root)s',        'logs', '%(task_id)s', '%(process)s', '%(run)s']
   }
 

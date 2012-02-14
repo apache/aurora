@@ -5,9 +5,9 @@ import threading
 
 from twitter.common import log
 from twitter.common.recordio import ThriftRecordReader
-from twitter.thermos.base import TaskCkptDispatcher
+from twitter.thermos.base import CheckpointDispatcher
 from gen.twitter.thermos.ttypes import (
-  ProcessRunState,
+  ProcessState,
   RunnerCkpt,
   RunnerState)
 
@@ -20,10 +20,9 @@ class TaskMonitor(object):
   """
 
   def __init__(self, pathspec, task_id):
-    self._task_id = task_id
-    self._dispatcher = TaskCkptDispatcher()
-    self._runnerstate = RunnerState(processes={})
-    self._runner_ckpt = pathspec.given(task_id=task_id).getpath('runner_checkpoint')
+    self._dispatcher = CheckpointDispatcher()
+    self._runnerstate = RunnerState(processes = {})
+    self._runner_ckpt = pathspec.given(task_id = task_id).getpath('runner_checkpoint')
     self._ckpt_head = 0
     self._apply_states()
     self._lock = threading.Lock()
@@ -50,7 +49,7 @@ class TaskMonitor(object):
               break
             try:
               self._dispatcher.dispatch(self._runnerstate, runner_update)
-            except TaskCkptDispatcher.InvalidSequenceNumber as e:
+            except CheckpointDispatcher.InvalidSequenceNumber as e:
               log.error('Checkpoint stream is corrupt: %s' % e)
               break
           new_ckpt_head = fp.tell()
@@ -88,17 +87,16 @@ class TaskMonitor(object):
   def get_active_processes(self):
     """
       Get active processes.  Returned is a list of tuples of the form:
-        (ProcessState object of running object, its run number)
+        (ProcessStatus object of running object, its run number)
     """
     active_processes = []
     with self._lock:
       self._apply_states()
       state = self._runnerstate
-      for process in state.processes:
-        runs = state.processes[process].runs
+      for process, runs in state.processes.items():
         if len(runs) == 0:
           continue
         last_run = runs[-1]
-        if last_run.run_state == ProcessRunState.RUNNING:
+        if last_run.state == ProcessState.RUNNING:
           active_processes.append((last_run, len(runs) - 1))
     return active_processes

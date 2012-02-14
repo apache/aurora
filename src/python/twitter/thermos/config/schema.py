@@ -1,4 +1,14 @@
-from pystachio import *
+from pystachio import (
+  Default,
+  Float,
+  Integer,
+  List,
+  Map,
+  Provided,
+  Required,
+  String,
+  Struct
+)
 
 class ThermosContext(Struct):
   ports   = Map(String, Integer)

@@ -14,7 +14,7 @@ from twitter.thermos.observer.muxer import TaskMuxer
 from twitter.thermos.observer.measure import TaskMeasurer
 
 from twitter.thermos.base import TaskPath
-from twitter.thermos.base.ckpt import TaskCkptDispatcher
+from twitter.thermos.base.ckpt import CheckpointDispatcher
 
 
 from twitter.thermos.config.schema import (
@@ -184,7 +184,7 @@ class TaskObserver(threading.Thread):
     else:
       # unread finished state, let's read and memoize.
       path = self._pathspec.given(task_id = task_id).getpath('runner_checkpoint')
-      self._states[task_id] = TaskCkptDispatcher.from_file(path)
+      self._states[task_id] = CheckpointDispatcher.from_file(path)
       return self._states[task_id]
     log.error(TaskObserver.UnexpectedError("Could not find task_id: %s" % task_id))
     return None
@@ -202,28 +202,27 @@ class TaskObserver(threading.Thread):
     if state is None:
       return {}
 
+    # XXX(wickman) ProcessHistoryState update
     waiting, running, success, failed, killed = [], [], [], [], []
-    for process in state.processes:
-      runs = state.processes[process].runs
+    for process, runs in state.processes.items():
       # No runs ==> nothing started.
       if len(runs) == 0:
         waiting.append(process)
       else:
-        if state.processes[process].state == TaskRunState.ACTIVE:
-          if runs[-1].run_state == ProcessRunState.WAITING:
-            waiting.append(process)
-          else:
-            running.append(process)
-        elif state.processes[process].state == TaskRunState.SUCCESS:
+        if runs[-1].state in (None, ProcessState.WAITING, ProcessState.LOST):
+          waiting.append(process)
+        elif runs[-1].state in (ProcessState.FORKED, ProcessState.RUNNING):
+          running.append(process)
+        elif runs[-1].state == ProcessState.SUCCESS:
           success.append(process)
-        elif state.processes[process].state == TaskRunState.FAILED:
+        elif runs[-1].state == ProcessState.FAILED:
           failed.append(process)
-        elif state.processes[process].state == TaskRunState.KILLED:
+        elif runs[-1].state == ProcessState.KILLED:
           killed.append(process)
         else:
           # TODO(wickman)  Consider log.error instead of raising.
           raise TaskObserver.UnexpectedState(
-            "Unexpected TaskRunState: %s" % state.processes[process].state)
+            "Unexpected ProcessHistoryState: %s" % state.processes[process].state)
 
     return dict(
       waiting = waiting,
@@ -313,22 +312,22 @@ class TaskObserver(threading.Thread):
       {
         process_name: string
         process_run: int
-        state: string [WAITING, FORKED, RUNNING, FINISHED, KILLED, FAILED, LOST]
+        state: string [WAITING, FORKED, RUNNING, SUCCESS, KILLED, FAILED, LOST]
         (optional) start_time: milliseconds from epoch
         (optional) stop_time: milliseconds from epoch
       }
     """
-    if len(history.runs) == 0:
+    if len(history) == 0:
       return {}
-    if run >= len(history.runs):
+    if run >= len(history):
       return {}
     else:
-      process_run = history.runs[run]
-      run = run % len(history.runs)
+      process_run = history[run]
+      run = run % len(history)
       d = dict(
         process_name = process_run.process,
         process_run = run,
-        state = ProcessRunState._VALUES_TO_NAMES[process_run.run_state],
+        state = ProcessState._VALUES_TO_NAMES[process_run.state],
       )
       if process_run.start_time:
         d.update(start_time = process_run.start_time * 1000)
@@ -346,7 +345,7 @@ class TaskObserver(threading.Thread):
         used: { cpu: float, ram: int bytes, disk: int bytes }
         start_time: (time since epoch in millis (utc))
         stop_time: (time since epoch in millis (utc))
-        state: string [WAITING, FORKED, RUNNING, FINISHED, KILLED, FAILED, LOST]
+        state: string [WAITING, FORKED, RUNNING, SUCCESS, KILLED, FAILED, LOST]
       }
 
       If run is None, return the latest run.
@@ -354,14 +353,13 @@ class TaskObserver(threading.Thread):
     state = self._state(task_id)
     if state is None:
       return {}
-    if process not in state.processes: return {}
+    if process not in state.processes:
+      return {}
     history = state.processes[process]
-
     run = int(run) if run is not None else -1
     tup = self._get_process_tuple(history, run)
     if not tup:
       return {}
-
     if tup.get('state') == 'RUNNING':
       tup.update(used = self._get_process_resource_consumption(task_id, process))
     return tup

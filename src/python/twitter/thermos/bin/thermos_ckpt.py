@@ -7,7 +7,7 @@ from gen.twitter.thermos.ttypes import RunnerState, RunnerCkpt, TaskState
 
 from twitter.common import app
 from twitter.common.recordio import ThriftRecordReader
-from twitter.thermos.base.ckpt import TaskCkptDispatcher
+from twitter.thermos.base.ckpt import CheckpointDispatcher
 
 app.add_option("--checkpoint", dest = "ckpt", metavar = "CKPT",
                help = "read checkpoint from CKPT")
@@ -30,7 +30,7 @@ def main(args):
   fp = file(values.ckpt, "r")
   rr = ThriftRecordReader(fp, RunnerCkpt)
   wrs = RunnerState(processes = {})
-  dispatcher = TaskCkptDispatcher()
+  dispatcher = CheckpointDispatcher()
   for wts in rr:
     print 'Recovering: ', wts
     if values.assemble is True:
@@ -44,9 +44,6 @@ def main(args):
     for task_status in wrs.statuses:
       print '  %s [pid: %d] => %s' % (time.asctime(time.localtime(task_status.timestamp_ms/1000.0)),
         task_status.runner_pid, TaskState._VALUES_TO_NAMES[task_status.state])
-
-    print '\nRecovered Allocated Ports'
-    pprint.pprint(wrs.ports, indent=4)
 
     print '\nRecovered Processes'
     pprint.pprint(wrs.processes, indent=4)

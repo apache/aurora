@@ -1,67 +1,46 @@
+from contextlib import contextmanager
 import errno
 import getpass
 import os
 import socket
 import signal
-import threading
 import time
-from contextlib import contextmanager
+import traceback
 
 from pystachio import Integer, Environment
 
 from twitter.common import log
-from twitter.common.dirutil import (
-  safe_mkdir,
-  safe_open,
-  lock_file,
-  unlock_file)
+from twitter.common.dirutil import safe_mkdir, lock_file
 from twitter.common.process import ProcessProviderFactory
 from twitter.common.quantity import Amount, Time
 from twitter.common.recordio import ThriftRecordReader, ThriftRecordWriter
 
 from twitter.thermos.base.path import TaskPath
 from twitter.thermos.base.ckpt import (
-  TaskCkptDispatcher,
+  CheckpointDispatcher,
   UniversalStateHandler,
   ProcessStateHandler,
   TaskStateHandler)
 from twitter.thermos.config.loader  import ThermosTaskWrapper, ThermosProcessWrapper
 from twitter.thermos.config.schema  import ThermosContext
 from twitter.thermos.runner.planner import Planner
-from twitter.thermos.runner.ports   import PortAllocator
 from twitter.thermos.runner.process import Process
 from twitter.thermos.runner.muxer   import ProcessMuxer
 
 from gen.twitter.thermos.ttypes import (
-  ProcessRunState,
   ProcessState,
-  TaskAllocatedPort,
+  ProcessStatus,
   RunnerCkpt,
   RunnerHeader,
   RunnerState,
-  TaskRunState,
-  TaskRunStateUpdate,
   TaskState,
   TaskStatus,
 )
-
-from thrift.TSerialization import serialize as thrift_serialize
-from thrift.TSerialization import deserialize as thrift_deserialize
 
 __author__ = 'wickman@twitter.com (brian wickman)'
 __tested__ = False
 
 class TaskRunnerHelper(object):
-  @staticmethod
-  def dump_state(state, filename):
-    with open(filename, 'w') as fp:
-      fp.write(thrift_serialize(state))
-
-  @staticmethod
-  def read_state(filename):
-    with open(filename, 'r') as fp:
-      return thrift_deserialize(RunnerState(), fp.read())
-
   @staticmethod
   def get_actual_user():
     import pwd
@@ -96,8 +75,8 @@ class TaskRunnerProcessHandler(ProcessStateHandler):
                |   .has_process(name) => yes/no
                |   .activate(name, sequence_number=0)
                |   .deactivate(name)
-               |   .get(name) => unfortunately requires checkpoint record generation
-               |      due to port acquisition.
+               |   .get(name) => ProcessHandle ???
+               |   .reap()
                |
                | ProcessFactory => Process(*1, *2, *3, pathspec, sandbox, user, chroot, fork)
                |   *1 => name
@@ -105,7 +84,8 @@ class TaskRunnerProcessHandler(ProcessStateHandler):
                |   *3 => sequence number
 
       _planner [Planner.forget, Planner.set_finished]
-      _set_process_history_state [state transition function => potentially ckpt mutable]
+        ==> Could make this completely stateless and instead make its decisions based upon
+            state.processes
   """
 
   def __init__(self, runner):
@@ -113,9 +93,10 @@ class TaskRunnerProcessHandler(ProcessStateHandler):
 
   def on_waiting(self, process_update):
     log.debug('Process on_waiting %s' % process_update)
-    self._runner._task_processes[process_update.process] = self._runner._task_process_from_process_name(
-      process_update.process, sequence_number=process_update.seq)
-    self._runner._watcher.register(self._runner._task_processes[process_update.process])
+    self._runner._task_processes[process_update.process] = (
+      self._runner._task_process_from_process_name(
+        process_update.process, process_update.seq + 1))
+    self._runner._watcher.register(process_update.process, process_update.seq - 1)
     self._runner._planner.forget(process_update.process)
 
   def on_forked(self, process_update):
@@ -128,12 +109,11 @@ class TaskRunnerProcessHandler(ProcessStateHandler):
     log.debug('Process on_running %s' % process_update)
     self._runner._planner.set_running(process_update.process)
 
-  def on_finished(self, process_update):
-    log.debug('Process on_finished %s' % process_update)
+  def on_success(self, process_update):
+    log.debug('Process on_success %s' % process_update)
     self._runner._task_processes.pop(process_update.process)
     self._runner._watcher.unregister(process_update.process)
     self._runner._planner.set_finished(process_update.process)
-    self._runner._set_process_history_state(process_update.process, TaskRunState.SUCCESS)
 
   def _on_abnormal(self, process_update):
     log.debug('  => _on_abnormal %s' % process_update)
@@ -144,11 +124,10 @@ class TaskRunnerProcessHandler(ProcessStateHandler):
     if self._runner._is_process_failed(process_name):
       log.info('Process %s reached maximum failures, marking process run failed.' % process_name)
       self._runner._planner.set_broken(process_update.process)
-      self._runner._set_process_history_state(process_name, TaskRunState.FAILED)
     else:
       log.info('Process %s under maximum failure limit, restarting.' % process_name)
       self._runner._planner.forget(process_update.process)
-      self._runner._set_process_state(process_name, ProcessRunState.WAITING)
+      self._runner._set_process_status(process_name, ProcessState.WAITING, process_update.seq + 1)
 
   def on_failed(self, process_update):
     log.debug('Process on_failed %s' % process_update)
@@ -162,7 +141,6 @@ class TaskRunnerProcessHandler(ProcessStateHandler):
     log.debug('Process on_killed %s' % process_update)
     self._runner._task_processes.pop(process_update.process)
     self._runner._watcher.unregister(process_update.process)
-    self._runner._set_process_history_state(process_update.process, TaskRunState.KILLED)
 
 
 class TaskRunnerTaskHandler(TaskStateHandler):
@@ -233,21 +211,11 @@ class TaskRunnerUniversalHandler(UniversalStateHandler):
 
   def on_process_transition(self, state, process_update):
     log.debug('_on_process_transition: %s' % process_update)
-    self._runner._ckpt_write(RunnerCkpt(process_state=process_update))
-
-  def on_process_history_transition(self, state, process_history_update):
-    log.debug('_on_process_history_transition: %s' % process_history_update)
-    self._runner._ckpt_write(RunnerCkpt(history_state_update=process_history_update))
+    self._runner._ckpt_write(RunnerCkpt(process_status=process_update))
 
   def on_task_transition(self, state, task_update):
     log.debug('_on_task_transition: %s' % task_update)
-    self._runner._ckpt_write(RunnerCkpt(status_update=task_update))
-
-  def on_port_allocation(self, name, port):
-    # self._runner._port_allocator.allocate(name, port) ? necessary
-    log.debug('_on_port_allocation: %s=>%s' % (name, port))
-    self._runner._ckpt_write(RunnerCkpt(allocated_port=TaskAllocatedPort(
-      port_name=name, port=port)))
+    self._runner._ckpt_write(RunnerCkpt(task_status=task_update))
 
   def on_initialization(self, header):
     log.debug('_on_initialization: %s' % header)
@@ -278,8 +246,20 @@ class TaskRunner(object):
   # exec'ed the child process.
   LOST_TIMEOUT = Amount(60, Time.SECONDS)
 
+  @staticmethod
+  def assert_valid_task(task, portmap):
+    for process in task.processes():
+      name = process.name().get()
+      ThermosProcessWrapper.assert_valid_process_name(name)
+    for port in ThermosTaskWrapper(task).ports():
+      assert port in portmap, 'Task requires unbound port %s!' % port
+    typecheck = task.check()
+    if not typecheck.ok():
+      raise TaskRunner.InvalidTaskError('Failed to fully evaluate task: %s' %
+        typecheck.message())
+
   def __init__(self, task, checkpoint_root, sandbox,
-               task_id=None, portmap=None, user=None, chroot=False):
+               task_id=None, portmap=None, user=None, chroot=False, clock=time):
     """
       required:
         task (config.Task) = the task to run
@@ -293,16 +273,14 @@ class TaskRunner(object):
         user (string)    = the user to run the task as.  if not current user, requires setuid
                            privileges.
         chroot (boolean) = whether or not to chroot into the sandbox prior to exec.
+        clock (time interface) = the clock to use throughout
     """
-    self._ckpt = None
-    typecheck = task.check()
-    if not typecheck.ok():
-       raise TaskRunner.InvalidTaskError('Failed to fully evaluate task: %s' %
-         typecheck.message())
+    self._portmap = portmap or {}
+    TaskRunner.assert_valid_task(task, self._portmap)
 
+    self._ckpt = None
     self._task = task
     self._task_processes = {}
-    self._watcher = ProcessMuxer()
     self._ps = ProcessProviderFactory.get()
     current_user = TaskRunnerHelper.get_actual_user()
     self._user = user or current_user
@@ -313,9 +291,9 @@ class TaskRunner(object):
 
     self._chroot = chroot
     self._planner = Planner.from_task(task)
-    self._port_allocator = PortAllocator(portmap)
+    self._clock = clock
 
-    launch_time = time.time()
+    launch_time = self._clock.time()
     launch_time_ms = '%06d' % int((launch_time - int(launch_time)) * 10**6)
     if not task_id:
       self._task_id = task_id = '%s-%s.%s' % (task.name(),
@@ -324,15 +302,15 @@ class TaskRunner(object):
     else:
       self._task_id = task_id
     self._launch_time = launch_time
-
     self._pathspec = TaskPath(root = checkpoint_root, task_id = self._task_id)
+    self._watcher = ProcessMuxer(self._pathspec)
 
     # set up sandbox for running process
     self._sandbox = sandbox
 
     # create runner state
     self._state      = RunnerState(processes = {})
-    self._dispatcher = TaskCkptDispatcher()
+    self._dispatcher = CheckpointDispatcher()
     self._register_handlers()
 
     # recover checkpointed runner state and update plan
@@ -373,25 +351,33 @@ class TaskRunner(object):
     safe_mkdir(self._sandbox)
     ckpt_file = self._pathspec.getpath('runner_checkpoint')
     safe_mkdir(os.path.dirname(ckpt_file))
-    fp = lock_file(ckpt_file, "a")
+    fp = lock_file(ckpt_file, "a+")
     if fp in (None, False):
       if force:
         log.info('Found existing runner, forcing leadership forfeit.')
         if self.kill_current_runner():
           log.info('Successfully killed leader.')
-          fp = lock_file(ckpt_file, "a")
+          # TODO(wickman)  Blocking may not be the best idea here.  Perhaps block up to
+          # a maximum timeout.  But blocking is necessary because os.kill does not immediately
+          # release the lock if we're in force mode.
+          fp = lock_file(ckpt_file, "a+", blocking=True)
       else:
         log.error('Found existing runner, cannot take control.')
     if fp in (None, False):
-      raise TaskRunner.PermissionError('Could not open locked checkpoint: %s' % ckpt_file)
+      raise TaskRunner.PermissionError('Could not open locked checkpoint: %s, lock_file = %s' %
+        (ckpt_file, fp))
     ckpt = ThriftRecordWriter(fp)
     ckpt.set_sync(True)
     self._ckpt = ckpt
     log.debug('Flipping recovery mode off.')
     self._recovery = False
-    self._set_task_state(TaskState.ACTIVE)
+    self._set_task_status(TaskState.ACTIVE)
     self._resume_task()
-    yield
+    try:
+      yield
+    except Exception as e:
+      log.error('Caught exception in self.control(): %s' % e)
+      log.error('  %s' % traceback.format_exc())
     self._ckpt.close()
 
   def _resume_task(self):
@@ -453,7 +439,8 @@ class TaskRunner(object):
         launch_time_ms = int(self._launch_time*1000),
         sandbox = self._sandbox,
         hostname = socket.gethostname(),
-        user = self._user)
+        user = self._user,
+        ports = self._portmap)
       runner_ckpt = RunnerCkpt(runner_header=header)
       self._dispatcher.dispatch(self._state, runner_ckpt)
 
@@ -465,32 +452,22 @@ class TaskRunner(object):
     # active status.
     assert self._state.statuses not in (None, [])
     if self._is_task_failed():
-      self._set_task_state(TaskState.FAILED)
+      self._set_task_status(TaskState.FAILED)
       return True
     elif self._planner.is_complete():
-      self._set_task_state(TaskState.SUCCESS)
+      self._set_task_status(TaskState.SUCCESS)
       return True
     return False
 
-  def _set_task_state(self, state):
-    update = TaskStatus(state = state, timestamp_ms = int(time.time() * 1000),
+  def _set_task_status(self, state):
+    update = TaskStatus(state = state, timestamp_ms = int(self._clock.time() * 1000),
                         runner_pid = os.getpid())
-    runner_ckpt = RunnerCkpt(status_update = update)
+    runner_ckpt = RunnerCkpt(task_status=update)
     self._dispatcher.dispatch(self._state, runner_ckpt, self._recovery)
 
-  def _set_process_state(self, process_name, process_state, **kw):
-    runner_ckpt = RunnerCkpt(process_state = ProcessState(
-      process = process_name, run_state = process_state, **kw))
-    self._dispatcher.dispatch(self._state, runner_ckpt, self._recovery)
-
-  def _set_process_history_state(self, process, state):
-    update = TaskRunStateUpdate(process = process, state = state)
-    runner_ckpt = RunnerCkpt(history_state_update = update)
-    self._dispatcher.dispatch(self._state, runner_ckpt, self._recovery)
-
-  def _set_allocated_port(self, port_name, port_number):
-    tap = TaskAllocatedPort(port_name = port_name, port = port_number)
-    runner_ckpt = RunnerCkpt(allocated_port=tap)
+  def _set_process_status(self, process_name, process_state, sequence, **kw):
+    runner_ckpt = RunnerCkpt(process_status = ProcessStatus(
+      process = process_name, state = process_state, seq = sequence, **kw))
     self._dispatcher.dispatch(self._state, runner_ckpt, self._recovery)
 
   def _register_handlers(self):
@@ -505,12 +482,10 @@ class TaskRunner(object):
     while applied_updates == 0 and (timeout is None or total_time < timeout):
       process_updates = self._watcher.select()
       for process_update in process_updates:
-        if self._dispatcher.dispatch(self._state, process_update):
-          applied_updates += 1
-      # TODO(wickman)  Factor the time module out of this so we at least stand some
-      # chance of testing this.
+        self._dispatcher.dispatch(self._state, process_update, self._recovery)
+        applied_updates += 1
       total_time += STAT_INTERVAL_SLEEP.as_(Time.SECONDS)
-      time.sleep(STAT_INTERVAL_SLEEP.as_(Time.SECONDS))
+      self._clock.sleep(STAT_INTERVAL_SLEEP.as_(Time.SECONDS))
 
   @staticmethod
   def tasks_equal(filename, reified_task):
@@ -521,24 +496,17 @@ class TaskRunner(object):
       return False
     return task.task == reified_task
 
-  def _task_process_from_process_name(self, process_name, sequence_number=0):
+  def _task_process_from_process_name(self, process_name, sequence_number):
     """
       Construct a Process() object from a process_name, populated with its
       correct run number and fully interpolated commandline.
     """
-    run_number = len(self.state().processes[process_name].runs)
+    run_number = len(self.state().processes[process_name])
     pathspec = self._pathspec.given(process = process_name, run = run_number)
     process = TaskRunnerHelper.process_from_name(self._task, process_name)
-    ports = ThermosProcessWrapper(process).ports()
-    portmap = {}
-    for port_name in ports:
-      allocated, port_number = self._port_allocator.allocate(port_name)
-      portmap[port_name] = port_number
-      if allocated:
-        self._set_allocated_port(port_name, port_number)
     context = ThermosContext(task_id = self._task_id,
                              user = self._user,
-                             ports = portmap)
+                             ports = self._portmap)
     process, uninterp = (process % Environment(thermos = context)).interpolate()
     assert len(uninterp) == 0, 'Failed to interpolate process, missing:\n%s' % (
       '\n'.join(str(ref) for ref in uninterp))
@@ -554,12 +522,14 @@ class TaskRunner(object):
       process.cmdline().get(),
       sequence_number,
       pathspec,
-      self._sandbox, self._user, self._chroot, fork=close_ckpt_and_fork)
+      self._sandbox,
+      self._user,
+      chroot=self._chroot,
+      fork=close_ckpt_and_fork)
 
   def _count_process_failures(self, process_name):
-    process_failures = filter(
-      lambda run: run.run_state == ProcessRunState.FAILED,
-      self._state.processes[process_name].runs)
+    process_failures = [run for run in self._state.processes.get(process_name, []) if
+      run.state == ProcessState.FAILED]
     return len(process_failures)
 
   def _is_process_failed(self, process_name):
@@ -571,11 +541,10 @@ class TaskRunner(object):
     return process.max_failures() != Integer(0) and process_failures >= process.max_failures()
 
   def _is_task_failed(self):
-    failures = filter(
-      lambda history: history.state == TaskRunState.FAILED,
-      self._state.processes.values())
-    return self._task.max_failures() != Integer(0) and (
-      Integer(len(failures)) >= self._task.max_failures())
+    if self._task.max_failures() == Integer(0):
+      return False
+    failures = filter(None, map(self._is_process_failed, self._state.processes.keys()))
+    return Integer(len(failures)) >= self._task.max_failures()
 
   @staticmethod
   def safe_kill_pid(pid):
@@ -589,15 +558,15 @@ class TaskRunner(object):
        Determine whether or not we should mark a task as LOST and do so if necessary.
     """
     assert process_name in self._task_processes
-    assert len(self._state.processes[process_name].runs) > 0
-    current_run = self._state.processes[process_name].runs[-1]
+    assert len(self._state.processes[process_name]) > 0
+    current_run = self._state.processes[process_name][-1]
 
     def forked_but_never_came_up():
-      return current_run.run_state == ProcessRunState.FORKED and (
-        time.time() - current_run.fork_time > TaskRunner.LOST_TIMEOUT.as_(Time.SECONDS))
+      return current_run.state == ProcessState.FORKED and (
+        self._clock.time() - current_run.fork_time > TaskRunner.LOST_TIMEOUT.as_(Time.SECONDS))
 
-    def running_but_runner_died():
-      if current_run.run_state != ProcessRunState.RUNNING:
+    def running_but_coordinator_died():
+      if current_run.state != ProcessState.RUNNING:
         return False
       self._ps.collect_set(set([current_run.coordinator_pid]))
       if current_run.coordinator_pid in self._ps.pids():
@@ -609,12 +578,12 @@ class TaskRunner(object):
           return False
       return True
 
-    if forked_but_never_came_up() or running_but_runner_died():
+    if forked_but_never_came_up() or running_but_coordinator_died():
       log.info('Detected a LOST task: %s' % current_run)
       log.debug('  forked_but_never_came_up: %s' % forked_but_never_came_up())
-      log.debug('  running_but_runner_died: %s' % running_but_runner_died())
-      need_kill = current_run.pid if current_run.run_state is ProcessRunState.RUNNING else None
-      self._set_process_state(process_name, ProcessRunState.LOST, seq = current_run.seq + 1)
+      log.debug('  running_but_coordinator_died: %s' % running_but_coordinator_died())
+      need_kill = current_run.pid if current_run.state is ProcessState.RUNNING else None
+      self._set_process_status(process_name, ProcessState.LOST, current_run.seq + 1)
       if need_kill:
         self._ps.collect_all()
         if need_kill not in self._ps.pids():
@@ -649,16 +618,16 @@ class TaskRunner(object):
 
         if len(running) == 0 and len(runnable) == 0 and not self._planner.is_complete():
           log.error('Terminating Task because nothing is runnable.')
-          self._set_task_state(TaskState.FAILED)
+          self._set_task_status(TaskState.FAILED)
           break
 
         for process_name in runnable:
           if process_name not in self._task_processes:
-            self._set_process_state(process_name, ProcessRunState.WAITING)
+            self._set_process_status(process_name, ProcessState.WAITING, 0)
 
           log.info('Forking Process(%s)' % process_name)
           tp = self._task_processes[process_name]
-          tp.fork()
+          tp.start()
           launched.append(tp)
 
         # gather and apply state transitions
@@ -682,8 +651,10 @@ class TaskRunner(object):
               log.warning('Unexpected error when calling waitpid: %s' % e)
             break
 
-  @staticmethod
-  def this_is_really_our_pid(pid_handle, user, start_time):
+  # Need from pid handle:
+  #   wall time of start
+  #   user who owns the pid
+  def this_is_really_our_pid(self, pid_handle, user, start_time):
     """
       A heuristic to make sure that this is likely the pid that we own/forked.  Necessary
       because of pid-space wrapping.  We don't want to go and kill processes we don't own,
@@ -691,8 +662,9 @@ class TaskRunner(object):
     """
     if pid_handle.user() != user:
       return False
-    estimated_start_time = time.time() - pid_handle.wall_time()
-    return abs(start_time - estimated_start_time) < TaskRunner.MAX_START_TIME_DRIFT.as_(Time.SECONDS)
+    estimated_start_time = self._clock.time() - pid_handle.wall_time()
+    return abs(start_time - estimated_start_time) < TaskRunner.MAX_START_TIME_DRIFT.as_(
+      Time.SECONDS)
 
   def kill(self, force=False):
     """
@@ -703,15 +675,7 @@ class TaskRunner(object):
       if self.task_state() != TaskState.ACTIVE:
         log.warning('Task is not in ACTIVE state, cannot issue kill.')
         return
-      self._set_task_state(TaskState.KILLED)
-
-  def _set_process_kill_state(self, process_state):
-    assert process_state.run_state in (ProcessRunState.RUNNING, ProcessRunState.FORKED)
-    update = ProcessState(seq=process_state.seq + 1, process=process_state.process,
-        stop_time=time.time(), return_code=-1, run_state=ProcessRunState.KILLED)
-    runner_ckpt = RunnerCkpt(process_state = update)
-    log.info('Dispatching KILL state to %s' % process_state.process)
-    self._dispatcher.dispatch(self._state, runner_ckpt)
+      self._set_task_status(TaskState.KILLED)
 
   def _kill(self):
     log.info('Killing ThermosRunner.')
@@ -719,24 +683,23 @@ class TaskRunner(object):
 
     coordinator_pids = []
     process_pids = []
-    process_states = []
+    process_statuses = []
 
     current_user = self._state.header.user
     for process_history in self._state.processes.values():
       # collect coordinator_pids for runners in >=FORKED, <=RUNNING state
-      last_run = process_history.runs[-1]
-      if last_run.run_state in (ProcessRunState.FORKED, ProcessRunState.RUNNING):
-        self._watcher.unregister(process_history.process)
-        process_states.append(last_run)
-        log.info('  Detected runner for %s: %s' % (process_history.process,
+      last_run = process_history[-1]
+      if last_run.state in (ProcessState.FORKED, ProcessState.RUNNING):
+        process_statuses.append(last_run)
+        log.info('  Inspecting coordinator for %s: %s' % (last_run.process,
             last_run.coordinator_pid))
-        if last_run.coordinator_pid in self._ps.pids() and TaskRunner.this_is_really_our_pid(
+        if last_run.coordinator_pid in self._ps.pids() and self.this_is_really_our_pid(
             self._ps.get_handle(last_run.coordinator_pid), current_user, last_run.fork_time):
           coordinator_pids.append(last_run.coordinator_pid)
         else:
-          log.info('    (runner appears to have completed)')
-      if last_run.run_state == ProcessRunState.RUNNING:
-        if last_run.pid in self._ps.pids() and TaskRunner.this_is_really_our_pid(
+          log.info('    (coordinator appears to have completed)')
+      if last_run.state == ProcessState.RUNNING:
+        if last_run.pid in self._ps.pids() and self.this_is_really_our_pid(
             self._ps.get_handle(last_run.pid), current_user, last_run.start_time):
           log.info('    => Active pid: %s' % last_run.pid)
           process_pids.append(last_run.pid)
@@ -745,14 +708,17 @@ class TaskRunner(object):
             log.info('      => Extra children: %s' % ' '.join(map(str, subtree)))
             process_pids.extend(subtree)
 
-    log.info('Issuing kills.')
+
     pid_types = { 'Coordinator': coordinator_pids, 'Child': process_pids }
+    if any(pid_types.values()):
+      log.info('Issuing kills.')
     for pid_type, pid_set in pid_types.items():
       for pid in pid_set:
         log.info('  %s: %s' % (pid_type, pid))
         TaskRunner.safe_kill_pid(pid)
 
-    for process_state in process_states:
-      self._set_process_kill_state(process_state)
+    for process_status in process_statuses:
+      self._set_process_status(process_status.process, ProcessState.KILLED, process_status.seq + 1,
+        stop_time=self._clock.time(), return_code=-1)
 
     log.info('Kill complete.')

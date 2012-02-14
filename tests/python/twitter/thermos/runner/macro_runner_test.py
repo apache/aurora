@@ -6,11 +6,12 @@ from twitter.thermos.config.schema import Task, Process, Resources
 from twitter.thermos.config.dsl import with_schedule
 from gen.twitter.thermos.ttypes import (
   TaskState,
-  TaskRunState,
-  ProcessRunState
+  ProcessState
 )
 
 class TestRunnerBasic(RunnerTestBase):
+  portmap = {'named_port': 8123}
+
   @classmethod
   def task(cls):
     hello_template = Process(cmdline = "echo 1")
@@ -44,39 +45,29 @@ class TestRunnerBasic(RunnerTestBase):
     assert header.launch_time_ms, 'header launch time must be set'
 
   def test_runner_has_allocated_name_ports(self):
-    ports = self.state.ports
+    ports = self.state.header.ports
     assert 'named_port' in ports, 'ephemeral port was either not allocated, or not checkpointed!'
+    assert ports['named_port'] == 8123
 
   def test_runner_has_expected_processes(self):
     processes = self.state.processes
-
     process_names = set(['t%d'%k for k in range(1,7)])
     actual_process_names = set(processes.keys())
     assert process_names == actual_process_names, "runner didn't run expected set of processes!"
     for process in processes:
-      assert processes[process].process == process
+      assert processes[process][-1].process == process
 
   def test_runner_processes_have_expected_output(self):
-    processes = self.state.processes
-    for process in processes:
-      history = processes[process]
-      assert history.state == TaskRunState.SUCCESS, (
-        "runner didn't succeed!  instead state = %s" % (history.state))
-      if len(history.runs) > 1:
-        for run in range(len(history.runs)-1):
-          assert history.runs[run].run_state != ProcessRunState.FINISHED, \
-            "nonterminal processes must not be in FINISHED state!"
-      last_run = history.runs[-1]
-      assert last_run.run_state == ProcessRunState.FINISHED, \
-        "terminal processes must be in FINISHED state!"
-      assert last_run.process == process, "process (%s) had unexpected checkpointed name: %s!" % (
-        process, last_run.process)
+    for process in self.state.processes:
+      history = self.state.processes[process]
+      assert history[-1].state == ProcessState.SUCCESS
+      if len(history) > 1:
+        for run in range(len(history)-1):
+          assert history[run].state != ProcessState.SUCCESS, \
+            "nonterminal processes must not be in SUCCESS state!"
 
   def test_runner_processes_have_monotonically_increasing_timestamps(self):
-    processes = self.state.processes
-    for process in processes:
-      history = processes[process]
-      for run in history.runs:
+    for process in self.state.processes:
+      for run in self.state.processes[process]:
         assert run.fork_time < run.start_time
         assert run.start_time < run.stop_time
-

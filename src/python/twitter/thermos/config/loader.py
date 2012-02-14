@@ -1,7 +1,6 @@
 import copy
 import json
-import os
-import sys
+import re
 
 from pystachio import Ref
 from twitter.common.dirutil import safe_open
@@ -19,6 +18,8 @@ def deposit_schema(environment):
 
 
 class ThermosProcessWrapper(object):
+  # >=1 characters && anything but NULL and '/'
+  VALID_PROCESS_NAME_RE = re.compile(r'^[^/]+$')
   class InvalidProcess(Exception): pass
 
   def __init__(self, process):
@@ -34,6 +35,11 @@ class ThermosProcessWrapper(object):
         assert subscope.is_index()
         ports.append(subscope.action().value)
     return ports
+
+  @staticmethod
+  def assert_valid_process_name(name):
+    assert ThermosProcessWrapper.VALID_PROCESS_NAME_RE.match(name), (
+      'Invalid process name: %s' % name)
 
 
 class ThermosTaskWrapper(object):

@@ -1,9 +1,4 @@
-import os
-import sys
-import time
-import pprint
-
-from twitter.common import app, log, options
+from twitter.common import app, options
 from twitter.thermos.config.loader import ThermosConfigLoader
 from twitter.thermos.runner import TaskRunner
 
@@ -121,5 +116,7 @@ def main(args, opts):
       task_runner.kill(opts.force)
   except TaskRunner.StateError:
     app.error('Task appears to already be in a terminal state.')
+  except TaskRunner.PermissionError:
+    app.error('Could not get permission to perform %s!' % opts.action)
 
 app.main()

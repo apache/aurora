@@ -7,8 +7,7 @@ from twitter.thermos.config.schema import (
   ProcessPair)
 from gen.twitter.thermos.ttypes import (
   TaskState,
-  TaskRunState,
-  ProcessRunState
+  ProcessState
 )
 
 class TestFailureLimit(RunnerTestBase):
@@ -38,12 +37,8 @@ class TestFailureLimit(RunnerTestBase):
 
   def test_runner_process_in_expected_states(self):
     processes = self.state.processes
-    assert len(processes['a'].runs) == 1
-    assert processes['a'].runs[0].run_state == ProcessRunState.FINISHED
-    assert processes['a'].state == TaskRunState.SUCCESS # change this to ProcessHistoryState ugh
-    
-    assert len(processes['b'].runs) == 1
-    assert processes['b'].runs[0].run_state == ProcessRunState.FAILED
-    assert processes['b'].state == TaskRunState.FAILED
-  
+    assert len(processes['a']) == 1
+    assert processes['a'][0].state == ProcessState.SUCCESS
+    assert len(processes['b']) == 1
+    assert processes['b'][0].state == ProcessState.FAILED
     assert 'c' not in processes

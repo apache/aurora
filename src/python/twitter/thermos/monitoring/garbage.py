@@ -6,7 +6,7 @@ import time
 
 from twitter.common.dirutil import safe_rmtree
 from twitter.common.quantity import Amount, Data, Time
-from twitter.thermos.base.ckpt import TaskCkptDispatcher
+from twitter.thermos.base.ckpt import CheckpointDispatcher
 from twitter.thermos.base.path import TaskPath
 from twitter.thermos.monitoring.detector import TaskDetector
 
@@ -18,7 +18,7 @@ class TaskGarbageCollector(object):
 
   def state(self, task_id):
     if task_id not in self._states:
-      self._states[task_id] = TaskCkptDispatcher.from_file(self._detector.get_checkpoint(task_id))
+      self._states[task_id] = CheckpointDispatcher.from_file(self._detector.get_checkpoint(task_id))
     return self._states[task_id]
 
   def get_age(self, task_id):
