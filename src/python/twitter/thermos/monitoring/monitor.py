@@ -20,6 +20,7 @@ class TaskMonitor(object):
   """
 
   def __init__(self, pathspec, task_id):
+    self._task_id = task_id
     self._dispatcher = CheckpointDispatcher()
     self._runnerstate = RunnerState(processes = {})
     self._runner_ckpt = pathspec.given(task_id = task_id).getpath('runner_checkpoint')
