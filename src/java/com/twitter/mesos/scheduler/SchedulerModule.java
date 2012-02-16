@@ -14,6 +14,7 @@ import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
@@ -49,7 +50,6 @@ import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.common.zookeeper.ZooKeeperUtils;
 import com.twitter.common_internal.zookeeper.ZooKeeperModule;
-import com.twitter.mesos.ExecutorKey;
 import com.twitter.mesos.gen.MesosAdmin;
 import com.twitter.mesos.scheduler.Driver.DriverImpl;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHosts;
@@ -61,11 +61,15 @@ import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.auth.SessionValidator;
 import com.twitter.mesos.scheduler.auth.SessionValidator.SessionValidatorImpl;
 import com.twitter.mesos.scheduler.httphandlers.ServletModule;
+import com.twitter.mesos.scheduler.periodic.BootstrapTaskLauncher;
+import com.twitter.mesos.scheduler.periodic.BootstrapTaskLauncher.Bootstrap;
+import com.twitter.mesos.scheduler.periodic.GcExecutorLauncher;
+import com.twitter.mesos.scheduler.periodic.GcExecutorLauncher.GcExecutor;
+import com.twitter.mesos.scheduler.periodic.PeriodicTaskModule;
 import com.twitter.mesos.scheduler.quota.QuotaModule;
 import com.twitter.mesos.scheduler.storage.AttributeStore;
 import com.twitter.mesos.scheduler.storage.AttributeStore.AttributeStoreImpl;
 import com.twitter.mesos.scheduler.storage.log.LogStorageModule;
-import com.twitter.mesos.scheduler.periodic.PeriodicTaskModule;
 import com.twitter.thrift.ServiceInstance;
 
 /**
@@ -99,6 +103,11 @@ public class SchedulerModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> EXECUTOR_DEAD_THRESHOLD =
       Arg.create(Amount.of(10L, Time.MINUTES));
 
+  @CmdLine(name = "executor_gc_interval",
+      help = "Interval on which to run the GC executor on a host to clean up dead tasks.")
+  private static final Arg<Amount<Long, Time>> EXECUTOR_GC_INTERVAL =
+      Arg.create(Amount.of(1L, Time.HOURS));
+
   @NotNull
   @CmdLine(name = "cluster_name", help = "Name to identify the cluster being served.")
   private static final Arg<String> CLUSTER_NAME = Arg.create();
@@ -110,6 +119,9 @@ public class SchedulerModule extends AbstractModule {
   @CmdLine(name = "executor_resources_ram",
       help = "The amount of RAM that should be reserved by mesos for the executor.")
   private static final Arg<Amount<Double, Data>> EXECUTOR_RAM = Arg.create(Amount.of(2d, Data.GB));
+
+  @CmdLine(name = "gc_executor_path", help = "Path to the gc executor launch script.")
+  private static final Arg<String> GC_EXECUTOR_PATH = Arg.create(null);
 
   private static final String TWITTER_EXECUTOR_ID = "twitter";
 
@@ -140,13 +152,21 @@ public class SchedulerModule extends AbstractModule {
     bind(SessionValidator.class).to(SessionValidatorImpl.class);
     bind(SchedulerCore.class).to(SchedulerCoreImpl.class).in(Singleton.class);
 
+    bind(new TypeLiteral<Optional<String>>() {
+    }).annotatedWith(GcExecutor.class)
+        .toInstance(Optional.fromNullable(GC_EXECUTOR_PATH.get()));
+    bind(new TypeLiteral<PulseMonitor<String>>() {})
+        .annotatedWith(GcExecutor.class)
+        .toInstance(new PulseMonitorImpl<String>(EXECUTOR_GC_INTERVAL.get()));
+
     // Bindings for SchedulerCoreImpl.
     bind(CronJobManager.class).in(Singleton.class);
     bind(ImmediateJobManager.class).in(Singleton.class);
-    bind(new TypeLiteral<PulseMonitor<ExecutorKey>>() {})
-        .toInstance(new PulseMonitorImpl<ExecutorKey>(EXECUTOR_DEAD_THRESHOLD.get()));
-    bind(new TypeLiteral<Supplier<Set<ExecutorKey>>>() {})
-        .to(new TypeLiteral<PulseMonitor<ExecutorKey>>() {});
+    bind(new TypeLiteral<PulseMonitor<String>>() {})
+        .annotatedWith(Bootstrap.class)
+        .toInstance(new PulseMonitorImpl<String>(EXECUTOR_DEAD_THRESHOLD.get()));
+    bind(new TypeLiteral<Supplier<Set<String>>>() {})
+        .to(new TypeLiteral<PulseMonitor<String>>() {});
 
     // Bindings for thrift interfaces.
     bind(MesosAdmin.Iface.class).to(SchedulerThriftInterface.class).in(Singleton.class);
@@ -263,5 +283,14 @@ public class SchedulerModule extends AbstractModule {
         .addResources(Resources.makeMesosResource(Resources.CPUS, EXECUTOR_CPUS.get()))
         .addResources(Resources.makeMesosResource(Resources.RAM_MB, EXECUTOR_RAM.get().as(Data.MB)))
         .build();
+  }
+
+  @Provides
+  @Singleton
+  List<TaskLauncher> provideTaskLaunchers(
+      BootstrapTaskLauncher bootstrapLauncher,
+      GcExecutorLauncher gcLauncher,
+      SchedulerCore scheduler) {
+    return ImmutableList.of(bootstrapLauncher, gcLauncher, scheduler);
   }
 }

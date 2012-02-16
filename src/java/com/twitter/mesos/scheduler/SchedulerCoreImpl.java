@@ -1,15 +1,11 @@
 package com.twitter.mesos.scheduler;
 
-import java.util.List;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
@@ -21,17 +17,14 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
-import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.Offer;
-import org.apache.mesos.Protos.Resource;
+import org.apache.mesos.Protos.TaskDescription;
+import org.apache.mesos.Protos.TaskStatus;
 
-import com.twitter.common.stats.Stats;
 import com.twitter.common.util.StateMachine;
-import com.twitter.mesos.ExecutorKey;
+import com.twitter.mesos.StateTranslator;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
-import com.twitter.mesos.gen.Constraint;
-import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduleStatus;
@@ -66,7 +59,7 @@ import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.STOPPED;
  *
  * @author William Farner
  */
-public class SchedulerCoreImpl implements SchedulerCore {
+public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
 
   private static final Logger LOG = Logger.getLogger(SchedulerCore.class.getName());
 
@@ -81,8 +74,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
   // Filter to determine whether a task should be scheduled.
   private final SchedulingFilter schedulingFilter;
 
-  // Monitor to determine when we need to send heartbeats to executors to determine their liveness.
-  private final PulseMonitor<ExecutorKey> executorPulseMonitor;
   private final QuotaManager quotaManager;
 
   enum State {
@@ -100,7 +91,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
       ImmediateJobManager immediateScheduler,
       StateManager stateManager,
       SchedulingFilter schedulingFilter,
-      PulseMonitor<ExecutorKey> executorPulseMonitor,
       QuotaManager quotaManager) {
 
     // The immediate scheduler will accept any job, so it's important that other schedulers are
@@ -110,7 +100,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
     this.stateManager = checkNotNull(stateManager);
 
     this.schedulingFilter = checkNotNull(schedulingFilter);
-    this.executorPulseMonitor = checkNotNull(executorPulseMonitor);
     this.quotaManager = checkNotNull(quotaManager);
 
    // TODO(John Sirois): Add a method to StateMachine or write a wrapper that allows for a
@@ -179,6 +168,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     return !getTasks(Query.activeQuery(job)).isEmpty();
   }
 
+  @Override
   public synchronized void tasksDeleted(Set<String> taskIds) {
     setTaskStatus(Query.byId(taskIds), ScheduleStatus.UNKNOWN, null);
   }
@@ -267,97 +257,69 @@ public class SchedulerCoreImpl implements SchedulerCore {
     };
   }
 
-  private static TwitterTaskInfo makeBootstrapTask() {
-    return new TwitterTaskInfo()
-        .setOwner(new Identity("mesos", "mesos"))
-        .setJobName("executor_bootstrap")
-        .setNumCpus(0.25)
-        .setRamMb(1)
-        .setShardId(0)
-        .setRequestedPorts(ImmutableSet.<String>of())
-        .setConstraints(ImmutableSet.<Constraint>of())
-        .setStartCommand("echo \"Bootstrapping\"");
-  }
-
   @Override
-  @Nullable
-  public synchronized TwitterTask offer(final Offer offer, ExecutorID defaultExecutorId)
-      throws ScheduleException {
+  public synchronized Optional<TaskDescription> createTask(Offer offer) {
     checkStarted();
     checkNotNull(offer);
 
-    vars.resourceOffers.incrementAndGet();
-
-    final String hostname = offer.getHostname();
-    stateManager.saveAttributesFromOffer(hostname, offer.getAttributesList());
-
-    Query query;
-    Optional<String> hostCheck;
-
-    ExecutorKey executorKey = new ExecutorKey(defaultExecutorId, offer.getHostname());
-    if (!executorPulseMonitor.isAlive(executorKey)) {
-      LOG.info("Pulse monitor considers executor dead, attempting to launch bootstrap task on: "
-          + hostname);
-      executorPulseMonitor.pulse(executorKey);
-      vars.executorBootstraps.incrementAndGet();
-      query = Query.byId(Iterables.getOnlyElement(
-          launchTasks(ImmutableSet.of(makeBootstrapTask()))));
-      hostCheck = Optional.absent();
-    } else {
-      query = Query.byStatus(PENDING);
-      hostCheck = Optional.of(hostname);
-    }
+    stateManager.saveAttributesFromOffer(offer.getHostname(), offer.getAttributesList());
 
     final ImmutableSortedSet<ScheduledTask> candidates = ImmutableSortedSet.copyOf(
         Tasks.SCHEDULING_ORDER.onResultOf(Tasks.SCHEDULED_TO_ASSIGNED),
-        stateManager.fetchTasks(query));
+        stateManager.fetchTasks(Query.byStatus(PENDING)));
     if (candidates.isEmpty()) {
       return null;
     }
     LOG.fine("Candidates for offer: " + Iterables.transform(candidates, Tasks.SCHEDULED_TO_ID));
 
-    ScheduledTask assignment = null;
     for (ScheduledTask task : candidates) {
-      Set<Veto> vetoes = schedulingFilter.filter(
-          Resources.from(offer), hostCheck, task.getAssignedTask().getTask());
+      Set<Veto> vetoes = schedulingFilter.filter(Resources.from(offer),
+          Optional.of(offer.getHostname()), task.getAssignedTask().getTask());
       if (vetoes.isEmpty()) {
-        assignment = task;
-        break;
+        return Optional.of(assignTask(offer, task));
       } else {
         // TODO(wfarner): Surface this information into the scheduler web UI.
         LOG.fine("Task " + Tasks.id(task) + " was vetoed: " + vetoes);
       }
     }
 
-    // There were no satisfied candidates.
-    if (assignment == null) {
-      return null;
-    }
-
-    Set<Integer> selectedPorts =
-        Resources.getPorts(offer, assignment.getAssignedTask().getTask().getRequestedPortsSize());
-
-    AssignedTask task =
-        stateManager.assignTask(Tasks.id(assignment), hostname, offer.getSlaveId(), selectedPorts);
-
-    LOG.info(String.format("Offer on slave %s (id %s) is being assigned task for %s.",
-        hostname, task.getSlaveId(), jobKey(task)));
-
-    ImmutableList.Builder<Resource> resourceBuilder =
-      ImmutableList.<Resource>builder()
-        .add(Resources.makeMesosResource(Resources.CPUS, task.getTask().getNumCpus()))
-        .add(Resources.makeMesosResource(Resources.RAM_MB, task.getTask().getRamMb()));
-    if (selectedPorts.size() > 0) {
-        resourceBuilder.add(Resources.makeMesosRangeResource(Resources.PORTS, selectedPorts));
-    }
-
-    return makeTwitterTask(task, offer.getSlaveId().getValue(), resourceBuilder.build());
+    return Optional.absent();
   }
 
-  @VisibleForTesting
-  static TwitterTask makeTwitterTask(AssignedTask task, String slaveId, List<Resource> resources) {
-    return new TwitterTask(task.getTaskId(), slaveId,
-        task.getTask().getJobName() + "-" + task.getTaskId(), resources, task);
+  private TaskDescription assignTask(Offer offer, ScheduledTask task) {
+    String host = offer.getHostname();
+    Set<Integer> selectedPorts =
+        Resources.getPorts(offer, task.getAssignedTask().getTask().getRequestedPortsSize());
+    task.setAssignedTask(
+        stateManager.assignTask(Tasks.id(task), host, offer.getSlaveId(), selectedPorts));
+    LOG.info(String.format("Offer on slave %s (id %s) is being assigned task for %s.",
+        host, offer.getSlaveId(), jobKey(task)));
+    return TaskLauncher.Util.makeMesosTask(task.getAssignedTask(), selectedPorts);
+  }
+
+  @Override
+  public boolean statusUpdate(TaskStatus status) {
+    String info = status.hasData() ? status.getData().toStringUtf8() : null;
+    Query query = Query.byId(status.getTaskId().getValue());
+
+    try {
+      if (getTasks(query).isEmpty()) {
+        LOG.severe("Failed to find task id " + status.getTaskId());
+      } else {
+        ScheduleStatus translatedState = StateTranslator.get(status.getState());
+        if (translatedState == null) {
+          LOG.log(Level.SEVERE,
+              "Failed to look up task state translation for: " + status.getState());
+        } else {
+          setTaskStatus(query, translatedState, info);
+          return true;
+        }
+      }
+    } catch (SchedulerException e) {
+      // We assume here that a subsequent RegisteredTaskUpdate will inform us of this tasks status.
+      LOG.log(Level.WARNING, "Failed to update status for: " + status, e);
+    }
+    return false;
   }
 
   @Override
@@ -548,10 +510,4 @@ public class SchedulerCoreImpl implements SchedulerCore {
   private void checkLifecycleState(State state) {
     Preconditions.checkState(stateMachine.getState() == state);
   }
-
-  private final class Vars {
-    final AtomicLong resourceOffers = Stats.exportLong("scheduler_resource_offers");
-    final AtomicLong executorBootstraps = Stats.exportLong("executor_bootstraps");
-  }
-  private final Vars vars = new Vars();
 }

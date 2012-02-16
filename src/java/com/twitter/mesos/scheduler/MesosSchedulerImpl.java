@@ -1,6 +1,5 @@
 package com.twitter.mesos.scheduler;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -8,40 +7,29 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.google.common.base.Function;
+import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.inject.Inject;
-import com.google.protobuf.ByteString;
 
 import org.apache.mesos.Protos.ExecutorID;
-import org.apache.mesos.Protos.ExecutorInfo;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskDescription;
-import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskStatus;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
 
 import com.twitter.common.application.Lifecycle;
-import com.twitter.common.args.Arg;
-import com.twitter.common.args.CmdLine;
-import com.twitter.common.args.constraints.NotNull;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
-import com.twitter.mesos.ExecutorKey;
-import com.twitter.mesos.StateTranslator;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
-import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.comm.SchedulerMessage;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -56,28 +44,23 @@ public class MesosSchedulerImpl implements Scheduler {
 
   private static final Amount<Long, Time> MAX_REGISTRATION_DELAY = Amount.of(1L, Time.MINUTES);
 
-  // TODO(wickman):  This belongs in SchedulerModule eventually.
-  @NotNull
-  @CmdLine(name = "thermos_executor_path", help = "Path to the thermos executor launch script.")
-  private static final Arg<String> THERMOS_EXECUTOR_PATH = Arg.create();
+  private final AtomicLong resourceOffers = Stats.exportLong("scheduler_resource_offers");
 
+  private final List<TaskLauncher> taskLaunchers;
   private final SlaveMapper slaveMapper;
 
   // Stores scheduler state and handles actual scheduling decisions.
   private final SchedulerCore schedulerCore;
-
   private volatile FrameworkID frameworkID = null;
-  private final ExecutorInfo executorInfo;
-
   private final AtomicInteger registeredFlag = Stats.exportInt("framework_registered");
 
   @Inject
   public MesosSchedulerImpl(SchedulerCore schedulerCore,
-      ExecutorInfo executorInfo,
       final Lifecycle lifecycle,
+      List<TaskLauncher> taskLaunchers,
       SlaveMapper slaveMapper) {
     this.schedulerCore = checkNotNull(schedulerCore);
-    this.executorInfo = checkNotNull(executorInfo);
+    this.taskLaunchers = checkNotNull(taskLaunchers);
     this.slaveMapper = checkNotNull(slaveMapper);
 
     // TODO(William Farner): Clean this up.
@@ -119,33 +102,8 @@ public class MesosSchedulerImpl implements Scheduler {
     }
   }
 
-  TaskDescription twitterTaskToMesosTask(SchedulerCore.TwitterTask twitterTask)
-      throws SchedulerException {
-
-    checkNotNull(twitterTask);
-    byte[] taskInBytes;
-    try {
-      taskInBytes = ThriftBinaryCodec.encode(twitterTask.task);
-    } catch (ThriftBinaryCodec.CodingException e) {
-      LOG.log(Level.SEVERE, "Unable to serialize task.", e);
-      throw new SchedulerException("Internal error.", e);
-    }
-
-    log(Level.INFO, "Setting task resources to %s", twitterTask.resources);
-    TaskDescription.Builder assignedTaskBuilder =
-        TaskDescription.newBuilder().setName(twitterTask.taskName)
-            .setTaskId(TaskID.newBuilder().setValue(twitterTask.taskId))
-            .setSlaveId(SlaveID.newBuilder().setValue(twitterTask.slaveId))
-            .addAllResources(twitterTask.resources)
-            .setData(ByteString.copyFrom(taskInBytes));
-    if (twitterTask.isThermosTask()) {
-      assignedTaskBuilder.setExecutor(ExecutorInfo.newBuilder()
-          .setExecutorId(ExecutorID.newBuilder().setValue(String.format("%s%s",
-              ExecutorKey.THERMOS_EXECUTOR_ID_PREFIX,
-              twitterTask.taskId)))
-          .setUri(THERMOS_EXECUTOR_PATH.get()));
-    }
-    return assignedTaskBuilder.build();
+  private static boolean fitsInOffer(TaskDescription task, Offer offer) {
+    return Resources.from(offer).greaterThanOrEqual(Resources.from(task.getResourcesList()));
   }
 
   @Timed("scheduler_resource_offers")
@@ -154,40 +112,34 @@ public class MesosSchedulerImpl implements Scheduler {
     Preconditions.checkState(frameworkID != null, "Must be registered before receiving offers.");
     for (Offer offer : offers) {
       log(Level.FINE, "Received offer: %s", offer);
+      resourceOffers.incrementAndGet();
+
       slaveMapper.addSlave(offer.getHostname(), offer.getSlaveId());
 
-      List<TaskDescription> scheduledTasks = Collections.emptyList();
       try {
-        SchedulerCore.TwitterTask task = schedulerCore.offer(offer, executorInfo.getExecutorId());
-        if (task != null) {
-          TaskDescription assignedTask = twitterTaskToMesosTask(task);
-          scheduledTasks = ImmutableList.of(assignedTask);
-        }
-
-        if (!scheduledTasks.isEmpty()) {
-          LOG.info(String.format("Accepting offer %s, to launch tasks %s", offer.getId().getValue(),
-              ImmutableSet.copyOf(Iterables.transform(scheduledTasks, TO_STRING))));
+        for (TaskLauncher launcher : taskLaunchers) {
+          Optional<TaskDescription> task = launcher.createTask(offer);
+          if (task.isPresent()) {
+            if (fitsInOffer(task.get(), offer)) {
+              LOG.info(String.format("Accepting offer %s, to launch task %s",
+                  offer.getId().getValue(), task.get()));
+              driver.launchTasks(offer.getId(), ImmutableList.of(task.get()));
+              return;
+            } else {
+              LOG.warning("Insufficient resources to launch task " + task);
+            }
+          }
         }
       } catch (SchedulerException e) {
-        LOG.log(Level.WARNING, "Failed to schedule offers.", e);
-        vars.failedOffers.incrementAndGet();
-      } catch (ScheduleException e) {
         LOG.log(Level.WARNING, "Failed to schedule offers.", e);
         vars.failedOffers.incrementAndGet();
       }
 
       // For a given offer, if we fail to process it we can always launch with an empty set of tasks
       // to signal the core we have processed the offer and just not used any of it.
-      driver.launchTasks(offer.getId(), scheduledTasks);
+      driver.launchTasks(offer.getId(), ImmutableList.<TaskDescription>of());
     }
   }
-
-  private static final Function<TaskDescription, String> TO_STRING =
-      new Function<TaskDescription, String>() {
-        @Override public String apply(TaskDescription task) {
-          return task.getTaskId().getValue() + " on " + task.getSlaveId().getValue();
-        }
-      };
 
   @Override
   public void offerRescinded(SchedulerDriver schedulerDriver, OfferID offerID) {
@@ -203,26 +155,13 @@ public class MesosSchedulerImpl implements Scheduler {
     LOG.info("Received status update for task " + status.getTaskId().getValue()
         + " in state " + status.getState() + infoMsg + coreMsg);
 
-    Query query = Query.byId(status.getTaskId().getValue());
-
-    try {
-      if (schedulerCore.getTasks(query).isEmpty()) {
-        LOG.severe("Failed to find task id " + status.getTaskId());
-      } else {
-        ScheduleStatus translatedState = StateTranslator.get(status.getState());
-        if (translatedState == null) {
-          LOG.log(Level.SEVERE,
-              "Failed to look up task state translation for: " + status.getState());
-          return;
-        }
-
-        schedulerCore.setTaskStatus(query, translatedState, info);
-      }
-    } catch (SchedulerException e) {
-      // We assume here that a subsequent RegisteredTaskUpdate will inform us of this tasks status.
-      LOG.log(Level.WARNING, "Failed to update status for: " + status, e);
-      vars.failedStatusUpdates.incrementAndGet();
+    for (TaskLauncher launcher : taskLaunchers) {
+      if (launcher.statusUpdate(status))
+        return;
     }
+
+    LOG.warning("Unhandled status update " + status);
+    vars.failedStatusUpdates.incrementAndGet();
   }
 
   @Override
@@ -270,10 +209,8 @@ public class MesosSchedulerImpl implements Scheduler {
   }
 
   private static class Vars {
-    final AtomicLong failedExecutorStatusUpdates =
-        Stats.exportLong("executor_status_updates_failed");
     final AtomicLong failedOffers = Stats.exportLong("scheduler_failed_offers");
-    final AtomicLong failedStatusUpdates = Stats.exportLong("scheduler_failed_status_updates");
+    final AtomicLong failedStatusUpdates = Stats.exportLong("scheduler_status_updates");
   }
   private final Vars vars = new Vars();
 

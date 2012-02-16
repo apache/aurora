@@ -160,6 +160,14 @@ public class Tasks {
     };
   }
 
+  public static Predicate<TwitterTaskInfo> IS_THERMOS_TASK = new Predicate<TwitterTaskInfo>() {
+    @Override public boolean apply(TwitterTaskInfo task) {
+      // Length check is an artifact of thrift 0.5.0 NPE workaround from ConfigurationManager.
+      // See MESOS-370.
+      return task.isSetThermosConfig() && (task.getThermosConfig().length > 0);
+    }
+  };
+
   public static boolean isActive(ScheduleStatus status) {
     return ACTIVE_STATES.contains(status);
   }

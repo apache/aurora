@@ -2,7 +2,6 @@ package com.twitter.mesos.scheduler;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -48,12 +47,62 @@ public class Resources {
   final Amount<Long, Data> ram;
   final int numPorts;
 
-  @VisibleForTesting
-  Resources(double numCpus, Amount<Long, Data> ram, Amount<Long, Data> disk, int numPorts) {
+  /**
+   * Creates a new resources object.
+   *
+   * @param numCpus Number of CPUs.
+   * @param ram Amount of RAM.
+   * @param disk Amount of disk.
+   * @param numPorts Number of ports.
+   */
+  public Resources(double numCpus, Amount<Long, Data> ram, Amount<Long, Data> disk, int numPorts) {
     this.numCpus = numCpus;
     this.ram = checkNotNull(ram);
     this.disk = checkNotNull(disk);
     this.numPorts = numPorts;
+  }
+
+  /**
+   * Tests whether this bundle of resources is greater than or equal to another bundle of resources.
+   *
+   * @param other Resources being compared to.
+   * @return {@code true} if all resources in this bundle are greater than or equal to the
+   *    equivalents from {@code other}, otherwise {@code false}.
+   */
+  public boolean greaterThanOrEqual(Resources other) {
+    return (numCpus >= other.numCpus)
+        && (disk.as(Data.MB) >= other.disk.as(Data.MB))
+        && (ram.as(Data.MB) >= other.ram.as(Data.MB))
+        && (numPorts >= other.numPorts);
+  }
+
+  /**
+   * Adapts this resources object to a list of mesos resources.
+   *
+   * @param selectedPorts The ports selected, to be applied as concrete task ranges.
+   * @return Mesos resources.
+   */
+  public List<Resource> toResourceList(Set<Integer> selectedPorts) {
+    ImmutableList.Builder<Resource> resourceBuilder =
+      ImmutableList.<Resource>builder()
+          .add(Resources.makeMesosResource(CPUS, numCpus))
+          .add(Resources.makeMesosResource(DISK_MB, disk.as(Data.MB)))
+          .add(Resources.makeMesosResource(RAM_MB, ram.as(Data.MB)));
+    if (selectedPorts.size() > 0) {
+        resourceBuilder.add(Resources.makeMesosRangeResource(Resources.PORTS, selectedPorts));
+    }
+
+    return resourceBuilder.build();
+  }
+
+  /**
+   * Convenience method for adapting to mesos resources without applying a port range.
+   *
+   * @see {@link #toResourceList(java.util.Set)}
+   * @return Mesos resources.
+   */
+  public List<Resource> toResourceList() {
+    return toResourceList(ImmutableSet.<Integer>of());
   }
 
   @Override
@@ -87,6 +136,22 @@ public class Resources {
   }
 
   /**
+   * Extracts the resources specified in a list of resource objects.
+   *
+   * @param resources Resources to translate.
+   * @return The canonical resources.
+   */
+  public static Resources from(List<Resource> resources) {
+    checkNotNull(resources);
+    return new Resources(
+        getScalarValue(resources, CPUS),
+        Amount.of((long) getScalarValue(resources, RAM_MB), Data.MB),
+        Amount.of((long) getScalarValue(resources, DISK_MB), Data.MB),
+        getNumAvailablePorts(resources)
+    );
+  }
+
+  /**
    * Extracts the resources available in a slave offer.
    *
    * @param offer Offer to get resources from.
@@ -98,19 +163,23 @@ public class Resources {
         getScalarValue(offer, CPUS),
         Amount.of((long) getScalarValue(offer, RAM_MB), Data.MB),
         Amount.of((long) getScalarValue(offer, DISK_MB), Data.MB),
-        getNumAvailablePorts(offer));
+        getNumAvailablePorts(offer.getResourcesList()));
   }
 
-  private static int getNumAvailablePorts(Offer offer) {
+  private static int getNumAvailablePorts(List<Resource> resource) {
     int offeredPorts = 0;
-    for (Range range : getPortRanges(offer)) {
+    for (Range range : getPortRanges(resource)) {
       offeredPorts += (1 + range.getEnd() - range.getBegin());
     }
     return offeredPorts;
   }
 
   private static double getScalarValue(Offer offer, String key) {
-    Resource resource = getResource(offer, key);
+    return getScalarValue(offer.getResourcesList(), key);
+  }
+
+  private static double getScalarValue(List<Resource> resources, String key) {
+    Resource resource = getResource(resources, key);
     if (resource == null) {
       return 0;
     }
@@ -118,8 +187,8 @@ public class Resources {
     return resource.getScalar().getValue();
   }
 
-  private static Resource getResource(Offer offer, String key) {
-    return Iterables.find(offer.getResourcesList(), withName(key), null);
+  private static Resource getResource(List<Resource> resource, String key) {
+      return Iterables.find(resource, withName(key), null);
   }
 
   private static Predicate<Resource> withName(final String name) {
@@ -130,8 +199,8 @@ public class Resources {
     };
   }
 
-  private static Iterable<Range> getPortRanges(Offer offer) {
-    Resource resource = getResource(offer, Resources.PORTS);
+  private static Iterable<Range> getPortRanges(List<Resource> resources) {
+    Resource resource = getResource(resources, Resources.PORTS);
     if (resource == null) {
       return ImmutableList.of();
     }
@@ -214,7 +283,7 @@ public class Resources {
     }
 
     List<Integer> availablePorts = Lists.newArrayList(Sets.newHashSet(
-        Iterables.concat(Iterables.transform(getPortRanges(offer), RANGE_TO_MEMBERS))));
+        Iterables.concat(Iterables.transform(getPortRanges(offer.getResourcesList()), RANGE_TO_MEMBERS))));
 
     if (availablePorts.size() < numPorts) {
       throw new InsufficientResourcesException(
