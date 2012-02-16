@@ -97,6 +97,7 @@ class PystachioConfig(ProxyConfig):
     task.maxTaskFailures = task_raw.max_failures().get()
     task.owner = owner
     task.requestedPorts = ThermosTaskWrapper(task_raw, strict=False).ports()
+    task.constraints = set()
 
     # Replicate task objects to reflect number of instances.
     tasks = []
@@ -141,7 +142,7 @@ class PystachioConfig(ProxyConfig):
     ti = MesosTaskInstance(task=job.task(),
                            layout=job.layout(),
                            role=job.role(),
-                           instance=instance) % Environment(mesos = context)
+                           instance=instance) % Environment(mesos=context)
     return ti.interpolate()
 
   def __init__(self, job):
