@@ -308,14 +308,14 @@ def main(args, options):
     sys.exit(1)
 
   if options.quiet:
-    LogOptions.set_stdout_log_level('NONE')
+    LogOptions.set_stderr_log_level('NONE')
     zookeeper.set_debug_level(zookeeper.LOG_LEVEL_ERROR)
   else:
     if options.verbose:
-      LogOptions.set_stdout_log_level('DEBUG')
+      LogOptions.set_stderr_log_level('DEBUG')
       zookeeper.set_debug_level(zookeeper.LOG_LEVEL_DEBUG)
     else:
-      LogOptions.set_stdout_log_level('INFO')
+      LogOptions.set_stderr_log_level('INFO')
       zookeeper.set_debug_level(zookeeper.LOG_LEVEL_INFO)
 
   cli = MesosCLI(options)
