@@ -6,7 +6,7 @@ import time
 
 from twitter.common import log
 from twitter.common.contextutil import temporary_file
-from twitter.thermos.base import TaskPath
+from twitter.thermos.base.path import TaskPath
 from twitter.thermos.base.ckpt import CheckpointDispatcher
 from twitter.thermos.config.loader import ThermosTaskWrapper
 from thrift.TSerialization import deserialize as thrift_deserialize

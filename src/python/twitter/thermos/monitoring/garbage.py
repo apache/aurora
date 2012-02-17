@@ -37,6 +37,13 @@ class TaskGarbageCollector(object):
       else:
         yield path
 
+  def get_logs(self, task_id, with_size=True):
+    for path in self._detector.get_process_logs(task_id):
+      if with_size:
+        yield path, os.path.getsize(path)
+      else:
+        yield path
+
   def get_data(self, task_id, with_size=True):
     state = self.state(task_id)
     if state and state.header and state.header.sandbox:
@@ -50,6 +57,7 @@ class TaskGarbageCollector(object):
 
   def erase_task(self, task_id):
     self.erase_data(task_id)
+    self.erase_logs(task_id)
     self.erase_metadata(task_id)
 
   def erase_metadata(self, task_id):
@@ -57,13 +65,19 @@ class TaskGarbageCollector(object):
       os.unlink(fn)
     safe_rmtree(TaskPath(root=self._root, task_id=task_id).getpath('checkpoint_path'))
 
+  def erase_logs(self, task_id):
+    for fn in self.get_logs(task_id, with_size=False):
+      os.unlink(fn)
+    safe_rmtree(TaskPath(root=self._root, task_id=task_id).getpath('process_logbase'))
+
   def erase_data(self, task_id):
     # TODO(wickman)
     # This could be potentially dangerous if somebody naively runs their sandboxes in e.g.
     # $HOME or / or similar.  Perhaps put a guard somewhere?
     for fn in self.get_data(task_id, with_size=False):
       os.unlink(fn)
-    safe_rmtree(self.state(task_id).header.sandbox)
+    if self.state(task_id).header.sandbox:
+      safe_rmtree(self.state(task_id).header.sandbox)
 
 
 class TaskGarbageCollectionPolicy(object):
@@ -96,6 +110,8 @@ class DefaultCollector(TaskGarbageCollectionPolicy):
         max_tasks: int (max number of tasks to keep)          [default: infinity]
         include_metadata: boolean  (Whether or not to include metadata in the
           space calculations.)  [default: True]
+        include_logs: boolean  (Whether or not to include logs in the
+          space calculations.)  [default: True]
         verbose: boolean (whether or not to log)  [default: False]
         logger: callable (function to call with log messages) [default: sys.stdout.write]
     """
@@ -103,6 +119,7 @@ class DefaultCollector(TaskGarbageCollectionPolicy):
     self._max_space = kw.get('max_space', Amount(10**10, Data.TB))
     self._max_tasks = kw.get('max_tasks', 10**10)
     self._include_metadata = kw.get('include_metadata', True)
+    self._include_logs = kw.get('include_logs', True)
     self._verbose = kw.get('verbose', False)
     self._logger = kw.get('logger', sys.stdout.write)
     TaskGarbageCollectionPolicy.__init__(self, collector)
@@ -114,23 +131,29 @@ class DefaultCollector(TaskGarbageCollectionPolicy):
   def run(self):
     tasks = []
     now = time.time()
-    TaskTuple = namedtuple('TaskTuple', 'task_id age metadata_size data_size')
+
+    TaskTuple = namedtuple('TaskTuple', 'task_id age metadata_size log_size data_size')
     for task_id in self.collector.get_finished_tasks():
       age = Amount(int(now - self.collector.get_age(task_id)), Time.SECONDS)
       self.log('Analyzing task %s (age: %s)... ' % (task_id, age))
       metadata_size = Amount(sum(sz for _, sz in self.collector.get_metadata(task_id)), Data.BYTES)
       self.log('  metadata %.1fKB ' % metadata_size.as_(Data.KB))
+      log_size = Amount(sum(sz for _, sz in self.collector.get_logs(task_id)), Data.BYTES)
+      self.log('  logs %.1fKB ' % log_size.as_(Data.KB))
       data_size = Amount(sum(sz for _, sz in self.collector.get_data(task_id)), Data.BYTES)
       self.log('  data %.1fMB ' % data_size.as_(Data.MB))
-      tasks.append(TaskTuple(task_id, age, metadata_size, data_size))
+      tasks.append(TaskTuple(task_id, age, metadata_size, log_size, data_size))
 
     gc_tasks = set()
     gc_tasks.update(task for task in tasks if task.age > self._max_age)
     self.log('After age filter: %s tasks' % len(gc_tasks))
 
     def total_gc_size(task):
-      return task.data_size + (task.metadata_size if self._include_metadata else
-                               Amount(0, Data.BYTES))
+      return sum([task.data_size,
+                  task.metadata_size if self._include_metadata else Amount(0, Data.BYTES),
+                  task.log_size if self._include_logs else Amount(0, Data.BYTES)],
+                  Amount(0, Data.BYTES))
+
     total_used = Amount(0, Data.BYTES)
     for task in sorted(tasks, key=lambda tsk: tsk.age):
       if task not in gc_tasks:
@@ -139,16 +162,16 @@ class DefaultCollector(TaskGarbageCollectionPolicy):
           gc_tasks.add(task)
     self.log('After size filter: %s tasks' % len(gc_tasks))
 
-    total_tasks = len(tasks)
-    for task in sorted(tasks, key=lambda tsk: tsk.age, reverse=True):
-      if total_tasks - len(gc_tasks) > self._max_tasks:
+    for task in sorted(tasks, key=lambda tsk: tsk.age):
+      if task not in gc_tasks and len(tasks) - len(gc_tasks) > self._max_tasks:
         gc_tasks.add(task)
-      else:
-        break
-    self.log('After numtask filter: %s tasks' % len(gc_tasks))
+    self.log('After total task filter: %s tasks' % len(gc_tasks))
 
     self.log('Deciding to garbage collect the following tasks:')
-    for task in gc_tasks:
-      self.log('   %s' % repr(task))
+    if gc_tasks:
+      for task in gc_tasks:
+        self.log('   %s' % repr(task))
+    else:
+      self.log('   None.')
 
     return gc_tasks

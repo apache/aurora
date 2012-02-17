@@ -43,6 +43,7 @@ class TaskPath(object):
       'checkpoint_path': ['%(root)s', 'checkpoints', '%(task_id)s'],
     'runner_checkpoint': ['%(root)s', 'checkpoints', '%(task_id)s', 'runner'],
    'process_checkpoint': ['%(root)s', 'checkpoints', '%(task_id)s', 'coordinator.%(process)s'],
+      'process_logbase': ['%(root)s',        'logs', '%(task_id)s'],
        'process_logdir': ['%(root)s',        'logs', '%(task_id)s', '%(process)s', '%(run)s']
   }
 

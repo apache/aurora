@@ -5,11 +5,12 @@ import threading
 
 from twitter.common import log
 from twitter.common.recordio import ThriftRecordReader
-from twitter.thermos.base import CheckpointDispatcher
+from twitter.thermos.base.ckpt import CheckpointDispatcher
 from gen.twitter.thermos.ttypes import (
   ProcessState,
   RunnerCkpt,
-  RunnerState)
+  RunnerState,
+  TaskState)
 
 __author__ = 'wickman@twitter.com (brian wickman)'
 __tested__ = False
@@ -22,8 +23,8 @@ class TaskMonitor(object):
   def __init__(self, pathspec, task_id):
     self._task_id = task_id
     self._dispatcher = CheckpointDispatcher()
-    self._runnerstate = RunnerState(processes = {})
-    self._runner_ckpt = pathspec.given(task_id = task_id).getpath('runner_checkpoint')
+    self._runnerstate = RunnerState(processes={})
+    self._runner_ckpt = pathspec.given(task_id=task_id).getpath('runner_checkpoint')
     self._ckpt_head = 0
     self._apply_states()
     self._lock = threading.Lock()

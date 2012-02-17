@@ -15,9 +15,6 @@ class UniversalStateHandler(object):
   def on_process_transition(self, state, process_update):
     pass
 
-  def on_process_history_transition(self, state, process_history_update):
-    pass
-
   def on_task_transition(self, state, task_update):
     pass
 
@@ -166,8 +163,6 @@ class CheckpointDispatcher(object):
           ProcessState._VALUES_TO_NAMES.get(process_state.state),
           ProcessState._VALUES_TO_NAMES.get(process_state_update.state)))
 
-
-    # see thrift/thermos_runner.thrift for more explanation of the state transitions
     # [CREATION] => WAITING
     if process_state_update.state == ProcessState.WAITING:
       assert_process_state_in(None)
@@ -288,6 +283,9 @@ class CheckpointDispatcher(object):
 
       # Run the process state machine.
       log.debug('Running state machine for process=%s/seq=%s' % (name, process_update.seq))
+      if not state.processes or name not in state.processes:
+        raise CheckpointDispatcher.ErrorRecoveringState("Encountered potentially out of order "
+          "process update.  Are you sure this is a full checkpoint stream?")
       CheckpointDispatcher.update_process_state(state.processes[name][-1], process_update)
       self._run_process_dispatch(process_update.state, process_update)
       return

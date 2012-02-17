@@ -21,11 +21,14 @@ from twitter.thermos.base.ckpt import (
   UniversalStateHandler,
   ProcessStateHandler,
   TaskStateHandler)
-from twitter.thermos.config.loader  import ThermosTaskWrapper, ThermosProcessWrapper
-from twitter.thermos.config.schema  import ThermosContext
+from twitter.thermos.config.loader import (
+  ThermosConfigLoader,
+  ThermosTaskWrapper,
+  ThermosProcessWrapper)
+from twitter.thermos.config.schema import ThermosContext
 from twitter.thermos.runner.planner import Planner
 from twitter.thermos.runner.process import Process
-from twitter.thermos.runner.muxer   import ProcessMuxer
+from twitter.thermos.runner.muxer import ProcessMuxer
 
 from gen.twitter.thermos.ttypes import (
   ProcessState,
@@ -111,6 +114,8 @@ class TaskRunnerProcessHandler(ProcessStateHandler):
 
   def on_success(self, process_update):
     log.debug('Process on_success %s' % process_update)
+    log.info('Process(%s) finished successfully [rc=%s]' % (
+      process_update.process, process_update.return_code))
     self._runner._task_processes.pop(process_update.process)
     self._runner._watcher.unregister(process_update.process)
     self._runner._planner.set_finished(process_update.process)
@@ -131,6 +136,8 @@ class TaskRunnerProcessHandler(ProcessStateHandler):
 
   def on_failed(self, process_update):
     log.debug('Process on_failed %s' % process_update)
+    log.info('Process(%s) failed [rc=%s]' % (
+      process_update.process, process_update.return_code))
     self._on_abnormal(process_update)
 
   def on_lost(self, process_update):
@@ -179,6 +186,7 @@ class TaskRunnerTaskHandler(TaskStateHandler):
 
   def on_success(self, task_update):
     log.debug('Task on_success' % task_update)
+    log.info('Task succeeded.')
     if not self._runner._recovery:
       self.on_terminal()
 
@@ -258,13 +266,35 @@ class TaskRunner(object):
       raise TaskRunner.InvalidTaskError('Failed to fully evaluate task: %s' %
         typecheck.message())
 
+  @staticmethod
+  def get(task_id, checkpoint_root):
+    """
+      Get a TaskRunner bound to the task_id in checkpoint_root.
+    """
+    path = TaskPath(root=checkpoint_root, task_id=task_id, state='active')
+    task_json = path.getpath('task_path')
+    task_checkpoint = path.getpath('runner_checkpoint')
+    if not os.path.exists(task_json):
+      return None
+    task = ThermosConfigLoader.load_json(task_json)
+    if task is None:
+      return None
+    try:
+      checkpoint = CheckpointDispatcher.from_file(task_checkpoint)
+      return TaskRunner(task.tasks()[0].task(), checkpoint_root,
+        checkpoint.header.sandbox, task_id)
+    except Exception as e:
+      return None
+
   def __init__(self, task, checkpoint_root, sandbox,
                task_id=None, portmap=None, user=None, chroot=False, clock=time):
     """
       required:
         task (config.Task) = the task to run
-        checkpoint_root (path) = the context in which to run the task
-        sandbox (path) = the checkpoint root
+        checkpoint_root (path) = the checkpoint root
+        sandbox (path) = the sandbox in which the path will be run
+                         [if None, cwd will be assumed, but garbage collection will be
+                          disalbed for this task.]
 
       optional:
         task_id (string) = bind to this task id.  if not specified, will synthesize an id based
@@ -276,6 +306,7 @@ class TaskRunner(object):
         clock (time interface) = the clock to use throughout
     """
     self._portmap = portmap or {}
+    # TODO(wickman)  Only do this assertion on taking control?  Instead warn initially then error.
     TaskRunner.assert_valid_task(task, self._portmap)
 
     self._ckpt = None
@@ -348,7 +379,8 @@ class TaskRunner(object):
     """
     if self.task_state() != TaskState.ACTIVE:
       raise TaskRunner.StateError('Cannot take control of a task in terminal state.')
-    safe_mkdir(self._sandbox)
+    if self._sandbox:
+      safe_mkdir(self._sandbox)
     ckpt_file = self._pathspec.getpath('runner_checkpoint')
     safe_mkdir(os.path.dirname(ckpt_file))
     fp = lock_file(ckpt_file, "a+")
@@ -501,7 +533,7 @@ class TaskRunner(object):
       Construct a Process() object from a process_name, populated with its
       correct run number and fully interpolated commandline.
     """
-    run_number = len(self.state().processes[process_name])
+    run_number = len(self.state().processes[process_name])-1
     pathspec = self._pathspec.given(process = process_name, run = run_number)
     process = TaskRunnerHelper.process_from_name(self._task, process_name)
     context = ThermosContext(task_id = self._task_id,

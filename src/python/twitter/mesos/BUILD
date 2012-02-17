@@ -18,7 +18,8 @@ python_binary(
   source = "bin/mesos_client.py",
   dependencies = [
     pants(":mesos-lib"),
-    pants("src/python/twitter/common")
+    pants("src/python/twitter/common"),
+    pants("src/python/twitter/thermos/base:options")
   ]
 )
 

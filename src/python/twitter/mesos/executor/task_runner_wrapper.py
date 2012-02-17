@@ -10,7 +10,7 @@ from twitter.common.contextutil import temporary_file
 from twitter.common.dirutil import chmod_plus_x
 from twitter.common.http.mirror_file import MirrorFile
 
-from twitter.thermos.base import TaskPath
+from twitter.thermos.base.path import TaskPath
 from twitter.thermos.runner import TaskRunner
 from twitter.thermos.monitoring.monitor import TaskMonitor
 from twitter.thermos.config.loader import ThermosTaskWrapper
@@ -120,6 +120,9 @@ class TaskRunnerWrapper(object):
   def task_state(self):
     return self._monitor.task_state()
 
+  def is_started(self):
+    return self._popen is not None
+
   def is_alive(self):
     """
       Is the process underlying the Thermos task runner alive?
@@ -139,7 +142,7 @@ class TaskRunnerWrapper(object):
 
   def quitquitquit(self):
     """Bind to the process tree of a Thermos task and kill it with impunity."""
-    runner = TaskRunner(self._task, self._sandbox.root(), self._checkpoint_root, self._task_id)
+    runner = TaskRunner(self._task, self._checkpoint_root, self._sandbox.root(), self._task_id)
     runner.kill()
 
 

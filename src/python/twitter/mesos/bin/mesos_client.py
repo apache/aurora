@@ -14,6 +14,7 @@ from twitter.common.log.options import LogOptions
 from twitter.mesos.client_wrapper import MesosClientAPI, MesosHelper
 from twitter.mesos.parsers.mesos_config import MesosConfig
 from twitter.mesos.parsers.pystachio_config import PystachioConfig
+from twitter.thermos.base.options import add_binding_to
 
 from gen.twitter.mesos.ttypes import (
   ResponseCode,
@@ -283,24 +284,9 @@ The subcommands and their arguments are:
                  help="Run jobs configured using the new mesos config format.")
   app.add_option('-j', '--json', default=False, action='store_true',
                  help="Jobs are written in json.")
-
-  def add_binding_callback(option, opt, value, parser):
-    if not hasattr(parser.values, 'bindings'):
-      parser.values.bindings = []
-    assert len(value.split('='))==2, 'Bindings must be of the form name=value!'
-    name, value = value.split('=')
-    try:
-      ref = Ref.from_address(name)
-    except Ref.InvalidRefError as e:
-      print('Could not parse ref %s: %s' % (name, e))
-      raise
-    parser.values.bindings.append({ref: value})
-
-  app.add_option('-E', type='string', nargs=1, action='callback',
-                 callback=add_binding_callback,
-                 default=[], metavar='NAME:VALUE',
+  app.add_option('-E', type='string', nargs=1, action='callback', default=[], metavar='NAME:VALUE',
+                 callback=add_binding_to('bindings'), dest='bindings'
                  help='bind an environment name to a value.')
-
 
 def main(args, options):
   if not args:

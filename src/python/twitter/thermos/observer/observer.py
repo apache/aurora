@@ -9,17 +9,16 @@ from collections import defaultdict
 from twitter.common import log
 from twitter.common.recordio import ThriftRecordReader
 
-from twitter.thermos.observer.detector import TaskDetector
-from twitter.thermos.observer.muxer import TaskMuxer
-from twitter.thermos.observer.measure import TaskMeasurer
+from twitter.thermos.monitoring.detector import TaskDetector
+from twitter.thermos.monitoring.muxer import TaskMuxer
+from twitter.thermos.monitoring.measure import TaskMeasurer
 
-from twitter.thermos.base import TaskPath
+from twitter.thermos.base.path import TaskPath
 from twitter.thermos.base.ckpt import CheckpointDispatcher
 
 
-from twitter.thermos.config.schema import (
-  Environment,
-  ThermosContext)
+from pystachio import Environment
+from twitter.thermos.config.schema import ThermosContext
 from twitter.thermos.config.loader import (
   ThermosTaskWrapper,
   ThermosProcessWrapper)
@@ -153,7 +152,7 @@ class TaskObserver(threading.Thread):
     if state is None:
       return None
     return ThermosContext(
-      ports = state.ports if state.ports is not None else {},
+      ports = state.header.ports if state.header and state.header.ports else {},
       task_id = state.header.task_id,
       user = state.header.user,
     )
@@ -403,9 +402,9 @@ class TaskObserver(threading.Thread):
   def get_run_number(self, runner_state, process, run = None):
     if runner_state is not None:
       run = run if run is not None else -1
-      if run < len(runner_state.processes[process].runs):
-        if len(runner_state.processes[process].runs) > 0:
-          return run % len(runner_state.processes[process].runs)
+      if run < len(runner_state.processes[process]):
+        if len(runner_state.processes[process]) > 0:
+          return run % len(runner_state.processes[process])
 
   def logs(self, task_id, process, run = None):
     """

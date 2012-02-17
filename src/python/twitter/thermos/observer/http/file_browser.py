@@ -1,5 +1,6 @@
 import os
 import bottle
+from twitter.common import log
 from twitter.common.http import HttpServer
 from templating import HttpTemplate
 
@@ -11,7 +12,8 @@ def _read_chunk(filename, offset=None, bytes=None):
     fstat = os.stat(filename)
     if not os.path.isfile(filename):
       return None
-  except:
+  except Exception as e:
+    log.error('Could not read from %s: %s' % (filename, e))
     return None
 
   filelen = fstat.st_size

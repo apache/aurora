@@ -91,6 +91,7 @@ class ProcessBase(object):
   class Error(Exception): pass
   class UnknownUserError(Error): pass
   class CheckpointError(Error): pass
+  class UnspecifiedSandbox(Error): pass
 
   CONTROL_WAIT_CHECK_INTERVAL = Amount(100, Time.MILLISECONDS)
   MAXIMUM_CONTROL_WAIT = Amount(1, Time.MINUTES)
@@ -114,7 +115,8 @@ class ProcessBase(object):
     self._pathspec = pathspec
     self._seq = sequence
     self._sandbox = sandbox_dir
-    safe_mkdir(self._sandbox)
+    if self._sandbox:
+      safe_mkdir(self._sandbox)
     self._pid = None
     self._fork_time = None
     self._stdout = None
@@ -272,6 +274,8 @@ class Process(ProcessBase):
     self._use_chroot = bool(kw.pop('chroot', False))
     kw['platform'] = RealPlatform(fork=fork)
     ProcessBase.__init__(self, *args, **kw)
+    if self._use_chroot and self._sandbox is None:
+      raise Process.UnspecifiedSandbox('If using chroot, must specify sandbox!')
 
   def _chroot(self):
     """
@@ -317,10 +321,15 @@ class Process(ProcessBase):
 
     # start process
     start_time = self._platform.clock().time()
+
+    if not self._sandbox:
+      sandbox = os.getcwd()
+    else:
+      sandbox = self._sandbox if not self._use_chroot else '/'
     self._popen = subprocess.Popen(["/bin/sh", "-c", self.cmdline()],
                      stderr = self._stderr,
                      stdout = self._stdout,
-                     cwd    = self._sandbox if not self._use_chroot else '/')
+                     cwd    = sandbox)
 
     self._write_process_update(state=ProcessState.RUNNING,
                                pid=self._popen.pid,

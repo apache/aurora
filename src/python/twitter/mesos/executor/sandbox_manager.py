@@ -1,12 +1,7 @@
 from abc import ABCMeta, abstractmethod
 import os
 import sys
-
-try:
-  import app as appapp
-  has_appapp = True
-except ImportError:
-  has_appapp = False
+from twitter.common_internal.appapp import AppFactory
 
 from twitter.common import app, log
 from twitter.common.dirutil import safe_mkdir, safe_rmtree
@@ -59,6 +54,9 @@ class DirectorySandbox(SandboxBase):
   def exists(self):
     return os.path.exists(self._dir)
 
+  def exists(self):
+    return os.path.exists(self._dir)
+
   def create(self, mesos_task):
     if mesos_task.has_layout():
       log.warning('DirectorySandbox got task with layout! %s' % mesos_task.layout())
@@ -72,12 +70,8 @@ class AppAppSandbox(SandboxBase):
   def __init__(self, task_id):
     SandboxBase.__init__(self, task_id)
 
-    if not has_appapp:
-      raise SandboxBase.CreationError("AppApp is unavailable: %r, PATH: %r" % (
-        os.uname(), sys.path))
-
     self._task_id = task_id
-    self._app = appapp.App()
+    self._app = AppFactory.get()
     self._layout = None
     self._layouts = self._app.layout_list(layout_name=task_id)
 

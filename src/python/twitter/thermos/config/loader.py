@@ -45,7 +45,9 @@ class ThermosProcessWrapper(object):
 class ThermosTaskWrapper(object):
   class InvalidTask(Exception): pass
 
-  def __init__(self, task, strict=True):
+  def __init__(self, task, bindings=None, strict=True):
+    if bindings:
+      task = task.bind(*bindings)
     if not task.check().ok() and strict:
       raise ThermosTaskWrapper.InvalidTask(task.check().message())
     self._task = task
@@ -71,11 +73,11 @@ class ThermosTaskWrapper(object):
       json.dump(ti.get(), fp)
 
   @staticmethod
-  def from_file(filename):
+  def from_file(filename, **kw):
     try:
       with safe_open(filename) as fp:
         js = json.load(fp)
-      return ThermosTaskWrapper(Task(js))
+      return ThermosTaskWrapper(Task(js), **kw)
     except Exception as e:
       return None
 
@@ -85,10 +87,10 @@ class ThermosConfigLoader(object):
   deposit_schema(SCHEMA)
 
   @staticmethod
-  def load(filename):
+  def load(filename, **kw):
     tc = ThermosConfigLoader()
     def export(task):
-      tc.add_task(ThermosTaskWrapper(task))
+      tc.add_task(ThermosTaskWrapper(task, **kw))
     schema_copy = copy.copy(ThermosConfigLoader.SCHEMA)
     schema_copy['export'] = export
     with open(filename) as fp:
@@ -96,9 +98,9 @@ class ThermosConfigLoader(object):
     return tc
 
   @staticmethod
-  def load_json(filename):
+  def load_json(filename, **kw):
     tc = ThermosConfigLoader()
-    tc.add_task(ThermosTaskWrapper.from_file(filename))
+    tc.add_task(ThermosTaskWrapper.from_file(filename, **kw))
     return tc
 
   def __init__(self):
