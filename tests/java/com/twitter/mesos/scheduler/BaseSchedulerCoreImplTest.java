@@ -123,8 +123,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private static final String JOB_B = "Test_Job_B";
 
   private static final SlaveID SLAVE_ID = SlaveID.newBuilder().setValue("SlaveId").build();
-  private static final ExecutorID EXECUTOR_ID =
-      ExecutorID.newBuilder().setValue("ExecutorId").build();
   private static final String SLAVE_HOST_1 = "SlaveHost1";
 
   private static final OfferID OFFER_ID = OfferID.newBuilder().setValue("OfferId").build();
@@ -180,6 +178,15 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     // Apply a default quota for users so we don't have to give quota for every test.
     quotaManager.setQuota(OWNER_A.getRole(), scale(DEFAULT_TASK_QUOTA, DEFAULT_TASKS_IN_QUOTA));
     quotaManager.setQuota(OWNER_B.getRole(), scale(DEFAULT_TASK_QUOTA, DEFAULT_TASKS_IN_QUOTA));
+  }
+
+  @Test
+  public void testOfferNoTasks() throws Exception {
+    control.replay();
+    buildScheduler();
+
+    Offer offer = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, FOUR_GB, ONE_GB);
+    assertThat(scheduler.createTask(offer), is(Optional.<TaskDescription>absent()));
   }
 
   @Test(expected = TaskDescriptionException.class)

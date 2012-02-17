@@ -268,7 +268,7 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
         Tasks.SCHEDULING_ORDER.onResultOf(Tasks.SCHEDULED_TO_ASSIGNED),
         stateManager.fetchTasks(Query.byStatus(PENDING)));
     if (candidates.isEmpty()) {
-      return null;
+      return Optional.absent();
     }
     LOG.fine("Candidates for offer: " + Iterables.transform(candidates, Tasks.SCHEDULED_TO_ID));
 

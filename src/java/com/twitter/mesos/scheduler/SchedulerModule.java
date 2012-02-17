@@ -165,8 +165,6 @@ public class SchedulerModule extends AbstractModule {
     bind(new TypeLiteral<PulseMonitor<String>>() {})
         .annotatedWith(Bootstrap.class)
         .toInstance(new PulseMonitorImpl<String>(EXECUTOR_DEAD_THRESHOLD.get()));
-    bind(new TypeLiteral<Supplier<Set<String>>>() {})
-        .to(new TypeLiteral<PulseMonitor<String>>() {});
 
     // Bindings for thrift interfaces.
     bind(MesosAdmin.Iface.class).to(SchedulerThriftInterface.class).in(Singleton.class);
