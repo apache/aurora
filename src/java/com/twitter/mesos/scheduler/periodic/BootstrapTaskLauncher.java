@@ -90,6 +90,7 @@ public class BootstrapTaskLauncher implements TaskLauncher {
         .setJobName("executor_bootstrap")
         .setNumCpus(0.25)
         .setRamMb(1)
+        .setDiskMb(1)
         .setShardId(0)
         .setRequestedPorts(ImmutableSet.<String>of())
         .setConstraints(ImmutableSet.<Constraint>of())
