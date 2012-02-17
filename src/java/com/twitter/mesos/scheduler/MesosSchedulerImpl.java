@@ -116,28 +116,32 @@ public class MesosSchedulerImpl implements Scheduler {
 
       slaveMapper.addSlave(offer.getHostname(), offer.getSlaveId());
 
-      try {
-        for (TaskLauncher launcher : taskLaunchers) {
-          Optional<TaskDescription> task = launcher.createTask(offer);
-          if (task.isPresent()) {
-            if (fitsInOffer(task.get(), offer)) {
-              LOG.info(String.format("Accepting offer %s, to launch task %s",
-                  offer.getId().getValue(), task.get()));
-              driver.launchTasks(offer.getId(), ImmutableList.of(task.get()));
-              return;
-            } else {
-              LOG.warning("Insufficient resources to launch task " + task);
-            }
+      Optional<TaskDescription> task = Optional.absent();
+
+      for (TaskLauncher launcher : taskLaunchers) {
+        try {
+          task = launcher.createTask(offer);
+        } catch (SchedulerException e) {
+          LOG.log(Level.WARNING, "Failed to schedule offers.", e);
+          vars.failedOffers.incrementAndGet();
+        }
+
+        if (task.isPresent()) {
+          if (fitsInOffer(task.get(), offer)) {
+            driver.launchTasks(offer.getId(), ImmutableList.of(task.get()));
+            break;
+          } else {
+            LOG.warning("Insufficient resources to launch task " + task);
+            task = Optional.absent();
           }
         }
-      } catch (SchedulerException e) {
-        LOG.log(Level.WARNING, "Failed to schedule offers.", e);
-        vars.failedOffers.incrementAndGet();
       }
 
-      // For a given offer, if we fail to process it we can always launch with an empty set of tasks
-      // to signal the core we have processed the offer and just not used any of it.
-      driver.launchTasks(offer.getId(), ImmutableList.<TaskDescription>of());
+      if (!task.isPresent()) {
+        // For a given offer, if we fail to process it we can always launch with an empty set of
+        // tasks to signal the core we have processed the offer and just not used any of it.
+        driver.launchTasks(offer.getId(), ImmutableList.<TaskDescription>of());
+      }
     }
   }
 

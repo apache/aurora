@@ -10,7 +10,6 @@ import com.google.common.collect.ImmutableList;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
-import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.Status;
 import org.apache.mesos.Protos.TaskDescription;
@@ -39,6 +38,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
 
   private static final String SLAVE_HOST = "slave-hostname";
   private static final SlaveID SLAVE_ID = SlaveID.newBuilder().setValue("slave-id").build();
+  private static final String SLAVE_HOST_2 = "slave-hostname-2";
+  private static final SlaveID SLAVE_ID_2 = SlaveID.newBuilder().setValue("slave-id-2").build();
 
   private static final OfferID OFFER_ID = OfferID.newBuilder().setValue("offer-id").build();
   private static final Offer OFFER = Offer.newBuilder()
@@ -46,6 +47,12 @@ public class MesosSchedulerImplTest extends EasyMockTest {
       .setSlaveId(SLAVE_ID)
       .setHostname(SLAVE_HOST)
       .setId(OFFER_ID)
+      .build();
+  private static final OfferID OFFER_ID_2 = OfferID.newBuilder().setValue("offer-id-2").build();
+  private static final Offer OFFER_2 = Offer.newBuilder(OFFER)
+      .setSlaveId(SLAVE_ID_2)
+      .setHostname(SLAVE_HOST_2)
+      .setId(OFFER_ID_2)
       .build();
 
   private static final TaskID TASK_ID = TaskID.newBuilder().setValue("task-id").build();
@@ -172,6 +179,27 @@ public class MesosSchedulerImplTest extends EasyMockTest {
       @Override void expectations() throws Exception {
         expect(launcher.statusUpdate(STATUS)).andReturn(false);
         expect(schedulerCore.statusUpdate(STATUS)).andReturn(true);
+      }
+    };
+  }
+
+  @Test
+  public void testMultipleOffers() throws Exception {
+    new RegisteredFixture() {
+      @Override void expectations() throws Exception {
+        slaveMapper.addSlave(SLAVE_HOST, SLAVE_ID);
+        slaveMapper.addSlave(SLAVE_HOST_2, SLAVE_ID_2);
+        expect(launcher.createTask(OFFER)).andReturn(Optional.<TaskDescription>absent());
+        expect(schedulerCore.createTask(OFFER)).andReturn(Optional.of(TASK));
+        expect(driver.launchTasks(OFFER_ID, ImmutableList.of(TASK))).andReturn(Status.OK);
+        expect(launcher.createTask(OFFER_2)).andReturn(Optional.<TaskDescription>absent());
+        expect(schedulerCore.createTask(OFFER_2)).andReturn(Optional.<TaskDescription>absent());
+        expect(driver.launchTasks(OFFER_ID_2, ImmutableList.<TaskDescription>of()))
+            .andReturn(Status.OK);
+      }
+
+      @Override void test() {
+        scheduler.resourceOffers(driver, ImmutableList.of(OFFER, OFFER_2));
       }
     };
   }

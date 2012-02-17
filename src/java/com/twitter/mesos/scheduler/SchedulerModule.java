@@ -152,8 +152,7 @@ public class SchedulerModule extends AbstractModule {
     bind(SessionValidator.class).to(SessionValidatorImpl.class);
     bind(SchedulerCore.class).to(SchedulerCoreImpl.class).in(Singleton.class);
 
-    bind(new TypeLiteral<Optional<String>>() {
-    }).annotatedWith(GcExecutor.class)
+    bind(new TypeLiteral<Optional<String>>() {}).annotatedWith(GcExecutor.class)
         .toInstance(Optional.fromNullable(GC_EXECUTOR_PATH.get()));
     bind(new TypeLiteral<PulseMonitor<String>>() {})
         .annotatedWith(GcExecutor.class)
