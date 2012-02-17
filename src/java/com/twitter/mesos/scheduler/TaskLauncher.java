@@ -67,12 +67,13 @@ public interface TaskLauncher {
      * Creates a mesos task description.
      *
      * @param task Assigned task to translate into a task description.
+     * @param slaveId Id of the slave the task is being assigned to.
      * @param selectedPorts Selected ports to include in task resources.
      * @return A new task description.
      * @throws SchedulerException If the task could not be encoded.
      */
-    public static TaskDescription makeMesosTask(AssignedTask task, Set<Integer> selectedPorts)
-        throws SchedulerException {
+    public static TaskDescription makeMesosTask(AssignedTask task, SlaveID slaveId,
+        Set<Integer> selectedPorts) throws SchedulerException {
 
       checkNotNull(task);
       byte[] taskInBytes;
@@ -89,7 +90,7 @@ public interface TaskLauncher {
       TaskDescription.Builder assignedTaskBuilder =
           TaskDescription.newBuilder().setName(Tasks.jobKey(task))
               .setTaskId(TaskID.newBuilder().setValue(task.getTaskId()))
-              .setSlaveId(SlaveID.newBuilder().setValue(task.getSlaveId()))
+              .setSlaveId(slaveId)
               .addAllResources(resources)
               .setData(ByteString.copyFrom(taskInBytes));
       if (Tasks.IS_THERMOS_TASK.apply(task.getTask())) {

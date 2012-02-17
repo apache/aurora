@@ -294,7 +294,8 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
         stateManager.assignTask(Tasks.id(task), host, offer.getSlaveId(), selectedPorts));
     LOG.info(String.format("Offer on slave %s (id %s) is being assigned task for %s.",
         host, offer.getSlaveId(), jobKey(task)));
-    return TaskLauncher.Util.makeMesosTask(task.getAssignedTask(), selectedPorts);
+    return TaskLauncher.Util.makeMesosTask(
+        task.getAssignedTask(), offer.getSlaveId(), selectedPorts);
   }
 
   @Override

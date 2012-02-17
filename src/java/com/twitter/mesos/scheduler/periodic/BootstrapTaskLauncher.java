@@ -100,6 +100,7 @@ public class BootstrapTaskLauncher implements TaskLauncher {
         offer.getSlaveId().getValue(),
         task,
         ImmutableMap.<String, Integer>of());
-    return TaskLauncher.Util.makeMesosTask(assignedTask, ImmutableSet.<Integer>of());
+    return TaskLauncher.Util.makeMesosTask(
+        assignedTask, offer.getSlaveId(), ImmutableSet.<Integer>of());
   }
 }
