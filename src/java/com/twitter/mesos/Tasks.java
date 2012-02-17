@@ -10,6 +10,7 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.Ordering;
 
 import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.Constraint;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;

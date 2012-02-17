@@ -109,7 +109,7 @@ class ConstraintFilter implements Function<Constraint, Optional<Veto>> {
   }
 
   // Finds all the attributes given by the name.
-  private static class NameFilter implements Predicate<Attribute> {
+  static class NameFilter implements Predicate<Attribute> {
     private final String attributeName;
 
     NameFilter(String attributeName) {

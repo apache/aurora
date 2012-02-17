@@ -1,10 +1,5 @@
 package com.twitter.mesos.scheduler;
 
-import java.util.Collection;
-import java.util.Map;
-import java.util.Set;
-import java.util.logging.Logger;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
@@ -15,20 +10,25 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
 import com.google.inject.name.Named;
-
 import com.twitter.common.quantity.Amount;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Attribute;
 import com.twitter.mesos.gen.Constraint;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work.Quiet;
 
+import java.util.Collection;
+import java.util.Map;
+import java.util.Set;
+
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.quantity.Data.BYTES;
 import static com.twitter.common.quantity.Data.MB;
+import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 
 /**
  * Implementation of the scheduling filter that ensures resource requirements of tasks are
@@ -39,8 +39,6 @@ import static com.twitter.common.quantity.Data.MB;
  *     for a task not being scheduled.
  */
 public class SchedulingFilterImpl implements SchedulingFilter {
-
-  private static final Logger LOG = Logger.getLogger(SchedulingFilterImpl.class.getName());
 
   /**
    * {@literal @Named} binding key for the machine reservation map.
@@ -108,8 +106,11 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   @VisibleForTesting static final Veto RAM_VETO = new Veto("Insufficient RAM");
   @VisibleForTesting static final Veto DISK_VETO = new Veto("Insufficient disk");
   @VisibleForTesting static final Veto PORTS_VETO = new Veto("Insufficient ports");
-  @VisibleForTesting static final Veto RESTRICTED_JOB_VETO = new Veto("Job is restricted to other hosts");
-  @VisibleForTesting static final Veto RESERVED_HOST_VETO = new Veto("Host is restricted to another job");
+  @VisibleForTesting
+  static final Veto RESTRICTED_JOB_VETO = new Veto("Job is restricted to other hosts");
+  @VisibleForTesting
+  static final Veto RESERVED_HOST_VETO = new Veto("Host is restricted to another job");
+  @VisibleForTesting static final Veto DEDICATED_HOST_VETO = new Veto("Host is dedicated");
 
   private Iterable<FilterRule> rulesFromOffer(final Resources available,
       final Optional<String> slaveHost) {
@@ -230,6 +231,16 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     };
   }
 
+  private boolean isDedicated(final String slaveHost) {
+    Iterable<Attribute> slaveAttributes = storage.doInTransaction(new Quiet<Iterable<Attribute>>() {
+      @Override public Iterable<Attribute> apply(final StoreProvider storeProvider) {
+        return storeProvider.getAttributeStore().getAttributeForHost(slaveHost);
+      }
+    });
+
+    return Iterables.any(slaveAttributes, new ConstraintFilter.NameFilter(DEDICATED_ATTRIBUTE));
+  }
+
   @Override
   public Set<Veto> filter(Resources resourceOffer, Optional<String> slaveHost,
       TwitterTaskInfo task) {
@@ -242,6 +253,10 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     }
 
     if (slaveHost.isPresent()) {
+      if (!ConfigurationManager.isDedicated(task) && isDedicated(slaveHost.get())) {
+        return ImmutableSet.of(DEDICATED_HOST_VETO);
+      }
+
       Iterable<SlaveConstraint> slaveConstraints =
           Iterables.transform(task.getConstraints(), addSlave(slaveHost.get()));
       Iterable<FilterRule> dynamicRules =

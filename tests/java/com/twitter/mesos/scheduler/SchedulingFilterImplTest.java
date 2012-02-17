@@ -39,9 +39,11 @@ import com.twitter.mesos.scheduler.storage.Storage.Work;
 import com.twitter.mesos.scheduler.storage.Storage.Work.Quiet;
 import com.twitter.mesos.scheduler.storage.TaskStore;
 
+import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static com.twitter.mesos.scheduler.ConstraintFilter.unsatisfiedLimitVeto;
 import static com.twitter.mesos.scheduler.ConstraintFilter.unsatisfiedValueVeto;
 import static com.twitter.mesos.scheduler.SchedulingFilterImpl.CPU_VETO;
+import static com.twitter.mesos.scheduler.SchedulingFilterImpl.DEDICATED_HOST_VETO;
 import static com.twitter.mesos.scheduler.SchedulingFilterImpl.DISK_VETO;
 import static com.twitter.mesos.scheduler.SchedulingFilterImpl.PORTS_VETO;
 import static com.twitter.mesos.scheduler.SchedulingFilterImpl.RAM_VETO;
@@ -169,6 +171,8 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
   @Test
   public void testJobAllowedOnMachine() throws Exception {
+    expectGetHostAttributes(HOST_B);
+    expectGetHostAttributes(HOST_C);
     control.replay();
 
     SchedulingFilter filterBuilder = new SchedulingFilterImpl(ImmutableMap.of(
@@ -176,19 +180,18 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         HOST_C, Tasks.jobKey(OWNER_A, JOB_A)),
         storage);
 
-    assertThat(
-        filterBuilder.filter(DEFAULT_OFFER, Optional.of(HOST_B),
-            makeTask(OWNER_A, JOB_A, DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)).isEmpty(),
+    assertThat(filterBuilder.filter(DEFAULT_OFFER, Optional.of(HOST_B),
+        makeTask(OWNER_A, JOB_A, DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)).isEmpty(),
         is(true));
 
-    assertThat(
-        filterBuilder.filter(DEFAULT_OFFER, Optional.of(HOST_C),
-            makeTask(OWNER_A, JOB_A, DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)).isEmpty(),
+    assertThat(filterBuilder.filter(DEFAULT_OFFER, Optional.of(HOST_C),
+        makeTask(OWNER_A, JOB_A, DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)).isEmpty(),
         is(true));
   }
 
   @Test
   public void testJobNotAllowedOnMachine() throws Exception {
+    expectGetHostAttributes(HOST_A);
     control.replay();
 
     SchedulingFilter filterBuilder = new SchedulingFilterImpl(ImmutableMap.of(
@@ -208,6 +211,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
   @Test
   public void testMachineNotAllowedToRunJob() throws Exception {
+    expectGetHostAttributes(HOST_A).anyTimes();
     control.replay();
 
     SchedulingFilter filterBuilder = new SchedulingFilterImpl(ImmutableMap.of(
@@ -226,7 +230,22 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   }
 
   @Test
+  public void testDedicatedRole() throws Exception {
+    expectGetHostAttributes(HOST_A, dedicated(ROLE_A));
+    expectGetHostAttributes(HOST_A, dedicated(ROLE_A));
+
+    control.replay();
+
+    assertThat(defaultFilter.filter(DEFAULT_OFFER, Optional.of(HOST_A),
+        makeTask(OWNER_A, JOB_B, new Constraint(DEDICATED_ATTRIBUTE, TaskConstraint.value(
+            new ValueConstraint(false, ImmutableSet.<String>of(ROLE_A)))))).isEmpty(), is(true));
+    assertEquals(ImmutableSet.of(DEDICATED_HOST_VETO),
+        defaultFilter.filter(DEFAULT_OFFER, Optional.of(HOST_A), makeTask(OWNER_B, JOB_B)));
+  }
+
+  @Test
   public void testUnderLimitNoTasks() throws Exception {
+    expectGetHostAttributes(HOST_A);
     expectGetHostAttributes(HOST_A, host(HOST_A));
     expectGetTasks();
 
@@ -242,6 +261,10 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
   private Attribute rack(String rack) {
     return valueAttribute(RACK_ATTRIBUTE, rack);
+  }
+
+  private Attribute dedicated(String role) {
+    return valueAttribute(DEDICATED_ATTRIBUTE, role);
   }
 
   @Test

@@ -25,8 +25,8 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
+import com.twitter.mesos.gen.LimitConstraint;
 import org.apache.mesos.Protos.Attribute;
-import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
@@ -58,14 +58,15 @@ import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
+import com.twitter.mesos.gen.ValueConstraint;
 import com.twitter.mesos.scheduler.SchedulerCore.RestartException;
 import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
-import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 import com.twitter.mesos.scheduler.quota.QuotaManager.QuotaManagerImpl;
@@ -85,6 +86,7 @@ import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.UPDATING;
 import static com.twitter.mesos.gen.UpdateResult.SUCCESS;
+import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.*;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertEquals;
@@ -239,7 +241,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     buildScheduler();
 
     JobConfiguration job = makeJob(OWNER_A, JOB_A, nonProductionTask(),
-        ConfigurationManager.MAX_TASKS_PER_JOB.get() + 1);
+        MAX_TASKS_PER_JOB.get() + 1);
     scheduler.createJob(job);
   }
 
@@ -249,11 +251,11 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     buildScheduler();
 
     JobConfiguration job = makeJob(OWNER_A, JOB_A, nonProductionTask(),
-        ConfigurationManager.MAX_TASKS_PER_JOB.get());
+        MAX_TASKS_PER_JOB.get());
     scheduler.createJob(job);
 
     job = makeJob(OWNER_A, JOB_A, nonProductionTask(),
-        ConfigurationManager.MAX_TASKS_PER_JOB.get() + 1);
+        MAX_TASKS_PER_JOB.get() + 1);
     scheduler.startUpdate(job);
   }
 
@@ -276,9 +278,69 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       assertThat(state.getAssignedTask().isSetSlaveId(), is(false));
       // Need to clear shard ID since that was assigned in our makeJob function.
       assertThat(state.getAssignedTask().getTask().setShardId(0),
-          is(ConfigurationManager.populateFields(job,
+          is(populateFields(job,
               productionTask().setShardId(0))));
     }
+  }
+
+  private static Constraint dedicatedConstraint(Set<String> values) {
+    return new Constraint(DEDICATED_ATTRIBUTE,
+        TaskConstraint.value(new ValueConstraint(false, values)));
+  }
+
+  private static Constraint dedicatedConstraint(int value) {
+    return new Constraint(DEDICATED_ATTRIBUTE, TaskConstraint.limit(new LimitConstraint(value)));
+  }
+
+  @Test
+  public void testDedicatedJob() throws Exception {
+    control.replay();
+    buildScheduler();
+
+    TwitterTaskInfo newTask = nonProductionTask();
+    newTask.addToConstraints(dedicatedConstraint(ImmutableSet.of(OWNER_A.getRole())));
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, ImmutableSet.of(newTask)));
+
+    assertThat(getOnlyTask(queryJob(OWNER_A, JOB_A)).getStatus(), is(PENDING));
+  }
+
+  @Test
+  public void testDedicatedJobKey() throws Exception {
+    control.replay();
+    buildScheduler();
+
+    TwitterTaskInfo newTask = nonProductionTask();
+    newTask.addToConstraints(dedicatedConstraint(ImmutableSet.of(Tasks.jobKey(OWNER_A, JOB_A))));
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, ImmutableSet.of(newTask)));
+
+    assertThat(getOnlyTask(queryJob(OWNER_A, JOB_A)).getStatus(), is(PENDING));
+  }
+
+  @Test(expected = ScheduleException.class)
+  public void testLimitConstraintForDedicatedJob() throws Exception {
+    control.replay();
+    buildScheduler();
+    TwitterTaskInfo task = nonProductionTask();
+    task.addToConstraints(dedicatedConstraint(1));
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, ImmutableSet.of(task)));
+  }
+
+  @Test(expected = ScheduleException.class)
+  public void testMultipleValueConstraintForDedicatedJob() throws Exception {
+    control.replay();
+    buildScheduler();
+    TwitterTaskInfo task = nonProductionTask();
+    task.addToConstraints(dedicatedConstraint(ImmutableSet.of("mesos", "test")));
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, ImmutableSet.of(task)));
+  }
+
+  @Test(expected = ScheduleException.class)
+  public void testUnauthorizedDedicatedJob() throws Exception {
+    control.replay();
+    buildScheduler();
+    TwitterTaskInfo task = nonProductionTask();
+    task.addToConstraints(dedicatedConstraint(ImmutableSet.of("mesos")));
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, ImmutableSet.of(task)));
   }
 
   @Test
@@ -349,7 +411,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     final Set<ScheduledTask> badTasks = ImmutableSet.copyOf(Iterables
         .transform(job.getTaskConfigs(),
             new Function<TwitterTaskInfo, ScheduledTask>() {
-              @Override public ScheduledTask apply(TwitterTaskInfo task) {
+              @Override
+              public ScheduledTask apply(TwitterTaskInfo task) {
                 return new ScheduledTask()
                     .setStatus(RUNNING)
                     .setAssignedTask(
@@ -392,7 +455,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setAvoidJobs(ImmutableSet.<String>of());
 
     storage.doInTransaction(new NoResult.Quiet() {
-      @Override protected void execute(Storage.StoreProvider storeProvider) {
+      @Override
+      protected void execute(Storage.StoreProvider storeProvider) {
         storeProvider.getTaskStore().saveTasks(ImmutableSet.of(new ScheduledTask()
             .setStatus(PENDING)
             .setAssignedTask(
@@ -431,7 +495,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setAvoidJobs(ImmutableSet.<String>of());
 
     storage.doInTransaction(new NoResult.Quiet() {
-      @Override protected void execute(Storage.StoreProvider storeProvider) {
+      @Override
+      protected void execute(Storage.StoreProvider storeProvider) {
         storeProvider.getJobStore().saveAcceptedJob(
             CronJobManager.MANAGER_KEY, makeJob(OWNER_A, JOB_A, storedTask, 1)
             .setCronSchedule("1 1 1 1 1"));
@@ -1926,7 +1991,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .addResources(Resource.newBuilder().setType(Type.RANGES).setName(Resources.PORTS)
             .setRanges(portRanges))
         .addAttributes(Attribute.newBuilder().setType(Type.TEXT)
-            .setName(ConfigurationManager.HOST_CONSTRAINT)
+            .setName(HOST_CONSTRAINT)
             .setText(Text.newBuilder().setValue(slaveHost)))
         .setSlaveId(slave)
         .setHostname(slaveHost)
@@ -1955,7 +2020,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     TwitterTaskInfo task = new TwitterTaskInfo().setConfiguration(ImmutableMap.copyOf(params));
 
     // Avoid hitting per-host scheduling constraints.
-    task.addToConstraints(ConfigurationManager.hostLimitConstraint(100));
+    task.addToConstraints(hostLimitConstraint(100));
     return task;
   }
 

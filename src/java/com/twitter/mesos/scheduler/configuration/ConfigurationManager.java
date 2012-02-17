@@ -29,9 +29,13 @@ import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.LimitConstraint;
 import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.gen.ValueConstraint;
 import com.twitter.mesos.scheduler.CommandLineExpander;
+import com.twitter.mesos.scheduler.ScheduleException;
 import com.twitter.mesos.scheduler.ThermosJank;
 import com.twitter.mesos.scheduler.configuration.ValueParser.ParseException;
+
+import javax.annotation.Nullable;
 
 /**
  * Manages translation from a string-mapped configuration to a concrete configuration type, and
@@ -48,6 +52,7 @@ public class ConfigurationManager {
   private static final Pattern GOOD_IDENTIFIER_PATTERN = Pattern.compile("[\\w\\-\\.]+");
   @VisibleForTesting public static final String HOST_CONSTRAINT = "host";
   private static final int MAX_IDENTIFIED_LENGTH = 255;
+  public static final String DEDICATED_ATTRIBUTE = "dedicated";
 
   @VisibleForTesting
   @Positive
@@ -81,9 +86,27 @@ public class ConfigurationManager {
     }
   }
 
+  private static boolean matchesRole(ValueConstraint constraint, String role) {
+    return Iterables.getOnlyElement(constraint.getValues()).split("/")[0].equals(role);
+  }
+
+  private static boolean isValueConstraint(TaskConstraint taskConstraint) {
+    return taskConstraint.getSetField() == TaskConstraint._Fields.VALUE;
+  }
+
+  public static boolean isDedicated(TwitterTaskInfo task) {
+    return Iterables.any(task.getConstraints(), getConstraintByName(DEDICATED_ATTRIBUTE));
+  }
+
+  @Nullable
+  private static Constraint getDedicatedConstraint(TwitterTaskInfo task) {
+    return Iterables.find(task.getConstraints(), getConstraintByName(DEDICATED_ATTRIBUTE), null);
+  }
+
   public static JobConfiguration validateAndPopulate(JobConfiguration job)
-      throws TaskDescriptionException {
+      throws TaskDescriptionException, ScheduleException {
     Preconditions.checkNotNull(job);
+    String role = job.getOwner().getRole();
 
     if (job.getTaskConfigsSize() > MAX_TASKS_PER_JOB.get()) {
       throw new TaskDescriptionException("Job exceeds task limit of " + MAX_TASKS_PER_JOB.get());
@@ -108,6 +131,25 @@ public class ConfigurationManager {
       populateFields(copy, config);
       if (!shardIds.add(config.getShardId())) {
         throw new TaskDescriptionException("Duplicate shard ID " + config.getShardId());
+      }
+
+      Constraint constraint = getDedicatedConstraint(config);
+      if (constraint == null) {
+        continue;
+      }
+
+      if (!isValueConstraint(constraint.getConstraint())) {
+        throw new ScheduleException("A dedicated constraint must be of value type.");
+      }
+
+      ValueConstraint valueConstraint = constraint.getConstraint().getValue();
+
+      if (!(valueConstraint.getValues().size() == 1)) {
+        throw new ScheduleException("A dedicated constraint must have exactly one value");
+      }
+
+      if (!matchesRole(valueConstraint, role)) {
+        throw new ScheduleException("Only " + role + " may use hosts dedicated for that role.");
       }
     }
 
@@ -175,6 +217,20 @@ public class ConfigurationManager {
     config.setConfigParsed(true);
 
     return config;
+  }
+
+  /**
+   * Provides a filter for the given constraint name.
+   *
+   * @param name The name of the constraint.
+   * @return A filter that matches the constraint.
+   */
+  public static Predicate<Constraint> getConstraintByName(final String name) {
+    return new Predicate<Constraint>() {
+      @Override public boolean apply(Constraint constraint) {
+        return constraint.getName().equals(name);
+      }
+    };
   }
 
   private abstract static class Field<T> {
