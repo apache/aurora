@@ -240,7 +240,7 @@ class MesosCLI(cmd.Cmd):
 
   @requires_arguments('task_id', 'state')
   def do_force_task_state(self, *line):
-    """force_state task_id state"""
+    """force_task_state task_id state"""
     (task_id, state) = line
     status = ScheduleStatus._NAMES_TO_VALUES.get(state)
     if status is None:
