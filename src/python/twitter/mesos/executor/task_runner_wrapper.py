@@ -142,8 +142,11 @@ class TaskRunnerWrapper(object):
 
   def quitquitquit(self):
     """Bind to the process tree of a Thermos task and kill it with impunity."""
-    runner = TaskRunner(self._task, self._checkpoint_root, self._sandbox.root(), self._task_id)
-    runner.kill()
+    try:
+      runner = TaskRunner(self._task, self._checkpoint_root, self._sandbox.root(), self._task_id)
+      runner.kill()
+    except TaskRunner.Error as e:
+      log.error('Could not quitquitquit runner: %s' % e)
 
 
 class ProductionTaskRunner(TaskRunnerWrapper):

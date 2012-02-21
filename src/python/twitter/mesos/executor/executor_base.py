@@ -3,7 +3,7 @@ import mesos
 import mesos_pb2 as mesos_pb
 from twitter.common import app, log
 from gen.twitter.mesos.ttypes import ScheduleStatus
-from gen.twitter.thermos.ttypes import TaskStatus
+from gen.twitter.thermos.ttypes import TaskState
 
 app.configure(module='twitter.common.app.modules.exception_handler',
     enable=True, category='thermos_executor_exceptions')
@@ -31,7 +31,7 @@ class ThermosExecutorBase(mesos.Executor):
 
   @staticmethod
   def thermos_status_is_terminal(status):
-    return status in (TaskStatus.SUCCESS, TaskStatus.FAILED, TaskStatus.KILLED)
+    return status in (TaskState.SUCCESS, TaskState.FAILED, TaskState.KILLED)
 
   def __init__(self):
     self._slave_id = None

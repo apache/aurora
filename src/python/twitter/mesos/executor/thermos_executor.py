@@ -43,6 +43,9 @@ else:
 
 
 class ExecutorPollingThread(threading.Thread):
+  POLL_WAIT = Amount(500, Time.MILLISECONDS)
+  WAIT_LIMIT = Amount(1, Time.MINUTES)
+
   def __init__(self, runner, driver, task_id):
     self._driver = driver
     self._runner = runner
@@ -52,22 +55,40 @@ class ExecutorPollingThread(threading.Thread):
   def run(self):
     # wait for the runner process to finish
     while self._runner.is_alive():
-      time.sleep(Amount(500, Time.MILLISECONDS).as_(Time.SECONDS))
+      time.sleep(ExecutorPollingThread.POLL_WAIT.as_(Time.SECONDS))
 
-    state = self._runner.state()
+    # TODO(wickman) MESOS-438
+    #
+    # There is a legit race condition here.  If we catch the is_alive latch
+    # down at exactly the right time, there are no proper waits to wait for
+    # rebinding to the executor by a third party killing process.
+    #
+    # While kills in production should be rare, we should monitor the
+    # task_state for 60 seconds until it is in a terminal state. If it never
+    # reaches a terminal state, then we could either:
+    #    1) issue the kills ourself and send a LOST message
+    # or 2) send a rebind_task call to the executor and have it attempt to
+    #       re-take control of the executor.  perhaps with a max bind
+    #       limit before going with route #1.
+    wait_limit = ExecutorPollingThread.WAIT_LIMIT
+    while wait_limit > Amount(0, Time.SECONDS):
+      if ThermosExecutor.thermos_status_is_terminal(self._runner.task_state()):
+        break
+      time.sleep(ExecutorPollingThread.POLL_WAIT.as_(Time.SECONDS))
+      wait_limit -= ExecutorPollingThread.POLL_WAIT
 
-    last_state = state.statuses[-1].state
+    last_state = self._runner.task_state()
     finish_state = None
     if last_state == TaskState.ACTIVE:
       log.error("Runner is dead but task state unexpectedly ACTIVE!")
       self._runner.quitquitquit()
-      finish_state = mesos_pb.TASK_FAILED
+      finish_state = mesos_pb.TASK_LOST
     elif last_state == TaskState.SUCCESS:
       finish_state = mesos_pb.TASK_FINISHED
     elif last_state == TaskState.FAILED:
       finish_state = mesos_pb.TASK_FAILED
     elif last_state == TaskState.KILLED:
-      log.error("Runner died but task is expectedly in KILLED state!")
+      log.warning("Task was KILLED!")
       finish_state = mesos_pb.TASK_KILLED
     else:
       log.error("Unknown task state! %s" % TaskState._VALUES_TO_NAMES.get(last_state, '(unknown)'))
