@@ -86,8 +86,8 @@ public class ConfigurationManager {
     }
   }
 
-  private static boolean matchesRole(ValueConstraint constraint, String role) {
-    return Iterables.getOnlyElement(constraint.getValues()).split("/")[0].equals(role);
+  private static String getRole(ValueConstraint constraint) {
+    return Iterables.getOnlyElement(constraint.getValues()).split("/")[0];
   }
 
   private static boolean isValueConstraint(TaskConstraint taskConstraint) {
@@ -148,8 +148,10 @@ public class ConfigurationManager {
         throw new ScheduleException("A dedicated constraint must have exactly one value");
       }
 
-      if (!matchesRole(valueConstraint, role)) {
-        throw new ScheduleException("Only " + role + " may use hosts dedicated for that role.");
+      String dedicatedRole = getRole(valueConstraint);
+      if (!role.equals(dedicatedRole)) {
+        throw new ScheduleException(
+            "Only " + dedicatedRole + " may use hosts dedicated for that role.");
       }
     }
 

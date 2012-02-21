@@ -51,7 +51,7 @@ class MesosConfig(ProxyConfig):
       assert isinstance(attribute, basestring) and isinstance(constraint_value, basestring), (
         "Both attribute name and value in constraints must be string")
       constraint = Constraint()
-      constraint.attribute = attribute
+      constraint.name = attribute
       task_constraint = TaskConstraint()
       if constraint_value.startswith('limit:'):
         task_constraint.limitConstraint = LimitConstraint()
@@ -77,12 +77,10 @@ class MesosConfig(ProxyConfig):
 
     # Force configuration map to be all strings.
     task = TwitterTaskInfo()
-    task_constraints = {}
     if 'constraints' in config:
-      task_constraints['constraints'] = MesosConfig.constraints_to_thrift(
-        config['constraints'])
+      task.constraints = MesosConfig.constraints_to_thrift(config['constraints'])
     task_configuration = dict((k, str(v)) for k, v in config['task'].items())
-    task.configuration = dict(task_configuration.items() + task_constraints.items())
+    task.configuration = task_configuration
     task.requestedPorts = EntityParser.match_ports(config['task']['start_command'])
 
     # Replicate task objects to reflect number of instances.

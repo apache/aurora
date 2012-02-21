@@ -285,7 +285,7 @@ The subcommands and their arguments are:
   app.add_option('-j', '--json', default=False, action='store_true',
                  help="Jobs are written in json.")
   app.add_option('-E', type='string', nargs=1, action='callback', default=[], metavar='NAME:VALUE',
-                 callback=add_binding_to('bindings'), dest='bindings'
+                 callback=add_binding_to('bindings'), dest='bindings',
                  help='bind an environment name to a value.')
 
 def main(args, options):
