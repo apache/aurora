@@ -30,7 +30,7 @@ class MesosConfig(ProxyConfig):
   @staticmethod
   def execute(config_file):
     """
-      Execute the .mesos configuration "filename" in the context of preloaded
+      Execute the .mesos configuration "config_file" in the context of preloaded
       library functions, e.g. mesos_include.
     """
     env = {}
