@@ -180,7 +180,7 @@ class MesosConfig(ProxyConfig):
         update_config['maxTotalFailures'] = DEFAULT_MAX_TOTAL_FAILURE
 
       jobs[job['name']] = job
-      return jobs
+    return jobs
 
 
   def __init__(self, filename, name=None):
