@@ -275,5 +275,3 @@ class MesosClientAPI(MesosClientBase):
   def force_task_state(self, task_id, status):
     log.info("Requesting that task %s transition to state %s" % (task_id, status))
     return self.client().forceTaskState(task_id, status, self._session_key)
-
-
