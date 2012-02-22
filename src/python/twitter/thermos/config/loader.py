@@ -4,7 +4,7 @@ import re
 
 from pystachio import Ref
 from twitter.common.dirutil import safe_open
-from twitter.common.lang.compatibility import *
+from twitter.common.lang import Compatibility
 from twitter.thermos.config.schema import Task
 
 SCHEMA_PREAMBLE = """
@@ -14,7 +14,7 @@ from twitter.thermos.config.dsl import *
 """
 
 def deposit_schema(environment):
-  exec_function(compile(SCHEMA_PREAMBLE, "<exec_function>", "exec"), environment)
+  Compatibility.exec_function(compile(SCHEMA_PREAMBLE, "<exec_function>", "exec"), environment)
 
 
 class ThermosProcessWrapper(object):
@@ -94,7 +94,7 @@ class ThermosConfigLoader(object):
     schema_copy = copy.copy(ThermosConfigLoader.SCHEMA)
     schema_copy['export'] = export
     with open(filename) as fp:
-      exec_function(compile(fp.read(), filename, 'exec'), schema_copy)
+      Compatibility.exec_function(compile(fp.read(), filename, 'exec'), schema_copy)
     return tc
 
   @staticmethod

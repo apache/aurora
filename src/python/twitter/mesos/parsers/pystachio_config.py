@@ -5,7 +5,7 @@ import sys
 
 from pystachio import Ref, Environment
 from twitter.common.dirutil import safe_open
-from twitter.common.lang.compatibility import *
+from twitter.common.lang import Compatibility
 from twitter.mesos.config.schema import (
   MesosJob,
   MesosTaskInstance,
@@ -28,7 +28,8 @@ from twitter.thermos.config.dsl import *
 """
 
 def deposit_schema(environment):
-  exec_function(compile(SCHEMA_PREAMBLE, "<exec_function>", "exec"), environment)
+  Compatibility.exec_function(
+    compile(SCHEMA_PREAMBLE, "<exec_function>", "exec"), environment)
 
 class MesosConfigLoader(object):
   SCHEMA = {}
@@ -53,7 +54,8 @@ class MesosConfigLoader(object):
     tc = MesosConfigLoader()
     schema_copy = copy.copy(MesosConfigLoader.SCHEMA)
     with open(filename) as fp:
-      locals_map = exec_function(compile(fp.read(), filename, 'exec'), schema_copy)
+      locals_map = Compatibility.exec_function(
+        compile(fp.read(), filename, 'exec'), schema_copy)
     job_list = locals_map.get('jobs')
     if not job_list or not isinstance(job_list, list):
       raise MesosConfigLoader.BadConfig("Could not extract any jobs from %s" % filename)
