@@ -90,7 +90,7 @@ class MesosHelper(object):
   @staticmethod
   def copy_app_to_hadoop(user, source_path, hdfs_path, cluster, ssh_proxy):
     assert hdfs_path is not None, 'No target HDFS path specified'
-    hdfs, hdfs_config = clusters.get_hadoop_uri(cluster), cluster.get_hadoop_config(cluster)
+    hdfs, hdfs_config = clusters.get_hadoop_uri(cluster), clusters.get_hadoop_config(cluster)
     hdfs_uri = '%s%s' % (hdfs, hdfs_path)
     MesosHelper.copy_to_hadoop(user, ssh_proxy, source_path, hdfs_uri, hdfs_config)
 
