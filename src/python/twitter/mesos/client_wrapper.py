@@ -69,7 +69,7 @@ class MesosHelper(object):
 
     hdfs_src = abs_src if Location.is_prod() else os.path.basename(abs_src)
 
-    hadoop_fs = ['hadoop', '--config=%s' % hadoop_fs_config, 'fs']
+    hadoop_fs = ['hadoop', '--config', hadoop_fs_config, 'fs']
     def call_hadoop(*args):
       return MesosHelper.call(hadoop_fs + list(args), ssh_proxy_host, user=user)
     def check_call_hadoop(*args):
