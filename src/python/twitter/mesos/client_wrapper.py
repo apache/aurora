@@ -57,7 +57,7 @@ class MesosHelper(object):
       clusters.assert_exists(cluster)
 
   @staticmethod
-  def copy_to_hadoop(user, ssh_proxy_host, src, dst):
+  def copy_to_hadoop(user, ssh_proxy_host, src, dst, hadoop_fs_config):
     """
     Copy the local file src to a hadoop path dst. Should be used in
     conjunction with starting new mesos jobs
@@ -69,26 +69,30 @@ class MesosHelper(object):
 
     hdfs_src = abs_src if Location.is_prod() else os.path.basename(abs_src)
 
+    hadoop_fs = ['hadoop', '--config=%s' % hadoop_fs_config, 'fs']
+    def call_hadoop(*args):
+      return MesosHelper.call(hadoop_fs + list(args), ssh_proxy_host, user=user)
+    def check_call_hadoop(*args):
+      MesosHelper.check_call(hadoop_fs + list(args), ssh_proxy_host, user=user)
+
     if ssh_proxy_host:
       log.info('Running in corp, copy will be done via %s@%s' % (user, ssh_proxy_host))
       subprocess.check_call(['scp', abs_src, '%s@%s:' % (user, ssh_proxy_host)])
-
-    if not MesosHelper.call(['hadoop', 'fs', '-test', '-e', dst], ssh_proxy_host, user=user):
+    if not call_hadoop('-test', '-e', dst):
       log.info("Deleting existing file at %s" % dst)
-      MesosHelper.check_call(['hadoop', 'fs', '-rm', dst], ssh_proxy_host, user=user)
-    elif MesosHelper.call(['hadoop', 'fs', '-test', '-e', dst_dir], ssh_proxy_host, user=user):
+      check_call_hadoop('-rm', dst)
+    elif call_hadoop('-test', '-e', dst_dir):
       log.info('Creating directory %s' % dst_dir)
-      MesosHelper.check_call(['hadoop', 'fs', '-mkdir', dst_dir], ssh_proxy_host, user=user)
-
+      check_call_hadoop('-mkdir', dst_dir)
     log.info('Copying %s -> %s' % (hdfs_src, dst))
-    MesosHelper.check_call(['hadoop', 'fs', '-put', hdfs_src, dst], ssh_proxy_host, user=user)
+    check_call_hadoop('-put', hdfs_src, dst)
 
   @staticmethod
   def copy_app_to_hadoop(user, source_path, hdfs_path, cluster, ssh_proxy):
     assert hdfs_path is not None, 'No target HDFS path specified'
-    hdfs = clusters.get_hadoop_uri(cluster)
+    hdfs, hdfs_config = clusters.get_hadoop_uri(cluster), cluster.get_hadoop_config(cluster)
     hdfs_uri = '%s%s' % (hdfs, hdfs_path)
-    MesosHelper.copy_to_hadoop(user, ssh_proxy, source_path, hdfs_uri)
+    MesosHelper.copy_to_hadoop(user, ssh_proxy, source_path, hdfs_uri, hdfs_config)
 
 class MesosClientBase(object):
   """
