@@ -27,8 +27,9 @@ python_binary(
   name = "deploy_scheduler",
   source = "bin/deploy_scheduler.py",
   dependencies = [
+    pants('3rdparty/python:git-python'),
     pants(":mesos-lib"),
-    pants("3rdparty/python:git-python")
+    pants("src/python/twitter/common"),
   ]
 )
 

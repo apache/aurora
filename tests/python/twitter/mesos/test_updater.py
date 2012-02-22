@@ -49,7 +49,7 @@ class UpdaterTest(unittest.TestCase):
     self._scheduler.expect_rollbackShards('mesos', 'sathya', shard_ids, 'test_update')
 
   def expect_get_statuses(self, num_calls, statuses):
-    for x in range(num_calls):
+    for x in range(int(num_calls)):
       self._scheduler.expect_getTasksStatus(statuses)
 
   def verify(self):
