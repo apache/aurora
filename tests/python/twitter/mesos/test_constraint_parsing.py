@@ -8,7 +8,7 @@ def test_parsing_constraints():
     'int': '2',
   }
   c = MesosConfig.constraints_to_thrift(constraints_dict).pop()
-  assert c.attribute == 'int'
+  assert c.name == 'int'
   assert c.constraint.value.negated == False
   assert c.constraint.value.values == set(['2'])
 
@@ -17,7 +17,7 @@ def test_parsing_constraints():
     '!str': '!foo',
   }
   c = MesosConfig.constraints_to_thrift(constraints_dict).pop()
-  assert c.attribute == '!str'
+  assert c.name == '!str'
   assert c.constraint.value.negated == True
   assert c.constraint.value.values == set(['foo'])
 
@@ -26,7 +26,7 @@ def test_parsing_constraints():
     'set': '1,2,3,a,b,c',
   }
   c = MesosConfig.constraints_to_thrift(constraints_dict).pop()
-  assert c.attribute == 'set'
+  assert c.name == 'set'
   assert c.constraint.value.negated == False
   assert c.constraint.value.values == set(['1', '2', '3', 'a', 'b', 'c'])
 
@@ -34,7 +34,7 @@ def test_parsing_constraints():
     '!set': '!1,2,3,a,b,c',
   }
   c = MesosConfig.constraints_to_thrift(constraints_dict).pop()
-  assert c.attribute == '!set'
+  assert c.name == '!set'
   assert c.constraint.value.negated == True
   assert c.constraint.value.values == set(['1', '2', '3', 'a', 'b', 'c'])
 
@@ -43,7 +43,7 @@ def test_parsing_constraints():
     'limit': 'limit:4',
   }
   c = MesosConfig.constraints_to_thrift(constraints_dict).pop()
-  assert c.attribute == 'limit'
+  assert c.name == 'limit'
   assert c.constraint.limitConstraint.limit == 4
 
   constraints_dict = {
