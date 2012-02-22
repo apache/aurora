@@ -28,20 +28,20 @@ class EntityParser(object):
 
 class MesosConfig(ProxyConfig):
   @staticmethod
-  def execute(filename):
+  def execute(config_file):
     """
       Execute the .mesos configuration "filename" in the context of preloaded
       library functions, e.g. mesos_include.
     """
     env = {}
-    deposit_stack = [os.path.dirname(filename)]
-    def ast_executor():
+    deposit_stack = [os.path.dirname(config_file)]
+    def ast_executor(filename):
       actual_file = os.path.join(deposit_stack[-1], filename)
       deposit_stack.append(os.path.dirname(actual_file))
       execfile(actual_file, env)
       deposit_stack.pop()
-    env.update({'mesos_include': functools.partial(ast_executor, filename)})
-    execfile(filename, env)
+    env.update({'mesos_include': lambda filename: ast_executor(filename) })
+    execfile(config_file, env)
     return env
 
   @staticmethod
