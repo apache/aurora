@@ -23,7 +23,7 @@ public interface AttributeStore {
    *
    * @param hostAttributes The attribute we are going to save.
    */
-  void saveHostAttribute(HostAttributes hostAttributes);
+  void saveHostAttributes(HostAttributes hostAttributes);
 
   /**
    * Fetches all host attributes given by the host.
@@ -31,7 +31,7 @@ public interface AttributeStore {
    * @param host the host we want to get attributes from.
    * @return return the host attributes that belong to the given host.
    */
-  Iterable<Attribute> getAttributeForHost(String host);
+  Iterable<Attribute> getHostAttributes(String host);
 
   class AttributeStoreImpl implements SnapshotStore<Set<HostAttributes>>, AttributeStore {
     private final Multimap<String, Attribute> hostAttributes;
@@ -42,18 +42,18 @@ public interface AttributeStore {
     }
 
     @Override
-    synchronized public void saveHostAttribute(HostAttributes attributes) {
+    public synchronized void saveHostAttributes(HostAttributes attributes) {
       // TODO(wfarner): If the attributes have changed, write to the log as well.
       hostAttributes.putAll(attributes.getHost(), attributes.getAttributes());
     }
 
     @Override
-    synchronized public Iterable<Attribute> getAttributeForHost(String host) {
+    public synchronized Iterable<Attribute> getHostAttributes(String host) {
       return hostAttributes.get(host);
     }
 
     @Override
-    synchronized public Set<HostAttributes> createSnapshot() {
+    public synchronized Set<HostAttributes> createSnapshot() {
       ImmutableSet.Builder<HostAttributes> builder = ImmutableSet.builder();
       for (Entry<String, Collection<Attribute>> entry : hostAttributes.asMap().entrySet()) {
         HostAttributes attributes = new HostAttributes();
@@ -65,10 +65,10 @@ public interface AttributeStore {
     }
 
     @Override
-    synchronized public void applySnapshot(Set<HostAttributes> snapshot) {
+    public synchronized void applySnapshot(Set<HostAttributes> snapshot) {
       hostAttributes.clear();
       for (HostAttributes attribute : snapshot) {
-        saveHostAttribute(attribute);
+        saveHostAttributes(attribute);
       }
     }
   }

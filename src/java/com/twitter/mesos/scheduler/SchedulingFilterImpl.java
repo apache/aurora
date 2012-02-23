@@ -174,7 +174,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
           @Override public Iterable<Optional<Veto>> apply(final StoreProvider storeProvider) {
             AttributeLoader attributeLoader = new AttributeLoader() {
               @Override public Iterable<Attribute> apply(String host) {
-                return storeProvider.getAttributeStore().getAttributeForHost(host);
+                return storeProvider.getAttributeStore().getHostAttributes(host);
               }
             };
 
@@ -234,7 +234,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   private boolean isDedicated(final String slaveHost) {
     Iterable<Attribute> slaveAttributes = storage.doInTransaction(new Quiet<Iterable<Attribute>>() {
       @Override public Iterable<Attribute> apply(final StoreProvider storeProvider) {
-        return storeProvider.getAttributeStore().getAttributeForHost(slaveHost);
+        return storeProvider.getAttributeStore().getHostAttributes(slaveHost);
       }
     });
 

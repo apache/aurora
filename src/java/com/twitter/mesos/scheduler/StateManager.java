@@ -648,7 +648,7 @@ public class StateManager {
 
     transactionalStorage.execute(new NoResult.Quiet() {
       @Override protected void execute(StoreProvider storeProvider) throws RuntimeException {
-        storeProvider.getAttributeStore().saveHostAttribute(new HostAttributes(slaveHost, attrs));
+        storeProvider.getAttributeStore().saveHostAttributes(new HostAttributes(slaveHost, attrs));
       }
     });
   }

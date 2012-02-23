@@ -195,12 +195,12 @@ public class ForwardingStore implements
   }
 
   @Override
-  public void saveHostAttribute(HostAttributes hostAttribute) {
-    attributeStore.saveHostAttribute(hostAttribute);
+  public void saveHostAttributes(HostAttributes hostAttribute) {
+    attributeStore.saveHostAttributes(hostAttribute);
   }
 
   @Override
-  public Iterable<Attribute> getAttributeForHost(String host) {
-    return attributeStore.getAttributeForHost(host);
+  public Iterable<Attribute> getHostAttributes(String host) {
+    return attributeStore.getHostAttributes(host);
   }
 }

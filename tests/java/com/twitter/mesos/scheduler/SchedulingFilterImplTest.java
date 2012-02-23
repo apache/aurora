@@ -1,7 +1,6 @@
 package com.twitter.mesos.scheduler;
 
 import java.util.Arrays;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.base.Optional;
@@ -21,7 +20,6 @@ import com.twitter.common.quantity.Data;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
-import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Attribute;
 import com.twitter.mesos.gen.Constraint;
 import com.twitter.mesos.gen.Identity;
@@ -35,7 +33,6 @@ import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.storage.AttributeStore;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
-import com.twitter.mesos.scheduler.storage.Storage.Work;
 import com.twitter.mesos.scheduler.storage.Storage.Work.Quiet;
 import com.twitter.mesos.scheduler.storage.TaskStore;
 
@@ -416,7 +413,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   private IExpectationSetters<Iterable<Attribute>> expectGetHostAttributes(String host,
       Attribute... attributes) {
 
-    return expect(attributeStore.getAttributeForHost(host)).andReturn(Arrays.asList(attributes));
+    return expect(attributeStore.getHostAttributes(host)).andReturn(Arrays.asList(attributes));
   }
 
   private final AtomicLong taskIdCounter = new AtomicLong();

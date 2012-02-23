@@ -170,12 +170,12 @@ public abstract class BaseTaskStoreTest<T extends TaskStore> extends TearDownTes
     Set<Attribute> attributes = new HashSet<Attribute>();
     attributes.add(makeAttribute("foo", "bar"));
     HostAttributes hostAttributes = new HostAttributes().setHost("HOST_A").setAttributes(attributes);
-    attributeStore1.saveHostAttribute(hostAttributes);
+    attributeStore1.saveHostAttributes(hostAttributes);
     assertEquals(attributeStore1.createSnapshot(), Sets.newHashSet(hostAttributes));
 
     AttributeStoreImpl attributeStore2 = new AttributeStoreImpl();
     attributeStore2.applySnapshot(attributeStore1.createSnapshot());
-    assertEquals(attributeStore2.getAttributeForHost("HOST_A"), attributes);
+    assertEquals(attributeStore2.getHostAttributes("HOST_A"), attributes);
   }
 
   private Attribute makeAttribute(String name, String v) {

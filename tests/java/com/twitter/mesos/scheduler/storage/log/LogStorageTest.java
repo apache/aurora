@@ -27,6 +27,7 @@ import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.Attribute;
 import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.Quota;
@@ -41,6 +42,7 @@ import com.twitter.mesos.gen.storage.RemoveQuota;
 import com.twitter.mesos.gen.storage.RemoveTasks;
 import com.twitter.mesos.gen.storage.SaveAcceptedJob;
 import com.twitter.mesos.gen.storage.SaveFrameworkId;
+import com.twitter.mesos.gen.storage.SaveHostAttributes;
 import com.twitter.mesos.gen.storage.SaveJobUpdate;
 import com.twitter.mesos.gen.storage.SaveQuota;
 import com.twitter.mesos.gen.storage.SaveTasks;
@@ -393,7 +395,8 @@ public class LogStorageTest extends EasyMockTest {
           @Override protected void execute(StoreProvider storeProvider) {
             assertEquals(mutated, storeProvider.getTaskStore().mutateTasks(query, mutation));
             logStorage.doInTransaction(new Work.NoResult.Quiet() {
-              @Override protected void execute(StoreProvider storeProvider) {
+              @Override
+              protected void execute(StoreProvider storeProvider) {
                 storeProvider.getTaskStore().removeTasks(tasksToRemove);
               }
             });
@@ -469,7 +472,8 @@ public class LogStorageTest extends EasyMockTest {
 
       @Override protected void performMutations() {
         logStorage.doInTransaction(new Work.NoResult.Quiet() {
-          @Override protected void execute(StoreProvider storeProvider) {
+          @Override
+          protected void execute(StoreProvider storeProvider) {
             logStorage.saveTasks(saved);
             assertEquals(mutated, logStorage.mutateTasks(query, mutation));
           }
@@ -586,6 +590,36 @@ public class LogStorageTest extends EasyMockTest {
 
       @Override protected void performMutations() {
         logStorage.removeQuota(role);
+      }
+    }.runTest();
+  }
+
+  @Test
+  public void testSaveHostAttributes() throws Exception {
+    final String host = "hostname";
+    final Set<Attribute> attributes =
+        ImmutableSet.of(new Attribute().setName("attr").setValues(ImmutableSet.of("value")));
+    final HostAttributes hostAttributes = new HostAttributes()
+        .setHost(host)
+        .setAttributes(attributes);
+
+    new MutationFixture() {
+      @Override protected void setupExpectations() throws Exception {
+        expect(attributeStore.getHostAttributes(host)).andReturn(ImmutableList.<Attribute>of());
+        expectStorageTransactionNoResult();
+        attributeStore.saveHostAttributes(hostAttributes);
+        expect(attributeStore.getHostAttributes(host)).andReturn(attributes);
+        expectStreamTransaction(Op.saveHostAttributes(new SaveHostAttributes(hostAttributes)));
+        expectStorageTransactionNoResult();
+        expect(attributeStore.getHostAttributes(host)).andReturn(attributes);
+        expect(attributeStore.getHostAttributes(host)).andReturn(attributes);
+      }
+
+      @Override protected void performMutations() {
+        logStorage.saveHostAttributes(hostAttributes);
+        assertEquals(attributes, logStorage.getHostAttributes(host));
+        logStorage.saveHostAttributes(hostAttributes);
+        assertEquals(attributes, logStorage.getHostAttributes(host));
       }
     }.runTest();
   }

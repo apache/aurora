@@ -28,6 +28,7 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
+import com.twitter.mesos.gen.Attribute;
 import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.Quota;
@@ -346,7 +347,7 @@ public class LogStorage extends ForwardingStore {
         break;
 
       case SAVE_HOST_ATTRIBUTES:
-        saveHostAttribute(op.getSaveHostAttributes().hostAttributes);
+        saveHostAttributes(op.getSaveHostAttributes().hostAttributes);
         break;
 
       default:
@@ -582,14 +583,17 @@ public class LogStorage extends ForwardingStore {
     });
   }
 
-
   @Timed("scheduler_save_host_attribute")
   @Override
-  public void saveHostAttribute(final HostAttributes hostAttributes) {
-        doInTransaction(new Work.NoResult.Quiet() {
+  public void saveHostAttributes(final HostAttributes hostAttributes) {
+    doInTransaction(new Work.NoResult.Quiet() {
       @Override protected void execute(StoreProvider unused) {
-        log(Op.saveHostAttributes(new SaveHostAttributes(hostAttributes)));
-        LogStorage.super.saveHostAttribute(hostAttributes);
+        Set<Attribute> savedAttributes =
+            ImmutableSet.copyOf(LogStorage.super.getHostAttributes(hostAttributes.getHost()));
+        if (!savedAttributes.equals(hostAttributes.getAttributes())) {
+          log(Op.saveHostAttributes(new SaveHostAttributes(hostAttributes)));
+          LogStorage.super.saveHostAttributes(hostAttributes);
+        }
       }
     });
   }
