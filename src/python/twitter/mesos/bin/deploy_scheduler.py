@@ -23,7 +23,9 @@ TEST_TARGETS = ['tests/java/com/twitter/mesos:all-tests!']
 BUILD_TARGET_CMDS = [
   './pants src/java/com/twitter/mesos/scheduler! zip',
   './pants src/java/com/twitter/mesos/executor! zip',
-  './pants src/python/twitter/mesos:process_scraper!'
+  './pants src/python/twitter/mesos:process_scraper',
+  './pants src/python/twitter/mesos/executor:thermos_executor',
+  './pants src/python/twitter/mesos/executor:gc_executor',
 ]
 
 STAGE_DIR = '~/release_staging'
@@ -40,6 +42,8 @@ HDFS_BIN_FILES = {
   'mesos/scripts/executor.sh': '%s/$cluster/$dc-$cluster-executor.sh' % HDFS_BIN_DIR,
   'dist/mesos-executor.zip':  '%s/$cluster/mesos-executor.zip' % HDFS_BIN_DIR,
   'dist/process_scraper.pex':  '%s/$cluster/process_scraper.pex' % HDFS_BIN_DIR,
+  'dist/thermos_executor.pex':  '%s/$cluster/thermos_executor.pex' % HDFS_BIN_DIR,
+  'dist/gc_executor.pex':  '%s/$cluster/gc_executor.pex' % HDFS_BIN_DIR,
 }
 
 MESOS_HOME = '/usr/local/mesos'

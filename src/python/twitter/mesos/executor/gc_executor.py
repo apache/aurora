@@ -1,5 +1,5 @@
-# mesos
 import mesos
+import os
 
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
@@ -45,7 +45,10 @@ class ThermosGCExecutor(ThermosExecutorBase):
       logger    = self.log
     )
     self._task_runner_factory = task_runner_factory
-    self._checkpoint_root = checkpoint_root or app.get_options().checkpoint_root
+    if 'ANGRYBIRD_HOME' in os.environ:
+      self._checkpoint_root = os.path.join(os.environ['ANGRYBIRD_HOME'], 'logs/thermos/run')
+    else:
+      self._checkpoint_root = checkpoint_root or app.get_options().checkpoint_root
 
   def reconcile_states(self, driver, retained_tasks):
     self.log('Told to retain the following task ids:')
