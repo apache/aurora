@@ -20,7 +20,6 @@ import org.apache.mesos.Protos.TaskStatus;
 
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.stats.Stats;
-import com.twitter.mesos.Message;
 import com.twitter.mesos.StateTranslator;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;

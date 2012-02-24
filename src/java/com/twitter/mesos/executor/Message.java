@@ -1,10 +1,10 @@
-package com.twitter.mesos;
+package com.twitter.mesos.executor;
 
 import javax.annotation.Nullable;
 
 import com.google.common.base.Preconditions;
 
-import org.apache.thrift.TBase;
+import com.twitter.mesos.gen.comm.SchedulerMessage;
 
 /**
  * A message in the mesos system, between a scheduler and executor.
@@ -13,13 +13,13 @@ import org.apache.thrift.TBase;
  */
 public class Message {
   private final String slaveId;
-  private final TBase message;
+  private final SchedulerMessage message;
 
-  public Message(TBase message) {
+  public Message(SchedulerMessage message) {
     this(null, message);
   }
 
-  public Message(@Nullable String slaveId, TBase message) {
+  public Message(@Nullable String slaveId, SchedulerMessage message) {
     this.slaveId = slaveId;
     this.message = Preconditions.checkNotNull(message);
   }
@@ -28,7 +28,7 @@ public class Message {
     return slaveId;
   }
 
-  public TBase getMessage() {
+  public SchedulerMessage getMessage() {
     return message;
   }
 

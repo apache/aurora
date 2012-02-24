@@ -49,7 +49,6 @@ import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
-import com.twitter.mesos.Message;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
 import com.twitter.mesos.executor.ProcessKiller.KillException;
@@ -58,6 +57,7 @@ import com.twitter.mesos.executor.Task.TaskRunException;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.comm.DeletedTasks;
+import com.twitter.mesos.gen.comm.SchedulerMessage;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
@@ -304,7 +304,7 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
     }
 
     if (!deletedTasks.isEmpty()) {
-      driver.apply(new Message(new DeletedTasks(deletedTasks)));
+      driver.apply(new Message(SchedulerMessage.deletedTasks(new DeletedTasks(deletedTasks))));
     }
   }
 

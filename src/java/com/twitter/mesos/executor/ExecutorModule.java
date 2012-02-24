@@ -37,7 +37,6 @@ import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common_internal.util.HdfsUtils;
-import com.twitter.mesos.Message;
 import com.twitter.mesos.executor.Driver.DriverImpl;
 import com.twitter.mesos.executor.FileCopier.HdfsFileCopier;
 import com.twitter.mesos.executor.FileDeleter.FileDeleterImpl;
