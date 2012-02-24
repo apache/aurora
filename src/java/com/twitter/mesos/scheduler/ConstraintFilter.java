@@ -1,15 +1,15 @@
 package com.twitter.mesos.scheduler;
 
 import java.util.Collection;
+import java.util.Set;
 import java.util.logging.Logger;
-
-import javax.annotation.Nullable;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Supplier;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
 import com.twitter.mesos.gen.Attribute;
@@ -73,26 +73,25 @@ class ConstraintFilter implements Function<Constraint, Optional<Veto>> {
 
   @Override
   public Optional<Veto> apply(Constraint constraint) {
-    Predicate<Attribute> matchName = new NameFilter(constraint.getName());
-    @Nullable Attribute attribute =
-        Iterables.getOnlyElement(Iterables.filter(hostAttributes, matchName), null);
+    Set<Attribute> attributes =
+        ImmutableSet.copyOf(Iterables.filter(hostAttributes, new NameFilter(constraint.getName())));
 
     TaskConstraint taskConstraint = constraint.getConstraint();
     switch (taskConstraint.getSetField()) {
       case VALUE:
         boolean matches =
-            AttributeFilter.matches(Optional.fromNullable(attribute), taskConstraint.getValue());
+            AttributeFilter.matches(attributes, taskConstraint.getValue());
         return matches
             ? Optional.<Veto>absent()
             : Optional.of(unsatisfiedValueVeto(constraint.getName()));
 
       case LIMIT:
-        if (attribute == null) {
+        if (attributes.isEmpty()) {
           return Optional.of(missingLimitVeto(constraint.getName()));
         }
 
         boolean satisfied = AttributeFilter.matches(
-            attribute,
+            attributes,
             jobKey,
             taskConstraint.getLimit().getLimit(),
             activeTasksSupplier.get(),

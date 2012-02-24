@@ -1,6 +1,7 @@
 package com.twitter.mesos.scheduler;
 
 import java.util.Arrays;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.base.Optional;
@@ -52,7 +53,6 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 /**
  * @author William Farner
@@ -79,6 +79,10 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   private static final String ROLE_B = "roleB";
   private static final String USER_B = "userB";
   private static final Identity OWNER_B = new Identity(ROLE_B, USER_B);
+
+  private static final String ROLE_C = "roleC";
+  private static final String USER_C = "userC";
+  private static final Identity OWNER_C = new Identity(ROLE_C, USER_C);
 
   private static final int DEFAULT_CPUS = 4;
   private static final long DEFAULT_RAM = 1000;
@@ -120,10 +124,8 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   public void testMeetsOffer() throws Exception {
     control.replay();
 
-    assertThat(defaultFilter.filter(DEFAULT_OFFER, Optional.<String>absent(),
-        makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)).isEmpty(), is(true));
-    assertThat(defaultFilter.filter(DEFAULT_OFFER, Optional.<String>absent(),
-        makeTask(DEFAULT_CPUS - 1, DEFAULT_RAM - 1, DEFAULT_DISK - 1)).isEmpty(), is(true));
+    assertNoVetoes(makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK));
+    assertNoVetoes(makeTask(DEFAULT_CPUS - 1, DEFAULT_RAM - 1, DEFAULT_DISK - 1));
   }
 
   @Test
@@ -141,6 +143,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         .setRequestedPorts(ImmutableSet.of("one", "two"));
     TwitterTaskInfo threePortTask = makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
         .setRequestedPorts(ImmutableSet.of("one", "two", "three"));
+
     assertTrue(defaultFilter.filter(twoPorts, Optional.<String>absent(), noPortTask).isEmpty());
     assertTrue(defaultFilter.filter(twoPorts, Optional.<String>absent(), onePortTask).isEmpty());
     assertTrue(defaultFilter.filter(twoPorts, Optional.<String>absent(), twoPortTask).isEmpty());
@@ -152,18 +155,11 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   public void testInsufficientResources() throws Exception {
     control.replay();
 
-    assertEquals(ImmutableSet.of(CPU_VETO, DISK_VETO, RAM_VETO),
-        defaultFilter.filter(DEFAULT_OFFER, Optional.<String>absent(),
-            makeTask(DEFAULT_CPUS + 1, DEFAULT_RAM + 1, DEFAULT_DISK + 1)));
-    assertEquals(ImmutableSet.of(CPU_VETO),
-        defaultFilter.filter(DEFAULT_OFFER, Optional.<String>absent(),
-            makeTask(DEFAULT_CPUS + 1, DEFAULT_RAM, DEFAULT_DISK)));
-    assertEquals(ImmutableSet.of(RAM_VETO),
-        defaultFilter.filter(DEFAULT_OFFER, Optional.<String>absent(),
-            makeTask(DEFAULT_CPUS, DEFAULT_RAM + 1, DEFAULT_DISK)));
-    assertEquals(ImmutableSet.of(DISK_VETO),
-        defaultFilter.filter(DEFAULT_OFFER, Optional.<String>absent(),
-            makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK + 1)));
+    assertVetoes(makeTask(DEFAULT_CPUS + 1, DEFAULT_RAM + 1, DEFAULT_DISK + 1),
+        CPU_VETO, DISK_VETO, RAM_VETO);
+    assertVetoes(makeTask(DEFAULT_CPUS + 1, DEFAULT_RAM, DEFAULT_DISK), CPU_VETO);
+    assertVetoes(makeTask(DEFAULT_CPUS, DEFAULT_RAM + 1, DEFAULT_DISK), RAM_VETO);
+    assertVetoes(makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK + 1), DISK_VETO);
   }
 
   @Test
@@ -223,21 +219,31 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         is(true));
     assertEquals(ImmutableSet.of(RESTRICTED_JOB_VETO),
         filterBuilder.filter(DEFAULT_OFFER, Optional.of(HOST_A),
-        makeTask(OWNER_A, JOB_A, DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)));
+            makeTask(OWNER_A, JOB_A, DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)));
   }
 
   @Test
   public void testDedicatedRole() throws Exception {
-    expectGetHostAttributes(HOST_A, dedicated(ROLE_A));
-    expectGetHostAttributes(HOST_A, dedicated(ROLE_A));
+    expectGetHostAttributes(HOST_A, dedicated(ROLE_A)).anyTimes();
 
     control.replay();
 
-    assertThat(defaultFilter.filter(DEFAULT_OFFER, Optional.of(HOST_A),
-        makeTask(OWNER_A, JOB_B, new Constraint(DEDICATED_ATTRIBUTE, TaskConstraint.value(
-            new ValueConstraint(false, ImmutableSet.<String>of(ROLE_A)))))).isEmpty(), is(true));
-    assertEquals(ImmutableSet.of(DEDICATED_HOST_VETO),
-        defaultFilter.filter(DEFAULT_OFFER, Optional.of(HOST_A), makeTask(OWNER_B, JOB_B)));
+    checkConstraint(HOST_A, DEDICATED_ATTRIBUTE, true, ROLE_A);
+    assertVetoes(makeTask(OWNER_B, JOB_B), HOST_A, DEDICATED_HOST_VETO);
+  }
+
+  @Test
+  public void testMultiValuedAttributes() throws Exception {
+    expectGetHostAttributes(HOST_A, valueAttribute("jvm", "1.0", "2.0", "3.0")).anyTimes();
+    expectGetHostAttributes(HOST_B, valueAttribute("jvm", "1.0")).anyTimes();
+
+    control.replay();
+
+    checkConstraint(HOST_A, "jvm", true, "1.0");
+    checkConstraint(HOST_A, "jvm", false, "4.0");
+
+    checkConstraint(HOST_A, "jvm", true, "1.0", "2.0");
+    checkConstraint(HOST_B, "jvm", false, "2.0", "3.0");
   }
 
   @Test
@@ -248,8 +254,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertTrue(
-        defaultFilter.filter(DEFAULT_OFFER, Optional.of(HOST_A), hostLimitTask(2)).isEmpty());
+    assertNoVetoes(hostLimitTask(2), HOST_A);
   }
 
   private Attribute host(String host) {
@@ -282,34 +287,19 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertTrue(defaultFilter.filter(DEFAULT_OFFER, Optional.of(HOST_A),
-        hostLimitTask(OWNER_A, JOB_A, 2)).isEmpty());
+    assertNoVetoes(hostLimitTask(OWNER_A, JOB_A, 2), HOST_A);
+    assertVetoes(hostLimitTask(OWNER_A, JOB_A, 1), HOST_B, unsatisfiedLimitVeto(HOST_ATTRIBUTE));
+    assertVetoes(hostLimitTask(OWNER_A, JOB_A, 2), HOST_B, unsatisfiedLimitVeto(HOST_ATTRIBUTE));
+    assertNoVetoes(hostLimitTask(OWNER_A, JOB_A, 3), HOST_B);
 
-    assertEquals(ImmutableSet.<Veto>of(unsatisfiedLimitVeto(HOST_ATTRIBUTE)),
-        defaultFilter.filter(DEFAULT_OFFER, Optional.of(HOST_B),
-            hostLimitTask(OWNER_A, JOB_A, 1)));
-    assertEquals(ImmutableSet.<Veto>of(unsatisfiedLimitVeto(HOST_ATTRIBUTE)),
-        defaultFilter.filter(DEFAULT_OFFER, Optional.of(HOST_B),
-            hostLimitTask(OWNER_A, JOB_A, 2)));
-    assertTrue(defaultFilter.filter(DEFAULT_OFFER, Optional.of(HOST_B),
-        hostLimitTask(OWNER_A, JOB_A, 3)).isEmpty());
+    assertVetoes(rackLimitTask(OWNER_B, JOB_A, 2), HOST_B, unsatisfiedLimitVeto(RACK_ATTRIBUTE));
+    assertVetoes(rackLimitTask(OWNER_B, JOB_A, 3), HOST_B, unsatisfiedLimitVeto(RACK_ATTRIBUTE));
+    assertNoVetoes(rackLimitTask(OWNER_B, JOB_A, 4), HOST_B);
 
-    assertEquals(ImmutableSet.<Veto>of(unsatisfiedLimitVeto(RACK_ATTRIBUTE)),
-        defaultFilter.filter(DEFAULT_OFFER, Optional.of(HOST_B),
-            rackLimitTask(OWNER_B, JOB_A, 2)));
-    assertEquals(ImmutableSet.<Veto>of(unsatisfiedLimitVeto(RACK_ATTRIBUTE)),
-        defaultFilter.filter(DEFAULT_OFFER, Optional.of(HOST_B),
-            rackLimitTask(OWNER_B, JOB_A, 3)));
-    assertTrue(defaultFilter.filter(DEFAULT_OFFER, Optional.of(HOST_B),
-        rackLimitTask(OWNER_B, JOB_A, 4)).isEmpty());
+    assertNoVetoes(rackLimitTask(OWNER_B, JOB_A, 1), HOST_C);
 
-    assertTrue(defaultFilter.filter(DEFAULT_OFFER, Optional.of(HOST_C),
-        rackLimitTask(OWNER_B, JOB_A, 1)).isEmpty());
-
-    assertEquals(ImmutableSet.<Veto>of(unsatisfiedLimitVeto(RACK_ATTRIBUTE)),
-        defaultFilter.filter(DEFAULT_OFFER, Optional.of(HOST_C), rackLimitTask(OWNER_A, JOB_A, 1)));
-    assertTrue(defaultFilter.filter(DEFAULT_OFFER, Optional.of(HOST_C),
-        rackLimitTask(OWNER_B, JOB_A, 2)).isEmpty());
+    assertVetoes(rackLimitTask(OWNER_A, JOB_A, 1), HOST_C, unsatisfiedLimitVeto(RACK_ATTRIBUTE));
+    assertNoVetoes(rackLimitTask(OWNER_B, JOB_A, 2), HOST_C);
   }
 
   @Test
@@ -371,9 +361,8 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     jvmNegated.getConstraint().getValue().setNegated(true);
     Constraint zoneNegated = jvmConstraint.deepCopy();
     zoneNegated.getConstraint().getValue().setNegated(true);
-    assertEquals(ImmutableSet.<Veto>of(unsatisfiedValueVeto("jvm")),
-        defaultFilter.filter(DEFAULT_OFFER, Optional.of(HOST_A),
-            makeTask(OWNER_A, JOB_A, jvmNegated, zoneNegated)));
+    assertVetoes(makeTask(OWNER_A, JOB_A, jvmNegated, zoneNegated), HOST_A,
+        unsatisfiedValueVeto("jvm"));
   }
 
   private void checkConstraint(String host, String constraintName,
@@ -401,6 +390,23 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         makeTask(owner, jobName, negated)).isEmpty(), is(!expected));
   }
 
+  private void assertNoVetoes(TwitterTaskInfo task) {
+    assertNoVetoes(task, null);
+  }
+
+  private void assertNoVetoes(TwitterTaskInfo task, String host) {
+    assertVetoes(task, host);
+  }
+
+  private void assertVetoes(TwitterTaskInfo task, Veto... vetos) {
+    assertVetoes(task, null, vetos);
+  }
+
+  private void assertVetoes(TwitterTaskInfo task, String host, Veto... vetoes) {
+    assertEquals(ImmutableSet.copyOf(vetoes), defaultFilter.filter(
+        DEFAULT_OFFER, host == null ? Optional.<String>absent() : Optional.of(host), task));
+  }
+
   private Attribute valueAttribute(String name, String string, String... strings) {
     return new Attribute(name,
         ImmutableSet.<String>builder().add(string).addAll(Arrays.asList(strings)).build());
@@ -412,7 +418,6 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
   private IExpectationSetters<Iterable<Attribute>> expectGetHostAttributes(String host,
       Attribute... attributes) {
-
     return expect(attributeStore.getHostAttributes(host)).andReturn(Arrays.asList(attributes));
   }
 
@@ -431,7 +436,6 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   }
 
   private TwitterTaskInfo makeTask(Identity owner, String jobName, Constraint... constraint) {
-
     return makeTask(OWNER_A, JOB_A, DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
         .setOwner(owner)
         .setJobName(jobName)
