@@ -120,6 +120,11 @@ public class DiskGarbageCollector implements Runnable {
         ImmutableSet.Builder<File> deletedBuilder = ImmutableSet.builder();
 
         long bytesReclaimed = 0;
+
+        // We sort the file names here to ensure that the ordering is guaranteed.  This is baking
+        // outside knowledge about how task IDs (and their sandbox directories) are crafted,
+        // but since this code is planned for replacement in the very near term, this is considered
+        // acceptable.
         for (File file : Ordering.natural().onResultOf(FILE_NAME).sortedCopy(files)) {
           if (bytesReclaimed >= bytesToReclaim) {
             break;
