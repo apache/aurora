@@ -21,10 +21,8 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.testing.EasyMockTest;
 
-import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
-import static org.easymock.EasyMock.or;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 
@@ -48,9 +46,9 @@ public class DiskGarbageCollectorTest extends EasyMockTest {
   public void setUp() {
     root = Files.createTempDir();
 
-    fileA = new File(root, "a");
-    fileB = new File(root, "b");
-    fileC = new File(root, "c");
+    fileA = new File(root, "1-foo");
+    fileB = new File(root, "2-foo");
+    fileC = new File(root, "3-foo");
 
     fileFilter = createMock(FileFilter.class);
     gcCallback = createMock(new Clazz<Closure<Set<File>>>() {});
@@ -83,8 +81,7 @@ public class DiskGarbageCollectorTest extends EasyMockTest {
     expect(fileFilter.accept(fileA)).andReturn(true);
     expect(fileFilter.accept(fileB)).andReturn(true);
     expect(fileFilter.accept(fileC)).andReturn(true);
-    gcCallback.execute(
-        or(eq(ImmutableSet.of(fileA)), or(eq(ImmutableSet.of(fileB)), eq(ImmutableSet.of(fileC)))));
+    gcCallback.execute(ImmutableSet.of(fileA));
 
     control.replay();
 

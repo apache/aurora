@@ -10,7 +10,9 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.google.common.base.Function;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Ordering;
 
 import org.apache.commons.io.FileUtils;
 
@@ -86,6 +88,12 @@ public class DiskGarbageCollector implements Runnable {
     return NO_FILES;
   }
 
+  private static final Function<File, String> FILE_NAME = new Function<File, String>() {
+    @Override public String apply(File file) {
+      return file.getName();
+    }
+  };
+
   @Override
   public void run() {
     try {
@@ -112,7 +120,7 @@ public class DiskGarbageCollector implements Runnable {
         ImmutableSet.Builder<File> deletedBuilder = ImmutableSet.builder();
 
         long bytesReclaimed = 0;
-        for (File file : files) {
+        for (File file : Ordering.natural().onResultOf(FILE_NAME).sortedCopy(files)) {
           if (bytesReclaimed >= bytesToReclaim) {
             break;
           }
