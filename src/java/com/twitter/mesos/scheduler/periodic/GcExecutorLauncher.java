@@ -103,8 +103,8 @@ public class GcExecutorLauncher implements TaskLauncher {
         Predicates.compose(Predicates.equalTo(host), TASK_TO_HOST);
     Set<ScheduledTask> hostPruned = ImmutableSet.copyOf(Iterables.filter(prunedTasks, sameHost));
     Map<String, ScheduledTask> hostPrunedById = Maps.uniqueIndex(hostPruned, Tasks.SCHEDULED_TO_ID);
-
-    Set<ScheduledTask> onHost = stateManager.fetchTasks(HistoryPruneRunner.hostQuery(host));
+    Set<ScheduledTask> onHost = ImmutableSet.copyOf(Iterables.filter(
+        stateManager.fetchTasks(HistoryPruneRunner.hostQuery(host)), IS_THERMOS));
 
     AdjustRetainedTasks message = retainedTasksMessage(onHost, hostPruned);
     byte[] data;

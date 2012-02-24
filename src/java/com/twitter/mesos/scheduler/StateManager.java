@@ -719,7 +719,8 @@ public class StateManager {
    * @param newState State to move the resulting tasks into.
    * @return the number of successful state changes.
    */
-  synchronized int changeState(Query taskQuery, ScheduleStatus newState) {
+  @VisibleForTesting
+  public synchronized int changeState(Query taskQuery, ScheduleStatus newState) {
     return changeState(taskQuery, stateUpdater(newState));
   }
 
