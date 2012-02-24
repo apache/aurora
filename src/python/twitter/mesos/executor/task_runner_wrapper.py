@@ -154,7 +154,7 @@ class ProductionTaskRunner(TaskRunnerWrapper):
   SVN_PATH = '/science-binaries/home/thermos'
 
   def __init__(self, task_id, mesos_task, *args, **kwargs):
-    TaskRunnerWrapper.__init__(self, task_id, *args, **kwargs)
+    TaskRunnerWrapper.__init__(self, task_id, mesos_task, *args, **kwargs)
     self._runner_pex = MirrorFile(
       ProductionTaskRunner.SVN_REPO,
       os.path.join(ProductionTaskRunner.SVN_PATH, TaskRunnerWrapper.PEX_NAME),

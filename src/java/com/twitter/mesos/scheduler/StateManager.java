@@ -88,7 +88,7 @@ public class StateManager {
   @CmdLine(name = "missing_task_grace_period",
       help = "The amount of time after which to treat an ASSIGNED task as LOST.")
   static final Arg<Amount<Long, Time>> MISSING_TASK_GRACE_PERIOD =
-      Arg.create(Amount.of(1L, Time.MINUTES));
+      Arg.create(Amount.of(5L, Time.MINUTES));
 
   // State of the manager instance.
   private enum State {

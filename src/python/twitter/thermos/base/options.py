@@ -22,7 +22,7 @@ def add_port_to(option_name):
 def add_binding_to(option_name):
   def add_binding_callback(option, opt, value, parser):
     if not getattr(parser.values, option_name, None):
-      setattr(parse.values, option_name, [])
+      setattr(parser.values, option_name, [])
     if len(value.split('=')) != 2:
       raise ParseError('Binding must be of the form NAME=VALUE')
     name, value = value.split('=')
