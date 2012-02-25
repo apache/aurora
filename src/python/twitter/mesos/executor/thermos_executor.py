@@ -57,6 +57,8 @@ class ExecutorPollingThread(threading.Thread):
     while self._runner.is_alive():
       time.sleep(ExecutorPollingThread.POLL_WAIT.as_(Time.SECONDS))
 
+    log.info('Executor polling thread got runner termination signal.')
+
     # TODO(wickman) MESOS-438
     #
     # There is a legit race condition here.  If we catch the is_alive latch
@@ -72,24 +74,32 @@ class ExecutorPollingThread(threading.Thread):
     #       limit before going with route #1.
     wait_limit = ExecutorPollingThread.WAIT_LIMIT
     while wait_limit > Amount(0, Time.SECONDS):
-      if ThermosExecutor.thermos_status_is_terminal(self._runner.task_state()):
+      current_state = self._runner.task_state()
+      log.info('Waiting for terminal state, current state: %s' %
+        TaskState._VALUES_TO_NAMES.get(current_state, '(unknown)'))
+      if ThermosExecutor.thermos_status_is_terminal(current_state):
+        log.info('Terminal reached, breaking')
         break
       time.sleep(ExecutorPollingThread.POLL_WAIT.as_(Time.SECONDS))
       wait_limit -= ExecutorPollingThread.POLL_WAIT
 
     last_state = self._runner.task_state()
+    log.info("State we've accepted: %s" % TaskState._VALUES_TO_NAMES.get(last_state, '(unknown)'))
     finish_state = None
     if last_state == TaskState.ACTIVE:
       log.error("Runner is dead but task state unexpectedly ACTIVE!")
       self._runner.quitquitquit()
       finish_state = mesos_pb.TASK_LOST
+      log.info('Sending LOST')
     elif last_state == TaskState.SUCCESS:
       finish_state = mesos_pb.TASK_FINISHED
+      log.info('Sending FINISHED')
     elif last_state == TaskState.FAILED:
       finish_state = mesos_pb.TASK_FAILED
+      log.info('Sending FAILED')
     elif last_state == TaskState.KILLED:
-      log.warning("Task was KILLED!")
       finish_state = mesos_pb.TASK_KILLED
+      log.info('Sending KILLED')
     else:
       log.error("Unknown task state! %s" % TaskState._VALUES_TO_NAMES.get(last_state, '(unknown)'))
       finish_state = mesos_pb.TASK_FAILED
@@ -192,6 +202,8 @@ class ThermosExecutor(ThermosExecutorBase):
       return
     log.info('Issuing kills.')
     self._runner.kill()
+    self._runner.quitquitquit()
+
 
   def shutdown(self, driver):
     self.log('shutdown()')
