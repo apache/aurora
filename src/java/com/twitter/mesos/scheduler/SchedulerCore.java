@@ -11,6 +11,7 @@ import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
@@ -36,7 +37,8 @@ import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
  *
  * @author William Farner
  */
-public interface SchedulerCore extends Function<Query, Iterable<TwitterTaskInfo>> , TaskLauncher {
+public interface SchedulerCore
+    extends Function<TaskQuery, Iterable<TwitterTaskInfo>>, TaskLauncher {
 
   /**
    * Prompts the scheduler to prepare for possible activation as the leading scheduler.  This
@@ -72,7 +74,7 @@ public interface SchedulerCore extends Function<Query, Iterable<TwitterTaskInfo>
    * @param query The query to identify tasks.
    * @return A set of task objects.
    */
-  Set<ScheduledTask> getTasks(Query query);
+  Set<ScheduledTask> getTasks(TaskQuery query);
 
   /**
    * Creates a new job, whose tasks will become candidates for scheduling.
@@ -161,7 +163,7 @@ public interface SchedulerCore extends Function<Query, Iterable<TwitterTaskInfo>
    * @param status The new state of the tasks.
    * @param message Additional information about the state transition.
    */
-  void setTaskStatus(Query query, ScheduleStatus status, @Nullable String message);
+  void setTaskStatus(TaskQuery query, ScheduleStatus status, @Nullable String message);
 
   /**
    * Kills a specific set of tasks.
@@ -170,7 +172,7 @@ public interface SchedulerCore extends Function<Query, Iterable<TwitterTaskInfo>
    * @param user Name of the user performing the kill.
    * @throws ScheduleException If a problem occurs with the kill request.
    */
-  void killTasks(Query query, String user) throws ScheduleException;
+  void killTasks(TaskQuery query, String user) throws ScheduleException;
 
   /**
    * Preempts a task in favor of another.

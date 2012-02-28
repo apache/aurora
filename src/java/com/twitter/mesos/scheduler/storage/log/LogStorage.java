@@ -33,6 +33,7 @@ import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.storage.LogEntry;
 import com.twitter.mesos.gen.storage.Op;
 import com.twitter.mesos.gen.storage.RemoveJob;
@@ -47,7 +48,6 @@ import com.twitter.mesos.gen.storage.SaveQuota;
 import com.twitter.mesos.gen.storage.SaveTasks;
 import com.twitter.mesos.gen.storage.Snapshot;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
-import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerException;
 import com.twitter.mesos.scheduler.log.Log.Stream.InvalidPositionException;
 import com.twitter.mesos.scheduler.log.Log.Stream.StreamAccessException;
@@ -499,7 +499,7 @@ public class LogStorage extends ForwardingStore {
   }
 
   @Override
-  public void removeTasks(final Query query) {
+  public void removeTasks(final TaskQuery query) {
     doInTransaction(new Work.NoResult.Quiet() {
       @Override protected void execute(StoreProvider storeProvider) {
         // TODO(John Sirois): this forces an id fetch whereas DbStorage skips a fetch when it can
@@ -522,7 +522,7 @@ public class LogStorage extends ForwardingStore {
 
   @Timed("scheduler_log_tasks_mutate")
   @Override
-  public ImmutableSet<ScheduledTask> mutateTasks(final Query query,
+  public ImmutableSet<ScheduledTask> mutateTasks(final TaskQuery query,
       final Closure<ScheduledTask> mutator) {
     return doInTransaction(new Work.Quiet<ImmutableSet<ScheduledTask>>() {
       @Override public ImmutableSet<ScheduledTask> apply(StoreProvider unused) {

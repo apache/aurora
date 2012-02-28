@@ -518,16 +518,12 @@ public class DbStorage implements
 
   @Timed("db_storage_remove_tasks")
   @Override
-  public void removeTasks(final Query query) {
+  public void removeTasks(final TaskQuery query) {
     checkNotNull(query);
 
     transactionTemplate.execute(new TransactionCallbackWithoutResult() {
       @Override protected void doInTransactionWithoutResult(TransactionStatus status) {
-        if (query.hasPostFilter()) {
-          removeTasks(fetchTaskIds(query));
-        } else {
-          remove(createWhereClause(query));
-        }
+        remove(createWhereClause(query));
       }
     });
   }
@@ -782,7 +778,7 @@ public class DbStorage implements
 
   @Timed("db_storage_mutate_tasks")
   @Override
-  public ImmutableSet<ScheduledTask> mutateTasks(final Query query,
+  public ImmutableSet<ScheduledTask> mutateTasks(final TaskQuery query,
       final Closure<ScheduledTask> mutator) {
 
     checkNotNull(query);
@@ -795,7 +791,7 @@ public class DbStorage implements
     });
   }
 
-  private ImmutableSet<ScheduledTask> doMutate(Query query, Closure<ScheduledTask> mutator) {
+  private ImmutableSet<ScheduledTask> doMutate(TaskQuery query, Closure<ScheduledTask> mutator) {
     ImmutableSet<ScheduledTask> taskStates = fetchTasks(query);
 
     ImmutableSet.Builder<ScheduledTask> tasksToUpdateBuilder = ImmutableSet.builder();
@@ -844,7 +840,7 @@ public class DbStorage implements
 
   @Timed("db_storage_fetch_tasks")
   @Override
-  public ImmutableSet<ScheduledTask> fetchTasks(final Query query) {
+  public ImmutableSet<ScheduledTask> fetchTasks(final TaskQuery query) {
     checkNotNull(query);
 
     ImmutableSet<ScheduledTask> fetched =
@@ -859,7 +855,7 @@ public class DbStorage implements
 
   @Timed("db_storage_fetch_task_ids")
   @Override
-  public Set<String> fetchTaskIds(final Query query) {
+  public Set<String> fetchTaskIds(final TaskQuery query) {
     checkNotNull(query);
 
     Set<String> fetched = transactionTemplate.execute(new TransactionCallback<Set<String>>() {
@@ -875,7 +871,7 @@ public class DbStorage implements
     return (items == null) || items.isEmpty();
   }
 
-  private Iterable<ScheduledTask> query(Query query) {
+  private Iterable<ScheduledTask> query(TaskQuery query) {
     StringBuilder sqlBuilder = new StringBuilder("SELECT scheduled_task FROM task_state");
 
     WhereClauseBuilder whereClauseBuilder = createWhereClause(query);
@@ -901,16 +897,13 @@ public class DbStorage implements
           }
         });
 
-    Iterable<ScheduledTask> postFiltered = query.hasPostFilter()
-        ? Iterables.filter(results, query.postFilter()) : results;
-
     long durationNanos = System.nanoTime() - startNanos;
     if (durationNanos >= SLOW_QUERY_THRESHOLD_NS) {
       LOG.warning("Slow query '" + rawQuery + "' completed in "
           + Amount.of(durationNanos, Time.NANOSECONDS).as(Time.MILLISECONDS) + "ms");
     }
 
-    return postFiltered;
+    return results;
   }
 
   /**
@@ -960,48 +953,46 @@ public class DbStorage implements
     }
   }
 
-  private static WhereClauseBuilder createWhereClause(Query query) {
+  private static WhereClauseBuilder createWhereClause(TaskQuery query) {
     // TODO(John Sirois): investigate using:
     // org.springframework.jdbc.core.namedparam.MapSqlParameterSource
     WhereClauseBuilder whereClauseBuilder = new WhereClauseBuilder();
 
-    TaskQuery taskQuery = query.base();
-
-    if (taskQuery.getOwner() != null) {
-      if (!StringUtils.isBlank(taskQuery.getOwner().getRole())) {
-        whereClauseBuilder.equals("job_role", Types.VARCHAR, taskQuery.getOwner().getRole());
+    if (query.getOwner() != null) {
+      if (!StringUtils.isBlank(query.getOwner().getRole())) {
+        whereClauseBuilder.equals("job_role", Types.VARCHAR, query.getOwner().getRole());
       }
-      if (!StringUtils.isBlank(taskQuery.getOwner().getUser())) {
-        whereClauseBuilder.equals("job_user", Types.VARCHAR, taskQuery.getOwner().getUser());
+      if (!StringUtils.isBlank(query.getOwner().getUser())) {
+        whereClauseBuilder.equals("job_user", Types.VARCHAR, query.getOwner().getUser());
       }
     }
-    if (!StringUtils.isEmpty(taskQuery.getJobName())) {
-      whereClauseBuilder.equals("job_name", Types.VARCHAR, taskQuery.getJobName());
+    if (!StringUtils.isEmpty(query.getJobName())) {
+      whereClauseBuilder.equals("job_name", Types.VARCHAR, query.getJobName());
     }
-    if (!StringUtils.isEmpty(taskQuery.getJobKey())) {
-      whereClauseBuilder.equals("job_key", Types.VARCHAR, taskQuery.getJobKey());
+    if (!StringUtils.isEmpty(query.getJobKey())) {
+      whereClauseBuilder.equals("job_key", Types.VARCHAR, query.getJobKey());
     }
 
     // MapStorage currently has the semantics that null taskIds skips the restriction, but empty
     // taskIds applies the always unsatisfiable restriction - we emulate this here by generating the
     // query clause 'where ... task_id in () ...' but the semantics seem confusing - address this.
-    if (taskQuery.getTaskIds() != null) {
-      restrictTaskIds(whereClauseBuilder, taskQuery.getTaskIds());
+    if (query.getTaskIds() != null) {
+      restrictTaskIds(whereClauseBuilder, query.getTaskIds());
     }
 
-    if (!isEmpty(taskQuery.getStatuses())) {
-      whereClauseBuilder.in("status", Types.INTEGER, taskQuery.getStatuses(),
+    if (!isEmpty(query.getStatuses())) {
+      whereClauseBuilder.in("status", Types.INTEGER, query.getStatuses(),
           new Function<ScheduleStatus, Integer>() {
             @Override public Integer apply(ScheduleStatus status) {
               return status.getValue();
             }
           });
     }
-    if (!StringUtils.isEmpty(taskQuery.getSlaveHost())) {
-      whereClauseBuilder.equals("slave_host", Types.VARCHAR, taskQuery.getSlaveHost());
+    if (!StringUtils.isEmpty(query.getSlaveHost())) {
+      whereClauseBuilder.equals("slave_host", Types.VARCHAR, query.getSlaveHost());
     }
-    if (!isEmpty(taskQuery.getShardIds())) {
-      whereClauseBuilder.in("shard_id", Types.INTEGER, taskQuery.getShardIds());
+    if (!isEmpty(query.getShardIds())) {
+      whereClauseBuilder.in("shard_id", Types.INTEGER, query.getShardIds());
     }
 
     return whereClauseBuilder;

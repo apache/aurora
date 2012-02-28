@@ -345,7 +345,7 @@ public class StateManager {
         .setStatuses(Tasks.ACTIVE_STATES)
         .setJobKey(jobKey)
         .setShardIds(ImmutableSet.of(shardId));
-    return taskStore.fetchTaskIds(new Query(query));
+    return taskStore.fetchTaskIds(query);
   }
 
   /**
@@ -683,22 +683,20 @@ public class StateManager {
   /**
    * Performs an operation on the state based on a fixed query.
    *
-   * @param taskQuery The query to perform, whose tasks will be made available to the callback via
-   *    the provided {@link StateChanger}.  If the query is {@code null}, no initial query will be
-   *    performed, and the {@code tasks} argument to
-   *    {@link StateMutation#execute(Set, StateChanger)} will be {@code null}.
+   * @param query The query to perform, whose tasks will be made available to the callback via
+   *    the provided {@link StateChanger}.
    * @param operation Operation to be performed.
    * @param <E> Type of exception thrown by the state change.
    * @throws E If the operation fails.
    */
-  synchronized <E extends Exception> void taskOperation(@Nullable final Query taskQuery,
+  synchronized <E extends Exception> void taskOperation(final TaskQuery query,
       final StateMutation<E> operation) throws E {
     checkNotNull(operation);
 
     transactionalStorage.doInTransaction(new NoResult<E>() {
       @Override protected void execute(Storage.StoreProvider storeProvider) throws E {
         final TaskStore taskStore = storeProvider.getTaskStore();
-        Set<ScheduledTask> tasks = (taskQuery == null) ? null : taskStore.fetchTasks(taskQuery);
+        Set<ScheduledTask> tasks = (query == null) ? null : taskStore.fetchTasks(query);
 
         operation.execute(tasks, new StateChanger() {
           @Override public void changeState(Set<String> taskIds, ScheduleStatus state,
@@ -715,27 +713,27 @@ public class StateManager {
    * state.
    * No audit message will be applied with the transition.
    *
-   * @param taskQuery Query to perform, the results of which will be modified.
+   * @param query Query to perform, the results of which will be modified.
    * @param newState State to move the resulting tasks into.
    * @return the number of successful state changes.
    */
   @VisibleForTesting
-  public synchronized int changeState(Query taskQuery, ScheduleStatus newState) {
-    return changeState(taskQuery, stateUpdater(newState));
+  public synchronized int changeState(TaskQuery query, ScheduleStatus newState) {
+    return changeState(query, stateUpdater(newState));
   }
 
   /**
    * Performs a simple state change, transitioning all tasks matching a query to the given
    * state and applying the given audit message.
    *
-   * @param taskQuery Query to perform, the results of which will be modified.
+   * @param query Query to perform, the results of which will be modified.
    * @param newState State to move the resulting tasks into.
    * @param auditMessage Audit message to apply along with the state change.
    * @return the number of successful state changes.
    */
-  synchronized int changeState(Query taskQuery, ScheduleStatus newState,
+  synchronized int changeState(TaskQuery query, ScheduleStatus newState,
       @Nullable String auditMessage) {
-    return changeState(taskQuery, stateUpdaterWithAuditMessage(newState, auditMessage));
+    return changeState(query, stateUpdaterWithAuditMessage(newState, auditMessage));
   }
 
   /**
@@ -766,7 +764,7 @@ public class StateManager {
    * @param query Query to perform.
    * @return A read-only view of the tasks matching the query.
    */
-  public synchronized Set<ScheduledTask> fetchTasks(final Query query) {
+  public synchronized Set<ScheduledTask> fetchTasks(final TaskQuery query) {
     checkNotNull(query);
     managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
 
@@ -777,13 +775,13 @@ public class StateManager {
     });
   }
 
-  private static final Query OUTSTANDING_TASK_QUERY = new Query(new TaskQuery().setStatuses(
+  private static final TaskQuery OUTSTANDING_TASK_QUERY = new TaskQuery().setStatuses(
       EnumSet.of(
           ScheduleStatus.ASSIGNED,
           ScheduleStatus.STARTING,
           ScheduleStatus.PREEMPTING,
           ScheduleStatus.RESTARTING,
-          ScheduleStatus.KILLING)));
+          ScheduleStatus.KILLING));
 
   /**
    * Scans any outstanding tasks and attempts to kill any tasks that have timed out.
@@ -808,23 +806,6 @@ public class StateManager {
       driver.killTask(missingTaskId);
     }
     changeState(Query.byId(missingTaskIds), ScheduleStatus.LOST, "Task timed out.");
-  }
-
-  /**
-   * Fetches the IDs of all tasks that match a query.
-   *
-   * @param query Query to perform.
-   * @return The IDs of all tasks matching the query.
-   */
-  public synchronized Set<String> fetchTaskIds(final Query query) {
-    checkNotNull(query);
-    managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
-
-    return transactionalStorage.doInTransaction(new Work.Quiet<Set<String>>() {
-      @Override public Set<String> apply(Storage.StoreProvider storeProvider) {
-        return storeProvider.getTaskStore().fetchTaskIds(query);
-      }
-    });
   }
 
   /**
@@ -890,11 +871,11 @@ public class StateManager {
   }
 
   private int changeState(
-      final Query taskQuery, final Function<TaskStateMachine, Boolean> stateChange) {
+      final TaskQuery query, final Function<TaskStateMachine, Boolean> stateChange) {
     return transactionalStorage.doInTransaction(new Work.Quiet<Integer>() {
       @Override public Integer apply(StoreProvider storeProvider) {
         return changeStateInTransaction(
-            storeProvider.getTaskStore().fetchTaskIds(taskQuery), stateChange);
+            storeProvider.getTaskStore().fetchTaskIds(query), stateChange);
       }
     });
   }
@@ -1003,7 +984,7 @@ public class StateManager {
       } else {
         TaskStore taskStore = storeProvider.getTaskStore();
         String taskId = stateMachine.getTaskId();
-        Query idQuery = Query.byId(taskId);
+        TaskQuery idQuery = Query.byId(taskId);
 
         switch (work.command) {
           case RESCHEDULE:
@@ -1077,8 +1058,7 @@ public class StateManager {
     transactionalStorage.doInTransaction(new Work.NoResult.Quiet() {
       @Override protected void execute(final StoreProvider storeProvider) {
         final TaskStore taskStore = storeProvider.getTaskStore();
-        final Iterable<ScheduledTask> tasks =
-            taskStore.fetchTasks(new Query(new TaskQuery().setTaskIds(taskIds)));
+        final Iterable<ScheduledTask> tasks = taskStore.fetchTasks(Query.byId(taskIds));
 
         transactionalStorage.addSideEffect(new SideEffect() {
           @Override public void mutate(MutableState state) {
@@ -1129,8 +1109,7 @@ public class StateManager {
   private Map<String, TaskStateMachine> getStateMachines(final Set<String> taskIds) {
     return transactionalStorage.doInTransaction(new Work.Quiet<Map<String, TaskStateMachine>>() {
       @Override public Map<String, TaskStateMachine> apply(StoreProvider storeProvider) {
-        Set<ScheduledTask> tasks = storeProvider.getTaskStore().fetchTasks(
-            new Query(new TaskQuery().setTaskIds(taskIds)));
+        Set<ScheduledTask> tasks = storeProvider.getTaskStore().fetchTasks(Query.byId(taskIds));
         Map<String, ScheduledTask> existingTasks = Maps.uniqueIndex(
             tasks,
             new Function<ScheduledTask, String>() {

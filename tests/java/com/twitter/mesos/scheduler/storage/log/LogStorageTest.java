@@ -33,6 +33,7 @@ import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.storage.LogEntry;
 import com.twitter.mesos.gen.storage.Op;
@@ -350,7 +351,7 @@ public class LogStorageTest extends EasyMockTest {
   public void testMutateTasks() throws Exception {
     new MutationFixture() {
 
-      private Query query = Query.byId("fred");
+      private TaskQuery query = Query.byId("fred");
       private Closure<ScheduledTask> mutation = Closures.noop();
       private ImmutableSet<ScheduledTask> mutated =
           ImmutableSet.of(task("a", ScheduleStatus.STARTING));
@@ -371,7 +372,7 @@ public class LogStorageTest extends EasyMockTest {
   public void testNestedTransactions() throws Exception {
     new MutationFixture() {
 
-      private Query query = Query.byId("fred");
+      private TaskQuery query = Query.byId("fred");
       private Closure<ScheduledTask> mutation = Closures.noop();
       private ImmutableSet<ScheduledTask> mutated =
           ImmutableSet.of(task("a", ScheduleStatus.STARTING));
@@ -410,7 +411,7 @@ public class LogStorageTest extends EasyMockTest {
   public void testSaveAndMutateTasks() throws Exception {
     new MutationFixture() {
 
-      private Query query = Query.byId("fred");
+      private TaskQuery query = Query.byId("fred");
       private Closure<ScheduledTask> mutation = Closures.noop();
       private Set<ScheduledTask> saved = ImmutableSet.of(task("a", ScheduleStatus.INIT));
       private ImmutableSet<ScheduledTask> mutated =
@@ -447,7 +448,7 @@ public class LogStorageTest extends EasyMockTest {
   public void testSaveAndMutateTasks_noCoalesceUniqueIds() throws Exception {
     new MutationFixture() {
 
-      private Query query = Query.byId("fred");
+      private TaskQuery query = Query.byId("fred");
       private Closure<ScheduledTask> mutation = Closures.noop();
       private Set<ScheduledTask> saved = ImmutableSet.of(task("b", ScheduleStatus.INIT));
       private ImmutableSet<ScheduledTask> mutated =

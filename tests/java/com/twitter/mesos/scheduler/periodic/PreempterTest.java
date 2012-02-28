@@ -4,7 +4,6 @@ import java.util.Set;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
@@ -27,7 +26,6 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.Resources;
 import com.twitter.mesos.scheduler.SchedulerCore;
 import com.twitter.mesos.scheduler.SchedulingFilter;
@@ -259,10 +257,10 @@ public class PreempterTest extends EasyMockTest {
   }
 
   private IExpectationSetters<Set<ScheduledTask>> expectGetTasks() {
-    return expect(scheduler.getTasks(EasyMock.<Query>anyObject())).andAnswer(
+    return expect(scheduler.getTasks(EasyMock.<TaskQuery>anyObject())).andAnswer(
         new IAnswer<Set<ScheduledTask>>() {
           @Override public Set<ScheduledTask> answer() {
-            return storage.fetch((Query) EasyMock.getCurrentArguments()[0]);
+            return storage.fetch((TaskQuery) EasyMock.getCurrentArguments()[0]);
           }
         }
     );
@@ -274,7 +272,7 @@ public class PreempterTest extends EasyMockTest {
         EasyMock.<TwitterTaskInfo>anyObject())).andAnswer(
         new IAnswer<Set<Veto>>() {
           @Override public Set<Veto> answer() {
-            return ImmutableSet.<Veto>of();
+            return ImmutableSet.of();
           }
         }
     );
@@ -330,24 +328,22 @@ public class PreempterTest extends EasyMockTest {
       tasks.add(state);
     }
 
-    Set<ScheduledTask> fetch(final Query query) {
+    Set<ScheduledTask> fetch(final TaskQuery q) {
       return ImmutableSet.copyOf(Iterables.filter(tasks,
-          Predicates.and(query.postFilter(),
-              new Predicate<ScheduledTask>() {
-                @Override public boolean apply(ScheduledTask scheduled) {
-                  AssignedTask task = scheduled.getAssignedTask();
-                  TaskQuery q = query.base();
-                  return (!q.isSetOwner() || q.getOwner().equals(task.getTask().getOwner()))
-                      && (!q.isSetJobName() || q.getJobName().equals(task.getTask().getJobName()))
-                      && (!q.isSetJobKey() || q.getJobKey().equals(Tasks.jobKey(task)))
-                      && (!q.isSetTaskIds() || q.getTaskIds().contains(task.getTaskId()))
-                      && (!q.isSetStatuses()
-                          || q.getStatuses().contains(scheduled.getStatus()))
-                      && (!q.isSetSlaveHost() || q.getSlaveHost().equals(task.getSlaveHost()))
-                      && (!q.isSetShardIds()
-                          || q.getShardIds().contains(task.getTask().getShardId()));
-                }
-              })));
+          new Predicate<ScheduledTask>() {
+            @Override public boolean apply(ScheduledTask scheduled) {
+              AssignedTask task = scheduled.getAssignedTask();
+              return (!q.isSetOwner() || q.getOwner().equals(task.getTask().getOwner()))
+                  && (!q.isSetJobName() || q.getJobName().equals(task.getTask().getJobName()))
+                  && (!q.isSetJobKey() || q.getJobKey().equals(Tasks.jobKey(task)))
+                  && (!q.isSetTaskIds() || q.getTaskIds().contains(task.getTaskId()))
+                  && (!q.isSetStatuses()
+                      || q.getStatuses().contains(scheduled.getStatus()))
+                  && (!q.isSetSlaveHost() || q.getSlaveHost().equals(task.getSlaveHost()))
+                  && (!q.isSetShardIds()
+                      || q.getShardIds().contains(task.getTask().getShardId()));
+            }
+          }));
     }
   }
 }

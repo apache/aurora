@@ -1,8 +1,9 @@
 package com.twitter.mesos.scheduler;
 
 import java.util.Arrays;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
+
+import javax.annotation.Nullable;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
@@ -27,6 +28,7 @@ import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.LimitConstraint;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskConstraint;
+import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.ValueConstraint;
 import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
@@ -37,7 +39,6 @@ import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work.Quiet;
 import com.twitter.mesos.scheduler.storage.TaskStore;
 
-import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static com.twitter.mesos.scheduler.ConstraintFilter.unsatisfiedLimitVeto;
 import static com.twitter.mesos.scheduler.ConstraintFilter.unsatisfiedValueVeto;
 import static com.twitter.mesos.scheduler.SchedulingFilterImpl.CPU_VETO;
@@ -47,6 +48,7 @@ import static com.twitter.mesos.scheduler.SchedulingFilterImpl.PORTS_VETO;
 import static com.twitter.mesos.scheduler.SchedulingFilterImpl.RAM_VETO;
 import static com.twitter.mesos.scheduler.SchedulingFilterImpl.RESERVED_HOST_VETO;
 import static com.twitter.mesos.scheduler.SchedulingFilterImpl.RESTRICTED_JOB_VETO;
+import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.expect;
 import static org.hamcrest.CoreMatchers.is;
@@ -79,10 +81,6 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   private static final String ROLE_B = "roleB";
   private static final String USER_B = "userB";
   private static final Identity OWNER_B = new Identity(ROLE_B, USER_B);
-
-  private static final String ROLE_C = "roleC";
-  private static final String USER_C = "userC";
-  private static final Identity OWNER_C = new Identity(ROLE_C, USER_C);
 
   private static final int DEFAULT_CPUS = 4;
   private static final long DEFAULT_RAM = 1000;
@@ -394,7 +392,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     assertNoVetoes(task, null);
   }
 
-  private void assertNoVetoes(TwitterTaskInfo task, String host) {
+  private void assertNoVetoes(TwitterTaskInfo task, @Nullable String host) {
     assertVetoes(task, host);
   }
 
@@ -402,7 +400,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     assertVetoes(task, null, vetos);
   }
 
-  private void assertVetoes(TwitterTaskInfo task, String host, Veto... vetoes) {
+  private void assertVetoes(TwitterTaskInfo task, @Nullable String host, Veto... vetoes) {
     assertEquals(ImmutableSet.copyOf(vetoes), defaultFilter.filter(
         DEFAULT_OFFER, host == null ? Optional.<String>absent() : Optional.of(host), task));
   }
@@ -413,7 +411,8 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   }
 
   private IExpectationSetters<ImmutableSet<ScheduledTask>> expectGetTasks(ScheduledTask... tasks) {
-    return expect(taskStore.fetchTasks((Query) anyObject())).andReturn(ImmutableSet.copyOf(tasks));
+    return expect(taskStore.fetchTasks((TaskQuery) anyObject()))
+        .andReturn(ImmutableSet.copyOf(tasks));
   }
 
   private IExpectationSetters<Iterable<Attribute>> expectGetHostAttributes(String host,

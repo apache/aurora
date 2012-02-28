@@ -13,7 +13,6 @@ import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.Shards;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
@@ -100,9 +99,9 @@ public interface QuotaManager {
     public Quota getConsumption(final String role) {
       checkNotBlank(role);
 
-      final Query query = new Query(new TaskQuery()
+      final TaskQuery query = new TaskQuery()
           .setOwner(new Identity().setRole(role))
-          .setStatuses(Tasks.ACTIVE_STATES));
+          .setStatuses(Tasks.ACTIVE_STATES);
 
       return storage.doInTransaction(
           new Work.Quiet<Quota>() {

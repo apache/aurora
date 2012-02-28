@@ -1,7 +1,6 @@
 package com.twitter.mesos.scheduler.periodic;
 
 import java.util.Collection;
-import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.logging.Logger;
@@ -29,7 +28,6 @@ import com.twitter.mesos.gen.comm.AdjustRetainedTasks;
 import com.twitter.mesos.gen.comm.ExecutorMessage;
 import com.twitter.mesos.scheduler.Driver;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHosts;
-import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.StateManager;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -66,8 +64,7 @@ class HistoryPruneRunner implements Runnable {
     this.slaveHosts = checkNotNull(slaveHosts);
   }
 
-  public static final Query INACTIVE_QUERY =
-      new Query(new TaskQuery().setStatuses(EnumSet.complementOf(Tasks.ACTIVE_STATES)));
+  public static final TaskQuery INACTIVE_QUERY = new TaskQuery().setStatuses(Tasks.TERMINAL_STATES);
 
   public static final Predicate<ScheduledTask> IS_THERMOS =
       Predicates.compose(Tasks.IS_THERMOS_TASK, Tasks.SCHEDULED_TO_INFO);
@@ -79,8 +76,8 @@ class HistoryPruneRunner implements Runnable {
         }
       };
 
-  public static Query hostQuery(String host) {
-    return new Query(new TaskQuery().setSlaveHost(host));
+  public static TaskQuery hostQuery(String host) {
+    return new TaskQuery().setSlaveHost(host);
   }
 
   public static Set<ScheduledTask> getPrunedTasks(Set<ScheduledTask> inactiveTasks,

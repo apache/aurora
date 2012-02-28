@@ -15,6 +15,7 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.db.testing.DbStorageTestUtil;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
@@ -53,7 +54,7 @@ public class CronJobManagerTest extends EasyMockTest {
 
   @Test
   public void testStart() throws Exception {
-    expect(scheduler.getTasks((Query) anyObject())).andReturn(ImmutableSet.<ScheduledTask>of());
+    expect(scheduler.getTasks((TaskQuery) anyObject())).andReturn(ImmutableSet.<ScheduledTask>of());
 
     JobConfiguration job = makeJob();
     // Job is executed immediately since there are no existing tasks to kill.
@@ -70,19 +71,19 @@ public class CronJobManagerTest extends EasyMockTest {
     Set<ScheduledTask> oneTask = ImmutableSet.of(new ScheduledTask());
 
     // Query to test if live tasks exist for the job.
-    expect(scheduler.getTasks((Query) anyObject())).andReturn(oneTask);
+    expect(scheduler.getTasks((TaskQuery) anyObject())).andReturn(oneTask);
 
     // Live tasks exist, so the cron manager must delay the cron launch.
     delayExecutor.execute(capture(delayLaunchCapture));
 
     // The cron manager will then try to initiate the kill.
-    scheduler.killTasks((Query) anyObject(), eq(CronJobManager.CRON_USER));
+    scheduler.killTasks((TaskQuery) anyObject(), eq(CronJobManager.CRON_USER));
 
     // Immediate query and delayed query.
-    expect(scheduler.getTasks((Query) anyObject())).andReturn(oneTask).times(2);
+    expect(scheduler.getTasks((TaskQuery) anyObject())).andReturn(oneTask).times(2);
 
     // Simulate the live task disappearing.
-    expect(scheduler.getTasks((Query) anyObject())).andReturn(ImmutableSet.<ScheduledTask>of());
+    expect(scheduler.getTasks((TaskQuery) anyObject())).andReturn(ImmutableSet.<ScheduledTask>of());
 
     JobConfiguration job = makeJob();
 
@@ -100,26 +101,26 @@ public class CronJobManagerTest extends EasyMockTest {
     Set<ScheduledTask> oneTask = ImmutableSet.of(new ScheduledTask());
 
     // Query to test if live tasks exist for the job.
-    expect(scheduler.getTasks((Query) anyObject())).andReturn(oneTask);
+    expect(scheduler.getTasks((TaskQuery) anyObject())).andReturn(oneTask);
 
     // Live tasks exist, so the cron manager must delay the cron launch.
     delayExecutor.execute(capture(delayLaunchCapture));
 
     // The cron manager will then try to initiate the kill.
-    scheduler.killTasks((Query) anyObject(), eq(CronJobManager.CRON_USER));
+    scheduler.killTasks((TaskQuery) anyObject(), eq(CronJobManager.CRON_USER));
 
     // Immediate query and delayed query.
-    expect(scheduler.getTasks((Query) anyObject())).andReturn(oneTask).times(2);
+    expect(scheduler.getTasks((TaskQuery) anyObject())).andReturn(oneTask).times(2);
 
     // Simulate the live task disappearing.
-    expect(scheduler.getTasks((Query) anyObject())).andReturn(ImmutableSet.<ScheduledTask>of());
+    expect(scheduler.getTasks((TaskQuery) anyObject())).andReturn(ImmutableSet.<ScheduledTask>of());
 
     // Round two.
-    expect(scheduler.getTasks((Query) anyObject())).andReturn(oneTask);
+    expect(scheduler.getTasks((TaskQuery) anyObject())).andReturn(oneTask);
     delayExecutor.execute(capture(delayLaunchCapture));
-    scheduler.killTasks((Query) anyObject(), eq(CronJobManager.CRON_USER));
-    expect(scheduler.getTasks((Query) anyObject())).andReturn(oneTask).times(2);
-    expect(scheduler.getTasks((Query) anyObject())).andReturn(ImmutableSet.<ScheduledTask>of());
+    scheduler.killTasks((TaskQuery) anyObject(), eq(CronJobManager.CRON_USER));
+    expect(scheduler.getTasks((TaskQuery) anyObject())).andReturn(oneTask).times(2);
+    expect(scheduler.getTasks((TaskQuery) anyObject())).andReturn(ImmutableSet.<ScheduledTask>of());
 
     JobConfiguration job = makeJob();
 
@@ -144,20 +145,20 @@ public class CronJobManagerTest extends EasyMockTest {
     Set<ScheduledTask> oneTask = ImmutableSet.of(new ScheduledTask());
 
     // Query to test if live tasks exist for the job.
-    expect(scheduler.getTasks((Query) anyObject())).andReturn(oneTask).times(3);
+    expect(scheduler.getTasks((TaskQuery) anyObject())).andReturn(oneTask).times(3);
 
     // Live tasks exist, so the cron manager must delay the cron launch.
     delayExecutor.execute(capture(delayLaunchCapture));
 
     // The cron manager will then try to initiate the kill.
-    scheduler.killTasks((Query) anyObject(), eq(CronJobManager.CRON_USER));
+    scheduler.killTasks((TaskQuery) anyObject(), eq(CronJobManager.CRON_USER));
     expectLastCall().times(3);
 
     // Immediate queries and delayed query.
-    expect(scheduler.getTasks((Query) anyObject())).andReturn(oneTask).times(4);
+    expect(scheduler.getTasks((TaskQuery) anyObject())).andReturn(oneTask).times(4);
 
     // Simulate the live task disappearing.
-    expect(scheduler.getTasks((Query) anyObject())).andReturn(ImmutableSet.<ScheduledTask>of());
+    expect(scheduler.getTasks((TaskQuery) anyObject())).andReturn(ImmutableSet.<ScheduledTask>of());
 
     JobConfiguration job = makeJob();
 

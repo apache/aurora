@@ -14,7 +14,6 @@ import javax.servlet.http.HttpServletResponse;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
-import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -23,7 +22,6 @@ import com.google.common.collect.Ordering;
 import com.google.inject.Inject;
 
 import org.antlr.stringtemplate.StringTemplate;
-import org.antlr.stringtemplate.AttributeRenderer;
 
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
@@ -36,7 +34,6 @@ import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.LeaderRedirect;
-import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerCore;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -220,11 +217,11 @@ public class SchedulerzJob extends StringTemplateServlet {
         Set<ScheduledTask> activeTasks;
         if (statusFilter != null) {
           query.setStatuses(FILTER_MAP.get(statusFilter));
-          activeTasks = scheduler.getTasks(new Query(query));
+          activeTasks = scheduler.getTasks(query);
         } else {
-          activeTasks = scheduler.getTasks(new Query(query, Tasks.ACTIVE_FILTER));
+          activeTasks = scheduler.getTasks(new TaskQuery(query).setStatuses(Tasks.ACTIVE_STATES));
           List<ScheduledTask> completedTasks = Lists.newArrayList(
-              scheduler.getTasks(new Query(query, Predicates.not(Tasks.ACTIVE_FILTER))));
+              scheduler.getTasks(new TaskQuery(query).setStatuses(Tasks.TERMINAL_STATES)));
           Collections.sort(completedTasks, REVERSE_CHRON_COMPARATOR);
           template.setAttribute("completedTasks",
             ImmutableList.copyOf(
@@ -236,7 +233,7 @@ public class SchedulerzJob extends StringTemplateServlet {
         Collections.sort(liveTasks, SHARD_ID_COMPARATOR);
         template.setAttribute("activeTasks",
           ImmutableList.copyOf(
-            Iterables.transform(offsetAndLimit(liveTasks, offset), TASK_TO_STRING_MAP)));
+              Iterables.transform(offsetAndLimit(liveTasks, offset), TASK_TO_STRING_MAP)));
         hasMore = hasMore || liveTasks.size() > (offset + PAGE_SIZE);
 
         if (offset > 0) {

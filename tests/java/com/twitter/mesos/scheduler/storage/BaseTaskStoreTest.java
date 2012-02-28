@@ -4,7 +4,6 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
-import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -74,30 +73,20 @@ public abstract class BaseTaskStoreTest<T extends TaskStore> extends TearDownTes
     store(ImmutableList.of(makeTask("task1"), makeTask("task2"), makeTask("task3")));
 
     assertEquals(ImmutableSet.of("task1", "task2", "task3"),
-        store.fetchTaskIds(new Query(new TaskQuery().setTaskIds(null))));
+        store.fetchTaskIds(new TaskQuery().setTaskIds(null)));
 
     // SchedulerCoreImpl currently requires the semantics that match [] ids == never match
     assertEquals(ImmutableSet.<String>of(),
-        store.fetchTaskIds(new Query(new TaskQuery().setTaskIds(ImmutableSet.<String>of()))));
+        store.fetchTaskIds(new TaskQuery().setTaskIds(ImmutableSet.<String>of())));
 
     assertEquals(ImmutableSet.of("task1"),
-        store.fetchTaskIds(new Query(new TaskQuery().setTaskIds(ImmutableSet.of("task1")))));
+        store.fetchTaskIds(new TaskQuery().setTaskIds(ImmutableSet.of("task1"))));
   }
 
   @Test
   public void testAddAndFetchTasks() {
     store(tasks);
-
     assertThat(Iterables.getOnlyElement(store.fetchTasks(Query.byId(TASK_A_ID))), is(taskA));
-
-    Predicate<ScheduledTask> taskIdFilter = new Predicate<ScheduledTask>() {
-      @Override public boolean apply(ScheduledTask task) {
-        return task.getAssignedTask().getTaskId().equals(TASK_A_ID);
-      }
-    };
-
-    assertThat(Iterables
-        .getOnlyElement(store.fetchTasks(new Query(new TaskQuery(), taskIdFilter))), is(taskA));
   }
 
   @Test(expected = IllegalStateException.class)

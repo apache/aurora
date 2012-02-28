@@ -162,7 +162,7 @@ public class HistoryPruneRunnerTest extends BaseStateManagerTest {
   }
 
   private void assertDeleted(final ScheduledTask... tasks) {
-    final Query query = new Query(new TaskQuery().setTaskIds(ids(tasks)));
+    final TaskQuery query = Query.byId(ids(tasks));
     assertEquals(ImmutableSet.<String>of(),
         storage.doInTransaction(new Work.Quiet<Set<String>>() {
           @Override

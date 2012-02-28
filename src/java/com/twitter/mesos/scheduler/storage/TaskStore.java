@@ -6,6 +6,7 @@ import com.google.common.collect.ImmutableSet;
 
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.Query;
 
 /**
@@ -30,10 +31,10 @@ public interface TaskStore {
    *
    * @param query The query whose matching tasks should be removed.
    */
-  void removeTasks(Query query);
+  void removeTasks(TaskQuery query);
 
   /**
-   * Convenience function for {@link #removeTasks(Query)} to remove by ID.
+   * Convenience function for {@link #removeTasks(TaskQuery)} to remove by ID.
    *
    * @param taskIds IDs of tasks to remove.
    */
@@ -47,7 +48,7 @@ public interface TaskStore {
    * @param mutator The mutate operation.
    * @return Immutable copies of only the tasks that were mutated.
    */
-  ImmutableSet<ScheduledTask> mutateTasks(Query query, Closure<ScheduledTask> mutator);
+  ImmutableSet<ScheduledTask> mutateTasks(TaskQuery query, Closure<ScheduledTask> mutator);
 
   /**
    * Fetches a read-only view of tasks matching a query and filters.
@@ -55,7 +56,7 @@ public interface TaskStore {
    * @param query Query to identify tasks with.
    * @return A read-only view of matching tasks.
    */
-  ImmutableSet<ScheduledTask> fetchTasks(Query query);
+  ImmutableSet<ScheduledTask> fetchTasks(TaskQuery query);
 
   /**
    * Convenience method to execute a query and only retrieve the IDs of the matching tasks.
@@ -63,5 +64,5 @@ public interface TaskStore {
    * @param query Query to identify tasks with.
    * @return IDs of the matching tasks.
    */
-  Set<String> fetchTaskIds(Query query);
+  Set<String> fetchTaskIds(TaskQuery query);
 }

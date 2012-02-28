@@ -13,8 +13,8 @@ import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
-import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.storage.Storage.Work.NoResult.Quiet;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -123,7 +123,7 @@ public class ForwardingStore implements
   }
 
   @Override
-  public void removeTasks(Query query) {
+  public void removeTasks(TaskQuery query) {
     taskStore.removeTasks(query);
   }
 
@@ -133,16 +133,16 @@ public class ForwardingStore implements
   }
 
   @Override
-  public ImmutableSet<ScheduledTask> mutateTasks(Query query, Closure<ScheduledTask> mutator) {
+  public ImmutableSet<ScheduledTask> mutateTasks(TaskQuery query, Closure<ScheduledTask> mutator) {
     return taskStore.mutateTasks(query, mutator);
   }
 
-  public ImmutableSet<ScheduledTask> fetchTasks(Query query) {
+  public ImmutableSet<ScheduledTask> fetchTasks(TaskQuery query) {
     return taskStore.fetchTasks(query);
   }
 
   @Override
-  public Set<String> fetchTaskIds(Query query) {
+  public Set<String> fetchTaskIds(TaskQuery query) {
     return taskStore.fetchTaskIds(query);
   }
 

@@ -1039,8 +1039,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     // Simulate a triggering of the cron job.
     cron.cronTriggered(job);
     assertTaskCount(10);
-    assertThat(getTasks(new Query(new TaskQuery()
-        .setOwner(OWNER_A).setJobName(JOB_A).setStatuses(Sets.newHashSet(PENDING)))).size(),
+    assertThat(getTasks(new TaskQuery()
+        .setOwner(OWNER_A).setJobName(JOB_A).setStatuses(Sets.newHashSet(PENDING))).size(),
         is(10));
 
     assertTaskCount(10);
@@ -1163,7 +1163,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     changeStatus(Query.byStatus(PENDING), ASSIGNED);
 
-    Query pendingQuery = Query.byStatus(PENDING);
+    TaskQuery pendingQuery = Query.byStatus(PENDING);
     changeStatus(Query.byStatus(ASSIGNED), LOST);
     assertThat(getOnlyTask(pendingQuery).getStatus(), is(PENDING));
     assertTaskCount(2);
@@ -2036,11 +2036,11 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     return getOnlyTask(query(taskId));
   }
 
-  private ScheduledTask getOnlyTask(Query query) {
-    return Iterables.getOnlyElement(scheduler.getTasks((query)));
+  private ScheduledTask getOnlyTask(TaskQuery query) {
+    return Iterables.getOnlyElement(scheduler.getTasks(query));
   }
 
-  private Set<ScheduledTask> getTasks(Query query) {
+  private Set<ScheduledTask> getTasks(TaskQuery query) {
     return scheduler.getTasks(query);
   }
 
@@ -2052,23 +2052,23 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     return scheduler.getTasks(query(owner, null, null));
   }
 
-  private Query query(Iterable<String> taskIds) {
+  private TaskQuery query(Iterable<String> taskIds) {
     return query(null, null, taskIds);
   }
 
-  private Query query(String... taskIds) {
+  private TaskQuery query(String... taskIds) {
     return query(null, null, ImmutableList.copyOf(taskIds));
   }
 
-  private Query queryByOwner(Identity owner) {
+  private TaskQuery queryByOwner(Identity owner) {
     return query(owner, null, null);
   }
 
-  private Query queryJob(Identity owner, String jobName) {
+  private TaskQuery queryJob(Identity owner, String jobName) {
     return query(owner, jobName, null);
   }
 
-  private Query query(@Nullable Identity owner, @Nullable String jobName,
+  private TaskQuery query(@Nullable Identity owner, @Nullable String jobName,
       @Nullable Iterable<String> taskIds) {
     TaskQuery query = new TaskQuery();
     if (owner != null) {
@@ -2081,14 +2081,14 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       query.setTaskIds(Sets.newHashSet(taskIds));
     }
 
-    return new Query(query);
+    return query;
   }
 
-  public void changeStatus(Query query, ScheduleStatus status, @Nullable String message) {
+  public void changeStatus(TaskQuery query, ScheduleStatus status, @Nullable String message) {
     scheduler.setTaskStatus(query, status, message);
   }
 
-  public void changeStatus(Query query, ScheduleStatus status) {
+  public void changeStatus(TaskQuery query, ScheduleStatus status) {
     changeStatus(query, status, null);
   }
 
@@ -2099,8 +2099,4 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   public void changeStatus(String taskId, ScheduleStatus status, @Nullable String message) {
     changeStatus(query(Arrays.asList(taskId)), status, message);
   }
-
-  private static final ImmutableSet<Veto> ALWAYS_VETO = ImmutableSet.of(new Veto("Fake veto"));
-
-  private static final ImmutableSet<Veto> NO_VETO = ImmutableSet.of();
 }

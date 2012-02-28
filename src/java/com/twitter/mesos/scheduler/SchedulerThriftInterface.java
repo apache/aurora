@@ -114,7 +114,7 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
       },
       Tasks.SCHEDULED_TO_INFO);
 
-  private void validateSessionKeyForTasks(SessionKey session, Query taskQuery)
+  private void validateSessionKeyForTasks(SessionKey session, TaskQuery taskQuery)
       throws AuthFailedException {
     Set<ScheduledTask> tasks = schedulerCore.getTasks(taskQuery);
     for (String role : ImmutableSet.copyOf(Iterables.transform(tasks, GET_ROLE))) {
@@ -183,7 +183,7 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
   public ScheduleStatusResponse getTasksStatus(TaskQuery query) {
     checkNotNull(query);
 
-    Set<ScheduledTask> tasks = schedulerCore.getTasks(new Query(query));
+    Set<ScheduledTask> tasks = schedulerCore.getTasks(query);
 
     ScheduleStatusResponse response = new ScheduleStatusResponse();
     if (tasks.isEmpty()) {
@@ -212,7 +212,7 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
       LOG.info("Granting kill query to admin user: " + query);
     } else {
       try {
-        validateSessionKeyForTasks(session, new Query(query));
+        validateSessionKeyForTasks(session, query);
       } catch (AuthFailedException e) {
         response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
         return response;
@@ -220,14 +220,14 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     }
 
     try {
-      schedulerCore.killTasks(new Query(query), session.getUser());
+      schedulerCore.killTasks(query, session.getUser());
     } catch (ScheduleException e) {
       response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
       return response;
     }
 
     BackoffHelper backoff = new BackoffHelper(killTaskInitialBackoff, killTaskMaxBackoff, true);
-    final Query activeQuery = new Query(query.setStatuses(Tasks.ACTIVE_STATES));
+    final TaskQuery activeQuery = query.setStatuses(Tasks.ACTIVE_STATES);
     try {
       backoff.doUntilSuccess(new Supplier<Boolean>() {
         @Override public Boolean get() {

@@ -145,7 +145,7 @@ public class CronJobManager extends JobManager {
     cronTriggered(job);
   }
 
-  private void delayedRun(final Query query, final JobConfiguration job) {
+  private void delayedRun(final TaskQuery query, final JobConfiguration job) {
     final String jobKey = Tasks.jobKey(job);
     LOG.info("Waiting for job to terminate before launching cron job " + jobKey);
     if (pendingRuns.put(jobKey, job) == null) {
@@ -161,7 +161,7 @@ public class CronJobManager extends JobManager {
     }
   }
 
-  private void runWhenTerminated(final Query query, final String jobKey) {
+  private void runWhenTerminated(final TaskQuery query, final String jobKey) {
     try {
       delayedStartBackoff.doUntilSuccess(new Supplier<Boolean>() {
         @Override public Boolean get() {
@@ -183,7 +183,7 @@ public class CronJobManager extends JobManager {
     }
   }
 
-  private boolean hasTasks(Query query) {
+  private boolean hasTasks(TaskQuery query) {
     return !schedulerCore.getTasks(query).isEmpty();
   }
 
@@ -199,8 +199,7 @@ public class CronJobManager extends JobManager {
 
     boolean runJob = false;
 
-    Query query = new Query(new TaskQuery().setOwner(job.getOwner()).setJobName(job.getName())
-        .setStatuses(Tasks.ACTIVE_STATES));
+    TaskQuery query = Query.activeQuery(job.getOwner(), job.getName());
 
     if (!hasTasks(query)) {
       runJob = true;

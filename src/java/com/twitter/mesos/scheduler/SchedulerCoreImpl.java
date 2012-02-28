@@ -29,6 +29,7 @@ import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
@@ -61,7 +62,7 @@ import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.STOPPED;
  */
 public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
 
-  private static final Logger LOG = Logger.getLogger(SchedulerCore.class.getName());
+  private static final Logger LOG = Logger.getLogger(SchedulerCoreImpl.class.getName());
 
   private final CronJobManager cronScheduler;
 
@@ -149,14 +150,14 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
   }
 
   @Override
-  public synchronized Set<ScheduledTask> getTasks(final Query query) {
+  public synchronized Set<ScheduledTask> getTasks(TaskQuery query) {
     checkStarted();
 
     return stateManager.fetchTasks(query);
   }
 
   @Override
-  public Iterable<TwitterTaskInfo> apply(Query query) {
+  public Iterable<TwitterTaskInfo> apply(TaskQuery query) {
     return Iterables.transform(getTasks(query), Tasks.SCHEDULED_TO_INFO);
   }
 
@@ -301,7 +302,7 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
   @Override
   public boolean statusUpdate(TaskStatus status) {
     String info = status.hasData() ? status.getData().toStringUtf8() : null;
-    Query query = Query.byId(status.getTaskId().getValue());
+    TaskQuery query = Query.byId(status.getTaskId().getValue());
 
     try {
       if (getTasks(query).isEmpty()) {
@@ -324,17 +325,17 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
   }
 
   @Override
-  public synchronized void setTaskStatus(Query rawQuery, final ScheduleStatus status,
+  public synchronized void setTaskStatus(TaskQuery query, final ScheduleStatus status,
       @Nullable final String message) {
     checkStarted();
-    checkNotNull(rawQuery);
+    checkNotNull(query);
     checkNotNull(status);
 
-    stateManager.changeState(rawQuery, status, message);
+    stateManager.changeState(query, status, message);
   }
 
   @Override
-  public synchronized void killTasks(final Query query, String user) throws ScheduleException {
+  public synchronized void killTasks(TaskQuery query, String user) throws ScheduleException {
     checkStarted();
     checkNotNull(query);
     LOG.info("Killing tasks matching " + query);
@@ -342,15 +343,15 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
     boolean matchingScheduler = false;
     boolean updateFinished = false;
 
-    if (query.specifiesJobOnly()) {
+    if (Query.specifiesJobOnly(query)) {
       // If this looks like a query for all tasks in a job, instruct the scheduler modules to
       // delete the job.
       for (JobManager manager : jobManagers) {
-        matchingScheduler = manager.deleteJob(query.getJobKey()) || matchingScheduler;
+        matchingScheduler = manager.deleteJob(Query.getJobKey(query).get()) || matchingScheduler;
       }
 
-      String role = query.base().getOwner().getRole();
-      String job = query.base().getJobName();
+      String role = query.getOwner().getRole();
+      String job = query.getJobName();
       if (!matchingScheduler) {
         try {
           updateFinished = stateManager.finishUpdate(
