@@ -1,6 +1,10 @@
 package com.twitter.mesos.scheduler.storage;
 
+import java.util.Set;
+
 import javax.annotation.Nullable;
+
+import com.google.common.base.Optional;
 
 import com.twitter.mesos.gen.Quota;
 
@@ -10,6 +14,11 @@ import com.twitter.mesos.gen.Quota;
  * @author William Farner
  */
 public interface QuotaStore {
+
+  /**
+   * Deletes all quotas.
+   */
+  void deleteQuotas();
 
   /**
    * Deletes quota for a role.
@@ -30,8 +39,14 @@ public interface QuotaStore {
    * Fetches the existing quota record for a role.
    *
    * @param role Role to fetch quota for.
-   * @return Quota associated with {@code role}, or {@code null} if there is no entry for the role.
+   * @return Optional quota associated with {@code role}.
    */
-  @Nullable
-  Quota fetchQuota(String role);
+  Optional<Quota> fetchQuota(String role);
+
+  /**
+   * Fetches all roles that have been assigned quotas.
+   *
+   * @return All roles with quota.
+   */
+  Set<String> fetchQuotaRoles();
 }

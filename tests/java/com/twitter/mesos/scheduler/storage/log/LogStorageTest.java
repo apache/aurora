@@ -35,6 +35,7 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.gen.storage.JobUpdateConfiguration;
 import com.twitter.mesos.gen.storage.LogEntry;
 import com.twitter.mesos.gen.storage.Op;
 import com.twitter.mesos.gen.storage.RemoveJob;
@@ -195,8 +196,9 @@ public class LogStorageTest extends EasyMockTest {
     // We should perform a snapshot when the snapshot thread runs.
     Capture<Runnable> snapshotAction = createCapture();
     schedulingService.doEvery(eq(SNAPSHOT_INTERVAL), capture(snapshotAction));
-    Snapshot snapshotContents = new Snapshot(NOW,
-        ByteBuffer.wrap("snapshot".getBytes()), ImmutableSet.<HostAttributes>of());
+    Snapshot snapshotContents = new Snapshot()
+        .setTimestamp(NOW)
+        .setDataDEPRECATED(ByteBuffer.wrap("snapshot".getBytes()));
     expect(snapshotStore.createSnapshot()).andReturn(snapshotContents);
     Position snapshotPosition = createMock(Position.class);
     LogEntry snapshot = LogEntry.snapshot(snapshotContents);
@@ -531,13 +533,15 @@ public class LogStorageTest extends EasyMockTest {
 
       @Override protected void setupExpectations() throws Exception {
         expectStorageTransactionNoResult();
-        updateStore.saveShardUpdateConfigs(role, job, updateToken, updateConfiguration);
+        updateStore.saveJobUpdateConfig(
+            new JobUpdateConfiguration(role, job, updateToken, updateConfiguration));
         expectStreamTransaction(
             Op.saveJobUpdate(new SaveJobUpdate(role, job, updateToken, updateConfiguration)));
       }
 
       @Override protected void performMutations() {
-        logStorage.saveShardUpdateConfigs(role, job, updateToken, updateConfiguration);
+        logStorage.saveJobUpdateConfig(
+            new JobUpdateConfiguration(role, job, updateToken, updateConfiguration));
       }
     }.runTest();
   }

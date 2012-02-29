@@ -1,8 +1,6 @@
 package com.twitter.mesos.scheduler.storage;
 
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -15,15 +13,12 @@ import org.junit.Test;
 
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.gen.AssignedTask;
-import com.twitter.mesos.gen.Attribute;
-import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.Query;
-import com.twitter.mesos.scheduler.storage.AttributeStore.AttributeStoreImpl;
 
 import static com.twitter.mesos.gen.ScheduleStatus.LOST;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
@@ -124,7 +119,7 @@ public abstract class BaseTaskStoreTest<T extends TaskStore> extends TearDownTes
         is(RUNNING));
 
     store.mutateTasks(Query.byId(TASK_B_ID), new Closure<ScheduledTask>() {
-      @Override public void execute(ScheduledTask task) throws RuntimeException {
+      @Override public void execute(ScheduledTask task) {
         task.setStatus(LOST);
       }
     });
@@ -151,24 +146,6 @@ public abstract class BaseTaskStoreTest<T extends TaskStore> extends TearDownTes
     store(tasks);
     store.removeTasks(Sets.newHashSet(taskA.getAssignedTask().getTaskId()));
     assertThat(Iterables.getOnlyElement(store.fetchTasks(Query.GET_ALL)), is(taskB));
-  }
-
-  @Test
-  public void testAttributeStoreSnapshot() {
-    AttributeStoreImpl attributeStore1 = new AttributeStoreImpl();
-    Set<Attribute> attributes = new HashSet<Attribute>();
-    attributes.add(makeAttribute("foo", "bar"));
-    HostAttributes hostAttributes = new HostAttributes().setHost("HOST_A").setAttributes(attributes);
-    attributeStore1.saveHostAttributes(hostAttributes);
-    assertEquals(attributeStore1.createSnapshot(), Sets.newHashSet(hostAttributes));
-
-    AttributeStoreImpl attributeStore2 = new AttributeStoreImpl();
-    attributeStore2.applySnapshot(attributeStore1.createSnapshot());
-    assertEquals(attributeStore2.getHostAttributes("HOST_A"), attributes);
-  }
-
-  private Attribute makeAttribute(String name, String v) {
-    return new Attribute(name, ImmutableSet.of(v));
   }
 
   protected void store(Iterable<ScheduledTask> tasks) {

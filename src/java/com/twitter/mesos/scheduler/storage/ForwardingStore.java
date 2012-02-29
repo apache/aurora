@@ -4,8 +4,8 @@ import java.util.Set;
 
 import javax.annotation.Nullable;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Multimap;
 
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.gen.Attribute;
@@ -14,7 +14,7 @@ import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
-import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
+import com.twitter.mesos.gen.storage.JobUpdateConfiguration;
 import com.twitter.mesos.scheduler.storage.Storage.Work.NoResult.Quiet;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -113,6 +113,11 @@ public class ForwardingStore implements
   }
 
   @Override
+  public void deleteJobs() {
+    jobStore.deleteJobs();
+  }
+
+  @Override
   public Set<String> fetchManagerIds() {
     return jobStore.fetchManagerIds();
   }
@@ -147,31 +152,28 @@ public class ForwardingStore implements
   }
 
   @Override
-  public void saveShardUpdateConfigs(String role, String job, String updateToken,
-      Set<TaskUpdateConfiguration> updateConfiguration) {
-    updateStore.saveShardUpdateConfigs(role, job, updateToken, updateConfiguration);
+  public void saveJobUpdateConfig(JobUpdateConfiguration updateConfiguration) {
+    updateStore.saveJobUpdateConfig(updateConfiguration);
   }
 
   @Override
-  @Nullable
-  public ShardUpdateConfiguration fetchShardUpdateConfig(String role, String job, int shardId) {
-    return updateStore.fetchShardUpdateConfig(role, job, shardId);
+  public Optional<JobUpdateConfiguration> fetchJobUpdateConfig(String role, String job) {
+    return updateStore.fetchJobUpdateConfig(role, job);
   }
 
   @Override
-  public Set<ShardUpdateConfiguration> fetchShardUpdateConfigs(String role, String job,
-      Set<Integer> shardIds) {
-    return updateStore.fetchShardUpdateConfigs(role, job, shardIds);
+  public Set<JobUpdateConfiguration> fetchUpdateConfigs(String role) {
+    return updateStore.fetchUpdateConfigs(role);
   }
 
   @Override
-  public Set<ShardUpdateConfiguration> fetchShardUpdateConfigs(String role, String job) {
-    return updateStore.fetchShardUpdateConfigs(role, job);
+  public Set<String> fetchUpdatingRoles() {
+    return updateStore.fetchUpdatingRoles();
   }
 
   @Override
-  public Multimap<String, ShardUpdateConfiguration> fetchShardUpdateConfigs(String role) {
-    return updateStore.fetchShardUpdateConfigs(role);
+  public void deleteShardUpdateConfigs() {
+    updateStore.deleteShardUpdateConfigs();
   }
 
   @Override
@@ -180,8 +182,18 @@ public class ForwardingStore implements
   }
 
   @Override
+  public Set<String> fetchQuotaRoles() {
+    return quotaStore.fetchQuotaRoles();
+  }
+
+  @Override
   public void removeQuota(String role) {
     quotaStore.removeQuota(role);
+  }
+
+  @Override
+  public void deleteQuotas() {
+    quotaStore.deleteQuotas();
   }
 
   @Override
@@ -190,7 +202,7 @@ public class ForwardingStore implements
   }
 
   @Override
-  public Quota fetchQuota(String role) {
+  public Optional<Quota> fetchQuota(String role) {
     return quotaStore.fetchQuota(role);
   }
 
@@ -202,5 +214,15 @@ public class ForwardingStore implements
   @Override
   public Iterable<Attribute> getHostAttributes(String host) {
     return attributeStore.getHostAttributes(host);
+  }
+
+  @Override
+  public Set<HostAttributes> getHostAttributes() {
+    return attributeStore.getHostAttributes();
+  }
+
+  @Override
+  public void deleteHostAttributes() {
+    attributeStore.deleteHostAttributes();
   }
 }

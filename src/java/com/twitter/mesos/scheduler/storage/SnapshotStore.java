@@ -28,5 +28,4 @@ public interface SnapshotStore<T> {
    * @param snapshot A snapshot blob created by {@link #createSnapshot()}.
    */
   void applySnapshot(T snapshot);
-
 }

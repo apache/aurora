@@ -55,6 +55,7 @@ import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
+import com.twitter.mesos.gen.storage.JobUpdateConfiguration;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
@@ -73,7 +74,6 @@ import static com.twitter.mesos.gen.ScheduleStatus.INIT;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.UNKNOWN;
-import static com.twitter.mesos.scheduler.storage.UpdateStore.ShardUpdateConfiguration;
 
 /**
  * Manager of all persistence-related operations for the scheduler.  Acts as a controller for
@@ -495,7 +495,7 @@ public class StateManager {
         }
 
         UpdateStore updateStore = storeProvider.getUpdateStore();
-        if (updateStore.fetchShardUpdateConfig(role, job, 0) != null) {
+        if (fetchShardUpdateConfig(updateStore, role, job, 0).isPresent()) {
           throw new UpdateException("Update already in progress for " + jobKey);
         }
 
@@ -511,11 +511,44 @@ public class StateManager {
         }
 
         String updateToken = UUID.randomUUID().toString();
-        updateStore.saveShardUpdateConfigs(role, job, updateToken, shardConfigBuilder.build());
+        updateStore.saveJobUpdateConfig(
+            new JobUpdateConfiguration(role, job, updateToken, shardConfigBuilder.build()));
         return updateToken;
       }
     });
   }
+
+  private Optional<TaskUpdateConfiguration> fetchShardUpdateConfig(UpdateStore updateStore,
+      String role, String job, int shard) {
+
+    Optional<JobUpdateConfiguration> optional = updateStore.fetchJobUpdateConfig(role, job);
+    return optional.isPresent()
+        ? fetchShardUpdateConfig(optional.get(), shard)
+        : Optional.<TaskUpdateConfiguration>absent();
+  }
+
+  private Optional<TaskUpdateConfiguration> fetchShardUpdateConfig(JobUpdateConfiguration config,
+      int shard) {
+
+    Set<TaskUpdateConfiguration> matches = fetchShardUpdateConfigs(config, ImmutableSet.of(shard));
+    return Optional.fromNullable(Iterables.getOnlyElement(matches, null));
+  }
+
+  private Set<TaskUpdateConfiguration> fetchShardUpdateConfigs(JobUpdateConfiguration config,
+      Set<Integer> shards) {
+
+    return ImmutableSet.copyOf(Iterables.filter(config.getConfigs(),
+        Predicates.compose(Predicates.in(shards), GET_SHARD)));
+  }
+
+  private static final Function<TaskUpdateConfiguration, Integer> GET_SHARD =
+      new Function<TaskUpdateConfiguration, Integer>() {
+        @Override public Integer apply(TaskUpdateConfiguration config) {
+          return config.isSetOldConfig()
+              ? config.getOldConfig().getShardId()
+              : config.getNewConfig().getShardId();
+        }
+      };
 
   /**
    * Terminates an in-progress update.
@@ -544,20 +577,21 @@ public class StateManager {
 
         // Since we store all shards in a job with the same token, we can just check shard 0,
         // which is always guaranteed to exist for a job.
-        ShardUpdateConfiguration updateConfig = updateStore.fetchShardUpdateConfig(role, job, 0);
-        if (updateConfig == null) {
+        Optional<JobUpdateConfiguration> jobConfig = updateStore.fetchJobUpdateConfig(role, job);
+        if (!jobConfig.isPresent()) {
           if (throwIfMissing) {
             throw new UpdateException("Update does not exist for " + jobKey);
           }
           return false;
         }
 
-        if ((updateToken.isPresent()) && !updateToken.get().equals(updateConfig.getUpdateToken())) {
+        if (updateToken.isPresent()
+            && !updateToken.get().equals(jobConfig.get().getUpdateToken())) {
           throw new UpdateException("Invalid update token for " + jobKey);
         }
 
         if (result == UpdateResult.SUCCESS) {
-          for (Integer shard : fetchShardsToKill(role, job, updateStore)) {
+          for (Integer shard : fetchShardsToKill(jobConfig.get())) {
             changeState(Query.liveShard(jobKey, shard), KILLING, "Removed during update.");
           }
         }
@@ -568,23 +602,23 @@ public class StateManager {
     });
   }
 
-  private static final Predicate<ShardUpdateConfiguration> SELECT_SHARDS_TO_KILL =
-      new Predicate<ShardUpdateConfiguration>() {
-        @Override public boolean apply(ShardUpdateConfiguration config) {
+  private static final Predicate<TaskUpdateConfiguration> SELECT_SHARDS_TO_KILL =
+      new Predicate<TaskUpdateConfiguration>() {
+        @Override public boolean apply(TaskUpdateConfiguration config) {
           return config.getNewConfig() == null;
         }
       };
 
-  private final Function<ShardUpdateConfiguration, Integer> GET_ORIGINAL_SHARD_ID =
-    new Function<ShardUpdateConfiguration, Integer>() {
-      @Override public Integer apply(ShardUpdateConfiguration config) {
+  private final Function<TaskUpdateConfiguration, Integer> GET_ORIGINAL_SHARD_ID =
+    new Function<TaskUpdateConfiguration, Integer>() {
+      @Override public Integer apply(TaskUpdateConfiguration config) {
         return config.getOldConfig().getShardId();
       }
     };
 
-  private Set<Integer> fetchShardsToKill(String role, String job, UpdateStore updateStore) {
+  private Set<Integer> fetchShardsToKill(JobUpdateConfiguration jobConfig) {
     return ImmutableSet.copyOf(Iterables.transform(Iterables.filter(
-        updateStore.fetchShardUpdateConfigs(role, job), SELECT_SHARDS_TO_KILL),
+        jobConfig.getConfigs(), SELECT_SHARDS_TO_KILL),
         GET_ORIGINAL_SHARD_ID));
   }
 
@@ -823,10 +857,14 @@ public class StateManager {
     checkNotBlank(shards);
     managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
 
-    Set<ShardUpdateConfiguration> configs = transactionalStorage.doInTransaction(
-        new Work.Quiet<Set<ShardUpdateConfiguration>>() {
-          @Override public Set<ShardUpdateConfiguration> apply(StoreProvider storeProvider) {
-            return storeProvider.getUpdateStore().fetchShardUpdateConfigs(role, job, shards);
+    Set<TaskUpdateConfiguration> configs = transactionalStorage.doInTransaction(
+        new Work.Quiet<Set<TaskUpdateConfiguration>>() {
+          @Override public Set<TaskUpdateConfiguration> apply(StoreProvider storeProvider) {
+            Optional<JobUpdateConfiguration> config =
+                storeProvider.getUpdateStore().fetchJobUpdateConfig(role, job);
+            return config.isPresent()
+                ? fetchShardUpdateConfigs(config.get(), shards)
+                : ImmutableSet.<TaskUpdateConfiguration>of();
           }
         });
 
@@ -946,7 +984,7 @@ public class StateManager {
       @Override public Boolean get() {
         return transactionalStorage.doInTransaction(new Work.Quiet<Boolean>() {
           @Override public Boolean apply(Storage.StoreProvider storeProvider) {
-            return storeProvider.getUpdateStore().fetchShardUpdateConfig(role, job, 0) != null;
+            return storeProvider.getUpdateStore().fetchJobUpdateConfig(role, job).isPresent();
           }
         });
       }
@@ -1080,18 +1118,22 @@ public class StateManager {
     TwitterTaskInfo oldConfig = Tasks.SCHEDULED_TO_INFO.apply(
         Iterables.getOnlyElement(taskStore.fetchTasks(Query.byId(taskId))));
 
-    UpdateStore.ShardUpdateConfiguration updateConfig = storeProvider.getUpdateStore()
-        .fetchShardUpdateConfig(oldConfig.getOwner().getRole(), oldConfig.getJobName(),
-            oldConfig.getShardId());
+    Optional<TaskUpdateConfiguration> optional = fetchShardUpdateConfig(
+        storeProvider.getUpdateStore(),
+        oldConfig.getOwner().getRole(),
+        oldConfig.getJobName(),
+        oldConfig.getShardId());
 
     // TODO(Sathya): Figure out a way to handle race condition when finish update is called
     //     before ROLLBACK
 
-    if (updateConfig == null) {
+    if (!optional.isPresent()) {
       LOG.warning("No update configuration found for key " + Tasks.jobKey(oldConfig)
           + " shard " + oldConfig.getShardId() + " : Assuming update has finished.");
       return;
     }
+
+    TaskUpdateConfiguration updateConfig = optional.get();
 
     TwitterTaskInfo newConfig =
         rollingBack ? updateConfig.getOldConfig() : updateConfig.getNewConfig();

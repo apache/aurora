@@ -14,6 +14,11 @@ import java.util.Set;
 public interface JobStore {
 
   /**
+   * Deletes all jobs.
+   */
+  void deleteJobs();
+
+  /**
    * Fetches all {@code JobConfiguration}s for jobs owned by the
    * {@link com.twitter.mesos.scheduler.JobManager} identified by {@code managerId}; if there are
    * none then an empty set is returned.
@@ -56,7 +61,8 @@ public interface JobStore {
 
   /**
    * Fetches all the unique manager ids that are present in the job store.
-   * @return
+   *
+   * @return The IDs of all stored job managers.
    */
   Set<String> fetchManagerIds();
 }

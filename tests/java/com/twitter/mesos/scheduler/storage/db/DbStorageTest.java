@@ -1,8 +1,8 @@
 package com.twitter.mesos.scheduler.storage.db;
 
 import java.sql.SQLException;
-import java.util.Set;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -15,12 +15,12 @@ import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.gen.storage.JobUpdateConfiguration;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.db.testing.DbStorageTestUtil;
 import com.twitter.mesos.scheduler.storage.BaseTaskStoreTest;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
-import com.twitter.mesos.scheduler.storage.UpdateStore.ShardUpdateConfiguration;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -111,24 +111,30 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
 
   @Test
   public void testQuotaStorage() {
-    assertNull(store.fetchQuota("jane"));
+    assertFalse(store.fetchQuota("jane").isPresent());
 
     Quota quota = new Quota()
         .setNumCpus(5)
         .setRamMb(2)
         .setDiskMb(10);
     store.saveQuota("jane", quota);
-    assertEquals(quota, store.fetchQuota("jane"));
+    assertEquals(Optional.of(quota), store.fetchQuota("jane"));
 
     Quota quota2 = new Quota()
         .setNumCpus(1)
         .setRamMb(3)
         .setDiskMb(5);
     store.saveQuota("jane", quota2);
-    assertEquals(quota2, store.fetchQuota("jane"));
+    assertEquals(Optional.of(quota2), store.fetchQuota("jane"));
 
     store.removeQuota("jane");
-    assertNull(store.fetchQuota("jane"));
+    assertFalse(store.fetchQuota("jane").isPresent());
+
+    store.saveQuota("foo", quota);
+    store.saveQuota("bar", quota2);
+    assertEquals(ImmutableSet.of("foo", "bar"), store.fetchQuotaRoles());
+    store.deleteQuotas();
+    assertEquals(ImmutableSet.<String>of(), store.fetchQuotaRoles());
   }
 
   @Test
@@ -149,7 +155,7 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
   public void testSnapshotting() {
     String frameworkId = "framework";
     String role = "jake";
-    String job = "fortune";
+    String job = "spin";
     String token = "please";
     byte[] snapshot1 = store.createSnapshot();
 
@@ -166,24 +172,24 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
     final TwitterTaskInfo newTaskInfo = originalTaskInfo.deepCopy().setNumCpus(42);
     TaskUpdateConfiguration updateConfiguration =
         new TaskUpdateConfiguration(originalTaskInfo, newTaskInfo);
-    store.saveShardUpdateConfigs(role, job, token,
-        ImmutableSet.<TaskUpdateConfiguration>of(updateConfiguration));
+    store.saveJobUpdateConfig(
+        new JobUpdateConfiguration(role, job, token, ImmutableSet.of(updateConfiguration)));
     byte[] snapshot3 = store.createSnapshot();
 
     store.applySnapshot(snapshot1);
     assertNull(store.fetchFrameworkId());
     assertTrue(Iterables.isEmpty(store.fetchJobs("CRON")));
     assertTrue(store.fetchTaskIds(Query.GET_ALL).isEmpty());
-    assertTrue(store.fetchShardUpdateConfigs(role).isEmpty());
+    assertTrue(store.fetchUpdateConfigs(role).isEmpty());
 
     store.applySnapshot(snapshot3);
     assertEquals(frameworkId, store.fetchFrameworkId());
     assertEquals(ImmutableList.of(fortuneCron), ImmutableList.copyOf(store.fetchJobs("CRON")));
     assertEquals("42", Iterables.getOnlyElement(store.fetchTaskIds(Query.GET_ALL)));
-    Set<ShardUpdateConfiguration> updateConfigs = store.fetchShardUpdateConfigs(role, job);
-    assertEquals(1, updateConfigs.size());
-    ShardUpdateConfiguration config = Iterables.getOnlyElement(updateConfigs);
-    assertEquals(token, config.getUpdateToken());
+    JobUpdateConfiguration updateConfig = store.fetchJobUpdateConfig(role, job).get();
+    assertEquals(token, updateConfig .getUpdateToken());
+    TaskUpdateConfiguration config = Iterables.getOnlyElement(updateConfig.getConfigs());
+
     assertEquals(originalTaskInfo, config.getOldConfig());
     assertEquals(newTaskInfo, config.getNewConfig());
 
@@ -191,7 +197,7 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
     assertEquals(frameworkId, store.fetchFrameworkId());
     assertTrue(Iterables.isEmpty(store.fetchJobs("CRON")));
     assertTrue(store.fetchTaskIds(Query.GET_ALL).isEmpty());
-    assertTrue(store.fetchShardUpdateConfigs(role).isEmpty());
+    assertTrue(store.fetchUpdateConfigs(role).isEmpty());
   }
 
   private JobConfiguration createJobConfig(String name, String role, String user) {

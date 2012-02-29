@@ -3,9 +3,9 @@ package com.twitter.mesos.scheduler.quota;
 import java.util.Collection;
 
 import com.google.common.base.Function;
+import com.google.common.base.Optional;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Multimap;
 import com.google.inject.Inject;
 
 import com.twitter.mesos.Tasks;
@@ -13,11 +13,12 @@ import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.gen.storage.JobUpdateConfiguration;
+import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 import com.twitter.mesos.scheduler.Shards;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
-import com.twitter.mesos.scheduler.storage.UpdateStore.ShardUpdateConfiguration;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
@@ -79,18 +80,18 @@ public interface QuotaManager {
     public Quota getQuota(final String role) {
       checkNotBlank(role);
 
-      Quota quota = storage.doInTransaction(new Work.Quiet<Quota>() {
-        @Override public Quota apply(StoreProvider storeProvider) {
+      Optional<Quota> quota = storage.doInTransaction(new Work.Quiet<Optional<Quota>>() {
+        @Override public Optional<Quota> apply(StoreProvider storeProvider) {
           return storeProvider.getQuotaStore().fetchQuota(role);
         }
       });
 
       // If this user doesn't have a quota record, return non-null empty quota.
-      return quota == null ? noQuota() : quota;
+      return quota.or(noQuota());
     }
 
-    private static Quota getUpdateQuota(Collection<ShardUpdateConfiguration> configs,
-        Function<ShardUpdateConfiguration, TwitterTaskInfo> taskExtractor) {
+    private static Quota getUpdateQuota(Collection<TaskUpdateConfiguration> configs,
+        Function<TaskUpdateConfiguration, TwitterTaskInfo> taskExtractor) {
       return Quotas.fromTasks(Iterables.filter(Iterables.transform(configs, taskExtractor),
           Predicates.notNull()));
     }
@@ -105,21 +106,17 @@ public interface QuotaManager {
 
       return storage.doInTransaction(
           new Work.Quiet<Quota>() {
-            @Override
-            public Quota apply(StoreProvider storeProvider) {
+            @Override public Quota apply(StoreProvider storeProvider) {
               Quota quota = Quotas.fromTasks(Iterables.transform(
                   storeProvider.getTaskStore().fetchTasks(query), Tasks.SCHEDULED_TO_INFO));
 
-              Multimap<String, ShardUpdateConfiguration> activeUpdates =
-                  storeProvider.getUpdateStore().fetchShardUpdateConfigs(role);
-              for (Collection<ShardUpdateConfiguration> shardUpdateConfigs
-                  : activeUpdates.asMap().values()) {
-
+              for (JobUpdateConfiguration updateConfig
+                  : storeProvider.getUpdateStore().fetchUpdateConfigs(role)) {
                 // If the user is performing an update that increases the quota for the job,
                 // bill them for the updated job.
                 Quota additionalQuota = Quotas.subtract(
-                    getUpdateQuota(shardUpdateConfigs, Shards.GET_NEW_CONFIG),
-                    getUpdateQuota(shardUpdateConfigs, Shards.GET_ORIGINAL_CONFIG)
+                    getUpdateQuota(updateConfig.getConfigs(), Shards.GET_NEW_CONFIG),
+                    getUpdateQuota(updateConfig.getConfigs(), Shards.GET_ORIGINAL_CONFIG)
                 );
                 if (Quotas.greaterThan(additionalQuota, Quotas.NO_QUOTA)) {
                   quota = Quotas.add(quota, additionalQuota);

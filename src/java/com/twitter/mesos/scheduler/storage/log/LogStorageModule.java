@@ -77,8 +77,6 @@ public class LogStorageModule extends AbstractModule {
     DbStorageModule.bind(binder, LogStorage.WriteBehind.class, new Closure<PrivateBinder>() {
       @Override public void execute(PrivateBinder binder) {
         binder.bind(new TypeLiteral<SnapshotStore<byte[]>>() {}).to(DbStorage.class);
-        binder.bind(
-            new TypeLiteral<SnapshotStore<Set<HostAttributes>>>() {}).to(AttributeStoreImpl.class);
 
         TypeLiteral<SnapshotStore<Snapshot>> snapshotStoreType =
             new TypeLiteral<SnapshotStore<Snapshot>>() {};

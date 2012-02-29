@@ -34,6 +34,7 @@ import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
+import com.twitter.mesos.gen.storage.JobUpdateConfiguration;
 import com.twitter.mesos.gen.storage.LogEntry;
 import com.twitter.mesos.gen.storage.Op;
 import com.twitter.mesos.gen.storage.RemoveJob;
@@ -47,7 +48,6 @@ import com.twitter.mesos.gen.storage.SaveJobUpdate;
 import com.twitter.mesos.gen.storage.SaveQuota;
 import com.twitter.mesos.gen.storage.SaveTasks;
 import com.twitter.mesos.gen.storage.Snapshot;
-import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 import com.twitter.mesos.scheduler.SchedulerException;
 import com.twitter.mesos.scheduler.log.Log.Stream.InvalidPositionException;
 import com.twitter.mesos.scheduler.log.Log.Stream.StreamAccessException;
@@ -316,8 +316,12 @@ public class LogStorage extends ForwardingStore {
 
       case SAVE_JOB_UPDATE:
         SaveJobUpdate jobUpdate = op.getSaveJobUpdate();
-        saveShardUpdateConfigs(jobUpdate.getRole(), jobUpdate.getJob(), jobUpdate.getUpdateToken(),
-            jobUpdate.getDelta());
+        saveJobUpdateConfig(new JobUpdateConfiguration(
+            jobUpdate.getRole(),
+            jobUpdate.getJob(),
+            jobUpdate.getUpdateToken(),
+            jobUpdate.getConfigs()
+        ));
         break;
 
       case REMOVE_JOB_UPDATE:
@@ -540,12 +544,15 @@ public class LogStorage extends ForwardingStore {
 
   @Timed("scheduler_log_jobupdate_save")
   @Override
-  public void saveShardUpdateConfigs(final String role, final String job, final String updateToken,
-      final Set<TaskUpdateConfiguration> delta) {
+  public void saveJobUpdateConfig(final JobUpdateConfiguration configs) {
     doInTransaction(new Work.NoResult.Quiet() {
       @Override protected void execute(StoreProvider unused) {
-        log(Op.saveJobUpdate(new SaveJobUpdate(role, job, updateToken, delta)));
-        LogStorage.super.saveShardUpdateConfigs(role, job, updateToken, delta);
+        log(Op.saveJobUpdate(new SaveJobUpdate(
+            configs.getRole(),
+            configs.getJob(),
+            configs.getUpdateToken(),
+            configs.getConfigs())));
+        LogStorage.super.saveJobUpdateConfig(configs);
       }
     });
   }
