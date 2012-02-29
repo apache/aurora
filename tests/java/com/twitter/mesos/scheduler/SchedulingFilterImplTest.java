@@ -162,8 +162,8 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
   @Test
   public void testJobAllowedOnMachine() throws Exception {
-    expectGetHostAttributes(HOST_B);
-    expectGetHostAttributes(HOST_C);
+    expectGetHostAttributes(HOST_B).anyTimes();
+    expectGetHostAttributes(HOST_C).anyTimes();
     control.replay();
 
     SchedulingFilter filterBuilder = new SchedulingFilterImpl(ImmutableMap.of(
@@ -182,7 +182,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
   @Test
   public void testJobNotAllowedOnMachine() throws Exception {
-    expectGetHostAttributes(HOST_A);
+    expectGetHostAttributes(HOST_A).anyTimes();
     control.replay();
 
     SchedulingFilter filterBuilder = new SchedulingFilterImpl(ImmutableMap.of(
@@ -242,6 +242,20 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
     checkConstraint(HOST_A, "jvm", true, "1.0", "2.0");
     checkConstraint(HOST_B, "jvm", false, "2.0", "3.0");
+  }
+
+  @Test
+  public void testMultipleTaskConstraints() throws Exception {
+    expectGetHostAttributes(HOST_A, dedicated(HOST_A), host(HOST_A));
+    expectGetHostAttributes(HOST_B, dedicated("xxx"), host(HOST_A));
+    control.replay();
+
+    Constraint constraint1 = makeConstraint("host", HOST_A);
+    Constraint constraint2 = makeConstraint(DEDICATED_ATTRIBUTE, "xxx");
+
+    assertVetoes(makeTask(OWNER_A, JOB_A, constraint1, constraint2), HOST_A,
+        unsatisfiedValueVeto(DEDICATED_ATTRIBUTE));
+    assertNoVetoes(makeTask(OWNER_B, JOB_B, constraint1, constraint2), HOST_B);
   }
 
   @Test
@@ -346,10 +360,8 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     checkConstraint(HOST_A, "xxx", false, "1.0", "1.4");
 
     // Check that logical AND works.
-    Constraint jvmConstraint = new Constraint("jvm",
-        TaskConstraint.value(new ValueConstraint(false, ImmutableSet.of("1.6"))));
-    Constraint zoneConstraint = new Constraint("zone",
-        TaskConstraint.value(new ValueConstraint(false, ImmutableSet.of("c"))));
+    Constraint jvmConstraint = makeConstraint("jvm", "1.6");
+    Constraint zoneConstraint = makeConstraint("zone", "c");
 
     assertThat(defaultFilter.filter(DEFAULT_OFFER, Optional.of(HOST_A),
         makeTask(OWNER_A, JOB_A, jvmConstraint, zoneConstraint)).isEmpty(),
@@ -408,6 +420,11 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   private Attribute valueAttribute(String name, String string, String... strings) {
     return new Attribute(name,
         ImmutableSet.<String>builder().add(string).addAll(Arrays.asList(strings)).build());
+  }
+
+  private static Constraint makeConstraint(String name, String... values) {
+    return new Constraint(name,
+        TaskConstraint.value(new ValueConstraint(false, ImmutableSet.copyOf(values))));
   }
 
   private IExpectationSetters<ImmutableSet<ScheduledTask>> expectGetTasks(ScheduledTask... tasks) {

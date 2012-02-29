@@ -13,7 +13,6 @@ import com.google.inject.name.Named;
 import com.twitter.common.quantity.Amount;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Attribute;
-import com.twitter.mesos.gen.Constraint;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
@@ -163,7 +162,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     return Optional.absent();
   }
 
-  private FilterRule fromConstraint(final SlaveConstraint constraint) {
+  private FilterRule getConstraintFilter(final String slaveHost) {
     return new FilterRule() {
       @Override public Iterable<Optional<Veto>> apply(final TwitterTaskInfo task) {
         if (!task.isSetConstraints()) {
@@ -191,44 +190,19 @@ public class SchedulingFilterImpl implements SchedulingFilter {
                     Tasks.jobKey(task),
                     activeTasksSupplier,
                     attributeLoader,
-                    attributeLoader.apply(constraint.slaveHost)));
+                    attributeLoader.apply(slaveHost)));
           }
         });
       }
     };
   }
 
-  private Function<SlaveConstraint, FilterRule> constraintToRule =
-      new Function<SlaveConstraint, FilterRule>() {
-        @Override public FilterRule apply(SlaveConstraint constraint) {
-          return fromConstraint(constraint);
-        }
-      };
-
   private Iterable<Veto> applyRules(Iterable<FilterRule> rules, TwitterTaskInfo task) {
     ImmutableList.Builder<Veto> builder = ImmutableList.builder();
-    for (FilterRule rule : rules) {
+    for (FilterRule rule: rules) {
       builder.addAll(Optional.presentInstances(rule.apply(task)));
     }
     return builder.build();
-  }
-
-  private static class SlaveConstraint {
-    final String slaveHost;
-    final Constraint constraint;
-
-    SlaveConstraint(Constraint constraint, String slaveHost) {
-      this.constraint = constraint;
-      this.slaveHost = slaveHost;
-    }
-  }
-
-  private Function<Constraint, SlaveConstraint> addSlave(final String slaveHost) {
-    return new Function<Constraint, SlaveConstraint>() {
-      @Override public SlaveConstraint apply(Constraint constraint) {
-        return new SlaveConstraint(constraint, slaveHost);
-      }
-    };
   }
 
   private boolean isDedicated(final String slaveHost) {
@@ -256,12 +230,8 @@ public class SchedulingFilterImpl implements SchedulingFilter {
       if (!ConfigurationManager.isDedicated(task) && isDedicated(slaveHost.get())) {
         return ImmutableSet.of(DEDICATED_HOST_VETO);
       }
-
-      Iterable<SlaveConstraint> slaveConstraints =
-          Iterables.transform(task.getConstraints(), addSlave(slaveHost.get()));
-      Iterable<FilterRule> dynamicRules =
-          Iterables.transform(slaveConstraints, constraintToRule);
-      return ImmutableSet.copyOf(applyRules(dynamicRules, task));
+      return ImmutableSet.copyOf(
+          Optional.presentInstances(getConstraintFilter(slaveHost.get()).apply(task)));
     } else {
       return ImmutableSet.of();
     }
