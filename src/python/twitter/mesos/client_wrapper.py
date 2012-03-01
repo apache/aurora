@@ -115,6 +115,13 @@ class MesosClientBase(object):
       return method(self, *args, **kwargs)
     return _wrapper
 
+  def requires_auth(method):
+    def _wrapper(self, *args, **kwargs):
+      if not self._session_key:
+        self._session_key = MesosHelper.acquire_session_key_or_die(getpass.getuser())
+      return method(self, *args, **kwargs)
+    return _wrapper
+
   @with_scheduler
   def client(self):
     return self._client
@@ -126,6 +133,10 @@ class MesosClientBase(object):
   @with_scheduler
   def cluster(self):
     return self._cluster
+
+  @requires_auth
+  def session_key(self):
+    return self._session_key
 
   def _construct_scheduler(self):
     """
@@ -139,9 +150,6 @@ class MesosClientBase(object):
     self._client = self._scheduler.get_thrift_client()
     assert self._client, "Could not construct thrift client."
 
-  def acquire_session(self):
-    return MesosHelper.acquire_session_key_or_die(getpass.getuser())
-
 
 class MesosClientAPI(MesosClientBase):
   """This class provides the API to talk to the twitter scheduler"""
@@ -149,29 +157,19 @@ class MesosClientAPI(MesosClientBase):
   def __init__(self, **kwargs):
     super(MesosClientAPI, self).__init__(**kwargs)
 
-  def requires_auth(method):
-    def _wrapper(self, *args, **kwargs):
-      if not self._session_key:
-        self._session_key = self.acquire_session()
-      return method(self, *args, **kwargs)
-    return _wrapper
-
-  @requires_auth
   def create_job(self, config, copy_app_from=None):
     if copy_app_from is not None:
       MesosHelper.copy_app_to_hadoop(config.role(), copy_app_from,
           config.hdfs_path(), self.cluster(), self.proxy())
 
     log.info('Creating job %s' % config.name())
-    return self.client().createJob(config.job(), self._session_key)
+    return self.client().createJob(config.job(), self.session_key())
 
-  @requires_auth
   def start_cronjob(self, role, jobname):
     log.info("Starting cron job: %s" % jobname)
 
-    return self.client().startCronJob(role, jobname, self._session_key)
+    return self.client().startCronJob(role, jobname, self.session_key())
 
-  @requires_auth
   def kill_job(self, role, jobname):
     log.info("Killing tasks for job: %s" % jobname)
 
@@ -179,7 +177,7 @@ class MesosClientAPI(MesosClientBase):
     query.owner = Identity(role=role)
     query.jobName = jobname
 
-    return self.client().killTasks(query, self._session_key)
+    return self.client().killTasks(query, self.session_key())
 
   def check_status(self, role, jobname):
     log.info("Checking status of job: %s" % jobname)
@@ -190,7 +188,6 @@ class MesosClientAPI(MesosClientBase):
 
     return self.client().getTasksStatus(query)
 
-  @requires_auth
   def update_job(self, config, copy_app_from=None):
     log.info("Updating job: %s" % config.name())
 
@@ -198,7 +195,7 @@ class MesosClientAPI(MesosClientBase):
       MesosHelper.copy_app_to_hadoop(config.role(), copy_app_from,
           config().hdfs_path(), self.cluster(), self.proxy())
 
-    resp = self.client().startUpdate(config.job(), self._session_key)
+    resp = self.client().startUpdate(config.job(), self.session_key())
 
     if resp.responseCode != ResponseCode.OK:
       log.info("Error doing start update: %s" % resp.message)
@@ -212,7 +209,7 @@ class MesosClientAPI(MesosClientBase):
     # TODO(William Farner): Cleanly handle connection failures in case the scheduler
     #                       restarts mid-update.
     updater = Updater(config.role(), config.name(), self.client(), time, resp.updateToken,
-                      self._session_key)
+                      self.session_key())
     failed_shards = updater.update(config.job())
 
     if failed_shards:
@@ -238,12 +235,11 @@ class MesosClientAPI(MesosClientBase):
     resp.message = "Update Unsuccessful" if failed_shards else "Update Successful"
     return resp
 
-  @requires_auth
   def cancel_update(self, jobname):
     log.info("Canceling update on job: %s" % jobname)
 
     resp = self.client().finishUpdate(role, jobname, UpdateResult.TERMINATE,
-        None, self._session_key)
+        None, self.session_key())
 
     if resp.responseCode != ResponseCode.OK:
       log.info("Error cancelling the update: %s" % resp.message)
@@ -264,14 +260,12 @@ class MesosClientAPI(MesosClientBase):
 
     return self.client().getQuota(role)
 
-  @requires_auth
   def set_quota(self, role, cpu, ram_mb, disk_mb):
     log.info("Setting quota for user:%s cpu:%f ram_mb:%d disk_mb: %d"
               % (role, cpu, ram_mb, disk_mb))
 
-    return self.client().setQuota(role, Quota(cpu, ram_mb, disk_mb), self._session_key)
+    return self.client().setQuota(role, Quota(cpu, ram_mb, disk_mb), self.session_key())
 
-  @requires_auth
   def force_task_state(self, task_id, status):
     log.info("Requesting that task %s transition to state %s" % (task_id, status))
-    return self.client().forceTaskState(task_id, status, self._session_key)
+    return self.client().forceTaskState(task_id, status, self.session_key())
