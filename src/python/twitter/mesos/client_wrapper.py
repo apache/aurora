@@ -5,7 +5,7 @@ import subprocess
 import time
 
 from twitter.common import log
-from twitter.mesos import clusters
+from twitter.mesos.clusters import Cluster
 from twitter.mesos.location import Location
 
 from twitter.mesos.scheduler_client import SchedulerClient
@@ -45,7 +45,7 @@ class MesosHelper(object):
       scluster = cluster.split(':')
 
       if scluster[0] != 'localhost':
-        clusters.assert_exists(scluster[0])
+        Cluster.assert_exists(scluster[0])
 
       if len(scluster) == 2:
         try:
@@ -54,7 +54,7 @@ class MesosHelper(object):
           log.fatal('The cluster argument is invalid: %s (error: %s)' % (cluster, e))
           assert False, 'Invalid cluster argument: %s' % cluster
     else:
-      clusters.assert_exists(cluster)
+      Cluster.assert_exists(cluster)
 
   @staticmethod
   def copy_to_hadoop(user, ssh_proxy_host, src, dst, hadoop_fs_config):
@@ -90,7 +90,8 @@ class MesosHelper(object):
   @staticmethod
   def copy_app_to_hadoop(user, source_path, hdfs_path, cluster, ssh_proxy):
     assert hdfs_path is not None, 'No target HDFS path specified'
-    hdfs, hdfs_config = clusters.get_hadoop_uri(cluster), clusters.get_hadoop_config(cluster)
+    cluster = Cluster.get(cluster)
+    hdfs, hdfs_config = cluster.hadoop_uri, cluster.hadoop_config
     hdfs_uri = '%s%s' % (hdfs, hdfs_path)
     MesosHelper.copy_to_hadoop(user, ssh_proxy, source_path, hdfs_uri, hdfs_config)
 
@@ -138,6 +139,10 @@ class MesosClientBase(object):
   def session_key(self):
     return self._session_key
 
+  @with_scheduler
+  def scheduler(self):
+    return self._scheduler
+
   def _construct_scheduler(self):
     """
       Populates:
@@ -179,13 +184,13 @@ class MesosClientAPI(MesosClientBase):
 
     return self.client().killTasks(query, self.session_key())
 
-  def check_status(self, role, jobname):
-    log.info("Checking status of job: %s" % jobname)
+  def check_status(self, role, jobname=None):
+    log.info("Checking status of role: %s / job: %s" % (role, jobname))
 
     query = TaskQuery()
     query.owner = Identity(role=role)
-    query.jobName = jobname
-
+    if jobname:
+      query.jobName = jobname
     return self.client().getTasksStatus(query)
 
   def update_job(self, config, copy_app_from=None):

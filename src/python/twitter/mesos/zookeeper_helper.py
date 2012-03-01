@@ -2,9 +2,9 @@ import sys
 import time
 import zookeeper
 
-import clusters
-from location import Location
-from tunnel_helper import TunnelHelper
+from twitter.mesos.clusters import Cluster
+from twitter.mesos.location import Location
+from twitter.mesos.tunnel_helper import TunnelHelper
 
 from twitter.common import log
 
@@ -16,8 +16,7 @@ class ZookeeperHelper(object):
     host, port = TunnelHelper.create_tunnel(
       TunnelHelper.get_tunnel_host(cluster),
       ZookeeperHelper.LOCAL_ZK_TUNNEL_PORT,
-      clusters.get_zk_host(cluster),
-      port)
+      Cluster.get(cluster).zk, port)
     return host, port
 
   @staticmethod
@@ -25,7 +24,7 @@ class ZookeeperHelper(object):
     """ Get a zookeeper connection reachable from this machine.
     by location. Sets up ssh tunnels as appropriate.
     """
-    host = clusters.get_zk_host(cluster)
+    host = Cluster.get(cluster).zk
 
     if host is not 'localhost' and Location.is_corp():
       host, port = ZookeeperHelper.create_zookeeper_tunnel(cluster, port)

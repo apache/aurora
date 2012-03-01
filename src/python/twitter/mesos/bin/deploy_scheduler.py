@@ -10,7 +10,7 @@ from optparse import OptionParser
 from time import gmtime, strftime
 
 from twitter.common import app
-from twitter.mesos import clusters
+from twitter.mesos.clusters import Cluster
 from twitter.mesos.tunnel_helper import TunnelHelper
 
 __author__ = 'William Farner'
@@ -52,34 +52,37 @@ RELEASES_DIR = '%s/releases' % MESOS_HOME
 
 SCHEDULER_HTTP = 'http://localhost:8081'
 
+
 def get_cluster_dc():
-  return clusters.get_dc(app.get_options().cluster)
+  return Cluster.get(app.get_options().cluster).dc
 
 
 def get_cluster_name():
-  return clusters.get_local_name(app.get_options().cluster)
+  return Cluster.get(app.get_options().cluster).local_name
 
 
 def get_scheduler_role():
-  return clusters.get_scheduler_role(app.get_options().cluster)
+  return Cluster.get(app.get_options().cluster).scheduler_role
 
 
 def cluster_is_colonized():
-  return clusters.is_colonized(app.get_options().cluster)
+  return Cluster.get(app.get_options().cluster).is_colonized
 
 
 def get_scheduler_machines():
+  cluster = Cluster.get(app.get_options().cluster)
+
   if app.get_options().really_push:
     params = dict(
-      dc = get_cluster_dc(),
-      role = get_scheduler_role()
+      dc = cluster.dc,
+      role = cluster.scheduler_role
     )
-    if cluster_is_colonized():
+    if cluster.is_colonized:
       cmd = "colony 'membersOf audubon.role.%(role)s'" % params
     else:
       cmd = 'loony --dc=%(dc)s --group=role:%(role)s --one-column' % params
 
-    result, (output, _) = run_cmd(['ssh', TunnelHelper.get_tunnel_host(app.get_options().cluster), cmd])
+    result, (output, _) = run_cmd(['ssh', TunnelHelper.get_tunnel_host(cluster.name), cmd])
     if result != 0:
       sys.exit("Failed to determine scheduler hosts for dc: %(dc)s role: %(role)s" % params)
     return [host.strip() for host in output.splitlines()]
@@ -406,8 +409,7 @@ app.add_option(
   action='store_true',
   help='Verbose logging. (default: %default)')
 
-cluster_list = list(clusters.get_clusters())
-cluster_list.sort()
+cluster_list = Cluster.get_list()
 app.add_option(
   '--cluster',
   type = 'choice',
@@ -460,8 +462,7 @@ def main(args, options):
     print '****************************************************************************************'
 
   if not options.cluster:
-    cluster_list = list(clusters.get_clusters())
-    cluster_list.sort()
+    cluster_list = Cluster.get_list()
     print ('Please specify the cluster you would like to deploy to with\n\t--cluster %s'
            % cluster_list)
     return

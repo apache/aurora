@@ -5,12 +5,16 @@
 
 # TODO(vinod): Use twitter.common.app subcommands instead of cmd
 import cmd
+import functools
+import getpass
 import sys
+from urlparse import urljoin
 import zookeeper
 from pystachio import Ref
 
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
+from twitter.mesos.clusters import Cluster
 from twitter.mesos.client_wrapper import MesosClientAPI, MesosHelper
 from twitter.mesos.parsers.mesos_config import MesosConfig
 from twitter.mesos.parsers.pystachio_config import PystachioConfig
@@ -30,6 +34,27 @@ __authors__ = ['William Farner',
 def _die(msg):
   log.fatal(msg)
   sys.exit(1)
+
+
+def open_url(url):
+  import webbrowser
+  webbrowser.open_new_tab(url)
+
+
+def synthesize_url(cluster, scheduler=None, role=None, job=None):
+  cluster = Cluster.get(cluster)
+  scheduler_url = cluster.proxy_url if cluster.is_service_proxied else (
+    'http://%s:8081' % scheduler.real_host)
+
+  if job and not role:
+    _die('If job specified, must specify role!')
+
+  if not role and not job:
+    return urljoin(scheduler_url, 'scheduler')
+  elif role and not job:
+    return urljoin(scheduler_url, 'scheduler/role?role=%s' % role)
+  else:
+    return urljoin(scheduler_url, 'scheduler/job?role=%s&job=%s' % (role, job))
 
 
 def choose_cluster(config):
@@ -76,19 +101,35 @@ def check_and_log_update_response(resp):
     sys.exit(1)
 
 
-class requires_arguments(object):
-  def __init__(self, *args):
-    self.expected_args = args
-
-  def __call__(self, fn):
-    def wrapped_fn(obj, line):
+class requires(object):
+  @staticmethod
+  def wrap_function(fn, args, comparator):
+    @functools.wraps(fn)
+    def wrapped_function(self, line):
       sline = line.split()
-      if len(sline) != len(self.expected_args):
-        _die('Expected %d args, got %d for: %s' % (
-            len(self.expected_args), len(sline), line))
-      return fn(obj, *sline)
-    wrapped_fn.__doc__ = fn.__doc__
-    return wrapped_fn
+      if not comparator(sline, args):
+        _die('Incorrect parameters for %s: %s' % (fn.__name__, ' '.join(sline)))
+      return fn(self, *sline)
+    return wrapped_function
+
+  @staticmethod
+  def exactly(*args):
+    def wrap(fn):
+      return requires.wrap_function(fn, args, (lambda want, got: len(want) == len(got)))
+    return wrap
+
+  @staticmethod
+  def at_least(*args):
+    def wrap(fn):
+      return requires.wrap_function(fn, args, (lambda want, got: len(want) >= len(got)))
+    return wrap
+
+  @staticmethod
+  def nothing(fn):
+    @functools.wraps(fn)
+    def real_fn(self, line):
+      return fn(self, *line.split())
+    return real_fn
 
 
 class MesosCLI(cmd.Cmd):
@@ -96,7 +137,13 @@ class MesosCLI(cmd.Cmd):
     cmd.Cmd.__init__(self)
     self.options = opts
 
-  @requires_arguments('job', 'config')
+  def handle_open(self, cluster, scheduler, role, job):
+    url = synthesize_url(cluster, scheduler, role, job)
+    log.info('Job url: %s' % url)
+    if self.options.open_browser:
+      open_url(url)
+
+  @requires.exactly('job', 'config')
   def do_create(self, *line):
     """create job config"""
     (jobname, config_file) = line
@@ -105,8 +152,25 @@ class MesosCLI(cmd.Cmd):
     api = MesosClientAPI(cluster=choose_cluster(config), verbose=self.options.verbose)
     resp = api.create_job(config, self.options.copy_app_from)
     check_and_log_response(resp)
+    self.handle_open(choose_cluster(config), api.scheduler(), config.role(), config.name())
 
-  @requires_arguments('job', 'config')
+  @requires.nothing
+  def do_open(self, *args):
+    """open --cluster=CLUSTER [role [job]]"""
+
+    role = job = None
+    if len(args) > 0:
+      role = args[0]
+    if len(args) > 1:
+      job = args[1]
+
+    if not self.options.cluster:
+      _die('--cluster required!')
+
+    api = MesosClientAPI(cluster=self.options.cluster, verbose=self.options.verbose)
+    open_url(synthesize_url(self.options.cluster, api.scheduler(), role, job))
+
+  @requires.exactly('job', 'config')
   def do_inspect(self, *line):
     """inspect job config"""
     (jobname, config_file) = line
@@ -117,7 +181,7 @@ class MesosCLI(cmd.Cmd):
       log.info('Would copy to %s via %s.' % (self.cluster(), self.proxy()))
     log.info('Parsed job config: %s' % config.job())
 
-  @requires_arguments('role', 'job')
+  @requires.exactly('role', 'job')
   def do_start_cron(self, *line):
     """start_cron role job"""
     (role, jobname) = line
@@ -125,8 +189,9 @@ class MesosCLI(cmd.Cmd):
     api = MesosClientAPI(cluster=self.options.cluster, verbose=self.options.verbose)
     resp = api.start_cronjob(role, jobname)
     check_and_log_response(resp)
+    self.handle_open(self.options.cluster, api.scheduler(), role, jobname)
 
-  @requires_arguments('role', 'job')
+  @requires.exactly('role', 'job')
   def do_kill(self, *line):
     """kill role job"""
     (role, jobname) = line
@@ -134,8 +199,9 @@ class MesosCLI(cmd.Cmd):
     api = MesosClientAPI(cluster=self.options.cluster, verbose=self.options.verbose)
     resp = api.kill_job(role, jobname)
     check_and_log_response(resp)
+    self.handle_open(self.options.cluster, api.scheduler(), role, jobname)
 
-  @requires_arguments('role', 'job')
+  @requires.exactly('role', 'job')
   def do_status(self, *line):
     """status role job"""
 
@@ -185,7 +251,7 @@ class MesosCLI(cmd.Cmd):
     else:
       log.info('No tasks found.')
 
-  @requires_arguments('job', 'config')
+  @requires.exactly('job', 'config')
   def do_update(self, *line):
     """update job config"""
     (jobname, config_file) = line
@@ -196,7 +262,7 @@ class MesosCLI(cmd.Cmd):
     resp = api.update_job(config, self.options.copy_app_from)
     check_and_log_update_response(resp)
 
-  @requires_arguments('role', 'job')
+  @requires.exactly('role', 'job')
   def do_cancel_update(self, *line):
     """cancel_update role job"""
     (role, jobname) = line
@@ -205,7 +271,7 @@ class MesosCLI(cmd.Cmd):
     resp = api.cancel_update(role, jobname)
     check_and_log_update_response(resp)
 
-  @requires_arguments('role')
+  @requires.exactly('role')
   def do_get_quota(self, *line):
     """get_quota role"""
     role = line[0]
@@ -222,7 +288,7 @@ class MesosCLI(cmd.Cmd):
              (role, '\n\t'.join(['%s\t%s' % (k, v) for (k, v) in quota_fields])))
 
   # TODO(wfarner): Revisit this once we have a better way to add named args per sub-cmmand
-  @requires_arguments('role', 'cpu', 'ramMb', 'diskMb')
+  @requires.exactly('role', 'cpu', 'ramMb', 'diskMb')
   def do_set_quota(self, *line):
     """set_quota role cpu ramMb diskMb"""
     (role, cpu_str, ram_mb_str, disk_mb_str) = line
@@ -238,7 +304,7 @@ class MesosCLI(cmd.Cmd):
     resp = api.set_quota(role, cpu, ram_mb, disk_mb)
     check_and_log_response(resp)
 
-  @requires_arguments('task_id', 'state')
+  @requires.exactly('task_id', 'state')
   def do_force_task_state(self, *line):
     """force_task_state task_id state"""
     (task_id, state) = line
@@ -277,6 +343,8 @@ The subcommands and their arguments are:
                   help="Cluster to launch the job in (e.g. sjc1, smf1-prod, smf1-nonprod)."
                         " NOTE: If specified, this option overrides the cluster specified "
                         "in the config file. ")
+  app.add_option('-o', '--open_browser', dest='open_browser', action='store_true', default=False,
+                 help="Open a browser window to the job page after a job mutation.")
   app.add_option('--copy_app_from', dest='copy_app_from', default=None,
                   help="Local path to use for the app (will copy to the cluster)"
                        " (default: %default)")
@@ -287,6 +355,7 @@ The subcommands and their arguments are:
   app.add_option('-E', type='string', nargs=1, action='callback', default=[], metavar='NAME:VALUE',
                  callback=add_binding_to('bindings'), dest='bindings',
                  help='bind an environment name to a value.')
+
 
 def main(args, options):
   if not args:
@@ -310,6 +379,7 @@ def main(args, options):
     cli.onecmd(' '.join(args))
   except AssertionError as e:
     _die('\n%s' % e)
+
 
 initialize_options()
 app.main()

@@ -22,7 +22,7 @@ import zookeeper
 
 from gen.twitter.thrift.endpoint.ttypes import ServiceInstance
 
-from twitter.mesos import clusters
+from twitter.mesos.clusters import Cluster
 from gen.twitter.mesos import MesosAdmin
 from twitter.mesos.location import Location
 from twitter.mesos.tunnel_helper import TunnelHelper
@@ -42,7 +42,7 @@ class SchedulerClient(object):
     if cluster.find('localhost:') == 0:
       log.info('Attempting to talk to local scheduler.')
       port = int(cluster.split(':')[1])
-      return None, LocalSchedulerClient(port, ssl=True)
+      return None, LocalSchedulerClient(port, ssl=True, real_host='localhost')
     else:
       if cluster.find(':') > -1:
         cluster, zk_port = cluster.split(':')
@@ -65,10 +65,11 @@ class SchedulerClient(object):
                                                       force_notunnel, ssl=True, **kwargs)
 
 
-  def __init__(self, verbose=False, ssl=False):
+  def __init__(self, verbose=False, ssl=False, real_host=None):
     self._client = None
     self._verbose = verbose
     self._ssl = ssl
+    self._real_host = real_host
 
   def get_thrift_client(self):
     if self._client is None:
@@ -80,18 +81,22 @@ class SchedulerClient(object):
   def _connect(self):
     return None
 
+  @property
+  def real_host(self):
+    return self._real_host
+
   @staticmethod
   def _connect_scheduler(host, port, with_ssl=False):
     if with_ssl:
       socket = TSSLSocket.TSSLSocket(host, port, validate=False)
     else:
       socket = TSocket.TSocket(host, port)
-
     transport = TTransport.TBufferedTransport(socket)
     protocol = TBinaryProtocol.TBinaryProtocol(transport)
     schedulerClient = MesosAdmin.Client(protocol)
     transport.open()
     return schedulerClient
+
 
 class ZookeeperSchedulerClient(SchedulerClient):
   LOCAL_SCHEDULER_TUNNEL_PORT = 8888
@@ -105,7 +110,7 @@ class ZookeeperSchedulerClient(SchedulerClient):
 
   def _connect(self):
     self._zh = ZookeeperHelper.get_zookeeper_handle(self._cluster, self._zkport)
-    (host, port) = ZookeeperSchedulerClient._get_scheduler_host_port(
+    (self._real_host, host, port) = ZookeeperSchedulerClient._get_scheduler_host_port(
       self._zh, self._cluster, self._notunnel, verbose=self._verbose)
     zookeeper.close(self._zh)
     return SchedulerClient._connect_scheduler(host, port, self._ssl)
@@ -137,7 +142,7 @@ class ZookeeperSchedulerClient(SchedulerClient):
     else:
       zookeeper.set_debug_level(zookeeper.LOG_LEVEL_WARN)
 
-    scheduler_zk_path = clusters.get_scheduler_zk_path(cluster)
+    scheduler_zk_path = Cluster.get(cluster).scheduler_zk_path
     children = ZookeeperHelper.get_zookeeper_children_or_die(zh, scheduler_zk_path)
 
     if not children:
@@ -148,13 +153,15 @@ class ZookeeperSchedulerClient(SchedulerClient):
     (data, stat) = zookeeper.get(zh, os.path.join(scheduler_zk_path, master))
 
     host, port = ZookeeperSchedulerClient._parse_endpoint(data)
+    real_host = host
 
     # Open a tunnel to the scheduler if necessary
     if Location.is_corp() and not no_tunnel:
       host, port = ZookeeperSchedulerClient._open_scheduler_tunnel(cluster, host, port)
 
     zookeeper.set_debug_level(zookeeper.LOG_LEVEL_WARN)
-    return host, port
+    return real_host, host, port
+
 
 class LocalSchedulerClient(SchedulerClient):
   def __init__(self, port, ssl=False):
