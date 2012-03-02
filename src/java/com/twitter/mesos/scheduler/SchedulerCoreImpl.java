@@ -280,7 +280,7 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
         return Optional.of(assignTask(offer, task));
       } else {
         // TODO(wfarner): Surface this information into the scheduler web UI.
-        LOG.fine("Task " + Tasks.id(task) + " was vetoed: " + vetoes);
+        LOG.fine("Slave " + offer.getHostname() + " vetoed task " + Tasks.id(task) + ": " + vetoes);
       }
     }
 
