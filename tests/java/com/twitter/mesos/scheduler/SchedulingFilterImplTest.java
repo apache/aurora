@@ -103,19 +103,21 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     attributeStore = createMock(AttributeStore.class);
 
     // Link the store provider to the store mocks.
-    expect(storage.doInTransaction(EasyMock.<Quiet<?>>anyObject()))
-        .andAnswer(new IAnswer<Object>() {
-          @Override
-          public Object answer() {
-            @SuppressWarnings("unchecked")
-            Quiet<?> arg = (Quiet<?>) EasyMock.getCurrentArguments()[0];
-            return arg.apply(storeProvider);
-          }
-        })
-        .anyTimes();
+    expectPossibleDoInTransaction();
 
     expect(storeProvider.getTaskStore()).andReturn(taskStore).anyTimes();
     expect(storeProvider.getAttributeStore()).andReturn(attributeStore).anyTimes();
+  }
+
+  @SuppressWarnings("unchecked")
+  private void expectPossibleDoInTransaction() throws Exception {
+    expect(storage.doInTransaction(EasyMock.<Quiet>anyObject()))
+        .andAnswer(new IAnswer<Object>() {
+          @Override public Object answer() throws Exception {
+            Quiet arg = (Quiet) EasyMock.getCurrentArguments()[0];
+            return arg.apply(storeProvider);
+          }
+        }).anyTimes();
   }
 
   @Test
