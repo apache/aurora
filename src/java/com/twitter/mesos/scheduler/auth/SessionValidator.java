@@ -8,6 +8,7 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Clock;
 import com.twitter.common_internal.ldap.Ods;
+import com.twitter.common_internal.ldap.Ods.LdapException;
 import com.twitter.common_internal.ldap.User;
 import com.twitter.mesos.gen.SessionKey;
 import com.twitter.mesos.scheduler.identity.AuthorizedKeySet;
@@ -77,22 +78,27 @@ public interface SessionValidator {
       }
 
       String userId = sessionKey.getUser();
-      if (!userId.equals(targetRole)) {
-        if (!ods.isRoleAccount(targetRole)) {
-          throw new AuthFailedException(targetRole + " %s is not a role account.");
-        }
-      }
-
-      User user = ods.getUser(userId);
-      if (user == null) {
-        throw new AuthFailedException(String.format("User %s not found.", userId));
-      }
-
       AuthorizedKeySet keySet;
       try {
-        keySet = AuthorizedKeySet.createFromKeys(ods.expandKeys(targetRole));
-      } catch (KeyParseException e) {
-        throw new AuthFailedException("Failed to parse SSH keys for user " + userId);
+        if (!userId.equals(targetRole)) {
+          if (!ods.isRoleAccount(targetRole)) {
+            throw new AuthFailedException(targetRole + " %s is not a role account.");
+          }
+        }
+
+        User user = ods.getUser(userId);
+        if (user == null) {
+          throw new AuthFailedException(String.format("User %s not found.", userId));
+        }
+
+
+        try {
+          keySet = AuthorizedKeySet.createFromKeys(ods.expandKeys(targetRole));
+        } catch (KeyParseException e) {
+          throw new AuthFailedException("Failed to parse SSH keys for user " + userId);
+        }
+      } catch (LdapException e) {
+        throw new AuthFailedException("LDAP request failed: " + e.getMessage(), e);
       }
 
       if (!keySet.verify(
