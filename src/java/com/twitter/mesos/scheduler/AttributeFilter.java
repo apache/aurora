@@ -1,25 +1,25 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Set;
+
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Attribute;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.ValueConstraint;
 import com.twitter.mesos.scheduler.SchedulingFilterImpl.AttributeLoader;
 
-import java.util.Collection;
-import java.util.Set;
-
 /**
  * Utility class that matches attributes to constraints.
  *
  * @author William Farner
  */
-class AttributeFilter {
+final class AttributeFilter {
 
   private static final Function<Attribute, Set<String>> GET_VALUES =
       new Function<Attribute, Set<String>>() {

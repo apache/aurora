@@ -16,21 +16,45 @@ import org.apache.thrift.protocol.TProtocolFactory;
  *
  * @author William Farner
  */
-public class ThriftBinaryCodec {
+public final class ThriftBinaryCodec {
 
   /**
    * Protocol factory used for all thrift encoding and decoding.
    */
   public static final TProtocolFactory PROTOCOL_FACTORY = new TBinaryProtocol.Factory();
 
+  private ThriftBinaryCodec() {
+    // Utility class.
+  }
+
+  /**
+   * Identical to {@link #decodeNonNull(Class, byte[])}, but allows for a null buffer.
+   *
+   * @param clazz Class to instantiate and deserialize to.
+   * @param buffer Buffer to decode.
+   * @param <T> Target type.
+   * @return A populated message, or {@code null} if the buffer was {@code null}.
+   * @throws CodingException If the message could not be decoded.
+   */
   @Nullable
-  public static <T extends TBase> T decode(Class<T> clazz, byte[] buffer) throws CodingException {
+  public static <T extends TBase> T decode(Class<T> clazz, @Nullable byte[] buffer)
+      throws CodingException {
+
     if (buffer == null) {
       return null;
     }
     return decodeNonNull(clazz, buffer);
   }
 
+  /**
+   * Decodes a binary-encoded byte array into a target type.
+   *
+   * @param clazz Class to instantiate and deserialize to.
+   * @param buffer Buffer to decode.
+   * @param <T> Target type.
+   * @return A populated message.
+   * @throws CodingException If the message could not be decoded.
+   */
   public static <T extends TBase> T decodeNonNull(Class<T> clazz, byte[] buffer)
       throws CodingException {
 
@@ -50,14 +74,28 @@ public class ThriftBinaryCodec {
     }
   }
 
+  /**
+   * Identical to {@link #encodeNonNull(TBase)}, but allows for a null input.
+   *
+   * @param tBase Object to encode.
+   * @return Encoded object, or {@code null} if the argument was {@code null}.
+   * @throws CodingException If the object could not be encoded.
+   */
   @Nullable
-  public static byte[] encode(TBase tBase) throws CodingException {
+  public static byte[] encode(@Nullable TBase tBase) throws CodingException {
     if (tBase == null) {
       return null;
     }
     return encodeNonNull(tBase);
   }
 
+  /**
+   * Encodes a thrift object into a binary array.
+   *
+   * @param tBase Object to encode.
+   * @return Encoded object.
+   * @throws CodingException If the object could not be encoded.
+   */
   public static byte[] encodeNonNull(TBase tBase) throws CodingException {
     Preconditions.checkNotNull(tBase);
 
@@ -68,6 +106,9 @@ public class ThriftBinaryCodec {
     }
   }
 
+  /**
+   * Thrown when serialization or deserialization failed.
+   */
   public static class CodingException extends Exception {
     public CodingException(String message) {
       super(message);

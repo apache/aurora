@@ -2,21 +2,24 @@ package com.twitter.mesos.angrybird;
 
 import java.io.IOException;
 import java.text.ParseException;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.annotation.Nullable;
 
+import com.google.common.net.HostAndPort;
+
 import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.data.Stat;
 import org.apache.zookeeper.server.ZKDatabase;
 
 import com.twitter.common.application.ShutdownRegistry;
-import com.twitter.common.collections.Pair;
 import com.twitter.common.zookeeper.testing.ZooKeeperTestServer;
 
+/**
+ * ZooKeeper server test harness for angrybird.
+ */
 public class AngryBirdZooKeeperServer extends ZooKeeperTestServer {
 
   private static final Logger LOG = Logger.getLogger(AngryBirdZooKeeperServer.class.getName());
@@ -51,13 +54,13 @@ public class AngryBirdZooKeeperServer extends ZooKeeperTestServer {
     return closeSession(sessionId);
   }
 
-  private final Long closeSession(@Nullable Long sessionId) {
-    if(sessionId == null) {
-      LOG.log(Level.WARNING, "No session found for expiration!");
+  private Long closeSession(@Nullable Long sessionId) {
+    if (sessionId == null) {
+      LOG.warning("No session found for expiration!");
       return null;
     }
 
-    LOG.log(Level.INFO, "Closing session: "+ sessionId);
+    LOG.info("Closing session: " + sessionId);
     zooKeeperServer.closeSession(sessionId.longValue());
 
     return sessionId;
@@ -68,37 +71,38 @@ public class AngryBirdZooKeeperServer extends ZooKeeperTestServer {
    * i.e, for master and log.
    *
    * @param host ip address of the endpoint
-   * @param port
+   * @param port endpoint port
    * @return Returns session id of the corresponding zk session if a match is found.
    * Otherwise null returned.
    */
-  // TODO(vinod): Instead of (host, port) args use the more generic byte[] as args
-  // so that comparison can be made on znodes that are ServerSet ephemerals
   @Nullable
-  private final Long getSessionID(String host, int port) {
+  private Long getSessionID(String host, int port) {
+    // TODO(vinod): Instead of (host, port) args use the more generic byte[] as args
+    // so that comparison can be made on znodes that are ServerSet ephemerals
+
     ZKDatabase zkDb = zooKeeperServer.getZKDatabase();
 
     for (Long sessionId : zkDb.getSessions()) {
       for (String path: zkDb.getEphemerals(sessionId)) {
-        LOG.log(Level.INFO, "SessionId:"+sessionId+" Path:" + path);
+        LOG.info("SessionId:" + sessionId + " Path:" + path);
         try {
           String data = new String(zkDb.getData(path, new Stat(), null));
-          LOG.log(Level.INFO, "Data in znode: "+data);
+          LOG.info("Data in znode: " + data);
 
-          Pair<String, Integer> endPoints = parseEndPoints(data);
-          LOG.log(Level.INFO, "Extracted "+ endPoints.getFirst() + ":" + endPoints.getSecond());
+          HostAndPort endpoint = parseEndpoint(data);
+          LOG.info("Extracted endpoint " + endpoint);
 
-          if(endPoints.getFirst().equals(host) && endPoints.getSecond().intValue() == port) {
-            LOG.log(Level.INFO, "Matching sessionId:"+ sessionId +
-                " found for endpoint " + host + ":" + port);
+          if (endpoint.getHostText().equals(host) && endpoint.getPort() == port) {
+            LOG.info(String.format(
+                "Matching session id %s found for endpoint %s:%s", sessionId, host, port));
             return sessionId;
           }
         } catch (NoNodeException e) {
-          LOG.log(Level.SEVERE, "Exception getting data for Path:" + path + " : " + e);
+          LOG.severe("Exception getting data for Path:" + path + " : " + e);
         } catch (ParseException e) {
-          LOG.log(Level.SEVERE, "Exception parsing data: "+ e);
+          LOG.severe("Exception parsing data: " + e);
         } catch (NumberFormatException e) {
-          LOG.log(Level.SEVERE, "Exception in url format "+ e);
+          LOG.severe("Exception in url format " + e);
         }
       }
     }
@@ -115,7 +119,7 @@ public class AngryBirdZooKeeperServer extends ZooKeeperTestServer {
    * Otherwise returns null.
    */
   @Nullable
-  private final Long getLeaderSessionID(String zkPath) {
+  private Long getLeaderSessionID(String zkPath) {
     ZKDatabase zkDb = zooKeeperServer.getZKDatabase();
     Long leaderSessionId = null;
     Long masterSeq = Long.MAX_VALUE;
@@ -131,7 +135,7 @@ public class AngryBirdZooKeeperServer extends ZooKeeperTestServer {
             // Get the sequence number.
             Matcher matcher = pattern.matcher(path);
             if (matcher.find()) {
-              LOG.log(Level.INFO, "Pattern matched path: "+ path + " session: " + sessionId);
+              LOG.info("Pattern matched path: " + path + " session: " + sessionId);
               Long seq = Long.parseLong(matcher.group());
               if (seq < masterSeq) {
                 masterSeq = seq;
@@ -139,14 +143,14 @@ public class AngryBirdZooKeeperServer extends ZooKeeperTestServer {
               }
             }
           } catch (NumberFormatException e) {
-            LOG.log(Level.SEVERE, "Exception formatting sequence number "+ e);
+            LOG.severe("Exception formatting sequence number " + e);
           }
         }
       }
     }
 
     if (leaderSessionId != null) {
-      LOG.log(Level.INFO, "Found session leader for " + zkPath + ":" + leaderSessionId);
+      LOG.info(String.format("Found session leader for %s: %s", zkPath, leaderSessionId));
     }
 
     return leaderSessionId;
@@ -161,7 +165,7 @@ public class AngryBirdZooKeeperServer extends ZooKeeperTestServer {
    * Otherwise returns null.
    */
   @Nullable
-  private final Long getFollowerSessionID(String zkPath) {
+  private Long getFollowerSessionID(String zkPath) {
     Long leaderSessionId = getLeaderSessionID(zkPath);
     if (leaderSessionId == null) {
       return null;
@@ -170,10 +174,12 @@ public class AngryBirdZooKeeperServer extends ZooKeeperTestServer {
     ZKDatabase zkDb = zooKeeperServer.getZKDatabase();
 
     for (Long sessionId : zkDb.getSessions()) {
-      if (sessionId == leaderSessionId) continue;
+      if (sessionId.equals(leaderSessionId)) {
+        continue;
+      }
       for (String path: zkDb.getEphemerals(sessionId)) {
         if (path.contains(zkPath)) {
-          LOG.log(Level.INFO, "Found session follower for " + zkPath + ":" + sessionId);
+          LOG.info(String.format("Found session follower for %s: %s", zkPath, sessionId));
           return sessionId;
         }
       }
@@ -182,19 +188,16 @@ public class AngryBirdZooKeeperServer extends ZooKeeperTestServer {
     return null;
   }
 
-  private final Pair<String, Integer> parseEndPoints(String data)
-    throws ParseException, NumberFormatException {
-    int index = -1;
+  private HostAndPort parseEndpoint(String data) throws ParseException {
 
-    if((index = data.indexOf("@")) != -1) {
-      data = data.substring(index+1);
-      index  = data.indexOf(":");
-      if(index == -1) {
-        throw new ParseException("Error parsing url: " + data, index);
+    int index = data.indexOf("@");
+    if (index != -1) {
+      try {
+        return HostAndPort.fromString(data.substring(index + 1));
+      } catch (IllegalArgumentException e) {
+        throw new ParseException("Failed to parse endpoint " + data, index + 1);
       }
-      return Pair.of(data.substring(0, index), Integer.parseInt(data.substring(index+1)));
-    }
-    else {
+    } else {
       // TODO(vinod): Implement parsing for other znode data formats
       throw new ParseException("Unknown znode data: " + data, index);
     }

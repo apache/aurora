@@ -10,7 +10,6 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.Ordering;
 
 import com.twitter.mesos.gen.AssignedTask;
-import com.twitter.mesos.gen.Constraint;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
@@ -37,7 +36,7 @@ import static com.twitter.mesos.gen.ScheduleStatus.UPDATING;
  *
  * @author William Farner
  */
-public class Tasks {
+public final class Tasks {
 
   public static final Function<ScheduledTask, AssignedTask> SCHEDULED_TO_ASSIGNED =
       new Function<ScheduledTask, AssignedTask>() {
@@ -140,6 +139,15 @@ public class Tasks {
           .onResultOf(Functions.compose(Functions.forPredicate(IS_PRODUCTION), ASSIGNED_TO_INFO))
           .compound(Ordering.natural().onResultOf(ASSIGNED_TO_ID));
 
+  public static final Predicate<TwitterTaskInfo> IS_THERMOS_TASK =
+      new Predicate<TwitterTaskInfo>() {
+        @Override public boolean apply(TwitterTaskInfo task) {
+          // Length check is an artifact of thrift 0.5.0 NPE workaround from ConfigurationManager.
+          // See MESOS-370.
+          return task.isSetThermosConfig() && (task.getThermosConfig().length > 0);
+        }
+      };
+
   private Tasks() {
     // Utility class.
   }
@@ -160,14 +168,6 @@ public class Tasks {
       }
     };
   }
-
-  public static Predicate<TwitterTaskInfo> IS_THERMOS_TASK = new Predicate<TwitterTaskInfo>() {
-    @Override public boolean apply(TwitterTaskInfo task) {
-      // Length check is an artifact of thrift 0.5.0 NPE workaround from ConfigurationManager.
-      // See MESOS-370.
-      return task.isSetThermosConfig() && (task.getThermosConfig().length > 0);
-    }
-  };
 
   public static boolean isActive(ScheduleStatus status) {
     return ACTIVE_STATES.contains(status);

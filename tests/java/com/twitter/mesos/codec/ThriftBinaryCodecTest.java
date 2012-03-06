@@ -21,7 +21,7 @@ public class ThriftBinaryCodecTest {
   }
 
   @Test
-  public void testRoundTrip_null() throws CodingException {
+  public void testRoundTripNull() throws CodingException {
     assertNull(ThriftBinaryCodec.decode(Identity.class, ThriftBinaryCodec.encode(null)));
   }
 
@@ -33,12 +33,12 @@ public class ThriftBinaryCodecTest {
   }
 
   @Test(expected = NullPointerException.class)
-  public void testEncodeNonNull_null() throws CodingException {
+  public void testEncodeNonNull() throws CodingException {
     ThriftBinaryCodec.encodeNonNull(null);
   }
 
   @Test(expected = NullPointerException.class)
-  public void testDecodeNonNull_null() throws CodingException {
+  public void testDecodeNonNull() throws CodingException {
     ThriftBinaryCodec.decodeNonNull(Identity.class, null);
   }
 }

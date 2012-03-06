@@ -7,10 +7,11 @@ import java.util.logging.Logger;
 
 import javax.annotation.Nonnegative;
 
-import org.apache.thrift.protocol.TBinaryProtocol;
-
 import com.google.inject.Inject;
 import com.google.inject.Module;
+
+import org.apache.thrift.protocol.TBinaryProtocol;
+
 import com.twitter.common.application.AbstractApplication;
 import com.twitter.common.application.AppLauncher;
 import com.twitter.common.application.Lifecycle;
@@ -27,17 +28,20 @@ import com.twitter.finagle.thrift.ThriftServerFramedCodec;
 import com.twitter.mesos.angrybird.gen.ZooKeeperThriftServer;
 import com.twitter.util.Duration;
 
+/**
+ * Angrybird ZooKeeper server launcher.
+ */
 public class AngryBirdZooKeeperMain extends AbstractApplication {
 
   private static final Logger LOG = Logger.getLogger(AngryBirdZooKeeperMain.class.getName());
 
   @NotNull
   @Positive
-  @CmdLine(name="thrift_port", help= "Thrift server port.")
+  @CmdLine(name = "thrift_port", help = "Thrift server port.")
   private static final Arg<Integer> THRIFT_PORT = Arg.create();
 
   @Nonnegative
-  @CmdLine(name="zk_port", help = "Zookeeper server port")
+  @CmdLine(name = "zk_port", help = "Zookeeper server port")
   private static final Arg<Integer> ZK_PORT = Arg.create(0);
 
   private AngryBirdZooKeeperServer zooKeeperServer;
@@ -66,7 +70,7 @@ public class AngryBirdZooKeeperMain extends AbstractApplication {
     lifecycle.awaitShutdown();
   }
 
-  private final void startThriftServer(int port) {
+  private void startThriftServer(int port) {
     // start the thrift server
     InetSocketAddress address = new InetSocketAddress(port);
 

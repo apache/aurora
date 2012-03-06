@@ -2,35 +2,41 @@ package com.twitter.mesos.angrybird;
 
 import java.io.IOException;
 
-import com.twitter.mesos.angrybird.gen.ExpireResponse;
-import com.twitter.mesos.angrybird.gen.ExpireRequest;
 import com.twitter.mesos.angrybird.gen.ExpireCandidateRequest;
-import com.twitter.mesos.angrybird.gen.Candidate;
+import com.twitter.mesos.angrybird.gen.ExpireRequest;
+import com.twitter.mesos.angrybird.gen.ExpireResponse;
+import com.twitter.mesos.angrybird.gen.RestartResponse;
 import com.twitter.mesos.angrybird.gen.ServerPortResponse;
 import com.twitter.mesos.angrybird.gen.ShutdownResponse;
 import com.twitter.mesos.angrybird.gen.StartupResponse;
-import com.twitter.mesos.angrybird.gen.RestartResponse;
 import com.twitter.mesos.angrybird.gen.ZooKeeperThriftServer;
-
-import static com.twitter.mesos.angrybird.gen.ResponseCode.OK;
-import static com.twitter.mesos.angrybird.gen.ResponseCode.ERROR;
-import static com.twitter.mesos.angrybird.gen.Candidate.LEADER;
-
 import com.twitter.util.Future;
 
+import static com.twitter.mesos.angrybird.gen.Candidate.LEADER;
+import static com.twitter.mesos.angrybird.gen.ResponseCode.ERROR;
+import static com.twitter.mesos.angrybird.gen.ResponseCode.OK;
+
+/**
+ * Thrift interface for the angrybird ZooKeeper server.
+ */
 public class AngryBirdZooKeeperThriftService implements ZooKeeperThriftServer.ServiceIface {
 
-  private final AngryBirdZooKeeperServer zk_server;
+  private final AngryBirdZooKeeperServer zkServer;
 
-  public AngryBirdZooKeeperThriftService(AngryBirdZooKeeperServer zk_server) {
-    this.zk_server = zk_server;
+  /**
+   * Creates a new angrybird thrift server
+   *
+   * @param zkServer Thrift server to interact with.
+   */
+  public AngryBirdZooKeeperThriftService(AngryBirdZooKeeperServer zkServer) {
+    this.zkServer = zkServer;
   }
 
   @Override
   public Future<ServerPortResponse> getZooKeeperServerPort() {
     ServerPortResponse response = new ServerPortResponse();
 
-    int port = zk_server.getPort();
+    int port = zkServer.getPort();
 
     response.setResponseCode(OK)
         .setPort(port);
@@ -42,7 +48,7 @@ public class AngryBirdZooKeeperThriftService implements ZooKeeperThriftServer.Se
   public Future<ExpireResponse> expireSession(ExpireRequest expireRequest) {
     ExpireResponse response = new ExpireResponse();
 
-    Long sessionId = zk_server.expireSession(expireRequest.host, expireRequest.port);
+    Long sessionId = zkServer.expireSession(expireRequest.host, expireRequest.port);
 
     if (sessionId != null) {
       response.setResponseCode(OK).setSessionid(sessionId.longValue());
@@ -57,7 +63,7 @@ public class AngryBirdZooKeeperThriftService implements ZooKeeperThriftServer.Se
   public Future<ExpireResponse> expireCandidateSession(ExpireCandidateRequest request) {
     ExpireResponse response = new ExpireResponse();
 
-    Long sessionId = zk_server.expireCandidateSession(request.zk_path,
+    Long sessionId = zkServer.expireCandidateSession(request.zk_path,
         request.candidate == LEADER);
 
     if (sessionId != null) {
@@ -74,7 +80,7 @@ public class AngryBirdZooKeeperThriftService implements ZooKeeperThriftServer.Se
     StartupResponse response = new StartupResponse();
 
     try {
-      zk_server.startNetwork();
+      zkServer.startNetwork();
       response.setResponseCode(OK);
     } catch (IOException e) {
       response.setResponseCode(ERROR);
@@ -88,7 +94,7 @@ public class AngryBirdZooKeeperThriftService implements ZooKeeperThriftServer.Se
   public Future<ShutdownResponse> shutdown() {
     ShutdownResponse response = new ShutdownResponse();
 
-    zk_server.shutdownNetwork();
+    zkServer.shutdownNetwork();
 
     response.setResponseCode(OK);
 
@@ -100,8 +106,8 @@ public class AngryBirdZooKeeperThriftService implements ZooKeeperThriftServer.Se
     RestartResponse response = new RestartResponse();
 
     try {
-      zk_server.shutdownNetwork();
-      zk_server.restartNetwork();
+      zkServer.shutdownNetwork();
+      zkServer.restartNetwork();
       response.setResponseCode(OK);
     } catch (IOException e) {
       response.setResponseCode(ERROR);

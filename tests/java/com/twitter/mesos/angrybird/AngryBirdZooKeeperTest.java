@@ -5,11 +5,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
+import javax.annotation.Nullable;
+
 import com.google.common.testing.junit4.TearDownTestCase;
-import com.twitter.common.application.ShutdownRegistry;
-import com.twitter.common.testing.TearDownRegistry;
-import com.twitter.common.zookeeper.ZooKeeperClient;
-import com.twitter.common.zookeeper.ZooKeeperUtils;
 
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
@@ -17,6 +15,11 @@ import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.data.ACL;
 import org.junit.Before;
 import org.junit.Test;
+
+import com.twitter.common.application.ShutdownRegistry;
+import com.twitter.common.testing.TearDownRegistry;
+import com.twitter.common.zookeeper.ZooKeeperClient;
+import com.twitter.common.zookeeper.ZooKeeperUtils;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
@@ -28,10 +31,11 @@ public class AngryBirdZooKeeperTest extends TearDownTestCase {
 
   private static final Logger LOG = Logger.getLogger(AngryBirdZooKeeperTest.class.getName());
 
-  private AngryBirdZooKeeperServer zkServer;
   private static final List<ACL> ACL = ZooDefs.Ids.OPEN_ACL_UNSAFE;
+  private static final String ROOT_PATH = "/dummy/sequence";
+
+  private AngryBirdZooKeeperServer zkServer;
   private Map<ZooKeeperClient, String> zkPaths;
-  private static String pathPrefix = "/dummy/sequence";
 
   @Before
   public final void setUp() throws Exception {
@@ -43,7 +47,7 @@ public class AngryBirdZooKeeperTest extends TearDownTestCase {
     zkPaths = new HashMap<ZooKeeperClient, String>();
   }
 
-  @Test
+  @Test(expected = KeeperException.class)
   public void testEndpointExpiration() throws Exception {
 
     // Create some sequential nodes.
@@ -59,13 +63,11 @@ public class AngryBirdZooKeeperTest extends TearDownTestCase {
     zkClient3.get().exists(zkPaths.get(zkClient3), null);
 
     // Check that the matching session has expired.
-    try {
-      zkClient1.get().exists(zkPaths.get(zkClient1), null);
-      fail("Matching session has not expired!");
-    } catch (KeeperException e) {}
+    zkClient1.get().exists(zkPaths.get(zkClient1), null);
+    fail("Matching session has not expired!");
   }
 
-  @Test
+  @Test(expected = KeeperException.class)
   public void testLeaderExpiration() throws Exception {
 
     // Create some sequential nodes.
@@ -74,17 +76,15 @@ public class AngryBirdZooKeeperTest extends TearDownTestCase {
     ZooKeeperClient zkClient3 = createZKClient();
 
     // Expire the leader's session.
-    zkServer.expireCandidateSession(pathPrefix, true);
+    zkServer.expireCandidateSession(ROOT_PATH, true);
 
     // Make sure the follower sessions are not expired.
     zkClient2.get().exists(zkPaths.get(zkClient2), null);
     zkClient3.get().exists(zkPaths.get(zkClient3), null);
 
     // Check that leader's session has expired.
-    try {
-      zkClient1.get().exists(zkPaths.get(zkClient1), null);
-      fail("Leader session has not expired!");
-    } catch (KeeperException e) {}
+    zkClient1.get().exists(zkPaths.get(zkClient1), null);
+    fail("Leader session has not expired!");
   }
 
   @Test
@@ -96,7 +96,7 @@ public class AngryBirdZooKeeperTest extends TearDownTestCase {
     ZooKeeperClient zkClient3 = createZKClient();
 
     // Expire the follower's session.
-    zkServer.expireCandidateSession(pathPrefix, false);
+    zkServer.expireCandidateSession(ROOT_PATH, false);
 
     // Make sure the leader's session is not expired.
     zkClient1.get().exists(zkPaths.get(zkClient1), null);
@@ -122,14 +122,14 @@ public class AngryBirdZooKeeperTest extends TearDownTestCase {
   }
 
   // Creates a zookeeper client and creates a znode with the given path.
-  private ZooKeeperClient createZKClient(byte[] data) throws Exception {
+  private ZooKeeperClient createZKClient(@Nullable byte[] data) throws Exception {
     final ZooKeeperClient zkClient = zkServer.createClient();
 
     // Create prefix path if it doesn't exist.
-    ZooKeeperUtils.ensurePath(zkClient, ACL, pathPrefix);
+    ZooKeeperUtils.ensurePath(zkClient, ACL, ROOT_PATH);
 
     // Create the ephemeral node.
-    String path = zkClient.get().create(pathPrefix, data, ACL, CreateMode.EPHEMERAL_SEQUENTIAL);
+    String path = zkClient.get().create(ROOT_PATH, data, ACL, CreateMode.EPHEMERAL_SEQUENTIAL);
 
     LOG.info("Created ephemeral node: " + path);
     zkPaths.put(zkClient, path);
