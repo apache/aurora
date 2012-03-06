@@ -94,13 +94,6 @@ def check_and_log_response(resp):
     sys.exit(1)
 
 
-def check_and_log_update_response(resp):
-  log.info('Update response from scheduler: %s (message: %s)'
-      % (UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
-  if resp.responseCode != UpdateResponseCode.OK:
-    sys.exit(1)
-
-
 class requires(object):
   @staticmethod
   def wrap_function(fn, args, comparator):
@@ -260,7 +253,7 @@ class MesosCLI(cmd.Cmd):
 
     api = MesosClientAPI(cluster=choose_cluster(config), verbose=self.options.verbose)
     resp = api.update_job(config, self.options.copy_app_from)
-    check_and_log_update_response(resp)
+    check_and_log_response(resp)
 
   @requires.exactly('role', 'job')
   def do_cancel_update(self, *line):
@@ -269,7 +262,7 @@ class MesosCLI(cmd.Cmd):
 
     api = MesosClientAPI(cluster=self.options.cluster, verbose=self.options.verbose)
     resp = api.cancel_update(role, jobname)
-    check_and_log_update_response(resp)
+    check_and_log_response(resp)
 
   @requires.exactly('role')
   def do_get_quota(self, *line):

@@ -198,7 +198,7 @@ class MesosClientAPI(MesosClientBase):
 
     if copy_app_from is not None:
       MesosHelper.copy_app_to_hadoop(config.role(), copy_app_from,
-          config().hdfs_path(), self.cluster(), self.proxy())
+          config.hdfs_path(), self.cluster(), self.proxy())
 
     resp = self.client().startUpdate(config.job(), self.session_key())
 
