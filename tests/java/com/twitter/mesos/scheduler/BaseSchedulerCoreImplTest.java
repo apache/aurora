@@ -707,6 +707,42 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     assertThat(taskId.equals(newTaskId), is(false));
   }
 
+  @Test
+  public void testStartRunningOverlapCronJob() throws Exception {
+    // Start a cron job that is already started by an earlier
+    // call and is PENDING. Make sure it follows the cron collision policy.
+    control.replay();
+    buildScheduler();
+
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, 1)
+        .setCronSchedule("1 1 1 1 1")
+        .setCronCollisionPolicy(CronCollisionPolicy.RUN_OVERLAP);
+
+    scheduler.createJob(job);
+    assertTaskCount(0);
+    assertThat(cron.hasJob(JOB_A_KEY), is(true));
+
+    cron.cronTriggered(job);
+    assertTaskCount(1);
+
+    String taskId = Tasks.id(getOnlyTask(queryJob(OWNER_A,JOB_A)));
+
+    // Now start the same cron job immediately.
+    cron.cronTriggered(job);
+
+    // Since the task never left PENDING, the second run should have been suppressed.
+    assertTaskCount(1);
+    assertThat(getTask(taskId).getStatus(), is(PENDING));
+
+    changeStatus(Query.byId(taskId), ASSIGNED);
+
+    cron.cronTriggered(job);
+    assertTaskCount(2);
+    assertThat(getTask(taskId).getStatus(), is(ASSIGNED));
+
+    getOnlyTask(Query.byStatus(ScheduleStatus.PENDING));
+  }
+
   @Test(expected = TaskDescriptionException.class)
   public void testCreateEmptyJob() throws Exception {
     control.replay();

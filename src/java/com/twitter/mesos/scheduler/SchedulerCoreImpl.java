@@ -224,7 +224,6 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
     checkNotNull(job);
     checkNotNull(job.getTaskConfigs());
     checkStarted();
-    checkState(!hasRunningTasks(job));
 
     launchTasks(job.getTaskConfigs());
   }

@@ -3,6 +3,7 @@ package com.twitter.mesos.scheduler;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
@@ -11,6 +12,7 @@ import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
@@ -33,8 +35,11 @@ import com.twitter.common.util.BackoffHelper;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.CronCollisionPolicy;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.ScheduleStatus;
+import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.storage.Storage;
+import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
 
 /**
@@ -193,8 +198,9 @@ public class CronJobManager extends JobManager {
    * @param job The config of the job to be triggered.
    */
   @VisibleForTesting
-  void cronTriggered(JobConfiguration job) {
-    LOG.info(String.format("Cron triggered for %s at %s", Tasks.jobKey(job), new Date()));
+  void cronTriggered(final JobConfiguration job) {
+    LOG.info(String.format("Cron triggered for %s at %s with policy %s",
+        Tasks.jobKey(job), new Date(), job.getCronCollisionPolicy()));
     cronJobsTriggered.incrementAndGet();
 
     boolean runJob = false;
@@ -211,7 +217,6 @@ public class CronJobManager extends JobManager {
 
       switch (collisionPolicy) {
         case KILL_EXISTING:
-          LOG.info("Cron collision policy requires killing existing job.");
           try {
             schedulerCore.killTasks(query, CRON_USER);
             // Check immediately if the tasks are gone.  This could happen if the existing tasks
@@ -224,15 +229,28 @@ public class CronJobManager extends JobManager {
           } catch (ScheduleException e) {
             LOG.log(Level.SEVERE, "Failed to kill job.", e);
           }
+          break;
 
-          break;
         case CANCEL_NEW:
-          LOG.info("Cron collision policy prevented job from running.");
           break;
+
         case RUN_OVERLAP:
-          LOG.info("Cron collision policy permitting overlapping job run.");
-          runJob = true;
+          boolean hasPendingTasks = storage.doInTransaction(new Work.Quiet<Boolean>() {
+            @Override public Boolean apply(StoreProvider storeProvider) {
+              return !storeProvider.getTaskStore().fetchTasks(new TaskQuery()
+                  .setOwner(job.getOwner())
+                  .setJobName(job.getName())
+                  .setStatuses(ImmutableSet.of(ScheduleStatus.PENDING))).isEmpty();
+            }
+          });
+
+          if (!hasPendingTasks) {
+            runJob = true;
+          } else {
+            LOG.info("Job " + Tasks.jobKey(job) + " has pending tasks, suppressing run.");
+          }
           break;
+
         default:
           LOG.severe("Unrecognized cron collision policy: " + job.getCronCollisionPolicy());
       }
