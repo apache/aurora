@@ -24,11 +24,13 @@ import com.twitter.mesos.scheduler.LeaderRedirect;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerCore;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-import static com.twitter.mesos.Tasks.jobKey;
-import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 import static javax.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
 import static javax.servlet.http.HttpServletResponse.SC_NOT_FOUND;
+
+import static com.google.common.base.Preconditions.checkNotNull;
+
+import static com.twitter.mesos.Tasks.jobKey;
+import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 
 /**
  * Simple redirector from the canonical name of a task to its configured HTTP port.
@@ -103,8 +105,12 @@ public class Mname extends HttpServlet {
 
       String queryString = req.getQueryString();
       String redirect = String.format("http://%s:%d", slaveHost, httpPort);
-      if (forwardRequest != null) redirect += forwardRequest;
-      if (queryString != null) redirect += "?" + queryString;
+      if (forwardRequest != null) {
+        redirect += forwardRequest;
+      }
+      if (queryString != null) {
+        redirect += "?" + queryString;
+      }
       resp.sendRedirect(redirect);
     } else {
       sendUsageError(resp);

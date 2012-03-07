@@ -37,6 +37,7 @@ import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
 
 import it.sauronsoftware.cron4j.InvalidPatternException;
+import it.sauronsoftware.cron4j.Predictor;
 import it.sauronsoftware.cron4j.Scheduler;
 import it.sauronsoftware.cron4j.SchedulingPattern;
 
@@ -133,6 +134,15 @@ public class CronJobManager extends JobManager {
         }
       }
     });
+  }
+
+  /**
+   * Predicts the next date at which a cron schedule will trigger.
+   *
+   * @param cronSchedule Cron schedule to predict the next time for.
+   */
+  public static Date predictNextRun(String cronSchedule) {
+    return new Predictor(cronSchedule).nextMatchingDate();
   }
 
   /**

@@ -8,9 +8,9 @@ import com.google.inject.Inject;
 import com.google.inject.Key;
 import com.google.inject.TypeLiteral;
 
-import com.twitter.common.application.modules.LocalServiceRegistry;
 import com.twitter.common.application.http.Registration;
 import com.twitter.common.application.modules.LifecycleModule;
+import com.twitter.common.application.modules.LocalServiceRegistry;
 import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.net.pool.DynamicHostSet;
 import com.twitter.common.net.pool.DynamicHostSet.MonitorException;
@@ -27,6 +27,7 @@ import com.twitter.thrift.ServiceInstance;
  * @author William Farner
  */
 public class ServletModule extends AbstractModule {
+
   @Override
   protected void configure() {
     requireBinding(SchedulerCore.class);

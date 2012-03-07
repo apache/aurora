@@ -37,6 +37,7 @@ import com.twitter.mesos.scheduler.LeaderRedirect;
 import com.twitter.mesos.scheduler.SchedulerCore;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
@@ -64,6 +65,9 @@ public class SchedulerzJob extends StringTemplateServlet {
   // Pagination controls.
   private static final String OFFSET_PARAM = "o";
   private static final int PAGE_SIZE = 50;
+
+  private static final Ordering<ScheduledTask> SHARD_ID_COMPARATOR =
+    Ordering.natural().onResultOf(Tasks.SCHEDULED_TO_SHARD_ID);
 
   private static final Map<ScheduleStatus, Set<ScheduleStatus>> FILTER_MAP =
       ImmutableMap.<ScheduleStatus, Set<ScheduleStatus>>builder()
@@ -99,8 +103,8 @@ public class SchedulerzJob extends StringTemplateServlet {
             .put("taskId", task.getTaskId())
             .put("shardId", task.getTask().getShardId())
             .put("slaveHost", task.isSetSlaveHost() ? task.getSlaveHost() : "")
-            .put("taskEvents", scheduledTask.isSetTaskEvents() ?
-               scheduledTask.getTaskEvents() : Lists.newArrayList());
+            .put("taskEvents", scheduledTask.isSetTaskEvents()
+                ? scheduledTask.getTaskEvents() : Lists.newArrayList());
           if (task.isSetAssignedPorts()
               && task.getAssignedPorts().containsKey("health")) {
             builder.put("healthPort", task.getAssignedPorts().get("health"));
@@ -119,10 +123,17 @@ public class SchedulerzJob extends StringTemplateServlet {
 
 
   private final SchedulerCore scheduler;
-
   private final String clusterName;
   private final LeaderRedirect redirector;
 
+  /**
+   * Creates a new job servlet.
+   *
+   * @param cacheTemplates Whether to cache the template file.
+   * @param scheduler Core scheduler.
+   * @param clusterName Name of the serving cluster.
+   * @param redirector Redirect logic.
+   */
   @Inject
   public SchedulerzJob(@CacheTemplates boolean cacheTemplates,
       SchedulerCore scheduler,
@@ -156,9 +167,6 @@ public class SchedulerzJob extends StringTemplateServlet {
   private static <T> Iterable<T> offsetAndLimit(Iterable<T> iterable, int offset) {
     return ImmutableList.copyOf(Iterables.limit(Iterables.skip(iterable, offset), PAGE_SIZE));
   }
-
-  private static final Comparator<ScheduledTask> SHARD_ID_COMPARATOR =
-      Ordering.natural().onResultOf(Tasks.SCHEDULED_TO_SHARD_ID);
 
   @Override
   protected void doGet(final HttpServletRequest req, HttpServletResponse resp)
@@ -212,8 +220,6 @@ public class SchedulerzJob extends StringTemplateServlet {
         int offset = getOffset(req);
         boolean hasMore = false;
 
-
-
         Set<ScheduledTask> activeTasks;
         if (statusFilter != null) {
           query.setStatuses(FILTER_MAP.get(statusFilter));
@@ -229,8 +235,7 @@ public class SchedulerzJob extends StringTemplateServlet {
           hasMore = completedTasks.size() > offset + PAGE_SIZE;
         }
 
-        List<ScheduledTask> liveTasks = Lists.newArrayList(activeTasks);
-        Collections.sort(liveTasks, SHARD_ID_COMPARATOR);
+        List<ScheduledTask> liveTasks = SHARD_ID_COMPARATOR.sortedCopy(activeTasks);
         template.setAttribute("activeTasks",
           ImmutableList.copyOf(
               Iterables.transform(offsetAndLimit(liveTasks, offset), TASK_TO_STRING_MAP)));

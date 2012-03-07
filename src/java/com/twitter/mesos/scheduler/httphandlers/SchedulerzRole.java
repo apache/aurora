@@ -17,8 +17,6 @@ import com.google.inject.Inject;
 
 import org.antlr.stringtemplate.StringTemplate;
 
-import it.sauronsoftware.cron4j.Predictor;
-
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.mesos.gen.JobConfiguration;
@@ -31,6 +29,7 @@ import com.twitter.mesos.scheduler.SchedulerCore;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**
@@ -48,6 +47,16 @@ public class SchedulerzRole extends StringTemplateServlet {
   private final QuotaManager quotaManager;
   private final LeaderRedirect redirector;
 
+  /**
+   * Creates a new role servlet.
+   *
+   * @param cacheTemplates Whether to cache the template file.
+   * @param scheduler Core scheduler.
+   * @param cronScheduler Cron scheduler.
+   * @param clusterName Name of the serving cluster.
+   * @param quotaManager Resource quota manager.
+   * @param redirector Redirect logic.
+   */
   @Inject
   public SchedulerzRole(@CacheTemplates boolean cacheTemplates,
       SchedulerCore scheduler,
@@ -127,8 +136,7 @@ public class SchedulerzRole extends StringTemplateServlet {
           }
         }
 
-        template.setAttribute("jobs",
-            DisplayUtils.sort(jobs.values(), DisplayUtils.SORT_JOB_BY_NAME));
+        template.setAttribute("jobs", DisplayUtils.JOB_ORDERING.sortedCopy(jobs.values()));
 
         Iterable<JobConfiguration> cronJobs = Iterables.filter(
             cronScheduler.getJobs(), new Predicate<JobConfiguration>() {
@@ -137,7 +145,7 @@ public class SchedulerzRole extends StringTemplateServlet {
               }
             });
 
-        cronJobs = DisplayUtils.sort(cronJobs, DisplayUtils.SORT_JOB_CONFIG_BY_NAME);
+        cronJobs = DisplayUtils.JOB_CONFIG_ORDERING.sortedCopy(cronJobs);
         Iterable<CronJob> cronJobObjs = Iterables.transform(cronJobs,
             new Function<JobConfiguration, CronJob>() {
               @Override public CronJob apply(JobConfiguration job) {
@@ -145,7 +153,7 @@ public class SchedulerzRole extends StringTemplateServlet {
                 cronJob.name = job.getName();
                 cronJob.pendingTaskCount = job.getTaskConfigsSize();
                 cronJob.cronSchedule = job.getCronSchedule();
-                cronJob.nextRun = new Predictor(cronJob.cronSchedule).nextMatchingDate().getTime();
+                cronJob.nextRun = CronJobManager.predictNextRun(cronJob.cronSchedule).getTime();
                 return cronJob;
               }
             });
@@ -157,6 +165,9 @@ public class SchedulerzRole extends StringTemplateServlet {
     });
   }
 
+  /**
+   * Template object to represent a job.
+   */
   static class Job {
     String name;
     int pendingTaskCount = 0;

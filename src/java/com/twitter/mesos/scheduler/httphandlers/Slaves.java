@@ -15,21 +15,23 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
 
-import com.twitter.mesos.gen.Attribute;
-import com.twitter.mesos.scheduler.storage.Storage;
 import org.antlr.stringtemplate.StringTemplate;
 
 import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
+import com.twitter.mesos.gen.Attribute;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.LeaderRedirect;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHosts;
+import com.twitter.mesos.scheduler.storage.Storage;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+
+import static org.apache.mesos.Protos.SlaveID;
+
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import static com.twitter.mesos.scheduler.storage.Storage.Work;
-import static org.apache.mesos.Protos.SlaveID;
 
 /**
  * HTTP interface to serve as a HUD for the mesos slaves tracked in the scheduler.
@@ -43,38 +45,6 @@ public class Slaves extends StringTemplateServlet {
   private final SlaveHosts slaveHosts;
   private LeaderRedirect redirector;
   private Storage storage;
-
-  private static class Slave {
-    final String host;
-    final SlaveID id;
-    final List<Attribute> attributes;
-
-    Slave(String host, SlaveID id, List<Attribute> attributes) {
-      this.host = host;
-      this.id = id;
-      this.attributes = attributes;
-    }
-
-    public String getHost() {
-      return host;
-    }
-
-    public SlaveID getId() {
-      return id;
-    }
-
-    public String getAttributes() {
-      return Joiner.on(", ").join(attributes);
-    }
-  }
-
-  private List<Attribute> getHostAttributes(final String key) {
-    return ImmutableList.copyOf(storage.doInTransaction(new Work.Quiet<Iterable<Attribute>>() {
-      @Override public Iterable<Attribute> apply(StoreProvider storeProvider) {
-        return storeProvider.getAttributeStore().getHostAttributes(key);
-      }
-    }));
-  }
 
   private final Function<Map.Entry<String, SlaveID>, Slave> slaveMapping =
       new Function<Map.Entry<String, SlaveID>, Slave>() {
@@ -102,6 +72,14 @@ public class Slaves extends StringTemplateServlet {
     this.storage = checkNotNull(storage);
   }
 
+  private List<Attribute> getHostAttributes(final String key) {
+    return ImmutableList.copyOf(storage.doInTransaction(new Work.Quiet<Iterable<Attribute>>() {
+      @Override public Iterable<Attribute> apply(StoreProvider storeProvider) {
+        return storeProvider.getAttributeStore().getHostAttributes(key);
+      }
+    }));
+  }
+
   @Override
   protected void doGet(HttpServletRequest req, HttpServletResponse resp)
       throws ServletException, IOException {
@@ -118,5 +96,32 @@ public class Slaves extends StringTemplateServlet {
             Iterables.transform(slaveHosts.getSlaves().entrySet(), slaveMapping)));
       }
     });
+  }
+
+  /**
+   * Template object to represent a slave.
+   */
+  private static class Slave {
+    final String host;
+    final SlaveID id;
+    final List<Attribute> attributes;
+
+    Slave(String host, SlaveID id, List<Attribute> attributes) {
+      this.host = host;
+      this.id = id;
+      this.attributes = attributes;
+    }
+
+    public String getHost() {
+      return host;
+    }
+
+    public SlaveID getId() {
+      return id;
+    }
+
+    public String getAttributes() {
+      return Joiner.on(", ").join(attributes);
+    }
   }
 }

@@ -1,10 +1,7 @@
 package com.twitter.mesos.scheduler.httphandlers;
 
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-
-import com.google.common.collect.Lists;
+import com.google.common.base.Function;
+import com.google.common.collect.Ordering;
 
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.scheduler.httphandlers.SchedulerzHome.Role;
@@ -15,32 +12,28 @@ import com.twitter.mesos.scheduler.httphandlers.SchedulerzRole.Job;
  *
  * @author William Farner
  */
-public class DisplayUtils {
+public final class DisplayUtils {
 
-  public static <T> List<T> sort(Iterable<T> values, Comparator<T> comparator) {
-    List<T> copy = Lists.newArrayList(values);
-    Collections.sort(copy, comparator);
-    return copy;
-  }
-
-  public static final Comparator<Role> SORT_USERS_BY_NAME = new Comparator<Role>() {
-      @Override public int compare(Role roleA, Role roleB) {
-        return roleA.role.compareTo(roleB.role);
-      }
-    };
-
-  public static final Comparator<Job> SORT_JOB_BY_NAME = new Comparator<Job>() {
-      @Override public int compare(Job jobA, Job jobB) {
-        return jobA.getName().compareTo(jobB.getName());
-      }
-    };
-
-  public static final Comparator<JobConfiguration> SORT_JOB_CONFIG_BY_NAME =
-      new Comparator<JobConfiguration>() {
-        @Override public int compare(JobConfiguration jobA, JobConfiguration jobB) {
-          return jobA.getName().compareTo(jobB.getName());
+  public static final Ordering<Role> ROLE_ORDERING = Ordering.natural().onResultOf(
+      new Function<Role, String>() {
+        @Override public String apply(Role role) {
+          return role.getRole();
         }
-      };
+      });
+
+  public static final Ordering<Job> JOB_ORDERING = Ordering.natural().onResultOf(
+      new Function<Job, String>() {
+        @Override public String apply(Job job) {
+          return job.getName();
+        }
+      });
+
+  public static final Ordering<JobConfiguration> JOB_CONFIG_ORDERING = Ordering.natural()
+      .onResultOf(new Function<JobConfiguration, String>() {
+        @Override public String apply(JobConfiguration job) {
+          return job.getName();
+        }
+      });
 
   private DisplayUtils() {
     // Utility class.

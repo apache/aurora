@@ -34,6 +34,7 @@ import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerCore;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**
@@ -43,11 +44,42 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
  */
 public class SchedulerzHome extends StringTemplateServlet {
 
+  private static final Function<String, Role> CREATE_ROLE = new Function<String, Role>() {
+    @Override public Role apply(String ownerRole) {
+      Role role = new Role();
+      role.role = ownerRole;
+      return role;
+    }
+  };
+
+  private static final Function<ScheduledTask, String> GET_JOB_NAME =
+      new Function<ScheduledTask, String>() {
+        @Override public String apply(ScheduledTask task) {
+          return task.getAssignedTask().getTask().getJobName();
+        }
+      };
+
+  private static final Function<JobConfiguration, String> GET_CRON_OWNER =
+      new Function<JobConfiguration, String>() {
+        @Override public String apply(JobConfiguration job) {
+          return job.getOwner().getRole();
+        }
+      };
+
   private final SchedulerCore scheduler;
   private final CronJobManager cronScheduler;
   private final String clusterName;
   private final LeaderRedirect redirector;
 
+  /**
+   * Creates a new scheduler home servlet.
+   *
+   * @param cacheTemplates Whether to cache the template file.
+   * @param scheduler Core scheduler.
+   * @param cronScheduler Cron scheduler.
+   * @param clusterName Name of the serving cluster.
+   * @param redirector Redirect logic.
+   */
   @Inject
   public SchedulerzHome(@CacheTemplates boolean cacheTemplates,
       SchedulerCore scheduler,
@@ -60,14 +92,6 @@ public class SchedulerzHome extends StringTemplateServlet {
     this.clusterName = checkNotBlank(clusterName);
     this.redirector = checkNotNull(redirector);
   }
-
-  private static final Function<String, Role> CREATE_ROLE = new Function<String, Role>() {
-    @Override public Role apply(String ownerRole) {
-      Role role = new Role();
-      role.role = ownerRole;
-      return role;
-    }
-  };
 
   @Override
   protected void doGet(final HttpServletRequest req, HttpServletResponse resp)
@@ -131,8 +155,7 @@ public class SchedulerzHome extends StringTemplateServlet {
               activeRoleTasks, GET_JOB_NAME)).size();
         }
 
-        template.setAttribute("owners",
-            DisplayUtils.sort(roles, DisplayUtils.SORT_USERS_BY_NAME));
+        template.setAttribute("owners", DisplayUtils.ROLE_ORDERING.sortedCopy(roles));
 
         // Add cron job counts for each role.
         for (Map.Entry<String, Collection<JobConfiguration>> entry
@@ -143,24 +166,13 @@ public class SchedulerzHome extends StringTemplateServlet {
     });
   }
 
-  private static final Function<ScheduledTask, String> GET_JOB_NAME =
-      new Function<ScheduledTask, String>() {
-        @Override public String apply(ScheduledTask task) {
-          return task.getAssignedTask().getTask().getJobName();
-        }
-      };
-
-  private static final Function<JobConfiguration, String> GET_CRON_OWNER =
-      new Function<JobConfiguration, String>() {
-        @Override public String apply(JobConfiguration job) {
-          return job.getOwner().getRole();
-        }
-      };
-
+  /**
+   * Template object to represent a role.
+   */
   static class Role {
-    String role;
-    int jobCount;
-    int cronJobCount;
+    private String role;
+    private int jobCount;
+    private int cronJobCount;
     private int pendingTaskCount = 0;
     private int activeTaskCount = 0;
     private int finishedTaskCount = 0;
