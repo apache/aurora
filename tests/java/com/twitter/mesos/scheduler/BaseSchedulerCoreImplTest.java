@@ -332,7 +332,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     assertThat(getOnlyTask(queryJob(OWNER_A, JOB_A)).getStatus(), is(PENDING));
   }
 
-  @Test(expected = ScheduleException.class)
+  @Test(expected = TaskDescriptionException.class)
   public void testLimitConstraintForDedicatedJob() throws Exception {
     control.replay();
     buildScheduler();
@@ -341,7 +341,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(makeJob(OWNER_A, JOB_A, ImmutableSet.of(task)));
   }
 
-  @Test(expected = ScheduleException.class)
+  @Test(expected = TaskDescriptionException.class)
   public void testMultipleValueConstraintForDedicatedJob() throws Exception {
     control.replay();
     buildScheduler();
@@ -350,7 +350,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(makeJob(OWNER_A, JOB_A, ImmutableSet.of(task)));
   }
 
-  @Test(expected = ScheduleException.class)
+  @Test(expected = TaskDescriptionException.class)
   public void testUnauthorizedDedicatedJob() throws Exception {
     control.replay();
     buildScheduler();

@@ -6,6 +6,8 @@ import java.util.Set;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
+import javax.annotation.Nullable;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
@@ -31,11 +33,8 @@ import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.ValueConstraint;
 import com.twitter.mesos.scheduler.CommandLineExpander;
-import com.twitter.mesos.scheduler.ScheduleException;
 import com.twitter.mesos.scheduler.ThermosJank;
 import com.twitter.mesos.scheduler.configuration.ValueParser.ParseException;
-
-import javax.annotation.Nullable;
 
 /**
  * Manages translation from a string-mapped configuration to a concrete configuration type, and
@@ -45,274 +44,24 @@ import javax.annotation.Nullable;
  *
  * @author William Farner
  */
-public class ConfigurationManager {
+public final class ConfigurationManager {
 
-  private static final Logger LOG = Logger.getLogger(ConfigurationManager.class.getName());
-
-  private static final Pattern GOOD_IDENTIFIER_PATTERN = Pattern.compile("[\\w\\-\\.]+");
-  @VisibleForTesting public static final String HOST_CONSTRAINT = "host";
-  private static final int MAX_IDENTIFIED_LENGTH = 255;
   public static final String DEDICATED_ATTRIBUTE = "dedicated";
+
+  @VisibleForTesting public static final String HOST_CONSTRAINT = "host";
 
   @VisibleForTesting
   @Positive
   @CmdLine(name = "max_tasks_per_job", help = "Maximum number of allowed tasks in a single job.")
   public static final Arg<Integer> MAX_TASKS_PER_JOB = Arg.create(500);
 
-  private static boolean isGoodIdentifier(String identifier) {
-    return GOOD_IDENTIFIER_PATTERN.matcher(identifier).matches()
-           && (identifier.length() <= MAX_IDENTIFIED_LENGTH);
-  }
+  private static final Logger LOG = Logger.getLogger(ConfigurationManager.class.getName());
 
-  private static void checkNotNull(Object value, String error) throws TaskDescriptionException {
-    if (value == null) {
-       throw new TaskDescriptionException(error);
-     }
-  }
+  private static final Pattern GOOD_IDENTIFIER_PATTERN = Pattern.compile("[\\w\\-\\.]+");
 
-  private static void assertOwnerValidity(Identity jobOwner) throws TaskDescriptionException {
-    checkNotNull(jobOwner, "No job owner specified!");
-    checkNotNull(jobOwner.getRole(), "No job role specified!");
-    checkNotNull(jobOwner.getUser(), "No job user specified!");
-
-    if (!isGoodIdentifier(jobOwner.getRole())) {
-      throw new TaskDescriptionException("Job role contains illegal characters: " +
-          jobOwner.getRole());
-    }
-
-    if (!isGoodIdentifier(jobOwner.getUser())) {
-      throw new TaskDescriptionException("Job user contains illegal characters: " +
-          jobOwner.getUser());
-    }
-  }
-
-  private static String getRole(ValueConstraint constraint) {
-    return Iterables.getOnlyElement(constraint.getValues()).split("/")[0];
-  }
-
-  private static boolean isValueConstraint(TaskConstraint taskConstraint) {
-    return taskConstraint.getSetField() == TaskConstraint._Fields.VALUE;
-  }
-
-  public static boolean isDedicated(TwitterTaskInfo task) {
-    return Iterables.any(task.getConstraints(), getConstraintByName(DEDICATED_ATTRIBUTE));
-  }
-
-  @Nullable
-  private static Constraint getDedicatedConstraint(TwitterTaskInfo task) {
-    return Iterables.find(task.getConstraints(), getConstraintByName(DEDICATED_ATTRIBUTE), null);
-  }
-
-  public static JobConfiguration validateAndPopulate(JobConfiguration job)
-      throws TaskDescriptionException, ScheduleException {
-    Preconditions.checkNotNull(job);
-    String role = job.getOwner().getRole();
-
-    if (job.getTaskConfigsSize() > MAX_TASKS_PER_JOB.get()) {
-      throw new TaskDescriptionException("Job exceeds task limit of " + MAX_TASKS_PER_JOB.get());
-    }
-
-    JobConfiguration copy = job.deepCopy();
-
-    assertOwnerValidity(job.getOwner());
-
-    if (!isGoodIdentifier(copy.getName())) {
-      throw new TaskDescriptionException("Job name contains illegal characters: " + copy.getName());
-    }
-
-    if (copy.getTaskConfigsSize() == 0) {
-      throw new TaskDescriptionException("No tasks specified.");
-    }
-
-    Set<Integer> shardIds = Sets.newHashSet();
-
-    List<TwitterTaskInfo> configsCopy = Lists.newArrayList(copy.getTaskConfigs());
-    for (TwitterTaskInfo config : configsCopy) {
-      populateFields(copy, config);
-      if (!shardIds.add(config.getShardId())) {
-        throw new TaskDescriptionException("Duplicate shard ID " + config.getShardId());
-      }
-
-      Constraint constraint = getDedicatedConstraint(config);
-      if (constraint == null) {
-        continue;
-      }
-
-      if (!isValueConstraint(constraint.getConstraint())) {
-        throw new ScheduleException("A dedicated constraint must be of value type.");
-      }
-
-      ValueConstraint valueConstraint = constraint.getConstraint().getValue();
-
-      if (!(valueConstraint.getValues().size() == 1)) {
-        throw new ScheduleException("A dedicated constraint must have exactly one value");
-      }
-
-      String dedicatedRole = getRole(valueConstraint);
-      if (!role.equals(dedicatedRole)) {
-        throw new ScheduleException(
-            "Only " + dedicatedRole + " may use hosts dedicated for that role.");
-      }
-    }
-
-    Set<TwitterTaskInfo> modifiedConfigs = ImmutableSet.copyOf(configsCopy);
-    Preconditions.checkState(modifiedConfigs.size() == configsCopy.size(),
-        "Task count changed after populating fields.");
-
-    // Ensure that all production flags are equal.
-    int numProductionTasks =
-        Iterables.size(Iterables.filter(modifiedConfigs, Tasks.IS_PRODUCTION));
-    if ((numProductionTasks != 0) && (numProductionTasks != modifiedConfigs.size())) {
-      throw new TaskDescriptionException("Tasks within a job must use the same production flag.");
-    }
-
-    // The configs were mutated, so we need to refresh the Set.
-    copy.setTaskConfigs(modifiedConfigs);
-
-    // Check for contiguous shard IDs.
-    for (int i = 0; i < copy.getTaskConfigsSize(); i++) {
-      if (!shardIds.contains(i)) {
-        throw new TaskDescriptionException("Shard ID " + i + " is missing.");
-      }
-    }
-
-    return copy;
-  }
-
-  @ThermosJank
-  @VisibleForTesting
-  public static TwitterTaskInfo populateFields(JobConfiguration job, TwitterTaskInfo config)
-      throws TaskDescriptionException {
-    if (config == null) {
-      throw new TaskDescriptionException("Task may not be null.");
-    }
-
-    if (config.isSetThermosConfig()) {
-      config.setConfigParsed(true);
-      return config;
-    }
-
-    if (config.getConfiguration() == null) {
-      throw new TaskDescriptionException("Task configuration may not be null");
-    }
-
-    if (!config.isSetShardId()) {
-      throw new TaskDescriptionException("Tasks must have a shard ID.");
-    }
-
-    if (!config.isSetRequestedPorts()) {
-      config.setRequestedPorts(ImmutableSet.<String>of());
-    }
-
-    config.setOwner(job.getOwner());
-    config.setJobName(job.getName());
-
-    assertUnset(config);
-    populateFields(config);
-
-    // Only one of [daemon=true, cron_schedule] may be set.
-    if (!StringUtils.isEmpty(job.getCronSchedule()) && config.isIsDaemon()) {
-      throw new TaskDescriptionException(
-          "A daemon task may not be run on a cron schedule: " + config);
-    }
-
-    config.setConfigParsed(true);
-
-    return config;
-  }
-
-  /**
-   * Provides a filter for the given constraint name.
-   *
-   * @param name The name of the constraint.
-   * @return A filter that matches the constraint.
-   */
-  public static Predicate<Constraint> getConstraintByName(final String name) {
-    return new Predicate<Constraint>() {
-      @Override public boolean apply(Constraint constraint) {
-        return constraint.getName().equals(name);
-      }
-    };
-  }
-
-  private abstract static class Field<T> {
-    final String key;
-    final T defaultValue;
-    final boolean required;
-
-    Field(String key) {
-      this.key = key;
-      this.defaultValue = null;
-      this.required = true;
-    }
-
-    Field(String key, T defaultValue) {
-      this.key = key;
-      this.defaultValue = defaultValue;
-      this.required = false;
-    }
-
-    abstract boolean isSet(TwitterTaskInfo task);
-
-    void applyDefault(TwitterTaskInfo task) {
-      try {
-        apply(task, defaultValue);
-      } catch (TaskDescriptionException e) {
-        // Switch to runtime, since defaults should be safe.
-        throw new IllegalStateException("Default value " + defaultValue + " rejected for " + key);
-      }
-    }
-
-    abstract T parse(String raw) throws ParseException;
-
-    abstract void apply(TwitterTaskInfo task, T value) throws TaskDescriptionException;
-
-    void parseAndApply(TwitterTaskInfo task, String raw) throws TaskDescriptionException {
-      try {
-        apply(task, parse(raw));
-      } catch (ParseException e) {
-          throw new TaskDescriptionException("Value [" + raw
-              + "] cannot be applied to field " + key + ", " + e.getMessage());
-      }
-    }
-  }
-
-  private abstract static class TypedField<T> extends Field<T> {
-    final Class<T> type;
-    final ValueParser<T> parser;
-
-    TypedField(Class<T> type, String key) {
-      super(key);
-      this.type = type;
-      this.parser = ValueParser.Registry.getParser(type);
-    }
-
-    TypedField(Class<T> type, String key, T defaultValue) {
-      super(key, defaultValue);
-      this.type = type;
-      this.parser = ValueParser.Registry.getParser(type);
-    }
-
-    @Override public T parse(String raw) throws ParseException {
-      return required ? parser.parse(raw) : parser.parseWithDefault(raw, defaultValue);
-    }
-  }
+  private static final int MAX_IDENTIFIER_LENGTH = 255;
 
   private static final String START_COMMAND_FIELD = "start_command";
-
-  /**
-   * Resets the {@code start_command} to the original value in the task's configuration.  This can be used
-   * to undo any command-line expansion in a previous iteration of a task.
-   *
-   * @param task Task whose {@code start_command} should be reset.
-   */
-  public static void resetStartCommand(TwitterTaskInfo task) {
-    Preconditions.checkNotNull(task);
-    // This condition realistically only fails in unit tests.
-    if (task.isSetConfiguration()) {
-      task.setStartCommand(task.getConfiguration().get(START_COMMAND_FIELD));
-    }
-  }
 
   private static final List<Field<?>> FIELDS = ImmutableList.<Field<?>>builder()
       .add(new TypedField<String>(String.class, "hdfs_path", null) {
@@ -417,6 +166,297 @@ public class ConfigurationManager {
       })
       .build();
 
+  private ConfigurationManager() {
+    // Utility class.
+  }
+
+  private static boolean isGoodIdentifier(String identifier) {
+    return GOOD_IDENTIFIER_PATTERN.matcher(identifier).matches()
+           && (identifier.length() <= MAX_IDENTIFIER_LENGTH);
+  }
+
+  private static void checkNotNull(Object value, String error) throws TaskDescriptionException {
+    if (value == null) {
+       throw new TaskDescriptionException(error);
+     }
+  }
+
+  private static void assertOwnerValidity(Identity jobOwner) throws TaskDescriptionException {
+    checkNotNull(jobOwner, "No job owner specified!");
+    checkNotNull(jobOwner.getRole(), "No job role specified!");
+    checkNotNull(jobOwner.getUser(), "No job user specified!");
+
+    if (!isGoodIdentifier(jobOwner.getRole())) {
+      throw new TaskDescriptionException(
+          "Job role contains illegal characters: " + jobOwner.getRole());
+    }
+
+    if (!isGoodIdentifier(jobOwner.getUser())) {
+      throw new TaskDescriptionException(
+          "Job user contains illegal characters: " + jobOwner.getUser());
+    }
+  }
+
+  private static String getRole(ValueConstraint constraint) {
+    return Iterables.getOnlyElement(constraint.getValues()).split("/")[0];
+  }
+
+  private static boolean isValueConstraint(TaskConstraint taskConstraint) {
+    return taskConstraint.getSetField() == TaskConstraint._Fields.VALUE;
+  }
+
+  public static boolean isDedicated(TwitterTaskInfo task) {
+    return Iterables.any(task.getConstraints(), getConstraintByName(DEDICATED_ATTRIBUTE));
+  }
+
+  @Nullable
+  private static Constraint getDedicatedConstraint(TwitterTaskInfo task) {
+    return Iterables.find(task.getConstraints(), getConstraintByName(DEDICATED_ATTRIBUTE), null);
+  }
+
+  /**
+   * Check validity of and populates defaults in a job configuration.  This will return a deep copy
+   * of the provided job configuration with default configuration values applied, and configuration
+   * map values parsed and applied to their respective struct fields.
+   *
+   * @param job Job to validate and populate.
+   * @return A deep copy of {@code job} that has been populated.
+   * @throws TaskDescriptionException If the job configuration is invalid.
+   */
+  public static JobConfiguration validateAndPopulate(JobConfiguration job)
+      throws TaskDescriptionException {
+    Preconditions.checkNotNull(job);
+    String role = job.getOwner().getRole();
+
+    if (job.getTaskConfigsSize() > MAX_TASKS_PER_JOB.get()) {
+      throw new TaskDescriptionException("Job exceeds task limit of " + MAX_TASKS_PER_JOB.get());
+    }
+
+    JobConfiguration copy = job.deepCopy();
+
+    assertOwnerValidity(job.getOwner());
+
+    if (!isGoodIdentifier(copy.getName())) {
+      throw new TaskDescriptionException("Job name contains illegal characters: " + copy.getName());
+    }
+
+    if (copy.getTaskConfigsSize() == 0) {
+      throw new TaskDescriptionException("No tasks specified.");
+    }
+
+    Set<Integer> shardIds = Sets.newHashSet();
+
+    List<TwitterTaskInfo> configsCopy = Lists.newArrayList(copy.getTaskConfigs());
+    for (TwitterTaskInfo config : configsCopy) {
+      populateFields(copy, config);
+      if (!shardIds.add(config.getShardId())) {
+        throw new TaskDescriptionException("Duplicate shard ID " + config.getShardId());
+      }
+
+      Constraint constraint = getDedicatedConstraint(config);
+      if (constraint == null) {
+        continue;
+      }
+
+      if (!isValueConstraint(constraint.getConstraint())) {
+        throw new TaskDescriptionException("A dedicated constraint must be of value type.");
+      }
+
+      ValueConstraint valueConstraint = constraint.getConstraint().getValue();
+
+      if (!(valueConstraint.getValues().size() == 1)) {
+        throw new TaskDescriptionException("A dedicated constraint must have exactly one value");
+      }
+
+      String dedicatedRole = getRole(valueConstraint);
+      if (!role.equals(dedicatedRole)) {
+        throw new TaskDescriptionException(
+            "Only " + dedicatedRole + " may use hosts dedicated for that role.");
+      }
+    }
+
+    Set<TwitterTaskInfo> modifiedConfigs = ImmutableSet.copyOf(configsCopy);
+    Preconditions.checkState(modifiedConfigs.size() == configsCopy.size(),
+        "Task count changed after populating fields.");
+
+    // Ensure that all production flags are equal.
+    int numProductionTasks =
+        Iterables.size(Iterables.filter(modifiedConfigs, Tasks.IS_PRODUCTION));
+    if ((numProductionTasks != 0) && (numProductionTasks != modifiedConfigs.size())) {
+      throw new TaskDescriptionException("Tasks within a job must use the same production flag.");
+    }
+
+    // The configs were mutated, so we need to refresh the Set.
+    copy.setTaskConfigs(modifiedConfigs);
+
+    // Check for contiguous shard IDs.
+    for (int i = 0; i < copy.getTaskConfigsSize(); i++) {
+      if (!shardIds.contains(i)) {
+        throw new TaskDescriptionException("Shard ID " + i + " is missing.");
+      }
+    }
+
+    return copy;
+  }
+
+  /**
+   * Populates fields in an individual task configuration, using the job as context.
+   *
+   * @param job The job that the task is a member of.
+   * @param config Task to populate.
+   * @return A reference to the modified {@code config} (for chaining).
+   * @throws TaskDescriptionException If the task is invalid.
+   */
+  @ThermosJank
+  @VisibleForTesting
+  public static TwitterTaskInfo populateFields(JobConfiguration job, TwitterTaskInfo config)
+      throws TaskDescriptionException {
+    if (config == null) {
+      throw new TaskDescriptionException("Task may not be null.");
+    }
+
+    if (config.isSetThermosConfig()) {
+      config.setConfigParsed(true);
+      return config;
+    }
+
+    if (config.getConfiguration() == null) {
+      throw new TaskDescriptionException("Task configuration may not be null");
+    }
+
+    if (!config.isSetShardId()) {
+      throw new TaskDescriptionException("Tasks must have a shard ID.");
+    }
+
+    if (!config.isSetRequestedPorts()) {
+      config.setRequestedPorts(ImmutableSet.<String>of());
+    }
+
+    config.setOwner(job.getOwner());
+    config.setJobName(job.getName());
+
+    assertUnset(config);
+    populateFields(config);
+
+    // Only one of [daemon=true, cron_schedule] may be set.
+    if (!StringUtils.isEmpty(job.getCronSchedule()) && config.isIsDaemon()) {
+      throw new TaskDescriptionException(
+          "A daemon task may not be run on a cron schedule: " + config);
+    }
+
+    config.setConfigParsed(true);
+
+    return config;
+  }
+
+  /**
+   * Provides a filter for the given constraint name.
+   *
+   * @param name The name of the constraint.
+   * @return A filter that matches the constraint.
+   */
+  public static Predicate<Constraint> getConstraintByName(final String name) {
+    return new Predicate<Constraint>() {
+      @Override public boolean apply(Constraint constraint) {
+        return constraint.getName().equals(name);
+      }
+    };
+  }
+
+  /**
+   * A redundant class that should collapse into {@link TypedField}.
+   * TODO(wfarner): Collapse this into TypedField.
+   *
+   * @param <T> Field type.
+   */
+  private abstract static class Field<T> {
+    private final String key;
+    private final T defaultValue;
+    private final boolean required;
+
+    private Field(String key) {
+      this.key = key;
+      this.defaultValue = null;
+      this.required = true;
+    }
+
+    private Field(String key, T defaultValue) {
+      this.key = key;
+      this.defaultValue = defaultValue;
+      this.required = false;
+    }
+
+    abstract boolean isSet(TwitterTaskInfo task);
+
+    private void applyDefault(TwitterTaskInfo task) {
+      try {
+        apply(task, defaultValue);
+      } catch (TaskDescriptionException e) {
+        // Switch to runtime, since defaults should be safe.
+        throw new IllegalStateException("Default value " + defaultValue + " rejected for " + key);
+      }
+    }
+
+    abstract T parse(String raw) throws ParseException;
+
+    abstract void apply(TwitterTaskInfo task, T value) throws TaskDescriptionException;
+
+    void parseAndApply(TwitterTaskInfo task, String raw) throws TaskDescriptionException {
+      try {
+        apply(task, parse(raw));
+      } catch (ParseException e) {
+          throw new TaskDescriptionException("Value [" + raw
+              + "] cannot be applied to field " + key + ", " + e.getMessage());
+      }
+    }
+
+    T getDefaultValue() {
+      return defaultValue;
+    }
+
+    boolean isRequired() {
+      return required;
+    }
+  }
+
+  /**
+   * A typed configuration field that knows how to extract and parse a value from the raw
+   * configuration, and apply the value to the appropriate task struct field.
+   *
+   * @param <T> Field type.
+   */
+  private abstract static class TypedField<T> extends Field<T> {
+    private final ValueParser<T> parser;
+
+    TypedField(Class<T> type, String key) {
+      super(key);
+      this.parser = ValueParser.Registry.getParser(type).get();
+    }
+
+    TypedField(Class<T> type, String key, T defaultValue) {
+      super(key, defaultValue);
+      this.parser = ValueParser.Registry.getParser(type).get();
+    }
+
+    @Override public T parse(String raw) throws ParseException {
+      return isRequired() ? parser.parse(raw) : parser.parseWithDefault(raw, getDefaultValue());
+    }
+  }
+
+  /**
+   * Resets the {@code start_command} to the original value in the task's configuration.  This can
+   * be used to undo any command-line expansion in a previous iteration of a task.
+   *
+   * @param task Task whose {@code start_command} should be reset.
+   */
+  public static void resetStartCommand(TwitterTaskInfo task) {
+    Preconditions.checkNotNull(task);
+    // This condition realistically only fails in unit tests.
+    if (task.isSetConfiguration()) {
+      task.setStartCommand(task.getConfiguration().get(START_COMMAND_FIELD));
+    }
+  }
+
   @VisibleForTesting
   public static Constraint hostLimitConstraint(int limit) {
     return new Constraint(HOST_CONSTRAINT, TaskConstraint.limit(new LimitConstraint(limit)));
@@ -431,7 +471,7 @@ public class ConfigurationManager {
     };
   }
 
-  public static void assertUnset(TwitterTaskInfo task) throws TaskDescriptionException {
+  private static void assertUnset(TwitterTaskInfo task) throws TaskDescriptionException {
     for (Field<?> field : FIELDS) {
       if (field.isSet(task)) {
         throw new TaskDescriptionException("Task field set before parsing: " + field.key);
@@ -439,7 +479,7 @@ public class ConfigurationManager {
     }
   }
 
-  public static TwitterTaskInfo populateFields(TwitterTaskInfo task)
+  private static TwitterTaskInfo populateFields(TwitterTaskInfo task)
       throws TaskDescriptionException {
     Map<String, String> config = task.getConfiguration();
 
@@ -461,6 +501,13 @@ public class ConfigurationManager {
     return task;
   }
 
+  /**
+   * Applies defaults to unset values in a task.
+   *
+   * @param task Task to apply defaults to.
+   * @return A reference to the (modified) {@code task}.
+   */
+  @VisibleForTesting
   public static TwitterTaskInfo applyDefaultsIfUnset(TwitterTaskInfo task) {
     fillDataFields(task);
 
@@ -476,6 +523,12 @@ public class ConfigurationManager {
     return task;
   }
 
+  /**
+   * Applies defaults to unset values in a job and its tasks.
+   *
+   * @param job Job to apply defaults to.
+   */
+  @VisibleForTesting
   public static void applyDefaultsIfUnset(JobConfiguration job) {
     for (TwitterTaskInfo task : job.getTaskConfigs()) {
       ConfigurationManager.applyDefaultsIfUnset(task);
@@ -499,21 +552,22 @@ public class ConfigurationManager {
     }
   }
 
+  /**
+   * Thrown when an invalid task or job configuration is encountered.
+   */
   public static class TaskDescriptionException extends Exception {
     public TaskDescriptionException(String msg) {
       super(msg);
     }
   }
 
-  private static final Splitter MULTI_VALUE_SPLITTER = Splitter.on(",");
-
   @SuppressWarnings("unchecked")
   private static <T> Set<T> getSet(String value, Class<T> type)
     throws ParseException {
     ImmutableSet.Builder<T> builder = ImmutableSet.builder();
     if (!StringUtils.isEmpty(value)) {
-      for (String item : MULTI_VALUE_SPLITTER.split(value)) {
-        builder.add(ValueParser.Registry.getParser(type).parse(item));
+      for (String item : Splitter.on(',').split(value)) {
+        builder.add(ValueParser.Registry.getParser(type).get().parse(item));
       }
     }
     return builder.build();
