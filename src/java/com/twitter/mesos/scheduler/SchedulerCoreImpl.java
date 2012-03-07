@@ -41,8 +41,8 @@ import com.twitter.mesos.scheduler.quota.QuotaManager;
 import com.twitter.mesos.scheduler.quota.Quotas;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.transform;
+
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.mesos.Tasks.SCHEDULED_TO_SHARD_ID;
 import static com.twitter.mesos.Tasks.jobKey;
@@ -77,6 +77,9 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
 
   private final QuotaManager quotaManager;
 
+  /**
+   * Scheduler states.
+   */
   enum State {
     CONSTRUCTED,
     STANDING_BY,
@@ -87,6 +90,15 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
 
   private final StateMachine<State> stateMachine;
 
+  /**
+   * Creates a new core scheduler.
+   *
+   * @param cronScheduler Cron scheduler.
+   * @param immediateScheduler Immediate scheduler.
+   * @param stateManager Persistent state manager.
+   * @param schedulingFilter Scheduling logic.
+   * @param quotaManager Quota tracker.
+   */
   @Inject
   public SchedulerCoreImpl(CronJobManager cronScheduler,
       ImmediateJobManager immediateScheduler,
@@ -185,9 +197,7 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
       throw new ScheduleException("Job already exists: " + jobKey(populated));
     }
 
-    if (!quotaManager.hasRemaining(job.getOwner().getRole(), Quotas.fromJob(populated))) {
-      throw new ScheduleException("Insufficient resource quota.");
-    }
+    ensureHasAdditionalQuota(job.getOwner().getRole(), Quotas.fromJob(populated));
 
     boolean accepted = false;
     for (final JobManager manager : jobManagers) {
@@ -406,6 +416,12 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
         });
   }
 
+  private void ensureHasAdditionalQuota(String role, Quota quota) throws ScheduleException {
+    if (!quotaManager.hasRemaining(role, quota)) {
+      throw new ScheduleException("Insufficient resource quota.");
+    }
+  }
+
   @Override
   public synchronized String startUpdate(JobConfiguration job)
       throws ScheduleException, ConfigurationManager.TaskDescriptionException {
@@ -420,9 +436,7 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
           Quotas.fromTasks(Iterables.transform(existingTasks, Tasks.SCHEDULED_TO_INFO));
       Quota newJobQuota = Quotas.fromJob(populated);
       Quota additionalQuota = Quotas.subtract(newJobQuota, currentJobQuota);
-      if (!quotaManager.hasRemaining(job.getOwner().getRole(), additionalQuota)) {
-        throw new ScheduleException("Insufficient resource quota.");
-      }
+      ensureHasAdditionalQuota(job.getOwner().getRole(), additionalQuota);
     }
 
     try {

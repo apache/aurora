@@ -8,7 +8,6 @@ import org.apache.mesos.Protos.SlaveID;
 import org.junit.Before;
 import org.springframework.transaction.TransactionException;
 
-import com.twitter.common.base.Closure;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
@@ -79,16 +78,17 @@ public abstract class BaseStateManagerTest extends EasyMockTest {
         wrappedStorage.stop();
       }
     };
+
     this.mutableState = new MutableState();
-    final StateManager stateManager = new StateManager(storage, clock, mutableState, driver);
-    stateManager.initialize();
-    stateManager.start();
+    final StateManager manager = new StateManager(storage, clock, mutableState, driver);
+    manager.initialize();
+    manager.start();
     addTearDown(new TearDown() {
       @Override public void tearDown() {
-        stateManager.stop();
+        manager.stop();
       }
     });
-    return stateManager;
+    return manager;
   }
 
   protected void failNthTransaction(int n) {

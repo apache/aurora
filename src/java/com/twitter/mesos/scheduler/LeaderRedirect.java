@@ -23,6 +23,9 @@ import com.twitter.thrift.Endpoint;
 import com.twitter.thrift.ServiceInstance;
 
 /**
+ * Redirect logic for finding the leading scheduler in the event that this process is not the
+ * leader.
+ *
  * @author William Farner
  */
 public class LeaderRedirect {
@@ -130,6 +133,9 @@ public class LeaderRedirect {
     }
   }
 
+  /**
+   * Monitor to track scheduler leader changes.
+   */
   private class SchedulerMonitor implements HostChangeMonitor<ServiceInstance> {
     @Override public void onChange(ImmutableSet<ServiceInstance> hostSet) {
       switch (hostSet.size()) {

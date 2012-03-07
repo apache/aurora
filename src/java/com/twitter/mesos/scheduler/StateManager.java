@@ -58,6 +58,7 @@ import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.storage.JobUpdateConfiguration;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
+import com.twitter.mesos.scheduler.TransactionalStorage.SideEffect;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
@@ -68,6 +69,7 @@ import com.twitter.mesos.scheduler.storage.UpdateStore;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.transform;
+
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.mesos.Tasks.jobKey;
 import static com.twitter.mesos.gen.ScheduleStatus.INIT;
@@ -82,7 +84,6 @@ import static com.twitter.mesos.gen.ScheduleStatus.UNKNOWN;
  * @author William Farner
  */
 public class StateManager {
-  private static final Logger LOG = Logger.getLogger(StateManager.class.getName());
 
   @VisibleForTesting
   @CmdLine(name = "missing_task_grace_period",
@@ -90,118 +91,74 @@ public class StateManager {
   static final Arg<Amount<Long, Time>> MISSING_TASK_GRACE_PERIOD =
       Arg.create(Amount.of(5L, Time.MINUTES));
 
-  // State of the manager instance.
-  private enum State {
-    CREATED,
-    INITIALIZED,
-    STARTED,
-    STOPPED
-  }
+  private static final Logger LOG = Logger.getLogger(StateManager.class.getName());
 
-  /**
-   * Side effects are modifications of the internal state.
-   */
-  private interface SideEffect {
-    void mutate(MutableState state);
-  }
+  private static final TaskQuery OUTSTANDING_TASK_QUERY = new TaskQuery().setStatuses(
+      EnumSet.of(
+          ScheduleStatus.ASSIGNED,
+          ScheduleStatus.STARTING,
+          ScheduleStatus.PREEMPTING,
+          ScheduleStatus.RESTARTING,
+          ScheduleStatus.KILLING));
 
-  /**
-   * Transactional wrapper around the persistent storage and mutable state.
-   */
-  private class TransactionalStorage {
-    private boolean inTransaction = false;
-    private final List<SideEffect> sideEffects = Lists.newLinkedList();
-
-    private final Storage storage;
-    private final MutableState mutableState;
-
-    TransactionalStorage(Storage storage, MutableState mutableState) {
-      this.storage = checkNotNull(storage);
-      this.mutableState = checkNotNull(mutableState);
-    }
-
-    void addSideEffect(SideEffect sideEffect) {
-      Preconditions.checkState(inTransaction);
-      sideEffects.add(sideEffect);
-    }
-
-    /**
-     * Perform a unit of work in a transaction.  This supports nesting/reentrancy.
-     *
-     * Note: It is not strictly necessary for this method to be synchronized, provided that calling
-     * code in StateManager is also properly synchronized.  However, we acquire an additional lock
-     * here as a safeguard in the event that a new package-visible unsynchronized method is added.
-     *
-     * @param work Work to perform.
-     * @param <T> Work return type
-     * @param <E> Work exception type.
-     * @return The work return value.
-     * @throws E The work exception.
-     */
-    synchronized <T, E extends Exception> T doInTransaction(Work<T, E> work) throws E {
-      if (inTransaction) {
-        return execute(work);
-      }
-
-      try {
-        inTransaction = true;
-        T result = execute(work);
-        executeSideEffects();
-        return result;
-      } finally {
-        inTransaction = false;
-        sideEffects.clear();
-      }
-    }
-
-    void start(Work.NoResult.Quiet work) {
-      Preconditions.checkState(!inTransaction);
-
-      try {
-        inTransaction = true;
-        executeStart(work);
-        executeSideEffects();
-      } finally {
-        inTransaction = false;
-        sideEffects.clear();
-      }
-    }
-
-    void prepare() {
-      Preconditions.checkState(!inTransaction);
-      storage.prepare();
-    }
-
-    void stop() {
-      Preconditions.checkState(!inTransaction);
-      storage.stop();
-    }
-
-    private <T, E extends Exception> T execute(final Work<T, E> work) throws E {
-      return storage.doInTransaction(new Work<T, E>() {
-        @Override public T apply(StoreProvider storeProvider) throws E {
-          T result = work.apply(storeProvider);
-          processWorkQueueInTransaction(storeProvider);
-          return result;
+  private static final Function<TaskUpdateConfiguration, Integer> GET_SHARD =
+      new Function<TaskUpdateConfiguration, Integer>() {
+        @Override public Integer apply(TaskUpdateConfiguration config) {
+          return config.isSetOldConfig()
+              ? config.getOldConfig().getShardId()
+              : config.getNewConfig().getShardId();
         }
-      });
-    }
+      };
 
-    private void executeStart(final Work.NoResult.Quiet work) {
-      storage.start(new Work.NoResult.Quiet() {
-        @Override protected void execute(Storage.StoreProvider storeProvider) {
-          work.apply(storeProvider);
-          processWorkQueueInTransaction(storeProvider);
+  private static final Function<Protos.Attribute, String> ATTRIBUTE_NAME =
+      new Function<org.apache.mesos.Protos.Attribute, String>() {
+        @Override public String apply(Protos.Attribute attr) {
+          return attr.getName();
         }
-      });
-    }
+      };
 
-    private void executeSideEffects() {
-      for (SideEffect sideEffect : sideEffects) {
-        sideEffect.mutate(mutableState);
+  private static final Predicate<TaskUpdateConfiguration> SELECT_SHARDS_TO_KILL =
+      new Predicate<TaskUpdateConfiguration>() {
+        @Override public boolean apply(TaskUpdateConfiguration config) {
+          return config.getNewConfig() == null;
+        }
+      };
+
+  private static final Function<TaskUpdateConfiguration, Integer> GET_ORIGINAL_SHARD_ID =
+    new Function<TaskUpdateConfiguration, Integer>() {
+      @Override public Integer apply(TaskUpdateConfiguration config) {
+        return config.getOldConfig().getShardId();
       }
+    };
+
+  private static final Function<Protos.Attribute, String> VALUE_CONVERTER =
+      new Function<Protos.Attribute, String>() {
+        @Override public String apply(Protos.Attribute attribute) {
+          switch (attribute.getType()) {
+            case SCALAR:
+              return String.valueOf(attribute.getScalar().getValue());
+
+            case TEXT:
+              return attribute.getText().getValue();
+
+            default:
+              LOG.finest("Unrecognized attribute type:" + attribute.getType() + " , ignoring.");
+              return null;
+          }
+        }
+      };
+
+  private static final AttributeConverter ATTRIBUTE_CONVERTER = new AttributeConverter() {
+    @Override public Attribute apply(Entry<String, Collection<Protos.Attribute>> entry) {
+      // Convert values and filter any that were ignored.
+      Iterable<String> values = Iterables.filter(
+          Iterables.transform(entry.getValue(), VALUE_CONVERTER), Predicates.notNull());
+
+      return new Attribute(entry.getKey(), ImmutableSet.copyOf(values));
     }
-  }
+  };
+
+  private final AtomicLong shardSanityCheckFails = Stats.exportLong("shard_sanity_check_failures");
 
   private final TransactionalStorage transactionalStorage;
 
@@ -212,20 +169,6 @@ public class StateManager {
       .addState(State.INITIALIZED, State.STARTED)
       .addState(State.STARTED, State.STOPPED)
       .build();
-
-  // An item of work on the work queue.
-  private static class WorkEntry {
-    private final WorkCommand command;
-    private final TaskStateMachine stateMachine;
-    private final Closure<ScheduledTask> mutation;
-
-    WorkEntry(WorkCommand command, TaskStateMachine stateMachine,
-        Closure<ScheduledTask> mutation) {
-      this.command = command;
-      this.stateMachine = stateMachine;
-      this.mutation = mutation;
-    }
-  }
 
   // Work queue to receive state machine side effect work.
   private final Queue<WorkEntry> workQueue = Lists.newLinkedList();
@@ -238,8 +181,7 @@ public class StateManager {
       }
     };
 
-  @VisibleForTesting
-  final Function<TwitterTaskInfo, ScheduledTask> taskCreator =
+  private final Function<TwitterTaskInfo, ScheduledTask> taskCreator =
       new Function<TwitterTaskInfo, ScheduledTask>() {
         @Override public ScheduledTask apply(TwitterTaskInfo task) {
           return new ScheduledTask()
@@ -253,12 +195,33 @@ public class StateManager {
   private final Driver driver;
   private final Clock clock;
 
+  /**
+   * An item of work on the work queue.
+   */
+  private static class WorkEntry {
+    private final WorkCommand command;
+    private final TaskStateMachine stateMachine;
+    private final Closure<ScheduledTask> mutation;
+
+    WorkEntry(WorkCommand command, TaskStateMachine stateMachine,
+        Closure<ScheduledTask> mutation) {
+      this.command = command;
+      this.stateMachine = stateMachine;
+      this.mutation = mutation;
+    }
+  }
+
   @Inject
   StateManager(Storage storage, final Clock clock, MutableState mutableState, Driver driver) {
     checkNotNull(storage);
     this.clock = checkNotNull(clock);
 
-    transactionalStorage = new TransactionalStorage(storage, mutableState);
+    transactionalStorage = new TransactionalStorage(storage, mutableState,
+        new Closure<StoreProvider>() {
+          @Override public void execute(StoreProvider storeProvider) {
+            processWorkQueueInTransaction(storeProvider);
+          }
+        });
 
     this.taskTimeoutFilter = new Predicate<Iterable<TaskEvent>>() {
       @Override public boolean apply(Iterable<TaskEvent> events) {
@@ -275,6 +238,21 @@ public class StateManager {
     this.driver = driver;
 
     Stats.exportSize("work_queue_depth", workQueue);
+  }
+
+  @VisibleForTesting
+  Function<TwitterTaskInfo, ScheduledTask> getTaskCreator() {
+    return taskCreator;
+  }
+
+  /**
+   * State manager lifecycle state.
+   */
+  private enum State {
+    CREATED,
+    INITIALIZED,
+    STARTED,
+    STOPPED
   }
 
   /**
@@ -303,7 +281,7 @@ public class StateManager {
         }
         transactionalStorage.addSideEffect(new SideEffect() {
           @Override public void mutate(MutableState state) {
-            state.vars.beginExporting();
+            state.getVars().beginExporting();
           }
         });
       }
@@ -391,7 +369,7 @@ public class StateManager {
 
                 transactionalStorage.addSideEffect(new SideEffect() {
                   @Override public void mutate(MutableState state) {
-                    state.vars.adjustCount(
+                    state.getVars().adjustCount(
                         Tasks.jobKey(task),
                         task.getStatus(),
                         ScheduleStatus.KILLED);
@@ -457,6 +435,9 @@ public class StateManager {
     return ImmutableSet.copyOf(Iterables.transform(scheduledTasks, Tasks.SCHEDULED_TO_ID));
   }
 
+  /**
+   * Thrown when an update fails.
+   */
   static class UpdateException extends Exception {
     public UpdateException(String msg) {
       super(msg);
@@ -541,15 +522,6 @@ public class StateManager {
         Predicates.compose(Predicates.in(shards), GET_SHARD)));
   }
 
-  private static final Function<TaskUpdateConfiguration, Integer> GET_SHARD =
-      new Function<TaskUpdateConfiguration, Integer>() {
-        @Override public Integer apply(TaskUpdateConfiguration config) {
-          return config.isSetOldConfig()
-              ? config.getOldConfig().getShardId()
-              : config.getNewConfig().getShardId();
-        }
-      };
-
   /**
    * Terminates an in-progress update.
    *
@@ -602,63 +574,17 @@ public class StateManager {
     });
   }
 
-  private static final Predicate<TaskUpdateConfiguration> SELECT_SHARDS_TO_KILL =
-      new Predicate<TaskUpdateConfiguration>() {
-        @Override public boolean apply(TaskUpdateConfiguration config) {
-          return config.getNewConfig() == null;
-        }
-      };
-
-  private final Function<TaskUpdateConfiguration, Integer> GET_ORIGINAL_SHARD_ID =
-    new Function<TaskUpdateConfiguration, Integer>() {
-      @Override public Integer apply(TaskUpdateConfiguration config) {
-        return config.getOldConfig().getShardId();
-      }
-    };
-
   private Set<Integer> fetchShardsToKill(JobUpdateConfiguration jobConfig) {
     return ImmutableSet.copyOf(Iterables.transform(Iterables.filter(
         jobConfig.getConfigs(), SELECT_SHARDS_TO_KILL),
         GET_ORIGINAL_SHARD_ID));
   }
 
-  private static final Function<Protos.Attribute, String>
-      VALUE_CONVERTER = new Function<Protos.Attribute, String>() {
-    @Override public String apply(Protos.Attribute attribute) {
-      switch (attribute.getType()) {
-        case SCALAR:
-          return String.valueOf(attribute.getScalar().getValue());
-
-        case TEXT:
-          return attribute.getText().getValue();
-
-        default:
-          LOG.finest("Unrecognized attribute type:" + attribute.getType() + " , ignoring.");
-          return null;
-      }
-    }
-  };
-
-  private static final Function<Protos.Attribute, String> ATTRIBUTE_NAME =
-      new Function<org.apache.mesos.Protos.Attribute, String>() {
-        @Override public String apply(Protos.Attribute attr) {
-          return attr.getName();
-        }
-      };
-
-  // Typedef to make anonymous implementation more concise.
-  private static abstract class AttributeConverter
-      implements Function<Entry<String, Collection<Protos.Attribute>>, Attribute> {}
-
-  private static final AttributeConverter ATTRIBUTE_CONVERTER = new AttributeConverter() {
-    @Override public Attribute apply(Entry<String, Collection<Protos.Attribute>> entry) {
-      // Convert values and filter any that were ignored.
-      Iterable<String> values = Iterables.filter(
-          Iterables.transform(entry.getValue(), VALUE_CONVERTER), Predicates.notNull());
-
-      return new Attribute(entry.getKey(), ImmutableSet.copyOf(values));
-    }
-  };
+  /**
+   * Typedef to make anonymous implementation more concise.
+   */
+  private abstract static class AttributeConverter
+      implements Function<Entry<String, Collection<Protos.Attribute>>, Attribute> { }
 
   /**
    * Persists the attributes associated with a host.
@@ -711,7 +637,7 @@ public class StateManager {
     /**
      * A state mutation that does not throw a checked exception.
      */
-    interface Quiet extends StateMutation<RuntimeException> {}
+    interface Quiet extends StateMutation<RuntimeException> { }
   }
 
   /**
@@ -808,14 +734,6 @@ public class StateManager {
       }
     });
   }
-
-  private static final TaskQuery OUTSTANDING_TASK_QUERY = new TaskQuery().setStatuses(
-      EnumSet.of(
-          ScheduleStatus.ASSIGNED,
-          ScheduleStatus.STARTING,
-          ScheduleStatus.PREEMPTING,
-          ScheduleStatus.RESTARTING,
-          ScheduleStatus.KILLING));
 
   /**
    * Scans any outstanding tasks and attempts to kill any tasks that have timed out.
@@ -999,18 +917,17 @@ public class StateManager {
    * @return New task ID.
    */
   private String generateTaskId(TwitterTaskInfo task) {
+    String sep = "-";
     return new StringBuilder()
         .append(clock.nowMillis())               // Allows chronological sorting.
-        .append("-")
+        .append(sep)
         .append(jobKey(task))                    // Identification and collision prevention.
-        .append("-")
+        .append(sep)
         .append(task.getShardId())               // Collision prevention within job.
-        .append("-")
+        .append(sep)
         .append(UUID.randomUUID())               // Just-in-case collision prevention.
-        .toString().replaceAll("[^\\w-]", "-");  // Constrain character set.
+        .toString().replaceAll("[^\\w-]", sep);  // Constrain character set.
   }
-
-  private final AtomicLong shardSanityCheckFails = Stats.exportLong("shard_sanity_check_failures");
 
   private void processWorkQueueInTransaction(StoreProvider storeProvider) {
     managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
@@ -1059,8 +976,9 @@ public class StateManager {
             });
             transactionalStorage.addSideEffect(new SideEffect() {
               @Override public void mutate(MutableState state) {
-                state.vars.adjustCount(stateMachine.getJobKey(), stateMachine.getPreviousState(),
-                    stateMachine.getState());
+                state.getVars()
+                    .adjustCount(stateMachine.getJobKey(), stateMachine.getPreviousState(),
+                        stateMachine.getState());
               }
             });
             break;
@@ -1101,7 +1019,7 @@ public class StateManager {
         transactionalStorage.addSideEffect(new SideEffect() {
           @Override public void mutate(MutableState state) {
             for (ScheduledTask task : tasks) {
-              state.vars.decrementCount(Tasks.jobKey(task), task.getStatus());
+              state.getVars().decrementCount(Tasks.jobKey(task), task.getStatus());
             }
           }
         });
@@ -1225,10 +1143,11 @@ public class StateManager {
 
     transactionalStorage.addSideEffect(new SideEffect() {
       @Override public void mutate(MutableState state) {
-        state.vars.incrementCount(jobKey, initialState);
+        state.getVars().incrementCount(jobKey, initialState);
       }
     });
 
     return stateMachine;
   }
+
 }

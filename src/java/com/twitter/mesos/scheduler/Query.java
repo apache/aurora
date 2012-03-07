@@ -18,7 +18,9 @@ import static org.apache.commons.lang.StringUtils.isEmpty;
  *
  * @author William Farner
  */
-public class Query {
+public final class Query {
+  public static final TaskQuery GET_ALL = new TaskQuery();
+
   private Query() {
     // Utility.
   }
@@ -62,8 +64,6 @@ public class Query {
     return Optional.of(isEmpty(query.getJobKey())
           ? Tasks.jobKey(query.getOwner(), query.getJobName()) : query.getJobKey());
   }
-
-  public static final TaskQuery GET_ALL = new TaskQuery();
 
   public static TaskQuery byId(Iterable<String> taskIds) {
     return new TaskQuery().setTaskIds(ImmutableSet.copyOf(taskIds));

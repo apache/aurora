@@ -28,9 +28,10 @@ import com.twitter.common.testing.EasyMockTest;
 import com.twitter.thrift.Endpoint;
 import com.twitter.thrift.ServiceInstance;
 
-import static com.twitter.mesos.scheduler.LeaderRedirect.HTTP_PORT_NAME;
 import static org.easymock.EasyMock.capture;
 import static org.junit.Assert.assertEquals;
+
+import static com.twitter.mesos.scheduler.LeaderRedirect.HTTP_PORT_NAME;
 
 /**
  * @author William Farner
@@ -38,6 +39,15 @@ import static org.junit.Assert.assertEquals;
 public class LeaderRedirectTest extends EasyMockTest {
 
   private static final int HTTP_PORT = 500;
+
+  private static final Function<HostAndPort, ServiceInstance> CREATE_INSTANCE =
+      new Function<HostAndPort, ServiceInstance>() {
+        @Override public ServiceInstance apply(HostAndPort endpoint) {
+          return new ServiceInstance()
+              .setAdditionalEndpoints(ImmutableMap.of(HTTP_PORT_NAME,
+                  new Endpoint(endpoint.getHostText(), endpoint.getPort())));
+        }
+      };
 
   private Capture<HostChangeMonitor<ServiceInstance>> monitorCapture;
 
@@ -123,13 +133,4 @@ public class LeaderRedirectTest extends EasyMockTest {
   private static HostAndPort localPort(int port) {
     return HostAndPort.fromParts("localhost", port);
   }
-
-  private static final Function<HostAndPort, ServiceInstance> CREATE_INSTANCE =
-      new Function<HostAndPort, ServiceInstance>() {
-        @Override public ServiceInstance apply(HostAndPort endpoint) {
-          return new ServiceInstance()
-              .setAdditionalEndpoints(ImmutableMap.of(HTTP_PORT_NAME,
-                  new Endpoint(endpoint.getHostText(), endpoint.getPort())));
-        }
-      };
 }

@@ -39,22 +39,22 @@ import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work.Quiet;
 import com.twitter.mesos.scheduler.storage.TaskStore;
 
-import static com.twitter.mesos.scheduler.ConstraintFilter.unsatisfiedLimitVeto;
-import static com.twitter.mesos.scheduler.ConstraintFilter.unsatisfiedValueVeto;
-import static com.twitter.mesos.scheduler.SchedulingFilterImpl.CPU_VETO;
-import static com.twitter.mesos.scheduler.SchedulingFilterImpl.DEDICATED_HOST_VETO;
-import static com.twitter.mesos.scheduler.SchedulingFilterImpl.DISK_VETO;
-import static com.twitter.mesos.scheduler.SchedulingFilterImpl.PORTS_VETO;
-import static com.twitter.mesos.scheduler.SchedulingFilterImpl.RAM_VETO;
-import static com.twitter.mesos.scheduler.SchedulingFilterImpl.RESERVED_HOST_VETO;
-import static com.twitter.mesos.scheduler.SchedulingFilterImpl.RESTRICTED_JOB_VETO;
-import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.expect;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+
+import static com.twitter.mesos.scheduler.ConstraintFilter.constraintVeto;
+import static com.twitter.mesos.scheduler.SchedulingFilterImpl.CPU;
+import static com.twitter.mesos.scheduler.SchedulingFilterImpl.DEDICATED_HOST_VETO;
+import static com.twitter.mesos.scheduler.SchedulingFilterImpl.DISK;
+import static com.twitter.mesos.scheduler.SchedulingFilterImpl.PORTS;
+import static com.twitter.mesos.scheduler.SchedulingFilterImpl.RAM;
+import static com.twitter.mesos.scheduler.SchedulingFilterImpl.RESERVED_HOST;
+import static com.twitter.mesos.scheduler.SchedulingFilterImpl.RESTRICTED_JOB;
+import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 
 /**
  * @author William Farner
@@ -87,6 +87,8 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   private static final long DEFAULT_DISK = 2000;
   private static final Resources DEFAULT_OFFER = new Resources(DEFAULT_CPUS,
       Amount.of(DEFAULT_RAM, Data.MB), Amount.of(DEFAULT_DISK, Data.MB), 0);
+
+  private final AtomicLong taskIdCounter = new AtomicLong();
 
   private SchedulingFilter defaultFilter;
   private Storage storage;
@@ -147,7 +149,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     assertTrue(defaultFilter.filter(twoPorts, Optional.<String>absent(), noPortTask).isEmpty());
     assertTrue(defaultFilter.filter(twoPorts, Optional.<String>absent(), onePortTask).isEmpty());
     assertTrue(defaultFilter.filter(twoPorts, Optional.<String>absent(), twoPortTask).isEmpty());
-    assertEquals(ImmutableSet.of(PORTS_VETO),
+    assertEquals(ImmutableSet.of(PORTS),
         defaultFilter.filter(twoPorts, Optional.<String>absent(), threePortTask));
   }
 
@@ -156,10 +158,10 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     control.replay();
 
     assertVetoes(makeTask(DEFAULT_CPUS + 1, DEFAULT_RAM + 1, DEFAULT_DISK + 1),
-        CPU_VETO, DISK_VETO, RAM_VETO);
-    assertVetoes(makeTask(DEFAULT_CPUS + 1, DEFAULT_RAM, DEFAULT_DISK), CPU_VETO);
-    assertVetoes(makeTask(DEFAULT_CPUS, DEFAULT_RAM + 1, DEFAULT_DISK), RAM_VETO);
-    assertVetoes(makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK + 1), DISK_VETO);
+        CPU, DISK, RAM);
+    assertVetoes(makeTask(DEFAULT_CPUS + 1, DEFAULT_RAM, DEFAULT_DISK), CPU);
+    assertVetoes(makeTask(DEFAULT_CPUS, DEFAULT_RAM + 1, DEFAULT_DISK), RAM);
+    assertVetoes(makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK + 1), DISK);
   }
 
   @Test
@@ -197,7 +199,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         filterBuilder.filter(DEFAULT_OFFER, Optional.of(HOST_A),
             makeTask(OWNER_A, JOB_B, DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)).isEmpty(),
         is(true));
-    assertEquals(ImmutableSet.of(RESERVED_HOST_VETO),
+    assertEquals(ImmutableSet.of(RESERVED_HOST),
         filterBuilder.filter(DEFAULT_OFFER, Optional.of(HOST_B),
             makeTask(OWNER_A, JOB_B, DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)));
   }
@@ -217,7 +219,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         filterBuilder.filter(DEFAULT_OFFER, Optional.of(HOST_A),
         makeTask(OWNER_A, JOB_B, DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)).isEmpty(),
         is(true));
-    assertEquals(ImmutableSet.of(RESTRICTED_JOB_VETO),
+    assertEquals(ImmutableSet.of(RESTRICTED_JOB),
         filterBuilder.filter(DEFAULT_OFFER, Optional.of(HOST_A),
             makeTask(OWNER_A, JOB_A, DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)));
   }
@@ -256,7 +258,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     Constraint constraint2 = makeConstraint(DEDICATED_ATTRIBUTE, "xxx");
 
     assertVetoes(makeTask(OWNER_A, JOB_A, constraint1, constraint2), HOST_A,
-        unsatisfiedValueVeto(DEDICATED_ATTRIBUTE));
+        constraintVeto(DEDICATED_ATTRIBUTE));
     assertNoVetoes(makeTask(OWNER_B, JOB_B, constraint1, constraint2), HOST_B);
   }
 
@@ -302,17 +304,17 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     control.replay();
 
     assertNoVetoes(hostLimitTask(OWNER_A, JOB_A, 2), HOST_A);
-    assertVetoes(hostLimitTask(OWNER_A, JOB_A, 1), HOST_B, unsatisfiedLimitVeto(HOST_ATTRIBUTE));
-    assertVetoes(hostLimitTask(OWNER_A, JOB_A, 2), HOST_B, unsatisfiedLimitVeto(HOST_ATTRIBUTE));
+    assertVetoes(hostLimitTask(OWNER_A, JOB_A, 1), HOST_B, constraintVeto(HOST_ATTRIBUTE));
+    assertVetoes(hostLimitTask(OWNER_A, JOB_A, 2), HOST_B, constraintVeto(HOST_ATTRIBUTE));
     assertNoVetoes(hostLimitTask(OWNER_A, JOB_A, 3), HOST_B);
 
-    assertVetoes(rackLimitTask(OWNER_B, JOB_A, 2), HOST_B, unsatisfiedLimitVeto(RACK_ATTRIBUTE));
-    assertVetoes(rackLimitTask(OWNER_B, JOB_A, 3), HOST_B, unsatisfiedLimitVeto(RACK_ATTRIBUTE));
+    assertVetoes(rackLimitTask(OWNER_B, JOB_A, 2), HOST_B, constraintVeto(RACK_ATTRIBUTE));
+    assertVetoes(rackLimitTask(OWNER_B, JOB_A, 3), HOST_B, constraintVeto(RACK_ATTRIBUTE));
     assertNoVetoes(rackLimitTask(OWNER_B, JOB_A, 4), HOST_B);
 
     assertNoVetoes(rackLimitTask(OWNER_B, JOB_A, 1), HOST_C);
 
-    assertVetoes(rackLimitTask(OWNER_A, JOB_A, 1), HOST_C, unsatisfiedLimitVeto(RACK_ATTRIBUTE));
+    assertVetoes(rackLimitTask(OWNER_A, JOB_A, 1), HOST_C, constraintVeto(RACK_ATTRIBUTE));
     assertNoVetoes(rackLimitTask(OWNER_B, JOB_A, 2), HOST_C);
   }
 
@@ -374,7 +376,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     Constraint zoneNegated = jvmConstraint.deepCopy();
     zoneNegated.getConstraint().getValue().setNegated(true);
     assertVetoes(makeTask(OWNER_A, JOB_A, jvmNegated, zoneNegated), HOST_A,
-        unsatisfiedValueVeto("jvm"));
+        constraintVeto("jvm"));
   }
 
   private void checkConstraint(String host, String constraintName,
@@ -438,8 +440,6 @@ public class SchedulingFilterImplTest extends EasyMockTest {
       Attribute... attributes) {
     return expect(attributeStore.getHostAttributes(host)).andReturn(Arrays.asList(attributes));
   }
-
-  private final AtomicLong taskIdCounter = new AtomicLong();
 
   private ScheduledTask makeScheduledTask(Identity owner, String jobName, String host) {
     return new ScheduledTask().setAssignedTask(

@@ -5,4 +5,4 @@ package com.twitter.mesos.scheduler;
  *
  * @author Brian Wickman
  */
-public @interface ThermosJank {}
+public @interface ThermosJank { }

@@ -27,12 +27,13 @@ import com.twitter.mesos.scheduler.auth.SessionValidator;
 import com.twitter.mesos.scheduler.auth.SessionValidator.AuthFailedException;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 
-import static com.twitter.mesos.scheduler.SchedulerThriftInterface.transitionMessage;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
+
+import static com.twitter.mesos.scheduler.SchedulerThriftInterface.transitionMessage;
 
 /**
  * @author William Farner

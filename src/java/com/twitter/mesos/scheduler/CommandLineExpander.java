@@ -26,17 +26,25 @@ public final class CommandLineExpander {
 
   private static final Logger LOG = Logger.getLogger(CommandLineExpander.class.getName());
 
-  private CommandLineExpander() {
-    // Utility.
-  }
-
   // Double percents to escape formatting sequence.
   private static final String PORT_FORMAT = "%%port:%s%%";
+
   private static final Pattern PORT_REQUEST_PATTERN =
       Pattern.compile(String.format(PORT_FORMAT, "(\\w+)"));
   private static final String SHARD_ID_REGEXP = "%shard_id%";
   private static final String TASK_ID_REGEXP = "%task_id%";
 
+  private CommandLineExpander() {
+    // Utility.
+  }
+
+  /**
+   * Associates requested port names with the allocated port numbers.
+   *
+   * @param portNames Names of requested ports.
+   * @param allocatedPorts Allocated ports.
+   * @return Named ports mapped to assigned port numbers.
+   */
   public static Map<String, Integer> getNameMappedPorts(Set<String> portNames,
       Set<Integer> allocatedPorts) {
     Preconditions.checkNotNull(portNames);
@@ -100,6 +108,12 @@ public final class CommandLineExpander {
     return task;
   }
 
+  /**
+   * Extracts port names from a command line string.
+   *
+   * @param commandLine Command line.
+   * @return Ports requested in the command line.
+   */
   public static Set<String> getPortNames(String commandLine) {
     if (StringUtils.isBlank(commandLine)) {
       return ImmutableSet.of();

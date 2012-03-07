@@ -1,6 +1,5 @@
 package com.twitter.mesos.scheduler;
 
-import java.util.Collections;
 import java.util.Set;
 
 import com.google.common.base.Optional;
@@ -26,6 +25,13 @@ import com.twitter.mesos.scheduler.storage.Storage.StorageException;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
 
+import static org.easymock.EasyMock.expectLastCall;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
 import static com.twitter.mesos.gen.ScheduleStatus.INIT;
@@ -38,12 +44,6 @@ import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.UNKNOWN;
 import static com.twitter.mesos.scheduler.StateManager.UpdateException;
-import static org.easymock.EasyMock.expectLastCall;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 /**
  * @author William Farner
@@ -215,7 +215,7 @@ public class StateManagerTest extends BaseStateManagerTest {
       @Override
       protected void execute(StoreProvider storeProvider) {
         storeProvider.getTaskStore()
-            .saveTasks(ImmutableSet.of(stateManager.taskCreator.apply(task)));
+            .saveTasks(ImmutableSet.of(stateManager.getTaskCreator().apply(task)));
       }
     });
     stateManager = createStateManager(storage);
@@ -233,7 +233,7 @@ public class StateManagerTest extends BaseStateManagerTest {
     // Insert a task in the INIT state, and restart the state manager.
     storage.doInTransaction(new Work.NoResult.Quiet() {
       @Override protected void execute(StoreProvider storeProvider) {
-        ScheduledTask scheduledTask = stateManager.taskCreator.apply(task);
+        ScheduledTask scheduledTask = stateManager.getTaskCreator().apply(task);
         scheduledTask.setStatus(UNKNOWN);
         storeProvider.getTaskStore()
             .saveTasks(ImmutableSet.of(scheduledTask));
@@ -285,7 +285,7 @@ public class StateManagerTest extends BaseStateManagerTest {
 
     // The database has not yet been loaded, so stats should be missing.
     for (ScheduleStatus status : ScheduleStatus.values()) {
-      assertNull(Stats.getVariable(mutableState.vars.getVarName(status)));
+      assertNull(Stats.getVariable(mutableState.getVars().getVarName(status)));
     }
     stateManager.initialize();
 
@@ -304,14 +304,14 @@ public class StateManagerTest extends BaseStateManagerTest {
   }
 
   private void assertVarCount(String owner, String job, ScheduleStatus status, long expected) {
-    Stat<?> stat = getVar(mutableState.vars.getVarName(Tasks.jobKey(owner, job), status));
+    Stat<?> stat = getVar(mutableState.getVars().getVarName(Tasks.jobKey(owner, job), status));
     if ((expected != 0) || (stat != null)) {
       assertEquals(expected, stat.read());
     }
   }
 
   private void assertVarCount(ScheduleStatus status, long expected) {
-    assertEquals(expected, getVar(mutableState.vars.getVarName(status)).read());
+    assertEquals(expected, getVar(mutableState.getVars().getVarName(status)).read());
   }
 
   private Stat<?> getVar(String name) {

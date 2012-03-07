@@ -61,9 +61,15 @@ public interface Driver {
    */
   Protos.Status run();
 
+  /**
+   * Mesos driver implementation.
+   */
   static class DriverImpl implements Driver {
     private static final Logger LOG = Logger.getLogger(Driver.class.getName());
 
+    /**
+     * Driver states.
+     */
     enum State {
       INIT,
       RUNNING,

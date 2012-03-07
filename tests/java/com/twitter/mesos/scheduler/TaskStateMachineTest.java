@@ -21,6 +21,14 @@ import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.TaskStateMachine.WorkSink;
 
+import static org.easymock.EasyMock.eq;
+import static org.easymock.EasyMock.expect;
+import static org.easymock.EasyMock.expectLastCall;
+import static org.hamcrest.CoreMatchers.is;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
+
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
@@ -41,13 +49,6 @@ import static com.twitter.mesos.scheduler.WorkCommand.KILL;
 import static com.twitter.mesos.scheduler.WorkCommand.RESCHEDULE;
 import static com.twitter.mesos.scheduler.WorkCommand.UPDATE;
 import static com.twitter.mesos.scheduler.WorkCommand.UPDATE_STATE;
-import static org.easymock.EasyMock.eq;
-import static org.easymock.EasyMock.expect;
-import static org.easymock.EasyMock.expectLastCall;
-import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.fail;
 
 /**
  * @author William Farner
@@ -62,8 +63,8 @@ public class TaskStateMachineTest extends EasyMockTest {
 
   @Before
   public void setUp() {
-    isJobUpdating = createMock(new Clazz<Supplier<Boolean>>() {});
-    taskTimeoutFilter = createMock(new Clazz<Predicate<Iterable<TaskEvent>>>() {});
+    isJobUpdating = createMock(new Clazz<Supplier<Boolean>>() { });
+    taskTimeoutFilter = createMock(new Clazz<Predicate<Iterable<TaskEvent>>>() { });
     workSink = createMock(WorkSink.class);
     clock = new FakeClock();
     stateMachine = makeStateMachine("test", makeTask(false));
@@ -130,6 +131,9 @@ public class TaskStateMachineTest extends EasyMockTest {
         case KILLING:
           expectWork(KILL);
           break;
+
+        default:
+          fail("Unknown state " + endState);
       }
 
       control.replay();

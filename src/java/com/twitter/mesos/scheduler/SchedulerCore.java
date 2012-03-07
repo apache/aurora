@@ -183,8 +183,13 @@ public interface SchedulerCore
    */
   void preemptTask(AssignedTask task, AssignedTask preemptingTask) throws ScheduleException;
 
+  /**
+   * Thrown when a task restart failed.
+   */
   class RestartException extends Exception {
-    RestartException(String msg) { super(msg); }
+    RestartException(String msg) {
+      super(msg);
+    }
   }
 
   /**

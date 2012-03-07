@@ -14,6 +14,9 @@ import com.twitter.common.thrift.ThriftServer;
  * @author John Sirois
  */
 class SchedulerThriftServer extends ThriftServer {
+
+  private static final String NO_IMPL = "Not implemented";
+
   SchedulerThriftServer() {
     super("TwitterMesosScheduler", "1");
   }
@@ -26,7 +29,7 @@ class SchedulerThriftServer extends ThriftServer {
   @Override
   public String getStatusDetails() {
     // TODO(William Farner): Return something useful here.
-    return "Not implemented";
+    return NO_IMPL;
   }
 
   @Override
@@ -49,7 +52,7 @@ class SchedulerThriftServer extends ThriftServer {
   @Override
   public String getOption(String key) {
     // TODO(William Farner): Return something useful here.
-    return "Not implemented";
+    return NO_IMPL;
   }
 
   @Override

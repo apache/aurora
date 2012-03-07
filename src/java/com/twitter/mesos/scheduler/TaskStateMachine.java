@@ -49,6 +49,35 @@ public class TaskStateMachine {
   private static final AtomicLong ILLEGAL_TRANSITIONS =
       Stats.exportLong("scheduler_illegal_task_state_transitions");
 
+  // Re-declarations of statuses as wrapped state objects.
+  private static final State ASSIGNED = State.create(ScheduleStatus.ASSIGNED);
+  private static final State FAILED = State.create(ScheduleStatus.FAILED);
+  private static final State FINISHED = State.create(ScheduleStatus.FINISHED);
+  private static final State INIT = State.create(ScheduleStatus.INIT);
+  private static final State KILLED = State.create(ScheduleStatus.KILLED);
+  private static final State KILLING = State.create(ScheduleStatus.KILLING);
+  private static final State LOST = State.create(ScheduleStatus.LOST);
+  private static final State PENDING = State.create(ScheduleStatus.PENDING);
+  private static final State PREEMPTING = State.create(ScheduleStatus.PREEMPTING);
+  private static final State RESTARTING = State.create(ScheduleStatus.RESTARTING);
+  private static final State ROLLBACK = State.create(ScheduleStatus.ROLLBACK);
+  private static final State RUNNING = State.create(ScheduleStatus.RUNNING);
+  private static final State STARTING = State.create(ScheduleStatus.STARTING);
+  private static final State UNKNOWN = State.create(ScheduleStatus.UNKNOWN);
+  private static final State UPDATING = State.create(ScheduleStatus.UPDATING);
+
+  private static final Supplier<String> LOCAL_HOST_SUPPLIER = Suppliers.memoize(
+      new Supplier<String>() {
+        @Override public String get() {
+          try {
+            return InetAddress.getLocalHost().getHostName();
+          } catch (UnknownHostException e) {
+            LOG.log(Level.SEVERE, "Failed to get self hostname.");
+            throw Throwables.propagate(e);
+          }
+        }
+      });
+
   private final String taskId;
   private final String jobKey;
   private final WorkSink workSink;
@@ -61,8 +90,8 @@ public class TaskStateMachine {
    * States must be equal for them to be considered equal.
    */
   private static class State {
-    final ScheduleStatus state;
-    final Closure<ScheduledTask> mutation;
+    private final ScheduleStatus state;
+    private final Closure<ScheduledTask> mutation;
 
     State(ScheduleStatus state, @Nullable Closure<ScheduledTask> mutation) {
       this.state = state;
@@ -102,24 +131,15 @@ public class TaskStateMachine {
     public String toString() {
       return state.toString();
     }
-  }
 
-  // Re-declarations of statuses as wrapped state objects.
-  private static final State ASSIGNED = State.create(ScheduleStatus.ASSIGNED);
-  private static final State FAILED = State.create(ScheduleStatus.FAILED);
-  private static final State FINISHED = State.create(ScheduleStatus.FINISHED);
-  private static final State INIT = State.create(ScheduleStatus.INIT);
-  private static final State KILLED = State.create(ScheduleStatus.KILLED);
-  private static final State KILLING = State.create(ScheduleStatus.KILLING);
-  private static final State LOST = State.create(ScheduleStatus.LOST);
-  private static final State PENDING = State.create(ScheduleStatus.PENDING);
-  private static final State PREEMPTING = State.create(ScheduleStatus.PREEMPTING);
-  private static final State RESTARTING = State.create(ScheduleStatus.RESTARTING);
-  private static final State ROLLBACK = State.create(ScheduleStatus.ROLLBACK);
-  private static final State RUNNING = State.create(ScheduleStatus.RUNNING);
-  private static final State STARTING = State.create(ScheduleStatus.STARTING);
-  private static final State UNKNOWN = State.create(ScheduleStatus.UNKNOWN);
-  private static final State UPDATING = State.create(ScheduleStatus.UPDATING);
+    private ScheduleStatus getState() {
+      return state;
+    }
+
+    private Closure<ScheduledTask> getMutation() {
+      return mutation;
+    }
+  }
 
   /**
    * A write-only work acceptor.
@@ -170,15 +190,15 @@ public class TaskStateMachine {
 
     @SuppressWarnings("unchecked")
     Closure<Transition<State>> manageTerminatedTasks = Closures.combine(
-        // Kill a task that we believe to be terminated when an attempt is made to revive.
+        /* Kill a task that we believe to be terminated when an attempt is made to revive. */
         Closures.filter(Transition.to(ASSIGNED, STARTING, RUNNING),
             addWorkClosure(WorkCommand.KILL)),
-        // Remove a terminated task that is remotely removed.
+        /* Remove a terminated task that is remotely removed. */
         Closures.filter(Transition.to(UNKNOWN), addWorkClosure(WorkCommand.DELETE)));
 
     final Closure<Transition<State>> manageRestartingTask = new Closure<Transition<State>>() {
       @Override public void execute(Transition<State> transition) {
-        switch (transition.getTo().state) {
+        switch (transition.getTo().getState()) {
           case ASSIGNED:
           case STARTING:
           case RUNNING:
@@ -187,11 +207,15 @@ public class TaskStateMachine {
 
           case LOST:
           case KILLED:
-            addWork(WorkCommand.RESCHEDULE, transition.getTo().mutation);
+            addWork(WorkCommand.RESCHEDULE, transition.getTo().getMutation());
             break;
 
           case UNKNOWN:
             updateState(ScheduleStatus.LOST);
+            break;
+
+          default:
+            // No-op.
         }
       }
     };
@@ -243,7 +267,7 @@ public class TaskStateMachine {
                 .withCallback(
                     new Closure<Transition<State>>() {
                       @Override public void execute(Transition<State> transition) {
-                        switch (transition.getTo().state) {
+                        switch (transition.getTo().getState()) {
                           case KILLING:
                             addWork(WorkCommand.DELETE);
                             break;
@@ -256,6 +280,10 @@ public class TaskStateMachine {
                           case ROLLBACK:
                             addWork(WorkCommand.ROLLBACK);
                             addWork(WorkCommand.DELETE);
+                            break;
+
+                          default:
+                            // No-op.
                         }
                       }
                     }
@@ -267,7 +295,7 @@ public class TaskStateMachine {
                 .withCallback(
                     new Closure<Transition<State>>() {
                       @Override public void execute(Transition<State> transition) {
-                        switch (transition.getTo().state) {
+                        switch (transition.getTo().getState()) {
                           case FINISHED:
                             rescheduleIfDaemon.execute();
                             break;
@@ -306,6 +334,10 @@ public class TaskStateMachine {
                             if (taskTimeoutFilter.apply(task.getTaskEvents())) {
                               updateState(ScheduleStatus.LOST);
                             }
+                            break;
+
+                           default:
+                             // No-op.
                         }
                       }
                     }
@@ -317,7 +349,7 @@ public class TaskStateMachine {
                 .withCallback(
                     new Closure<Transition<State>>() {
                       @Override public void execute(Transition<State> transition) {
-                        switch (transition.getTo().state) {
+                        switch (transition.getTo().getState()) {
                           case FINISHED:
                             rescheduleIfDaemon.execute();
                             break;
@@ -355,6 +387,10 @@ public class TaskStateMachine {
                             // The slave previously acknowledged that it had the task, and now
                             // stopped reporting it.
                             updateState(ScheduleStatus.LOST);
+                            break;
+
+                           default:
+                             // No-op.
                         }
                       }
                     }
@@ -366,7 +402,7 @@ public class TaskStateMachine {
                 .withCallback(
                     new Closure<Transition<State>>() {
                       @Override public void execute(Transition<State> transition) {
-                        switch (transition.getTo().state) {
+                        switch (transition.getTo().getState()) {
                           case FINISHED:
                             rescheduleIfDaemon.execute();
                             break;
@@ -402,6 +438,10 @@ public class TaskStateMachine {
 
                           case UNKNOWN:
                             updateState(ScheduleStatus.LOST);
+                            break;
+
+                           default:
+                             // No-op.
                         }
                       }
                     }
@@ -452,14 +492,14 @@ public class TaskStateMachine {
             new Closure<Transition<State>>() {
               @Override
               public void execute(final Transition<State> transition) {
-                ScheduleStatus from = transition.getFrom().state;
-                ScheduleStatus to = transition.getTo().state;
+                ScheduleStatus from = transition.getFrom().getState();
+                ScheduleStatus to = transition.getTo().getState();
 
                 if (transition.isValidStateChange() && (to != ScheduleStatus.UNKNOWN)
                     // Prevent an update when killing a pending task, since the task is deleted
                     // prior to the update.
                     && !((from == ScheduleStatus.PENDING) && (to == ScheduleStatus.KILLING))) {
-                  addWork(WorkCommand.UPDATE_STATE, transition.getTo().mutation);
+                  addWork(WorkCommand.UPDATE_STATE, transition.getTo().getMutation());
                 } else if (!transition.isAllowed()) {
                   LOG.log(Level.SEVERE, "Illegal state transition attempted: " + transition);
                   ILLEGAL_TRANSITIONS.incrementAndGet();
@@ -478,7 +518,7 @@ public class TaskStateMachine {
   private Closure<Transition<State>> manageUpdatingTask(final boolean rollback) {
     return new Closure<Transition<State>>() {
       @Override public void execute(Transition<State> transition) {
-        switch (transition.getTo().state) {
+        switch (transition.getTo().getState()) {
           case ASSIGNED:
           case STARTING:
           case KILLING:
@@ -499,6 +539,10 @@ public class TaskStateMachine {
             // task, but moving to LOST will cause it to be rescheduled.  Need to rethink.
             addWork(WorkCommand.DELETE);
             addWork(rollback ? WorkCommand.ROLLBACK : WorkCommand.UPDATE);
+            break;
+
+          default:
+            // No-op.
         }
       }
     };
@@ -571,10 +615,12 @@ public class TaskStateMachine {
     checkNotNull(status);
     checkNotNull(mutation);
 
-    // Don't bother applying noop state changes.  If we end up modifying task state without a
-    // state transition (e.g. storing resource consumption of a running task, for example), we need
-    // to find a different way to suppress noop transitions.
-    if (stateMachine.getState().state != status) {
+    /**
+     * Don't bother applying noop state changes.  If we end up modifying task state without a
+     * state transition (e.g. storing resource consumption of a running task, for example), we need
+     * to find a different way to suppress noop transitions.
+     */
+    if (stateMachine.getState().getState() != status) {
       @SuppressWarnings("unchecked")
       Closure<ScheduledTask> operation = Closures.combine(mutation,
           new Closure<ScheduledTask>() {
@@ -592,25 +638,13 @@ public class TaskStateMachine {
     return false;
   }
 
-  private static final Supplier<String> LOCAL_HOST_SUPPLIER = Suppliers.memoize(
-      new Supplier<String>() {
-        @Override public String get() {
-          try {
-            return InetAddress.getLocalHost().getHostName();
-          } catch (UnknownHostException e) {
-            LOG.log(Level.SEVERE, "Failed to get self hostname.");
-            throw Throwables.propagate(e);
-          }
-        }
-      });
-
   /**
    * Fetch the current state from the state machine.
    *
    * @return The current state.
    */
   public synchronized ScheduleStatus getState() {
-    return stateMachine.getState().state;
+    return stateMachine.getState().getState();
   }
 
   /**

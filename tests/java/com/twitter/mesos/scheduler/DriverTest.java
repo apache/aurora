@@ -22,13 +22,14 @@ public class DriverTest extends EasyMockTest {
   private static final String TASK_1 = "1";
   private static final String TASK_2 = "2";
 
+  private SchedulerDriver schedulerDriver;
+
+  private Supplier<Optional<SchedulerDriver>>  driverSupplier;
+  private DriverImpl driver;
+
   private static Protos.TaskID createTaskId(String taskId) {
     return Protos.TaskID.newBuilder().setValue(taskId).build();
   }
-
-  private SchedulerDriver schedulerDriver;
-  private Supplier<Optional<SchedulerDriver>>  driverSupplier;
-  private DriverImpl driver;
 
   @Before
   public void setUp() {

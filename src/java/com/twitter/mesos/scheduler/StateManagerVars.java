@@ -22,7 +22,16 @@ class StateManagerVars {
    * Mutable state of the StateManager.
    */
   static class MutableState {
-    final Vars vars = new Vars();
+    private final Vars vars = new Vars();
+
+    /**
+     * Gets a reference to the vars.
+     *
+     * @return State manager variables.
+     */
+    public Vars getVars() {
+      return vars;
+    }
   }
 
   /**
@@ -49,6 +58,9 @@ class StateManagerVars {
     }
   }
 
+  /**
+   * Vars layer to handle delayed export.
+   */
   static final class Vars {
     private volatile boolean exporting = false;
     private final Function<Var, Var> maybeExport = new Function<Var, Var>() {

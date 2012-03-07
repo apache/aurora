@@ -53,15 +53,22 @@ public interface TaskLauncher {
    */
   boolean statusUpdate(TaskStatus status);
 
+  /**
+   * Task launcher utility class.
+   */
   final class Util {
     private static final Logger LOG = Logger.getLogger(Util.class.getName());
 
-    public static final String THERMOS_EXECUTOR_ID_PREFIX = "thermos-";
+    private static final String THERMOS_EXECUTOR_ID_PREFIX = "thermos-";
 
     // TODO(wickman):  This belongs in SchedulerModule eventually.
     @NotNull
     @CmdLine(name = "thermos_executor_path", help = "Path to the thermos executor launch script.")
     private static final Arg<String> THERMOS_EXECUTOR_PATH = Arg.create();
+
+    private Util() {
+      // Utility class.
+    }
 
     /**
      * Creates a mesos task description.

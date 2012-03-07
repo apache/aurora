@@ -27,7 +27,7 @@ public class ResourcesTest {
   private static final String NAME = "resource_name";
 
   @Test
-  public void testPortRange_exact() {
+  public void testPortRangeExact() {
     Resource portsResource = createPortRange(Pair.of(1, 5));
     Set<Integer> ports = Resources.getPorts(createOffer(portsResource), 5);
     assertEquals(5, ports.size());
@@ -41,14 +41,14 @@ public class ResourcesTest {
   }
 
   @Test
-  public void testPortRange_abundance() {
+  public void testPortRangeAbundance() {
     Resource portsResource = createPortRange(Pair.of(1, 10));
     Set<Integer> ports = Resources.getPorts(createOffer(portsResource), 5);
     assertEquals(5, ports.size());
   }
 
   @Test
-  public void testPortRange_exhaust() {
+  public void testPortRangeExhaust() {
     Resource portsResource = createPortRanges(Pair.of(1, 2), Pair.of(10, 15));
 
     Set<Integer> ports = Resources.getPorts(createOffer(portsResource), 7);
@@ -66,7 +66,7 @@ public class ResourcesTest {
   }
 
   @Test(expected = Resources.InsufficientResourcesException.class)
-  public void testPortRange_scarcity() {
+  public void testPortRangeScarcity() {
     Resource portsResource = createPortRange(Pair.of(1, 2));
     Resources.getPorts(createOffer(portsResource), 5);
   }
@@ -104,7 +104,7 @@ public class ResourcesTest {
 
   @Test
   public void testRangeResourceEmpty() {
-    expectRanges(ImmutableSet.<Pair<Long,Long>>of(), ImmutableSet.<Integer>of());
+    expectRanges(ImmutableSet.<Pair<Long, Long>>of(), ImmutableSet.<Integer>of());
   }
 
   @Test

@@ -14,10 +14,6 @@ import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
  */
 public final class Shards {
 
-  private Shards() {
-    // Utility.
-  }
-
   /**
    * Gets the original task configuration for a shard update.  Result may be null if the update
    * adds the shard.
@@ -41,4 +37,8 @@ public final class Shards {
           return updateConfig.getNewConfig();
         }
       };
+
+  private Shards() {
+    // Utility.
+  }
 }

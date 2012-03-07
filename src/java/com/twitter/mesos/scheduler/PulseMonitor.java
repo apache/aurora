@@ -4,11 +4,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import com.google.common.base.Functions;
 import com.google.common.base.Supplier;
-import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.collect.MapMaker;
 
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -18,6 +15,8 @@ import com.twitter.common.quantity.Time;
  * threshold.
  * Also acts as a supplier of the pulsed type, which will provide access to all non-expired
  * entries.
+ *
+ * @param <T> The type of values to track.
  *
  * @author William Farner
  */
@@ -41,6 +40,11 @@ public interface PulseMonitor<T> extends Supplier<Set<T>> {
    */
   boolean isAlive(T t);
 
+  /**
+   * Pulse monitor implementation using a decaying map for time expiration.
+   *
+   * @param <T> The type of values to track.
+   */
   public static class PulseMonitorImpl<T> implements PulseMonitor<T> {
 
     private final Map<T, T> pulses;

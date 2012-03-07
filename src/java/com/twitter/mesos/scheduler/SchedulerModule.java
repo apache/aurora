@@ -4,7 +4,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
@@ -80,22 +79,22 @@ public class SchedulerModule extends AbstractModule {
 
   @NotNull
   @CmdLine(name = "mesos_scheduler_ns",
-      help ="The name service name for the mesos scheduler thrift server.")
+      help = "The name service name for the mesos scheduler thrift server.")
   private static final Arg<String> MESOS_SCHEDULER_NAME_SPEC = Arg.create();
 
   @CmdLine(name = "machine_restrictions",
-      help ="Map of machine hosts to job keys."
+      help = "Map of machine hosts to job keys."
               + "  If A maps to B, only B can run on A and B can only run on A.")
-  public static final Arg<Map<String, String>> MACHINE_RESTRICTIONS =
+  private static final Arg<Map<String, String>> MACHINE_RESTRICTIONS =
       Arg.create(Collections.<String, String>emptyMap());
 
   @NotNull
   @CmdLine(name = "mesos_master_address",
-          help ="Mesos address for the master, can be a mesos address or zookeeper path.")
+          help = "Mesos address for the master, can be a mesos address or zookeeper path.")
   private static final Arg<String> MESOS_MASTER_ADDRESS = Arg.create();
 
   @NotNull
-  @CmdLine(name = "executor_path", help ="Path to the executor launch script.")
+  @CmdLine(name = "executor_path", help = "Path to the executor launch script.")
   private static final Arg<String> EXECUTOR_PATH = Arg.create();
 
   @CmdLine(name = "executor_dead_threashold", help =
@@ -145,23 +144,23 @@ public class SchedulerModule extends AbstractModule {
     bind(Driver.class).to(DriverImpl.class);
     bind(DriverImpl.class).in(Singleton.class);
 
-    bind(new TypeLiteral<Supplier<Optional<SchedulerDriver>>>() {}).to(DriverReference.class);
+    bind(new TypeLiteral<Supplier<Optional<SchedulerDriver>>>() { }).to(DriverReference.class);
     bind(DriverReference.class).in(Singleton.class);
 
     // Bindings for MesosSchedulerImpl.
     bind(SessionValidator.class).to(SessionValidatorImpl.class);
     bind(SchedulerCore.class).to(SchedulerCoreImpl.class).in(Singleton.class);
 
-    bind(new TypeLiteral<Optional<String>>() {}).annotatedWith(GcExecutor.class)
+    bind(new TypeLiteral<Optional<String>>() { }).annotatedWith(GcExecutor.class)
         .toInstance(Optional.fromNullable(GC_EXECUTOR_PATH.get()));
-    bind(new TypeLiteral<PulseMonitor<String>>() {})
+    bind(new TypeLiteral<PulseMonitor<String>>() { })
         .annotatedWith(GcExecutor.class)
         .toInstance(new PulseMonitorImpl<String>(EXECUTOR_GC_INTERVAL.get()));
 
     // Bindings for SchedulerCoreImpl.
     bind(CronJobManager.class).in(Singleton.class);
     bind(ImmediateJobManager.class).in(Singleton.class);
-    bind(new TypeLiteral<PulseMonitor<String>>() {})
+    bind(new TypeLiteral<PulseMonitor<String>>() { })
         .annotatedWith(Bootstrap.class)
         .toInstance(new PulseMonitorImpl<String>(EXECUTOR_DEAD_THRESHOLD.get()));
 
@@ -176,7 +175,7 @@ public class SchedulerModule extends AbstractModule {
     // updaterTaskProvider handled in provider.
 
     // Bindings for SchedulingFilterImpl.
-    bind(Key.get(new TypeLiteral<Map<String, String>>() {},
+    bind(Key.get(new TypeLiteral<Map<String, String>>() { },
         Names.named(SchedulingFilterImpl.MACHINE_RESTRICTIONS)))
         .toInstance(MACHINE_RESTRICTIONS.get());
 
@@ -203,12 +202,15 @@ public class SchedulerModule extends AbstractModule {
     install(new ServletModule());
   }
 
+  /**
+   * Command to register a thread stack printer that identifies initiator of a shutdown.
+   */
   private static class RegisterShutdownStackPrinter implements Command {
-    private static final Function<StackTraceElement, String> STACK_ELEMENT_TOSTRING =
+    private static final Function<StackTraceElement, String> STACK_ELEM_TOSTRING =
         new Function<StackTraceElement, String>() {
           @Override public String apply(StackTraceElement element) {
             return element.getClassName() + "." + element.getMethodName()
-                + "(" + element.getFileName() + ":" + element.getLineNumber() + ")";
+                + String.format("(%s:%s)", element.getFileName(), element.getLineNumber());
           }
         };
 
@@ -229,7 +231,7 @@ public class SchedulerModule extends AbstractModule {
               .append(" (id ").append(thread.getId()).append(")")
               .append("\n")
               .append(Joiner.on("\n  ").join(
-                  Iterables.transform(Arrays.asList(thread.getStackTrace()), STACK_ELEMENT_TOSTRING)))
+                  Iterables.transform(Arrays.asList(thread.getStackTrace()), STACK_ELEM_TOSTRING)))
               .toString();
 
           LOG.info("Shutdown initiated by: " + message);

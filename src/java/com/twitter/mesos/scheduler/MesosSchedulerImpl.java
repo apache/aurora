@@ -45,21 +45,33 @@ public class MesosSchedulerImpl implements Scheduler {
   private static final Amount<Long, Time> MAX_REGISTRATION_DELAY = Amount.of(1L, Time.MINUTES);
 
   private final AtomicLong resourceOffers = Stats.exportLong("scheduler_resource_offers");
+  private final AtomicLong failedOffers = Stats.exportLong("scheduler_failed_offers");
+  private final AtomicLong failedStatusUpdates = Stats.exportLong("scheduler_status_updates");
 
   private final List<TaskLauncher> taskLaunchers;
   private final SlaveMapper slaveMapper;
 
   // Stores scheduler state and handles actual scheduling decisions.
   private final SchedulerCore schedulerCore;
+  private final Lifecycle lifecycle;
   private volatile FrameworkID frameworkID = null;
   private final AtomicInteger registeredFlag = Stats.exportInt("framework_registered");
 
+  /**
+   * Creates a new mesos scheduler.
+   *
+   * @param schedulerCore Core scheduler.
+   * @param lifecycle Application lifecycle manager.
+   * @param taskLaunchers Task launchers.
+   * @param slaveMapper Slave information accumulator.
+   */
   @Inject
   public MesosSchedulerImpl(SchedulerCore schedulerCore,
       final Lifecycle lifecycle,
       List<TaskLauncher> taskLaunchers,
       SlaveMapper slaveMapper) {
     this.schedulerCore = checkNotNull(schedulerCore);
+    this.lifecycle = checkNotNull(lifecycle);
     this.taskLaunchers = checkNotNull(taskLaunchers);
     this.slaveMapper = checkNotNull(slaveMapper);
 
@@ -90,10 +102,10 @@ public class MesosSchedulerImpl implements Scheduler {
   }
 
   @Override
-  public void registered(final SchedulerDriver driver, FrameworkID frameworkID) {
-    LOG.info("Registered with ID " + frameworkID);
+  public void registered(final SchedulerDriver driver, FrameworkID fId) {
+    LOG.info("Registered with ID " + fId);
     registeredFlag.set(1);
-    this.frameworkID = frameworkID;
+    this.frameworkID = fId;
     try {
       schedulerCore.registered(frameworkID.getValue());
     } catch (SchedulerException e) {
@@ -123,7 +135,7 @@ public class MesosSchedulerImpl implements Scheduler {
           task = launcher.createTask(offer);
         } catch (SchedulerException e) {
           LOG.log(Level.WARNING, "Failed to schedule offers.", e);
-          vars.failedOffers.incrementAndGet();
+          failedOffers.incrementAndGet();
         }
 
         if (task.isPresent()) {
@@ -160,19 +172,19 @@ public class MesosSchedulerImpl implements Scheduler {
         + " in state " + status.getState() + infoMsg + coreMsg);
 
     for (TaskLauncher launcher : taskLaunchers) {
-      if (launcher.statusUpdate(status))
+      if (launcher.statusUpdate(status)) {
         return;
+      }
     }
 
     LOG.warning("Unhandled status update " + status);
-    vars.failedStatusUpdates.incrementAndGet();
+    failedStatusUpdates.incrementAndGet();
   }
 
   @Override
   public void error(SchedulerDriver driver, int code, String message) {
     LOG.severe("Received error message: " + message + " with code " + code);
-    // TODO(William Farner): Exit cleanly.
-    System.exit(1);
+    lifecycle.shutdown();
   }
 
   @Timed("scheduler_framework_message")
@@ -212,16 +224,10 @@ public class MesosSchedulerImpl implements Scheduler {
     }
   }
 
-  private static class Vars {
-    final AtomicLong failedOffers = Stats.exportLong("scheduler_failed_offers");
-    final AtomicLong failedStatusUpdates = Stats.exportLong("scheduler_status_updates");
-  }
-  private final Vars vars = new Vars();
-
   /**
    * Maintains a mapping between hosts and slave ids.
    */
-  public static interface SlaveHosts {
+  public interface SlaveHosts {
 
     /**
      * Gets the slave ID associated with a host name.
@@ -244,7 +250,7 @@ public class MesosSchedulerImpl implements Scheduler {
    *
    * We accept a trivial memory "leak" by not removing when a slave machine is decommissioned.
    */
-  public static interface SlaveMapper {
+  public interface SlaveMapper {
 
     /**
      * Records a host to slave ID mapping.
@@ -255,6 +261,9 @@ public class MesosSchedulerImpl implements Scheduler {
     void addSlave(String host, SlaveID slaveId);
   }
 
+  /**
+   * In-memory slave host mapper.
+   */
   static class SlaveHostsImpl implements SlaveHosts, SlaveMapper {
     private final Map<String, SlaveID> executorSlaves = Maps.newConcurrentMap();
 

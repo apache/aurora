@@ -1,5 +1,9 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Collection;
+import java.util.Map;
+import java.util.Set;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
@@ -10,6 +14,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
 import com.google.inject.name.Named;
+
 import com.twitter.common.quantity.Amount;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Attribute;
@@ -20,11 +25,8 @@ import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work.Quiet;
 
-import java.util.Collection;
-import java.util.Map;
-import java.util.Set;
-
 import static com.google.common.base.Preconditions.checkNotNull;
+
 import static com.twitter.common.quantity.Data.BYTES;
 import static com.twitter.common.quantity.Data.MB;
 import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
@@ -44,6 +46,18 @@ public class SchedulingFilterImpl implements SchedulingFilter {
    */
   public static final String MACHINE_RESTRICTIONS =
       "com.twitter.mesos.scheduler.MACHINE_RESTRICTIONS";
+
+  @VisibleForTesting static final Veto CPU = new Veto("Insufficient CPU");
+  @VisibleForTesting static final Veto RAM = new Veto("Insufficient RAM");
+  @VisibleForTesting static final Veto DISK = new Veto("Insufficient disk");
+  @VisibleForTesting static final Veto PORTS = new Veto("Insufficient ports");
+  @VisibleForTesting static final Veto RESTRICTED_JOB =
+      new Veto("Job is restricted to other hosts");
+  @VisibleForTesting static final Veto RESERVED_HOST =
+      new Veto("Host is restricted to another job");
+  @VisibleForTesting static final Veto DEDICATED_HOST_VETO = new Veto("Host is dedicated");
+
+  private static final Optional<Veto> NO_VETO = Optional.absent();
 
   private final Map<String, String> machineRestrictions;
   private final Storage storage;
@@ -86,12 +100,20 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     return !foundJobRestriction;
   }
 
-  public interface AttributeLoader extends Function<String, Iterable<Attribute>> {}
+  /**
+   * A function that fetches attributes associated with a given host.
+   */
+  public interface AttributeLoader extends Function<String, Iterable<Attribute>> { }
 
-  private static interface FilterRule
-      extends Function<TwitterTaskInfo, Iterable<Optional<Veto>>> {}
+  /**
+   * A function that may veto a task.
+   */
+  private interface FilterRule extends Function<TwitterTaskInfo, Iterable<Optional<Veto>>> { }
 
-  private static abstract class SingleVetoRule implements FilterRule {
+  /**
+   * Convenience class for a rule that will only ever have a single veto.
+   */
+  private abstract static class SingleVetoRule implements FilterRule {
     @Override public final Iterable<Optional<Veto>> apply(TwitterTaskInfo task) {
       return ImmutableList.of(doApply(task));
     }
@@ -99,43 +121,33 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     abstract Optional<Veto> doApply(TwitterTaskInfo task);
   }
 
-  private static final Optional<Veto> NO_VETO = Optional.absent();
-
-  @VisibleForTesting static final Veto CPU_VETO = new Veto("Insufficient CPU");
-  @VisibleForTesting static final Veto RAM_VETO = new Veto("Insufficient RAM");
-  @VisibleForTesting static final Veto DISK_VETO = new Veto("Insufficient disk");
-  @VisibleForTesting static final Veto PORTS_VETO = new Veto("Insufficient ports");
-  @VisibleForTesting
-  static final Veto RESTRICTED_JOB_VETO = new Veto("Job is restricted to other hosts");
-  @VisibleForTesting
-  static final Veto RESERVED_HOST_VETO = new Veto("Host is restricted to another job");
-  @VisibleForTesting static final Veto DEDICATED_HOST_VETO = new Veto("Host is dedicated");
-
   private Iterable<FilterRule> rulesFromOffer(final Resources available,
       final Optional<String> slaveHost) {
 
     return ImmutableList.<FilterRule>of(
         new SingleVetoRule() {
           @Override public Optional<Veto> doApply(TwitterTaskInfo task) {
-            return (available.numCpus >= task.getNumCpus()) ? NO_VETO : Optional.of(CPU_VETO);
+            return (available.getNumCpus() >= task.getNumCpus()) ? NO_VETO : Optional.of(CPU);
           }
         },
         new SingleVetoRule() {
           @Override public Optional<Veto> doApply(TwitterTaskInfo task) {
-            boolean passed = available.ram.as(BYTES) >= Amount.of(task.getRamMb(), MB).as(BYTES);
-            return passed ? NO_VETO : Optional.of(RAM_VETO);
+            boolean passed =
+                available.getRam().as(BYTES) >= Amount.of(task.getRamMb(), MB).as(BYTES);
+            return passed ? NO_VETO : Optional.of(RAM);
           }
         },
         new SingleVetoRule() {
           @Override public Optional<Veto> doApply(TwitterTaskInfo task) {
-            boolean passed = available.disk.as(BYTES) >= Amount.of(task.getDiskMb(), MB).as(BYTES);
-            return passed ? NO_VETO : Optional.of(DISK_VETO);
+            boolean passed =
+                available.getDisk().as(BYTES) >= Amount.of(task.getDiskMb(), MB).as(BYTES);
+            return passed ? NO_VETO : Optional.of(DISK);
           }
         },
         new SingleVetoRule() {
           @Override public Optional<Veto> doApply(TwitterTaskInfo task) {
-            boolean passed = available.numPorts >= task.getRequestedPorts().size();
-            return passed ? NO_VETO : Optional.of(PORTS_VETO);
+            boolean passed = available.getNumPorts() >= task.getRequestedPorts().size();
+            return passed ? NO_VETO : Optional.of(PORTS);
           }
         },
         new SingleVetoRule() {
@@ -153,10 +165,10 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     String hostReservation = machineRestrictions.get(host);
     if (hostReservation != null) {
       if (!hostReservation.equals(jobKey)) {
-        return Optional.of(RESERVED_HOST_VETO);
+        return Optional.of(RESERVED_HOST);
       }
     } else if (!jobCanRunOnMachine(host, jobKey)) {
-      return Optional.of(RESTRICTED_JOB_VETO);
+      return Optional.of(RESTRICTED_JOB);
     }
 
     return Optional.absent();
@@ -224,14 +236,16 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     Iterable<Veto> staticVetos = applyRules(staticRules, task);
     if (!Iterables.isEmpty(staticVetos)) {
       return ImmutableSet.copyOf(staticVetos);
-    }
-
-    if (slaveHost.isPresent()) {
+    } else if (slaveHost.isPresent()) {
+      Set<Veto> vetoes;
       if (!ConfigurationManager.isDedicated(task) && isDedicated(slaveHost.get())) {
-        return ImmutableSet.of(DEDICATED_HOST_VETO);
+        vetoes = ImmutableSet.of(DEDICATED_HOST_VETO);
+      } else {
+        vetoes = ImmutableSet.copyOf(
+            Optional.presentInstances(getConstraintFilter(slaveHost.get()).apply(task)));
       }
-      return ImmutableSet.copyOf(
-          Optional.presentInstances(getConstraintFilter(slaveHost.get()).apply(task)));
+
+      return vetoes;
     } else {
       return ImmutableSet.of();
     }

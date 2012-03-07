@@ -51,6 +51,7 @@ import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.mesos.gen.ResponseCode.AUTH_FAILED;
 import static com.twitter.mesos.gen.ResponseCode.INVALID_REQUEST;
@@ -64,13 +65,13 @@ import static com.twitter.mesos.gen.ResponseCode.WARNING;
  * @author William Farner
  */
 public class SchedulerThriftInterface implements MesosAdmin.Iface {
-  private static final Logger LOG = Logger.getLogger(SchedulerThriftInterface.class.getName());
-
   @VisibleForTesting
   @NotEmpty
   @CmdLine(name = "admin_role",
       help = "Auth role that is premitted to run administrative functions.")
   static final Arg<String> ADMIN_ROLE = Arg.create("mesos");
+
+  private static final Logger LOG = Logger.getLogger(SchedulerThriftInterface.class.getName());
 
   @CmdLine(name = "kill_task_initial_backoff",
       help = "Initial backoff delay while waiting for the tasks to transition to KILLED.")
@@ -82,11 +83,22 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
   private static final Arg<Amount<Long, Time>> KILL_TASK_MAX_BACKOFF =
       Arg.create(Amount.of(30L, Time.SECONDS));
 
+  private static final String NOT_ADMIN_MESSAGE = "Only admins may perform this operation.";
+
+  private static final Function<ScheduledTask, String> GET_ROLE = Functions.compose(
+      new Function<TwitterTaskInfo, String>() {
+        @Override public String apply(TwitterTaskInfo task) {
+          return task.getOwner().getRole();
+        }
+      },
+      Tasks.SCHEDULED_TO_INFO);
+
   private final SchedulerCore schedulerCore;
   private final SessionValidator sessionValidator;
-  private final QuotaManager quotaManager;
 
+  private final QuotaManager quotaManager;
   private final Amount<Long, Time> killTaskInitialBackoff;
+
   private final Amount<Long, Time> killTaskMaxBackoff;
 
   @Inject
@@ -106,14 +118,6 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     this.killTaskMaxBackoff = checkNotNull(maxBackoff);
   }
 
-  private static final Function<ScheduledTask, String> GET_ROLE = Functions.compose(
-      new Function<TwitterTaskInfo, String>() {
-        @Override public String apply(TwitterTaskInfo task) {
-          return task.getOwner().getRole();
-        }
-      },
-      Tasks.SCHEDULED_TO_INFO);
-
   private void validateSessionKeyForTasks(SessionKey session, TaskQuery taskQuery)
       throws AuthFailedException {
     Set<ScheduledTask> tasks = schedulerCore.getTasks(taskQuery);
@@ -125,7 +129,7 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
   @Override
   public CreateJobResponse createJob(JobConfiguration job, SessionKey session) {
     checkNotNull(job);
-    checkNotNull(session, "Session must be set.");
+    checkNotNull(session);
 
     LOG.info("Received createJob request: " + Tasks.jobKey(job));
     CreateJobResponse response = new CreateJobResponse();
@@ -155,9 +159,9 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
 
   @Override
   public StartCronResponse startCronJob(String role, String jobName, SessionKey session) {
-    checkNotBlank(role, "Role must not be blank.");
-    checkNotBlank(jobName, "Job name must not be blank.");
-    checkNotNull(session, "Session must be provided.");
+    checkNotBlank(role);
+    checkNotBlank(jobName);
+    checkNotNull(session);
 
     StartCronResponse response = new StartCronResponse();
     try {
@@ -200,8 +204,8 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
   @Override
   public KillResponse killTasks(final TaskQuery query, SessionKey session) {
     checkNotNull(query);
-    checkNotNull(session, "Session must be set.");
-    checkNotNull(session.getUser(), "Session user must be set.");
+    checkNotNull(session);
+    checkNotNull(session.getUser());
 
     // TODO(wfarner): Determine whether this is a useful function, or if it should simply be
     //     switched to 'killJob'.
@@ -255,8 +259,8 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
   //     ensure that the shards requested exist (reporting failure and ignoring request otherwise).
   @Override
   public RestartResponse restartTasks(Set<String> taskIds, SessionKey session) {
-    checkNotBlank(taskIds, "At least one task ID must be provided.");
-    checkNotNull(session, "Session must be set.");
+    checkNotBlank(taskIds);
+    checkNotNull(session);
 
     RestartResponse response = new RestartResponse()
         .setMessage(taskIds.size() + " tasks scheduled for restart.");
@@ -287,7 +291,7 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
   @Override
   public StartUpdateResponse startUpdate(JobConfiguration job, SessionKey session) {
     checkNotNull(job);
-    checkNotNull(session, "Session must be set.");
+    checkNotNull(session);
 
     LOG.info("Received update request for tasks: " + Tasks.jobKey(job));
     StartUpdateResponse response = new StartUpdateResponse();
@@ -313,11 +317,11 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
   @Override
   public UpdateShardsResponse updateShards(String role, String jobName,
       Set<Integer> shards, String updateToken, SessionKey session) {
-    checkNotBlank(role, "Role may not be blank.");
-    checkNotBlank(jobName, "Job may not be blank.");
-    checkNotBlank(shards, "At least one shard must be specified.");
-    checkNotBlank(updateToken, "Update token may not be blank.");
-    checkNotNull(session, "Session must be set.");
+    checkNotBlank(role);
+    checkNotBlank(jobName);
+    checkNotBlank(shards);
+    checkNotBlank(updateToken);
+    checkNotNull(session);
 
     UpdateShardsResponse response = new UpdateShardsResponse();
     try {
@@ -334,11 +338,11 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
   @Override
   public RollbackShardsResponse rollbackShards(String role, String jobName,
       Set<Integer> shards, String updateToken, SessionKey session) {
-    checkNotBlank(role, "Role may not be blank.");
-    checkNotBlank(jobName, "Job may not be blank.");
-    checkNotBlank(shards, "At least one shard must be specified.");
-    checkNotBlank(updateToken, "Update token may not be blank.");
-    checkNotNull(session, "Session must be set.");
+    checkNotBlank(role);
+    checkNotBlank(jobName);
+    checkNotBlank(shards);
+    checkNotBlank(updateToken);
+    checkNotNull(session);
 
     RollbackShardsResponse response = new RollbackShardsResponse();
     try {
@@ -355,15 +359,15 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
   @Override
   public FinishUpdateResponse finishUpdate(String role, String jobName,
       UpdateResult updateResult, String updateToken, SessionKey session) {
-    checkNotBlank(role, "Role may not be blank.");
-    checkNotBlank(jobName, "Job may not be blank.");
-    checkNotNull(session, "Session must be set.");
+    checkNotBlank(role);
+    checkNotBlank(jobName);
+    checkNotNull(session);
 
     FinishUpdateResponse response = new FinishUpdateResponse();
     try {
       schedulerCore.finishUpdate(role, jobName,
-          updateResult == UpdateResult.TERMINATE ?
-              Optional.<String>absent() : Optional.of(updateToken),
+          updateResult == UpdateResult.TERMINATE
+              ? Optional.<String>absent() : Optional.of(updateToken),
           updateResult);
       response.setResponseCode(OK).setMessage("Update successfully finished.");
     } catch (ScheduleException e) {
@@ -375,7 +379,7 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
 
   @Override
   public GetQuotaResponse getQuota(String ownerRole) {
-    checkNotBlank(ownerRole, "Owner role may not be blank.");
+    checkNotBlank(ownerRole);
     return new GetQuotaResponse().setQuota(quotaManager.getQuota(ownerRole));
   }
 
@@ -392,13 +396,11 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     }
   }
 
-  private static final String NOT_ADMIN_MESSAGE = "Only admins may perform this operation.";
-
   @Override
   public SetQuotaResponse setQuota(String ownerRole, Quota quota, SessionKey session) {
-    checkNotBlank(ownerRole, "Owner role must not be blank.");
-    checkNotNull(quota, "Quota must not be null");
-    checkNotNull(session, "Session must be set.");
+    checkNotBlank(ownerRole);
+    checkNotNull(quota);
+    checkNotNull(session);
 
     SetQuotaResponse response = new SetQuotaResponse();
     try {
@@ -416,9 +418,9 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
   public ForceTaskStateResponse forceTaskState(String taskId, ScheduleStatus status,
       SessionKey session) {
 
-    checkNotBlank(taskId, "Task ID must not be blank.");
-    checkNotNull(status, "Schedule status must not be null.");
-    checkNotNull(session, "Session must be set.");
+    checkNotBlank(taskId);
+    checkNotNull(status);
+    checkNotNull(session);
 
     ForceTaskStateResponse response = new ForceTaskStateResponse();
     try {

@@ -8,7 +8,8 @@ import com.twitter.mesos.gen.JobConfiguration;
 
 /**
  * Interface for a job manager.  A job manager is responsible for deciding whether and when to
- * trigger execution of a job.  A job manager will be {@link #start() started} before any other methods are called.
+ * trigger execution of a job.  A job manager will be {@link #start() started} before any other
+ * methods are called.
  *
  * @author William Farner
  */

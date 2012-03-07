@@ -78,6 +78,9 @@ class SchedulerLifecycle {
     return new SchedulerCandidateImpl();
   }
 
+  /**
+   * Maintains a reference to the driver.
+   */
   static class DriverReference implements Supplier<Optional<SchedulerDriver>> {
     private volatile Optional<SchedulerDriver> driver = Optional.absent();
 
@@ -86,11 +89,14 @@ class SchedulerLifecycle {
       return driver;
     }
 
-    private void set(SchedulerDriver driver) {
-      this.driver = Optional.of(driver);
+    private void set(SchedulerDriver ref) {
+      this.driver = Optional.of(ref);
     }
   }
 
+  /**
+   * Implementation of the scheduler candidate lifecycle.
+   */
   private class SchedulerCandidateImpl implements SchedulerCandidate {
 
     @Override public void onLeading(ServerSet.EndpointStatus status) {

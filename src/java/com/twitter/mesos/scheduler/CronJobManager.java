@@ -3,7 +3,6 @@ package com.twitter.mesos.scheduler;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
@@ -19,10 +18,6 @@ import com.google.inject.Inject;
 
 import org.apache.commons.lang.StringUtils;
 
-import it.sauronsoftware.cron4j.InvalidPatternException;
-import it.sauronsoftware.cron4j.Scheduler;
-import it.sauronsoftware.cron4j.SchedulingPattern;
-
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
@@ -36,11 +31,14 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.CronCollisionPolicy;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
-import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
+
+import it.sauronsoftware.cron4j.InvalidPatternException;
+import it.sauronsoftware.cron4j.Scheduler;
+import it.sauronsoftware.cron4j.SchedulingPattern;
 
 /**
  * A job scheduler that receives jobs that should be run periodically on a cron schedule.
@@ -52,13 +50,14 @@ import com.twitter.mesos.scheduler.storage.Storage.Work;
  * @author William Farner
  */
 public class CronJobManager extends JobManager {
-  private static Logger LOG = Logger.getLogger(CronJobManager.class.getName());
 
   @VisibleForTesting
   static final String MANAGER_KEY = "CRON";
 
   @VisibleForTesting
   static final String CRON_USER = "cron";
+
+  private static final Logger LOG = Logger.getLogger(CronJobManager.class.getName());
 
   @CmdLine(name = "cron_start_initial_backoff", help =
       "Initial backoff delay while waiting for a previous cron run to start.")

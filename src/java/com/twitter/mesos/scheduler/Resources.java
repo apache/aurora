@@ -4,8 +4,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
+import com.google.common.base.Objects;
 import com.google.common.base.Predicate;
 import com.google.common.collect.DiscreteDomains;
 import com.google.common.collect.ImmutableList;
@@ -42,10 +42,18 @@ public class Resources {
   public static final String DISK_MB = "disk";
   public static final String PORTS = "ports";
 
-  final double numCpus;
-  final Amount<Long, Data> disk;
-  final Amount<Long, Data> ram;
-  final int numPorts;
+  private static final Function<Range, Set<Integer>> RANGE_TO_MEMBERS =
+      new Function<Range, Set<Integer>>() {
+        @Override public Set<Integer> apply(Range range) {
+          return com.google.common.collect.Ranges.closed(
+              (int) range.getBegin(), (int) range.getEnd()).asSet(DiscreteDomains.integers());
+        }
+      };
+
+  private final double numCpus;
+  private final Amount<Long, Data> disk;
+  private final Amount<Long, Data> ram;
+  private final int numPorts;
 
   /**
    * Creates a new resources object.
@@ -120,6 +128,11 @@ public class Resources {
         .isEquals();
   }
 
+  @Override
+  public int hashCode() {
+    return Objects.hashCode(numCpus, ram, disk, numPorts);
+  }
+
   /**
    * Extracts the resources required from a task.
    *
@@ -169,7 +182,7 @@ public class Resources {
   private static int getNumAvailablePorts(List<Resource> resource) {
     int offeredPorts = 0;
     for (Range range : getPortRanges(resource)) {
-      offeredPorts += (1 + range.getEnd() - range.getBegin());
+      offeredPorts += 1 + (range.getEnd() - range.getBegin());
     }
     return offeredPorts;
   }
@@ -251,6 +264,42 @@ public class Resources {
   }
 
   /**
+   * Number of CPUs.
+   *
+   * @return CPUs.
+   */
+  double getNumCpus() {
+    return numCpus;
+  }
+
+  /**
+   * Disk amount.
+   *
+   * @return Disk.
+   */
+  Amount<Long, Data> getDisk() {
+    return disk;
+  }
+
+  /**
+   * RAM amount.
+   *
+   * @return RAM.
+   */
+  Amount<Long, Data> getRam() {
+    return ram;
+  }
+
+  /**
+   * Number of ports.
+   *
+   * @return Port count.
+   */
+  int getNumPorts() {
+    return numPorts;
+  }
+
+  /**
    * Thrown when there are insufficient resources to satisfy a request.
    */
   static class InsufficientResourcesException extends RuntimeException {
@@ -258,14 +307,6 @@ public class Resources {
       super(message);
     }
   }
-
-  private static final Function<Range, Set<Integer>> RANGE_TO_MEMBERS =
-      new Function<Range, Set<Integer>>() {
-        @Override public Set<Integer> apply(Range range) {
-          return com.google.common.collect.Ranges.closed(
-              (int) range.getBegin(), (int) range.getEnd()).asSet(DiscreteDomains.integers());
-        }
-      };
 
   /**
    * Attempts to grab {@code numPorts} from the given resource {@code offer}.
@@ -283,7 +324,8 @@ public class Resources {
     }
 
     List<Integer> availablePorts = Lists.newArrayList(Sets.newHashSet(
-        Iterables.concat(Iterables.transform(getPortRanges(offer.getResourcesList()), RANGE_TO_MEMBERS))));
+        Iterables.concat(
+            Iterables.transform(getPortRanges(offer.getResourcesList()), RANGE_TO_MEMBERS))));
 
     if (availablePorts.size() < numPorts) {
       throw new InsufficientResourcesException(

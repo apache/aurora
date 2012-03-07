@@ -10,7 +10,6 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 
 import org.apache.commons.lang.StringUtils;
-import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
@@ -24,9 +23,8 @@ import org.joda.time.format.DateTimeFormatter;
  */
 public class LogFormatter extends Formatter {
 
-  private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormat.forPattern(
-    "MMdd HH:mm:ss.SSS"
-  ).withZone(DateTimeZone.UTC);
+  private static final DateTimeFormatter DATE_TIME_FORMATTER =
+      DateTimeFormat.forPattern("MMdd HH:mm:ss.SSS").withZone(DateTimeZone.UTC);
 
   /**
    * Build a level 'label' by taking the first character of the level name and making uppercase.
@@ -51,8 +49,6 @@ public class LogFormatter extends Formatter {
 
   @Override
   public String format(final LogRecord record) {
-    DateTime dt = new DateTime();
-
     int messageLength = BASE_MESSAGE_LENGTH
         + 2  // Colon and space
         + record.getMessage().length();

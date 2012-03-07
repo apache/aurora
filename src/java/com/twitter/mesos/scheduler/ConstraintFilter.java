@@ -20,6 +20,7 @@ import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
 import com.twitter.mesos.scheduler.SchedulingFilterImpl.AttributeLoader;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**
@@ -35,21 +36,6 @@ class ConstraintFilter implements Function<Constraint, Optional<Veto>> {
   private final Supplier<Collection<ScheduledTask>> activeTasksSupplier;
   private final AttributeLoader attributeLoader;
   private final Iterable<Attribute> hostAttributes;
-
-  @VisibleForTesting
-  static Veto unsatisfiedValueVeto(String constraint) {
-    return new Veto("Constraint not satisfied: " + constraint);
-  }
-
-  @VisibleForTesting
-  static Veto missingLimitVeto(String constraint) {
-    return new Veto("Limit constraint not present: " + constraint);
-  }
-
-  @VisibleForTesting
-  static Veto unsatisfiedLimitVeto(String constraint) {
-    return new Veto("Constraint not satisfied: " + constraint);
-  }
 
   /**
    * Creates a new constraint filer for a given job.
@@ -71,6 +57,16 @@ class ConstraintFilter implements Function<Constraint, Optional<Veto>> {
     this.hostAttributes = checkNotNull(hostAttributes);
   }
 
+  @VisibleForTesting
+  static Veto constraintVeto(String constraint) {
+    return new Veto("Constraint not satisfied: " + constraint);
+  }
+
+  @VisibleForTesting
+  static Veto missingLimitVeto(String constraint) {
+    return new Veto("Limit constraint not present: " + constraint);
+  }
+
   @Override
   public Optional<Veto> apply(Constraint constraint) {
     Set<Attribute> attributes =
@@ -83,7 +79,7 @@ class ConstraintFilter implements Function<Constraint, Optional<Veto>> {
             AttributeFilter.matches(attributes, taskConstraint.getValue());
         return matches
             ? Optional.<Veto>absent()
-            : Optional.of(unsatisfiedValueVeto(constraint.getName()));
+            : Optional.of(constraintVeto(constraint.getName()));
 
       case LIMIT:
         if (attributes.isEmpty()) {
@@ -98,16 +94,18 @@ class ConstraintFilter implements Function<Constraint, Optional<Veto>> {
             attributeLoader);
         return satisfied
             ? Optional.<Veto>absent()
-            : Optional.of(unsatisfiedLimitVeto(constraint.getName()));
+            : Optional.of(constraintVeto(constraint.getName()));
 
       default:
-        LOG.warning("Failed to recognize the constraint type: " + taskConstraint.getSetField());
+        LOG.warning("Unrecognized constraint type: " + taskConstraint.getSetField());
         throw new SchedulerException("Failed to recognize the constraint type: "
             + taskConstraint.getSetField());
     }
   }
 
-  // Finds all the attributes given by the name.
+  /**
+   * A filter to find attributes matching a name.
+   */
   static class NameFilter implements Predicate<Attribute> {
     private final String attributeName;
 
