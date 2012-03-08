@@ -66,19 +66,9 @@ def choose_cluster(config):
   return cmdline_cluster or config.cluster()
 
 
-def is_admin():
-  try:
-    MesosHelper.acquire_session_key_or_die('mesos')
-  except:
-    return False
-  return True
-
-
 def get_config(jobname, config_file, new_mesos, is_json, bindings=None):
   """Returns the proxy config."""
   if new_mesos:
-    assert is_admin(), ("--new_mesos is currently only allowed"
-                        " for users in the mesos group.")
     loader = PystachioConfig.load_json if is_json else PystachioConfig.load
     config = loader(config_file, jobname, bindings)
   else:

@@ -48,6 +48,7 @@ class MesosConfigLoader(object):
     for job in job_list:
       if str(job.name()) == name:
         return job.bind(*bindings) if bindings else job
+    raise ValueError('Could not find job named %s!' % name)
 
   @staticmethod
   def load(filename, name=None, bindings=None):
@@ -92,7 +93,7 @@ class PystachioConfig(ProxyConfig):
 
     MB = 1024 * 1024
     task = TwitterTaskInfo()
-    task.jobName = task_raw.name().get()
+    task.jobName = job.name().get()
     task.numCpus = task_raw.resources().cpu().get()
     task.ramMb = task_raw.resources().ram().get() / MB
     task.diskMb = task_raw.resources().disk().get() / MB
