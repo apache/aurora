@@ -16,7 +16,6 @@ import com.twitter.mesos.scheduler.PulseMonitor;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 /**
  * @author William Farner
@@ -47,7 +46,7 @@ public class BootstrapTaskLauncherTest extends EasyMockTest {
 
   @Before
   public void setUp() {
-    hostMonitor = createMock(new Clazz<PulseMonitor<String>>() {});
+    hostMonitor = createMock(new Clazz<PulseMonitor<String>>() { });
     bootstrap = new BootstrapTaskLauncher(hostMonitor);
   }
 

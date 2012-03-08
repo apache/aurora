@@ -36,14 +36,16 @@ import com.twitter.mesos.scheduler.Resources;
 import com.twitter.mesos.scheduler.StateManager;
 import com.twitter.mesos.scheduler.TaskLauncher;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-import static com.twitter.mesos.scheduler.periodic.HistoryPruneRunner.IS_THERMOS;
-import static com.twitter.mesos.scheduler.periodic.HistoryPruneRunner.TASK_TO_HOST;
-import static com.twitter.mesos.scheduler.periodic.HistoryPruneRunner.retainedTasksMessage;
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+import static com.google.common.base.Preconditions.checkNotNull;
+
+import static com.twitter.mesos.scheduler.periodic.HistoryPruneRunner.IS_THERMOS;
+import static com.twitter.mesos.scheduler.periodic.HistoryPruneRunner.TASK_TO_HOST;
+import static com.twitter.mesos.scheduler.periodic.HistoryPruneRunner.retainedTasksMessage;
 
 /**
  * A task launcher that periodically initiates a garbage-collecting executor on a host.
@@ -57,8 +59,8 @@ public class GcExecutorLauncher implements TaskLauncher {
    * Binding annotation for gc executor-related fields..
    */
   @BindingAnnotation
-  @Target({FIELD, PARAMETER, METHOD}) @Retention(RUNTIME)
-  public @interface GcExecutor {}
+  @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
+  public @interface GcExecutor { }
 
   private static final Resources GC_EXECUTOR_RESOURCES =
       new Resources(0.2, Amount.of(64L, Data.MB), Amount.of(16L, Data.MB), 0);

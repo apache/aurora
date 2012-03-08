@@ -39,12 +39,12 @@ public class PeriodicTaskModule extends AbstractModule {
   protected void configure() {
     bind(Integer.class).annotatedWith(PruneThreshold.class)
         .toInstance(PER_JOB_TASK_HISTORY_GOAL.get());
-    bind(new TypeLiteral<Amount<Long, Time>>() {}).annotatedWith(PruneThreshold.class)
+    bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(PruneThreshold.class)
         .toInstance(HISTORY_PRUNE_THRESHOLD.get());
     bind(HistoryPruner.class).to(HistoryPrunerImpl.class);
     bind(HistoryPrunerImpl.class).in(Singleton.class);
 
-    bind(new TypeLiteral<Amount<Long, Time>>() {}).annotatedWith(PeriodicTaskInterval.class)
+    bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(PeriodicTaskInterval.class)
         .toInstance(PERIODIC_TASK_INTERVAL.get());
     bind(HistoryPruneRunner.class).in(Singleton.class);
 

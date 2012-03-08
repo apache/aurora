@@ -4,7 +4,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 
@@ -35,12 +34,13 @@ import com.twitter.mesos.scheduler.periodic.HistoryPruner.HistoryPrunerImpl;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
 
-import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
-import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+
+import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
+import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 
 public class GcExecutorLauncherTest extends BaseStateManagerTest {
 
@@ -60,6 +60,13 @@ public class GcExecutorLauncherTest extends BaseStateManagerTest {
 
   private static final int PER_JOB_HISTORY = 1;
 
+  private final AtomicInteger taskIdCounter = new AtomicInteger();
+
+  private FakeClock clock;
+  private HistoryPruner pruner;
+  private PulseMonitor<String> hostMonitor;
+  private GcExecutorLauncher gcExecutorLauncher;
+
   private static void assertRetainedTasks(TaskDescription taskDescription, ScheduledTask... tasks)
       throws ThriftBinaryCodec.CodingException {
     AdjustRetainedTasks message = ThriftBinaryCodec.decode(
@@ -69,18 +76,11 @@ public class GcExecutorLauncherTest extends BaseStateManagerTest {
     assertEquals(message.getRetainedTasks(), Maps.transformValues(byId, Tasks.GET_STATUS));
   }
 
-  private final AtomicInteger taskIdCounter = new AtomicInteger();
-
-  private FakeClock clock;
-  private HistoryPruner pruner;
-  private PulseMonitor<String> hostMonitor;
-  private GcExecutorLauncher gcExecutorLauncher;
-
   @Before
   public void setUp() {
     clock = new FakeClock();
     pruner = new HistoryPrunerImpl(clock, ONE_DAY, PER_JOB_HISTORY);
-    hostMonitor = createMock(new Clazz<PulseMonitor<String>>() {});
+    hostMonitor = createMock(new Clazz<PulseMonitor<String>>() { });
     gcExecutorLauncher =
         new GcExecutorLauncher(hostMonitor, Optional.of("nonempty"), stateManager, pruner);
   }
@@ -134,7 +134,7 @@ public class GcExecutorLauncherTest extends BaseStateManagerTest {
             .setTask(new TwitterTaskInfo()
                 .setJobName(jobName)
                 .setOwner(new Identity().setRole("role").setUser("user"))
-                .setThermosConfig(isThermos ? new byte[] { 1,2,3 } : new byte[] {})));
+                .setThermosConfig(isThermos ? new byte[] {1, 2, 3} : new byte[] {})));
   }
 
   private void insertTasks(final ScheduledTask... tasks) {

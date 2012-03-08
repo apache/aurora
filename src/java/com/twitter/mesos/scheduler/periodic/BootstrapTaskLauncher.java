@@ -25,11 +25,12 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.PulseMonitor;
 import com.twitter.mesos.scheduler.TaskLauncher;
 
-import static com.google.common.base.Preconditions.checkNotNull;
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * A task launcher that periodically accepts offers to run bootstrap tasks on hosts and ensure that
@@ -38,7 +39,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * @author William Farner
  */
 public class BootstrapTaskLauncher implements TaskLauncher {
-  private static final Logger LOG = Logger.getLogger(BootstrapTaskLauncher.class.getName());
 
   @VisibleForTesting
   static final String TASK_ID_PREFIX = "system-bootstrap-";
@@ -47,8 +47,10 @@ public class BootstrapTaskLauncher implements TaskLauncher {
    * Binding annotation for bootstrap-related fields.
    */
   @BindingAnnotation
-  @Target({FIELD, PARAMETER, METHOD}) @Retention(RUNTIME)
-  public @interface Bootstrap {}
+  @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
+  public @interface Bootstrap { }
+
+  private static final Logger LOG = Logger.getLogger(BootstrapTaskLauncher.class.getName());
 
   private final AtomicLong executorBootstraps = Stats.exportLong("executor_bootstraps");
 

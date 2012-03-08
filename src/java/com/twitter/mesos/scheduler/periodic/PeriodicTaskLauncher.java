@@ -18,11 +18,12 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 import com.twitter.mesos.scheduler.StateManager;
 
-import static com.google.common.base.Preconditions.checkNotNull;
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Launcher responsible for scheduling and cleaning up after periodic tasks in the scheduler.
@@ -39,8 +40,8 @@ public class PeriodicTaskLauncher implements Command, Runnable {
    * @author William Farner
    */
   @BindingAnnotation
-  @Target({FIELD, PARAMETER, METHOD}) @Retention(RUNTIME)
-  public @interface PeriodicTaskInterval {}
+  @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
+  public @interface PeriodicTaskInterval { }
 
   private final HistoryPruneRunner pruneRunner;
   private final StateManager stateManager;

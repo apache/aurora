@@ -3,10 +3,7 @@ package com.twitter.mesos.scheduler.periodic;
 import java.util.Set;
 
 import com.google.common.base.Optional;
-import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Sets;
 
 import org.easymock.EasyMock;
 import org.easymock.IAnswer;
@@ -18,22 +15,21 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
-import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskEvent;
-import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.Resources;
 import com.twitter.mesos.scheduler.SchedulerCore;
 import com.twitter.mesos.scheduler.SchedulingFilter;
 
+import static org.easymock.EasyMock.expect;
+
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 import static com.twitter.mesos.scheduler.SchedulingFilter.Veto;
-import static org.easymock.EasyMock.expect;
 
 /**
  * @author William Farner
@@ -51,22 +47,19 @@ public class PreempterTest extends EasyMockTest {
   private static final String HOST_A = "host_a";
   private static final String HOST_B = "host_b";
 
-  private static final Amount<Long, Time> preemptionCandidacyDelay = Amount.of(30L, Time.SECONDS);
+  private static final Amount<Long, Time> PREEMPTION_DELAY = Amount.of(30L, Time.SECONDS);
 
   private SchedulerCore scheduler;
   private SchedulingFilter schedulingFilter;
   private FakeClock clock;
   private Preempter preempter;
 
-  private FakeStorage storage;
-
   @Before
   public void setUp() {
     scheduler = createMock(SchedulerCore.class);
     schedulingFilter = createMock(SchedulingFilter.class);
     clock = new FakeClock();
-    preempter = new Preempter(scheduler, schedulingFilter, preemptionCandidacyDelay, clock);
-    storage = new FakeStorage();
+    preempter = new Preempter(scheduler, schedulingFilter, PREEMPTION_DELAY, clock);
   }
 
   // TODO(wfarner): Put together a SchedulerPreempterIntegrationTest as well.
@@ -74,10 +67,20 @@ public class PreempterTest extends EasyMockTest {
 
   @Test
   public void testNoPendingTasks() {
-    expectGetTasks();
+    expectGetPendingTasks();
 
     control.replay();
     preempter.run();
+  }
+
+  private void expectGetPendingTasks(ScheduledTask... returnedTasks) {
+    expect(scheduler.getTasks(Preempter.PENDING_QUERY))
+        .andReturn(ImmutableSet.<ScheduledTask>builder().add(returnedTasks).build());
+  }
+
+  private void expectGetActiveTasks(ScheduledTask... returnedTasks) {
+    expect(scheduler.getTasks(Preempter.ACTIVE_NOT_PENDING_QUERY))
+        .andReturn(ImmutableSet.<ScheduledTask>builder().add(returnedTasks).build());
   }
 
   @Test
@@ -85,9 +88,7 @@ public class PreempterTest extends EasyMockTest {
     ScheduledTask lowPriority = makeTask(USER_A, JOB_A, TASK_ID_A);
     runOnHost(lowPriority, HOST_A);
 
-    makeTask(USER_A, JOB_A, TASK_ID_B, 100);
-
-    expectGetTasks();
+    expectGetPendingTasks(lowPriority, makeTask(USER_A, JOB_A, TASK_ID_B, 100));
 
     control.replay();
     preempter.run();
@@ -99,9 +100,10 @@ public class PreempterTest extends EasyMockTest {
     runOnHost(lowPriority, HOST_A);
 
     ScheduledTask highPriority = makeTask(USER_A, JOB_A, TASK_ID_B, 100);
-    clock.advance(preemptionCandidacyDelay);
+    clock.advance(PREEMPTION_DELAY);
 
-    expectGetTasks().times(2);
+    expectGetPendingTasks(highPriority);
+    expectGetActiveTasks(lowPriority);
 
     expectFiltering();
     expectPreempted(lowPriority, highPriority);
@@ -119,9 +121,10 @@ public class PreempterTest extends EasyMockTest {
     runOnHost(lowerPriority, HOST_A);
 
     ScheduledTask highPriority = makeTask(USER_A, JOB_A, TASK_ID_C, 100);
-    clock.advance(preemptionCandidacyDelay);
+    clock.advance(PREEMPTION_DELAY);
 
-    expectGetTasks().times(2);
+    expectGetPendingTasks(highPriority);
+    expectGetActiveTasks(lowerPriority, lowerPriority);
 
     expectFiltering();
     expectPreempted(lowerPriority, highPriority);
@@ -142,9 +145,10 @@ public class PreempterTest extends EasyMockTest {
     runOnHost(lowestPriority, HOST_A);
 
     ScheduledTask pendingPriority = makeTask(USER_A, JOB_A, TASK_ID_D, 98);
-    clock.advance(preemptionCandidacyDelay);
+    clock.advance(PREEMPTION_DELAY);
 
-    expectGetTasks().times(2);
+    expectGetPendingTasks(pendingPriority);
+    expectGetActiveTasks(highPriority, lowerPriority, lowestPriority);
 
     expectFiltering();
     expectPreempted(lowestPriority, pendingPriority);
@@ -158,10 +162,11 @@ public class PreempterTest extends EasyMockTest {
     ScheduledTask highPriority = makeTask(USER_A, JOB_A, TASK_ID_B, 100);
     runOnHost(highPriority, HOST_A);
 
-    makeTask(USER_A, JOB_A, TASK_ID_A);
-    clock.advance(preemptionCandidacyDelay);
+    ScheduledTask task = makeTask(USER_A, JOB_A, TASK_ID_A);
+    clock.advance(PREEMPTION_DELAY);
 
-    expectGetTasks().times(2);
+    expectGetPendingTasks(task);
+    expectGetActiveTasks(highPriority);
 
     control.replay();
     preempter.run();
@@ -175,9 +180,10 @@ public class PreempterTest extends EasyMockTest {
     // Despite having two high priority tasks, we only perform one eviction.
     ScheduledTask highPriority1 = makeTask(USER_A, JOB_A, TASK_ID_B, 100);
     ScheduledTask highPriority2 = makeTask(USER_A, JOB_A, TASK_ID_C, 100);
-    clock.advance(preemptionCandidacyDelay);
+    clock.advance(PREEMPTION_DELAY);
 
-    expectGetTasks().times(2);
+    expectGetPendingTasks(highPriority1, highPriority2);
+    expectGetActiveTasks(lowPriority);
 
     expectFiltering();
     expectPreempted(lowPriority, highPriority1);
@@ -193,8 +199,10 @@ public class PreempterTest extends EasyMockTest {
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_B + "_a1", 100);
     runOnHost(a1, HOST_A);
 
-    clock.advance(preemptionCandidacyDelay);
-    expectGetTasks().times(2);
+    clock.advance(PREEMPTION_DELAY);
+
+    expectGetPendingTasks(p1);
+    expectGetActiveTasks(a1);
 
     expectFiltering();
     expectPreempted(a1, p1);
@@ -210,8 +218,10 @@ public class PreempterTest extends EasyMockTest {
     ScheduledTask a1 = makeTask(USER_B, JOB_A, TASK_ID_B + "_a1", 100);
     runOnHost(a1, HOST_A);
 
-    clock.advance(preemptionCandidacyDelay);
-    expectGetTasks().times(2);
+    clock.advance(PREEMPTION_DELAY);
+
+    expectGetPendingTasks(p1);
+    expectGetActiveTasks(a1);
 
     expectFiltering();
     expectPreempted(a1, p1);
@@ -226,8 +236,10 @@ public class PreempterTest extends EasyMockTest {
     ScheduledTask a1 = makeProductionTask(USER_B, JOB_A, TASK_ID_B + "_a1", 0);
     runOnHost(a1, HOST_A);
 
-    clock.advance(preemptionCandidacyDelay);
-    expectGetTasks().times(2);
+    clock.advance(PREEMPTION_DELAY);
+
+    expectGetPendingTasks(p1);
+    expectGetActiveTasks(a1);
 
     control.replay();
     preempter.run();
@@ -245,25 +257,16 @@ public class PreempterTest extends EasyMockTest {
     runOnHost(a2, HOST_A);
     runOnHost(a1, HOST_B);
 
-    clock.advance(preemptionCandidacyDelay);
+    clock.advance(PREEMPTION_DELAY);
 
-    expectGetTasks().times(2);
+    expectGetPendingTasks(p1, p2, p3);
+    expectGetActiveTasks(a1, a2, a3);
 
     expectFiltering().anyTimes();
     expectPreempted(a1, p2);
 
     control.replay();
     preempter.run();
-  }
-
-  private IExpectationSetters<Set<ScheduledTask>> expectGetTasks() {
-    return expect(scheduler.getTasks(EasyMock.<TaskQuery>anyObject())).andAnswer(
-        new IAnswer<Set<ScheduledTask>>() {
-          @Override public Set<ScheduledTask> answer() {
-            return storage.fetch((TaskQuery) EasyMock.getCurrentArguments()[0]);
-          }
-        }
-    );
   }
 
   private IExpectationSetters<Set<Veto>> expectFiltering() {
@@ -303,7 +306,6 @@ public class PreempterTest extends EasyMockTest {
         .setStatus(PENDING)
         .setAssignedTask(assignedTask);
     addEvent(scheduledTask, PENDING);
-    storage.addTask(scheduledTask);
     return scheduledTask;
   }
 
@@ -319,31 +321,5 @@ public class PreempterTest extends EasyMockTest {
     task.setStatus(RUNNING);
     addEvent(task, RUNNING);
     task.getAssignedTask().setSlaveHost(host);
-  }
-
-  private static class FakeStorage {
-    private final Set<ScheduledTask> tasks = Sets.newHashSet();
-
-    void addTask(ScheduledTask state) {
-      tasks.add(state);
-    }
-
-    Set<ScheduledTask> fetch(final TaskQuery q) {
-      return ImmutableSet.copyOf(Iterables.filter(tasks,
-          new Predicate<ScheduledTask>() {
-            @Override public boolean apply(ScheduledTask scheduled) {
-              AssignedTask task = scheduled.getAssignedTask();
-              return (!q.isSetOwner() || q.getOwner().equals(task.getTask().getOwner()))
-                  && (!q.isSetJobName() || q.getJobName().equals(task.getTask().getJobName()))
-                  && (!q.isSetJobKey() || q.getJobKey().equals(Tasks.jobKey(task)))
-                  && (!q.isSetTaskIds() || q.getTaskIds().contains(task.getTaskId()))
-                  && (!q.isSetStatuses()
-                      || q.getStatuses().contains(scheduled.getStatus()))
-                  && (!q.isSetSlaveHost() || q.getSlaveHost().equals(task.getSlaveHost()))
-                  && (!q.isSetShardIds()
-                      || q.getShardIds().contains(task.getTask().getShardId()));
-            }
-          }));
-    }
   }
 }

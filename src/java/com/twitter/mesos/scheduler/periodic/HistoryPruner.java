@@ -38,6 +38,13 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 interface HistoryPruner extends Function<Set<ScheduledTask>, Set<ScheduledTask>> {
 
   static class HistoryPrunerImpl implements HistoryPruner {
+    private static final Ordering<ScheduledTask> LATEST_ACTIVITY_ORDER = Ordering.natural()
+        .onResultOf(new Function<ScheduledTask, Long>() {
+          @Override public Long apply(ScheduledTask task) {
+            return lastEventTimestamp(task);
+          }
+        });
+
     private final int perJobHistoryGoal;
 
     /**
@@ -46,8 +53,8 @@ interface HistoryPruner extends Function<Set<ScheduledTask>, Set<ScheduledTask>>
      * @author William Farner
      */
     @BindingAnnotation
-    @Target({FIELD, PARAMETER, METHOD}) @Retention(RUNTIME)
-    public @interface PruneThreshold {}
+    @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
+    public @interface PruneThreshold { }
 
     private final Predicate<ScheduledTask> inactivePeriodFilter;
 
@@ -75,13 +82,6 @@ interface HistoryPruner extends Function<Set<ScheduledTask>, Set<ScheduledTask>>
     private static long lastEventTimestamp(ScheduledTask task) {
       return Iterables.getLast(task.getTaskEvents()).getTimestamp();
     }
-
-    private static final Ordering<ScheduledTask> LATEST_ACTIVITY_ORDER = Ordering.natural()
-        .onResultOf(new Function<ScheduledTask, Long>() {
-          @Override public Long apply(ScheduledTask task) {
-            return lastEventTimestamp(task);
-          }
-        });
 
     @Timed("history_prune")
     @Override

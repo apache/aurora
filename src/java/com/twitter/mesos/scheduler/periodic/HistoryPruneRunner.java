@@ -42,6 +42,18 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 class HistoryPruneRunner implements Runnable {
 
+  public static final TaskQuery INACTIVE_QUERY = new TaskQuery().setStatuses(Tasks.TERMINAL_STATES);
+
+  public static final Predicate<ScheduledTask> IS_THERMOS =
+      Predicates.compose(Tasks.IS_THERMOS_TASK, Tasks.SCHEDULED_TO_INFO);
+
+  public static final Function<ScheduledTask, String> TASK_TO_HOST =
+      new Function<ScheduledTask, String>() {
+        @Override public String apply(ScheduledTask task) {
+          return task.assignedTask.getSlaveHost();
+        }
+      };
+
   private static final Logger LOG = Logger.getLogger(HistoryPruneRunner.class.getName());
 
   private final Driver driver;
@@ -63,18 +75,6 @@ class HistoryPruneRunner implements Runnable {
     this.defaultExecutorId = checkNotNull(defaultExecutorId);
     this.slaveHosts = checkNotNull(slaveHosts);
   }
-
-  public static final TaskQuery INACTIVE_QUERY = new TaskQuery().setStatuses(Tasks.TERMINAL_STATES);
-
-  public static final Predicate<ScheduledTask> IS_THERMOS =
-      Predicates.compose(Tasks.IS_THERMOS_TASK, Tasks.SCHEDULED_TO_INFO);
-
-  public static final Function<ScheduledTask, String> TASK_TO_HOST =
-      new Function<ScheduledTask, String>() {
-        @Override public String apply(ScheduledTask task) {
-          return task.assignedTask.getSlaveHost();
-        }
-      };
 
   public static TaskQuery hostQuery(String host) {
     return new TaskQuery().setSlaveHost(host);

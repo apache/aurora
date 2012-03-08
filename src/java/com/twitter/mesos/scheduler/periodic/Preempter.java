@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
@@ -30,6 +31,7 @@ import com.twitter.mesos.scheduler.SchedulerCore;
 import com.twitter.mesos.scheduler.SchedulingFilter;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+
 import static com.twitter.mesos.Tasks.SCHEDULED_TO_ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 
@@ -44,11 +46,34 @@ import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
  */
 class Preempter implements Runnable {
 
+  @VisibleForTesting
+  static final TaskQuery PENDING_QUERY = Query.byStatus(PENDING);
+
+  @VisibleForTesting
+  static final TaskQuery ACTIVE_NOT_PENDING_QUERY = new TaskQuery()
+      .setStatuses(ImmutableSet.copyOf(Sets.difference(Tasks.ACTIVE_STATES, EnumSet.of(PENDING))));
+
   private static final Logger LOG = Logger.getLogger(Preempter.class.getName());
 
-  private static final TaskQuery PENDING_QUERY = Query.byStatus(PENDING);
-  private static final TaskQuery ACTIVE_NOT_PENDING_QUERY = new TaskQuery()
-      .setStatuses(ImmutableSet.copyOf(Sets.difference(Tasks.ACTIVE_STATES, EnumSet.of(PENDING))));
+  private static final Predicate<AssignedTask> IS_PRODUCTION = new Predicate<AssignedTask>() {
+    @Override public boolean apply(AssignedTask task) {
+      return task.getTask().isProduction();
+    }
+  };
+
+  private static final Function<AssignedTask, Integer> GET_PRIORITY =
+      new Function<AssignedTask, Integer>() {
+        @Override public Integer apply(AssignedTask task) {
+          return task.getTask().getPriority();
+        }
+      };
+
+  private final Predicate<ScheduledTask> isIdleTask = new Predicate<ScheduledTask>() {
+    @Override public boolean apply(ScheduledTask task) {
+      return (clock.nowMillis() - Iterables.getLast(task.getTaskEvents()).getTimestamp())
+          >= preemptionCandidacyDelay.as(Time.MILLISECONDS);
+    }
+  };
 
   private final SchedulerCore scheduler;
   private final SchedulingFilter schedulingFilter;
@@ -157,12 +182,6 @@ class Preempter implements Runnable {
     );
   }
 
-  private static final Predicate<AssignedTask> IS_PRODUCTION = new Predicate<AssignedTask>() {
-    @Override public boolean apply(AssignedTask task) {
-      return task.getTask().isProduction();
-    }
-  };
-
   private Predicate<AssignedTask> isOwnedBy(final String role) {
     return new Predicate<AssignedTask>() {
       @Override public boolean apply(AssignedTask task) {
@@ -174,20 +193,6 @@ class Preempter implements Runnable {
   private static String getRole(AssignedTask task) {
     return task.getTask().getOwner().getRole();
   }
-
-  private final Predicate<ScheduledTask> isIdleTask = new Predicate<ScheduledTask>() {
-    @Override public boolean apply(ScheduledTask task) {
-      return (clock.nowMillis() - Iterables.getLast(task.getTaskEvents()).getTimestamp()) >=
-          preemptionCandidacyDelay.as(Time.MILLISECONDS);
-    }
-  };
-
-  private static final Function<AssignedTask, Integer> GET_PRIORITY =
-      new Function<AssignedTask, Integer>() {
-        @Override public Integer apply(AssignedTask task) {
-          return task.getTask().getPriority();
-        }
-      };
 
   private static Predicate<Integer> greaterThan(final int value) {
     return new Predicate<Integer>() {
