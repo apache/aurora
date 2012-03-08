@@ -46,38 +46,38 @@ import com.twitter.mesos.gen.storage.LogEntry;
 public class MesosLogStreamModule extends PrivateModule {
   @CmdLine(name = "native_log_quorum_size",
            help = "The size of the quorum required for all log mutations.")
-  private static final Arg<Integer> quorumSize = Arg.create(1);
+  private static final Arg<Integer> QUORUM_SIZE = Arg.create(1);
 
   @NotNull
   @CmdLine(name = "native_log_file_path",
-           help = "Path to a file to store the native log data in.  If the parent directory does" +
-                  "not exist it will be created.")
-  private static final Arg<File> logPath = Arg.create();
+           help = "Path to a file to store the native log data in.  If the parent directory does"
+               + "not exist it will be created.")
+  private static final Arg<File> LOG_PATH = Arg.create();
 
   @CmdLine(name = "native_log_zk_group_path",
            help = "A zookeeper node for use by the native log to track the master coordinator.")
-  private static final Arg<String> zkLogGroupPath = Arg.create();
+  private static final Arg<String> ZK_LOG_GROUP_PATH = Arg.create();
 
   // TODO(John Sirois): the combo of retires + timeout for becoming coordinator is slightly odd,
   // but the way the timeout is actually used in the Coordinator.elect code seems more odd - ask Ben
   // for guidance on this.
   @CmdLine(name = "native_log_election_timeout",
            help = "The timeout for attempting to obtain a new log writer.")
-  private static final Arg<Amount<Long, Time>> coordinatorElectionTimeout =
+  private static final Arg<Amount<Long, Time>> COORDINATOR_ELECTION_TIMEOUT =
       Arg.create(Amount.of(15L, Time.SECONDS));
 
   @CmdLine(name = "native_log_election_retries",
            help = "The maximum number of retries to obtain a new log writer.")
-  private static final Arg<Integer> coordinatorElectionRetries = Arg.create(3);
+  private static final Arg<Integer> COORDINATOR_ELECTION_RETRIES = Arg.create(3);
 
   @CmdLine(name = "native_log_read_timeout",
            help = "The timeout for doing log reads.")
-  private static final Arg<Amount<Long, Time>> readTimeout =
+  private static final Arg<Amount<Long, Time>> READ_TIMEOUT =
       Arg.create(Amount.of(5L, Time.SECONDS));
 
   @CmdLine(name = "native_log_write_timeout",
            help = "The timeout for doing log appends and truncations.")
-  private static final Arg<Amount<Long, Time>> writeTimeout =
+  private static final Arg<Amount<Long, Time>> WRITE_TIMEOUT =
       Arg.create(Amount.of(3L, Time.SECONDS));
 
   /**
@@ -93,13 +93,13 @@ public class MesosLogStreamModule extends PrivateModule {
   @Override
   protected void configure() {
     requireBinding(Credentials.class);
-    requireBinding(Key.get(new TypeLiteral<List<InetSocketAddress>>() {}, ZooKeeper.class));
-    requireBinding(Key.get(new TypeLiteral<Amount<Integer, Time>>() {}, ZooKeeper.class));
+    requireBinding(Key.get(new TypeLiteral<List<InetSocketAddress>>() { }, ZooKeeper.class));
+    requireBinding(Key.get(new TypeLiteral<Amount<Integer, Time>>() { }, ZooKeeper.class));
 
-    bind(new TypeLiteral<Amount<Long, Time>>() {}).annotatedWith(MesosLog.ReadTimeout.class)
-        .toInstance(readTimeout.get());
-    bind(new TypeLiteral<Amount<Long, Time>>() {}).annotatedWith(MesosLog.WriteTimeout.class)
-        .toInstance(writeTimeout.get());
+    bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(MesosLog.ReadTimeout.class)
+        .toInstance(READ_TIMEOUT.get());
+    bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(MesosLog.WriteTimeout.class)
+        .toInstance(WRITE_TIMEOUT.get());
 
     bind(com.twitter.mesos.scheduler.log.Log.class).to(MesosLog.class).in(Singleton.class);
     expose(com.twitter.mesos.scheduler.log.Log.class);
@@ -110,7 +110,7 @@ public class MesosLogStreamModule extends PrivateModule {
   Log provideLog(@ZooKeeper List<InetSocketAddress> endpoints,
                  Credentials credentials, @ZooKeeper Amount<Integer, Time> sessionTimeout) {
 
-    File logFile = logPath.get();
+    File logFile = LOG_PATH.get();
     File parentDir = logFile.getParentFile();
     if (!parentDir.exists() && !parentDir.mkdirs()) {
       addError("Failed to create parent directory to store native log at: %s", parentDir);
@@ -119,12 +119,12 @@ public class MesosLogStreamModule extends PrivateModule {
     String zkConnectString =
         Joiner.on(',').join(Iterables.transform(endpoints, InetSocketAddressHelper.INET_TO_STR));
 
-    return new Log(quorumSize.get(),
+    return new Log(QUORUM_SIZE.get(),
                    logFile.getAbsolutePath(),
                    zkConnectString,
                    sessionTimeout.getValue(),
                    sessionTimeout.getUnit().getTimeUnit(),
-                   zkLogGroupPath.get(),
+                   ZK_LOG_GROUP_PATH.get(),
                    credentials.scheme(),
                    credentials.authToken());
   }
@@ -136,9 +136,9 @@ public class MesosLogStreamModule extends PrivateModule {
 
   @Provides
   Log.Writer provideWriter(Log log) {
-    Amount<Long, Time> electionTimeout = coordinatorElectionTimeout.get();
+    Amount<Long, Time> electionTimeout = COORDINATOR_ELECTION_TIMEOUT.get();
     return new Log.Writer(log, electionTimeout.getValue(), electionTimeout.getUnit().getTimeUnit(),
-        coordinatorElectionRetries.get());
+        COORDINATOR_ELECTION_RETRIES.get());
   }
 
   @Provides

@@ -40,7 +40,7 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
    */
   @BindingAnnotation
   @Retention(RUNTIME)
-  @Target({PARAMETER, METHOD})
+  @Target({ PARAMETER, METHOD })
   public @interface NoopEntry { }
 
   /**
@@ -48,7 +48,7 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
    */
   @BindingAnnotation
   @Retention(RUNTIME)
-  @Target({PARAMETER, METHOD})
+  @Target({ PARAMETER, METHOD })
   public @interface ReadTimeout { }
 
   /**
@@ -56,7 +56,7 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
    */
   @BindingAnnotation
   @Retention(RUNTIME)
-  @Target({PARAMETER, METHOD})
+  @Target({ PARAMETER, METHOD })
   public @interface WriteTimeout { }
 
   private final Provider<Log.Reader> readerFactory;
@@ -67,6 +67,15 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
 
   private final byte[] noopEntry;
 
+  /**
+   * Creates a new mesos log.
+   *
+   * @param readerFactory Factory to provide access to log readers.
+   * @param readTimeout Log read timeout.
+   * @param writerFactory Factory to provide access to log writers.
+   * @param writeTimeout Log write timeout.
+   * @param noopEntry A no-op log entry blob.
+   */
   @Inject
   public MesosLog(Provider<Log.Reader> readerFactory, @ReadTimeout Amount<Long, Time> readTimeout,
       Provider<Log.Writer> writerFactory, @WriteTimeout Amount<Long, Time> writeTimeout,
@@ -87,11 +96,7 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
   }
 
   private static class LogStream implements com.twitter.mesos.scheduler.log.Log.Stream {
-    private static class OpStats {
-      private static AtomicLong exportLongStat(String template, Object... args) {
-        return Stats.exportLong(String.format(template, args));
-      }
-
+    private static final class OpStats {
       final String opName;
       final AtomicLong total;
       final AtomicLong timeouts;
@@ -103,14 +108,22 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
         timeouts = exportLongStat("scheduler_log_native_%s_timeouts", opName);
         failures = exportLongStat("scheduler_log_native_%s_failures", opName);
       }
+
+      private static AtomicLong exportLongStat(String template, Object... args) {
+        return Stats.exportLong(String.format(template, args));
+      }
     }
 
-    private static class Vars {
-      final OpStats read = new OpStats("read");
-      final OpStats append = new OpStats("append");
-      final OpStats truncate = new OpStats("truncate");
-    }
-    private final Vars vars = new Vars();
+    private static final Function<Log.Entry, LogEntry> MESOS_ENTRY_TO_ENTRY =
+        new Function<Log.Entry, LogEntry>() {
+          @Override public LogEntry apply(Log.Entry entry) {
+            return new LogEntry(entry);
+          }
+        };
+
+    private final OpStats read = new OpStats("read");
+    private final OpStats append = new OpStats("append");
+    private final OpStats truncate = new OpStats("truncate");
 
     private final Log.Reader reader;
     private final long readTimeout;
@@ -121,6 +134,8 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
     private final TimeUnit writeTimeUnit;
 
     private final byte[] noopEntry;
+
+    private Log.Writer writer;
 
     LogStream(Log.Reader reader, Amount<Long, Time> readTimeout,
         Provider<Log.Writer> writerFactory, Amount<Long, Time> writeTimeout,
@@ -136,13 +151,6 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
 
       this.noopEntry = noopEntry;
     }
-
-    private static final Function<Log.Entry, LogEntry> MESOS_ENTRY_TO_ENTRY =
-        new Function<Log.Entry, LogEntry>() {
-          @Override public LogEntry apply(Log.Entry entry) {
-            return new LogEntry(entry);
-          }
-        };
 
     @Timed("scheduler_log_native_read_from")
     @Override
@@ -164,13 +172,13 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
         List<Log.Entry> entries = reader.read(from, to, readTimeout, readTimeUnit);
         return Iterables.<Log.Entry, Entry>transform(entries, MESOS_ENTRY_TO_ENTRY).iterator();
       } catch (TimeoutException e) {
-        vars.read.timeouts.getAndIncrement();
+        read.timeouts.getAndIncrement();
         throw new StreamAccessException("Timeout reading from log.", e);
       } catch (Log.OperationFailedException e) {
-        vars.read.failures.getAndIncrement();
+        read.failures.getAndIncrement();
         throw new StreamAccessException("Problem reading from log", e);
       } finally {
-        vars.read.total.getAndIncrement();
+        read.total.getAndIncrement();
       }
     }
 
@@ -179,10 +187,10 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
     public LogPosition append(final byte[] contents) throws StreamAccessException {
       Preconditions.checkNotNull(contents);
 
-      Log.Position position = mutate(vars.append, new Mutation<Log.Position>() {
-        @Override public Log.Position apply(Log.Writer writer)
+      Log.Position position = mutate(append, new Mutation<Log.Position>() {
+        @Override public Log.Position apply(Log.Writer logWriter)
             throws TimeoutException, Log.WriterFailedException {
-          return writer.append(contents, writeTimeout, writeTimeUnit);
+          return logWriter.append(contents, writeTimeout, writeTimeUnit);
         }
       });
       return LogPosition.wrap(position);
@@ -196,10 +204,10 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
       Preconditions.checkArgument(position instanceof LogPosition);
 
       final Log.Position before = ((LogPosition) position).unwrap();
-      mutate(vars.truncate, new Mutation<Void>() {
-        @Override public Void apply(Log.Writer writer)
+      mutate(truncate, new Mutation<Void>() {
+        @Override public Void apply(Log.Writer logWriter)
             throws TimeoutException, Log.WriterFailedException {
-          writer.truncate(before, writeTimeout, writeTimeUnit);
+          logWriter.truncate(before, writeTimeout, writeTimeUnit);
           return null;
         }
       });
@@ -208,8 +216,6 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
     private interface Mutation<T> {
       T apply(Log.Writer writer) throws TimeoutException, Log.WriterFailedException;
     }
-
-    private Log.Writer writer;
 
     private synchronized <T> T mutate(OpStats stats, Mutation<T> mutation) {
       if (writer == null) {
@@ -243,14 +249,14 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
     }
 
     private static class LogPosition implements com.twitter.mesos.scheduler.log.Log.Position {
-      static LogPosition wrap(Log.Position position) {
-        return new LogPosition(position);
-      }
-
       private final Log.Position underlying;
 
       LogPosition(Log.Position underlying) {
         this.underlying = underlying;
+      }
+
+      static LogPosition wrap(Log.Position position) {
+        return new LogPosition(position);
       }
 
       Log.Position unwrap() {

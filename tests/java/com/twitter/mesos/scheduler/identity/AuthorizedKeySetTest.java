@@ -79,8 +79,8 @@ public class AuthorizedKeySetTest {
   private void testVerify(AuthorizedKeySet keySet, String privkeyResource, boolean valid)
       throws Exception {
     PKey pk = PKey.readPrivateKeyFromStream(getClass().getResourceAsStream(privkeyResource), null);
-    Message hello_world_sig = pk.signSSHData(new CraiJCE(), DATA);
-    assertEquals(valid, keySet.verify(DATA, hello_world_sig.toByteArray()));
+    Message helloWorldSig = pk.signSSHData(new CraiJCE(), DATA);
+    assertEquals(valid, keySet.verify(DATA, helloWorldSig.toByteArray()));
   }
 
   private AuthorizedKeySet load(String... pubkeyResources) throws Exception {

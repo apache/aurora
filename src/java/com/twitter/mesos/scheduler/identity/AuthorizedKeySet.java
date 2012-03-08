@@ -94,9 +94,9 @@ public class AuthorizedKeySet {
 
       PKey key;
       try {
-        if (fields[0].equals("ssh-rsa")) {
+        if ("ssh-rsa".equals(fields[0])) {
           key = RSAKey.createFromBase64(fields[1]);
-        } else if (fields[0].equals("ssh-dss")) {
+        } else if ("ssh-dss".equals(fields[0])) {
           key = DSSKey.createFromBase64(fields[1]);
         } else {
           LOG.warning(String.format("Unknown key type: %s", fields[0]));

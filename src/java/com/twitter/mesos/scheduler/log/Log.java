@@ -27,6 +27,8 @@ public interface Log {
   interface Entry {
 
     /**
+     * Gets the contents of the log entry.
+     *
      * @return the data stored in this log entry
      */
     byte[] contents();
@@ -39,9 +41,9 @@ public interface Log {
   interface Stream extends Closeable {
 
     /**
-     * Indicates a {@link Position} that is not (currently) contained in this log stream.  This might
-     * indicate the position id from a different log or that the position was from this log but has
-     * been truncated.
+     * Indicates a {@link Position} that is not (currently) contained in this log stream.
+     * This might indicate the position id from a different log or that the position was from this
+     * log but has been truncated.
      */
     class InvalidPositionException extends RuntimeException {
       public InvalidPositionException(String message) {

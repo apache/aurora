@@ -27,6 +27,8 @@ public abstract class ForwardingMesosSchedulerManager implements MesosSchedulerM
   private final MesosSchedulerManager.Iface delegate;
 
   /**
+   * Creates a new forwarding manager with a delelegate for non-overridden calls.
+   *
    * @param delegate a delegate that all calls will be forwarded to.
    */
   protected ForwardingMesosSchedulerManager(MesosSchedulerManager.Iface delegate) {
