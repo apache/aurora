@@ -1,11 +1,5 @@
 package com.twitter.mesos.scheduler.storage;
 
-import com.google.common.base.Preconditions;
-import com.google.inject.Inject;
-
-import com.twitter.common.util.Clock;
-import com.twitter.mesos.gen.storage.Snapshot;
-
 /**
  * Storage mechanism that is able to create complete snapshots of the local storage system state
  * and apply these to restore local storage from a snapshotted baseline.

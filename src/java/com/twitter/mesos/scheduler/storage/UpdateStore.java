@@ -1,16 +1,10 @@
 package com.twitter.mesos.scheduler.storage;
 
-import java.util.Map;
 import java.util.Set;
 
-import javax.annotation.Nullable;
-
 import com.google.common.base.Optional;
-import com.google.common.collect.Multimap;
 
-import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.storage.JobUpdateConfiguration;
-import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 
 /**
  * Stores all update configurations for on-going updates.
@@ -19,8 +13,21 @@ import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
  * @author William Farner, Sathya Hariesh.
  */
 public interface UpdateStore {
+
+  /**
+   * Saves a job update configuration.
+   *
+   * @param updateConfiguration Configuration to store.
+   */
   void saveJobUpdateConfig(JobUpdateConfiguration updateConfiguration);
 
+  /**
+   * Fetches the update configuration (if present) for the given role/job.
+   *
+   * @param role Role the job is under.
+   * @param job Job to fetch update configuration for.
+   * @return Optional job update configuration.
+   */
   Optional<JobUpdateConfiguration> fetchJobUpdateConfig(String role, String job);
 
   /**

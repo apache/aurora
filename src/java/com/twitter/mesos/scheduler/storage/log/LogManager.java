@@ -65,9 +65,9 @@ final class LogManager {
    * Identifies the maximum log entry size to permit before chunking entries into frames.
    */
   @Retention(RetentionPolicy.RUNTIME)
-  @Target({ElementType.PARAMETER, ElementType.METHOD})
+  @Target({ ElementType.PARAMETER, ElementType.METHOD })
   @BindingAnnotation
-  public @interface MaxEntrySize {}
+  public @interface MaxEntrySize { }
 
   private static final Logger LOG = Logger.getLogger(LogManager.class.getName());
 
@@ -164,7 +164,7 @@ final class LogManager {
       byte[][] chunks = new byte[header.chunkCount][];
 
       messageDigest.reset();
-      for (int i = 0; i < header.chunkCount; i ++) {
+      for (int i = 0; i < header.chunkCount; i++) {
         if (!entries.hasNext()) {
           logBadFrame(header, i);
           return null;
@@ -276,7 +276,7 @@ final class LogManager {
 
     private byte[][] createEntries(byte[] entry) throws CodingException {
       if (entry.length <= maxEntrySizeBytes) {
-        return new byte[][] { entry };
+        return new byte[][] {entry};
       }
 
       int chunks = (int) Math.ceil(entry.length / (double) maxEntrySizeBytes);
@@ -309,7 +309,7 @@ final class LogManager {
      * Manages a single log stream append transaction.  Local storage ops can be added to the
      * transaction and then later committed as an atomic unit.
      */
-    class StreamTransaction {
+    final class StreamTransaction {
       private final Transaction transaction = new Transaction();
       private final AtomicBoolean committed = new AtomicBoolean(false);
 

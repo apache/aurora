@@ -20,12 +20,13 @@ import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.Query;
 
-import static com.twitter.mesos.gen.ScheduleStatus.LOST;
-import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
-import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
+
+import static com.twitter.mesos.gen.ScheduleStatus.LOST;
+import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
+import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 
 /**
  * A basic test that verifies a {@link TaskStore} implementation conforms to expected behavior.
@@ -34,16 +35,16 @@ import static org.junit.Assert.assertThat;
  */
 public abstract class BaseTaskStoreTest<T extends TaskStore> extends TearDownTestCase {
 
-  protected T store;
-
   private static final String TASK_A_ID = "fake-task-id-a";
   private static final ScheduleStatus TASK_A_STATUS = PENDING;
-  private ScheduledTask taskA;
 
   private static final String TASK_B_ID = "fake-task-id-b";
   private static final ScheduleStatus TASK_B_STATUS = RUNNING;
-  private ScheduledTask taskB;
 
+  protected T store;
+
+  private ScheduledTask taskA;
+  private ScheduledTask taskB;
   private Iterable<ScheduledTask> tasks;
 
   @Before
@@ -148,8 +149,8 @@ public abstract class BaseTaskStoreTest<T extends TaskStore> extends TearDownTes
     assertThat(Iterables.getOnlyElement(store.fetchTasks(Query.GET_ALL)), is(taskB));
   }
 
-  protected void store(Iterable<ScheduledTask> tasks) {
-    store.saveTasks(ImmutableSet.copyOf(tasks));
+  protected void store(Iterable<ScheduledTask> stored) {
+    store.saveTasks(ImmutableSet.copyOf(stored));
   }
 
   protected static ScheduledTask makeTask(String taskId) {

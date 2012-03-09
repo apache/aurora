@@ -42,6 +42,17 @@ public class ForwardingStore implements
   private final QuotaStore quotaStore;
   private final AttributeStore attributeStore;
 
+  /**
+   * Creats a new forwarding store that delegates to the providing default stores.
+   *
+   * @param storage Delegate.
+   * @param schedulerStore Delegate.
+   * @param jobStore Delegate.
+   * @param taskStore Delegate.
+   * @param updateStore Delegate.
+   * @param quotaStore Delegate.
+   * @param attributeStore Delegate.
+   */
   public ForwardingStore(
       Storage storage,
       SchedulerStore schedulerStore,

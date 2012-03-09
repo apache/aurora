@@ -21,6 +21,7 @@ import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**

@@ -150,31 +150,60 @@ public class LogStorage extends ForwardingStore {
 
   private StreamManager streamManager;
 
+  private boolean recovered = false;
+  private StreamTransaction transaction = null;
+
+  private final StoreProvider logStoreProvider = new StoreProvider() {
+    @Override public SchedulerStore getSchedulerStore() {
+      return LogStorage.this;
+    }
+
+    @Override public JobStore getJobStore() {
+      return LogStorage.this;
+    }
+
+    @Override public TaskStore getTaskStore() {
+      return LogStorage.this;
+    }
+
+    @Override public UpdateStore getUpdateStore() {
+      return LogStorage.this;
+    }
+
+    @Override public QuotaStore getQuotaStore() {
+      return LogStorage.this;
+    }
+
+    @Override public AttributeStore getAttributeStore() {
+      return LogStorage.this;
+    }
+  };
+
   /**
    * Identifies the grace period to give in-process snapshots and checkpoints to complete during
    * shutdown.
    */
   @Retention(RetentionPolicy.RUNTIME)
-  @Target({ElementType.PARAMETER, ElementType.METHOD})
+  @Target({ ElementType.PARAMETER, ElementType.METHOD })
   @BindingAnnotation
-  public @interface ShutdownGracePeriod {}
+  public @interface ShutdownGracePeriod { }
 
   /**
    * Identifies the interval between snapshots of local storage truncating the log.
    */
   @Retention(RetentionPolicy.RUNTIME)
-  @Target({ElementType.PARAMETER, ElementType.METHOD})
+  @Target({ ElementType.PARAMETER, ElementType.METHOD })
   @BindingAnnotation
-  public @interface SnapshotInterval {}
+  public @interface SnapshotInterval { }
 
   /**
    * Identifies a local storage layer that is written to only after first ensuring the write
    * operation is persisted in the log.
    */
   @Retention(RetentionPolicy.RUNTIME)
-  @Target({ElementType.PARAMETER, ElementType.METHOD})
+  @Target({ ElementType.PARAMETER, ElementType.METHOD })
   @BindingAnnotation
-  public @interface WriteBehind {}
+  public @interface WriteBehind { }
 
   @Inject
   LogStorage(LogManager logManager,
@@ -222,8 +251,6 @@ public class LogStorage extends ForwardingStore {
     this.snapshotStore = checkNotNull(snapshotStore);
     this.snapshotInterval = checkNotNull(snapshotInterval);
   }
-
-  private boolean recovered = false;
 
   @Override
   public synchronized void prepare() {
@@ -274,7 +301,7 @@ public class LogStorage extends ForwardingStore {
     }
   }
 
-  private static class RecoveryFailedException extends SchedulerException {
+  private static final class RecoveryFailedException extends SchedulerException {
     private RecoveryFailedException(Throwable cause) {
       super(cause);
     }
@@ -388,33 +415,6 @@ public class LogStorage extends ForwardingStore {
       }
     });
   }
-
-  private StreamTransaction transaction = null;
-  private final StoreProvider logStoreProvider = new StoreProvider() {
-    @Override public SchedulerStore getSchedulerStore() {
-      return LogStorage.this;
-    }
-
-    @Override public JobStore getJobStore() {
-      return LogStorage.this;
-    }
-
-    @Override public TaskStore getTaskStore() {
-      return LogStorage.this;
-    }
-
-    @Override public UpdateStore getUpdateStore() {
-      return LogStorage.this;
-    }
-
-    @Override public QuotaStore getQuotaStore() {
-      return LogStorage.this;
-    }
-
-    @Override public AttributeStore getAttributeStore() {
-      return LogStorage.this;
-    }
-  };
 
   @Override
   public synchronized <T, E extends Exception> T doInTransaction(final Work<T, E> work)

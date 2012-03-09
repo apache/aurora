@@ -1,7 +1,6 @@
 package com.twitter.mesos.scheduler.storage.log;
 
 import java.lang.annotation.Annotation;
-import java.util.Set;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
@@ -18,11 +17,8 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Clock;
-import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.storage.Snapshot;
 import com.twitter.mesos.scheduler.log.mesos.MesosLogStreamModule;
-import com.twitter.mesos.scheduler.storage.AttributeStore.AttributeStoreImpl;
-import com.twitter.mesos.scheduler.storage.SnapshotStore;
 import com.twitter.mesos.scheduler.storage.JobStore;
 import com.twitter.mesos.scheduler.storage.QuotaStore;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
@@ -47,19 +43,19 @@ public class LogStorageModule extends AbstractModule {
   @CmdLine(name = "dlog_shutdown_grace_period",
            help = "Specifies the maximum time to wait for scheduled checkpoint and snapshot "
                   + "actions to complete before forcibly shutting down.")
-  private static final Arg<Amount<Long, Time>> shutdownGracePeriod =
+  private static final Arg<Amount<Long, Time>> SHUTDOWN_GRACE_PERIOD =
       Arg.create(Amount.of(2L, Time.SECONDS));
 
   @CmdLine(name = "dlog_snapshot_interval",
            help = "Specifies the frequency at which snapshots of local storage are taken and "
                   + "written to the log.")
-  private static final Arg<Amount<Long, Time>> snapshotInterval =
+  private static final Arg<Amount<Long, Time>> SNAPSHOT_INTERVAL =
       Arg.create(Amount.of(5L, Time.MINUTES));
 
   @CmdLine(name = "dlog_max_entry_size",
            help = "Specifies the maximum entry size to append to the log. Larger entries will be "
                   + "split across entry Frames.")
-  private static final Arg<Amount<Integer, Data>> maxLogEntrySize =
+  private static final Arg<Amount<Integer, Data>> MAX_LOG_ENTRY_SIZE =
       Arg.create(Amount.of(512, Data.KB));
 
   private static <T> Key<T> createKey(Class<T> clazz) {
@@ -76,32 +72,32 @@ public class LogStorageModule extends AbstractModule {
     // the core log exposing its listener interface.  No need to store twice.
     DbStorageModule.bind(binder, LogStorage.WriteBehind.class, new Closure<PrivateBinder>() {
       @Override public void execute(PrivateBinder binder) {
-        binder.bind(new TypeLiteral<SnapshotStore<byte[]>>() {}).to(DbStorage.class);
+        binder.bind(new TypeLiteral<SnapshotStore<byte[]>>() { }).to(DbStorage.class);
 
         TypeLiteral<SnapshotStore<Snapshot>> snapshotStoreType =
-            new TypeLiteral<SnapshotStore<Snapshot>>() {};
+            new TypeLiteral<SnapshotStore<Snapshot>>() { };
         binder.bind(snapshotStoreType).to(SnapshotStoreImpl.class);
         binder.expose(snapshotStoreType);
 
-        Key<SchedulerStore> SCHEDULER_STORE_KEY = createKey(SchedulerStore.class);
-        binder.bind(SCHEDULER_STORE_KEY).to(DbStorage.class);
-        binder.expose(SCHEDULER_STORE_KEY);
+        Key<SchedulerStore> schedulerStoreKey = createKey(SchedulerStore.class);
+        binder.bind(schedulerStoreKey).to(DbStorage.class);
+        binder.expose(schedulerStoreKey);
 
-        Key<JobStore> JOB_STORE_KEY = createKey(JobStore.class);
-        binder.bind(JOB_STORE_KEY).to(DbStorage.class);
-        binder.expose(JOB_STORE_KEY);
+        Key<JobStore> jobStoreKey = createKey(JobStore.class);
+        binder.bind(jobStoreKey).to(DbStorage.class);
+        binder.expose(jobStoreKey);
 
-        Key<TaskStore> TASK_STORE_KEY = createKey(TaskStore.class);
-        binder.bind(TASK_STORE_KEY).to(DbStorage.class);
-        binder.expose(TASK_STORE_KEY);
+        Key<TaskStore> taskStoreKey = createKey(TaskStore.class);
+        binder.bind(taskStoreKey).to(DbStorage.class);
+        binder.expose(taskStoreKey);
 
-        Key<UpdateStore> UPDATE_STORE_KEY = createKey(UpdateStore.class);
-        binder.bind(UPDATE_STORE_KEY).to(DbStorage.class);
-        binder.expose(UPDATE_STORE_KEY);
+        Key<UpdateStore> updateStoreKey = createKey(UpdateStore.class);
+        binder.bind(updateStoreKey).to(DbStorage.class);
+        binder.expose(updateStoreKey);
 
-        Key<QuotaStore> QUOTA_STORE_KEY = createKey(QuotaStore.class);
-        binder.bind(QUOTA_STORE_KEY).to(DbStorage.class);
-        binder.expose(QUOTA_STORE_KEY);
+        Key<QuotaStore> quotaStoreKey = createKey(QuotaStore.class);
+        binder.bind(quotaStoreKey).to(DbStorage.class);
+        binder.expose(quotaStoreKey);
       }
     });
 
@@ -114,11 +110,11 @@ public class LogStorageModule extends AbstractModule {
     requireBinding(Clock.class);
     requireBinding(ShutdownRegistry.class);
 
-    bindInterval(ShutdownGracePeriod.class, shutdownGracePeriod);
-    bindInterval(SnapshotInterval.class, snapshotInterval);
+    bindInterval(ShutdownGracePeriod.class, SHUTDOWN_GRACE_PERIOD);
+    bindInterval(SnapshotInterval.class, SNAPSHOT_INTERVAL);
 
-    bind(new TypeLiteral<Amount<Integer, Data>>() {}).annotatedWith(MaxEntrySize.class)
-        .toInstance(maxLogEntrySize.get());
+    bind(new TypeLiteral<Amount<Integer, Data>>() { }).annotatedWith(MaxEntrySize.class)
+        .toInstance(MAX_LOG_ENTRY_SIZE.get());
     bind(LogManager.class).in(Singleton.class);
 
     bind(Storage.class).to(LogStorage.class);
@@ -126,6 +122,6 @@ public class LogStorageModule extends AbstractModule {
   }
 
   private void bindInterval(Class<? extends Annotation> key, Arg<Amount<Long, Time>> value) {
-    bind(Key.get(new TypeLiteral<Amount<Long, Time>>() {}, key)).toInstance(value.get());
+    bind(Key.get(new TypeLiteral<Amount<Long, Time>>() { }, key)).toInstance(value.get());
   }
 }

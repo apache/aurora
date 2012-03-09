@@ -7,7 +7,6 @@ import com.google.common.collect.ImmutableSet;
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
-import com.twitter.mesos.scheduler.Query;
 
 /**
  * Stores all tasks configured with the scheduler.

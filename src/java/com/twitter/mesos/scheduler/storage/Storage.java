@@ -26,7 +26,7 @@ public interface Storage {
    */
   interface Work<T, E extends Exception> {
 
-    public static final NoResult.Quiet NOOP = new NoResult.Quiet() {
+    NoResult.Quiet NOOP = new NoResult.Quiet() {
       @Override protected void execute(Storage.StoreProvider storeProvider) {
         // No-op.
       }
@@ -58,8 +58,7 @@ public interface Storage {
      */
     abstract class NoResult<E extends Exception> implements Work<Void, E> {
 
-      @Override
-      public final Void apply(StoreProvider storeProvider) throws E {
+      @Override public final Void apply(StoreProvider storeProvider) throws E {
         execute(storeProvider);
         return null;
       }
@@ -77,7 +76,7 @@ public interface Storage {
        * A convenient typedef for Work with no result that throws no checked exceptions - it runs
        * quitely.
        */
-      public static abstract class Quiet extends Work.NoResult<RuntimeException> {
+      public abstract static class Quiet extends Work.NoResult<RuntimeException> {
         // typedef
       }
     }

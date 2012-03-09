@@ -19,7 +19,9 @@ import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
 
 /**
- * Auxiliary class to simplify testing against a mocked storage.
+ * Auxiliary class to simplify testing against a mocked storage.  This allows callers to directly
+ * set up call expectations on individual stores rather than writing plumbing code to deal with
+ * transactions and {@link StoreProvider}.
  *
  * @author William Farner
  */
@@ -34,6 +36,11 @@ public class StorageTestUtil {
   public final SchedulerStore schedulerStore;
   public final Storage storage;
 
+  /**
+   * Creates a new storage test utility.
+   *
+   * @param easyMock Mocking framework to use for setting up mocks and expectations.
+   */
   public StorageTestUtil(EasyMockTest easyMock) {
     this.storeProvider = easyMock.createMock(StoreProvider.class);
     this.taskStore = easyMock.createMock(TaskStore.class);
@@ -45,6 +52,13 @@ public class StorageTestUtil {
     this.storage = easyMock.createMock(Storage.class);
   }
 
+  /**
+   * Sets up an expectation for a single transaction, which may be chained to produce a result
+   * such as a return value or exception.
+   *
+   * @param <T> Return value type.
+   * @return A call expectation setter.
+   */
   public <T> IExpectationSetters<T> expectTransaction() {
     expect(storeProvider.getTaskStore()).andReturn(taskStore).anyTimes();
     expect(storeProvider.getQuotaStore()).andReturn(quotaStore).anyTimes();
@@ -61,6 +75,9 @@ public class StorageTestUtil {
     });
   }
 
+  /**
+   * Expects any number of transactions.
+   */
   public void expectTransactions() {
     expectTransaction().anyTimes();
   }

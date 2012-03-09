@@ -44,7 +44,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
   public void setUp() {
     FakeClock clock = new FakeClock();
     clock.setNowMillis(NOW);
-    binarySnapshotStore = createMock(new Clazz<SnapshotStore<byte[]>>() {});
+    binarySnapshotStore = createMock(new Clazz<SnapshotStore<byte[]>>() { });
     storageUtil = new StorageTestUtil(this);
     snapshotStore = new SnapshotStoreImpl(clock, binarySnapshotStore, storageUtil.storage);
   }

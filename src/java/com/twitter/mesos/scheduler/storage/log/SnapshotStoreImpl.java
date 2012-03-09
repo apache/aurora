@@ -33,37 +33,6 @@ public final class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
 
   private static final Logger LOG = Logger.getLogger(SnapshotStoreImpl.class.getName());
 
-  private final Clock clock;
-  private final SnapshotStore<byte[]> binarySnapshotStore;
-  private final Storage storage;
-
-  @Inject
-  public SnapshotStoreImpl(Clock clock,
-      SnapshotStore<byte[]> binarySnapshotStore,
-      Storage storage) {
-
-    this.clock = checkNotNull(clock);
-    this.binarySnapshotStore = checkNotNull(binarySnapshotStore);
-    this.storage = checkNotNull(storage);
-  }
-
-  @Override public Snapshot createSnapshot() {
-    return storage.doInTransaction(new Work.Quiet<Snapshot>() {
-      @Override public Snapshot apply(StoreProvider storeProvider) {
-        Snapshot snapshot = new Snapshot();
-
-        // Capture timestamp to signify the beginning of a snapshot operation, apply after in case
-        // one of the field closures is mean and tries to apply a timestamp.
-        long timestamp = clock.nowMillis();
-        for (SnapshotField field : SNAPSHOT_FIELDS) {
-          field.saveToSnapshot(storeProvider, snapshot);
-        }
-        snapshot.setTimestamp(timestamp);
-        return snapshot;
-      }
-    });
-  }
-
   private static final Set<Snapshot._Fields> NEW_FIELDS = EnumSet.of(
       Snapshot._Fields.TASKS,
       Snapshot._Fields.JOBS,
@@ -71,45 +40,6 @@ public final class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
       Snapshot._Fields.UPDATE_CONFIGURATIONS,
       Snapshot._Fields.QUOTA_CONFIGURATIONS
   );
-
-  private static void checkNewFieldsBlank(Snapshot snapshot) {
-    for (Snapshot._Fields field : NEW_FIELDS) {
-      Preconditions.checkState(!snapshot.isSet(field),
-          "Unexpected field set in snapshot: " + field
-              + ", snapshot taken at " + snapshot.getTimestamp()
-              + ", field value: " + snapshot.getFieldValue(field));
-    }
-  }
-
-  @Override public void applySnapshot(final Snapshot snapshot) {
-    checkNotNull(snapshot);
-
-    storage.doInTransaction(new Work.NoResult.Quiet() {
-      @Override protected void execute(StoreProvider storeProvider) {
-
-        if (snapshot.isSetDataDEPRECATED()) {
-          // TODO(wfarner): Remove this after rolled forward to all clusters.
-          LOG.info("Restoring from old-style snapshot.");
-          checkNewFieldsBlank(snapshot);
-
-          binarySnapshotStore.applySnapshot(snapshot.getDataDEPRECATED());
-          ATTRIBUTE_FIELD.restoreFromSnapshot(storeProvider, snapshot);
-        } else {
-          LOG.info("Restoring from new-style snapshot.");
-
-          for (SnapshotField field : SNAPSHOT_FIELDS) {
-            field.restoreFromSnapshot(storeProvider, snapshot);
-          }
-        }
-      }
-    });
-  }
-
-  private interface SnapshotField {
-    void saveToSnapshot(StoreProvider storeProvider, Snapshot snapshot);
-
-    void restoreFromSnapshot(StoreProvider storeProvider, Snapshot snapshot);
-  }
 
   private static final SnapshotField ATTRIBUTE_FIELD = new SnapshotField() {
     @Override public void saveToSnapshot(StoreProvider storeProvider, Snapshot snapshot) {
@@ -222,4 +152,74 @@ public final class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         }
       }
   );
+
+  private final Clock clock;
+  private final SnapshotStore<byte[]> binarySnapshotStore;
+  private final Storage storage;
+
+  @Inject
+  public SnapshotStoreImpl(Clock clock,
+      SnapshotStore<byte[]> binarySnapshotStore,
+      Storage storage) {
+
+    this.clock = checkNotNull(clock);
+    this.binarySnapshotStore = checkNotNull(binarySnapshotStore);
+    this.storage = checkNotNull(storage);
+  }
+
+  @Override public Snapshot createSnapshot() {
+    return storage.doInTransaction(new Work.Quiet<Snapshot>() {
+      @Override public Snapshot apply(StoreProvider storeProvider) {
+        Snapshot snapshot = new Snapshot();
+
+        // Capture timestamp to signify the beginning of a snapshot operation, apply after in case
+        // one of the field closures is mean and tries to apply a timestamp.
+        long timestamp = clock.nowMillis();
+        for (SnapshotField field : SNAPSHOT_FIELDS) {
+          field.saveToSnapshot(storeProvider, snapshot);
+        }
+        snapshot.setTimestamp(timestamp);
+        return snapshot;
+      }
+    });
+  }
+
+  private static void checkNewFieldsBlank(Snapshot snapshot) {
+    for (Snapshot._Fields field : NEW_FIELDS) {
+      Preconditions.checkState(!snapshot.isSet(field),
+          "Unexpected field set in snapshot: " + field
+              + ", snapshot taken at " + snapshot.getTimestamp()
+              + ", field value: " + snapshot.getFieldValue(field));
+    }
+  }
+
+  @Override public void applySnapshot(final Snapshot snapshot) {
+    checkNotNull(snapshot);
+
+    storage.doInTransaction(new Work.NoResult.Quiet() {
+      @Override protected void execute(StoreProvider storeProvider) {
+
+        if (snapshot.isSetDataDEPRECATED()) {
+          // TODO(wfarner): Remove this after rolled forward to all clusters.
+          LOG.info("Restoring from old-style snapshot.");
+          checkNewFieldsBlank(snapshot);
+
+          binarySnapshotStore.applySnapshot(snapshot.getDataDEPRECATED());
+          ATTRIBUTE_FIELD.restoreFromSnapshot(storeProvider, snapshot);
+        } else {
+          LOG.info("Restoring from new-style snapshot.");
+
+          for (SnapshotField field : SNAPSHOT_FIELDS) {
+            field.restoreFromSnapshot(storeProvider, snapshot);
+          }
+        }
+      }
+    });
+  }
+
+  private interface SnapshotField {
+    void saveToSnapshot(StoreProvider storeProvider, Snapshot snapshot);
+
+    void restoreFromSnapshot(StoreProvider storeProvider, Snapshot snapshot);
+  }
 }

@@ -2,8 +2,6 @@ package com.twitter.mesos.scheduler.storage;
 
 import java.util.Set;
 
-import javax.annotation.Nullable;
-
 import com.google.common.base.Optional;
 
 import com.twitter.mesos.gen.Quota;

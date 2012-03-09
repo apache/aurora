@@ -10,6 +10,8 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
+ * Convenience class for normalizing resource measures between tasks and offers.
+ *
  * @author William Farner
  */
 public final class Quotas {

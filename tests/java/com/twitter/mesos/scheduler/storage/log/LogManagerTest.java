@@ -102,10 +102,10 @@ public class LogManagerTest extends EasyMockTest {
   }
 
   @Test
-  public void testStreamManager_readFromUnknown_none() throws CodingException {
+  public void testStreamManagerReadFromUnknownNone() throws CodingException {
     expect(stream.readAll()).andReturn(Iterators.<Log.Entry>emptyIterator());
 
-    Closure<LogEntry> reader = createMock(new Clazz<Closure<LogEntry>>() {});
+    Closure<LogEntry> reader = createMock(new Clazz<Closure<LogEntry>>() { });
 
     control.replay();
 
@@ -113,13 +113,13 @@ public class LogManagerTest extends EasyMockTest {
   }
 
   @Test
-  public void testStreamManager_readFromUnknown_some() throws CodingException {
+  public void testStreamManagerReadFromUnknownSome() throws CodingException {
     LogEntry transaction1 = createLogEntry(Op.removeJob(new RemoveJob("job1")));
     Entry entry1 = createMock(Entry.class);
     expect(entry1.contents()).andReturn(encode(transaction1));
     expect(stream.readAll()).andReturn(Iterators.singletonIterator(entry1));
 
-    Closure<LogEntry> reader = createMock(new Clazz<Closure<LogEntry>>() {});
+    Closure<LogEntry> reader = createMock(new Clazz<Closure<LogEntry>>() { });
     reader.execute(transaction1);
 
     control.replay();
@@ -128,7 +128,7 @@ public class LogManagerTest extends EasyMockTest {
   }
 
   @Test
-  public void testStreamManager_truncateBefore() {
+  public void testStreamManagerTruncateBefore() {
     stream.truncateBefore(position2);
 
     control.replay();
@@ -137,7 +137,7 @@ public class LogManagerTest extends EasyMockTest {
   }
 
   @Test
-  public void testStreamManager_successiveCommits() throws CodingException {
+  public void testStreamManagerSuccessiveCommits() throws CodingException {
     control.replay();
 
     StreamManager streamManager = createNoMessagesStreamManager();
@@ -149,7 +149,7 @@ public class LogManagerTest extends EasyMockTest {
   }
 
   @Test
-  public void testTransaction_empty() throws CodingException {
+  public void testTransactionEmpty() throws CodingException {
     control.replay();
 
     Position position = createNoMessagesStreamManager().startTransaction().commit();
@@ -157,7 +157,7 @@ public class LogManagerTest extends EasyMockTest {
   }
 
   @Test(expected = IllegalStateException.class)
-  public void testTransaction_doubleCommit() throws CodingException {
+  public void testTransactionDoubleCommit() throws CodingException {
     control.replay();
 
     StreamTransaction streamTransaction = createNoMessagesStreamManager().startTransaction();
@@ -166,7 +166,7 @@ public class LogManagerTest extends EasyMockTest {
   }
 
   @Test(expected = IllegalStateException.class)
-  public void testTransaction_addAfterCommit() throws CodingException {
+  public void testTransactionAddAfterCommit() throws CodingException {
     control.replay();
 
     StreamTransaction streamTransaction = createNoMessagesStreamManager().startTransaction();
@@ -219,7 +219,7 @@ public class LogManagerTest extends EasyMockTest {
   }
 
   @Test
-  public void testTransaction_snapshot() throws CodingException {
+  public void testTransactionSnapshot() throws CodingException {
     Snapshot snapshot = createSnapshot("snapshot-data");
     expectAppend(position1, LogEntry.snapshot(snapshot));
     stream.truncateBefore(position1);
@@ -230,7 +230,7 @@ public class LogManagerTest extends EasyMockTest {
   }
 
   @Test
-  public void testTransaction_ops() throws CodingException {
+  public void testTransactionOps() throws CodingException {
     Op saveFrameworkId = Op.saveFrameworkId(new SaveFrameworkId("jake"));
     Op deleteJob = Op.removeJob(new RemoveJob("jane"));
     expectTransaction(position1, saveFrameworkId, deleteJob);
@@ -285,7 +285,7 @@ public class LogManagerTest extends EasyMockTest {
   }
 
   @Test
-  public void testTransaction_frames() throws Exception {
+  public void testTransactionFrames() throws Exception {
     Op saveFrameworkId = Op.saveFrameworkId(new SaveFrameworkId("jake"));
 
     Message message = frame(createLogEntry(saveFrameworkId));
@@ -302,7 +302,7 @@ public class LogManagerTest extends EasyMockTest {
   }
 
   @Test
-  public void testStreamManager_readFrames() throws Exception {
+  public void testStreamManagerReadFrames() throws Exception {
     LogEntry transaction1 = createLogEntry(Op.removeJob(new RemoveJob("job1")));
     LogEntry transaction2 = createLogEntry(Op.removeJob(new RemoveJob("job2")));
 
@@ -344,7 +344,7 @@ public class LogManagerTest extends EasyMockTest {
 
     expect(stream.readAll()).andReturn(entries.iterator());
 
-    Closure<LogEntry> reader = createMock(new Clazz<Closure<LogEntry>>() {});
+    Closure<LogEntry> reader = createMock(new Clazz<Closure<LogEntry>>() { });
     reader.execute(transaction1);
     reader.execute(transaction2);
 
