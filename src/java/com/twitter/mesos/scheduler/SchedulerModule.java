@@ -186,9 +186,10 @@ public class SchedulerModule extends AbstractModule {
     bind(MesosSchedulerImpl.class).in(Singleton.class);
 
     // Bindings for StateManager
+    bind(StateManager.class).to(StateManagerImpl.class);
     bind(MutableState.class).in(Singleton.class);
     bind(Clock.class).toInstance(Clock.SYSTEM_CLOCK);
-    bind(StateManager.class).in(Singleton.class);
+    bind(StateManagerImpl.class).in(Singleton.class);
 
     LifecycleModule.bindServiceRunner(binder(), ThriftServerLauncher.class);
     LifecycleModule.bindStartupAction(binder(), RegisterShutdownStackPrinter.class);

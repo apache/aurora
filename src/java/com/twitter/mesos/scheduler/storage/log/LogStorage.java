@@ -532,7 +532,7 @@ public class LogStorage extends ForwardingStore {
       @Override public ImmutableSet<ScheduledTask> apply(StoreProvider unused) {
         ImmutableSet<ScheduledTask> mutated = LogStorage.super.mutateTasks(query, mutator);
 
-        Map<String, ScheduledTask> tasksById = Maps.uniqueIndex(mutated, Tasks.SCHEDULED_TO_ID);
+        Map<String, ScheduledTask> tasksById = Tasks.mapById(mutated);
         LOG.info("Storing updated tasks to log: "
             + Maps.transformValues(tasksById, Tasks.GET_STATUS));
 

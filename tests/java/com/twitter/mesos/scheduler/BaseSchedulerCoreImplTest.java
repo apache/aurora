@@ -146,7 +146,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   };
 
   private Driver driver;
-  private StateManager stateManager;
+  private StateManagerImpl stateManager;
   private SchedulerCoreImpl scheduler;
   private CronJobManager cron;
   private QuotaManager quotaManager;
@@ -181,7 +181,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private void buildScheduler(Storage storage) throws Exception {
     ImmediateJobManager immediateManager = new ImmediateJobManager();
     cron = new CronJobManager(storage, new TearDownRegistry(this));
-    stateManager = new StateManager(storage, clock, new MutableState(), driver);
+    stateManager = new StateManagerImpl(storage, clock, new MutableState(), driver);
     quotaManager = new QuotaManagerImpl(storage);
     SchedulingFilter schedulingFilter =
         new SchedulingFilterImpl(ImmutableMap.<String, String>of(), storage);
@@ -925,8 +925,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     changeStatus(queryByOwner(OWNER_A), RUNNING);
     changeStatus(queryByOwner(OWNER_A), FINISHED);
 
-    String taskId = Iterables.getOnlyElement(Iterables.transform(
-        scheduler.getTasks(queryByOwner(OWNER_A)), Tasks.SCHEDULED_TO_ID));
+    String taskId = Tasks.id(getOnlyTask(queryByOwner(OWNER_A)));
     scheduler.restartTasks(ImmutableSet.of(taskId));
   }
 
@@ -1128,15 +1127,13 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     cron.cronTriggered(job);
     assertTaskCount(10);
 
-    Set<String> taskIds = ImmutableSet.copyOf(Iterables.transform(getTasksOwnedBy(OWNER_A),
-        Tasks.SCHEDULED_TO_ID));
+    Set<String> taskIds = Tasks.ids(getTasksOwnedBy(OWNER_A));
 
     // Simulate a triggering of the cron job.
     cron.cronTriggered(job);
     assertTaskCount(10);
 
-    Set<String> newTaskIds = ImmutableSet.copyOf(Iterables.transform(getTasksOwnedBy(OWNER_A),
-        Tasks.SCHEDULED_TO_ID));
+    Set<String> newTaskIds = Tasks.ids(getTasksOwnedBy(OWNER_A));
 
     assertThat(Sets.intersection(taskIds, newTaskIds).isEmpty(), is(true));
 
@@ -1921,8 +1918,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     changeStatus(taskId, STARTING);
     changeStatus(taskId, KILLING);
 
-    clock.advance(StateManager.MISSING_TASK_GRACE_PERIOD.get());
-    clock.advance(StateManager.MISSING_TASK_GRACE_PERIOD.get());
+    clock.advance(StateManagerImpl.MISSING_TASK_GRACE_PERIOD.get());
+    clock.advance(StateManagerImpl.MISSING_TASK_GRACE_PERIOD.get());
 
     stateManager.scanOutstandingTasks();
 
@@ -1940,8 +1937,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     String taskId = Tasks.id(getOnlyTask(queryByOwner(OWNER_A)));
     changeStatus(taskId, ASSIGNED);
 
-    clock.advance(StateManager.MISSING_TASK_GRACE_PERIOD.get());
-    clock.advance(StateManager.MISSING_TASK_GRACE_PERIOD.get());
+    clock.advance(StateManagerImpl.MISSING_TASK_GRACE_PERIOD.get());
+    clock.advance(StateManagerImpl.MISSING_TASK_GRACE_PERIOD.get());
 
     stateManager.scanOutstandingTasks();
 

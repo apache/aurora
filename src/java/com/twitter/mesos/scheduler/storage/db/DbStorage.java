@@ -32,7 +32,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
-import com.google.common.collect.Sets;
 import com.google.common.io.Files;
 import com.google.common.primitives.Ints;
 import com.google.inject.Inject;
@@ -88,7 +87,6 @@ import com.twitter.mesos.scheduler.storage.TaskStore;
 import com.twitter.mesos.scheduler.storage.UpdateStore;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.collect.Iterables.transform;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**
@@ -324,8 +322,7 @@ public class DbStorage implements
       throw new IllegalStateException(e);
     }
 
-    Map<String, ScheduledTask> tasksById =
-        Maps.uniqueIndex(fetchTasks(Query.GET_ALL), Tasks.SCHEDULED_TO_ID);
+    Map<String, ScheduledTask> tasksById = Tasks.mapById(fetchTasks(Query.GET_ALL));
     LOG.info("Recovered tasks from storage: " + Maps.transformValues(tasksById, Tasks.GET_STATUS));
   }
 
@@ -485,8 +482,7 @@ public class DbStorage implements
   @Override
   public void saveTasks(final Set<ScheduledTask> tasks) {
     checkNotNull(tasks);
-    Preconditions.checkState(
-        Sets.newHashSet(transform(tasks, Tasks.SCHEDULED_TO_ID)).size() == tasks.size(),
+    Preconditions.checkState(Tasks.ids(tasks).size() == tasks.size(),
         "Proposed new tasks would create task ID collision.");
 
     // Do a first pass to make sure all of the values are good.
@@ -842,7 +838,7 @@ public class DbStorage implements
     }
     final ImmutableSet<ScheduledTask> tasksToUpdate = tasksToUpdateBuilder.build();
     if (!tasksToUpdate.isEmpty()) {
-      Map<String, ScheduledTask> tasksById = Maps.uniqueIndex(tasksToUpdate, Tasks.SCHEDULED_TO_ID);
+      Map<String, ScheduledTask> tasksById = Tasks.mapById(tasksToUpdate);
       LOG.info("Storing updated tasks to database: "
           + Maps.transformValues(tasksById, Tasks.GET_STATUS));
 
@@ -898,7 +894,7 @@ public class DbStorage implements
 
     Set<String> fetched = transactionTemplate.execute(new TransactionCallback<Set<String>>() {
       @Override public Set<String> doInTransaction(TransactionStatus status) {
-        return ImmutableSet.copyOf(Iterables.transform(query(query), Tasks.SCHEDULED_TO_ID));
+        return Tasks.ids(query(query));
       }
     });
     vars.taskIdsFetched.addAndGet(fetched.size());

@@ -6,7 +6,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 
 import org.apache.mesos.Protos.ExecutorID;
@@ -15,35 +14,30 @@ import org.easymock.IExpectationSetters;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
-import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.comm.AdjustRetainedTasks;
 import com.twitter.mesos.gen.comm.ExecutorMessage;
-import com.twitter.mesos.scheduler.BaseStateManagerTest;
 import com.twitter.mesos.scheduler.Driver;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHosts;
-import com.twitter.mesos.scheduler.Query;
-import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
-import com.twitter.mesos.scheduler.storage.Storage.Work;
+import com.twitter.mesos.scheduler.StateManager;
 
 import static org.easymock.EasyMock.expect;
-import static org.junit.Assert.assertEquals;
 
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
 import static com.twitter.mesos.gen.ScheduleStatus.LOST;
-import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 
 /**
  * @author William Farner
  */
-public class HistoryPruneRunnerTest extends BaseStateManagerTest {
+public class HistoryPruneRunnerTest extends EasyMockTest {
 
   private static final ExecutorID EXECUTOR = ExecutorID.newBuilder().setValue("executor").build();
 
@@ -59,6 +53,7 @@ public class HistoryPruneRunnerTest extends BaseStateManagerTest {
 
   private Driver driver;
   private HistoryPruner pruner;
+  private StateManager stateManager;
   private SlaveHosts slaveHosts;
 
   private Runnable runner;
@@ -71,24 +66,35 @@ public class HistoryPruneRunnerTest extends BaseStateManagerTest {
   public void setUp() {
     driver = createMock(Driver.class);
     pruner = createMock(HistoryPruner.class);
+    stateManager = createMock(StateManager.class);
     slaveHosts = createMock(SlaveHosts.class);
     runner = new HistoryPruneRunner(driver, stateManager, pruner, EXECUTOR, slaveHosts);
   }
 
   @Test
   public void testNoTasks() {
+    expectGetInactiveTasks();
+
     control.replay();
     runner.run();
   }
 
+  private void expectGetInactiveTasks(ScheduledTask... tasks) {
+    expect(stateManager.fetchTasks(HistoryPruneRunner.INACTIVE_QUERY))
+        .andReturn(ImmutableSet.<ScheduledTask>builder().add(tasks).build());
+  }
+
+  private void expectGetTasksByHost(String host, ScheduledTask... tasks) {
+    expect(stateManager.fetchTasks(HistoryPruneRunner.hostQuery(host)))
+        .andReturn(ImmutableSet.<ScheduledTask>builder().add(tasks).build());
+  }
+
   @Test
   public void testNoPruning() {
-    ScheduledTask pending = makeTask(PENDING);
-    ScheduledTask running = makeTask(RUNNING);
     ScheduledTask finished = makeTask(FINISHED);
     ScheduledTask lost = makeTask(LOST);
-    insertTasks(pending, running, finished, lost);
 
+    expectGetInactiveTasks(finished, lost);
     expectPruneCandidates(finished, lost).andReturn(ImmutableSet.<ScheduledTask>of());
 
     control.replay();
@@ -97,22 +103,24 @@ public class HistoryPruneRunnerTest extends BaseStateManagerTest {
 
   @Test
   public void testPruning() {
-    ScheduledTask pending = makeTask(PENDING);
     ScheduledTask running = makeTask(RUNNING, HOST_A);
     ScheduledTask finished = makeTask(FINISHED, HOST_A);
     ScheduledTask failed = makeTask(FAILED, HOST_B);
     ScheduledTask lost = makeTask(LOST, HOST_A);
-    insertTasks(pending, running, finished, failed, lost);
 
+    expectGetInactiveTasks(failed, finished, lost);
     expectPruneCandidates(finished, failed, lost).andReturn(ImmutableSet.of(lost, failed));
     expectGetSlaves();
+
+    expectGetTasksByHost(HOST_A, running, finished);
     expectRetainTasks(HOST_A, running, finished);
+    expectGetTasksByHost(HOST_B, failed);
     expectRetainTasks(HOST_B);
+
+    stateManager.deleteTasks(ImmutableSet.of(Tasks.id(lost), Tasks.id(failed)));
 
     control.replay();
     runner.run();
-
-    assertDeleted(lost, failed);
   }
 
   @Test
@@ -120,16 +128,17 @@ public class HistoryPruneRunnerTest extends BaseStateManagerTest {
     ScheduledTask running = makeTask(RUNNING, HOST_A);
     ScheduledTask finished = makeTask(FINISHED, HOST_A);
     ScheduledTask failed = makeTask(FAILED, UNKNOWN_HOST);
-    insertTasks(running, finished, failed);
 
+    expectGetInactiveTasks(failed, finished);
     expectPruneCandidates(finished, failed).andReturn(ImmutableSet.of(finished, failed));
     expectGetSlaves();
+    expectGetTasksByHost(HOST_A, running, finished);
     expectRetainTasks(HOST_A, running);
+
+    stateManager.deleteTasks(Tasks.ids(finished, failed));
 
     control.replay();
     runner.run();
-
-    assertDeleted(failed);
   }
 
   private ScheduledTask makeTask(ScheduleStatus status) {
@@ -153,26 +162,6 @@ public class HistoryPruneRunnerTest extends BaseStateManagerTest {
             .setShardId(0));
   }
 
-  private void insertTasks(final ScheduledTask... tasks) {
-    storage.doInTransaction(new Work.NoResult.Quiet() {
-      @Override protected void execute(StoreProvider storeProvider) {
-        storeProvider.getTaskStore()
-            .saveTasks(ImmutableSet.<ScheduledTask>builder().add(tasks).build());
-      }
-    });
-  }
-
-  private void assertDeleted(final ScheduledTask... tasks) {
-    final TaskQuery query = Query.byId(ids(tasks));
-    assertEquals(ImmutableSet.<String>of(),
-        storage.doInTransaction(new Work.Quiet<Set<String>>() {
-          @Override
-          public Set<String> apply(StoreProvider storeProvider) {
-            return storeProvider.getTaskStore().fetchTaskIds(query);
-          }
-        }));
-  }
-
   private IExpectationSetters<Set<ScheduledTask>> expectPruneCandidates(ScheduledTask... tasks) {
     return expect(pruner.apply(ImmutableSet.<ScheduledTask>builder().add(tasks).build()));
   }
@@ -181,14 +170,8 @@ public class HistoryPruneRunnerTest extends BaseStateManagerTest {
     expect(slaveHosts.getSlaves()).andReturn(SLAVES);
   }
 
-  private Set<String> ids(ScheduledTask... tasks) {
-    return ImmutableSet.copyOf(Iterables.transform(
-        ImmutableSet.<ScheduledTask>builder().add(tasks).build(), Tasks.SCHEDULED_TO_ID));
-  }
-
   private void expectRetainTasks(String host, ScheduledTask... tasks) {
-    Map<String, ScheduledTask> byId = Maps.uniqueIndex(
-        ImmutableSet.<ScheduledTask>builder().add(tasks).build(), Tasks.SCHEDULED_TO_ID);
+    Map<String, ScheduledTask> byId = Tasks.mapById(ImmutableSet.copyOf(tasks));
     Map<String, ScheduleStatus> idToStatus = Maps.transformValues(byId, Tasks.GET_STATUS);
 
     AdjustRetainedTasks message = new AdjustRetainedTasks().setRetainedTasks(idToStatus);

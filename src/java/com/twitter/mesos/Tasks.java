@@ -1,12 +1,16 @@
 package com.twitter.mesos;
 
 import java.util.EnumSet;
+import java.util.Map;
 import java.util.Set;
 
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Ordering;
 
 import com.twitter.mesos.gen.AssignedTask;
@@ -152,23 +156,6 @@ public final class Tasks {
     // Utility class.
   }
 
-  /**
-   * Creates a predicate that tests whether other {@link ScheduledTask}s have a status equal to
-   * {@code status}.
-   *
-   * @param status Status to compare against other tasks.
-   * @return A new filter that will match other tasks with the same status.
-   */
-  public static Predicate<ScheduledTask> hasStatus(final ScheduleStatus status) {
-    Preconditions.checkNotNull(status);
-
-    return new Predicate<ScheduledTask>() {
-      @Override public boolean apply(ScheduledTask task) {
-        return task.getStatus() == status;
-      }
-    };
-  }
-
   public static boolean isActive(ScheduleStatus status) {
     return ACTIVE_STATES.contains(status);
   }
@@ -203,5 +190,17 @@ public final class Tasks {
 
   public static String id(ScheduledTask task) {
     return task.getAssignedTask().getTaskId();
+  }
+
+  public static Set<String> ids(Iterable<ScheduledTask> tasks) {
+    return ImmutableSet.copyOf(Iterables.transform(tasks, SCHEDULED_TO_ID));
+  }
+
+  public static Set<String> ids(ScheduledTask... tasks) {
+    return ids(ImmutableList.copyOf(tasks));
+  }
+
+  public static Map<String, ScheduledTask> mapById(Iterable<ScheduledTask> tasks) {
+    return Maps.uniqueIndex(tasks, SCHEDULED_TO_ID);
   }
 }

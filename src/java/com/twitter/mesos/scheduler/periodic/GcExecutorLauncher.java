@@ -12,7 +12,6 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Maps;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
 import com.google.protobuf.ByteString;
@@ -104,7 +103,7 @@ public class GcExecutorLauncher implements TaskLauncher {
     Predicate<ScheduledTask> sameHost =
         Predicates.compose(Predicates.equalTo(host), TASK_TO_HOST);
     Set<ScheduledTask> hostPruned = ImmutableSet.copyOf(Iterables.filter(prunedTasks, sameHost));
-    Map<String, ScheduledTask> hostPrunedById = Maps.uniqueIndex(hostPruned, Tasks.SCHEDULED_TO_ID);
+    Map<String, ScheduledTask> hostPrunedById = Tasks.mapById(hostPruned);
     Set<ScheduledTask> onHost = ImmutableSet.copyOf(Iterables.filter(
         stateManager.fetchTasks(HistoryPruneRunner.hostQuery(host)), IS_THERMOS));
 
@@ -118,7 +117,10 @@ public class GcExecutorLauncher implements TaskLauncher {
     }
 
     pulseMonitor.pulse(offer.getHostname());
-    stateManager.deleteTasks(hostPrunedById.keySet());
+
+    if (!hostPrunedById.isEmpty()) {
+      stateManager.deleteTasks(hostPrunedById.keySet());
+    }
 
     String uuid = UUID.randomUUID().toString();
     return Optional.of(TaskDescription.newBuilder().setName("system-gc")

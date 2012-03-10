@@ -33,9 +33,9 @@ import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
-import com.twitter.mesos.scheduler.StateManager.StateChanger;
-import com.twitter.mesos.scheduler.StateManager.StateMutation;
-import com.twitter.mesos.scheduler.StateManager.UpdateException;
+import com.twitter.mesos.scheduler.StateManagerImpl.StateChanger;
+import com.twitter.mesos.scheduler.StateManagerImpl.StateMutation;
+import com.twitter.mesos.scheduler.StateManagerImpl.UpdateException;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 import com.twitter.mesos.scheduler.quota.Quotas;
@@ -70,7 +70,7 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
   private final ImmutableList<JobManager> jobManagers;
 
   // State manager handles persistence of task modifications and state transitions.
-  private final StateManager stateManager;
+  private final StateManagerImpl stateManager;
 
   // Filter to determine whether a task should be scheduled.
   private final SchedulingFilter schedulingFilter;
@@ -102,7 +102,7 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
   @Inject
   public SchedulerCoreImpl(CronJobManager cronScheduler,
       ImmediateJobManager immediateScheduler,
-      StateManager stateManager,
+      StateManagerImpl stateManager,
       SchedulingFilter schedulingFilter,
       QuotaManager quotaManager) {
 
@@ -175,10 +175,6 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
 
   private boolean hasActiveJob(JobConfiguration job) {
     return Iterables.any(jobManagers, managerHasJob(job));
-  }
-
-  private boolean hasRunningTasks(JobConfiguration job) {
-    return !getTasks(Query.activeQuery(job)).isEmpty();
   }
 
   @Override
@@ -280,7 +276,7 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
     if (candidates.isEmpty()) {
       return Optional.absent();
     }
-    LOG.fine("Candidates for offer: " + Iterables.transform(candidates, Tasks.SCHEDULED_TO_ID));
+    LOG.fine("Candidates for offer: " + Tasks.ids(candidates));
 
     for (ScheduledTask task : candidates) {
       Set<Veto> vetoes = schedulingFilter.filter(Resources.from(offer),
@@ -394,9 +390,7 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
               throws RestartException {
 
             if (tasks.size() != taskIds.size()) {
-              Set<String> unknownTasks = Sets.difference(taskIds, ImmutableSet
-                  .copyOf(transform(tasks, Tasks.SCHEDULED_TO_ID)));
-
+              Set<String> unknownTasks = Sets.difference(taskIds, Tasks.ids(tasks));
               throw new RestartException("Restart requested for unknown tasks " + unknownTasks);
             } else if (Iterables.any(tasks, Predicates.not(Tasks.ACTIVE_FILTER))) {
               throw new RestartException("Restart requested for inactive tasks "
@@ -409,9 +403,7 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
                   "Task restart request cannot span multiple jobs: " + jobKeys);
             }
 
-            changer.changeState(
-                ImmutableSet.copyOf(Iterables.transform(tasks, Tasks.SCHEDULED_TO_ID)),
-                RESTARTING, "Restarting by client request");
+            changer.changeState(Tasks.ids(tasks), RESTARTING, "Restarting by client request");
           }
         });
   }
@@ -442,7 +434,7 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
     try {
       return stateManager.registerUpdate(job.getOwner().getRole(), job.getName(),
           populated.getTaskConfigs());
-    } catch (StateManager.UpdateException e) {
+    } catch (StateManagerImpl.UpdateException e) {
       LOG.log(Level.INFO, "Failed to start update.", e);
       throw new ScheduleException(e.getMessage(), e);
     }
@@ -495,7 +487,7 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
 
     try {
       stateManager.finishUpdate(role, jobName, updateToken, result, true);
-    } catch (StateManager.UpdateException e) {
+    } catch (StateManagerImpl.UpdateException e) {
       LOG.log(Level.INFO, "Failed to finish update.", e);
       throw new ScheduleException(e.getMessage(), e);
     }

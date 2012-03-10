@@ -405,9 +405,8 @@ final class LogManager {
             // It is an expected invariant that an operation may reference a task (identified by
             // task ID) no more than one time.  Therefore, to coalesce two SaveTasks operations,
             // the most recent task definition overrides the prior operation.
-            Map<String, ScheduledTask> coalesced =
-                Maps.newHashMap(Maps.uniqueIndex(prior.getTasks(), Tasks.SCHEDULED_TO_ID));
-            coalesced.putAll(Maps.uniqueIndex(next.getTasks(), Tasks.SCHEDULED_TO_ID));
+            Map<String, ScheduledTask> coalesced = Maps.newHashMap(Tasks.mapById(prior.getTasks()));
+            coalesced.putAll(Tasks.mapById(next.getTasks()));
 
             prior.setTasks(ImmutableSet.copyOf(coalesced.values()));
           } else {

@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.logging.Logger;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
@@ -42,8 +43,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 class HistoryPruneRunner implements Runnable {
 
-  public static final TaskQuery INACTIVE_QUERY = new TaskQuery().setStatuses(Tasks.TERMINAL_STATES);
-
   public static final Predicate<ScheduledTask> IS_THERMOS =
       Predicates.compose(Tasks.IS_THERMOS_TASK, Tasks.SCHEDULED_TO_INFO);
 
@@ -53,6 +52,9 @@ class HistoryPruneRunner implements Runnable {
           return task.assignedTask.getSlaveHost();
         }
       };
+
+  @VisibleForTesting
+  static final TaskQuery INACTIVE_QUERY = new TaskQuery().setStatuses(Tasks.TERMINAL_STATES);
 
   private static final Logger LOG = Logger.getLogger(HistoryPruneRunner.class.getName());
 
@@ -76,7 +78,7 @@ class HistoryPruneRunner implements Runnable {
     this.slaveHosts = checkNotNull(slaveHosts);
   }
 
-  public static TaskQuery hostQuery(String host) {
+  static TaskQuery hostQuery(String host) {
     return new TaskQuery().setSlaveHost(host);
   }
 
@@ -95,8 +97,7 @@ class HistoryPruneRunner implements Runnable {
   @Timed("history_prune_runner")
   @Override
   public void run() {
-    Set<ScheduledTask> allInactiveTasks =
-        stateManager.fetchTasks(HistoryPruneRunner.INACTIVE_QUERY);
+    Set<ScheduledTask> allInactiveTasks = stateManager.fetchTasks(INACTIVE_QUERY);
     Set<ScheduledTask> inactiveNonThermosTasks =
         ImmutableSet.copyOf(Iterables.filter(allInactiveTasks, Predicates.not(IS_THERMOS)));
 
@@ -111,8 +112,7 @@ class HistoryPruneRunner implements Runnable {
       return;
     }
 
-    Set<String> pruneTaskIds = ImmutableSet.copyOf(
-        Iterables.transform(prunedTasks, Tasks.SCHEDULED_TO_ID));
+    Set<String> pruneTaskIds = Tasks.ids(prunedTasks);
     LOG.info("Pruning " + prunedTasks.size() + " tasks: " + pruneTaskIds);
 
     stateManager.deleteTasks(pruneTaskIds);
@@ -144,16 +144,12 @@ class HistoryPruneRunner implements Runnable {
     }
   }
 
-  private static Set<String> taskIds(Iterable<ScheduledTask> tasks) {
-    return ImmutableSet.copyOf(Iterables.transform(tasks, Tasks.SCHEDULED_TO_ID));
-  }
-
   public static AdjustRetainedTasks retainedTasksMessage(Set<ScheduledTask> tasksOnHost,
       Iterable<ScheduledTask> pruned) {
 
-    Map<String, ScheduledTask> byId = Maps.uniqueIndex(tasksOnHost, Tasks.SCHEDULED_TO_ID);
+    Map<String, ScheduledTask> byId = Tasks.mapById(tasksOnHost);
 
-    Predicate<String> retain = Predicates.not(Predicates.in(taskIds(pruned)));
+    Predicate<String> retain = Predicates.not(Predicates.in(Tasks.ids(pruned)));
     Map<String, ScheduledTask> retainedTasks = Maps.filterKeys(byId, retain);
     Map<String, ScheduleStatus> retainedWithStatus =
         Maps.transformValues(retainedTasks, Tasks.GET_STATUS);

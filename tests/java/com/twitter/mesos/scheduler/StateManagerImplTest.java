@@ -3,27 +3,38 @@ package com.twitter.mesos.scheduler;
 import java.util.Set;
 
 import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
+import com.google.common.testing.TearDown;
 
+import org.apache.mesos.Protos.SlaveID;
 import org.easymock.EasyMock;
+import org.junit.Before;
 import org.junit.Test;
+import org.springframework.transaction.TransactionException;
 
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stat;
 import com.twitter.common.stats.Stats;
+import com.twitter.common.testing.EasyMockTest;
+import com.twitter.common.util.testing.FakeClock;
 import com.twitter.mesos.Tasks;
+import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
+import com.twitter.mesos.scheduler.db.testing.DbStorageTestUtil;
+import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.StorageException;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
+import com.twitter.mesos.scheduler.storage.Storage.Work.NoResult.Quiet;
 
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
@@ -43,14 +54,82 @@ import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.UNKNOWN;
-import static com.twitter.mesos.scheduler.StateManager.UpdateException;
+import static com.twitter.mesos.scheduler.StateManagerImpl.UpdateException;
 
 /**
  * @author William Farner
  */
-public class StateManagerTest extends BaseStateManagerTest {
+public class StateManagerImplTest extends EasyMockTest {
 
   private static final String HOST_A = "host_a";
+
+  private Driver driver;
+  private StateManagerImpl stateManager;
+  private MutableState mutableState;
+  private FakeClock clock = new FakeClock();
+  private Storage storage;
+
+  private int transactionsUntilFailure = 0;
+
+  @Before
+  public void setUp() throws Exception {
+    resetStats();
+
+    driver = createMock(Driver.class);
+    stateManager = createStateManager();
+  }
+
+  /**
+   * Flush residual stats from different tests, and stats exported by StateManager creation during
+   * test setup methods.
+   */
+  private void resetStats() {
+    Stats.flush();
+  }
+
+  private StateManagerImpl createStateManager(final Storage wrappedStorage) {
+    resetStats();
+    this.storage = new Storage() {
+      @Override public void prepare() {
+        wrappedStorage.prepare();
+      }
+
+      @Override public void start(Quiet initilizationLogic) {
+        wrappedStorage.start(initilizationLogic);
+      }
+
+      @Override public <T, E extends Exception> T doInTransaction(final Work<T, E> work)
+          throws StorageException, E {
+        return wrappedStorage.doInTransaction(new Work<T, E>() {
+          @Override public T apply(StoreProvider storeProvider) throws E {
+            T result = work.apply(storeProvider);
+
+            // Inject the failure after the work is performed in the transaction, so that we can
+            // check for unintended side effects remaining.
+            if ((transactionsUntilFailure != 0) && (--transactionsUntilFailure == 0)) {
+              throw new TransactionException("Injected storage failure.") { };
+            }
+            return result;
+          }
+        });
+      }
+
+      @Override public void stop() {
+        wrappedStorage.stop();
+      }
+    };
+
+    this.mutableState = new MutableState();
+    final StateManagerImpl manager = new StateManagerImpl(storage, clock, mutableState, driver);
+    manager.initialize();
+    manager.start();
+    addTearDown(new TearDown() {
+      @Override public void tearDown() {
+        manager.stop();
+      }
+    });
+    return manager;
+  }
 
   @Test
   public void testAbandonRunningTask() {
@@ -169,7 +248,7 @@ public class StateManagerTest extends BaseStateManagerTest {
 
       changeState(taskId, finalState);
 
-      clock.advance(StateManager.MISSING_TASK_GRACE_PERIOD.get());
+      clock.advance(StateManagerImpl.MISSING_TASK_GRACE_PERIOD.get());
       clock.advance(Amount.of(1L, Time.MILLISECONDS));
       stateManager.scanOutstandingTasks();
     }
@@ -281,7 +360,7 @@ public class StateManagerTest extends BaseStateManagerTest {
     control.replay();
 
     mutableState = new MutableState();
-    stateManager = new StateManager(storage, clock, mutableState, driver);
+    stateManager = new StateManagerImpl(storage, clock, mutableState, driver);
 
     // The database has not yet been loaded, so stats should be missing.
     for (ScheduleStatus status : ScheduleStatus.values()) {
@@ -320,5 +399,32 @@ public class StateManagerTest extends BaseStateManagerTest {
 
   private int changeState(String taskId, ScheduleStatus status) {
     return stateManager.changeState(Query.byId(taskId), status);
+  }
+
+  private void failNthTransaction(int n) {
+    Preconditions.checkState(transactionsUntilFailure == 0, "Last failure has not yet occurred");
+    transactionsUntilFailure = n;
+  }
+
+  private StateManagerImpl createStateManager() throws Exception {
+    return createStateManager(createStorage());
+  }
+
+  private Storage createStorage() throws Exception {
+    return DbStorageTestUtil.setupStorage(this);
+  }
+
+  private static TwitterTaskInfo makeTask(String owner, String job, int shard) {
+    return new TwitterTaskInfo()
+        .setOwner(new Identity().setRole(owner).setUser(owner))
+        .setJobName(job)
+        .setShardId(shard)
+        .setStartCommand("echo")
+        .setRequestedPorts(ImmutableSet.<String>of());
+  }
+
+  private void assignTask(String taskId, String host) {
+    stateManager.assignTask(taskId, host, SlaveID.newBuilder().setValue(host).build(),
+        ImmutableSet.<Integer>of());
   }
 }

@@ -16,7 +16,7 @@ import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
-import com.twitter.mesos.scheduler.StateManager;
+import com.twitter.mesos.scheduler.StateManagerImpl;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -44,7 +44,7 @@ public class PeriodicTaskLauncher implements Command, Runnable {
   public @interface PeriodicTaskInterval { }
 
   private final HistoryPruneRunner pruneRunner;
-  private final StateManager stateManager;
+  private final StateManagerImpl stateManager;
   private final ShutdownRegistry shutdownRegistry;
   private final ScheduledExecutorService executor;
   private final Amount<Long, Time> taskInterval;
@@ -52,7 +52,7 @@ public class PeriodicTaskLauncher implements Command, Runnable {
   @Inject
   PeriodicTaskLauncher(
       HistoryPruneRunner pruneRunner,
-      StateManager stateManager,
+      StateManagerImpl stateManager,
       ShutdownRegistry shutdownRegistry,
       @PeriodicTaskInterval Amount<Long, Time> taskInterval) {
 
