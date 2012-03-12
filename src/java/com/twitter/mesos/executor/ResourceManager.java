@@ -38,9 +38,11 @@ public class ResourceManager {
   private static final Logger LOG = Logger.getLogger(ResourceManager.class.getName());
 
   // TODO(William Farner): Wire this through a module.
+  // Slaves are configured with 400k MB of disk, which is approx 390 GB.
   @CmdLine(name = "max_disk_space",
            help = "Maximum amount of consumed sandbox disk before proactively reclaiming.")
-  private static final Arg<Amount<Long, Data>> MAX_DISK_SPACE = Arg.create(Amount.of(20L, Data.GB));
+  private static final Arg<Amount<Long, Data>> MAX_DISK_SPACE =
+      Arg.create(Amount.of(390L, Data.GB));
 
   private final File managedDir;
   private final TaskManager taskManager;
