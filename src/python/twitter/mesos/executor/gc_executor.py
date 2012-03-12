@@ -128,7 +128,7 @@ class ThermosGCExecutor(ThermosExecutorBase):
     self.log('shutdown() called, ignoring.')
 
 
-LogOptions.set_log_dir('/var/log/thermos/gc')
+LogOptions.set_log_dir('/var/log/mesos')
 def main():
   LogOptions.set_disk_log_level('DEBUG')
   thermos_gc_executor = ThermosGCExecutor()

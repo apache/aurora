@@ -38,7 +38,7 @@ if 'ANGRYBIRD_HOME' in os.environ:
   RUNNER_CLASS = AngrybirdTaskRunner
   LogOptions.set_log_dir(os.path.join(os.environ['ANGRYBIRD_HOME'], 'logs/thermos/log'))
 else:
-  LogOptions.set_log_dir('/var/log/thermos')
+  LogOptions.set_log_dir('/var/log/mesos')
   RUNNER_CLASS = ProductionTaskRunner
 
 

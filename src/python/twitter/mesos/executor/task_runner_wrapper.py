@@ -1,3 +1,4 @@
+import errno
 import getpass
 import os
 import signal
@@ -24,18 +25,6 @@ app.add_option("--checkpoint_root", dest="checkpoint_root", metavar="PATH",
                default="/var/run/thermos",
                help="the path where we will store workflow logs and checkpoints")
 
-class LocalFile(object):
-  """
-    Local analogue of MirrorFile.
-  """
-  def __init__(self, filename):
-    self._name = filename
-
-  def refresh(self):
-    return os.path.exists(self._name)
-
-  def filename(self):
-    return self._name
 
 class TaskRunnerWrapper(object):
   TEMPDIR = None
@@ -75,14 +64,12 @@ class TaskRunnerWrapper(object):
 
       REQUIRES SUBCLASSES TO DEFINE:
         self._sandbox (SandboxManager)
-        self._runner_pex (MirrorFile)
+        self._runner_pex (filename)
     """
     assert hasattr(self, '_sandbox')
     assert hasattr(self, '_runner_pex')
-
-    log.info('Acquiring runner pex: %s' % (
-      'Success' if self._runner_pex.refresh() else 'Already up to date'))
-    chmod_plus_x(self._runner_pex.filename())
+    assert os.path.exists(self._runner_pex)
+    chmod_plus_x(self._runner_pex)
 
     self._monitor = TaskMonitor(TaskPath(root=self._checkpoint_root), self._task_id)
 
@@ -102,7 +89,7 @@ class TaskRunnerWrapper(object):
     if getpass.getuser() == 'root':
       params.update(setuid=self._role)
 
-    cmdline_args = [self._runner_pex.filename()]
+    cmdline_args = [self._runner_pex]
     cmdline_args.extend('--%s=%s' % (flag, value) for flag, value in params.items())
     cmdline_args.extend([
       '--enable_scribe_exception_hook',
@@ -150,16 +137,14 @@ class TaskRunnerWrapper(object):
 
 
 class ProductionTaskRunner(TaskRunnerWrapper):
-  SVN_REPO = 'svn.twitter.biz'
-  SVN_PATH = '/science-binaries/home/thermos'
-
   def __init__(self, task_id, mesos_task, *args, **kwargs):
     TaskRunnerWrapper.__init__(self, task_id, mesos_task, *args, **kwargs)
-    self._runner_pex = MirrorFile(
-      ProductionTaskRunner.SVN_REPO,
-      os.path.join(ProductionTaskRunner.SVN_PATH, TaskRunnerWrapper.PEX_NAME),
-      os.path.join(ProductionTaskRunner.TEMPDIR, TaskRunnerWrapper.PEX_NAME),
-      https=True)
+    import pkg_resources
+    import twitter.mesos.executor.resources
+    self._runner_pex = os.path.join(ProductionTaskRunner.TEMPDIR, TaskRunnerWrapper.PEX_NAME)
+    with open(self._runner_pex, 'w') as fp:
+      fp.write(pkg_resources.resource_stream(twitter.mesos.executor.resources.__name__,
+        TaskRunnerWrapper.PEX_NAME))
     if mesos_task.has_layout():
       self._sandbox = AppAppSandbox(task_id)
       self._enable_chroot = True
@@ -168,14 +153,12 @@ class ProductionTaskRunner(TaskRunnerWrapper):
       self._enable_chroot = False
 
 
-
 class AngrybirdTaskRunner(TaskRunnerWrapper):
   def __init__(self, task_id, *args, **kwargs):
     TaskRunnerWrapper.__init__(self, task_id, *args, **kwargs)
     self._angrybird_home = os.environ['ANGRYBIRD_HOME']
     self._sandbox_root = os.path.join(self._angrybird_home, 'logs/thermos/lib')
     self._checkpoint_root = os.path.join(self._angrybird_home, 'logs/thermos/run')
-    self._runner_pex = LocalFile(os.path.join(self._angrybird_home,
-                                              'science/dist',
-                                              TaskRunnerWrapper.PEX_NAME))
+    self._runner_pex = os.path.join(self._angrybird_home,
+        'science', 'dist', TaskRunnerWrapper.PEX_NAME)
     self._sandbox = DirectorySandbox(task_id, self._sandbox_root)

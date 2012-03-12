@@ -25,16 +25,17 @@ from twitter.mesos.config.schema import (
   Process,
   Resources)
 from twitter.mesos.executor.thermos_executor import ThermosExecutor
-from twitter.mesos.executor.task_runner_wrapper import TaskRunnerWrapper, LocalFile
+from twitter.mesos.executor.task_runner_wrapper import TaskRunnerWrapper
 from twitter.mesos.executor.sandbox_manager import DirectorySandbox
 from twitter.pants import get_buildroot
 from twitter.thermos.runner.runner import TaskRunner
 from twitter.thermos.base.path import TaskPath
 
+
 class TestTaskRunner(TaskRunnerWrapper):
   def __init__(self, task_id, *args, **kwargs):
     self._tempdir = tempfile.mkdtemp()
-    self._runner_pex = LocalFile(os.path.join(get_buildroot(), 'dist', 'thermos_run.pex'))
+    self._runner_pex = os.path.join(get_buildroot(), 'dist', 'thermos_run.pex')
     self._sandbox = DirectorySandbox(task_id, sandbox_root=self._tempdir)
     self._enable_chroot = False
     TaskRunnerWrapper.__init__(self, task_id, *args, **kwargs)

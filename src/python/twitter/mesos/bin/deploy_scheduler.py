@@ -23,8 +23,9 @@ TEST_TARGETS = ['tests/java/com/twitter/mesos:all-tests!']
 BUILD_TARGET_CMDS = [
   './pants src/java/com/twitter/mesos/scheduler! zip',
   './pants src/java/com/twitter/mesos/executor! zip',
-  './pants src/python/twitter/mesos:process_scraper',
   './pants src/python/twitter/mesos/executor:thermos_executor',
+  './pants src/python/twitter/thermos/bin:thermos_run',
+  './pants src/python/twitter/mesos:process_scraper',
   './pants src/python/twitter/mesos/executor:gc_executor',
 ]
 
@@ -196,6 +197,14 @@ def check_tag(tag, check_on_master=True):
   return tag_sha
 
 
+def thermos_postprocess():
+  import contextlib
+  import zipfile
+  with contextlib.closing(zipfile.ZipFile('dist/thermos_executor.pex', 'a')) as zf:
+    zf.writestr('twitter/mesos/executor/resources/__init__.py', '')
+    zf.write('dist/thermos_run.pex', 'twitter/mesos/executor/resources/thermos_run.pex')
+
+
 def build():
   for test_target in TEST_TARGETS:
     print 'Executing test target: %s' % test_target
@@ -203,6 +212,7 @@ def build():
   for build_target_cmd in BUILD_TARGET_CMDS:
     print 'Executing build target: %s' % build_target_cmd
     check_call(build_target_cmd.split(' '))
+  thermos_postprocess()
 
 
 def find_current_build(hosts):
