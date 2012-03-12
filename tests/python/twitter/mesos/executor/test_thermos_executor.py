@@ -85,13 +85,21 @@ def sleep60():
 
 class TestThermosExecutor(object):
   PANTS_BUILT = False
+  LOG_DIR = None
 
   @classmethod
   def setup_class(cls):
+    cls.LOG_DIR = tempfile.mkdtemp()
+    LogOptions.set_log_dir(cls.LOG_DIR)
+    log.init('executor_logger')
     if not TestThermosExecutor.PANTS_BUILT:
       buildroot = get_buildroot()
       assert subprocess.call(["./pants", "src/python/twitter/thermos/bin:thermos_run"]) == 0
       PANTS_BUILD = True
+
+  @classmethod
+  def teardown_class(cls):
+    safe_rmtree(cls.LOG_DIR)
 
   def test_basic(self):
     proxy_driver = ProxyDriver()
