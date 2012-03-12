@@ -144,7 +144,7 @@ class ProductionTaskRunner(TaskRunnerWrapper):
     self._runner_pex = os.path.join(ProductionTaskRunner.TEMPDIR, TaskRunnerWrapper.PEX_NAME)
     with open(self._runner_pex, 'w') as fp:
       fp.write(pkg_resources.resource_stream(twitter.mesos.executor.resources.__name__,
-        TaskRunnerWrapper.PEX_NAME))
+        TaskRunnerWrapper.PEX_NAME).read())
     if mesos_task.has_layout():
       self._sandbox = AppAppSandbox(task_id)
       self._enable_chroot = True
