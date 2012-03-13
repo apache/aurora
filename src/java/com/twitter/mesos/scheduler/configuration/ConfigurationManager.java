@@ -49,6 +49,7 @@ public final class ConfigurationManager {
   public static final String DEDICATED_ATTRIBUTE = "dedicated";
 
   @VisibleForTesting public static final String HOST_CONSTRAINT = "host";
+  @VisibleForTesting public static final String START_COMMAND_FIELD = "start_command";
 
   @VisibleForTesting
   @Positive
@@ -60,8 +61,6 @@ public final class ConfigurationManager {
   private static final Pattern GOOD_IDENTIFIER_PATTERN = Pattern.compile("[\\w\\-\\.]+");
 
   private static final int MAX_IDENTIFIER_LENGTH = 255;
-
-  private static final String START_COMMAND_FIELD = "start_command";
 
   private static final List<Field<?>> FIELDS = ImmutableList.<Field<?>>builder()
       .add(new TypedField<String>(String.class, "hdfs_path", null) {

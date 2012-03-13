@@ -1051,7 +1051,6 @@ public class StateManagerImpl implements StateManager {
     }
 
     TaskUpdateConfiguration updateConfig = optional.get();
-
     TwitterTaskInfo newConfig =
         rollingBack ? updateConfig.getOldConfig() : updateConfig.getNewConfig();
     if (newConfig == null) {
@@ -1059,6 +1058,7 @@ public class StateManagerImpl implements StateManager {
       return;
     }
 
+    ConfigurationManager.resetStartCommand(newConfig);
     ScheduledTask newTask = taskCreator.apply(newConfig).setAncestorId(taskId);
     taskStore.saveTasks(ImmutableSet.of(newTask));
     createStateMachine(newTask)

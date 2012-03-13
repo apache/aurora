@@ -4,6 +4,7 @@ import java.util.Set;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -23,12 +24,14 @@ import com.twitter.common.stats.Stats;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 import com.twitter.mesos.Tasks;
+import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
+import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.db.testing.DbStorageTestUtil;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.StorageException;
@@ -51,9 +54,11 @@ import static com.twitter.mesos.gen.ScheduleStatus.LOST;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.PREEMPTING;
 import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
+import static com.twitter.mesos.gen.ScheduleStatus.ROLLBACK;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.UNKNOWN;
+import static com.twitter.mesos.gen.ScheduleStatus.UPDATING;
 import static com.twitter.mesos.scheduler.StateManagerImpl.UpdateException;
 
 /**
@@ -286,6 +291,50 @@ public class StateManagerImplTest extends EasyMockTest {
   }
 
   @Test
+  public void testRollback() throws Exception {
+    driver.killTask(EasyMock.<String>anyObject());
+    expectLastCall().times(2);
+
+    control.replay();
+    TwitterTaskInfo taskInfo = makeTaskWithPorts("jim", "myJob", 0, "%port:foo%", "foo");
+
+    String taskId = insertTask(taskInfo);
+    stateManager.assignTask(taskId, HOST_A, SlaveID.newBuilder().setValue(HOST_A).build(),
+        ImmutableSet.<Integer>of(50));
+    ScheduledTask task =
+        Iterables.getOnlyElement(stateManager.fetchTasks(Query.byRole("jim")));
+    assertEquals(ImmutableMap.of("foo", 50), task.getAssignedTask().getAssignedPorts());
+    assertEquals("50", task.getAssignedTask().getTask().getStartCommand());
+    assignTask(taskId, HOST_A);
+    changeState(taskId, STARTING);
+    changeState(taskId, RUNNING);
+
+    stateManager.registerUpdate("jim", "myJob", ImmutableSet.of(taskInfo));
+    changeState(taskId, UPDATING);
+    changeState(taskId, FINISHED);
+
+    String newTaskId =
+        Tasks.id(Iterables.getOnlyElement(stateManager.fetchTasks(Query.byStatus(PENDING))));
+    AssignedTask updated = stateManager.assignTask(newTaskId, HOST_A,
+        SlaveID.newBuilder().setValue(HOST_A).build(),
+        ImmutableSet.<Integer>of(51));
+
+    assertEquals(ImmutableMap.of("foo", 51), updated.getAssignedPorts());
+    assertEquals("51", updated.getTask().getStartCommand());
+    changeState(newTaskId, STARTING);
+    changeState(newTaskId, ROLLBACK);
+    changeState(newTaskId, FINISHED);
+
+    String rolledBackId =
+        Tasks.id(Iterables.getOnlyElement(stateManager.fetchTasks(Query.byStatus(PENDING))));
+    AssignedTask rolledBack = stateManager.assignTask(rolledBackId, HOST_A,
+        SlaveID.newBuilder().setValue(HOST_A).build(),
+        ImmutableSet.<Integer>of(52));
+    assertEquals(ImmutableMap.of("foo", 52), rolledBack.getAssignedPorts());
+    assertEquals("52", rolledBack.getTask().getStartCommand());
+  }
+
+  @Test
   public void testTracksInit() throws Exception {
     final TwitterTaskInfo task = makeTask("jim", "myJob", 0);
 
@@ -421,6 +470,15 @@ public class StateManagerImplTest extends EasyMockTest {
         .setShardId(shard)
         .setStartCommand("echo")
         .setRequestedPorts(ImmutableSet.<String>of());
+  }
+
+  private static TwitterTaskInfo makeTaskWithPorts(String owner, String job, int shard,
+      String startCommand, String... requestedPorts) {
+    TwitterTaskInfo task = makeTask(owner, job, shard);
+    task.setStartCommand(startCommand);
+    task.setRequestedPorts(ImmutableSet.<String>builder().add(requestedPorts).build());
+    task.setConfiguration(ImmutableMap.of(ConfigurationManager.START_COMMAND_FIELD, startCommand));
+    return task;
   }
 
   private void assignTask(String taskId, String host) {
