@@ -6,9 +6,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 import org.easymock.EasyMock;
@@ -20,7 +18,6 @@ import org.junit.Test;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.testing.EasyMockTest;
-import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Attribute;
 import com.twitter.mesos.gen.Constraint;
@@ -52,8 +49,6 @@ import static com.twitter.mesos.scheduler.SchedulingFilterImpl.DEDICATED_HOST_VE
 import static com.twitter.mesos.scheduler.SchedulingFilterImpl.DISK;
 import static com.twitter.mesos.scheduler.SchedulingFilterImpl.PORTS;
 import static com.twitter.mesos.scheduler.SchedulingFilterImpl.RAM;
-import static com.twitter.mesos.scheduler.SchedulingFilterImpl.RESERVED_HOST;
-import static com.twitter.mesos.scheduler.SchedulingFilterImpl.RESTRICTED_JOB;
 import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 
 /**
@@ -99,7 +94,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   @Before
   public void setUp() throws Exception {
     storage = createMock(Storage.class);
-    defaultFilter = new SchedulingFilterImpl(Maps.<String, String>newHashMap(), storage);
+    defaultFilter = new SchedulingFilterImpl(storage);
     storeProvider = createMock(StoreProvider.class);
     taskStore = createMock(TaskStore.class);
     attributeStore = createMock(AttributeStore.class);
@@ -162,66 +157,6 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     assertVetoes(makeTask(DEFAULT_CPUS + 1, DEFAULT_RAM, DEFAULT_DISK), CPU);
     assertVetoes(makeTask(DEFAULT_CPUS, DEFAULT_RAM + 1, DEFAULT_DISK), RAM);
     assertVetoes(makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK + 1), DISK);
-  }
-
-  @Test
-  public void testJobAllowedOnMachine() throws Exception {
-    expectGetHostAttributes(HOST_B).anyTimes();
-    expectGetHostAttributes(HOST_C).anyTimes();
-    control.replay();
-
-    SchedulingFilter filterBuilder = new SchedulingFilterImpl(ImmutableMap.of(
-        HOST_B, Tasks.jobKey(OWNER_A, JOB_A),
-        HOST_C, Tasks.jobKey(OWNER_A, JOB_A)),
-        storage);
-
-    assertThat(filterBuilder.filter(DEFAULT_OFFER, Optional.of(HOST_B),
-        makeTask(OWNER_A, JOB_A, DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)).isEmpty(),
-        is(true));
-
-    assertThat(filterBuilder.filter(DEFAULT_OFFER, Optional.of(HOST_C),
-        makeTask(OWNER_A, JOB_A, DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)).isEmpty(),
-        is(true));
-  }
-
-  @Test
-  public void testJobNotAllowedOnMachine() throws Exception {
-    expectGetHostAttributes(HOST_A).anyTimes();
-    control.replay();
-
-    SchedulingFilter filterBuilder = new SchedulingFilterImpl(ImmutableMap.of(
-        HOST_B, Tasks.jobKey(OWNER_A, JOB_A),
-        HOST_C, Tasks.jobKey(OWNER_A, JOB_A)),
-        storage);
-
-    // HOST_B can only run OWNER_A/JOB_A.
-    assertThat(
-        filterBuilder.filter(DEFAULT_OFFER, Optional.of(HOST_A),
-            makeTask(OWNER_A, JOB_B, DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)).isEmpty(),
-        is(true));
-    assertEquals(ImmutableSet.of(RESERVED_HOST),
-        filterBuilder.filter(DEFAULT_OFFER, Optional.of(HOST_B),
-            makeTask(OWNER_A, JOB_B, DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)));
-  }
-
-  @Test
-  public void testMachineNotAllowedToRunJob() throws Exception {
-    expectGetHostAttributes(HOST_A).anyTimes();
-    control.replay();
-
-    SchedulingFilter filterBuilder = new SchedulingFilterImpl(ImmutableMap.of(
-        HOST_B, Tasks.jobKey(OWNER_A, JOB_A),
-        HOST_C, Tasks.jobKey(OWNER_A, JOB_A)),
-        storage);
-
-    // OWNER_A/JOB_A can only run on HOST_B or HOST_C
-    assertThat(
-        filterBuilder.filter(DEFAULT_OFFER, Optional.of(HOST_A),
-        makeTask(OWNER_A, JOB_B, DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)).isEmpty(),
-        is(true));
-    assertEquals(ImmutableSet.of(RESTRICTED_JOB),
-        filterBuilder.filter(DEFAULT_OFFER, Optional.of(HOST_A),
-            makeTask(OWNER_A, JOB_A, DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)));
   }
 
   @Test

@@ -183,8 +183,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     cron = new CronJobManager(storage, new TearDownRegistry(this));
     stateManager = new StateManagerImpl(storage, clock, new MutableState(), driver);
     quotaManager = new QuotaManagerImpl(storage);
-    SchedulingFilter schedulingFilter =
-        new SchedulingFilterImpl(ImmutableMap.<String, String>of(), storage);
+    SchedulingFilter schedulingFilter = new SchedulingFilterImpl(storage);
     scheduler = new SchedulerCoreImpl(cron, immediateManager, stateManager, schedulingFilter,
         quotaManager);
     cron.schedulerCore = scheduler;

@@ -1,7 +1,6 @@
 package com.twitter.mesos.scheduler;
 
 import java.util.Collection;
-import java.util.Map;
 import java.util.Set;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -13,7 +12,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
-import com.google.inject.name.Named;
 
 import com.twitter.common.quantity.Amount;
 import com.twitter.mesos.Tasks;
@@ -35,69 +33,27 @@ import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.DED
  * Implementation of the scheduling filter that ensures resource requirements of tasks are
  * fulfilled, and that tasks are allowed to run on the given machine.
  *
- * TODO(wfarner): A big improvement on this would be allowing non-matched constraints to bubble
- *     up to the caller, so that we may expose constraints that are not being matched as a reason
- *     for a task not being scheduled.
  */
 public class SchedulingFilterImpl implements SchedulingFilter {
-
-  /**
-   * {@literal @Named} binding key for the machine reservation map.
-   */
-  public static final String MACHINE_RESTRICTIONS =
-      "com.twitter.mesos.scheduler.MACHINE_RESTRICTIONS";
 
   @VisibleForTesting static final Veto CPU = new Veto("Insufficient CPU");
   @VisibleForTesting static final Veto RAM = new Veto("Insufficient RAM");
   @VisibleForTesting static final Veto DISK = new Veto("Insufficient disk");
   @VisibleForTesting static final Veto PORTS = new Veto("Insufficient ports");
-  @VisibleForTesting static final Veto RESTRICTED_JOB =
-      new Veto("Job is restricted to other hosts");
-  @VisibleForTesting static final Veto RESERVED_HOST =
-      new Veto("Host is restricted to another job");
   @VisibleForTesting static final Veto DEDICATED_HOST_VETO = new Veto("Host is dedicated");
 
   private static final Optional<Veto> NO_VETO = Optional.absent();
 
-  private final Map<String, String> machineRestrictions;
   private final Storage storage;
 
   /**
    * Creates a new scheduling filter.
-   * TODO(wfarner): Use host attribute to implement machine restrictions.
    *
-   * @param machineRestrictions Mapping from machine host name to job key.  Restricted machines
-   *    may only run the specified job key, and the specified job key may only run on the
-   *    respective machine.
    * @param storage Interface to accessing the task store.
    */
   @Inject
-  public SchedulingFilterImpl(
-      @Named(MACHINE_RESTRICTIONS) Map<String, String> machineRestrictions, Storage storage) {
-    this.machineRestrictions = checkNotNull(machineRestrictions);
+  public SchedulingFilterImpl(Storage storage) {
     this.storage = checkNotNull(storage);
-  }
-
-  /**
-   * Tests whether a job is allowed to run on a machine.  A job may run on a machine if the
-   * machine is reserved for the job, or the job has no machine reservations.
-   *
-   * @param slaveHost The host to test.
-   * @param jobKey The job to check against.
-   * @return {@code true} if the job may run on the machine, {@code false} otherwise.
-   */
-  private boolean jobCanRunOnMachine(String slaveHost, String jobKey) {
-    boolean foundJobRestriction = false;
-    for (Map.Entry<String, String> hostToJob : machineRestrictions.entrySet()) {
-      if (hostToJob.getValue().equals(jobKey)) {
-        foundJobRestriction = true;
-        if (hostToJob.getKey().equals(slaveHost)) {
-          return true;
-        }
-      }
-    }
-
-    return !foundJobRestriction;
   }
 
   /**
@@ -121,9 +77,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     abstract Optional<Veto> doApply(TwitterTaskInfo task);
   }
 
-  private Iterable<FilterRule> rulesFromOffer(final Resources available,
-      final Optional<String> slaveHost) {
-
+  private Iterable<FilterRule> rulesFromOffer(final Resources available) {
     return ImmutableList.<FilterRule>of(
         new SingleVetoRule() {
           @Override public Optional<Veto> doApply(TwitterTaskInfo task) {
@@ -149,29 +103,8 @@ public class SchedulingFilterImpl implements SchedulingFilter {
             boolean passed = available.getNumPorts() >= task.getRequestedPorts().size();
             return passed ? NO_VETO : Optional.of(PORTS);
           }
-        },
-        new SingleVetoRule() {
-          @Override Optional<Veto> doApply(TwitterTaskInfo task) {
-            return slaveHost.isPresent()
-                ? checkMachineRestrictions(slaveHost.get(), Tasks.jobKey(task))
-                : NO_VETO;
-          }
         }
     );
-  }
-
-  private Optional<Veto> checkMachineRestrictions(String host, String jobKey) {
-    // Legacy check to handle old-style machine reservations.
-    String hostReservation = machineRestrictions.get(host);
-    if (hostReservation != null) {
-      if (!hostReservation.equals(jobKey)) {
-        return Optional.of(RESERVED_HOST);
-      }
-    } else if (!jobCanRunOnMachine(host, jobKey)) {
-      return Optional.of(RESTRICTED_JOB);
-    }
-
-    return Optional.absent();
   }
 
   private FilterRule getConstraintFilter(final String slaveHost) {
@@ -231,7 +164,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   public Set<Veto> filter(Resources resourceOffer, Optional<String> slaveHost,
       TwitterTaskInfo task) {
 
-    final Iterable<FilterRule> staticRules = rulesFromOffer(resourceOffer, slaveHost);
+    final Iterable<FilterRule> staticRules = rulesFromOffer(resourceOffer);
 
     Iterable<Veto> staticVetos = applyRules(staticRules, task);
     if (!Iterables.isEmpty(staticVetos)) {

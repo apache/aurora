@@ -1,9 +1,7 @@
 package com.twitter.mesos.scheduler;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
@@ -21,7 +19,6 @@ import com.google.inject.Key;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
-import com.google.inject.name.Names;
 
 import org.apache.mesos.MesosSchedulerDriver;
 import org.apache.mesos.Protos.ExecutorID;
@@ -81,12 +78,6 @@ public class SchedulerModule extends AbstractModule {
   @CmdLine(name = "mesos_scheduler_ns",
       help = "The name service name for the mesos scheduler thrift server.")
   private static final Arg<String> MESOS_SCHEDULER_NAME_SPEC = Arg.create();
-
-  @CmdLine(name = "machine_restrictions",
-      help = "Map of machine hosts to job keys."
-              + "  If A maps to B, only B can run on A and B can only run on A.")
-  private static final Arg<Map<String, String>> MACHINE_RESTRICTIONS =
-      Arg.create(Collections.<String, String>emptyMap());
 
   @NotNull
   @CmdLine(name = "mesos_master_address",
@@ -173,11 +164,6 @@ public class SchedulerModule extends AbstractModule {
     bind(SchedulingFilter.class).to(SchedulingFilterImpl.class);
 
     // updaterTaskProvider handled in provider.
-
-    // Bindings for SchedulingFilterImpl.
-    bind(Key.get(new TypeLiteral<Map<String, String>>() { },
-        Names.named(SchedulingFilterImpl.MACHINE_RESTRICTIONS)))
-        .toInstance(MACHINE_RESTRICTIONS.get());
 
     bind(SlaveHosts.class).to(SlaveHostsImpl.class);
     bind(SlaveMapper.class).to(SlaveHostsImpl.class);
