@@ -42,9 +42,13 @@ def open_url(url):
 
 
 def synthesize_url(cluster, scheduler=None, role=None, job=None):
-  cluster = Cluster.get(cluster)
-  scheduler_url = cluster.proxy_url if cluster.is_service_proxied else (
-    'http://%s:8081' % scheduler.real_host)
+  if 'angrybird-local' in cluster:
+    # TODO(vinod): Get the correct web port of the leading scheduler from zk!
+    scheduler_url = 'http://%s:5051' % scheduler.real_host
+  else :
+    cluster = Cluster.get(cluster)
+    scheduler_url = cluster.proxy_url if cluster.is_service_proxied else \
+      ('http://%s:8081' % scheduler.real_host)
 
   if job and not role:
     _die('If job specified, must specify role!')
