@@ -11,7 +11,7 @@ import com.google.inject.Inject;
 import org.apache.hadoop.conf.Configuration;
 
 import com.twitter.common.base.ExceptionalFunction;
-import com.twitter.common_internal.util.HdfsUtils;
+import com.twitter.common_internal.hadoop.HdfsUtils;
 
 import static com.twitter.mesos.executor.FileCopier.FileCopyException;
 
