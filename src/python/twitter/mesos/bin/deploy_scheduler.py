@@ -385,13 +385,13 @@ def watch_scheduler(host, sha, up_min_secs):
           print 'Detected scheduler process restart after update (uptime %s)!' % uptime
           return False
         elif (time.time() - start_detected_at) > up_min_secs:
-          deployed_sha = get_scheduler_sha(host)
-          if deployed_sha != sha:
-            print 'Host %s is not on current build %s, has %s' % (host, sha, deployed_sha)
-            return False
-          else:
-            print 'Host %s has been up for at least %d seconds' % (host, up_min_secs)
-            return True
+          if sha:
+            deployed_sha = get_scheduler_sha(host)
+            if deployed_sha != sha:
+              print 'Host %s is not on current build %s, has %s' % (host, sha, deployed_sha)
+              return False
+          print 'Host %s has been up for at least %d seconds' % (host, up_min_secs)
+          return True
       else:
         start_detected_at = time.time()
 
