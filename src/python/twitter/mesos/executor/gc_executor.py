@@ -22,6 +22,12 @@ app.add_option("--checkpoint_root", dest="checkpoint_root", metavar="PATH",
                default="/var/run/thermos",
                help="the checkpoint root from which we garbage collect")
 
+class ThermosTaskGarbageCollector(TaskGarbageCollector):
+  @classmethod
+  def _log(cls, msg):
+    log.warning('TaskGarbageCollector: %s' % msg)
+
+
 class ThermosGCExecutor(ThermosExecutorBase):
   """
     Thermos GC Executor, responsible for:
@@ -103,7 +109,7 @@ class ThermosGCExecutor(ThermosExecutorBase):
     task_garbage_collector.erase_metadata(task_id)
 
   def garbage_collect(self, retained_task_ids):
-    tgc = TaskGarbageCollector(root=self._checkpoint_root)
+    tgc = ThermosTaskGarbageCollector(root=self._checkpoint_root)
     gc_tasks = DefaultCollector(tgc, **self._gc_options).run()
     gc_task_ids = set(task.task_id for task in gc_tasks)
     for task_id in set(retained_task_ids).intersection(gc_task_ids):
