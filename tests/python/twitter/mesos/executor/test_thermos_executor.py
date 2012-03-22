@@ -27,7 +27,6 @@ from twitter.mesos.config.schema import (
 from twitter.mesos.executor.thermos_executor import ThermosExecutor
 from twitter.mesos.executor.task_runner_wrapper import TaskRunnerWrapper
 from twitter.mesos.executor.sandbox_manager import DirectorySandbox
-from twitter.pants import get_buildroot
 from twitter.thermos.runner.runner import TaskRunner
 from twitter.thermos.base.path import TaskPath
 
@@ -35,7 +34,7 @@ from twitter.thermos.base.path import TaskPath
 class TestTaskRunner(TaskRunnerWrapper):
   def __init__(self, task_id, *args, **kwargs):
     self._tempdir = tempfile.mkdtemp()
-    self._runner_pex = os.path.join(get_buildroot(), 'dist', 'thermos_run.pex')
+    self._runner_pex = os.path.join('dist', 'thermos_run.pex')
     self._sandbox = DirectorySandbox(task_id, sandbox_root=self._tempdir)
     self._enable_chroot = False
     TaskRunnerWrapper.__init__(self, task_id, *args, **kwargs)
@@ -93,7 +92,6 @@ class TestThermosExecutor(object):
     LogOptions.set_log_dir(cls.LOG_DIR)
     log.init('executor_logger')
     if not TestThermosExecutor.PANTS_BUILT:
-      buildroot = get_buildroot()
       assert subprocess.call(["./pants", "src/python/twitter/thermos/bin:thermos_run"]) == 0
       PANTS_BUILD = True
 

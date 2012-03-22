@@ -5,7 +5,7 @@ import subprocess
 import time
 
 from twitter.common import log
-from twitter.common.contextutil import temporary_file
+from twitter.common.contextutil import temporary_file, environment_as
 from twitter.thermos.base.path import TaskPath
 from twitter.thermos.base.ckpt import CheckpointDispatcher
 from twitter.thermos.config.loader import ThermosTaskWrapper
@@ -76,9 +76,10 @@ with open('%(state_filename)s', 'w') as fp:
       })
 
     cls.pathspec = TaskPath(root = cls.tempdir, task_id = cls.task_id)
-    po = subprocess.Popen([sys.executable, cls.script_filename],
-      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    so, se = po.communicate()
+    with environment_as(PYTHONPATH=os.pathsep.join(sys.path)):
+      po = subprocess.Popen([sys.executable, cls.script_filename],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+      so, se = po.communicate()
     assert po.returncode == 0,\
     """
       Runner failed!

@@ -20,7 +20,11 @@ python_binary(
     pants(":mesos-lib"),
     pants("src/python/twitter/common"),
     pants("src/python/twitter/thermos/base:options")
-  ]
+  ],
+  platforms = [
+    'linux-x86_64',
+    'macosx-10.4-x86_64'
+  ],
 )
 
 python_binary(
