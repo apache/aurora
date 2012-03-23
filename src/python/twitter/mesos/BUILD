@@ -53,5 +53,9 @@ python_binary(
   dependencies = [
     pants("3rdparty/python:psutil"),
     pants("src/python/twitter/common/app"),
+  ],
+  platforms = [
+    'linux-x86_64',
+    'macosx-10.6-x86_64',
   ]
 )

@@ -18,6 +18,10 @@ python_binary(
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/thermos/config:schema'),
     pants('src/python/twitter/thermos/runner'),
+  ],
+  platforms = [
+    'linux-x86_64',
+    'macosx-10.6-x86_64'
   ]
 )
 
@@ -33,6 +37,10 @@ python_binary(
     pants('src/python/twitter/thermos/monitoring:garbage'),
     pants('src/python/twitter/thermos/runner'),
     pants('src/thrift/com/twitter/thermos:py-thrift')
+  ],
+  platforms = [
+    'linux-x86_64',
+    'macosx-10.6-x86_64'
   ]
 )
 
@@ -44,5 +52,9 @@ python_binary(
     pants('src/python/twitter/common/app/modules:all'),
     pants('src/python/twitter/thermos/observer'),
     pants('src/python/twitter/thermos/monitoring'),
+  ],
+  platforms = [
+    'linux-x86_64',
+    'macosx-10.6-x86_64'
   ]
 )
