@@ -1,14 +1,14 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.List;
 import java.util.Set;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Multimap;
 import com.google.common.testing.TearDown;
 
 import org.apache.mesos.Protos.SlaveID;
@@ -49,6 +49,7 @@ import static org.junit.Assert.fail;
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
 import static com.twitter.mesos.gen.ScheduleStatus.INIT;
+import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
 import static com.twitter.mesos.gen.ScheduleStatus.LOST;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
@@ -71,7 +72,7 @@ public class StateManagerImplTest extends EasyMockTest {
   private Driver driver;
   private StateManagerImpl stateManager;
   private MutableState mutableState;
-  private FakeClock clock = new FakeClock();
+  private final FakeClock clock = new FakeClock();
   private Storage storage;
 
   private int transactionsUntilFailure = 0;
@@ -227,35 +228,50 @@ public class StateManagerImplTest extends EasyMockTest {
   }
 
   @Test
-  public void testTimedoutTask() {
-    Multimap<ScheduleStatus, ScheduleStatus> testCases =
-        ImmutableMultimap.<ScheduleStatus, ScheduleStatus>builder()
-            .putAll(ASSIGNED, PENDING)
-            .putAll(STARTING, ASSIGNED)
-            .putAll(PREEMPTING, ASSIGNED, RUNNING)
-            .putAll(RESTARTING, ASSIGNED, RUNNING)
-            .putAll(KILLING, ASSIGNED, RUNNING)
-            .build();
+  public void testTimedoutTask() throws Exception {
+    List<List<ScheduleStatus>> testCases =
+        ImmutableList.<List<ScheduleStatus>>of(
+            ImmutableList.of(PENDING, ASSIGNED),
+            ImmutableList.of(ASSIGNED, STARTING),
+            ImmutableList.of(ASSIGNED, RUNNING, PREEMPTING),
+            ImmutableList.of(ASSIGNED, RUNNING, RESTARTING),
+            ImmutableList.of(ASSIGNED, RUNNING, KILLING),
+            ImmutableList.of(ASSIGNED, RUNNING, UPDATING));
 
     driver.killTask(EasyMock.<String>anyObject());
     // Three extra kills that are encountered while transition during test prep:
-    // PREEMPTING, RESTARTING, KILLING.
-    expectLastCall().times(testCases.keySet().size() + 3);
+    // PREEMPTING, RESTARTING, KILLING, UPDATING.
+    expectLastCall().times(testCases.size() + 4);
 
     control.replay();
 
-    for (ScheduleStatus finalState : testCases.keySet()) {
-      String taskId = insertTask(makeTask("jim", "lost_" + finalState, 0));
+    for (List<ScheduleStatus> testCase : testCases) {
+      ScheduleStatus finalStatus = Iterables.getLast(testCase);
+      TwitterTaskInfo taskInfo = makeTask("jim", "lost_" + finalStatus, 0);
+      String taskId = insertTask(taskInfo);
 
-      for (ScheduleStatus prepState : testCases.get(finalState)) {
-        changeState(taskId, prepState);
+      for (ScheduleStatus state : testCase) {
+        if (state == UPDATING) {
+          stateManager.registerUpdate(taskInfo.getOwner().getRole(), taskInfo.getJobName(),
+              ImmutableSet.of(taskInfo));
+        }
+        changeState(taskId, state);
       }
-
-      changeState(taskId, finalState);
 
       clock.advance(StateManagerImpl.MISSING_TASK_GRACE_PERIOD.get());
       clock.advance(Amount.of(1L, Time.MILLISECONDS));
       stateManager.scanOutstandingTasks();
+      changeState(taskId, KILLED);
+
+      Set<ScheduledTask> active =
+          stateManager.fetchTasks(Query.activeQuery(taskInfo.getOwner(), taskInfo.getJobName()));
+
+      if (finalStatus == KILLING) {
+        assertTrue(active.isEmpty());
+      } else {
+        assertEquals(1, active.size());
+        assertEquals(PENDING, Iterables.getOnlyElement(active).getStatus());
+      }
     }
   }
 
