@@ -173,14 +173,14 @@ class DefaultCollector(TaskGarbageCollectionPolicy):
                   Amount(0, Data.BYTES))
 
     total_used = Amount(0, Data.BYTES)
-    for task in sorted(tasks, key=lambda tsk: tsk.age):
+    for task in sorted(tasks, key=lambda tsk: tsk.age, reverse=True):
       if task not in gc_tasks:
         total_used += total_gc_size(task)
         if total_used > self._max_space:
           gc_tasks.add(task)
     self.log('After size filter: %s tasks' % len(gc_tasks))
 
-    for task in sorted(tasks, key=lambda tsk: tsk.age):
+    for task in sorted(tasks, key=lambda tsk: tsk.age, reverse=True):
       if task not in gc_tasks and len(tasks) - len(gc_tasks) > self._max_tasks:
         gc_tasks.add(task)
     self.log('After total task filter: %s tasks' % len(gc_tasks))

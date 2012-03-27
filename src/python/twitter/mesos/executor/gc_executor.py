@@ -14,6 +14,7 @@ from twitter.mesos.executor.sandbox_manager import (
   AppAppSandbox)
 from twitter.mesos.executor.executor_base import ThermosExecutorBase
 from gen.twitter.mesos.comm.ttypes import AdjustRetainedTasks
+from gen.twitter.mesos.ttypes import ScheduleStatus
 
 # thrifts
 from thrift.TSerialization import deserialize as thrift_deserialize
@@ -21,6 +22,7 @@ from thrift.TSerialization import deserialize as thrift_deserialize
 app.add_option("--checkpoint_root", dest="checkpoint_root", metavar="PATH",
                default="/var/run/thermos",
                help="the checkpoint root from which we garbage collect")
+
 
 class ThermosTaskGarbageCollector(TaskGarbageCollector):
   @classmethod
@@ -58,8 +60,8 @@ class ThermosGCExecutor(ThermosExecutorBase):
 
   def reconcile_states(self, driver, retained_tasks):
     self.log('Told to retain the following task ids:')
-    for task_id in retained_tasks:
-      self.log('  => %s' % task_id)
+    for task_id, schedule_status in retained_tasks.items():
+      self.log('  => %s as %s' % (task_id, ScheduleStatus._VALUES_TO_NAMES[schedule_status]))
 
     def kill_task(task_id):
       runner = self._task_runner_factory(task_id, self._checkpoint_root)

@@ -112,13 +112,17 @@ class ProcessState(object):
     self._pidmap = defaultdict(set)
 
   def update(self):
-    # update processes with live processesp
+    # update processes with live processes
     pids = set(filter(None, get_pid_list()))
     last_pids = set(self._processes.keys())
     for pid in last_pids - pids:
       self._processes.pop(pid)
     for pid in pids - last_pids:
-      self._processes[pid] = Process(pid)
+      try:
+        process = Process(pid)
+      except NoSuchProcess:
+        continue
+      self._processes[pid] = process
     self._samples = {}
     self._pidmap = defaultdict(set)
     for pid, process in self._processes.items():
@@ -136,20 +140,31 @@ class ProcessState(object):
       for pid in tree.copy():
         tree.update(self.children_of(pid))
     for pid in tree:
-      self._samples[pid] = ProcessSample.process_to_sample(self._processes[pid])
+      if pid not in self._processes:
+        log.warning("Attempting to sample pid %s but it's not in the list of active processes" %
+          pid)
+        continue
+      try:
+        self._samples[pid] = ProcessSample.process_to_sample(self._processes[pid])
+      except (NoSuchProcess, AccessDenied):
+        continue
 
   def children_of(self, pid):
-    pidset = set(self._pidmap[pid])
-    for cpid in self._pidmap[pid]:
+    pidset = set(self._pidmap.get(pid, []))
+    for cpid in self._pidmap.get(pid, []):
       pidset.update(self.children_of(cpid))
     return pidset
 
   def aggregate(self, pid):
+    if pid not in self._samples:
+      log.warning('Called aggregate on an inactive task.')
+      return ProcessSample.empty()
     log.debug('Aggregating %s => %s' % (pid, self.children_of(pid)))
-    log.debug('   pid (%s) => %s' % (pid, self._samples[pid]))
+    log.debug('   pid (%s) => %s' % (pid, self._samples.get(pid)))
     for cpid in self.children_of(pid):
       log.debug('     cpid (%s) => %s' % (cpid, self._samples.get(cpid)))
-    return sum(filter(None, map(self._samples.get, self.children_of(pid))), self._samples[pid])
+    return sum(filter(None, map(self._samples.get, self.children_of(pid))),
+      self._samples.get(pid, ProcessSample.empty()))
 
 
 class TaskMeasurer(threading.Thread):
