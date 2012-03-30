@@ -258,7 +258,7 @@ public class StateManagerImplTest extends EasyMockTest {
         changeState(taskId, state);
       }
 
-      clock.advance(StateManagerImpl.MISSING_TASK_GRACE_PERIOD.get());
+      clock.advance(StateManagerImpl.TRANSIENT_TASK_STATE_TIMEOUT.get());
       clock.advance(Amount.of(1L, Time.MILLISECONDS));
       stateManager.scanOutstandingTasks();
       changeState(taskId, KILLED);

@@ -1917,8 +1917,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     changeStatus(taskId, STARTING);
     changeStatus(taskId, KILLING);
 
-    clock.advance(StateManagerImpl.MISSING_TASK_GRACE_PERIOD.get());
-    clock.advance(StateManagerImpl.MISSING_TASK_GRACE_PERIOD.get());
+    clock.advance(StateManagerImpl.TRANSIENT_TASK_STATE_TIMEOUT.get());
+    clock.advance(StateManagerImpl.TRANSIENT_TASK_STATE_TIMEOUT.get());
 
     stateManager.scanOutstandingTasks();
 
@@ -1936,8 +1936,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     String taskId = Tasks.id(getOnlyTask(queryByOwner(OWNER_A)));
     changeStatus(taskId, ASSIGNED);
 
-    clock.advance(StateManagerImpl.MISSING_TASK_GRACE_PERIOD.get());
-    clock.advance(StateManagerImpl.MISSING_TASK_GRACE_PERIOD.get());
+    clock.advance(StateManagerImpl.TRANSIENT_TASK_STATE_TIMEOUT.get());
+    clock.advance(StateManagerImpl.TRANSIENT_TASK_STATE_TIMEOUT.get());
 
     stateManager.scanOutstandingTasks();
 

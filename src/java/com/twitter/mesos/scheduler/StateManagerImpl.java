@@ -86,9 +86,9 @@ import static com.twitter.mesos.gen.ScheduleStatus.UNKNOWN;
 public class StateManagerImpl implements StateManager {
 
   @VisibleForTesting
-  @CmdLine(name = "missing_task_grace_period",
-      help = "The amount of time after which to treat an ASSIGNED task as LOST.")
-  static final Arg<Amount<Long, Time>> MISSING_TASK_GRACE_PERIOD =
+  @CmdLine(name = "transient_task_state_timeout",
+      help = "The amount of time after which to treat a task stuck in a transient state as LOST.")
+  static final Arg<Amount<Long, Time>> TRANSIENT_TASK_STATE_TIMEOUT =
       Arg.create(Amount.of(5L, Time.MINUTES));
 
   private static final Logger LOG = Logger.getLogger(StateManagerImpl.class.getName());
@@ -231,7 +231,7 @@ public class StateManagerImpl implements StateManager {
           return true;
         } else {
           long lastEventAgeMillis = clock.nowMillis() - lastEvent.getTimestamp();
-          return lastEventAgeMillis > MISSING_TASK_GRACE_PERIOD.get().as(Time.MILLISECONDS);
+          return lastEventAgeMillis > TRANSIENT_TASK_STATE_TIMEOUT.get().as(Time.MILLISECONDS);
         }
       }
     };
