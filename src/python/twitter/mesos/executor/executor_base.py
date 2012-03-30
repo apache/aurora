@@ -5,8 +5,8 @@ from twitter.common import app, log
 from gen.twitter.mesos.ttypes import ScheduleStatus
 from gen.twitter.thermos.ttypes import TaskState
 
-app.configure(module='twitter.common.app.modules.exception_handler',
-    enable=True, category='thermos_executor_exceptions')
+app.configure(module='twitter.common.app.modules.scribe_exception_handler',
+    category='test_thermos_executor_exceptions')
 app.configure(debug=True)
 
 class ThermosExecutorBase(mesos.Executor):

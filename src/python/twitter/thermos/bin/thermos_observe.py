@@ -15,8 +15,8 @@ app.add_option("--root",
 
 app.configure(module='twitter.common.app.modules.http',
     port=1338, host=socket.gethostname(), enable=True, framework='tornado')
-app.configure(module='twitter.common.app.modules.exception_handler',
-    enable=True, category='thermos_observer_exceptions')
+app.configure(module='twitter.common.app.modules.scribe_exception_handler',
+    category='test_thermos_observer_exceptions')
 
 def main(args, opts):
   if args:

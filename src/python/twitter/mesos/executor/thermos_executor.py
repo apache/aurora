@@ -29,8 +29,9 @@ from gen.twitter.mesos.ttypes import AssignedTask
 from gen.twitter.thermos.ttypes import TaskState
 from thrift.TSerialization import deserialize as thrift_deserialize
 
-app.configure(module='twitter.common.app.modules.exception_handler',
-    enable=True, category='thermos_executor_exceptions')
+# TODO(wickman) When chickadee is ready on mesos machines, scribe to Chickadee instead.
+app.configure(module='twitter.common.app.modules.scribe_exception_handler',
+    category='test_thermos_executor_exceptions')
 app.configure(debug=True)
 
 

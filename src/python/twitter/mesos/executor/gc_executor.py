@@ -137,12 +137,15 @@ class ThermosGCExecutor(ThermosExecutorBase):
 
 
 LogOptions.set_log_dir('/var/log/mesos')
+app.configure(module='twitter.common.app.modules.scribe_exception_handler',
+    category='test_thermos_gc_executor_exceptions')
+app.configure(debug=True)
+
 def main():
   LogOptions.set_disk_log_level('DEBUG')
   thermos_gc_executor = ThermosGCExecutor()
   drv = mesos.MesosExecutorDriver(thermos_gc_executor)
   drv.run()
   log.info('MesosExecutorDriver.run() has finished.')
-
 
 app.main()
