@@ -31,6 +31,7 @@ python_library(
     pants('3rdparty/python.twitter:mesos-latest'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/app/modules:exceptions'),
+    pants('src/python/twitter/common/app/modules:scribe_exceptions'),
     pants('src/python/twitter/common/log'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
     pants('src/thrift/com/twitter/thermos:py-thrift'),

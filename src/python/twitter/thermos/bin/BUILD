@@ -15,6 +15,7 @@ python_binary(
   dependencies = [
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/app/modules:exceptions'),
+    pants('src/python/twitter/common/app/modules:scribe_exceptions'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/thermos/config:schema'),
     pants('src/python/twitter/thermos/runner'),

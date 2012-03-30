@@ -92,8 +92,7 @@ class TaskRunnerWrapper(object):
     cmdline_args = [self._runner_pex]
     cmdline_args.extend('--%s=%s' % (flag, value) for flag, value in params.items())
     cmdline_args.extend([
-      '--enable_scribe_exception_hook',
-      '--scribe_exception_category=thermos_runner_exceptions'])
+      '--scribe_exception_category=test_thermos_runner_exceptions'])
     if self._enable_chroot:
       cmdline_args.extend(['--enable_chroot'])
     for name, port in self._ports.items():
