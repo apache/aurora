@@ -8,6 +8,7 @@ python_test_suite(name = 'all',
 
 python_tests(name = 'sandbox_manager',
   sources = ['test_sandbox_manager.py'],
+  soft_dependencies = True,
   dependencies = [
     pants('src/python/twitter/common/contextutil'),
     pants('src/python/twitter/mesos/config:schema'),
@@ -17,6 +18,7 @@ python_tests(name = 'sandbox_manager',
 
 python_tests(name = 'gc_executor',
   sources = ['test_gc_executor.py'],
+  soft_dependencies = True,
   dependencies = [
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/quantity'),
@@ -28,6 +30,7 @@ python_tests(name = 'gc_executor',
 
 python_tests(name = 'thermos_executor',
   sources = ['test_thermos_executor.py'],
+  soft_dependencies = True,
   dependencies = [
     pants('src/python/twitter/pants:pants-lib'),
     pants('src/python/twitter/common/app'),
