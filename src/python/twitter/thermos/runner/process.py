@@ -286,9 +286,16 @@ class Process(ProcessBase):
 
   def _setuid(self):
     """
-      Drop privileges to the user supplied in Process creation.
+      Drop privileges to the user supplied in Process creation (if necessary.)
     """
-    user = pwd.getpwnam(self._user)
+    try:
+      user = pwd.getpwnam(self._user)
+      current_user = pwd.getpwuid(os.getuid())
+    except KeyError:
+      raise ProcessBase.UnknownUserError('Unable to get pwent information in order to setuid!')
+
+    if user.pw_uid == current_user.pw_uid:
+      return
 
     def drop_privs():
       uid, gid = user.pw_uid, user.pw_gid
@@ -316,7 +323,7 @@ class Process(ProcessBase):
     os.setsid()
     if self._use_chroot:
       self._chroot()
-    if self._user and self._user != getpass.getuser():
+    if self._user:
       self._setuid()
 
     # start process

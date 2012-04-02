@@ -693,8 +693,13 @@ class TaskRunner(object):
       especially if the killer is running as root.
     """
     if pid_handle.user() != user:
+      log.info("    Expected pid %s to be ours but the pid user is %s and we're %s" % (
+        pid_handle.pid(), pid_handle.user(), user))
       return False
     estimated_start_time = self._clock.time() - pid_handle.wall_time()
+    log.info("    Time drift from the start of %s is %s, real: %s, pid wall: %s, estimated: %s" % (
+      pid_handle.pid(), abs(start_time - estimated_start_time), start_time, pid_handle.wall_time(),
+      estimated_start_time))
     return abs(start_time - estimated_start_time) < TaskRunner.MAX_START_TIME_DRIFT.as_(
       Time.SECONDS)
 
@@ -718,12 +723,14 @@ class TaskRunner(object):
     process_statuses = []
 
     current_user = self._state.header.user
+    log.info('    => Current user: %s' % current_user)
+    log.info('    => All PIDs on system: %s' % ' '.join(map(str, sorted(self._ps.pids()))))
     for process_history in self._state.processes.values():
       # collect coordinator_pids for runners in >=FORKED, <=RUNNING state
       last_run = process_history[-1]
       if last_run.state in (ProcessState.FORKED, ProcessState.RUNNING):
         process_statuses.append(last_run)
-        log.info('  Inspecting coordinator for %s: %s' % (last_run.process,
+        log.info('  Inspecting %s coordinator [pid: %s]' % (last_run.process,
             last_run.coordinator_pid))
         if last_run.coordinator_pid in self._ps.pids() and self.this_is_really_our_pid(
             self._ps.get_handle(last_run.coordinator_pid), current_user, last_run.fork_time):
@@ -731,13 +738,14 @@ class TaskRunner(object):
         else:
           log.info('    (coordinator appears to have completed)')
       if last_run.state == ProcessState.RUNNING:
+        log.info('  Inspecting %s [pid: %s]' % (last_run.process, last_run.pid))
         if last_run.pid in self._ps.pids() and self.this_is_really_our_pid(
             self._ps.get_handle(last_run.pid), current_user, last_run.start_time):
-          log.info('    => Active pid: %s' % last_run.pid)
+          log.info('    => pid is active.')
           process_pids.append(last_run.pid)
           subtree = self._ps.children_of(last_run.pid, all=True)
           if subtree:
-            log.info('      => Extra children: %s' % ' '.join(map(str, subtree)))
+            log.info('      => has children: %s' % ' '.join(map(str, subtree)))
             process_pids.extend(subtree)
 
 
