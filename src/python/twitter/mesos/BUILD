@@ -38,6 +38,16 @@ python_binary(
 )
 
 python_binary(
+  name = "deploy_thermos",
+  source = "bin/deploy_thermos.py",
+  dependencies = [
+    pants(":mesos-lib"),
+    pants("src/python/twitter/common"),
+  ]
+)
+
+
+python_binary(
   name = "restart_job",
   source = "bin/restart_job.py",
   dependencies = [

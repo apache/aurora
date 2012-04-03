@@ -55,6 +55,10 @@ python_binary(
   name = 'thermos_executor',
   source = 'thermos_executor.py',
   ignore_errors = True,
+  platforms = [
+    'linux-x86_64',
+    'macosx-10.4-x86_64',
+  ],
   dependencies = [
     pants(':thermos_executor_lib')
   ]
@@ -83,6 +87,10 @@ python_binary(
   name = 'gc_executor',
   source = 'gc_executor.py',
   ignore_errors = True,
+  platforms = [
+    'linux-x86_64',
+    'macosx-10.4-x86_64',
+  ],
   dependencies = [
     pants(':gc_executor_lib')
   ]

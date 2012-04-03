@@ -25,13 +25,13 @@ class TaskGarbageCollector(object):
 
   @classmethod
   def safe_size(cls, path):
-    if os.path.islink(path):
-      # The cost of a symlink is the length of the target filename.
-      return len(os.readlink(path))
     try:
+      if os.path.islink(path):
+        # The cost of a symlink is the length of the target filename.
+        return len(os.readlink(path))
       return os.path.getsize(path)
-    except OSError:
-      cls._log('Could not stat %s' % path)
+    except OSError as e:
+      cls._log('Could not stat %s: %s' % (path, e))
       return 0
 
   def state(self, task_id):
