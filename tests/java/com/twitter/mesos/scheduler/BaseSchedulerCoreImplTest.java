@@ -15,6 +15,7 @@ import javax.annotation.Nullable;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicates;
 import com.google.common.base.Splitter;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
@@ -1498,6 +1499,49 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         });
       }
     };
+  }
+
+  @Test
+  public void testAddingShards() throws Exception {
+    expectKillTask(1);
+
+    control.replay();
+    buildScheduler();
+
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, productionTask().deepCopy(), 3);
+    scheduler.createJob(job);
+    changeStatus(queryByOwner(OWNER_A), ASSIGNED);
+    changeStatus(queryByOwner(OWNER_A), RUNNING);
+
+    JobConfiguration updatedJob = makeJob(OWNER_A, JOB_A, productionTask().deepCopy(), 10);
+    // Change the start command on shard 1 to ensure that it (and only it) gets restarted as a
+    // part of the update.
+    Iterables.getOnlyElement(Iterables.filter(updatedJob.getTaskConfigs(),
+        Predicates.compose(Predicates.equalTo(1), Tasks.INFO_TO_SHARD_ID)))
+        .putToConfiguration("start_command", "echo");
+
+    String updateToken = scheduler.startUpdate(updatedJob);
+    String role = OWNER_A.getRole();
+    String jobKey = Tasks.jobKey(OWNER_A, JOB_A);
+
+    scheduler.updateShards(role, JOB_A, ImmutableSet.of(0, 1, 2), updateToken);
+    // Move a few tasks into RUNNING to ensure that the scheduler does not try to kill them
+    // in subsequent update batches.
+    changeStatus(Query.liveShard(jobKey, 0), FINISHED);
+    changeStatus(Query.liveShard(jobKey, 0), ASSIGNED);
+    changeStatus(Query.liveShard(jobKey, 0), RUNNING);
+    changeStatus(Query.liveShard(jobKey, 1), FINISHED);
+    changeStatus(Query.liveShard(jobKey, 1), ASSIGNED);
+    changeStatus(Query.liveShard(jobKey, 1), RUNNING);
+
+    scheduler.updateShards(role, JOB_A, ImmutableSet.of(3, 4, 5), updateToken);
+    scheduler.updateShards(role, JOB_A, ImmutableSet.of(6, 7, 8), updateToken);
+    scheduler.updateShards(role, JOB_A, ImmutableSet.of(9), updateToken);
+    scheduler.finishUpdate(role, JOB_A, Optional.of(updateToken), UpdateResult.SUCCESS);
+
+    assertEquals("echo",
+        Iterables.getOnlyElement(getTasks(Query.liveShard(jobKey, 1)))
+            .getAssignedTask().getTask().getStartCommand());
   }
 
   @Test

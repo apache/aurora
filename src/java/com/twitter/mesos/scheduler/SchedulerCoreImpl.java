@@ -446,8 +446,7 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
     checkStarted();
 
     String jobKey = Tasks.jobKey(role, jobName);
-    Set<ScheduledTask> tasks =
-       stateManager.fetchTasks(Query.liveShards(jobKey, shards));
+    Set<ScheduledTask> tasks = stateManager.fetchTasks(Query.liveShards(jobKey, shards));
 
     // Extract any shard IDs that are being added as a part of this stage in the update.
     Set<Integer> newShardIds = Sets.difference(shards,
@@ -466,9 +465,22 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
       stateManager.insertTasks(newTasks);
     }
 
-    // Initiate update on the existing shards.
-    stateManager.changeState(Query.liveShards(jobKey, Sets.difference(shards, newShardIds)),
-        ScheduleStatus.UPDATING);
+    Set<Integer> updateShardIds = Sets.difference(shards, newShardIds);
+    if (!updateShardIds.isEmpty()) {
+      Set<TwitterTaskInfo> oldTasks =
+          ImmutableSet.copyOf(Iterables.transform(tasks, Tasks.SCHEDULED_TO_INFO));
+      Set<TwitterTaskInfo> newTasks =
+          stateManager.fetchUpdatedTaskConfigs(role, jobName, updateShardIds);
+
+      Set<TwitterTaskInfo> changedTasks = Sets.difference(newTasks, oldTasks);
+      Set<Integer> changedShards =
+          ImmutableSet.copyOf(Iterables.transform(changedTasks, Tasks.INFO_TO_SHARD_ID));
+
+      if (!changedShards.isEmpty()) {
+        // Initiate update on the existing shards.
+        stateManager.changeState(Query.liveShards(jobKey, changedShards), ScheduleStatus.UPDATING);
+      }
+    }
   }
 
   @Override
