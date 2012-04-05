@@ -8,16 +8,15 @@ from twitter.mesos.updater import Updater
 
 from fake_scheduler import *
 
+RUNNING  = ScheduleStatus.RUNNING
+
 def find_expected_status_calls(watch_secs, sleep_secs):
   return ceil(watch_secs / sleep_secs)
 
 class UpdaterTest(unittest.TestCase):
   BATCH_SIZE = 3
   WATCH_SECS = RESTART_THRESHOLD = 50.0
-  EXPECTED_INITIAL_GET_STATUS_CALL = 1
-  EXPECTED_GET_STATUS_CALLS = (find_expected_status_calls(WATCH_SECS, 3.0) +
-      EXPECTED_INITIAL_GET_STATUS_CALL)
-  EXPECTED_GET_STATUS_CALLS_IN_UNKNOWN_STATE = 1
+  EXPECTED_GET_STATUS_CALLS = (find_expected_status_calls(WATCH_SECS, 3.0) + 1)
   MAX_SHARD_FAILURE = 0
   MAX_TOTAL_FAILURE = 0
 
@@ -48,7 +47,7 @@ class UpdaterTest(unittest.TestCase):
   def expect_rollback(self, shard_ids):
     self._scheduler.expect_rollbackShards('mesos', 'sathya', shard_ids, 'test_update')
 
-  def expect_get_statuses(self, num_calls, statuses):
+  def expect_get_statuses(self, statuses, num_calls=EXPECTED_GET_STATUS_CALLS):
     for x in range(int(num_calls)):
       self._scheduler.expect_getTasksStatus(statuses)
 
@@ -58,22 +57,13 @@ class UpdaterTest(unittest.TestCase):
   def test_case_pass(self):
     """All tasks complete and update succeeds"""
     self.expect_restart([0, 1, 2])
-    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS,
-                             {0: ScheduleStatus.RUNNING,
-                              1: ScheduleStatus.RUNNING,
-                              2: ScheduleStatus.RUNNING})
+    self.expect_get_statuses({0: RUNNING, 1: RUNNING, 2: RUNNING})
     self.expect_restart([3, 4, 5])
-    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS,
-                             {3: ScheduleStatus.RUNNING,
-                              4: ScheduleStatus.RUNNING,
-                              5: ScheduleStatus.RUNNING})
+    self.expect_get_statuses({3: RUNNING, 4: RUNNING, 5: RUNNING})
     self.expect_restart([6, 7, 8])
-    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS,
-                             {6: ScheduleStatus.RUNNING,
-                              7: ScheduleStatus.RUNNING,
-                              8: ScheduleStatus.RUNNING})
+    self.expect_get_statuses({6: RUNNING, 7: RUNNING, 8: RUNNING})
     self.expect_restart([9])
-    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS, {9: ScheduleStatus.RUNNING})
+    self.expect_get_statuses({9: RUNNING})
     shards_expected = []
     shards_returned = self._updater.update(self._job_config)
     assert shards_expected == shards_returned, ('Expected shards (%s) : Returned shards (%s)' %
@@ -85,14 +75,11 @@ class UpdaterTest(unittest.TestCase):
     self._update_config.maxTotalFailures = 5
     self._update_config.maxPerShardFailures = 2
     self.expect_restart([0, 1, 2])
-    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS,
-        {0: ScheduleStatus.STARTING, 1: ScheduleStatus.STARTING, 2: ScheduleStatus.STARTING})
+    self.expect_get_statuses({})
     self.expect_restart([0, 1, 2])
-    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS,
-        {0: ScheduleStatus.STARTING, 1: ScheduleStatus.STARTING, 2: ScheduleStatus.STARTING})
+    self.expect_get_statuses({})
     self.expect_rollback([0, 1, 2])
-    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS,
-        {0: ScheduleStatus.RUNNING, 1: ScheduleStatus.RUNNING, 2: ScheduleStatus.RUNNING})
+    self.expect_get_statuses({0: RUNNING, 1: RUNNING, 2: RUNNING})
     shards_expected = [0, 1, 2]
     shards_returned = self._updater.update(self._job_config)
     assert shards_expected == shards_returned, ('Expected shards (%s) : Returned shards (%s)' %
@@ -104,23 +91,17 @@ class UpdaterTest(unittest.TestCase):
     self._update_config.maxTotalFailures = 5
     self._update_config.maxPerShardFailures = 2
     self.expect_restart([0, 1, 2])
-    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS,
-        {0: ScheduleStatus.STARTING, 1: ScheduleStatus.RUNNING, 2: ScheduleStatus.RUNNING})
+    self.expect_get_statuses({1: RUNNING, 2: RUNNING})
     self.expect_restart([0, 3, 4])
-    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS,
-        {0: ScheduleStatus.STARTING, 3: ScheduleStatus.RUNNING, 4: ScheduleStatus.RUNNING})
+    self.expect_get_statuses({3: RUNNING, 4: RUNNING})
     self.expect_restart([0, 5, 6])
-    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS,
-        {0: ScheduleStatus.STARTING, 5: ScheduleStatus.RUNNING, 6: ScheduleStatus.RUNNING})
+    self.expect_get_statuses({5: RUNNING, 6: RUNNING})
     self.expect_rollback([0, 1, 2])
-    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS,
-        {0: ScheduleStatus.RUNNING, 1: ScheduleStatus.RUNNING, 2: ScheduleStatus.RUNNING})
+    self.expect_get_statuses({0: RUNNING, 1: RUNNING, 2: RUNNING})
     self.expect_rollback([3, 4, 5])
-    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS,
-        {3: ScheduleStatus.RUNNING, 4: ScheduleStatus.RUNNING, 5: ScheduleStatus.RUNNING})
+    self.expect_get_statuses({3: RUNNING, 4: RUNNING, 5: RUNNING})
     self.expect_rollback([6])
-    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS,
-        {6: ScheduleStatus.RUNNING})
+    self.expect_get_statuses({6: RUNNING})
     shards_expected = [0]
     shards_returned = self._updater.update(self._job_config)
     assert shards_expected == shards_returned, ('Expected shards (%s) : Returned shards (%s)' %
@@ -130,25 +111,17 @@ class UpdaterTest(unittest.TestCase):
   def test_shard_state_transition(self):
     """All tasks move into running state at the end of restart threshold."""
     self.expect_restart([0, 1, 2])
-    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS - 1,
-        {0: ScheduleStatus.STARTING, 1: ScheduleStatus.STARTING, 2: ScheduleStatus.STARTING})
-    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS,
-        {0: ScheduleStatus.RUNNING, 1: ScheduleStatus.RUNNING, 2: ScheduleStatus.RUNNING})
+    self.expect_get_statuses({}, num_calls=(self.EXPECTED_GET_STATUS_CALLS - 1))
+    self.expect_get_statuses({0: RUNNING, 1: RUNNING, 2: RUNNING})
     self.expect_restart([3, 4, 5])
-    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS - 1,
-        {3: ScheduleStatus.STARTING, 4: ScheduleStatus.STARTING, 5: ScheduleStatus.STARTING})
-    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS,
-        {3: ScheduleStatus.RUNNING, 4: ScheduleStatus.RUNNING, 5: ScheduleStatus.RUNNING})
+    self.expect_get_statuses({}, self.EXPECTED_GET_STATUS_CALLS - 1)
+    self.expect_get_statuses({3: RUNNING, 4: RUNNING, 5: RUNNING})
     self.expect_restart([6, 7, 8])
-    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS - 1,
-        {6: ScheduleStatus.STARTING, 7: ScheduleStatus.STARTING, 8: ScheduleStatus.STARTING})
-    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS,
-        {6: ScheduleStatus.RUNNING, 7: ScheduleStatus.RUNNING, 8: ScheduleStatus.RUNNING})
+    self.expect_get_statuses({}, self.EXPECTED_GET_STATUS_CALLS - 1)
+    self.expect_get_statuses({6: RUNNING, 7: RUNNING, 8: RUNNING})
     self.expect_restart([9])
-    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS - 1,
-        {9: ScheduleStatus.STARTING})
-    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS,
-        {9: ScheduleStatus.RUNNING})
+    self.expect_get_statuses({}, self.EXPECTED_GET_STATUS_CALLS - 1)
+    self.expect_get_statuses({9: RUNNING})
     shards_expected = []
     shards_returned = self._updater.update(self._job_config)
     assert shards_expected == shards_returned, ('Expected shards (%s) : Returned shards (%s)' %
@@ -160,14 +133,13 @@ class UpdaterTest(unittest.TestCase):
     self._update_config.maxTotalFailures = 5
     self._update_config.maxPerShardFailures = 2
     self.expect_restart([0, 1, 2])
-    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS_IN_UNKNOWN_STATE,
-        {0: ScheduleStatus.FINISHED, 1: ScheduleStatus.FINISHED, 2: ScheduleStatus.FINISHED})
+    self.expect_get_statuses({0: RUNNING, 1: RUNNING, 2: RUNNING}, num_calls=1)
+    self.expect_get_statuses({}, num_calls=1)
     self.expect_restart([0, 1, 2])
-    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS_IN_UNKNOWN_STATE,
-        {0: ScheduleStatus.FINISHED, 1: ScheduleStatus.FINISHED, 2: ScheduleStatus.FINISHED})
+    self.expect_get_statuses({0: RUNNING, 1: RUNNING, 2: RUNNING}, num_calls=1)
+    self.expect_get_statuses({}, num_calls=1)
     self.expect_rollback([0, 1, 2])
-    self.expect_get_statuses(UpdaterTest.EXPECTED_GET_STATUS_CALLS,
-        {0: ScheduleStatus.RUNNING, 1: ScheduleStatus.RUNNING, 2: ScheduleStatus.RUNNING})
+    self.expect_get_statuses({0: RUNNING, 1: RUNNING, 2: RUNNING})
     shards_expected = [0, 1, 2]
     shards_returned = self._updater.update(self._job_config)
     assert shards_expected == shards_returned, ('Expected shards (%s) : Returned shards (%s)' %

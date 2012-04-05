@@ -240,7 +240,7 @@ class MesosClientAPI(MesosClientBase):
     resp.message = "Update Unsuccessful" if failed_shards else "Update Successful"
     return resp
 
-  def cancel_update(self, jobname):
+  def cancel_update(self, role, jobname):
     log.info("Canceling update on job: %s" % jobname)
 
     resp = self.client().finishUpdate(role, jobname, UpdateResult.TERMINATE,

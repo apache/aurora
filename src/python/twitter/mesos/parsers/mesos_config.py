@@ -91,7 +91,7 @@ class MesosConfig(ProxyConfig):
       tasks.append(task_copy)
 
     # additional stuff
-    update_config = UpdateConfig(**config['update_config']) if config.get('update_config') else None
+    update_config = UpdateConfig(**config['updateConfig']) if config.get('updateConfig') else None
 
     ccp = config.get('cron_collision_policy')
     if ccp and ccp not in CronCollisionPolicy._NAMES_TO_VALUES:
@@ -178,7 +178,7 @@ class MesosConfig(ProxyConfig):
         update_config['maxPerShardFailures'] = DEFAULT_MAX_PER_SHARD_FAILURE
       if not 'maxTotalFailures' in update_config:
         update_config['maxTotalFailures'] = DEFAULT_MAX_TOTAL_FAILURE
-
+      job['updateConfig'] = update_config
       jobs[job['name']] = job
     return jobs
 
