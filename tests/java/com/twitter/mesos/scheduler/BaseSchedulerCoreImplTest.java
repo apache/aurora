@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
 
 import org.apache.mesos.Protos.Attribute;
@@ -1508,12 +1509,25 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    JobConfiguration job = makeJob(OWNER_A, JOB_A, productionTask().deepCopy(), 3);
+    // Use command line wildcards to detect bugs where command lines with populated wildcards
+    // make tasks appear different.
+    TwitterTaskInfo task = productionTask("start_command", "%port:foo% %task_id% %shard_id%")
+        .setRequestedPorts(ImmutableSet.of("foo"));
+
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, task, 3);
     scheduler.createJob(job);
+    List<String> taskIds = Ordering.natural().sortedCopy(Tasks.ids(getTasksOwnedBy(OWNER_A)));
+
+    Offer onePortOffer = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, FOUR_GB, ONE_GB,
+        ImmutableSet.of(Pair.of(80, 80)));
+    Set<Integer> port = ImmutableSet.of(80);
+    sendOffer(onePortOffer, taskIds.get(0), SLAVE_HOST_1, ImmutableSet.of("foo"), port);
+    sendOffer(onePortOffer, taskIds.get(1), SLAVE_HOST_1, ImmutableSet.of("foo"), port);
+    sendOffer(onePortOffer, taskIds.get(2), SLAVE_HOST_1, ImmutableSet.of("foo"), port);
     changeStatus(queryByOwner(OWNER_A), ASSIGNED);
     changeStatus(queryByOwner(OWNER_A), RUNNING);
 
-    JobConfiguration updatedJob = makeJob(OWNER_A, JOB_A, productionTask().deepCopy(), 10);
+    JobConfiguration updatedJob = makeJob(OWNER_A, JOB_A, task, 10);
     // Change the start command on shard 1 to ensure that it (and only it) gets restarted as a
     // part of the update.
     Iterables.getOnlyElement(Iterables.filter(updatedJob.getTaskConfigs(),

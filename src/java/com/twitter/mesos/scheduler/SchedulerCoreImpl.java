@@ -6,6 +6,8 @@ import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 
+import com.google.common.base.Function;
+import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
@@ -63,6 +65,15 @@ import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.STOPPED;
 public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
 
   private static final Logger LOG = Logger.getLogger(SchedulerCoreImpl.class.getName());
+
+  private static final Function<TwitterTaskInfo, TwitterTaskInfo> COPY_AND_RESET_START_COMMAND =
+      new Function<TwitterTaskInfo, TwitterTaskInfo>() {
+        @Override public TwitterTaskInfo apply(TwitterTaskInfo task) {
+          TwitterTaskInfo copy = task.deepCopy();
+          ConfigurationManager.resetStartCommand(copy);
+          return copy;
+        }
+      };
 
   private final CronJobManager cronScheduler;
 
@@ -467,8 +478,9 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
 
     Set<Integer> updateShardIds = Sets.difference(shards, newShardIds);
     if (!updateShardIds.isEmpty()) {
-      Set<TwitterTaskInfo> oldTasks =
-          ImmutableSet.copyOf(Iterables.transform(tasks, Tasks.SCHEDULED_TO_INFO));
+      Set<TwitterTaskInfo> oldTasks = ImmutableSet.copyOf(Iterables.transform(tasks,
+          Functions.compose(COPY_AND_RESET_START_COMMAND, Tasks.SCHEDULED_TO_INFO)));
+      // No need to reset the start command here since the updated tasks have not been populated.
       Set<TwitterTaskInfo> newTasks =
           stateManager.fetchUpdatedTaskConfigs(role, jobName, updateShardIds);
 
