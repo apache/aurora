@@ -58,17 +58,26 @@ public class MesosLogStreamModule extends PrivateModule {
            help = "A zookeeper node for use by the native log to track the master coordinator.")
   private static final Arg<String> ZK_LOG_GROUP_PATH = Arg.create();
 
-  // TODO(John Sirois): the combo of retires + timeout for becoming coordinator is slightly odd,
-  // but the way the timeout is actually used in the Coordinator.elect code seems more odd - ask Ben
-  // for guidance on this.
+  /*
+   * This timeout includes the time to get a quorum to promise leadership to the coordinator and
+   * the time to fill any holes in the coordinator's log.
+   */
   @CmdLine(name = "native_log_election_timeout",
-           help = "The timeout for attempting to obtain a new log writer.")
+           help = "The timeout for a single attempt to obtain a new log writer.")
   private static final Arg<Amount<Long, Time>> COORDINATOR_ELECTION_TIMEOUT =
       Arg.create(Amount.of(15L, Time.SECONDS));
 
+  /*
+   * Normally retries would not be expected to help much - however in the small replica set where
+   * a few down replicas doom a coordinator election attempt, retrying effectively gives us a wider
+   * window in which to await a live quorum before giving up and thrashing the global election
+   * process.  Observed log replica recovery times as of 4/6/2012 can be ~45 seconds so giving a
+   * window >= 2x this should support 1-round election events (that possibly use several retries in
+   * the single round).
+   */
   @CmdLine(name = "native_log_election_retries",
-           help = "The maximum number of retries to obtain a new log writer.")
-  private static final Arg<Integer> COORDINATOR_ELECTION_RETRIES = Arg.create(3);
+           help = "The maximum number of attempts to obtain a new log writer.")
+  private static final Arg<Integer> COORDINATOR_ELECTION_RETRIES = Arg.create(8);
 
   @CmdLine(name = "native_log_read_timeout",
            help = "The timeout for doing log reads.")
