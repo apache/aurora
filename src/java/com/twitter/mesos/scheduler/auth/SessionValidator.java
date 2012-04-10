@@ -82,7 +82,7 @@ public interface SessionValidator {
       try {
         if (!userId.equals(targetRole)) {
           if (!ods.isRoleAccount(targetRole)) {
-            throw new AuthFailedException(targetRole + " %s is not a role account.");
+            throw new AuthFailedException(targetRole + " is not a role account.");
           }
         }
 
