@@ -2,6 +2,7 @@ python_test_suite(name = 'all',
   dependencies = [
     pants(':updater'),
     pants(':constraints'),
+    pants('tests/python/twitter/mesos/parsers:all'),
     pants('tests/python/twitter/mesos/executor:all')
     # Commented out till we fix the zookeeper import problem
     #pants('tests/python/twitter/mesos/angrybird:tests'),
@@ -20,6 +21,6 @@ python_tests(name = 'updater',
 python_tests(name = 'constraints',
   sources = ['test_constraint_parsing.py'],
   dependencies = [
-    pants('src/python/twitter/mesos:mesos-lib'),
+    pants('src/python/twitter/mesos:parsers'),
   ]
 )

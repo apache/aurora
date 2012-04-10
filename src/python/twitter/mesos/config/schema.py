@@ -23,11 +23,11 @@ class MesosContext(Struct):
   instance = Required(Integer)
 
 class UpdateConfig(Struct):
-  batch_size         = Default(Integer, 3)
-  restart_threshold  = Default(Integer, 10)
-  watch_secs         = Default(Integer, 30)
-  failures_per_shard = Default(Integer, 0)
-  total_failures     = Default(Integer, 0)
+  batch_size             = Default(Integer, 1)
+  restart_threshold      = Default(Integer, 30)
+  watch_secs             = Default(Integer, 30)
+  max_per_shard_failures = Default(Integer, 0)
+  max_total_failures     = Default(Integer, 0)
 
 # The thermosConfig populated inside of TwitterTaskInfo.
 @Provided(mesos=MesosContext)
@@ -48,3 +48,11 @@ class MesosJob(Struct):
   cron_policy   = Default(String, 'KILL_EXISTING')
   layout        = Layout
   update_config = Default(UpdateConfig, UpdateConfig())
+
+  # NEW
+  constraints       = Map(String, String)
+  daemon            = Default(Integer, 0)  # boolean
+  max_task_failures = Default(Integer, 1)
+  production        = Default(Integer, 0)  # boolean
+  priority          = Default(Integer, 0)
+  health_check_interval_secs = Integer

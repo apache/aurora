@@ -1,6 +1,23 @@
 python_library(
-  name = "mesos-lib",
-  sources = rglobs("*.py"),
+  name = 'parsers',
+  sources = globs('parsers/*.py'),
+  dependencies = [
+    pants('3rdparty/python:pystachio'),
+    pants('src/python/twitter/common/lang'),
+    pants('src/python/twitter/mesos/config:schema'),
+    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants(':clusters')
+  ]
+)
+
+python_library(
+  name = 'clusters',
+  sources = ['clusters.py'],
+)
+
+python_library(
+  name = 'mesos-lib',
+  sources = rglobs('*.py'),
   dependencies = [
     pants('3rdparty/python:zookeeper'),
     pants('3rdparty/python:paramiko'),
@@ -14,12 +31,12 @@ python_library(
 )
 
 python_binary(
-  name = "mesos_client",
-  source = "bin/mesos_client.py",
+  name = 'mesos_client',
+  source = 'bin/mesos_client.py',
   dependencies = [
-    pants(":mesos-lib"),
-    pants("src/python/twitter/common"),
-    pants("src/python/twitter/thermos/base:options")
+    pants(':mesos-lib'),
+    pants('src/python/twitter/common'),
+    pants('src/python/twitter/thermos/base:options')
   ],
   platforms = [
     'linux-x86_64',
@@ -28,41 +45,50 @@ python_binary(
 )
 
 python_binary(
-  name = "deploy_scheduler",
-  source = "bin/deploy_scheduler.py",
+  name = 'deploy_scheduler',
+  source = 'bin/deploy_scheduler.py',
   dependencies = [
     pants('3rdparty/python:git-python'),
-    pants(":mesos-lib"),
-    pants("src/python/twitter/common"),
+    pants(':mesos-lib'),
+    pants('src/python/twitter/common'),
   ]
 )
 
 python_binary(
-  name = "deploy_thermos",
-  source = "bin/deploy_thermos.py",
+  name = 'deploy_thermos',
+  source = 'bin/deploy_thermos.py',
   dependencies = [
-    pants(":mesos-lib"),
-    pants("src/python/twitter/common"),
+    pants(':mesos-lib'),
+    pants('src/python/twitter/common'),
   ]
 )
 
 
 python_binary(
-  name = "restart_job",
-  source = "bin/restart_job.py",
+  name = 'restart_job',
+  source = 'bin/restart_job.py',
   dependencies = [
-    pants("src/python/twitter/common/log"),
-    pants(":mesos-lib"),
-    pants("3rdparty/python:git-python")
+    pants('src/python/twitter/common/log'),
+    pants(':mesos-lib'),
+    pants('3rdparty/python:git-python')
   ]
 )
 
 python_binary(
-  name = "process_scraper",
-  source = "process_scraper.py",
+  name = 'thermos_codec',
+  source = 'bin/thermos_codec.py',
   dependencies = [
-    pants("3rdparty/python:psutil"),
-    pants("src/python/twitter/common/app"),
+    pants(':mesos-lib'),
+    pants('src/python/twitter/common/app'),
+  ]
+)
+
+python_binary(
+  name = 'process_scraper',
+  source = 'process_scraper.py',
+  dependencies = [
+    pants('3rdparty/python:psutil'),
+    pants('src/python/twitter/common/app'),
   ],
   platforms = [
     'linux-x86_64',

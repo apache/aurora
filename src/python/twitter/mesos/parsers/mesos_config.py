@@ -2,9 +2,14 @@ import copy
 import functools
 import getpass
 import os
-import re
+import pprint
+import sys
 
-from twitter.mesos.proxy_config import ProxyConfig
+from twitter.common.lang import Compatibility
+
+from .base import EntityParser, ThriftCodec
+from .proxy_config import ProxyConfig
+
 from gen.twitter.mesos.ttypes import (
   Constraint,
   CronCollisionPolicy,
@@ -17,16 +22,16 @@ from gen.twitter.mesos.ttypes import (
   ValueConstraint,
 )
 
-class EntityParser(object):
-  PORT_RE = re.compile(r'%port:(\w+)%')
-
-  @staticmethod
-  def match_ports(str):
-    matcher = EntityParser.PORT_RE
-    matched = matcher.findall(str)
-    return set(matched)
 
 class MesosConfig(ProxyConfig):
+  UPDATE_CONFIG_DEFAULTS = {
+    'batchSize':           1,
+    'restartThreshold':   30,
+    'watchSecs':          30,
+    'maxPerShardFailures': 0,
+    'maxTotalFailures':    0,
+  }
+
   @staticmethod
   def execute(config_file):
     """
@@ -45,30 +50,21 @@ class MesosConfig(ProxyConfig):
     return env
 
   @staticmethod
-  def constraints_to_thrift(constraints):
-    result = set()
-    for attribute, constraint_value in constraints.items():
-      assert isinstance(attribute, basestring) and isinstance(constraint_value, basestring), (
-        "Both attribute name and value in constraints must be string")
-      constraint = Constraint()
-      constraint.name = attribute
-      task_constraint = TaskConstraint()
-      if constraint_value.startswith('limit:'):
-        task_constraint.limitConstraint = LimitConstraint()
-        try:
-          task_constraint.limitConstraint.limit = int(constraint_value.replace('limit:', ''))
-        except ValueError:
-          print '%s is not a valid limit value, must be integer' % constraint_value
-          raise
+  def get_update_config(job_dict, snaked=False):
+    """Expand the update_config in either snake or camelcase format."""
+    def snake(st):
+      return ''.join((ch if ch.islower() else '_%s' % ch.lower()) for ch in st)
+    config = job_dict.get(snake('updateConfig'), job_dict.get('updateConfig', {}))
+    filled = {}
+    for key in MesosConfig.UPDATE_CONFIG_DEFAULTS:
+      store_key = snake(key) if snaked else key
+      if key in config:
+        filled[store_key] = config[key]
+      elif snake(key) in config:
+        filled[store_key] = config[snake(key)]
       else:
-        # Strip off the leading negation if present.
-        negated = constraint_value.startswith('!')
-        if negated:
-          constraint_value = constraint_value[1:]
-        task_constraint.value = ValueConstraint(negated, set(constraint_value.split(',')))
-      constraint.constraint = task_constraint
-      result.add(constraint)
-    return result
+        filled[store_key] = MesosConfig.UPDATE_CONFIG_DEFAULTS[key]
+    return filled
 
   @staticmethod
   def job_to_thrift(job_dict):
@@ -78,7 +74,7 @@ class MesosConfig(ProxyConfig):
     # Force configuration map to be all strings.
     task = TwitterTaskInfo()
     if 'constraints' in config:
-      task.constraints = MesosConfig.constraints_to_thrift(config['constraints'])
+      task.constraints = ThriftCodec.constraints_to_thrift(config['constraints'])
     task_configuration = dict((k, str(v)) for k, v in config['task'].items())
     task.configuration = task_configuration
     task.requestedPorts = EntityParser.match_ports(config['task']['start_command'])
@@ -91,8 +87,7 @@ class MesosConfig(ProxyConfig):
       tasks.append(task_copy)
 
     # additional stuff
-    update_config = UpdateConfig(**config['updateConfig']) if config.get('updateConfig') else None
-
+    update_config = UpdateConfig(**config['update_config'])
     ccp = config.get('cron_collision_policy')
     if ccp and ccp not in CronCollisionPolicy._NAMES_TO_VALUES:
       raise MesosConfig.InvalidConfig('Invalid cron collision policy: %s' % ccp)
@@ -107,6 +102,43 @@ class MesosConfig(ProxyConfig):
       ccp,
       update_config)
 
+  @staticmethod
+  def assert_in(dic, key, with_types, errors):
+    def type_repr(tps):
+      return ' '.join(typ.__name__ for typ in tps)
+    if key not in dic:
+      errors.append('Missing key %s in task dictionary' % key)
+    if with_types and not isinstance(dic[key], with_types):
+      errors.append('Value for key %s must be of type(s): %s, got %s' % (key, type_repr(with_types),
+          dic[key]))
+
+  @staticmethod
+  def fill_task_defaults(task_dict, errors):
+    if not isinstance(task_dict, dict):
+      errors.append('Task must be a dictionary!')
+      return
+
+    task_dict = task_dict.copy()
+
+    # optionals
+    task_dict['daemon'] = bool(task_dict.get('daemon', False))
+    task_dict['priority'] = int(task_dict.get('priority', 0))
+    task_dict['max_task_failures'] = int(task_dict.get('max_task_failures', 1))
+    task_dict['production'] = bool(task_dict.get('production', False))
+
+    # deprecated
+    if 'max_per_host' in task_dict:
+      print('WARNING: task.max_per_host is deprecated')
+    if 'avoid_jobs' in task_dict:
+      print('WARNING: task.avoid_jobs is deprecated')
+
+    # requires
+    MesosConfig.assert_in(task_dict, 'num_cpus', Compatibility.numeric, errors)
+    MesosConfig.assert_in(task_dict, 'ram_mb', Compatibility.integer, errors)
+    MesosConfig.assert_in(task_dict, 'disk_mb', Compatibility.integer, errors)
+    MesosConfig.assert_in(task_dict, 'start_command', Compatibility.string, errors)
+    task_dict['num_cpus'] = float(task_dict['num_cpus'])
+    return task_dict
 
   @staticmethod
   def fill_defaults(config):
@@ -121,20 +153,13 @@ class MesosConfig(ProxyConfig):
     Returns the job configurations found in the configuration object.
     """
 
-    DEFAULT_BATCH_SIZE = 3
-    DEFAULT_RESTART_THRESHOLD = 30
-    DEFAULT_WATCH_SECS = 30
-    DEFAULT_MAX_PER_SHARD_FAILURE = 0
-    DEFAULT_MAX_TOTAL_FAILURE = 0
-    if 'jobs' not in config and isinstance(config['jobs'], list):
+    if 'jobs' not in config or not isinstance(config['jobs'], list):
       raise MesosConfig.InvalidConfig(
         'Configuration must define a python list named "jobs"')
 
-    job_dicts = config['jobs']
     jobs = {}
-    has_errors = False
 
-    for job in job_dicts:
+    for job in config['jobs']:
       errors = []
       if 'name' not in job:
         errors.append('Missing required option: name')
@@ -150,38 +175,21 @@ class MesosConfig(ProxyConfig):
       else:
         if 'role' not in job:
           errors.append('Must specify role.')
+
       if 'task' not in job:
         errors.append('Missing required option: task')
-      elif not isinstance(job['task'], dict):
-        errors.append('Task configuration must be a python dictionary.')
-      if 'start_command' not in job['task']:
-        errors.append('Task must have start_command.')
+      job['task'] = MesosConfig.fill_task_defaults(job['task'], errors)
 
       if errors:
         raise MesosConfig.InvalidConfig('Invalid configuration: %s\n' % '\n'.join(errors))
 
       # Default to a single instance.
-      if 'instances' not in job:
-        job['instances'] = 1
-
-      if 'cron_schedule' not in job:
-        job['cron_schedule'] = ''
-
-      update_config = job.get('update_config', {})
-      if not 'batchSize' in update_config:
-        update_config['batchSize'] = DEFAULT_BATCH_SIZE
-      if not 'restartThreshold' in update_config:
-        update_config['restartThreshold'] = DEFAULT_RESTART_THRESHOLD
-      if not 'watchSecs' in update_config:
-        update_config['watchSecs'] = DEFAULT_WATCH_SECS
-      if not 'maxPerShardFailures' in update_config:
-        update_config['maxPerShardFailures'] = DEFAULT_MAX_PER_SHARD_FAILURE
-      if not 'maxTotalFailures' in update_config:
-        update_config['maxTotalFailures'] = DEFAULT_MAX_TOTAL_FAILURE
-      job['updateConfig'] = update_config
+      job['instances'] = int(job.get('instances', 1))
+      job['cron_schedule'] = job.get('cron_schedule', '')
+      job['cron_collision_policy'] = job.get('cron_collision_policy', 'KILL_EXISTING')
+      job['update_config'] = MesosConfig.get_update_config(job)
       jobs[job['name']] = job
     return jobs
-
 
   def __init__(self, filename, name=None):
     """Loads a job configuration from a file and validates it.

@@ -3,15 +3,16 @@ import getpass
 import json
 import sys
 
-from pystachio import Ref, Environment
+from pystachio import Empty, Environment, Ref
 from twitter.common.dirutil import safe_open
 from twitter.common.lang import Compatibility
 from twitter.mesos.config.schema import (
+  MesosContext,
   MesosJob,
-  MesosTaskInstance,
-  MesosContext)
+  MesosTaskInstance
+)
+
 from twitter.thermos.config.loader import ThermosTaskWrapper
-from twitter.mesos.proxy_config import ProxyConfig
 from gen.twitter.mesos.ttypes import (
   CronCollisionPolicy,
   Identity,
@@ -19,6 +20,9 @@ from gen.twitter.mesos.ttypes import (
   TwitterTaskInfo,
   UpdateConfig,
 )
+
+from .base import ThriftCodec
+from .proxy_config import ProxyConfig
 
 
 SCHEMA_PREAMBLE = """
@@ -93,14 +97,22 @@ class PystachioConfig(ProxyConfig):
 
     MB = 1024 * 1024
     task = TwitterTaskInfo()
+    # job components
     task.jobName = job.name().get()
+    task.production = bool(job.production().get())
+    task.isDaemon = bool(job.daemon().get())
+    task.maxTaskFailures = job.max_task_failures().get()
+    task.priority = job.priority().get()
+    if job.has_health_check_interval_secs():
+      task.healthCheckIntervalSecs = job.health_check_interval_secs().get()
+    # task components
     task.numCpus = task_raw.resources().cpu().get()
     task.ramMb = task_raw.resources().ram().get() / MB
     task.diskMb = task_raw.resources().disk().get() / MB
-    task.maxTaskFailures = task_raw.max_failures().get()
     task.owner = owner
     task.requestedPorts = ThermosTaskWrapper(task_raw, strict=False).ports()
-    task.constraints = set()
+    task.constraints = ThriftCodec.constraints_to_thrift(
+      job.constraints().get() if job.constraints() is not Empty else {})
 
     # Replicate task objects to reflect number of instances.
     tasks = []
@@ -121,8 +133,8 @@ class PystachioConfig(ProxyConfig):
     update.batchSize = job.update_config().batch_size().get()
     update.restartThreshold = job.update_config().restart_threshold().get()
     update.watchSecs = job.update_config().watch_secs().get()
-    update.maxPerShardFailures = job.update_config().failures_per_shard().get()
-    update.maxTotalFailures = job.update_config().total_failures().get()
+    update.maxPerShardFailures = job.update_config().max_per_shard_failures().get()
+    update.maxTotalFailures = job.update_config().max_total_failures().get()
 
     # NOTE: Un-interpolated vars are dangerous only when they are not going
     # to be provided by the thermos context!

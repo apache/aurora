@@ -1,13 +1,14 @@
 import exceptions
 import pytest
 import unittest
-from twitter.mesos.parsers.mesos_config import MesosConfig
+
+from twitter.mesos.parsers.base import ThriftCodec
 
 def test_parsing_constraints():
   constraints_dict = {
     'int': '2',
   }
-  c = MesosConfig.constraints_to_thrift(constraints_dict).pop()
+  c = ThriftCodec.constraints_to_thrift(constraints_dict).pop()
   assert c.name == 'int'
   assert c.constraint.value.negated == False
   assert c.constraint.value.values == set(['2'])
@@ -16,7 +17,7 @@ def test_parsing_constraints():
   constraints_dict = {
     '!str': '!foo',
   }
-  c = MesosConfig.constraints_to_thrift(constraints_dict).pop()
+  c = ThriftCodec.constraints_to_thrift(constraints_dict).pop()
   assert c.name == '!str'
   assert c.constraint.value.negated == True
   assert c.constraint.value.values == set(['foo'])
@@ -25,7 +26,7 @@ def test_parsing_constraints():
   constraints_dict = {
     'set': '1,2,3,a,b,c',
   }
-  c = MesosConfig.constraints_to_thrift(constraints_dict).pop()
+  c = ThriftCodec.constraints_to_thrift(constraints_dict).pop()
   assert c.name == 'set'
   assert c.constraint.value.negated == False
   assert c.constraint.value.values == set(['1', '2', '3', 'a', 'b', 'c'])
@@ -33,7 +34,7 @@ def test_parsing_constraints():
   constraints_dict = {
     '!set': '!1,2,3,a,b,c',
   }
-  c = MesosConfig.constraints_to_thrift(constraints_dict).pop()
+  c = ThriftCodec.constraints_to_thrift(constraints_dict).pop()
   assert c.name == '!set'
   assert c.constraint.value.negated == True
   assert c.constraint.value.values == set(['1', '2', '3', 'a', 'b', 'c'])
@@ -42,7 +43,7 @@ def test_parsing_constraints():
   constraints_dict = {
     'limit': 'limit:4',
   }
-  c = MesosConfig.constraints_to_thrift(constraints_dict).pop()
+  c = ThriftCodec.constraints_to_thrift(constraints_dict).pop()
   assert c.name == 'limit'
   assert c.constraint.limitConstraint.limit == 4
 
@@ -50,4 +51,4 @@ def test_parsing_constraints():
     'limit': 'limit:a',
   }
   with pytest.raises(exceptions.ValueError):
-    constraints = MesosConfig.constraints_to_thrift(constraints_dict)
+    constraints = ThriftCodec.constraints_to_thrift(constraints_dict)

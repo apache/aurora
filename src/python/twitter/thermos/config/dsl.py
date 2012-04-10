@@ -41,3 +41,9 @@ def with_schedule(task, *constraints):
   existing_constraints = task.constraints() if task.has_constraints() else []
   return task(constraints = existing_constraints + new_constraints)
 
+
+def in_order(processes):
+  constraints = []
+  for k in range(1, len(processes)):
+    constraints.append(ProcessPair(first = processes[k-1].name(), second = processes[k].name()))
+  return [ProcessConstraint(ordered = constraints)]
