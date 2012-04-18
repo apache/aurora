@@ -31,6 +31,7 @@ python_tests(name = 'gc_executor',
 python_tests(name = 'thermos_executor',
   sources = ['test_thermos_executor.py'],
   soft_dependencies = True,
+  timeout = Amount(5, Time.MINUTES),
   dependencies = [
     pants('src/python/twitter/pants:pants-lib'),
     pants('src/python/twitter/common/app'),
