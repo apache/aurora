@@ -2,7 +2,7 @@ python_test_suite(name = 'all',
   dependencies = [
     pants(':sandbox_manager'),
     pants(':gc_executor'),
-    pants(':thermos_executor'),
+#   pants(':thermos_executor'),
   ]
 )
 
@@ -28,6 +28,14 @@ python_tests(name = 'gc_executor',
   ]
 )
 
+"""
+TODO(wickman): This test is currently broken because
+test_thermos_executor.py shells out to pants in order to build thermos_run,
+but this means that two pants must run in parallel, which no longer works
+due to 3a7957f2c2f68c8cd841d69781ab90e35aea6acb.
+
+http://jira.local.twitter.com/browse/MESOS-584
+
 python_tests(name = 'thermos_executor',
   sources = ['test_thermos_executor.py'],
   soft_dependencies = True,
@@ -42,3 +50,4 @@ python_tests(name = 'thermos_executor',
     pants('src/python/twitter/mesos/executor:thermos_executor_lib'),
   ]
 )
+"""
