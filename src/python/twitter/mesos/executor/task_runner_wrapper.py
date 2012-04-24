@@ -130,7 +130,7 @@ class TaskRunnerWrapper(object):
     """Bind to the process tree of a Thermos task and kill it with impunity."""
     try:
       runner = TaskRunner(self._task, self._checkpoint_root, self._sandbox.root(), self._task_id)
-      runner.kill()
+      runner.kill(force=True)
     except TaskRunner.Error as e:
       log.error('Could not quitquitquit runner: %s' % e)
 

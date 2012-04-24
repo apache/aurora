@@ -58,9 +58,18 @@ class DirectorySandbox(SandboxBase):
     return os.path.exists(self._dir)
 
   def create(self, mesos_task):
+    import grp, pwd
     if mesos_task.has_layout():
       log.warning('DirectorySandbox got task with layout! %s' % mesos_task.layout())
+    log.debug('DirectorySandbox: mkdir %s' % self._dir)
     safe_mkdir(self._dir)
+    user = mesos_task.role().get()
+    pwent = pwd.getpwnam(user)
+    grent = grp.getgrgid(pwent.pw_gid)
+    log.debug('DirectorySandbox: chown %s:%s %s' % (user, grent.gr_name, self._dir))
+    os.chown(self._dir, pwent.pw_uid, pwent.pw_gid)
+    log.debug('DirectorySandbox: chmod 700 %s' % self._dir)
+    os.chmod(self._dir, 0700)
 
   def destroy(self):
     safe_rmtree(self._dir)

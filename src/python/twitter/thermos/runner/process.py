@@ -177,7 +177,8 @@ class ProcessBase(object):
     if ckpt_fp in (None, False):
       raise ProcessBase.CheckpointError('Could not acquire checkpoint permission or lock for %s!' %
         self.ckpt_file())
-    self._ckpt_head = ckpt_fp.tell()
+    self._ckpt_head = os.path.getsize(self.ckpt_file())
+    ckpt_fp.seek(self._ckpt_head)
     self._ckpt = ThriftRecordWriter(ckpt_fp)
     self._ckpt.set_sync(True)
 
@@ -205,6 +206,11 @@ class ProcessBase(object):
               checkpoint.process_status.state != ProcessState.FORKED or
               checkpoint.process_status.fork_time != self._fork_time or
               checkpoint.process_status.coordinator_pid != self._pid):
+            self._log('Losing control of the checkpoint stream:')
+            self._log('   fork_time [%s] vs self._fork_time [%s]' % (
+                checkpoint.process_status.fork_time, self._fork_time))
+            self._log('   coordinator_pid [%s] vs self._pid [%s]' % (
+                checkpoint.process_status.coordinator_pid, self._pid))
             raise ProcessBase.CheckpointError('Lost control of the checkpoint stream!')
           self._log('Taking control of the checkpoint stream at record: %s' %
             checkpoint.process_status)
