@@ -18,6 +18,7 @@ from twitter.mesos.clusters import Cluster
 from twitter.mesos.client_wrapper import MesosClientAPI, MesosHelper
 from twitter.mesos.parsers.mesos_config import MesosConfig
 from twitter.mesos.parsers.pystachio_config import PystachioConfig
+from twitter.mesos.parsers.pystachio_codec import PystachioCodec
 from twitter.thermos.base.options import add_binding_to
 
 from gen.twitter.mesos.ttypes import (
@@ -61,25 +62,27 @@ def synthesize_url(cluster, scheduler=None, role=None, job=None):
     return urljoin(scheduler_url, 'scheduler/job?role=%s&job=%s' % (role, job))
 
 
-def choose_cluster(config):
-  cmdline_cluster = app.get_options().cluster
-  if config.cluster() and cmdline_cluster and config.cluster() != cmdline_cluster:
-    log.error(
-      """Warning: --cluster and the cluster in your configuration do not match.
-         Using the cluster specified on the command line. (cluster = %s)""" % cmdline_cluster)
-  return cmdline_cluster or config.cluster()
 
 
-def get_config(jobname, config_file, new_mesos, is_json, bindings=None):
+def get_config(jobname, config_file):
   """Returns the proxy config."""
-  if new_mesos:
-    loader = PystachioConfig.load_json if is_json else PystachioConfig.load
-    config = loader(config_file, jobname, bindings)
-  else:
-    assert not is_json, "--json only supported with pystachio jobs"
-    config = MesosConfig(config_file, jobname)
-  return config
 
+  options = app.get_options()
+  config_type, is_json = options.config_type, options.json
+  bindings = getattr(options, 'bindings', [])
+
+  if is_json:
+    assert config_type == 'thermos', "--json only supported with thermos jobs"
+
+  if config_type == 'mesos':
+    return MesosConfig(config_file, jobname)
+  elif config_type == 'thermos':
+    loader = PystachioConfig.load_json if is_json else PystachioConfig.load
+    return loader(config_file, jobname, bindings)
+  elif config_type == 'auto':
+    return PystachioCodec(config_file, jobname)
+  else:
+    raise ValueError('Unknown config type %s!' % config_type)
 
 def check_and_log_response(resp):
   log.info('Response from scheduler: %s (message: %s)'
@@ -134,12 +137,15 @@ class MesosCLI(cmd.Cmd):
   def do_create(self, *line):
     """create job config"""
     (jobname, config_file) = line
-    config = get_config(jobname, config_file, self.options.new_mesos, self.options.json,
-                        getattr(self.options, 'bindings', None))
-    api = MesosClientAPI(cluster=choose_cluster(config), verbose=self.options.verbose)
+    config = get_config(jobname, config_file)
+    if self.options.cluster is not None:
+      log.warning('Deprecation warning: config cluster with --cluster is no longer supported.')
+      assert self.options.cluster == config.cluster(), (
+          'Command line --cluster and config file cluster do not match.')
+    api = MesosClientAPI(cluster=config.cluster(), verbose=self.options.verbose)
     resp = api.create_job(config, self.options.copy_app_from)
     check_and_log_response(resp)
-    self.handle_open(choose_cluster(config), api.scheduler(), config.role(), config.name())
+    self.handle_open(config.cluster(), api.scheduler(), config.role(), config.name())
 
   @requires.nothing
   def do_open(self, *args):
@@ -161,11 +167,10 @@ class MesosCLI(cmd.Cmd):
   def do_inspect(self, *line):
     """inspect job config"""
     (jobname, config_file) = line
-    config = get_config(jobname, config_file, self.options.new_mesos, self.options.json,
-                         getattr(self.options, 'bindings', None))
+    config = get_config(jobname, config_file)
+    cluster = Cluster.get(config.cluster())
     if self.options.copy_app_from and config.hdfs_path():
-      log.info('Detected HDFS package: %s' % config.hdfs_path())
-      log.info('Would copy to %s via %s.' % (self.cluster(), self.proxy()))
+      log.info('Would copy HDFS package to: %s' % config.hdfs_path())
     log.info('Parsed job config: %s' % config.job())
 
   @requires.exactly('role', 'job')
@@ -242,10 +247,8 @@ class MesosCLI(cmd.Cmd):
   def do_update(self, *line):
     """update job config"""
     (jobname, config_file) = line
-    config = get_config(jobname, config_file, self.options.new_mesos, self.options.json,
-                        getattr(self.options, 'bindings', None))
-
-    api = MesosClientAPI(cluster=choose_cluster(config), verbose=self.options.verbose)
+    config = get_config(jobname, config_file)
+    api = MesosClientAPI(cluster=config.cluster(), verbose=self.options.verbose)
     resp = api.update_job(config, self.options.copy_app_from)
     check_and_log_response(resp)
 
@@ -327,18 +330,20 @@ The subcommands and their arguments are:
   app.add_option('-q', dest='quiet', default=False, action='store_true',
                   help='Minimum logging. (default: %default)')
   app.add_option('--cluster', dest='cluster', default=None,
-                  help="Cluster to launch the job in (e.g. sjc1, smf1-prod, smf1-nonprod)."
-                        " NOTE: If specified, this option overrides the cluster specified "
-                        "in the config file. ")
+                  help='Cluster to use for commands that do not take configuration, '
+                       'e.g. kill, start_cron, get_quota.')
   app.add_option('-o', '--open_browser', dest='open_browser', action='store_true', default=False,
                  help="Open a browser window to the job page after a job mutation.")
   app.add_option('--copy_app_from', dest='copy_app_from', default=None,
                   help="Local path to use for the app (will copy to the cluster)"
                        " (default: %default)")
-  app.add_option('-n', '--new_mesos', default=False, action='store_true',
-                 help="Run jobs configured using the new mesos config format.")
+  app.add_option('-c', '--config_type', type='choice', action='store', dest='config_type',
+                 choices=['mesos', 'thermos', 'auto'], default='mesos',
+                 help='The type of the configuration file supplied.  Options are `mesos`, the '
+                      'new `thermos` format, or `auto`, which automatically converts from '
+                      'mesos to thermos configs.')
   app.add_option('-j', '--json', default=False, action='store_true',
-                 help="Jobs are written in json.")
+                 help="If specified, configuration is read in JSON format.")
   app.add_option('-E', type='string', nargs=1, action='callback', default=[], metavar='NAME:VALUE',
                  callback=add_binding_to('bindings'), dest='bindings',
                  help='bind an environment name to a value.')

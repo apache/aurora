@@ -36,6 +36,7 @@ class MesosTaskInstance(Struct):
   layout   = Layout
   instance = Required(Integer)
   role     = Required(String)
+  health_check_interval_secs = Integer
 
 @Provided(mesos=MesosContext)
 class MesosJob(Struct):
@@ -55,4 +56,5 @@ class MesosJob(Struct):
   max_task_failures = Default(Integer, 1)
   production        = Default(Integer, 0)  # boolean
   priority          = Default(Integer, 0)
+
   health_check_interval_secs = Integer

@@ -1,25 +1,25 @@
-import re
+from pystachio import Map, String
 
-from pystachio import List, Map, String
-from twitter.thermos.config.dsl import in_order
-from twitter.thermos.config.schema import (
-  Process,
-  ProcessConstraint,
-  ProcessPair,
-  Resources,
-  Task,
-)
+from twitter.mesos.clusters import Cluster
 from twitter.mesos.config.schema import (
   MesosJob,
   UpdateConfig,
 )
+from twitter.thermos.config.dsl import in_order
+from twitter.thermos.config.schema import (
+  Process,
+  Resources,
+  Task,
+)
+
 from .base import EntityParser
 from .mesos_config import MesosConfig
+from .pystachio_thrift import convert as convert_pystachio_to_thrift
 
 
-class ThermosCodec(MesosConfig):
+class PystachioCodec(MesosConfig):
   def __init__(self, filename, name=None):
-    super(ThermosCodec, self).__init__(filename, name)
+    super(PystachioCodec, self).__init__(filename, name)
 
   def build_constraints(self):
     return Map(String, String)(self._config.get('constraints', {}))
@@ -63,6 +63,7 @@ class ThermosCodec(MesosConfig):
     cfg = self._config
     job_dict = dict(
       name = self.name(),
+      role = cfg['role'],
       instances = cfg['instances'],
       task = self.build_task(),
       cron_schedule = cfg['cron_schedule'],
@@ -75,4 +76,7 @@ class ThermosCodec(MesosConfig):
       priority = cfg['task']['priority'])
     if cfg['task'].get('health_check_interval_secs'):
       job_dict['health_check_interval_secs'] = cfg['task']['health_check_interval_secs']
-    return MesosJob(job_dict)
+    return MesosJob(job_dict) % Cluster.get(cfg['cluster']).context()
+
+  def job(self):
+    return convert_pystachio_to_thrift(self.build())

@@ -16,7 +16,7 @@ from twitter.mesos.config.schema import (
   MesosJob,
   UpdateConfig as pyUpdateConfig,
 )
-from twitter.mesos.parsers.pystachio_config import PystachioConfig
+from twitter.mesos.parsers.pystachio_thrift import convert as convert_pystachio_to_thrift
 from twitter.thermos.config.schema import (
   Process,
   Resources,
@@ -38,7 +38,7 @@ HELLO_WORLD = MesosJob(
 
 
 def test_simple_config():
-  job = PystachioConfig.pystachio_to_thrift(HELLO_WORLD)
+  job = convert_pystachio_to_thrift(HELLO_WORLD)
   assert len(job.taskConfigs) == 1
   tti = iter(job.taskConfigs).next()
 
@@ -70,7 +70,7 @@ def test_simple_config():
 
 def test_config_with_nondefault_update_config():
   hwc = HELLO_WORLD(update_config = pyUpdateConfig(watch_secs = 60))
-  job = PystachioConfig.pystachio_to_thrift(hwc)
+  job = convert_pystachio_to_thrift(hwc)
   assert job.updateConfig == thriftUpdateConfig(
     batchSize = 1,
     restartThreshold = 30,
@@ -91,7 +91,7 @@ def test_config_with_options():
       'cpu': 'x86_64'
     }
   )
-  job = PystachioConfig.pystachio_to_thrift(hwc)
+  job = convert_pystachio_to_thrift(hwc)
   assert len(job.taskConfigs) == 1
   tti = iter(job.taskConfigs).next()
 
@@ -122,7 +122,7 @@ def test_config_with_ports():
       ]
     )
   )
-  job = PystachioConfig.pystachio_to_thrift(hwc)
+  job = convert_pystachio_to_thrift(hwc)
   assert len(job.taskConfigs) == 1
   tti = iter(job.taskConfigs).next()
   assert tti.requestedPorts == set(['http', 'admin'])

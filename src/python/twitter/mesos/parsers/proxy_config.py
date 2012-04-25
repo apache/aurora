@@ -7,6 +7,11 @@ class ProxyConfig(object):
     pass
 
   @abstractmethod
+  def job(self):
+    """Return the JobConfiguration representation of this job."""
+    pass
+
+  @abstractmethod
   def name(self):
     pass
 

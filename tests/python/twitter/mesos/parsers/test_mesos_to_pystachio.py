@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from twitter.common.contextutil import temporary_file
 from twitter.mesos.clusters import Cluster
 from twitter.mesos.config.schema import UpdateConfig
-from twitter.mesos.parsers.mesos_codec import ThermosCodec
+from twitter.mesos.parsers.pystachio_codec import PystachioCodec
 from twitter.thermos.config.schema import Resources, Process, Task
 
 from pystachio import String, Integer, Map, Empty
@@ -34,7 +34,7 @@ def temporary_config(config):
 
 def convert(config):
   with temporary_config(config) as fp:
-    codec = ThermosCodec(fp.name)
+    codec = PystachioCodec(fp.name)
     return codec.build() % Cluster.get(config['cluster']).context()
 
 
