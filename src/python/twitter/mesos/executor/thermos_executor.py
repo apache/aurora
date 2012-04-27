@@ -11,7 +11,6 @@ import time
 
 # mesos
 import mesos
-import mesos_pb2 as mesos_pb
 
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
@@ -26,8 +25,9 @@ from twitter.mesos.executor.executor_base import ThermosExecutorBase
 
 # thrifts
 from gen.twitter.mesos.ttypes import AssignedTask
-from gen.twitter.thermos.ttypes import TaskState
 from thrift.TSerialization import deserialize as thrift_deserialize
+
+from .status_manager import StatusManager
 
 # TODO(wickman) When chickadee is ready on mesos machines, scribe to Chickadee instead.
 app.configure(module='twitter.common.app.modules.scribe_exception_handler',
@@ -43,85 +43,12 @@ else:
   RUNNER_CLASS = ProductionTaskRunner
 
 
-class ExecutorPollingThread(threading.Thread):
-  POLL_WAIT = Amount(500, Time.MILLISECONDS)
-  WAIT_LIMIT = Amount(1, Time.MINUTES)
-
-  def __init__(self, runner, driver, task_id):
-    self._driver = driver
-    self._runner = runner
-    self._task_id = task_id
-    threading.Thread.__init__(self)
-
-  def run(self):
-    # wait for the runner process to finish
-    while self._runner.is_alive():
-      time.sleep(ExecutorPollingThread.POLL_WAIT.as_(Time.SECONDS))
-
-    log.info('Executor polling thread got runner termination signal.')
-
-    # TODO(wickman) MESOS-438
-    #
-    # There is a legit race condition here.  If we catch the is_alive latch
-    # down at exactly the right time, there are no proper waits to wait for
-    # rebinding to the executor by a third party killing process.
-    #
-    # While kills in production should be rare, we should monitor the
-    # task_state for 60 seconds until it is in a terminal state. If it never
-    # reaches a terminal state, then we could either:
-    #    1) issue the kills ourself and send a LOST message
-    # or 2) send a rebind_task call to the executor and have it attempt to
-    #       re-take control of the executor.  perhaps with a max bind
-    #       limit before going with route #1.
-    wait_limit = ExecutorPollingThread.WAIT_LIMIT
-    while wait_limit > Amount(0, Time.SECONDS):
-      current_state = self._runner.task_state()
-      log.info('Waiting for terminal state, current state: %s' %
-        TaskState._VALUES_TO_NAMES.get(current_state, '(unknown)'))
-      if ThermosExecutor.thermos_status_is_terminal(current_state):
-        log.info('Terminal reached, breaking')
-        break
-      time.sleep(ExecutorPollingThread.POLL_WAIT.as_(Time.SECONDS))
-      wait_limit -= ExecutorPollingThread.POLL_WAIT
-
-    last_state = self._runner.task_state()
-    log.info("State we've accepted: %s" % TaskState._VALUES_TO_NAMES.get(last_state, '(unknown)'))
-    finish_state = None
-    if last_state == TaskState.ACTIVE:
-      log.error("Runner is dead but task state unexpectedly ACTIVE!")
-      self._runner.quitquitquit()
-      finish_state = mesos_pb.TASK_LOST
-      log.info('Sending LOST')
-    elif last_state == TaskState.SUCCESS:
-      finish_state = mesos_pb.TASK_FINISHED
-      log.info('Sending FINISHED')
-    elif last_state == TaskState.FAILED:
-      finish_state = mesos_pb.TASK_FAILED
-      log.info('Sending FAILED')
-    elif last_state == TaskState.KILLED:
-      finish_state = mesos_pb.TASK_KILLED
-      log.info('Sending KILLED')
-    else:
-      log.error("Unknown task state! %s" % TaskState._VALUES_TO_NAMES.get(last_state, '(unknown)'))
-      finish_state = mesos_pb.TASK_FAILED
-
-    update = mesos_pb.TaskStatus()
-    update.task_id.value = self._task_id
-    update.state = finish_state
-    log.info('Sending terminal state update.')
-    self._driver.sendStatusUpdate(update)
-
-    # the executor is ephemeral and we just submitted a terminal task state, so shutdown
-    log.info('Stopping executor.')
-    self._driver.stop()
-
-
 class ThermosExecutor(ThermosExecutorBase):
   def __init__(self, runner_class=RUNNER_CLASS):
     ThermosExecutorBase.__init__(self)
     self._runner = None
     self._task_id = None
-    self._poller = None
+    self._manager = None
     self._runner_class = runner_class
 
   @staticmethod
@@ -187,8 +114,8 @@ class ThermosExecutor(ThermosExecutorBase):
     log.debug('Task started.')
     self.send_update(driver, self._task_id, 'RUNNING')
 
-    self._poller = ExecutorPollingThread(self._runner, driver, self._task_id)
-    self._poller.start()
+    self._manager = StatusManager(self._runner, driver, self._task_id, portmap.get('health'))
+    self._manager.start()
 
   def killTask(self, driver, task_id):
     self.log('killTask() got task_id: %s' % task_id)
@@ -204,7 +131,6 @@ class ThermosExecutor(ThermosExecutorBase):
     log.info('Issuing kills.')
     self._runner.kill()
     self._runner.quitquitquit()
-
 
   def shutdown(self, driver):
     self.log('shutdown()')

@@ -108,7 +108,7 @@ class TestThermosExecutor(object):
       te.launchTask(proxy_driver, make_task(hello_world()))
       while te._runner.is_alive():
         time.sleep(0.1)
-      te._poller.join()
+      te._manager.join()
 
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
@@ -148,7 +148,7 @@ class TestThermosExecutor(object):
       assert runner is not None
       runner.kill(force=True)
 
-      te._poller.join()
+      te._manager.join()
 
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3

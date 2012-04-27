@@ -25,6 +25,19 @@ python_library(
 )
 
 python_library(
+  name = 'status_manager',
+  sources = ['http_signaler.py', 'health_checker.py', 'status_manager.py'],
+  dependencies = [
+    pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/common/lang'),
+    pants('src/python/twitter/common/quantity'),
+    pants('3rdparty/python.twitter:mesos-latest'),
+    pants('src/thrift/com/twitter/thermos:py-thrift'),
+    pants(':thermos_executor_base')
+  ]
+)
+
+python_library(
   name = 'thermos_executor_base',
   sources = ['executor_base.py'],
   dependencies = [
@@ -42,6 +55,7 @@ python_library(
   name = 'thermos_executor_lib',
   sources = ['thermos_executor.py'],
   dependencies = [
+    pants(':status_manager'),
     pants(':task_runner_wrapper'),
     pants(':thermos_executor_base'),
     pants('src/python/twitter/common/app'),

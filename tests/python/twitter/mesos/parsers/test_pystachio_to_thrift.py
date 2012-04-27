@@ -62,7 +62,7 @@ def test_simple_config():
   assert tti.requestedPorts == set()
   assert tti.production == False
   assert tti.priority == 0
-  assert tti.healthCheckIntervalSecs is None
+  assert tti.healthCheckIntervalSecs == 30
   assert tti.maxTaskFailures == 1
   assert tti.shardId == 0
   assert tti.constraints == set()

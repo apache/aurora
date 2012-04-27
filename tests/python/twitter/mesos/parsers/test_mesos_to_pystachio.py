@@ -59,7 +59,7 @@ def test_simple_config():
   assert job.production() == Integer(0)
   assert job.priority() == Integer(0)
   assert job.max_task_failures() == Integer(1)
-  assert job.health_check_interval_secs() == Empty
+  assert job.health_check_interval_secs() == Integer(30)
   assert job.task() == Task(
     name = job.name(),
     resources = Resources(cpu = 0.1, ram = 64 * 1048576, disk = 64 * 1048576),

@@ -56,5 +56,4 @@ class MesosJob(Struct):
   max_task_failures = Default(Integer, 1)
   production        = Default(Integer, 0)  # boolean
   priority          = Default(Integer, 0)
-
-  health_check_interval_secs = Integer
+  health_check_interval_secs = Default(Integer, 30)
