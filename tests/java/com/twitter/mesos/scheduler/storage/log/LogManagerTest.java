@@ -3,7 +3,11 @@ package com.twitter.mesos.scheduler.storage.log;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
+import java.util.Deque;
+import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedBlockingDeque;
 
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
@@ -47,6 +51,7 @@ import com.twitter.mesos.scheduler.storage.log.LogManager.StreamManager.StreamTr
 import static org.easymock.EasyMock.aryEq;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertNull;
@@ -60,6 +65,16 @@ public class LogManagerTest extends EasyMockTest {
 
   private static final Amount<Integer, Data> NO_FRAMES_EVER_SIZE =
       Amount.of(Integer.MAX_VALUE, Data.GB);
+
+  private static final Function<LogEntry, byte[]> ENCODE = new Function<LogEntry, byte[]>() {
+    @Override public byte[] apply(LogEntry entry) {
+      try {
+        return encode(entry);
+      } catch (CodingException e) {
+        throw new RuntimeException(e);
+      }
+    }
+  };
 
   private Stream stream;
   private Position position1;
@@ -299,6 +314,94 @@ public class LogManagerTest extends EasyMockTest {
 
     Position position = transaction.commit();
     assertSame(position1, position);
+  }
+
+  @Test
+  public void testConcurrentWrites() throws Exception {
+    control.replay(); // No easymock expectations used here
+
+    Op op1 = Op.removeJob(new RemoveJob("job1"));
+    final Op op2 = Op.removeJob(new RemoveJob("job2"));
+
+    LogEntry transaction1 = createLogEntry(op1);
+    LogEntry transaction2 = createLogEntry(op2);
+
+    final CountDownLatch message1Started = new CountDownLatch(1);
+
+    Message message1 = frame(transaction1);
+    Message message2 = frame(transaction2);
+
+    List<byte[]> expectedAppends =
+        ImmutableList.<byte[]>builder()
+            .add(encode(message1.header))
+            .addAll(Iterables.transform(message1.chunks, ENCODE))
+            .add(encode(message2.header))
+            .addAll(Iterables.transform(message2.chunks, ENCODE))
+            .build();
+
+    final Deque<byte[]> actualAppends = new LinkedBlockingDeque<byte[]>();
+
+    Stream mockStream = new Stream() {
+      @Override
+      public Position append(byte[] contents) throws StreamAccessException {
+        actualAppends.addLast(contents);
+        message1Started.countDown();
+        try {
+          // If a chunked message is not properly serialized to the log, this sleep all but ensures
+          // interleaved chunk writes and a test failure.
+          Thread.sleep(100);
+        } catch (InterruptedException e) {
+          throw new RuntimeException(e);
+        }
+        return null;
+      }
+
+      @Override
+      public Iterator<Entry> readAll() throws InvalidPositionException, StreamAccessException {
+        throw new UnsupportedOperationException();
+      }
+
+      @Override
+      public void truncateBefore(Position position)
+          throws InvalidPositionException, StreamAccessException {
+        throw new UnsupportedOperationException();
+      }
+
+      @Override
+      public void close() throws IOException {
+        // noop
+      }
+    };
+
+    final StreamManager streamManager = new StreamManager(mockStream, message1.chunkSize);
+    StreamTransaction tr1 = streamManager.startTransaction();
+    tr1.add(op1);
+
+    Thread snapshotThread = new Thread() {
+      @Override public void run() {
+        StreamTransaction tr2 = streamManager.startTransaction();
+        tr2.add(op2);
+        try {
+          message1Started.await();
+          tr2.commit();
+        } catch (CodingException e) {
+          throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+          throw new RuntimeException(e);
+        }
+      }
+    };
+    snapshotThread.setDaemon(true);
+    snapshotThread.start();
+
+    tr1.commit();
+
+    snapshotThread.join();
+
+    assertEquals(expectedAppends.size(), actualAppends.size());
+    for (byte[] expectedData : expectedAppends) {
+      assertArrayEquals(expectedData, actualAppends.removeFirst());
+    }
   }
 
   @Test

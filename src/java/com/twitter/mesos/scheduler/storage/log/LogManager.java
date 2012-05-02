@@ -114,6 +114,7 @@ final class LogManager {
     }
     private final Vars vars = new Vars();
 
+    private final Object writeMutex = new Object();
     private final Stream stream;
     private final int maxEntrySizeBytes;
     private final MessageDigest messageDigest;
@@ -262,13 +263,15 @@ final class LogManager {
     @Timed("scheduler_log_append")
     private Position appendAndGetPosition(LogEntry logEntry) throws CodingException {
       Position firstPosition = null;
-      byte[] fullEntry = encode(logEntry);
-      for (byte[] entry : createEntries(fullEntry)) {
-        Position position = stream.append(entry);
-        if (firstPosition == null) {
-          firstPosition = position;
+      byte[][] entries = createEntries(encode(logEntry));
+      synchronized (writeMutex) { // ensure all sub-entries are written as a unit
+        for (byte[] entry : entries) {
+          Position position = stream.append(entry);
+          if (firstPosition == null) {
+            firstPosition = position;
+          }
+          vars.bytesWritten.addAndGet(entry.length);
         }
-        vars.bytesWritten.addAndGet(entry.length);
       }
       vars.entriesWritten.incrementAndGet();
       return firstPosition;
