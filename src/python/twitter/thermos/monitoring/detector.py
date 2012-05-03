@@ -50,7 +50,7 @@ class TaskDetector(object):
         process, run = path_re.match(path).groups()
       except:
         continue
-      yield process, run
+      yield process, int(run)
 
   def get_process_logs(self, task_id):
     for process, run in self.get_process_runs(task_id):

@@ -12,7 +12,8 @@ from pystachio import Ref
 
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
-from twitter.common.dirutil import du
+from twitter.common.dirutil import du, tail_f
+from twitter.common.dirutil import tail as tail_closed
 from twitter.common.quantity import Amount, Time, Data
 from twitter.common.quantity.parse_simple import parse_time, parse_data
 from twitter.common.recordio import ThriftRecordReader
@@ -27,6 +28,7 @@ from twitter.thermos.config.schema import (
 from twitter.thermos.runner import TaskRunner
 from twitter.thermos.monitoring.detector import TaskDetector
 from twitter.thermos.monitoring.garbage import TaskGarbageCollector, DefaultCollector
+from twitter.thermos.monitoring.monitor import TaskMonitor
 
 from gen.twitter.thermos.ttypes import (
   ProcessState,
@@ -464,6 +466,66 @@ def status(args, options):
       for task_id in finished_task_ids:
         format_task(task_id)
       print()
+
+
+@app.command
+@app.command_option("--stderr", default=False, dest='use_stderr', action='store_true',
+                    help="Tail stderr instead of stdout")
+def tail(args, options):
+  """Tail the logs of a task process.
+
+    Usage: thermos tail task_name [process_name]
+  """
+  if len(args) == 0:
+    app.error('Expected a task to tail, got nothing!')
+  if len(args) not in (1, 2):
+    app.error('Expected at most two arguments (task and optional process), got %d' % len(args))
+
+  detector = TaskDetector(root = options.root)
+  process_runs = [(process, run) for (process, run) in detector.get_process_runs(args[0])]
+  if len(args) == 2:
+    process_runs = [(process, run) for (process, run) in process_runs if process == args[1]]
+
+  if len(process_runs) == 0:
+    print('ERROR: No processes found.', file=sys.stderr)
+    sys.exit(1)
+
+  processes = set([process for process, _ in process_runs])
+  if len(processes) != 1:
+    print('ERROR: More than one process matches query.', file=sys.stderr)
+    sys.exit(1)
+
+  process = processes.pop()
+  run = max([run for _, run in process_runs])
+
+  logdir = TaskPath(root = options.root, task_id = args[0], process = process,
+     run = run).getpath('process_logdir')
+  logfile = os.path.join(logdir, 'stderr' if options.use_stderr else 'stdout')
+
+  monitor = TaskMonitor(TaskPath(root = options.root), args[0])
+  def log_is_active():
+    active_processes = monitor.get_active_processes()
+    for process_status, process_run in active_processes:
+      if process_status.process == process and process_run == run:
+        return True
+    return False
+
+  if not log_is_active():
+    print('Tail of terminal log %s' % logfile)
+    for line in tail_closed(logfile):
+      print(line.rstrip())
+    return
+
+  now = time.time()
+  next_check = now + 5.0
+  print('Tail of active log %s' % logfile)
+  for line in tail_f(logfile, include_last=True, forever=False):
+    print(line.rstrip())
+    if time.time() > next_check:
+      if not log_is_active():
+        break
+      else:
+        next_check = time.time() + 5.0
 
 
 @app.command
