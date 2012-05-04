@@ -3,6 +3,7 @@ package com.twitter.mesos.scheduler;
 import com.google.common.collect.ImmutableSet;
 
 import org.easymock.Capture;
+import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -21,6 +22,7 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.SessionKey;
 import com.twitter.mesos.gen.SetQuotaResponse;
+import com.twitter.mesos.gen.StartUpdateResponse;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.auth.SessionValidator;
@@ -69,6 +71,21 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     CreateJobResponse response = thriftInterface.createJob(job, SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
+  }
+
+  @Test
+  public void testInvalidStartUpdate() throws Exception {
+    JobConfiguration job = makeJob();
+    expectAuth(ROLE, true);
+
+    // Get tasks returns a set of tasks in UPDATING/ROLLBACK when queried for in start update.
+    expect(scheduler.getTasks(EasyMock.<TaskQuery>anyObject()))
+        .andReturn(ImmutableSet.of(new ScheduledTask()));
+
+    control.replay();
+
+    StartUpdateResponse response = thriftInterface.startUpdate(job, SESSION);
+    assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
 
   @Test

@@ -236,12 +236,13 @@ public class StateManagerImplTest extends EasyMockTest {
             ImmutableList.of(ASSIGNED, RUNNING, PREEMPTING),
             ImmutableList.of(ASSIGNED, RUNNING, RESTARTING),
             ImmutableList.of(ASSIGNED, RUNNING, KILLING),
-            ImmutableList.of(ASSIGNED, RUNNING, UPDATING));
+            ImmutableList.of(ASSIGNED, RUNNING, UPDATING),
+            ImmutableList.of(ASSIGNED, RUNNING, UPDATING, ROLLBACK));
 
     driver.killTask(EasyMock.<String>anyObject());
-    // Three extra kills that are encountered while transition during test prep:
-    // PREEMPTING, RESTARTING, KILLING, UPDATING.
-    expectLastCall().times(testCases.size() + 4);
+    // Six extra kills that are encountered while transition during test prep:
+    // PREEMPTING, RESTARTING, KILLING, UPDATING, (UPDATING, ROLLBACK).
+    expectLastCall().times(testCases.size() + 6);
 
     control.replay();
 

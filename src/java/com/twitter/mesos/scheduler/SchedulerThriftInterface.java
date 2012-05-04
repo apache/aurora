@@ -57,6 +57,8 @@ import static com.twitter.mesos.gen.ResponseCode.AUTH_FAILED;
 import static com.twitter.mesos.gen.ResponseCode.INVALID_REQUEST;
 import static com.twitter.mesos.gen.ResponseCode.OK;
 import static com.twitter.mesos.gen.ResponseCode.WARNING;
+import static com.twitter.mesos.gen.ScheduleStatus.ROLLBACK;
+import static com.twitter.mesos.gen.ScheduleStatus.UPDATING;
 
 /**
  * Mesos scheduler thrift server implementation.
@@ -293,12 +295,23 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     checkNotNull(job);
     checkNotNull(session);
 
-    LOG.info("Received update request for tasks: " + Tasks.jobKey(job));
+    String jobKey = Tasks.jobKey(job);
+    LOG.info("Received update request for tasks: " + jobKey);
     StartUpdateResponse response = new StartUpdateResponse();
     try {
       sessionValidator.checkAuthenticated(session, job.getOwner().getRole());
     } catch (AuthFailedException e) {
       response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
+      return response;
+    }
+
+    // If any tasks for the job are already in UPDATING or ROLLBACK, this call should be rejected.
+    TaskQuery query =
+        new TaskQuery().setJobKey(jobKey).setStatuses(ImmutableSet.of(UPDATING, ROLLBACK));
+    if (!getTasksStatus(query).getTasks().isEmpty()) {
+      response
+          .setResponseCode(INVALID_REQUEST)
+          .setMessage("Update/Rollback already in progress for " + jobKey);
       return response;
     }
 
@@ -327,7 +340,7 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     try {
       schedulerCore.updateShards(role, jobName, shards, updateToken);
       response.setResponseCode(UpdateResponseCode.OK).
-          setMessage("Successful update of shards: " + shards);
+          setMessage("Successfully started update of shards: " + shards);
     } catch (ScheduleException e) {
       response.setResponseCode(UpdateResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
     }
@@ -348,7 +361,7 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     try {
       schedulerCore.rollbackShards(role, jobName, shards, updateToken);
       response.setResponseCode(UpdateResponseCode.OK)
-          .setMessage("Successful rollback of shards: " + shards);
+          .setMessage("Successfully started rollback of shards: " + shards);
     } catch (ScheduleException e) {
       response.setResponseCode(UpdateResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
     }

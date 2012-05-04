@@ -100,7 +100,8 @@ public class StateManagerImpl implements StateManager {
           ScheduleStatus.PREEMPTING,
           ScheduleStatus.RESTARTING,
           ScheduleStatus.KILLING,
-          ScheduleStatus.UPDATING));
+          ScheduleStatus.UPDATING,
+          ScheduleStatus.ROLLBACK));
 
   private static final Function<TaskUpdateConfiguration, Integer> GET_SHARD =
       new Function<TaskUpdateConfiguration, Integer>() {

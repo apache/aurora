@@ -115,15 +115,20 @@ class Updater(object):
     """
     log.info('Reverting update for %s' % shards_to_rollback)
     shards_to_rollback.sort()
+    failed_shards = []
     while shards_to_rollback:
       batch_shards = shards_to_rollback[0 : update_config.batchSize]
       shards_to_rollback = list(set(shards_to_rollback) - set(batch_shards))
       resp = self._scheduler.rollbackShards(self._role, self._job_name, batch_shards,
           self._update_token, self._session)
-      self.watch_shards(batch_shards, update_config.restartThreshold, update_config.watchSecs)
-      log.log(debug_if(resp == UpdateResponseCode.OK),
+      log.log(debug_if(resp.responseCode == UpdateResponseCode.OK),
         'Response from scheduler: %s (message: %s)'
           % (UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
+      failed_shards += self.watch_shards(batch_shards, update_config.restartThreshold,
+          update_config.watchSecs)
+
+    if failed_shards:
+      log.error('Rollback failed for shards: %s' % failed_shards)
 
   def restart_shards(self, shard_ids):
     """Performs a scheduler call for restart.
