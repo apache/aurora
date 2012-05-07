@@ -1358,6 +1358,24 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.startUpdate(job);
   }
 
+  @Test(expected = ScheduleException.class)
+  public void testInvalidStartUpdate() throws Exception {
+    expectKillTask(1);
+    control.replay();
+    buildScheduler();
+
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, 1);
+    scheduler.createJob(job);
+
+    changeStatus(queryByOwner(OWNER_A), ASSIGNED);
+    changeStatus(queryByOwner(OWNER_A), STARTING);
+    changeStatus(queryByOwner(OWNER_A), RUNNING);
+    scheduler.startUpdate(job);
+    changeStatus(queryByOwner(OWNER_A), UPDATING);
+
+    scheduler.startUpdate(job);
+  }
+
   @Test
   public void testFinishUpdateNotFound() throws Exception {
     control.replay();

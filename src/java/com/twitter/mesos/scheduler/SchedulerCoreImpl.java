@@ -51,6 +51,8 @@ import static com.twitter.mesos.Tasks.jobKey;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
+import static com.twitter.mesos.gen.ScheduleStatus.ROLLBACK;
+import static com.twitter.mesos.gen.ScheduleStatus.UPDATING;
 import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.CONSTRUCTED;
 import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.INITIALIZED;
 import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.STANDING_BY;
@@ -74,6 +76,12 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
           return copy;
         }
       };
+
+  private static final Predicate<ScheduledTask> IS_UPDATING = new Predicate<ScheduledTask>() {
+    @Override public boolean apply(ScheduledTask task) {
+      return task.getStatus() == UPDATING || task.getStatus() == ROLLBACK;
+    }
+  };
 
   private final CronJobManager cronScheduler;
 
@@ -434,6 +442,12 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
 
     Set<ScheduledTask> existingTasks =
         stateManager.fetchTasks(Query.activeQuery(Tasks.jobKey(job)));
+
+    // Reject if any existing task for the job is in UPDATING/ROLLBACK
+    if (Iterables.any(existingTasks, IS_UPDATING)) {
+      throw new ScheduleException("Update/Rollback already in progress for " + Tasks.jobKey(job));
+    }
+
     if (!existingTasks.isEmpty()) {
       Quota currentJobQuota =
           Quotas.fromTasks(Iterables.transform(existingTasks, Tasks.SCHEDULED_TO_INFO));

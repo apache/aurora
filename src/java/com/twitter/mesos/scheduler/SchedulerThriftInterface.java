@@ -57,8 +57,6 @@ import static com.twitter.mesos.gen.ResponseCode.AUTH_FAILED;
 import static com.twitter.mesos.gen.ResponseCode.INVALID_REQUEST;
 import static com.twitter.mesos.gen.ResponseCode.OK;
 import static com.twitter.mesos.gen.ResponseCode.WARNING;
-import static com.twitter.mesos.gen.ScheduleStatus.ROLLBACK;
-import static com.twitter.mesos.gen.ScheduleStatus.UPDATING;
 
 /**
  * Mesos scheduler thrift server implementation.
@@ -295,23 +293,12 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     checkNotNull(job);
     checkNotNull(session);
 
-    String jobKey = Tasks.jobKey(job);
-    LOG.info("Received update request for tasks: " + jobKey);
+    LOG.info("Received update request for tasks: " + Tasks.jobKey(job));
     StartUpdateResponse response = new StartUpdateResponse();
     try {
       sessionValidator.checkAuthenticated(session, job.getOwner().getRole());
     } catch (AuthFailedException e) {
       response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
-      return response;
-    }
-
-    // If any tasks for the job are already in UPDATING or ROLLBACK, this call should be rejected.
-    TaskQuery query =
-        new TaskQuery().setJobKey(jobKey).setStatuses(ImmutableSet.of(UPDATING, ROLLBACK));
-    if (!getTasksStatus(query).getTasks().isEmpty()) {
-      response
-          .setResponseCode(INVALID_REQUEST)
-          .setMessage("Update/Rollback already in progress for " + jobKey);
       return response;
     }
 
