@@ -653,7 +653,13 @@ class TaskRunner(object):
           self._set_task_status(TaskState.FAILED)
           break
 
-        for process_name in runnable:
+        def pick_processes(process_list):
+          if self._task.max_concurrency() == Integer(0):
+            return process_list
+          num_to_pick = max(self._task.max_concurrency().get() - len(running), 0)
+          return process_list[:num_to_pick]
+
+        for process_name in pick_processes(runnable):
           if process_name not in self._task_processes:
             self._set_process_status(process_name, ProcessState.WAITING, 0)
 

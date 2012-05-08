@@ -71,3 +71,32 @@ class TestRunnerBasic(RunnerTestBase):
       for run in self.state.processes[process]:
         assert run.fork_time < run.start_time
         assert run.start_time < run.stop_time
+
+
+
+class TestConcurrencyBasic(RunnerTestBase):
+  @classmethod
+  def task(cls):
+    hello_template = Process(cmdline = "sleep 1")
+    tsk = Task(
+      name = "complex",
+      processes = [hello_template(name = "process1"),
+                   hello_template(name = "process2"),
+                   hello_template(name = "process3")],
+      resources = Resources(cpu = 1.0, ram = 16*1024*1024, disk = 16*1024),
+      max_concurrency = 1)
+    return tsk
+
+  def test_runner_state_success(self):
+    assert self.state.statuses[-1].state == TaskState.SUCCESS
+
+  # TODO(wickman)  This needs a better test.
+  def test_runner_processes_separated_temporally_due_to_concurrency_limit(self):
+    runs = []
+    for process in self.state.processes:
+      assert len(self.state.processes[process]) == 1, 'Expect one run per task'
+      assert self.state.processes[process][0].state == ProcessState.SUCCESS
+      runs.append(self.state.processes[process][0].start_time)
+    runs.sort()
+    assert runs[1] - runs[0] > 1.0
+    assert runs[2] - runs[1] > 1.0
