@@ -8,7 +8,7 @@ import tempfile
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 from twitter.common.contextutil import temporary_file
-from twitter.common.dirutil import chmod_plus_x
+from twitter.common.dirutil import chmod_plus_x, safe_rmtree
 from twitter.common.http.mirror_file import MirrorFile
 
 from twitter.thermos.base.path import TaskPath
@@ -27,7 +27,6 @@ app.add_option("--checkpoint_root", dest="checkpoint_root", metavar="PATH",
 
 
 class TaskRunnerWrapper(object):
-  TEMPDIR = None
   PEX_NAME = 'thermos_run.pex'
 
   class TaskError(Exception):
@@ -48,8 +47,6 @@ class TaskRunnerWrapper(object):
     self._checkpoint_root = checkpoint_root or app.get_options().checkpoint_root
     self._enable_chroot = False
     self._role = role
-    if TaskRunnerWrapper.TEMPDIR is None:
-      TaskRunnerWrapper.TEMPDIR = tempfile.mkdtemp()
 
   @staticmethod
   def dump_task(task):
@@ -115,6 +112,9 @@ class TaskRunnerWrapper(object):
     """
     return self._popen is not None and self._popen.poll() is None
 
+  def cleanup(self):
+    pass
+
   def kill(self):
     """
       Kill the underlying runner process.  Returns True if killed, False if
@@ -140,16 +140,23 @@ class ProductionTaskRunner(TaskRunnerWrapper):
     TaskRunnerWrapper.__init__(self, task_id, mesos_task, *args, **kwargs)
     import pkg_resources
     import twitter.mesos.executor.resources
-    self._runner_pex = os.path.join(ProductionTaskRunner.TEMPDIR, TaskRunnerWrapper.PEX_NAME)
+    self._tempdir = tempfile.mkdtemp()
+    os.chmod(self._tempdir, 755)
+    self._runner_pex = os.path.join(self._tempdir, self.PEX_NAME)
     with open(self._runner_pex, 'w') as fp:
       fp.write(pkg_resources.resource_stream(twitter.mesos.executor.resources.__name__,
-        TaskRunnerWrapper.PEX_NAME).read())
+        self.PEX_NAME).read())
     if mesos_task.has_layout():
       self._sandbox = AppAppSandbox(task_id)
       self._enable_chroot = True
     else:
       self._sandbox = DirectorySandbox(task_id)
       self._enable_chroot = False
+
+  def cleanup(self):
+    if self._tempdir:
+      safe_rmtree(self._tempdir)
+      self._tempdir = None
 
 
 class AngrybirdTaskRunner(TaskRunnerWrapper):
@@ -158,6 +165,5 @@ class AngrybirdTaskRunner(TaskRunnerWrapper):
     self._angrybird_home = os.environ['ANGRYBIRD_HOME']
     self._sandbox_root = os.path.join(self._angrybird_home, 'logs/thermos/lib')
     self._checkpoint_root = os.path.join(self._angrybird_home, 'logs/thermos/run')
-    self._runner_pex = os.path.join(self._angrybird_home,
-        'science', 'dist', TaskRunnerWrapper.PEX_NAME)
+    self._runner_pex = os.path.join(self._angrybird_home, 'science', 'dist', self.PEX_NAME)
     self._sandbox = DirectorySandbox(task_id, self._sandbox_root)

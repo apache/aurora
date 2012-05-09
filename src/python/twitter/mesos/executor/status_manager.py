@@ -127,4 +127,5 @@ class StatusManager(threading.Thread):
 
     # the executor is ephemeral and we just submitted a terminal task state, so shutdown
     log.info('Stopping executor.')
+    self._runner.cleanup()
     self._driver.stop()

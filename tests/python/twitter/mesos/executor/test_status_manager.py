@@ -166,7 +166,11 @@ class MockRunner(object):
     self._task_state = TaskState.ACTIVE
     self._quit_state = TaskState.FAILED
     self._is_alive = True
+    self.cleaned = False
     self.qqq = threading.Event()
+
+  def cleanup(self):
+    self.cleaned = True
 
   def set_dead(self):
     self._is_alive = False
@@ -209,6 +213,7 @@ class TestStatusManager(unittest.TestCase):
     assert self.driver.stop_event.is_set()
     assert len(self.driver.updates) == 1
     assert self.driver.updates[0].state == mesos_pb.TASK_FAILED
+    assert self.runner.cleaned
 
   def test_task_goes_lost(self):
     class FastStatusManager(StatusManager):
@@ -223,6 +228,7 @@ class TestStatusManager(unittest.TestCase):
     assert self.driver.stop_event.is_set()
     assert len(self.driver.updates) == 1
     assert self.driver.updates[0].state == mesos_pb.TASK_LOST
+    assert self.runner.cleaned
 
   def test_unhealthy_task_overridden(self):
     class FastStatusManager(StatusManager):
@@ -247,3 +253,4 @@ class TestStatusManager(unittest.TestCase):
     assert len(self.driver.updates) == 1
     assert self.driver.updates[0].state == mesos_pb.TASK_FAILED
     assert self.driver.updates[0].message == 'Failed health check!'
+    assert self.runner.cleaned
