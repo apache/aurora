@@ -17,17 +17,7 @@ __author__ = 'William Farner'
 
 REMOTE_USER = 'mesos'
 
-TEST_CMD = './pants %s clean-all test'
-TEST_TARGETS = ['tests/java/com/twitter/mesos:all-tests!']
-
-BUILD_TARGET_CMDS = [
-  './pants src/java/com/twitter/mesos/scheduler! zip',
-  './pants src/java/com/twitter/mesos/executor! zip',
-  './pants src/python/twitter/mesos/executor:thermos_executor',
-  './pants src/python/twitter/thermos/bin:thermos_run',
-  './pants src/python/twitter/mesos:process_scraper',
-  './pants src/python/twitter/mesos/executor:gc_executor',
-]
+TEST_CMDS = ['./pants goal clean-all test tests/java/com/twitter/mesos:all']
 
 STAGE_DIR = '~/release_staging'
 
@@ -54,20 +44,44 @@ RELEASES_DIR = '%s/releases' % MESOS_HOME
 SCHEDULER_HTTP = 'http://localhost:8081'
 
 
+def get_cluster():
+  return Cluster.get(app.get_options().cluster)
+
+
 def get_cluster_dc():
-  return Cluster.get(app.get_options().cluster).dc
+  return get_cluster().dc
 
 
 def get_cluster_name():
-  return Cluster.get(app.get_options().cluster).local_name
+  return get_cluster().local_name
 
 
 def get_scheduler_role():
-  return Cluster.get(app.get_options().cluster).scheduler_role
+  return get_cluster().scheduler_role
 
 
 def cluster_is_colonized():
-  return Cluster.get(app.get_options().cluster).is_colonized
+  return get_cluster().is_colonized
+
+
+def get_hadoop_version():
+  return get_cluster().hadoop_version
+
+
+def get_hadoop_config():
+  return get_cluster().hadoop_config
+
+
+def get_build_target_commands():
+  return [
+    './pants goal bundle mesos:scheduler --bundle-archive=zip',
+    './pants goal bundle mesos:executor-%s --bundle-archive=zip' % get_hadoop_version(),
+    './pants src/python/twitter/mesos/executor:thermos_executor',
+    './pants src/python/twitter/thermos/bin:thermos_run',
+    './pants src/python/twitter/mesos:process_scraper',
+    './pants src/python/twitter/mesos/executor:gc_executor',
+  ]
+
 
 
 def get_scheduler_machines():
@@ -79,7 +93,7 @@ def get_scheduler_machines():
       role = cluster.scheduler_role
     )
     if cluster.is_colonized:
-      cmd = "colony 'membersOf audubon.role.%(role)s'" % params
+      cmd = "colony --server=colony.%(dc)s.twitter.com 'membersOf audubon.role.%(role)s'" % params
     else:
       cmd = 'loony --dc=%(dc)s --group=role:%(role)s --one-column' % params
 
@@ -109,7 +123,9 @@ def read_bool_stdin(prompt, default=None):
 
 def maybe_run_command(runner, cmd):
   if app.get_options().verbose or not app.get_options().really_push:
-    print '%s command: %s' % ('Executing' if app.get_options().really_push else 'Would run', ' '.join(cmd))
+    print '%s command: %s' % (
+      'Executing' if app.get_options().really_push else 'Would run', ' '.join(cmd)
+    )
   if app.get_options().really_push:
     return runner(cmd)
 
@@ -206,11 +222,11 @@ def thermos_postprocess():
 
 
 def build():
-  for test_target in TEST_TARGETS:
-    print 'Executing test target: %s' % test_target
-    check_call((TEST_CMD % test_target).split(' '))
-  for build_target_cmd in BUILD_TARGET_CMDS:
-    print 'Executing build target: %s' % build_target_cmd
+  for test_cmd in TEST_CMDS:
+    print 'Executing test command: %s' % test_cmd
+    check_call(test_cmd.split(' '))
+  for build_target_cmd in get_build_target_commands():
+    print 'Executing build command: %s' % build_target_cmd
     check_call(build_target_cmd.split(' '))
   thermos_postprocess()
 
@@ -233,16 +249,17 @@ def find_current_build(hosts):
         current_builds.add(current_build)
 
   current_builds = filter(bool, current_builds)
-  if not app.get_options().ignore_conflicting_builds and app.get_options().really_push and len(current_builds) != 1:
+  if (not app.get_options().ignore_conflicting_builds
+      and app.get_options().really_push
+      and len(current_builds) > 1):
     sys.exit('Found conflicting current builds: %s please resolve manually' % current_builds)
-  current_build = current_builds.pop() if app.get_options().really_push else None
+  current_build = current_builds.pop() if current_builds and app.get_options().really_push else None
   print 'Found current build: %s' % current_build
   return current_build
 
 
 def replace_hdfs_file(host, local_file, hdfs_path):
-  HADOOP_CONF_DIR = '/etc/hadoop/hadoop-conf-%s' % get_cluster_dc()
-  BASE_HADOOP_CMD = ['hadoop', '--config', HADOOP_CONF_DIR, 'fs']
+  BASE_HADOOP_CMD = ['hadoop', '--config', get_hadoop_config(), 'fs']
 
   remote_call(host, BASE_HADOOP_CMD + ['-mkdir', os.path.dirname(hdfs_path)])
   remote_call(host, BASE_HADOOP_CMD + ['-rm', hdfs_path])
@@ -498,7 +515,8 @@ def main(args, options):
   # Stage the build on all machines and shut all the schedulers down
   current_build = find_current_build(all_schedulers)
   new_build = stage_build(all_schedulers)
-  stop_scheduler(all_schedulers)
+  if current_build:
+    stop_scheduler(all_schedulers)
 
   # Point to the new build and start all schedulers up
   # TODO(John Sirois): support a rolling restart once multi-scheduler is used in all enviornments
