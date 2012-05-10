@@ -1,7 +1,6 @@
 package com.twitter.mesos.executor;
 
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -22,6 +21,7 @@ import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.mesos.JNICallback;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduleStatus;
@@ -53,6 +53,7 @@ public class MesosExecutorImpl implements Executor {
     this.shutdownRegistry = checkNotNull(shutdownRegistry);
   }
 
+  @JNICallback
   @Override
   public void init(ExecutorDriver executorDriver, ExecutorArgs executorArgs) {
     LOG.info("Initialized with driver " + executorDriver + " and args " + executorArgs);
@@ -70,6 +71,7 @@ public class MesosExecutorImpl implements Executor {
     return initialized.await(timeout.as(Time.MILLISECONDS), TimeUnit.MILLISECONDS);
   }
 
+  @JNICallback
   @Override
   public void launchTask(ExecutorDriver driverDoNotUse, TaskDescription task) {
     if (shuttingDown) {
@@ -99,12 +101,14 @@ public class MesosExecutorImpl implements Executor {
     executorCore.executeTask(assignedTask);
   }
 
+  @JNICallback
   @Override
   public void killTask(ExecutorDriver driverDoNotUse, TaskID taskID) {
     LOG.info("Received killTask request for " + taskID);
     executorCore.stopLiveTask(taskID.getValue());
   }
 
+  @JNICallback
   @Override
   public void shutdown(ExecutorDriver driverDoNotUse) {
     shuttingDown = true;
@@ -120,12 +124,14 @@ public class MesosExecutorImpl implements Executor {
     }
   }
 
+  @JNICallback
   @Override
   public void error(ExecutorDriver driver, int code, String message) {
     LOG.info("Error received with code: " + code + " and message: " + message);
     shutdown(driver);
   }
 
+  @JNICallback
   @Override
   public void frameworkMessage(ExecutorDriver driver, byte[] data) {
     if (data == null) {

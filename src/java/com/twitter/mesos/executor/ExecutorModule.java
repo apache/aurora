@@ -34,9 +34,11 @@ import com.twitter.common.args.constraints.Exists;
 import com.twitter.common.args.constraints.NotNull;
 import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
+import com.twitter.common.inject.TimedInterceptor;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common_internal.hadoop.HdfsUtils;
+import com.twitter.mesos.GuiceUtils;
 import com.twitter.mesos.executor.Driver.DriverImpl;
 import com.twitter.mesos.executor.FileCopier.HdfsFileCopier;
 import com.twitter.mesos.executor.FileDeleter.FileDeleterImpl;
@@ -98,10 +100,14 @@ public class ExecutorModule extends AbstractModule {
 
   @Override
   protected void configure() {
+    // Enable intercepted method timings and context classloader repair.
+    TimedInterceptor.bind(binder());
+    GuiceUtils.bindJNIContextClassLoader(binder());
 
     // Bindings needed for ExecutorMain.
     bind(File.class).annotatedWith(ExecutorRootDir.class).toInstance(TASK_ROOT_DIR.get());
     bind(Executor.class).to(MesosExecutorImpl.class).in(Singleton.class);
+    bind(DriverRunner.class).in(Singleton.class);
     bind(ExecutorCore.class).in(Singleton.class);
     bind(new TypeLiteral<Supplier<Iterable<Task>>>() {})
         .to(DeadTaskLoader.class).in(Singleton.class);

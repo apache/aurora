@@ -46,6 +46,7 @@ import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.common.zookeeper.ZooKeeperUtils;
 import com.twitter.common_internal.zookeeper.ZooKeeperModule;
+import com.twitter.mesos.GuiceUtils;
 import com.twitter.mesos.gen.MesosAdmin;
 import com.twitter.mesos.scheduler.Driver.DriverImpl;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHosts;
@@ -119,8 +120,9 @@ public class SchedulerModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    // Enable intercepted method timings
+    // Enable intercepted method timings and context classloader repair.
     TimedInterceptor.bind(binder());
+    GuiceUtils.bindJNIContextClassLoader(binder());
 
     bind(ExecutorID.class)
         .toInstance(ExecutorID.newBuilder().setValue(TWITTER_EXECUTOR_ID).build());

@@ -29,6 +29,7 @@ import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
+import com.twitter.mesos.JNICallback;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.comm.SchedulerMessage;
 
@@ -96,11 +97,13 @@ public class MesosSchedulerImpl implements Scheduler {
     registrationChecker.start();
   }
 
+  @JNICallback
   @Override
   public void slaveLost(SchedulerDriver schedulerDriver, SlaveID slaveId) {
     LOG.info("Received notification of lost slave: " + slaveId);
   }
 
+  @JNICallback
   @Override
   public void registered(final SchedulerDriver driver, FrameworkID fId) {
     LOG.info("Registered with ID " + fId);
@@ -118,6 +121,7 @@ public class MesosSchedulerImpl implements Scheduler {
     return Resources.from(offer).greaterThanOrEqual(Resources.from(task.getResourcesList()));
   }
 
+  @JNICallback
   @Timed("scheduler_resource_offers")
   @Override
   public void resourceOffers(SchedulerDriver driver, List<Offer> offers) {
@@ -157,11 +161,13 @@ public class MesosSchedulerImpl implements Scheduler {
     }
   }
 
+  @JNICallback
   @Override
   public void offerRescinded(SchedulerDriver schedulerDriver, OfferID offerID) {
     LOG.info("Offer rescinded but we don't care " + offerID);
   }
 
+  @JNICallback
   @Timed("scheduler_status_update")
   @Override
   public void statusUpdate(SchedulerDriver driver, TaskStatus status) {
@@ -181,12 +187,14 @@ public class MesosSchedulerImpl implements Scheduler {
     failedStatusUpdates.incrementAndGet();
   }
 
+  @JNICallback
   @Override
   public void error(SchedulerDriver driver, int code, String message) {
     LOG.severe("Received error message: " + message + " with code " + code);
     lifecycle.shutdown();
   }
 
+  @JNICallback
   @Timed("scheduler_framework_message")
   @Override
   public void frameworkMessage(SchedulerDriver driver, SlaveID slave, ExecutorID executor,
