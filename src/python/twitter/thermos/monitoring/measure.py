@@ -214,7 +214,9 @@ class TaskMeasurer(threading.Thread):
 
   def sample_by_task_id(self, task_id):
     with self._lock:
-      samples = [self._ps.aggregate(sample.pid) for tid, sample, _ in self._actives if tid == task_id]
+      samples = [
+          self._ps.aggregate(sample.pid) for tid, sample, _ in self._actives if tid == task_id]
+      log.debug('task_id samples: %s' % ' '.join(map(str, samples)))
       return sum(samples, ProcessSample.empty())
 
   def sample_by_process(self, task_id, process_name):

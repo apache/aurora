@@ -25,6 +25,14 @@
 <link rel="stylesheet"
       type="text/css"
       href="/assets/bootstrap.css"/>
+<style type="text/css">
+div.tight
+{
+  height:85%;
+  overflow-y:scroll;
+  overflow-x:auto;
+}
+</style>
 
 <title>log browser ${task_id}</title>
 
@@ -48,7 +56,7 @@
     % endif
   </div>
 
-  <div class="span16">
+  <div class="span12 tight">
 <pre>
 ${data}
 </pre>

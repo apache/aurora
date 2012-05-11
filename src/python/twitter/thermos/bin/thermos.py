@@ -278,11 +278,28 @@ def kill(args, options):
   """Kill task(s)
 
   Usage: thermos kill task_id1 [task_id2 ...]
+
+  Regular expressions may be used to match multiple tasks.
   """
+  import re
+
   if not args:
     print('Must specify tasks!', file=sys.stderr)
     return
-  for task_id in args:
+
+  detector = TaskDetector(root = options.root)
+  active_task_ids = [t_id for _, t_id in detector.get_task_ids(state='active')]
+  matched_tasks = set()
+  for task_expr in map(re.compile, args):
+    for task_id in active_task_ids:
+      if task_expr.match(task_id):
+        matched_tasks.add(task_id)
+
+  if not matched_tasks:
+    print('No tasks matched.')
+    return
+
+  for task_id in matched_tasks:
     runner = TaskRunner.get(task_id, options.root)
     if runner is None:
       print('Could not bind to %s!' % task_id, file=sys.stderr)

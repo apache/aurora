@@ -8,6 +8,7 @@
 <body>
 
 <%!
+ import socket
  import time
 
  def pretty_time(seconds):
@@ -15,49 +16,28 @@
 %>
 
 <div class="container">
-
-  <h3> task ${task_id} </h3>
-
-  <div class="row">
-    <div class="span6" id="leftBar">
-      <dl>
-        <dt> task </dt>
-          <dd> <strong> status </strong> ${status} </dd>
-          <dd> <strong> user </strong> ${user} </dd>
-      </dl>
-    </div>
-
-    <div class="span6" id="rightBar">
-      <dl>
-        <dt> header </dt>
-          <dd> <strong> chroot </strong> <a href="/browse/${task_id}">browse</a> </dd>
-          <dd> <strong> hostname </strong> <a href="/">${hostname}</a> </dd>
-          <dd> <strong> launch time </strong> ${pretty_time(launch_time)} </dd>
-      </dl>
-    </div>
-  </div>
+  <h3> host ${socket.gethostname()} </h3>
 
   <div class="content" id="defaultLayout">
-     <table class="table table-bordered table-condensed table-striped">
+     <table class="zebra-striped">
      <thead>
        <tr>
-         <th colspan=3> process </th>
-         <th colspan=2> time </th>
-         <th colspan=2> used </th>
-         <th colspan=2> logs </th>
+         <th colspan=3> task </th>
+         <th colspan=4> resources </th>
+         <th colspan=3> links </th>
        </tr>
 
        <tr>
-         <th> name </th> <th> run </th> <th> status </th> <th> started </th> <th> finished </th>
-         <th> cpu </th> <th> ram </th>
-         <th> stdout </th> <th> stderr </th>
+         <th> name </th> <th> role </th> <th> status </th>
+         <th> procs </th> <th> cpu </th> <th> ram </th> <th> disk </th>
+         <th> task </th> <th> chroot </th> <th> ports </th>
        </tr>
       </thead>
       <tbody>
 
       % for proc_name, proc in sorted(processes.items()):
        <tr>
-         <td> <a href="/process/${task_id}/${proc["process_name"]}">${proc["process_name"]}</a> </td>
+         <td> ${proc["process_name"]} </td>
          <td> ${proc["process_run"]} </td>
          <td> ${proc["state"]} </td>
          <td> ${pretty_time(float(proc["start_time"])/1000.0) if "start_time" in proc else ""} </td>

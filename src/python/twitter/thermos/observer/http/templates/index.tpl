@@ -5,33 +5,45 @@
       type="text/css"
       href="assets/bootstrap.css"/>
 
-<script src="assets/mootools-core.js"> </script>
-<script src="assets/observer.js"> </script>
+<script src="assets/jquery.js"></script>
 
 <body>
 
-<div id="topbar">task index</div>
-
-<div id="workspace">
-  <div class="fixed-container" id="defaultLayout">
-    <div id="activeTaskContainer">
+<div class="container" id="defaultLayout">
+  <div id="activeTaskContainer" class='uber-container'>
+    <div class="active-container" data-url="main/active">
     </div>
-    <br><br>
-    <div id="finishedTaskContainer">
+  </div>
+  <br><br>
+  <div id="finishedTaskContainer" class='uber-container'>
+    <div class="finished-container" data-url="main/finished">
     </div>
   </div>
 </div>
 
 <script type="text/javascript">
 
-onDomReady = function() {
-  activeTableManager = new TableManager('active')
-  finishedTableManager = new TableManager('finished')
-  $('activeTaskContainer').adopt(activeTableManager.element)
-  $('finishedTaskContainer').adopt(finishedTableManager.element)
+$(document).on('click', 'a.refresh-container', function(e) {
+   e.preventDefault()
+   topLevelDivContainer = $(this).closest('.uber-container')
+   divDataUrl = $(this).attr('data-url')
+   $.ajax({
+      'type': 'GET',
+      'dataType': 'html',
+      'url': divDataUrl,
+      success: function(data, xhr, err) {
+        $(topLevelDivContainer).html(data)
+      }
+   })
+ })
+
+refreshDivs = function() {
+  $('#activeTaskContainer').load($('.uber-container .active-container').attr('data-url'))
+  $('#finishedTaskContainer').load($('.uber-container .finished-container').attr('data-url'))
 }
 
-window.addEvent("domready", onDomReady)
+$(document).bind('ready', refreshDivs)
+setInterval(refreshDivs, 10000)
 
 </script>
 

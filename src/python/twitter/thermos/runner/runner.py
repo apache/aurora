@@ -183,6 +183,7 @@ class TaskRunnerTaskHandler(TaskStateHandler):
     assert is_active and not is_finished
     safe_mkdir(os.path.dirname(finished_task))
     os.rename(active_task, finished_task)
+    os.utime(finished_task, None)
 
   def on_success(self, task_update):
     log.debug('Task on_success' % task_update)
@@ -227,6 +228,7 @@ class TaskRunnerUniversalHandler(UniversalStateHandler):
 
   def on_initialization(self, header):
     log.debug('_on_initialization: %s' % header)
+    TaskRunner.assert_valid_task(self._runner.task, header.ports)
     self._runner._ckpt_write(RunnerCkpt(runner_header=header))
 
 
@@ -260,7 +262,8 @@ class TaskRunner(object):
       name = process.name().get()
       ThermosProcessWrapper.assert_valid_process_name(name)
     for port in ThermosTaskWrapper(task).ports():
-      assert port in portmap, 'Task requires unbound port %s!' % port
+      if port not in portmap:
+        raise TaskRunner.InvalidTaskError('Task requires unbound port %s!' % port)
     typecheck = task.check()
     if not typecheck.ok():
       raise TaskRunner.InvalidTaskError('Failed to fully evaluate task: %s' %
@@ -282,8 +285,9 @@ class TaskRunner(object):
     try:
       checkpoint = CheckpointDispatcher.from_file(task_checkpoint)
       return TaskRunner(task.tasks()[0].task(), checkpoint_root,
-        checkpoint.header.sandbox, task_id)
+        checkpoint.header.sandbox, task_id, portmap=checkpoint.header.ports)
     except Exception as e:
+      log.error('Failed to reconstitute checkpoint in TaskRunner.get: %s' % e)
       return None
 
   def __init__(self, task, checkpoint_root, sandbox,
@@ -306,9 +310,6 @@ class TaskRunner(object):
         clock (time interface) = the clock to use throughout
     """
     self._portmap = portmap or {}
-    # TODO(wickman)  Only do this assertion on taking control?  Instead warn initially then error.
-    TaskRunner.assert_valid_task(task, self._portmap)
-
     self._ckpt = None
     self._task = task
     self._task_processes = {}
@@ -347,6 +348,10 @@ class TaskRunner(object):
     # recover checkpointed runner state and update plan
     self._recovery = True
     self._replay_runner_ckpt()
+
+  @property
+  def task(self):
+    return self._task
 
   def state(self):
     return self._state

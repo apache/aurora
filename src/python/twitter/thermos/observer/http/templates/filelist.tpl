@@ -1,6 +1,7 @@
 <%doc>
  Template arguments:
    task_id
+   chroot
    path
    dirs
    files
@@ -25,6 +26,8 @@
 <html>
 
 <title>path browser for ${task_id}</title>
+
+% if chroot is not None:
 <body>
   <h3>${path}</h3>
   <div class="container">
@@ -44,5 +47,10 @@
     </table>
   </div>
 </body>
+% else:
+<body>
+  This task is running without a chroot.
+</body>
+% endif
 
 </html>

@@ -89,6 +89,26 @@ class BottleObserver(HttpServer, StaticAssets, BottleObserverMixins):
       hostname = socket.gethostname()
     )
 
+  @HttpServer.route("/main")
+  @HttpServer.route("/main/:type")
+  @HttpServer.route("/main/:type/:offset")
+  @HttpServer.route("/main/:type/:offset/:num")
+  @HttpServer.mako_view(HttpTemplate.load('main'))
+  def handle_main(self, type=None, offset=None, num=None):
+    if type not in (None, 'all', 'finished', 'active'):
+      return HttpServer.Response(status=404)
+    if offset is not None:
+      try:
+        offset = int(offset)
+      except:
+        return HttpServer.Response(status=404)
+    if num is not None:
+      try:
+        num = int(num)
+      except:
+        return HttpServer.Response(status=404)
+    return self._observer.main(type, offset, num)
+
   @HttpServer.route("/task/:task_id")
   @HttpServer.mako_view(HttpTemplate.load('task'))
   def handle_task(self, task_id):
@@ -112,3 +132,43 @@ class BottleObserver(HttpServer, StaticAssets, BottleObserverMixins):
       launch_time = state.get('launch_time', 0),
       hostname = state.get('hostname', 'localhost')
     )
+
+  @HttpServer.route("/process/:task_id/:process_id")
+  @HttpServer.mako_view(HttpTemplate.load('process'))
+  def handle_process(self, task_id, process_id):
+    all_processes = {}
+    current_run = self._observer.process(task_id, process_id)
+    if not current_run:
+      return HttpServer.Response(status=404)
+    process = self._observer.process_from_name(task_id, process_id)
+    if process is None:
+      log.error('Could not recover process: %s/%s' % (task_id, process_id))
+      return HttpServer.Response(status=404)
+
+    current_run_number = current_run['process_run']
+    all_processes[current_run_number] = current_run
+    for run in range(current_run_number):
+      all_processes[run] = self._observer.process(task_id, process_id, run)
+    def convert_process_tuple(run_tuple):
+      process_tuple = dict(state = run_tuple['state'])
+      if 'start_time' in run_tuple:
+        process_tuple.update(start_time = run_tuple['start_time'])
+      if 'stop_time' in run_tuple:
+        process_tuple.update(stop_time = run_tuple['stop_time'])
+      return process_tuple
+
+    template = {
+      'task_id': task_id,
+      'process': {
+         'name': process_id,
+         'status': all_processes[current_run_number]["state"],
+         'cmdline': process.cmdline().get()
+      },
+    }
+    template['process'].update(**all_processes[current_run_number].get('used', {}))
+    template['runs'] = dict((run, convert_process_tuple(run_tuple))
+        for run, run_tuple in all_processes.items())
+    log.info('Rendering template is: %s' % template)
+    return template
+
+

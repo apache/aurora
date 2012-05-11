@@ -1,5 +1,5 @@
 import threading
-from twitter.common.lang.synchronizable import Lockable
+from twitter.common.lang import Lockable
 from twitter.thermos.monitoring.monitor import TaskMonitor
 
 __author__ = 'wickman@twitter.com (brian wickman)'

@@ -27,10 +27,19 @@
 <link rel="stylesheet"
       type="text/css"
       href="/assets/bootstrap.css"/>
+<style type="text/css">
+div.tight
+{
+  height:85%;
+  overflow-y:scroll;
+  overflow-x:auto;
+}
+</style>
 
 <title>file browser ${task_id}</title>
 <body>
-  <div class="span16">
+ <div class="container">
+  <div class="span12">
     <strong> path </strong> ${filename}
   </div>
 
@@ -56,11 +65,12 @@
     % endif
   </div>
 
-  <div class="span16">
+  <div class="span12 tight">
 <pre>
 ${data}
 </pre>
   </div>
+</div>
 
 </body>
 </html>

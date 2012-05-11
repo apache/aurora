@@ -7,6 +7,7 @@ import threading
 from collections import defaultdict
 
 from twitter.common import log
+from twitter.common.lang import Lockable
 from twitter.common.recordio import ThriftRecordReader
 
 from twitter.thermos.monitoring.detector import TaskDetector
@@ -16,7 +17,6 @@ from twitter.thermos.monitoring.measure import TaskMeasurer
 from twitter.thermos.base.path import TaskPath
 from twitter.thermos.base.ckpt import CheckpointDispatcher
 
-
 from pystachio import Environment
 from twitter.thermos.config.schema import ThermosContext
 from twitter.thermos.config.loader import (
@@ -25,11 +25,10 @@ from twitter.thermos.config.loader import (
 
 from gen.twitter.thermos.ttypes import *
 
-
 __author__ = 'wickman@twitter.com (brian wickman)'
-__tested__ = False
 
-class TaskObserver(threading.Thread):
+
+class TaskObserver(threading.Thread, Lockable):
   """
     The task observer monitors the thermos checkpoint root for active/finished
     tasks.  It is used to be the oracle of the state of all thermos tasks on
@@ -44,14 +43,16 @@ class TaskObserver(threading.Thread):
   def __init__(self, root):
     self._pathspec = TaskPath(root = root)
     self._detector = TaskDetector(root)
-    self._muxer    = TaskMuxer(self._pathspec)
+    self._muxer = TaskMuxer(self._pathspec)
     self._measurer = TaskMeasurer(self._muxer)
     self._measurer.start()
-    self._states   = {}
-    self._actives  = set()  # set of active task_ids
+    self._states = {}
+    self._actives = set()   # set of active task_ids
     self._finishes = set()  # set of finished task_ids
-    self._tasks    = {}     # task_id => ThermosTask
+    self._tasks = {}        # task_id => ThermosTask
+    self._stat = {}         # task_id => mtime of task file
     threading.Thread.__init__(self)
+    Lockable.__init__(self)
     self.daemon = True
 
   def run(self):
@@ -60,36 +61,58 @@ class TaskObserver(threading.Thread):
       checkpoint root for new tasks, or transitions of tasks from active to
       finished state.
     """
-    total_seconds = 0
-
     while True:
       time.sleep(1)
-      total_seconds += 1
 
-      active_tasks   = [task_id for _, task_id in self._detector.get_task_ids(state='active')]
+      active_tasks = [task_id for _, task_id in self._detector.get_task_ids(state='active')]
       finished_tasks = [task_id for _, task_id in self._detector.get_task_ids(state='finished')]
-      for active in active_tasks:
-        if active in self._finishes:
-          log.error('Found an active (%s) in finished tasks?' % active)
-        if active not in self._actives:
-          self._actives.add(active)    # add to active list
-          self._muxer.add(active)      # add to checkpoint monitor
-          self._read_task(active)      # read and memoize ThermosTask object
-          log.debug('pid %s -> active' % active)
-      for finished in finished_tasks:
-        if finished in self._actives:
-          log.debug('pid %s active -> finished' % finished)
-          self._actives.remove(finished) # remove from actives
-          self._muxer.remove(finished)   # remove from checkpoint monitor
-        self._finishes.add(finished)
 
+      with self.lock:
+        for active in active_tasks:
+          if active in self._finishes:
+            log.error('Found an active (%s) in finished tasks?' % active)
+          if active not in self._actives:
+            self._actives.add(active)    # add to active list
+            self._muxer.add(active)      # add to checkpoint monitor
+            self._read_task(active)      # read and memoize ThermosTask object
+            self._stat[active] = self._get_stat(active)
+            log.debug('pid %s -> active' % active)
+        for finished in finished_tasks:
+          if finished in self._actives:
+            log.debug('pid %s active -> finished' % finished)
+            self._actives.remove(finished) # remove from actives
+            self._muxer.remove(finished)   # remove from checkpoint monitor
+          if finished not in self._stat:
+            self._stat[finished] = self._get_stat(finished)
+          self._finishes.add(finished)
+
+  def _get_stat(self, task_id):
+    ps = self._pathspec.given(task_id=task_id)
+    try:
+      return os.path.getmtime(ps.given(state='active').getpath('task_path'))
+    except OSError as e:
+      if e.errno != errno.ENOENT:
+        raise
+      return os.path.getmtime(ps.given(state='finished').getpath('task_path'))
+
+  @Lockable.sync
+  def process_from_name(self, task_id, process_id):
+    task = self._read_task(task_id)
+    if task is None:
+      return None
+    for process in task.processes():
+      if process.name().get() == process_id:
+        return process
+    return None
+
+  @Lockable.sync
   def _read_task(self, task_id):
     """
       Given a task id, read it.  Memoize already-read tasks.
     """
     task = self._tasks.get(task_id, None)
     if task:
-      return task.task()
+      return task
 
     task_id_map = {
       'active': self._actives,
@@ -104,10 +127,13 @@ class TaskObserver(threading.Thread):
           if task is None:
             log.error('Error reading ThermosTask from %s in observer.' % path)
           else:
+            context = self.context(task_id)
+            task = task.task() % Environment(thermos = context)
             self._tasks[task_id] = task
-            return task.task()
+            return task
     return None
 
+  @Lockable.sync
   def task_id_count(self):
     """
       Return the list of active and finished task_ids.
@@ -117,35 +143,51 @@ class TaskObserver(threading.Thread):
       finished = len(self._finishes)
     )
 
+  @Lockable.sync
   def task_ids(self, type=None, offset=None, num=None):
     """
       Return the list of task_ids in a browser-friendly format.
+      Task ids are sorted by interest:
+        - active tasks are sorted by start time
+        - finished tasks are sorted by completion time
 
       type = (all|active|finished|None) [default: all]
       offset = offset into the list of task_ids [default: 0]
       num = number of results to return [default: return rest]
-    """
-    task_idlist = []
-    if type is None or type == 'all':
-      task_idlist += self._actives
-      task_idlist += self._finishes
-    elif type == 'active':
-      task_idlist += self._actives
-    elif type == 'finished':
-      task_idlist += self._finishes
-    task_idlist.sort()
 
-    offset = offset if offset is not None else 0
+      Returns {
+        task_ids: [task_id_1, ..., task_id_N],
+        type: query type,
+        offset: next offset,
+        num: next num
+      }
+    """
+    num = num or 20
+    offset = offset or 0
+    type = type or 'all'
+
+    if type == 'all':
+      tids = list(self._actives) + list(self._finishes)
+    elif type == 'active':
+      tids = list(self._actives)
+    elif type == 'finished':
+      tids = list(self._finishes)
+    else:
+      raise ValueError('Unknown task type %s' % type)
+
+    tids = sorted([(tid, self._stat.get(tid, 0)) for tid in tids], key=lambda pair: pair[1],
+        reverse=True)
+
+    end = num
     if offset < 0:
-      if len(task_idlist) > abs(offset):
-        offset = offset % len(task_idlist)
-      else:
-        offset = 0
-    if num:
-      num += offset
+      offset = offset % len(tids) if len(tids) > abs(offset) else 0
+    end += offset
+
     return dict(
-      task_ids = task_idlist[offset:num]
-    )
+        task_ids=[v[0] for v in tids[offset:end]],
+        type=type,
+        offset=offset,
+        num=num)
 
   def context(self, task_id):
     state = self._state(task_id)
@@ -157,6 +199,7 @@ class TaskObserver(threading.Thread):
       user = state.header.user,
     )
 
+  @Lockable.sync
   def state(self, task_id):
     real_state = self._state(task_id)
     if real_state is None or real_state.header is None:
@@ -170,12 +213,13 @@ class TaskObserver(threading.Thread):
         user = real_state.header.user
       )
 
+  @Lockable.sync
   def _state(self, task_id):
     """
       Return the current runner state of a given task id
     """
     if task_id in self._actives:
-      # TODO(wickman)  Protect this call
+      print '_muxer.get_state(%s)' % task_id
       return self._muxer.get_state(task_id)
     elif task_id in self._states:
       # memoized finished state
@@ -183,11 +227,13 @@ class TaskObserver(threading.Thread):
     else:
       # unread finished state, let's read and memoize.
       path = self._pathspec.given(task_id = task_id).getpath('runner_checkpoint')
+      print 'Calling checkpoint dispatcher'
       self._states[task_id] = CheckpointDispatcher.from_file(path)
       return self._states[task_id]
     log.error(TaskObserver.UnexpectedError("Could not find task_id: %s" % task_id))
     return None
 
+  @Lockable.sync
   def _task_processes(self, task_id):
     """
       Return the processes of a task given its task_id.
@@ -195,6 +241,7 @@ class TaskObserver(threading.Thread):
       Returns a map from state to processes in that state, where possible
       states are: waiting, running, success, failed.
     """
+    print 'Task processes: %s' % task_id
     if task_id not in self._actives and task_id not in self._finishes:
       return {}
     state = self._state(task_id)
@@ -231,25 +278,44 @@ class TaskObserver(threading.Thread):
       killed = killed
     )
 
+  @Lockable.sync
+  def main(self, type=None, offset=None, num=None):
+    task_map = self.task_ids(type, offset, num)
+    task_ids = task_map['task_ids']
+    tasks = self.task(task_ids)
+    def task_row(tid):
+      task = tasks[tid]
+      return dict(
+          task_id=tid,
+          name=task['name'],
+          role=task['user'],
+          state=task['state'],
+          ports=task['ports'],
+          **task['resource_consumption'])
+    return dict(
+      tasks=map(task_row, task_ids),
+      type=task_map['type'],
+      offset=task_map['offset'],
+      num=task_map['num'])
+
+  def _sample(self, task_id):
+    sample = self._measurer.sample_by_task_id(task_id).to_dict()
+    sample['disk'] = 0
+    return sample
+
+  @Lockable.sync
   def _task(self, task_id):
     """
       Return composite information about a particular task task_id, given the below
       schema.
 
-      X denotes currently unimplemented fields.
-
       {
          task_id: string,
          name: string,
-         replica: int,
+         user: string,
          state: string [ACTIVE, SUCCESS, FAILED]
-      X  ports: { name1: 'url', name2: 'url2' }
-         resource_consumption: {cpu: , ram: , disk:}
-      X  timeline: {
-            axes: [ 'time', 'cpu', 'ram', 'disk'],
-            data: [ (1299534274324, 0.9, 1212492188, 493932999392),
-                    (1299534275327, 0.92, 23432423423, 52353252343), ... ]
-         }
+         ports: { name1: 'url', name2: 'url2' }
+         resource_consumption: { cpu:, ram:, disk: }
          processes: { -> names only
             waiting: [],
             running: [],
@@ -274,35 +340,32 @@ class TaskObserver(threading.Thread):
       # TODO(wickman)  Can this happen?
       return {}
 
-    context = self.context(task_id)
-    task = task % Environment(thermos = context)
-    sample = self._measurer.sample_by_task_id(task_id).to_dict()
-    sample['disk'] = 0
-    log.debug('Resource consumption (%s, *) => %s' % (task_id, sample))
-
     return dict(
        task_id = task_id,
        name = task.name().get(),
        state = TaskState._VALUES_TO_NAMES[state.statuses[-1].state],
        user = task.user().get(),
-       # ports
-       resource_consumption = sample,
-       # timeline
+       resource_consumption = self._sample(task_id),
+       ports = state.header.ports,
        processes = self._task_processes(task_id)
     )
 
+  @Lockable.sync
   def task(self, task_ids):
     """
       Return a map from task_id => task, given the task schema from _task.
     """
     return dict((task_id, self._task(task_id)) for task_id in task_ids)
 
+  @Lockable.sync
   def _get_process_resource_consumption(self, task_id, process_name):
+    print 'Sampling process for %s' % task_id
     sample = self._measurer.sample_by_process(task_id, process_name).to_dict()
     sample['disk'] = 0
     log.debug('Resource consumption (%s, %s) => %s' % (task_id, process_name, sample))
     return sample
 
+  @Lockable.sync
   def _get_process_tuple(self, history, run):
     """
       Return the basic description of a process run if it exists, otherwise
@@ -334,6 +397,7 @@ class TaskObserver(threading.Thread):
         d.update(stop_time = process_run.stop_time * 1000)
       return d
 
+  @Lockable.sync
   def process(self, task_id, process, run = None):
     """
       Returns a process run, where the schema is given below:
@@ -363,6 +427,7 @@ class TaskObserver(threading.Thread):
       tup.update(used = self._get_process_resource_consumption(task_id, process))
     return tup
 
+  @Lockable.sync
   def _processes(self, task_id):
     """
       Return
@@ -390,6 +455,7 @@ class TaskObserver(threading.Thread):
         d.update({ process_name: self.process(task_id, process_name) })
     return d
 
+  @Lockable.sync
   def processes(self, task_ids):
     """
       Given a list of task_ids, returns a map of task_id => processes, where processes
@@ -399,6 +465,7 @@ class TaskObserver(threading.Thread):
       return {}
     return dict((task_id, self._processes(task_id)) for task_id in task_ids)
 
+  @Lockable.sync
   def get_run_number(self, runner_state, process, run = None):
     if runner_state is not None:
       run = run if run is not None else -1
@@ -406,6 +473,7 @@ class TaskObserver(threading.Thread):
         if len(runner_state.processes[process]) > 0:
           return run % len(runner_state.processes[process])
 
+  @Lockable.sync
   def logs(self, task_id, process, run = None):
     """
       Given a task_id and a process and (optional) run number, return a dict:
@@ -444,6 +512,7 @@ class TaskObserver(threading.Thread):
       return (normalized_base, os.path.relpath(normalized, normalized_base))
     return (None, None)
 
+  @Lockable.sync
   def file_path(self, task_id, path):
     """
       Given a task_id and a path within that task_id's sandbox, verify:
@@ -464,6 +533,7 @@ class TaskObserver(threading.Thread):
         return chroot, path
     return None, None
 
+  @Lockable.sync
   def files(self, task_id, path = None):
     """
       Returns dictionary
@@ -482,6 +552,8 @@ class TaskObserver(threading.Thread):
       chroot = runner_state.header.sandbox
     except:
       return {}
+    if chroot is None:  # chroot-less job
+      return dict(task_id=task_id, chroot=None, path=None, dirs=None, files=None)
     chroot, path = self._sanitize_path(chroot, path)
     if chroot is None or path is None:
       return {}
