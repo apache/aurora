@@ -86,9 +86,11 @@ python_library(
     pants(':thermos_executor_base'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/common/process'),
     pants('src/python/twitter/common/quantity'),
     pants('src/python/twitter/mesos/config:schema'),
     pants('src/python/twitter/thermos/runner'),
+    pants('src/python/twitter/thermos/runner:inspector'),
     pants('src/python/twitter/thermos/monitoring:detector'),
     pants('src/python/twitter/thermos/monitoring:garbage'),
   ]

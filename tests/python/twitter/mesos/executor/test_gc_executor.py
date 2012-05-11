@@ -1,8 +1,12 @@
 from collections import defaultdict
+import os
+import time
 
 from thrift.TSerialization import serialize
 import mesos_pb2 as mesos
 
+from twitter.common.contextutil import temporary_dir
+from twitter.common.dirutil import safe_rmtree
 from twitter.common.quantity import Amount, Time, Data
 from gen.twitter.mesos.ttypes import ScheduleStatus
 from gen.twitter.mesos.comm.ttypes import AdjustRetainedTasks
@@ -23,13 +27,18 @@ class ProxyDriver(object):
 class ProxyRunner(object):
   def __init__(self):
     self._kills = set()
+    self._loses = set()
 
   def __call__(self, task_id, checkpoint_root):
     class AnonymousKiller(object):
       def kill(*args, **kw):
         self._kills.add(task_id)
+      def lose(*args, **kw):
+        self._loses.add(task_id)
     return AnonymousKiller()
 
+
+ACTIVE_TASKS = ('sleep60-lost',)
 
 FINISHED_TASKS = {
   'failure': ProcessState.SUCCESS,
@@ -55,24 +64,36 @@ class TestThermosGCExecutor(ThermosGCExecutor):
     self._task_garbage_collections.add(task_id)
 
 
+def setup_tree(td, lose=False):
+  import shutil
+  safe_rmtree(td)
+  shutil.copytree('tests/resources/com/twitter/thermos/root', td)
+  if lose:
+    lost_age = time.time() - (
+      2 * TestThermosGCExecutor.MAX_CHECKPOINT_TIME_DRIFT.as_(Time.SECONDS))
+    os.utime(os.path.join(td, 'checkpoints/sleep60-lost/runner'), (lost_age, lost_age))
+
+
 def test_state_reconciliation():
   proxy_runner = ProxyRunner()
   proxy_driver = ProxyDriver()
 
-  tgce = TestThermosGCExecutor(
-    max_age=Amount(10**10, Time.DAYS),
-    max_space=Amount(10**10, Data.GB),
-    max_tasks=10**10,
-    task_runner_factory=proxy_runner,
-    checkpoint_root='tests/resources/com/twitter/thermos/root')
+  with temporary_dir() as td:
+    setup_tree(td, lose=False)
+    tgce = TestThermosGCExecutor(
+      max_age=Amount(10**10, Time.DAYS),
+      max_space=Amount(10**10, Data.GB),
+      max_tasks=10**10,
+      task_runner_factory=proxy_runner,
+      checkpoint_root='tests/resources/com/twitter/thermos/root')
 
-  art = AdjustRetainedTasks(retainedTasks = {
-    'does_not_exist': ScheduleStatus.RUNNING,
-    'failure': ScheduleStatus.FAILED,
-    'ordering': ScheduleStatus.FINISHED
-  })
+    art = AdjustRetainedTasks(retainedTasks = {
+      'does_not_exist': ScheduleStatus.RUNNING,
+      'failure': ScheduleStatus.FAILED,
+      'ordering': ScheduleStatus.FINISHED
+    })
 
-  tgce.launchTask(proxy_driver, serialize_art(art))
+    tgce.launchTask(proxy_driver, serialize_art(art))
 
   assert len(proxy_driver.method_calls['sendStatusUpdate']) == 1
   assert len(proxy_driver.method_calls['sendStatusUpdate'][0]) == 2 # args, kw
@@ -83,16 +104,38 @@ def test_state_reconciliation():
   assert len(tgce._task_garbage_collections) == 0
 
 
-def test_gc():
+def test_gc_with_loss():
   proxy_runner = ProxyRunner()
   proxy_driver = ProxyDriver()
 
-  tgce = TestThermosGCExecutor(max_tasks=0,
-    task_runner_factory=proxy_runner,
-    checkpoint_root='tests/resources/com/twitter/thermos/root')
+  with temporary_dir() as td:
+    setup_tree(td, lose=True)
+    tgce = TestThermosGCExecutor(max_tasks=0,
+      task_runner_factory=proxy_runner,
+      checkpoint_root=td)
 
-  art = AdjustRetainedTasks(retainedTasks={})
-  tgce.launchTask(proxy_driver, serialize_art(art))
+    art = AdjustRetainedTasks(retainedTasks={})
+    tgce.launchTask(proxy_driver, serialize_art(art))
+
+  assert len(proxy_driver.method_calls['sendStatusUpdate']) == 1
+  assert len(tgce._task_garbage_collections) == len(FINISHED_TASKS)
+  update = proxy_driver.method_calls['sendStatusUpdate'][0][0][0]
+  assert update.task_id.value == 'sleep60-lost'
+  assert update.state == mesos.TASK_LOST
+
+
+def test_gc_without_loss():
+  proxy_runner = ProxyRunner()
+  proxy_driver = ProxyDriver()
+
+  with temporary_dir() as td:
+    setup_tree(td)
+    tgce = TestThermosGCExecutor(max_tasks=0,
+      task_runner_factory=proxy_runner,
+      checkpoint_root=td)
+
+    art = AdjustRetainedTasks(retainedTasks={})
+    tgce.launchTask(proxy_driver, serialize_art(art))
 
   assert len(proxy_driver.method_calls['sendStatusUpdate']) == 0
   assert len(tgce._task_garbage_collections) == len(FINISHED_TASKS)

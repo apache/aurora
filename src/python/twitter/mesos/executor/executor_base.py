@@ -19,6 +19,14 @@ class ThermosExecutorBase(mesos.Executor):
     'LOST': mesos_pb.TASK_LOST,
   }
 
+  THERMOS_TO_MESOS_STATES = {
+    TaskState.ACTIVE: mesos_pb.TASK_RUNNING,
+    TaskState.SUCCESS: mesos_pb.TASK_FINISHED,
+    TaskState.FAILED: mesos_pb.TASK_FAILED,
+    TaskState.KILLED: mesos_pb.TASK_KILLED,
+    TaskState.LOST: mesos_pb.TASK_LOST
+  }
+
   @staticmethod
   def twitter_status_is_terminal(status):
     return status in (ScheduleStatus.FAILED, ScheduleStatus.FINISHED, ScheduleStatus.KILLED,
@@ -31,7 +39,7 @@ class ThermosExecutorBase(mesos.Executor):
 
   @staticmethod
   def thermos_status_is_terminal(status):
-    return status in (TaskState.SUCCESS, TaskState.FAILED, TaskState.KILLED)
+    return status in (TaskState.SUCCESS, TaskState.FAILED, TaskState.KILLED, TaskState.LOST)
 
   def __init__(self):
     self._slave_id = None
@@ -43,10 +51,14 @@ class ThermosExecutorBase(mesos.Executor):
     self.log('init() called with ExecutorInfo: %s' % executor_info)
 
   def send_update(self, driver, task_id, state, message=None):
-    assert state in ThermosExecutorBase.MESOS_STATES
     update = mesos_pb.TaskStatus()
+    if isinstance(state, str):
+      assert state in self.MESOS_STATES
+      update.state = self.MESOS_STATES[state]
+    elif isinstance(state, int):
+      assert state in self.THERMOS_TO_MESOS_STATES
+      update.state = self.THERMOS_TO_MESOS_STATES[state]
     update.task_id.value = task_id
-    update.state = ThermosExecutorBase.MESOS_STATES[state]
     update.message = str(message)
     self.log('Updating %s => %s' % (task_id, state))
     self.log('   Reason: %s' % message)

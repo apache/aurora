@@ -10,6 +10,16 @@ python_library(
 )
 
 python_library(
+  name = 'inspector',
+  sources = ['inspector.py'],
+  dependencies = [
+    pants(':muxer'),
+    pants('src/python/twitter/thermos/base:ckpt'),
+    pants('src/python/twitter/thermos/base:path')
+  ]
+)
+
+python_library(
   name = 'process',
   sources = ['process.py'],
   dependencies = [

@@ -153,3 +153,41 @@ class TestThermosExecutor(object):
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
     assert updates[-1][0][0].state == mesos_pb.TASK_KILLED
+
+  # TODO(wickman) This is mostly copy&paste of the previous test.  Do pytest
+  # parameterization here if possible.
+  def test_task_lost(self):
+    proxy_driver = ProxyDriver()
+
+    with temporary_dir() as checkpoint_root:
+      runner_class = functools.partial(TestTaskRunner, checkpoint_root=checkpoint_root)
+      te = ThermosExecutor(runner_class=runner_class)
+      task_description = make_task(sleep60())
+      te.launchTask(proxy_driver, task_description)
+      while not te._runner.is_started():
+        time.sleep(0.1)
+      while te._runner.task_state() != TaskState.ACTIVE:
+        time.sleep(0.1)
+
+      task_json = TaskPath(root = checkpoint_root, task_id = task_description.task_id.value,
+                           state = 'active').getpath('task_path')
+      while not os.path.exists(task_json):
+        time.sleep(0.1)
+
+      # make sure startup was kosher
+      updates = proxy_driver.method_calls['sendStatusUpdate']
+      assert len(updates) == 2
+      status_updates = [arg_tuple[0][0] for arg_tuple in updates]
+      assert status_updates[0].state == mesos_pb.TASK_STARTING
+      assert status_updates[1].state == mesos_pb.TASK_RUNNING
+
+      # lose the existing runner
+      runner = TaskRunner.get(task_description.task_id.value, checkpoint_root)
+      assert runner is not None
+      runner.lose(force=True)
+
+      te._manager.join()
+
+    updates = proxy_driver.method_calls['sendStatusUpdate']
+    assert len(updates) == 3
+    assert updates[-1][0][0].state == mesos_pb.TASK_LOST

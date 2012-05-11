@@ -43,7 +43,7 @@ runner = TaskRunner(task, '%(root)s', sandbox, **args)
 runner.run()
 
 with open('%(state_filename)s', 'w') as fp:
-  fp.write(thrift_serialize(runner.state()))
+  fp.write(thrift_serialize(runner.state))
 """
 
   @classmethod

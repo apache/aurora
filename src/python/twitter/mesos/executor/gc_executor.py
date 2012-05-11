@@ -1,9 +1,14 @@
 import mesos
 import os
+import pwd
+import time
 
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
+from twitter.common.process import ProcessProviderFactory
 from twitter.common.quantity import Amount, Time, Data
+from twitter.thermos.base.path import TaskPath
+from twitter.thermos.runner.inspector import CheckpointInspector
 from twitter.thermos.runner.runner import TaskRunner
 from twitter.thermos.monitoring.detector import TaskDetector
 from twitter.thermos.monitoring.garbage import (
@@ -37,6 +42,9 @@ class ThermosGCExecutor(ThermosExecutorBase):
       - state reconciliation with the scheduler (in case it thinks we're running
         something we're not or vice versa.)
   """
+  MAX_PID_TIME_DRIFT = Amount(10, Time.SECONDS)
+  MAX_CHECKPOINT_TIME_DRIFT = Amount(1, Time.HOURS)  # maximum runner disconnection time
+
   def __init__(self, max_age=Amount(14, Time.DAYS),
                      max_space=Amount(200, Data.GB),
                      max_tasks=1000,
@@ -63,35 +71,86 @@ class ThermosGCExecutor(ThermosExecutorBase):
     for task_id, schedule_status in retained_tasks.items():
       self.log('  => %s as %s' % (task_id, ScheduleStatus._VALUES_TO_NAMES[schedule_status]))
 
-    def kill_task(task_id):
+    def terminate_task(task_id, kill=True):
       runner = self._task_runner_factory(task_id, self._checkpoint_root)
       if runner is None:
-        self.log('Could not kill task %s because we could not bind to its TaskRunner.' % task_id)
+        self.log('Could not terminate task %s because we could not bind to its TaskRunner.'
+             % task_id)
         return False
-      self.log('Killing %s...' % task_id)
+      self.log('Terminating %s...' % task_id)
+      runner_terminate = runner.kill if kill else runner.lose
       try:
-        runner.kill(force=True)
+        runner_terminate(force=True)
         return True
       except Exception as e:
-        self.log('Could not kill: %s' % e)
+        self.log('Could not terminate: %s' % e)
         return False
 
     detector = TaskDetector(root=self._checkpoint_root)
     active_tasks = set(t_id for _, t_id in detector.get_task_ids(state='active'))
     finished_tasks = set(t_id for _, t_id in detector.get_task_ids(state='finished'))
 
+    def get_state(task_id):
+      pathspec = TaskPath(root=self._checkpoint_root, task_id=task_id)
+      runner_ckpt = pathspec.getpath('runner_checkpoint')
+      state = CheckpointDispatcher.from_file(runner_ckpt)
+      return runner_ckpt, state
+
+    terminated_tasks = set()
     for task_id, task_state in retained_tasks.items():
       if task_id not in active_tasks and task_id not in finished_tasks:
         self.send_update(driver, task_id, 'LOST',
           'GC executor could find no trace of %s.' % task_id)
       elif task_id in active_tasks and self.twitter_status_is_terminal(task_state):
         log._info('Scheduler thinks active task %s is in terminal state, killing.' % task_id)
-        if kill_task(task_id):
+        if terminate_task(task_id):
           self.send_update(driver, task_id, 'KILLED',
             'Scheduler thought %s was in terminal state so we killed it.' % task_id)
+          terminated_tasks.add(task_id)
       elif task_id in finished_tasks and not self.twitter_status_is_terminal(task_state):
-        # translate to its proper terminal state
-        pass
+        _, state = get_state(task_id)
+        if state is None or state.statuses is None:
+          self.log('Failed to replay %s, state: %s' % (runner_ckpt, state))
+          continue
+        self.send_update(driver, task_id, state.statuses[-1].state,
+          'Scheduler thinks finished task %s is active, sending terminal state.' % task_id)
+
+    # Inspect checkpoints for trees that have been kill -9'ed but not properly cleaned up.
+    inspector = CheckpointInspector(self._checkpoint_root)
+    ps = ProcessProviderFactory.get()
+    ps.collect_all()
+
+    # TODO(wickman) This is almost a replica of code in runner/runner.py, factor out.
+    def is_our_pid(pid, uid, timestamp):
+      handle = ps.get_handle(pid)
+      if handle.user() != pwd.getpwuid(uid)[0]: return False
+      estimated_start_time = time.time() - handle.wall_time()
+      return abs(timestamp - estimated_start_time) < self.MAX_PID_TIME_DRIFT.as_(Time.SECONDS)
+
+    for task_id in active_tasks - terminated_tasks:
+      log.info('Inspecting running task: %s' % task_id)
+      inspection = inspector.inspect(task_id)
+      latest_runner = inspection.runner_processes[-1]
+      # Assume that it has not yet started?
+      if not latest_runner:
+        log.warning('  - Task has no registered runners.')
+        continue
+      runner_pid, runner_uid, runner_timestamp = latest_runner
+      if runner_pid in ps.pids() and is_our_pid(runner_pid, runner_uid, runner_timestamp):
+        log.info('  - Runner appears healthy.')
+        continue
+      # Runner is dead
+      runner_ckpt = TaskPath(root=self._checkpoint_root, task_id=task_id).getpath(
+          'runner_checkpoint')
+      latest_update = os.path.getmtime(runner_ckpt)
+      if time.time() - latest_update < self.MAX_CHECKPOINT_TIME_DRIFT.as_(Time.SECONDS):
+        log.info('  - Runner is dead but under LOST threshold.')
+        continue
+      # Dead enough that we need to garbage collect
+      log.info('  - Runner is dead and beyond LOST threshold, finalizing its checkpoint.')
+      if terminate_task(task_id, kill=False):
+        self.send_update(driver, task_id, 'LOST',
+          'Reporting task %s as LOST because its runner has been dead too long.' % task_id)
 
   def garbage_collect_task(self, task_id, task_garbage_collector):
     directory_sandbox = DirectorySandbox(task_id)

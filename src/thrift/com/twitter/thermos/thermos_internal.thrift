@@ -45,12 +45,14 @@ enum TaskState {
   SUCCESS  = 1
   FAILED   = 2
   KILLED   = 3
+  LOST     = 4
 }
 
 struct TaskStatus {
   1: TaskState state
   2: i64       timestamp_ms
   3: i32       runner_pid
+  4: i32       runner_uid
 }
 
 // The first framed message in the Ckpt stream.

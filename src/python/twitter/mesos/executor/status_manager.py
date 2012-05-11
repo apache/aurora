@@ -113,6 +113,8 @@ class StatusManager(threading.Thread):
       finish_state = mesos_pb.TASK_FAILED
     elif last_state == TaskState.KILLED:
       finish_state = mesos_pb.TASK_KILLED
+    elif last_state == TaskState.LOST:
+      finish_state = mesos_pb.TASK_LOST
     else:
       log.error("Unknown task state! %s" % TaskState._VALUES_TO_NAMES.get(last_state, '(unknown)'))
       finish_state = mesos_pb.TASK_FAILED

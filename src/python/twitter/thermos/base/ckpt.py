@@ -1,5 +1,3 @@
-import copy
-
 from twitter.common import log
 from twitter.common.recordio import ThriftRecordReader
 from gen.twitter.thermos.ttypes import (
@@ -53,6 +51,9 @@ class TaskStateHandler(object):
     pass
 
   def on_killed(self, task_update):
+    pass
+
+  def on_lost(self, task_update):
     pass
 
 
@@ -243,7 +244,7 @@ class CheckpointDispatcher(object):
       return
 
     # case 2: task_status
-    #   -> State transition on the task (ACTIVE, FAILED, SUCCESS)
+    #   -> State transition on the task (ACTIVE, FAILED, SUCCESS, LOST)
     if runner_ckpt.task_status is not None:
       if state.statuses is None:
         state.statuses = []
