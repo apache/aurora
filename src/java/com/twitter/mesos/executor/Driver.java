@@ -13,7 +13,7 @@ import com.google.inject.Inject;
 import com.google.protobuf.ByteString;
 
 import org.apache.mesos.ExecutorDriver;
-import org.apache.mesos.Protos.ExecutorArgs;
+import org.apache.mesos.Protos.ExecutorInfo;
 import org.apache.mesos.Protos.Status;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskStatus;
@@ -26,11 +26,10 @@ import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.ScheduleStatus;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static org.apache.mesos.Protos.Status.DRIVER_RUNNING;
 
 /**
  * Abstraction away from the mesos executor driver.
- *
- * @author William Farner
  */
 public interface Driver extends Function<Message, Integer> {
 
@@ -49,9 +48,9 @@ public interface Driver extends Function<Message, Integer> {
    * Sets the underlying driver.
    *
    * @param driver Real driver.
-   * @param executorArgs executor args.
+   * @param executorInfo executor info.
    */
-  void init(ExecutorDriver driver, ExecutorArgs executorArgs);
+  void init(ExecutorDriver driver, ExecutorInfo executorInfo);
 
   /**
    * Stops the driver immediately.
@@ -80,8 +79,8 @@ public interface Driver extends Function<Message, Integer> {
     }
 
     @Override
-    public void init(ExecutorDriver driver, ExecutorArgs executorArgs) {
-      LOG.info("Driver assigned " + driver + ", and args " + executorArgs);
+    public void init(ExecutorDriver driver, ExecutorInfo executorInfo) {
+      LOG.info("Driver assigned " + driver + ", and args " + executorInfo);
       this.driverRef.set(driver);
     }
 
@@ -118,7 +117,7 @@ public interface Driver extends Function<Message, Integer> {
 
           LOG.info("Sending message to scheduler.");
           Status status = driver.sendFrameworkMessage(data);
-          if (status != Status.OK) {
+          if (status != DRIVER_RUNNING) {
             LOG.warning(String.format("Attempt to send executor message returned code %s: %s",
                 status, message));
             messagesFailed.incrementAndGet();
@@ -153,7 +152,7 @@ public interface Driver extends Function<Message, Integer> {
           }
 
           Status s = driver.sendStatusUpdate(msg.build());
-          if (s != Status.OK) {
+          if (s != DRIVER_RUNNING) {
             LOG.warning("Status update failed with " + s + ", committing suicide.");
             lifecycle.shutdown();
           } else {

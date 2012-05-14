@@ -21,6 +21,8 @@ import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.comm.ExecutorMessage;
 
+import static org.apache.mesos.Protos.Status.DRIVER_RUNNING;
+
 /**
  * Wraps the mesos core Scheduler driver to ensure its used in a valid lifecycle; namely:
  * <pre>
@@ -28,8 +30,6 @@ import com.twitter.mesos.gen.comm.ExecutorMessage;
  * </pre>
  *
  * Also ensures the driver is only asked for when needed.
- *
- * @author John Sirois
  */
 public interface Driver {
 
@@ -128,7 +128,7 @@ public interface Driver {
       SchedulerDriver driver = get(State.RUNNING);
       Protos.Status status = driver.killTask(Protos.TaskID.newBuilder().setValue(taskId).build());
 
-      if (status != Protos.Status.OK) {
+      if (status != DRIVER_RUNNING) {
         LOG.severe(String.format("Attempt to kill task %s failed with code %s",
             taskId, status));
         killFailures.incrementAndGet();
@@ -153,8 +153,8 @@ public interface Driver {
 
       LOG.info(String.format("Attempting to send message to %s/%s - %s",
           slave.getValue(), executor.getValue(), message));
-      Status status = driver.sendFrameworkMessage(slave, executor, data);
-      if (status != Status.OK) {
+      Status status = driver.sendFrameworkMessage(executor, slave, data);
+      if (status != DRIVER_RUNNING) {
         LOG.severe(
             String.format("Attempt to send message failed with code %s [%s]", status, message));
         messageFailures.incrementAndGet();

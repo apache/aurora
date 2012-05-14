@@ -33,7 +33,7 @@ import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.SlaveID;
-import org.apache.mesos.Protos.TaskDescription;
+import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.Protos.Value.Range;
 import org.apache.mesos.Protos.Value.Ranges;
 import org.apache.mesos.Protos.Value.Scalar;
@@ -66,6 +66,7 @@ import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.ValueConstraint;
+import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
 import com.twitter.mesos.scheduler.SchedulerCore.RestartException;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
@@ -110,10 +111,6 @@ import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.pop
  *    - Failed tasks have failed count incremented.
  *    - Tasks above maxTaskFailures have _all_ tasks in the job removed.
  *    - Daemon tasks are rescheduled.
- *
- * TODO(William Farner): Add test cases for when the storage has pre-loaded task data.
- *
- * @author William Farner
  */
 public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
@@ -152,12 +149,14 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private SchedulerCoreImpl scheduler;
   private CronJobManager cron;
   private QuotaManager quotaManager;
+  private MesosTaskFactory taskFactory;
   private FakeClock clock;
 
   @Before
   public void setUp() throws Exception {
     driver = createMock(Driver.class);
     clock = new FakeClock();
+    taskFactory = new MesosTaskFactoryImpl("/fake/executor.zip");
   }
 
   /**
@@ -186,8 +185,13 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     stateManager = new StateManagerImpl(storage, clock, new MutableState(), driver);
     quotaManager = new QuotaManagerImpl(storage);
     SchedulingFilter schedulingFilter = new SchedulingFilterImpl(storage);
-    scheduler = new SchedulerCoreImpl(cron, immediateManager, stateManager, schedulingFilter,
-        quotaManager);
+    scheduler = new SchedulerCoreImpl(cron,
+        immediateManager,
+        stateManager,
+        schedulingFilter,
+        quotaManager,
+        taskFactory);
+
     cron.schedulerCore = scheduler;
     immediateManager.schedulerCore = scheduler;
     scheduler.prepare();
@@ -205,7 +209,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     buildScheduler();
 
     Offer offer = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, FOUR_GB, ONE_GB);
-    assertThat(scheduler.createTask(offer), is(Optional.<TaskDescription>absent()));
+    assertThat(scheduler.createTask(offer), is(Optional.<TaskInfo>absent()));
   }
 
   @Test(expected = TaskDescriptionException.class)
@@ -399,7 +403,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     assertThat(Iterables.getLast(getTask(storedTaskId).getTaskEvents()).getStatus(), is(PENDING));
 
     Offer offer = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, FOUR_GB, ONE_GB);
-    Optional<TaskDescription> launchedTask = scheduler.createTask(offer);
+    Optional<TaskInfo> launchedTask = scheduler.createTask(offer);
 
     // Since task fields are backfilled with defaults, the production flag and thermos config
     // should be filled.
@@ -409,7 +413,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     assertThat(getTask(storedTaskId).getStatus(), is(ASSIGNED));
   }
 
-  private AssignedTask extractTask(Optional<TaskDescription> task) throws CodingException {
+  private AssignedTask extractTask(Optional<TaskInfo> task) throws CodingException {
     assertTrue(task.isPresent());
     return ThriftBinaryCodec.decode(AssignedTask.class, task.get().getData().toByteArray());
   }
@@ -472,8 +476,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setAvoidJobs(ImmutableSet.<String>of());
 
     storage.doInTransaction(new NoResult.Quiet() {
-      @Override
-      protected void execute(Storage.StoreProvider storeProvider) {
+      @Override protected void execute(Storage.StoreProvider storeProvider) {
         storeProvider.getTaskStore().saveTasks(ImmutableSet.of(new ScheduledTask()
             .setStatus(PENDING)
             .setAssignedTask(
@@ -487,7 +490,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     Offer offer =
         createOffer(SLAVE_ID, SLAVE_HOST_1, 4, FOUR_GB, ONE_GB, ImmutableSet.of(Pair.of(80, 81)));
-    Optional<TaskDescription> launchedTask = scheduler.createTask(offer);
+    Optional<TaskInfo> launchedTask = scheduler.createTask(offer);
 
     assertEquals(ImmutableSet.of("foo"), extractTask(launchedTask).getTask().getRequestedPorts());
   }
@@ -1273,7 +1276,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     }
     List<Resource> resources = resourceBuilder.build();
 
-    Optional<TaskDescription> launched = scheduler.createTask(offer);
+    Optional<TaskInfo> launched = scheduler.createTask(offer);
     AssignedTask assigned = extractTask(launched);
 
     assertThat(launched.get().getResourcesList(), is(resources));

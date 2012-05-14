@@ -20,7 +20,7 @@ import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
 import org.apache.mesos.Protos.Offer;
-import org.apache.mesos.Protos.TaskDescription;
+import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.Protos.TaskStatus;
 
 import com.twitter.common.util.StateMachine;
@@ -95,6 +95,7 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
   private final SchedulingFilter schedulingFilter;
 
   private final QuotaManager quotaManager;
+  private final MesosTaskFactory taskFactory;
 
   /**
    * Scheduler states.
@@ -117,13 +118,15 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
    * @param stateManager Persistent state manager.
    * @param schedulingFilter Scheduling logic.
    * @param quotaManager Quota tracker.
+   * @param taskFactory Factory to contstruct mesos task objects.
    */
   @Inject
   public SchedulerCoreImpl(CronJobManager cronScheduler,
       ImmediateJobManager immediateScheduler,
       StateManagerImpl stateManager,
       SchedulingFilter schedulingFilter,
-      QuotaManager quotaManager) {
+      QuotaManager quotaManager,
+      MesosTaskFactory taskFactory) {
 
     // The immediate scheduler will accept any job, so it's important that other schedulers are
     // placed first.
@@ -133,6 +136,7 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
 
     this.schedulingFilter = checkNotNull(schedulingFilter);
     this.quotaManager = checkNotNull(quotaManager);
+    this.taskFactory = checkNotNull(taskFactory);
 
    // TODO(John Sirois): Add a method to StateMachine or write a wrapper that allows for a
    // read-locked do-in-state assertion around a block of work.  Transition would then need to grab
@@ -283,7 +287,7 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
   }
 
   @Override
-  public synchronized Optional<TaskDescription> createTask(Offer offer) {
+  public synchronized Optional<TaskInfo> createTask(Offer offer) {
     checkStarted();
     checkNotNull(offer);
 
@@ -311,7 +315,7 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
     return Optional.absent();
   }
 
-  private TaskDescription assignTask(Offer offer, ScheduledTask task) {
+  private TaskInfo assignTask(Offer offer, ScheduledTask task) {
     String host = offer.getHostname();
     Set<Integer> selectedPorts =
         Resources.getPorts(offer, task.getAssignedTask().getTask().getRequestedPortsSize());
@@ -319,8 +323,7 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
         stateManager.assignTask(Tasks.id(task), host, offer.getSlaveId(), selectedPorts));
     LOG.info(String.format("Offer on slave %s (id %s) is being assigned task for %s.",
         host, offer.getSlaveId(), jobKey(task)));
-    return TaskLauncher.Util.makeMesosTask(
-        task.getAssignedTask(), offer.getSlaveId(), selectedPorts);
+    return taskFactory.createFrom(task.getAssignedTask(), offer.getSlaveId());
   }
 
   @Override

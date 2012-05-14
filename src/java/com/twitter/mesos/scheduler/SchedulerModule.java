@@ -21,9 +21,9 @@ import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 
 import org.apache.mesos.MesosSchedulerDriver;
-import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.ExecutorInfo;
 import org.apache.mesos.Protos.FrameworkID;
+import org.apache.mesos.Protos.FrameworkInfo;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
 import org.apache.zookeeper.data.ACL;
@@ -37,7 +37,6 @@ import com.twitter.common.base.Command;
 import com.twitter.common.inject.TimedInterceptor;
 import com.twitter.common.net.pool.DynamicHostSet;
 import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.thrift.ThriftServer;
 import com.twitter.common.util.Clock;
@@ -52,6 +51,7 @@ import com.twitter.mesos.scheduler.Driver.DriverImpl;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHosts;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHostsImpl;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveMapper;
+import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
 import com.twitter.mesos.scheduler.PulseMonitor.PulseMonitorImpl;
 import com.twitter.mesos.scheduler.SchedulerLifecycle.DriverReference;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
@@ -75,6 +75,8 @@ import com.twitter.thrift.ServiceInstance;
 public class SchedulerModule extends AbstractModule {
   private static final Logger LOG = Logger.getLogger(SchedulerModule.class.getName());
 
+  private static final String EXECUTOR_USER = "root";
+
   @NotNull
   @CmdLine(name = "mesos_scheduler_ns",
       help = "The name service name for the mesos scheduler thrift server.")
@@ -84,10 +86,6 @@ public class SchedulerModule extends AbstractModule {
   @CmdLine(name = "mesos_master_address",
           help = "Mesos address for the master, can be a mesos address or zookeeper path.")
   private static final Arg<String> MESOS_MASTER_ADDRESS = Arg.create();
-
-  @NotNull
-  @CmdLine(name = "executor_path", help = "Path to the executor launch script.")
-  private static final Arg<String> EXECUTOR_PATH = Arg.create();
 
   @CmdLine(name = "executor_dead_threashold", help =
       "Time after which the scheduler will consider an executor dead and attempt to revive it.")
@@ -103,18 +101,8 @@ public class SchedulerModule extends AbstractModule {
   @CmdLine(name = "cluster_name", help = "Name to identify the cluster being served.")
   private static final Arg<String> CLUSTER_NAME = Arg.create();
 
-  @CmdLine(name = "executor_resources_cpus",
-      help = "The number of CPUS that should be reserved by mesos for the executor.")
-  private static final Arg<Double> EXECUTOR_CPUS = Arg.create(0.25);
-
-  @CmdLine(name = "executor_resources_ram",
-      help = "The amount of RAM that should be reserved by mesos for the executor.")
-  private static final Arg<Amount<Double, Data>> EXECUTOR_RAM = Arg.create(Amount.of(2d, Data.GB));
-
   @CmdLine(name = "gc_executor_path", help = "Path to the gc executor launch script.")
   private static final Arg<String> GC_EXECUTOR_PATH = Arg.create(null);
-
-  private static final String TWITTER_EXECUTOR_ID = "twitter";
 
   private static final String TWITTER_FRAMEWORK_NAME = "TwitterScheduler";
 
@@ -123,9 +111,6 @@ public class SchedulerModule extends AbstractModule {
     // Enable intercepted method timings and context classloader repair.
     TimedInterceptor.bind(binder());
     GuiceUtils.bindJNIContextClassLoader(binder());
-
-    bind(ExecutorID.class)
-        .toInstance(ExecutorID.newBuilder().setValue(TWITTER_EXECUTOR_ID).build());
 
     // Bind a ZooKeeperClient
     install(new ZooKeeperModule(
@@ -139,6 +124,8 @@ public class SchedulerModule extends AbstractModule {
 
     bind(new TypeLiteral<Supplier<Optional<SchedulerDriver>>>() { }).to(DriverReference.class);
     bind(DriverReference.class).in(Singleton.class);
+
+    bind(MesosTaskFactory.class).to(MesosTaskFactoryImpl.class);
 
     // Bindings for MesosSchedulerImpl.
     bind(SessionValidator.class).to(SessionValidatorImpl.class);
@@ -238,15 +225,19 @@ public class SchedulerModule extends AbstractModule {
       @Override public SchedulerDriver apply(@Nullable String frameworkId) {
         LOG.info("Connecting to mesos master: " + MESOS_MASTER_ADDRESS.get());
 
+        FrameworkInfo.Builder frameworkInfo = FrameworkInfo.newBuilder()
+            .setUser(EXECUTOR_USER)
+            .setName(TWITTER_FRAMEWORK_NAME);
+
         if (frameworkId != null) {
           LOG.info("Found persisted framework ID: " + frameworkId);
-          return new MesosSchedulerDriver(scheduler.get(), TWITTER_FRAMEWORK_NAME, executorInfo,
-              MESOS_MASTER_ADDRESS.get(), FrameworkID.newBuilder().setValue(frameworkId).build());
+          frameworkInfo.setId(FrameworkID.newBuilder().setValue(frameworkId));
         } else {
           LOG.warning("Did not find a persisted framework ID, connecting as a new framework.");
-          return new MesosSchedulerDriver(scheduler.get(), TWITTER_FRAMEWORK_NAME, executorInfo,
-              MESOS_MASTER_ADDRESS.get());
         }
+
+        return new MesosSchedulerDriver(scheduler.get(), frameworkInfo.build(),
+            MESOS_MASTER_ADDRESS.get());
       }
     };
   }
@@ -261,16 +252,6 @@ public class SchedulerModule extends AbstractModule {
   @Singleton
   DynamicHostSet<ServiceInstance> provideSchedulerHostSet(ZooKeeperClient zkClient, List<ACL> acl) {
     return new ServerSetImpl(zkClient, acl, MESOS_SCHEDULER_NAME_SPEC.get());
-  }
-
-  @Provides
-  @Singleton
-  ExecutorInfo provideExecutorInfo(ExecutorID defaultExecutorId) {
-    return ExecutorInfo.newBuilder().setUri(EXECUTOR_PATH.get())
-        .setExecutorId(defaultExecutorId)
-        .addResources(Resources.makeMesosResource(Resources.CPUS, EXECUTOR_CPUS.get()))
-        .addResources(Resources.makeMesosResource(Resources.RAM_MB, EXECUTOR_RAM.get().as(Data.MB)))
-        .build();
   }
 
   @Provides

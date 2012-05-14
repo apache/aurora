@@ -12,9 +12,11 @@ import com.google.inject.Inject;
 
 import org.apache.mesos.Executor;
 import org.apache.mesos.ExecutorDriver;
-import org.apache.mesos.Protos.ExecutorArgs;
-import org.apache.mesos.Protos.TaskDescription;
+import org.apache.mesos.Protos.ExecutorInfo;
+import org.apache.mesos.Protos.FrameworkInfo;
+import org.apache.mesos.Protos.SlaveInfo;
 import org.apache.mesos.Protos.TaskID;
+import org.apache.mesos.Protos.TaskInfo;
 
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.application.ShutdownRegistry;
@@ -55,10 +57,14 @@ public class MesosExecutorImpl implements Executor {
 
   @JNICallback
   @Override
-  public void init(ExecutorDriver executorDriver, ExecutorArgs executorArgs) {
-    LOG.info("Initialized with driver " + executorDriver + " and args " + executorArgs);
-    executorCore.setSlaveId(executorArgs.getSlaveId().getValue());
-    driver.init(executorDriver, executorArgs);
+  public void registered(ExecutorDriver executorDriver,
+      ExecutorInfo executorInfo,
+      FrameworkInfo frameworkInfo,
+      SlaveInfo slaveInfo) {
+
+    LOG.info("Initialized with driver " + executorDriver + " and args " + executorInfo);
+    executorCore.setSlaveId(slaveInfo.getId().getValue());
+    driver.init(executorDriver, executorInfo);
     shutdownRegistry.addAction(new ExceptionalCommand<RuntimeException>() {
       @Override public void execute() {
         shuttingDown = true;
@@ -67,13 +73,23 @@ public class MesosExecutorImpl implements Executor {
     initialized.countDown();
   }
 
+  @Override
+  public void reregistered(ExecutorDriver executorDriver, SlaveInfo slaveInfo) {
+    LOG.info("Re-registered with " + executorDriver + " and slave info " + slaveInfo);
+  }
+
+  @Override
+  public void disconnected(ExecutorDriver executorDriver) {
+    LOG.info("Disconnected from slave.");
+  }
+
   public boolean awaitInit(Amount<Long, Time> timeout) throws InterruptedException {
     return initialized.await(timeout.as(Time.MILLISECONDS), TimeUnit.MILLISECONDS);
   }
 
   @JNICallback
   @Override
-  public void launchTask(ExecutorDriver driverDoNotUse, TaskDescription task) {
+  public void launchTask(ExecutorDriver driverDoNotUse, TaskInfo task) {
     if (shuttingDown) {
       LOG.warning(String.format("Rejecting task %s with ID %s since the executor is shutting down.",
           task.getName(), task.getTaskId()));
@@ -126,8 +142,8 @@ public class MesosExecutorImpl implements Executor {
 
   @JNICallback
   @Override
-  public void error(ExecutorDriver driver, int code, String message) {
-    LOG.info("Error received with code: " + code + " and message: " + message);
+  public void error(ExecutorDriver driver, String message) {
+    LOG.info("Error received with message: " + message);
     shutdown(driver);
   }
 

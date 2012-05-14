@@ -14,7 +14,7 @@ import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
 
 import org.apache.mesos.Protos.Offer;
-import org.apache.mesos.Protos.TaskDescription;
+import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.Protos.TaskStatus;
 
 import com.twitter.common.stats.Stats;
@@ -22,6 +22,7 @@ import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Constraint;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.MesosTaskFactory;
 import com.twitter.mesos.scheduler.PulseMonitor;
 import com.twitter.mesos.scheduler.TaskLauncher;
 
@@ -35,8 +36,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * A task launcher that periodically accepts offers to run bootstrap tasks on hosts and ensure that
  * an executor is available.
- *
- * @author William Farner
  */
 public class BootstrapTaskLauncher implements TaskLauncher {
 
@@ -55,14 +54,18 @@ public class BootstrapTaskLauncher implements TaskLauncher {
   private final AtomicLong executorBootstraps = Stats.exportLong("executor_bootstraps");
 
   private final PulseMonitor<String> pulseMonitor;
+  private final MesosTaskFactory taskFactory;
 
   @Inject
-  BootstrapTaskLauncher(@Bootstrap PulseMonitor<String> pulseMonitor) {
+  BootstrapTaskLauncher(@Bootstrap PulseMonitor<String> pulseMonitor,
+      MesosTaskFactory taskFactory) {
+
     this.pulseMonitor = checkNotNull(pulseMonitor);
+    this.taskFactory = checkNotNull(taskFactory);
   }
 
   @Override
-  public Optional<TaskDescription> createTask(Offer offer) {
+  public Optional<TaskInfo> createTask(Offer offer) {
     String hostname = offer.getHostname();
     if (pulseMonitor.isAlive(offer.getHostname())) {
       return Optional.absent();
@@ -86,7 +89,7 @@ public class BootstrapTaskLauncher implements TaskLauncher {
     }
   }
 
-  private static TaskDescription launchTask(Offer offer) {
+  private TaskInfo launchTask(Offer offer) {
     TwitterTaskInfo task = new TwitterTaskInfo()
         .setOwner(new Identity("mesos", "mesos"))
         .setJobName("executor_bootstrap")
@@ -103,7 +106,6 @@ public class BootstrapTaskLauncher implements TaskLauncher {
         offer.getSlaveId().getValue(),
         task,
         ImmutableMap.<String, Integer>of());
-    return TaskLauncher.Util.makeMesosTask(
-        assignedTask, offer.getSlaveId(), ImmutableSet.<Integer>of());
+    return taskFactory.createFrom(assignedTask, offer.getSlaveId());
   }
 }

@@ -5,21 +5,23 @@ import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskID;
+import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.Protos.TaskState;
 import org.apache.mesos.Protos.TaskStatus;
+import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.common.testing.EasyMockTest;
+import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.scheduler.MesosTaskFactory;
 import com.twitter.mesos.scheduler.PulseMonitor;
 
+import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-/**
- * @author William Farner
- */
 public class BootstrapTaskLauncherTest extends EasyMockTest {
 
   private static final String HOST = "slave-host";
@@ -42,17 +44,21 @@ public class BootstrapTaskLauncherTest extends EasyMockTest {
       .build();
 
   private PulseMonitor<String> hostMonitor;
+  private MesosTaskFactory taskFactory;
   private BootstrapTaskLauncher bootstrap;
 
   @Before
   public void setUp() {
     hostMonitor = createMock(new Clazz<PulseMonitor<String>>() { });
-    bootstrap = new BootstrapTaskLauncher(hostMonitor);
+    taskFactory = createMock(MesosTaskFactory.class);
+    bootstrap = new BootstrapTaskLauncher(hostMonitor, taskFactory);
   }
 
   @Test
   public void testLaunchBootstrap() {
     expect(hostMonitor.isAlive(HOST)).andReturn(false);
+    expect(taskFactory.createFrom(EasyMock.<AssignedTask>anyObject(), eq(OFFER.getSlaveId())))
+        .andReturn(TaskInfo.getDefaultInstance());
     hostMonitor.pulse(HOST);
 
     control.replay();

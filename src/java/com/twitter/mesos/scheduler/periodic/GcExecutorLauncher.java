@@ -19,8 +19,8 @@ import com.google.protobuf.ByteString;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.ExecutorInfo;
 import org.apache.mesos.Protos.Offer;
-import org.apache.mesos.Protos.TaskDescription;
 import org.apache.mesos.Protos.TaskID;
+import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.Protos.TaskStatus;
 
 import com.twitter.common.quantity.Amount;
@@ -30,6 +30,7 @@ import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.comm.AdjustRetainedTasks;
+import com.twitter.mesos.scheduler.CommandUtil;
 import com.twitter.mesos.scheduler.PulseMonitor;
 import com.twitter.mesos.scheduler.Resources;
 import com.twitter.mesos.scheduler.StateManager;
@@ -86,7 +87,7 @@ public class GcExecutorLauncher implements TaskLauncher {
   }
 
   @Override
-  public Optional<TaskDescription> createTask(Offer offer) {
+  public Optional<TaskInfo> createTask(Offer offer) {
     if (!gcExecutorPath.isPresent() || pulseMonitor.isAlive(offer.getHostname())) {
       return Optional.absent();
     }
@@ -123,14 +124,16 @@ public class GcExecutorLauncher implements TaskLauncher {
     }
 
     String uuid = UUID.randomUUID().toString();
-    return Optional.of(TaskDescription.newBuilder().setName("system-gc")
+    ExecutorInfo.Builder executor = ExecutorInfo.newBuilder()
+        .setExecutorId(ExecutorID.newBuilder().setValue(EXECUTOR_PREFIX + uuid))
+        .setCommand(CommandUtil.create(gcExecutorPath.get()));
+
+    return Optional.of(TaskInfo.newBuilder().setName("system-gc")
         .setTaskId(TaskID.newBuilder().setValue(SYSTEM_TASK_PREFIX + uuid))
         .setSlaveId(offer.getSlaveId())
         .addAllResources(GC_EXECUTOR_RESOURCES.toResourceList())
         .setData(ByteString.copyFrom(data))
-        .setExecutor(ExecutorInfo.newBuilder()
-            .setExecutorId(ExecutorID.newBuilder().setValue(EXECUTOR_PREFIX + uuid))
-            .setUri(gcExecutorPath.get()))
+        .setExecutor(executor)
         .build());
   }
 

@@ -11,7 +11,7 @@ import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.SlaveID;
-import org.apache.mesos.Protos.TaskDescription;
+import org.apache.mesos.Protos.TaskInfo;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -92,28 +92,28 @@ public class GcExecutorLauncherTest extends EasyMockTest {
     control.replay();
 
     // First call - hostMonitor returns true, no GC.
-    Optional<TaskDescription> taskDescription = gcExecutorLauncher.createTask(OFFER);
-    assertFalse(taskDescription.isPresent());
+    Optional<TaskInfo> taskInfo = gcExecutorLauncher.createTask(OFFER);
+    assertFalse(taskInfo.isPresent());
 
     // Second call - no tasks pruned.
-    taskDescription = gcExecutorLauncher.createTask(OFFER);
-    assertTrue(taskDescription.isPresent());
-    assertRetainedTasks(taskDescription.get(), thermosTask, thermosPrunedTask);
+    taskInfo = gcExecutorLauncher.createTask(OFFER);
+    assertTrue(taskInfo.isPresent());
+    assertRetainedTasks(taskInfo.get(), thermosTask, thermosPrunedTask);
 
     thermosPrunedTask.setStatus(FAILED);
     thermosTask.setStatus(FAILED);
     nonThermosTask.setStatus(FAILED);
 
     // Third call - one task pruned.
-    taskDescription = gcExecutorLauncher.createTask(OFFER);
-    assertTrue(taskDescription.isPresent());
-    assertRetainedTasks(taskDescription.get(), thermosTask);
+    taskInfo = gcExecutorLauncher.createTask(OFFER);
+    assertTrue(taskInfo.isPresent());
+    assertRetainedTasks(taskInfo.get(), thermosTask);
   }
 
-  private static void assertRetainedTasks(TaskDescription taskDescription, ScheduledTask... tasks)
+  private static void assertRetainedTasks(TaskInfo taskInfo, ScheduledTask... tasks)
       throws ThriftBinaryCodec.CodingException {
     AdjustRetainedTasks message = ThriftBinaryCodec.decode(
-        AdjustRetainedTasks.class, taskDescription.getData().toByteArray());
+        AdjustRetainedTasks.class, taskInfo.getData().toByteArray());
     Map<String, ScheduledTask> byId = Tasks.mapById(ImmutableSet.copyOf(tasks));
     assertEquals(Maps.transformValues(byId, Tasks.GET_STATUS), message.getRetainedTasks());
   }

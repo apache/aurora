@@ -16,10 +16,11 @@ import com.google.inject.Inject;
 
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.FrameworkID;
+import org.apache.mesos.Protos.MasterInfo;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.SlaveID;
-import org.apache.mesos.Protos.TaskDescription;
+import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.Protos.TaskStatus;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
@@ -48,6 +49,11 @@ public class MesosSchedulerImpl implements Scheduler {
   private final AtomicLong resourceOffers = Stats.exportLong("scheduler_resource_offers");
   private final AtomicLong failedOffers = Stats.exportLong("scheduler_failed_offers");
   private final AtomicLong failedStatusUpdates = Stats.exportLong("scheduler_status_updates");
+  private final AtomicLong frameworkDisconnects =
+      Stats.exportLong("scheduler_framework_disconnects");
+  private final AtomicLong frameworkReregisters =
+      Stats.exportLong("scheduler_framework_reregisters");
+  private final AtomicLong lostExecutors = Stats.exportLong("scheduler_lost_executors");
 
   private final List<TaskLauncher> taskLaunchers;
   private final SlaveMapper slaveMapper;
@@ -105,10 +111,10 @@ public class MesosSchedulerImpl implements Scheduler {
 
   @JNICallback
   @Override
-  public void registered(final SchedulerDriver driver, FrameworkID fId) {
-    LOG.info("Registered with ID " + fId);
+  public void registered(SchedulerDriver driver, FrameworkID frameworkId, MasterInfo masterInfo) {
+    LOG.info("Registered with ID " + frameworkId + ", master: " + masterInfo);
     registeredFlag.set(1);
-    this.frameworkID = fId;
+    this.frameworkID = frameworkId;
     try {
       schedulerCore.registered(frameworkID.getValue());
     } catch (SchedulerException e) {
@@ -117,7 +123,21 @@ public class MesosSchedulerImpl implements Scheduler {
     }
   }
 
-  private static boolean fitsInOffer(TaskDescription task, Offer offer) {
+  @JNICallback
+  @Override
+  public void disconnected(SchedulerDriver schedulerDriver) {
+    LOG.warning("Framework disconnected.");
+    frameworkDisconnects.incrementAndGet();
+  }
+
+  @JNICallback
+  @Override
+  public void reregistered(SchedulerDriver schedulerDriver, MasterInfo masterInfo) {
+    LOG.info("Framework re-registered with master " + masterInfo);
+    frameworkReregisters.incrementAndGet();
+  }
+
+  private static boolean fitsInOffer(TaskInfo task, Offer offer) {
     return Resources.from(offer).greaterThanOrEqual(Resources.from(task.getResourcesList()));
   }
 
@@ -132,7 +152,7 @@ public class MesosSchedulerImpl implements Scheduler {
 
       slaveMapper.addSlave(offer.getHostname(), offer.getSlaveId());
 
-      Optional<TaskDescription> task = Optional.absent();
+      Optional<TaskInfo> task = Optional.absent();
 
       for (TaskLauncher launcher : taskLaunchers) {
         try {
@@ -156,7 +176,7 @@ public class MesosSchedulerImpl implements Scheduler {
       if (!task.isPresent()) {
         // For a given offer, if we fail to process it we can always launch with an empty set of
         // tasks to signal the core we have processed the offer and just not used any of it.
-        driver.launchTasks(offer.getId(), ImmutableList.<TaskDescription>of());
+        driver.launchTasks(offer.getId(), ImmutableList.<TaskInfo>of());
       }
     }
   }
@@ -189,15 +209,24 @@ public class MesosSchedulerImpl implements Scheduler {
 
   @JNICallback
   @Override
-  public void error(SchedulerDriver driver, int code, String message) {
-    LOG.severe("Received error message: " + message + " with code " + code);
+  public void error(SchedulerDriver driver, String message) {
+    LOG.severe("Received error message: " + message);
     lifecycle.shutdown();
+  }
+
+  @JNICallback
+  @Override
+  public void executorLost(SchedulerDriver schedulerDriver, ExecutorID executorID, SlaveID slaveID,
+      int status) {
+
+    LOG.info("Lost executor " + executorID);
+    lostExecutors.incrementAndGet();
   }
 
   @JNICallback
   @Timed("scheduler_framework_message")
   @Override
-  public void frameworkMessage(SchedulerDriver driver, SlaveID slave, ExecutorID executor,
+  public void frameworkMessage(SchedulerDriver driver, ExecutorID executor, SlaveID slave,
       byte[] data) {
 
     if (data == null) {

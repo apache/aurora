@@ -6,9 +6,6 @@ import com.twitter.mesos.scheduler.BaseSchedulerCoreImplTest;
 import com.twitter.mesos.scheduler.db.testing.DbStorageTestUtil;
 import com.twitter.mesos.scheduler.storage.Storage;
 
-/**
- * @author John Sirois
- */
 public class DbStorageSchedulerCoreImplTest extends BaseSchedulerCoreImplTest {
 
   @Override
