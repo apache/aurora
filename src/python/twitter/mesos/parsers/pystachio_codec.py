@@ -5,7 +5,6 @@ from twitter.mesos.config.schema import (
   MesosJob,
   UpdateConfig,
 )
-from twitter.thermos.config.dsl import in_order
 from twitter.thermos.config.schema import (
   Process,
   Resources,
@@ -49,13 +48,14 @@ class PystachioCodec(MesosConfig):
     task_dict = dict(
       name = self.name(),
       processes = processes,
+
       resources = Resources(
         cpu  = cfg['task']['num_cpus'],
         ram  = cfg['task']['ram_mb'] * 1048576,
         disk = cfg['task']['disk_mb'] * 1048576),
     )
     if len(processes) > 1:
-      task_dict.update(constraints = in_order(processes))
+      task_dict.update(constraints = [{'order': [process.name() for process in processes]}])
     return Task(task_dict)
 
   def build(self):

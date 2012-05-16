@@ -68,10 +68,18 @@ def setup_tree(td, lose=False):
   import shutil
   safe_rmtree(td)
   shutil.copytree('tests/resources/com/twitter/thermos/root', td)
+
   if lose:
     lost_age = time.time() - (
       2 * TestThermosGCExecutor.MAX_CHECKPOINT_TIME_DRIFT.as_(Time.SECONDS))
-    os.utime(os.path.join(td, 'checkpoints/sleep60-lost/runner'), (lost_age, lost_age))
+    utime = (lost_age, lost_age)
+  else:
+    utime = None
+
+  # touch everything
+  for root, dirs, files in os.walk(td):
+    for fn in files:
+      os.utime(os.path.join(root, fn), utime)
 
 
 def test_state_reconciliation():
@@ -85,7 +93,7 @@ def test_state_reconciliation():
       max_space=Amount(10**10, Data.GB),
       max_tasks=10**10,
       task_runner_factory=proxy_runner,
-      checkpoint_root='tests/resources/com/twitter/thermos/root')
+      checkpoint_root=td)
 
     art = AdjustRetainedTasks(retainedTasks = {
       'does_not_exist': ScheduleStatus.RUNNING,

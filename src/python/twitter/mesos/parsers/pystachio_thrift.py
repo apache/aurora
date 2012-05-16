@@ -62,6 +62,9 @@ def convert(job):
     task.healthCheckIntervalSecs = job.health_check_interval_secs().get()
 
   # task components
+  if not task_raw.has_resources():
+    raise ValueError('Task must specify resources!')
+
   task.numCpus = task_raw.resources().cpu().get()
   task.ramMb = task_raw.resources().ram().get() / MB
   task.diskMb = task_raw.resources().disk().get() / MB

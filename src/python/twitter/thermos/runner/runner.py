@@ -308,7 +308,7 @@ class TaskRunner(object):
       return cls(task.tasks()[0].task(), checkpoint_root, checkpoint.header.sandbox, task_id,
           portmap=checkpoint.header.ports)
     except Exception as e:
-      log.error('Failed to reconstitute checkpoint in TaskRunner.get: %s' % e)
+      log.error('Failed to reconstitute checkpoint in TaskRunner.get: %s' % e, exc_info=True)
       return None
 
   def __init__(self, task, checkpoint_root, sandbox,
@@ -685,7 +685,7 @@ class TaskRunner(object):
               timeout=TaskRunner.MAX_ITERATION_TIME.as_(Time.SECONDS)):
             # no updates to the checkpoint stream after a large wait, so touch the
             # checkpoint to prevent upstream garbage collection.
-            os.utime(self._pathspec.getpath('runner_checkpoint'))
+            os.utime(self._pathspec.getpath('runner_checkpoint'), None)
 
         # Call waitpid on terminating forked tasks to prevent zombies.
         # ProcessFactory.reap_children()

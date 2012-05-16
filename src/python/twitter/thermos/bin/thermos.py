@@ -13,7 +13,7 @@ from pystachio import Ref
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 from twitter.common.dirutil import du, tail_f
-from twitter.common.dirutil import tail as tail_closed
+from twitter.common.dirutil.tail import tail as tail_closed
 from twitter.common.quantity import Amount, Time, Data
 from twitter.common.quantity.parse_simple import parse_time, parse_data
 from twitter.common.recordio import ThriftRecordReader

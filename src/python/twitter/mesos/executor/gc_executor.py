@@ -146,8 +146,8 @@ class ThermosGCExecutor(ThermosExecutorBase):
       if time.time() - latest_update < self.MAX_CHECKPOINT_TIME_DRIFT.as_(Time.SECONDS):
         log.info('  - Runner is dead but under LOST threshold.')
         continue
-      # Dead enough that we need to garbage collect
-      log.info('  - Runner is dead and beyond LOST threshold, finalizing its checkpoint.')
+      log.info('  - Runner is dead but beyond LOST threshold: %.1fs' % (
+          time.time() - latest_update))
       if terminate_task(task_id, kill=False):
         self.send_update(driver, task_id, 'LOST',
           'Reporting task %s as LOST because its runner has been dead too long.' % task_id)

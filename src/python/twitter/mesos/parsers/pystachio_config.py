@@ -23,7 +23,6 @@ from .pystachio_thrift import convert as convert_pystachio_to_thrift
 SCHEMA_PREAMBLE = """
 from pystachio import *
 from twitter.mesos.config.schema import *
-from twitter.thermos.config.dsl import *
 """
 
 def deposit_schema(environment):

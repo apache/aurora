@@ -10,7 +10,6 @@ from twitter.thermos.config.schema import Task
 SCHEMA_PREAMBLE = """
 from pystachio import *
 from twitter.thermos.config.schema import *
-from twitter.thermos.config.dsl import *
 """
 
 def deposit_schema(environment):
@@ -90,6 +89,8 @@ class ThermosConfigLoader(object):
   def load(filename, **kw):
     tc = ThermosConfigLoader()
     def export(task):
+      if isinstance(task, dict):
+        task = Task(task)
       tc.add_task(ThermosTaskWrapper(task, **kw))
     schema_copy = copy.copy(ThermosConfigLoader.SCHEMA)
     schema_copy['export'] = export

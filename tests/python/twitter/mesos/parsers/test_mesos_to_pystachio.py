@@ -74,9 +74,8 @@ def test_config_with_copy():
   assert len(list(job.task().processes())) == 2
   constraints = job.task().constraints()
   assert len(list(constraints)) == 1
-  assert len(list(constraints[0].ordered())) == 1
-  assert constraints[0].ordered()[0].first() == String('installer')
-  assert constraints[0].ordered()[0].second() == job.name()
+  assert constraints[0].order()[0] == String('installer')
+  assert constraints[0].order()[1] == job.name()
 
 
 def test_config_with_nondefault_update_config():

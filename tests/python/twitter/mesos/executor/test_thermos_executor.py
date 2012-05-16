@@ -143,9 +143,12 @@ class TestThermosExecutor(object):
       assert status_updates[0].state == mesos_pb.TASK_STARTING
       assert status_updates[1].state == mesos_pb.TASK_RUNNING
 
-      # kill the existing runner
-      runner = TaskRunner.get(task_description.task_id.value, checkpoint_root)
-      assert runner is not None
+      # wait for the runner to bind to a task
+      while True:
+        runner = TaskRunner.get(task_description.task_id.value, checkpoint_root)
+        if runner:
+          break
+        time.sleep(0.1)
       runner.kill(force=True)
 
       te._manager.join()
@@ -182,8 +185,11 @@ class TestThermosExecutor(object):
       assert status_updates[1].state == mesos_pb.TASK_RUNNING
 
       # lose the existing runner
-      runner = TaskRunner.get(task_description.task_id.value, checkpoint_root)
-      assert runner is not None
+      while True:
+        runner = TaskRunner.get(task_description.task_id.value, checkpoint_root)
+        if runner:
+          break
+        time.sleep(0.1)
       runner.lose(force=True)
 
       te._manager.join()

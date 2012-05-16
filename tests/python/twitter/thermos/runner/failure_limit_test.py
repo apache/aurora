@@ -2,9 +2,7 @@ from runner_base import RunnerTestBase
 from twitter.thermos.config.schema import (
   Task,
   Resources,
-  Process,
-  ProcessConstraint,
-  ProcessPair)
+  Process)
 from gen.twitter.thermos.ttypes import (
   TaskState,
   ProcessState
@@ -22,10 +20,7 @@ class TestFailureLimit(RunnerTestBase):
         Process(name = "b", max_failures=1, cmdline="exit 1"),
         Process(name = "c", max_failures=1, cmdline="echo hello world")
       ],
-      constraints = [
-        ProcessConstraint(ordered = [ProcessPair(first = 'a', second = 'b')]),
-        ProcessConstraint(ordered = [ProcessPair(first = 'b', second = 'c')]),
-      ]
+      constraints = [{'order': ['a', 'b', 'c']}]
     )
     return task.interpolate()[0]
 

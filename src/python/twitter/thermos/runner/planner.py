@@ -20,12 +20,14 @@ class Planner(object):
     dependencies = defaultdict(set)
     if task.has_constraints():
       for constraint in task.constraints():
-        for pair in constraint.ordered():
-          if pair.first().get() not in processes:
-            raise Planner.InvalidSchedule("Unknown process in dependency: %s" % pair.first())
-          if pair.second().get() not in processes:
-            raise Planner.InvalidSchedule("Unknown process in dependency: %s" % pair.second())
-          dependencies[pair.second().get()].add(pair.first().get())
+        # handle process orders
+        process_names = constraint.order().get()
+        for k in range(1, len(process_names)):
+          if process_names[k-1] not in processes:
+            raise Planner.InvalidSchedule("Unknown process in dependency: %s" % process_names[k-1])
+          if process_names[k] not in processes:
+            raise Planner.InvalidSchedule("Unknown process in dependency: %s" % process_names[k])
+          dependencies[process_names[k]].add(process_names[k-1])
     return (processes, dependencies)
 
   @staticmethod

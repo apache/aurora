@@ -10,6 +10,7 @@ from pystachio import (
   Struct
 )
 
+
 class ThermosContext(Struct):
   ports   = Map(String, Integer)
   task_id = String
@@ -24,20 +25,14 @@ class Resources(Struct):
   ram  = Required(Integer)
   disk = Required(Integer)
 
-  # TODO(wickman)  Add Boolean to pystachio
-  best_effort = Default(Integer, 0)
 
+class Constraint(Struct):
+  order = List(String)
 
-class ProcessPair(Struct):
-  first  = String
-  second = String
-
-class ProcessConstraint(Struct):
-  ordered   = List(ProcessPair)
 
 class Process(Struct):
   cmdline = Required(String)
-  name    = Required(String)  # Making this required will make my life way easier.
+  name    = Required(String)
 
   # optionals
   resources     = Resources
@@ -48,12 +43,11 @@ class Process(Struct):
 @Provided(thermos = ThermosContext)
 class Task(Struct):
   name      = Required(String)
-  resources = Required(Resources)
+  resources = Resources
   processes = List(Process)
-  constraints = List(ProcessConstraint)
+  constraints = List(Constraint)
 
   max_failures  = Default(Integer, 1)
-  min_successes = Default(Integer, 0)  # currently unsupported
 
   # 0 = infinite concurrency, > 0 => max concurrent processes.
   max_concurrency = Default(Integer, 0)

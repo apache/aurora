@@ -3,7 +3,6 @@ import pytest
 from runner_base import RunnerTestBase
 
 from twitter.thermos.config.schema import Task, Process, Resources
-from twitter.thermos.config.dsl import with_schedule
 from gen.twitter.thermos.ttypes import (
   TaskState,
   ProcessState
@@ -21,12 +20,16 @@ class TestRunnerBasic(RunnerTestBase):
     t4 = hello_template(name = "t4")
     t5 = hello_template(name = "t5")
     t6 = hello_template(name = "t6")
-    tsk = with_schedule(Task(
-      name = "complex",
-      processes = [t1, t2, t3, t4, t5, t6],
-      resources = Resources(cpu = 1.0, ram = 16*1024*1024, disk = 16*1024)),
-      "t1 before t3", "t1 before t4", "t2 before t3", "t2 before t4",
-      "t3 before t5", "t3 before t6", "t4 before t5", "t4 before t6")
+    tsk = Task(name = "complex", processes = [t1, t2, t3, t4, t5, t6])
+    # three ways of tasks: t1 t2, t3 t4, t5 t6
+    tsk = tsk(constraints = [{'order': ['t1', 't3']},
+                             {'order': ['t1', 't4']},
+                             {'order': ['t2', 't3']},
+                             {'order': ['t2', 't4']},
+                             {'order': ['t3', 't5']},
+                             {'order': ['t3', 't6']},
+                             {'order': ['t4', 't5']},
+                             {'order': ['t4', 't6']}])
     return tsk
 
   def test_runner_state_reconstruction(self):
