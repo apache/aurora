@@ -24,6 +24,7 @@ import com.google.inject.TypeLiteral;
 import com.google.inject.name.Names;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.apache.mesos.Executor;
 
 import com.twitter.common.application.http.Registration;
@@ -37,7 +38,6 @@ import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.common.inject.TimedInterceptor;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
-import com.twitter.common_internal.hadoop.HdfsUtils;
 import com.twitter.mesos.GuiceUtils;
 import com.twitter.mesos.executor.Driver.DriverImpl;
 import com.twitter.mesos.executor.FileCopier.HdfsFileCopier;
@@ -153,7 +153,7 @@ public class ExecutorModule extends AbstractModule {
 
     // Bindings needed for FileCopier
     try {
-      bind(Configuration.class).toInstance(HdfsUtils.getHdfsConfiguration(HDFS_CONFIG.get()));
+      bind(Configuration.class).toInstance(getHdfsConfiguration(HDFS_CONFIG.get()));
     } catch (IOException e) {
       LOG.log(Level.SEVERE, "Failed to create HDFS fileSystem.", e);
       Throwables.propagate(e);
@@ -164,6 +164,19 @@ public class ExecutorModule extends AbstractModule {
 
     Registration.registerServlet(binder(), "/task", TaskHome.class, false);
     Registration.registerServlet(binder(), "/executor", ExecutorHome.class, false);
+  }
+
+  /**
+   * A helper function to construct a Configuration. The code is directly copied from
+   * HdfsUtils.getHdfsConfiguration().
+   * TODO(vinod): This is a temporary fix for MESOS-514..
+   * Use HdfsUtils.getHdfsConfiguration() instead, when smf1 is migrated to cdh3.
+   */
+  private static Configuration getHdfsConfiguration(String hdfsConfigPath) throws IOException {
+    Configuration conf = new Configuration(true);
+    conf.addResource(new Path(hdfsConfigPath));
+    conf.reloadConfiguration();
+    return conf;
   }
 
   @Provides

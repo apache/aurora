@@ -1,6 +1,7 @@
 package com.twitter.mesos.executor;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -8,10 +9,13 @@ import java.util.logging.Logger;
 import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 
 import com.twitter.common.base.ExceptionalFunction;
-import com.twitter.common_internal.hadoop.HdfsUtils;
 
 import static com.twitter.mesos.executor.FileCopier.FileCopyException;
 
@@ -53,7 +57,7 @@ public interface FileCopier extends ExceptionalFunction<FileCopyRequest, File, F
           "HDFS file %s -> local file %s", copy.getSourcePath(), copy.getDestPath()));
 
       try {
-        return HdfsUtils.downloadFileFromHdfs(conf, copy.getSourcePath(), copy.getDestPath(),
+        return downloadFileFromHdfs(conf, copy.getSourcePath(), copy.getDestPath(),
             true /* overwrite */);
       } catch (IOException e) {
         LOG.log(Level.SEVERE, "Failed to download file from HDFS", e);
@@ -62,6 +66,38 @@ public interface FileCopier extends ExceptionalFunction<FileCopyRequest, File, F
         LOG.log(Level.SEVERE, "Failed to download file from HDFS", e);
         throw new FileCopyException(e);
       }
+    }
+
+    /**
+     * A helper function to copy the file from HDFS. The code is directly copied from
+     * HdfsUtils.downloadFileFromHdfs().
+     * TODO(vinod): This is a temporary fix for MESOS-514.
+     * Use HdfsUtils.downloadFileFromHdfs() instead, when smf1 is migrated to cdh3.
+     */
+    private static File downloadFileFromHdfs(Configuration conf, String fileUri,
+        String localDirName, boolean overwrite) throws IOException {
+
+      Path path = new Path(fileUri);
+      FileSystem hdfs = path.getFileSystem(conf);
+      FSDataInputStream remoteStream = hdfs.open(path);
+
+      File localFile = new File(localDirName, path.getName());
+
+      if (overwrite && localFile.exists()) {
+        boolean success = localFile.delete();
+        if (!success) {
+          LOG.warning("Failed to delete file to be overwritten: " + localFile);
+        }
+      }
+
+      FileOutputStream localStream = new FileOutputStream(localFile);
+      try {
+        IOUtils.copy(remoteStream, localStream);
+      } finally {
+        IOUtils.closeQuietly(remoteStream);
+        IOUtils.closeQuietly(localStream);
+      }
+      return localFile;
     }
   }
 }
