@@ -163,7 +163,8 @@ class AngrybirdTaskRunner(TaskRunnerWrapper):
   def __init__(self, task_id, *args, **kwargs):
     TaskRunnerWrapper.__init__(self, task_id, *args, **kwargs)
     self._angrybird_home = os.environ['ANGRYBIRD_HOME']
-    self._sandbox_root = os.path.join(self._angrybird_home, 'logs/thermos/lib')
-    self._checkpoint_root = os.path.join(self._angrybird_home, 'logs/thermos/run')
+    self._angrybird_logdir = os.environ['ANGRYBIRD_THERMOS']
+    self._sandbox_root = os.path.join(self._angrybird_logdir, 'thermos/lib')
+    self._checkpoint_root = os.path.join(self._angrybird_logdir, 'thermos/run')
     self._runner_pex = os.path.join(self._angrybird_home, 'science', 'dist', self.PEX_NAME)
     self._sandbox = DirectorySandbox(task_id, self._sandbox_root)

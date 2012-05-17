@@ -54,15 +54,15 @@ class ThermosGCExecutor(ThermosExecutorBase):
     ThermosExecutorBase.__init__(self)
     self._slave_id = None
     self._gc_options = dict(
-      max_age   = max_age,
-      max_space = max_space,
-      max_tasks = max_tasks,
-      verbose   = verbose,
-      logger    = self.log
+      max_age=max_age,
+      max_space=max_space,
+      max_tasks=max_tasks,
+      verbose=verbose,
+      logger=self.log
     )
     self._task_runner_factory = task_runner_factory
-    if 'ANGRYBIRD_HOME' in os.environ:
-      self._checkpoint_root = os.path.join(os.environ['ANGRYBIRD_HOME'], 'logs/thermos/run')
+    if 'ANGRYBIRD_THERMOS' in os.environ:
+      self._checkpoint_root = os.path.join(os.environ['ANGRYBIRD_THERMOS'], 'thermos/run')
     else:
       self._checkpoint_root = checkpoint_root or app.get_options().checkpoint_root
 

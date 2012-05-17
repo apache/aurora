@@ -35,9 +35,9 @@ app.configure(module='twitter.common.app.modules.scribe_exception_handler',
 app.configure(debug=True)
 
 
-if 'ANGRYBIRD_HOME' in os.environ:
+if 'ANGRYBIRD_THERMOS' in os.environ:
   RUNNER_CLASS = AngrybirdTaskRunner
-  LogOptions.set_log_dir(os.path.join(os.environ['ANGRYBIRD_HOME'], 'logs/thermos/log'))
+  LogOptions.set_log_dir(os.path.join(os.environ['ANGRYBIRD_THERMOS'], 'thermos/log'))
 else:
   LogOptions.set_log_dir('/var/log/mesos')
   RUNNER_CLASS = ProductionTaskRunner
