@@ -25,6 +25,7 @@ import com.twitter.mesos.gen.comm.AdjustRetainedTasks;
 import com.twitter.mesos.gen.comm.ExecutorMessage;
 import com.twitter.mesos.scheduler.Driver;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHosts;
+import com.twitter.mesos.scheduler.MesosTaskFactory;
 import com.twitter.mesos.scheduler.StateManager;
 
 import static org.easymock.EasyMock.expect;
@@ -39,7 +40,7 @@ import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
  */
 public class HistoryPruneRunnerTest extends EasyMockTest {
 
-  private static final ExecutorID EXECUTOR = ExecutorID.newBuilder().setValue("executor").build();
+  private static final ExecutorID EXECUTOR = MesosTaskFactory.DEFAULT_EXECUTOR_ID;
 
   private static final String HOST_A = "host_a";
   private static final SlaveID HOST_A_ID =  slaveId(HOST_A);
@@ -68,7 +69,7 @@ public class HistoryPruneRunnerTest extends EasyMockTest {
     pruner = createMock(HistoryPruner.class);
     stateManager = createMock(StateManager.class);
     slaveHosts = createMock(SlaveHosts.class);
-    runner = new HistoryPruneRunner(driver, stateManager, pruner, EXECUTOR, slaveHosts);
+    runner = new HistoryPruneRunner(driver, stateManager, pruner, slaveHosts);
   }
 
   @Test

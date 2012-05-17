@@ -34,6 +34,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 public interface MesosTaskFactory {
 
+  ExecutorID DEFAULT_EXECUTOR_ID = ExecutorID.newBuilder().setValue("twitter").build();
+
   /**
    * Creates a mesos task object.
    *
@@ -47,8 +49,6 @@ public interface MesosTaskFactory {
   static class MesosTaskFactoryImpl implements MesosTaskFactory {
     private static final Logger LOG = Logger.getLogger(MesosTaskFactoryImpl.class.getName());
 
-    private static final ExecutorID DEFAULT_EXECUTOR_ID =
-        ExecutorID.newBuilder().setValue("twitter").build();
     private static final String THERMOS_EXECUTOR_ID_PREFIX = "thermos-";
 
     // TODO(wfarner): Push these args out to a module once java executor is gone.

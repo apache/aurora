@@ -21,7 +21,6 @@ import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 
 import org.apache.mesos.MesosSchedulerDriver;
-import org.apache.mesos.Protos.ExecutorInfo;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.FrameworkInfo;
 import org.apache.mesos.Scheduler;
@@ -219,7 +218,7 @@ public class SchedulerModule extends AbstractModule {
   @Provides
   @Singleton
   Function<String, SchedulerDriver> provideMesosSchedulerDriverFactory(
-      final Provider<Scheduler> scheduler, final ExecutorInfo executorInfo) {
+      final Provider<Scheduler> scheduler) {
 
     return new Function<String, SchedulerDriver>() {
       @Override public SchedulerDriver apply(@Nullable String frameworkId) {

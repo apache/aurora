@@ -17,7 +17,6 @@ import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
-import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.SlaveID;
 
 import com.twitter.common.inject.TimedInterceptor.Timed;
@@ -29,6 +28,7 @@ import com.twitter.mesos.gen.comm.AdjustRetainedTasks;
 import com.twitter.mesos.gen.comm.ExecutorMessage;
 import com.twitter.mesos.scheduler.Driver;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHosts;
+import com.twitter.mesos.scheduler.MesosTaskFactory;
 import com.twitter.mesos.scheduler.StateManager;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -61,20 +61,17 @@ class HistoryPruneRunner implements Runnable {
   private final Driver driver;
   private final StateManager stateManager;
   private final HistoryPruner historyPruner;
-  private final ExecutorID defaultExecutorId;
   private final SlaveHosts slaveHosts;
 
   @Inject
   HistoryPruneRunner(Driver driver,
       StateManager stateManager,
       HistoryPruner historyPruner,
-      ExecutorID defaultExecutorId,
       SlaveHosts slaveHosts) {
 
     this.driver = checkNotNull(driver);
     this.stateManager = checkNotNull(stateManager);
     this.historyPruner = checkNotNull(historyPruner);
-    this.defaultExecutorId = checkNotNull(defaultExecutorId);
     this.slaveHosts = checkNotNull(slaveHosts);
   }
 
@@ -140,7 +137,7 @@ class HistoryPruneRunner implements Runnable {
       driver.sendMessage(
           ExecutorMessage.adjustRetainedTasks(message),
           knownHosts.get(host),
-          defaultExecutorId);
+          MesosTaskFactory.DEFAULT_EXECUTOR_ID);
     }
   }
 
