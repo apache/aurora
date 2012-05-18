@@ -31,7 +31,7 @@ from twitter.mesos.zookeeper_helper import ZookeeperHelper
 class SchedulerClient(object):
   @staticmethod
   def get(cluster, **kwargs):
-    log.info('Auto-detected location: %s' % 'prod' if Location.is_prod() else 'corp')
+    log.debug('Client location: %s' % ('prod' if Location.is_prod() else 'corp'))
 
     # TODO(vinod) : Clear up the convention of what --cluster <arg> means
     # Currently arg can be any one of
@@ -42,7 +42,7 @@ class SchedulerClient(object):
     if cluster.find('localhost:') == 0:
       log.info('Attempting to talk to local scheduler.')
       port = int(cluster.split(':')[1])
-      return None, LocalSchedulerClient(port, ssl=True, real_host='localhost')
+      return None, LocalSchedulerClient(port, ssl=True)
     else:
       if cluster.find(':') > -1:
         cluster, zk_port = cluster.split(':')

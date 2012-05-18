@@ -139,7 +139,8 @@ class MesosCLI(cmd.Cmd):
     (jobname, config_file) = line
     config = get_config(jobname, config_file)
     if self.options.cluster is not None:
-      log.warning('Deprecation warning: config cluster with --cluster is no longer supported.')
+      log.warning('Deprecation warning: --cluster command line option is no longer supported.'
+                  ' Cluster should be specified in the job config file.')
       assert self.options.cluster == config.cluster(), (
           'Command line --cluster and config file cluster do not match.')
     api = MesosClientAPI(cluster=config.cluster(), verbose=self.options.verbose)
