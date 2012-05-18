@@ -102,7 +102,7 @@ class ThermosGCExecutor(ThermosExecutorBase):
         self.send_update(driver, task_id, 'LOST',
           'GC executor could find no trace of %s.' % task_id)
       elif task_id in active_tasks and self.twitter_status_is_terminal(task_state):
-        log._info('Scheduler thinks active task %s is in terminal state, killing.' % task_id)
+        log.info('Scheduler thinks active task %s is in terminal state, killing.' % task_id)
         if terminate_task(task_id):
           self.send_update(driver, task_id, 'KILLED',
             'Scheduler thought %s was in terminal state so we killed it.' % task_id)
