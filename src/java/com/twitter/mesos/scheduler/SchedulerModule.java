@@ -43,6 +43,7 @@ import com.twitter.common.zookeeper.ServerSetImpl;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.common.zookeeper.ZooKeeperUtils;
+import com.twitter.common_internal.ldap.Ods;
 import com.twitter.common_internal.zookeeper.ZooKeeperModule;
 import com.twitter.mesos.GuiceUtils;
 import com.twitter.mesos.gen.MesosAdmin;
@@ -56,6 +57,9 @@ import com.twitter.mesos.scheduler.SchedulerLifecycle.DriverReference;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.auth.SessionValidator;
 import com.twitter.mesos.scheduler.auth.SessionValidator.SessionValidatorImpl;
+import com.twitter.mesos.scheduler.auth.SessionValidator.UserValidator;
+import com.twitter.mesos.scheduler.auth.SessionValidator.UserValidator.ODSValidator;
+import com.twitter.mesos.scheduler.auth.SessionValidator.UserValidator.TestValidator;
 import com.twitter.mesos.scheduler.httphandlers.ServletModule;
 import com.twitter.mesos.scheduler.periodic.BootstrapTaskLauncher;
 import com.twitter.mesos.scheduler.periodic.BootstrapTaskLauncher.Bootstrap;
@@ -103,6 +107,9 @@ public class SchedulerModule extends AbstractModule {
   @CmdLine(name = "gc_executor_path", help = "Path to the gc executor launch script.")
   private static final Arg<String> GC_EXECUTOR_PATH = Arg.create(null);
 
+  @CmdLine(name = "secure_auth", help = "Enforces RPC authentication with mesos client.")
+  private static final Arg<Boolean> SECURE_AUTH = Arg.create(true);
+
   private static final String TWITTER_FRAMEWORK_NAME = "TwitterScheduler";
 
   @Override
@@ -128,6 +135,16 @@ public class SchedulerModule extends AbstractModule {
 
     // Bindings for MesosSchedulerImpl.
     bind(SessionValidator.class).to(SessionValidatorImpl.class);
+
+    if (SECURE_AUTH.get()) {
+      bind(UserValidator.class).to(ODSValidator.class);
+      bind(ODSValidator.class).in(Singleton.class);
+      bind(Ods.class).in(Singleton.class);
+    } else {
+      bind(UserValidator.class).to(TestValidator.class);
+      bind(TestValidator.class).in(Singleton.class);
+    }
+
     bind(SchedulerCore.class).to(SchedulerCoreImpl.class).in(Singleton.class);
 
     bind(new TypeLiteral<Optional<String>>() { }).annotatedWith(GcExecutor.class)

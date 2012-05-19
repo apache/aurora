@@ -46,6 +46,8 @@ def synthesize_url(cluster, scheduler=None, role=None, job=None):
   if 'angrybird-local' in cluster:
     # TODO(vinod): Get the correct web port of the leading scheduler from zk!
     scheduler_url = 'http://%s:5051' % scheduler.real_host
+  elif 'localhost' in cluster:
+    scheduler_url = 'http://localhost:8081'
   else :
     cluster = Cluster.get(cluster)
     scheduler_url = cluster.proxy_url if cluster.is_service_proxied else \

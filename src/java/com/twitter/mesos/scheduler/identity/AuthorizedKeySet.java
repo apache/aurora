@@ -55,6 +55,16 @@ public class AuthorizedKeySet {
 
     Message sig = new Message(signature);
 
+    // TODO(vinod): This is a hack because verifySSHSignature below may throw
+    // OutOfMemory error if its not fed a valid RSA/DSA signature.
+    // NOTE: getInt() on the signature returns the length of type of
+    // the signature (e.g. ssh-rsa, ssh-dsa).
+    int length = sig.getInt();
+    if (length > 100) {
+      LOG.log(Level.WARNING, "Invalid signature. Length: " + length);
+      return false;
+    }
+
     for (PKey key : keys) {
       sig.rewind();
       try {

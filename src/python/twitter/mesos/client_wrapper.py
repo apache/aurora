@@ -1,8 +1,6 @@
 import getpass
 import os
-import pprint
 import subprocess
-import tempfile
 import time
 
 from twitter.common import log, dirutil
@@ -16,7 +14,6 @@ from twitter.mesos.updater import Updater
 
 from gen.twitter.mesos.ttypes import *
 
-# TODO(vinod): Merge this class with twitter.mesos.client_wrapper.MesosHelper
 class HDFSHelper(object):
   """Helper class for performing HDFS operations."""
 
@@ -126,9 +123,15 @@ class MesosHelper(object):
   _DEFAULT_USER = getpass.getuser()
 
   @staticmethod
-  def acquire_session_key_or_die(owner):
+  def acquire_session_key(owner):
     key = SessionKey(user=owner)
-    SessionKeyHelper.sign_session(key, owner)
+    try:
+      SessionKeyHelper.sign_session(key, owner)
+    except Exception as e:
+      log.warning('Cannot use SSH auth: %s' % e)
+      log.warning('Attempting un-authenticated communication')
+      key.nonce = SessionKeyHelper.get_timestamp()
+      key.nonceSig = 'UNAUTHENTICATED'
     return key
 
   @staticmethod
@@ -195,7 +198,7 @@ class MesosClientBase(object):
   def requires_auth(method):
     def _wrapper(self, *args, **kwargs):
       if not self._session_key:
-        self._session_key = MesosHelper.acquire_session_key_or_die(getpass.getuser())
+        self._session_key = MesosHelper.acquire_session_key(getpass.getuser())
       return method(self, *args, **kwargs)
     return _wrapper
 

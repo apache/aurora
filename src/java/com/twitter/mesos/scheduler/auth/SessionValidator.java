@@ -52,13 +52,13 @@ public interface SessionValidator {
 
     private static final Amount<Long, Time> MAXIMUM_NONCE_DRIFT = Amount.of(60L, Time.SECONDS);
 
-    private final Ods ods;
     private final Clock clock;
+    private final UserValidator userValidator;
 
     @Inject
-    public SessionValidatorImpl(Ods ods, Clock clock) {
-      this.ods = checkNotNull(ods);
+    public SessionValidatorImpl(Clock clock, UserValidator userValidator) {
       this.clock = checkNotNull(clock);
+      this.userValidator = checkNotNull(userValidator);
     }
 
     @Override
@@ -77,34 +77,82 @@ public interface SessionValidator {
         throw new AuthFailedException("Session key nonce expired.");
       }
 
-      String userId = sessionKey.getUser();
-      AuthorizedKeySet keySet;
-      try {
-        if (!userId.equals(targetRole)) {
-          if (!ods.isRoleAccount(targetRole)) {
-            throw new AuthFailedException(targetRole + " is not a role account.");
-          }
-        }
-
-        User user = ods.getUser(userId);
-        if (user == null) {
-          throw new AuthFailedException(String.format("User %s not found.", userId));
-        }
+      userValidator.assertRoleAccess(sessionKey, targetRole);
+    }
+  }
 
 
-        try {
-          keySet = AuthorizedKeySet.createFromKeys(ods.expandKeys(targetRole));
-        } catch (KeyParseException e) {
-          throw new AuthFailedException("Failed to parse SSH keys for user " + userId);
-        }
-      } catch (LdapException e) {
-        throw new AuthFailedException("LDAP request failed: " + e.getMessage(), e);
+  public interface UserValidator {
+
+    /**
+     * Validates the sessionKey against the user.
+     *
+     * @param sessionKey to validate.
+     * @param targetRole to validate the sessionKey against.
+     * @throws AuthFailedException If the key cannot be validated as the role.
+     */
+    void assertRoleAccess(SessionKey sessionKey, String targetRole) throws AuthFailedException;
+
+    /**
+     * User validator that checks against ODS LDAP Server.
+     */
+    public static class ODSValidator implements UserValidator {
+
+      private final Ods ods;
+
+      @Inject
+      public ODSValidator(Ods ods) {
+        this.ods = checkNotNull(ods);
       }
 
-      if (!keySet.verify(
-          Long.toString(sessionKey.getNonce()).getBytes(),
-          sessionKey.getNonceSig())) {
-        throw new AuthFailedException("Authentication failed for " + userId);
+      @Override
+      public void assertRoleAccess(SessionKey sessionKey, String targetRole)
+          throws AuthFailedException {
+
+        String userId = sessionKey.getUser();
+        AuthorizedKeySet keySet;
+        try {
+          if (!userId.equals(targetRole)) {
+            if (!ods.isRoleAccount(targetRole)) {
+              throw new AuthFailedException(targetRole + " is not a role account.");
+            }
+          }
+
+          User user = ods.getUser(userId);
+          if (user == null) {
+            throw new AuthFailedException(String.format("User %s not found.", userId));
+          }
+
+          try {
+            keySet = AuthorizedKeySet.createFromKeys(ods.expandKeys(targetRole));
+          } catch (KeyParseException e) {
+            throw new AuthFailedException("Failed to parse SSH keys for user " + userId);
+          }
+        } catch (LdapException e) {
+          throw new AuthFailedException("LDAP request failed: " + e.getMessage(), e);
+        }
+
+        if (!keySet.verify(
+            Long.toString(sessionKey.getNonce()).getBytes(),
+            sessionKey.getNonceSig())) {
+          throw new AuthFailedException("Authentication failed for " + userId);
+        }
+      }
+    }
+
+    /**
+     * User validator that simply checks for non-blank signature.
+     */
+    public static class TestValidator implements UserValidator {
+
+      @Override
+      public void assertRoleAccess(SessionKey sessionKey, String targetRole)
+          throws AuthFailedException {
+
+        String signature = new String(sessionKey.getNonceSig());
+        if (StringUtils.isBlank(signature)) {
+          throw new AuthFailedException("Blank signature");
+        }
       }
     }
   }
