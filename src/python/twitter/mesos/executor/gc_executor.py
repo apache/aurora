@@ -196,8 +196,8 @@ class ThermosGCExecutor(ThermosExecutorBase):
 
 
 LogOptions.set_log_dir('/var/log/mesos')
-app.configure(module='twitter.common.app.modules.scribe_exception_handler',
-    category='test_thermos_gc_executor_exceptions')
+app.configure(module='twitter.common_internal.app.modules.chickadee_handler',
+    service_name='thermos_gc_executor')
 app.configure(debug=True)
 
 def main():

@@ -29,9 +29,9 @@ from thrift.TSerialization import deserialize as thrift_deserialize
 
 from .status_manager import StatusManager
 
-# TODO(wickman) When chickadee is ready on mesos machines, scribe to Chickadee instead.
-app.configure(module='twitter.common.app.modules.scribe_exception_handler',
-    category='test_thermos_executor_exceptions')
+
+app.configure(module='twitter.common_internal.app.modules.chickadee_handler',
+    service_name='thermos_executor')
 app.configure(debug=True)
 
 

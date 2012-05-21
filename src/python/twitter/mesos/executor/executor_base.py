@@ -1,13 +1,8 @@
-# mesos
 import mesos
 import mesos_pb2 as mesos_pb
-from twitter.common import app, log
+from twitter.common import log
 from gen.twitter.mesos.ttypes import ScheduleStatus
 from gen.twitter.thermos.ttypes import TaskState
-
-app.configure(module='twitter.common.app.modules.scribe_exception_handler',
-    category='test_thermos_executor_exceptions')
-app.configure(debug=True)
 
 class ThermosExecutorBase(mesos.Executor):
   MESOS_STATES = {
