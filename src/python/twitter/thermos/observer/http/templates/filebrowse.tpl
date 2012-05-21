@@ -31,8 +31,7 @@
 div.tight
 {
   height:85%;
-  overflow-y:scroll;
-  overflow-x:auto;
+  overflow:auto;
 }
 </style>
 

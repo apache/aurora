@@ -1,8 +1,12 @@
 import os
-import bottle
 from twitter.common import log
 from twitter.common.http import HttpServer
-from templating import HttpTemplate
+
+import bottle
+from mako.template import Template
+
+from .templating import HttpTemplate
+
 
 def _read_chunk(filename, offset=None, bytes=None):
   MB = 1024 * 1024
@@ -40,14 +44,15 @@ def _read_chunk(filename, offset=None, bytes=None):
     try:
       data = fp.read(bytes)
       return dict(
-        data = data,
+        data = data.decode('ascii', 'replace'),
         filelen = filelen,
         read = len(data),
         offset = offset,
         bytes = bytes,
         has_more = offset + bytes < filelen
       )
-    except:
+    except Exception as e:
+      log.error('Failed to read or escape file: %s' % e, exc_info=True)
       return {}
 
 class TaskObserverFileBrowser(object):
@@ -104,9 +109,11 @@ class TaskObserverFileBrowser(object):
     return d
 
   @HttpServer.route("/browse/:task_id")
-  @HttpServer.route("/browse/:task_id/:path#.+#")
+  @HttpServer.route("/browse/:task_id/:path#.*#")
   @HttpServer.mako_view(HttpTemplate.load('filelist'))
   def handle_dir(self, task_id, path=None):
+    if path == "":
+      path = None
     return self._observer.files(task_id, path)
 
   @HttpServer.route("/download/:task_id/:path#.+#")

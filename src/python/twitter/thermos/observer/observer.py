@@ -285,15 +285,16 @@ class TaskObserver(threading.Thread, Lockable):
     tasks = self.task(task_ids)
     def task_row(tid):
       task = tasks[tid]
-      return dict(
-          task_id=tid,
-          name=task['name'],
-          role=task['user'],
-          state=task['state'],
-          ports=task['ports'],
-          **task['resource_consumption'])
+      if task:
+        return dict(
+            task_id=tid,
+            name=task['name'],
+            role=task['user'],
+            state=task['state'],
+            ports=task['ports'],
+            **task['resource_consumption'])
     return dict(
-      tasks=map(task_row, task_ids),
+      tasks=filter(None, map(task_row, task_ids)),
       type=task_map['type'],
       offset=task_map['offset'],
       num=task_map['num'])
