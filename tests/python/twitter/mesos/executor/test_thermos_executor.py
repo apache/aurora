@@ -53,7 +53,7 @@ class ProxyDriver(object):
 def make_task(thermos_config, assigned_ports={}):
   at = AssignedTask(task = TwitterTaskInfo(thermosConfig = json.dumps(thermos_config.get())),
                     assignedPorts = assigned_ports)
-  td = mesos_pb.TaskDescription()
+  td = mesos_pb.TaskInfo()
   td.task_id.value = thermos_config.task().name().get() + '-001'
   td.name = thermos_config.task().name().get()
   td.data = serialize(at)

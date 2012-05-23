@@ -42,8 +42,21 @@ class ThermosExecutorBase(mesos.Executor):
   def log(self, msg):
     log.info('Executor [%s]: %s' % (self._slave_id, msg))
 
-  def init(self, driver, executor_info):
-    self.log('init() called with ExecutorInfo: %s' % executor_info)
+  def registered(self, driver, executor_info, framework_info, slave_info):
+    self.log('registered() called with:')
+    self.log('   ExecutorInfo:  %s' % executor_info)
+    self.log('   FrameworkInfo: %s' % framework_info)
+    self.log('   SlaveInfo:     %s' % slave_info)
+    self._executor_info = executor_info
+    self._framework_info = framework_info
+    self._slave_info = slave_info
+
+  def reregistered(self, driver, slave_info):
+    self.log('reregistered() called with:')
+    self.log('   SlaveInfo:     %s' % slave_info)
+
+  def disconnected(self, driver):
+    self.log('disconnected() called')
 
   def send_update(self, driver, task_id, state, message=None):
     update = mesos_pb.TaskStatus()
@@ -62,5 +75,5 @@ class ThermosExecutorBase(mesos.Executor):
   def frameworkMessage(self, driver, message):
     self.log('frameworkMessage() got message: %s, ignoring.' % message)
 
-  def error(self, driver, code, message):
-    self.log('ERROR code: %s, message: %s' % (code, message))
+  def error(self, driver, message):
+    self.log('Received error message: %s' % message)

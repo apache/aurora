@@ -50,7 +50,7 @@ FINISHED_TASKS = {
 }
 
 def serialize_art(art):
-  td = mesos.TaskDescription()
+  td = mesos.TaskInfo()
   td.data = serialize(art)
   return td
 

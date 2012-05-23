@@ -31,9 +31,9 @@ python_library(
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/lang'),
     pants('src/python/twitter/common/quantity'),
-    pants('3rdparty/python.twitter:mesos-latest'),
     pants('src/thrift/com/twitter/thermos:py-thrift'),
-    pants(':thermos_executor_base')
+    pants(':thermos_executor_base'),
+    python_requirement('mesos==0.9.0'),
   ]
 )
 
@@ -41,13 +41,13 @@ python_library(
   name = 'thermos_executor_base',
   sources = ['executor_base.py'],
   dependencies = [
-    pants('3rdparty/python.twitter:mesos-latest'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/app/modules:exceptions'),
     pants('src/python/twitter/common_internal/app/modules'),
     pants('src/python/twitter/common/log'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
     pants('src/thrift/com/twitter/thermos:py-thrift'),
+    python_requirement('mesos==0.9.0'),
   ]
 )
 
