@@ -13,7 +13,7 @@ REMOTE_USER = 'mesos'
 
 BUILD_TARGET_CMDS = [
   './pants src/python/twitter/mesos/executor:thermos_executor',
-  './pants src/python/twitter/thermos/bin:thermos_run',
+  './pants src/python/twitter/mesos/executor:thermos_runner',
   './pants src/python/twitter/mesos/executor:gc_executor',
 ]
 
@@ -82,7 +82,7 @@ def thermos_postprocess():
   import zipfile
   with contextlib.closing(zipfile.ZipFile('dist/thermos_executor.pex', 'a')) as zf:
     zf.writestr('twitter/mesos/executor/resources/__init__.py', '')
-    zf.write('dist/thermos_run.pex', 'twitter/mesos/executor/resources/thermos_run.pex')
+    zf.write('dist/thermos_runner.pex', 'twitter/mesos/executor/resources/thermos_runner.pex')
 
 def build():
   for build_target_cmd in BUILD_TARGET_CMDS:

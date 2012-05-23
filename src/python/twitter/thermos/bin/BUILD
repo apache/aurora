@@ -10,23 +10,6 @@ python_binary(
 )
 
 python_binary(
-  name = 'thermos_run',
-  source = 'thermos_run.py',
-  dependencies = [
-    pants('src/python/twitter/common/app'),
-    pants('src/python/twitter/common/app/modules:exceptions'),
-    pants('src/python/twitter/common/app/modules:scribe_exceptions'),
-    pants('src/python/twitter/common/log'),
-    pants('src/python/twitter/thermos/config:schema'),
-    pants('src/python/twitter/thermos/runner'),
-  ],
-  platforms = [
-    'linux-x86_64',
-    'macosx-10.6-x86_64'
-  ]
-)
-
-python_binary(
   name = 'thermos_observe',
   source = 'thermos_observe.py',
   dependencies = [

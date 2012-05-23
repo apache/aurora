@@ -27,7 +27,7 @@ app.add_option("--checkpoint_root", dest="checkpoint_root", metavar="PATH",
 
 
 class TaskRunnerWrapper(object):
-  PEX_NAME = 'thermos_run.pex'
+  PEX_NAME = 'thermos_runner.pex'
 
   class TaskError(Exception):
     pass
@@ -88,8 +88,6 @@ class TaskRunnerWrapper(object):
 
     cmdline_args = [self._runner_pex]
     cmdline_args.extend('--%s=%s' % (flag, value) for flag, value in params.items())
-    cmdline_args.extend([
-      '--scribe_exception_category=test_thermos_runner_exceptions'])
     if self._enable_chroot:
       cmdline_args.extend(['--enable_chroot'])
     for name, port in self._ports.items():

@@ -78,6 +78,23 @@ python_binary(
   ]
 )
 
+python_binary(
+  name = 'thermos_runner',
+  source = 'thermos_runner.py',
+  dependencies = [
+    pants('src/python/twitter/common/app'),
+    pants('src/python/twitter/common/app/modules:exceptions'),
+    pants('src/python/twitter/common_internal/app/modules'),
+    pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/thermos/config:schema'),
+    pants('src/python/twitter/thermos/runner'),
+  ],
+  platforms = [
+    'linux-x86_64',
+    'macosx-10.6-x86_64'
+  ]
+)
+
 python_library(
   name = 'gc_executor_lib',
   sources = ['gc_executor.py'],
