@@ -12,8 +12,5 @@ python_binary(
     pants('src/python/twitter/thermos/runner'),
     pants('src/thrift/com/twitter/thermos:py-thrift')
   ],
-  platforms = [
-    'linux-x86_64',
-    'macosx-10.6-x86_64'
-  ]
+  platforms = ['linux-x86_64'],
 )
