@@ -371,6 +371,10 @@ class TaskRunner(object):
     return self._task
 
   @property
+  def task_id(self):
+    return self._task_id
+
+  @property
   def state(self):
     return self._state
 
@@ -396,6 +400,11 @@ class TaskRunner(object):
         # pid no longer exists
         return True
       raise
+
+  def close_ckpt(self):
+    """Force close the checkpoint stream.  This is necessary for runners terminated through
+       exception propagation."""
+    self._ckpt.close()
 
   @contextmanager
   def control(self, force=False):

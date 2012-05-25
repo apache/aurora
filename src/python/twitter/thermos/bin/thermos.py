@@ -92,6 +92,31 @@ def daemonize():
                                        open('/dev/null', 'a+'),
                                        open('/dev/null', 'a+', 0))
 
+
+def _really_run(task, root, sandbox, task_id=None, user=None, prebound_ports=None, chroot=None,
+                daemon=False):
+  prebound_ports = prebound_ports or {}
+  missing_ports = set(task.ports()) - set(prebound_ports.keys())
+  if missing_ports:
+    app.error('ERROR!  Unbound ports: %s' % ' '.join(port for port in missing_ports))
+  task_runner = TaskRunner(task.task, root, sandbox, task_id=task_id,
+                           user=user, portmap=prebound_ports, chroot=chroot)
+  if daemon:
+    print('Daemonizing and starting runner.')
+    try:
+      log.teardown_stderr_logging()
+      daemonize()
+    except Exception as e:
+      print("Failed to daemonize: %s" % e)
+      sys.exit(1)
+  try:
+    task_runner.run()
+  except KeyboardInterrupt:
+    print('Got keyboard interrupt, killing job!')
+    task_runner.close_ckpt()
+    task_runner.kill()
+
+
 @app.command
 @app.command_option("--user", metavar="USER", default=getpass.getuser(), dest='user',
                     help="run as this user.  if not $USER, must have setuid privilege.")
@@ -141,21 +166,14 @@ def run(args, options):
       --daemon			   Fork and daemonize the task.
   """
   thermos_task = get_task_from_options(args, options)
-  prebound_ports = options.prebound_ports or {}
-  missing_ports = set(thermos_task.ports()) - set(prebound_ports.keys())
-  if missing_ports:
-    app.error('ERROR!  Unbound ports: %s' % ' '.join(port for port in missing_ports))
-  task_runner = TaskRunner(thermos_task.task, options.root, options.sandbox,
-    task_id=options.task_id, user=options.user, portmap=prebound_ports, chroot=options.chroot)
-  if options.daemon:
-    print('Daemonizing and starting runner.')
-    try:
-      log.teardown_stderr_logging()
-      daemonize()
-    except Exception as e:
-      print("Failed to daemonize: %s" % e)
-      sys.exit(1)
-  task_runner.run()
+  _really_run(thermos_task,
+              options.root,
+              options.sandbox,
+              task_id=options.task_id,
+              user=options.user,
+              prebound_ports=options.prebound_ports,
+              chroot=options.chroot,
+              daemon=options.daemon)
 
 
 @app.command
@@ -203,21 +221,14 @@ def simplerun(args, options):
     resources = Resources(cpu = 1.0, ram = 256 * 1024 * 1024, disk = 0),
     processes = [Process(name = options.name, cmdline = cmdline)]))
 
-  prebound_ports = options.prebound_ports or {}
-  missing_ports = set(thermos_task.ports()) - set(prebound_ports.keys())
-  if missing_ports:
-    app.error('ERROR!  Unbound ports: %s' % ' '.join(port for port in missing_ports))
-  task_runner = TaskRunner(thermos_task.task, options.root, None,
-    task_id=options.task_id, user=options.user, portmap=prebound_ports)
-  if options.daemon:
-    print('Daemonizing and starting runner.')
-    try:
-      log.teardown_stderr_logging()
-      daemonize()
-    except Exception as e:
-      print("Failed to daemonize: %s" % e)
-      sys.exit(1)
-  task_runner.run()
+  _really_run(thermos_task,
+              options.root,
+              None,
+              task_id=options.task_id,
+              user=options.user,
+              prebound_ports=options.prebound_ports,
+              chroot=False,
+              daemon=options.daemon)
 
 
 @app.command
