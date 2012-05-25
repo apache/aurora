@@ -17,9 +17,6 @@ class ThermosContext(Struct):
   user    = String
 
 
-# TODO(wickman)  Resource management/enforcement currently unsupported by Thermos
-# and it's questionable whether it will ever be enforced or available in a standard
-# way.  It could feasibly be enforced through some plugin mechanism perhaps.
 class Resources(Struct):
   cpu  = Required(Float)
   ram  = Required(Integer)
@@ -36,20 +33,23 @@ class Process(Struct):
 
   # optionals
   resources     = Resources
-  daemon        = Default(Integer, 0)   # boolean, currently unsupported
-  max_failures  = Default(Integer, 1)
+
+
+  max_failures  = Default(Integer, 1) # maximum number of failed process runs
+                                      # before process is failed.
+  daemon        = Default(Integer, 0) # boolean
+  ephemeral     = Default(Integer, 0) # boolean
+  min_duration  = Default(Integer, 5) # integer seconds
 
 
 @Provided(thermos = ThermosContext)
 class Task(Struct):
-  name      = Required(String)
-  resources = Resources
+  name = Required(String)
   processes = List(Process)
+
+  # optionals
   constraints = List(Constraint)
-
-  max_failures  = Default(Integer, 1)
-
-  # 0 = infinite concurrency, > 0 => max concurrent processes.
-  max_concurrency = Default(Integer, 0)
-
-  user          = Default(String, '{{thermos.user}}')
+  resources = Resources
+  max_failures = Default(Integer, 1) # maximum number of failed processes before task is failed.
+  max_concurrency = Default(Integer, 0) # 0 = infinite concurrency, > 0 => max concurrent processes.
+  user = Default(String, '{{thermos.user}}')

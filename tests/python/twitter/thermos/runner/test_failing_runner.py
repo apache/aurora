@@ -11,6 +11,7 @@ class TestFailingRunner(RunnerTestBase):
   def task(cls):
     ping_template = Process(
       name="{{name}}",
+      min_duration=1,
       max_failures=5,
       cmdline = "echo {{name}} pinging;                                "
                 "echo ping >> {{name}};                                "

@@ -16,9 +16,9 @@ class TestFailureLimit(RunnerTestBase):
       resources = Resources(cpu = 1.0, ram = 16*1024*1024, disk = 16*1024),
       max_failures = 2,
       processes = [
-        Process(name = "a", max_failures=1, cmdline="echo hello world"),
-        Process(name = "b", max_failures=1, cmdline="exit 1"),
-        Process(name = "c", max_failures=1, cmdline="echo hello world")
+        Process(name = "a", max_failures=1, min_duration=1, cmdline="echo hello world"),
+        Process(name = "b", max_failures=1, min_duration=1, cmdline="exit 1"),
+        Process(name = "c", max_failures=1, min_duration=1, cmdline="echo hello world")
       ],
       constraints = [{'order': ['a', 'b', 'c']}]
     )
@@ -42,19 +42,15 @@ class TestFailureLimit(RunnerTestBase):
 class TestTaskSucceedsIfMaxFailures0(RunnerTestBase):
   @classmethod
   def task(cls):
+    base = Process(max_failures=2, min_duration=1)
+    ex = base(cmdline="exit 1")
+    hw = base(cmdline="echo hello world")
     task = Task(
       name = "failing_task",
       resources = Resources(cpu = 1.0, ram = 16*1024*1024, disk = 16*1024),
       max_failures = 0,
-      processes = [
-        Process(name = "f1", max_failures=2, cmdline="exit 1"),
-        Process(name = "f2", max_failures=2, cmdline="exit 1"),
-        Process(name = "f3", max_failures=2, cmdline="exit 1"),
-        Process(name = "s1", max_failures=2, cmdline="echo hello world"),
-        Process(name = "s2", max_failures=2, cmdline="echo hello world"),
-        Process(name = "s3", max_failures=2, cmdline="echo hello world")
-      ],
-    )
+      processes = [ex(name='f1'), ex(name='f2'), ex(name='f3'),
+                   hw(name='s1'), hw(name='s2'), hw(name='s3')])
     return task.interpolate()[0]
 
   def test_runner_state_reconstruction(self):

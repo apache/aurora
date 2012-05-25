@@ -137,7 +137,7 @@ class TestHealthChecker(unittest.TestCase):
     assert hct.healthy
     clock.tick(3)
     assert hct.healthy
-    clock.tick(2)
+    clock.tick(5)
     assert not hct.healthy
     hct.stop()
 

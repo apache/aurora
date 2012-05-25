@@ -1,38 +1,28 @@
-__author__ = 'wickman@twitter.com (brian wickman)'
+"""
+
+Planners to schedule processes within Tasks.
+
+TaskPlanner:
+  a daemon process can depend upon a regular process
+  a regular process can not depend upon a daemon process
+"""
 
 import copy
-from collections import defaultdict
+from collections import defaultdict, namedtuple
+from functools import partial
+import sys
+import time
 
 class Planner(object):
   """
-     Given a scheduler, determine runnable processes based upon what is running
-     and what has finished.
+    Given a set of process names and a graph of dependencies between them, determine
+    what can run predicated upon process completions.
   """
-
   class InvalidSchedule(Exception): pass
 
   @staticmethod
-  def extract_constraints(task):
-    """
-      Construct a set of processes and the process dependencies from a Thermos Task.
-    """
-    processes = set(process.name().get() for process in task.processes())
-    dependencies = defaultdict(set)
-    if task.has_constraints():
-      for constraint in task.constraints():
-        # handle process orders
-        process_names = constraint.order().get()
-        for k in range(1, len(process_names)):
-          if process_names[k-1] not in processes:
-            raise Planner.InvalidSchedule("Unknown process in dependency: %s" % process_names[k-1])
-          if process_names[k] not in processes:
-            raise Planner.InvalidSchedule("Unknown process in dependency: %s" % process_names[k])
-          dependencies[process_names[k]].add(process_names[k-1])
-    return (processes, dependencies)
-
-  @staticmethod
-  def runnable(processes, dependencies):
-    return set(process for process in processes if not dependencies[process])
+  def filter_runnable(processes, dependencies):
+    return set(process for process in processes if not dependencies.get(process))
 
   @staticmethod
   def filter_dependencies(dependencies, given=frozenset()):
@@ -57,61 +47,210 @@ class Planner(object):
     scheduling = True
     while scheduling:
       scheduling = False
-      runnables = Planner.runnable(processes, dependencies)
+      runnables = Planner.filter_runnable(processes, dependencies)
       if runnables:
         scheduling = True
         processes -= runnables
       dependencies = Planner.filter_dependencies(dependencies, given=runnables)
     return len(processes) == 0
 
-  @staticmethod
-  def from_task(task):
-    """
-      Construct a planner from a Thermos Task.
-    """
-    processes, dependencies = Planner.extract_constraints(task)
-    return Planner(processes, dependencies)
-
   def __init__(self, processes, dependencies):
-    self._processes = processes
-    self._dependencies = dependencies
+    self._processes = set(processes)
+    self._dependencies = dict((process, set(dependencies.get(process, [])))
+        for process in self._processes)
     if not Planner.satisfiable(self._processes, self._dependencies):
       raise Planner.InvalidSchedule("Cycles detected in the task schedule!")
     self._running = set()
     self._finished = set()
-    self._broken = set()
+    self._failed = set()
 
-  def get_runnable(self):
-    return Planner.runnable(self._processes - self._broken - self._running - self._finished,
+  @property
+  def runnable(self):
+    return Planner.filter_runnable(self._processes - self._running - self._finished - self._failed,
       Planner.filter_dependencies(self._dependencies, given=self._finished))
 
-  def get_running(self):
-    return list(self._running)
+  @property
+  def processes(self):
+    return set(self._processes)
 
-  def get_finished(self):
-    return list(self._finished)
+  @property
+  def running(self):
+    return set(self._running)
 
-  def forget(self, process):
-    self._finished.discard(process)
+  @property
+  def finished(self):
+    return set(self._finished)
+
+  @property
+  def failed(self):
+    return set(self._failed)
+
+  def reset(self, process):
+    assert process in self._running
+    assert process not in self._finished
+    assert process not in self._failed
     self._running.discard(process)
 
-  def set_broken(self, process):
-    self.forget(process)
-    self._broken.add(process)
-
   def set_running(self, process):
-    self._finished.discard(process)
+    assert process not in self._failed
+    assert process not in self._finished
+    assert process in self._running or process in self.runnable
     self._running.add(process)
 
   def set_finished(self, process):
+    assert process in self._running
+    assert process not in self._failed
     self._running.discard(process)
     self._finished.add(process)
 
-  def is_finished(self, process):
-    return process in self._finished
-
-  def is_running(self, process):
-    return process in self._running
+  def set_failed(self, process):
+    assert process in self._running
+    assert process not in self._finished
+    self._running.discard(process)
+    self._failed.add(process)
 
   def is_complete(self):
-    return self._finished == (self._processes - self._broken)
+    return self._finished == (self._processes - self._failed)
+
+
+TaskAttributes = namedtuple('TaskAttributes', 'min_duration is_daemon max_failures is_ephemeral')
+
+class TaskPlanner(object):
+  """
+    A planner for processes part of a Thermos task, taking into account ephemeral and daemon
+    bits, in addition to duration restrictions [and failure limits?].
+
+                               is_daemon
+         .----------------------------------------------------.
+         |                                                    |
+         |    clock gate      .----------------------.        |
+         |  .---------------> | runnable && !waiting |        |
+         v  |                 `----------------------'        |
+       .----------.                       |                   |
+       | runnable |                       | set_running       |
+       `----------'                       v                   |
+            ^        forget          .---------.              |  !is_daemon  .----------.
+            `------------------------| running |--------------+------------> | finished |
+            ^                        `---------' add_success                 `----------'
+            |                             |
+            |     under failure limit     | add_failure
+            `-----------------------------+
+                                          | past failure limit
+                                          v
+                                      .--------.
+                                      | failed |
+                                      `--------'
+  """
+  InvalidSchedule = Planner.InvalidSchedule
+  INFINITY = sys.float_info.max
+
+  @staticmethod
+  def extract_dependencies(task):
+    """
+      Construct a set of processes and the process dependencies from a Thermos Task.
+    """
+    process_map = dict((process.name().get(), process) for process in task.processes())
+    processes = set(process_map)
+    dependencies = defaultdict(set)
+    if task.has_constraints():
+      for constraint in task.constraints():
+        # handle process orders
+        process_names = constraint.order().get()
+        for k in range(1, len(process_names)):
+          pnk, pnk1 = process_names[k], process_names[k-1]
+          if pnk1 not in processes:
+            raise TaskPlanner.InvalidSchedule("Unknown process in dependency: %s" % pnk1)
+          if pnk not in processes:
+            raise TaskPlanner.InvalidSchedule("Unknown process in dependency: %s" % pnk)
+          if process_map[pnk1].daemon().get():
+            raise TaskPlanner.InvalidSchedule("Process %s may not depend upon daemon process %s"
+                % (pnk, pnk1))
+          dependencies[pnk].add(pnk1)
+    return (processes, dependencies)
+
+  def __init__(self, task, clock=time):
+    self._planner = Planner(*self.extract_dependencies(task))
+    self._clock = clock
+    self._last_terminal = {} # process => timestamp of last terminal state
+    self._failures = defaultdict(int)
+    self._attributes = {}
+    self._ephemerals = set(process.name().get() for process in task.processes()
+        if process.ephemeral().get())
+
+    for process in task.processes():
+      self._attributes[process.name().get()] = TaskAttributes(
+        is_daemon=bool(process.daemon().get()),
+        is_ephemeral=bool(process.ephemeral().get()),
+        max_failures=process.max_failures().get(),
+        min_duration=process.min_duration().get())
+
+  def get_wait(self, process, timestamp=None):
+    now = timestamp if timestamp is not None else self._clock.time()
+    if process not in self._last_terminal:
+      return 0
+    return self._attributes[process].min_duration - (now - self._last_terminal[process])
+
+  def is_ready(self, process, timestamp=None):
+    return self.get_wait(process, timestamp) <= 0
+
+  def is_waiting(self, process, timestamp=None):
+    return not self.is_ready(process, timestamp)
+
+  @property
+  def runnable(self):
+    """A list of processes that are runnable w/o duration restrictions."""
+    return self.runnable_at(self._clock.time())
+
+  @property
+  def waiting(self):
+    """A list of processes that are runnable w/o duration restrictions."""
+    return self.waiting_at(self._clock.time())
+
+  def runnable_at(self, timestamp):
+    return set(filter(partial(self.is_ready, timestamp=timestamp), self._planner.runnable))
+
+  def waiting_at(self, timestamp):
+    return set(filter(partial(self.is_waiting, timestamp=timestamp), self._planner.runnable))
+
+  def min_wait(self, timestamp=None):
+    """Return the current wait time for the next process to become runnable, or sys.float.max if
+       there are no waiters."""
+    waits = [self.get_wait(waiter, timestamp) for waiter in self.waiting_at(timestamp)]
+    return min(waits) if waits else self.INFINITY
+
+  def set_running(self, process):
+    self._planner.set_running(process)
+
+  def add_failure(self, process, timestamp=None):
+    timestamp = timestamp if timestamp is not None else self._clock.time()
+    self._last_terminal[process] = timestamp
+    self._failures[process] += 1
+    if self._failures[process] >= self._attributes[process].max_failures:
+      self._planner.set_failed(process)
+    else:
+      self._planner.reset(process)
+
+  def add_success(self, process, timestamp=None):
+    timestamp = timestamp if timestamp is not None else self._clock.time()
+    self._last_terminal[process] = timestamp
+    if not self._attributes[process].is_daemon:
+      self._planner.set_finished(process)
+    else:
+      self._planner.reset(process)
+
+  def is_complete(self):
+    terminals = self._planner.finished.union(self._planner.failed).union(self._ephemerals)
+    return self._planner.processes == terminals
+
+  # TODO(wickman) Should we consider subclassing again?
+  @property
+  def failed(self):
+    return self._planner.failed
+
+  @property
+  def running(self):
+    return self._planner.running
+
+  @property
+  def finished(self):
+    return self._planner.finished
