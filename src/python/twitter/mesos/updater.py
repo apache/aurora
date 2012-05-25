@@ -31,11 +31,11 @@ class Updater(object):
   @staticmethod
   def validate_config(update_config):
     """Perform sanity test on update_config."""
-    if update_config.batchSize < 1:
+    if update_config['batchSize'] < 1:
       raise Updater.InvalidConfigError('Batch size should be greater than 0')
-    if update_config.restartThreshold < 1:
+    if update_config['restartThreshold'] < 1:
       raise Updater.InvalidConfigError('Restart Threshold should be greater than 0')
-    if update_config.watchSecs < 1:
+    if update_config['watchSecs'] < 1:
       raise Updater.InvalidConfigError('Watch seconds should be greater than 0')
 
   def update_failure_counts(self, failed_shards):
@@ -65,35 +65,34 @@ class Updater(object):
               (self._failures_by_shard[shard], shard, self._max_shard_failures))
     return is_failed
 
-  def update(self, job_config):
+  def update(self, update_config, initial_shards):
     """Performs the job update, blocking until it completes.
     A rollback will be performed if the update was considered a failure based on the
     update configuration.
 
     Arguments:
-    job_config -- job configuration object.
+    update_config -- job update configuration object.
+    initial_shards -- a list of shards to update.
 
     Returns the set of shards that failed to update.
     """
-    Updater.validate_config(job_config.updateConfig)
+    Updater.validate_config(update_config)
 
-    update_config = job_config.updateConfig
     failed_shards = []
-    self._max_total_failures = update_config.maxTotalFailures
-    self._max_shard_failures = update_config.maxPerShardFailures
-    initial_shards = sorted(map(lambda config: config.shardId, job_config.taskConfigs))
+    self._max_total_failures = update_config['maxTotalFailures']
+    self._max_shard_failures = update_config['maxPerShardFailures']
     remaining_shards = initial_shards[:]
 
     log.info('Starting job update.')
     while remaining_shards and not self.is_failed_update(failed_shards):
-      batch_shards = remaining_shards[0 : update_config.batchSize]
+      batch_shards = remaining_shards[0 : update_config['batchSize']]
       remaining_shards = list(set(remaining_shards) - set(batch_shards))
       resp = self.restart_shards(batch_shards)
       log.log(debug_if(resp.responseCode == UpdateResponseCode.OK),
         'Response from scheduler: %s (message: %s)' % (
           UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
-      failed_shards = self.watch_shards(batch_shards, update_config.restartThreshold,
-          update_config.watchSecs)
+      failed_shards = self.watch_shards(batch_shards, update_config['restartThreshold'],
+          update_config['watchSecs'])
       log.log(debug_if(not failed_shards), 'Failed shards: %s' % failed_shards)
       remaining_shards += failed_shards
       remaining_shards.sort()
@@ -117,15 +116,15 @@ class Updater(object):
     shards_to_rollback.sort()
     failed_shards = []
     while shards_to_rollback:
-      batch_shards = shards_to_rollback[0 : update_config.batchSize]
+      batch_shards = shards_to_rollback[0 : update_config['batchSize']]
       shards_to_rollback = list(set(shards_to_rollback) - set(batch_shards))
       resp = self._scheduler.rollbackShards(self._role, self._job_name, batch_shards,
           self._update_token, self._session)
       log.log(debug_if(resp.responseCode == UpdateResponseCode.OK),
         'Response from scheduler: %s (message: %s)'
           % (UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
-      failed_shards += self.watch_shards(batch_shards, update_config.restartThreshold,
-          update_config.watchSecs)
+      failed_shards += self.watch_shards(batch_shards, update_config['restartThreshold'],
+          update_config['watchSecs'])
 
     if failed_shards:
       log.error('Rollback failed for shards: %s' % failed_shards)

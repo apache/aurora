@@ -7,14 +7,12 @@ from gen.twitter.mesos.ttypes import (
   CronCollisionPolicy,
   Identity,
   TaskConstraint,
-  UpdateConfig as thriftUpdateConfig,
   ValueConstraint,
 )
 from twitter.common.contextutil import temporary_file
 from twitter.mesos.clusters import Cluster
 from twitter.mesos.config.schema import (
   MesosJob,
-  UpdateConfig as pyUpdateConfig,
 )
 from twitter.mesos.parsers.pystachio_thrift import convert as convert_pystachio_to_thrift
 from twitter.thermos.config.schema import (
@@ -46,13 +44,6 @@ def test_simple_config():
   assert job.name == 'hello_world'
   assert job.owner == Identity(role=HELLO_WORLD.role().get(), user=getpass.getuser())
   assert job.cronSchedule == ''
-  assert job.updateConfig == thriftUpdateConfig(
-    batchSize = 1,
-    restartThreshold = 30,
-    watchSecs = 30,
-    maxPerShardFailures = 0,
-    maxTotalFailures = 0
-  )
 
   assert tti.jobName == 'hello_world'
   assert tti.isDaemon == False
@@ -67,17 +58,6 @@ def test_simple_config():
   assert tti.shardId == 0
   assert tti.constraints == set()
 
-
-def test_config_with_nondefault_update_config():
-  hwc = HELLO_WORLD(update_config = pyUpdateConfig(watch_secs = 60))
-  job = convert_pystachio_to_thrift(hwc)
-  assert job.updateConfig == thriftUpdateConfig(
-    batchSize = 1,
-    restartThreshold = 30,
-    watchSecs = 60,
-    maxPerShardFailures = 0,
-    maxTotalFailures = 0
-  )
 
 def test_config_with_options():
   hwc = HELLO_WORLD(

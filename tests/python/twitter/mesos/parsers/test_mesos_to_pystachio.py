@@ -3,7 +3,6 @@ from contextlib import contextmanager
 
 from twitter.common.contextutil import temporary_file
 from twitter.mesos.clusters import Cluster
-from twitter.mesos.config.schema import UpdateConfig
 from twitter.mesos.parsers.pystachio_codec import PystachioCodec
 from twitter.thermos.config.schema import Resources, Process, Task
 
@@ -47,13 +46,6 @@ def test_simple_config():
   assert job.instances() == Integer(1)
   assert job.cron_schedule() == String('')
   assert job.cron_policy() == String('KILL_EXISTING')
-  assert job.update_config() == UpdateConfig(
-    batch_size = 1,
-    restart_threshold = 30,
-    watch_secs = 30,
-    max_per_shard_failures = 0,
-    max_total_failures = 0
-  )
   assert job.daemon() == Integer(0)  # Boolean(False)
   assert job.constraints() == Map(String, String)({})
   assert job.production() == Integer(0)
@@ -76,20 +68,6 @@ def test_config_with_copy():
   assert len(list(constraints)) == 1
   assert constraints[0].order()[0] == String('installer')
   assert constraints[0].order()[1] == job.name()
-
-
-def test_config_with_nondefault_update_config():
-  hello_world_copy = copy.deepcopy(HELLO_WORLD)
-  hello_world_copy['updateConfig'] = {}
-  hello_world_copy['updateConfig']['watchSecs'] = 60
-  job = convert(hello_world_copy)
-  assert job.update_config() == UpdateConfig(
-    batch_size = 1,
-    restart_threshold = 30,
-    watch_secs = 60,
-    max_per_shard_failures = 0,
-    max_total_failures = 0
-  )
 
 
 def test_config_with_options():

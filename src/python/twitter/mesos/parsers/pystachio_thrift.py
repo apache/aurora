@@ -8,7 +8,6 @@ from gen.twitter.mesos.ttypes import (
   Identity,
   JobConfiguration,
   TwitterTaskInfo,
-  UpdateConfig,
 )
 
 from twitter.mesos.clusters import Cluster
@@ -87,13 +86,6 @@ def convert(job):
   if cron_policy is None:
     raise ValueError('Invalid cron policy: %s' % job.cron_policy().get())
 
-  update = UpdateConfig()
-  update.batchSize = job.update_config().batch_size().get()
-  update.restartThreshold = job.update_config().restart_threshold().get()
-  update.watchSecs = job.update_config().watch_secs().get()
-  update.maxPerShardFailures = job.update_config().max_per_shard_failures().get()
-  update.maxTotalFailures = job.update_config().max_total_failures().get()
-
   if not job.check().ok():
     raise ValueError('Invalid Job Config: %s' % job.check().message())
 
@@ -102,5 +94,4 @@ def convert(job):
     owner,
     tasks,
     cron_schedule,
-    cron_policy,
-    update)
+    cron_policy)

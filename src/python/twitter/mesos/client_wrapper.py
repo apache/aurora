@@ -294,7 +294,8 @@ class MesosClientAPI(MesosClientBase):
     #                       restarts mid-update.
     updater = Updater(config.role(), config.name(), self.client(), time, resp.updateToken,
                       self.session_key())
-    failed_shards = updater.update(config.job())
+    failed_shards = updater.update(
+      config.update_config(), sorted(map(lambda task: task.shardId, config.job().taskConfigs)))
 
     if failed_shards:
       log.info('Update reverted, failures detected on shards %s' % failed_shards)

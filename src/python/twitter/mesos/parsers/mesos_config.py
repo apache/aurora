@@ -174,3 +174,6 @@ class MesosConfig(ProxyConfig):
 
   def name(self):
     return self._name
+
+  def update_config(self):
+    return self._config['update_config']

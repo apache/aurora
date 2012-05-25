@@ -6,7 +6,6 @@ from gen.twitter.mesos.ttypes import (
   Identity,
   JobConfiguration,
   TwitterTaskInfo,
-  UpdateConfig,
 )
 
 from .base import EntityParser, ThriftCodec
@@ -35,7 +34,6 @@ def convert(config):
     tasks.append(task_copy)
 
   # additional stuff
-  update_config = UpdateConfig(**config['update_config'])
   ccp = config.get('cron_collision_policy')
   if ccp and ccp not in CronCollisionPolicy._NAMES_TO_VALUES:
     raise ValueError('Invalid cron collision policy: %s' % ccp)
@@ -47,5 +45,4 @@ def convert(config):
     owner,
     tasks,
     config.get('cron_schedule'),
-    ccp,
-    update_config)
+    ccp)
