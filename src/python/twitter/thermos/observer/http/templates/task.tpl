@@ -10,8 +10,8 @@
 <%!
  import time
 
- def pretty_time(seconds):
-   return time.asctime(time.localtime(seconds))
+ def pretty_time(seconds=time.time()):
+   return time.strftime('%m/%d %H:%M:%S', time.gmtime(seconds))
 %>
 
 <div class="container">
@@ -24,6 +24,10 @@
         <dt> task </dt>
           <dd> <strong> status </strong> ${status} </dd>
           <dd> <strong> user </strong> ${user} </dd>
+        <dt> ports </dt>
+        % for port_name, port_number in ports.items():
+          <dd> <strong> ${port_name} </strong> <a href="http://${hostname}:${port_number}">${port_number}</a> </dd>
+        %endfor
       </dl>
     </div>
 
@@ -60,8 +64,8 @@
          <td> <a href="/process/${task_id}/${proc["process_name"]}">${proc["process_name"]}</a> </td>
          <td> ${proc["process_run"]} </td>
          <td> ${proc["state"]} </td>
-         <td> ${pretty_time(float(proc["start_time"])/1000.0) if "start_time" in proc else ""} </td>
-         <td> ${pretty_time(float(proc["stop_time"])/1000.0) if "stop_time" in proc else ""} </td>
+         <td> ${pretty_time(proc["start_time"]) if "start_time" in proc else ""} </td>
+         <td> ${pretty_time(proc["stop_time"]) if "stop_time" in proc else ""} </td>
          <td> ${'%.3f' % proc["used"]["cpu"] if "used" in proc else ""} </td>
          <td> ${'%dMB' % (proc["used"]["ram"] / 1024 / 1024) if "used" in proc else ""} </td>
          <td> <a href="/logs/${task_id}/${proc["process_name"]}/${proc["process_run"]}/stdout">stdout</a> </td>
@@ -71,7 +75,6 @@
      </tbody>
      </table>
   </div>
-
 </div>
 
 </body>

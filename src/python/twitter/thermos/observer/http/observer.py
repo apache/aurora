@@ -127,6 +127,7 @@ class BottleObserver(HttpServer, StaticAssets, BottleObserverMixins):
       task_id = task_id,
       status = task['state'],
       user = task['user'],
+      ports = task['ports'],
       processes = processes,
       chroot = state.get('sandbox', ''),
       launch_time = state.get('launch_time', 0),

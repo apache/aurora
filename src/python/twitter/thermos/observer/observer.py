@@ -219,7 +219,6 @@ class TaskObserver(threading.Thread, Lockable):
       Return the current runner state of a given task id
     """
     if task_id in self._actives:
-      print '_muxer.get_state(%s)' % task_id
       return self._muxer.get_state(task_id)
     elif task_id in self._states:
       # memoized finished state
@@ -227,7 +226,6 @@ class TaskObserver(threading.Thread, Lockable):
     else:
       # unread finished state, let's read and memoize.
       path = self._pathspec.given(task_id = task_id).getpath('runner_checkpoint')
-      print 'Calling checkpoint dispatcher'
       self._states[task_id] = CheckpointDispatcher.from_file(path)
       return self._states[task_id]
     log.error(TaskObserver.UnexpectedError("Could not find task_id: %s" % task_id))
@@ -241,7 +239,6 @@ class TaskObserver(threading.Thread, Lockable):
       Returns a map from state to processes in that state, where possible
       states are: waiting, running, success, failed.
     """
-    print 'Task processes: %s' % task_id
     if task_id not in self._actives and task_id not in self._finishes:
       return {}
     state = self._state(task_id)
@@ -290,7 +287,9 @@ class TaskObserver(threading.Thread, Lockable):
             task_id=tid,
             name=task['name'],
             role=task['user'],
+            launch_timestamp=task['launch_timestamp'],
             state=task['state'],
+            state_timestamp=task['state_timestamp'],
             ports=task['ports'],
             **task['resource_consumption'])
     return dict(
@@ -314,6 +313,7 @@ class TaskObserver(threading.Thread, Lockable):
          task_id: string,
          name: string,
          user: string,
+         launch_timestamp: seconds,
          state: string [ACTIVE, SUCCESS, FAILED]
          ports: { name1: 'url', name2: 'url2' }
          resource_consumption: { cpu:, ram:, disk: }
@@ -341,10 +341,21 @@ class TaskObserver(threading.Thread, Lockable):
       # TODO(wickman)  Can this happen?
       return {}
 
+    # Get the timestamp of the transition into the current state.
+    current_state = state.statuses[-1].state
+    last_state = state.statuses[0]
+    state_timestamp = 0
+    for status in state.statuses:
+      if status.state == current_state and last_state != current_state:
+        state_timestamp = status.timestamp_ms / 1000
+      last_state = status.state
+
     return dict(
        task_id = task_id,
        name = task.name().get(),
+       launch_timestamp = state.statuses[0].timestamp_ms / 1000,
        state = TaskState._VALUES_TO_NAMES[state.statuses[-1].state],
+       state_timestamp = state_timestamp,
        user = task.user().get(),
        resource_consumption = self._sample(task_id),
        ports = state.header.ports,
@@ -360,7 +371,6 @@ class TaskObserver(threading.Thread, Lockable):
 
   @Lockable.sync
   def _get_process_resource_consumption(self, task_id, process_name):
-    print 'Sampling process for %s' % task_id
     sample = self._measurer.sample_by_process(task_id, process_name).to_dict()
     sample['disk'] = 0
     log.debug('Resource consumption (%s, %s) => %s' % (task_id, process_name, sample))
@@ -376,8 +386,8 @@ class TaskObserver(threading.Thread, Lockable):
         process_name: string
         process_run: int
         state: string [WAITING, FORKED, RUNNING, SUCCESS, KILLED, FAILED, LOST]
-        (optional) start_time: milliseconds from epoch
-        (optional) stop_time: milliseconds from epoch
+        (optional) start_time: seconds from epoch
+        (optional) stop_time: seconds from epoch
       }
     """
     if len(history) == 0:
@@ -393,9 +403,9 @@ class TaskObserver(threading.Thread, Lockable):
         state = ProcessState._VALUES_TO_NAMES[process_run.state],
       )
       if process_run.start_time:
-        d.update(start_time = process_run.start_time * 1000)
+        d.update(start_time = process_run.start_time)
       if process_run.stop_time:
-        d.update(stop_time = process_run.stop_time * 1000)
+        d.update(stop_time = process_run.stop_time)
       return d
 
   @Lockable.sync

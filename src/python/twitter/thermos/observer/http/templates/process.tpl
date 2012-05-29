@@ -21,7 +21,11 @@ Template arguments:
 </%doc>
 
 <%!
-  import socket
+import socket
+import time
+
+def pretty_time(seconds=time.time()):
+  return time.strftime('%m/%d %H:%M:%S', time.gmtime(seconds))
 %>
 
 <html>
@@ -32,12 +36,6 @@ Template arguments:
       href="/assets/bootstrap.css"/>
 <body>
 
-<%!
- import time
-
- def pretty_time(seconds):
-   return time.asctime(time.localtime(float(seconds)/1000.0))
-%>
 
 <div class="container">
   <div class="row">
