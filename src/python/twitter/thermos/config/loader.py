@@ -101,7 +101,9 @@ class ThermosConfigLoader(object):
   @staticmethod
   def load_json(filename, **kw):
     tc = ThermosConfigLoader()
-    tc.add_task(ThermosTaskWrapper.from_file(filename, **kw))
+    task = ThermosTaskWrapper.from_file(filename, **kw)
+    if task:
+      tc.add_task(task)
     return tc
 
   def __init__(self):

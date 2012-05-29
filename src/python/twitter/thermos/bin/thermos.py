@@ -26,6 +26,7 @@ from twitter.thermos.config.schema import (
   Resources,
   Task)
 from twitter.thermos.runner import TaskRunner
+from twitter.thermos.runner.helper import TaskRunnerHelper
 from twitter.thermos.monitoring.detector import TaskDetector
 from twitter.thermos.monitoring.garbage import TaskGarbageCollector, DefaultCollector
 from twitter.thermos.monitoring.monitor import TaskMonitor
@@ -307,17 +308,13 @@ def kill(args, options):
         matched_tasks.add(task_id)
 
   if not matched_tasks:
-    print('No tasks matched.')
+    print('No active tasks matched.')
     return
 
   for task_id in matched_tasks:
-    runner = TaskRunner.get(task_id, options.root)
-    if runner is None:
-      print('Could not bind to %s!' % task_id, file=sys.stderr)
-    else:
-      print('Killing %s...' % task_id, end='')
-      runner.kill(force=True)
-      print('done.')
+    print('Killing %s...' % task_id, end='')
+    TaskRunnerHelper.kill(task_id, options.root, force=True)
+    print('done.')
 
 
 @app.command
@@ -421,6 +418,8 @@ def monitor(args, options):
 @app.command
 @app.command_option("--verbosity", default=0, dest='verbose', type='int',
                     help="Display more verbosity")
+@app.command_option("--only", default=None, dest='only', type='choice',
+                    choices=('active', 'finished'), help="Display only tasks of this type.")
 def status(args, options):
   """Get the status of task(s).
 
@@ -461,8 +460,8 @@ def status(args, options):
       for process, process_history in state.processes.items():
         print('      - %s runs: %s' % (process, len(process_history)), end='')
         last_run = process_history[-1]
-        print(' last: pid=%d, rc=%s, finish:%s, state:%s' % (
-          last_run.pid,
+        print(' last: pid=%s, rc=%s, finish:%s, state:%s' % (
+          last_run.pid or 'None',
           last_run.return_code if last_run.return_code is not None else '',
           time.asctime(time.localtime(last_run.stop_time)) if last_run.stop_time else 'None',
           ProcessState._VALUES_TO_NAMES.get(last_run.state, 'Unknown')))
@@ -483,17 +482,19 @@ def status(args, options):
       print('No tasks found in root [%s]' % options.root)
       sys.exit(1)
 
-    if active_task_ids:
-      print('Active tasks:')
-      for task_id in active_task_ids:
-        format_task(task_id)
-      print()
+    if options.only is None or options.only == 'active':
+      if active_task_ids:
+        print('Active tasks:')
+        for task_id in active_task_ids:
+          format_task(task_id)
+        print()
 
-    if finished_task_ids:
-      print('Finished tasks:')
-      for task_id in finished_task_ids:
-        format_task(task_id)
-      print()
+    if options.only is None or options.only == 'finished':
+      if finished_task_ids:
+        print('Finished tasks:')
+        for task_id in finished_task_ids:
+          format_task(task_id)
+        print()
 
 
 @app.command
@@ -582,7 +583,7 @@ commands:
   app.set_usage(usage)
 
 
-LogOptions.set_disk_log_level('DEBUG')
+LogOptions.set_disk_log_level('NONE')
 LogOptions.set_stdout_log_level('INFO')
 generate_usage()
 app.main()

@@ -1,10 +1,12 @@
 python_library(
-  name = 'muxer',
-  sources = ['muxer.py'],
+  name = 'helper',
+  sources = ['helper.py'],
   dependencies = [
     pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/common/process'),
     pants('src/python/twitter/common/quantity'),
     pants('src/python/twitter/common/recordio:recordio-thrift'),
+    pants('src/python/twitter/thermos/base'),
     pants('src/thrift/com/twitter/thermos:py-thrift'),
   ]
 )
@@ -16,6 +18,17 @@ python_library(
     pants(':muxer'),
     pants('src/python/twitter/thermos/base:ckpt'),
     pants('src/python/twitter/thermos/base:path')
+  ]
+)
+
+python_library(
+  name = 'muxer',
+  sources = ['muxer.py'],
+  dependencies = [
+    pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/common/quantity'),
+    pants('src/python/twitter/common/recordio:recordio-thrift'),
+    pants('src/thrift/com/twitter/thermos:py-thrift'),
   ]
 )
 
@@ -44,7 +57,8 @@ python_library(
     pants('src/python/twitter/thermos/base'),
     pants('src/python/twitter/thermos/config:schema'),
     pants('src/thrift/com/twitter/thermos:py-thrift'),
+    pants(':helper'),
+    pants(':muxer'),
     pants(':process'),
-    pants(':muxer')
   ]
 )

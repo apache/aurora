@@ -24,7 +24,7 @@ class ProxyDriver(object):
     return enqueue_arguments
 
 
-class ProxyRunner(object):
+class ProxyKiller(object):
   def __init__(self):
     self._kills = set()
     self._loses = set()
@@ -83,7 +83,7 @@ def setup_tree(td, lose=False):
 
 
 def test_state_reconciliation():
-  proxy_runner = ProxyRunner()
+  proxy_killer = ProxyKiller()
   proxy_driver = ProxyDriver()
 
   with temporary_dir() as td:
@@ -92,7 +92,7 @@ def test_state_reconciliation():
       max_age=Amount(10**10, Time.DAYS),
       max_space=Amount(10**10, Data.GB),
       max_tasks=10**10,
-      task_runner_factory=proxy_runner,
+      task_killer=proxy_killer,
       checkpoint_root=td)
 
     art = AdjustRetainedTasks(retainedTasks = {
@@ -113,13 +113,13 @@ def test_state_reconciliation():
 
 
 def test_gc_with_loss():
-  proxy_runner = ProxyRunner()
+  proxy_killer = ProxyKiller()
   proxy_driver = ProxyDriver()
 
   with temporary_dir() as td:
     setup_tree(td, lose=True)
     tgce = TestThermosGCExecutor(max_tasks=0,
-      task_runner_factory=proxy_runner,
+      task_killer=proxy_killer,
       checkpoint_root=td)
 
     art = AdjustRetainedTasks(retainedTasks={})
@@ -133,13 +133,13 @@ def test_gc_with_loss():
 
 
 def test_gc_without_loss():
-  proxy_runner = ProxyRunner()
+  proxy_killer = ProxyKiller()
   proxy_driver = ProxyDriver()
 
   with temporary_dir() as td:
     setup_tree(td)
     tgce = TestThermosGCExecutor(max_tasks=0,
-      task_runner_factory=proxy_runner,
+      task_killer=proxy_killer,
       checkpoint_root=td)
 
     art = AdjustRetainedTasks(retainedTasks={})

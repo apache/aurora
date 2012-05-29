@@ -9,6 +9,7 @@ from twitter.common.process import ProcessProviderFactory
 from twitter.common.quantity import Amount, Time, Data
 from twitter.thermos.base.path import TaskPath
 from twitter.thermos.runner.inspector import CheckpointInspector
+from twitter.thermos.runner.helper import TaskKiller
 from twitter.thermos.runner.runner import TaskRunner
 from twitter.thermos.monitoring.detector import TaskDetector
 from twitter.thermos.monitoring.garbage import (
@@ -49,7 +50,7 @@ class ThermosGCExecutor(ThermosExecutorBase):
                      max_space=Amount(200, Data.GB),
                      max_tasks=1000,
                      verbose=True,
-                     task_runner_factory=TaskRunner.get,
+                     task_killer=TaskKiller,
                      checkpoint_root=None):
     ThermosExecutorBase.__init__(self)
     self._slave_id = None
@@ -60,7 +61,7 @@ class ThermosGCExecutor(ThermosExecutorBase):
       verbose=verbose,
       logger=self.log
     )
-    self._task_runner_factory = task_runner_factory
+    self._task_killer = task_killer
     if 'ANGRYBIRD_THERMOS' in os.environ:
       self._checkpoint_root = os.path.join(os.environ['ANGRYBIRD_THERMOS'], 'thermos/run')
     else:
@@ -72,13 +73,9 @@ class ThermosGCExecutor(ThermosExecutorBase):
       self.log('  => %s as %s' % (task_id, ScheduleStatus._VALUES_TO_NAMES[schedule_status]))
 
     def terminate_task(task_id, kill=True):
-      runner = self._task_runner_factory(task_id, self._checkpoint_root)
-      if runner is None:
-        self.log('Could not terminate task %s because we could not bind to its TaskRunner.'
-             % task_id)
-        return False
+      killer = self._task_killer(task_id, self._checkpoint_root)
       self.log('Terminating %s...' % task_id)
-      runner_terminate = runner.kill if kill else runner.lose
+      runner_terminate = killer.kill if kill else killer.lose
       try:
         runner_terminate(force=True)
         return True

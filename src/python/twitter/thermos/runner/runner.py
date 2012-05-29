@@ -1,19 +1,17 @@
 from contextlib import contextmanager
 import errno
-import getpass
 import os
 import socket
-import signal
 import time
 import traceback
 
-from pystachio import Integer, Environment
+from pystachio import Environment
 
 from twitter.common import log
-from twitter.common.dirutil import safe_mkdir, lock_file
+from twitter.common.dirutil import safe_mkdir
 from twitter.common.process import ProcessProviderFactory
 from twitter.common.quantity import Amount, Time
-from twitter.common.recordio import ThriftRecordReader, ThriftRecordWriter
+from twitter.common.recordio import ThriftRecordReader
 
 from twitter.thermos.base.path import TaskPath
 from twitter.thermos.base.ckpt import (
@@ -40,34 +38,7 @@ from gen.twitter.thermos.ttypes import (
   TaskStatus,
 )
 
-__author__ = 'wickman@twitter.com (brian wickman)'
-__tested__ = False
-
-
-def safe_kill_pid(pid):
-  try:
-    os.kill(pid, signal.SIGKILL)
-  except Exception as e:
-    log.error('    (error: %s)' % e)
-
-
-class TaskRunnerHelper(object):
-  @staticmethod
-  def get_actual_user():
-    import pwd
-    try:
-      pwd_entry = pwd.getpwuid(os.getuid())
-    except KeyError:
-      return getpass.getuser()
-    return pwd_entry[0]
-
-  @staticmethod
-  def process_from_name(task, process_name):
-    if task.has_processes():
-      for process in task.processes():
-        if process.name().get() == process_name:
-          return process
-    return None
+from .helper import TaskRunnerHelper
 
 
 # TODO(wickman) Currently this is messy because of all the private access into ._runner.
@@ -192,13 +163,7 @@ class TaskRunnerTaskHandler(TaskStateHandler):
 
   def on_terminal(self):
     self._runner._kill()
-    active_task = self._pathspec.given(state='active').getpath('task_path')
-    finished_task = self._pathspec.given(state='finished').getpath('task_path')
-    is_active, is_finished = map(os.path.exists, [active_task, finished_task])
-    assert is_active and not is_finished
-    safe_mkdir(os.path.dirname(finished_task))
-    os.rename(active_task, finished_task)
-    os.utime(finished_task, None)
+    TaskRunnerHelper.finalize_task(self._pathspec)
 
   def kill(self):
     if not self._runner._recovery:
@@ -249,17 +214,11 @@ class TaskRunner(object):
   """
     Run a ThermosTask.
   """
-
   class Error(Exception): pass
   class InternalError(Error): pass
   class InvalidTaskError(Error): pass
   class PermissionError(Error): pass
   class StateError(Error): pass
-
-  # Maximum drift between when the system says a task was forked and when we checkpointed
-  # its fork_time (used as a heuristic to determine a forked task is really ours instead of
-  # a task with coincidentally the same PID but just wrapped around.)
-  MAX_START_TIME_DRIFT = Amount(10, Time.SECONDS)
 
   # Maximum amount of time we spend waiting for new updates from the checkpoint streams
   # before doing housecleaning (checking for LOST tasks, dead PIDs.)
@@ -295,6 +254,8 @@ class TaskRunner(object):
     task = ThermosConfigLoader.load_json(task_json)
     if task is None:
       return None
+    if len(task.tasks()) == 0:
+      return None
     try:
       checkpoint = CheckpointDispatcher.from_file(task_checkpoint)
       return cls(task.tasks()[0].task(), checkpoint_root, checkpoint.header.sandbox, task_id,
@@ -311,7 +272,7 @@ class TaskRunner(object):
         checkpoint_root (path) = the checkpoint root
         sandbox (path) = the sandbox in which the path will be run
                          [if None, cwd will be assumed, but garbage collection will be
-                          disalbed for this task.]
+                          disabled for this task.]
 
       optional:
         task_id (string) = bind to this task id.  if not specified, will synthesize an id based
@@ -385,22 +346,6 @@ class TaskRunner(object):
   def task_state(self):
     return self._state.statuses[-1].state if self._state.statuses else TaskState.ACTIVE
 
-  def kill_current_runner(self):
-    assert self._state.statuses
-    pid = self._state.statuses[-1].runner_pid
-    assert pid != os.getpid(), 'Unwilling to commit seppuku.'
-    try:
-      os.kill(pid, signal.SIGKILL)
-      return True
-    except OSError as e:
-      if e.errno == errno.EPERM:
-        # Permission denied
-        return False
-      elif e.errno == errno.ESRCH:
-        # pid no longer exists
-        return True
-      raise
-
   def close_ckpt(self):
     """Force close the checkpoint stream.  This is necessary for runners terminated through
        exception propagation."""
@@ -418,25 +363,10 @@ class TaskRunner(object):
     if self._sandbox:
       safe_mkdir(self._sandbox)
     ckpt_file = self._pathspec.getpath('runner_checkpoint')
-    safe_mkdir(os.path.dirname(ckpt_file))
-    fp = lock_file(ckpt_file, "a+")
-    if fp in (None, False):
-      if force:
-        log.info('Found existing runner, forcing leadership forfeit.')
-        if self.kill_current_runner():
-          log.info('Successfully killed leader.')
-          # TODO(wickman)  Blocking may not be the best idea here.  Perhaps block up to
-          # a maximum timeout.  But blocking is necessary because os.kill does not immediately
-          # release the lock if we're in force mode.
-          fp = lock_file(ckpt_file, "a+", blocking=True)
-      else:
-        log.error('Found existing runner, cannot take control.')
-    if fp in (None, False):
-      raise TaskRunner.PermissionError('Could not open locked checkpoint: %s, lock_file = %s' %
-        (ckpt_file, fp))
-    ckpt = ThriftRecordWriter(fp)
-    ckpt.set_sync(True)
-    self._ckpt = ckpt
+    try:
+      self._ckpt = TaskRunnerHelper.open_checkpoint(ckpt_file, force=force, state=self._state)
+    except TaskRunnerHelper.PermissionError:
+      raise TaskRunner.PermissionError('Unable to open checkpoint %s' % ckpt_file)
     log.debug('Flipping recovery mode off.')
     self._recovery = False
     self._set_task_status(TaskState.ACTIVE)
@@ -650,7 +580,7 @@ class TaskRunner(object):
           pids = [need_kill] + list(self._ps.children_of(need_kill, all=True))
           for pid in pids:
             log.info('  Killing orphaned pid: %s' % pid)
-            safe_kill_pid(pid)
+            TaskRunnerHelper.safe_kill_pid(pid)
 
   def run(self, force=False):
     """
@@ -683,7 +613,7 @@ class TaskRunner(object):
           break
 
         def pick_processes(process_list):
-          if self._task.max_concurrency() == Integer(0):
+          if self._task.max_concurrency().get() == 0:
             return process_list
           num_to_pick = max(self._task.max_concurrency().get() - len(running), 0)
           return process_list[:num_to_pick]
@@ -721,26 +651,6 @@ class TaskRunner(object):
               log.warning('Unexpected error when calling waitpid: %s' % e)
             break
 
-  # Need from pid handle:
-  #   wall time of start
-  #   user who owns the pid
-  def this_is_really_our_pid(self, pid_handle, user, start_time):
-    """
-      A heuristic to make sure that this is likely the pid that we own/forked.  Necessary
-      because of pid-space wrapping.  We don't want to go and kill processes we don't own,
-      especially if the killer is running as root.
-    """
-    if pid_handle.user() != user:
-      log.info("    Expected pid %s to be ours but the pid user is %s and we're %s" % (
-        pid_handle.pid(), pid_handle.user(), user))
-      return False
-    estimated_start_time = self._clock.time() - pid_handle.wall_time()
-    log.info("    Time drift from the start of %s is %s, real: %s, pid wall: %s, estimated: %s" % (
-      pid_handle.pid(), abs(start_time - estimated_start_time), start_time, pid_handle.wall_time(),
-      estimated_start_time))
-    return abs(start_time - estimated_start_time) < TaskRunner.MAX_START_TIME_DRIFT.as_(
-      Time.SECONDS)
-
   def kill(self, force=False, terminal_status=TaskState.KILLED):
     """
       Kill all processes associated with this task and set task/process states as KILLED.
@@ -751,6 +661,7 @@ class TaskRunner(object):
       if self.task_state() != TaskState.ACTIVE:
         log.warning('Task is not in ACTIVE state, cannot issue kill.')
         return
+      # N.B. This will invoke self._kill via the state machine runner.
       self._set_task_status(terminal_status)
 
   def lose(self, force=False):
@@ -759,55 +670,11 @@ class TaskRunner(object):
     """
     return self.kill(force, terminal_status=TaskState.LOST)
 
-  # REFACTOR(wickman)  Split this into two separate functions
-  #   for ph in self.get_all_process_handles():
-  #      platform.kill(ph)
-  #
-  # Separate out the ProcessPlatform logic as much as possible.
   def _kill(self):
-    log.info('Killing ThermosRunner.')
-    self._ps.collect_all()
-
-    coordinator_pids = []
-    process_pids = []
-    process_statuses = []
-
-    current_user = self._state.header.user
-    log.info('    => Current user: %s' % current_user)
-    log.debug('    => All PIDs on system: %s' % ' '.join(map(str, sorted(self._ps.pids()))))
-    for process_history in self._state.processes.values():
-      # collect coordinator_pids for runners in >=FORKED, <=RUNNING state
-      last_run = process_history[-1]
-      if last_run.state in (ProcessState.FORKED, ProcessState.RUNNING):
-        process_statuses.append(last_run)
-        log.info('  Inspecting %s coordinator [pid: %s]' % (last_run.process,
-            last_run.coordinator_pid))
-        if last_run.coordinator_pid in self._ps.pids() and self.this_is_really_our_pid(
-            self._ps.get_handle(last_run.coordinator_pid), current_user, last_run.fork_time):
-          coordinator_pids.append(last_run.coordinator_pid)
-        else:
-          log.info('    (coordinator appears to have completed)')
-      if last_run.state == ProcessState.RUNNING:
-        log.info('  Inspecting %s [pid: %s]' % (last_run.process, last_run.pid))
-        if last_run.pid in self._ps.pids() and self.this_is_really_our_pid(
-            self._ps.get_handle(last_run.pid), current_user, last_run.start_time):
-          log.info('    => pid is active.')
-          process_pids.append(last_run.pid)
-          subtree = self._ps.children_of(last_run.pid, all=True)
-          if subtree:
-            log.info('      => has children: %s' % ' '.join(map(str, subtree)))
-            process_pids.extend(subtree)
-
-    pid_types = { 'Coordinator': coordinator_pids, 'Child': process_pids }
-    if any(pid_types.values()):
-      log.info('Issuing kills.')
-    for pid_type, pid_set in pid_types.items():
-      for pid in pid_set:
-        log.info('  %s: %s' % (pid_type, pid))
-        safe_kill_pid(pid)
-
-    for process_status in process_statuses:
+    active, lost = TaskRunnerHelper.killtree(self._state, clock=self._clock)
+    for process_status in active:
       self._set_process_status(process_status.process, ProcessState.KILLED,
         stop_time=self._clock.time(), return_code=-1)
-
+    for process_status in lost:
+      self._set_process_status(process_status.process, ProcessState.LOST)
     log.info('Kill complete.')
