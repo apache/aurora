@@ -78,16 +78,15 @@ def convert(job):
     task_copy = copy.deepcopy(task)
     task_copy.shardId = k
     underlying, _ = task_instance_from_job(job, k)
+    if not underlying.check().ok():
+      raise ValueError('Invalid task instance: %s' % underlying.check().message())
     task_copy.thermosConfig = json.dumps(underlying.get())
     tasks.append(task_copy)
 
   cron_schedule = job.cron_schedule().get() if job.has_cron_schedule() else ''
-  cron_policy = CronCollisionPolicy._NAMES_TO_VALUES.get(job.cron_policy().get(), None)
+  cron_policy = CronCollisionPolicy._NAMES_TO_VALUES.get(job.cron_policy().get())
   if cron_policy is None:
     raise ValueError('Invalid cron policy: %s' % job.cron_policy().get())
-
-  if not job.check().ok():
-    raise ValueError('Invalid Job Config: %s' % job.check().message())
 
   return JobConfiguration(
     str(job.name()),
