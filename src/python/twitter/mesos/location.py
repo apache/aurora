@@ -7,6 +7,7 @@ class Location(object):
   PROD_SUFFIXES = [
     '.corpdc.twitter.com',
     '.prod.twitter.com',
+    '.devel.twitter.com'
   ]
 
   @staticmethod
