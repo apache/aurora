@@ -1,5 +1,6 @@
 import copy
 import json
+import os
 import re
 
 from pystachio import Ref
@@ -88,14 +89,22 @@ class ThermosConfigLoader(object):
   @staticmethod
   def load(filename, **kw):
     tc = ThermosConfigLoader()
+    deposit_stack = [os.path.dirname(filename)]
+    def ast_executor(config_file, env):
+      actual_file = os.path.join(deposit_stack[-1], config_file)
+      deposit_stack.append(os.path.dirname(actual_file))
+      with open(actual_file) as fp:
+        Compatibility.exec_function(compile(fp.read(), actual_file, 'exec'), env)
+      deposit_stack.pop()
     def export(task):
       if isinstance(task, dict):
         task = Task(task)
       tc.add_task(ThermosTaskWrapper(task, **kw))
     schema_copy = copy.copy(ThermosConfigLoader.SCHEMA)
-    schema_copy['export'] = export
-    with open(filename) as fp:
-      Compatibility.exec_function(compile(fp.read(), filename, 'exec'), schema_copy)
+    schema_copy.update(
+      include = lambda fn: ast_executor(fn, schema_copy),
+      export = export)
+    ast_executor(os.path.basename(filename), schema_copy)
     return tc
 
   @staticmethod
