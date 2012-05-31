@@ -110,6 +110,11 @@ public class SchedulerModule extends AbstractModule {
   @CmdLine(name = "secure_auth", help = "Enforces RPC authentication with mesos client.")
   private static final Arg<Boolean> SECURE_AUTH = Arg.create(true);
 
+  @CmdLine(name = "framework_failover_timeout",
+      help = "Time after which a framework is considered deleted.  SHOULD BE VERY HIGH.")
+  private static final Arg<Amount<Long, Time>> FRAMEWORK_FAILOVER_TIMEOUT =
+      Arg.create(Amount.of(21L, Time.DAYS));
+
   private static final String TWITTER_FRAMEWORK_NAME = "TwitterScheduler";
 
   @Override
@@ -243,7 +248,8 @@ public class SchedulerModule extends AbstractModule {
 
         FrameworkInfo.Builder frameworkInfo = FrameworkInfo.newBuilder()
             .setUser(EXECUTOR_USER)
-            .setName(TWITTER_FRAMEWORK_NAME);
+            .setName(TWITTER_FRAMEWORK_NAME)
+            .setFailoverTimeout(FRAMEWORK_FAILOVER_TIMEOUT.get().as(Time.SECONDS));
 
         if (frameworkId != null) {
           LOG.info("Found persisted framework ID: " + frameworkId);
