@@ -111,7 +111,7 @@ class HDFSHelper(object):
       subprocess.check_call(['scp', abs_src, '%s@%s:' % (user, ssh_proxy_host)])
     if not call_hadoop('-test', '-e', dst):
       log.info("Deleting existing file at %s" % dst)
-      check_call_hadoop('-rm', dst)
+      check_call_hadoop('-rm', '-skipTrash', dst)
     elif call_hadoop('-test', '-e', dst_dir):
       log.info('Creating directory %s' % dst_dir)
       check_call_hadoop('-mkdir', dst_dir)
