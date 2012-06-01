@@ -33,9 +33,7 @@ def task_instance_from_job(job, instance):
                          role=job.role(),
                          health_check_interval_secs=job.health_check_interval_secs(),
                          instance=instance)
-  ti %= Environment(mesos=context)
-  ti %= cluster_context
-  return ti.interpolate()
+  return ti.bind(Environment(mesos=context), cluster_context).interpolate()
 
 
 def convert(job):
@@ -79,7 +77,7 @@ def convert(job):
     task_copy.shardId = k
     underlying, _ = task_instance_from_job(job, k)
     if not underlying.check().ok():
-      raise ValueError('Invalid task instance: %s' % underlying.check().message())
+      raise ValueError('Task not fully specified: %s' % underlying.check().message())
     task_copy.thermosConfig = json.dumps(underlying.get())
     tasks.append(task_copy)
 

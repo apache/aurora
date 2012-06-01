@@ -288,6 +288,7 @@ class TaskRunner(object):
 
     self._ckpt = None
     self._task = task
+    self._process_map = dict((p.name().get(), p) for p in task.processes())
     self._task_processes = {}
     self._ps = ProcessProviderFactory.get()
     current_user = TaskRunnerHelper.get_actual_user()
@@ -501,7 +502,7 @@ class TaskRunner(object):
     """
     run_number = len(self.state.processes[process_name])-1
     pathspec = self._pathspec.given(process = process_name, run = run_number)
-    process = TaskRunnerHelper.process_from_name(self._task, process_name)
+    process = self._process_map.get(process_name)
     context = ThermosContext(task_id = self._task_id,
                              user = self._user,
                              ports = self._portmap)

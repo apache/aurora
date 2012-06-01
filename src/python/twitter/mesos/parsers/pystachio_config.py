@@ -1,6 +1,7 @@
 import copy
 import getpass
 import json
+import os
 import sys
 
 from pystachio import Empty, Environment, Ref
@@ -49,14 +50,29 @@ class MesosConfigLoader(object):
         return job.bind(*bindings) if bindings else job
     raise ValueError('Could not find job named %s!' % name)
 
+  # TODO(wickman)  This code smells.  Refactor so that we can share the common include
+  # code between Thermos and Mesos, perhaps with a DSLBuilder in Pystachio that has the
+  # basic AST parsing + injection of a prescribed environment + 'include' statement(s).
   @staticmethod
   def load(filename, name=None, bindings=None):
-    tc = MesosConfigLoader()
+    deposit_stack = [os.path.dirname(filename)]
+    def ast_executor(config_file, env):
+      actual_file = os.path.join(deposit_stack[-1], config_file)
+      deposit_stack.append(os.path.dirname(actual_file))
+      with open(actual_file) as fp:
+        Compatibility.exec_function(compile(fp.read(), actual_file, 'exec'), env)
+      deposit_stack.pop()
+    def export(task):
+      if isinstance(task, dict):
+        task = Task(task)
+      tc.add_task(ThermosTaskWrapper(task, **kw))
     schema_copy = copy.copy(MesosConfigLoader.SCHEMA)
-    with open(filename) as fp:
-      locals_map = Compatibility.exec_function(
-        compile(fp.read(), filename, 'exec'), schema_copy)
-    job_list = locals_map.get('jobs')
+    schema_copy.update(
+      mesos_include = lambda fn: ast_executor(fn, schema_copy),
+      include = lambda fn: ast_executor(fn, schema_copy),
+      export = export)
+    ast_executor(os.path.basename(filename), schema_copy)
+    job_list = schema_copy.get('jobs')
     if not job_list or not isinstance(job_list, list):
       raise MesosConfigLoader.BadConfig("Could not extract any jobs from %s" % filename)
     return MesosConfigLoader.pick(job_list, name, bindings)

@@ -19,7 +19,7 @@ def deposit_schema(environment):
 
 class ThermosProcessWrapper(object):
   # >=1 characters && anything but NULL and '/'
-  VALID_PROCESS_NAME_RE = re.compile(r'^[^/]+$')
+  VALID_PROCESS_NAME_RE = re.compile(r'^[^./][^/]*$')
   class InvalidProcess(Exception): pass
 
   def __init__(self, process):

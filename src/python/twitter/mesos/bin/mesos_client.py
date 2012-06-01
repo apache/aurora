@@ -1,5 +1,3 @@
-#!/usr/bin/env python2.6
-
 """Command-line client for managing jobs with the Twitter mesos scheduler.
 """
 
@@ -7,9 +5,11 @@
 import cmd
 import functools
 import getpass
+import os
 import sys
 from urlparse import urljoin
 import zookeeper
+
 from pystachio import Ref
 
 from twitter.common import app, log
@@ -64,6 +64,12 @@ def synthesize_url(cluster, scheduler=None, role=None, job=None):
     return urljoin(scheduler_url, 'scheduler/job?role=%s&job=%s' % (role, job))
 
 
+def get_extra_context():
+  options = app.get_options()
+  if options.copy_app_from:
+    return { 'mesos': { 'package': os.path.basename(options.copy_app_from) } }
+  else:
+    return {}
 
 
 def get_config(jobname, config_file):
@@ -72,6 +78,8 @@ def get_config(jobname, config_file):
   options = app.get_options()
   config_type, is_json = options.config_type, options.json
   bindings = getattr(options, 'bindings', [])
+  if options.copy_app_from:
+    bindings.append({'mesos': {'package': os.path.basename(options.copy_app_from)}})
 
   if is_json:
     assert config_type == 'thermos', "--json only supported with thermos jobs"
@@ -85,6 +93,7 @@ def get_config(jobname, config_file):
     return PystachioCodec(config_file, jobname)
   else:
     raise ValueError('Unknown config type %s!' % config_type)
+
 
 def check_and_log_response(resp):
   log.info('Response from scheduler: %s (message: %s)'

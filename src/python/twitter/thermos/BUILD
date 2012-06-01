@@ -14,3 +14,5 @@ python_binary(
   ],
   platforms = ['linux-x86_64'],
 )
+
+page(name = 'readme', source = 'README.md')

@@ -3,10 +3,12 @@ from __future__ import print_function
 from collections import namedtuple
 import getpass
 import os
+import pprint
 import pwd
+import re
 import sys
 import time
-import pprint
+
 
 from pystachio import Ref
 
@@ -293,8 +295,6 @@ def kill(args, options):
 
   Regular expressions may be used to match multiple tasks.
   """
-  import re
-
   if not args:
     print('Must specify tasks!', file=sys.stderr)
     return
@@ -423,9 +423,11 @@ def monitor(args, options):
 def status(args, options):
   """Get the status of task(s).
 
-    Usage: thermos [options] status [task_name]
+    Usage: thermos [options] status [task_name(s) or task_regexp(s)]
+
     Options:
-      --verbosity=LEVEL		Verbosity level for logging. [default: 0]
+      --verbosity=LEVEL     Verbosity level for logging. [default: 0]
+      --only=TYPE	    Only print tasks of TYPE (options: active finished)
   """
   detector = TaskDetector(root = options.root)
 
@@ -467,34 +469,33 @@ def status(args, options):
           ProcessState._VALUES_TO_NAMES.get(last_run.state, 'Unknown')))
       print()
 
-  if args:
-    for task_id in args:
-      if os.path.exists(detector.get_checkpoint(task_id)):
-        print('Found task %s' % task_id)
+  matchers = map(re.compile, args or ['.*'])
+  active = [t_id for _, t_id in detector.get_task_ids(state='active')
+            if any(pattern.match(t_id) for pattern in matchers)]
+  finished = [t_id for _, t_id in detector.get_task_ids(state='finished')
+              if any(pattern.match(t_id) for pattern in matchers)]
+
+  found = False
+  if options.only is None or options.only == 'active':
+    if active:
+      print('Active tasks:')
+      found = True
+      for task_id in active:
         format_task(task_id)
-      else:
-        print('ERROR: Could not find task %s' % task_id, file=sys.stderr)
-  else:
-    active_task_ids = [t_id for _, t_id in detector.get_task_ids(state='active')]
-    finished_task_ids = [t_id for _, t_id in detector.get_task_ids(state='finished')]
+      print()
 
-    if not active_task_ids and not finished_task_ids:
-      print('No tasks found in root [%s]' % options.root)
-      sys.exit(1)
+  if options.only is None or options.only == 'finished':
+    if finished:
+      print('Finished tasks:')
+      found = True
+      for task_id in finished:
+        format_task(task_id)
+      print()
 
-    if options.only is None or options.only == 'active':
-      if active_task_ids:
-        print('Active tasks:')
-        for task_id in active_task_ids:
-          format_task(task_id)
-        print()
+  if not found:
+    print('No tasks found in root [%s]' % options.root)
+    sys.exit(1)
 
-    if options.only is None or options.only == 'finished':
-      if finished_task_ids:
-        print('Finished tasks:')
-        for task_id in finished_task_ids:
-          format_task(task_id)
-        print()
 
 
 @app.command
