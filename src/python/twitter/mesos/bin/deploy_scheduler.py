@@ -153,7 +153,8 @@ def remote_call(host, cmd):
 
 
 def fetch_scheduler_http(host, endpoint):
-  result = remote_call(host, ['curl', '--silent', '%s/%s' % (SCHEDULER_HTTP, endpoint)])
+  result = remote_call(host, ['curl', '--connect-timeout', '5',
+                              '--silent', '%s/%s' % (SCHEDULER_HTTP, endpoint)])
   if result is not None:
     return result[1][0].strip()
 
