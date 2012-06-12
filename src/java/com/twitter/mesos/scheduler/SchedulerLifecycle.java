@@ -5,7 +5,6 @@ import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
@@ -45,7 +44,7 @@ class SchedulerLifecycle {
 
   private static final Logger LOG = Logger.getLogger(SchedulerLifecycle.class.getName());
 
-  private final Function<String, SchedulerDriver> driverFactory;
+  private final DriverFactory driverFactory;
   private final SchedulerCore scheduler;
   private final Lifecycle lifecycle;
 
@@ -53,7 +52,7 @@ class SchedulerLifecycle {
   private final DriverReference driverRef;
 
   @Inject
-  SchedulerLifecycle(Function<String, SchedulerDriver> driverFactory,
+  SchedulerLifecycle(DriverFactory driverFactory,
       SchedulerCore scheduler,
       Lifecycle lifecycle,
       Driver driver,

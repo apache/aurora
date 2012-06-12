@@ -23,8 +23,6 @@ import com.twitter.thrift.ServiceInstance;
 
 /**
  * Binding module for scheduler HTTP servlets.
- *
- * @author William Farner
  */
 public class ServletModule extends AbstractModule {
 
@@ -44,6 +42,7 @@ public class ServletModule extends AbstractModule {
     Registration.registerServlet(binder(), "/scheduler/role", SchedulerzRole.class, true);
     Registration.registerServlet(binder(), "/scheduler/job", SchedulerzJob.class, true);
     Registration.registerServlet(binder(), "/mname", Mname.class, false);
+    Registration.registerServlet(binder(), "/structdump", StructDump.class, true);
 
     // Static assets.
     Registration.registerHttpAsset(binder(), "/js/util.js", ServletModule.class,

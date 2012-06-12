@@ -4,9 +4,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.logging.Logger;
 
-import javax.annotation.Nullable;
-import javax.inject.Provider;
-
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
@@ -20,9 +17,6 @@ import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 
-import org.apache.mesos.MesosSchedulerDriver;
-import org.apache.mesos.Protos.FrameworkID;
-import org.apache.mesos.Protos.FrameworkInfo;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
 import org.apache.zookeeper.data.ACL;
@@ -48,6 +42,7 @@ import com.twitter.common_internal.zookeeper.ZooKeeperModule;
 import com.twitter.mesos.GuiceUtils;
 import com.twitter.mesos.gen.MesosAdmin;
 import com.twitter.mesos.scheduler.Driver.DriverImpl;
+import com.twitter.mesos.scheduler.DriverFactory.DriverFactoryImpl;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHosts;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHostsImpl;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveMapper;
@@ -70,6 +65,7 @@ import com.twitter.mesos.scheduler.quota.QuotaModule;
 import com.twitter.mesos.scheduler.storage.AttributeStore;
 import com.twitter.mesos.scheduler.storage.AttributeStore.AttributeStoreImpl;
 import com.twitter.mesos.scheduler.storage.log.LogStorageModule;
+import com.twitter.mesos.scheduler.testing.IsolatedSchedulerModule;
 import com.twitter.thrift.ServiceInstance;
 
 /**
@@ -78,17 +74,10 @@ import com.twitter.thrift.ServiceInstance;
 public class SchedulerModule extends AbstractModule {
   private static final Logger LOG = Logger.getLogger(SchedulerModule.class.getName());
 
-  private static final String EXECUTOR_USER = "root";
-
   @NotNull
   @CmdLine(name = "mesos_scheduler_ns",
       help = "The name service name for the mesos scheduler thrift server.")
   private static final Arg<String> MESOS_SCHEDULER_NAME_SPEC = Arg.create();
-
-  @NotNull
-  @CmdLine(name = "mesos_master_address",
-          help = "Mesos address for the master, can be a mesos address or zookeeper path.")
-  private static final Arg<String> MESOS_MASTER_ADDRESS = Arg.create();
 
   @CmdLine(name = "executor_dead_threashold", help =
       "Time after which the scheduler will consider an executor dead and attempt to revive it.")
@@ -110,12 +99,9 @@ public class SchedulerModule extends AbstractModule {
   @CmdLine(name = "secure_auth", help = "Enforces RPC authentication with mesos client.")
   private static final Arg<Boolean> SECURE_AUTH = Arg.create(true);
 
-  @CmdLine(name = "framework_failover_timeout",
-      help = "Time after which a framework is considered deleted.  SHOULD BE VERY HIGH.")
-  private static final Arg<Amount<Long, Time>> FRAMEWORK_FAILOVER_TIMEOUT =
-      Arg.create(Amount.of(21L, Time.DAYS));
-
-  private static final String TWITTER_FRAMEWORK_NAME = "TwitterScheduler";
+  @CmdLine(name = "testing_isolated_scheduler",
+      help = "If true, run in a testing mode with the scheduler isolated from other components.")
+  private static final Arg<Boolean> ISOLATED_SCHEDULER = Arg.create(false);
 
   @Override
   protected void configure() {
@@ -169,7 +155,13 @@ public class SchedulerModule extends AbstractModule {
     bind(MesosAdmin.Iface.class).to(SchedulerThriftInterface.class).in(Singleton.class);
     bind(ThriftServer.class).to(SchedulerThriftServer.class).in(Singleton.class);
 
-    LogStorageModule.bind(binder());
+    if (ISOLATED_SCHEDULER.get()) {
+      install(new IsolatedSchedulerModule());
+    } else {
+      LogStorageModule.bind(binder());
+      bind(DriverFactory.class).to(DriverFactoryImpl.class);
+      bind(DriverFactoryImpl.class).in(Singleton.class);
+    }
 
     bind(SchedulingFilter.class).to(SchedulingFilterImpl.class);
 
@@ -235,33 +227,6 @@ public class SchedulerModule extends AbstractModule {
         }
       });
     }
-  }
-
-  @Provides
-  @Singleton
-  Function<String, SchedulerDriver> provideMesosSchedulerDriverFactory(
-      final Provider<Scheduler> scheduler) {
-
-    return new Function<String, SchedulerDriver>() {
-      @Override public SchedulerDriver apply(@Nullable String frameworkId) {
-        LOG.info("Connecting to mesos master: " + MESOS_MASTER_ADDRESS.get());
-
-        FrameworkInfo.Builder frameworkInfo = FrameworkInfo.newBuilder()
-            .setUser(EXECUTOR_USER)
-            .setName(TWITTER_FRAMEWORK_NAME)
-            .setFailoverTimeout(FRAMEWORK_FAILOVER_TIMEOUT.get().as(Time.SECONDS));
-
-        if (frameworkId != null) {
-          LOG.info("Found persisted framework ID: " + frameworkId);
-          frameworkInfo.setId(FrameworkID.newBuilder().setValue(frameworkId));
-        } else {
-          LOG.warning("Did not find a persisted framework ID, connecting as a new framework.");
-        }
-
-        return new MesosSchedulerDriver(scheduler.get(), frameworkInfo.build(),
-            MESOS_MASTER_ADDRESS.get());
-      }
-    };
   }
 
   @Provides

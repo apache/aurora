@@ -47,13 +47,10 @@ import it.sauronsoftware.cron4j.SchedulingPattern;
  * TODO(William Farner): Some more work might be required here.  For example, when the cron job is
  * triggered, we may want to see if the same job is still running and allow the configuration to
  * specify the policy for when that occurs (i.e. overlap or kill the existing job).
- *
- * @author William Farner
  */
 public class CronJobManager extends JobManager {
 
-  @VisibleForTesting
-  static final String MANAGER_KEY = "CRON";
+  public static final String MANAGER_KEY = "CRON";
 
   @VisibleForTesting
   static final String CRON_USER = "cron";
