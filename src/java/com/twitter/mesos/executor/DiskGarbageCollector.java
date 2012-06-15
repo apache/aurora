@@ -2,8 +2,6 @@ package com.twitter.mesos.executor;
 
 import java.io.File;
 import java.io.FileFilter;
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
@@ -14,19 +12,16 @@ import com.google.common.base.Function;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Ordering;
 
-import org.apache.commons.io.FileUtils;
-
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
+import com.twitter.mesos.executor.util.Disk;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Garbage collector to reclaim disk space consumed by unused files.
- *
- * @author William Farner
  */
 public class DiskGarbageCollector implements Runnable {
   private static final Logger LOG = Logger.getLogger(DiskGarbageCollector.class.getName());
@@ -108,7 +103,7 @@ public class DiskGarbageCollector implements Runnable {
         return;
       }
 
-      long diskUsedBytes = fileSize(scanDirectory);
+      long diskUsedBytes = Disk.recursiveFileSize(scanDirectory);
       long bytesToReclaim = diskUsedBytes - gcThreshold.as(Data.BYTES);
       if (bytesToReclaim > 0) {
         LOG.info("Triggering " + name + " GC, need to reclaim: "
@@ -130,7 +125,7 @@ public class DiskGarbageCollector implements Runnable {
             break;
           }
 
-          long fileSize = fileSize(file);
+          long fileSize = Disk.recursiveFileSize(file);
 
           LOG.info(name + " GC reclaiming " + Amount.of(fileSize, Data.BYTES).as(Data.MB)
                    + " MB from " + file);
@@ -150,63 +145,5 @@ public class DiskGarbageCollector implements Runnable {
     } catch (Throwable t) {
       LOG.log(Level.WARNING, name + " GC encountered an exception.", t);
     }
-  }
-
-  private static long fileSize(File f) throws IOException {
-    return f.isFile() ? f.length() : sizeOfDirectory(f);
-  }
-
-  // TODO(wfarner): Figure out a better long-term plan for the code below.  Right now, it is
-  //     a shameless copy from org.apache.commons.io.FileUtils to quickly plug an issue caused
-  //     by symlinks present in a directory.
-  public static long sizeOf(File file) throws IOException {
-    if (FileUtils.isSymlink(file)) {
-      LOG.warning("Skipping symlink " + file);
-      return 0;
-    }
-
-    if (!file.exists()) {
-      String message = file + " does not exist";
-      throw new FileNotFoundException(message);
-    }
-
-    if (file.isDirectory()) {
-      return sizeOfDirectory(file);
-    } else {
-      return file.length();
-    }
-  }
-
-  public static long sizeOfDirectory(File directory) throws IOException {
-    if (FileUtils.isSymlink(directory)) {
-      LOG.warning("Skipping symlink " + directory);
-      return 0;
-    }
-
-    if (!directory.exists()) {
-      String message = directory + " does not exist";
-      throw new FileNotFoundException(message);
-    }
-
-    if (!directory.isDirectory()) {
-      String message = directory + " is not a directory";
-      throw new IllegalArgumentException(message);
-    }
-
-    long size = 0;
-
-    File[] files = directory.listFiles();
-    if (files == null) {  // null if security restricted
-      return 0L;
-    }
-    for (File file : files) {
-      try {
-        size += sizeOf(file);
-      } catch (IOException e) {
-        LOG.warning("Failed to calculate size of " + file +  ", " + e.getMessage());
-      }
-    }
-
-    return size;
   }
 }

@@ -164,6 +164,8 @@ public class ExecutorModule extends AbstractModule {
 
     Registration.registerServlet(binder(), "/task", TaskHome.class, false);
     Registration.registerServlet(binder(), "/executor", ExecutorHome.class, false);
+
+    install(new DiskScannerModule());
   }
 
   /**
