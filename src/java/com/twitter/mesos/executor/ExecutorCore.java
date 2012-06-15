@@ -53,6 +53,7 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
 import com.twitter.mesos.executor.ProcessKiller.KillException;
 import com.twitter.mesos.executor.ProcessScanner.ProcessInfo;
+import com.twitter.mesos.executor.Task.AuditedStatus;
 import com.twitter.mesos.executor.Task.TaskRunException;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduleStatus;
@@ -68,8 +69,6 @@ import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
  * ExecutorCore
  *
  * TODO(William Farner): When a LiveTask is terminated, should we replace its entry with a DeadTask?
- *
- * @author William Farner
  */
 public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleStatus>> {
   private static final Logger LOG = Logger.getLogger(MesosExecutorImpl.class.getName());
@@ -218,7 +217,7 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
     } catch (TaskRunException e) {
       LOG.log(Level.SEVERE, "Failed to stage or run task " + taskId, e);
       taskFailures.incrementAndGet();
-      task.terminate(FAILED);
+      task.terminate(new AuditedStatus(FAILED, "Staging failed: " + e.getMessage()));
       driver.sendStatusUpdate(taskId, FAILED, Optional.of(e.getMessage()));
       return;
     }
@@ -226,26 +225,30 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
     taskExecutor.execute(new Runnable() {
       @Override public void run() {
         LOG.info("Waiting for task " + taskId + " to complete.");
-        ScheduleStatus state = task.blockUntilTerminated();
+        AuditedStatus state = task.blockUntilTerminated();
         LOG.info("Task " + taskId + " completed in state " + state);
-        driver.sendStatusUpdate(taskId, state, Optional.<String>absent());
+        sendStatusUpdate(taskId, state);
       }
     });
   }
 
-  public Task stopLiveTask(String taskId) {
+  private void sendStatusUpdate(String taskId, AuditedStatus state) {
+    driver.sendStatusUpdate(taskId, state.getStatus(), state.getMessage());
+  }
+
+  public Task stopLiveTask(String taskId, String message) {
     Task task = tasks.get(taskId);
 
-    if (task != null && Tasks.isActive(task.getScheduleStatus())) {
+    if (task != null && Tasks.isActive(task.getAuditedStatus().getStatus())) {
       LOG.info("Killing task: " + task);
       tasksKilled.incrementAndGet();
-      task.terminate(ScheduleStatus.KILLED);
+      task.terminate(new AuditedStatus(ScheduleStatus.KILLED, message));
     } else if (task == null) {
       LOG.severe("No such task found: " + taskId);
       driver.sendStatusUpdate(taskId, ScheduleStatus.LOST, Optional.of("Task not found on slave."));
     } else {
-      LOG.info("Kill request for task in state " + task.getScheduleStatus() + " ignored.");
-      driver.sendStatusUpdate(taskId, task.getScheduleStatus(),
+      LOG.info("Kill request for task in state " + task.getAuditedStatus() + " ignored.");
+      driver.sendStatusUpdate(taskId, task.getAuditedStatus().getStatus(),
           Optional.of("Repeating lost update."));
     }
     return task;
@@ -262,7 +265,7 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
   private static final Function<Task, ScheduleStatus> GET_STATUS =
       new Function<Task, ScheduleStatus>() {
         @Override public ScheduleStatus apply(Task task) {
-          return task.getScheduleStatus();
+          return task.getAuditedStatus().getStatus();
         }
       };
 
@@ -340,7 +343,7 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
     if (!runningTasks.isEmpty()) {
       LOG.warning("Retained tasks excluded locally-active tasks " + runningTasks.keySet());
       for (Task task : runningTasks.values()) {
-        task.terminate(ScheduleStatus.KILLED);
+        task.terminate(new AuditedStatus(ScheduleStatus.KILLED, "Deleted on scheduler."));
       }
     }
 
@@ -369,11 +372,12 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
       if (activeLocally && !activeRemotely) {
         LOG.warning("Terminating locally-active task with mismatched state: " + taskId);
         localActiveMismatch.incrementAndGet();
-        local.terminate(ScheduleStatus.KILLED);
+        local.terminate(new AuditedStatus(ScheduleStatus.KILLED, REPLAY_STATUS_MSG));
       } else if (activeRemotely && !activeLocally) {
         LOG.warning("Task considered active remotely but not locally: " + taskId);
         localInactiveMismatch.incrementAndGet();
-        driver.sendStatusUpdate(taskId, local.getScheduleStatus(), Optional.of(REPLAY_STATUS_MSG));
+        driver.sendStatusUpdate(taskId, local.getAuditedStatus().getStatus(),
+            Optional.of(REPLAY_STATUS_MSG));
       }
     }
   }
@@ -382,7 +386,7 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
   public Map<String, ScheduleStatus> get() {
     ImmutableMap.Builder<String, ScheduleStatus> statuses = ImmutableMap.builder();
     for (Map.Entry<String, Task> entry : tasks.entrySet()) {
-      statuses.put(entry.getKey(), entry.getValue().getScheduleStatus());
+      statuses.put(entry.getKey(), entry.getValue().getAuditedStatus().getStatus());
     }
     return statuses.build();
   }
@@ -401,7 +405,7 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
       try {
         Task task = result.get();
         if (!result.isCancelled() && task != null
-            && task.getScheduleStatus() == ScheduleStatus.KILLED) {
+            && task.getAuditedStatus().getStatus() == ScheduleStatus.KILLED) {
           killed.add(task);
         }
       } catch (InterruptedException e) {
@@ -422,7 +426,7 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
             @Override public Callable<Task> apply(final Task task) {
               return new Callable<Task>() {
                 @Override public Task call() {
-                  return stopLiveTask(task.getId());
+                  return stopLiveTask(task.getId(), "Executor shutting down.");
                 }
               };
             }

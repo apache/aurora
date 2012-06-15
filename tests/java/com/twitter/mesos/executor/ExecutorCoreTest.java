@@ -23,6 +23,7 @@ import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
 import com.twitter.mesos.executor.ProcessKiller.KillException;
 import com.twitter.mesos.executor.ProcessScanner.ProcessInfo;
+import com.twitter.mesos.executor.Task.AuditedStatus;
 import com.twitter.mesos.executor.Task.TaskRunException;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
@@ -37,12 +38,10 @@ import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
-/**
- * @author William Farner
- */
 public class ExecutorCoreTest extends EasyMockTest {
   private static final String USER_A = "user-a";
   private static final String ROLE_A = "role-a";
@@ -92,7 +91,7 @@ public class ExecutorCoreTest extends EasyMockTest {
     task1.stage();
     stateChange(task.getTaskId(), RUNNING);
     task1.run();
-    expect(task1.blockUntilTerminated()).andReturn(FINISHED);
+    expect(task1.blockUntilTerminated()).andReturn(new AuditedStatus(FINISHED));
     Capture<Runnable> taskCapture = new Capture<Runnable>();
     taskExecutor.execute(capture(taskCapture));
     stateChange(task.getTaskId(), FINISHED);
@@ -105,6 +104,7 @@ public class ExecutorCoreTest extends EasyMockTest {
 
   @Test
   public void testTaskFails() throws Exception {
+    String msg = "Bad stuff!";
     AssignedTask task = makeTask(OWNER_A, JOB_A);
 
     expect(taskFactory.apply(task)).andReturn(task1);
@@ -112,10 +112,10 @@ public class ExecutorCoreTest extends EasyMockTest {
     task1.stage();
     stateChange(task.getTaskId(), RUNNING);
     task1.run();
-    expect(task1.blockUntilTerminated()).andReturn(FAILED);
+    expect(task1.blockUntilTerminated()).andReturn(new AuditedStatus(FAILED, msg));
     Capture<Runnable> taskCapture = new Capture<Runnable>();
     taskExecutor.execute(capture(taskCapture));
-    stateChange(task.getTaskId(), FAILED);
+    stateChange(task.getTaskId(), FAILED, Optional.of(msg));
 
     control.replay();
 
@@ -132,7 +132,7 @@ public class ExecutorCoreTest extends EasyMockTest {
     task1.stage();
     expectLastCall().andThrow(new TaskRunException("Staging failed."));
     stateChange(task.getTaskId(), FAILED, "Staging failed.");
-    task1.terminate(FAILED);
+    task1.terminate(new AuditedStatus(FAILED));
 
     control.replay();
 
@@ -150,7 +150,7 @@ public class ExecutorCoreTest extends EasyMockTest {
     task1.run();
     expectLastCall().andThrow(new TaskRunException("Failed to start."));
     stateChange(task.getTaskId(), FAILED, "Failed to start.");
-    task1.terminate(FAILED);
+    task1.terminate(new AuditedStatus(FAILED));
 
     control.replay();
 
@@ -167,7 +167,7 @@ public class ExecutorCoreTest extends EasyMockTest {
     stateChange(task.getTaskId(), RUNNING);
     task1.run();
     expectGetStatus(task1, RUNNING);
-    expect(task1.blockUntilTerminated()).andReturn(FINISHED);
+    expect(task1.blockUntilTerminated()).andReturn(new AuditedStatus(FINISHED));
     Capture<Runnable> taskCapture = new Capture<Runnable>();
     taskExecutor.execute(capture(taskCapture));
     stateChange(task.getTaskId(), FINISHED);
@@ -191,8 +191,12 @@ public class ExecutorCoreTest extends EasyMockTest {
     return running;
   }
 
-  private void expectGetStatus(Task task, ScheduleStatus returnedStatsus) {
-    expect(task.getScheduleStatus()).andReturn(returnedStatsus).anyTimes();
+  private void expectGetStatus(Task task, AuditedStatus returnedStatsus) {
+    expect(task.getAuditedStatus()).andReturn(returnedStatsus).anyTimes();
+  }
+
+  private void expectGetStatus(Task task, ScheduleStatus returnedStatus) {
+    expectGetStatus(task, new AuditedStatus(returnedStatus));
   }
 
   private void expectDelete(Task task) throws Exception {
@@ -236,7 +240,7 @@ public class ExecutorCoreTest extends EasyMockTest {
   public void testRetainLocallyRunningMismatch() throws Exception {
     AssignedTask running = setupRunningTask(task1);
     expectGetStatus(task1, RUNNING);
-    task1.terminate(KILLED);
+    task1.terminate(new AuditedStatus(KILLED));
 
     control.replay();
 
@@ -267,7 +271,7 @@ public class ExecutorCoreTest extends EasyMockTest {
 
     AssignedTask running = setupRunningTask(task1);
     expectGetStatus(task1, RUNNING);
-    task1.terminate(KILLED);
+    task1.terminate(new AuditedStatus(KILLED));
     expectDelete(task1);
 
     control.replay();
@@ -288,7 +292,7 @@ public class ExecutorCoreTest extends EasyMockTest {
 
     AssignedTask running = setupRunningTask(task2);
     expectGetStatus(task2, RUNNING);
-    task2.terminate(KILLED);
+    task2.terminate(new AuditedStatus(KILLED));
     expectDelete(task2);
 
     control.replay();
@@ -358,7 +362,7 @@ public class ExecutorCoreTest extends EasyMockTest {
   public void testScanNotRunningTask() throws Exception {
     AssignedTask killed = setupRunningTask(task1);
     expectGetStatus(task1, RUNNING);
-    task1.terminate(KILLED);
+    task1.terminate(new AuditedStatus(KILLED));
     expect(task1.isRunning()).andReturn(false);
 
     processKiller.execute(new KillCommand(2));
@@ -366,7 +370,7 @@ public class ExecutorCoreTest extends EasyMockTest {
     control.replay();
 
     executor.executeTask(killed);
-    executor.stopLiveTask(killed.getTaskId());
+    executor.stopLiveTask(killed.getTaskId(), "Halting for test.");
 
     executor.checkProcesses(ImmutableSet.of(
         new ProcessInfo(2, killed.getTaskId(), ImmutableSet.of(5, 6))));

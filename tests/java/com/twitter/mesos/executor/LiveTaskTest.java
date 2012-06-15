@@ -1,10 +1,10 @@
 package com.twitter.mesos.executor;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.Arrays;
 
 import com.google.common.base.Charsets;
+import com.google.common.base.Optional;
 import com.google.common.collect.Sets;
 import com.google.common.io.Files;
 
@@ -22,15 +22,22 @@ import com.twitter.mesos.executor.ProcessKiller.KillCommand;
 import com.twitter.mesos.executor.ProcessKiller.KillException;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
-import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 
-import static com.twitter.mesos.executor.LiveTask.*;
+import static com.twitter.mesos.executor.LiveTask.AuditedStatus;
+import static com.twitter.mesos.executor.LiveTask.PIDFILE_NAME;
+import static com.twitter.mesos.executor.LiveTask.RUN_SCRIPT_NAME;
+import static com.twitter.mesos.executor.LiveTask.SANDBOX_DIR_NAME;
+import static com.twitter.mesos.executor.LiveTask.STDERR_CAPTURE_FILE;
+import static com.twitter.mesos.executor.LiveTask.STDOUT_CAPTURE_FILE;
 import static com.twitter.mesos.executor.TaskOnDisk.TASK_DUMP_FILE;
 import static com.twitter.mesos.executor.TaskOnDisk.TASK_STATUS_FILE;
+import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
-import static org.easymock.EasyMock.*;
+import static org.easymock.EasyMock.anyObject;
+import static org.easymock.EasyMock.createControl;
+import static org.easymock.EasyMock.expect;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
@@ -103,7 +110,7 @@ public class LiveTaskTest {
     LiveTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
     taskA.run();
-    assertThat(taskA.blockUntilTerminated(), is(FINISHED));
+    assertThat(taskA.blockUntilTerminated(), is(new AuditedStatus(FINISHED)));
     assertDirContents(taskA.taskRoot, SANDBOX_DIR_NAME, PIDFILE_NAME, TASK_DUMP_FILE,
         TASK_STATUS_FILE);
     assertDirContents(taskA.sandboxDir, "a.txt", RUN_SCRIPT_NAME, STDERR_CAPTURE_FILE,
@@ -120,7 +127,7 @@ public class LiveTaskTest {
     LiveTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
     taskA.run();
-    assertThat(taskA.blockUntilTerminated(), is(FINISHED));
+    assertThat(taskA.blockUntilTerminated(), is(new AuditedStatus(FINISHED)));
     assertDirContents(taskA.taskRoot, SANDBOX_DIR_NAME, PIDFILE_NAME, TASK_DUMP_FILE,
         TASK_STATUS_FILE);
     assertDirContents(taskA.sandboxDir, RUN_SCRIPT_NAME, STDERR_CAPTURE_FILE, STDOUT_CAPTURE_FILE);
@@ -139,7 +146,7 @@ public class LiveTaskTest {
     LiveTask taskA = makeTask(taskObj, TASK_ID_A);
     taskA.stage();
     taskA.run();
-    assertThat(taskA.blockUntilTerminated(), is(FINISHED));
+    assertThat(taskA.blockUntilTerminated(), is(new AuditedStatus(FINISHED)));
     assertDirContents(taskA.taskRoot, SANDBOX_DIR_NAME, PIDFILE_NAME, TASK_DUMP_FILE,
         TASK_STATUS_FILE);
     assertDirContents(taskA.sandboxDir, RUN_SCRIPT_NAME, STDERR_CAPTURE_FILE, STDOUT_CAPTURE_FILE);
@@ -159,14 +166,13 @@ public class LiveTaskTest {
     taskA.stage();
     taskA.run();
     assertFalse(taskA.isCompleted());
-    assertThat(taskA.blockUntilTerminated(), is(ScheduleStatus.FAILED));
+    assertThat(taskA.blockUntilTerminated(), is(new AuditedStatus(FAILED)));
     assertThat(taskA.getExitCode(), is(2));
     assertTrue(taskA.isCompleted());
   }
 
   @Test
   public void testShutdown() throws Exception {
-    final int customPort = 4634;
     expect(pidFetcher.apply((File) anyObject())).andReturn(PID);
     processKiller.execute(EasyMock.<KillCommand>anyObject());
 
@@ -178,8 +184,9 @@ public class LiveTaskTest {
     taskA.run();
 
     assertFalse(taskA.isCompleted());
-    taskA.terminate(KILLED);
-    assertThat(taskA.blockUntilTerminated(), is(ScheduleStatus.KILLED));
+    AuditedStatus status = new AuditedStatus(KILLED, "Killed.");
+    taskA.terminate(status);
+    assertThat(taskA.blockUntilTerminated(), is(status));
   }
 
   @Test
@@ -198,7 +205,9 @@ public class LiveTaskTest {
     taskA.stage();
     taskA.run();
 
-    assertThat(taskA.blockUntilTerminated(), is(ScheduleStatus.FAILED));
+    AuditedStatus status = taskA.blockUntilTerminated();
+    assertThat(status.getStatus(), is(FAILED));
+    assertThat(status.getMessage(), is(Optional.of(LiveTask.HEALTH_CHECK_FAIL_MSG)));
   }
 
   private LiveTask makeTask(AssignedTask task, String taskId) {

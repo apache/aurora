@@ -5,9 +5,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
-import java.util.EnumSet;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -41,12 +39,6 @@ import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduleStatus;
 
 import static com.twitter.mesos.executor.FileCopier.FileCopyException;
-import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
-import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
-import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
-import static com.twitter.mesos.gen.ScheduleStatus.LOST;
-import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
-import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 
 /**
  * Handles storing information and performing duties related to a running task.
@@ -61,11 +53,16 @@ import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
  * $TASK_ROOT/sandbox/$PAYLOAD  - Payload specified in task configuration (fetched from HDFS).
  * $TASK_ROOT/sandbox/stderr  - Captured standard error stream.
  * $TASK_ROOT/sandbox/stdout - Captured standard output stream.
- *
- * @author William Farner
  */
 public class LiveTask extends TaskOnDisk {
   private static final Logger LOG = Logger.getLogger(LiveTask.class.getName());
+
+  private static final AuditedStatus FAILED = new AuditedStatus(ScheduleStatus.FAILED);
+  private static final AuditedStatus FINISHED = new AuditedStatus(ScheduleStatus.FINISHED);
+  private static final AuditedStatus KILLED = new AuditedStatus(ScheduleStatus.KILLED);
+  private static final AuditedStatus LOST = new AuditedStatus(ScheduleStatus.LOST);
+  private static final AuditedStatus RUNNING = new AuditedStatus(ScheduleStatus.RUNNING);
+  private static final AuditedStatus STARTING = new AuditedStatus(ScheduleStatus.STARTING);
 
   @VisibleForTesting static final String PIDFILE_NAME = "pidfile";
   @VisibleForTesting static final String RUN_SCRIPT_NAME = "run.sh";
@@ -75,7 +72,7 @@ public class LiveTask extends TaskOnDisk {
 
   private static final Amount<Long, Time> LAUNCH_PIDFILE_GRACE_PERIOD = Amount.of(1L, Time.SECONDS);
 
-  private final StateMachine<ScheduleStatus> stateMachine;
+  private final StateMachine<AuditedStatus> stateMachine;
 
   private final ExceptionalFunction<Integer, Boolean, HealthCheckException> healthChecker;
   private final ExceptionalClosure<KillCommand, KillException> processKiller;
@@ -112,7 +109,7 @@ public class LiveTask extends TaskOnDisk {
     this.fileCopier = Preconditions.checkNotNull(fileCopier);
     this.multiUser = multiUser;
 
-    stateMachine = StateMachine.<ScheduleStatus>builder(toString())
+    stateMachine = StateMachine.<AuditedStatus>builder(toString())
           .initialState(STARTING)
           .addState(STARTING, RUNNING, FAILED, KILLED)
           .addState(RUNNING, FINISHED, FAILED, KILLED, LOST)
@@ -170,7 +167,7 @@ public class LiveTask extends TaskOnDisk {
   }
 
   @Override
-  public ScheduleStatus getScheduleStatus() {
+  public AuditedStatus getAuditedStatus() {
     return stateMachine.getState();
   }
 
@@ -178,6 +175,8 @@ public class LiveTask extends TaskOnDisk {
   public AssignedTask getAssignedTask() {
     return task.deepCopy();
   }
+
+  @VisibleForTesting static final String HEALTH_CHECK_FAIL_MSG = "HTTP health check failure.";
 
   @Override
   public void run() throws TaskRunException {
@@ -227,7 +226,7 @@ public class LiveTask extends TaskOnDisk {
     try {
       process = processBuilder.start();
     } catch (IOException e) {
-      terminate(FAILED);
+      terminate(new AuditedStatus(ScheduleStatus.FAILED, "Failed to launch process."));
       throw new TaskRunException("Failed to launch process.", e);
     }
 
@@ -246,7 +245,7 @@ public class LiveTask extends TaskOnDisk {
             @Override public void run() {
               if (!isHealthy()) {
                 LOG.info("Task not healthy!");
-                terminate(FAILED);
+                terminate(new AuditedStatus(ScheduleStatus.FAILED, HEALTH_CHECK_FAIL_MSG));
               }
             }
           },
@@ -332,15 +331,15 @@ public class LiveTask extends TaskOnDisk {
    * @return The state that the task was in upon termination.
    */
   @Override
-  public ScheduleStatus blockUntilTerminated() {
+  public AuditedStatus blockUntilTerminated() {
     Preconditions.checkNotNull(process);
 
-    while (stateMachine.getState() == RUNNING) {
+    while (stateMachine.getState().equals(RUNNING)) {
       try {
         exitCode = process.waitFor();
         LOG.info("Process terminated with exit code: " + exitCode);
 
-        if (stateMachine.getState() != KILLED && stateMachine.getState() != FAILED) {
+        if (!stateMachine.getState().equals(KILLED) && !stateMachine.getState().equals(FAILED)) {
           setStatus(exitCode == 0 ? FINISHED : FAILED);
         }
       } catch (InterruptedException e) {
@@ -359,11 +358,9 @@ public class LiveTask extends TaskOnDisk {
     return task.getTaskId();
   }
 
-  private static final Set<ScheduleStatus> RUNNING_STATES = EnumSet.of(STARTING, RUNNING);
-
   @Override
   public boolean isRunning() {
-    return RUNNING_STATES.contains(stateMachine.getState());
+    return Tasks.isActive(stateMachine.getState().getStatus());
   }
 
   @Override
@@ -371,7 +368,7 @@ public class LiveTask extends TaskOnDisk {
     return completed;
   }
 
-  public ScheduleStatus getStatus() {
+  public AuditedStatus getStatus() {
     return stateMachine.getState();
   }
 
@@ -379,17 +376,17 @@ public class LiveTask extends TaskOnDisk {
     return exitCode;
   }
 
-  private void setStatus(ScheduleStatus status) {
+  private void setStatus(AuditedStatus status) {
     stateMachine.transition(status);
     try {
-      recordStatus(stateMachine.getState());
+      recordStatus(stateMachine.getState().getStatus());
     } catch (TaskStorageException e) {
       LOG.log(Level.WARNING, "Failed to store task status.", e);
     }
   }
 
   @Override
-  public void terminate(ScheduleStatus terminalState) {
+  public void terminate(AuditedStatus terminalState) {
     LOG.info("Terminating " + this + " with status " + terminalState);
 
     if (healthCheckExecutor != null) {
@@ -403,8 +400,8 @@ public class LiveTask extends TaskOnDisk {
       }
     }
 
-    ScheduleStatus currentStatus = stateMachine.getState();
-    if (Tasks.isTerminated(currentStatus)) {
+    AuditedStatus currentStatus = stateMachine.getState();
+    if (Tasks.isTerminated(currentStatus.getStatus())) {
       LOG.info("Task " + this + " is already terminated, not changing state to " + terminalState);
       return;
     }

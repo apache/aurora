@@ -121,7 +121,7 @@ public class MesosExecutorImpl implements Executor {
   @Override
   public void killTask(ExecutorDriver driverDoNotUse, TaskID taskID) {
     LOG.info("Received killTask request for " + taskID);
-    executorCore.stopLiveTask(taskID.getValue());
+    executorCore.stopLiveTask(taskID.getValue(), "Killed by framework.");
   }
 
   @JNICallback

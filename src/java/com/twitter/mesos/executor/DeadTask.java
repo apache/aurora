@@ -6,17 +6,14 @@ import com.google.common.base.Preconditions;
 
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
-import com.twitter.mesos.gen.ScheduleStatus;
 
 /**
  * A task that has completed execution.
- *
- * @author William Farner
  */
 public class DeadTask extends TaskOnDisk {
 
   private final AssignedTask task;
-  private final ScheduleStatus state;
+  private final AuditedStatus state;
 
   /**
    * Creates a new dead task.
@@ -32,8 +29,8 @@ public class DeadTask extends TaskOnDisk {
     Preconditions.checkArgument(taskRoot.isDirectory(), "Not a directory: " + taskRoot);
 
     this.task = restoreTask();
-    this.state = restoreStatus();
-    Preconditions.checkState(!Tasks.isActive(state),
+    this.state = new AuditedStatus(restoreStatus());
+    Preconditions.checkState(!Tasks.isActive(state.getStatus()),
         "A dead task may not be assigned an active state.");
   }
 
@@ -58,12 +55,12 @@ public class DeadTask extends TaskOnDisk {
   }
 
   @Override
-  public ScheduleStatus blockUntilTerminated() {
+  public AuditedStatus blockUntilTerminated() {
     throw new UnsupportedOperationException("Should not attempt to block on a dead task.");
   }
 
   @Override
-  public void terminate(ScheduleStatus terminalState) {
+  public void terminate(AuditedStatus terminalState) {
     throw new UnsupportedOperationException("The state of a dead task cannot be changed.");
   }
 
@@ -73,7 +70,7 @@ public class DeadTask extends TaskOnDisk {
   }
 
   @Override
-  public ScheduleStatus getScheduleStatus() {
+  public AuditedStatus getAuditedStatus() {
     return state;
   }
 
