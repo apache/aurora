@@ -61,8 +61,6 @@ import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.STOPPED;
 
 /**
  * Implementation of the scheduler core.
- *
- * @author William Farner
  */
 public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
 
@@ -345,8 +343,8 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
         }
       }
     } catch (SchedulerException e) {
-      // We assume here that a subsequent RegisteredTaskUpdate will inform us of this tasks status.
       LOG.log(Level.WARNING, "Failed to update status for: " + status, e);
+      throw e;
     }
     return false;
   }

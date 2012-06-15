@@ -8,6 +8,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.annotation.Nullable;
@@ -33,7 +34,10 @@ import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.SlaveID;
+import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskInfo;
+import org.apache.mesos.Protos.TaskState;
+import org.apache.mesos.Protos.TaskStatus;
 import org.apache.mesos.Protos.Value.Range;
 import org.apache.mesos.Protos.Value.Ranges;
 import org.apache.mesos.Protos.Value.Scalar;
@@ -74,8 +78,10 @@ import com.twitter.mesos.scheduler.quota.QuotaManager;
 import com.twitter.mesos.scheduler.quota.QuotaManager.QuotaManagerImpl;
 import com.twitter.mesos.scheduler.quota.Quotas;
 import com.twitter.mesos.scheduler.storage.Storage;
+import com.twitter.mesos.scheduler.storage.Storage.StorageException;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
 import com.twitter.mesos.scheduler.storage.Storage.Work.NoResult;
+import com.twitter.mesos.scheduler.storage.Storage.Work.NoResult.Quiet;
 
 import static org.easymock.EasyMock.expectLastCall;
 import static org.hamcrest.CoreMatchers.is;
@@ -1980,6 +1986,59 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       assertEquals(expected.getSecond(), event.getMessage());
       assertEquals(hostname, event.getScheduler());
     }
+  }
+
+  private static class FailureInjectingStorage implements Storage {
+    final Storage delegate;
+    final AtomicBoolean failTransactions = new AtomicBoolean(false);
+
+    FailureInjectingStorage(Storage delegate) {
+      this.delegate = delegate;
+    }
+
+    @Override public void prepare() {
+      delegate.prepare();
+    }
+
+    @Override public void start(Quiet initilizationLogic) {
+      delegate.start(initilizationLogic);
+    }
+
+    @Override public <T, E extends Exception> T doInTransaction(Work<T, E> work)
+        throws StorageException, E {
+      if (failTransactions.get()) {
+        throw new StorageException("Injected.");
+      }
+      return delegate.doInTransaction(work);
+    }
+
+    @Override public void stop() {
+      delegate.stop();
+    }
+  }
+
+  @Test(expected = StorageException.class)
+  public void testFailedStatusUpdate() throws Exception {
+    FailureInjectingStorage storage = new FailureInjectingStorage(createStorage());
+
+    control.replay();
+    buildScheduler(storage);
+
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, 1));
+
+    String taskId = Tasks.id(getOnlyTask(queryByOwner(OWNER_A)));
+
+    Offer offer = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, FOUR_GB, ONE_GB);
+    sendOffer(offer, taskId, SLAVE_HOST_1);
+
+    TaskStatus status = TaskStatus.newBuilder()
+        .setState(TaskState.TASK_RUNNING)
+        .setTaskId(TaskID.newBuilder().setValue(taskId))
+        .build();
+    scheduler.statusUpdate(status);
+
+    storage.failTransactions.set(true);
+    scheduler.statusUpdate(TaskStatus.newBuilder(status).setState(TaskState.TASK_FINISHED).build());
   }
 
   @Test

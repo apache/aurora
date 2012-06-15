@@ -197,10 +197,15 @@ public class MesosSchedulerImpl implements Scheduler {
     LOG.info("Received status update for task " + status.getTaskId().getValue()
         + " in state " + status.getState() + infoMsg + coreMsg);
 
-    for (TaskLauncher launcher : taskLaunchers) {
-      if (launcher.statusUpdate(status)) {
-        return;
+    try {
+      for (TaskLauncher launcher : taskLaunchers) {
+        if (launcher.statusUpdate(status)) {
+          return;
+        }
       }
+    } catch (SchedulerException e) {
+      LOG.log(Level.SEVERE, "Aborting driver due to scheduler exception: " + e, e);
+      driver.abort();
     }
 
     LOG.warning("Unhandled status update " + status);

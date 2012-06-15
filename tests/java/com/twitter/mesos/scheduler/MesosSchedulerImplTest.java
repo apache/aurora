@@ -12,6 +12,7 @@ import org.apache.mesos.Protos.MasterInfo;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.SlaveID;
+import org.apache.mesos.Protos.Status;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.Protos.TaskState;
@@ -24,6 +25,7 @@ import com.twitter.common.application.Lifecycle;
 import com.twitter.common.base.Command;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveMapper;
+import com.twitter.mesos.scheduler.storage.Storage.StorageException;
 
 import static org.apache.mesos.Protos.Status.DRIVER_RUNNING;
 import static org.easymock.EasyMock.expect;
@@ -177,6 +179,17 @@ public class MesosSchedulerImplTest extends EasyMockTest {
       @Override void expectations() throws Exception {
         expect(launcher.statusUpdate(STATUS)).andReturn(false);
         expect(schedulerCore.statusUpdate(STATUS)).andReturn(true);
+      }
+    };
+  }
+
+  @Test
+  public void testStatusUpdateFails() throws Exception {
+    new StatusFixture() {
+      @Override void expectations() throws Exception {
+        expect(launcher.statusUpdate(STATUS)).andReturn(false);
+        expect(schedulerCore.statusUpdate(STATUS)).andThrow(new StorageException("Injected."));
+        expect(driver.abort()).andReturn(Status.DRIVER_ABORTED);
       }
     };
   }
