@@ -38,6 +38,7 @@ import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.common.inject.TimedInterceptor;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.common.util.Clock;
 import com.twitter.mesos.GuiceUtils;
 import com.twitter.mesos.executor.Driver.DriverImpl;
 import com.twitter.mesos.executor.FileCopier.HdfsFileCopier;
@@ -104,10 +105,13 @@ public class ExecutorModule extends AbstractModule {
     TimedInterceptor.bind(binder());
     GuiceUtils.bindJNIContextClassLoader(binder());
 
+    bind(Clock.class).toInstance(Clock.SYSTEM_CLOCK);
+
     // Bindings needed for ExecutorMain.
     bind(File.class).annotatedWith(ExecutorRootDir.class).toInstance(TASK_ROOT_DIR.get());
     bind(Executor.class).to(MesosExecutorImpl.class).in(Singleton.class);
     bind(DriverRunner.class).in(Singleton.class);
+    bind(TaskManager.class).to(ExecutorCore.class);
     bind(ExecutorCore.class).in(Singleton.class);
     bind(new TypeLiteral<Supplier<Iterable<Task>>>() {})
         .to(DeadTaskLoader.class).in(Singleton.class);
