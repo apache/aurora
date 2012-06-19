@@ -107,7 +107,8 @@ public class SchedulerModule extends AbstractModule {
   protected void configure() {
     // Enable intercepted method timings and context classloader repair.
     TimedInterceptor.bind(binder());
-    GuiceUtils.bindJNIContextClassLoader(binder());
+    GuiceUtils.bindJNIContextClassLoader(binder(), Scheduler.class);
+    GuiceUtils.bindExceptionTrap(binder(), Scheduler.class);
 
     // Bind a ZooKeeperClient
     install(new ZooKeeperModule(

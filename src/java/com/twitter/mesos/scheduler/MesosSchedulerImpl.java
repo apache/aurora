@@ -30,7 +30,7 @@ import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
-import com.twitter.mesos.JNICallback;
+import com.twitter.mesos.GuiceUtils.AllowUnchecked;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.comm.SchedulerMessage;
 
@@ -38,8 +38,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Location for communication with the mesos core.
- *
- * @author William Farner
  */
 public class MesosSchedulerImpl implements Scheduler {
   private static final Logger LOG = Logger.getLogger(MesosSchedulerImpl.class.getName());
@@ -103,13 +101,11 @@ public class MesosSchedulerImpl implements Scheduler {
     registrationChecker.start();
   }
 
-  @JNICallback
   @Override
   public void slaveLost(SchedulerDriver schedulerDriver, SlaveID slaveId) {
     LOG.info("Received notification of lost slave: " + slaveId);
   }
 
-  @JNICallback
   @Override
   public void registered(SchedulerDriver driver, FrameworkID frameworkId, MasterInfo masterInfo) {
     LOG.info("Registered with ID " + frameworkId + ", master: " + masterInfo);
@@ -123,14 +119,12 @@ public class MesosSchedulerImpl implements Scheduler {
     }
   }
 
-  @JNICallback
   @Override
   public void disconnected(SchedulerDriver schedulerDriver) {
     LOG.warning("Framework disconnected.");
     frameworkDisconnects.incrementAndGet();
   }
 
-  @JNICallback
   @Override
   public void reregistered(SchedulerDriver schedulerDriver, MasterInfo masterInfo) {
     LOG.info("Framework re-registered with master " + masterInfo);
@@ -141,7 +135,6 @@ public class MesosSchedulerImpl implements Scheduler {
     return Resources.from(offer).greaterThanOrEqual(Resources.from(task.getResourcesList()));
   }
 
-  @JNICallback
   @Timed("scheduler_resource_offers")
   @Override
   public void resourceOffers(SchedulerDriver driver, List<Offer> offers) {
@@ -181,13 +174,12 @@ public class MesosSchedulerImpl implements Scheduler {
     }
   }
 
-  @JNICallback
   @Override
   public void offerRescinded(SchedulerDriver schedulerDriver, OfferID offerID) {
     LOG.info("Offer rescinded but we don't care " + offerID);
   }
 
-  @JNICallback
+  @AllowUnchecked
   @Timed("scheduler_status_update")
   @Override
   public void statusUpdate(SchedulerDriver driver, TaskStatus status) {
@@ -212,14 +204,12 @@ public class MesosSchedulerImpl implements Scheduler {
     failedStatusUpdates.incrementAndGet();
   }
 
-  @JNICallback
   @Override
   public void error(SchedulerDriver driver, String message) {
     LOG.severe("Received error message: " + message);
     lifecycle.shutdown();
   }
 
-  @JNICallback
   @Override
   public void executorLost(SchedulerDriver schedulerDriver, ExecutorID executorID, SlaveID slaveID,
       int status) {
@@ -228,7 +218,6 @@ public class MesosSchedulerImpl implements Scheduler {
     lostExecutors.incrementAndGet();
   }
 
-  @JNICallback
   @Timed("scheduler_framework_message")
   @Override
   public void frameworkMessage(SchedulerDriver driver, ExecutorID executor, SlaveID slave,

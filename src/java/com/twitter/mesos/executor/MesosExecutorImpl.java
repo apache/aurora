@@ -23,7 +23,6 @@ import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
-import com.twitter.mesos.JNICallback;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduleStatus;
@@ -55,7 +54,6 @@ public class MesosExecutorImpl implements Executor {
     this.shutdownRegistry = checkNotNull(shutdownRegistry);
   }
 
-  @JNICallback
   @Override
   public void registered(ExecutorDriver executorDriver,
       ExecutorInfo executorInfo,
@@ -87,7 +85,6 @@ public class MesosExecutorImpl implements Executor {
     return initialized.await(timeout.as(Time.MILLISECONDS), TimeUnit.MILLISECONDS);
   }
 
-  @JNICallback
   @Override
   public void launchTask(ExecutorDriver driverDoNotUse, TaskInfo task) {
     if (shuttingDown) {
@@ -117,14 +114,12 @@ public class MesosExecutorImpl implements Executor {
     executorCore.executeTask(assignedTask);
   }
 
-  @JNICallback
   @Override
   public void killTask(ExecutorDriver driverDoNotUse, TaskID taskID) {
     LOG.info("Received killTask request for " + taskID);
     executorCore.stopLiveTask(taskID.getValue(), "Killed by framework.");
   }
 
-  @JNICallback
   @Override
   public void shutdown(ExecutorDriver driverDoNotUse) {
     shuttingDown = true;
@@ -140,14 +135,12 @@ public class MesosExecutorImpl implements Executor {
     }
   }
 
-  @JNICallback
   @Override
   public void error(ExecutorDriver driver, String message) {
     LOG.info("Error received with message: " + message);
     shutdown(driver);
   }
 
-  @JNICallback
   @Override
   public void frameworkMessage(ExecutorDriver driver, byte[] data) {
     if (data == null) {

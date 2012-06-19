@@ -55,9 +55,7 @@ import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduleStatus;
 
 /**
- * ExecutorModule
- *
- * @author Florian Leibert
+ * Binding module for the twitter mesos executor.
  */
 public class ExecutorModule extends AbstractModule {
   private static final Logger LOG = Logger.getLogger(ExecutorModule.class.getName());
@@ -103,13 +101,15 @@ public class ExecutorModule extends AbstractModule {
   protected void configure() {
     // Enable intercepted method timings and context classloader repair.
     TimedInterceptor.bind(binder());
-    GuiceUtils.bindJNIContextClassLoader(binder());
+    GuiceUtils.bindJNIContextClassLoader(binder(), Executor.class);
+    GuiceUtils.bindExceptionTrap(binder(), Executor.class);
 
     bind(Clock.class).toInstance(Clock.SYSTEM_CLOCK);
 
     // Bindings needed for ExecutorMain.
     bind(File.class).annotatedWith(ExecutorRootDir.class).toInstance(TASK_ROOT_DIR.get());
-    bind(Executor.class).to(MesosExecutorImpl.class).in(Singleton.class);
+    bind(Executor.class).to(MesosExecutorImpl.class);
+    bind(MesosExecutorImpl.class).in(Singleton.class);
     bind(DriverRunner.class).in(Singleton.class);
     bind(TaskManager.class).to(ExecutorCore.class);
     bind(ExecutorCore.class).in(Singleton.class);
