@@ -123,7 +123,7 @@ public class LiveTask extends TaskOnDisk {
    * @throws TaskRunException If there was an error that caused staging to fail.
    */
   @Override
-  public void stage() throws TaskRunException {
+  public synchronized void stage() throws TaskRunException {
     LOG.info(String.format("Staging task %s", task.getTaskId()));
 
     LOG.info("Building task directory hierarchy.");
@@ -181,6 +181,7 @@ public class LiveTask extends TaskOnDisk {
   @Override
   public void run() throws TaskRunException {
     LOG.info("Executing from working directory: " + sandboxDir);
+    stateMachine.checkState(STARTING);
 
     // Write the start command to a file.
     try {
@@ -386,7 +387,7 @@ public class LiveTask extends TaskOnDisk {
   }
 
   @Override
-  public void terminate(AuditedStatus terminalState) {
+  public synchronized void terminate(AuditedStatus terminalState) {
     LOG.info("Terminating " + this + " with status " + terminalState);
 
     if (healthCheckExecutor != null) {

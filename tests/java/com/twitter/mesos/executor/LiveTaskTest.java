@@ -2,13 +2,16 @@ package com.twitter.mesos.executor;
 
 import java.io.File;
 import java.util.Arrays;
+import java.util.concurrent.CountDownLatch;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Optional;
 import com.google.common.collect.Sets;
+import com.google.common.io.CharStreams;
 import com.google.common.io.Files;
 
 import org.easymock.EasyMock;
+import org.easymock.IAnswer;
 import org.easymock.IMocksControl;
 import org.junit.After;
 import org.junit.Before;
@@ -20,8 +23,10 @@ import com.twitter.common.io.FileUtils;
 import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
 import com.twitter.mesos.executor.ProcessKiller.KillException;
+import com.twitter.mesos.executor.Task.TaskRunException;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
+import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 
 import static com.twitter.mesos.executor.LiveTask.AuditedStatus;
@@ -37,11 +42,15 @@ import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.createControl;
+import static org.easymock.EasyMock.createMock;
 import static org.easymock.EasyMock.expect;
+import static org.easymock.EasyMock.getCurrentArguments;
 import static org.hamcrest.CoreMatchers.is;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * @author William Farner
@@ -134,6 +143,70 @@ public class LiveTaskTest {
 
     assertThat(Files.readLines(new File(taskA.sandboxDir, STDOUT_CAPTURE_FILE), Charsets.UTF_8),
         is(Arrays.asList("hello world")));
+  }
+
+  @Test
+  public void testKillWhileStaging() throws Exception {
+    final CountDownLatch stagingStarted = new CountDownLatch(1);
+    final CountDownLatch stagingDone = new CountDownLatch(1);
+    FileCopier copier = new FileCopier() {
+      @Override public File apply(FileCopyRequest request) {
+        try {
+          stagingStarted.countDown();
+          stagingDone.await();
+
+          File payload = new File(request.getDestPath(), "payload");
+          Files.write("Payload data".getBytes(), payload);
+          return payload;
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      }
+    };
+
+    expect(pidFetcher.apply((File) anyObject())).andReturn(PID);
+    processKiller.execute(EasyMock.<KillCommand>anyObject());
+
+    control.replay();
+
+    taskObj.setTaskId(TASK_ID_A);
+    final LiveTask task = new LiveTask(healthChecker, processKiller, pidFetcher,
+        new File(executorRoot, String.valueOf(taskObj.getTaskId())), taskObj, copier, false);
+
+    Thread stage = new Thread() {
+      @Override public void run() {
+        try {
+          task.stage();
+        } catch (TaskRunException e) {
+          fail(e.getMessage());
+        }
+      }
+    };
+
+    final AuditedStatus status = new AuditedStatus(ScheduleStatus.FAILED, "Fail!");
+    final CountDownLatch terminateStarted = new CountDownLatch(1);
+    Thread terminate = new Thread() {
+      @Override public void run() {
+        terminateStarted.countDown();
+        task.terminate(status);
+      }
+    };
+
+    stage.start();
+
+    stagingStarted.await();
+    terminate.start();
+    terminateStarted.await();
+    assertEquals(ScheduleStatus.STARTING, task.getStatus().getStatus());
+    stagingDone.countDown();
+
+    try {
+      task.run();
+      fail("Run should have failed.");
+    } catch (IllegalStateException e) {
+      // Expected.
+    }
+    assertThat(task.blockUntilTerminated(), is(status));
   }
 
   @Test
