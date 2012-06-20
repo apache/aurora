@@ -153,7 +153,9 @@ class MesosConfig(ProxyConfig):
         raise ValueError('Must specify job name in multi-job configuration!')
     else:
       if name not in self._config:
-        raise ValueError('Unknown job %s!' % name)
+        raise ValueError('Unknown job %s! Perhaps you meant one of these?:\n  %s' % (
+          name, '\n  '.join(self._config.keys())
+        ))
       self._config = self._config[name]
     self._name = self._config['name']
 

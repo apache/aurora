@@ -88,7 +88,6 @@ class HDFSHelper(object):
     """
     abs_src = os.path.expanduser(src)
 
-    dst = HDFSHelper.hdfs_uri(cluster, dst)
     dst_dir = os.path.dirname(dst)
 
     log.info('Dst: %s Dir: %s' % (dst, dst_dir))
@@ -100,24 +99,12 @@ class HDFSHelper(object):
     ssh_proxy_host = HDFSHelper.ssh_proxy(cluster)
     hadoop_fs_config = HDFSHelper.hadoop_config(cluster)
 
-    hadoop_fs = ['hadoop', '--config', hadoop_fs_config, 'fs']
-    def call_hadoop(*args):
-      return MesosHelper.call(hadoop_fs + list(args), ssh_proxy_host, user=user)
-    def check_call_hadoop(*args):
-      MesosHelper.check_call(hadoop_fs + list(args), ssh_proxy_host, user=user)
-
     if ssh_proxy_host:
       log.info('Running in corp, copy will be done via %s@%s' % (user, ssh_proxy_host))
       subprocess.check_call(['scp', abs_src, '%s@%s:' % (user, ssh_proxy_host)])
-    if not call_hadoop('-test', '-e', dst):
-      log.info("Deleting existing file at %s" % dst)
-      check_call_hadoop('-rm', '-skipTrash', dst)
-    elif call_hadoop('-test', '-e', dst_dir):
-      log.info('Creating directory %s' % dst_dir)
-      check_call_hadoop('-mkdir', dst_dir)
-    log.info('Copying %s -> %s' % (hdfs_src, dst))
-    check_call_hadoop('-put', hdfs_src, dst)
 
+    cmd = ['sudo', '-u', 'mesos', 'mesos-upload.sh', hadoop_fs_config, hdfs_src, dst]
+    MesosHelper.check_call(cmd, ssh_proxy_host, user=user)
 
 class MesosHelper(object):
   _DEFAULT_USER = getpass.getuser()
@@ -136,24 +123,22 @@ class MesosHelper(object):
 
   @staticmethod
   def call(cmd, host, user=_DEFAULT_USER):
-    if host is not None:
-      return subprocess.call(['ssh', '%s@%s' % (user, host), ' '.join(cmd)])
-    else:
-      return subprocess.call(cmd)
+    cmd = MesosHelper._maybe_tunnel_cmd(cmd, host, user)
+    return subprocess.call(cmd)
 
   @staticmethod
   def check_call(cmd, host, user=_DEFAULT_USER):
-    if host is not None:
-      return subprocess.check_call(['ssh', '%s@%s' % (user, host), ' '.join(cmd)])
-    else:
-      return subprocess.check_call(cmd)
+    cmd = MesosHelper._maybe_tunnel_cmd(cmd, host, user)
+    return subprocess.check_call(cmd)
 
   @staticmethod
   def check_output(cmd, host, user=_DEFAULT_USER):
-    if host is not None:
-      cmd = ['ssh', '%s@%s' % (user, host), ' '.join(cmd)]
-
+    cmd = MesosHelper._maybe_tunnel_cmd(cmd, host, user)
     return subprocess.Popen(cmd, stdout=subprocess.PIPE).communicate()[0].rstrip('\n')
+
+  @staticmethod
+  def _maybe_tunnel_cmd(cmd, host, user):
+    return ['ssh', '-t', '%s@%s' % (user, host), ' '.join(cmd)] if host is not None else cmd
 
   @staticmethod
   def assert_valid_cluster(cluster):
