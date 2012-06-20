@@ -20,7 +20,6 @@ import java.util.logging.Logger;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
-import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
@@ -62,6 +61,7 @@ import com.twitter.mesos.gen.comm.SchedulerMessage;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
+import static com.twitter.mesos.gen.ScheduleStatus.LOST;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 
@@ -209,16 +209,20 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
     final Task task = taskFactory.apply(assignedTask);
     tasks.put(taskId, task);
 
-    driver.sendStatusUpdate(taskId, STARTING, Optional.<String>absent());
+    sendStatusUpdate(taskId, new AuditedStatus(STARTING));
     try {
-      task.stage();
-      driver.sendStatusUpdate(taskId, RUNNING, Optional.<String>absent());
-      task.run();
+      // Synchronize on the task mutex to prevent entry into terminate() before we apply
+      // the RUNNING update.
+      synchronized (task.getMutex()) {
+        task.stage();
+        task.run();
+        sendStatusUpdate(taskId, new AuditedStatus(RUNNING));
+      }
     } catch (TaskRunException e) {
       LOG.log(Level.SEVERE, "Failed to stage or run task " + taskId, e);
       taskFailures.incrementAndGet();
       task.terminate(new AuditedStatus(FAILED, "Staging failed: " + e.getMessage()));
-      driver.sendStatusUpdate(taskId, FAILED, Optional.of(e.getMessage()));
+      sendStatusUpdate(taskId, new AuditedStatus(FAILED, e.getMessage()));
       return;
     }
 
@@ -245,11 +249,11 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
       task.terminate(new AuditedStatus(ScheduleStatus.KILLED, message));
     } else if (task == null) {
       LOG.severe("No such task found: " + taskId);
-      driver.sendStatusUpdate(taskId, ScheduleStatus.LOST, Optional.of("Task not found on slave."));
+      sendStatusUpdate(taskId, new AuditedStatus(LOST, "Task not found on slave."));
     } else {
       LOG.info("Kill request for task in state " + task.getAuditedStatus() + " ignored.");
-      driver.sendStatusUpdate(taskId, task.getAuditedStatus().getStatus(),
-          Optional.of("Repeating lost update."));
+      sendStatusUpdate(taskId,
+          new AuditedStatus(task.getAuditedStatus().getStatus(), "Repeating lost update."));
     }
     return task;
   }
@@ -313,8 +317,6 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
 
   @Override
   public void adjustRetainedTasks(Map<String, ScheduleStatus> retainedTasks) {
-    LOG.info("Adjusting task retention to match " + retainedTasks);
-
     synchronized (tasks) {
       Set<String> unknownTasks = Sets.difference(retainedTasks.keySet(), tasks.keySet());
       if (!unknownTasks.isEmpty()) {
@@ -376,8 +378,8 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
       } else if (activeRemotely && !activeLocally) {
         LOG.warning("Task considered active remotely but not locally: " + taskId);
         localInactiveMismatch.incrementAndGet();
-        driver.sendStatusUpdate(taskId, local.getAuditedStatus().getStatus(),
-            Optional.of(REPLAY_STATUS_MSG));
+        sendStatusUpdate(taskId,
+            new AuditedStatus(local.getAuditedStatus().getStatus(), REPLAY_STATUS_MSG));
       }
     }
   }

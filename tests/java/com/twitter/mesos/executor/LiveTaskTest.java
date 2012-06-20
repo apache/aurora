@@ -7,11 +7,9 @@ import java.util.concurrent.CountDownLatch;
 import com.google.common.base.Charsets;
 import com.google.common.base.Optional;
 import com.google.common.collect.Sets;
-import com.google.common.io.CharStreams;
 import com.google.common.io.Files;
 
 import org.easymock.EasyMock;
-import org.easymock.IAnswer;
 import org.easymock.IMocksControl;
 import org.junit.After;
 import org.junit.Before;
@@ -42,9 +40,7 @@ import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.createControl;
-import static org.easymock.EasyMock.createMock;
 import static org.easymock.EasyMock.expect;
-import static org.easymock.EasyMock.getCurrentArguments;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -52,9 +48,6 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-/**
- * @author William Farner
- */
 public class LiveTaskTest {
 
   private static final int PID = 12345;
@@ -185,10 +178,12 @@ public class LiveTaskTest {
 
     final AuditedStatus status = new AuditedStatus(ScheduleStatus.FAILED, "Fail!");
     final CountDownLatch terminateStarted = new CountDownLatch(1);
+    final CountDownLatch terminateDone = new CountDownLatch(1);
     Thread terminate = new Thread() {
       @Override public void run() {
         terminateStarted.countDown();
         task.terminate(status);
+        terminateDone.countDown();
       }
     };
 
@@ -199,6 +194,7 @@ public class LiveTaskTest {
     terminateStarted.await();
     assertEquals(ScheduleStatus.STARTING, task.getStatus().getStatus());
     stagingDone.countDown();
+    terminateDone.await();
 
     try {
       task.run();

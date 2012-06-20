@@ -14,30 +14,37 @@ import com.twitter.mesos.gen.ScheduleStatus;
  */
 public interface Task {
 
-  public String getId();
+  String getId();
 
-  public void stage() throws TaskRunException;
+  /**
+   * Gets the mutex object that is used to guard mutating operations on the task.
+   *
+   * @return the task's mutex lock.
+   */
+  Object getMutex();
 
-  public void run() throws TaskRunException;
+  void stage() throws TaskRunException;
 
-  public AuditedStatus blockUntilTerminated();
+  void run() throws TaskRunException;
 
-  public boolean isRunning();
+  AuditedStatus blockUntilTerminated();
+
+  boolean isRunning();
 
   /**
    * Whether underlying process is terminated after completion.
    *
    * @return {@code true} iff the underlying process is completed
    */
-  public boolean isCompleted();
+  boolean isCompleted();
 
-  public void terminate(AuditedStatus terminalState);
+  void terminate(AuditedStatus terminalState);
 
-  public File getSandboxDir();
+  File getSandboxDir();
 
-  public AssignedTask getAssignedTask();
+  AssignedTask getAssignedTask();
 
-  public AuditedStatus getAuditedStatus();
+  AuditedStatus getAuditedStatus();
 
   public static class TaskRunException extends Exception {
 

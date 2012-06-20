@@ -178,7 +178,6 @@ public class MesosExecutorImpl implements Executor {
             return;
           }
 
-          LOG.info("Received request to adjust retained tasks to " + tasks);
           executorCore.adjustRetainedTasks(tasks);
           break;
 

@@ -38,7 +38,6 @@ import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
@@ -82,15 +81,24 @@ public class ExecutorCoreTest extends EasyMockTest {
         fileDeleter);
   }
 
+  private void expectStaging(AssignedTask assigned, Task task) throws Exception {
+    expect(taskFactory.apply(assigned)).andReturn(task);
+    stateChange(assigned.getTaskId(), STARTING);
+    expect(task.getMutex()).andReturn(task);
+    task.stage();
+  }
+
+  private void expectStageAndRun(AssignedTask assigned, Task task) throws Exception {
+    expectStaging(assigned, task);
+    stateChange(assigned.getTaskId(), RUNNING);
+    task.run();
+  }
+
   @Test
   public void testRunTask() throws Exception {
     AssignedTask task = makeTask(OWNER_A, JOB_A);
+    expectStageAndRun(task, task1);
 
-    expect(taskFactory.apply(task)).andReturn(task1);
-    stateChange(task.getTaskId(), STARTING);
-    task1.stage();
-    stateChange(task.getTaskId(), RUNNING);
-    task1.run();
     expect(task1.blockUntilTerminated()).andReturn(new AuditedStatus(FINISHED));
     Capture<Runnable> taskCapture = new Capture<Runnable>();
     taskExecutor.execute(capture(taskCapture));
@@ -107,11 +115,7 @@ public class ExecutorCoreTest extends EasyMockTest {
     String msg = "Bad stuff!";
     AssignedTask task = makeTask(OWNER_A, JOB_A);
 
-    expect(taskFactory.apply(task)).andReturn(task1);
-    stateChange(task.getTaskId(), STARTING);
-    task1.stage();
-    stateChange(task.getTaskId(), RUNNING);
-    task1.run();
+    expectStageAndRun(task, task1);
     expect(task1.blockUntilTerminated()).andReturn(new AuditedStatus(FAILED, msg));
     Capture<Runnable> taskCapture = new Capture<Runnable>();
     taskExecutor.execute(capture(taskCapture));
@@ -127,9 +131,7 @@ public class ExecutorCoreTest extends EasyMockTest {
   public void testStagingFails() throws Exception {
     AssignedTask task = makeTask(OWNER_A, JOB_A);
 
-    expect(taskFactory.apply(task)).andReturn(task1);
-    stateChange(task.getTaskId(), STARTING);
-    task1.stage();
+    expectStaging(task, task1);
     expectLastCall().andThrow(new TaskRunException("Staging failed."));
     stateChange(task.getTaskId(), FAILED, "Staging failed.");
     task1.terminate(new AuditedStatus(FAILED));
@@ -143,10 +145,7 @@ public class ExecutorCoreTest extends EasyMockTest {
   public void testRunFails() throws Exception {
     AssignedTask task = makeTask(OWNER_A, JOB_A);
 
-    expect(taskFactory.apply(task)).andReturn(task1);
-    stateChange(task.getTaskId(), STARTING);
-    task1.stage();
-    stateChange(task.getTaskId(), RUNNING);
+    expectStaging(task, task1);
     task1.run();
     expectLastCall().andThrow(new TaskRunException("Failed to start."));
     stateChange(task.getTaskId(), FAILED, "Failed to start.");
@@ -161,11 +160,7 @@ public class ExecutorCoreTest extends EasyMockTest {
   public void testDeleteActiveTask() throws Exception {
     AssignedTask task = makeTask(OWNER_A, JOB_A);
 
-    expect(taskFactory.apply(task)).andReturn(task1);
-    stateChange(task.getTaskId(), STARTING);
-    task1.stage();
-    stateChange(task.getTaskId(), RUNNING);
-    task1.run();
+    expectStageAndRun(task, task1);
     expectGetStatus(task1, RUNNING);
     expect(task1.blockUntilTerminated()).andReturn(new AuditedStatus(FINISHED));
     Capture<Runnable> taskCapture = new Capture<Runnable>();
@@ -182,11 +177,7 @@ public class ExecutorCoreTest extends EasyMockTest {
 
   private AssignedTask setupRunningTask(Task task) throws Exception {
     AssignedTask running = makeTask(OWNER_A, JOB_A);
-    expect(taskFactory.apply(running)).andReturn(task);
-    stateChange(running.getTaskId(), STARTING);
-    task.stage();
-    stateChange(running.getTaskId(), RUNNING);
-    task.run();
+    expectStageAndRun(running, task);
     taskExecutor.execute(EasyMock.<Runnable>anyObject());
     return running;
   }

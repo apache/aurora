@@ -35,7 +35,7 @@ public class Disk {
   //     by symlinks present in a directory.
   private static long sizeOf(File file) throws IOException {
     if (FileUtils.isSymlink(file)) {
-      LOG.warning("Skipping symlink " + file);
+      LOG.finest("Skipping symlink " + file);
       return 0;
     }
 
@@ -53,7 +53,7 @@ public class Disk {
 
   private static long sizeOfDirectory(File directory) throws IOException {
     if (FileUtils.isSymlink(directory)) {
-      LOG.warning("Skipping symlink " + directory);
+      LOG.finest("Skipping symlink " + directory);
       return 0;
     }
 

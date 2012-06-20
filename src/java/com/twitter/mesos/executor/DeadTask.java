@@ -50,6 +50,11 @@ public class DeadTask extends TaskOnDisk {
   }
 
   @Override
+  public Object getMutex() {
+    throw new UnsupportedOperationException("A dead task should not be mutated.");
+  }
+
+  @Override
   public void stage() throws TaskRunException {
     throw new UnsupportedOperationException("A dead task cannot be staged.");
   }

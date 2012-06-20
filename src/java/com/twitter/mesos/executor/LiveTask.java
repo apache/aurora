@@ -116,6 +116,11 @@ public class LiveTask extends TaskOnDisk {
           .build();
   }
 
+  @Override
+  public Object getMutex() {
+    return this;
+  }
+
   /**
    * Performs staging operations necessary to launch a task.
    * This will prepare the working directory for the task, and download the binary to run.
@@ -179,7 +184,7 @@ public class LiveTask extends TaskOnDisk {
   @VisibleForTesting static final String HEALTH_CHECK_FAIL_MSG = "HTTP health check failure.";
 
   @Override
-  public void run() throws TaskRunException {
+  public synchronized void run() throws TaskRunException {
     LOG.info("Executing from working directory: " + sandboxDir);
     stateMachine.checkState(STARTING);
 
@@ -333,9 +338,8 @@ public class LiveTask extends TaskOnDisk {
    */
   @Override
   public AuditedStatus blockUntilTerminated() {
-    Preconditions.checkNotNull(process);
-
     while (stateMachine.getState().equals(RUNNING)) {
+      Preconditions.checkNotNull(process);
       try {
         exitCode = process.waitFor();
         LOG.info("Process terminated with exit code: " + exitCode);
