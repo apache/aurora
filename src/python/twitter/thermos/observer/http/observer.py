@@ -19,6 +19,7 @@ BottleObserverMixins = [
 
 __author__ = 'wickman@twitter.com (brian wickman)'
 
+
 class StaticAssets(object):
   """
     Serve the /assets directory.
@@ -66,6 +67,7 @@ class ListExpansionMetaclass(type):
   def __new__(mcls, name, parents, attrs):
     parents = _flatten(parents)
     return type(name, tuple(parents), attrs)
+
 
 class BottleObserver(HttpServer, StaticAssets, BottleObserverMixins):
   """
@@ -125,7 +127,7 @@ class BottleObserver(HttpServer, StaticAssets, BottleObserverMixins):
 
     return dict(
       task_id = task_id,
-      status = task['state'],
+      statuses = self._observer.task_statuses(task_id),
       user = task['user'],
       ports = task['ports'],
       processes = processes,

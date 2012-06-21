@@ -22,7 +22,7 @@
     <div class="span6" id="leftBar">
       <dl>
         <dt> task </dt>
-          <dd> <strong> status </strong> ${status} </dd>
+          <dd> <strong> status </strong> ${statuses[-1][0] if statuses else 'UNKNOWN'} </dd>
           <dd> <strong> user </strong> ${user} </dd>
         <dt> ports </dt>
         % for port_name, port_number in ports.items():
@@ -41,7 +41,26 @@
     </div>
   </div>
 
-  <div class="content" id="defaultLayout">
+  <div class="content" id="taskLayout">
+     <table class="table table-bordered table-condensed table-striped">
+     <thead>
+       <tr>
+         <th colspan=1> task status </th>
+         <th colspan=1> time </th>
+       </tr>
+      </thead>
+
+      <tbody>
+      % for status, timestamp in sorted(statuses, key=lambda status: status[1]):
+       <tr>
+         <td> ${status} </td> <td> ${pretty_time(timestamp)} </td>
+       </tr>
+      % endfor
+     </tbody>
+     </table>
+  </div>
+
+  <div class="content" id="processesLayout">
      <table class="table table-bordered table-condensed table-striped">
      <thead>
        <tr>
@@ -57,9 +76,9 @@
          <th> stdout </th> <th> stderr </th>
        </tr>
       </thead>
-      <tbody>
 
-      % for proc_name, proc in sorted(processes.items()):
+      <tbody>
+      % for proc_name, proc in sorted(processes.items(), key=lambda item: item[1].get('start_time')):
        <tr>
          <td> <a href="/process/${task_id}/${proc["process_name"]}">${proc["process_name"]}</a> </td>
          <td> ${proc["process_run"]} </td>

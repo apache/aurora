@@ -152,7 +152,6 @@ class TaskPlanner(object):
     process_map = dict((process.name().get(), process)
                         for process in filter(process_filter, task.processes()))
     processes = set(process_map)
-    print 'Extracting dependencies for: %s' % processes
     dependencies = defaultdict(set)
     if task.has_constraints():
       for constraint in task.constraints():

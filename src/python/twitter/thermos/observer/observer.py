@@ -304,6 +304,31 @@ class TaskObserver(threading.Thread, Lockable):
     return sample
 
   @Lockable.sync
+  def task_statuses(self, task_id):
+    """
+      Return the sequence of task states.
+
+      [(task_state [string], timestamp), ...]
+    """
+
+    # Unknown task_id.
+    if task_id not in self._actives and task_id not in self._finishes:
+      return []
+
+    task = self._read_task(task_id)
+    if task is None:
+      return []
+
+    state = self._state(task_id)
+    if state is None:
+      return []
+
+    # Get the timestamp of the transition into the current state.
+    return [
+      (TaskState._VALUES_TO_NAMES.get(state.state, 'UNKNOWN'), state.timestamp_ms / 1000)
+      for state in state.statuses]
+
+  @Lockable.sync
   def _task(self, task_id):
     """
       Return composite information about a particular task task_id, given the below
