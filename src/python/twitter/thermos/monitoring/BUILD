@@ -20,7 +20,7 @@ python_library(
   name = 'measure',
   sources = ['measure.py'],
   dependencies = [
-    pants('3rdparty/python:psutil'),
+    python_requirement('psutil>=0.5.0'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/quantity'),
   ]

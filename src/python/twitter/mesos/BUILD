@@ -84,7 +84,7 @@ python_binary(
   name = 'process_scraper',
   source = 'process_scraper.py',
   dependencies = [
-    pants('3rdparty/python:psutil'),
+    python_requirement('psutil>=0.5.0'),
     pants('src/python/twitter/common/app'),
   ],
   platforms = ['linux-x86_64'],
