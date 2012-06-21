@@ -21,6 +21,17 @@ class UniversalStateHandler(object):
 
 
 class ProcessStateHandler(object):
+  """
+    Process run state machine () - starting state, [] - terminal state
+
+                             [FAILED]
+                                ^
+                                |
+  (WAITING) ----> FORKED ----> RUNNING -----> [KILLED]
+                    |          |    |
+                    v          |    `---> [SUCCESS]
+                 [LOST] <------'
+  """
   def on_waiting(self, process_update):
     pass
 
@@ -39,9 +50,40 @@ class ProcessStateHandler(object):
   def on_lost(self, process_update):
     pass
 
+  def on_killed(self, process_update):
+    pass
+
 
 class TaskStateHandler(object):
+  """
+    Task state machine () - starting state, [] - terminal state
+
+       .--------------------------------------------+----.
+       |                                            |    |
+       |                   .----------> [SUCCESS]   |    |
+       |                   |                        |    |
+       |                   | .--------> [FAILED]    |    |
+       |                   | |                      |    |
+    (ACTIVE)           FINALIZING ---> [KILLED] <---'    |
+       |                 ^    |    .------^              |
+       |                 |    |    |                     |
+       `---> CLEANING ---'    `----)--> [LOST] <---------'
+                | |                |      ^
+                | `----------------'      |
+                `-------------------------'
+
+    ACTIVE -> KILLED/LOST only happens under garbage collection situations.
+    Ordinary task preemption/kill still goes through CLEANING/FINALIZING before
+    reaching a terminal state.
+  """
+
   def on_active(self, task_update):
+    pass
+
+  def on_cleaning(self, task_update):
+    pass
+
+  def on_finalizing(self, task_update):
     pass
 
   def on_success(self, task_update):
@@ -135,7 +177,6 @@ class CheckpointDispatcher(object):
       getattr(handler, handler_function)(task_update)
 
   def _run_header_dispatch(self, header):
-    log.debug('_run_header_dispatch has universal_handlers: %s' % self._universal_handlers)
     for handler in self._universal_handlers:
       handler.on_initialization(header)
 
@@ -197,7 +238,7 @@ class CheckpointDispatcher(object):
     # {FORKED, RUNNING} => KILLED
     elif process_state_update.state == ProcessState.KILLED:
       assert_process_state_in(ProcessState.FORKED, ProcessState.RUNNING)
-      required_fields = ['seq', 'state', 'stop_time']
+      required_fields = ['seq', 'state', 'stop_time', 'return_code']
       copy_fields(process_state, process_state_update, required_fields)
 
     # {FORKED, RUNNING} => LOST

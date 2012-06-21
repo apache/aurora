@@ -349,13 +349,17 @@ class Process(ProcessBase):
                                start_time=start_time)
 
     # wait for job to finish
-    self._popen.wait()
-    rc = self._popen.returncode
+    rc = self._popen.wait()
 
     # indicate that we have finished/failed
-    state = ProcessState.SUCCESS if rc == 0 else ProcessState.FAILED
-    self._write_process_update(state=state,
-                               return_code=rc,
+    if rc < 0:
+      state = ProcessState.KILLED
+    elif rc == 0:
+      state = ProcessState.SUCCESS
+    else:
+      state = ProcessState.FAILED
+
+    self._write_process_update(state=state, return_code=rc,
                                stop_time=self._platform.clock().time())
 
     # normal exit

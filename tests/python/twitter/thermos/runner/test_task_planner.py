@@ -149,25 +149,104 @@ def test_task_waits():
                                         dt(name='d5', min_duration=5),
                                         dt(name='d7', min_duration=7)]))
   assert p.runnable_at(timestamp=0) == _('d3', 'd5', 'd7')
-  assert p.min_wait(timestamp=0) == TaskPlanner.INFINITY
+  assert p.min_wait(timestamp=0) == 0
 
   p.set_running('d3')
   p.add_success('d3', timestamp=0)
   assert p.runnable_at(timestamp=0) == _('d5', 'd7')
   assert p.waiting_at(timestamp=0) == _('d3')
   assert approx_equal(p.get_wait('d3', timestamp=0), 3)
-  assert approx_equal(p.min_wait(timestamp=0), 3)
-  assert approx_equal(p.min_wait(timestamp=1), 2)
+  assert approx_equal(p.min_wait(timestamp=0), 0)
+  assert approx_equal(p.min_wait(timestamp=1), 0)
   assert p.waiting_at(timestamp=3) == empty
   assert p.runnable_at(timestamp=3) == _('d3', 'd5', 'd7')
 
   p.set_running('d3')
   p.set_running('d7')
   p.add_success('d7', timestamp=1)
+  assert approx_equal(p.min_wait(timestamp=2), 0)
+  p.set_running('d5')
   assert approx_equal(p.min_wait(timestamp=2), 6)
-  assert approx_equal(p.min_wait(timestamp=3), 5)
-  p.add_success('d3', timestamp=3)
-  assert approx_equal(p.min_wait(timestamp=3), 3)
-  assert p.runnable_at(timestamp=2) == _('d5')
-  assert p.runnable_at(timestamp=6) == _('d3', 'd5')
+  p.add_success('d5', timestamp=2)
+  p.add_success('d3', timestamp=2)
+  assert approx_equal(p.min_wait(timestamp=3), 2)
+  assert p.runnable_at(timestamp=2) == empty
+  assert p.runnable_at(timestamp=5) == _('d3')
+  assert p.runnable_at(timestamp=7) == _('d3', 'd5')
   assert p.runnable_at(timestamp=8) == _('d3', 'd5', 'd7')
+
+
+def test_task_fails():
+  dt = p1(max_failures=1, min_duration=1)
+  p = TaskPlanner(empty_task(processes = [dt(name='d1'), dt(name='d2')]))
+  assert p.runnable_at(timestamp=0) == _('d1', 'd2')
+  p.set_running('d1')
+  p.set_running('d2')
+  assert p.runnable_at(timestamp=0) == empty
+  p.add_failure('d1', timestamp=0)
+  p.add_failure('d2', timestamp=0)
+  assert p.runnable_at(timestamp=0) == empty
+  assert p.min_wait(timestamp=0) == TaskPlanner.INFINITY
+
+  p = TaskPlanner(empty_task(processes = [dt(name='d1'), dt(name='d2')]))
+  assert p.runnable_at(timestamp=0) == _('d1', 'd2')
+  p.set_running('d1')
+  p.set_failed('d1')
+  assert p.runnable_at(timestamp=0) == _('d2')
+  p.set_running('d2')
+  assert p.runnable_at(timestamp=0) == empty
+  p.add_failure('d2', timestamp=0)
+  assert p.runnable_at(timestamp=0) == empty
+  assert p.min_wait(timestamp=0) == TaskPlanner.INFINITY
+
+
+def test_task_lost():
+  dt = p1(max_failures=2, min_duration=1)
+
+  # regular success behavior
+  p = TaskPlanner(empty_task(processes = [dt(name='d1')]))
+  assert p.runnable_at(timestamp=0) == _('d1')
+  p.set_running('d1')
+  p.add_success('d1', timestamp=0)
+  assert p.min_wait(timestamp=0) == TaskPlanner.INFINITY
+
+  # regular failure behavior
+  p = TaskPlanner(empty_task(processes = [dt(name='d1')]))
+  assert p.runnable_at(timestamp=0) == _('d1')
+  p.set_running('d1')
+  p.add_failure('d1', timestamp=1)
+  assert approx_equal(p.min_wait(timestamp=1), 1)
+  p.set_running('d1')
+  p.add_failure('d1', timestamp=3)
+  assert p.min_wait(timestamp=3) == TaskPlanner.INFINITY
+
+  # lost behavior
+  p = TaskPlanner(empty_task(processes = [dt(name='d1')]))
+  assert p.runnable_at(timestamp=0) == _('d1')
+  p.set_running('d1')
+  p.add_failure('d1', timestamp=1)
+  assert approx_equal(p.min_wait(timestamp=1), 1)
+  p.set_running('d1')
+  p.lost('d1')
+  assert approx_equal(p.min_wait(timestamp=1), 1)
+  p.set_running('d1')
+  p.add_failure('d1', timestamp=3)
+  assert p.min_wait(timestamp=3) == TaskPlanner.INFINITY
+
+
+def test_task_filters():
+  t = p1
+  task = empty_task(processes = [t(name='p1'), t(name='p2'), t(name='p3'),
+                                 t(name='f1'), t(name='f2'), t(name='f3')],
+                    constraints = [Constraint(order=['p1','p2','p3']),
+                                   Constraint(order=['f1','f2','f3'])])
+  assert TaskPlanner(task, process_filter=lambda proc: proc.name().get().startswith('p'))
+  assert TaskPlanner(task, process_filter=lambda proc: proc.name().get().startswith('f'))
+
+  with pytest.raises(TaskPlanner.InvalidSchedule):
+    TaskPlanner(task(constraints=[Constraint(order=['p1','f1'])]),
+                process_filter=lambda proc: proc.name().get().startswith('p'))
+  with pytest.raises(TaskPlanner.InvalidSchedule):
+    TaskPlanner(task(constraints=[Constraint(order=['p1','f1'])]),
+                process_filter=lambda proc: proc.name().get().startswith('f'))
+

@@ -145,17 +145,25 @@ class TaskPlanner(object):
   INFINITY = sys.float_info.max
 
   @staticmethod
-  def extract_dependencies(task):
+  def extract_dependencies(task, process_filter=None):
     """
       Construct a set of processes and the process dependencies from a Thermos Task.
     """
-    process_map = dict((process.name().get(), process) for process in task.processes())
+    process_map = dict((process.name().get(), process)
+                        for process in filter(process_filter, task.processes()))
     processes = set(process_map)
+    print 'Extracting dependencies for: %s' % processes
     dependencies = defaultdict(set)
     if task.has_constraints():
       for constraint in task.constraints():
         # handle process orders
         process_names = constraint.order().get()
+        process_name_set = set(process_names)
+        # either all process_names must be in processes or none should be
+        if process_name_set.issubset(processes) == process_name_set.isdisjoint(processes):
+          raise TaskPlanner.InvalidSchedule('Invalid process dependencies!')
+        if not process_name_set.issubset(processes):
+          continue
         for k in range(1, len(process_names)):
           pnk, pnk1 = process_names[k], process_names[k-1]
           if pnk1 not in processes:
@@ -168,16 +176,19 @@ class TaskPlanner(object):
           dependencies[pnk].add(pnk1)
     return (processes, dependencies)
 
-  def __init__(self, task, clock=time):
-    self._planner = Planner(*self.extract_dependencies(task))
+  def __init__(self, task, clock=time, process_filter=None):
+    self._filter = process_filter
+    assert self._filter is None or callable(self._filter), (
+        'TaskPlanner must be given callable process filter.')
+    self._planner = Planner(*self.extract_dependencies(task, self._filter))
     self._clock = clock
     self._last_terminal = {} # process => timestamp of last terminal state
     self._failures = defaultdict(int)
     self._attributes = {}
     self._ephemerals = set(process.name().get() for process in task.processes()
-        if process.ephemeral().get())
+        if (self._filter is None or self._filter(process)) and process.ephemeral().get())
 
-    for process in task.processes():
+    for process in filter(self._filter, task.processes()):
       self._attributes[process.name().get()] = TaskAttributes(
         is_daemon=bool(process.daemon().get()),
         is_ephemeral=bool(process.ephemeral().get()),
@@ -213,8 +224,10 @@ class TaskPlanner(object):
     return set(filter(partial(self.is_waiting, timestamp=timestamp), self._planner.runnable))
 
   def min_wait(self, timestamp=None):
-    """Return the current wait time for the next process to become runnable, or sys.float.max if
-       there are no waiters."""
+    """Return the current wait time for the next process to become runnable, 0 if something is ready
+       immediately, or sys.float.max if there are no waiters."""
+    if self.runnable_at(timestamp if timestamp is not None else self._clock.time()):
+      return 0
     waits = [self.get_wait(waiter, timestamp) for waiter in self.waiting_at(timestamp)]
     return min(waits) if waits else self.INFINITY
 
@@ -237,6 +250,15 @@ class TaskPlanner(object):
       self._planner.set_finished(process)
     else:
       self._planner.reset(process)
+
+  def set_failed(self, process):
+    """Force a process to be in failed state.  E.g. kill -9 and you want it pinned failed."""
+    self._planner.set_failed(process)
+
+  def lost(self, process):
+    """Mark a process as lost.  This sets its runnable state back to the previous runnable
+       state and does not increment its failure count."""
+    self._planner.reset(process)
 
   def is_complete(self):
     terminals = self._planner.finished.union(self._planner.failed).union(self._ephemerals)

@@ -37,6 +37,13 @@ class TaskKiller(object):
                           terminal_status=TaskState.LOST)
 
 
+# TODO(wickman) Clock is used haphazardly.
+#
+# TaskRunnerHelper is sort of a mishmash of "checkpoint-only" operations and
+# the "Process Platform" stuff that started to get pulled into process.py
+#
+# This really needs some hard design thought to see if it can be extracted out
+# even further.
 
 class TaskRunnerHelper(object):
   """
@@ -45,6 +52,7 @@ class TaskRunnerHelper(object):
     task.
   """
   class PermissionError(Exception): pass
+  PS = ProcessProviderFactory.get()
 
   # Maximum drift between when the system says a task was forked and when we checkpointed
   # its fork_time (used as a heuristic to determine a forked task is really ours instead of
@@ -68,13 +76,6 @@ class TaskRunnerHelper(object):
           return process
     return None
 
-  @staticmethod
-  def safe_kill_pid(pid):
-    try:
-      os.kill(pid, signal.SIGKILL)
-    except Exception as e:
-      log.error('    (error: %s)' % e)
-
   @classmethod
   def this_is_really_our_pid(cls, process_handle, current_user, start_time, clock=time):
     """
@@ -93,61 +94,107 @@ class TaskRunnerHelper(object):
     return abs(start_time - estimated_start_time) < cls.MAX_START_TIME_DRIFT.as_(Time.SECONDS)
 
   @classmethod
-  def killtree(cls, state, clock=time):
+  def scan_process(cls, state, process_name, clock=time, ps=None):
     """
-      Kill the process tree associated with the provided task state.
-
-      Returns the tuple of (active, lost) ProcessState objects should the caller
-      want to update the state object.
+      Given a process_run and its owner, return the following:
+        (coordinator pid, process pid, process tree)
     """
-    log.info('Killing task id: %s' % state.header.task_id)
-    ps = ProcessProviderFactory.get()
-    ps.collect_all()
+    process_run = state.processes[process_name][-1]
+    process_owner = state.header.user
 
-    coordinator_pids = []
-    process_pids = []
-    lost_processes, active_processes = [], []
+    if ps is None:
+      ps = cls.PS
+      ps.collect_all()
 
-    current_user = state.header.user
-    log.info('    => Current user: %s' % current_user)
-    log.debug('    => All PIDs on system: %s' % ' '.join(map(str, sorted(ps.pids()))))
-    for process_history in state.processes.values():
-      # collect coordinator_pids for runners in >=FORKED, <=RUNNING state
-      last_run = process_history[-1]
-      if last_run.state in (ProcessState.FORKED, ProcessState.RUNNING):
-        log.info('  Inspecting %s coordinator [pid: %s]' % (last_run.process,
-            last_run.coordinator_pid))
-        if last_run.coordinator_pid in ps.pids() and cls.this_is_really_our_pid(
-            ps.get_handle(last_run.coordinator_pid), current_user, last_run.fork_time):
-          coordinator_pids.append(last_run.coordinator_pid)
-        else:
-          log.info('    (coordinator appears to have completed)')
-      if last_run.state == ProcessState.RUNNING:
-        log.info('  Inspecting %s [pid: %s]' % (last_run.process, last_run.pid))
-        if last_run.pid in ps.pids() and cls.this_is_really_our_pid(
-            ps.get_handle(last_run.pid), current_user, last_run.start_time, clock=clock):
-          log.info('    => pid is active.')
-          active_processes.append(last_run)
-          process_pids.append(last_run.pid)
-          subtree = ps.children_of(last_run.pid, all=True)
-          if subtree:
-            log.info('      => has children: %s' % ' '.join(map(str, subtree)))
-            process_pids.extend(subtree)
-        else:
-          lost_processes.append(last_run)
+    coordinator_pid, pid, tree = None, None, set()
 
-    pid_types = { 'Coordinator': coordinator_pids, 'Child': process_pids }
-    if any(pid_types.values()):
-      log.info('Issuing kills.')
-    for pid_type, pid_set in pid_types.items():
-      for pid in pid_set:
-        log.info('  %s: %s' % (pid_type, pid))
-        cls.safe_kill_pid(pid)
+    if process_run.coordinator_pid:
+      log.info('  Inspecting %s coordinator [pid: %s]' % (process_run.process,
+          process_run.coordinator_pid))
+      if process_run.coordinator_pid in ps.pids() and cls.this_is_really_our_pid(
+          ps.get_handle(process_run.coordinator_pid), process_owner, process_run.fork_time):
+        coordinator_pid = process_run.coordinator_pid
+        log.info('    coordinator is active')
+      else:
+        log.info('    coordinator appears to have completed')
 
-    return active_processes, lost_processes
+    if process_run.pid:
+      log.info('  Inspecting %s [pid: %s]' % (process_run.process, process_run.pid))
+      if process_run.pid in ps.pids() and cls.this_is_really_our_pid(
+          ps.get_handle(process_run.pid), process_owner, process_run.start_time, clock=clock):
+        log.info('    => pid is active.')
+        pid = process_run.pid
+        subtree = ps.children_of(process_run.pid, all=True)
+        if subtree:
+          log.info('      => has children: %s' % ' '.join(map(str, subtree)))
+          tree = set(subtree)
+      else:
+        log.info('   => pid has finished.')
+
+    return (coordinator_pid, pid, tree)
+
+  @classmethod
+  def scantree(cls, state, clock=time):
+    """
+      Scan the process tree associated with the provided task state.
+
+      Returns a dictionary of process name => (coordinator pid, pid, pid children)
+      If the coordinator is no longer active, coordinator pid will be None.  If the
+      forked process is no longer active, pid will be None and its children will be
+      an empty set.
+    """
+    cls.PS.collect_all()
+    return dict((process_name, cls.scan_process(state, process_name, ps=cls.PS, clock=clock)) for
+                 process_name in state.processes)
+
+  @classmethod
+  def safe_signal(cls, pid, sig=signal.SIGTERM):
+    try:
+      os.kill(pid, sig)
+    except Exception as e:
+      log.error('    (error: %s)' % e)
+
+  @classmethod
+  def terminate_pid(cls, pid):
+    cls.safe_signal(pid, signal.SIGTERM)
+
+  @classmethod
+  def kill_pid(cls, pid):
+    cls.safe_signal(pid, signal.SIGKILL)
+
+  @classmethod
+  def _get_process_tuple(cls, state, process_name):
+    assert process_name in state.processes and len(state.processes[process_name]) > 0
+    cls.PS.collect_all()
+    return cls.scan_process(state, process_name, ps=cls.PS)
+
+  @classmethod
+  def terminate_process(cls, state, process_name):
+    log.debug('TaskRunnerHelper.terminate_process(%s)' % process_name)
+    _, pid, _ = cls._get_process_tuple(state, process_name)
+    if pid:
+      log.debug('   => SIGTERM pid %s' % pid)
+      cls.terminate_pid(pid)
+    return bool(pid)
+
+  @classmethod
+  def kill_process(cls, state, process_name):
+    log.debug('TaskRunnerHelper.kill_process(%s)' % process_name)
+    coordinator_pid, pid, tree = cls._get_process_tuple(state, process_name)
+    if coordinator_pid:
+      log.debug('   => SIGKILL coordinator %s' % coordinator_pid)
+      cls.kill_pid(coordinator_pid)
+    if pid:
+      log.debug('   => SIGKILL pid %s' % pid)
+      cls.kill_pid(pid)
+    for child in tree:
+      log.debug('   => SIGKILL child %s' % child)
+      cls.kill_pid(child)
+    return bool(coordinator_pid or pid or tree)
 
   @classmethod
   def kill_runner(cls, state):
+    log.debug('TaskRunnerHelper.kill_runner()')
     assert state, 'Could not read state!'
     assert state.statuses
     pid = state.statuses[-1].runner_pid
@@ -191,16 +238,6 @@ class TaskRunnerHelper(object):
     return ckpt
 
   @classmethod
-  def finalize_task(cls, spec):
-    active_task = spec.given(state='active').getpath('task_path')
-    finished_task = spec.given(state='finished').getpath('task_path')
-    is_active, is_finished = map(os.path.exists, [active_task, finished_task])
-    assert is_active and not is_finished
-    safe_mkdir(os.path.dirname(finished_task))
-    os.rename(active_task, finished_task)
-    os.utime(finished_task, None)
-
-  @classmethod
   def kill(cls, task_id, checkpoint_root, force=False,
            terminal_status=TaskState.KILLED, clock=time):
     """
@@ -217,30 +254,91 @@ class TaskRunnerHelper(object):
       log.error('Cannot update states in uninitialized TaskState!')
       return
 
-    def write_task_status(status):
-      update = TaskStatus(state=status, timestamp_ms=int(clock.time() * 1000),
+    def write_task_state(state):
+      update = TaskStatus(state=state, timestamp_ms=int(clock.time() * 1000),
                           runner_pid=os.getpid(), runner_uid=os.getuid())
       ckpt.write(RunnerCkpt(task_status=update))
 
-    if state.statuses[-1].state is not TaskState.ACTIVE:
+    def write_process_status(status):
+      ckpt.write(RunnerCkpt(process_status=status))
+
+    if cls.is_task_terminal(state.statuses[-1].state):
       log.info('Task is already in terminal state!  Finalizing.')
       cls.finalize_task(pathspec)
       return
 
     with closing(ckpt):
-      active_processes, lost_processes = cls.killtree(state)
-      if active_processes + lost_processes:
-        write_task_status(TaskState.ACTIVE)
-        for process_status in active_processes:
-          status = ProcessStatus(process=process_status.process, state=ProcessState.KILLED,
-              seq=process_status.seq + 1, return_code=-1, stop_time=clock.time())
-          ckpt.write(RunnerCkpt(process_status=status))
-        for process_status in lost_processes:
-          status = ProcessStatus(process=process_status.process, state=ProcessState.LOST,
-              seq=process_status.seq + 1)
-          ckpt.write(RunnerCkpt(process_status=status))
-        write_task_status(terminal_status)
-      else:
-        log.info('Nothing to kill.')
-
+      write_task_state(TaskState.ACTIVE)
+      for process, history in state.processes.items():
+        process_status = history[-1]
+        if not cls.is_process_terminal(process_status.state):
+          if cls.kill_process(state, process):
+            write_process_status(ProcessStatus(process=process,
+              state=ProcessState.KILLED, seq=process_status.seq + 1, return_code=-9,
+              stop_time=clock.time()))
+          else:
+            if process_status.state is not ProcessState.WAITING:
+              write_process_status(ProcessStatus(process=process,
+                state=ProcessState.LOST, seq=process_status.seq + 1))
+      write_task_state(terminal_status)
     cls.finalize_task(pathspec)
+
+  @classmethod
+  def reap_children(cls):
+    pids = set()
+
+    while True:
+      try:
+        pid, status, rusage = os.wait3(os.WNOHANG)
+        if pid == 0:
+          break
+        pids.add(pid)
+        log.debug('Detected terminated process: pid=%s, status=%s, rusage=%s' % (
+          pid, status, rusage))
+      except OSError as e:
+        if e.errno != errno.ECHILD:
+          log.warning('Unexpected error when calling waitpid: %s' % e)
+        break
+
+    return pids
+
+  TERMINAL_PROCESS_STATES = frozenset([
+    ProcessState.SUCCESS,
+    ProcessState.KILLED,
+    ProcessState.FAILED,
+    ProcessState.LOST])
+
+  TERMINAL_TASK_STATES = frozenset([
+    TaskState.SUCCESS,
+    TaskState.FAILED,
+    TaskState.KILLED,
+    TaskState.LOST])
+
+  @classmethod
+  def is_process_terminal(cls, process_status):
+    return process_status in cls.TERMINAL_PROCESS_STATES
+
+  @classmethod
+  def is_task_terminal(cls, task_status):
+    return task_status in cls.TERMINAL_TASK_STATES
+
+  @staticmethod
+  def initialize_task(spec, task):
+    active_task = spec.given(state='active').getpath('task_path')
+    finished_task = spec.given(state='finished').getpath('task_path')
+    is_active, is_finished = map(os.path.exists, [active_task, finished_task])
+    assert not is_finished
+    if not is_active:
+      safe_mkdir(os.path.dirname(active_task))
+      with open(active_task, 'w') as fp:
+        fp.write(task)
+
+  @staticmethod
+  def finalize_task(spec):
+    active_task = spec.given(state='active').getpath('task_path')
+    finished_task = spec.given(state='finished').getpath('task_path')
+    is_active, is_finished = map(os.path.exists, [active_task, finished_task])
+    assert is_active and not is_finished
+    safe_mkdir(os.path.dirname(finished_task))
+    os.rename(active_task, finished_task)
+    os.utime(finished_task, None)

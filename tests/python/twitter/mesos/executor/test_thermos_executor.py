@@ -149,7 +149,7 @@ class TestThermosExecutor(object):
         if runner:
           break
         time.sleep(0.1)
-      runner.kill(force=True)
+      runner.kill(force=True, preemption_wait=Amount(1, Time.SECONDS))
 
       te._manager.join()
 

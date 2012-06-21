@@ -40,6 +40,8 @@ class Process(Struct):
   daemon        = Default(Integer, 0) # boolean
   ephemeral     = Default(Integer, 0) # boolean
   min_duration  = Default(Integer, 5) # integer seconds
+  final         = Default(Integer, 0) # if this process should be a finalizing process
+                                      # that should always be run after regular processes
 
 
 @Provided(thermos = ThermosContext)
@@ -52,4 +54,6 @@ class Task(Struct):
   resources = Resources
   max_failures = Default(Integer, 1) # maximum number of failed processes before task is failed.
   max_concurrency = Default(Integer, 0) # 0 = infinite concurrency, > 0 => max concurrent processes.
+  finalization_wait = Default(Integer, 30) # the amount of time in seconds we allocate to run the
+                                           # finalization schedule.
   user = Default(String, '{{thermos.user}}')

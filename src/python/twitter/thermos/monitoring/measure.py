@@ -11,6 +11,7 @@ from twitter.common.quantity import Time, Amount
 __author__ = 'wickman@twitter.com (brian wickman)'
 __tested__ = False
 
+
 _ProcessSample = namedtuple('_ProcessSample', 'rate user system rss vms nice status threads')
 class ProcessSample(_ProcessSample):
   @staticmethod
@@ -104,6 +105,7 @@ class ProcessSample(_ProcessSample):
       status  = str(self.status),
       threads = self.threads
     )
+
 
 class ProcessState(object):
   def __init__(self):

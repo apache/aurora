@@ -24,9 +24,6 @@ class TestFailureLimit(RunnerTestBase):
     )
     return task.interpolate()[0]
 
-  def test_runner_state_reconstruction(self):
-    assert self.state == self.reconstructed_state
-
   def test_runner_state_failure(self):
     assert self.state.statuses[-1].state == TaskState.FAILED
 
@@ -52,9 +49,6 @@ class TestTaskSucceedsIfMaxFailures0(RunnerTestBase):
       processes = [ex(name='f1'), ex(name='f2'), ex(name='f3'),
                    hw(name='s1'), hw(name='s2'), hw(name='s3')])
     return task.interpolate()[0]
-
-  def test_runner_state_reconstruction(self):
-    assert self.state == self.reconstructed_state
 
   def test_runner_state_failure(self):
     assert self.state.statuses[-1].state == TaskState.SUCCESS

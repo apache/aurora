@@ -47,20 +47,34 @@ class ProcessMuxer(object):
         self._fast_forward_stream(process_name)
 
   def _fast_forward_stream(self, process_name):
+    log.debug('Fast forwarding %s stream to seq=%s' % (process_name,
+      self._watermarks[process_name]))
     assert self._processes.get(process_name) is not None
-    rr = ThriftRecordReader(self._processes[process_name], RunnerCkpt)
+    fp = self._processes[process_name]
+    rr = ThriftRecordReader(fp, RunnerCkpt)
     current_watermark = -1
     records = 0
     while current_watermark < self._watermarks[process_name]:
-      record = rr.read()
-      records += 1
+      last_pos = fp.tell()
+      record = rr.try_read()
       if record is None:
-        raise ProcessMuxer.CorruptCheckpoint('Could not reach high watermark for %s@sequence=%s' %
-          process_name, self._watermarks[process_name])
-      else:
-        current_watermark = record.process_status.seq
+        break
+      new_watermark = record.process_status.seq
+      if new_watermark > self._watermarks[process_name]:
+        log.debug('Over-seeked %s [watermark = %s, high watermark = %s], rewinding.' % (
+          process_name, new_watermark, self._watermarks[process_name]))
+        fp.seek(last_pos)
+        break
+      current_watermark = new_watermark
+      records += 1
+
+    if current_watermark < self._watermarks[process_name]:
+      log.warning('Only able to fast forward to %s@sequence=%s, high watermark is %s' % (
+         process_name, current_watermark, self._watermarks[process_name]))
+
     if records:
-      log.debug('Fast forwarded %s %s record(s).' % (self._processes[process_name].name, records))
+      log.debug('Fast forwarded %s %s record(s) to seq=%s.' % (process_name, records,
+        current_watermark))
 
   def unregister(self, process_name):
     log.debug('unregistering %s' % process_name)

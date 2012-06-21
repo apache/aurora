@@ -41,11 +41,16 @@ struct ProcessStatus {
 }
 
 enum TaskState {
-  ACTIVE   = 0
-  SUCCESS  = 1
-  FAILED   = 2
-  KILLED   = 3
-  LOST     = 4
+  ACTIVE     = 0  // Regular plan is being executed
+  CLEANING   = 5  // Regular plan has failed/finished and is being cleaned up
+                  // Existing processes get SIGTERMs.
+                  // Once all processes are finished, => FINALIZING
+                  // If finalization wait overflows, SIGKILL and transition to terminal.
+  FINALIZING = 6  // Finalizing plan is being executed
+  SUCCESS    = 1  // Task has succeeded
+  FAILED     = 2  // Task has failed
+  KILLED     = 3  // Task has been killed
+  LOST       = 4  // Task is lost (special state reserved for garbage collection.)
 }
 
 struct TaskStatus {

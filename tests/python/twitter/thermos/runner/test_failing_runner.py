@@ -32,10 +32,6 @@ class TestFailingRunner(RunnerTestBase):
     )
     return tsk.interpolate()[0]
 
-
-  def test_runner_state_reconstruction(self):
-    assert self.state == self.reconstructed_state
-
   def test_runner_state_success(self):
     assert self.state.statuses[-1].state == TaskState.SUCCESS
 

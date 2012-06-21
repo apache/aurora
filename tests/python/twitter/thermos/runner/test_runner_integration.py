@@ -32,18 +32,15 @@ class TestRunnerBasic(RunnerTestBase):
                              {'order': ['t4', 't6']}])
     return tsk
 
-  def test_runner_state_reconstruction(self):
-    assert self.state == self.reconstructed_state
-
   def test_runner_state_success(self):
     assert self.state.statuses[-1].state == TaskState.SUCCESS
 
   def test_runner_header_populated(self):
     header = self.state.header
     assert header is not None, 'header should be populated.'
-    assert header.task_id == self.task_id, 'header task id must be set!'
-    assert header.sandbox == os.path.join(self.tempdir, 'sandbox', header.task_id), \
-      'header sandbox must be set!'
+    assert header.task_id == self.runner.task_id, 'header task id must be set!'
+    assert header.sandbox == os.path.join(self.runner.tempdir, 'sandbox', header.task_id), (
+      'header sandbox must be set!')
     assert header.hostname, 'header task replica id must be set!'
     assert header.launch_time_ms, 'header launch time must be set'
 
