@@ -12,7 +12,6 @@ import org.apache.mesos.Protos.MasterInfo;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.SlaveID;
-import org.apache.mesos.Protos.Status;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.Protos.TaskState;
@@ -183,13 +182,12 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     };
   }
 
-  @Test
+  @Test(expected = SchedulerException.class)
   public void testStatusUpdateFails() throws Exception {
     new StatusFixture() {
       @Override void expectations() throws Exception {
         expect(launcher.statusUpdate(STATUS)).andReturn(false);
         expect(schedulerCore.statusUpdate(STATUS)).andThrow(new StorageException("Injected."));
-        expect(driver.abort()).andReturn(Status.DRIVER_ABORTED);
       }
     };
   }

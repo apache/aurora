@@ -196,8 +196,13 @@ public class MesosSchedulerImpl implements Scheduler {
         }
       }
     } catch (SchedulerException e) {
-      LOG.log(Level.SEVERE, "Aborting driver due to scheduler exception: " + e, e);
-      driver.abort();
+      LOG.log(Level.SEVERE, "Status update failed due to scheduler exception: " + e, e);
+      // We re-throw the exception here in an effort to NACK the status update and trigger an
+      // abort of the driver.  Previously we directly issued driver.abort(), but the re-entrancy
+      // guarantees of that are uncertain (and we believe it was not working).  However, this
+      // was difficult to discern since logging is unreliable during JVM shutdown and we would not
+      // see the above log message.
+      throw e;
     }
 
     LOG.warning("Unhandled status update " + status);
