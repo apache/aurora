@@ -51,7 +51,7 @@ public class TaskHome extends StringTemplateServlet {
         }
         template.setAttribute("id", task.getId());
         template.setAttribute("taskDir", task.getSandboxDir());
-        template.setAttribute("status", task.getAuditedStatus());
+        template.setAttribute("status", task.getStatus());
         template.setAttribute("taskPretty", Util.prettyPrint(task.getAssignedTask()));
       }
     });

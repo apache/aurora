@@ -44,7 +44,7 @@ public interface Task {
 
   AssignedTask getAssignedTask();
 
-  AuditedStatus getAuditedStatus();
+  AuditedStatus getStatus();
 
   public static class TaskRunException extends Exception {
 

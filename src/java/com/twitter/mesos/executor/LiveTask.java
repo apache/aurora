@@ -172,11 +172,6 @@ public class LiveTask extends TaskOnDisk {
   }
 
   @Override
-  public AuditedStatus getAuditedStatus() {
-    return stateMachine.getState();
-  }
-
-  @Override
   public AssignedTask getAssignedTask() {
     return task.deepCopy();
   }
@@ -373,6 +368,7 @@ public class LiveTask extends TaskOnDisk {
     return completed;
   }
 
+  @Override
   public AuditedStatus getStatus() {
     return stateMachine.getState();
   }

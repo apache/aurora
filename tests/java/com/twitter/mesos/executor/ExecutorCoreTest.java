@@ -183,7 +183,7 @@ public class ExecutorCoreTest extends EasyMockTest {
   }
 
   private void expectGetStatus(Task task, AuditedStatus returnedStatsus) {
-    expect(task.getAuditedStatus()).andReturn(returnedStatsus).anyTimes();
+    expect(task.getStatus()).andReturn(returnedStatsus).anyTimes();
   }
 
   private void expectGetStatus(Task task, ScheduleStatus returnedStatus) {

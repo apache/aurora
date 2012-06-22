@@ -243,7 +243,7 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
   public Task stopLiveTask(String taskId, String message) {
     Task task = tasks.get(taskId);
 
-    if (task != null && Tasks.isActive(task.getAuditedStatus().getStatus())) {
+    if (task != null && Tasks.isActive(task.getStatus().getStatus())) {
       LOG.info("Killing task: " + task);
       tasksKilled.incrementAndGet();
       task.terminate(new AuditedStatus(ScheduleStatus.KILLED, message));
@@ -251,9 +251,9 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
       LOG.severe("No such task found: " + taskId);
       sendStatusUpdate(taskId, new AuditedStatus(LOST, "Task not found on slave."));
     } else {
-      LOG.info("Kill request for task in state " + task.getAuditedStatus() + " ignored.");
+      LOG.info("Kill request for task in state " + task.getStatus() + " ignored.");
       sendStatusUpdate(taskId,
-          new AuditedStatus(task.getAuditedStatus().getStatus(), "Repeating lost update."));
+          new AuditedStatus(task.getStatus().getStatus(), "Repeating lost update."));
     }
     return task;
   }
@@ -269,7 +269,7 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
   private static final Function<Task, ScheduleStatus> GET_STATUS =
       new Function<Task, ScheduleStatus>() {
         @Override public ScheduleStatus apply(Task task) {
-          return task.getAuditedStatus().getStatus();
+          return task.getStatus().getStatus();
         }
       };
 
@@ -379,7 +379,7 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
         LOG.warning("Task considered active remotely but not locally: " + taskId);
         localInactiveMismatch.incrementAndGet();
         sendStatusUpdate(taskId,
-            new AuditedStatus(local.getAuditedStatus().getStatus(), REPLAY_STATUS_MSG));
+            new AuditedStatus(local.getStatus().getStatus(), REPLAY_STATUS_MSG));
       }
     }
   }
@@ -388,7 +388,7 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
   public Map<String, ScheduleStatus> get() {
     ImmutableMap.Builder<String, ScheduleStatus> statuses = ImmutableMap.builder();
     for (Map.Entry<String, Task> entry : tasks.entrySet()) {
-      statuses.put(entry.getKey(), entry.getValue().getAuditedStatus().getStatus());
+      statuses.put(entry.getKey(), entry.getValue().getStatus().getStatus());
     }
     return statuses.build();
   }
@@ -407,7 +407,7 @@ public class ExecutorCore implements TaskManager, Supplier<Map<String, ScheduleS
       try {
         Task task = result.get();
         if (!result.isCancelled() && task != null
-            && task.getAuditedStatus().getStatus() == ScheduleStatus.KILLED) {
+            && task.getStatus().getStatus() == ScheduleStatus.KILLED) {
           killed.add(task);
         }
       } catch (InterruptedException e) {

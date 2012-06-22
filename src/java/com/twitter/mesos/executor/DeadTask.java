@@ -75,7 +75,7 @@ public class DeadTask extends TaskOnDisk {
   }
 
   @Override
-  public AuditedStatus getAuditedStatus() {
+  public AuditedStatus getStatus() {
     return state;
   }
 
