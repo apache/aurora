@@ -62,9 +62,6 @@ import static com.twitter.mesos.gen.ScheduleStatus.UNKNOWN;
 import static com.twitter.mesos.gen.ScheduleStatus.UPDATING;
 import static com.twitter.mesos.scheduler.StateManagerImpl.UpdateException;
 
-/**
- * @author William Farner
- */
 public class StateManagerImplTest extends EasyMockTest {
 
   private static final String HOST_A = "host_a";

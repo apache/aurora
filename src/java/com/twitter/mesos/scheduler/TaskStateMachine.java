@@ -165,7 +165,7 @@ public class TaskStateMachine {
    * @param task Read-only task that this state machine manages.
    * @param isJobUpdating Supplier to test whether the task's job is currently in a rolling update.
    * @param workSink Work sink to receive transition response actions
-   * @param taskTimeoutFilter Filter to determine if a task has timed out
+   * @param taskTimedOut Filter to determine if a task has timed out
    *      (and should be considered lost).
    * @param clock Clock to use for reading the current time.
    * @param initialState The state to begin the state machine at.  All legal transitions will be
@@ -178,7 +178,7 @@ public class TaskStateMachine {
       final ScheduledTask task,
       final Supplier<Boolean> isJobUpdating,
       final WorkSink workSink,
-      final Predicate<Iterable<TaskEvent>> taskTimeoutFilter,
+      final Predicate<ScheduledTask> taskTimedOut,
       final Clock clock,
       final ScheduleStatus initialState) {
 
@@ -331,7 +331,7 @@ public class TaskStateMachine {
 
                           case UNKNOWN:
                             // Determine if we have been waiting too long on this task.
-                            if (taskTimeoutFilter.apply(task.getTaskEvents())) {
+                            if (taskTimedOut.apply(task)) {
                               updateState(ScheduleStatus.LOST);
                             }
                             break;

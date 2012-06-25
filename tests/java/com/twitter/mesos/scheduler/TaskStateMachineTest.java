@@ -56,7 +56,7 @@ import static com.twitter.mesos.scheduler.WorkCommand.UPDATE_STATE;
 public class TaskStateMachineTest extends EasyMockTest {
 
   private Supplier<Boolean> isJobUpdating;
-  private Predicate<Iterable<TaskEvent>> taskTimeoutFilter;
+  private Predicate<ScheduledTask> taskTimeoutFilter;
   private WorkSink workSink;
   private FakeClock clock;
   private TaskStateMachine stateMachine;
@@ -64,7 +64,7 @@ public class TaskStateMachineTest extends EasyMockTest {
   @Before
   public void setUp() {
     isJobUpdating = createMock(new Clazz<Supplier<Boolean>>() { });
-    taskTimeoutFilter = createMock(new Clazz<Predicate<Iterable<TaskEvent>>>() { });
+    taskTimeoutFilter = createMock(new Clazz<Predicate<ScheduledTask>>() { });
     workSink = createMock(WorkSink.class);
     clock = new FakeClock();
     stateMachine = makeStateMachine("test", makeTask(false));
@@ -183,10 +183,10 @@ public class TaskStateMachineTest extends EasyMockTest {
   @Test
   public void testMissingAssignedRescheduledAfterGracePeriod() {
     expectWork(UPDATE_STATE).times(3);
-    expect(taskTimeoutFilter.apply(EasyMock.<Iterable<TaskEvent>>anyObject()))
+    expect(taskTimeoutFilter.apply(EasyMock.<ScheduledTask>anyObject()))
         .andReturn(false)
         .times(2);
-    expect(taskTimeoutFilter.apply(EasyMock.<Iterable<TaskEvent>>anyObject())).andReturn(true);
+    expect(taskTimeoutFilter.apply(EasyMock.<ScheduledTask>anyObject())).andReturn(true);
     expectWork(RESCHEDULE);
 
     control.replay();

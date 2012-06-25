@@ -16,15 +16,13 @@ import com.twitter.mesos.scheduler.periodic.PeriodicTaskLauncher.PeriodicTaskInt
 
 /**
  * Binding module that configures periodic scheduler tasks.
- *
- * @author William Farner
  */
 public class PeriodicTaskModule extends AbstractModule {
 
   @CmdLine(name = "periodic_task_interval",
       help = "Interval on which to run task garbage collection tasks.")
   private static final Arg<Amount<Long, Time>> PERIODIC_TASK_INTERVAL =
-      Arg.create(Amount.of(5L, Time.MINUTES));
+      Arg.create(Amount.of(2L, Time.MINUTES));
 
   @CmdLine(name = "history_prune_threshold",
       help = "Time after which the scheduler will prune terminated task history.")

@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import javax.annotation.Nullable;
 
@@ -49,6 +50,8 @@ import org.junit.Test;
 
 import com.twitter.common.base.Closure;
 import com.twitter.common.collections.Pair;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.common.testing.TearDownRegistry;
 import com.twitter.common.util.testing.FakeClock;
@@ -98,6 +101,9 @@ import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
 import static com.twitter.mesos.gen.ScheduleStatus.LOST;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
+import static com.twitter.mesos.gen.ScheduleStatus.PREEMPTING;
+import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
+import static com.twitter.mesos.gen.ScheduleStatus.ROLLBACK;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.UPDATING;
@@ -2082,6 +2088,62 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     assertTaskCount(2);
     assertEquals(1, getTasksByStatus(PENDING).size());
     assertEquals(1, getTasksByStatus(LOST).size());
+  }
+
+  private void checkOutstandingTimer(ScheduleStatus status, long expectedValue) {
+    AtomicLong timer = stateManager.maxOutstandingTimes.getIfPresent(status);
+    if (timer == null) {
+      fail("Timer not present for " + status);
+    } else {
+      assertEquals(expectedValue, timer.get());
+    }
+  }
+
+  @Test
+  public void testOutstandingTimers() throws Exception {
+    expectKillTask(1);
+
+    control.replay();
+    buildScheduler();
+
+    stateManager.scanOutstandingTasks();
+    checkOutstandingTimer(ASSIGNED, 0);
+    checkOutstandingTimer(STARTING, 0);
+    checkOutstandingTimer(PREEMPTING, 0);
+    checkOutstandingTimer(RESTARTING, 0);
+    checkOutstandingTimer(KILLING, 0);
+    checkOutstandingTimer(UPDATING, 0);
+    checkOutstandingTimer(ROLLBACK, 0);
+
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, 1));
+    scheduler.createJob(makeJob(OWNER_B, JOB_A, 1));
+    String taskA = Tasks.id(getOnlyTask(queryByOwner(OWNER_A)));
+    String taskB = Tasks.id(getOnlyTask(queryByOwner(OWNER_B)));
+    changeStatus(taskA, ASSIGNED);
+
+    Amount<Long, Time> tick = Amount.of(10L, Time.SECONDS);
+    clock.advance(tick);
+
+    stateManager.scanOutstandingTasks();
+    checkOutstandingTimer(ASSIGNED, tick.as(Time.MILLISECONDS));
+
+    clock.advance(tick);
+    changeStatus(taskB, ASSIGNED);
+
+    clock.advance(tick);
+    stateManager.scanOutstandingTasks();
+    checkOutstandingTimer(ASSIGNED, tick.as(Time.MILLISECONDS) * 3);
+
+    changeStatus(taskA, RUNNING);
+    changeStatus(taskB, STARTING);
+    clock.advance(tick);
+    changeStatus(taskA, KILLING);
+    clock.advance(tick);
+
+    stateManager.scanOutstandingTasks();
+    checkOutstandingTimer(ASSIGNED, 0);
+    checkOutstandingTimer(STARTING, tick.as(Time.MILLISECONDS) * 2);
+    checkOutstandingTimer(KILLING, tick.as(Time.MILLISECONDS));
   }
 
   private static String getLocalHost() {
