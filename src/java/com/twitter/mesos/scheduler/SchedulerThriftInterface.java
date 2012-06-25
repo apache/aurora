@@ -83,6 +83,10 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
   private static final Arg<Amount<Long, Time>> KILL_TASK_MAX_BACKOFF =
       Arg.create(Amount.of(30L, Time.SECONDS));
 
+  @CmdLine(name = "enable_job_creation",
+      help = "Allow new jobs to be created, if false all job creation requests will be denied.")
+  private static final Arg<Boolean> ENABLE_JOB_CREATION = Arg.create(true);
+
   private static final String NOT_ADMIN_MESSAGE = "Only admins may perform this operation.";
 
   private static final Function<ScheduledTask, String> GET_ROLE = Functions.compose(
@@ -133,6 +137,11 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
 
     LOG.info("Received createJob request: " + Tasks.jobKey(job));
     CreateJobResponse response = new CreateJobResponse();
+
+    if (!ENABLE_JOB_CREATION.get()) {
+      return response.setResponseCode(INVALID_REQUEST)
+          .setMessage("Job creation is disabled on this cluster.");
+    }
 
     try {
       sessionValidator.checkAuthenticated(session, job.getOwner().getRole());
