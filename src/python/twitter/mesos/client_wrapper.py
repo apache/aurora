@@ -88,6 +88,7 @@ class HDFSHelper(object):
     """
     abs_src = os.path.expanduser(src)
 
+    dst = HDFSHelper.hdfs_uri(cluster, dst)
     dst_dir = os.path.dirname(dst)
 
     log.info('Dst: %s Dir: %s' % (dst, dst_dir))
@@ -99,12 +100,24 @@ class HDFSHelper(object):
     ssh_proxy_host = HDFSHelper.ssh_proxy(cluster)
     hadoop_fs_config = HDFSHelper.hadoop_config(cluster)
 
+    hadoop_fs = ['hadoop', '--config', hadoop_fs_config, 'fs']
+    def call_hadoop(*args):
+      return MesosHelper.call(hadoop_fs + list(args), ssh_proxy_host, user=user)
+    def check_call_hadoop(*args):
+      MesosHelper.check_call(hadoop_fs + list(args), ssh_proxy_host, user=user)
+
     if ssh_proxy_host:
       log.info('Running in corp, copy will be done via %s@%s' % (user, ssh_proxy_host))
       subprocess.check_call(['scp', abs_src, '%s@%s:' % (user, ssh_proxy_host)])
+    if not call_hadoop('-test', '-e', dst):
+      log.info("Deleting existing file at %s" % dst)
+      check_call_hadoop('-rm', '-skipTrash', dst)
+    elif call_hadoop('-test', '-e', dst_dir):
+      log.info('Creating directory %s' % dst_dir)
+      check_call_hadoop('-mkdir', dst_dir)
+    log.info('Copying %s -> %s' % (hdfs_src, dst))
+    check_call_hadoop('-put', hdfs_src, dst)
 
-    cmd = ['sudo', '-u', 'mesos', 'mesos-upload.sh', hadoop_fs_config, hdfs_src, dst]
-    MesosHelper.check_call(cmd, ssh_proxy_host, user=user)
 
 class MesosHelper(object):
   _DEFAULT_USER = getpass.getuser()
