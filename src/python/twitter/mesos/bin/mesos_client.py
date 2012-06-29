@@ -324,22 +324,21 @@ class MesosCLI(cmd.Cmd):
     resp = api.force_task_state(task_id, status)
     check_and_log_response(resp)
 
-  def query(self, role, job, shards=None, statuses=LIVE_TASK_STATES):
+  def query(self, role, job, shards=None, statuses=LIVE_TASK_STATES, api=None):
     query = TaskQuery()
     query.statuses = statuses
     query.owner = Identity(role=role)
     query.jobName = job
     query.shardIds = shards
-    api = MesosClientAPI(cluster=self.options.cluster, verbose=self.options.verbose)
-    resp = api.client().getTasksStatus(query)
-    if not resp.responseCode:
-      _die('Request failed, server responded with "%s"' % resp.message)
-    return resp
+    api = api or MesosClientAPI(cluster=self.options.cluster, verbose=self.options.verbose)
+    return api.client().getTasksStatus(query)
 
   @requires.exactly('role', 'job', 'shard')
   def do_ssh(self, *line):
     (role, job, shard) = line
     resp = self.query(role, job, set([int(shard)]))
+    if not resp.responseCode:
+      _die('Request failed, server responded with "%s"' % resp.message)
     return subprocess.call(['ssh', resp.tasks[0].assignedTask.slaveHost])
 
   @requires.at_least('role', 'job', 'cmd')
@@ -347,13 +346,20 @@ class MesosCLI(cmd.Cmd):
     """run role job cmd"""
     # TODO(William Farner): Add support for invoking on individual shards.
     # This will require some arg refactoring in the client.
-    (role, job) = line[:2]
+    (role, jobs) = line[:2]
+    cmd = list(line[2:])
 
     if not self.options.cluster:
       _die('--cluster is required')
 
-    cmd = list(line[2:])
-    resp = self.query(role, job)
+    tasks = []
+    api = MesosClientAPI(cluster=self.options.cluster, verbose=self.options.verbose)
+    for job in jobs.split(','):
+      resp = self.query(role, job, api=api)
+      if not resp.responseCode:
+        log.error('Failed to query job: %s' % job)
+        continue
+      tasks.extend(resp.tasks)
 
     def replace(match, replace_val):
       def _replace(value):
@@ -361,7 +367,7 @@ class MesosCLI(cmd.Cmd):
       return _replace
 
     # TODO(William Farner): Support parallelization of this process with -t ala loony.
-    for task in resp.tasks:
+    for task in tasks:
       host = task.assignedTask.slaveHost
       full_cmd = ['ssh', '-n', '-q', host, 'cd', '/var/run/nexus/%task_id%/sandbox;']
       full_cmd += cmd
