@@ -431,6 +431,7 @@ def main(args, options):
     LogOptions.set_stderr_log_level('DEBUG')
     zookeeper.set_debug_level(zookeeper.LOG_LEVEL_DEBUG)
   else:
+    LogOptions.set_stderr_log_level('INFO')
     zookeeper.set_debug_level(zookeeper.LOG_LEVEL_ERROR)
 
   cli = MesosCLI(options)
