@@ -62,24 +62,21 @@ class MesosConfigLoader(object):
       with open(actual_file) as fp:
         Compatibility.exec_function(compile(fp.read(), actual_file, 'exec'), env)
       deposit_stack.pop()
-    def export(task):
-      if isinstance(task, dict):
-        task = Task(task)
-      tc.add_task(ThermosTaskWrapper(task, **kw))
+    def export(*args, **kw):
+      pass
     schema_copy = copy.copy(MesosConfigLoader.SCHEMA)
     schema_copy.update(
       mesos_include = lambda fn: ast_executor(fn, schema_copy),
       include = lambda fn: ast_executor(fn, schema_copy),
       export = export)
     ast_executor(os.path.basename(filename), schema_copy)
-    job_list = schema_copy.get('jobs')
-    if not job_list or not isinstance(job_list, list):
+    job_list = schema_copy.get('jobs', [])
+    if not isinstance(job_list, list) or len(job_list) == 0:
       raise MesosConfigLoader.BadConfig("Could not extract any jobs from %s" % filename)
     return MesosConfigLoader.pick(job_list, name, bindings)
 
   @staticmethod
   def load_json(filename, name=None, bindings=None):
-    tc = MesosConfigLoader()
     with open(filename) as fp:
       js = json.load(fp)
     job = MesosJob(js)

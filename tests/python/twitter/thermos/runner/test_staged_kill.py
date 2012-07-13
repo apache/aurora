@@ -178,9 +178,9 @@ class TestRunnerKillProcessTrappingSIGTERM(RunnerBase):
     preempter.kill(force=True, preemption_wait=Amount(1, Time.SECONDS))
     duration = time.time() - now
 
-    # This is arbitrary, but make sure we finish within 20% of
+    # This is arbitrary, but make sure we finish within half a second of
     # requested preemption wait.
-    assert abs(duration - 1.0) < 0.2
+    assert abs(duration - 1.0) < 0.5
 
     assert preempter.state.statuses[-1].state == TaskState.KILLED
     assert preempter.state.processes['process'][-1].state == ProcessState.KILLED

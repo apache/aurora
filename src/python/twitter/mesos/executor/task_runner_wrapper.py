@@ -108,7 +108,21 @@ class TaskRunnerWrapper(object):
     """
       Is the process underlying the Thermos task runner alive?
     """
-    return self._popen is not None and self._popen.poll() is None
+    if self._popen is None:
+      return False
+
+    # We can't rely upon subprocess.Popen.poll because we may be invoking
+    # os.wait4 via TaskRunner.run => TaskRunnerHelper.reap_children.  While
+    # arguably an abstraction breakdown, this workaround seems reasonable.
+    try:
+      pid, _ = os.waitpid(self._popen.pid, os.WNOHANG)
+      if pid == 0:
+        return True
+    except OSError as e:
+      if e.errno != errno.ECHILD:
+        raise
+
+    return False
 
   def cleanup(self):
     pass

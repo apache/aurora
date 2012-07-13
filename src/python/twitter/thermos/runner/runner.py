@@ -373,6 +373,8 @@ class TaskRunner(object):
       return None
     try:
       checkpoint = CheckpointDispatcher.from_file(task_checkpoint)
+      if checkpoint is None or checkpoint.header is None:
+        return None
       return cls(task.tasks()[0].task(), checkpoint_root, checkpoint.header.sandbox, task_id,
           portmap=checkpoint.header.ports)
     except Exception as e:

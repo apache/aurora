@@ -3,7 +3,6 @@ import json
 import os
 import pwd
 import signal
-import subprocess
 import sys
 import tempfile
 import threading
