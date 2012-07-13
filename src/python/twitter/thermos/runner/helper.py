@@ -163,10 +163,19 @@ class TaskRunnerHelper(object):
     cls.safe_signal(pid, signal.SIGKILL)
 
   @classmethod
+  def kill_group(cls, pgrp):
+    cls.safe_signal(-pgrp, signal.SIGKILL)
+
+  @classmethod
   def _get_process_tuple(cls, state, process_name):
     assert process_name in state.processes and len(state.processes[process_name]) > 0
     cls.PS.collect_all()
     return cls.scan_process(state, process_name, ps=cls.PS)
+
+  @classmethod
+  def _get_coordinator_group(cls, state, process_name):
+    assert process_name in state.processes and len(state.processes[process_name]) > 0
+    return state.processes[process_name][-1].coordinator_pid
 
   @classmethod
   def terminate_process(cls, state, process_name):
@@ -180,7 +189,15 @@ class TaskRunnerHelper(object):
   @classmethod
   def kill_process(cls, state, process_name):
     log.debug('TaskRunnerHelper.kill_process(%s)' % process_name)
+    coordinator_pgid = cls._get_coordinator_group(state, process_name)
     coordinator_pid, pid, tree = cls._get_process_tuple(state, process_name)
+    # This is super dangerous.  TODO(wickman)  Add a heuristic that determines
+    # that 1) there processes that currently belong to this process group
+    #  and 2) those processes have inherited the coordinator checkpoint filehandle
+    # This way we validate that it is in fact the process group we expect.
+    if coordinator_pgid:
+      log.debug('   => SIGKILL coordinator group %s' % coordinator_pgid)
+      cls.kill_group(coordinator_pgid)
     if coordinator_pid:
       log.debug('   => SIGKILL coordinator %s' % coordinator_pid)
       cls.kill_pid(coordinator_pid)

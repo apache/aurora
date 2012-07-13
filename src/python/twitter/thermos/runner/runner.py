@@ -75,10 +75,15 @@ class TaskRunnerProcessHandler(ProcessStateHandler):
     log.debug('Process on_running %s' % process_update)
     self._runner._plan.set_running(process_update.process)
 
+  def _cleanup(self, process_update):
+    if not self._runner._recovery:
+      TaskRunnerHelper.kill_process(self._runner.state, process_update.process)
+
   def on_success(self, process_update):
     log.debug('Process on_success %s' % process_update)
     log.info('Process(%s) finished successfully [rc=%s]' % (
       process_update.process, process_update.return_code))
+    self._cleanup(process_update)
     self._runner._task_processes.pop(process_update.process)
     self._runner._watcher.unregister(process_update.process)
     self._runner._plan.add_success(process_update.process)
@@ -91,6 +96,7 @@ class TaskRunnerProcessHandler(ProcessStateHandler):
   def on_failed(self, process_update):
     log.debug('Process on_failed %s' % process_update)
     log.info('Process(%s) failed [rc=%s]' % (process_update.process, process_update.return_code))
+    self._cleanup(process_update)
     self._on_abnormal(process_update)
     self._runner._plan.add_failure(process_update.process)
     if process_update.process in self._runner._plan.failed:
@@ -101,16 +107,13 @@ class TaskRunnerProcessHandler(ProcessStateHandler):
 
   def on_lost(self, process_update):
     log.debug('Process on_lost %s' % process_update)
-    if not self._runner._recovery:
-      TaskRunnerHelper.kill_process(self._runner.state, process_update.process)
+    self._cleanup(process_update)
     self._on_abnormal(process_update)
     self._runner._plan.lost(process_update.process)
 
   def on_killed(self, process_update):
     log.debug('Process on_killed %s' % process_update)
-    if not self._runner._recovery:
-      # Clean up just in case.
-      TaskRunnerHelper.kill_process(self._runner.state, process_update.process)
+    self._cleanup(process_update)
     self._runner._task_processes.pop(process_update.process)
     self._runner._watcher.unregister(process_update.process)
     log.debug('Process killed, marking it as a loss.')
@@ -846,7 +849,7 @@ class TaskRunner(object):
           log.warning('  coordinator_pid: %s' % coordinator_pid)
           log.warning('              pid: %s' % pid)
           log.warning('             tree: %s' % tree)
-          TaskRunnerHelper.kill_process(self.state, process)
+        TaskRunnerHelper.kill_process(self.state, process)
       else:
         if coordinator_pid or pid or tree:
           self._set_process_status(process, ProcessState.KILLED,

@@ -6,6 +6,7 @@ import time
 
 from runner_base import Runner
 
+from twitter.common.process import ProcessProviderFactory
 from twitter.common.quantity import Amount, Time
 from twitter.thermos.config.schema import (
   Task,
@@ -184,3 +185,70 @@ class TestRunnerKillProcessTrappingSIGTERM(RunnerBase):
 
     assert preempter.state.statuses[-1].state == TaskState.KILLED
     assert preempter.state.processes['process'][-1].state == ProcessState.KILLED
+
+
+
+SIMPLEFORK_SCRIPT = """
+cat <<EOF | python -
+from __future__ import print_function
+import os
+import time
+
+pid = os.fork()
+
+if pid == 0:
+  pid = os.getpid()
+  with open('child.txt', 'w') as fp:
+    print(pid, file=fp)
+  time.sleep(60)
+else:
+  with open('parent.txt', 'w') as fp:
+    print(os.getpid(), file=fp)
+  while not os.path.exists('exit.txt'):
+    time.sleep(0.1)
+EOF
+"""
+
+class TestRunnerKillProcessGroup(RunnerBase):
+  @classmethod
+  def task(cls):
+    task = Task(name = "task", processes = [Process(name="process", cmdline=SIMPLEFORK_SCRIPT)])
+    return task.interpolate()[0]
+
+  def test_pg_is_killed(self):
+    runner = self.start_runner()
+    tm = TaskMonitor(runner.pathspec, runner.task_id)
+    self.wait_until_running(tm)
+    process_state, run_number = tm.get_active_processes()[0]
+    assert process_state.process == 'process'
+    assert run_number == 0
+
+    child_pidfile = os.path.join(runner.sandbox, runner.task_id, 'child.txt')
+    while not os.path.exists(child_pidfile):
+      time.sleep(0.1)
+    parent_pidfile = os.path.join(runner.sandbox, runner.task_id, 'parent.txt')
+    while not os.path.exists(parent_pidfile):
+      time.sleep(0.1)
+    with open(child_pidfile) as fp:
+      child_pid = int(fp.read().rstrip())
+    with open(parent_pidfile) as fp:
+      parent_pid = int(fp.read().rstrip())
+
+    ps = ProcessProviderFactory.get()
+    ps.collect_all()
+    assert parent_pid in ps.pids()
+    assert child_pid in ps.pids()
+    assert child_pid in ps.children_of(parent_pid)
+
+    with open(os.path.join(runner.sandbox, runner.task_id, 'exit.txt'), 'w') as fp:
+      fp.write('go away!')
+
+    while tm.task_state() is not TaskState.SUCCESS:
+      time.sleep(0.1)
+
+    state = tm.get_state()
+    assert state.processes['process'][0].state == ProcessState.SUCCESS
+
+    ps.collect_all()
+    assert parent_pid not in ps.pids()
+    assert child_pid not in ps.pids()
