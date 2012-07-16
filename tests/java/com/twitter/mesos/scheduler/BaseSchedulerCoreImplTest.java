@@ -51,6 +51,7 @@ import org.junit.Test;
 import com.twitter.common.base.Closure;
 import com.twitter.common.collections.Pair;
 import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.common.testing.TearDownRegistry;
@@ -168,7 +169,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   public void setUp() throws Exception {
     driver = createMock(Driver.class);
     clock = new FakeClock();
-    taskFactory = new MesosTaskFactoryImpl("/fake/executor.zip");
+    taskFactory = new MesosTaskFactoryImpl("/fake/executor.zip", 0.1, Amount.of(1.0, Data.MB),
+        ImmutableMap.of("EXECUTOR_DEBUG", "1"));
   }
 
   /**
