@@ -25,6 +25,7 @@ python_library(
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common_internal/ods'),
     pants('src/python/twitter/mesos/config:schema'),
+    pants('src/python/twitter/mesos/packer'),
     pants('src/thrift/com/twitter/thrift:py-thrift'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
   ]

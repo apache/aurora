@@ -4,11 +4,11 @@
 # TODO(vinod): Use twitter.common.app subcommands instead of cmd
 import cmd
 import functools
-import getpass
+import json
 import os
-import re
 import subprocess
 import sys
+import time
 from urlparse import urljoin
 import zookeeper
 
@@ -18,6 +18,7 @@ from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 from twitter.mesos.clusters import Cluster
 from twitter.mesos.client_wrapper import MesosClientAPI, MesosHelper
+from twitter.mesos.packer.packer_client import Packer
 from twitter.mesos.parsers.mesos_config import MesosConfig
 from twitter.mesos.parsers.pystachio_config import PystachioConfig
 from twitter.mesos.parsers.pystachio_codec import PystachioCodec
@@ -381,6 +382,51 @@ class MesosCLI(cmd.Cmd):
       proc = subprocess.Popen(full_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
       output = proc.communicate()
       print '\n'.join(['%s:  %s' % (host, line) for line in output[0].splitlines()])
+
+  @staticmethod
+  def _get_packer():
+    return Packer('packer.prod.mesos.service.smf1.twitter.com', 80)
+
+  @requires.exactly('role')
+  def do_package_list(self, role):
+    print '\n'.join(MesosCLI._get_packer().list_packages(role))
+
+  @staticmethod
+  def _print_package(pkg):
+    pkg_detail = 'Version: %s' % pkg['id']
+    audits = sorted(pkg['auditLog'], key=lambda k: int(k['timestamp']))
+    if audits[-1]['state'] == 'LIVE':
+      pkg_detail += ' (LIVE)'
+    print pkg_detail
+    for audit in audits:
+      gmtime = time.strftime('%m/%d/%Y %H:%M:%S UTC',
+                             time.gmtime(int(audit['timestamp']) / 1000))
+      print '  moved to state %s by %s on %s' % (audit['state'], audit['user'], gmtime)
+
+  @requires.exactly('role', 'package')
+  def do_package_versions(self, role, package):
+    for version in MesosCLI._get_packer().list_versions(role, package):
+      MesosCLI._print_package(version)
+
+  @requires.exactly('role', 'package', 'version')
+  def do_package_delete_version(self, role, package, version):
+    MesosCLI._get_packer().delete(role, package, version)
+    print 'Version deleted'
+
+  @requires.exactly('role', 'package', 'file_path')
+  def do_package_add_version(self, role, package, file_path):
+    print 'Package added:'
+    MesosCLI._print_package(MesosCLI._get_packer().add(role, package, file_path))
+
+  @requires.exactly('role', 'package', 'version')
+  def do_package_set_live(self, role, package, version):
+    MesosCLI._get_packer().set_live(role, package, version)
+    print 'Version %s is now the LIVE vesion' % version
+
+  @requires.exactly('role', 'package')
+  def do_package_unlock(self, role, package):
+    MesosCLI._get_packer().unlock(role, package)
+    print 'Package unlocked'
 
 
 def initialize_options():
