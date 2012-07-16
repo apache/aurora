@@ -21,6 +21,8 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.BackoffHelper;
 import com.twitter.mesos.Tasks;
+import com.twitter.mesos.auth.SessionValidator;
+import com.twitter.mesos.auth.SessionValidator.AuthFailedException;
 import com.twitter.mesos.gen.CreateJobResponse;
 import com.twitter.mesos.gen.FinishUpdateResponse;
 import com.twitter.mesos.gen.ForceTaskStateResponse;
@@ -45,8 +47,6 @@ import com.twitter.mesos.gen.UpdateResponseCode;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.UpdateShardsResponse;
 import com.twitter.mesos.scheduler.SchedulerCore.RestartException;
-import com.twitter.mesos.scheduler.auth.SessionValidator;
-import com.twitter.mesos.scheduler.auth.SessionValidator.AuthFailedException;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 

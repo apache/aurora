@@ -37,9 +37,9 @@ import com.twitter.common.zookeeper.ServerSetImpl;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.common.zookeeper.ZooKeeperUtils;
-import com.twitter.common_internal.ldap.Ods;
 import com.twitter.common_internal.zookeeper.ZooKeeperModule;
 import com.twitter.mesos.GuiceUtils;
+import com.twitter.mesos.auth.AuthBindings;
 import com.twitter.mesos.gen.MesosAdmin;
 import com.twitter.mesos.scheduler.Driver.DriverImpl;
 import com.twitter.mesos.scheduler.DriverFactory.DriverFactoryImpl;
@@ -50,11 +50,6 @@ import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
 import com.twitter.mesos.scheduler.PulseMonitor.PulseMonitorImpl;
 import com.twitter.mesos.scheduler.SchedulerLifecycle.DriverReference;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
-import com.twitter.mesos.scheduler.auth.SessionValidator;
-import com.twitter.mesos.scheduler.auth.SessionValidator.SessionValidatorImpl;
-import com.twitter.mesos.scheduler.auth.SessionValidator.UserValidator;
-import com.twitter.mesos.scheduler.auth.SessionValidator.UserValidator.ODSValidator;
-import com.twitter.mesos.scheduler.auth.SessionValidator.UserValidator.TestValidator;
 import com.twitter.mesos.scheduler.httphandlers.ServletModule;
 import com.twitter.mesos.scheduler.periodic.BootstrapTaskLauncher;
 import com.twitter.mesos.scheduler.periodic.BootstrapTaskLauncher.Bootstrap;
@@ -126,15 +121,10 @@ public class SchedulerModule extends AbstractModule {
     bind(MesosTaskFactory.class).to(MesosTaskFactoryImpl.class);
 
     // Bindings for MesosSchedulerImpl.
-    bind(SessionValidator.class).to(SessionValidatorImpl.class);
-
     if (SECURE_AUTH.get()) {
-      bind(UserValidator.class).to(ODSValidator.class);
-      bind(ODSValidator.class).in(Singleton.class);
-      bind(Ods.class).in(Singleton.class);
+      AuthBindings.bindLdapAuth(binder());
     } else {
-      bind(UserValidator.class).to(TestValidator.class);
-      bind(TestValidator.class).in(Singleton.class);
+      AuthBindings.bindTestAuth(binder());
     }
 
     bind(SchedulerCore.class).to(SchedulerCoreImpl.class).in(Singleton.class);

@@ -9,6 +9,8 @@ import org.junit.Test;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.EasyMockTest;
+import com.twitter.mesos.auth.SessionValidator;
+import com.twitter.mesos.auth.SessionValidator.AuthFailedException;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.CreateJobResponse;
 import com.twitter.mesos.gen.ForceTaskStateResponse;
@@ -23,8 +25,6 @@ import com.twitter.mesos.gen.SessionKey;
 import com.twitter.mesos.gen.SetQuotaResponse;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.auth.SessionValidator;
-import com.twitter.mesos.scheduler.auth.SessionValidator.AuthFailedException;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 
 import static org.easymock.EasyMock.capture;

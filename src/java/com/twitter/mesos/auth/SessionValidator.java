@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler.auth;
+package com.twitter.mesos.auth;
 
 import com.google.inject.Inject;
 
@@ -10,9 +10,8 @@ import com.twitter.common.util.Clock;
 import com.twitter.common_internal.ldap.Ods;
 import com.twitter.common_internal.ldap.Ods.LdapException;
 import com.twitter.common_internal.ldap.User;
+import com.twitter.mesos.auth.AuthorizedKeySet.KeyParseException;
 import com.twitter.mesos.gen.SessionKey;
-import com.twitter.mesos.scheduler.identity.AuthorizedKeySet;
-import com.twitter.mesos.scheduler.identity.AuthorizedKeySet.KeyParseException;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -48,7 +47,7 @@ public interface SessionValidator {
   /**
    * Session validator that verifies users against the twitter ODS LDAP server.
    */
-  public static class SessionValidatorImpl implements SessionValidator {
+  static class SessionValidatorImpl implements SessionValidator {
 
     private static final Amount<Long, Time> MAXIMUM_NONCE_DRIFT = Amount.of(60L, Time.SECONDS);
 
@@ -96,7 +95,7 @@ public interface SessionValidator {
     /**
      * User validator that checks against ODS LDAP Server.
      */
-    public static class ODSValidator implements UserValidator {
+    static class ODSValidator implements UserValidator {
 
       private final Ods ods;
 
@@ -143,7 +142,7 @@ public interface SessionValidator {
     /**
      * User validator that simply checks for non-blank signature.
      */
-    public static class TestValidator implements UserValidator {
+    static class TestValidator implements UserValidator {
 
       @Override
       public void assertRoleAccess(SessionKey sessionKey, String targetRole)

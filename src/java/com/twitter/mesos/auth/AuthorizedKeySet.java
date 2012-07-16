@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler.identity;
+package com.twitter.mesos.auth;
 
 import java.util.Set;
 import java.util.logging.Level;
