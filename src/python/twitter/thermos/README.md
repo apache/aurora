@@ -145,6 +145,7 @@ need to specify anything more.
   <tr> <td> <em>daemon</em>             </td> <td> Daemon process? (Boolean, default False) </td> </tr>
   <tr> <td> <em>ephemeral</em>          </td> <td> Ephemeral process? (Boolean, default False) </td> </tr>
   <tr> <td> <em>min_duration</em>       </td> <td> Min duration between runs in seconds (Integer, default 15) </td> </tr>
+  <tr> <td> <em>final</em>              </td> <td> This is a finalizing process that should run last (Boolean, default False) </td> </tr>
 </table>
 
 
@@ -198,6 +199,22 @@ Processes may succeed or fail multiple times throughout the duration of a
 single task.  Each of these is called a "process run."  The `min_duration` is the minimum
 number of seconds the scheduler waits between running the same process.
 
+#### final ####
+
+Processes can be grouped into two classes: ordinary processes and finalizing
+processes.  By default, Thermos processes are ordinary.  They run as long as
+the Thermos Task is considered healthy (i.e., no failure limits have been
+reached.) But once all regular Thermos processes have either finished or the
+Task has reached a certain failure threshold, it moves into a "finalization"
+stage and then runs all finalizing processes.  These are typically processes
+necessary for cleaning up the task, such as log checkpointers, or perhaps
+e-mail notifications that the task has completed.
+
+Finalizing processes may not depend upon ordinary processes or vice-versa, however
+finalizing processes may depend upon other finalizing processes and will otherwise run as
+a typical process schedule.
+
+
 ### Task objects ###
 
 Tasks fundamentally consist of a `name` and a list of processes `processes`.
@@ -211,6 +228,7 @@ Processes can be further constrained with `constraints`
   <tr> <td> <em>resources</em>             </td> <td> Resource footprint (Resource, optional) </td> </tr>
   <tr> <td> <em>max_failures</em>          </td> <td> Max failures (Integer, default 1) </td> </tr>
   <tr> <td> <em>max_concurrency</em>       </td> <td> Max concurrency (Integer, default 0 = unlimited concurrency) </td> </tr>
+  <tr> <td> <em>finalization_wait</em>     </td> <td> Amount of time allocated to run finalizing processes (Integer in seconds, default 30) </td> </tr>
 </table>
 
 <table>
@@ -305,6 +323,26 @@ task = Task(
 
 export(task)
 ```
+
+#### finalization_wait ####
+
+Tasks have three active stages: ACTIVE, CLEANING and FINALIZING.  The ACTIVE stage is when
+ordinary processes run.  This stage will last as long as processes are running and the
+task is healthy.  The moment either all processes have finished successfully or the task
+has reached a maximum process failure limit, it will go into CLEANING stage and send SIGTERMs
+to all currently running processes and their process trees.  Once all processes have
+terminated, the task goes into FINALIZING stage and invokes the schedule of all processes
+with the "final" bit set.
+
+This whole process from the end of ACTIVE stage to the end of FINALIZING must take place within
+"finalization_wait" seconds.  If it does not complete within that time, all remaining
+processes will be sent SIGKILLs (or if they depend upon processes that have not yet completed,
+will never be invoked.)
+
+Client applications with higher priority may be able to force a shorter
+finalization wait (e.g. through parameters to `thermos kill`), so this is
+mostly a best-effort signal.
+
 
 ## REPL ##
 
