@@ -4,14 +4,18 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.util.Iterator;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Logger;
 
 import javax.inject.Provider;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.UnmodifiableIterator;
+import com.google.common.primitives.Longs;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
 
@@ -34,6 +38,8 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * @author John Sirois
  */
 public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
+
+  private static final Logger LOG = Logger.getLogger(MesosLog.class.getName());
 
   /**
    * Binding annotation for the opaque value of a log noop entry.
@@ -59,6 +65,8 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
   @Target({ PARAMETER, METHOD })
   public @interface WriteTimeout { }
 
+  private final Provider<Log> logFactory;
+
   private final Provider<Log.Reader> readerFactory;
   private final Amount<Long, Time> readTimeout;
 
@@ -70,6 +78,7 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
   /**
    * Creates a new mesos log.
    *
+   * @param logFactory Factory to provide access to log.
    * @param readerFactory Factory to provide access to log readers.
    * @param readTimeout Log read timeout.
    * @param writerFactory Factory to provide access to log writers.
@@ -77,9 +86,15 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
    * @param noopEntry A no-op log entry blob.
    */
   @Inject
-  public MesosLog(Provider<Log.Reader> readerFactory, @ReadTimeout Amount<Long, Time> readTimeout,
-      Provider<Log.Writer> writerFactory, @WriteTimeout Amount<Long, Time> writeTimeout,
-      @NoopEntry byte[] noopEntry) {
+    public MesosLog(
+        Provider<Log> logFactory,
+        Provider<Log.Reader> readerFactory,
+        @ReadTimeout Amount<Long, Time> readTimeout,
+        Provider<Log.Writer> writerFactory,
+        @WriteTimeout Amount<Long, Time> writeTimeout,
+        @NoopEntry byte[] noopEntry) {
+
+    this.logFactory = Preconditions.checkNotNull(logFactory);
 
     this.readerFactory = Preconditions.checkNotNull(readerFactory);
     this.readTimeout = readTimeout;
@@ -92,7 +107,8 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
 
   @Override
   public Stream open() {
-    return new LogStream(readerFactory.get(), readTimeout, writerFactory, writeTimeout, noopEntry);
+    return new LogStream(
+        logFactory.get(), readerFactory.get(), readTimeout, writerFactory, writeTimeout, noopEntry);
   }
 
   private static class LogStream implements com.twitter.mesos.scheduler.log.Log.Stream {
@@ -125,6 +141,8 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
     private final OpStats append = new OpStats("append");
     private final OpStats truncate = new OpStats("truncate");
 
+    private final Log log;
+
     private final Log.Reader reader;
     private final long readTimeout;
     private final TimeUnit readTimeUnit;
@@ -137,9 +155,11 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
 
     private Log.Writer writer;
 
-    LogStream(Log.Reader reader, Amount<Long, Time> readTimeout,
+    LogStream(Log log, Log.Reader reader, Amount<Long, Time> readTimeout,
         Provider<Log.Writer> writerFactory, Amount<Long, Time> writeTimeout,
         byte[] noopEntry) {
+
+      this.log = log;
 
       this.reader = reader;
       this.readTimeout = readTimeout.getValue();
@@ -166,20 +186,50 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
         throw new StreamAccessException("Error writing noop prior to a read", e);
       }
 
-      Log.Position from = reader.beginning();
-      Log.Position to = end().unwrap();
-      try {
-        List<Log.Entry> entries = reader.read(from, to, readTimeout, readTimeUnit);
-        return Iterables.<Log.Entry, Entry>transform(entries, MESOS_ENTRY_TO_ENTRY).iterator();
-      } catch (TimeoutException e) {
-        read.timeouts.getAndIncrement();
-        throw new StreamAccessException("Timeout reading from log.", e);
-      } catch (Log.OperationFailedException e) {
-        read.failures.getAndIncrement();
-        throw new StreamAccessException("Problem reading from log", e);
-      } finally {
-        read.total.getAndIncrement();
-      }
+      final Log.Position from = reader.beginning();
+      final Log.Position to = end().unwrap();
+
+      // Reading all the entries at once may cause large garbage collections. Instead, we
+      // lazily read the entries one by one as they are requested.
+      // TODO(Benjamin Hindman): Eventually replace this functionality with functionality
+      // from the Mesos Log.
+      return new UnmodifiableIterator<Entry>() {
+        private long position = Longs.fromByteArray(from.identity());
+        private final long endPosition = Longs.fromByteArray(to.identity());
+
+        @Override
+        public boolean hasNext() {
+          return position <= endPosition;
+        }
+
+        @Override
+        public Entry next() {
+          if (!hasNext()) {
+            throw new NoSuchElementException();
+          }
+
+          try {
+            Log.Position p = log.position(Longs.toByteArray(position));
+            LOG.info("Reading position " + position + " from the log");
+            List<Log.Entry> entries = reader.read(p, p, readTimeout, readTimeUnit);
+
+            // N.B. HACK! There is currently no way to "increment" a position. Until the Mesos
+            // Log actually provides a way to "stream" the log, we approximate as much by
+            // using longs via Log.Position.identity and Log.position.
+            position++;
+
+            return MESOS_ENTRY_TO_ENTRY.apply(Iterables.getOnlyElement(entries));
+          } catch (TimeoutException e) {
+            read.timeouts.getAndIncrement();
+            throw new StreamAccessException("Timeout reading from log.", e);
+          } catch (Log.OperationFailedException e) {
+            read.failures.getAndIncrement();
+            throw new StreamAccessException("Problem reading from log", e);
+          } finally {
+            read.total.getAndIncrement();
+          }
+        }
+      };
     }
 
     @Timed("scheduler_log_native_append")
