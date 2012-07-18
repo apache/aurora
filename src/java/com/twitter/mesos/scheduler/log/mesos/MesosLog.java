@@ -141,7 +141,7 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
     private final OpStats append = new OpStats("append");
     private final OpStats truncate = new OpStats("truncate");
     private final AtomicLong entriesSkipped =
-      Stats.exportLong("scheduler_log_native_native_entries_skipped");
+        Stats.exportLong("scheduler_log_native_native_entries_skipped");
 
     private final Log log;
 
