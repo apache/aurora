@@ -239,10 +239,16 @@ class MesosClientAPI(MesosClientBase):
   def __init__(self, **kwargs):
     super(MesosClientAPI, self).__init__(**kwargs)
 
+  def hdfs_path(self, config, copy_app_from):
+    if config.hdfs_path():
+      return config.hdfs_path()
+    else:
+      return '/mesos/pkg/%s/%s' % (config.role(), os.path.basename(copy_app_from))
+
   def create_job(self, config, copy_app_from=None):
     if copy_app_from is not None:
       HDFSHelper.copy_to_hdfs(config.role(), self.cluster(),
-                              copy_app_from, config.hdfs_path())
+                              copy_app_from, self.hdfs_path(config, copy_app_from))
 
     log.info('Creating job %s' % config.name())
     return self.client().createJob(config.job(), self.session_key())
@@ -275,7 +281,7 @@ class MesosClientAPI(MesosClientBase):
 
     if copy_app_from is not None:
       HDFSHelper.copy_to_hdfs(config.role(), self.cluster(),
-                              copy_app_from, config.hdfs_path())
+                              copy_app_from, self.hdfs_path(config, copy_app_from))
 
     resp = self.client().startUpdate(config.job(), self.session_key())
 

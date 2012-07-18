@@ -1,9 +1,5 @@
 from pystachio import *
-from twitter.thermos.config.schema import (
-  Task,
-  Process,
-  Resources,
-  ThermosContext)
+from twitter.thermos.config.schema import *
 
 class Package(Struct):
   name    = Required(String)

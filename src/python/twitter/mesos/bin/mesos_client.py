@@ -186,8 +186,6 @@ class MesosCLI(cmd.Cmd):
     (jobname, config_file) = line
     config = get_config(jobname, config_file)
     cluster = Cluster.get(config.cluster())
-    if self.options.copy_app_from and config.hdfs_path():
-      log.info('Would copy HDFS package to: %s' % config.hdfs_path())
     log.info('Parsed job config: %s' % config.job())
 
   @requires.exactly('role', 'job')
