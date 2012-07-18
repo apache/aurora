@@ -140,6 +140,8 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
     private final OpStats read = new OpStats("read");
     private final OpStats append = new OpStats("append");
     private final OpStats truncate = new OpStats("truncate");
+    private final AtomicLong entriesSkipped =
+      Stats.exportLong("scheduler_log_native_native_entries_skipped");
 
     private final Log log;
 
@@ -196,38 +198,58 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
       return new UnmodifiableIterator<Entry>() {
         private long position = Longs.fromByteArray(from.identity());
         private final long endPosition = Longs.fromByteArray(to.identity());
+        private Entry entry = null;
 
         @Override
         public boolean hasNext() {
-          return position <= endPosition;
+          if (entry != null) {
+            return true;
+          }
+
+          while (position <= endPosition) {
+            try {
+              Log.Position p = log.position(Longs.toByteArray(position));
+              LOG.info("Reading position " + position + " from the log");
+              List<Log.Entry> entries = reader.read(p, p, readTimeout, readTimeUnit);
+
+              // N.B. HACK! There is currently no way to "increment" a position. Until the Mesos
+              // Log actually provides a way to "stream" the log, we approximate as much by
+              // using longs via Log.Position.identity and Log.position.
+              position++;
+
+              // Reading positions in this way means it's possible that we get an "invalid" entry
+              // (e.g., in the underlying log terminology this would be anything but an append)
+              // which will be removed from the returned entries resulting in an empty list.
+              // We skip these.
+              if (entries.isEmpty()) {
+                entriesSkipped.getAndIncrement();
+                continue;
+              } else {
+                entry = MESOS_ENTRY_TO_ENTRY.apply(Iterables.getOnlyElement(entries));
+                return true;
+              }
+            } catch (TimeoutException e) {
+              read.timeouts.getAndIncrement();
+              throw new StreamAccessException("Timeout reading from log.", e);
+            } catch (Log.OperationFailedException e) {
+              read.failures.getAndIncrement();
+              throw new StreamAccessException("Problem reading from log", e);
+            } finally {
+              read.total.getAndIncrement();
+            }
+          }
+          return false;
         }
 
         @Override
         public Entry next() {
-          if (!hasNext()) {
+          if (entry == null && !hasNext()) {
             throw new NoSuchElementException();
           }
 
-          try {
-            Log.Position p = log.position(Longs.toByteArray(position));
-            LOG.info("Reading position " + position + " from the log");
-            List<Log.Entry> entries = reader.read(p, p, readTimeout, readTimeUnit);
-
-            // N.B. HACK! There is currently no way to "increment" a position. Until the Mesos
-            // Log actually provides a way to "stream" the log, we approximate as much by
-            // using longs via Log.Position.identity and Log.position.
-            position++;
-
-            return MESOS_ENTRY_TO_ENTRY.apply(Iterables.getOnlyElement(entries));
-          } catch (TimeoutException e) {
-            read.timeouts.getAndIncrement();
-            throw new StreamAccessException("Timeout reading from log.", e);
-          } catch (Log.OperationFailedException e) {
-            read.failures.getAndIncrement();
-            throw new StreamAccessException("Problem reading from log", e);
-          } finally {
-            read.total.getAndIncrement();
-          }
+          Entry result = Preconditions.checkNotNull(entry);
+          entry = null;
+          return result;
         }
       };
     }
