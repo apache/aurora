@@ -128,6 +128,9 @@ class TaskObserver(threading.Thread, Lockable):
             log.error('Error reading ThermosTask from %s in observer.' % path)
           else:
             context = self.context(task_id)
+            if not context:
+              log.warning('Task not yet available: %s' % task_id)
+              return None
             task = task.task() % Environment(thermos = context)
             self._tasks[task_id] = task
             return task
@@ -191,8 +194,8 @@ class TaskObserver(threading.Thread, Lockable):
 
   def context(self, task_id):
     state = self._state(task_id)
-    if state is None:
-      return None
+    if state is None or state.header is None:
+      return {}
     return ThermosContext(
       ports = state.header.ports if state.header and state.header.ports else {},
       task_id = state.header.task_id,
@@ -242,7 +245,7 @@ class TaskObserver(threading.Thread, Lockable):
     if task_id not in self._actives and task_id not in self._finishes:
       return {}
     state = self._state(task_id)
-    if state is None:
+    if state is None or state.header is None:
       return {}
 
     # XXX(wickman) ProcessHistoryState update
@@ -320,7 +323,7 @@ class TaskObserver(threading.Thread, Lockable):
       return []
 
     state = self._state(task_id)
-    if state is None:
+    if state is None or state.header is None:
       return []
 
     # Get the timestamp of the transition into the current state.
@@ -362,7 +365,7 @@ class TaskObserver(threading.Thread, Lockable):
       return {}
 
     state = self._state(task_id)
-    if state is None:
+    if state is None or state.header is None:
       # TODO(wickman)  Can this happen?
       return {}
 
@@ -450,7 +453,7 @@ class TaskObserver(threading.Thread, Lockable):
       If run is None, return the latest run.
     """
     state = self._state(task_id)
-    if state is None:
+    if state is None or state.header is None:
       return {}
     if process not in state.processes:
       return {}
@@ -481,7 +484,7 @@ class TaskObserver(threading.Thread, Lockable):
     if task_id not in self._actives and task_id not in self._finishes:
       return {}
     state = self._state(task_id)
-    if state is None:
+    if state is None or state.header is None:
       return {}
 
     processes = self._task_processes(task_id)
@@ -503,7 +506,7 @@ class TaskObserver(threading.Thread, Lockable):
 
   @Lockable.sync
   def get_run_number(self, runner_state, process, run = None):
-    if runner_state is not None:
+    if runner_state is not None and runner_state.processes is not None:
       run = run if run is not None else -1
       if run < len(runner_state.processes[process]):
         if len(runner_state.processes[process]) > 0:
@@ -557,7 +560,7 @@ class TaskObserver(threading.Thread, Lockable):
       Returns chroot and the pathname relative to that chroot.
     """
     runner_state = self._state(task_id)
-    if runner_state is None:
+    if runner_state is None or runner_state.header is None:
       return None, None
     try:
       chroot = runner_state.header.sandbox
