@@ -45,7 +45,7 @@ python_library(
 
 python_library(
   name = 'runner',
-  sources = ['__init__.py', 'planner.py', 'runner.py'],
+  sources = ['__init__.py', 'runner.py'],
   dependencies = [
     pants('3rdparty/python:pystachio'),
     pants('3rdparty/python:thrift-0.7'),

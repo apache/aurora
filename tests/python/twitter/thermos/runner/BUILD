@@ -1,15 +1,7 @@
 python_test_suite(name = 'all',
   dependencies = [
-    pants(':small'),
     pants(':medium'),
     pants(':large'),
-  ]
-)
-
-python_test_suite(name = 'small',
-  dependencies = [
-    pants(':test_planner'),
-    pants(':test_task_planner'),
   ]
 )
 
@@ -67,25 +59,10 @@ python_tests(name = 'test_failure_limit',
   dependencies = [pants(':runner_baselibs')]
 )
 
-python_tests(name = 'test_planner',
-  sources = ['test_planner.py'],
-  dependencies = [
-    pants('src/python/twitter/thermos/runner'),
-  ]
-)
-
 python_tests(name = 'test_staged_kill',
   sources = ['test_staged_kill.py'],
   dependencies = [
      pants(':runner_baselibs'),
      pants('src/python/twitter/thermos/monitoring:monitor'),
-  ]
-)
-
-python_tests(name = 'test_task_planner',
-  sources = ['test_task_planner.py'],
-  dependencies = [
-    pants('src/python/twitter/common/testing'),
-    pants('src/python/twitter/thermos/runner'),
   ]
 )

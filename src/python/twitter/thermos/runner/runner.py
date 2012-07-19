@@ -14,18 +14,19 @@ from twitter.common.process import ProcessProviderFactory
 from twitter.common.quantity import Amount, Time
 from twitter.common.recordio import ThriftRecordReader
 
-from twitter.thermos.base.path import TaskPath
 from twitter.thermos.base.ckpt import (
   CheckpointDispatcher,
   UniversalStateHandler,
   ProcessStateHandler,
   TaskStateHandler)
+from twitter.thermos.base.path import TaskPath
+from twitter.thermos.base.planner import TaskPlanner
 from twitter.thermos.config.loader import (
   ThermosConfigLoader,
+  ThermosProcessWrapper,
   ThermosTaskWrapper,
-  ThermosProcessWrapper)
+  ThermosTaskValidator)
 from twitter.thermos.config.schema import ThermosContext
-from twitter.thermos.runner.planner import TaskPlanner
 from twitter.thermos.runner.process import Process
 from twitter.thermos.runner.muxer import ProcessMuxer
 
@@ -197,7 +198,8 @@ class TaskRunnerUniversalHandler(UniversalStateHandler):
 
   def on_initialization(self, header):
     log.debug('_on_initialization: %s' % header)
-    TaskRunner.assert_valid_task(self._runner.task, header.ports)
+    ThermosTaskValidator.assert_valid_task(self._runner.task)
+    ThermosTaskValidator.assert_valid_ports(self._runner.task, header.ports)
     self.checkpoint(RunnerCkpt(runner_header=header))
 
 
@@ -315,8 +317,8 @@ class TaskRunner(object):
     Run a ThermosTask.
   """
   class Error(Exception): pass
+  class InvalidTask(Error): pass
   class InternalError(Error): pass
-  class InvalidTaskError(Error): pass
   class PermissionError(Error): pass
   class StateError(Error): pass
 
@@ -337,27 +339,6 @@ class TaskRunner(object):
     TaskState.CLEANING: TaskRunnerStage_CLEANING,
     TaskState.FINALIZING: TaskRunnerStage_FINALIZING
   }
-
-  @staticmethod
-  def assert_valid_task(task, portmap):
-    for process in task.processes():
-      name = process.name().get()
-      ThermosProcessWrapper.assert_valid_process_name(name)
-    for port in ThermosTaskWrapper(task).ports():
-      if port not in portmap:
-        raise TaskRunner.InvalidTaskError('Task requires unbound port %s!' % port)
-    typecheck = task.check()
-    if not typecheck.ok():
-      raise TaskRunner.InvalidTaskError('Failed to fully evaluate task: %s' %
-        typecheck.message())
-
-  @staticmethod
-  def assert_same_task(spec, task):
-    active_task = spec.given(state='active').getpath('task_path')
-    if os.path.exists(active_task):
-      task_on_disk = ThermosTaskWrapper.from_file(active_task)
-      return task_on_disk and task_on_disk.task == task
-    return True
 
   @classmethod
   def get(cls, task_id, checkpoint_root):
@@ -417,8 +398,12 @@ class TaskRunner(object):
     self._launch_time = launch_time
     self._pathspec = TaskPath(root = checkpoint_root, task_id = self._task_id)
     self._portmap = portmap or {}
-    TaskRunner.assert_valid_task(task, self._portmap)
-    TaskRunner.assert_same_task(self._pathspec, task)
+    try:
+      ThermosTaskValidator.assert_valid_task(task)
+      ThermosTaskValidator.assert_valid_ports(task, self._portmap)
+      ThermosTaskValidator.assert_same_task(self._pathspec, task)
+    except ThermosTaskValidator.InvalidTaskError as e:
+      raise self.InvalidTask('Invalid task: %s' % e)
     self._plan = None
     self._regular_plan = TaskPlanner(task, clock=clock,
         process_filter=lambda proc: proc.final().get() == False)

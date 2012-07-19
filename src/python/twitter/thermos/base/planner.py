@@ -7,8 +7,8 @@ TaskPlanner:
   a regular process can not depend upon a daemon process
 """
 
-import copy
 from collections import defaultdict, namedtuple
+import copy
 from functools import partial
 import sys
 import time

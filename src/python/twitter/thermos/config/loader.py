@@ -6,12 +6,15 @@ import re
 from pystachio import Ref
 from twitter.common.dirutil import safe_open
 from twitter.common.lang import Compatibility
+from twitter.thermos.base.planner import TaskPlanner
 from twitter.thermos.config.schema import Task
+
 
 SCHEMA_PREAMBLE = """
 from pystachio import *
 from twitter.thermos.config.schema import *
 """
+
 
 def deposit_schema(environment):
   Compatibility.exec_function(compile(SCHEMA_PREAMBLE, "<exec_function>", "exec"), environment)
@@ -82,6 +85,54 @@ class ThermosTaskWrapper(object):
       return None
 
 
+class ThermosTaskValidator(object):
+  class InvalidTaskError(Exception): pass
+
+  @classmethod
+  def assert_valid_task(cls, task):
+    cls.assert_valid_names(task)
+    cls.assert_typecheck(task)
+    cls.assert_valid_plan(task)
+
+  @classmethod
+  def assert_valid_plan(cls, task):
+    try:
+      TaskPlanner(task, process_filter=lambda proc: proc.final().get() == False)
+      TaskPlanner(task, process_filter=lambda proc: proc.final().get() == True)
+    except TaskPlanner.InvalidSchedule as e:
+      raise cls.InvalidTaskError('Task has invalid plan: %s' % e)
+
+  @classmethod
+  def assert_valid_names(cls, task):
+    for process in task.processes():
+      name = process.name().get()
+      try:
+        ThermosProcessWrapper.assert_valid_process_name(name)
+      except ThermosProcessWrapper.InvalidProcess as e:
+        raise cls.InvalidTaskError('Task has invalid process: %s' % e)
+
+  @classmethod
+  def assert_typecheck(cls, task):
+    typecheck = task.check()
+    if not typecheck.ok():
+      raise cls.InvalidTaskError('Failed to fully evaluate task: %s' %
+        typecheck.message())
+
+  @classmethod
+  def assert_valid_ports(cls, task, portmap):
+    for port in ThermosTaskWrapper(task).ports():
+      if port not in portmap:
+        raise cls.InvalidTaskError('Task requires unbound port %s!' % port)
+
+  @classmethod
+  def assert_same_task(cls, spec, task):
+    active_task = spec.given(state='active').getpath('task_path')
+    if os.path.exists(active_task):
+      task_on_disk = ThermosTaskWrapper.from_file(active_task)
+      if not task_on_disk or task_on_disk.task != task:
+        raise cls.InvalidTaskError('Task differs from on disk copy: %s' % active_task)
+
+
 class ThermosConfigLoader(object):
   SCHEMA = {}
   deposit_schema(SCHEMA)
@@ -112,6 +163,7 @@ class ThermosConfigLoader(object):
     tc = ThermosConfigLoader()
     task = ThermosTaskWrapper.from_file(filename, **kw)
     if task:
+      ThermosTaskValidator.assert_valid_task(task.task())
       tc.add_task(task)
     return tc
 

@@ -5,6 +5,7 @@ from twitter.mesos.config.schema import (
   MesosJob,
   UpdateConfig,
 )
+from twitter.thermos.config.loader import ThermosTaskValidator
 from twitter.thermos.config.schema import (
   Process,
   Resources,

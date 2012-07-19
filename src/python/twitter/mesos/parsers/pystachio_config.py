@@ -7,6 +7,7 @@ import sys
 from pystachio import Empty, Environment, Ref
 from twitter.common.dirutil import safe_open
 from twitter.common.lang import Compatibility
+from twitter.thermos.config.loader import ThermosTaskValidator
 from twitter.mesos.clusters import Cluster
 from twitter.mesos.config.schema import (
   MesosContext,

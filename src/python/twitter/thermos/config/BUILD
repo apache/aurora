@@ -3,7 +3,8 @@ python_library(
   sources = globs('*.py'),
   dependencies = [
     pants("3rdparty/python:pystachio"),
-    pants("src/python/twitter/common/lang")
+    pants("src/python/twitter/common/lang"),
+    pants("src/python/twitter/thermos/base:planner")
   ]
 )
 

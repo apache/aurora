@@ -14,6 +14,11 @@ python_library(
 )
 
 python_library(
+  name = 'planner',
+  sources = ['planner.py'],
+)
+
+python_library(
   name = 'options',
   sources = ['options.py'],
   dependencies = [
@@ -26,7 +31,8 @@ python_library(
   name = 'base',
   dependencies = [
     pants(':ckpt'),
-    pants(':path'),
     pants(':options'),
+    pants(':path'),
+    pants(':planner'),
   ]
 )
