@@ -17,7 +17,7 @@ from pystachio import Ref
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 from twitter.mesos.clusters import Cluster
-from twitter.mesos.client_wrapper import MesosClientAPI, MesosHelper
+from twitter.mesos.client_wrapper import MesosClientAPI
 from twitter.mesos.packer.packer_client import Packer
 from twitter.mesos.parsers.mesos_config import MesosConfig
 from twitter.mesos.parsers.pystachio_config import PystachioConfig

@@ -11,7 +11,6 @@ from time import gmtime, strftime
 
 from twitter.common import app
 from twitter.mesos.clusters import Cluster
-from twitter.mesos.tunnel_helper import TunnelHelper
 
 __author__ = 'William Farner'
 
@@ -97,7 +96,7 @@ def get_scheduler_machines():
     else:
       cmd = 'loony --dc=%(dc)s --group=role:%(role)s --one-column' % params
 
-    result, (output, _) = run_cmd(['ssh', TunnelHelper.get_tunnel_host(cluster.name), cmd])
+    result, (output, _) = run_cmd(['ssh', app.get_options().tunnel_host, cmd])
     if result != 0:
       sys.exit("Failed to determine scheduler hosts for dc: %(dc)s role: %(role)s" % params)
     return [host.strip() for host in output.splitlines()]
@@ -444,6 +443,12 @@ app.add_option(
   choices = cluster_list,
   dest='cluster',
   help='Cluster to deploy the scheduler in (one of: %s)' % ', '.join(cluster_list))
+
+app.add_option(
+  '--tunnel_host',
+  dest='tunnel_host',
+  default='nest1.corp.twitter.com',
+  help='Host to tunnel ssh requests through.')
 
 app.add_option(
   '--skip_build',

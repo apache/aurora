@@ -9,15 +9,9 @@ from twitter.mesos.tunnel_helper import TunnelHelper
 from twitter.common import log
 
 class ZookeeperHelper(object):
-  LOCAL_ZK_TUNNEL_PORT = 9999
-
   @staticmethod
   def create_zookeeper_tunnel(cluster, port=2181):
-    host, port = TunnelHelper.create_tunnel(
-      TunnelHelper.get_tunnel_host(cluster),
-      ZookeeperHelper.LOCAL_ZK_TUNNEL_PORT,
-      Cluster.get(cluster).zk, port)
-    return host, port
+    return TunnelHelper.create_tunnel(Cluster.get(cluster).zk, port)
 
   @staticmethod
   def get_zookeeper_handle(cluster, port=2181):
@@ -25,7 +19,6 @@ class ZookeeperHelper(object):
     by location. Sets up ssh tunnels as appropriate.
     """
     host = Cluster.get(cluster).zk
-
     if host is not 'localhost' and Location.is_corp():
       host, port = ZookeeperHelper.create_zookeeper_tunnel(cluster, port)
     log.info('Initializing zookeeper client on %s:%d' % (host, port))

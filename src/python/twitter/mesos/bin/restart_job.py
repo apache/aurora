@@ -119,8 +119,7 @@ class JobRestarter(object):
     """ The main work, restarting all the job's tasks, or aborting on an error.
     """
 
-    sc = scheduler_client.SchedulerClient(SCHEDULER_ZK_PATH,
-                                          False)
+    sc = scheduler_client.SchedulerClient(SCHEDULER_ZK_PATH, False)
     self.thread_local.client = sc.get_thrift_client()
 
     statuses = self.get_active_task_statuses()
@@ -298,8 +297,7 @@ class JobRestarter(object):
     # Set up a per-worker thread client to the scheduler, in case
     # it's not reentrant.
     # TODO(Alex Roetter): confirm it's reentrant and optimize this away if so.
-    sc = scheduler_client.SchedulerClient(SCHEDULER_ZK_PATH,
-                                          False)
+    sc = scheduler_client.SchedulerClient(SCHEDULER_ZK_PATH, False)
     self.thread_local.client = sc.get_thrift_client()
 
     while not self.should_abort.is_set():

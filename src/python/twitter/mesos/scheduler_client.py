@@ -3,7 +3,9 @@
 
 __author__ = 'Alex Roetter'
 
-import os, sys
+import os
+import sys
+import time
 from twitter.common import log
 
 # Load this first.  Because of general Python interpreter pyc path caching stupidity, you can't mix
@@ -28,7 +30,13 @@ from twitter.mesos.location import Location
 from twitter.mesos.tunnel_helper import TunnelHelper
 from twitter.mesos.zookeeper_helper import ZookeeperHelper
 
+
 class SchedulerClient(object):
+  THRIFT_RETRIES = 5
+  RETRY_TIMEOUT_SECS = 1.0
+
+  class CouldNotConnect(Exception): pass
+
   @staticmethod
   def get(cluster, **kwargs):
     log.debug('Client location: %s' % ('prod' if Location.is_prod() else 'corp'))
@@ -39,31 +47,15 @@ class SchedulerClient(object):
     # '<cluster name>'
     # '<cluster name>: <zk port>'
     # Instead of encoding zk port inside the <arg> string make it explicit.
-    if cluster.find('localhost:') == 0:
+    if cluster.startswith('localhost:'):
       log.info('Attempting to talk to local scheduler.')
       port = int(cluster.split(':')[1])
-      return None, LocalSchedulerClient(port, ssl=True)
+      return LocalSchedulerClient(port, ssl=True)
     else:
-      if cluster.find(':') > -1:
-        cluster, zk_port = cluster.split(':')
-        zk_port = int(zk_port)
-      else:
-        zk_port = 2181
-
-      force_notunnel = True
-
-      if cluster == 'angrybird-local':
-        ssh_proxy_host = None
-      else:
-        ssh_proxy_host = TunnelHelper.get_tunnel_host(cluster) if Location.is_corp() else None
-
-      if ssh_proxy_host is not None:
-        log.info('Proxying through %s' % ssh_proxy_host)
-        force_notunnel = False
-
-      return ssh_proxy_host, ZookeeperSchedulerClient(cluster, zk_port,
-                                                      force_notunnel, ssl=True, **kwargs)
-
+      zk_port = 2181 if ':' not in cluster else int(cluster.split(':')[1])
+      # If the cluster is an angrybird cluster, we want to force no tunnel
+      notunnel = (cluster == 'angrybird-local')
+      return ZookeeperSchedulerClient(cluster, zk_port, force_notunnel=notunnel, ssl=True, **kwargs)
 
   def __init__(self, verbose=False, ssl=False, real_host=None):
     self._client = None
@@ -94,12 +86,17 @@ class SchedulerClient(object):
     transport = TTransport.TBufferedTransport(socket)
     protocol = TBinaryProtocol.TBinaryProtocol(transport)
     schedulerClient = MesosAdmin.Client(protocol)
-    transport.open()
-    return schedulerClient
+    for _ in range(SchedulerClient.THRIFT_RETRIES):
+      try:
+        transport.open()
+        return schedulerClient
+      except TTransport.TTransportException:
+        time.sleep(SchedulerClient.RETRY_TIMEOUT_SECS)
+        continue
+    raise SchedulerClient.CouldNotConnect('Could not connect to %s:%s' % (host, port))
 
 
 class ZookeeperSchedulerClient(SchedulerClient):
-  LOCAL_SCHEDULER_TUNNEL_PORT = 8888
   SCHEDULER_ZK_PATH = '/twitter/service/mesos-scheduler'
 
   def __init__(self, cluster, port=2181, force_notunnel=False, ssl=False, verbose=False):
@@ -125,12 +122,7 @@ class ZookeeperSchedulerClient(SchedulerClient):
 
   @staticmethod
   def _open_scheduler_tunnel(cluster, remote_host, remote_port):
-    host, port = TunnelHelper.create_tunnel(
-      TunnelHelper.get_tunnel_host(cluster),
-      ZookeeperSchedulerClient.LOCAL_SCHEDULER_TUNNEL_PORT,
-      remote_host,
-      remote_port)
-    return host, port
+    return TunnelHelper.create_tunnel(remote_host, remote_port)
 
   @staticmethod
   def _get_scheduler_host_port(zh, cluster, no_tunnel, verbose=False):
