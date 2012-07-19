@@ -17,6 +17,7 @@ from twitter.mesos.config.schema import (
 from twitter.thermos.config.loader import ThermosTaskWrapper
 
 from .base import ThriftCodec
+from .mesos_config import MesosConfig
 from .proxy_config import ProxyConfig
 from .pystachio_thrift import convert as convert_pystachio_to_thrift
 
@@ -66,9 +67,9 @@ class MesosConfigLoader(object):
       pass
     schema_copy = copy.copy(MesosConfigLoader.SCHEMA)
     schema_copy.update(
-      mesos_include = lambda fn: ast_executor(fn, schema_copy),
-      include = lambda fn: ast_executor(fn, schema_copy),
-      export = export)
+      mesos_include=lambda fn: ast_executor(fn, schema_copy),
+      include=lambda fn: ast_executor(fn, schema_copy),
+      export=export)
     ast_executor(os.path.basename(filename), schema_copy)
     job_list = schema_copy.get('jobs', [])
     if not isinstance(job_list, list) or len(job_list) == 0:
@@ -115,3 +116,6 @@ class PystachioConfig(ProxyConfig):
 
   def ports(self):
     return ThermosTaskWrapper(self._job.task(), strict=False).ports()
+
+  def update_config(self):
+    return MesosConfig.get_update_config(self._job.get())
