@@ -77,7 +77,7 @@ public class MesosLogStreamModule extends PrivateModule {
    */
   @CmdLine(name = "native_log_election_retries",
            help = "The maximum number of attempts to obtain a new log writer.")
-  private static final Arg<Integer> COORDINATOR_ELECTION_RETRIES = Arg.create(8);
+  private static final Arg<Integer> COORDINATOR_ELECTION_RETRIES = Arg.create(20);
 
   @CmdLine(name = "native_log_read_timeout",
            help = "The timeout for doing log reads.")
