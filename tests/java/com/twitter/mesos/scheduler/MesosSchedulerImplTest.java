@@ -76,6 +76,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   private SchedulerCore schedulerCore;
   private TaskLauncher launcher;
   private SlaveMapper slaveMapper;
+  private RegisteredListener registeredListener;
   private SchedulerDriver driver;
 
   private MesosSchedulerImpl scheduler;
@@ -87,8 +88,13 @@ public class MesosSchedulerImplTest extends EasyMockTest {
         new Lifecycle(createMock(Command.class), createMock(UncaughtExceptionHandler.class));
     launcher = createMock(TaskLauncher.class);
     slaveMapper = createMock(SlaveMapper.class);
+    registeredListener = createMock(RegisteredListener.class);
     scheduler = new MesosSchedulerImpl(
-        schedulerCore, lifecycle, Arrays.asList(launcher, schedulerCore), slaveMapper);
+        schedulerCore,
+        lifecycle,
+        Arrays.asList(launcher, schedulerCore),
+        slaveMapper,
+        registeredListener);
     driver = createMock(SchedulerDriver.class);
   }
 
@@ -101,8 +107,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   }
 
   @Test
-  public void testNoOffers() {
-    schedulerCore.registered(FRAMEWORK_ID);
+  public void testNoOffers() throws Exception {
+    registeredListener.registered(FRAMEWORK_ID);
 
     control.replay();
 
@@ -215,7 +221,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
 
   private abstract class RegisteredFixture {
     RegisteredFixture() throws Exception {
-      schedulerCore.registered(FRAMEWORK_ID);
+      registeredListener.registered(FRAMEWORK_ID);
       expectations();
 
       control.replay();

@@ -38,7 +38,7 @@ import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
  * @author William Farner
  */
 public interface SchedulerCore
-    extends Function<TaskQuery, Iterable<TwitterTaskInfo>>, TaskLauncher {
+    extends Function<TaskQuery, Iterable<TwitterTaskInfo>>, TaskLauncher, RegisteredListener {
 
   /**
    * Prompts the scheduler to prepare for possible activation as the leading scheduler.  This
@@ -66,6 +66,7 @@ public interface SchedulerCore
    *
    * @param frameworkId Framework ID.
    */
+  @Override
   void registered(String frameworkId);
 
   /**

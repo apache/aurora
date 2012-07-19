@@ -1,5 +1,6 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.concurrent.CountDownLatch;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -15,6 +16,10 @@ import org.apache.mesos.Protos;
 import org.apache.mesos.SchedulerDriver;
 
 import com.twitter.common.application.Lifecycle;
+import com.twitter.common.args.Arg;
+import com.twitter.common.args.CmdLine;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
 import com.twitter.common.zookeeper.ServerSet;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.thrift.Status;
@@ -26,10 +31,8 @@ import com.twitter.thrift.Status;
  *
  * <p>TODO(John Sirois): This class contains the old logic of SchedulerMain - now that its extracted
  * it should be tested.
- *
- * @author John Sirois
  */
-class SchedulerLifecycle {
+class SchedulerLifecycle implements RegisteredListener {
 
   /**
    * A {@link SingletonService} scheduler leader candidate that exposes a method for awaiting clean
@@ -42,11 +45,17 @@ class SchedulerLifecycle {
     void awaitShutdown();
   }
 
+  @CmdLine(name = "max_registration_delay", help =
+      "Max allowable delay to allow the driver to register before aborting")
+  private static final Arg<Amount<Long, Time>> MAX_REGISTRATION_DELAY =
+      Arg.create(Amount.of(1L, Time.MINUTES));
+
   private static final Logger LOG = Logger.getLogger(SchedulerLifecycle.class.getName());
 
   private final DriverFactory driverFactory;
   private final SchedulerCore scheduler;
   private final Lifecycle lifecycle;
+  private final CountDownLatch registeredLatch = new CountDownLatch(1);
 
   private final Driver driver;
   private final DriverReference driverRef;
@@ -75,6 +84,11 @@ class SchedulerLifecycle {
     LOG.info("Preparing scheduler candidate");
     scheduler.prepare();
     return new SchedulerCandidateImpl();
+  }
+
+  @Override
+  public void registered(String frameworkId) throws RegisterHandlingException {
+    registeredLatch.countDown();
   }
 
   /**
@@ -112,6 +126,15 @@ class SchedulerLifecycle {
       }
     }
 
+    private void startDaemonThread(String name, Runnable work) {
+      new ThreadFactoryBuilder()
+          .setNameFormat(name + "-%d")
+          .setDaemon(true)
+          .build()
+          .newThread(work)
+          .start();
+    }
+
     private void lead() {
       @Nullable final String frameworkId = scheduler.initialize();
 
@@ -119,17 +142,33 @@ class SchedulerLifecycle {
 
       scheduler.start();
 
-      new ThreadFactoryBuilder()
-          .setNameFormat("Driver-Runner-%d")
-          .setDaemon(true)
-          .build()
-          .newThread(new Runnable() {
-            @Override public void run() {
-              Protos.Status status = driver.run();
-              LOG.info("Driver completed with exit code " + status);
+      startDaemonThread("Driver-Runner", new Runnable() {
+        @Override public void run() {
+          Protos.Status status = driver.run();
+          LOG.info("Driver completed with exit code " + status);
+          lifecycle.shutdown();
+        }
+      });
+
+      startDaemonThread("Driver-Register-Watchdog", new Runnable() {
+        @Override public void run() {
+          LOG.info(String.format("Waiting up to %s for scheduler registration.",
+              MAX_REGISTRATION_DELAY.get()));
+
+          try {
+            boolean registered = registeredLatch.await(
+                MAX_REGISTRATION_DELAY.get().getValue(),
+                MAX_REGISTRATION_DELAY.get().getUnit().getTimeUnit());
+            if (!registered) {
+              LOG.severe("Framework has not been registered within the tolerated delay, quitting.");
               lifecycle.shutdown();
             }
-          }).start();
+          } catch (InterruptedException e) {
+            LOG.log(Level.WARNING, "Delayed registration check interrupted.", e);
+            Thread.currentThread().interrupt();
+          }
+        }
+      });
     }
 
     @Override

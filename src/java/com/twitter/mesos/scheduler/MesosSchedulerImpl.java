@@ -27,12 +27,11 @@ import org.apache.mesos.SchedulerDriver;
 
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.inject.TimedInterceptor.Timed;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
 import com.twitter.mesos.GuiceUtils.AllowUnchecked;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.comm.SchedulerMessage;
+import com.twitter.mesos.scheduler.RegisteredListener.RegisterHandlingException;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -41,8 +40,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 public class MesosSchedulerImpl implements Scheduler {
   private static final Logger LOG = Logger.getLogger(MesosSchedulerImpl.class.getName());
-
-  private static final Amount<Long, Time> MAX_REGISTRATION_DELAY = Amount.of(1L, Time.MINUTES);
 
   private final AtomicLong resourceOffers = Stats.exportLong("scheduler_resource_offers");
   private final AtomicLong failedOffers = Stats.exportLong("scheduler_failed_offers");
@@ -55,6 +52,7 @@ public class MesosSchedulerImpl implements Scheduler {
 
   private final List<TaskLauncher> taskLaunchers;
   private final SlaveMapper slaveMapper;
+  private final RegisteredListener registeredListener;
 
   // Stores scheduler state and handles actual scheduling decisions.
   private final SchedulerCore schedulerCore;
@@ -74,31 +72,13 @@ public class MesosSchedulerImpl implements Scheduler {
   public MesosSchedulerImpl(SchedulerCore schedulerCore,
       final Lifecycle lifecycle,
       List<TaskLauncher> taskLaunchers,
-      SlaveMapper slaveMapper) {
+      SlaveMapper slaveMapper,
+      RegisteredListener registeredListener) {
     this.schedulerCore = checkNotNull(schedulerCore);
     this.lifecycle = checkNotNull(lifecycle);
     this.taskLaunchers = checkNotNull(taskLaunchers);
     this.slaveMapper = checkNotNull(slaveMapper);
-
-    // TODO(William Farner): Clean this up.
-    LOG.info(String.format("Waiting up to %s for scheduler registration.", MAX_REGISTRATION_DELAY));
-    Thread registrationChecker = new Thread() {
-      @Override public void run() {
-        try {
-          Thread.sleep(MAX_REGISTRATION_DELAY.as(Time.MILLISECONDS));
-        } catch (InterruptedException e) {
-          LOG.log(Level.WARNING, "Delayed registration check interrupted.", e);
-          Thread.currentThread().interrupt();
-        }
-
-        if (frameworkID == null) {
-          LOG.severe("Framework has not been registered within the tolerated delay, quitting.");
-          lifecycle.shutdown();
-        }
-      }
-    };
-    registrationChecker.setDaemon(true);
-    registrationChecker.start();
+    this.registeredListener = checkNotNull(registeredListener);
   }
 
   @Override
@@ -109,11 +89,12 @@ public class MesosSchedulerImpl implements Scheduler {
   @Override
   public void registered(SchedulerDriver driver, FrameworkID frameworkId, MasterInfo masterInfo) {
     LOG.info("Registered with ID " + frameworkId + ", master: " + masterInfo);
+
     registeredFlag.set(1);
     this.frameworkID = frameworkId;
     try {
-      schedulerCore.registered(frameworkID.getValue());
-    } catch (SchedulerException e) {
+      registeredListener.registered(frameworkId.getValue());
+    } catch (RegisterHandlingException e) {
       LOG.log(Level.SEVERE, "Problem registering", e);
       driver.abort();
     }
@@ -242,6 +223,9 @@ public class MesosSchedulerImpl implements Scheduler {
 
       switch (schedulerMsg.getSetField()) {
         case DELETED_TASKS:
+          // TODO(William Farner): Refactor this to use a thinner interface here.  As it stands
+          // it is odd that we route the registered() call to schedulerCore via the
+          // registeredListener and call the schedulerCore directly here.
           schedulerCore.tasksDeleted(schedulerMsg.getDeletedTasks().getTaskIds());
           break;
 
