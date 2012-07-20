@@ -72,11 +72,14 @@ class HDFSHelper(object):
   def join(self, *paths):
     return posixpath.join(self._uri, *paths)
 
-  def call(self, cmd, *args):
-    """Runs hadoop fs command (via proxy if necessary) with the given command and args."""
+  def call(self, cmd, *args, **kwargs):
+    """Runs hadoop fs command (via proxy if necessary) with the given command and args.
+    Checks the result of the call by default but this can be disabled with check=False.
+    """
     log.info("Running hadoop fs %s %s" % (cmd, list(args)))
-    return Command(['hadoop', '--config', self._config, 'fs', cmd] + list(args),
-                   self._user, self._proxy).check_call()
+    cmd = Command(['hadoop', '--config', self._config, 'fs', cmd] + list(args),
+                   self._user, self._proxy)
+    return cmd.check_call() if kwargs.get('check', False) else cmd.call()
 
   def copy_from(self, src, dst):
     """
@@ -105,17 +108,22 @@ class HDFSHelper(object):
     assert os.path.exists(abs_src), 'File does not exist, cannot copy: %s' % abs_src
     log.info('Copying %s -> %s' % (abs_src, self.join(dst_dir)))
 
+    def do_put(source):
+      hdfs_dst = self.join(dst)
+      if not self.call('-test', '-e', hdfs_dst, check=False):
+        self.call('-rm', '-skipTrash', hdfs_dst)
+      self.call('-put', source, hdfs_dst)
+
     if self._proxy:
       scratch_dir = Command('mktemp -d', user=self._user, host=self._proxy).check_output()
       Command('chmod 755 %s' % scratch_dir, user=self._user, host=self._proxy).check_call()
       try:
-        Command('scp %s %s@%s:%s' % (abs_src, self._user, self._proxy, scratch_dir)).check_call()
-        self.call('-copyFromLocal', os.path.join(scratch_dir, os.path.basename(abs_src)),
-                  self.join(dst))
+        Command(['scp', abs_src, '%s@%s:%s' % (self._user, self._proxy, scratch_dir)]).check_call()
+        do_put(os.path.join(scratch_dir, os.path.basename(abs_src)))
       finally:
         Command('rm -rf %s' % scratch_dir, user=self._user, host=self._proxy).call()
     else:
-      self.call('-copyFromLocal', abs_src, self.join(dst))
+      do_put(abs_src)
 
 
 class MesosHelper(object):
@@ -220,8 +228,8 @@ class MesosClientAPI(MesosClientBase):
 
   def create_job(self, config, copy_app_from=None):
     if copy_app_from is not None:
-      MesosHDFSHelper(self.cluster(), config.role()).copy_to(copy_app_from,
-          self.hdfs_path(config, copy_app_from))
+      HDFSHelper(self.cluster(), config.role()).copy_to(copy_app_from,
+        self.hdfs_path(config, copy_app_from))
 
     log.info('Creating job %s' % config.name())
     return self.client().createJob(config.job(), self.session_key())
@@ -253,7 +261,7 @@ class MesosClientAPI(MesosClientBase):
     log.info("Updating job: %s" % config.name())
 
     if copy_app_from is not None:
-      MesosHDFSHelper(self.cluster(), config.role()).copy_to(copy_app_from,
+      HDFSHelper(self.cluster(), config.role()).copy_to(copy_app_from,
         self.hdfs_path(config, copy_app_from))
 
     resp = self.client().startUpdate(config.job(), self.session_key())
