@@ -11,7 +11,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.google.common.base.Functions;
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -20,7 +19,6 @@ import com.google.inject.Inject;
 import org.apache.commons.lang.StringUtils;
 
 import com.twitter.mesos.gen.ScheduledTask;
-import com.twitter.mesos.scheduler.LeaderRedirect;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerCore;
 
@@ -34,8 +32,6 @@ import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 
 /**
  * Simple redirector from the canonical name of a task to its configured HTTP port.
- *
- * @author William Farner
  */
 public class Mname extends HttpServlet {
 
@@ -45,22 +41,14 @@ public class Mname extends HttpServlet {
       "health", "http", "HTTP", "web");
 
   private final SchedulerCore scheduler;
-  private final LeaderRedirect redirector;
 
   @Inject
-  public Mname(SchedulerCore scheduler, LeaderRedirect redirector) {
+  public Mname(SchedulerCore scheduler) {
     this.scheduler = checkNotNull(scheduler);
-    this.redirector = checkNotNull(redirector);
   }
 
   @Override
   protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-    Optional<String> leaderRedirect = redirector.getRedirectTarget(req);
-    if (leaderRedirect.isPresent()) {
-      resp.sendRedirect(leaderRedirect.get());
-      return;
-    }
-
     if (StringUtils.isBlank(req.getPathInfo())) {
       sendUsageError(resp);
     }

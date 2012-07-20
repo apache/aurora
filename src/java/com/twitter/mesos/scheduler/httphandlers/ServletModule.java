@@ -1,12 +1,14 @@
 package com.twitter.mesos.scheduler.httphandlers;
 
 import javax.inject.Singleton;
+import javax.servlet.http.HttpServlet;
 
 import com.google.common.base.Preconditions;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
 import com.google.inject.Key;
 import com.google.inject.TypeLiteral;
+import com.google.inject.servlet.GuiceFilter;
 
 import com.twitter.common.application.http.Registration;
 import com.twitter.common.application.modules.LifecycleModule;
@@ -37,12 +39,28 @@ public class ServletModule extends AbstractModule {
     requireBinding(LocalServiceRegistry.class);
     requireBinding(Key.get(new TypeLiteral<DynamicHostSet<ServiceInstance>>() { }));
 
-    Registration.registerServlet(binder(), "/slaves", Slaves.class, false);
-    Registration.registerServlet(binder(), "/scheduler", SchedulerzHome.class, false);
-    Registration.registerServlet(binder(), "/scheduler/role", SchedulerzRole.class, true);
-    Registration.registerServlet(binder(), "/scheduler/job", SchedulerzJob.class, true);
-    Registration.registerServlet(binder(), "/mname", Mname.class, false);
-    Registration.registerServlet(binder(), "/structdump", StructDump.class, true);
+    Registration.registerServletFilter(binder(), GuiceFilter.class, "/*");
+    install(new com.google.inject.servlet.ServletModule() {
+
+      private void bindLeaderServlet(
+          String path,
+          Class<? extends HttpServlet> servletClass,
+          boolean silent) {
+
+        Registration.registerServlet(binder(), path, servletClass, silent);
+        filter(path + "*").through(LeaderRedirectFilter.class);
+      }
+
+      @Override protected void configureServlets() {
+        bind(LeaderRedirectFilter.class).in(Singleton.class);
+        bindLeaderServlet("/slaves", Slaves.class, false);
+        bindLeaderServlet("/scheduler", SchedulerzHome.class, false);
+        bindLeaderServlet("/scheduler/role", SchedulerzRole.class, true);
+        bindLeaderServlet("/scheduler/job", SchedulerzJob.class, true);
+        bindLeaderServlet("/mname", Mname.class, true);
+        bindLeaderServlet("/structdump", StructDump.class, true);
+      }
+    });
 
     // Static assets.
     Registration.registerHttpAsset(binder(), "/js/util.js", ServletModule.class,

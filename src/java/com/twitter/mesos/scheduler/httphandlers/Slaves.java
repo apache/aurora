@@ -10,7 +10,6 @@ import javax.servlet.http.HttpServletResponse;
 
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
@@ -21,7 +20,6 @@ import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.mesos.gen.Attribute;
 import com.twitter.mesos.scheduler.ClusterName;
-import com.twitter.mesos.scheduler.LeaderRedirect;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHosts;
 import com.twitter.mesos.scheduler.storage.Storage;
 
@@ -33,17 +31,13 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import static com.twitter.mesos.scheduler.storage.Storage.Work;
 
+
 /**
  * HTTP interface to serve as a HUD for the mesos slaves tracked in the scheduler.
- *
- * TODO(William Farner): Wrap up common redirecting logic in a filter or wrapper/super class.
- *
- * @author Benjamin Mahler
  */
 public class Slaves extends StringTemplateServlet {
   private final String clusterName;
   private final SlaveHosts slaveHosts;
-  private LeaderRedirect redirector;
   private Storage storage;
 
   private final Function<Map.Entry<String, SlaveID>, Slave> slaveMapping =
@@ -59,16 +53,18 @@ public class Slaves extends StringTemplateServlet {
    * @param cacheTemplates whether to cache templates
    * @param clusterName cluster name
    * @param slaveHosts slave hosts
-   * @param redirector leader redirector
    * @param storage store to fetch the host attributes from
    */
   @Inject
-  public Slaves(@CacheTemplates boolean cacheTemplates, @ClusterName String clusterName,
-      SlaveHosts slaveHosts, LeaderRedirect redirector, Storage storage) {
+  public Slaves(
+      @CacheTemplates boolean cacheTemplates,
+      @ClusterName String clusterName,
+      SlaveHosts slaveHosts,
+      Storage storage) {
+
     super("slaves", cacheTemplates);
     this.clusterName = checkNotBlank(clusterName);
     this.slaveHosts = checkNotNull(slaveHosts);
-    this.redirector = checkNotNull(redirector);
     this.storage = checkNotNull(storage);
   }
 
@@ -83,11 +79,6 @@ public class Slaves extends StringTemplateServlet {
   @Override
   protected void doGet(HttpServletRequest req, HttpServletResponse resp)
       throws ServletException, IOException {
-    Optional<String> leaderRedirect = redirector.getRedirectTarget(req);
-    if (leaderRedirect.isPresent()) {
-      resp.sendRedirect(leaderRedirect.get());
-      return;
-    }
 
     writeTemplate(resp, new Closure<StringTemplate>() {
       @Override public void execute(StringTemplate template) {

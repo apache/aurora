@@ -13,7 +13,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -33,7 +32,6 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.ClusterName;
-import com.twitter.mesos.scheduler.LeaderRedirect;
 import com.twitter.mesos.scheduler.SchedulerCore;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -51,8 +49,6 @@ import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 
 /**
  * HTTP interface to view information about a job in the mesos scheduler.
- *
- * @author William Farner
  */
 public class SchedulerzJob extends StringTemplateServlet {
   private static final String ROLE_PARAM = "role";
@@ -124,7 +120,6 @@ public class SchedulerzJob extends StringTemplateServlet {
 
   private final SchedulerCore scheduler;
   private final String clusterName;
-  private final LeaderRedirect redirector;
 
   /**
    * Creates a new job servlet.
@@ -132,17 +127,15 @@ public class SchedulerzJob extends StringTemplateServlet {
    * @param cacheTemplates Whether to cache the template file.
    * @param scheduler Core scheduler.
    * @param clusterName Name of the serving cluster.
-   * @param redirector Redirect logic.
    */
   @Inject
-  public SchedulerzJob(@CacheTemplates boolean cacheTemplates,
+  public SchedulerzJob(
+      @CacheTemplates boolean cacheTemplates,
       SchedulerCore scheduler,
-      @ClusterName String clusterName,
-      LeaderRedirect redirector) {
+      @ClusterName String clusterName) {
     super("schedulerzjob", cacheTemplates);
     this.scheduler = checkNotNull(scheduler);
     this.clusterName = checkNotBlank(clusterName);
-    this.redirector = checkNotNull(redirector);
   }
 
   /**
@@ -171,11 +164,6 @@ public class SchedulerzJob extends StringTemplateServlet {
   @Override
   protected void doGet(final HttpServletRequest req, HttpServletResponse resp)
       throws ServletException, IOException {
-    Optional<String> leaderRedirect = redirector.getRedirectTarget(req);
-    if (leaderRedirect.isPresent()) {
-      resp.sendRedirect(leaderRedirect.get());
-      return;
-    }
 
     writeTemplate(resp, new Closure<StringTemplate>() {
       @Override public void execute(StringTemplate template) {

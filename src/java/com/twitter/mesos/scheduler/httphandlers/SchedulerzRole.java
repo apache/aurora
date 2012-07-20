@@ -8,7 +8,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -23,7 +22,6 @@ import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.CronJobManager;
-import com.twitter.mesos.scheduler.LeaderRedirect;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerCore;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
@@ -34,8 +32,6 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**
  * HTTP interface to provide information about jobs for a specific mesos role.
- *
- * @author William Farner
  */
 public class SchedulerzRole extends StringTemplateServlet {
 
@@ -45,7 +41,6 @@ public class SchedulerzRole extends StringTemplateServlet {
   private final CronJobManager cronScheduler;
   private final String clusterName;
   private final QuotaManager quotaManager;
-  private final LeaderRedirect redirector;
 
   /**
    * Creates a new role servlet.
@@ -55,31 +50,23 @@ public class SchedulerzRole extends StringTemplateServlet {
    * @param cronScheduler Cron scheduler.
    * @param clusterName Name of the serving cluster.
    * @param quotaManager Resource quota manager.
-   * @param redirector Redirect logic.
    */
   @Inject
   public SchedulerzRole(@CacheTemplates boolean cacheTemplates,
       SchedulerCore scheduler,
       CronJobManager cronScheduler,
       @ClusterName String clusterName,
-      QuotaManager quotaManager,
-      LeaderRedirect redirector) {
+      QuotaManager quotaManager) {
     super("schedulerzrole", cacheTemplates);
     this.scheduler = checkNotNull(scheduler);
     this.cronScheduler = checkNotNull(cronScheduler);
     this.clusterName = checkNotBlank(clusterName);
     this.quotaManager = checkNotNull(quotaManager);
-    this.redirector = checkNotNull(redirector);
   }
 
   @Override
   protected void doGet(final HttpServletRequest req, final HttpServletResponse resp)
       throws ServletException, IOException {
-    Optional<String> leaderRedirect = redirector.getRedirectTarget(req);
-    if (leaderRedirect.isPresent()) {
-      resp.sendRedirect(leaderRedirect.get());
-      return;
-    }
 
     final String role = req.getParameter(ROLE_PARAM);
 

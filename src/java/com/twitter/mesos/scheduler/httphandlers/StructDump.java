@@ -6,7 +6,6 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
@@ -19,7 +18,6 @@ import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.common.thrift.Util;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.scheduler.CronJobManager;
-import com.twitter.mesos.scheduler.LeaderRedirect;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
@@ -34,29 +32,18 @@ class StructDump extends StringTemplateServlet {
   private static final String JOB_PARAM = "job";
   private static final String TASK_PARAM = "task";
 
-  private final LeaderRedirect redirector;
   private final Storage storage;
 
   @Inject
-  public StructDump(
-      @CacheTemplates boolean cacheTemplates,
-      Storage storage,
-      LeaderRedirect redirector) {
+  public StructDump(@CacheTemplates boolean cacheTemplates, Storage storage) {
 
     super("structdump", cacheTemplates);
     this.storage = Preconditions.checkNotNull(storage);
-    this.redirector = Preconditions.checkNotNull(redirector);
   }
 
   @Override
   protected void doGet(final HttpServletRequest req, HttpServletResponse resp)
       throws ServletException, IOException {
-
-    Optional<String> leaderRedirect = redirector.getRedirectTarget(req);
-    if (leaderRedirect.isPresent()) {
-      resp.sendRedirect(leaderRedirect.get());
-      return;
-    }
 
     writeTemplate(resp, new Closure<StringTemplate>() {
       @Override public void execute(StringTemplate template) {

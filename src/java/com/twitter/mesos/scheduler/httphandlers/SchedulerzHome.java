@@ -9,7 +9,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -29,7 +28,6 @@ import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.CronJobManager;
-import com.twitter.mesos.scheduler.LeaderRedirect;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerCore;
 
@@ -39,8 +37,6 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**
  * HTTP interface to serve as a HUD for the mesos scheduler.
- *
- * @author William Farner
  */
 public class SchedulerzHome extends StringTemplateServlet {
 
@@ -69,7 +65,6 @@ public class SchedulerzHome extends StringTemplateServlet {
   private final SchedulerCore scheduler;
   private final CronJobManager cronScheduler;
   private final String clusterName;
-  private final LeaderRedirect redirector;
 
   /**
    * Creates a new scheduler home servlet.
@@ -78,29 +73,21 @@ public class SchedulerzHome extends StringTemplateServlet {
    * @param scheduler Core scheduler.
    * @param cronScheduler Cron scheduler.
    * @param clusterName Name of the serving cluster.
-   * @param redirector Redirect logic.
    */
   @Inject
   public SchedulerzHome(@CacheTemplates boolean cacheTemplates,
       SchedulerCore scheduler,
       CronJobManager cronScheduler,
-      @ClusterName String clusterName,
-      LeaderRedirect redirector) {
+      @ClusterName String clusterName) {
     super("schedulerzhome", cacheTemplates);
     this.scheduler = checkNotNull(scheduler);
     this.cronScheduler = checkNotNull(cronScheduler);
     this.clusterName = checkNotBlank(clusterName);
-    this.redirector = checkNotNull(redirector);
   }
 
   @Override
   protected void doGet(final HttpServletRequest req, HttpServletResponse resp)
       throws ServletException, IOException {
-    Optional<String> leaderRedirect = redirector.getRedirectTarget(req);
-    if (leaderRedirect.isPresent()) {
-      resp.sendRedirect(leaderRedirect.get());
-      return;
-    }
 
     writeTemplate(resp, new Closure<StringTemplate>() {
       @Override public void execute(StringTemplate template) {
