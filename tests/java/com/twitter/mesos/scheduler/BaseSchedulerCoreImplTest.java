@@ -169,8 +169,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   public void setUp() throws Exception {
     driver = createMock(Driver.class);
     clock = new FakeClock();
-    taskFactory = new MesosTaskFactoryImpl("/fake/executor.zip", 0.1, Amount.of(1.0, Data.MB),
-        ImmutableMap.of("EXECUTOR_DEBUG", "1"));
+    taskFactory = new MesosTaskFactoryImpl("/fake/executor.zip", 0.1, Amount.of(1.0, Data.MB));
   }
 
   /**

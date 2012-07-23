@@ -1,13 +1,12 @@
 package com.twitter.mesos.scheduler;
 
 import java.util.List;
-import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
 import com.google.protobuf.ByteString;
@@ -22,7 +21,6 @@ import org.apache.mesos.Protos.TaskInfo;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.NotNull;
-import com.twitter.common.args.constraints.Positive;
 import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
@@ -64,42 +62,32 @@ public interface MesosTaskFactory {
     @CmdLine(name = "thermos_executor_path", help = "Path to the thermos executor launch script.")
     private static final Arg<String> THERMOS_EXECUTOR_PATH = Arg.create();
 
-    @CmdLine(name = "executor_env",
-        help = "Environment variables to set for the executor launch script.")
-    private static final Arg<Map<String, String>> EXECUTOR_ENV =
-        Arg.<Map<String, String>>create(ImmutableMap.<String, String>of());
-
-    @Positive
-    @CmdLine(name = "executor_resources_cpus",
-        help = "The number of CPUS that should be reserved by mesos for the executor.")
-    private static final Arg<Double> EXECUTOR_CPUS = Arg.create(0.25);
-
-    @Positive
-    @CmdLine(name = "executor_resources_ram",
-        help = "The amount of RAM that should be reserved by mesos for the executor.")
-    private static final Arg<Amount<Double, Data>> EXECUTOR_RAM =
-        Arg.create(Amount.of(2d, Data.GB));
+    // These are hard-coded to avoid risk posed due to MESOS-911.
+    private static final double EXECUTOR_CPUS = 0.25;
+    private static final Amount<Double, Data> EXECUTOR_RAM = Amount.of(3d, Data.GB);
 
     private final String exepath;
-    private final ImmutableMap<String, String> env;
     private final double cpus;
     private final Amount<Double, Data> ram;
 
     @Inject
     MesosTaskFactoryImpl() {
-      this(EXECUTOR_PATH.get(), EXECUTOR_CPUS.get(), EXECUTOR_RAM.get(), EXECUTOR_ENV.get());
+      this(EXECUTOR_PATH.get());
     }
 
-    MesosTaskFactoryImpl(String executorPath, double cpus, Amount<Double, Data> ram,
-        Map<String, String> env) {
+    @VisibleForTesting
+    MesosTaskFactoryImpl(String executorPath) {
+      this(executorPath, EXECUTOR_CPUS, EXECUTOR_RAM);
+    }
 
+    @VisibleForTesting
+    MesosTaskFactoryImpl(String executorPath, double cpus, Amount<Double, Data> ram) {
       Preconditions.checkArgument(cpus > 0);
 
       Preconditions.checkNotNull(ram);
       Preconditions.checkArgument(ram.getValue() > 0);
 
       this.exepath = MorePreconditions.checkNotBlank(executorPath);
-      this.env = ImmutableMap.copyOf(env);
       this.cpus = cpus;
       this.ram = ram;
     }
@@ -135,12 +123,12 @@ public interface MesosTaskFactory {
       ExecutorInfo executor;
       if (Tasks.IS_THERMOS_TASK.apply(task.getTask())) {
         executor = ExecutorInfo.newBuilder()
-            .setCommand(CommandUtil.create(THERMOS_EXECUTOR_PATH.get(), env))
+            .setCommand(CommandUtil.create(THERMOS_EXECUTOR_PATH.get()))
             .setExecutorId(
                 ExecutorID.newBuilder().setValue(THERMOS_EXECUTOR_ID_PREFIX + task.getTaskId()))
             .build();
       } else {
-        executor = ExecutorInfo.newBuilder().setCommand(CommandUtil.create(exepath, env))
+        executor = ExecutorInfo.newBuilder().setCommand(CommandUtil.create(exepath))
             .setExecutorId(DEFAULT_EXECUTOR_ID)
             .addResources(Resources.makeMesosResource(Resources.CPUS, cpus))
             .addResources(Resources.makeMesosResource(Resources.RAM_MB, ram.as(Data.MB)))

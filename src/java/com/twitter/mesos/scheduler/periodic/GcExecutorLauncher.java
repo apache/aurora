@@ -10,7 +10,6 @@ import java.util.logging.Logger;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.inject.BindingAnnotation;
@@ -50,8 +49,6 @@ import static com.twitter.mesos.scheduler.periodic.HistoryPruneRunner.retainedTa
 
 /**
  * A task launcher that periodically initiates a garbage-collecting executor on a host.
- *
- * @author William Farner
  */
 public class GcExecutorLauncher implements TaskLauncher {
   private static final Logger LOG = Logger.getLogger(GcExecutorLauncher.class.getName());
@@ -127,7 +124,7 @@ public class GcExecutorLauncher implements TaskLauncher {
     String uuid = UUID.randomUUID().toString();
     ExecutorInfo.Builder executor = ExecutorInfo.newBuilder()
         .setExecutorId(ExecutorID.newBuilder().setValue(EXECUTOR_PREFIX + uuid))
-        .setCommand(CommandUtil.create(gcExecutorPath.get(), ImmutableMap.<String, String>of()));
+        .setCommand(CommandUtil.create(gcExecutorPath.get()));
 
     return Optional.of(TaskInfo.newBuilder().setName("system-gc")
         .setTaskId(TaskID.newBuilder().setValue(SYSTEM_TASK_PREFIX + uuid))
