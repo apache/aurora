@@ -93,12 +93,18 @@ public class SchedulerModule extends AbstractModule {
   @CmdLine(name = "gc_executor_path", help = "Path to the gc executor launch script.")
   private static final Arg<String> GC_EXECUTOR_PATH = Arg.create(null);
 
-  @CmdLine(name = "secure_auth", help = "Enforces RPC authentication with mesos client.")
-  private static final Arg<Boolean> SECURE_AUTH = Arg.create(true);
-
   @CmdLine(name = "testing_isolated_scheduler",
       help = "If true, run in a testing mode with the scheduler isolated from other components.")
   private static final Arg<Boolean> ISOLATED_SCHEDULER = Arg.create(false);
+
+  @CmdLine(name = "auth_mode", help = "Enforces RPC authentication with mesos client.")
+  private static final Arg<AuthMode> AUTH_MODE = Arg.create(AuthMode.SECURE);
+
+  private enum AuthMode {
+    UNSECURE,
+    ANGRYBIRD_UNSECURE,
+    SECURE
+  }
 
   @Override
   protected void configure() {
@@ -123,10 +129,24 @@ public class SchedulerModule extends AbstractModule {
     bind(MesosTaskFactory.class).to(MesosTaskFactoryImpl.class);
 
     // Bindings for MesosSchedulerImpl.
-    if (SECURE_AUTH.get()) {
-      AuthBindings.bindLdapAuth(binder());
-    } else {
-      AuthBindings.bindTestAuth(binder());
+    switch(AUTH_MODE.get()) {
+      case SECURE:
+        LOG.info("Using secure authentication mode");
+        AuthBindings.bindLdapAuth(binder());
+        break;
+
+      case UNSECURE:
+        LOG.warning("Using unsecure authentication mode");
+        AuthBindings.bindTestAuth(binder());
+        break;
+
+      case ANGRYBIRD_UNSECURE:
+        LOG.warning("Using angrybird authentication mode");
+        AuthBindings.bindAngryBirdAuth(binder());
+        break;
+
+       default:
+         throw new IllegalArgumentException("Invalid authentication mode: " + AUTH_MODE.get());
     }
 
     bind(SchedulerCore.class).to(SchedulerCoreImpl.class).in(Singleton.class);

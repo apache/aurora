@@ -1,6 +1,17 @@
 package com.twitter.mesos.auth;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 import org.apache.commons.lang.StringUtils;
 
@@ -12,8 +23,6 @@ import com.twitter.common_internal.ldap.Ods.LdapException;
 import com.twitter.common_internal.ldap.User;
 import com.twitter.mesos.auth.AuthorizedKeySet.KeyParseException;
 import com.twitter.mesos.gen.SessionKey;
-
-import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Validator for RPC sessions with the mesos scheduler.
@@ -92,6 +101,12 @@ public interface SessionValidator {
      */
     void assertRoleAccess(SessionKey sessionKey, String targetRole) throws AuthFailedException;
 
+    @BindingAnnotation @Target({FIELD, PARAMETER, METHOD}) @Retention(RUNTIME)
+    public @interface Secure { }
+
+    @BindingAnnotation @Target({FIELD, PARAMETER, METHOD}) @Retention(RUNTIME)
+    public @interface Unsecure { }
+
     /**
      * User validator that checks against ODS LDAP Server.
      */
@@ -100,7 +115,7 @@ public interface SessionValidator {
       private final Ods ods;
 
       @Inject
-      public ODSValidator(Ods ods) {
+      ODSValidator(Ods ods) {
         this.ods = checkNotNull(ods);
       }
 
@@ -142,7 +157,7 @@ public interface SessionValidator {
     /**
      * User validator that simply checks for non-blank signature.
      */
-    static class TestValidator implements UserValidator {
+    static class UnsecureValidator implements UserValidator {
 
       @Override
       public void assertRoleAccess(SessionKey sessionKey, String targetRole)
@@ -151,6 +166,37 @@ public interface SessionValidator {
         String signature = new String(sessionKey.getNonceSig());
         if (StringUtils.isBlank(signature)) {
           throw new AuthFailedException("Blank signature");
+        }
+      }
+    }
+
+    /**
+     * Validator that allows angrybird user non-authenticated access.
+     * All other users are validated against ODS.
+     */
+    static class AngryBirdValidator implements UserValidator {
+
+      private final UserValidator odsValidator;
+      private final UserValidator unsecureValidator;
+
+      @Inject
+      AngryBirdValidator(
+          @Secure UserValidator odsValidator,
+          @Unsecure UserValidator unsecureValidator) {
+        this.odsValidator = odsValidator;
+        this.unsecureValidator = unsecureValidator;
+      }
+
+      @Override
+      public void assertRoleAccess(SessionKey sessionKey, String targetRole)
+          throws AuthFailedException {
+
+        String userId = sessionKey.getUser();
+
+        if ("angrybird".equals(userId)) {
+          unsecureValidator.assertRoleAccess(sessionKey, targetRole);
+        } else {
+          odsValidator.assertRoleAccess(sessionKey, targetRole);
         }
       }
     }
