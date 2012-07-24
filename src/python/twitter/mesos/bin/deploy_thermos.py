@@ -4,8 +4,8 @@ import subprocess
 import sys
 import time
 from twitter.common import app
+from twitter.common.net.tunnel import TunnelHelper
 from twitter.mesos.clusters import Cluster
-from twitter.mesos.tunnel_helper import TunnelHelper
 
 __author__ = 'William Farner'
 

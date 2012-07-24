@@ -24,10 +24,10 @@ import zookeeper
 
 from gen.twitter.thrift.endpoint.ttypes import ServiceInstance
 
+from twitter.common.net.tunnel import TunnelHelper
 from twitter.mesos.clusters import Cluster
 from gen.twitter.mesos import MesosAdmin
 from twitter.mesos.location import Location
-from twitter.mesos.tunnel_helper import TunnelHelper
 from twitter.mesos.zookeeper_helper import ZookeeperHelper
 
 

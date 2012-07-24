@@ -2,9 +2,9 @@ import sys
 import time
 import zookeeper
 
+from twitter.common.net.tunnel import TunnelHelper
 from twitter.mesos.clusters import Cluster
 from twitter.mesos.location import Location
-from twitter.mesos.tunnel_helper import TunnelHelper
 
 from twitter.common import log
 

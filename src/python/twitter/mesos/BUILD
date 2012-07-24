@@ -21,6 +21,7 @@ python_library(
   dependencies = [
     pants('3rdparty/python:zookeeper'),
     pants('3rdparty/python:paramiko'),
+    pants('src/python/twitter/common/net:ssh'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common_internal/ods'),
