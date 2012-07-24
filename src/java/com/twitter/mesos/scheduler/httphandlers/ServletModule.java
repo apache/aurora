@@ -9,6 +9,8 @@ import com.google.inject.Inject;
 import com.google.inject.Key;
 import com.google.inject.TypeLiteral;
 import com.google.inject.servlet.GuiceFilter;
+import com.sun.jersey.guice.JerseyServletModule;
+import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
 
 import com.twitter.common.application.http.Registration;
 import com.twitter.common.application.modules.LifecycleModule;
@@ -40,8 +42,7 @@ public class ServletModule extends AbstractModule {
     requireBinding(Key.get(new TypeLiteral<DynamicHostSet<ServiceInstance>>() { }));
 
     Registration.registerServletFilter(binder(), GuiceFilter.class, "/*");
-    install(new com.google.inject.servlet.ServletModule() {
-
+    install(new JerseyServletModule() {
       private void bindLeaderServlet(
           String path,
           Class<? extends HttpServlet> servletClass,
@@ -59,6 +60,12 @@ public class ServletModule extends AbstractModule {
         bindLeaderServlet("/scheduler/job", SchedulerzJob.class, true);
         bindLeaderServlet("/mname", Mname.class, true);
         bindLeaderServlet("/structdump", StructDump.class, true);
+
+        // TODO(William Farner): Come up with a better way to mix vanilla servlets with jersey
+        // endpoints to ensure they all show up on the index page.
+        serve("/utilization*").with(GuiceContainer.class);
+        bind(Utilization.class);
+        Registration.registerEndpoint(binder(), "/utilization");
       }
     });
 
