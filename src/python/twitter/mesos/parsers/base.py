@@ -22,9 +22,9 @@ class ThriftCodec(object):
       constraint.name = attribute
       task_constraint = TaskConstraint()
       if constraint_value.startswith('limit:'):
-        task_constraint.limitConstraint = LimitConstraint()
+        task_constraint.limit = LimitConstraint()
         try:
-          task_constraint.limitConstraint.limit = int(constraint_value.replace('limit:', '', 1))
+          task_constraint.limit.limit = int(constraint_value.replace('limit:', '', 1))
         except ValueError:
           print('%s is not a valid limit value, must be integer' % constraint_value)
           raise

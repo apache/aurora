@@ -45,7 +45,7 @@ def test_parsing_constraints():
   }
   c = ThriftCodec.constraints_to_thrift(constraints_dict).pop()
   assert c.name == 'limit'
-  assert c.constraint.limitConstraint.limit == 4
+  assert c.constraint.limit.limit == 4
 
   constraints_dict = {
     'limit': 'limit:a',
