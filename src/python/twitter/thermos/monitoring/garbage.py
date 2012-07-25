@@ -6,7 +6,7 @@ import os
 import sys
 import time
 
-from twitter.common.dirutil import safe_rmtree
+from twitter.common.dirutil import safe_rmtree, safe_bsize
 from twitter.common.quantity import Amount, Data, Time
 from twitter.thermos.base.ckpt import CheckpointDispatcher
 from twitter.thermos.base.path import TaskPath
@@ -22,17 +22,6 @@ class TaskGarbageCollector(object):
   @classmethod
   def _log(cls, msg):
     print(msg, file=sys.stderr)
-
-  @classmethod
-  def safe_size(cls, path):
-    try:
-      if os.path.islink(path):
-        # The cost of a symlink is the length of the target filename.
-        return len(os.readlink(path))
-      return os.path.getsize(path)
-    except OSError as e:
-      cls._log('Could not stat %s: %s' % (path, e))
-      return 0
 
   def state(self, task_id):
     if task_id not in self._states:
@@ -51,14 +40,14 @@ class TaskGarbageCollector(object):
     json_spec = TaskPath(root=self._root, task_id=task_id, state='finished').getpath('task_path')
     for path in [json_spec, runner_ckpt] + process_ckpts:
       if with_size:
-        yield path, self.safe_size(path)
+        yield path, safe_bsize(path)
       else:
         yield path
 
   def get_logs(self, task_id, with_size=True):
     for path in self._detector.get_process_logs(task_id):
       if with_size:
-        yield path, self.safe_size(path)
+        yield path, safe_bsize(path)
       else:
         yield path
 
@@ -69,7 +58,7 @@ class TaskGarbageCollector(object):
         for file in files:
           filename = os.path.join(root, file)
           if with_size:
-            yield filename, self.safe_size(filename)
+            yield filename, safe_bsize(filename)
           else:
             yield filename
 
