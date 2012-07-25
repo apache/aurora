@@ -237,10 +237,11 @@ class TaskPlanner(object):
     timestamp = timestamp if timestamp is not None else self._clock.time()
     self._last_terminal[process] = timestamp
     self._failures[process] += 1
-    if self._failures[process] >= self._attributes[process].max_failures:
-      self._planner.set_failed(process)
-    else:
+    if self._attributes[process].max_failures == 0 or (
+        self._failures[process] < self._attributes[process].max_failures):
       self._planner.reset(process)
+    else:
+      self._planner.set_failed(process)
 
   def add_success(self, process, timestamp=None):
     timestamp = timestamp if timestamp is not None else self._clock.time()

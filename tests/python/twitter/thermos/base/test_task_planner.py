@@ -199,6 +199,39 @@ def test_task_fails():
   assert p.runnable_at(timestamp=0) == empty
   assert p.min_wait(timestamp=0) == TaskPlanner.INFINITY
 
+  # test max_failures=0 && daemon==True ==> retries forever
+  p = TaskPlanner(empty_task(processes = [dt(name='d1', max_failures=0, daemon=True)]))
+  for k in range(10):
+    p.set_running('d1')
+    assert 'd1' in p.running
+    assert 'd1' not in p.failed
+    p.add_failure('d1')
+    assert 'd1' not in p.running
+    assert 'd1' not in p.failed
+    p.set_running('d1')
+    assert 'd1' in p.running
+    assert 'd1' not in p.failed
+    p.add_success('d1')
+    assert 'd1' not in p.running
+    assert 'd1' not in p.failed
+    assert 'd1' not in p.finished
+
+  p = TaskPlanner(empty_task(processes = [dt(name='d1', max_failures=0)]))
+  p.set_running('d1')
+  assert 'd1' in p.running
+  assert 'd1' not in p.failed
+  p.add_failure('d1')
+  assert 'd1' not in p.running
+  assert 'd1' not in p.failed
+  p.set_running('d1')
+  assert 'd1' in p.running
+  assert 'd1' not in p.failed
+  p.add_success('d1')
+  assert 'd1' not in p.running
+  assert 'd1' not in p.failed
+  assert 'd1' in p.finished
+
+
 
 def test_task_lost():
   dt = p1(max_failures=2, min_duration=1)
