@@ -239,6 +239,42 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(job);
   }
 
+  @Test(expected = TaskDescriptionException.class)
+  public void testCreateJobBadCpu() throws Exception {
+    control.replay();
+    buildScheduler();
+
+    TwitterTaskInfo task = productionTask().deepCopy();
+    task.getConfiguration().put("num_cpus", "0.0");
+
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, task, 1);
+    scheduler.createJob(job);
+  }
+
+  @Test(expected = TaskDescriptionException.class)
+  public void testCreateJobBadRam() throws Exception {
+    control.replay();
+    buildScheduler();
+
+    TwitterTaskInfo task = productionTask().deepCopy();
+    task.getConfiguration().put("ram_mb", "-123");
+
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, task, 1);
+    scheduler.createJob(job);
+  }
+
+  @Test(expected = TaskDescriptionException.class)
+  public void testCreateJobBadDisk() throws Exception {
+    control.replay();
+    buildScheduler();
+
+    TwitterTaskInfo task = productionTask().deepCopy();
+    task.getConfiguration().put("disk_mb", "0");
+
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, task, 1);
+    scheduler.createJob(job);
+  }
+
   @Test(expected = ScheduleException.class)
   public void testCreateJobNoQuota() throws Exception {
     control.replay();

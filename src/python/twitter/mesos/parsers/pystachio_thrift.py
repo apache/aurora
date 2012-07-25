@@ -62,9 +62,17 @@ def convert(job):
   if not task_raw.has_resources():
     raise ValueError('Task must specify resources!')
 
+  if task_raw.resources().ram().get() == 0 or task_raw.resources().disk().get() == 0:
+    raise ValueError('Must specify ram and disk resources, got ram:%r disk:%r' % (
+      task_raw.resources().ram().get(), task_raw.resources().disk().get()))
+
   task.numCpus = task_raw.resources().cpu().get()
   task.ramMb = task_raw.resources().ram().get() / MB
   task.diskMb = task_raw.resources().disk().get() / MB
+  if task.numCpus <= 0 or task.ramMb <= 0 or task.diskMb <= 0:
+    raise ValueError('Task has invalid resources.  cpu/ramMb/diskMb must all be positive: '
+        'cpu:%r ramMb:%r diskMb:%r' % (task.numCpus, task.ramMb, task.diskMb))
+
   task.owner = owner
   task.requestedPorts = ThermosTaskWrapper(task_raw, strict=False).ports()
   task.constraints = ThriftCodec.constraints_to_thrift(

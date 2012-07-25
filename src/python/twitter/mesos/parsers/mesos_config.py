@@ -56,9 +56,9 @@ class MesosConfig(ProxyConfig):
       return ' '.join(typ.__name__ for typ in tps)
     if key not in dic:
       errors.append('Missing key %s in task dictionary' % key)
-    if with_types and not isinstance(dic[key], with_types):
-      errors.append('Value for key %s must be of type(s): %s, got %s' % (key, type_repr(with_types),
-          dic[key]))
+    elif with_types and not isinstance(dic[key], with_types):
+      errors.append('Value for key %s must be of type(s): %s, got %s' % (
+          key, type_repr(with_types), dic[key]))
 
   @staticmethod
   def fill_task_defaults(task_dict, errors):
@@ -85,8 +85,17 @@ class MesosConfig(ProxyConfig):
     MesosConfig.assert_in(task_dict, 'ram_mb', Compatibility.integer, errors)
     MesosConfig.assert_in(task_dict, 'disk_mb', Compatibility.integer, errors)
     MesosConfig.assert_in(task_dict, 'start_command', Compatibility.string, errors)
-    task_dict['num_cpus'] = float(task_dict['num_cpus'])
+    if 'num_cpus' in task_dict:
+      task_dict['num_cpus'] = float(task_dict['num_cpus'])
     return task_dict
+
+  @staticmethod
+  def validate_task_resources(task_dict, errors):
+    # requires
+    resources = ('num_cpus', 'ram_mb', 'disk_mb')
+    if any(task_dict.get(resource, 0) <= 0 for resource in resources):
+      errors.append('Resources must be positive!  Got %s' % (
+          ' '.join('%s:%r' % (resource, task_dict.get(resource)) for resource in resources)))
 
   @staticmethod
   def fill_defaults(config):
@@ -124,9 +133,14 @@ class MesosConfig(ProxyConfig):
         if 'role' not in job:
           errors.append('Must specify role.')
 
+      if 'cluster' not in job:
+        errors.append('Missing required option: cluster')
+
       if 'task' not in job:
         errors.append('Missing required option: task')
-      job['task'] = MesosConfig.fill_task_defaults(job['task'], errors)
+      else:
+        job['task'] = MesosConfig.fill_task_defaults(job['task'], errors)
+        MesosConfig.validate_task_resources(job['task'], errors)
 
       if errors:
         raise MesosConfig.InvalidConfig('Invalid configuration: %s\n' % '\n'.join(errors))

@@ -2,6 +2,8 @@ import copy
 import getpass
 from contextlib import contextmanager
 
+import pytest
+
 from gen.twitter.mesos.ttypes import (
   Constraint,
   CronCollisionPolicy,
@@ -106,3 +108,29 @@ def test_config_with_ports():
   assert len(job.taskConfigs) == 1
   tti = iter(job.taskConfigs).next()
   assert tti.requestedPorts == set(['http', 'admin'])
+
+
+def test_config_with_bad_resources():
+  MB = 1048576
+  hwtask = HELLO_WORLD.task()
+
+  convert_pystachio_to_thrift(HELLO_WORLD)
+
+  good_resources = [
+    Resources(cpu = 1.0, ram = 1 * MB, disk = 1 * MB)
+  ]
+
+  bad_resources = [
+    Resources(cpu = 0, ram = 1 * MB, disk = 1 * MB),
+    Resources(cpu = 1, ram = 0 * MB, disk = 1 * MB),
+    Resources(cpu = 1, ram = 1 * MB, disk = 0 * MB),
+    Resources(cpu = 1, ram = 1 * MB - 1, disk = 1 * MB),
+    Resources(cpu = 1, ram = 1 * MB, disk = 1 * MB - 1)
+  ]
+
+  for resource in good_resources:
+    convert_pystachio_to_thrift(HELLO_WORLD(task = hwtask(resources = resource)))
+
+  for resource in bad_resources:
+    with pytest.raises(ValueError):
+      convert_pystachio_to_thrift(HELLO_WORLD(task = hwtask(resources = resource)))

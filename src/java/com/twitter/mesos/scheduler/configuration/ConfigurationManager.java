@@ -88,6 +88,10 @@ public final class ConfigurationManager {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetNumCpus(); }
 
         @Override void apply(TwitterTaskInfo task, Double value) throws TaskDescriptionException {
+          if (value <= 0) {
+            throw new TaskDescriptionException("Task must reserve > 0 cores.");
+          }
+
           task.setNumCpus(value);
         }
       })
@@ -95,6 +99,10 @@ public final class ConfigurationManager {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetRamMb(); }
 
         @Override void apply(TwitterTaskInfo task, Integer value) throws TaskDescriptionException {
+          if (value <= 0) {
+            throw new TaskDescriptionException("Task ram reservation must be > 0 MB.");
+          }
+
           task.setRamMb(value);
         }
       })
@@ -102,6 +110,10 @@ public final class ConfigurationManager {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetDiskMb(); }
 
         @Override void apply(TwitterTaskInfo task, Integer value) throws TaskDescriptionException {
+          if (value <= 0) {
+            throw new TaskDescriptionException("Task disk reservation must be > 0 MB.");
+          }
+
           task.setDiskMb(value);
         }
       })
