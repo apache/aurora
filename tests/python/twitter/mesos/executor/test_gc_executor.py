@@ -49,8 +49,11 @@ FINISHED_TASKS = {
   'sleep60': ProcessState.KILLED
 }
 
-def serialize_art(art):
+
+def serialize_art(art, task_id='default_task_id'):
   td = mesos.TaskInfo()
+  td.slave_id.value = 'ignore_me'
+  td.task_id.value = task_id
   td.data = serialize(art)
   return td
 
@@ -101,15 +104,19 @@ def test_state_reconciliation():
       'ordering': ScheduleStatus.FINISHED
     })
 
-    tgce.launchTask(proxy_driver, serialize_art(art))
+    tgce.launchTask(proxy_driver, serialize_art(art, 'gc_executor_task_id'))
 
-  assert len(proxy_driver.method_calls['sendStatusUpdate']) == 1
+  assert len(proxy_driver.method_calls['sendStatusUpdate']) == 2
   assert len(proxy_driver.method_calls['sendStatusUpdate'][0]) == 2 # args, kw
   assert len(proxy_driver.method_calls['sendStatusUpdate'][0][0]) == 1 # args
   update = proxy_driver.method_calls['sendStatusUpdate'][0][0][0]
   assert update.task_id.value == 'does_not_exist'
   assert update.state == mesos.TASK_LOST
   assert len(tgce._task_garbage_collections) == 0
+
+  update = proxy_driver.method_calls['sendStatusUpdate'][1][0][0]
+  assert update.task_id.value == 'gc_executor_task_id'
+  assert update.state == mesos.TASK_FINISHED
 
 
 def test_gc_with_loss():
@@ -123,13 +130,17 @@ def test_gc_with_loss():
       checkpoint_root=td)
 
     art = AdjustRetainedTasks(retainedTasks={})
-    tgce.launchTask(proxy_driver, serialize_art(art))
+    tgce.launchTask(proxy_driver, serialize_art(art, 'gc_executor_task_id'))
 
-  assert len(proxy_driver.method_calls['sendStatusUpdate']) == 1
+  assert len(proxy_driver.method_calls['sendStatusUpdate']) == 2
   assert len(tgce._task_garbage_collections) == len(FINISHED_TASKS)
   update = proxy_driver.method_calls['sendStatusUpdate'][0][0][0]
   assert update.task_id.value == 'sleep60-lost'
   assert update.state == mesos.TASK_LOST
+
+  update = proxy_driver.method_calls['sendStatusUpdate'][1][0][0]
+  assert update.task_id.value == 'gc_executor_task_id'
+  assert update.state == mesos.TASK_FINISHED
 
 
 def test_gc_without_loss():
@@ -143,7 +154,11 @@ def test_gc_without_loss():
       checkpoint_root=td)
 
     art = AdjustRetainedTasks(retainedTasks={})
-    tgce.launchTask(proxy_driver, serialize_art(art))
+    tgce.launchTask(proxy_driver, serialize_art(art, 'gc_executor_task_id'))
 
-  assert len(proxy_driver.method_calls['sendStatusUpdate']) == 0
+  assert len(proxy_driver.method_calls['sendStatusUpdate']) == 1
   assert len(tgce._task_garbage_collections) == len(FINISHED_TASKS)
+
+  update = proxy_driver.method_calls['sendStatusUpdate'][0][0][0]
+  assert update.task_id.value == 'gc_executor_task_id'
+  assert update.state == mesos.TASK_FINISHED

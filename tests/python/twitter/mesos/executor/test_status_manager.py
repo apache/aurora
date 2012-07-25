@@ -7,8 +7,6 @@ import unittest
 
 import mesos_pb2 as mesos_pb
 
-from twitter.common import log
-from twitter.common.log.options import LogOptions
 from twitter.common.quantity import Amount, Time
 from twitter.common.testing.clock import ThreadedClock
 from twitter.mesos.executor.http_signaler import HttpSignaler
@@ -195,20 +193,21 @@ class TestStatusManager(unittest.TestCase):
     self.http.start()
     self.runner = MockRunner()
     self.driver = MockDriver()
-    self.clock = ThreadedClock()
+    self.clock = ThreadedClock(hz=10)
     thread_yield()
 
   def tearDown(self):
     self.http.stop()
 
   def test_without_http(self):
-    monitor = StatusManager(self.runner, self.driver, 'abc', clock=self.clock)
+    class FastStatusManager(StatusManager):
+      PERSISTENCE_WAIT = Amount(0, Time.SECONDS)
+    monitor = FastStatusManager(self.runner, self.driver, 'abc', clock=time)
     monitor.start()
     self.runner.set_dead()
-    self.clock.tick(1)
+    time.sleep(FastStatusManager.POLL_WAIT.as_(Time.SECONDS))
     assert not self.driver.stop_event.is_set()
     self.runner.set_task_state(TaskState.FAILED)
-    self.clock.tick(1)
     self.driver.stop_event.wait(timeout=1.0)
     assert self.driver.stop_event.is_set()
     assert len(self.driver.updates) == 1
@@ -223,7 +222,8 @@ class TestStatusManager(unittest.TestCase):
     monitor.start()
     self.runner.set_dead()
     self.runner.qqq.wait(timeout=2.0)
-    self.driver.stop_event.wait(timeout=1.0)
+    self.clock.tick(0.1 + StatusManager.PERSISTENCE_WAIT.as_(Time.SECONDS))
+    self.driver.stop_event.wait(timeout=10.0)
     assert self.runner.qqq.is_set()
     assert self.driver.stop_event.is_set()
     assert len(self.driver.updates) == 1
@@ -248,7 +248,8 @@ class TestStatusManager(unittest.TestCase):
     assert not self.driver.stop_event.is_set()
     self.runner.set_dead()
     self.runner.set_task_state(TaskState.KILLED)
-    self.driver.stop_event.wait(timeout=1.0)
+    self.clock.tick(0.1 + StatusManager.PERSISTENCE_WAIT.as_(Time.SECONDS))
+    self.driver.stop_event.wait(timeout=10.0)
     assert self.driver.stop_event.is_set()
     assert len(self.driver.updates) == 1
     assert self.driver.updates[0].state == mesos_pb.TASK_FAILED

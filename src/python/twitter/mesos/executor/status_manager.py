@@ -17,6 +17,7 @@ class StatusManager(threading.Thread):
   POLL_WAIT = Amount(500, Time.MILLISECONDS)
   WAIT_LIMIT = Amount(1, Time.MINUTES)
   ESCALATION_WAIT = Amount(5, Time.SECONDS)
+  PERSISTENCE_WAIT = Amount(5, Time.SECONDS)
 
   def __init__(self, runner, driver, task_id, signal_port=None, check_interval=None, clock=time):
     self._driver = driver
@@ -130,4 +131,8 @@ class StatusManager(threading.Thread):
     # the executor is ephemeral and we just submitted a terminal task state, so shutdown
     log.info('Stopping executor.')
     self._runner.cleanup()
+
+    # TODO(wickman) Remove this once external MESOS-243 is resolved.
+    log.info('Sleeping briefly to mitigate https://issues.apache.org/jira/browse/MESOS-243')
+    self._clock.sleep(self.PERSISTENCE_WAIT.as_(Time.SECONDS))
     self._driver.stop()

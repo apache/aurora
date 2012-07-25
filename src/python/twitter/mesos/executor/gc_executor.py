@@ -22,6 +22,8 @@ from twitter.mesos.executor.executor_base import ThermosExecutorBase
 from gen.twitter.mesos.comm.ttypes import AdjustRetainedTasks
 from gen.twitter.mesos.ttypes import ScheduleStatus
 
+import mesos_pb2 as mesos_pb
+
 # thrifts
 from thrift.TSerialization import deserialize as thrift_deserialize
 
@@ -45,6 +47,7 @@ class ThermosGCExecutor(ThermosExecutorBase):
   """
   MAX_PID_TIME_DRIFT = Amount(10, Time.SECONDS)
   MAX_CHECKPOINT_TIME_DRIFT = Amount(1, Time.HOURS)  # maximum runner disconnection time
+  PERSISTENCE_WAIT = Amount(5, Time.SECONDS)
 
   def __init__(self, max_age=Amount(14, Time.DAYS),
                      max_space=Amount(200, Data.GB),
@@ -183,6 +186,9 @@ class ThermosGCExecutor(ThermosExecutorBase):
     thrift_deserialize(retain_tasks, task.data)
     self.reconcile_states(driver, retain_tasks.retainedTasks)
     self.garbage_collect(retain_tasks.retainedTasks.keys())
+    self.send_update(driver, task.task_id.value, 'FINISHED',
+      "Garbage collection finished.")
+    time.sleep(self.PERSISTENCE_WAIT.as_(Time.SECONDS))
     driver.stop()
 
   def killTask(self, driver, task_id):
@@ -197,11 +203,13 @@ app.configure(module='twitter.common_internal.app.modules.chickadee_handler',
     service_name='thermos_gc_executor')
 app.configure(debug=True)
 
+
 def main():
   LogOptions.set_disk_log_level('DEBUG')
   thermos_gc_executor = ThermosGCExecutor()
   drv = mesos.MesosExecutorDriver(thermos_gc_executor)
   drv.run()
   log.info('MesosExecutorDriver.run() has finished.')
+
 
 app.main()
