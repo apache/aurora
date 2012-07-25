@@ -105,8 +105,7 @@ public class DbStorage implements
 
   private static final Logger LOG = Logger.getLogger(DbStorage.class.getName());
 
-  private static final long SLOW_QUERY_THRESHOLD_NS =
-      Amount.of(100L, Time.MILLISECONDS).as(Time.NANOSECONDS);
+  private static final long SLOW_QUERY_THRESHOLD_MS = 20;
 
   @VisibleForTesting final JdbcTemplate jdbcTemplate;
   private final TransactionTemplate transactionTemplate;
@@ -862,11 +861,10 @@ public class DbStorage implements
             }
           });
 
-      long durationNanos = System.nanoTime() - startNanos;
-      if (durationNanos >= SLOW_QUERY_THRESHOLD_NS) {
-        LOG.warning("Slow update of " + tasksToUpdate.size() + " tasks took "
-                    + Amount.of(durationNanos, Time.NANOSECONDS).as(Time.MILLISECONDS) + " ms");
-      }
+      long durationMs =
+          Amount.of(System.nanoTime() - startNanos, Time.NANOSECONDS).as(Time.MILLISECONDS);
+      logQuery(durationMs,
+          "Update of " + tasksToUpdate.size() + " tasks took " + durationMs + " ms");
     }
     vars.tasksMutated.addAndGet(tasksToUpdate.size());
     return tasksToUpdate;
@@ -931,13 +929,16 @@ public class DbStorage implements
           }
         });
 
-    long durationNanos = System.nanoTime() - startNanos;
-    if (durationNanos >= SLOW_QUERY_THRESHOLD_NS) {
-      LOG.warning("Slow query '" + rawQuery + "' completed in "
-          + Amount.of(durationNanos, Time.NANOSECONDS).as(Time.MILLISECONDS) + "ms");
-    }
+    long durationMs =
+        Amount.of(System.nanoTime() - startNanos, Time.NANOSECONDS).as(Time.MILLISECONDS);
+    logQuery(durationMs, "Query '" + rawQuery + "' completed in " + durationMs + " ms");
 
     return results;
+  }
+
+  private static void logQuery(long durationMs, String message) {
+    Level level = (durationMs >= SLOW_QUERY_THRESHOLD_MS) ? Level.WARNING : Level.FINE;
+    LOG.log(level, message);
   }
 
   /**
