@@ -267,9 +267,17 @@ class MesosClientAPI(MesosClientBase):
     resp = self.client().startUpdate(config.job(), self.session_key())
 
     if resp.responseCode != ResponseCode.OK:
-      log.info("Error doing start update: %s" % resp.message)
+      log.info("Error starting update: %s" % resp.message)
+      log.warning('''Note: if the scheduler detects that an update is in progress (or was not
+properly completed) it will reject subsequent updates.  This is because your job is
+likely in a partially-updated state. You should only begin another update if you are
+confident that no other team members are updating this job, and that the job is in a
+state suitable for an update.
 
-      # Create a update response and return it
+After checking on the above, you may release the update lock on the job by
+invoking cancel_update.''')
+
+      # Create an update response and return it
       update_resp = FinishUpdateResponse()
       update_resp.responseCode = ResponseCode.INVALID_REQUEST
       update_resp.message = resp.message
