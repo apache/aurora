@@ -82,6 +82,38 @@ def sleep60():
     role = getpass.getuser())
 
 
+def make_runner(proxy_driver, checkpoint_root, task):
+  runner_class = functools.partial(TestTaskRunner, checkpoint_root=checkpoint_root)
+  te = ThermosExecutor(runner_class=runner_class)
+  task_description = make_task(task)
+  te.launchTask(proxy_driver, task_description)
+  while not te._runner.is_started():
+    time.sleep(0.1)
+  while te._runner.task_state() != TaskState.ACTIVE:
+    time.sleep(0.1)
+
+  task_json = TaskPath(root = checkpoint_root, task_id = task_description.task_id.value,
+                       state = 'active').getpath('task_path')
+  while not os.path.exists(task_json):
+    time.sleep(0.1)
+
+  # make sure startup was kosher
+  updates = proxy_driver.method_calls['sendStatusUpdate']
+  assert len(updates) == 2
+  status_updates = [arg_tuple[0][0] for arg_tuple in updates]
+  assert status_updates[0].state == mesos_pb.TASK_STARTING
+  assert status_updates[1].state == mesos_pb.TASK_RUNNING
+
+  # wait for the runner to bind to a task
+  while True:
+    runner = TaskRunner.get(task_description.task_id.value, checkpoint_root)
+    if runner:
+      break
+    time.sleep(0.1)
+
+  return runner, te
+
+
 class TestThermosExecutor(object):
   PANTS_BUILT = False
   LOG_DIR = None
@@ -90,6 +122,7 @@ class TestThermosExecutor(object):
   def setup_class(cls):
     cls.LOG_DIR = tempfile.mkdtemp()
     LogOptions.set_log_dir(cls.LOG_DIR)
+    LogOptions.set_disk_log_level('DEBUG')
     log.init('executor_logger')
     if not TestThermosExecutor.PANTS_BUILT:
       assert subprocess.call(["./pants", "src/python/twitter/mesos/executor:thermos_runner"]) == 0
@@ -121,78 +154,45 @@ class TestThermosExecutor(object):
     proxy_driver = ProxyDriver()
 
     with temporary_dir() as checkpoint_root:
-      runner_class = functools.partial(TestTaskRunner, checkpoint_root=checkpoint_root)
-      te = ThermosExecutor(runner_class=runner_class)
-      task_description = make_task(sleep60())
-      te.launchTask(proxy_driver, task_description)
-      while not te._runner.is_started():
-        time.sleep(0.1)
-      while te._runner.task_state() != TaskState.ACTIVE:
-        time.sleep(0.1)
-
-      # This is a bug, ugh.
-      task_json = TaskPath(root = checkpoint_root, task_id = task_description.task_id.value,
-                           state = 'active').getpath('task_path')
-      while not os.path.exists(task_json):
-        time.sleep(0.1)
-
-      # make sure startup was kosher
-      updates = proxy_driver.method_calls['sendStatusUpdate']
-      assert len(updates) == 2
-      status_updates = [arg_tuple[0][0] for arg_tuple in updates]
-      assert status_updates[0].state == mesos_pb.TASK_STARTING
-      assert status_updates[1].state == mesos_pb.TASK_RUNNING
-
-      # wait for the runner to bind to a task
-      while True:
-        runner = TaskRunner.get(task_description.task_id.value, checkpoint_root)
-        if runner:
-          break
-        time.sleep(0.1)
+      runner, executor = make_runner(proxy_driver, checkpoint_root, sleep60())
       runner.kill(force=True, preemption_wait=Amount(1, Time.SECONDS))
-
-      te._manager.join()
+      executor._manager.join()
 
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
     assert updates[-1][0][0].state == mesos_pb.TASK_KILLED
 
-  # TODO(wickman) This is mostly copy&paste of the previous test.  Do pytest
-  # parameterization here if possible.
+  def test_killTask(self):
+    proxy_driver = ProxyDriver()
+
+    with temporary_dir() as checkpoint_root:
+      runner, executor = make_runner(proxy_driver, checkpoint_root, sleep60())
+      executor.killTask(proxy_driver, mesos_pb.TaskID(value='sleep60-001'))
+      executor._manager.join()
+
+    updates = proxy_driver.method_calls['sendStatusUpdate']
+    assert len(updates) == 3
+    assert updates[-1][0][0].state == mesos_pb.TASK_KILLED
+
+  def test_shutdown(self):
+    proxy_driver = ProxyDriver()
+
+    with temporary_dir() as checkpoint_root:
+      runner, executor = make_runner(proxy_driver, checkpoint_root, sleep60())
+      executor.shutdown(proxy_driver)
+      executor._manager.join()
+
+    updates = proxy_driver.method_calls['sendStatusUpdate']
+    assert len(updates) == 3
+    assert updates[-1][0][0].state == mesos_pb.TASK_KILLED
+
   def test_task_lost(self):
     proxy_driver = ProxyDriver()
 
     with temporary_dir() as checkpoint_root:
-      runner_class = functools.partial(TestTaskRunner, checkpoint_root=checkpoint_root)
-      te = ThermosExecutor(runner_class=runner_class)
-      task_description = make_task(sleep60())
-      te.launchTask(proxy_driver, task_description)
-      while not te._runner.is_started():
-        time.sleep(0.1)
-      while te._runner.task_state() != TaskState.ACTIVE:
-        time.sleep(0.1)
-
-      task_json = TaskPath(root = checkpoint_root, task_id = task_description.task_id.value,
-                           state = 'active').getpath('task_path')
-      while not os.path.exists(task_json):
-        time.sleep(0.1)
-
-      # make sure startup was kosher
-      updates = proxy_driver.method_calls['sendStatusUpdate']
-      assert len(updates) == 2
-      status_updates = [arg_tuple[0][0] for arg_tuple in updates]
-      assert status_updates[0].state == mesos_pb.TASK_STARTING
-      assert status_updates[1].state == mesos_pb.TASK_RUNNING
-
-      # lose the existing runner
-      while True:
-        runner = TaskRunner.get(task_description.task_id.value, checkpoint_root)
-        if runner:
-          break
-        time.sleep(0.1)
+      runner, executor = make_runner(proxy_driver, checkpoint_root, sleep60())
       runner.lose(force=True)
-
-      te._manager.join()
+      executor._manager.join()
 
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3

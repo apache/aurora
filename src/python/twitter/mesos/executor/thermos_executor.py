@@ -10,6 +10,7 @@ import time
 
 # mesos
 import mesos
+import mesos_pb2 as mesos_pb
 
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
@@ -127,14 +128,13 @@ class ThermosExecutor(ThermosExecutorBase):
     if self.thermos_status_is_terminal(self._runner.task_state()):
       log.error('Got killTask for task in terminal state!')
       return
-    log.info('Issuing kills.')
     self._runner.kill()
     self._runner.quitquitquit()
 
   def shutdown(self, driver):
-    self.log('shutdown()')
+    self.log('shutdown() called')
     if self._task_id:
-      self.killTask(driver, self._task_id)
+      self.killTask(driver, mesos_pb.TaskID(value=self._task_id))
 
 
 def main():
