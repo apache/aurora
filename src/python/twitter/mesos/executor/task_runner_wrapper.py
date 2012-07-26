@@ -4,12 +4,14 @@ import os
 import signal
 import subprocess
 import tempfile
+import time
 
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 from twitter.common.contextutil import temporary_file
 from twitter.common.dirutil import chmod_plus_x, safe_rmtree
 from twitter.common.http.mirror_file import MirrorFile
+from twitter.common.quantity import Amount, Time
 
 from twitter.thermos.base.path import TaskPath
 from twitter.thermos.runner import TaskRunner
@@ -28,11 +30,12 @@ app.add_option("--checkpoint_root", dest="checkpoint_root", metavar="PATH",
 
 class TaskRunnerWrapper(object):
   PEX_NAME = 'thermos_runner.pex'
+  POLL_INTERVAL = Amount(500, Time.MILLISECONDS)
 
   class TaskError(Exception):
     pass
 
-  def __init__(self, task_id, mesos_task, role, mesos_ports, checkpoint_root=None):
+  def __init__(self, task_id, mesos_task, role, mesos_ports, checkpoint_root=None, clock=time):
     """
       :task_id       => task_id assigned by scheduler
       :mesos_task  => twitter.mesos.config.schema.MesosTaskInstance object
@@ -47,6 +50,7 @@ class TaskRunnerWrapper(object):
     self._checkpoint_root = checkpoint_root or app.get_options().checkpoint_root
     self._enable_chroot = False
     self._role = role
+    self._clock = clock
 
   @staticmethod
   def dump_task(task):
@@ -127,16 +131,29 @@ class TaskRunnerWrapper(object):
   def cleanup(self):
     pass
 
+  def _timed_wait(self, timeout=Amount(10, Time.SECONDS)):
+    deadline = self._clock.time() + timeout.as_(Time.SECONDS)
+    while True:
+      rc = self._popen.poll()
+      if rc is not None:
+        log.info('Task terminated with returncode %s' % rc)
+        return rc
+      if self._clock.time() >= deadline:
+        log.error('Task failed to terminate within deadline.')
+        return None
+      self._clock.sleep(self.POLL_INTERVAL.as_(Time.SECONDS))
+
   def kill(self):
     """
-      Kill the underlying runner process.  Returns True if killed, False if
-      it exited on its own.
+      Kill the underlying runner process.  Returns the exit returncode, None
+      if the kill was unsuccessful.
     """
     assert self._popen is not None
     if self._popen.poll() is None:
-      self._popen.send_signal(signal.SIGINT)
-      self._popen.wait()
-    return self._popen.poll() == -signal.SIGINT
+      log.info('Underlying task is still running, sending SIGKILL.')
+      self._popen.send_signal(signal.SIGKILL)
+      self._timed_wait()
+    return self._popen.poll()
 
   def quitquitquit(self):
     """Bind to the process tree of a Thermos task and kill it with impunity."""
