@@ -43,7 +43,7 @@ python_library(
   dependencies = [
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/app/modules:exceptions'),
-    pants('src/python/twitter/common_internal/app/modules'),
+    pants('src/python/twitter/common_internal/app/modules:chickadee_handler'),
     pants('src/python/twitter/common/log'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
     pants('src/thrift/com/twitter/thermos:py-thrift'),
@@ -81,7 +81,7 @@ python_binary(
   dependencies = [
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/app/modules:exceptions'),
-    pants('src/python/twitter/common_internal/app/modules'),
+    pants('src/python/twitter/common_internal/app/modules:chickadee_handler'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/thermos/config:schema'),
     pants('src/python/twitter/thermos/runner'),
