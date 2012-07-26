@@ -870,6 +870,35 @@ public class DbStorage implements
     return tasksToUpdate;
   }
 
+  /**
+   * Tasks with equal IDs are always expected to be equal.  With high query volume, we can spend
+   * an inordinate amount of time computing hashcode and equals in order to populate a Set.
+   * This subclass allows us to skip expensive computation and only compare stored tasks by
+   * their IDs.
+   */
+  private static class IdComparedScheduledTask extends ScheduledTask {
+
+    private final String taskId;
+
+    IdComparedScheduledTask(ScheduledTask realTask) {
+      super(realTask);
+      taskId = realTask.getAssignedTask().getTaskId();
+    }
+
+    @Override public int hashCode() {
+      return taskId.hashCode();
+    }
+
+    @Override public boolean equals(Object that) {
+      if (!(that instanceof IdComparedScheduledTask)) {
+        return false;
+      }
+
+      IdComparedScheduledTask other = (IdComparedScheduledTask) that;
+      return taskId.equals(other.taskId);
+    }
+  }
+
   @Timed("db_storage_fetch_tasks")
   @Override
   public ImmutableSet<ScheduledTask> fetchTasks(final TaskQuery query) {
@@ -925,7 +954,7 @@ public class DbStorage implements
               throw new SQLException("Problem decoding ScheduledTask", e);
             }
 
-            return scheduledTask;
+            return new IdComparedScheduledTask(scheduledTask);
           }
         });
 

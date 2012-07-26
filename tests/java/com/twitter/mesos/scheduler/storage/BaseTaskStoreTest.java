@@ -20,18 +20,15 @@ import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.Query;
 
-import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
 
 import static com.twitter.mesos.gen.ScheduleStatus.LOST;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 
 /**
- * A basic test that verifies a {@link TaskStore} implementation conforms to expected behavior.
- *
- * @author William Farner
+ * A base class for task stores.
+ * Verifies a {@link TaskStore} implementation conforms to expected behavior.
  */
 public abstract class BaseTaskStoreTest<T extends TaskStore> extends TearDownTestCase {
 
@@ -79,10 +76,16 @@ public abstract class BaseTaskStoreTest<T extends TaskStore> extends TearDownTes
         store.fetchTaskIds(new TaskQuery().setTaskIds(ImmutableSet.of("task1"))));
   }
 
+  private ScheduledTask getTask(String taskId) {
+    // Perform a deep copy of the underlying task to ensure that tests check all fields and not
+    // just the task ID as implemented in DbStorage.IdComparedScheduledTask.
+    return new ScheduledTask(Iterables.getOnlyElement(store.fetchTasks(Query.byId(taskId))));
+  }
+
   @Test
   public void testAddAndFetchTasks() {
     store(tasks);
-    assertThat(Iterables.getOnlyElement(store.fetchTasks(Query.byId(TASK_A_ID))), is(taskA));
+    assertEquals(taskA, getTask(TASK_A_ID));
   }
 
   @Test(expected = IllegalStateException.class)
@@ -101,9 +104,7 @@ public abstract class BaseTaskStoreTest<T extends TaskStore> extends TearDownTes
     store(tasks);
 
     taskA.setStatus(RUNNING);
-
-    assertThat(Iterables.getOnlyElement(store.fetchTasks(Query.byId(TASK_A_ID))).getStatus(),
-        is(PENDING));
+    assertEquals(PENDING, getTask(TASK_A_ID).getStatus());
   }
 
   @Test
@@ -116,16 +117,14 @@ public abstract class BaseTaskStoreTest<T extends TaskStore> extends TearDownTes
         task.setStatus(RUNNING);
       }
     });
-    assertThat(Iterables.getOnlyElement(store.fetchTasks(Query.byId(TASK_A_ID))).getStatus(),
-        is(RUNNING));
+    assertEquals(RUNNING, getTask(TASK_A_ID).getStatus());
 
     store.mutateTasks(Query.byId(TASK_B_ID), new Closure<ScheduledTask>() {
       @Override public void execute(ScheduledTask task) {
         task.setStatus(LOST);
       }
     });
-    assertThat(Iterables.getOnlyElement(store.fetchTasks(Query.byId(TASK_B_ID))).getStatus(),
-        is(LOST));
+    assertEquals(LOST, getTask(TASK_B_ID).getStatus());
   }
 
   @Test
@@ -133,20 +132,20 @@ public abstract class BaseTaskStoreTest<T extends TaskStore> extends TearDownTes
     store(tasks);
 
     store.saveTasks(ImmutableSet.<ScheduledTask>of(taskA));
-    assertThat(Iterables.getOnlyElement(store.fetchTasks(Query.byId(TASK_A_ID))), is(taskA));
+    assertEquals(taskA, getTask(TASK_A_ID));
 
     ScheduledTask updated = taskA.deepCopy();
     updated.setStatus(ScheduleStatus.FAILED);
     updated.setAncestorId("parent");
     store.saveTasks(ImmutableSet.<ScheduledTask>of(updated));
-    assertThat(Iterables.getOnlyElement(store.fetchTasks(Query.byId(TASK_A_ID))), is(updated));
+    assertEquals(updated, getTask(TASK_A_ID));
   }
 
   @Test
   public void testRemove() {
     store(tasks);
     store.removeTasks(Sets.newHashSet(taskA.getAssignedTask().getTaskId()));
-    assertThat(Iterables.getOnlyElement(store.fetchTasks(Query.GET_ALL)), is(taskB));
+    assertEquals(taskB, Iterables.getOnlyElement(store.fetchTasks(Query.GET_ALL)));
   }
 
   protected void store(Iterable<ScheduledTask> stored) {
