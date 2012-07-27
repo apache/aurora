@@ -18,7 +18,8 @@ import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Clock;
 import com.twitter.mesos.gen.storage.Snapshot;
-import com.twitter.mesos.scheduler.log.mesos.MesosLogStreamModule;
+import com.twitter.mesos.scheduler.db.DbUtil.Builder.JdbcUrl;
+import com.twitter.mesos.scheduler.log.Log;
 import com.twitter.mesos.scheduler.storage.JobStore;
 import com.twitter.mesos.scheduler.storage.QuotaStore;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
@@ -35,8 +36,29 @@ import com.twitter.mesos.scheduler.storage.log.LogStorage.SnapshotInterval;
 
 /**
  * Bindings for scheduler distributed log based storage.
- *
- * @author John Sirois
+ * <p/>
+ * Requires bindings for:
+ * <ul>
+ *   <li>{@link Clock}</li>
+ *   <li>{@link ShutdownRegistry}</li>
+ *   <li>The concrete {@link Log} implementation.</li>
+ * </ul>
+ * <p/>
+ * Exposes bindings for storage components:
+ * <ul>
+ *   <li>jdbc URL keyed by {@link JdbcUrl}</li>
+ *   <li>{@link Storage}</li>
+ *   <li>{@link SnapshotStore}</li>
+ *   <li>Keyed by {@link LogStorage.WriteBehind}
+ *     <ul>
+ *       <li>{@link SchedulerStore}</li>
+ *       <li>{@link JobStore}</li>
+ *       <li>{@link TaskStore}</li>
+ *       <li>{@link UpdateStore}</li>
+ *       <li>{@link QuotaStore}</li>
+ *     </ul>
+ *   </li>
+ * </ul>
  */
 public class LogStorageModule extends AbstractModule {
 
@@ -68,8 +90,6 @@ public class LogStorageModule extends AbstractModule {
    * @param binder a guice binder to bind the storage with
    */
   public static void bind(Binder binder) {
-    // TODO(John Sirois): parameterize H2 bindings to accept a mem configuration once we have
-    // the core log exposing its listener interface.  No need to store twice.
     DbStorageModule.bind(binder, LogStorage.WriteBehind.class, new Closure<PrivateBinder>() {
       @Override public void execute(PrivateBinder binder) {
         binder.bind(new TypeLiteral<SnapshotStore<byte[]>>() { }).to(DbStorage.class);
@@ -98,15 +118,18 @@ public class LogStorageModule extends AbstractModule {
         Key<QuotaStore> quotaStoreKey = createKey(QuotaStore.class);
         binder.bind(quotaStoreKey).to(DbStorage.class);
         binder.expose(quotaStoreKey);
+
+        // Expose the jdbc url for tools
+        binder.expose(Key.get(String.class, JdbcUrl.class));
       }
     });
 
-    MesosLogStreamModule.bind(binder);
     binder.install(new LogStorageModule());
   }
 
   @Override
   protected void configure() {
+    requireBinding(Log.class);
     requireBinding(Clock.class);
     requireBinding(ShutdownRegistry.class);
 

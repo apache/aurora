@@ -2,6 +2,8 @@ package com.twitter.mesos.scheduler.db;
 
 import java.beans.PropertyVetoException;
 import java.io.IOException;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 import java.net.URL;
 import java.util.logging.Logger;
 
@@ -9,8 +11,10 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Resources;
-import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
+import com.google.inject.BindingAnnotation;
+import com.google.inject.Exposed;
+import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import com.mchange.v2.c3p0.ComboPooledDataSource;
@@ -29,10 +33,12 @@ import com.twitter.common.application.http.Registration;
 import com.twitter.common.base.Command;
 import com.twitter.common.base.MorePreconditions;
 
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
 /**
  * Utilities for dealing with database operations.
- *
- * @author John Sirois
  */
 public final class DbUtil {
 
@@ -76,13 +82,19 @@ public final class DbUtil {
   }
 
   /**
-   * A simple struct that groups templates used for database access.
+   * A simple struct that groups information used for database access.
    */
   public static class DbAccess {
+    public final String jdbcUrl;
     public final TransactionTemplate transactionTemplate;
     public final JdbcTemplate jdbcTemplate;
 
-    private DbAccess(TransactionTemplate transactionTemplate, JdbcTemplate jdbcTemplate) {
+    private DbAccess(
+        String jdbcUrl,
+        TransactionTemplate transactionTemplate,
+        JdbcTemplate jdbcTemplate) {
+
+      this.jdbcUrl = jdbcUrl;
       this.transactionTemplate = transactionTemplate;
       this.jdbcTemplate = jdbcTemplate;
     }
@@ -158,7 +170,9 @@ public final class DbUtil {
         dataSource.setPassword(password);
       }
 
-      return new DbAccess(new TransactionTemplate(new DataSourceTransactionManager(dataSource)),
+      return new DbAccess(
+          jdbcUrl,
+          new TransactionTemplate(new DataSourceTransactionManager(dataSource)),
           jdbcTemplate);
     }
 
@@ -167,15 +181,23 @@ public final class DbUtil {
     }
 
     /**
-     * Binds a {@link TransactionTemplate} and a {@link JdbcTemplate} for the database specified by
-     * this builder in {@link Singleton} scope.  Requires a {@link ShutdownStage}
-     * {@link ShutdownRegistry} be bound.
+     * A {@literal @BindingAnnotation} keying a jdbc URL.
+     */
+    @Retention(RUNTIME)
+    @Target({METHOD, PARAMETER})
+    @BindingAnnotation
+    public @interface JdbcUrl {}
+
+    /**
+     * Binds a JDBC Url keyed by {@link JdbcUrl}, a {@link TransactionTemplate} and a
+     * {@link JdbcTemplate} for the database specified by this builder in {@link Singleton} scope.
+     * Requires a {@link ShutdownStage} {@link ShutdownRegistry} be bound.
      *
      * @param binder The binder to bind the database templates against.
      */
     public void bind(Binder binder) {
       Preconditions.checkNotNull(binder);
-      binder.install(new AbstractModule() {
+      binder.install(new PrivateModule() {
         @Override protected void configure() {
           requireBinding(ShutdownRegistry.class);
         }
@@ -186,12 +208,17 @@ public final class DbUtil {
           return Builder.this.build(actionRegistry);
         }
 
-        @Provides @Singleton
+        @Provides @Exposed @JdbcUrl @Singleton
+        String provideJdbcUrl(DbAccess dbAccess) {
+          return dbAccess.jdbcUrl;
+        }
+
+        @Provides @Exposed @Singleton
         JdbcTemplate provideJdbcTemplate(DbAccess dbAccess) {
           return dbAccess.jdbcTemplate;
         }
 
-        @Provides @Singleton
+        @Provides @Exposed @Singleton
         TransactionTemplate provideTransactionTemplate(DbAccess dbAccess) {
           return dbAccess.transactionTemplate;
         }

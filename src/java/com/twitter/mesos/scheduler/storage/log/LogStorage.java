@@ -100,8 +100,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
  *
  * <p>If the op fails to apply to local storage we will never write the op to the log and if the op
  * fails to apply to the log, it'll throw and abort the local storage transaction as well.
- *
- * @author John Sirois
  */
 public class LogStorage extends ForwardingStore {
 
@@ -404,9 +402,15 @@ public class LogStorage extends ForwardingStore {
     }
   }
 
+  /**
+   * Forces a snapshot of the storage state.
+   *
+   * @throws CodingException If there is a problem encoding the snapshot.
+   * @throws InvalidPositionException If the log stream cursor is invalid.
+   * @throws StreamAccessException If there is a problem writing the snapshot to the log stream.
+   */
   @Timed("scheduler_log_snapshot")
-  @VisibleForTesting
-  void snapshot() throws CodingException, InvalidPositionException, StreamAccessException {
+  public void snapshot() throws CodingException, InvalidPositionException, StreamAccessException {
     super.doInTransaction(new Work.NoResult<CodingException>() {
       @Override protected void execute(StoreProvider unused)
           throws CodingException, InvalidPositionException, StreamAccessException {

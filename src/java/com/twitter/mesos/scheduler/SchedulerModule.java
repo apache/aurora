@@ -53,6 +53,7 @@ import com.twitter.mesos.scheduler.RegisteredListener.FanoutRegisteredListener;
 import com.twitter.mesos.scheduler.SchedulerLifecycle.DriverReference;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.httphandlers.ServletModule;
+import com.twitter.mesos.scheduler.log.mesos.MesosLogStreamModule;
 import com.twitter.mesos.scheduler.periodic.BootstrapTaskLauncher;
 import com.twitter.mesos.scheduler.periodic.BootstrapTaskLauncher.Bootstrap;
 import com.twitter.mesos.scheduler.periodic.GcExecutorLauncher;
@@ -171,6 +172,7 @@ public class SchedulerModule extends AbstractModule {
     if (ISOLATED_SCHEDULER.get()) {
       install(new IsolatedSchedulerModule());
     } else {
+      MesosLogStreamModule.bind(binder());
       LogStorageModule.bind(binder());
       bind(DriverFactory.class).to(DriverFactoryImpl.class);
       bind(DriverFactoryImpl.class).in(Singleton.class);

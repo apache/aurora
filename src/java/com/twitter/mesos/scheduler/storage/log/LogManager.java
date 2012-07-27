@@ -56,10 +56,8 @@ import com.twitter.mesos.scheduler.log.Log.Stream.StreamAccessException;
 
 /**
  * Manages opening, reading from and writing to a {@link Log}.
- *
- * @author John Sirois
  */
-final class LogManager {
+public final class LogManager {
 
   /**
    * Identifies the maximum log entry size to permit before chunking entries into frames.
@@ -83,7 +81,13 @@ final class LogManager {
     this.shutdownRegistry = Preconditions.checkNotNull(shutdownRegistry);
   }
 
-  StreamManager open() throws IOException {
+  /**
+   * Opens the log for reading and writing.
+   *
+   * @return A stream manager that can be used to manipulate the log stream.
+   * @throws IOException If there is a problem opening the log.
+   */
+  public StreamManager open() throws IOException {
     final Stream stream = log.open();
     shutdownRegistry.addAction(new ExceptionalCommand<IOException>() {
       @Override public void execute() throws IOException {
@@ -100,7 +104,7 @@ final class LogManager {
    * operations can be committed atomically, or the log can be compacted by
    * {@link #snapshot(com.twitter.mesos.gen.storage.Snapshot) snapshotting}.
    */
-  static class StreamManager {
+  public static class StreamManager {
 
     private static class Vars {
       final AtomicInteger unSnapshottedTransactions =
@@ -138,7 +142,7 @@ final class LogManager {
      * @throws InvalidPositionException if the given position is not found in the log.
      * @throws StreamAccessException if there is a problem reading from the log.
      */
-    void readFromBeginning(Closure<LogEntry> reader)
+    public void readFromBeginning(Closure<LogEntry> reader)
         throws CodingException, InvalidPositionException, StreamAccessException {
 
       Iterator<Entry> entries = stream.readAll();

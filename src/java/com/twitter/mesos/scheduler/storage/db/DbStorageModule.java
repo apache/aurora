@@ -1,7 +1,6 @@
 package com.twitter.mesos.scheduler.storage.db;
 
 import java.lang.annotation.Annotation;
-import java.util.logging.Logger;
 
 import com.google.common.base.Preconditions;
 import com.google.inject.Binder;
@@ -14,28 +13,18 @@ import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Closures;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Data;
 import com.twitter.mesos.scheduler.db.DbUtil;
 import com.twitter.mesos.scheduler.storage.Storage;
 
 /**
  * Provides bindings for db based scheduler storage.
- *
- * @author John Sirois
  */
 public class DbStorageModule extends PrivateModule {
-
-  @CmdLine(name = "scheduler_db_cache_size",
-          help ="The size to use for the H2 in-memory db cache.")
-  private static final Arg<Amount<Long, Data>> dbCacheSize = Arg.create(Amount.of(256L, Data.MB));
 
   // TODO(John Sirois): reconsider exposing the db by default - obvious danger here
   @CmdLine(name = "scheduler_db_admin_interface",
           help ="Turns on a web interface to the storage db - use with caution")
   private static final Arg<Boolean> exposeDbAdmin = Arg.create(true);
-
-  private static final Logger LOG = Logger.getLogger(DbStorageModule.class.getName());
 
   /**
    * Binds the database {@link Storage} engine.
@@ -90,8 +79,6 @@ public class DbStorageModule extends PrivateModule {
     bind(DbStorage.class).in(Singleton.class);
     expose(storageKey);
 
-    // TODO(John Sirois): Consider switching to inMemory(...) when we are successfully running on
-    // the mesos-core log.
     DbUtil.inMemory("h2-v1")
         .secured("scheduler", "ep1nephrin3")
         .bind(binder());

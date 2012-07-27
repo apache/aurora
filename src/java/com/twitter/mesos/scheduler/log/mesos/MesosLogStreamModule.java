@@ -5,6 +5,7 @@ import java.net.InetSocketAddress;
 import java.util.List;
 
 import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.inject.Binder;
 import com.google.inject.Key;
@@ -14,10 +15,10 @@ import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 
 import org.apache.mesos.Log;
+import org.apache.zookeeper.common.PathUtils;
 
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
-import com.twitter.common.args.constraints.NotNull;
 import com.twitter.common.net.InetSocketAddressHelper;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -40,23 +41,20 @@ import com.twitter.mesos.gen.storage.LogEntry;
  * <ul>
  *   <li>{@link Log} - a log backed by the mesos native distributed log</li>
  * </ul>
- *
- * @author John Sirois
  */
 public class MesosLogStreamModule extends PrivateModule {
   @CmdLine(name = "native_log_quorum_size",
            help = "The size of the quorum required for all log mutations.")
   private static final Arg<Integer> QUORUM_SIZE = Arg.create(1);
 
-  @NotNull
   @CmdLine(name = "native_log_file_path",
            help = "Path to a file to store the native log data in.  If the parent directory does"
                + "not exist it will be created.")
-  private static final Arg<File> LOG_PATH = Arg.create();
+  private static final Arg<File> LOG_PATH = Arg.create(null);
 
   @CmdLine(name = "native_log_zk_group_path",
            help = "A zookeeper node for use by the native log to track the master coordinator.")
-  private static final Arg<String> ZK_LOG_GROUP_PATH = Arg.create();
+  private static final Arg<String> ZK_LOG_GROUP_PATH = Arg.create(null);
 
   /*
    * This timeout includes the time to get a quorum to promise leadership to the coordinator and
@@ -99,6 +97,39 @@ public class MesosLogStreamModule extends PrivateModule {
     binder.install(new MesosLogStreamModule());
   }
 
+  private final Key<com.twitter.mesos.scheduler.log.Log> key;
+  private final File logPath;
+  private final String zkPath;
+
+  /**
+   * Creates a module that binds the mesos native log using a log path and zookeeper coordination
+   * path from command line flags.
+   */
+  public MesosLogStreamModule() {
+    this(Key.get(com.twitter.mesos.scheduler.log.Log.class),
+        LOG_PATH.get(),
+        ZK_LOG_GROUP_PATH.get());
+  }
+
+  /**
+   * Creates a module that binds the mesos native log to the given key.
+   *
+   * @param key The key to bind the native log implementation to.
+   * @param logPath The path to the native log data directory.
+   * @param zkPath The zookeeper path to use for replica coordination.
+   */
+  public MesosLogStreamModule(
+      Key<com.twitter.mesos.scheduler.log.Log> key,
+      File logPath,
+      String zkPath) {
+
+    this.key = Preconditions.checkNotNull(key);
+    this.logPath = Preconditions.checkNotNull(logPath);
+
+    PathUtils.validatePath(zkPath);
+    this.zkPath = zkPath;
+  }
+
   @Override
   protected void configure() {
     requireBinding(Credentials.class);
@@ -110,8 +141,8 @@ public class MesosLogStreamModule extends PrivateModule {
     bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(MesosLog.WriteTimeout.class)
         .toInstance(WRITE_TIMEOUT.get());
 
-    bind(com.twitter.mesos.scheduler.log.Log.class).to(MesosLog.class).in(Singleton.class);
-    expose(com.twitter.mesos.scheduler.log.Log.class);
+    bind(key).to(MesosLog.class).in(Singleton.class);
+    expose(key);
   }
 
   @Provides
@@ -119,8 +150,7 @@ public class MesosLogStreamModule extends PrivateModule {
   Log provideLog(@ZooKeeper List<InetSocketAddress> endpoints,
                  Credentials credentials, @ZooKeeper Amount<Integer, Time> sessionTimeout) {
 
-    File logFile = LOG_PATH.get();
-    File parentDir = logFile.getParentFile();
+    File parentDir = logPath.getParentFile();
     if (!parentDir.exists() && !parentDir.mkdirs()) {
       addError("Failed to create parent directory to store native log at: %s", parentDir);
     }
@@ -129,11 +159,11 @@ public class MesosLogStreamModule extends PrivateModule {
         Joiner.on(',').join(Iterables.transform(endpoints, InetSocketAddressHelper.INET_TO_STR));
 
     return new Log(QUORUM_SIZE.get(),
-                   logFile.getAbsolutePath(),
+                   logPath.getAbsolutePath(),
                    zkConnectString,
                    sessionTimeout.getValue(),
                    sessionTimeout.getUnit().getTimeUnit(),
-                   ZK_LOG_GROUP_PATH.get(),
+                   zkPath,
                    credentials.scheme(),
                    credentials.authToken());
   }
