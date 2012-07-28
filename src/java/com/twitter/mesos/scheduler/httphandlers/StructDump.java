@@ -17,6 +17,7 @@ import com.twitter.common.base.Closure;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.common.thrift.Util;
 import com.twitter.mesos.Tasks;
+import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.scheduler.CronJobManager;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.storage.Storage;
@@ -65,8 +66,9 @@ class StructDump extends StringTemplateServlet {
           id = "Task " + taskId;
           work = new Work.Quiet<TBase>() {
             @Override public TBase apply(StoreProvider storeProvider) {
-              return Iterables.getOnlyElement(
-                  storeProvider.getTaskStore().fetchTasks(Query.byId(taskId)), null);
+              // Deep copy the struct to sidestep any subclass trickery inside the storage system.
+              return new ScheduledTask(Iterables.getOnlyElement(
+                  storeProvider.getTaskStore().fetchTasks(Query.byId(taskId)), null));
             }
           };
         } else {
