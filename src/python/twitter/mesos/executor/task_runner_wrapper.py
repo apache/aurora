@@ -4,6 +4,7 @@ import os
 import signal
 import subprocess
 import tempfile
+import threading
 import time
 
 from twitter.common import app, log
@@ -42,6 +43,7 @@ class TaskRunnerWrapper(object):
       :mesos_ports   => { name => port } dictionary
     """
     self._popen = None
+    self._dead = threading.Event()
     self._task_id = task_id
     self._mesos_task = mesos_task
     self._task = mesos_task.task()
@@ -96,6 +98,8 @@ class TaskRunnerWrapper(object):
       cmdline_args.extend(['--enable_chroot'])
     for name, port in self._ports.items():
       cmdline_args.extend(['--port=%s:%s' % (name, port)])
+    if 'THERMOS_DEBUG' in os.environ:
+      cmdline_args.extend(['--log_to_disk=DEBUG'])
     log.info('Forking off runner with cmdline: %s' % ' '.join(cmdline_args))
     self._popen = subprocess.Popen(cmdline_args)
 
@@ -112,12 +116,16 @@ class TaskRunnerWrapper(object):
     """
       Is the process underlying the Thermos task runner alive?
     """
-    if self._popen is None:
+    if not self.is_started():
+      return False
+    if self._dead.is_set():
       return False
 
-    # We can't rely upon subprocess.Popen.poll because we may be invoking
-    # os.wait4 via TaskRunner.run => TaskRunnerHelper.reap_children.  While
-    # arguably an abstraction breakdown, this workaround seems reasonable.
+    # N.B. You cannot mix this code and any code that relies upon os.wait
+    # mechanisms with blanket child process collection.  One example is the
+    # Thermos task runner which calls os.wait4 -- without refactoring, you
+    # should not mix a Thermos task runner in the same process as this
+    # thread.
     try:
       pid, _ = os.waitpid(self._popen.pid, os.WNOHANG)
       if pid == 0:
@@ -126,45 +134,38 @@ class TaskRunnerWrapper(object):
       if e.errno != errno.ECHILD:
         raise
 
+    self._dead.set()
     return False
 
   def cleanup(self):
     pass
 
-  def _timed_wait(self, timeout=Amount(10, Time.SECONDS)):
-    deadline = self._clock.time() + timeout.as_(Time.SECONDS)
-    while True:
-      rc = self._popen.poll()
-      if rc is not None:
-        log.info('Task terminated with returncode %s' % rc)
-        return rc
-      if self._clock.time() >= deadline:
-        log.error('Task failed to terminate within deadline.')
-        return None
-      self._clock.sleep(self.POLL_INTERVAL.as_(Time.SECONDS))
-
   def kill(self):
     """
-      Kill the underlying runner process.  Returns the exit returncode, None
-      if the kill was unsuccessful.
+      Kill the underlying runner process.
     """
     assert self._popen is not None
-    if self._popen.poll() is None:
-      log.info('Underlying task is still running, sending SIGKILL.')
-      self._popen.send_signal(signal.SIGKILL)
-      self._timed_wait()
-    return self._popen.poll()
+    if self.is_alive():
+      log.info('Runner is alive, sending SIGINT')
+      try:
+        self._popen.send_signal(signal.SIGINT)
+      except OSError as e:
+        log.error('Got OSError on SIGINT: %s' % e)
+    else:
+      log.info('Runner is dead, skipping kill.')
 
   def quitquitquit(self):
     """Bind to the process tree of a Thermos task and kill it with impunity."""
     try:
       runner = TaskRunner.get(self._task_id, self._checkpoint_root)
       if runner:
+        log.info('quitquitquit calling runner.kill')
         runner.kill(force=True)
       else:
         log.error('Could not instantiate runner!')
     except TaskRunner.Error as e:
       log.error('Could not quitquitquit runner: %s' % e)
+
 
 
 class ProductionTaskRunner(TaskRunnerWrapper):

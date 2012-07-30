@@ -1,6 +1,6 @@
 import os
 
-from twitter.common import app, options
+from twitter.common import app, options, log
 
 from twitter.thermos.base.options import add_port_to
 from twitter.thermos.config.loader import ThermosConfigLoader
@@ -59,6 +59,10 @@ def main(args, opts):
     app.error('Task appears to already be in a terminal state.')
   except TaskRunner.PermissionError:
     app.error('Could not get permission to perform %s!' % opts.action)
+  except KeyboardInterrupt:
+    log.info('Thermos runner got SIGINT, shutting down.')
+    task_runner.close_ckpt()
+    task_runner.kill()
 
 
 app.main()

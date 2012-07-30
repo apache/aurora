@@ -106,6 +106,9 @@ class StatusManager(threading.Thread):
     finish_state = None
     if last_state == TaskState.ACTIVE:
       log.error("Runner is dead but task state unexpectedly ACTIVE!")
+      # TODO(wickman) This is a potentially dangerous operation.
+      # If the status_manager caught the is_alive latch on down, then we should be
+      # safe because the task_runner_wrapper will have the same view and won't block.
       self._runner.quitquitquit()
       finish_state = mesos_pb.TASK_LOST
     elif last_state == TaskState.SUCCESS:
@@ -125,7 +128,8 @@ class StatusManager(threading.Thread):
     update.state = force_status if force_status is not None else finish_state
     if force_message:
       update.message = force_message
-    log.info('Sending terminal state update: %s' % update.state)
+    task_state = mesos_pb._TASKSTATE.values_by_number.get(update.state)
+    log.info('Sending terminal state update: %s' % (task_state.name if task_state else 'UNKNOWN'))
     self._driver.sendStatusUpdate(update)
 
     # the executor is ephemeral and we just submitted a terminal task state, so shutdown

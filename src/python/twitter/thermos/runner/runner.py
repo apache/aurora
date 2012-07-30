@@ -120,6 +120,7 @@ class TaskRunnerProcessHandler(ProcessStateHandler):
     log.debug('Process killed, marking it as a loss.')
     self._runner._plan.lost(process_update.process)
 
+
 class TaskRunnerTaskHandler(TaskStateHandler):
   """
     Accesses these parts of the runner:
@@ -765,7 +766,8 @@ class TaskRunner(object):
   def terminal_state(self):
     # Forced terminal state
     if self._terminal_state:
-      log.debug('Forced terminal state: %s' % self._terminal_state)
+      log.debug('Forced terminal state: %s' %
+          TaskState._VALUES_TO_NAMES.get(self._terminal_state, 'UNKNOWN'))
       return self._terminal_state
     else:
       return TaskState.SUCCESS if self.is_healthy() else TaskState.FAILED

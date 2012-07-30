@@ -3,6 +3,7 @@ import functools
 import getpass
 import json
 import os
+import signal
 import subprocess
 import tempfile
 import time
@@ -27,8 +28,13 @@ from twitter.mesos.config.schema import (
 from twitter.mesos.executor.thermos_executor import ThermosExecutor
 from twitter.mesos.executor.task_runner_wrapper import TaskRunnerWrapper
 from twitter.mesos.executor.sandbox_manager import DirectorySandbox
+from twitter.mesos.executor.status_manager import StatusManager
 from twitter.thermos.runner.runner import TaskRunner
 from twitter.thermos.base.path import TaskPath
+
+
+class TestStatusManager(StatusManager):
+  WAIT_LIMIT = Amount(1, Time.SECONDS)
 
 
 class TestTaskRunner(TaskRunnerWrapper):
@@ -82,9 +88,10 @@ def sleep60():
     role = getpass.getuser())
 
 
-def make_runner(proxy_driver, checkpoint_root, task):
+def make_runner(proxy_driver, checkpoint_root, task, fast_status=False):
   runner_class = functools.partial(TestTaskRunner, checkpoint_root=checkpoint_root)
-  te = ThermosExecutor(runner_class=runner_class)
+  manager_class = TestStatusManager if fast_status else StatusManager
+  te = ThermosExecutor(runner_class=runner_class, manager_class=manager_class)
   task_description = make_task(task)
   te.launchTask(proxy_driver, task_description)
   while not te._runner.is_started():
@@ -130,7 +137,10 @@ class TestThermosExecutor(object):
 
   @classmethod
   def teardown_class(cls):
-    safe_rmtree(cls.LOG_DIR)
+    if 'THERMOS_DEBUG' not in os.environ:
+      safe_rmtree(cls.LOG_DIR)
+    else:
+      print('Saving executor logs in %s' % cls.LOG_DIR)
 
   def test_basic(self):
     proxy_driver = ProxyDriver()
@@ -149,6 +159,21 @@ class TestThermosExecutor(object):
     assert status_updates[0].state == mesos_pb.TASK_STARTING
     assert status_updates[1].state == mesos_pb.TASK_RUNNING
     assert status_updates[2].state == mesos_pb.TASK_FINISHED
+
+  def test_runner_disappears(self):
+    proxy_driver = ProxyDriver()
+
+    with temporary_dir() as checkpoint_root:
+      _, executor = make_runner(proxy_driver, checkpoint_root, sleep60(), fast_status=True)
+      while executor._runner is None or executor._runner._popen is None or (
+          executor._runner._popen.pid is None):
+        time.sleep(0.1)
+      os.kill(executor._runner._popen.pid, signal.SIGKILL)
+      executor._manager.join()
+
+    updates = proxy_driver.method_calls['sendStatusUpdate']
+    assert len(updates) == 3
+    assert updates[-1][0][0].state == mesos_pb.TASK_LOST
 
   def test_task_killed(self):
     proxy_driver = ProxyDriver()

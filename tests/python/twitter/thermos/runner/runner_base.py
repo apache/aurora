@@ -172,7 +172,10 @@ with open('%(state_filename)s', 'w') as fp:
           pass
       os.unlink(self.job_filename)
       os.unlink(self.script_filename)
-      shutil.rmtree(self.tempdir, ignore_errors=True)
+      if 'THERMOS_DEBUG' not in os.environ:
+        shutil.rmtree(self.tempdir, ignore_errors=True)
+      else:
+        print('Logs saved in %s' % self.tempdir)
       self.cleaned = True
 
 

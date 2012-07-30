@@ -44,12 +44,13 @@ else:
 
 
 class ThermosExecutor(ThermosExecutorBase):
-  def __init__(self, runner_class=RUNNER_CLASS):
+  def __init__(self, runner_class=RUNNER_CLASS, manager_class=StatusManager):
     ThermosExecutorBase.__init__(self)
     self._runner = None
     self._task_id = None
     self._manager = None
     self._runner_class = runner_class
+    self._manager_class = manager_class
 
   @staticmethod
   def deserialize_assigned_task(task):
@@ -114,7 +115,7 @@ class ThermosExecutor(ThermosExecutorBase):
     log.debug('Task started.')
     self.send_update(driver, self._task_id, 'RUNNING')
 
-    self._manager = StatusManager(self._runner, driver, self._task_id, portmap.get('health'))
+    self._manager = self._manager_class(self._runner, driver, self._task_id, portmap.get('health'))
     self._manager.start()
 
   def killTask(self, driver, task_id):
@@ -128,13 +129,15 @@ class ThermosExecutor(ThermosExecutorBase):
     if self.thermos_status_is_terminal(self._runner.task_state()):
       log.error('Got killTask for task in terminal state!')
       return
+    self.log('killTask() calling TaskRunnerWrapper.kill')
     self._runner.kill()
-    self._runner.quitquitquit()
+    self.log('killTask() returned')
 
   def shutdown(self, driver):
     self.log('shutdown() called')
     if self._task_id:
       self.killTask(driver, mesos_pb.TaskID(value=self._task_id))
+    self.log('shutdown() returned')
 
 
 def main():
