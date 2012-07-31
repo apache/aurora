@@ -54,12 +54,12 @@ class Command(object):
 class HDFSHelper(object):
   """Helper class for performing HDFS operations."""
 
-  def __init__(self, cluster, user=None, proxy=None):
+  def __init__(self, cluster, user=None, proxy=True):
     self._cluster = cluster
     self._uri = Cluster.get(cluster).hadoop_uri
     self._config = Cluster.get(cluster).hadoop_config
     self._user = user or getpass.getuser()
-    self._proxy = proxy or Cluster.get(cluster).proxy
+    self._proxy = Cluster.get(cluster).proxy if proxy else None
 
   @property
   def config(self):
