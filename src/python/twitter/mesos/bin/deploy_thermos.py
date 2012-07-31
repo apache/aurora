@@ -7,8 +7,6 @@ from twitter.common import app
 from twitter.common.net.tunnel import TunnelHelper
 from twitter.mesos.clusters import Cluster
 
-__author__ = 'William Farner'
-
 REMOTE_USER = 'mesos'
 
 BUILD_TARGET_CMDS = [
@@ -29,6 +27,9 @@ HDFS_BIN_FILES = {
 
 def get_cluster_dc():
   return Cluster.get(app.get_options().cluster).dc
+
+def get_hdfs_config():
+  return Cluster.get(app.get_options().cluster).hadoop_config
 
 def get_cluster_name():
   return Cluster.get(app.get_options().cluster).local_name
@@ -91,8 +92,7 @@ def build():
   thermos_postprocess()
 
 def replace_hdfs_file(host, local_file, hdfs_path):
-  HADOOP_CONF_DIR = '/etc/hadoop/hadoop-conf-%s' % get_cluster_dc()
-  BASE_HADOOP_CMD = ['hadoop', '--config', HADOOP_CONF_DIR, 'fs']
+  BASE_HADOOP_CMD = ['hadoop', '--config', get_hdfs_config(), 'fs']
   remote_call(host, BASE_HADOOP_CMD + ['-mkdir', os.path.dirname(hdfs_path)])
   remote_call(host, BASE_HADOOP_CMD + ['-rm', hdfs_path])
   remote_check_call(host, BASE_HADOOP_CMD + ['-put', local_file, hdfs_path])
