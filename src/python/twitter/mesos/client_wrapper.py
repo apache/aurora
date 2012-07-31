@@ -228,7 +228,7 @@ class MesosClientAPI(MesosClientBase):
 
   def create_job(self, config, copy_app_from=None):
     if copy_app_from is not None:
-      HDFSHelper(self.cluster(), config.role()).copy_to(copy_app_from,
+      HDFSHelper(self.cluster(), config.role(), Location.is_corp()).copy_to(copy_app_from,
         self.hdfs_path(config, copy_app_from))
 
     log.info('Creating job %s' % config.name())
@@ -261,7 +261,7 @@ class MesosClientAPI(MesosClientBase):
     log.info("Updating job: %s" % config.name())
 
     if copy_app_from is not None:
-      HDFSHelper(self.cluster(), config.role()).copy_to(copy_app_from,
+      HDFSHelper(self.cluster(), config.role(), Location.is_corp()).copy_to(copy_app_from,
         self.hdfs_path(config, copy_app_from))
 
     resp = self.client().startUpdate(config.job(), self.session_key())
