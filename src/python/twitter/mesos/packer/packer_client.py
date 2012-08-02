@@ -99,6 +99,9 @@ class Packer(object):
   def list_packages(self, role):
     return json.loads(self._api(Packer._role_url(role)))
 
+  def get_version(self, role, package, version):
+    return json.loads(self._api(Packer._ver_url(role, package, version)))
+
   def list_versions(self, role, package):
     return json.loads(self._api(Packer._pkg_url(role, package)))
 
@@ -143,4 +146,4 @@ class Packer(object):
     return self._api('%s/unlock' % Packer._pkg_url(role, package), auth=True, method='POST')
 
   def set_live(self, role, package, version):
-    return self._api('%s/live' % Packer._ver_url(role, package, version), auth=True, method='POST')
+    return self._api(Packer._ver_url(role, package, version), auth=True, method='PUT')

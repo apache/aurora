@@ -18,7 +18,7 @@ from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 from twitter.mesos.clusters import Cluster
 from twitter.mesos.client_wrapper import MesosClientAPI
-from twitter.mesos.packer.packer_client import Packer
+from twitter.mesos.packer import sd_packer_client
 from twitter.mesos.parsers.mesos_config import MesosConfig
 from twitter.mesos.parsers.pystachio_config import PystachioConfig
 from twitter.mesos.parsers.pystachio_codec import PystachioCodec
@@ -77,8 +77,8 @@ def get_extra_context():
     return {}
 
 
-def get_config(jobname, config_file):
-  """Returns the proxy config."""
+def get_config(jobname, config_file, packer_factory):
+  """Creates and returns a config object contained in the provided file."""
 
   options = app.get_options()
   config_type, is_json = options.config_type, options.json
@@ -90,7 +90,19 @@ def get_config(jobname, config_file):
     assert config_type == 'thermos', "--json only supported with thermos jobs"
 
   if config_type == 'mesos':
-    return MesosConfig(config_file, jobname)
+    config = MesosConfig(config_file, jobname)
+    package = config.package()
+    if package:
+      if options.copy_app_from:
+        _die('copy_app_from may not be used when a package spec is used in the configuration')
+      if not isinstance(package, tuple) or len(package) is not 3:
+        _die('package must be a tuple of exactly three elements')
+
+      role, name, version = package
+      log.info('Fetching metadata for package %s/%s version %s.' % package)
+      metadata = packer_factory(config.cluster()).get_version(role, name, version)
+      config.set_hdfs_path(metadata['uri'])
+    return config
   elif config_type == 'thermos':
     loader = PystachioConfig.load_json if is_json else PystachioConfig.load
     return loader(config_file, jobname, bindings)
@@ -153,7 +165,7 @@ class MesosCLI(cmd.Cmd):
   def do_create(self, *line):
     """create job config"""
     (jobname, config_file) = line
-    config = get_config(jobname, config_file)
+    config = get_config(jobname, config_file, self._get_packer)
     if self.options.cluster is not None:
       log.warning('Deprecation warning: --cluster command line option is no longer supported.'
                   ' Cluster should be specified in the job config file.')
@@ -184,7 +196,7 @@ class MesosCLI(cmd.Cmd):
   def do_inspect(self, *line):
     """inspect job config"""
     (jobname, config_file) = line
-    config = get_config(jobname, config_file)
+    config = get_config(jobname, config_file, self._get_packer)
     cluster = Cluster.get(config.cluster())
     log.info('Parsed job config: %s' % config.job())
 
@@ -262,7 +274,7 @@ class MesosCLI(cmd.Cmd):
   def do_update(self, *line):
     """update job config"""
     (jobname, config_file) = line
-    config = get_config(jobname, config_file)
+    config = get_config(jobname, config_file, self._get_packer)
     api = MesosClientAPI(cluster=config.cluster(), verbose=self.options.verbose)
     resp = api.update_job(config, self.options.copy_app_from)
     check_and_log_response(resp)
@@ -381,13 +393,16 @@ class MesosCLI(cmd.Cmd):
       output = proc.communicate()
       print '\n'.join(['%s:  %s' % (host, line) for line in output[0].splitlines()])
 
-  @staticmethod
-  def _get_packer():
-    return Packer('packer.prod.mesos.service.smf1.twitter.com', 80)
+
+  def _get_packer(self, cluster=None):
+    cluster = cluster or self.options.cluster
+    if not cluster:
+      _die('--cluster must be specified')
+    return sd_packer_client.create_packer(Cluster.get(cluster))
 
   @requires.exactly('role')
   def do_package_list(self, role):
-    print '\n'.join(MesosCLI._get_packer().list_packages(role))
+    print '\n'.join(self._get_packer().list_packages(role))
 
   @staticmethod
   def _print_package(pkg):
@@ -403,27 +418,27 @@ class MesosCLI(cmd.Cmd):
 
   @requires.exactly('role', 'package')
   def do_package_versions(self, role, package):
-    for version in MesosCLI._get_packer().list_versions(role, package):
+    for version in self._get_packer().list_versions(role, package):
       MesosCLI._print_package(version)
 
   @requires.exactly('role', 'package', 'version')
   def do_package_delete_version(self, role, package, version):
-    MesosCLI._get_packer().delete(role, package, version)
+    self._get_packer().delete(role, package, version)
     print 'Version deleted'
 
   @requires.exactly('role', 'package', 'file_path')
   def do_package_add_version(self, role, package, file_path):
     print 'Package added:'
-    MesosCLI._print_package(MesosCLI._get_packer().add(role, package, file_path))
+    MesosCLI._print_package(self._get_packer().add(role, package, file_path))
 
   @requires.exactly('role', 'package', 'version')
   def do_package_set_live(self, role, package, version):
-    MesosCLI._get_packer().set_live(role, package, version)
+    self._get_packer().set_live(role, package, version)
     print 'Version %s is now the LIVE vesion' % version
 
   @requires.exactly('role', 'package')
   def do_package_unlock(self, role, package):
-    MesosCLI._get_packer().unlock(role, package)
+    self._get_packer().unlock(role, package)
     print 'Package unlocked'
 
 

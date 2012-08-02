@@ -182,6 +182,9 @@ class MesosConfig(ProxyConfig):
   def hdfs_path(self):
     return self._config['task'].get('hdfs_path')
 
+  def set_hdfs_path(self, path):
+    self._config['task']['hdfs_path'] = path
+
   def role(self):
     return self._config['role']
 
@@ -193,3 +196,6 @@ class MesosConfig(ProxyConfig):
 
   def update_config(self):
     return self._config['update_config']
+
+  def package(self):
+    return self._config.get('package')

@@ -28,6 +28,7 @@ from twitter.common.net.tunnel import TunnelHelper
 from twitter.mesos.clusters import Cluster
 from gen.twitter.mesos import MesosAdmin
 from twitter.mesos.location import Location
+from twitter.mesos.util import serverset_util
 from twitter.mesos.zookeeper_helper import ZookeeperHelper
 
 
@@ -114,10 +115,7 @@ class ZookeeperSchedulerClient(SchedulerClient):
 
   @staticmethod
   def _parse_endpoint(data):
-    transportIn = TTransport.TMemoryBuffer(data)
-    protocolIn = TBinaryProtocol.TBinaryProtocol(transportIn)
-    si = ServiceInstance()
-    si.read(protocolIn)
+    si = serverset_util.decode_service_instance(data)
     return si.serviceEndpoint.host, si.serviceEndpoint.port
 
   @staticmethod
