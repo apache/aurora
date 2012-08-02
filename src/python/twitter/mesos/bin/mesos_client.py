@@ -406,12 +406,8 @@ class MesosCLI(cmd.Cmd):
 
   @staticmethod
   def _print_package(pkg):
-    pkg_detail = 'Version: %s' % pkg['id']
-    audits = sorted(pkg['auditLog'], key=lambda k: int(k['timestamp']))
-    if audits[-1]['state'] == 'LIVE':
-      pkg_detail += ' (LIVE)'
-    print pkg_detail
-    for audit in audits:
+    print 'Version: %s' % pkg['id']
+    for audit in sorted(pkg['auditLog'], key=lambda k: int(k['timestamp'])):
       gmtime = time.strftime('%m/%d/%Y %H:%M:%S UTC',
                              time.gmtime(int(audit['timestamp']) / 1000))
       print '  moved to state %s by %s on %s' % (audit['state'], audit['user'], gmtime)
@@ -430,11 +426,6 @@ class MesosCLI(cmd.Cmd):
   def do_package_add_version(self, role, package, file_path):
     print 'Package added:'
     MesosCLI._print_package(self._get_packer().add(role, package, file_path))
-
-  @requires.exactly('role', 'package', 'version')
-  def do_package_set_live(self, role, package, version):
-    self._get_packer().set_live(role, package, version)
-    print 'Version %s is now the LIVE vesion' % version
 
   @requires.exactly('role', 'package')
   def do_package_unlock(self, role, package):
