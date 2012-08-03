@@ -1,19 +1,14 @@
 package com.twitter.mesos.executor;
 
-import java.util.List;
-
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
 
 import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
-import com.twitter.mesos.executor.HttpSignaler.SignalException;
+import com.twitter.mesos.executor.HttpSignaler.Method;
 
 /**
  * Function that checks the health of a process via HTTP signaling.
- *
- * @author William Farner
  */
 public class HealthChecker implements ExceptionalFunction<Integer, Boolean, HealthCheckException> {
 
@@ -22,18 +17,18 @@ public class HealthChecker implements ExceptionalFunction<Integer, Boolean, Heal
 
   private static final String HEALTH_CHECK_OK_VALUE = "ok";
 
-  private final ExceptionalFunction<String, List<String>, SignalException> httpSignaler;
+  private final HttpSignaler httpSignaler;
 
   @Inject
-  public HealthChecker(ExceptionalFunction<String, List<String>, SignalException> httpSignaler) {
+  public HealthChecker(HttpSignaler httpSignaler) {
     this.httpSignaler = Preconditions.checkNotNull(httpSignaler);
   }
 
   @Override
   public Boolean apply(Integer healthCheckPort) throws HealthCheckException {
     try {
-      List<String> lines = httpSignaler.apply(String.format(URL_FORMAT, healthCheckPort));
-      return HEALTH_CHECK_OK_VALUE.equalsIgnoreCase(Joiner.on("").join(lines).trim());
+      String response = httpSignaler.signal(Method.GET, String.format(URL_FORMAT, healthCheckPort));
+      return HEALTH_CHECK_OK_VALUE.equalsIgnoreCase(response.trim());
     } catch (HttpSignaler.SignalException e) {
       throw new HealthCheckException("Failed to check health.", e);
     }

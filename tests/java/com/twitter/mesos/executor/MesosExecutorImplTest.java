@@ -28,8 +28,6 @@ import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 
-/**
- */
 public class MesosExecutorImplTest extends EasyMockTest {
   private static final String TASK_ID = "TASK_ID";
   private static final String SLAVE_ID = "SLAVE_ID";
@@ -99,7 +97,7 @@ public class MesosExecutorImplTest extends EasyMockTest {
   public void testShutdown() {
     executorCore.setSlaveId(EasyMock.<String>anyObject());
     driver.init(executorDriver, EXECUTOR_INFO);
-    shutdownRegistry.addAction(EasyMock.<ExceptionalCommand>anyObject());
+    shutdownRegistry.addAction(EasyMock.<ExceptionalCommand<RuntimeException>>anyObject());
 
     Task task = createMock(Task.class);
     expect(executorCore.shutdownCore()).andReturn(ImmutableSet.of(task));
@@ -125,5 +123,4 @@ public class MesosExecutorImplTest extends EasyMockTest {
     mesosExecutor.shutdown(executorDriver);
     mesosExecutor.launchTask(executorDriver, taskDescription);
   }
-
 }

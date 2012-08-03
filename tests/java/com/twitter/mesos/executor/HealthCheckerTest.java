@@ -1,60 +1,47 @@
 package com.twitter.mesos.executor;
 
-import com.twitter.common.base.ExceptionalFunction;
-import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
-import com.twitter.mesos.executor.HttpSignaler.SignalException;
-import org.easymock.IMocksControl;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.util.Arrays;
-import java.util.List;
+import com.twitter.common.testing.EasyMockTest;
+import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
+import com.twitter.mesos.executor.HttpSignaler.Method;
+import com.twitter.mesos.executor.HttpSignaler.SignalException;
 
-import static org.easymock.EasyMock.createControl;
 import static org.easymock.EasyMock.expect;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 
-/**
- * @author William Farner
- */
-public class HealthCheckerTest {
+public class HealthCheckerTest extends EasyMockTest {
 
   private static final String SIGNAL_URL = "http://localhost:8080/health";
 
-  private IMocksControl control;
-  private ExceptionalFunction<String, List<String>, SignalException> signaler;
+  private HttpSignaler signaler;
   private HealthChecker healthChecker;
 
   @Before
   @SuppressWarnings("unchecked")
   public void setUp() {
-    control = createControl();
-    signaler = control.createMock(ExceptionalFunction.class);
+    signaler = createMock(HttpSignaler.class);
     healthChecker = new HealthChecker(signaler);
   }
 
   @Test
   public void testHealthy() throws SignalException, HealthCheckException {
-    expect(signaler.apply(SIGNAL_URL)).andReturn(Arrays.asList("ok"));
+    expect(signaler.signal(Method.GET, SIGNAL_URL)).andReturn("ok");
+    expect(signaler.signal(Method.GET, SIGNAL_URL)).andReturn("ok   \t\r\n");
+    expect(signaler.signal(Method.GET, SIGNAL_URL)).andReturn("OK");
 
     control.replay();
 
     assertThat(healthChecker.apply(8080), is(Boolean.TRUE));
-  }
-
-  @Test
-  public void testHealthyWithWhitespace() throws SignalException, HealthCheckException {
-    expect(signaler.apply(SIGNAL_URL)).andReturn(Arrays.asList("\t\r\n  ok\n\t \r"));
-
-    control.replay();
-
+    assertThat(healthChecker.apply(8080), is(Boolean.TRUE));
     assertThat(healthChecker.apply(8080), is(Boolean.TRUE));
   }
 
   @Test
   public void testUnhealthy() throws SignalException, HealthCheckException {
-    expect(signaler.apply(SIGNAL_URL)).andReturn(Arrays.asList(""));
+    expect(signaler.signal(Method.GET, SIGNAL_URL)).andReturn("");
 
     control.replay();
 
@@ -63,7 +50,7 @@ public class HealthCheckerTest {
 
   @Test(expected = HealthCheckException.class)
   public void testSignalingFailed() throws SignalException, HealthCheckException {
-    expect(signaler.apply(SIGNAL_URL)).andThrow(new SignalException("Signal failed."));
+    expect(signaler.signal(Method.GET, SIGNAL_URL)).andThrow(new SignalException("Signal failed."));
 
     control.replay();
 

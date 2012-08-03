@@ -3,7 +3,6 @@ package com.twitter.mesos.executor;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -16,23 +15,19 @@ import com.google.common.io.Closeables;
 import org.apache.commons.lang.builder.EqualsBuilder;
 
 import com.twitter.common.base.ExceptionalClosure;
-import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
-import com.twitter.mesos.executor.HttpSignaler.SignalException;
+import com.twitter.mesos.executor.HttpSignaler.Method;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
 import com.twitter.mesos.executor.ProcessKiller.KillException;
-import com.twitter.mesos.gen.ScheduleStatus;
 
 /**
  * Handles escalated killing of a process.
- *
- * @author William Farner
  */
 public class ProcessKiller implements ExceptionalClosure<KillCommand, KillException> {
   private static final Logger LOG = Logger.getLogger(ProcessKiller.class.getName());
 
-  private final ExceptionalFunction<String, List<String>, SignalException> httpSignaler;
+  private final HttpSignaler httpSignaler;
 
   private static final String URL_FORMAT = "http://localhost:%d/%s";
 
@@ -41,8 +36,11 @@ public class ProcessKiller implements ExceptionalClosure<KillCommand, KillExcept
   private final File killTreeScript;
   private final Amount<Long, Time> escalationDelay;
 
-  public ProcessKiller(ExceptionalFunction<String, List<String>, SignalException> httpSignaler,
-      File killTreeScript, Amount<Long, Time> escalationDelay) {
+  public ProcessKiller(
+      HttpSignaler httpSignaler,
+      File killTreeScript,
+      Amount<Long, Time> escalationDelay) {
+
     Preconditions.checkNotNull(killTreeScript);
     Preconditions.checkArgument(killTreeScript.canRead());
 
@@ -79,7 +77,7 @@ public class ProcessKiller implements ExceptionalClosure<KillCommand, KillExcept
 
   private void signal(int port, String endpoint) {
     try {
-      httpSignaler.apply(String.format(URL_FORMAT, port, endpoint));
+      httpSignaler.signal(Method.POST, String.format(URL_FORMAT, port, endpoint));
     } catch (HttpSignaler.SignalException e) {
       LOG.log(Level.INFO, "HTTP signal failed: " + endpoint, e);
     }
@@ -161,10 +159,6 @@ public class ProcessKiller implements ExceptionalClosure<KillCommand, KillExcept
   }
 
   public static class KillException extends Exception {
-    public KillException(String msg) {
-      super(msg);
-    }
-
     public KillException(String msg, Throwable t) {
       super(msg, t);
     }

@@ -2,7 +2,6 @@ package com.twitter.mesos.executor;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -45,7 +44,7 @@ import com.twitter.mesos.executor.FileCopier.HdfsFileCopier;
 import com.twitter.mesos.executor.FileDeleter.FileDeleterImpl;
 import com.twitter.mesos.executor.FileToInt.FetchException;
 import com.twitter.mesos.executor.HealthChecker.HealthCheckException;
-import com.twitter.mesos.executor.HttpSignaler.SignalException;
+import com.twitter.mesos.executor.HttpSignaler.HttpSignalerImpl;
 import com.twitter.mesos.executor.ProcessKiller.KillCommand;
 import com.twitter.mesos.executor.ProcessKiller.KillException;
 import com.twitter.mesos.executor.httphandlers.ExecutorHome;
@@ -151,8 +150,9 @@ public class ExecutorModule extends AbstractModule {
         .setDaemon(true)
         .setNameFormat("HTTP-signaler-%d")
         .build();
-    bind(new TypeLiteral<ExceptionalFunction<String, List<String>, SignalException>>() {})
-        .toInstance(new HttpSignaler(Executors.newCachedThreadPool(httpSignalThreadFactory),
+    bind(HttpSignaler.class).toInstance(
+        new HttpSignalerImpl(
+            Executors.newCachedThreadPool(httpSignalThreadFactory),
             HTTP_SIGNAL_TIMEOUT.get()));
 
     // Bindings needed for FileCopier
@@ -187,7 +187,7 @@ public class ExecutorModule extends AbstractModule {
 
   @Provides
   public ExceptionalClosure<KillCommand, KillException> provideProcessKiller(
-      ExceptionalFunction<String, List<String>, SignalException> httpSignaler) throws IOException {
+      HttpSignaler httpSignaler) throws IOException {
 
     return new ProcessKiller(httpSignaler, KILLTREE_PATH.get(), KILL_ESCALATION_DELAY.get());
   }
