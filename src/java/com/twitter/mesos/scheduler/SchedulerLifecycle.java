@@ -179,13 +179,12 @@ class SchedulerLifecycle implements RegisteredListener {
         if (status != null) {
           status.update(Status.DEAD);
         }
+
+        driver.stop(); // shut down incoming offers
+        scheduler.stop(); // shut down offer and slave update processing
       } catch (ServerSet.UpdateException e) {
         LOG.log(Level.WARNING, "Failed to leave server set.", e);
       } finally {
-        if (driver != null) {
-          driver.stop(); // shut down incoming offers
-          scheduler.stop(); // shut down offer and slave update processing
-        }
         lifecycle.shutdown(); // shut down the server
       }
     }
