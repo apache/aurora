@@ -1,6 +1,7 @@
 package com.twitter.mesos.scheduler;
 
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -20,6 +21,7 @@ import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.common.stats.Stats;
 import com.twitter.common.zookeeper.ServerSet;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.thrift.Status;
@@ -56,6 +58,7 @@ class SchedulerLifecycle implements RegisteredListener {
   private final SchedulerCore scheduler;
   private final Lifecycle lifecycle;
   private final CountDownLatch registeredLatch = new CountDownLatch(1);
+  private final AtomicInteger registeredFlag = Stats.exportInt("framework_registered");
 
   private final Driver driver;
   private final DriverReference driverRef;
@@ -89,6 +92,7 @@ class SchedulerLifecycle implements RegisteredListener {
   @Override
   public void registered(String frameworkId) throws RegisterHandlingException {
     registeredLatch.countDown();
+    registeredFlag.set(1);
   }
 
   /**

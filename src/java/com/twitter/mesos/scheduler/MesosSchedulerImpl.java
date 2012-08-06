@@ -2,7 +2,6 @@ package com.twitter.mesos.scheduler;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -58,7 +57,6 @@ public class MesosSchedulerImpl implements Scheduler {
   private final SchedulerCore schedulerCore;
   private final Lifecycle lifecycle;
   private volatile FrameworkID frameworkID = null;
-  private final AtomicInteger registeredFlag = Stats.exportInt("framework_registered");
 
   /**
    * Creates a new mesos scheduler.
@@ -90,7 +88,6 @@ public class MesosSchedulerImpl implements Scheduler {
   public void registered(SchedulerDriver driver, FrameworkID frameworkId, MasterInfo masterInfo) {
     LOG.info("Registered with ID " + frameworkId + ", master: " + masterInfo);
 
-    registeredFlag.set(1);
     this.frameworkID = frameworkId;
     try {
       registeredListener.registered(frameworkId.getValue());
