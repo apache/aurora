@@ -8,7 +8,6 @@ import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableSet;
@@ -41,8 +40,6 @@ import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
  *
  * To avoid excessive churn, the preempter requires that a task is PENDING for a duration (dictated
  * by {@link #preemptionCandidacyDelay}) before it becomes eligible to preempt other tasks.
- *
- * @author William Farner
  */
 class Preempter implements Runnable {
 
@@ -141,7 +138,7 @@ class Preempter implements Runnable {
 
       AssignedTask preempting = null;
       for (AssignedTask task : Iterables.filter(pendingTasks, preemptionFilter)) {
-        if (schedulingFilter.filter(slot, Optional.of(host), task.getTask()).isEmpty()) {
+        if (schedulingFilter.filter(slot, host, task.getTask()).isEmpty()) {
           preempting = task;
           break;
         }

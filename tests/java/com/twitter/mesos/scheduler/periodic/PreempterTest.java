@@ -2,7 +2,6 @@ package com.twitter.mesos.scheduler.periodic;
 
 import java.util.Set;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
 import org.easymock.EasyMock;
@@ -31,9 +30,6 @@ import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 import static com.twitter.mesos.scheduler.SchedulingFilter.Veto;
 
-/**
- * @author William Farner
- */
 public class PreempterTest extends EasyMockTest {
 
   private static final String USER_A = "user_a";
@@ -271,7 +267,7 @@ public class PreempterTest extends EasyMockTest {
 
   private IExpectationSetters<Set<Veto>> expectFiltering() {
     return expect(schedulingFilter.filter(EasyMock.<Resources>anyObject(),
-        EasyMock.<Optional<String>>anyObject(),
+        EasyMock.<String>anyObject(),
         EasyMock.<TwitterTaskInfo>anyObject())).andAnswer(
         new IAnswer<Set<Veto>>() {
           @Override public Set<Veto> answer() {

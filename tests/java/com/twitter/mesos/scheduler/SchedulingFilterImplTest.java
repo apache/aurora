@@ -3,9 +3,6 @@ package com.twitter.mesos.scheduler;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicLong;
 
-import javax.annotation.Nullable;
-
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 
@@ -38,9 +35,7 @@ import com.twitter.mesos.scheduler.storage.TaskStore;
 
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.expect;
-import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
 import static com.twitter.mesos.scheduler.ConstraintFilter.constraintVeto;
@@ -51,9 +46,6 @@ import static com.twitter.mesos.scheduler.SchedulingFilterImpl.PORTS;
 import static com.twitter.mesos.scheduler.SchedulingFilterImpl.RAM;
 import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 
-/**
- * @author William Farner
- */
 public class SchedulingFilterImplTest extends EasyMockTest {
 
   private static final String HOST_A = "hostA";
@@ -119,6 +111,8 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
   @Test
   public void testMeetsOffer() throws Exception {
+    expectGetHostAttributes(HOST_A, host(HOST_A)).atLeastOnce();
+
     control.replay();
 
     assertNoVetoes(makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK));
@@ -127,6 +121,8 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
   @Test
   public void testSufficientPorts() throws Exception {
+    expectGetHostAttributes(HOST_A, host(HOST_A)).atLeastOnce();
+
     control.replay();
 
     Resources twoPorts = new Resources(DEFAULT_CPUS, Amount.of(DEFAULT_RAM, Data.MB),
@@ -141,11 +137,10 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     TwitterTaskInfo threePortTask = makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
         .setRequestedPorts(ImmutableSet.of("one", "two", "three"));
 
-    assertTrue(defaultFilter.filter(twoPorts, Optional.<String>absent(), noPortTask).isEmpty());
-    assertTrue(defaultFilter.filter(twoPorts, Optional.<String>absent(), onePortTask).isEmpty());
-    assertTrue(defaultFilter.filter(twoPorts, Optional.<String>absent(), twoPortTask).isEmpty());
-    assertEquals(ImmutableSet.of(PORTS),
-        defaultFilter.filter(twoPorts, Optional.<String>absent(), threePortTask));
+    assertTrue(defaultFilter.filter(twoPorts, HOST_A, noPortTask).isEmpty());
+    assertTrue(defaultFilter.filter(twoPorts, HOST_A, onePortTask).isEmpty());
+    assertTrue(defaultFilter.filter(twoPorts, HOST_A, twoPortTask).isEmpty());
+    assertEquals(ImmutableSet.of(PORTS), defaultFilter.filter(twoPorts, HOST_A, threePortTask));
   }
 
   @Test
@@ -302,9 +297,8 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     Constraint jvmConstraint = makeConstraint("jvm", "1.6");
     Constraint zoneConstraint = makeConstraint("zone", "c");
 
-    assertThat(defaultFilter.filter(DEFAULT_OFFER, Optional.of(HOST_A),
-        makeTask(OWNER_A, JOB_A, jvmConstraint, zoneConstraint)).isEmpty(),
-        is(true));
+    TwitterTaskInfo task = makeTask(OWNER_A, JOB_A, jvmConstraint, zoneConstraint);
+    assertTrue(defaultFilter.filter(DEFAULT_OFFER, HOST_A, task).isEmpty());
 
     Constraint jvmNegated = jvmConstraint.deepCopy();
     jvmNegated.getConstraint().getValue().setNegated(true);
@@ -330,30 +324,29 @@ public class SchedulingFilterImplTest extends EasyMockTest {
       boolean expected, ValueConstraint value) {
 
     Constraint constraint = new Constraint(constraintName, TaskConstraint.value(value));
-    assertThat(defaultFilter.filter(DEFAULT_OFFER, Optional.of(host),
-        makeTask(owner, jobName, constraint)).isEmpty(), is(expected));
+    assertEquals(expected,
+        defaultFilter.filter(DEFAULT_OFFER, host, makeTask(owner, jobName, constraint)).isEmpty());
 
     Constraint negated = constraint.deepCopy();
     negated.getConstraint().getValue().setNegated(!value.isNegated());
-    assertThat(defaultFilter.filter(DEFAULT_OFFER, Optional.of(host),
-        makeTask(owner, jobName, negated)).isEmpty(), is(!expected));
+    assertEquals(!expected,
+        defaultFilter.filter(DEFAULT_OFFER, host, makeTask(owner, jobName, negated)).isEmpty());
   }
 
   private void assertNoVetoes(TwitterTaskInfo task) {
-    assertNoVetoes(task, null);
+    assertNoVetoes(task, HOST_A);
   }
 
-  private void assertNoVetoes(TwitterTaskInfo task, @Nullable String host) {
+  private void assertNoVetoes(TwitterTaskInfo task, String host) {
     assertVetoes(task, host);
   }
 
   private void assertVetoes(TwitterTaskInfo task, Veto... vetos) {
-    assertVetoes(task, null, vetos);
+    assertVetoes(task, HOST_A, vetos);
   }
 
-  private void assertVetoes(TwitterTaskInfo task, @Nullable String host, Veto... vetoes) {
-    assertEquals(ImmutableSet.copyOf(vetoes), defaultFilter.filter(
-        DEFAULT_OFFER, host == null ? Optional.<String>absent() : Optional.of(host), task));
+  private void assertVetoes(TwitterTaskInfo task, String host, Veto... vetoes) {
+    assertEquals(ImmutableSet.copyOf(vetoes), defaultFilter.filter(DEFAULT_OFFER, host, task));
   }
 
   private Attribute valueAttribute(String name, String string, String... strings) {
@@ -371,8 +364,10 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         .andReturn(ImmutableSet.copyOf(tasks));
   }
 
-  private IExpectationSetters<Iterable<Attribute>> expectGetHostAttributes(String host,
+  private IExpectationSetters<Iterable<Attribute>> expectGetHostAttributes(
+      String host,
       Attribute... attributes) {
+
     return expect(attributeStore.getHostAttributes(host)).andReturn(Arrays.asList(attributes));
   }
 

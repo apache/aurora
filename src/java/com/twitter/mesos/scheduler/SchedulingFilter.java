@@ -3,21 +3,16 @@ package com.twitter.mesos.scheduler;
 import java.util.Set;
 
 import com.google.common.base.Objects;
-import com.google.common.base.Optional;
 
 import com.twitter.mesos.gen.TwitterTaskInfo;
 
 /**
  * Determines whether a proposed scheduling assignment should be allowed.
- *
- * @author William Farner
  */
 public interface SchedulingFilter {
 
   /**
    * Reason for a proposed scheduling assignment to be filtered out.
-   *
-   * @author William Farner
    */
   public static class Veto {
     private final String reason;
@@ -52,7 +47,7 @@ public interface SchedulingFilter {
   }
 
   /**
-   * Applies a task against the filter with the given resources, and on the (optional) host.
+   * Applies a task against the filter with the given resources, and on the host.
    *
    * @param resourceOffer Resources offered.
    * @param slaveHost Host that the resources are associated with.
@@ -60,5 +55,5 @@ public interface SchedulingFilter {
    * @return A set of vetoes indicating reasons the task cannot be scheduled.  If the task may be
    *    scheduled, the set will be empty.
    */
-  Set<Veto> filter(Resources resourceOffer, Optional<String> slaveHost, TwitterTaskInfo task);
+  Set<Veto> filter(Resources resourceOffer, String slaveHost, TwitterTaskInfo task);
 }

@@ -64,14 +64,14 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   /**
    * A function that may veto a task.
    */
-  private interface FilterRule extends Function<TwitterTaskInfo, Iterable<Optional<Veto>>> { }
+  private interface FilterRule extends Function<TwitterTaskInfo, Iterable<Veto>> { }
 
   /**
    * Convenience class for a rule that will only ever have a single veto.
    */
   private abstract static class SingleVetoRule implements FilterRule {
-    @Override public final Iterable<Optional<Veto>> apply(TwitterTaskInfo task) {
-      return ImmutableList.of(doApply(task));
+    @Override public final Iterable<Veto> apply(TwitterTaskInfo task) {
+      return doApply(task).asSet();
     }
 
     abstract Optional<Veto> doApply(TwitterTaskInfo task);
@@ -109,13 +109,13 @@ public class SchedulingFilterImpl implements SchedulingFilter {
 
   private FilterRule getConstraintFilter(final String slaveHost) {
     return new FilterRule() {
-      @Override public Iterable<Optional<Veto>> apply(final TwitterTaskInfo task) {
+      @Override public Iterable<Veto> apply(final TwitterTaskInfo task) {
         if (!task.isSetConstraints()) {
-          return ImmutableList.of(Optional.<Veto>absent());
+          return ImmutableList.of();
         }
 
-        return storage.doInTransaction(new Quiet<Iterable<Optional<Veto>>>() {
-          @Override public Iterable<Optional<Veto>> apply(final StoreProvider storeProvider) {
+        return storage.doInTransaction(new Quiet<Iterable<Veto>>() {
+          @Override public Iterable<Veto> apply(final StoreProvider storeProvider) {
             AttributeLoader attributeLoader = new AttributeLoader() {
               @Override public Iterable<Attribute> apply(String host) {
                 return storeProvider.getAttributeStore().getHostAttributes(host);
@@ -130,12 +130,12 @@ public class SchedulingFilterImpl implements SchedulingFilter {
                   }
                 });
 
-            return Iterables.transform(task.getConstraints(),
+            return Optional.presentInstances(Iterables.transform(task.getConstraints(),
                 new ConstraintFilter(
                     Tasks.jobKey(task),
                     activeTasksSupplier,
                     attributeLoader,
-                    attributeLoader.apply(slaveHost)));
+                    attributeLoader.apply(slaveHost))));
           }
         });
       }
@@ -145,7 +145,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   private Iterable<Veto> applyRules(Iterable<FilterRule> rules, TwitterTaskInfo task) {
     ImmutableList.Builder<Veto> builder = ImmutableList.builder();
     for (FilterRule rule: rules) {
-      builder.addAll(Optional.presentInstances(rule.apply(task)));
+      builder.addAll(rule.apply(task));
     }
     return builder.build();
   }
@@ -161,26 +161,18 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   }
 
   @Override
-  public Set<Veto> filter(Resources resourceOffer, Optional<String> slaveHost,
-      TwitterTaskInfo task) {
-
-    final Iterable<FilterRule> staticRules = rulesFromOffer(resourceOffer);
-
-    Iterable<Veto> staticVetos = applyRules(staticRules, task);
+  public Set<Veto> filter(Resources resourceOffer, String slaveHost, TwitterTaskInfo task) {
+    Iterable<Veto> staticVetos = applyRules(rulesFromOffer(resourceOffer), task);
     if (!Iterables.isEmpty(staticVetos)) {
       return ImmutableSet.copyOf(staticVetos);
-    } else if (slaveHost.isPresent()) {
-      Set<Veto> vetoes;
-      if (!ConfigurationManager.isDedicated(task) && isDedicated(slaveHost.get())) {
-        vetoes = ImmutableSet.of(DEDICATED_HOST_VETO);
-      } else {
-        vetoes = ImmutableSet.copyOf(
-            Optional.presentInstances(getConstraintFilter(slaveHost.get()).apply(task)));
-      }
-
-      return vetoes;
-    } else {
-      return ImmutableSet.of();
     }
+    Set<Veto> vetoes;
+    if (!ConfigurationManager.isDedicated(task) && isDedicated(slaveHost)) {
+      vetoes = ImmutableSet.of(DEDICATED_HOST_VETO);
+    } else {
+      vetoes = ImmutableSet.copyOf(getConstraintFilter(slaveHost).apply(task));
+    }
+
+    return vetoes;
   }
 }

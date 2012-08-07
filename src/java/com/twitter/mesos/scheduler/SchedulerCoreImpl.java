@@ -300,8 +300,10 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
     LOG.fine("Candidates for offer: " + Tasks.ids(candidates));
 
     for (ScheduledTask task : candidates) {
-      Set<Veto> vetoes = schedulingFilter.filter(Resources.from(offer),
-          Optional.of(offer.getHostname()), task.getAssignedTask().getTask());
+      Set<Veto> vetoes = schedulingFilter.filter(
+          Resources.from(offer),
+          offer.getHostname(),
+          task.getAssignedTask().getTask());
       if (vetoes.isEmpty()) {
         return Optional.of(assignTask(offer, task));
       } else {
