@@ -17,19 +17,20 @@ class HttpSignaler(object):
   def url(self, endpoint):
     return self._url_base + endpoint
 
-  def __call__(self, endpoint, expected_response=None):
+  def __call__(self, endpoint, use_post_method, expected_response=None):
     try:
-      with contextlib.closing(urlopen(self.url(endpoint), timeout=self.TIMEOUT_SECS)) as fp:
+      data = '' if use_post_method else None
+      with contextlib.closing(urlopen(self.url(endpoint), data, timeout=self.TIMEOUT_SECS)) as fp:
         response = fp.read().strip().lower()
         return response == expected_response if expected_response is not None else True
     except URLError as e:
       return False
 
   def health(self):
-    return self('health', 'ok')
+    return self('health', use_post_method=False, expected_response='ok')
 
   def quitquitquit(self):
-    return self('quitquitquit')
+    return self('quitquitquit', use_post_method=True)
 
   def abortabortabort(self):
-    return self('abortabortabort')
+    return self('abortabortabort', use_post_method=True)

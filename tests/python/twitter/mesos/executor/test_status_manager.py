@@ -59,11 +59,17 @@ class MainHandler(tornado.web.RequestHandler):
     self.requests = requests
     self.event = event
 
-  def get(self):
-    print('Get called: %s' % self.request)
-    self.requests.add(self.request.uri)
+  def _record(self):
+    print('%s called: %s' % (self.request.method, self.request))
+    self.requests.add((self.request.method, self.request.uri))
     self.write(self.health.value)
     self.event.set()
+
+  def get(self):
+    self._record()
+
+  def post(self):
+    self._record()
 
 
 class HttpThread(threading.Thread):
@@ -99,15 +105,17 @@ class TestSignaler(unittest.TestCase):
   def test_basic_ok(self):
     signaler = HttpSignaler(self.http.port)
     assert signaler.health()
-    assert self.http.requests.q == ['/health']
+    assert self.http.requests.q == [('GET', '/health')]
     assert signaler.quitquitquit()
     assert signaler.abortabortabort()
-    assert self.http.requests.q == ['/health', '/quitquitquit', '/abortabortabort']
+    assert self.http.requests.q == [('GET', '/health'),
+                                    ('POST', '/quitquitquit'),
+                                    ('POST', '/abortabortabort')]
 
     self.http.requests.clear()
     self.http.health.value = 'bad'
     assert not signaler.health()
-    assert self.http.requests.q == ['/health']
+    assert self.http.requests.q == [('GET', '/health')]
 
   def test_faulty_server(self):
     signaler = HttpSignaler(self.http.port)
