@@ -65,7 +65,7 @@ public final class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         }
 
         @Override public void restoreFromSnapshot(StoreProvider storeProvider, Snapshot snapshot) {
-          storeProvider.getTaskStore().removeTasks(Query.GET_ALL);
+          storeProvider.getTaskStore().deleteTasks();
 
           if (snapshot.isSetTasks()) {
             storeProvider.getTaskStore().saveTasks(snapshot.getTasks());

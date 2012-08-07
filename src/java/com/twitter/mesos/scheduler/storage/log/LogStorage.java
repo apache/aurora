@@ -48,6 +48,7 @@ import com.twitter.mesos.gen.storage.SaveJobUpdate;
 import com.twitter.mesos.gen.storage.SaveQuota;
 import com.twitter.mesos.gen.storage.SaveTasks;
 import com.twitter.mesos.gen.storage.Snapshot;
+import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerException;
 import com.twitter.mesos.scheduler.log.Log.Stream.InvalidPositionException;
 import com.twitter.mesos.scheduler.log.Log.Stream.StreamAccessException;
@@ -363,7 +364,7 @@ public class LogStorage extends ForwardingStore {
         break;
 
       case REMOVE_TASKS:
-        removeTasks(op.getRemoveTasks().getTaskIds());
+        deleteTasks(op.getRemoveTasks().getTaskIds());
         break;
 
       case SAVE_QUOTA:
@@ -507,23 +508,23 @@ public class LogStorage extends ForwardingStore {
   }
 
   @Override
-  public void removeTasks(final TaskQuery query) {
+  public void deleteTasks() {
     doInTransaction(new Work.NoResult.Quiet() {
       @Override protected void execute(StoreProvider storeProvider) {
         // TODO(John Sirois): this forces an id fetch whereas DbStorage skips a fetch when it can
         // doing DELETE FROM WHERE ... perhaps this is the best we can do.
-        removeTasks(storeProvider.getTaskStore().fetchTaskIds(query));
+        deleteTasks(storeProvider.getTaskStore().fetchTaskIds(Query.GET_ALL));
       }
     });
   }
 
   @Timed("scheduler_log_tasks_remove")
   @Override
-  public void removeTasks(final Set<String> taskIds) {
+  public void deleteTasks(final Set<String> taskIds) {
     doInTransaction(new Work.NoResult.Quiet() {
       @Override protected void execute(StoreProvider unused) {
         log(Op.removeTasks(new RemoveTasks(taskIds)));
-        LogStorage.super.removeTasks(taskIds);
+        LogStorage.super.deleteTasks(taskIds);
       }
     });
   }

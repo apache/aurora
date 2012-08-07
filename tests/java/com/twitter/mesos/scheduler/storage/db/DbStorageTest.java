@@ -147,7 +147,7 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
     store(ImmutableList.of(makeTask("task2"), makeTask("task3")));
     assertEquals(3, store.getTaskStoreSize());
 
-    store.removeTasks(Query.GET_ALL);
+    store.deleteTasks();
     assertEquals(0, store.getTaskStoreSize());
   }
 

@@ -144,7 +144,7 @@ public abstract class BaseTaskStoreTest<T extends TaskStore> extends TearDownTes
   @Test
   public void testRemove() {
     store(tasks);
-    store.removeTasks(Sets.newHashSet(taskA.getAssignedTask().getTaskId()));
+    store.deleteTasks(Sets.newHashSet(taskA.getAssignedTask().getTaskId()));
     assertEquals(taskB, Iterables.getOnlyElement(store.fetchTasks(Query.GET_ALL)));
   }
 

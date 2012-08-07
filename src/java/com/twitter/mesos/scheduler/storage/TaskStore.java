@@ -26,18 +26,16 @@ public interface TaskStore {
   void saveTasks(Set<ScheduledTask> tasks);
 
   /**
-   * Removes tasks from the store.
-   *
-   * @param query The query whose matching tasks should be removed.
+   * Removes all tasks from the store.
    */
-  void removeTasks(TaskQuery query);
+  void deleteTasks();
 
   /**
-   * Convenience function for {@link #removeTasks(TaskQuery)} to remove by ID.
+   * Deletes specific tasks from the store.
    *
-   * @param taskIds IDs of tasks to remove.
+   * @param taskIds IDs of tasks to delete.
    */
-  void removeTasks(Set<String> taskIds);
+  void deleteTasks(Set<String> taskIds);
 
   /**
    * Offers temporary mutable access to tasks.  If a task ID is not found, it will be silently

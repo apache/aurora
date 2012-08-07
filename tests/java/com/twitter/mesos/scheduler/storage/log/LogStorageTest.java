@@ -359,7 +359,7 @@ public class LogStorageTest extends EasyMockTest {
         storageUtil.expectTransactions();
         expect(storageUtil.taskStore.mutateTasks(query, mutation)).andReturn(mutated);
 
-        storageUtil.taskStore.removeTasks(tasksToRemove);
+        storageUtil.taskStore.deleteTasks(tasksToRemove);
 
         expectStreamTransaction(Op.saveTasks(new SaveTasks(mutated)),
             Op.removeTasks(new RemoveTasks(tasksToRemove)));
@@ -372,7 +372,7 @@ public class LogStorageTest extends EasyMockTest {
             logStorage.doInTransaction(new Work.NoResult.Quiet() {
               @Override
               protected void execute(StoreProvider innerProvider) {
-                innerProvider.getTaskStore().removeTasks(tasksToRemove);
+                innerProvider.getTaskStore().deleteTasks(tasksToRemove);
               }
             });
           }
@@ -451,12 +451,12 @@ public class LogStorageTest extends EasyMockTest {
       @Override protected void setupExpectations() throws Exception {
         storageUtil.expectTransactions();
         expect(storageUtil.taskStore.fetchTaskIds(Query.GET_ALL)).andReturn(taskIds);
-        storageUtil.taskStore.removeTasks(taskIds);
+        storageUtil.taskStore.deleteTasks(taskIds);
         expectStreamTransaction(Op.removeTasks(new RemoveTasks(taskIds)));
       }
 
       @Override protected void performMutations() {
-        logStorage.removeTasks(Query.GET_ALL);
+        logStorage.deleteTasks();
       }
     };
   }
@@ -467,12 +467,12 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override protected void setupExpectations() throws Exception {
         storageUtil.expectTransactions();
-        storageUtil.taskStore.removeTasks(taskIds);
+        storageUtil.taskStore.deleteTasks(taskIds);
         expectStreamTransaction(Op.removeTasks(new RemoveTasks(taskIds)));
       }
 
       @Override protected void performMutations() {
-        logStorage.removeTasks(taskIds);
+        logStorage.deleteTasks(taskIds);
       }
     };
   }

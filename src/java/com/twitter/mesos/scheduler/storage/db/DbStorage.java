@@ -527,19 +527,17 @@ public class DbStorage implements
 
   @Timed("db_storage_remove_tasks")
   @Override
-  public void removeTasks(final TaskQuery query) {
-    checkNotNull(query);
-
+  public void deleteTasks() {
     transactionTemplate.execute(new TransactionCallbackWithoutResult() {
       @Override protected void doInTransactionWithoutResult(TransactionStatus status) {
-        remove(createWhereClause(query));
+        remove(createWhereClause(Query.GET_ALL));
       }
     });
   }
 
   @Timed("db_storage_remove_tasks_by_id")
   @Override
-  public void removeTasks(final Set<String> taskIds) {
+  public void deleteTasks(final Set<String> taskIds) {
     if (!taskIds.isEmpty()) {
       LOG.info("Removing tasks: " + taskIds);
       transactionTemplate.execute(new TransactionCallbackWithoutResult() {

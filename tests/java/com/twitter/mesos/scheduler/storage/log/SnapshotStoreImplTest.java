@@ -123,7 +123,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
   }
 
   private void expectDataWipe() {
-    storageUtil.taskStore.removeTasks(Query.GET_ALL);
+    storageUtil.taskStore.deleteTasks();
     storageUtil.quotaStore.deleteQuotas();
     storageUtil.attributeStore.deleteHostAttributes();
     storageUtil.jobStore.deleteJobs();

@@ -139,13 +139,13 @@ public class ForwardingStore implements
   }
 
   @Override
-  public void removeTasks(TaskQuery query) {
-    taskStore.removeTasks(query);
+  public void deleteTasks() {
+    taskStore.deleteTasks();
   }
 
   @Override
-  public void removeTasks(Set<String> taskIds) {
-    taskStore.removeTasks(taskIds);
+  public void deleteTasks(Set<String> taskIds) {
+    taskStore.deleteTasks(taskIds);
   }
 
   @Override

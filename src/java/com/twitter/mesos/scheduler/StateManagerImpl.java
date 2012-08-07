@@ -1055,7 +1055,7 @@ public class StateManagerImpl implements StateManager {
           }
         });
 
-        taskStore.removeTasks(taskIds);
+        taskStore.deleteTasks(taskIds);
       }
     });
   }
