@@ -32,8 +32,6 @@ HDFS_BIN_FILES = {
   'mesos/scripts/executor.sh': '%s/$cluster/$dc-$cluster-executor.sh' % HDFS_BIN_DIR,
   'dist/mesos-executor.zip':  '%s/$cluster/mesos-executor.zip' % HDFS_BIN_DIR,
   'dist/process_scraper.pex':  '%s/$cluster/process_scraper.pex' % HDFS_BIN_DIR,
-  'dist/thermos_executor.pex':  '%s/$cluster/thermos_executor.pex' % HDFS_BIN_DIR,
-  'dist/gc_executor.pex':  '%s/$cluster/gc_executor.pex' % HDFS_BIN_DIR,
 }
 
 MESOS_HOME = '/usr/local/mesos'
@@ -75,10 +73,7 @@ def get_build_target_commands():
   return [
     './pants goal bundle mesos:scheduler --bundle-archive=zip',
     './pants goal bundle mesos:executor-%s --bundle-archive=zip' % get_hadoop_version(),
-    './pants src/python/twitter/mesos/executor:thermos_executor',
-    './pants src/python/twitter/mesos/executor:thermos_runner',
     './pants src/python/twitter/mesos:process_scraper',
-    './pants src/python/twitter/mesos/executor:gc_executor',
   ]
 
 
@@ -213,14 +208,6 @@ def check_tag(tag, check_on_master=True):
   return tag_sha
 
 
-def thermos_postprocess():
-  import contextlib
-  import zipfile
-  with contextlib.closing(zipfile.ZipFile('dist/thermos_executor.pex', 'a')) as zf:
-    zf.writestr('twitter/mesos/executor/resources/__init__.py', '')
-    zf.write('dist/thermos_runner.pex', 'twitter/mesos/executor/resources/thermos_runner.pex')
-
-
 def build():
   for test_cmd in TEST_CMDS:
     print 'Executing test command: %s' % test_cmd
@@ -228,7 +215,6 @@ def build():
   for build_target_cmd in get_build_target_commands():
     print 'Executing build command: %s' % build_target_cmd
     check_call(build_target_cmd.split(' '))
-  thermos_postprocess()
 
 
 def find_current_build(hosts):
