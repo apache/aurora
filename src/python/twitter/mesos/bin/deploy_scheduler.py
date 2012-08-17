@@ -28,11 +28,6 @@ STAGED_PACKAGE_PATH = '%s/%s' % (STAGE_DIR, SCHEDULER_PACKAGE)
 DC_WILDCARD = '$dc'
 CLUSTER_WILDCARD = '$cluster'
 HDFS_BIN_DIR = '/mesos/pkg/mesos/bin'
-HDFS_BIN_FILES = {
-  'mesos/scripts/executor.sh': '%s/$cluster/$dc-$cluster-executor.sh' % HDFS_BIN_DIR,
-  'dist/mesos-executor.zip':  '%s/$cluster/mesos-executor.zip' % HDFS_BIN_DIR,
-  'dist/process_scraper.pex':  '%s/$cluster/process_scraper.pex' % HDFS_BIN_DIR,
-}
 
 MESOS_HOME = '/usr/local/mesos'
 LIVE_BUILD_PATH = '%s/current' % MESOS_HOME
@@ -72,10 +67,19 @@ def get_hadoop_config():
 def get_build_target_commands():
   return [
     './pants goal bundle mesos:scheduler --bundle-archive=zip',
-    './pants goal bundle mesos:executor-%s --bundle-archive=zip' % get_hadoop_version(),
+    './pants goal bundle mesos:executor-cdh2 --bundle-outdir=dist/cdh2 --bundle-archive=zip',
+    './pants goal bundle mesos:executor-cdh3 --bundle-outdir=dist/cdh3 --bundle-archive=zip',
     './pants src/python/twitter/mesos:process_scraper',
   ]
 
+
+def get_hdfs_bin_files():
+  executor_dist = 'dist/%s/mesos-executor.zip' % get_hadoop_version()
+  return {
+    'mesos/scripts/executor.sh': '%s/$cluster/$dc-$cluster-executor.sh' % HDFS_BIN_DIR,
+    executor_dist: '%s/$cluster/mesos-executor.zip' % HDFS_BIN_DIR,
+    'dist/process_scraper.pex':  '%s/$cluster/process_scraper.pex' % HDFS_BIN_DIR,
+  }
 
 
 def get_scheduler_machines():
@@ -209,6 +213,11 @@ def check_tag(tag, check_on_master=True):
 
 
 def build():
+  # We need a clean pex bootstrap cache so the HEAD bootstrap code is included in pexes the build
+  # creates.  The bootstrap cache lives inside pants.pex - so we remove it to allow a fresh cache to
+  # be built.
+  os.unlink('pants.pex')
+
   for test_cmd in TEST_CMDS:
     print 'Executing test command: %s' % test_cmd
     check_call(test_cmd.split(' '))
@@ -284,7 +293,7 @@ def stage_build(hosts):
     DC_WILDCARD: get_cluster_dc(),
     CLUSTER_WILDCARD: get_cluster_name()
   }
-  for local_file, hdfs_target in HDFS_BIN_FILES.items():
+  for local_file, hdfs_target in get_hdfs_bin_files().items():
     for wildcard, value in wildcards.items():
       local_file = local_file.replace(wildcard, value)
       hdfs_target = hdfs_target.replace(wildcard, value)
