@@ -17,10 +17,7 @@ def create_packer(cluster):
   if Location.is_corp():
     zk_host, zk_port = TunnelHelper.create_tunnel(zk_host, zk_port)
 
-  zk_client = ZooKeeper(
-      servers='%s:%d' % (zk_host, zk_port),
-      timeout_secs=_ZK_TIMEOUT_SECS,
-      logger=log.info)
+  zk_client = ZooKeeper(servers='%s:%d' % (zk_host, zk_port), timeout_secs=_ZK_TIMEOUT_SECS)
 
   nodes = zk_client.get_children(cluster.packer_zk_path)
   log.debug('Found nodes: %s' % ', '.join(nodes))
