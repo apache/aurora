@@ -101,6 +101,9 @@ def get_config(jobname, config_file, packer_factory):
       role, name, version = package
       log.info('Fetching metadata for package %s/%s version %s.' % package)
       metadata = packer_factory(config.cluster()).get_version(role, name, version)
+      latest_audit = sorted(metadata['auditLog'], key=lambda a: a['timestamp'])[-1]
+      if latest_audit['state'] == 'DELETED':
+        _die('The requested package version has been deleted.')
       config.set_hdfs_path(metadata['uri'])
     return config
   elif config_type == 'thermos':

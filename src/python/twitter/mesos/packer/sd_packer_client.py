@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import os
 import random
 
@@ -25,7 +23,7 @@ def create_packer(cluster):
       logger=log.info)
 
   nodes = zk_client.get_children(cluster.packer_zk_path)
-  print(', '.join(nodes))
+  log.debug('Found nodes: %s' % ', '.join(nodes))
   random.shuffle(nodes)
   target_node = nodes[0]
   data, _ = zk_client.get(os.path.join(cluster.packer_zk_path, target_node))
@@ -33,12 +31,11 @@ def create_packer(cluster):
   instance = serverset_util.decode_service_instance(data)
   packer_host, packer_port = instance.serviceEndpoint.host, instance.serviceEndpoint.port
 
-  print('Selecting host %s:%s' % (packer_host, packer_port))
+  log.debug('Selecting host %s:%s' % (packer_host, packer_port))
   if Location.is_corp():
     packer_host, packer_port = TunnelHelper.create_tunnel(packer_host, packer_port)
   # TODO(wfarner): Fix this in TunnelHelper. We sleep since the tunnel process may still be
   #   starting but not established.
   import time
   time.sleep(1)
-  print('Connecting to %s:%s' % (packer_host, packer_port))
   return Packer(packer_host, packer_port)
