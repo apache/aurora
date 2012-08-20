@@ -14,6 +14,7 @@ import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
 
 import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Data;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Attribute;
 import com.twitter.mesos.gen.ScheduledTask;
@@ -25,8 +26,10 @@ import com.twitter.mesos.scheduler.storage.Storage.Work.Quiet;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import static com.twitter.common.quantity.Data.BYTES;
-import static com.twitter.common.quantity.Data.MB;
+import static com.twitter.mesos.scheduler.SchedulingFilterImpl.ResourceVector.CPU;
+import static com.twitter.mesos.scheduler.SchedulingFilterImpl.ResourceVector.DISK;
+import static com.twitter.mesos.scheduler.SchedulingFilterImpl.ResourceVector.PORTS;
+import static com.twitter.mesos.scheduler.SchedulingFilterImpl.ResourceVector.RAM;
 import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 
 /**
@@ -36,11 +39,8 @@ import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.DED
  */
 public class SchedulingFilterImpl implements SchedulingFilter {
 
-  @VisibleForTesting static final Veto CPU = new Veto("Insufficient CPU");
-  @VisibleForTesting static final Veto RAM = new Veto("Insufficient RAM");
-  @VisibleForTesting static final Veto DISK = new Veto("Insufficient disk");
-  @VisibleForTesting static final Veto PORTS = new Veto("Insufficient ports");
-  @VisibleForTesting static final Veto DEDICATED_HOST_VETO = new Veto("Host is dedicated");
+  @VisibleForTesting static final Veto DEDICATED_HOST_VETO =
+      new Veto("Host is dedicated", Veto.MAX_SCORE);
 
   private static final Optional<Veto> NO_VETO = Optional.absent();
 
@@ -77,31 +77,64 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     abstract Optional<Veto> doApply(TwitterTaskInfo task);
   }
 
+  // Scaling ranges to use for comparison of vetos.  This has no real bearing besides trying to
+  // determine if a veto along one resource vector is a 'stronger' veto than that of another vector.
+  // The values below represent the maximum resources on a typical slave machine.
+  @VisibleForTesting
+  enum ResourceVector {
+    CPU("CPU", 16),
+    RAM("RAM", Amount.of(24, Data.GB).as(Data.MB)),
+    DISK("disk", Amount.of(450, Data.GB).as(Data.MB)),
+    PORTS("ports", 1000);
+
+    private final String name;
+    @VisibleForTesting
+    final int range;
+
+    private ResourceVector(String name, int range) {
+      this.name = name;
+      this.range = range;
+    }
+
+    Optional<Veto> maybeVeto(double available, double requested) {
+      double tooLarge = requested - available;
+      if (tooLarge <= 0) {
+        return NO_VETO;
+      } else {
+        return Optional.of(veto(tooLarge));
+      }
+    }
+
+    private static int scale(double value, int range) {
+      return Math.min(Veto.MAX_SCORE, (int) ((Veto.MAX_SCORE * value)) / range);
+    }
+
+    @VisibleForTesting
+    Veto veto(double excess) {
+      return new Veto("Insufficient " + name, scale(excess, range));
+    }
+  }
+
   private Iterable<FilterRule> rulesFromOffer(final Resources available) {
     return ImmutableList.<FilterRule>of(
         new SingleVetoRule() {
           @Override public Optional<Veto> doApply(TwitterTaskInfo task) {
-            return (available.getNumCpus() >= task.getNumCpus()) ? NO_VETO : Optional.of(CPU);
+            return CPU.maybeVeto(available.getNumCpus(), task.getNumCpus());
           }
         },
         new SingleVetoRule() {
           @Override public Optional<Veto> doApply(TwitterTaskInfo task) {
-            boolean passed =
-                available.getRam().as(BYTES) >= Amount.of(task.getRamMb(), MB).as(BYTES);
-            return passed ? NO_VETO : Optional.of(RAM);
+            return RAM.maybeVeto(available.getRam().as(Data.MB), task.getRamMb());
           }
         },
         new SingleVetoRule() {
           @Override public Optional<Veto> doApply(TwitterTaskInfo task) {
-            boolean passed =
-                available.getDisk().as(BYTES) >= Amount.of(task.getDiskMb(), MB).as(BYTES);
-            return passed ? NO_VETO : Optional.of(DISK);
+            return DISK.maybeVeto(available.getDisk().as(Data.MB), task.getDiskMb());
           }
         },
         new SingleVetoRule() {
           @Override public Optional<Veto> doApply(TwitterTaskInfo task) {
-            boolean passed = available.getNumPorts() >= task.getRequestedPorts().size();
-            return passed ? NO_VETO : Optional.of(PORTS);
+            return PORTS.maybeVeto(available.getNumPorts(), task.getRequestedPorts().size());
           }
         }
     );

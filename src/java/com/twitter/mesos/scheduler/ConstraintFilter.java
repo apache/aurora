@@ -59,12 +59,12 @@ class ConstraintFilter implements Function<Constraint, Optional<Veto>> {
 
   @VisibleForTesting
   static Veto constraintVeto(String constraint) {
-    return new Veto("Constraint not satisfied: " + constraint);
+    return new Veto("Constraint not satisfied: " + constraint, Veto.MAX_SCORE);
   }
 
   @VisibleForTesting
   static Veto missingLimitVeto(String constraint) {
-    return new Veto("Limit constraint not present: " + constraint);
+    return new Veto("Limit constraint not present: " + constraint, Veto.MAX_SCORE);
   }
 
   @Override

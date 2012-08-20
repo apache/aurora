@@ -2,6 +2,7 @@ package com.twitter.mesos.scheduler;
 
 import java.util.Set;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
 
 import com.twitter.mesos.gen.TwitterTaskInfo;
@@ -13,16 +14,28 @@ public interface SchedulingFilter {
 
   /**
    * Reason for a proposed scheduling assignment to be filtered out.
+   * A veto also contains a score, which is an opaque indicator as to how strong a veto is.  This
+   * is only intended to be used for relative ranking of vetoes for determining which veto against
+   * a scheduling assignment is 'weakest'.
    */
   public static class Veto {
-    private final String reason;
+    public static final int MAX_SCORE = 1000;
 
-    Veto(String reason) {
+    private final String reason;
+    private final int score;
+
+    @VisibleForTesting
+    public Veto(String reason, int score) {
       this.reason = reason;
+      this.score = Math.min(MAX_SCORE, score);
     }
 
     public String getReason() {
       return reason;
+    }
+
+    public int getScore() {
+      return score;
     }
 
     @Override
@@ -32,17 +45,21 @@ public interface SchedulingFilter {
       }
 
       Veto other = (Veto) o;
-      return reason.equals(other.getReason());
+      return Objects.equal(reason, other.reason)
+          && (score == other.score);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(reason);
+      return Objects.hashCode(reason, score);
     }
 
     @Override
     public String toString() {
-      return "Veto<" + reason + ">";
+      return Objects.toStringHelper(this)
+          .add("reason", reason)
+          .add("score", score)
+          .toString();
     }
   }
 

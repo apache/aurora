@@ -39,11 +39,11 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import static com.twitter.mesos.scheduler.ConstraintFilter.constraintVeto;
-import static com.twitter.mesos.scheduler.SchedulingFilterImpl.CPU;
 import static com.twitter.mesos.scheduler.SchedulingFilterImpl.DEDICATED_HOST_VETO;
-import static com.twitter.mesos.scheduler.SchedulingFilterImpl.DISK;
-import static com.twitter.mesos.scheduler.SchedulingFilterImpl.PORTS;
-import static com.twitter.mesos.scheduler.SchedulingFilterImpl.RAM;
+import static com.twitter.mesos.scheduler.SchedulingFilterImpl.ResourceVector.CPU;
+import static com.twitter.mesos.scheduler.SchedulingFilterImpl.ResourceVector.DISK;
+import static com.twitter.mesos.scheduler.SchedulingFilterImpl.ResourceVector.PORTS;
+import static com.twitter.mesos.scheduler.SchedulingFilterImpl.ResourceVector.RAM;
 import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 
 public class SchedulingFilterImplTest extends EasyMockTest {
@@ -140,18 +140,21 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     assertTrue(defaultFilter.filter(twoPorts, HOST_A, noPortTask).isEmpty());
     assertTrue(defaultFilter.filter(twoPorts, HOST_A, onePortTask).isEmpty());
     assertTrue(defaultFilter.filter(twoPorts, HOST_A, twoPortTask).isEmpty());
-    assertEquals(ImmutableSet.of(PORTS), defaultFilter.filter(twoPorts, HOST_A, threePortTask));
+    assertEquals(
+        ImmutableSet.of(PORTS.veto(1)),
+        defaultFilter.filter(twoPorts, HOST_A, threePortTask));
   }
 
   @Test
   public void testInsufficientResources() throws Exception {
     control.replay();
 
-    assertVetoes(makeTask(DEFAULT_CPUS + 1, DEFAULT_RAM + 1, DEFAULT_DISK + 1),
-        CPU, DISK, RAM);
-    assertVetoes(makeTask(DEFAULT_CPUS + 1, DEFAULT_RAM, DEFAULT_DISK), CPU);
-    assertVetoes(makeTask(DEFAULT_CPUS, DEFAULT_RAM + 1, DEFAULT_DISK), RAM);
-    assertVetoes(makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK + 1), DISK);
+    assertVetoes(
+        makeTask(DEFAULT_CPUS + 1, DEFAULT_RAM + 1, DEFAULT_DISK + 1),
+        CPU.veto(1), DISK.veto(1), RAM.veto(1));
+    assertVetoes(makeTask(DEFAULT_CPUS + 1, DEFAULT_RAM, DEFAULT_DISK), CPU.veto(1));
+    assertVetoes(makeTask(DEFAULT_CPUS, DEFAULT_RAM + 1, DEFAULT_DISK), RAM.veto(1));
+    assertVetoes(makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK + 1), DISK.veto(1));
   }
 
   @Test
@@ -306,6 +309,15 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     zoneNegated.getConstraint().getValue().setNegated(true);
     assertVetoes(makeTask(OWNER_A, JOB_A, jvmNegated, zoneNegated), HOST_A,
         constraintVeto("jvm"));
+  }
+
+  @Test
+  public void testVetoScaling() {
+    control.replay();
+    assertEquals((int) (Veto.MAX_SCORE * 1.0 / CPU.range), CPU.veto(1).getScore());
+    assertEquals(Veto.MAX_SCORE, CPU.veto(CPU.range * 10).getScore());
+    assertEquals((int) (Veto.MAX_SCORE * 2.0 / RAM.range), RAM.veto(2).getScore());
+    assertEquals((int) (Veto.MAX_SCORE * 200.0 / DISK.range), DISK.veto(200).getScore());
   }
 
   private void checkConstraint(String host, String constraintName,
