@@ -69,14 +69,6 @@ def synthesize_url(cluster, scheduler=None, role=None, job=None):
     return urljoin(scheduler_url, 'scheduler/job?role=%s&job=%s' % (role, job))
 
 
-def get_extra_context():
-  options = app.get_options()
-  if options.copy_app_from:
-    return { 'mesos': { 'package': os.path.basename(options.copy_app_from) } }
-  else:
-    return {}
-
-
 def get_config(jobname, config_file, packer_factory):
   """Creates and returns a config object contained in the provided file."""
 
@@ -105,6 +97,17 @@ def get_config(jobname, config_file, packer_factory):
       if latest_audit['state'] == 'DELETED':
         _die('The requested package version has been deleted.')
       config.set_hdfs_path(metadata['uri'])
+    elif config.hdfs_path():
+      log.warning('''
+*******************************************************************************
+    hdfs_path in job configurations has been deprecated and will soon be
+    disabled altogether.
+    Please switch to using the package option as soon as possible!
+    For details on how to do this, please consult
+    http://go/mesostutorial
+    and
+    http://confluence.local.twitter.com/display/ENG/Mesos+Configuration+Reference
+*******************************************************************************''')
     return config
   elif config_type == 'thermos':
     loader = PystachioConfig.load_json if is_json else PystachioConfig.load
