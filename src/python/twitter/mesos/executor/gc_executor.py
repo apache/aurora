@@ -1,6 +1,7 @@
 import mesos
 import os
 import pwd
+import threading
 import time
 
 from twitter.common import app, log
@@ -54,7 +55,8 @@ class ThermosGCExecutor(ThermosExecutorBase):
                      max_tasks=1000,
                      verbose=True,
                      task_killer=TaskKiller,
-                     checkpoint_root=None):
+                     checkpoint_root=None,
+                     clock=time):
     ThermosExecutorBase.__init__(self)
     self._slave_id = None
     self._gc_options = dict(
@@ -64,6 +66,7 @@ class ThermosGCExecutor(ThermosExecutorBase):
       verbose=verbose,
       logger=self.log
     )
+    self._clock = clock
     self._task_killer = task_killer
     if 'ANGRYBIRD_THERMOS' in os.environ:
       self._checkpoint_root = os.path.join(os.environ['ANGRYBIRD_THERMOS'], 'thermos/run')
@@ -124,7 +127,7 @@ class ThermosGCExecutor(ThermosExecutorBase):
     def is_our_pid(pid, uid, timestamp):
       handle = ps.get_handle(pid)
       if handle.user() != pwd.getpwuid(uid)[0]: return False
-      estimated_start_time = time.time() - handle.wall_time()
+      estimated_start_time = self._clock.time() - handle.wall_time()
       return abs(timestamp - estimated_start_time) < self.MAX_PID_TIME_DRIFT.as_(Time.SECONDS)
 
     for task_id in active_tasks - terminated_tasks:
@@ -143,11 +146,11 @@ class ThermosGCExecutor(ThermosExecutorBase):
       runner_ckpt = TaskPath(root=self._checkpoint_root, task_id=task_id).getpath(
           'runner_checkpoint')
       latest_update = os.path.getmtime(runner_ckpt)
-      if time.time() - latest_update < self.MAX_CHECKPOINT_TIME_DRIFT.as_(Time.SECONDS):
+      if self._clock.time() - latest_update < self.MAX_CHECKPOINT_TIME_DRIFT.as_(Time.SECONDS):
         log.info('  - Runner is dead but under LOST threshold.')
         continue
       log.info('  - Runner is dead but beyond LOST threshold: %.1fs' % (
-          time.time() - latest_update))
+          self._clock.time() - latest_update))
       if terminate_task(task_id, kill=False):
         self.send_update(driver, task_id, 'LOST',
           'Reporting task %s as LOST because its runner has been dead too long.' % task_id)
@@ -188,8 +191,13 @@ class ThermosGCExecutor(ThermosExecutorBase):
     self.garbage_collect(retain_tasks.retainedTasks.keys())
     self.send_update(driver, task.task_id.value, 'FINISHED',
       "Garbage collection finished.")
-    time.sleep(self.PERSISTENCE_WAIT.as_(Time.SECONDS))
-    driver.stop()
+    class ShutdownThread(threading.Thread):
+      def run(thread_self):
+        self.log('Shutdown timer started.')
+        self._clock.sleep(self.PERSISTENCE_WAIT.as_(Time.SECONDS))
+        self.log('Stopping driver.')
+        driver.stop()
+    ShutdownThread().start()
 
   def killTask(self, driver, task_id):
     self.log('killTask() got task_id: %s, ignoring.' % task_id)

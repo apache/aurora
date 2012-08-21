@@ -1,5 +1,6 @@
 from collections import defaultdict
 import os
+import threading
 import time
 
 from thrift.TSerialization import serialize
@@ -17,6 +18,10 @@ from twitter.mesos.executor.gc_executor import ThermosGCExecutor
 class ProxyDriver(object):
   def __init__(self):
     self.method_calls = defaultdict(list)
+    self.stopped = threading.Event()
+
+  def stop(self):
+    self.stopped.set()
 
   def __getattr__(self, attr):
     def enqueue_arguments(*args, **kw):
@@ -58,9 +63,20 @@ def serialize_art(art, task_id='default_task_id'):
   return td
 
 
+class FakeClock(object):
+  def __init__(self):
+    self.slept = 0
+
+  def time(self):
+    return time.time()
+
+  def sleep(self, amount):
+    self.slept += amount
+
+
 class TestThermosGCExecutor(ThermosGCExecutor):
   def __init__(self, *args, **kw):
-    ThermosGCExecutor.__init__(self, *args, **kw)
+    ThermosGCExecutor.__init__(self, *args, clock=FakeClock(), **kw)
     self._task_garbage_collections = set()
 
   def garbage_collect_task(self, task_id, task_garbage_collector):
@@ -118,6 +134,9 @@ def test_state_reconciliation():
   assert update.task_id.value == 'gc_executor_task_id'
   assert update.state == mesos.TASK_FINISHED
 
+  proxy_driver.stopped.wait(timeout=1.0)
+  assert proxy_driver.stopped.is_set()
+
 
 def test_gc_with_loss():
   proxy_killer = ProxyKiller()
@@ -142,6 +161,9 @@ def test_gc_with_loss():
   assert update.task_id.value == 'gc_executor_task_id'
   assert update.state == mesos.TASK_FINISHED
 
+  proxy_driver.stopped.wait(timeout=1.0)
+  assert proxy_driver.stopped.is_set()
+
 
 def test_gc_without_loss():
   proxy_killer = ProxyKiller()
@@ -162,3 +184,6 @@ def test_gc_without_loss():
   update = proxy_driver.method_calls['sendStatusUpdate'][0][0][0]
   assert update.task_id.value == 'gc_executor_task_id'
   assert update.state == mesos.TASK_FINISHED
+
+  proxy_driver.stopped.wait(timeout=1.0)
+  assert proxy_driver.stopped.is_set()
