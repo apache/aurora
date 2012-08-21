@@ -84,14 +84,18 @@ class TaskRunnerHelper(object):
       especially if the killer is running as root.
     """
     if process_handle.user() != current_user:
-      log.info("    Expected pid %s to be ours but the pid user is %s and we're %s" % (
+      log.info("Expected pid %s to be ours but the pid user is %s and we're %s" % (
         process_handle.pid(), process_handle.user(), current_user))
       return False
+
     estimated_start_time = clock.time() - process_handle.wall_time()
-    log.info("    Time drift from the start of %s is %s, real: %s, pid wall: %s, estimated: %s" % (
-      process_handle.pid(), abs(start_time - estimated_start_time), start_time,
-      process_handle.wall_time(), estimated_start_time))
-    return abs(start_time - estimated_start_time) < cls.MAX_START_TIME_DRIFT.as_(Time.SECONDS)
+    if abs(start_time - estimated_start_time) >= cls.MAX_START_TIME_DRIFT.as_(Time.SECONDS):
+      log.info("Time drift from the start of %s is %s, real: %s, pid wall: %s, estimated: %s" % (
+        process_handle.pid(), abs(start_time - estimated_start_time), start_time,
+        process_handle.wall_time(), estimated_start_time))
+      return False
+
+    return True
 
   @classmethod
   def scan_process(cls, state, process_name, clock=time, ps=None):
@@ -109,27 +113,22 @@ class TaskRunnerHelper(object):
     coordinator_pid, pid, tree = None, None, set()
 
     if process_run.coordinator_pid:
-      log.info('  Inspecting %s coordinator [pid: %s]' % (process_run.process,
-          process_run.coordinator_pid))
       if process_run.coordinator_pid in ps.pids() and cls.this_is_really_our_pid(
           ps.get_handle(process_run.coordinator_pid), process_owner, process_run.fork_time):
         coordinator_pid = process_run.coordinator_pid
-        log.info('    coordinator is active')
       else:
-        log.info('    coordinator appears to have completed')
+        log.info('  Coordinator %s [pid: %s] completed.' % (process_run.process,
+            process_run.coordinator_pid))
 
     if process_run.pid:
-      log.info('  Inspecting %s [pid: %s]' % (process_run.process, process_run.pid))
       if process_run.pid in ps.pids() and cls.this_is_really_our_pid(
           ps.get_handle(process_run.pid), process_owner, process_run.start_time, clock=clock):
-        log.info('    => pid is active.')
         pid = process_run.pid
         subtree = ps.children_of(process_run.pid, all=True)
         if subtree:
-          log.info('      => has children: %s' % ' '.join(map(str, subtree)))
           tree = set(subtree)
       else:
-        log.info('   => pid has finished.')
+        log.info('  Process %s [pid: %s] completed.' % (process_run.process, process_run.pid))
 
     return (coordinator_pid, pid, tree)
 

@@ -150,6 +150,8 @@ class TaskRunnerTaskHandler(TaskStateHandler):
 
   def on_finalizing(self, task_update):
     log.debug('Task on_finalizing(%s)' % task_update)
+    if not self._runner._recovery:
+      self._runner._kill()
     self._runner._plan = self._runner._finalizing_plan
     if self._runner._finalization_start is None:
       self._runner._finalization_start = task_update.timestamp_ms / 1000.0
@@ -213,7 +215,6 @@ class TaskRunnerStage(object):
   def __init__(self, runner):
     self.runner = runner
     self.clock = runner._clock
-
 
   def run(self):
     """
@@ -839,8 +840,10 @@ class TaskRunner(object):
         TaskRunnerHelper.kill_process(self.state, process)
       else:
         if coordinator_pid or pid or tree:
+          log.info('Transitioning %s to KILLED' % process)
           self._set_process_status(process, ProcessState.KILLED,
             stop_time=self._clock.time(), return_code=-1)
         else:
+          log.info('Transitioning %s to LOST' % process)
           if current_run.state != ProcessState.WAITING:
             self._set_process_status(process, ProcessState.LOST)

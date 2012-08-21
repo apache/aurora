@@ -19,7 +19,6 @@ from gen.twitter.thermos.ttypes import (
   ProcessState
 )
 
-
 sleepy_process = Process(
   name = "sleepy",
   cmdline = "sleep 3",
@@ -123,7 +122,9 @@ class TestRunnerKill(RunnerBase, ProcessPidTestCase):
 class TestRunnerKillProcessTrappingSIGTERM(RunnerBase):
   @classmethod
   def task(cls):
-    task = Task(name = "task", processes = [ignorant_process(name="process")])
+    task = Task(name = "task",
+                finalization_wait = 3,
+                processes = [ignorant_process(name="ignorant_process")])
     return task.interpolate()[0]
 
   def test_coordinator_kill(self):
@@ -131,7 +132,7 @@ class TestRunnerKillProcessTrappingSIGTERM(RunnerBase):
     tm = TaskMonitor(runner.pathspec, runner.task_id)
     self.wait_until_running(tm)
     process_state, run_number = tm.get_active_processes()[0]
-    assert process_state.process == 'process'
+    assert process_state.process == 'ignorant_process'
     assert run_number == 0
     os.kill(process_state.coordinator_pid, signal.SIGKILL)
 
@@ -143,7 +144,7 @@ class TestRunnerKillProcessTrappingSIGTERM(RunnerBase):
     self.wait_until_running(tm)
 
     process_state, run_number = tm.get_active_processes()[0]
-    assert process_state.process == 'process'
+    assert process_state.process == 'ignorant_process'
     assert run_number == 1
     os.kill(process_state.pid, signal.SIGKILL)
 
@@ -158,19 +159,39 @@ class TestRunnerKillProcessTrappingSIGTERM(RunnerBase):
 
     try:
       state = tm.get_state()
-      assert state.processes['process'][0].state == ProcessState.LOST
-      assert state.processes['process'][1].state == ProcessState.KILLED
-      assert state.processes['process'][2].state == ProcessState.RUNNING
+      assert state.processes['ignorant_process'][0].state == ProcessState.LOST
+      assert state.processes['ignorant_process'][1].state == ProcessState.KILLED
+      assert state.processes['ignorant_process'][2].state == ProcessState.RUNNING
     finally:
-      os.kill(state.processes['process'][2].coordinator_pid, signal.SIGKILL)
-      os.kill(state.processes['process'][2].pid, signal.SIGKILL)
+      os.kill(state.processes['ignorant_process'][2].coordinator_pid, signal.SIGKILL)
+      os.kill(state.processes['ignorant_process'][2].pid, signal.SIGKILL)
+
+  def test_coordinator_dead_kill(self):
+    runner = self.start_runner()
+    tm = TaskMonitor(runner.pathspec, runner.task_id)
+    self.wait_until_running(tm)
+    process_state, run_number = tm.get_active_processes()[0]
+    assert process_state.process == 'ignorant_process'
+    assert run_number == 0
+
+    os.kill(runner.po.pid, signal.SIGKILL)
+    os.kill(process_state.coordinator_pid, signal.SIGKILL)
+    os.kill(process_state.pid, signal.SIGKILL)
+
+    killer = TaskRunner.get(runner.task_id, runner.root)
+    assert killer is not None
+    killer.kill(force=True)
+
+    state = tm.get_state()
+    assert len(state.processes['ignorant_process']) == 1
+    assert state.processes['ignorant_process'][0].state == ProcessState.LOST
 
   def test_preemption_wait(self):
     runner = self.start_runner()
     tm = TaskMonitor(runner.pathspec, runner.task_id)
     self.wait_until_running(tm)
     process_state, run_number = tm.get_active_processes()[0]
-    assert process_state.process == 'process'
+    assert process_state.process == 'ignorant_process'
     assert run_number == 0
 
     preempter = TaskRunner.get(runner.task_id, runner.root)
@@ -184,7 +205,7 @@ class TestRunnerKillProcessTrappingSIGTERM(RunnerBase):
     assert abs(duration - 1.0) < 0.5
 
     assert preempter.state.statuses[-1].state == TaskState.KILLED
-    assert preempter.state.processes['process'][-1].state == ProcessState.KILLED
+    assert preempter.state.processes['ignorant_process'][-1].state == ProcessState.KILLED
 
 
 
