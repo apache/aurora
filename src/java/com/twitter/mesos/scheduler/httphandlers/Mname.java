@@ -1,8 +1,8 @@
 package com.twitter.mesos.scheduler.httphandlers;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -10,14 +10,17 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import com.google.common.base.Functions;
-import com.google.common.collect.ImmutableList;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
 import org.apache.commons.lang.StringUtils;
 
+import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerCore;
@@ -37,7 +40,7 @@ public class Mname extends HttpServlet {
 
   private static final Pattern TASK_PATTERN = Pattern.compile("/([^/]+)/([^/]+)/(\\d+)(/.*)?");
 
-  private static final List<String> HTTP_PORT_NAMES = ImmutableList.of(
+  private static final Set<String> HTTP_PORT_NAMES = ImmutableSet.of(
       "health", "http", "HTTP", "web");
 
   private final SchedulerCore scheduler;
@@ -81,18 +84,15 @@ public class Mname extends HttpServlet {
         return;
       }
 
-      String slaveHost = task.getAssignedTask().getSlaveHost();
-      Map<String, Integer> assignedPorts = task.getAssignedTask().isSetAssignedPorts()
-          ? task.getAssignedTask().getAssignedPorts() : ImmutableMap.<String, Integer>of();
-      Integer httpPort = Iterables.getFirst(
-          Iterables.transform(HTTP_PORT_NAMES, Functions.forMap(assignedPorts)), null);
-      if (httpPort == null) {
+      AssignedTask assignedTask = task.getAssignedTask();
+      Optional<Integer> port = getRedirectPort(assignedTask);
+      if (!port.isPresent()) {
         resp.sendError(SC_NOT_FOUND, "The task does not have a registered http port.");
         return;
       }
 
       String queryString = req.getQueryString();
-      String redirect = String.format("http://%s:%d", slaveHost, httpPort);
+      String redirect = String.format("http://%s:%d", assignedTask.getSlaveHost(), port.get());
       if (forwardRequest != null) {
         redirect += forwardRequest;
       }
@@ -103,6 +103,15 @@ public class Mname extends HttpServlet {
     } else {
       sendUsageError(resp);
     }
+  }
+
+  @VisibleForTesting
+  static Optional<Integer> getRedirectPort(AssignedTask task) {
+    Map<String, Integer> ports = task.isSetAssignedPorts()
+        ? task.getAssignedPorts() : ImmutableMap.<String, Integer>of();
+    String httpPortName =
+        Iterables.getFirst(Sets.intersection(ports.keySet(), HTTP_PORT_NAMES), null);
+    return httpPortName == null ? Optional.<Integer>absent() : Optional.of(ports.get(httpPortName));
   }
 
   private void sendUsageError(HttpServletResponse resp) throws IOException {
