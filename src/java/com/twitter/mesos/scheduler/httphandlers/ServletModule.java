@@ -8,7 +8,6 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
 import com.google.inject.Key;
 import com.google.inject.TypeLiteral;
-import com.google.inject.servlet.GuiceFilter;
 import com.sun.jersey.guice.JerseyServletModule;
 import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
 
@@ -41,7 +40,6 @@ public class ServletModule extends AbstractModule {
     requireBinding(LocalServiceRegistry.class);
     requireBinding(Key.get(new TypeLiteral<DynamicHostSet<ServiceInstance>>() { }));
 
-    Registration.registerServletFilter(binder(), GuiceFilter.class, "/*");
     install(new JerseyServletModule() {
       private void bindLeaderServlet(
           String path,
