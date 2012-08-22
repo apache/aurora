@@ -303,7 +303,8 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
       Set<Veto> vetoes = schedulingFilter.filter(
           Resources.from(offer),
           offer.getHostname(),
-          task.getAssignedTask().getTask());
+          task.getAssignedTask().getTask(),
+          Tasks.id(task));
       if (vetoes.isEmpty()) {
         return Optional.of(assignTask(offer, task));
       } else {

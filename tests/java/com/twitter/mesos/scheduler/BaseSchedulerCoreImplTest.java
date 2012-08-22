@@ -78,6 +78,7 @@ import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
 import com.twitter.mesos.scheduler.SchedulerCore.RestartException;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
+import com.twitter.mesos.scheduler.events.TaskPubsubEvent;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 import com.twitter.mesos.scheduler.quota.QuotaManager.QuotaManagerImpl;
 import com.twitter.mesos.scheduler.quota.Quotas;
@@ -164,12 +165,16 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private QuotaManager quotaManager;
   private MesosTaskFactory taskFactory;
   private FakeClock clock;
+  private Closure<TaskPubsubEvent> eventSink;
 
   @Before
   public void setUp() throws Exception {
     driver = createMock(Driver.class);
     clock = new FakeClock();
     taskFactory = new MesosTaskFactoryImpl("/fake/executor.zip", 0.1, Amount.of(1.0, Data.MB));
+    eventSink = createMock(new Clazz<Closure<TaskPubsubEvent>>() { });
+    eventSink.execute(EasyMock.<TaskPubsubEvent>anyObject());
+    expectLastCall().anyTimes();
   }
 
   /**
@@ -195,7 +200,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private void buildScheduler(Storage storage) throws Exception {
     ImmediateJobManager immediateManager = new ImmediateJobManager();
     cron = new CronJobManager(storage, new TearDownRegistry(this));
-    stateManager = new StateManagerImpl(storage, clock, new MutableState(), driver);
+    stateManager = new StateManagerImpl(storage, clock, new MutableState(), driver, eventSink);
     quotaManager = new QuotaManagerImpl(storage);
     SchedulingFilter schedulingFilter = new SchedulingFilterImpl(storage);
     scheduler = new SchedulerCoreImpl(cron,

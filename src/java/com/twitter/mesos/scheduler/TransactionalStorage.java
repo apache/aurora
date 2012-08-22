@@ -7,6 +7,7 @@ import com.google.common.collect.Lists;
 
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
+import com.twitter.mesos.scheduler.events.TaskPubsubEvent;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
@@ -19,22 +20,39 @@ import static com.google.common.base.Preconditions.checkNotNull;
 class TransactionalStorage {
   private boolean inTransaction = false;
   private final List<SideEffect> sideEffects = Lists.newLinkedList();
+  private final List<TaskPubsubEvent> events = Lists.newLinkedList();
 
   private final Storage storage;
   private final MutableState mutableState;
   private final Closure<StoreProvider> transactionFinalizer;
+  private final Closure<TaskPubsubEvent> taskEventSink;
 
-  TransactionalStorage(Storage storage, MutableState mutableState,
-      Closure<StoreProvider> transactionFinalizer) {
+  TransactionalStorage(
+      Storage storage,
+      MutableState mutableState,
+      Closure<StoreProvider> transactionFinalizer,
+      Closure<TaskPubsubEvent> taskEventSink) {
 
     this.storage = checkNotNull(storage);
     this.mutableState = checkNotNull(mutableState);
     this.transactionFinalizer = checkNotNull(transactionFinalizer);
+    this.taskEventSink = checkNotNull(taskEventSink);
   }
 
   void addSideEffect(SideEffect sideEffect) {
     Preconditions.checkState(inTransaction);
-    sideEffects.add(sideEffect);
+    sideEffects.add(Preconditions.checkNotNull(sideEffect));
+  }
+
+  void addTaskEvent(TaskPubsubEvent notice) {
+    Preconditions.checkState(inTransaction);
+    events.add(Preconditions.checkNotNull(notice));
+  }
+
+  private void clearTransactionState() {
+    inTransaction = false;
+    sideEffects.clear();
+    events.clear();
   }
 
   /**
@@ -59,10 +77,10 @@ class TransactionalStorage {
       inTransaction = true;
       T result = execute(work);
       executeSideEffects();
+      sendPubsubEvents();
       return result;
     } finally {
-      inTransaction = false;
-      sideEffects.clear();
+      clearTransactionState();
     }
   }
 
@@ -78,9 +96,9 @@ class TransactionalStorage {
       inTransaction = true;
       executeStart(work);
       executeSideEffects();
+      sendPubsubEvents();
     } finally {
-      inTransaction = false;
-      sideEffects.clear();
+      clearTransactionState();
     }
   }
 
@@ -131,6 +149,12 @@ class TransactionalStorage {
   private void executeSideEffects() {
     for (SideEffect sideEffect : sideEffects) {
       sideEffect.mutate(mutableState);
+    }
+  }
+
+  private void sendPubsubEvents() {
+    for (TaskPubsubEvent event : events) {
+      taskEventSink.execute(event);
     }
   }
 

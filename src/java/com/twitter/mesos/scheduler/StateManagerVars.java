@@ -20,6 +20,7 @@ class StateManagerVars {
 
   /**
    * Mutable state of the StateManager.
+   * TODO(William Farner): Rework this to work with task pubsub events.
    */
   static class MutableState {
     private final Vars vars = new Vars();

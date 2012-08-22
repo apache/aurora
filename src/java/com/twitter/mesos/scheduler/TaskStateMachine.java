@@ -490,8 +490,7 @@ public class TaskStateMachine {
         // must be the last chained transition callback.
         .onAnyTransition(
             new Closure<Transition<State>>() {
-              @Override
-              public void execute(final Transition<State> transition) {
+              @Override public void execute(final Transition<State> transition) {
                 ScheduleStatus from = transition.getFrom().getState();
                 ScheduleStatus to = transition.getTo().getState();
 

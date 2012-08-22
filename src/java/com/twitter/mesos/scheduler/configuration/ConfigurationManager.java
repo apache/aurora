@@ -41,8 +41,6 @@ import com.twitter.mesos.scheduler.configuration.ValueParser.ParseException;
  * defaults for optional values.
  *
  * TODO(William Farner): Add input validation to all fields (strings not empty, positive ints, etc).
- *
- * @author William Farner
  */
 public final class ConfigurationManager {
 

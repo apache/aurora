@@ -266,9 +266,11 @@ public class PreempterTest extends EasyMockTest {
   }
 
   private IExpectationSetters<Set<Veto>> expectFiltering() {
-    return expect(schedulingFilter.filter(EasyMock.<Resources>anyObject(),
+    return expect(schedulingFilter.filter(
+        EasyMock.<Resources>anyObject(),
         EasyMock.<String>anyObject(),
-        EasyMock.<TwitterTaskInfo>anyObject())).andAnswer(
+        EasyMock.<TwitterTaskInfo>anyObject(),
+        EasyMock.<String>anyObject())).andAnswer(
         new IAnswer<Set<Veto>>() {
           @Override public Set<Veto> answer() {
             return ImmutableSet.of();

@@ -17,6 +17,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.springframework.transaction.TransactionException;
 
+import com.twitter.common.base.Closure;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stat;
@@ -33,6 +34,7 @@ import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.db.testing.DbStorageTestUtil;
+import com.twitter.mesos.scheduler.events.TaskPubsubEvent;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.StorageException;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
@@ -67,6 +69,7 @@ public class StateManagerImplTest extends EasyMockTest {
   private static final String HOST_A = "host_a";
 
   private Driver driver;
+  private Closure<TaskPubsubEvent> eventSink;
   private StateManagerImpl stateManager;
   private MutableState mutableState;
   private final FakeClock clock = new FakeClock();
@@ -79,6 +82,12 @@ public class StateManagerImplTest extends EasyMockTest {
     resetStats();
 
     driver = createMock(Driver.class);
+    eventSink = createMock(new Clazz<Closure<TaskPubsubEvent>>() { });
+    eventSink.execute(EasyMock.<TaskPubsubEvent>anyObject());
+    // TODO(William Farner): Rework StateManagerImpl to accept a task ID generator and allow for
+    // easy verification of pubsub events.
+    expectLastCall().anyTimes();
+
     stateManager = createStateManager();
   }
 
@@ -97,8 +106,8 @@ public class StateManagerImplTest extends EasyMockTest {
         wrappedStorage.prepare();
       }
 
-      @Override public void start(Quiet initilizationLogic) {
-        wrappedStorage.start(initilizationLogic);
+      @Override public void start(Quiet initializationLogic) {
+        wrappedStorage.start(initializationLogic);
       }
 
       @Override public <T, E extends Exception> T doInTransaction(final Work<T, E> work)
@@ -123,7 +132,8 @@ public class StateManagerImplTest extends EasyMockTest {
     };
 
     this.mutableState = new MutableState();
-    final StateManagerImpl manager = new StateManagerImpl(storage, clock, mutableState, driver);
+    final StateManagerImpl manager =
+        new StateManagerImpl(storage, clock, mutableState, driver, eventSink);
     manager.initialize();
     manager.start();
     addTearDown(new TearDown() {
@@ -423,7 +433,7 @@ public class StateManagerImplTest extends EasyMockTest {
     control.replay();
 
     mutableState = new MutableState();
-    stateManager = new StateManagerImpl(storage, clock, mutableState, driver);
+    stateManager = new StateManagerImpl(storage, clock, mutableState, driver, eventSink);
 
     // The database has not yet been loaded, so stats should be missing.
     for (ScheduleStatus status : ScheduleStatus.values()) {

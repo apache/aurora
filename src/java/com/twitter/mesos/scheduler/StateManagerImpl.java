@@ -66,6 +66,7 @@ import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.TransactionalStorage.SideEffect;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
+import com.twitter.mesos.scheduler.events.TaskPubsubEvent;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
@@ -219,29 +220,38 @@ public class StateManagerImpl implements StateManager {
   }
 
   @Inject
-  StateManagerImpl(Storage storage, final Clock clock, MutableState mutableState, Driver driver) {
+  StateManagerImpl(
+      Storage storage,
+      final Clock clock,
+      MutableState mutableState,
+      Driver driver,
+      Closure<TaskPubsubEvent> taskEventSink) {
+
     checkNotNull(storage);
     this.clock = checkNotNull(clock);
 
-    transactionalStorage = new TransactionalStorage(storage, mutableState,
-        new Closure<StoreProvider>() {
-          @Override public void execute(StoreProvider storeProvider) {
-            processWorkQueueInTransaction(storeProvider);
-          }
-        });
+    Closure<StoreProvider> transactionFinalizer = new Closure<StoreProvider>() {
+      @Override public void execute(StoreProvider storeProvider) {
+        processWorkQueueInTransaction(storeProvider);
+      }
+    };
+
+    transactionalStorage =
+        new TransactionalStorage(storage, mutableState, transactionFinalizer, taskEventSink);
 
     this.latestStateDuration = Functions.compose(
-      new Function<Iterable<TaskEvent>, Long>() {
-        @Override public Long apply(Iterable<TaskEvent> events) {
-          return clock.nowMillis() - Iterables.getLast(events).getTimestamp();
-        }
-      }, Tasks.GET_TASK_EVENTS);
+        new Function<Iterable<TaskEvent>, Long>() {
+          @Override public Long apply(Iterable<TaskEvent> events) {
+            return clock.nowMillis() - Iterables.getLast(events).getTimestamp();
+          }
+        },
+        Tasks.GET_TASK_EVENTS);
 
     this.taskTimedOut = Predicates.compose(
         Ranges.greaterThan(TRANSIENT_TASK_STATE_TIMEOUT.get().as(Time.MILLISECONDS)),
         latestStateDuration);
 
-    this.driver = driver;
+    this.driver = checkNotNull(driver);
 
     Stats.exportSize("work_queue_depth", workQueue);
   }
@@ -1012,6 +1022,11 @@ public class StateManagerImpl implements StateManager {
                         stateMachine.getState());
               }
             });
+            transactionalStorage.addTaskEvent(
+                new TaskPubsubEvent.StateChange(
+                    stateMachine.getTaskId(),
+                    stateMachine.getPreviousState(),
+                    stateMachine.getState()));
             break;
 
           case DELETE:
@@ -1054,6 +1069,8 @@ public class StateManagerImpl implements StateManager {
             }
           }
         });
+        transactionalStorage.addTaskEvent(
+            new TaskPubsubEvent.Deleted(ImmutableSet.copyOf(taskIds)));
 
         taskStore.deleteTasks(taskIds);
       }

@@ -11,6 +11,7 @@ import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
 import com.twitter.common.quantity.Amount;
@@ -175,9 +176,9 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     };
   }
 
-  private Iterable<Veto> applyRules(Iterable<FilterRule> rules, TwitterTaskInfo task) {
-    ImmutableList.Builder<Veto> builder = ImmutableList.builder();
-    for (FilterRule rule: rules) {
+  private Set<Veto> getResourceVetoes(Resources offer, TwitterTaskInfo task) {
+    ImmutableSet.Builder<Veto> builder = ImmutableSet.builder();
+    for (FilterRule rule : rulesFromOffer(offer)) {
       builder.addAll(rule.apply(task));
     }
     return builder.build();
@@ -194,18 +195,14 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   }
 
   @Override
-  public Set<Veto> filter(Resources resourceOffer, String slaveHost, TwitterTaskInfo task) {
-    Iterable<Veto> staticVetos = applyRules(rulesFromOffer(resourceOffer), task);
-    if (!Iterables.isEmpty(staticVetos)) {
-      return ImmutableSet.copyOf(staticVetos);
-    }
-    Set<Veto> vetoes;
+  public Set<Veto> filter(Resources offer, String slaveHost, TwitterTaskInfo task, String taskId) {
+    Set<Veto> constraintVetoes;
     if (!ConfigurationManager.isDedicated(task) && isDedicated(slaveHost)) {
-      vetoes = ImmutableSet.of(DEDICATED_HOST_VETO);
+      constraintVetoes = ImmutableSet.of(DEDICATED_HOST_VETO);
     } else {
-      vetoes = ImmutableSet.copyOf(getConstraintFilter(slaveHost).apply(task));
+      constraintVetoes = ImmutableSet.copyOf(getConstraintFilter(slaveHost).apply(task));
     }
 
-    return vetoes;
+    return ImmutableSet.copyOf(Sets.union(getResourceVetoes(offer, task), constraintVetoes));
   }
 }

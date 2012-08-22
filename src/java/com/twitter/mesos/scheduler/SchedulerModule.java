@@ -52,6 +52,7 @@ import com.twitter.mesos.scheduler.PulseMonitor.PulseMonitorImpl;
 import com.twitter.mesos.scheduler.RegisteredListener.FanoutRegisteredListener;
 import com.twitter.mesos.scheduler.SchedulerLifecycle.DriverReference;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
+import com.twitter.mesos.scheduler.events.TaskEventModule;
 import com.twitter.mesos.scheduler.httphandlers.ServletModule;
 import com.twitter.mesos.scheduler.log.mesos.MesosLogStreamModule;
 import com.twitter.mesos.scheduler.periodic.BootstrapTaskLauncher;
@@ -178,7 +179,7 @@ public class SchedulerModule extends AbstractModule {
       bind(DriverFactoryImpl.class).in(Singleton.class);
     }
 
-    bind(SchedulingFilter.class).to(SchedulingFilterImpl.class);
+    TaskEventModule.bind(binder(), SchedulingFilterImpl.class);
 
     // updaterTaskProvider handled in provider.
 

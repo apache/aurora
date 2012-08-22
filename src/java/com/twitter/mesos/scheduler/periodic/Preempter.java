@@ -138,7 +138,7 @@ class Preempter implements Runnable {
 
       AssignedTask preempting = null;
       for (AssignedTask task : Iterables.filter(pendingTasks, preemptionFilter)) {
-        if (schedulingFilter.filter(slot, host, task.getTask()).isEmpty()) {
+        if (schedulingFilter.filter(slot, host, task.getTask(), task.getTaskId()).isEmpty()) {
           preempting = task;
           break;
         }

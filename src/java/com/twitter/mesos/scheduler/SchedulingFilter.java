@@ -66,11 +66,12 @@ public interface SchedulingFilter {
   /**
    * Applies a task against the filter with the given resources, and on the host.
    *
-   * @param resourceOffer Resources offered.
+   * @param offer Resources offered.
    * @param slaveHost Host that the resources are associated with.
    * @param task Task.
+   * @param taskId Canonical ID of the task.
    * @return A set of vetoes indicating reasons the task cannot be scheduled.  If the task may be
    *    scheduled, the set will be empty.
    */
-  Set<Veto> filter(Resources resourceOffer, String slaveHost, TwitterTaskInfo task);
+  Set<Veto> filter(Resources offer, String slaveHost, TwitterTaskInfo task, String taskId);
 }
