@@ -3,6 +3,7 @@ import getpass
 import grp
 import os
 import pwd
+import signal
 import subprocess
 import sys
 import time
@@ -242,20 +243,36 @@ class ProcessBase(object):
     if self._pid == 0:
       self._pid = self._platform.getpid()
       self._wait_for_control()
-      self.execute()
+      try:
+        self.execute()
+      finally:
+        self._ckpt.close()
+        self.finish()
     else:
       self._finalize_fork()
 
   def execute(self):
     raise NotImplementedError
 
+  def finish(self):
+    pass
+
 
 class RealPlatform(Platform):
+  IGNORE_SIGNALS = (signal.SIGINT,)
+
   def __init__(self, fork=os.fork):
     self._fork = fork
 
   def fork(self):
-    return self._fork()
+    pid = self._fork()
+    if pid == 0:
+      self._sanitize()
+    return pid
+
+  def _sanitize(self):
+    for sig in self.IGNORE_SIGNALS:
+      signal.signal(sig, signal.SIG_IGN)
 
   def getpid(self):
     return os.getpid()
@@ -339,10 +356,9 @@ class Process(ProcessBase):
       sandbox = os.getcwd()
     else:
       sandbox = self._sandbox if not self._use_chroot else '/'
+
     self._popen = subprocess.Popen(["/bin/sh", "-c", self.cmdline()],
-                     stderr = self._stderr,
-                     stdout = self._stdout,
-                     cwd    = sandbox)
+                                   stderr=self._stderr, stdout=self._stdout, cwd=sandbox)
 
     self._write_process_update(state=ProcessState.RUNNING,
                                pid=self._popen.pid,
@@ -362,5 +378,6 @@ class Process(ProcessBase):
     self._write_process_update(state=state, return_code=rc,
                                stop_time=self._platform.clock().time())
 
-    # normal exit
+  def finish(self):
+    self._log('Coordinator exiting.')
     sys.exit(0)
