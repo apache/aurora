@@ -47,9 +47,10 @@ python_binary(
   name = 'deploy_scheduler',
   source = 'bin/deploy_scheduler.py',
   dependencies = [
-    pants('3rdparty/python:git-python'),
-    pants(':mesos-lib'),
-    pants('src/python/twitter/common'),
+    pants(':clusters'),
+    pants('src/python/twitter/common/app'),
+    pants('src/python/twitter/common/dirutil'),
+    pants('src/python/twitter/mesos/deploy'),
   ]
 )
 
@@ -57,11 +58,11 @@ python_binary(
   name = 'deploy_thermos',
   source = 'bin/deploy_thermos.py',
   dependencies = [
-    pants(':mesos-lib'),
-    pants('src/python/twitter/common'),
+    pants(':clusters'),
+    pants('src/python/twitter/common/app'),
+    pants('src/python/twitter/mesos/deploy')
   ]
 )
-
 
 python_binary(
   name = 'restart_job',
