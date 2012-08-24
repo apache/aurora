@@ -27,20 +27,20 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 public class ForwardingStore implements
     Storage,
-    SchedulerStore,
-    JobStore,
-    TaskStore,
-    UpdateStore,
-    QuotaStore,
-    AttributeStore {
+    SchedulerStore.Mutable,
+    JobStore.Mutable,
+    TaskStore.Mutable,
+    UpdateStore.Mutable,
+    QuotaStore.Mutable,
+    AttributeStore.Mutable {
 
   private final Storage storage;
-  private final SchedulerStore schedulerStore;
-  private final JobStore jobStore;
-  private final TaskStore taskStore;
-  private final UpdateStore updateStore;
-  private final QuotaStore quotaStore;
-  private final AttributeStore attributeStore;
+  private final SchedulerStore.Mutable schedulerStore;
+  private final JobStore.Mutable jobStore;
+  private final TaskStore.Mutable taskStore;
+  private final UpdateStore.Mutable updateStore;
+  private final QuotaStore.Mutable quotaStore;
+  private final AttributeStore.Mutable attributeStore;
 
   /**
    * Creats a new forwarding store that delegates to the providing default stores.
@@ -55,12 +55,12 @@ public class ForwardingStore implements
    */
   public ForwardingStore(
       Storage storage,
-      SchedulerStore schedulerStore,
-      JobStore jobStore,
-      TaskStore taskStore,
-      UpdateStore updateStore,
-      QuotaStore quotaStore,
-      AttributeStore attributeStore) {
+      SchedulerStore.Mutable schedulerStore,
+      JobStore.Mutable jobStore,
+      TaskStore.Mutable taskStore,
+      UpdateStore.Mutable updateStore,
+      QuotaStore.Mutable quotaStore,
+      AttributeStore.Mutable attributeStore) {
 
     this.storage = checkNotNull(storage);
     this.schedulerStore = checkNotNull(schedulerStore);

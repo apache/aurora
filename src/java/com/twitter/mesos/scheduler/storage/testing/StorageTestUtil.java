@@ -22,18 +22,16 @@ import static org.easymock.EasyMock.expect;
  * Auxiliary class to simplify testing against a mocked storage.  This allows callers to directly
  * set up call expectations on individual stores rather than writing plumbing code to deal with
  * transactions and {@link StoreProvider}.
- *
- * @author William Farner
  */
 public class StorageTestUtil {
 
   public final StoreProvider storeProvider;
-  public final TaskStore taskStore;
-  public final QuotaStore quotaStore;
-  public final AttributeStore attributeStore;
-  public final JobStore jobStore;
-  public final UpdateStore updateStore;
-  public final SchedulerStore schedulerStore;
+  public final TaskStore.Mutable taskStore;
+  public final QuotaStore.Mutable quotaStore;
+  public final AttributeStore.Mutable attributeStore;
+  public final JobStore.Mutable jobStore;
+  public final UpdateStore.Mutable updateStore;
+  public final SchedulerStore.Mutable schedulerStore;
   public final Storage storage;
 
   /**
@@ -43,12 +41,12 @@ public class StorageTestUtil {
    */
   public StorageTestUtil(EasyMockTest easyMock) {
     this.storeProvider = easyMock.createMock(StoreProvider.class);
-    this.taskStore = easyMock.createMock(TaskStore.class);
-    this.quotaStore = easyMock.createMock(QuotaStore.class);
-    this.attributeStore = easyMock.createMock(AttributeStore.class);
-    this.jobStore = easyMock.createMock(JobStore.class);
-    this.updateStore = easyMock.createMock(UpdateStore.class);
-    this.schedulerStore = easyMock.createMock(SchedulerStore.class);
+    this.taskStore = easyMock.createMock(TaskStore.Mutable.class);
+    this.quotaStore = easyMock.createMock(QuotaStore.Mutable.class);
+    this.attributeStore = easyMock.createMock(AttributeStore.Mutable.class);
+    this.jobStore = easyMock.createMock(JobStore.Mutable.class);
+    this.updateStore = easyMock.createMock(UpdateStore.Mutable.class);
+    this.schedulerStore = easyMock.createMock(SchedulerStore.Mutable.class);
     this.storage = easyMock.createMock(Storage.class);
   }
 

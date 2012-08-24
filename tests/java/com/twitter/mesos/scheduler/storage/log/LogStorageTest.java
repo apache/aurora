@@ -71,9 +71,6 @@ import static org.easymock.EasyMock.notNull;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-/**
- * @author John Sirois
- */
 public class LogStorageTest extends EasyMockTest {
 
   private static final Amount<Long, Time> SNAPSHOT_INTERVAL = Amount.of(1L, Time.MINUTES);

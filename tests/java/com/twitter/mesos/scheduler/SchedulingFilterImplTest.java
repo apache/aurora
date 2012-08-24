@@ -82,16 +82,16 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   private SchedulingFilter defaultFilter;
   private Storage storage;
   private StoreProvider storeProvider;
-  private TaskStore taskStore;
-  private AttributeStore attributeStore;
+  private TaskStore.Mutable taskStore;
+  private AttributeStore.Mutable attributeStore;
 
   @Before
   public void setUp() throws Exception {
     storage = createMock(Storage.class);
     defaultFilter = new SchedulingFilterImpl(storage);
     storeProvider = createMock(StoreProvider.class);
-    taskStore = createMock(TaskStore.class);
-    attributeStore = createMock(AttributeStore.class);
+    taskStore = createMock(TaskStore.Mutable.class);
+    attributeStore = createMock(AttributeStore.Mutable.class);
 
     // Link the store provider to the store mocks.
     expectPossibleDoInTransaction();

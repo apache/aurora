@@ -153,27 +153,27 @@ public class LogStorage extends ForwardingStore {
   private StreamTransaction transaction = null;
 
   private final StoreProvider logStoreProvider = new StoreProvider() {
-    @Override public SchedulerStore getSchedulerStore() {
+    @Override public SchedulerStore.Mutable getSchedulerStore() {
       return LogStorage.this;
     }
 
-    @Override public JobStore getJobStore() {
+    @Override public JobStore.Mutable getJobStore() {
       return LogStorage.this;
     }
 
-    @Override public TaskStore getTaskStore() {
+    @Override public TaskStore.Mutable getTaskStore() {
       return LogStorage.this;
     }
 
-    @Override public UpdateStore getUpdateStore() {
+    @Override public UpdateStore.Mutable getUpdateStore() {
       return LogStorage.this;
     }
 
-    @Override public QuotaStore getQuotaStore() {
+    @Override public QuotaStore.Mutable getQuotaStore() {
       return LogStorage.this;
     }
 
-    @Override public AttributeStore getAttributeStore() {
+    @Override public AttributeStore.Mutable getAttributeStore() {
       return LogStorage.this;
     }
   };
@@ -211,12 +211,12 @@ public class LogStorage extends ForwardingStore {
              SnapshotStore<Snapshot> snapshotStore,
              @SnapshotInterval Amount<Long, Time> snapshotInterval,
              @WriteBehind Storage storage,
-             @WriteBehind SchedulerStore schedulerStore,
-             @WriteBehind JobStore jobStore,
-             @WriteBehind TaskStore taskStore,
-             @WriteBehind UpdateStore updateStore,
-             @WriteBehind QuotaStore quotaStore,
-             AttributeStore attributeStore) {
+             @WriteBehind SchedulerStore.Mutable schedulerStore,
+             @WriteBehind JobStore.Mutable jobStore,
+             @WriteBehind TaskStore.Mutable taskStore,
+             @WriteBehind UpdateStore.Mutable updateStore,
+             @WriteBehind QuotaStore.Mutable quotaStore,
+             AttributeStore.Mutable attributeStore) {
 
     this(logManager,
         new ScheduledExecutorSchedulingService(shutdownRegistry, shutdownGracePeriod),
@@ -237,12 +237,12 @@ public class LogStorage extends ForwardingStore {
              SnapshotStore<Snapshot> snapshotStore,
              Amount<Long, Time> snapshotInterval,
              Storage storage,
-             SchedulerStore schedulerStore,
-             JobStore jobStore,
-             TaskStore taskStore,
-             UpdateStore updateStore,
-             QuotaStore quotaStore,
-             AttributeStore attributeStore) {
+             SchedulerStore.Mutable schedulerStore,
+             JobStore.Mutable jobStore,
+             TaskStore.Mutable taskStore,
+             UpdateStore.Mutable updateStore,
+             QuotaStore.Mutable quotaStore,
+             AttributeStore.Mutable attributeStore) {
 
     super(storage, schedulerStore, jobStore, taskStore, updateStore, quotaStore, attributeStore);
     this.logManager = checkNotNull(logManager);

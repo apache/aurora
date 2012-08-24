@@ -39,8 +39,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
  *
  * TODO(William Farner): Introduce an interface to allow state machines to be dealt with
  *     abstractly from the consumption side.
- *
- * @author William Farner
  */
 public class TaskStateMachine {
 
@@ -255,7 +253,7 @@ public class TaskStateMachine {
       }
     };
 
-    stateMachine = StateMachine.<State>builder("Task-" + taskId)
+    stateMachine = StateMachine.<State>builder(taskId)
         .logTransitions()
         .initialState(State.create(initialState))
         .addState(

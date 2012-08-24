@@ -9,17 +9,8 @@ import com.twitter.mesos.gen.storage.JobUpdateConfiguration;
 /**
  * Stores all update configurations for on-going updates.
  * Includes the old configuration and the updated configuration for the tasks in a job.
- *
- * @author William Farner, Sathya Hariesh.
  */
 public interface UpdateStore {
-
-  /**
-   * Saves a job update configuration.
-   *
-   * @param updateConfiguration Configuration to store.
-   */
-  void saveJobUpdateConfig(JobUpdateConfiguration updateConfiguration);
 
   /**
    * Fetches the update configuration (if present) for the given role/job.
@@ -45,16 +36,26 @@ public interface UpdateStore {
    */
   Set<String> fetchUpdatingRoles();
 
-  /**
-   * Removes the update configuration for the job.
-   *
-   * @param role Owner role of the job.
-   * @param job Name of the job.
-   */
-  void removeShardUpdateConfigs(String role, String job);
+  public interface Mutable extends UpdateStore {
 
-  /**
-   * Deletes all update configurations.
-   */
-  void deleteShardUpdateConfigs();
+    /**
+     * Saves a job update configuration.
+     *
+     * @param updateConfiguration Configuration to store.
+     */
+    void saveJobUpdateConfig(JobUpdateConfiguration updateConfiguration);
+
+    /**
+     * Removes the update configuration for the job.
+     *
+     * @param role Owner role of the job.
+     * @param job Name of the job.
+     */
+    void removeShardUpdateConfigs(String role, String job);
+
+    /**
+     * Deletes all update configurations.
+     */
+    void deleteShardUpdateConfigs();
+  }
 }

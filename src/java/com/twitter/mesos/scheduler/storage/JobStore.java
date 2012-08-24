@@ -8,15 +8,8 @@ import com.twitter.mesos.gen.JobConfiguration;
 
 /**
  * Stores job configuration data.
- *
- * @author John Sirois
  */
 public interface JobStore {
-
-  /**
-   * Deletes all jobs.
-   */
-  void deleteJobs();
 
   /**
    * Fetches all {@code JobConfiguration}s for jobs owned by the
@@ -42,27 +35,34 @@ public interface JobStore {
   @Nullable JobConfiguration fetchJob(String managerId, String jobKey);
 
   /**
-   * Saves the job configuration for a job that has been accepted by the scheduler. Acts as an
-   * update if the managerId already exists.
-   *
-   * @param managerId The unique id of the {@link com.twitter.mesos.scheduler.JobManager} that
-   *     accepted the job.
-   * @param jobConfig The configuration of the accepted job.
-   */
-  void saveAcceptedJob(String managerId, JobConfiguration jobConfig);
-
-  /**
-   * Removes the job configuration for the job identified by {@code jobKey}.  If there is no stored
-   * configuration for the identified job, this method returns silently.
-   *
-   * @param jobKey the key identifying the job to delete.
-   */
-  void removeJob(String jobKey);
-
-  /**
    * Fetches all the unique manager ids that are present in the job store.
    *
    * @return The IDs of all stored job managers.
    */
   Set<String> fetchManagerIds();
+
+  public interface Mutable extends JobStore {
+    /**
+     * Saves the job configuration for a job that has been accepted by the scheduler. Acts as an
+     * update if the managerId already exists.
+     *
+     * @param managerId The unique id of the {@link com.twitter.mesos.scheduler.JobManager} that
+     *     accepted the job.
+     * @param jobConfig The configuration of the accepted job.
+     */
+    void saveAcceptedJob(String managerId, JobConfiguration jobConfig);
+
+    /**
+     * Removes the job configuration for the job identified by {@code jobKey}.
+     * If there is no stored configuration for the identified job, this method returns silently.
+     *
+     * @param jobKey the key identifying the job to delete.
+     */
+    void removeJob(String jobKey);
+
+    /**
+     * Deletes all jobs.
+     */
+    void deleteJobs();
+  }
 }

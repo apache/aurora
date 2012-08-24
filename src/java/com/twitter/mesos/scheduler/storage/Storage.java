@@ -4,18 +4,16 @@ import com.twitter.mesos.scheduler.SchedulerException;
 
 /**
  * Manages scheduler storage operations providing an interface to perform atomic changes.
- *
- * @author John Sirois
  */
 public interface Storage {
 
   interface StoreProvider {
-    SchedulerStore getSchedulerStore();
-    JobStore getJobStore();
-    TaskStore getTaskStore();
-    UpdateStore getUpdateStore();
-    QuotaStore getQuotaStore();
-    AttributeStore getAttributeStore();
+    SchedulerStore.Mutable getSchedulerStore();
+    JobStore.Mutable getJobStore();
+    TaskStore.Mutable getTaskStore();
+    UpdateStore.Mutable getUpdateStore();
+    QuotaStore.Mutable getQuotaStore();
+    AttributeStore.Mutable getAttributeStore();
   }
 
   /**

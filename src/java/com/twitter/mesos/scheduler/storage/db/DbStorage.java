@@ -91,17 +91,15 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**
  * A task store that saves data to a database with a JDBC driver.
- *
- * @author John Sirois
  */
 public class DbStorage implements
     SnapshotStore<byte[]>,
     Storage,
-    SchedulerStore,
-    JobStore,
-    TaskStore,
-    UpdateStore,
-    QuotaStore {
+    SchedulerStore.Mutable,
+    JobStore.Mutable,
+    TaskStore.Mutable,
+    UpdateStore.Mutable,
+    QuotaStore.Mutable {
 
   private static final Logger LOG = Logger.getLogger(DbStorage.class.getName());
 
@@ -111,26 +109,26 @@ public class DbStorage implements
   private final TransactionTemplate transactionTemplate;
   private final Temporary temporary = FileUtils.SYSTEM_TMP;
   private boolean initialized;
-  private final AttributeStore attributeStore;
+  private final AttributeStore.Mutable attributeStore;
 
   private final DbStorage self = this;
   private final StoreProvider storeProvider = new StoreProvider() {
-    @Override public SchedulerStore getSchedulerStore() {
+    @Override public SchedulerStore.Mutable getSchedulerStore() {
       return self;
     }
-    @Override public JobStore getJobStore() {
+    @Override public JobStore.Mutable getJobStore() {
       return self;
     }
-    @Override public TaskStore getTaskStore() {
+    @Override public TaskStore.Mutable getTaskStore() {
       return self;
     }
-    @Override public UpdateStore getUpdateStore() {
+    @Override public UpdateStore.Mutable getUpdateStore() {
       return self;
     }
-    @Override public QuotaStore getQuotaStore() {
+    @Override public QuotaStore.Mutable getQuotaStore() {
       return self;
     }
-    @Override public AttributeStore getAttributeStore() {
+    @Override public AttributeStore.Mutable getAttributeStore() {
       // When we run as a server, this will never be executed; however, if we run as a unittest,
       // we will need to have it here because it use DBStorage instead of the LogStorage.
       // TODO(wfarner): refactor the code and remove the attributeStore binding here.
@@ -145,8 +143,11 @@ public class DbStorage implements
    * @param attributeStore The {@code TransactionTemplate} object provides host attributes.
    */
   @Inject
-  public DbStorage(JdbcTemplate jdbcTemplate, TransactionTemplate transactionTemplate,
-      AttributeStore attributeStore) {
+  public DbStorage(
+      JdbcTemplate jdbcTemplate,
+      TransactionTemplate transactionTemplate,
+      AttributeStore.Mutable attributeStore) {
+
     this.jdbcTemplate = checkNotNull(jdbcTemplate);
     this.transactionTemplate = checkNotNull(transactionTemplate);
     this.attributeStore = checkNotNull(attributeStore);

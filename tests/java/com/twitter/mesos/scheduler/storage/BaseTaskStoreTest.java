@@ -30,7 +30,7 @@ import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
  * A base class for task stores.
  * Verifies a {@link TaskStore} implementation conforms to expected behavior.
  */
-public abstract class BaseTaskStoreTest<T extends TaskStore> extends TearDownTestCase {
+public abstract class BaseTaskStoreTest<T extends TaskStore.Mutable> extends TearDownTestCase {
 
   private static final String TASK_A_ID = "fake-task-id-a";
   private static final ScheduleStatus TASK_A_STATUS = PENDING;

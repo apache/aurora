@@ -15,19 +15,6 @@ import com.twitter.mesos.gen.HostAttributes;
  * Storage interface for host attributes.
  */
 public interface AttributeStore {
-
-  /**
-   * Deletes all attributes in the store.
-   */
-  void deleteHostAttributes();
-
-  /**
-   * Save a host attribute in the attribute store.
-   *
-   * @param hostAttributes The attribute we are going to save.
-   */
-  void saveHostAttributes(HostAttributes hostAttributes);
-
   /**
    * Fetches all host attributes given by the host.
    *
@@ -43,7 +30,22 @@ public interface AttributeStore {
    */
   Set<HostAttributes> getHostAttributes();
 
-  class AttributeStoreImpl implements AttributeStore {
+  public interface Mutable extends AttributeStore {
+
+    /**
+     * Deletes all attributes in the store.
+     */
+    void deleteHostAttributes();
+
+    /**
+     * Save a host attribute in the attribute store.
+     *
+     * @param hostAttributes The attribute we are going to save.
+     */
+    void saveHostAttributes(HostAttributes hostAttributes);
+  }
+
+  class AttributeStoreImpl implements Mutable {
     private final Map<String, HostAttributes> hostAttributes;
 
     @Inject

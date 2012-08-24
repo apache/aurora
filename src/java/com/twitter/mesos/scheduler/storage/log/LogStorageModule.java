@@ -99,23 +99,23 @@ public class LogStorageModule extends AbstractModule {
         binder.bind(snapshotStoreType).to(SnapshotStoreImpl.class);
         binder.expose(snapshotStoreType);
 
-        Key<SchedulerStore> schedulerStoreKey = createKey(SchedulerStore.class);
+        Key<SchedulerStore.Mutable> schedulerStoreKey = createKey(SchedulerStore.Mutable.class);
         binder.bind(schedulerStoreKey).to(DbStorage.class);
         binder.expose(schedulerStoreKey);
 
-        Key<JobStore> jobStoreKey = createKey(JobStore.class);
+        Key<JobStore.Mutable> jobStoreKey = createKey(JobStore.Mutable.class);
         binder.bind(jobStoreKey).to(DbStorage.class);
         binder.expose(jobStoreKey);
 
-        Key<TaskStore> taskStoreKey = createKey(TaskStore.class);
+        Key<TaskStore.Mutable> taskStoreKey = createKey(TaskStore.Mutable.class);
         binder.bind(taskStoreKey).to(DbStorage.class);
         binder.expose(taskStoreKey);
 
-        Key<UpdateStore> updateStoreKey = createKey(UpdateStore.class);
+        Key<UpdateStore.Mutable> updateStoreKey = createKey(UpdateStore.Mutable.class);
         binder.bind(updateStoreKey).to(DbStorage.class);
         binder.expose(updateStoreKey);
 
-        Key<QuotaStore> quotaStoreKey = createKey(QuotaStore.class);
+        Key<QuotaStore.Mutable> quotaStoreKey = createKey(QuotaStore.Mutable.class);
         binder.bind(quotaStoreKey).to(DbStorage.class);
         binder.expose(quotaStoreKey);
 
