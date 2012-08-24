@@ -151,8 +151,15 @@ public interface Driver {
         return;
       }
 
-      LOG.info(String.format("Attempting to send message to %s/%s - %s",
-          slave.getValue(), executor.getValue(), message));
+      String logMessage = String.format("Attempting to send message to %s/%s",
+          slave.getValue(), executor.getValue());
+      Level level = Level.INFO;
+      if (LOG.isLoggable(Level.FINE)) {
+        level = Level.FINE;
+        logMessage += " - " + message;
+      }
+      LOG.log(level, logMessage);
+
       Status status = driver.sendFrameworkMessage(executor, slave, data);
       if (status != DRIVER_RUNNING) {
         LOG.severe(

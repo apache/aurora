@@ -8,6 +8,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
 import com.google.protobuf.ByteString;
 
@@ -24,6 +25,7 @@ import com.twitter.common.args.constraints.NotNull;
 import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
+import com.twitter.mesos.Protobufs;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.AssignedTask;
@@ -112,7 +114,8 @@ public interface MesosTaskFactory {
         resources = ImmutableList.of();
       }
 
-      LOG.info("Setting task resources to " + resources);
+      LOG.info("Setting task resources to "
+          + Iterables.transform(resources, Protobufs.SHORT_TOSTRING));
       TaskInfo.Builder taskBuilder =
           TaskInfo.newBuilder().setName(Tasks.jobKey(task))
               .setTaskId(TaskID.newBuilder().setValue(task.getTaskId()))

@@ -3,6 +3,7 @@ package com.twitter.mesos.scheduler.periodic;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -132,7 +133,9 @@ class HistoryPruneRunner implements Runnable {
       String host = pruneByHost.getKey();
       AdjustRetainedTasks message =
           retainedTasksMessage(stateManager.fetchTasks(hostQuery(host)), pruneByHost.getValue());
-      LOG.info("Instructing executor " + host + " to retain only tasks " + message);
+      if (LOG.isLoggable(Level.FINE)) {
+        LOG.fine("Instructing executor " + host + " to retain only tasks " + message);
+      }
 
       driver.sendMessage(
           ExecutorMessage.adjustRetainedTasks(message),

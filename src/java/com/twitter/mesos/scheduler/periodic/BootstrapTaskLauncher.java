@@ -18,6 +18,7 @@ import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.Protos.TaskStatus;
 
 import com.twitter.common.stats.Stats;
+import com.twitter.mesos.Protobufs;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Constraint;
 import com.twitter.mesos.gen.Identity;
@@ -82,7 +83,7 @@ public class BootstrapTaskLauncher implements TaskLauncher {
   @Override
   public boolean statusUpdate(TaskStatus status) {
     if (status.getTaskId().getValue().startsWith(TASK_ID_PREFIX)) {
-      LOG.info("Received status update for bootstrap task: " + status);
+      LOG.info("Received status update for bootstrap task: " + Protobufs.toString(status));
       return true;
     } else {
       return false;
