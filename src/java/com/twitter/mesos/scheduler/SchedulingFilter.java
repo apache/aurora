@@ -23,11 +23,28 @@ public interface SchedulingFilter {
 
     private final String reason;
     private final int score;
+    private final boolean dedicatedMismatch;
+
+    private Veto(String reason, int score, boolean dedicatedMismatch) {
+      this.reason = reason;
+      this.score = Math.min(MAX_SCORE, score);
+      this.dedicatedMismatch = dedicatedMismatch;
+    }
 
     @VisibleForTesting
     public Veto(String reason, int score) {
-      this.reason = reason;
-      this.score = Math.min(MAX_SCORE, score);
+      this(reason, score, false);
+    }
+
+    /**
+     * Creates a special veto that represents a mismatch between the server and task's configuration
+     * for a dedicated machine pool.
+     *
+     * @param reason Information about the dedicated mismatch.
+     * @return A dedicated veto.
+     */
+    public static Veto dedicated(String reason) {
+      return new Veto(reason, MAX_SCORE, true);
     }
 
     public String getReason() {
@@ -38,6 +55,10 @@ public interface SchedulingFilter {
       return score;
     }
 
+    public boolean isDedicatedMismatch() {
+      return dedicatedMismatch;
+    }
+
     @Override
     public boolean equals(Object o) {
       if (!(o instanceof Veto)) {
@@ -46,12 +67,13 @@ public interface SchedulingFilter {
 
       Veto other = (Veto) o;
       return Objects.equal(reason, other.reason)
-          && (score == other.score);
+          && (score == other.score)
+          && (dedicatedMismatch == other.dedicatedMismatch);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(reason, score);
+      return Objects.hashCode(reason, score, dedicatedMismatch);
     }
 
     @Override
@@ -59,6 +81,7 @@ public interface SchedulingFilter {
       return Objects.toStringHelper(this)
           .add("reason", reason)
           .add("score", score)
+          .add("dedicatedMismatch", dedicatedMismatch)
           .toString();
     }
   }

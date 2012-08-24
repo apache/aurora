@@ -47,7 +47,7 @@ public class NotifyingSchedulingFilterTest extends EasyMockTest {
   public void testEvents() {
     Set<Veto> vetoes = ImmutableSet.of(VETO_1, VETO_2);
     expect(delegate.filter(TASK_RESOURCES, SLAVE, TASK, TASK_ID)).andReturn(vetoes);
-    eventSink.execute(new Vetoed(TASK_ID, SLAVE, vetoes));
+    eventSink.execute(new Vetoed(TASK_ID, vetoes));
 
     control.replay();
 

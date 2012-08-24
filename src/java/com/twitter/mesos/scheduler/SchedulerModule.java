@@ -55,6 +55,7 @@ import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.events.TaskEventModule;
 import com.twitter.mesos.scheduler.httphandlers.ServletModule;
 import com.twitter.mesos.scheduler.log.mesos.MesosLogStreamModule;
+import com.twitter.mesos.scheduler.metadata.MetadataModule;
 import com.twitter.mesos.scheduler.periodic.BootstrapTaskLauncher;
 import com.twitter.mesos.scheduler.periodic.BootstrapTaskLauncher.Bootstrap;
 import com.twitter.mesos.scheduler.periodic.GcExecutorLauncher;
@@ -180,6 +181,7 @@ public class SchedulerModule extends AbstractModule {
     }
 
     TaskEventModule.bind(binder(), SchedulingFilterImpl.class);
+    install(new MetadataModule());
 
     // updaterTaskProvider handled in provider.
 

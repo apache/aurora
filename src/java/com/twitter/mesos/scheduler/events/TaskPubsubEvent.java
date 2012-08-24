@@ -24,10 +24,14 @@ public interface TaskPubsubEvent {
    * Event sent when tasks were deleted.
    */
   public static class Deleted implements TaskPubsubEvent {
-    final Set<String> taskIds;
+    private final Set<String> taskIds;
 
     public Deleted(Set<String> taskIds) {
       this.taskIds = checkNotNull(taskIds);
+    }
+
+    public Set<String> getTaskIds() {
+      return taskIds;
     }
 
     @Override
@@ -50,14 +54,26 @@ public interface TaskPubsubEvent {
    * Event sent when a task changed state.
    */
   public static class StateChange implements TaskPubsubEvent {
-    final String taskId;
-    final ScheduleStatus oldState;
-    final ScheduleStatus newState;
+    private final String taskId;
+    private final ScheduleStatus oldState;
+    private final ScheduleStatus newState;
 
     public StateChange(String taskId, ScheduleStatus oldState, ScheduleStatus newState) {
       this.taskId = checkNotNull(taskId);
       this.oldState = checkNotNull(oldState);
       this.newState = checkNotNull(newState);
+    }
+
+    public String getTaskId() {
+      return taskId;
+    }
+
+    public ScheduleStatus getOldState() {
+      return oldState;
+    }
+
+    public ScheduleStatus getNewState() {
+      return newState;
     }
 
     @Override
@@ -82,14 +98,20 @@ public interface TaskPubsubEvent {
    * Event sent when a scheduling assignment was vetoed.
    */
   public static class Vetoed implements TaskPubsubEvent {
-    final String taskId;
-    final String slaveHost;
-    final Set<Veto> vetoes;
+    private final String taskId;
+    private final Set<Veto> vetoes;
 
-    public Vetoed(String taskId, String slaveHost, Set<Veto> vetoes) {
+    public Vetoed(String taskId, Set<Veto> vetoes) {
       this.taskId = checkNotNull(taskId);
-      this.slaveHost = checkNotNull(slaveHost);
       this.vetoes = checkNotNull(vetoes);
+    }
+
+    public String getTaskId() {
+      return taskId;
+    }
+
+    public Set<Veto> getVetoes() {
+      return vetoes;
     }
 
     @Override
@@ -100,13 +122,12 @@ public interface TaskPubsubEvent {
 
       Vetoed other = (Vetoed) o;
       return Objects.equal(taskId, other.taskId)
-          && Objects.equal(slaveHost, other.slaveHost)
           && Objects.equal(vetoes, other.vetoes);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(taskId, slaveHost, vetoes);
+      return Objects.hashCode(taskId, vetoes);
     }
   }
 }

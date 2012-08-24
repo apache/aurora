@@ -40,8 +40,7 @@ import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.DED
  */
 public class SchedulingFilterImpl implements SchedulingFilter {
 
-  @VisibleForTesting static final Veto DEDICATED_HOST_VETO =
-      new Veto("Host is dedicated", Veto.MAX_SCORE);
+  @VisibleForTesting static final Veto DEDICATED_HOST_VETO = Veto.dedicated("Host is dedicated");
 
   private static final Optional<Veto> NO_VETO = Optional.absent();
 

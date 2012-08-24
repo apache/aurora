@@ -18,6 +18,7 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
 import com.twitter.mesos.scheduler.SchedulingFilterImpl.AttributeLoader;
+import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -59,7 +60,11 @@ class ConstraintFilter implements Function<Constraint, Optional<Veto>> {
 
   @VisibleForTesting
   static Veto constraintVeto(String constraint) {
-    return new Veto("Constraint not satisfied: " + constraint, Veto.MAX_SCORE);
+    if (constraint.equals(ConfigurationManager.DEDICATED_ATTRIBUTE)) {
+      return Veto.dedicated("Task is dedicated.");
+    } else {
+      return new Veto("Constraint not satisfied: " + constraint, Veto.MAX_SCORE);
+    }
   }
 
   @VisibleForTesting

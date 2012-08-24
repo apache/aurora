@@ -48,7 +48,7 @@ class NotifyingSchedulingFilter implements SchedulingFilter {
   public Set<Veto> filter(Resources offer, String slaveHost, TwitterTaskInfo task, String taskId) {
     Set<Veto> vetoes = delegate.filter(offer, slaveHost, task, taskId);
     if (!vetoes.isEmpty()) {
-      eventSink.execute(new Vetoed(taskId, slaveHost, vetoes));
+      eventSink.execute(new Vetoed(taskId, vetoes));
     }
 
     return vetoes;

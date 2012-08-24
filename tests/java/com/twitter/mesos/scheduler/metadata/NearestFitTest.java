@@ -11,6 +11,8 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.testing.FakeTicker;
 import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
+import com.twitter.mesos.scheduler.events.TaskPubsubEvent.Deleted;
+import com.twitter.mesos.scheduler.events.TaskPubsubEvent.Vetoed;
 
 import static org.junit.Assert.assertEquals;
 
@@ -19,6 +21,7 @@ public class NearestFitTest {
   private static final Veto ALMOST = new Veto("Almost", 1);
   private static final Veto NOPE = new Veto("Nope", 5);
   private static final Veto NO_CHANCE = new Veto("No chance", 1000);
+  private static final Veto DEDICATED = Veto.dedicated("Dedicated");
 
   private static final String TASK = "taskId";
 
@@ -38,35 +41,35 @@ public class NearestFitTest {
 
   @Test
   public void testMultipleVetoes() {
-    record(ALMOST, NOPE);
+    vetoed(ALMOST, NOPE);
     assertNearest(ALMOST, NOPE);
     // Even though the aggregate score for NO_CHANCE is higher than ALMOST and NOPE,
     // NO_CHANCE becomes the pending reason since we consider one vector smaller than two
     // (regardless of magnitude).
-    record(NO_CHANCE);
+    vetoed(NO_CHANCE);
     assertNearest(NO_CHANCE);
   }
 
   @Test
   public void testScoring() {
-    record(NO_CHANCE);
+    vetoed(NO_CHANCE);
     assertNearest(NO_CHANCE);
-    record(ALMOST);
+    vetoed(ALMOST);
     assertNearest(ALMOST);
-    record(NO_CHANCE);
+    vetoed(NO_CHANCE);
     assertNearest(ALMOST);
   }
 
   @Test
   public void testRemove() {
-    record(NO_CHANCE);
-    nearest.remove(TASK);
+    vetoed(NO_CHANCE);
+    nearest.remove(new Deleted(ImmutableSet.of(TASK)));
     assertNearest();
   }
 
   @Test
   public void testExpiration() {
-    record(ALMOST);
+    vetoed(ALMOST);
     assertNearest(ALMOST);
     ticker.advance(NearestFit.EXPIRATION);
     ticker.advance(Amount.of(1L, Time.SECONDS));
@@ -77,8 +80,8 @@ public class NearestFitTest {
     return ImmutableSet.<Veto>builder().add(vetoes).build();
   }
 
-  private void record(Veto... vetoes) {
-    nearest.record(TASK, vetoes(vetoes));
+  private void vetoed(Veto... vetoes) {
+    nearest.vetoed(new Vetoed(TASK, ImmutableSet.<Veto>builder().add(vetoes).build()));
   }
 
   private void assertNearest(Veto... vetoes) {

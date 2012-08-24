@@ -13,6 +13,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.google.common.base.Function;
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -33,6 +34,8 @@ import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.SchedulerCore;
+import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
+import com.twitter.mesos.scheduler.metadata.NearestFit;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -91,7 +94,7 @@ public class SchedulerzJob extends StringTemplateServlet {
         }
       };
 
-  private static final Function<ScheduledTask, Map<String, Object>> TASK_TO_STRING_MAP =
+  private final Function<ScheduledTask, Map<String, Object>> taskToStringMap =
       new Function<ScheduledTask, Map<String, Object>>() {
         @Override public Map<String, Object> apply(ScheduledTask scheduledTask) {
           AssignedTask task = scheduledTask.getAssignedTask();
@@ -101,6 +104,18 @@ public class SchedulerzJob extends StringTemplateServlet {
             .put("slaveHost", task.isSetSlaveHost() ? task.getSlaveHost() : "")
             .put("taskEvents", scheduledTask.isSetTaskEvents()
                 ? scheduledTask.getTaskEvents() : Lists.newArrayList());
+
+          String pendingReason = "";
+          if (scheduledTask.getStatus() == ScheduleStatus.PENDING) {
+            Set<Veto> vetoes = nearestFit.getNearestFit(task.getTaskId());
+            if (vetoes.isEmpty()) {
+              pendingReason = "No matching hosts.";
+            } else {
+              pendingReason = Joiner.on(",").join(vetoes);
+            }
+          }
+          builder.put("pendingReason", pendingReason);
+
           if (task.isSetAssignedPorts()
               && task.getAssignedPorts().containsKey("health")) {
             builder.put("healthPort", task.getAssignedPorts().get("health"));
@@ -117,9 +132,9 @@ public class SchedulerzJob extends StringTemplateServlet {
         }
       };
 
-
   private final SchedulerCore scheduler;
   private final String clusterName;
+  private final NearestFit nearestFit;
 
   /**
    * Creates a new job servlet.
@@ -132,10 +147,13 @@ public class SchedulerzJob extends StringTemplateServlet {
   public SchedulerzJob(
       @CacheTemplates boolean cacheTemplates,
       SchedulerCore scheduler,
-      @ClusterName String clusterName) {
+      @ClusterName String clusterName,
+      NearestFit nearestFit) {
+
     super("schedulerzjob", cacheTemplates);
     this.scheduler = checkNotNull(scheduler);
     this.clusterName = checkNotBlank(clusterName);
+    this.nearestFit = checkNotNull(nearestFit);
   }
 
   /**
@@ -219,14 +237,14 @@ public class SchedulerzJob extends StringTemplateServlet {
           Collections.sort(completedTasks, REVERSE_CHRON_COMPARATOR);
           template.setAttribute("completedTasks",
             ImmutableList.copyOf(
-              Iterables.transform(offsetAndLimit(completedTasks, offset), TASK_TO_STRING_MAP)));
+              Iterables.transform(offsetAndLimit(completedTasks, offset), taskToStringMap)));
           hasMore = completedTasks.size() > offset + PAGE_SIZE;
         }
 
         List<ScheduledTask> liveTasks = SHARD_ID_COMPARATOR.sortedCopy(activeTasks);
         template.setAttribute("activeTasks",
           ImmutableList.copyOf(
-              Iterables.transform(offsetAndLimit(liveTasks, offset), TASK_TO_STRING_MAP)));
+              Iterables.transform(offsetAndLimit(liveTasks, offset), taskToStringMap)));
         hasMore = hasMore || liveTasks.size() > (offset + PAGE_SIZE);
 
         if (offset > 0) {
