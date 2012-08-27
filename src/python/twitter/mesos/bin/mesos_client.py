@@ -64,9 +64,9 @@ def synthesize_url(cluster, scheduler=None, role=None, job=None):
   if not role and not job:
     return urljoin(scheduler_url, 'scheduler')
   elif role and not job:
-    return urljoin(scheduler_url, 'scheduler/role?role=%s' % role)
+    return urljoin(scheduler_url, 'scheduler/%s' % role)
   else:
-    return urljoin(scheduler_url, 'scheduler/job?role=%s&job=%s' % (role, job))
+    return urljoin(scheduler_url, 'scheduler/%s/%s' % (role, job))
 
 
 def get_config(jobname, config_file, packer_factory):

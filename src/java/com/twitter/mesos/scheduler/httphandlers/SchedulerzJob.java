@@ -93,6 +93,12 @@ public class SchedulerzJob extends JerseyTemplateServlet {
         }
       };
 
+  private static final Function<Veto, String> GET_REASON = new Function<Veto, String>() {
+    @Override public String apply(Veto veto) {
+      return veto.getReason();
+    }
+  };
+
   private final Function<ScheduledTask, Map<String, Object>> taskToStringMap =
       new Function<ScheduledTask, Map<String, Object>>() {
         @Override public Map<String, Object> apply(ScheduledTask scheduledTask) {
@@ -110,7 +116,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
             if (vetoes.isEmpty()) {
               pendingReason = "No matching hosts.";
             } else {
-              pendingReason = Joiner.on(",").join(vetoes);
+              pendingReason = Joiner.on(",").join(Iterables.transform(vetoes, GET_REASON));
             }
           }
           builder.put("pendingReason", pendingReason);
