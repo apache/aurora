@@ -41,7 +41,7 @@ import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 /**
  * A servlet to give an aggregate view of cluster resources consumed, grouped by category.
  */
-@Path("/")
+@Path("/utilization")
 public class Utilization {
 
   private static final TaskQuery ALL_ACTIVE = new TaskQuery().setStatuses(Tasks.ACTIVE_STATES);

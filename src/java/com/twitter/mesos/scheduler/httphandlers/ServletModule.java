@@ -1,14 +1,17 @@
 package com.twitter.mesos.scheduler.httphandlers;
 
+import java.util.Map;
+
 import javax.inject.Singleton;
-import javax.servlet.http.HttpServlet;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
 import com.google.inject.Key;
 import com.google.inject.TypeLiteral;
 import com.google.inject.servlet.GuiceFilter;
+import com.sun.jersey.api.container.filter.GZIPContentEncodingFilter;
 import com.sun.jersey.guice.JerseyServletModule;
 import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
 
@@ -25,10 +28,19 @@ import com.twitter.mesos.scheduler.SchedulerCore;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 import com.twitter.thrift.ServiceInstance;
 
+import static com.sun.jersey.api.core.ResourceConfig.PROPERTY_CONTAINER_REQUEST_FILTERS;
+import static com.sun.jersey.api.core.ResourceConfig.PROPERTY_CONTAINER_RESPONSE_FILTERS;
+import static com.sun.jersey.api.json.JSONConfiguration.FEATURE_POJO_MAPPING;
+
 /**
  * Binding module for scheduler HTTP servlets.
  */
 public class ServletModule extends AbstractModule {
+
+  private static final Map<String, String> CONTAINER_PARAMS = ImmutableMap.of(
+      FEATURE_POJO_MAPPING, Boolean.TRUE.toString(),
+      PROPERTY_CONTAINER_REQUEST_FILTERS, GZIPContentEncodingFilter.class.getName(),
+      PROPERTY_CONTAINER_RESPONSE_FILTERS, GZIPContentEncodingFilter.class.getName());
 
   @Override
   protected void configure() {
@@ -40,32 +52,28 @@ public class ServletModule extends AbstractModule {
     // Bindings required for the leader redirector.
     requireBinding(LocalServiceRegistry.class);
     requireBinding(Key.get(new TypeLiteral<DynamicHostSet<ServiceInstance>>() { }));
-
     Registration.registerServletFilter(binder(), GuiceFilter.class, "/*");
     install(new JerseyServletModule() {
-      private void bindLeaderServlet(
-          String path,
-          Class<? extends HttpServlet> servletClass,
-          boolean silent) {
-
-        Registration.registerServlet(binder(), path, servletClass, silent);
-        filter(path + "*").through(LeaderRedirectFilter.class);
+      private void registerJerseyEndpoint(String indexPath, Class<?>... servlets) {
+        filter(indexPath + "/*").through(LeaderRedirectFilter.class);
+        filter(indexPath + "*").through(GuiceContainer.class, CONTAINER_PARAMS);
+        Registration.registerEndpoint(binder(), indexPath);
+        for (Class<?> servlet : servlets) {
+          bind(servlet);
+        }
       }
 
       @Override protected void configureServlets() {
         bind(LeaderRedirectFilter.class).in(Singleton.class);
-        bindLeaderServlet("/slaves", Slaves.class, false);
-        bindLeaderServlet("/scheduler", SchedulerzHome.class, false);
-        bindLeaderServlet("/scheduler/role", SchedulerzRole.class, true);
-        bindLeaderServlet("/scheduler/job", SchedulerzJob.class, true);
-        bindLeaderServlet("/mname", Mname.class, true);
-        bindLeaderServlet("/structdump", StructDump.class, true);
-
-        // TODO(William Farner): Come up with a better way to mix vanilla servlets with jersey
-        // endpoints to ensure they all show up on the index page.
-        serve("/utilization*").with(GuiceContainer.class);
-        bind(Utilization.class);
-        Registration.registerEndpoint(binder(), "/utilization");
+        registerJerseyEndpoint("/mname", Mname.class);
+        registerJerseyEndpoint(
+            "/scheduler",
+            SchedulerzHome.class,
+            SchedulerzRole.class,
+            SchedulerzJob.class);
+        registerJerseyEndpoint("/slaves", Slaves.class);
+        registerJerseyEndpoint("/structdump", StructDump.class);
+        registerJerseyEndpoint("/utilization", Utilization.class);
       }
     });
 

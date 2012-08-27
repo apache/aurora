@@ -1,11 +1,13 @@
 package com.twitter.mesos.scheduler.httphandlers;
 
-import java.io.IOException;
 import java.util.Map;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
@@ -17,7 +19,6 @@ import com.google.inject.Inject;
 import org.antlr.stringtemplate.StringTemplate;
 
 import com.twitter.common.base.Closure;
-import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.scheduler.ClusterName;
@@ -33,9 +34,8 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 /**
  * HTTP interface to provide information about jobs for a specific mesos role.
  */
-public class SchedulerzRole extends StringTemplateServlet {
-
-  private static final String ROLE_PARAM = "role";
+@Path("/scheduler/{role}")
+public class SchedulerzRole extends JerseyTemplateServlet {
 
   private final SchedulerCore scheduler;
   private final CronJobManager cronScheduler;
@@ -45,32 +45,34 @@ public class SchedulerzRole extends StringTemplateServlet {
   /**
    * Creates a new role servlet.
    *
-   * @param cacheTemplates Whether to cache the template file.
    * @param scheduler Core scheduler.
    * @param cronScheduler Cron scheduler.
    * @param clusterName Name of the serving cluster.
    * @param quotaManager Resource quota manager.
    */
   @Inject
-  public SchedulerzRole(@CacheTemplates boolean cacheTemplates,
+  public SchedulerzRole(
       SchedulerCore scheduler,
       CronJobManager cronScheduler,
       @ClusterName String clusterName,
       QuotaManager quotaManager) {
-    super("schedulerzrole", cacheTemplates);
+
+    super("schedulerzrole");
     this.scheduler = checkNotNull(scheduler);
     this.cronScheduler = checkNotNull(cronScheduler);
     this.clusterName = checkNotBlank(clusterName);
     this.quotaManager = checkNotNull(quotaManager);
   }
 
-  @Override
-  protected void doGet(final HttpServletRequest req, final HttpServletResponse resp)
-      throws ServletException, IOException {
-
-    final String role = req.getParameter(ROLE_PARAM);
-
-    writeTemplate(resp, new Closure<StringTemplate>() {
+  /**
+   * Fetches the landing page for a role.
+   *
+   * @return HTTP response.
+   */
+  @GET
+  @Produces(MediaType.TEXT_HTML)
+  public Response get(@PathParam("role") final String role) {
+    return fillTemplate(new Closure<StringTemplate>() {
       @Override public void execute(StringTemplate template) {
         template.setAttribute("cluster_name", clusterName);
 
@@ -127,10 +129,10 @@ public class SchedulerzRole extends StringTemplateServlet {
 
         Iterable<JobConfiguration> cronJobs = Iterables.filter(
             cronScheduler.getJobs(), new Predicate<JobConfiguration>() {
-              @Override public boolean apply(JobConfiguration job) {
-                return job.getOwner().getRole().equals(role);
-              }
-            });
+          @Override public boolean apply(JobConfiguration job) {
+            return job.getOwner().getRole().equals(role);
+          }
+        });
 
         cronJobs = DisplayUtils.JOB_CONFIG_ORDERING.sortedCopy(cronJobs);
         Iterable<CronJob> cronJobObjs = Iterables.transform(cronJobs,

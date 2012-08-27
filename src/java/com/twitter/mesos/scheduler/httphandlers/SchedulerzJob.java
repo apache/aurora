@@ -1,6 +1,5 @@
 package com.twitter.mesos.scheduler.httphandlers;
 
-import java.io.IOException;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumSet;
@@ -8,9 +7,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
@@ -24,7 +27,6 @@ import com.google.inject.Inject;
 import org.antlr.stringtemplate.StringTemplate;
 
 import com.twitter.common.base.Closure;
-import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
@@ -53,11 +55,8 @@ import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 /**
  * HTTP interface to view information about a job in the mesos scheduler.
  */
-public class SchedulerzJob extends StringTemplateServlet {
-  private static final String ROLE_PARAM = "role";
-  private static final String USER_PARAM = "user";
-  private static final String JOB_PARAM = "job";
-  // TODO(William Farner): Allow filtering by task status.
+@Path("/scheduler/{role}/{job}")
+public class SchedulerzJob extends JerseyTemplateServlet {
   private static final String STATUS_FILTER_PARAM = "status";
   private static final String ADMIN_VIEW_PARAM = "admin";
 
@@ -139,72 +138,46 @@ public class SchedulerzJob extends StringTemplateServlet {
   /**
    * Creates a new job servlet.
    *
-   * @param cacheTemplates Whether to cache the template file.
    * @param scheduler Core scheduler.
    * @param clusterName Name of the serving cluster.
    */
   @Inject
   public SchedulerzJob(
-      @CacheTemplates boolean cacheTemplates,
       SchedulerCore scheduler,
       @ClusterName String clusterName,
       NearestFit nearestFit) {
 
-    super("schedulerzjob", cacheTemplates);
+    super("schedulerzjob");
     this.scheduler = checkNotNull(scheduler);
     this.clusterName = checkNotBlank(clusterName);
     this.nearestFit = checkNotNull(nearestFit);
-  }
-
-  /**
-   * Extracts the offset count from the request, and returns the number of items that should be
-   * skipped to render the page.
-   *
-   * @param req Servlet request.
-   * @return The number of items to skip to get to the requested offset.
-   */
-  private static int getOffset(HttpServletRequest req) {
-    String offset = req.getParameter(OFFSET_PARAM);
-    if (offset != null) {
-      try {
-        return Integer.parseInt(offset);
-      } catch (NumberFormatException e) {
-        // Ignore, default to zero offset.
-      }
-    }
-    return 0;
   }
 
   private static <T> Iterable<T> offsetAndLimit(Iterable<T> iterable, int offset) {
     return ImmutableList.copyOf(Iterables.limit(Iterables.skip(iterable, offset), PAGE_SIZE));
   }
 
-  @Override
-  protected void doGet(final HttpServletRequest req, HttpServletResponse resp)
-      throws ServletException, IOException {
+  /**
+   * Fetches the landing page for a job within a role.
+   *
+   * @return HTTP response.
+   */
+  @GET
+  @Produces(MediaType.TEXT_HTML)
+  public Response get(
+      @PathParam("role") final String role,
+      @PathParam("job") final String job,
+      @QueryParam(OFFSET_PARAM) final int offset,
+      @QueryParam(STATUS_FILTER_PARAM) final String filterArg,
+      @QueryParam(ADMIN_VIEW_PARAM) final String adminView) {
 
-    writeTemplate(resp, new Closure<StringTemplate>() {
+    return fillTemplate(new Closure<StringTemplate>() {
       @Override public void execute(StringTemplate template) {
         template.setAttribute("cluster_name", clusterName);
+        template.setAttribute(ADMIN_VIEW_PARAM, adminView != null);
 
-        template.setAttribute(ADMIN_VIEW_PARAM, req.getParameter(ADMIN_VIEW_PARAM) != null);
+        Identity identity = new Identity(role, role);
 
-        String user = req.getParameter(USER_PARAM);
-        String role = req.getParameter(ROLE_PARAM);
-
-        if (role == null) {
-          template.setAttribute("exception", "Please specify a role.");
-          return;
-        }
-        Identity identity = new Identity(role, user);
-
-        String job = req.getParameter(JOB_PARAM);
-        if (job == null) {
-          template.setAttribute("exception", "Please specify a job.");
-          return;
-        }
-
-        String filterArg = req.getParameter(STATUS_FILTER_PARAM);
         ScheduleStatus statusFilter = null;
         if (filterArg != null) {
           template.setAttribute(STATUS_FILTER_PARAM, filterArg);
@@ -223,7 +196,6 @@ public class SchedulerzJob extends StringTemplateServlet {
             .setOwner(identity)
             .setJobName(job);
 
-        int offset = getOffset(req);
         boolean hasMore = false;
 
         Set<ScheduledTask> activeTasks;
@@ -236,15 +208,15 @@ public class SchedulerzJob extends StringTemplateServlet {
               scheduler.getTasks(new TaskQuery(query).setStatuses(Tasks.TERMINAL_STATES)));
           Collections.sort(completedTasks, REVERSE_CHRON_COMPARATOR);
           template.setAttribute("completedTasks",
-            ImmutableList.copyOf(
-              Iterables.transform(offsetAndLimit(completedTasks, offset), taskToStringMap)));
+              ImmutableList.copyOf(
+                  Iterables.transform(offsetAndLimit(completedTasks, offset), taskToStringMap)));
           hasMore = completedTasks.size() > offset + PAGE_SIZE;
         }
 
         List<ScheduledTask> liveTasks = SHARD_ID_COMPARATOR.sortedCopy(activeTasks);
         template.setAttribute("activeTasks",
-          ImmutableList.copyOf(
-              Iterables.transform(offsetAndLimit(liveTasks, offset), taskToStringMap)));
+            ImmutableList.copyOf(
+                Iterables.transform(offsetAndLimit(liveTasks, offset), taskToStringMap)));
         hasMore = hasMore || liveTasks.size() > (offset + PAGE_SIZE);
 
         if (offset > 0) {

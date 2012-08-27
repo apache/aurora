@@ -1,14 +1,20 @@
 package com.twitter.mesos.scheduler.httphandlers;
 
-import java.io.IOException;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.Status;
+import javax.ws.rs.core.UriBuilder;
+import javax.ws.rs.core.UriInfo;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
@@ -18,15 +24,12 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
-import org.apache.commons.lang.StringUtils;
-
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulerCore;
 
-import static javax.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
-import static javax.servlet.http.HttpServletResponse.SC_NOT_FOUND;
+import static javax.ws.rs.core.Response.Status.NOT_FOUND;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -36,9 +39,8 @@ import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 /**
  * Simple redirector from the canonical name of a task to its configured HTTP port.
  */
-public class Mname extends HttpServlet {
-
-  private static final Pattern TASK_PATTERN = Pattern.compile("/([^/]+)/([^/]+)/(\\d+)(/.*)?");
+@Path("/mname")
+public class Mname {
 
   private static final Set<String> HTTP_PORT_NAMES = ImmutableSet.of(
       "health", "http", "HTTP", "web");
@@ -50,59 +52,74 @@ public class Mname extends HttpServlet {
     this.scheduler = checkNotNull(scheduler);
   }
 
-  @Override
-  protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-    if (StringUtils.isBlank(req.getPathInfo())) {
-      sendUsageError(resp);
+  @GET
+  @Produces(MediaType.TEXT_HTML)
+  public Response getUsage() {
+    return Response
+        .status(Status.BAD_REQUEST)
+        .entity("<html>Usage: /mname/{role}/{job}/{shard}</html>")
+        .build();
+  }
+
+  @GET
+  @Path("/{role}/{job}/{shard}/{forward}")
+  @Produces(MediaType.TEXT_HTML)
+  public Response getWithForwardRequest(
+      @PathParam("role") String role,
+      @PathParam("job") String job,
+      @PathParam("shard") int shardId,
+      @PathParam("forward") String forward,
+      @Context UriInfo uriInfo) {
+
+    return get(role, job, shardId, uriInfo, Optional.of(forward));
+  }
+
+  @GET
+  @Path("/{role}/{job}/{shard}")
+  @Produces(MediaType.TEXT_HTML)
+  public Response get(
+      @PathParam("role") String role,
+      @PathParam("job") String job,
+      @PathParam("shard") int shardId,
+      @Context UriInfo uriInfo) {
+
+    return get(role, job, shardId, uriInfo, Optional.<String>absent());
+  }
+
+  private Response get(
+      String role,
+      String job,
+      int shardId,
+      UriInfo uriInfo,
+      Optional<String> forwardRequest) {
+
+    ScheduledTask task = Iterables.getOnlyElement(
+        scheduler.getTasks(Query.liveShard(jobKey(role, job), shardId)), null);
+    if (task == null) {
+      return respond(NOT_FOUND, "No such live shard found.");
     }
 
-    Matcher matcher = TASK_PATTERN.matcher(req.getPathInfo());
-    if (matcher.matches()) {
-      String role = matcher.group(1);
-      String jobName = matcher.group(2);
-      String shardIdStr = matcher.group(3);
-      String forwardRequest = matcher.group(4);
-
-      int shardId;
-      try {
-        shardId = Integer.parseInt(shardIdStr);
-      } catch (NumberFormatException e) {
-        resp.sendError(SC_BAD_REQUEST, String.format("'%s' is not a valid shard ID.", shardIdStr));
-        return;
-      }
-
-      ScheduledTask task = Iterables.getOnlyElement(
-          scheduler.getTasks(Query.liveShard(jobKey(role, jobName), shardId)), null);
-      if (task == null) {
-        resp.sendError(SC_NOT_FOUND, "No such live shard found.");
-        return;
-      }
-
-      if (task.getStatus() != RUNNING) {
-        resp.sendError(SC_NOT_FOUND,
-            "The selected shard is currently in state " + task.getStatus());
-        return;
-      }
-
-      AssignedTask assignedTask = task.getAssignedTask();
-      Optional<Integer> port = getRedirectPort(assignedTask);
-      if (!port.isPresent()) {
-        resp.sendError(SC_NOT_FOUND, "The task does not have a registered http port.");
-        return;
-      }
-
-      String queryString = req.getQueryString();
-      String redirect = String.format("http://%s:%d", assignedTask.getSlaveHost(), port.get());
-      if (forwardRequest != null) {
-        redirect += forwardRequest;
-      }
-      if (queryString != null) {
-        redirect += "?" + queryString;
-      }
-      resp.sendRedirect(redirect);
-    } else {
-      sendUsageError(resp);
+    if (task.getStatus() != RUNNING) {
+      return respond(NOT_FOUND, "The selected shard is currently in state " + task.getStatus());
     }
+
+    AssignedTask assignedTask = task.getAssignedTask();
+    Optional<Integer> port = getRedirectPort(assignedTask);
+    if (!port.isPresent()) {
+      return respond(NOT_FOUND, "The task does not have a registered http port.");
+    }
+
+    UriBuilder redirect = UriBuilder
+        .fromPath(forwardRequest.or("/"))
+        .host(assignedTask.getSlaveHost())
+        .port(port.get());
+    for (Entry<String, List<String>> entry : uriInfo.getQueryParameters().entrySet()) {
+      for (String value : entry.getValue()) {
+        redirect.queryParam(entry.getKey(), value);
+      }
+    }
+
+    return Response.temporaryRedirect(redirect.build()).build();
   }
 
   @VisibleForTesting
@@ -114,7 +131,7 @@ public class Mname extends HttpServlet {
     return httpPortName == null ? Optional.<Integer>absent() : Optional.of(ports.get(httpPortName));
   }
 
-  private void sendUsageError(HttpServletResponse resp) throws IOException {
-    resp.sendError(SC_BAD_REQUEST, "Request must be of the format /mname/role/job/shard.");
+  private Response respond(Status status, String message) {
+    return Response.status(status).entity(message).build();
   }
 }

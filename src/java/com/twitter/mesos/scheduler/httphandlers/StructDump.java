@@ -1,10 +1,12 @@
 package com.twitter.mesos.scheduler.httphandlers;
 
-import java.io.IOException;
-
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.Status;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
@@ -14,7 +16,6 @@ import org.antlr.stringtemplate.StringTemplate;
 import org.apache.thrift.TBase;
 
 import com.twitter.common.base.Closure;
-import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.common.thrift.Util;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduledTask;
@@ -23,59 +24,74 @@ import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
+import com.twitter.mesos.scheduler.storage.Storage.Work.Quiet;
 
 /**
  * Servlet that prints out the raw configuration for a specified struct.
  */
-class StructDump extends StringTemplateServlet {
-
-  private static final String ROLE_PARAM = "role";
-  private static final String JOB_PARAM = "job";
-  private static final String TASK_PARAM = "task";
+@Path("/structdump")
+public class StructDump extends JerseyTemplateServlet {
 
   private final Storage storage;
 
   @Inject
-  public StructDump(@CacheTemplates boolean cacheTemplates, Storage storage) {
-
-    super("structdump", cacheTemplates);
+  public StructDump(Storage storage) {
+    super("structdump");
     this.storage = Preconditions.checkNotNull(storage);
   }
 
-  @Override
-  protected void doGet(final HttpServletRequest req, HttpServletResponse resp)
-      throws ServletException, IOException {
+  @GET
+  @Produces(MediaType.TEXT_HTML)
+  public Response getUsage() {
+    return Response
+        .status(Status.BAD_REQUEST)
+        .entity("<html>Usage: /structdump/{task_id} or /structdump/job/{role}/{job}</html>")
+        .build();
+  }
 
-    writeTemplate(resp, new Closure<StringTemplate>() {
+  /**
+   * Dumps a task struct.
+   *
+   * @return HTTP response.
+   */
+  @GET
+  @Path("/task/{task}")
+  @Produces(MediaType.TEXT_HTML)
+  public Response dumpJob(
+      @PathParam("task") final String taskId) {
+
+    return dumpEntity("Task " + taskId, new Work.Quiet<TBase>() {
+      @Override public TBase apply(StoreProvider storeProvider) {
+        // Deep copy the struct to sidestep any subclass trickery inside the storage system.
+        return new ScheduledTask(Iterables.getOnlyElement(
+            storeProvider.getTaskStore().fetchTasks(Query.byId(taskId)), null));
+      }
+    });
+  }
+
+  /**
+   * Dumps a cron job struct.
+   *
+   * @return HTTP response.
+   */
+  @GET
+  @Path("/cron/{role}/{job}")
+  @Produces(MediaType.TEXT_HTML)
+  public Response dump(
+      @PathParam("role") final String role,
+      @PathParam("job") final String job) {
+
+    final String key = Tasks.jobKey(role, job);
+    return dumpEntity("Cron job " + key, new Work.Quiet<TBase>() {
+      @Override public TBase apply(StoreProvider storeProvider) {
+        return storeProvider.getJobStore().fetchJob(CronJobManager.MANAGER_KEY, key);
+      }
+    });
+  }
+
+  private Response dumpEntity(final String id, final Quiet<TBase> work) {
+    return fillTemplate(new Closure<StringTemplate>() {
       @Override public void execute(StringTemplate template) {
-        String role = req.getParameter(ROLE_PARAM);
-        String job = req.getParameter(JOB_PARAM);
-        final String taskId = req.getParameter(TASK_PARAM);
-
-        String id;
-        Work.Quiet<TBase> work;
-        if ((role != null) && (job != null)) {
-          final String key = Tasks.jobKey(role, job);
-          id = "Cron job " + key;
-          work = new Work.Quiet<TBase>() {
-            @Override public TBase apply(StoreProvider storeProvider) {
-              return storeProvider.getJobStore().fetchJob(CronJobManager.MANAGER_KEY, key);
-            }
-          };
-        } else if (taskId != null) {
-          id = "Task " + taskId;
-          work = new Work.Quiet<TBase>() {
-            @Override public TBase apply(StoreProvider storeProvider) {
-              // Deep copy the struct to sidestep any subclass trickery inside the storage system.
-              return new ScheduledTask(Iterables.getOnlyElement(
-                  storeProvider.getTaskStore().fetchTasks(Query.byId(taskId)), null));
-            }
-          };
-        } else {
-          template.setAttribute("exception", "Bad request - must specify task or role and job.");
-          return;
-        }
-
         template.setAttribute("id", id);
         TBase struct = storage.doInTransaction(work);
         if (struct == null) {

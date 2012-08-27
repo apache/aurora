@@ -1,12 +1,13 @@
 package com.twitter.mesos.scheduler.httphandlers;
 
-import java.io.IOException;
 import java.util.Collection;
 import java.util.Map;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 
 import com.google.common.base.Function;
 import com.google.common.cache.CacheBuilder;
@@ -22,7 +23,6 @@ import com.google.inject.Inject;
 import org.antlr.stringtemplate.StringTemplate;
 
 import com.twitter.common.base.Closure;
-import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduledTask;
@@ -38,7 +38,8 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 /**
  * HTTP interface to serve as a HUD for the mesos scheduler.
  */
-public class SchedulerzHome extends StringTemplateServlet {
+@Path("/scheduler")
+public class SchedulerzHome extends JerseyTemplateServlet {
 
   private static final Function<String, Role> CREATE_ROLE = new Function<String, Role>() {
     @Override public Role apply(String ownerRole) {
@@ -69,28 +70,33 @@ public class SchedulerzHome extends StringTemplateServlet {
   /**
    * Creates a new scheduler home servlet.
    *
-   * @param cacheTemplates Whether to cache the template file.
    * @param scheduler Core scheduler.
    * @param cronScheduler Cron scheduler.
    * @param clusterName Name of the serving cluster.
    */
   @Inject
-  public SchedulerzHome(@CacheTemplates boolean cacheTemplates,
+  public SchedulerzHome(
       SchedulerCore scheduler,
       CronJobManager cronScheduler,
       @ClusterName String clusterName) {
-    super("schedulerzhome", cacheTemplates);
+
+    super("schedulerzhome");
     this.scheduler = checkNotNull(scheduler);
     this.cronScheduler = checkNotNull(cronScheduler);
     this.clusterName = checkNotBlank(clusterName);
   }
 
-  @Override
-  protected void doGet(final HttpServletRequest req, HttpServletResponse resp)
-      throws ServletException, IOException {
-
-    writeTemplate(resp, new Closure<StringTemplate>() {
-      @Override public void execute(StringTemplate template) {
+  /**
+   * Fetches the scheduler landing page.
+   *
+   * @return HTTP response.
+   */
+  @GET
+  @Produces(MediaType.TEXT_HTML)
+  public Response get() {
+    return fillTemplate(new Closure<StringTemplate>() {
+      @Override
+      public void execute(StringTemplate template) {
         template.setAttribute("cluster_name", clusterName);
 
         LoadingCache<String, Role> owners =

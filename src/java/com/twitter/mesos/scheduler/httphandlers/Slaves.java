@@ -1,12 +1,13 @@
 package com.twitter.mesos.scheduler.httphandlers;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
@@ -17,7 +18,6 @@ import com.google.inject.Inject;
 import org.antlr.stringtemplate.StringTemplate;
 
 import com.twitter.common.base.Closure;
-import com.twitter.common.net.http.handlers.StringTemplateServlet;
 import com.twitter.mesos.gen.Attribute;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHosts;
@@ -35,7 +35,8 @@ import static com.twitter.mesos.scheduler.storage.Storage.Work;
 /**
  * HTTP interface to serve as a HUD for the mesos slaves tracked in the scheduler.
  */
-public class Slaves extends StringTemplateServlet {
+@Path("/slaves")
+public class Slaves extends JerseyTemplateServlet {
   private final String clusterName;
   private final SlaveHosts slaveHosts;
   private Storage storage;
@@ -50,19 +51,17 @@ public class Slaves extends StringTemplateServlet {
   /**
    * Injected constructor.
    *
-   * @param cacheTemplates whether to cache templates
    * @param clusterName cluster name
    * @param slaveHosts slave hosts
    * @param storage store to fetch the host attributes from
    */
   @Inject
   public Slaves(
-      @CacheTemplates boolean cacheTemplates,
       @ClusterName String clusterName,
       SlaveHosts slaveHosts,
       Storage storage) {
 
-    super("slaves", cacheTemplates);
+    super("slaves");
     this.clusterName = checkNotBlank(clusterName);
     this.slaveHosts = checkNotNull(slaveHosts);
     this.storage = checkNotNull(storage);
@@ -76,11 +75,15 @@ public class Slaves extends StringTemplateServlet {
     }));
   }
 
-  @Override
-  protected void doGet(HttpServletRequest req, HttpServletResponse resp)
-      throws ServletException, IOException {
-
-    writeTemplate(resp, new Closure<StringTemplate>() {
+  /**
+   * Fetches the listing of known slaves.
+   *
+   * @return HTTP response.
+   */
+  @GET
+  @Produces(MediaType.TEXT_HTML)
+  public Response get() {
+    return fillTemplate(new Closure<StringTemplate>() {
       @Override public void execute(StringTemplate template) {
         template.setAttribute("cluster_name", clusterName);
         template.setAttribute("slaves", ImmutableList.copyOf(
