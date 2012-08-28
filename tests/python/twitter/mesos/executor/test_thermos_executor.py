@@ -6,6 +6,7 @@ import os
 import signal
 import subprocess
 import tempfile
+import threading
 import time
 
 from thrift.TSerialization import serialize
@@ -25,7 +26,7 @@ from twitter.mesos.config.schema import (
   Task,
   Process,
   Resources)
-from twitter.mesos.executor.thermos_executor import ThermosExecutor
+from twitter.mesos.executor.thermos_executor import ThermosExecutor, ThermosExecutorTimer
 from twitter.mesos.executor.task_runner_wrapper import TaskRunnerWrapper
 from twitter.mesos.executor.sandbox_manager import DirectorySandbox
 from twitter.mesos.executor.status_manager import StatusManager
@@ -35,6 +36,15 @@ from twitter.thermos.base.path import TaskPath
 
 class TestStatusManager(StatusManager):
   WAIT_LIMIT = Amount(1, Time.SECONDS)
+
+
+class TestThermosExecutorTimer(ThermosExecutorTimer):
+  EXECUTOR_TIMEOUT = Amount(1, Time.SECONDS)
+
+  def __init__(self, *args, **kw):
+    super(TestThermosExecutorTimer, self).__init__(*args, **kw)
+    self.exit_action_event = threading.Event()
+    self.EXIT_ACTION = lambda: self.exit_action_event.set()
 
 
 class TestTaskRunner(TaskRunnerWrapper):
@@ -91,7 +101,8 @@ def sleep60():
 def make_runner(proxy_driver, checkpoint_root, task, fast_status=False):
   runner_class = functools.partial(TestTaskRunner, checkpoint_root=checkpoint_root)
   manager_class = TestStatusManager if fast_status else StatusManager
-  te = ThermosExecutor(runner_class=runner_class, manager_class=manager_class)
+  te = ThermosExecutor(runner_class=runner_class, manager_class=manager_class,
+      timeout_handler=TestThermosExecutorTimer)
   task_description = make_task(task)
   te.launchTask(proxy_driver, task_description)
   while not te._runner.is_started():
@@ -118,6 +129,7 @@ def make_runner(proxy_driver, checkpoint_root, task, fast_status=False):
       break
     time.sleep(0.1)
 
+  assert te._launch.is_set()
   return runner, te
 
 
@@ -174,6 +186,7 @@ class TestThermosExecutor(object):
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
     assert updates[-1][0][0].state == mesos_pb.TASK_LOST
+    assert not executor._timeout_handler.exit_action_event.is_set()
 
   def test_task_killed(self):
     proxy_driver = ProxyDriver()
@@ -186,6 +199,7 @@ class TestThermosExecutor(object):
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
     assert updates[-1][0][0].state == mesos_pb.TASK_KILLED
+    assert not executor._timeout_handler.exit_action_event.is_set()
 
   def test_killTask(self):
     proxy_driver = ProxyDriver()
@@ -198,6 +212,7 @@ class TestThermosExecutor(object):
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
     assert updates[-1][0][0].state == mesos_pb.TASK_KILLED
+    assert not executor._timeout_handler.exit_action_event.is_set()
 
   def test_shutdown(self):
     proxy_driver = ProxyDriver()
@@ -210,6 +225,7 @@ class TestThermosExecutor(object):
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
     assert updates[-1][0][0].state == mesos_pb.TASK_KILLED
+    assert not executor._timeout_handler.exit_action_event.is_set()
 
   def test_task_lost(self):
     proxy_driver = ProxyDriver()
@@ -222,3 +238,12 @@ class TestThermosExecutor(object):
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
     assert updates[-1][0][0].state == mesos_pb.TASK_LOST
+    assert not executor._timeout_handler.exit_action_event.is_set()
+
+
+def test_waiting_executor():
+  with temporary_dir() as checkpoint_root:
+    runner_class = functools.partial(TestTaskRunner, checkpoint_root=checkpoint_root)
+    te = ThermosExecutor(runner_class=runner_class, timeout_handler=TestThermosExecutorTimer)
+    te._timeout_handler.exit_action_event.wait(timeout=2.0)
+    assert te._timeout_handler.exit_action_event.is_set()

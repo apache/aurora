@@ -43,14 +43,40 @@ else:
   RUNNER_CLASS = ProductionTaskRunner
 
 
+def default_exit_action():
+  sys.exit(0)
+
+
+class ThermosExecutorTimer(threading.Thread):
+  EXECUTOR_TIMEOUT = Amount(10, Time.SECONDS)
+  EXIT_ACTION = default_exit_action
+
+  def __init__(self, executor, event):
+    self._executor = executor
+    self._event = event
+    super(ThermosExecutorTimer, self).__init__()
+    self.daemon = True
+
+  def run(self):
+    self._event.wait(self.EXECUTOR_TIMEOUT.as_(Time.SECONDS))
+    if not self._event.is_set():
+      self._executor.log('Executor timing out on lack of launchTask.')
+      self.EXIT_ACTION()
+
+
 class ThermosExecutor(ThermosExecutorBase):
-  def __init__(self, runner_class=RUNNER_CLASS, manager_class=StatusManager):
+  def __init__(self, runner_class=RUNNER_CLASS,
+                     manager_class=StatusManager,
+                     timeout_handler=ThermosExecutorTimer):
     ThermosExecutorBase.__init__(self)
     self._runner = None
     self._task_id = None
     self._manager = None
     self._runner_class = runner_class
     self._manager_class = manager_class
+    self._launch = threading.Event()
+    self._timeout_handler = timeout_handler(self, self._launch)
+    self._timeout_handler.start()
 
   @staticmethod
   def deserialize_assigned_task(task):
@@ -81,6 +107,7 @@ class ThermosExecutor(ThermosExecutorBase):
     return (MesosTaskInstance(json_blob), assigned_task.assignedPorts)
 
   def launchTask(self, driver, task):
+    self._launch.set()
     self.log('launchTask got task: %s:%s' % (task.name, task.task_id.value))
 
     if self._runner:
