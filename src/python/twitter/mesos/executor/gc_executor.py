@@ -96,7 +96,7 @@ class ThermosGCExecutor(ThermosExecutorBase):
     def get_state(task_id):
       pathspec = TaskPath(root=self._checkpoint_root, task_id=task_id)
       runner_ckpt = pathspec.getpath('runner_checkpoint')
-      state = CheckpointDispatcher.from_file(runner_ckpt)
+      state = CheckpointDispatcher.from_file(runner_ckpt, truncate=True)
       return runner_ckpt, state
 
     terminated_tasks = set()

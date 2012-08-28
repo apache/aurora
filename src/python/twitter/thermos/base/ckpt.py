@@ -127,14 +127,14 @@ class CheckpointDispatcher(object):
   class InvalidHandler(Error): pass
 
   @staticmethod
-  def from_file(filename):
+  def from_file(filename, truncate=False):
     state = RunnerState(processes = {})
     builder = CheckpointDispatcher()
     with open(filename, 'r') as fp:
       rr = ThriftRecordReader(fp, RunnerCkpt)
       try:
         for process_update in rr:
-          builder.dispatch(state, process_update)
+          builder.dispatch(state, process_update, truncate=truncate)
         return state
       except CheckpointDispatcher.Error as e:
         log.error('Failed to recover from %s: %s' % (filename, e))
@@ -265,12 +265,14 @@ class CheckpointDispatcher(object):
       # produce a transition
       return state.processes[process][-1].seq < process_update.seq
 
-  def dispatch(self, state, runner_ckpt, recovery=False):
+  def dispatch(self, state, runner_ckpt, recovery=False, truncate=False):
     """
       state          = RunnerState to apply process update
       process_update = RunnerCkpt update
       recovery       = Pass in as true if you are in recovery mode
                        (accept out-of-order sequence updates)
+      truncate       = If true, store only the latest task/process states, instead of
+                       history for all runs.
     """
     # case 1: runner_header
     #   -> Initialization of the task stream.
@@ -292,7 +294,10 @@ class CheckpointDispatcher(object):
         old_state = None
       else:
         old_state = state.statuses[-1].state
-      state.statuses.append(runner_ckpt.task_status)
+      if not truncate:
+        state.statuses.append(runner_ckpt.task_status)
+      else:
+        state.statuses = [runner_ckpt.task_status]
       new_state = runner_ckpt.task_status.state
       log.debug('Flipping task state from %s to %s' % (
         TaskState._VALUES_TO_NAMES.get(old_state, '(undefined)'),
@@ -321,7 +326,10 @@ class CheckpointDispatcher(object):
         if name not in state.processes:
           state.processes[name] = [ProcessStatus(seq=-1)]
         else:
-          state.processes[name].append(ProcessStatus(seq=current_run.seq))
+          if not truncate:
+            state.processes[name].append(ProcessStatus(seq=current_run.seq))
+          else:
+            state.processes[name] = [ProcessStatus(seq=current_run.seq)]
 
       # Run the process state machine.
       log.debug('Running state machine for process=%s/seq=%s' % (name, process_update.seq))
