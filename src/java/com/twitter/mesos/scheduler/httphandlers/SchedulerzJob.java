@@ -182,8 +182,6 @@ public class SchedulerzJob extends JerseyTemplateServlet {
         template.setAttribute("cluster_name", clusterName);
         template.setAttribute(ADMIN_VIEW_PARAM, adminView != null);
 
-        Identity identity = new Identity(role, role);
-
         ScheduleStatus statusFilter = null;
         if (filterArg != null) {
           template.setAttribute(STATUS_FILTER_PARAM, filterArg);
@@ -199,7 +197,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
         template.setAttribute("job", job);
 
         TaskQuery query = new TaskQuery()
-            .setOwner(identity)
+            .setOwner(new Identity().setRole(role))
             .setJobName(job);
 
         boolean hasMore = false;
