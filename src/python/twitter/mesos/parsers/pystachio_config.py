@@ -4,7 +4,8 @@ import json
 import os
 import sys
 
-from pystachio import Empty, Environment, Ref
+from pystachio import Empty, Environment, Integer, Ref
+from twitter.common import log
 from twitter.common.dirutil import safe_open
 from twitter.common.lang import Compatibility
 from twitter.thermos.config.loader import ThermosTaskValidator
@@ -95,7 +96,25 @@ class PystachioConfig(ProxyConfig):
     return PystachioConfig(MesosConfigLoader.load_json(filename, name, bindings))
 
   def __init__(self, job):
-    self._job = job
+    self._job = self.sanitize_job(job)
+
+  @staticmethod
+  def sanitize_job(job):
+    """
+      Do any necessarity sanitation of input job.  Currently we only make
+      sure that the maximum process failures is capped at a reasonable
+      maximum, 100.
+    """
+    def process_over_failure_limit(proc):
+      return (proc.max_failures() == Integer(0) or proc.max_failures() >= Integer(100))
+    for proc in job.task().processes():
+      if process_over_failure_limit(proc):
+        log.warning('Processes running in Mesos must have failure limits between 1 and 100, '
+                    'changing Process(%s) failure limit from %s to 100.' % (proc.name(),
+                     proc.max_failures()))
+    return job(task = job.task()(
+      processes = [proc(max_failures = 100) if process_over_failure_limit(proc) else proc
+                   for proc in job.task().processes()]))
 
   def job(self):
     return convert_pystachio_to_thrift(self._job)
