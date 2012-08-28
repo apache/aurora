@@ -64,6 +64,7 @@ class Deployer(object):
   def maybe_run_command(self, runner, cmd):
     if self._verbose or self._dry_run:
       print('%s command: %s' % ('Would run' if self._dry_run else 'Executing', ' '.join(cmd)))
+      return 0, ''
     if not self._dry_run:
       return runner(cmd)
 
