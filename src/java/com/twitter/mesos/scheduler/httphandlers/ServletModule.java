@@ -55,7 +55,7 @@ public class ServletModule extends AbstractModule {
     Registration.registerServletFilter(binder(), GuiceFilter.class, "/*");
     install(new JerseyServletModule() {
       private void registerJerseyEndpoint(String indexPath, Class<?>... servlets) {
-        filter(indexPath + "/*").through(LeaderRedirectFilter.class);
+        filter(indexPath + "*").through(LeaderRedirectFilter.class);
         filter(indexPath + "*").through(GuiceContainer.class, CONTAINER_PARAMS);
         Registration.registerEndpoint(binder(), indexPath);
         for (Class<?> servlet : servlets) {
