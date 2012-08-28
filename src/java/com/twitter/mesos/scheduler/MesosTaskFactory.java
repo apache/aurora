@@ -125,10 +125,14 @@ public interface MesosTaskFactory {
 
       ExecutorInfo executor;
       if (Tasks.IS_THERMOS_TASK.apply(task.getTask())) {
+        // Thermos executors in the wild have been observed using 48-54MB RSS, setting to 128MB
+        // to be extra vigilant initially.
         executor = ExecutorInfo.newBuilder()
             .setCommand(CommandUtil.create(THERMOS_EXECUTOR_PATH.get()))
             .setExecutorId(
                 ExecutorID.newBuilder().setValue(THERMOS_EXECUTOR_ID_PREFIX + task.getTaskId()))
+            .addResources(Resources.makeMesosResource(Resources.CPUS, 0.25))
+            .addResources(Resources.makeMesosResource(Resources.RAM_MB, 128))
             .build();
       } else {
         executor = ExecutorInfo.newBuilder().setCommand(CommandUtil.create(exepath))
