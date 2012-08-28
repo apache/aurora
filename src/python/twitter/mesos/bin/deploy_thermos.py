@@ -16,6 +16,13 @@ class ThermosBuilder(Builder):
     return 'thermos'
 
   @property
+  def test_commands(self):
+    return [
+      './pants tests/python/twitter/thermos:all',
+      './pants tests/python/twitter/mesos/executor:all',
+    ]
+
+  @property
   def commands(self):
     return [
       './pants src/python/twitter/mesos/executor:thermos_executor',
