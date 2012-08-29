@@ -1,12 +1,18 @@
 package com.twitter.mesos.auth;
 
-import java.util.Set;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.annotation.Nullable;
+
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.CharMatcher;
+import com.google.common.base.Optional;
+import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Sets;
+import com.google.common.collect.Iterables;
 
 import net.lag.crai.Crai;
 import net.lag.craijce.CraiJCE;
@@ -16,14 +22,15 @@ import net.lag.jaramiko.PKey;
 import net.lag.jaramiko.RSAKey;
 import net.lag.jaramiko.SSHException;
 
-import org.apache.commons.lang.StringUtils;
+import com.twitter.common.base.Either;
+import com.twitter.common.base.Either.Transformer;
+import com.twitter.common.base.Function;
+import com.twitter.common.collections.Pair;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Manages state around public keys of role accounts.
- *
- * @author Brian Wickman
  */
 public class AuthorizedKeySet {
 
@@ -83,8 +90,6 @@ public class AuthorizedKeySet {
 
   /**
    * Creates a key set associated with multiple keys.
-   * Expected to be in Twitter's authorized keys format, specifically: ssh-{rsa,dss} {key blob}
-   * ({user@machine}).
    *
    * @param lines Key lines to load, in the OpenSSH key file format.
    * @return a keyset comprised of keys parsed from the given {@code lines}.
@@ -94,36 +99,54 @@ public class AuthorizedKeySet {
       throws KeyParseException {
     checkNotNull(lines);
 
-    Set<PKey> keys = Sets.newHashSet();
-    for (String line : lines) {
-      String[] fields = StringUtils.split(line);
-      if (fields.length < 2 || fields.length > 3) {
-        LOG.warning("Invalid number of fields on line: " + line);
-        continue;
-      }
+    return new AuthorizedKeySet(Optional.presentInstances(Iterables.transform(lines,
+        new Function<String, Optional<PKey>>() {
+          @Override public Optional<PKey> apply(String item) {
+            return parseKey(item).map(
+                new Transformer<Pair<String, Exception>, PKey, Optional<PKey>>() {
+                  @Override public Optional<PKey> mapLeft(Pair<String, Exception> failure) {
+                    LOG.log(Level.WARNING, failure.getFirst(), failure.getSecond());
+                    return Optional.absent();
+                  }
+                  @Override public Optional<PKey> mapRight(PKey key) {
+                    return Optional.of(key);
+                  }
+                });
+          }
+        })));
+  }
 
-      PKey key;
-      try {
-        if ("ssh-rsa".equals(fields[0])) {
-          key = RSAKey.createFromBase64(fields[1]);
-        } else if ("ssh-dss".equals(fields[0])) {
-          key = DSSKey.createFromBase64(fields[1]);
-        } else {
-          LOG.warning(String.format("Unknown key type: %s", fields[0]));
-          continue;
-        }
-      } catch (SSHException e) {
-        LOG.log(Level.WARNING, "Failed to create key for line: " + line, e);
-        continue;
-      } catch (NumberFormatException e) {
-        // TODO(John Sirois): Patch jaramiko to handle and throw some form of SSHException
-        LOG.log(Level.WARNING, "Failed to create key for line: " + line, e);
-        continue;
-      }
-      keys.add(key);
+  private static final Splitter PUB_KEY_SPLITTER = Splitter.on(CharMatcher.WHITESPACE).limit(3);
+
+  private static Either<Pair<String, Exception>, PKey> parseKey(String line) {
+    List<String> fields = ImmutableList.copyOf(PUB_KEY_SPLITTER.split(line));
+    if (fields.size() < 2) {
+      return failure("Invalid number of fields on line: " + line, null);
     }
 
-    return new AuthorizedKeySet(keys);
+    String algorithm = fields.get(0);
+    String encodedKey = fields.get(1);
+    try {
+      if ("ssh-rsa".equals(algorithm)) {
+        return Either.right(RSAKey.createFromBase64(encodedKey));
+      } else if ("ssh-dss".equals(algorithm)) {
+        return Either.right(DSSKey.createFromBase64(encodedKey));
+      } else {
+        return failure("Unknown key type: " + algorithm, null);
+      }
+    } catch (SSHException e) {
+      return failure("Failed to create key for line: " + line, e);
+    } catch (NumberFormatException e) {
+      // TODO(John Sirois): Patch jaramiko to handle and throw some form of SSHException
+      return failure("Failed to create key for line: " + line, e);
+    }
+  }
+
+  private static Either<Pair<String, Exception>, PKey> failure(
+      String message,
+      @Nullable Exception exception) {
+
+    return Either.left(Pair.of(message, exception));
   }
 
   /**
