@@ -47,8 +47,8 @@ python_library(
   name = 'runner',
   sources = ['__init__.py', 'runner.py'],
   dependencies = [
-    python_requirement('pystachio>=0.4.3'),
-    python_requirement('thrift'),
+    pants('3rdparty/python:pystachio'),
+    pants('3rdparty/python:thrift-0.7'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/dirutil'),
     pants('src/python/twitter/common/process'),
