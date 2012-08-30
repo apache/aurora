@@ -83,7 +83,7 @@ public class BootstrapTaskLauncher implements TaskLauncher {
   @Override
   public boolean statusUpdate(TaskStatus status) {
     if (status.getTaskId().getValue().startsWith(TASK_ID_PREFIX)) {
-      LOG.info("Received status update for bootstrap task: " + Protobufs.toString(status));
+      LOG.fine("Received status update for bootstrap task: " + Protobufs.toString(status));
       return true;
     } else {
       return false;

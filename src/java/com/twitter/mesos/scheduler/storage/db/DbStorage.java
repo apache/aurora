@@ -847,8 +847,10 @@ public class DbStorage implements
     final ImmutableSet<ScheduledTask> tasksToUpdate = tasksToUpdateBuilder.build();
     if (!tasksToUpdate.isEmpty()) {
       Map<String, ScheduledTask> tasksById = Tasks.mapById(tasksToUpdate);
-      LOG.info("Storing updated tasks to database: "
-          + Maps.transformValues(tasksById, Tasks.GET_STATUS));
+      if (LOG.isLoggable(Level.FINE)) {
+        LOG.fine("Storing updated tasks to database: "
+            + Maps.transformValues(tasksById, Tasks.GET_STATUS));
+      }
 
       long startNanos = System.nanoTime();
       final Iterator<ScheduledTask> tasks = tasksToUpdate.iterator();

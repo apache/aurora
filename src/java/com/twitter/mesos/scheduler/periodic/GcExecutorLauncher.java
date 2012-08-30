@@ -25,6 +25,7 @@ import org.apache.mesos.Protos.TaskStatus;
 
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
+import com.twitter.mesos.Protobufs;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
@@ -138,7 +139,7 @@ public class GcExecutorLauncher implements TaskLauncher {
   @Override
   public boolean statusUpdate(TaskStatus status) {
     if (status.getTaskId().getValue().startsWith(SYSTEM_TASK_PREFIX)) {
-      LOG.info("Received status update for GC task: " + status);
+      LOG.info("Received status update for GC task: " + Protobufs.toString(status));
       return true;
     } else {
       return false;

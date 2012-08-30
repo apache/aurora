@@ -538,8 +538,10 @@ public class LogStorage extends ForwardingStore {
         ImmutableSet<ScheduledTask> mutated = LogStorage.super.mutateTasks(query, mutator);
 
         Map<String, ScheduledTask> tasksById = Tasks.mapById(mutated);
-        LOG.info("Storing updated tasks to log: "
-            + Maps.transformValues(tasksById, Tasks.GET_STATUS));
+        if (LOG.isLoggable(Level.FINE)) {
+          LOG.fine("Storing updated tasks to log: "
+              + Maps.transformValues(tasksById, Tasks.GET_STATUS));
+        }
 
         log(Op.saveTasks(new SaveTasks(mutated)));
         return mutated;

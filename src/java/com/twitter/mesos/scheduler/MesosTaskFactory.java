@@ -114,8 +114,10 @@ public interface MesosTaskFactory {
         resources = ImmutableList.of();
       }
 
-      LOG.info("Setting task resources to "
-          + Iterables.transform(resources, Protobufs.SHORT_TOSTRING));
+      if (LOG.isLoggable(Level.FINE)) {
+        LOG.fine("Setting task resources to "
+            + Iterables.transform(resources, Protobufs.SHORT_TOSTRING));
+      }
       TaskInfo.Builder taskBuilder =
           TaskInfo.newBuilder().setName(Tasks.jobKey(task))
               .setTaskId(TaskID.newBuilder().setValue(task.getTaskId()))
