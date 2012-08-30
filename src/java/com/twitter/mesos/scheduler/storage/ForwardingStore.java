@@ -15,15 +15,12 @@ import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.storage.JobUpdateConfiguration;
-import com.twitter.mesos.scheduler.storage.Storage.Work.NoResult.Quiet;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * A store that forwards all its operations to underlying storage systems.  Useful for decorating
  * an existing storage system.
- *
- * @author John Sirois
  */
 public class ForwardingStore implements
     Storage,
@@ -77,13 +74,20 @@ public class ForwardingStore implements
   }
 
   @Override
-  public void start(Quiet initilizationLogic) {
+  public void start(MutateWork.NoResult.Quiet initilizationLogic) {
     storage.start(initilizationLogic);
   }
 
   @Override
   public <T, E extends Exception> T doInTransaction(Work<T, E> work) throws StorageException, E {
     return storage.doInTransaction(work);
+  }
+
+  @Override
+  public <T, E extends Exception> T doInWriteTransaction(MutateWork<T, E> work)
+      throws StorageException, E {
+
+    return storage.doInWriteTransaction(work);
   }
 
   @Override

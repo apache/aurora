@@ -83,10 +83,9 @@ import com.twitter.mesos.scheduler.quota.QuotaManager;
 import com.twitter.mesos.scheduler.quota.QuotaManager.QuotaManagerImpl;
 import com.twitter.mesos.scheduler.quota.Quotas;
 import com.twitter.mesos.scheduler.storage.Storage;
+import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
+import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
 import com.twitter.mesos.scheduler.storage.Storage.StorageException;
-import com.twitter.mesos.scheduler.storage.Storage.Work;
-import com.twitter.mesos.scheduler.storage.Storage.Work.NoResult;
-import com.twitter.mesos.scheduler.storage.Storage.Work.NoResult.Quiet;
 
 import static org.easymock.EasyMock.expectLastCall;
 import static org.hamcrest.CoreMatchers.is;
@@ -426,7 +425,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     Storage storage = createStorage();
 
-    storage.start(Work.NOOP);
+    storage.start(MutateWork.NOOP);
 
     final TwitterTaskInfo storedTask = new TwitterTaskInfo()
         .setOwner(OWNER_A)
@@ -440,8 +439,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setAvoidJobs(ImmutableSet.<String>of())
         .setConstraints(ImmutableSet.<Constraint>of());
 
-    storage.doInTransaction(new NoResult.Quiet() {
-      @Override protected void execute(Storage.StoreProvider storeProvider) {
+    storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getTaskStore().saveTasks(ImmutableSet.of(new ScheduledTask()
             .setStatus(PENDING)
             .setAssignedTask(
@@ -478,7 +477,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     Storage storage = createStorage();
 
-    storage.start(Work.NOOP);
+    storage.start(MutateWork.NOOP);
 
     final AtomicInteger taskId = new AtomicInteger();
 
@@ -486,8 +485,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     final Set<ScheduledTask> badTasks = ImmutableSet.copyOf(Iterables
         .transform(job.getTaskConfigs(),
             new Function<TwitterTaskInfo, ScheduledTask>() {
-              @Override
-              public ScheduledTask apply(TwitterTaskInfo task) {
+              @Override public ScheduledTask apply(TwitterTaskInfo task) {
                 return new ScheduledTask()
                     .setStatus(RUNNING)
                     .setAssignedTask(
@@ -497,8 +495,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
               }
             }));
 
-    storage.doInTransaction(new NoResult.Quiet() {
-      @Override protected void execute(Storage.StoreProvider storeProvider) {
+    storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getTaskStore().saveTasks(badTasks);
       }
     });
@@ -517,7 +515,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     Storage storage = createStorage();
 
-    storage.start(Work.NOOP);
+    storage.start(MutateWork.NOOP);
 
     final TwitterTaskInfo storedTask = new TwitterTaskInfo()
         .setOwner(OWNER_A)
@@ -529,8 +527,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setStartCommand("ls %port:foo%")
         .setAvoidJobs(ImmutableSet.<String>of());
 
-    storage.doInTransaction(new NoResult.Quiet() {
-      @Override protected void execute(Storage.StoreProvider storeProvider) {
+    storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getTaskStore().saveTasks(ImmutableSet.of(new ScheduledTask()
             .setStatus(PENDING)
             .setAssignedTask(
@@ -556,7 +554,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     Storage storage = createStorage();
 
-    storage.start(Work.NOOP);
+    storage.start(MutateWork.NOOP);
 
     final TwitterTaskInfo storedTask = new TwitterTaskInfo()
         .setOwner(OWNER_A)
@@ -568,9 +566,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setStartCommand("ls %port:foo%")
         .setAvoidJobs(ImmutableSet.<String>of());
 
-    storage.doInTransaction(new NoResult.Quiet() {
+    storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(Storage.StoreProvider storeProvider) {
+      protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getJobStore().saveAcceptedJob(
             CronJobManager.MANAGER_KEY, makeJob(OWNER_A, JOB_A, storedTask, 1)
             .setCronSchedule("1 1 1 1 1"));
@@ -2048,16 +2046,27 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       delegate.prepare();
     }
 
-    @Override public void start(Quiet initilizationLogic) {
+    @Override public void start(MutateWork.NoResult.Quiet initilizationLogic) {
       delegate.start(initilizationLogic);
     }
 
-    @Override public <T, E extends Exception> T doInTransaction(Work<T, E> work)
+    @Override public <T, E extends Exception> T doInTransaction(final Work<T, E> work)
         throws StorageException, E {
+
+      return doInWriteTransaction(new MutateWork<T, E>() {
+        @Override public T apply(MutableStoreProvider storeProvider) throws E {
+          return work.apply(storeProvider);
+        }
+      });
+    }
+
+    @Override public <T, E extends Exception> T doInWriteTransaction(MutateWork<T, E> work)
+        throws StorageException, E {
+
       if (failTransactions.get()) {
         throw new StorageException("Injected.");
       }
-      return delegate.doInTransaction(work);
+      return delegate.doInWriteTransaction(work);
     }
 
     @Override public void stop() {

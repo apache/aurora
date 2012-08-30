@@ -9,8 +9,8 @@ import com.twitter.common.base.Closure;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.events.TaskPubsubEvent;
 import com.twitter.mesos.scheduler.storage.Storage;
-import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
-import com.twitter.mesos.scheduler.storage.Storage.Work;
+import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
+import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -24,13 +24,13 @@ class TransactionalStorage {
 
   private final Storage storage;
   private final MutableState mutableState;
-  private final Closure<StoreProvider> transactionFinalizer;
+  private final Closure<MutableStoreProvider> transactionFinalizer;
   private final Closure<TaskPubsubEvent> taskEventSink;
 
   TransactionalStorage(
       Storage storage,
       MutableState mutableState,
-      Closure<StoreProvider> transactionFinalizer,
+      Closure<MutableStoreProvider> transactionFinalizer,
       Closure<TaskPubsubEvent> taskEventSink) {
 
     this.storage = checkNotNull(storage);
@@ -68,7 +68,7 @@ class TransactionalStorage {
    * @return The work return value.
    * @throws E The work exception.
    */
-  synchronized <T, E extends Exception> T doInTransaction(Work<T, E> work) throws E {
+  synchronized <T, E extends Exception> T doInWriteTransaction(MutateWork<T, E> work) throws E {
     if (inTransaction) {
       return execute(work);
     }
@@ -89,7 +89,7 @@ class TransactionalStorage {
    *
    * @param work Work to execute.
    */
-  void start(Work.NoResult.Quiet work) {
+  void start(MutateWork.NoResult.Quiet work) {
     Preconditions.checkState(!inTransaction);
 
     try {
@@ -127,9 +127,9 @@ class TransactionalStorage {
    * @return Return value from the transaction closure.
    * @throws E Exception thrown by transaction.
    */
-  <T, E extends Exception> T execute(final Work<T, E> work) throws E {
-    return storage.doInTransaction(new Work<T, E>() {
-      @Override public T apply(StoreProvider storeProvider) throws E {
+  <T, E extends Exception> T execute(final MutateWork<T, E> work) throws E {
+    return storage.doInWriteTransaction(new MutateWork<T, E>() {
+      @Override public T apply(MutableStoreProvider storeProvider) throws E {
         T result = work.apply(storeProvider);
         transactionFinalizer.execute(storeProvider);
         return result;
@@ -137,9 +137,9 @@ class TransactionalStorage {
     });
   }
 
-  private void executeStart(final Work.NoResult.Quiet work) {
-    storage.start(new Work.NoResult.Quiet() {
-      @Override protected void execute(StoreProvider storeProvider) {
+  private void executeStart(final MutateWork.NoResult.Quiet work) {
+    storage.start(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider storeProvider) {
         work.apply(storeProvider);
         transactionFinalizer.execute(storeProvider);
       }

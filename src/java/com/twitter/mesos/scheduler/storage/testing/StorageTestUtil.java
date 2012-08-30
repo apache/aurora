@@ -10,6 +10,8 @@ import com.twitter.mesos.scheduler.storage.JobStore;
 import com.twitter.mesos.scheduler.storage.QuotaStore;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
 import com.twitter.mesos.scheduler.storage.Storage;
+import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
+import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
 import com.twitter.mesos.scheduler.storage.TaskStore;
@@ -26,6 +28,7 @@ import static org.easymock.EasyMock.expect;
 public class StorageTestUtil {
 
   public final StoreProvider storeProvider;
+  public final MutableStoreProvider mutableStoreProvider;
   public final TaskStore.Mutable taskStore;
   public final QuotaStore.Mutable quotaStore;
   public final AttributeStore.Mutable attributeStore;
@@ -41,6 +44,7 @@ public class StorageTestUtil {
    */
   public StorageTestUtil(EasyMockTest easyMock) {
     this.storeProvider = easyMock.createMock(StoreProvider.class);
+    this.mutableStoreProvider = easyMock.createMock(MutableStoreProvider.class);
     this.taskStore = easyMock.createMock(TaskStore.Mutable.class);
     this.quotaStore = easyMock.createMock(QuotaStore.Mutable.class);
     this.attributeStore = easyMock.createMock(AttributeStore.Mutable.class);
@@ -50,14 +54,7 @@ public class StorageTestUtil {
     this.storage = easyMock.createMock(Storage.class);
   }
 
-  /**
-   * Sets up an expectation for a single transaction, which may be chained to produce a result
-   * such as a return value or exception.
-   *
-   * @param <T> Return value type.
-   * @return A call expectation setter.
-   */
-  public <T> IExpectationSetters<T> expectTransaction() {
+  private <T> IExpectationSetters<T> expectTransaction() {
     expect(storeProvider.getTaskStore()).andReturn(taskStore).anyTimes();
     expect(storeProvider.getQuotaStore()).andReturn(quotaStore).anyTimes();
     expect(storeProvider.getAttributeStore()).andReturn(attributeStore).anyTimes();
@@ -73,10 +70,27 @@ public class StorageTestUtil {
     });
   }
 
+  private <T> IExpectationSetters<T> expectWriteTransaction() {
+    expect(mutableStoreProvider.getTaskStore()).andReturn(taskStore).anyTimes();
+    expect(mutableStoreProvider.getQuotaStore()).andReturn(quotaStore).anyTimes();
+    expect(mutableStoreProvider.getAttributeStore()).andReturn(attributeStore).anyTimes();
+    expect(mutableStoreProvider.getJobStore()).andReturn(jobStore).anyTimes();
+    expect(mutableStoreProvider.getUpdateStore()).andReturn(updateStore).anyTimes();
+    expect(mutableStoreProvider.getSchedulerStore()).andReturn(schedulerStore).anyTimes();
+
+    final Capture<MutateWork<T, RuntimeException>> work = EasyMockTest.createCapture();
+    return expect(storage.doInWriteTransaction(capture(work))).andAnswer(new IAnswer<T>() {
+      @Override public T answer() {
+        return work.getValue().apply(mutableStoreProvider);
+      }
+    });
+  }
+
   /**
    * Expects any number of transactions.
    */
   public void expectTransactions() {
     expectTransaction().anyTimes();
+    expectWriteTransaction().anyTimes();
   }
 }

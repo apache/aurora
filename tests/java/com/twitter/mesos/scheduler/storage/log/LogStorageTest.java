@@ -57,8 +57,8 @@ import com.twitter.mesos.scheduler.log.Log.Entry;
 import com.twitter.mesos.scheduler.log.Log.Position;
 import com.twitter.mesos.scheduler.log.Log.Stream;
 import com.twitter.mesos.scheduler.storage.SnapshotStore;
-import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
-import com.twitter.mesos.scheduler.storage.Storage.Work;
+import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
+import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
 import com.twitter.mesos.scheduler.storage.log.LogStorage.SchedulingService;
 import com.twitter.mesos.scheduler.storage.testing.StorageTestUtil;
 
@@ -123,19 +123,19 @@ public class LogStorageTest extends EasyMockTest {
     // Our start should recover the log and then forward to the underlying storage start of the
     // supplied initialization logic.
     final AtomicBoolean initialized = new AtomicBoolean(false);
-    Work.NoResult.Quiet initializationLogic = new Work.NoResult.Quiet() {
-      @Override protected void execute(StoreProvider provider) {
+    MutateWork.NoResult.Quiet initializationLogic = new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider provider) {
         // Creating a mock and expecting apply(storeProvider) does not work here for whatever
         // reason.
         initialized.set(true);
       }
     };
 
-    final Capture<Work.NoResult.Quiet> recoverAndInitializeWork = createCapture();
+    final Capture<MutateWork.NoResult.Quiet> recoverAndInitializeWork = createCapture();
     storageUtil.storage.start(capture(recoverAndInitializeWork));
     expectLastCall().andAnswer(new IAnswer<Void>() {
       @Override public Void answer() throws Throwable {
-        recoverAndInitializeWork.getValue().apply(storageUtil.storeProvider);
+        recoverAndInitializeWork.getValue().apply(storageUtil.mutableStoreProvider);
         return null;
       }
     });
@@ -152,22 +152,22 @@ public class LogStorageTest extends EasyMockTest {
     expect(entry2.contents()).andReturn(ThriftBinaryCodec.encodeNonNull(recoveredEntry2));
     expect(stream.readAll()).andReturn(Iterators.<Entry>forArray(entry1, entry2));
 
-    final Capture<Work<Void, RuntimeException>> recoveryWork = createCapture();
-    expect(storageUtil.storage.doInTransaction(capture(recoveryWork))).andAnswer(
+    final Capture<MutateWork<Void, RuntimeException>> recoveryWork = createCapture();
+    expect(storageUtil.storage.doInWriteTransaction(capture(recoveryWork))).andAnswer(
         new IAnswer<Void>() {
           @Override public Void answer() {
-            recoveryWork.getValue().apply(storageUtil.storeProvider);
+            recoveryWork.getValue().apply(storageUtil.mutableStoreProvider);
             return null;
           }
         });
     storageUtil.schedulerStore.saveFrameworkId(frameworkId1);
     storageUtil.schedulerStore.saveFrameworkId(frameworkId2);
 
-    final Capture<Work<Void, RuntimeException>> initializationWork = createCapture();
-    expect(storageUtil.storage.doInTransaction(capture(initializationWork))).andAnswer(
+    final Capture<MutateWork<Void, RuntimeException>> initializationWork = createCapture();
+    expect(storageUtil.storage.doInWriteTransaction(capture(initializationWork))).andAnswer(
         new IAnswer<Void>() {
           @Override public Void answer() {
-            initializationWork.getValue().apply(storageUtil.storeProvider);
+            initializationWork.getValue().apply(storageUtil.mutableStoreProvider);
             return null;
           }
         });
@@ -184,11 +184,11 @@ public class LogStorageTest extends EasyMockTest {
     expect(stream.append(aryEq(ThriftBinaryCodec.encodeNonNull(snapshot))))
         .andReturn(snapshotPosition);
     stream.truncateBefore(snapshotPosition);
-    final Capture<Work<Void, RuntimeException>> snapshotWork = createCapture();
-    expect(storageUtil.storage.doInTransaction(capture(snapshotWork))).andAnswer(
+    final Capture<MutateWork<Void, RuntimeException>> snapshotWork = createCapture();
+    expect(storageUtil.storage.doInWriteTransaction(capture(snapshotWork))).andAnswer(
         new IAnswer<Void>() {
           @Override public Void answer() {
-            snapshotWork.getValue().apply(storageUtil.storeProvider);
+            snapshotWork.getValue().apply(storageUtil.mutableStoreProvider);
             return null;
           }
         }).times(2);
@@ -219,23 +219,23 @@ public class LogStorageTest extends EasyMockTest {
       // Simulate NOOP initialization work
       // Creating a mock and expecting apply(storeProvider) does not work here for whatever
       // reason.
-      Work.NoResult.Quiet initializationLogic = Work.NOOP;
+      MutateWork.NoResult.Quiet initializationLogic = MutateWork.NOOP;
 
-      final Capture<Work.NoResult.Quiet> recoverAndInitializeWork = createCapture();
+      final Capture<MutateWork.NoResult.Quiet> recoverAndInitializeWork = createCapture();
       storageUtil.storage.start(capture(recoverAndInitializeWork));
       expectLastCall().andAnswer(new IAnswer<Void>() {
         @Override public Void answer() throws Throwable {
-          recoverAndInitializeWork.getValue().apply(storageUtil.storeProvider);
+          recoverAndInitializeWork.getValue().apply(storageUtil.mutableStoreProvider);
           return null;
         }
       });
 
       expect(stream.readAll()).andReturn(Iterators.<Entry>emptyIterator());
-      final Capture<Work<Void, RuntimeException>> recoveryWork = createCapture();
-      expect(storageUtil.storage.doInTransaction(capture(recoveryWork))).andAnswer(
+      final Capture<MutateWork<Void, RuntimeException>> recoveryWork = createCapture();
+      expect(storageUtil.storage.doInWriteTransaction(capture(recoveryWork))).andAnswer(
           new IAnswer<Void>() {
             @Override public Void answer() {
-              recoveryWork.getValue().apply(storageUtil.storeProvider);
+              recoveryWork.getValue().apply(storageUtil.mutableStoreProvider);
               return null;
             }
           });
@@ -363,12 +363,11 @@ public class LogStorageTest extends EasyMockTest {
       }
 
       @Override protected void performMutations() {
-        logStorage.doInTransaction(new Work.NoResult.Quiet() {
-          @Override protected void execute(StoreProvider provider) {
+        logStorage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+          @Override protected void execute(MutableStoreProvider provider) {
             assertEquals(mutated, provider.getTaskStore().mutateTasks(query, mutation));
-            logStorage.doInTransaction(new Work.NoResult.Quiet() {
-              @Override
-              protected void execute(StoreProvider innerProvider) {
+            logStorage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+              @Override protected void execute(MutableStoreProvider innerProvider) {
                 innerProvider.getTaskStore().deleteTasks(tasksToRemove);
               }
             });
@@ -398,9 +397,8 @@ public class LogStorageTest extends EasyMockTest {
       }
 
       @Override protected void performMutations() {
-        logStorage.doInTransaction(new Work.NoResult.Quiet() {
-          @Override
-          protected void execute(StoreProvider provider) {
+        logStorage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+          @Override protected void execute(MutableStoreProvider provider) {
             logStorage.saveTasks(saved);
             assertEquals(mutated, logStorage.mutateTasks(query, mutation));
           }
@@ -430,9 +428,8 @@ public class LogStorageTest extends EasyMockTest {
       }
 
       @Override protected void performMutations() {
-        logStorage.doInTransaction(new Work.NoResult.Quiet() {
-          @Override
-          protected void execute(StoreProvider provider) {
+        logStorage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+          @Override protected void execute(MutableStoreProvider provider) {
             logStorage.saveTasks(saved);
             assertEquals(mutated, logStorage.mutateTasks(query, mutation));
           }

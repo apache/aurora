@@ -33,6 +33,7 @@ import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.storage.Storage;
+import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
 
@@ -118,19 +119,20 @@ public class CronJobManager extends JobManager {
 
   @Override
   public void start() {
-    storage.doInTransaction(new Work.NoResult.Quiet() {
-      @Override protected void execute(Storage.StoreProvider storeProvider) {
-
-        for (JobConfiguration job : storeProvider.getJobStore().fetchJobs(MANAGER_KEY)) {
-          try {
-            String scheduledJobKey = scheduleJob(job);
-            mapScheduledJob(job, scheduledJobKey);
-          } catch (ScheduleException e) {
-            LOG.log(Level.SEVERE, "While trying to restore state, scheduler module failed.", e);
+    Iterable<JobConfiguration> crons =
+        storage.doInTransaction(new Work.Quiet<Iterable<JobConfiguration>>() {
+          @Override public Iterable<JobConfiguration> apply(Storage.StoreProvider storeProvider) {
+            return storeProvider.getJobStore().fetchJobs(MANAGER_KEY);
           }
-        }
+        });
+
+    for (JobConfiguration job : crons) {
+      try {
+        mapScheduledJob(job, scheduleJob(job));
+      } catch (ScheduleException e) {
+        LOG.log(Level.SEVERE, "Scheduling failed for recovered job " + job, e);
       }
-    });
+    }
   }
 
   /**
@@ -285,8 +287,8 @@ public class CronJobManager extends JobManager {
     }
 
     String scheduledJobKey = scheduleJob(job);
-    storage.doInTransaction(new Work.NoResult.Quiet() {
-      @Override protected void execute(Storage.StoreProvider storeProvider) {
+    storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(Storage.MutableStoreProvider storeProvider) {
         storeProvider.getJobStore().saveAcceptedJob(MANAGER_KEY, job);
       }
     });
@@ -360,8 +362,8 @@ public class CronJobManager extends JobManager {
     String scheduledJobKey = scheduledJobs.remove(jobKey);
     if (scheduledJobKey != null) {
       scheduler.deschedule(scheduledJobKey);
-      storage.doInTransaction(new Work.NoResult.Quiet() {
-        @Override protected void execute(Storage.StoreProvider storeProvider) {
+      storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+        @Override protected void execute(Storage.MutableStoreProvider storeProvider) {
           storeProvider.getJobStore().removeJob(jobKey);
         }
       });

@@ -112,7 +112,7 @@ public class DbStorage implements
   private final AttributeStore.Mutable attributeStore;
 
   private final DbStorage self = this;
-  private final StoreProvider storeProvider = new StoreProvider() {
+  private final MutableStoreProvider storeProvider = new MutableStoreProvider() {
     @Override public SchedulerStore.Mutable getSchedulerStore() {
       return self;
     }
@@ -201,12 +201,11 @@ public class DbStorage implements
   }
 
   @Override
-  public void start(final Work.NoResult.Quiet initilizationLogic) {
+  public void start(final MutateWork.NoResult.Quiet initilizationLogic) {
     checkNotNull(initilizationLogic);
 
-    doInTransaction(new Work.NoResult.Quiet() {
-      @Override
-      protected void execute(StoreProvider storeProvider) {
+    doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider storeProvider) {
         ensureInitialized();
 
         initilizationLogic.apply(storeProvider);
@@ -217,6 +216,17 @@ public class DbStorage implements
 
   @Override
   public <T, E extends Exception> T doInTransaction(final Work<T, E> work)
+      throws StorageException, E {
+
+    return doInWriteTransaction(new MutateWork<T, E>() {
+      @Override public T apply(MutableStoreProvider storeProvider) throws E {
+        return work.apply(storeProvider);
+      }
+    });
+  }
+
+  @Override
+  public <T, E extends Exception> T doInWriteTransaction(final MutateWork<T, E> work)
       throws StorageException, E {
 
     checkNotNull(work);

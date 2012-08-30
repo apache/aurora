@@ -18,7 +18,7 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.db.testing.DbStorageTestUtil;
 import com.twitter.mesos.scheduler.storage.Storage;
-import com.twitter.mesos.scheduler.storage.Storage.Work;
+import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
 
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.capture;
@@ -26,9 +26,6 @@ import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 
-/**
- * @author William Farner
- */
 public class CronJobManagerTest extends EasyMockTest {
 
   private static final String OWNER = "owner";
@@ -47,7 +44,7 @@ public class CronJobManagerTest extends EasyMockTest {
     delayLaunchCapture = createCapture();
     Storage storage = DbStorageTestUtil.setupStorage(this);
     storage.prepare();
-    storage.start(Work.NOOP);
+    storage.start(MutateWork.NOOP);
     cron = new CronJobManager(storage, new TearDownRegistry(this), delayExecutor);
     cron.schedulerCore = scheduler;
   }

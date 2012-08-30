@@ -17,6 +17,8 @@ import com.twitter.mesos.gen.storage.JobUpdateConfiguration;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 import com.twitter.mesos.scheduler.Shards;
 import com.twitter.mesos.scheduler.storage.Storage;
+import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
+import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
 
@@ -26,8 +28,6 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**
  * Allows access to resource quotas, and tracks quota consumption.
- *
- * @author William Farner
  */
 public interface QuotaManager {
 
@@ -134,8 +134,8 @@ public interface QuotaManager {
       checkNotBlank(role);
       checkNotNull(quota);
 
-      storage.doInTransaction(new Work.NoResult.Quiet() {
-        @Override public void execute(StoreProvider storeProvider) {
+      storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+        @Override public void execute(MutableStoreProvider storeProvider) {
           storeProvider.getQuotaStore().saveQuota(role, quota);
         }
       });

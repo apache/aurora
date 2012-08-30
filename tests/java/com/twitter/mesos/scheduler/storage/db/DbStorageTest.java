@@ -20,22 +20,19 @@ import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.db.testing.DbStorageTestUtil;
 import com.twitter.mesos.scheduler.storage.BaseTaskStoreTest;
-import com.twitter.mesos.scheduler.storage.Storage.Work;
+import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-/**
- * @author John Sirois
- */
 public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
 
   @Override
   protected DbStorage createTaskStore() throws SQLException {
     DbStorage dbStorage = DbStorageTestUtil.setupStorage(this);
-    dbStorage.start(Work.NOOP);
+    dbStorage.start(MutateWork.NOOP);
     return dbStorage;
   }
 

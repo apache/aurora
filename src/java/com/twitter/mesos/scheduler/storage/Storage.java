@@ -8,6 +8,15 @@ import com.twitter.mesos.scheduler.SchedulerException;
 public interface Storage {
 
   interface StoreProvider {
+    SchedulerStore getSchedulerStore();
+    JobStore getJobStore();
+    TaskStore getTaskStore();
+    UpdateStore getUpdateStore();
+    QuotaStore getQuotaStore();
+    AttributeStore getAttributeStore();
+  }
+
+  interface MutableStoreProvider extends StoreProvider {
     SchedulerStore.Mutable getSchedulerStore();
     JobStore.Mutable getJobStore();
     TaskStore.Mutable getTaskStore();
@@ -17,15 +26,42 @@ public interface Storage {
   }
 
   /**
-   * Encapsulates a storage transaction unit of work.
+   * Encapsulates a storage transaction unit of read-only work.
    *
    * @param <T> The type of result this unit of work produces.
    * @param <E> The type of exception this unit of work can throw.
    */
   interface Work<T, E extends Exception> {
 
+    /**
+     * Abstracts a unit of work that has a result, but may also throw a specific exception.
+     *
+     * @param storeProvider A provider to give access to different available stores.
+     * @return the result of the successfully completed unit of work
+     * @throws E if the unit of work could not be completed
+     */
+    T apply(StoreProvider storeProvider) throws E;
+
+    /**
+     * A convenient typedef for Work that throws no checked exceptions - it runs quietly.
+     *
+     * @param <T> The type of result this unit of work produces.
+     */
+    interface Quiet<T> extends Work<T, RuntimeException> {
+      // typedef
+    }
+  }
+
+  /**
+   * Encapsulates a storage transaction unit of work, which has mutable storage access.
+   *
+   * @param <T> The type of result this unit of work produces.
+   * @param <E> The type of exception this unit of work can throw.
+   */
+  interface MutateWork<T, E extends Exception> {
+
     NoResult.Quiet NOOP = new NoResult.Quiet() {
-      @Override protected void execute(Storage.StoreProvider storeProvider) {
+      @Override protected void execute(Storage.MutableStoreProvider storeProvider) {
         // No-op.
       }
     };
@@ -38,14 +74,14 @@ public interface Storage {
      * @return the result of the successfully completed unit of work
      * @throws E if the unit of work could not be completed
      */
-    T apply(StoreProvider storeProvider) throws E;
+    T apply(MutableStoreProvider storeProvider) throws E;
 
     /**
-     * A convenient typedef for Work that throws no checked exceptions - it runs quitely.
+     * A convenient typedef for Work that throws no checked exceptions - it runs quietly.
      *
      * @param <T> The type of result this unit of work produces.
      */
-    interface Quiet<T> extends Work<T, RuntimeException> {
+    interface Quiet<T> extends MutateWork<T, RuntimeException> {
       // typedef
     }
 
@@ -54,27 +90,27 @@ public interface Storage {
      *
      * @param <E> The type of exception this unit of work can throw.
      */
-    abstract class NoResult<E extends Exception> implements Work<Void, E> {
+    abstract class NoResult<E extends Exception> implements MutateWork<Void, E> {
 
-      @Override public final Void apply(StoreProvider storeProvider) throws E {
+      @Override public final Void apply(MutableStoreProvider storeProvider) throws E {
         execute(storeProvider);
         return null;
       }
 
       /**
-       * Similar to {@link #apply(StoreProvider)} except that no result is
+       * Similar to {@link #apply(MutableStoreProvider)} except that no result is
        * returned.
        *
        * @param storeProvider A provider to give access to different available stores.
        * @throws E if the unit of work could not be completed
        */
-      protected abstract void execute(StoreProvider storeProvider) throws E;
+      protected abstract void execute(MutableStoreProvider storeProvider) throws E;
 
       /**
        * A convenient typedef for Work with no result that throws no checked exceptions - it runs
        * quitely.
        */
-      public abstract static class Quiet extends Work.NoResult<RuntimeException> {
+      public abstract static class Quiet extends NoResult<RuntimeException> {
         // typedef
       }
     }
@@ -106,14 +142,26 @@ public interface Storage {
    *     allowing general use of
    *     {@link #doInTransaction(com.twitter.mesos.scheduler.storage.Storage.Work)}.
    */
-  void start(Work.NoResult.Quiet initilizationLogic);
+  void start(MutateWork.NoResult.Quiet initilizationLogic);
+
+  /**
+   * Executes the unit of {@code work} in a read-only transaction.
+   *
+   * <p>TODO(John Sirois): Audit usages and handle StorageException appropriately.
+   *
+   * @param work The unit of work to execute in a transaction.
+   * @param <T> The type of result this unit of work produces.
+   * @param <E> The type of exception this unit of work can throw.
+   * @return the result when the unit of work completes successfully
+   * @throws StorageException if there was a problem reading from stable storage.
+   * @throws E bubbled transparently when the unit of work throws
+   */
+  <T, E extends Exception> T doInTransaction(Work<T, E> work) throws StorageException, E;
 
   /**
    * Executes the unit of {@code work} in a transaction such that any storage write operations
    * requested are either all committed if the unit of work does not throw or else none of the
    * requested storage operations commit when it does throw.
-   *
-   * <p>TODO(John Sirois): Audit usages and handle StorageException appropriately.
    *
    * @param work The unit of work to execute in a transaction.
    * @param <T> The type of result this unit of work produces.
@@ -122,7 +170,8 @@ public interface Storage {
    * @throws StorageException if there was a problem reading from or writing to stable storage.
    * @throws E bubbled transparently when the unit of work throws
    */
-  <T, E extends Exception> T doInTransaction(Work<T, E> work) throws StorageException, E;
+  <T, E extends Exception> T doInWriteTransaction(MutateWork<T, E> work)
+      throws StorageException, E;
 
   /**
    * Prepares the underlying storage system for clean shutdown.

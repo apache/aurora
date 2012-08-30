@@ -36,10 +36,11 @@ import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.db.testing.DbStorageTestUtil;
 import com.twitter.mesos.scheduler.events.TaskPubsubEvent;
 import com.twitter.mesos.scheduler.storage.Storage;
+import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
+import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
 import com.twitter.mesos.scheduler.storage.Storage.StorageException;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
-import com.twitter.mesos.scheduler.storage.Storage.Work.NoResult.Quiet;
 
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
@@ -106,14 +107,25 @@ public class StateManagerImplTest extends EasyMockTest {
         wrappedStorage.prepare();
       }
 
-      @Override public void start(Quiet initializationLogic) {
+      @Override public void start(MutateWork.NoResult.Quiet initializationLogic) {
         wrappedStorage.start(initializationLogic);
       }
 
       @Override public <T, E extends Exception> T doInTransaction(final Work<T, E> work)
           throws StorageException, E {
-        return wrappedStorage.doInTransaction(new Work<T, E>() {
-          @Override public T apply(StoreProvider storeProvider) throws E {
+
+        return doInWriteTransaction(new MutateWork<T, E>() {
+          @Override public T apply(MutableStoreProvider storeProvider) throws E {
+            return work.apply(storeProvider);
+          }
+        });
+      }
+
+      @Override public <T, E extends Exception> T doInWriteTransaction(final MutateWork<T, E> work)
+          throws StorageException, E {
+
+        return wrappedStorage.doInWriteTransaction(new MutateWork<T, E>() {
+          @Override public T apply(MutableStoreProvider storeProvider) throws E {
             T result = work.apply(storeProvider);
 
             // Inject the failure after the work is performed in the transaction, so that we can
@@ -363,9 +375,8 @@ public class StateManagerImplTest extends EasyMockTest {
     final TwitterTaskInfo task = makeTask("jim", "myJob", 0);
 
     // Insert a task in the INIT state, and restart the state manager.
-    storage.doInTransaction(new Work.NoResult.Quiet() {
-      @Override
-      protected void execute(StoreProvider storeProvider) {
+    storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getTaskStore()
             .saveTasks(ImmutableSet.of(stateManager.getTaskCreator().apply(task)));
       }
@@ -383,8 +394,8 @@ public class StateManagerImplTest extends EasyMockTest {
     final TwitterTaskInfo task = makeTask("jim", "myJob", 0);
 
     // Insert a task in the INIT state, and restart the state manager.
-    storage.doInTransaction(new Work.NoResult.Quiet() {
-      @Override protected void execute(StoreProvider storeProvider) {
+    storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider storeProvider) {
         ScheduledTask scheduledTask = stateManager.getTaskCreator().apply(task);
         scheduledTask.setStatus(UNKNOWN);
         storeProvider.getTaskStore()
