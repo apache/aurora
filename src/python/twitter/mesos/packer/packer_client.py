@@ -144,3 +144,9 @@ class Packer(object):
 
   def unlock(self, role, package):
     return self._api('%s/unlock' % Packer._pkg_url(role, package), auth=True, method='POST')
+
+  def set_live(self, role, package, version):
+    return self._api(Packer._pkg_url(role, package),
+                     auth=True,
+                     body='version=%s' % version,
+                     method='PUT')
