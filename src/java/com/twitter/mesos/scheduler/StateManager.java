@@ -1,14 +1,20 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.List;
 import java.util.Set;
 
+import com.google.common.base.Optional;
+
+import org.apache.mesos.Protos.Attribute;
+import org.apache.mesos.Protos.SlaveID;
+
+import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 
 /**
  * Thin interface for the state manager.
- *
- * @author William Farner
  */
 public interface StateManager {
 
@@ -19,6 +25,45 @@ public interface StateManager {
    * @return Tasks found matching the query.
    */
   Set<ScheduledTask> fetchTasks(TaskQuery query);
+
+  /**
+   * Performs a simple state change, transitioning all tasks matching a query to the given
+   * state and applying the given audit message.
+   * TODO(William Farner): Consider removing the return value.
+   *
+   * @param query Query to perform, the results of which will be modified.
+   * @param newState State to move the resulting tasks into.
+   * @param auditMessage Audit message to apply along with the state change.
+   * @return the number of successful state changes.
+   */
+  int changeState(
+      TaskQuery query,
+      ScheduleStatus newState,
+      Optional<String> auditMessage);
+
+  /**
+   * Persists the attributes associated with a host.
+   *
+   * @param slaveHost Host to save attributes for.
+   * @param attributes Attributes associated with the host.
+   */
+  void saveAttributesFromOffer(String slaveHost, List<Attribute> attributes);
+
+  /**
+   * Assigns a task to a specific slave.
+   * This will modify the task record to reflect the host assignment and return the updated record.
+   *
+   * @param taskId ID of the task to mutate.
+   * @param slaveHost Host name that the task is being assigned to.
+   * @param slaveId ID of the slave that the task is being assigned to.
+   * @param assignedPorts Ports on the host that are being assigned to the task.
+   * @return The updated task record, or {@code null} if the task was not found.
+   */
+  AssignedTask assignTask(
+      String taskId,
+      String slaveHost,
+      SlaveID slaveId,
+      Set<Integer> assignedPorts);
 
   /**
    * Deletes tasks with the given task IDs.

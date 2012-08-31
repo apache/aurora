@@ -67,7 +67,8 @@ public class MesosSchedulerImpl implements Scheduler {
    * @param slaveMapper Slave information accumulator.
    */
   @Inject
-  public MesosSchedulerImpl(SchedulerCore schedulerCore,
+  public MesosSchedulerImpl(
+      SchedulerCore schedulerCore,
       final Lifecycle lifecycle,
       List<TaskLauncher> taskLaunchers,
       SlaveMapper slaveMapper,

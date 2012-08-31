@@ -73,8 +73,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
       .setTaskId(TASK_ID)
       .build();
 
-  private SchedulerCore schedulerCore;
-  private TaskLauncher launcher;
+  private TaskLauncher systemLauncher;
+  private TaskLauncher userLauncher;
   private SlaveMapper slaveMapper;
   private RegisteredListener registeredListener;
   private SchedulerDriver driver;
@@ -83,16 +83,16 @@ public class MesosSchedulerImplTest extends EasyMockTest {
 
   @Before
   public void setUp() {
-    schedulerCore = createMock(SchedulerCore.class);
     Lifecycle lifecycle =
         new Lifecycle(createMock(Command.class), createMock(UncaughtExceptionHandler.class));
-    launcher = createMock(TaskLauncher.class);
+    systemLauncher = createMock(TaskLauncher.class);
+    userLauncher = createMock(TaskLauncher.class);
     slaveMapper = createMock(SlaveMapper.class);
     registeredListener = createMock(RegisteredListener.class);
     scheduler = new MesosSchedulerImpl(
-        schedulerCore,
+        createMock(SchedulerCore.class),
         lifecycle,
-        Arrays.asList(launcher, schedulerCore),
+        Arrays.asList(systemLauncher, userLauncher),
         slaveMapper,
         registeredListener);
     driver = createMock(SchedulerDriver.class);
@@ -120,8 +120,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   public void testNoAccepts() throws Exception {
     new OfferFixture() {
       @Override List<TaskInfo> respondToOffer() throws Exception {
-        expect(launcher.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
-        expect(schedulerCore.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
+        expect(systemLauncher.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
+        expect(userLauncher.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
         return ImmutableList.of();
       }
     };
@@ -131,7 +131,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   public void testOfferFirstAccepts() throws Exception {
     new OfferFixture() {
       @Override List<TaskInfo> respondToOffer() throws Exception {
-        expect(launcher.createTask(OFFER)).andReturn(Optional.of(TASK));
+        expect(systemLauncher.createTask(OFFER)).andReturn(Optional.of(TASK));
         return ImmutableList.of(TASK);
       }
     };
@@ -141,8 +141,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   public void testOfferSchedulerAccepts() throws Exception {
     new OfferFixture() {
       @Override List<TaskInfo> respondToOffer() throws Exception {
-        expect(launcher.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
-        expect(schedulerCore.createTask(OFFER)).andReturn(Optional.of(TASK));
+        expect(systemLauncher.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
+        expect(userLauncher.createTask(OFFER)).andReturn(Optional.of(TASK));
         return ImmutableList.of(TASK);
       }
     };
@@ -152,8 +152,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   public void testAcceptedExceedsOffer() throws Exception {
     new OfferFixture() {
       @Override List<TaskInfo> respondToOffer() throws Exception {
-        expect(launcher.createTask(OFFER)).andReturn(Optional.of(BIGGER_TASK));
-        expect(schedulerCore.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
+        expect(systemLauncher.createTask(OFFER)).andReturn(Optional.of(BIGGER_TASK));
+        expect(userLauncher.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
         return ImmutableList.of();
       }
     };
@@ -163,8 +163,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   public void testStatusUpdateNoAccepts() throws Exception {
     new StatusFixture() {
       @Override void expectations() throws Exception {
-        expect(launcher.statusUpdate(STATUS)).andReturn(false);
-        expect(schedulerCore.statusUpdate(STATUS)).andReturn(false);
+        expect(systemLauncher.statusUpdate(STATUS)).andReturn(false);
+        expect(userLauncher.statusUpdate(STATUS)).andReturn(false);
       }
     };
   }
@@ -173,7 +173,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   public void testStatusUpdateFirstAccepts() throws Exception {
     new StatusFixture() {
       @Override void expectations() throws Exception {
-        expect(launcher.statusUpdate(STATUS)).andReturn(true);
+        expect(systemLauncher.statusUpdate(STATUS)).andReturn(true);
       }
     };
   }
@@ -182,8 +182,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   public void testStatusUpdateSecondAccepts() throws Exception {
     new StatusFixture() {
       @Override void expectations() throws Exception {
-        expect(launcher.statusUpdate(STATUS)).andReturn(false);
-        expect(schedulerCore.statusUpdate(STATUS)).andReturn(true);
+        expect(systemLauncher.statusUpdate(STATUS)).andReturn(false);
+        expect(userLauncher.statusUpdate(STATUS)).andReturn(true);
       }
     };
   }
@@ -192,8 +192,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   public void testStatusUpdateFails() throws Exception {
     new StatusFixture() {
       @Override void expectations() throws Exception {
-        expect(launcher.statusUpdate(STATUS)).andReturn(false);
-        expect(schedulerCore.statusUpdate(STATUS)).andThrow(new StorageException("Injected."));
+        expect(systemLauncher.statusUpdate(STATUS)).andReturn(false);
+        expect(userLauncher.statusUpdate(STATUS)).andThrow(new StorageException("Injected."));
       }
     };
   }
@@ -204,11 +204,11 @@ public class MesosSchedulerImplTest extends EasyMockTest {
       @Override void expectations() throws Exception {
         slaveMapper.addSlave(SLAVE_HOST, SLAVE_ID);
         slaveMapper.addSlave(SLAVE_HOST_2, SLAVE_ID_2);
-        expect(launcher.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
-        expect(schedulerCore.createTask(OFFER)).andReturn(Optional.of(TASK));
+        expect(systemLauncher.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
+        expect(userLauncher.createTask(OFFER)).andReturn(Optional.of(TASK));
         expect(driver.launchTasks(OFFER_ID, ImmutableList.of(TASK))).andReturn(DRIVER_RUNNING);
-        expect(launcher.createTask(OFFER_2)).andReturn(Optional.<TaskInfo>absent());
-        expect(schedulerCore.createTask(OFFER_2)).andReturn(Optional.<TaskInfo>absent());
+        expect(systemLauncher.createTask(OFFER_2)).andReturn(Optional.<TaskInfo>absent());
+        expect(userLauncher.createTask(OFFER_2)).andReturn(Optional.<TaskInfo>absent());
         expect(driver.launchTasks(OFFER_ID_2, ImmutableList.<TaskInfo>of()))
             .andReturn(DRIVER_RUNNING);
       }

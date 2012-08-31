@@ -30,14 +30,14 @@ class NotifyingSchedulingFilter implements SchedulingFilter {
    */
   @BindingAnnotation
   @Target({FIELD, PARAMETER, METHOD}) @Retention(RUNTIME)
-  public @interface Delegate { }
+  public @interface NotifyDelegate { }
 
   private final SchedulingFilter delegate;
   private final Closure<TaskPubsubEvent> eventSink;
 
   @Inject
   NotifyingSchedulingFilter(
-      @Delegate SchedulingFilter delegate,
+      @NotifyDelegate SchedulingFilter delegate,
       Closure<TaskPubsubEvent> eventSink) {
 
     this.delegate = checkNotNull(delegate);

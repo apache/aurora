@@ -4,8 +4,6 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.annotation.Nullable;
-
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Optional;
@@ -14,17 +12,11 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
-import org.apache.mesos.Protos.Offer;
-import org.apache.mesos.Protos.TaskInfo;
-import org.apache.mesos.Protos.TaskStatus;
-
 import com.twitter.common.util.StateMachine;
-import com.twitter.mesos.StateTranslator;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.JobConfiguration;
@@ -34,7 +26,6 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
-import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
 import com.twitter.mesos.scheduler.StateManagerImpl.StateChanger;
 import com.twitter.mesos.scheduler.StateManagerImpl.StateMutation;
 import com.twitter.mesos.scheduler.StateManagerImpl.UpdateException;
@@ -49,7 +40,6 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.mesos.Tasks.SCHEDULED_TO_SHARD_ID;
 import static com.twitter.mesos.Tasks.jobKey;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
-import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.ROLLBACK;
 import static com.twitter.mesos.gen.ScheduleStatus.UPDATING;
@@ -62,7 +52,7 @@ import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.STOPPED;
 /**
  * Implementation of the scheduler core.
  */
-public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
+public class SchedulerCoreImpl implements SchedulerCore {
 
   private static final Logger LOG = Logger.getLogger(SchedulerCoreImpl.class.getName());
 
@@ -89,11 +79,7 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
   // State manager handles persistence of task modifications and state transitions.
   private final StateManagerImpl stateManager;
 
-  // Filter to determine whether a task should be scheduled.
-  private final SchedulingFilter schedulingFilter;
-
   private final QuotaManager quotaManager;
-  private final MesosTaskFactory taskFactory;
 
   /**
    * Scheduler states.
@@ -114,27 +100,20 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
    * @param cronScheduler Cron scheduler.
    * @param immediateScheduler Immediate scheduler.
    * @param stateManager Persistent state manager.
-   * @param schedulingFilter Scheduling logic.
    * @param quotaManager Quota tracker.
-   * @param taskFactory Factory to contstruct mesos task objects.
    */
   @Inject
   public SchedulerCoreImpl(CronJobManager cronScheduler,
       ImmediateJobManager immediateScheduler,
       StateManagerImpl stateManager,
-      SchedulingFilter schedulingFilter,
-      QuotaManager quotaManager,
-      MesosTaskFactory taskFactory) {
+      QuotaManager quotaManager) {
 
     // The immediate scheduler will accept any job, so it's important that other schedulers are
     // placed first.
     this.jobManagers = ImmutableList.of(cronScheduler, immediateScheduler);
     this.cronScheduler = cronScheduler;
     this.stateManager = checkNotNull(stateManager);
-
-    this.schedulingFilter = checkNotNull(schedulingFilter);
     this.quotaManager = checkNotNull(quotaManager);
-    this.taskFactory = checkNotNull(taskFactory);
 
    // TODO(John Sirois): Add a method to StateMachine or write a wrapper that allows for a
    // read-locked do-in-state assertion around a block of work.  Transition would then need to grab
@@ -200,7 +179,7 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
 
   @Override
   public synchronized void tasksDeleted(Set<String> taskIds) {
-    setTaskStatus(Query.byId(taskIds), ScheduleStatus.UNKNOWN, null);
+    setTaskStatus(Query.byId(taskIds), ScheduleStatus.UNKNOWN, Optional.<String>absent());
   }
 
   @Override
@@ -285,76 +264,8 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
   }
 
   @Override
-  public synchronized Optional<TaskInfo> createTask(Offer offer) {
-    checkStarted();
-    checkNotNull(offer);
-
-    stateManager.saveAttributesFromOffer(offer.getHostname(), offer.getAttributesList());
-
-    final ImmutableSortedSet<ScheduledTask> candidates = ImmutableSortedSet.copyOf(
-        Tasks.SCHEDULING_ORDER.onResultOf(Tasks.SCHEDULED_TO_ASSIGNED),
-        stateManager.fetchTasks(Query.byStatus(PENDING)));
-    if (candidates.isEmpty()) {
-      return Optional.absent();
-    }
-    LOG.fine("Candidates for offer: " + Tasks.ids(candidates));
-
-    for (ScheduledTask task : candidates) {
-      Set<Veto> vetoes = schedulingFilter.filter(
-          Resources.from(offer),
-          offer.getHostname(),
-          task.getAssignedTask().getTask(),
-          Tasks.id(task));
-      if (vetoes.isEmpty()) {
-        return Optional.of(assignTask(offer, task));
-      } else {
-        // TODO(wfarner): Surface this information into the scheduler web UI.
-        LOG.fine("Slave " + offer.getHostname() + " vetoed task " + Tasks.id(task) + ": " + vetoes);
-      }
-    }
-
-    return Optional.absent();
-  }
-
-  private TaskInfo assignTask(Offer offer, ScheduledTask task) {
-    String host = offer.getHostname();
-    Set<Integer> selectedPorts =
-        Resources.getPorts(offer, task.getAssignedTask().getTask().getRequestedPortsSize());
-    task.setAssignedTask(
-        stateManager.assignTask(Tasks.id(task), host, offer.getSlaveId(), selectedPorts));
-    LOG.info(String.format("Offer on slave %s (id %s) is being assigned task for %s.",
-        host, offer.getSlaveId(), jobKey(task)));
-    return taskFactory.createFrom(task.getAssignedTask(), offer.getSlaveId());
-  }
-
-  @Override
-  public boolean statusUpdate(TaskStatus status) {
-    String info = status.hasData() ? status.getData().toStringUtf8() : null;
-    TaskQuery query = Query.byId(status.getTaskId().getValue());
-
-    try {
-      if (getTasks(query).isEmpty()) {
-        LOG.severe("Failed to find task id " + status.getTaskId());
-      } else {
-        ScheduleStatus translatedState = StateTranslator.get(status.getState());
-        if (translatedState == null) {
-          LOG.log(Level.SEVERE,
-              "Failed to look up task state translation for: " + status.getState());
-        } else {
-          setTaskStatus(query, translatedState, info);
-          return true;
-        }
-      }
-    } catch (SchedulerException e) {
-      LOG.log(Level.WARNING, "Failed to update status for: " + status, e);
-      throw e;
-    }
-    return false;
-  }
-
-  @Override
   public synchronized void setTaskStatus(TaskQuery query, final ScheduleStatus status,
-      @Nullable final String message) {
+      Optional<String> message) {
     checkStarted();
     checkNotNull(query);
     checkNotNull(status);
@@ -391,7 +302,7 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
       }
     }
 
-    int tasksAffected = stateManager.changeState(query, KILLING, "Killed by " + user);
+    int tasksAffected = stateManager.changeState(query, KILLING, Optional.of("Killed by " + user));
     if (!matchingScheduler && !updateFinished && (tasksAffected == 0)) {
       throw new ScheduleException("No jobs to kill");
     }
@@ -542,7 +453,7 @@ public class SchedulerCoreImpl implements SchedulerCore, TaskLauncher {
     // TODO(William Farner): Throw SchedulingException if either task doesn't exist, etc.
 
     stateManager.changeState(Query.byId(task.getTaskId()), ScheduleStatus.PREEMPTING,
-        "Preempting in favor of " + Tasks.jobKey(preemptingTask));
+        Optional.of("Preempting in favor of " + Tasks.jobKey(preemptingTask)));
   }
 
   @Override

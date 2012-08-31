@@ -444,7 +444,7 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
   }
 
   @VisibleForTesting
-  static String transitionMessage(String user) {
-    return "Transition forced by " + user;
+  static Optional<String> transitionMessage(String user) {
+    return Optional.of("Transition forced by " + user);
   }
 }

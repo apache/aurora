@@ -8,7 +8,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -29,21 +28,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
 
-import org.apache.mesos.Protos.Attribute;
-import org.apache.mesos.Protos.FrameworkID;
-import org.apache.mesos.Protos.Offer;
-import org.apache.mesos.Protos.OfferID;
-import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.SlaveID;
-import org.apache.mesos.Protos.TaskID;
-import org.apache.mesos.Protos.TaskInfo;
-import org.apache.mesos.Protos.TaskState;
-import org.apache.mesos.Protos.TaskStatus;
-import org.apache.mesos.Protos.Value.Range;
-import org.apache.mesos.Protos.Value.Ranges;
-import org.apache.mesos.Protos.Value.Scalar;
-import org.apache.mesos.Protos.Value.Text;
-import org.apache.mesos.Protos.Value.Type;
 import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
@@ -51,14 +36,11 @@ import org.junit.Test;
 import com.twitter.common.base.Closure;
 import com.twitter.common.collections.Pair;
 import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.common.testing.TearDownRegistry;
 import com.twitter.common.util.testing.FakeClock;
 import com.twitter.mesos.Tasks;
-import com.twitter.mesos.codec.ThriftBinaryCodec;
-import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Constraint;
 import com.twitter.mesos.gen.CronCollisionPolicy;
@@ -74,7 +56,6 @@ import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.ValueConstraint;
-import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
 import com.twitter.mesos.scheduler.SchedulerCore.RestartException;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
@@ -85,14 +66,11 @@ import com.twitter.mesos.scheduler.quota.Quotas;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
-import com.twitter.mesos.scheduler.storage.Storage.StorageException;
 
 import static org.easymock.EasyMock.expectLastCall;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
@@ -110,7 +88,6 @@ import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.UPDATING;
 import static com.twitter.mesos.gen.UpdateResult.SUCCESS;
 import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
-import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.HOST_CONSTRAINT;
 import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.MAX_TASKS_PER_JOB;
 import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.hostLimitConstraint;
 import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.populateFields;
@@ -118,12 +95,6 @@ import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.pop
 /**
  * Base integration test for the SchedulerCoreImpl, subclasses should supply a concrete Storage
  * system.
- *
- * TODO(William Farner): Test all the different cases for setTaskStaus:
- *    - Killed tasks get removed.
- *    - Failed tasks have failed count incremented.
- *    - Tasks above maxTaskFailures have _all_ tasks in the job removed.
- *    - Daemon tasks are rescheduled.
  */
 public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
@@ -133,7 +104,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private static final String JOB_A = "Test_Job_A";
   private static final String JOB_A_KEY = Tasks.jobKey(OWNER_A, JOB_A);
   private static final int ONE_GB = 1024;
-  private static final int FOUR_GB = 4096;
   private static final Quota DEFAULT_TASK_QUOTA = new Quota(1.0, ONE_GB, ONE_GB);
   private static final int DEFAULT_TASKS_IN_QUOTA = 10;
 
@@ -142,8 +112,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   private static final SlaveID SLAVE_ID = SlaveID.newBuilder().setValue("SlaveId").build();
   private static final String SLAVE_HOST_1 = "SlaveHost1";
-
-  private static final OfferID OFFER_ID = OfferID.newBuilder().setValue("OfferId").build();
 
   private static final Function<Integer, String> NEW_COMMAND = new Function<Integer, String>() {
     @Override public String apply(Integer shardId) {
@@ -162,7 +130,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private SchedulerCoreImpl scheduler;
   private CronJobManager cron;
   private QuotaManager quotaManager;
-  private MesosTaskFactory taskFactory;
   private FakeClock clock;
   private Closure<TaskPubsubEvent> eventSink;
 
@@ -170,7 +137,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   public void setUp() throws Exception {
     driver = createMock(Driver.class);
     clock = new FakeClock();
-    taskFactory = new MesosTaskFactoryImpl("/fake/executor.zip", 0.1, Amount.of(1.0, Data.MB));
     eventSink = createMock(new Clazz<Closure<TaskPubsubEvent>>() { });
     eventSink.execute(EasyMock.<TaskPubsubEvent>anyObject());
     expectLastCall().anyTimes();
@@ -201,13 +167,10 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     cron = new CronJobManager(storage, new TearDownRegistry(this));
     stateManager = new StateManagerImpl(storage, clock, new MutableState(), driver, eventSink);
     quotaManager = new QuotaManagerImpl(storage);
-    SchedulingFilter schedulingFilter = new SchedulingFilterImpl(storage);
     scheduler = new SchedulerCoreImpl(cron,
         immediateManager,
         stateManager,
-        schedulingFilter,
-        quotaManager,
-        taskFactory);
+        quotaManager);
 
     cron.schedulerCore = scheduler;
     immediateManager.schedulerCore = scheduler;
@@ -218,15 +181,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     // Apply a default quota for users so we don't have to give quota for every test.
     quotaManager.setQuota(OWNER_A.getRole(), scale(DEFAULT_TASK_QUOTA, DEFAULT_TASKS_IN_QUOTA));
     quotaManager.setQuota(OWNER_B.getRole(), scale(DEFAULT_TASK_QUOTA, DEFAULT_TASKS_IN_QUOTA));
-  }
-
-  @Test
-  public void testOfferNoTasks() throws Exception {
-    control.replay();
-    buildScheduler();
-
-    Offer offer = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, FOUR_GB, ONE_GB);
-    assertThat(scheduler.createTask(offer), is(Optional.<TaskInfo>absent()));
   }
 
   @Test(expected = TaskDescriptionException.class)
@@ -455,20 +409,22 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     // Check that the missing event was synthesized.
     assertThat(Iterables.getLast(getTask(storedTaskId).getTaskEvents()).getStatus(), is(PENDING));
 
-    Offer offer = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, FOUR_GB, ONE_GB);
-    Optional<TaskInfo> launchedTask = scheduler.createTask(offer);
+    assignTask(storedTaskId, SLAVE_ID, SLAVE_HOST_1);
 
     // Since task fields are backfilled with defaults, the production flag and thermos config
     // should be filled.
-    assertThat(extractTask(launchedTask).getTask(),
+    assertThat(getTask(storedTaskId).getAssignedTask().getTask(),
         is(new TwitterTaskInfo(storedTask).setProduction(false).setThermosConfig(new byte[] {})));
 
     assertThat(getTask(storedTaskId).getStatus(), is(ASSIGNED));
   }
 
-  private AssignedTask extractTask(Optional<TaskInfo> task) throws CodingException {
-    assertTrue(task.isPresent());
-    return ThriftBinaryCodec.decode(AssignedTask.class, task.get().getData().toByteArray());
+  private void assignTask(String taskId, SlaveID slaveId, String slaveHost, Set<Integer> ports) {
+    stateManager.assignTask(taskId, slaveHost, slaveId, ports);
+  }
+
+  private void assignTask(String taskId, SlaveID slaveId, String slaveHost) {
+    assignTask(taskId, slaveId, slaveHost, ImmutableSet.<Integer>of());
   }
 
   @Test
@@ -540,11 +496,11 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     buildScheduler(storage);
 
-    Offer offer =
-        createOffer(SLAVE_ID, SLAVE_HOST_1, 4, FOUR_GB, ONE_GB, ImmutableSet.of(Pair.of(80, 81)));
-    Optional<TaskInfo> launchedTask = scheduler.createTask(offer);
+    assignTask(storedTaskId, SLAVE_ID, SLAVE_HOST_1, ImmutableSet.of(80, 81));
 
-    assertEquals(ImmutableSet.of("foo"), extractTask(launchedTask).getTask().getRequestedPorts());
+    assertEquals(
+        ImmutableSet.of("foo"),
+        getTask(storedTaskId).getAssignedTask().getTask().getRequestedPorts());
   }
 
   @Test
@@ -567,8 +523,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setAvoidJobs(ImmutableSet.<String>of());
 
     storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
-      @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      @Override protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getJobStore().saveAcceptedJob(
             CronJobManager.MANAGER_KEY, makeJob(OWNER_A, JOB_A, storedTask, 1)
             .setCronSchedule("1 1 1 1 1"));
@@ -863,25 +818,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         ImmutableSet.of(
             productionTask().setShardId(0),
             productionTask().setShardId(2))));
-  }
-
-  @Test
-  public void testHonorsScheduleFilter() throws Exception {
-    control.replay();
-    buildScheduler();
-
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, 10));
-
-    assertTaskCount(10);
-
-    Offer offer = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, FOUR_GB, 1);
-
-    assertFalse(scheduler.createTask(offer).isPresent());
-    assertFalse(scheduler.createTask(offer).isPresent());
-    assertFalse(scheduler.createTask(offer).isPresent());
-
-    // No tasks should have moved out of the pending state.
-    assertThat(getTasksByStatus(PENDING).size(), is(10));
   }
 
   @Test
@@ -1310,35 +1246,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     }
   }
 
-  private void sendOffer(Offer offer, String taskId, String slaveHost)
-      throws Exception {
-    sendOffer(offer, taskId, slaveHost, ImmutableSet.<String>of(), ImmutableSet.<Integer>of());
-  }
-
-  private void sendOffer(Offer offer, String taskId, String slaveHost,
-      Set<String> portNames, Set<Integer> ports) throws Exception {
-    AssignedTask task = getTask(taskId).getAssignedTask().deepCopy();
-
-    ImmutableList.Builder<Resource> resourceBuilder = ImmutableList.<Resource>builder()
-        .add(Resources.makeMesosResource(Resources.CPUS, task.getTask().getNumCpus()))
-        .add(Resources.makeMesosResource(Resources.DISK_MB, task.getTask().getDiskMb()))
-        .add(Resources.makeMesosResource(Resources.RAM_MB, task.getTask().getRamMb()));
-    if (ports.size() > 0) {
-        resourceBuilder.add(Resources.makeMesosRangeResource(Resources.PORTS, ports));
-    }
-    List<Resource> resources = resourceBuilder.build();
-
-    Optional<TaskInfo> launched = scheduler.createTask(offer);
-    AssignedTask assigned = extractTask(launched);
-
-    assertThat(launched.get().getResourcesList(), is(resources));
-    assertThat(assigned, is(getTask(taskId).getAssignedTask()));
-    assertThat(assigned.getSlaveHost(), is(slaveHost));
-    Map<String, Integer> assignedPorts = assigned.getAssignedPorts();
-    assertThat(assignedPorts.keySet(), is(portNames));
-    assertEquals(ports, ImmutableSet.copyOf(assignedPorts.values()));
-  }
-
   @Test
   public void testSlaveDeletesTasks() throws Exception {
     control.replay();
@@ -1349,9 +1256,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     String taskId1 = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)));
     String taskId2 = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 1)));
 
-    Offer offer = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, FOUR_GB, ONE_GB);
-    sendOffer(offer, taskId1, SLAVE_HOST_1);
-    sendOffer(offer, taskId2, SLAVE_HOST_1);
+    assignTask(taskId1, SLAVE_ID, SLAVE_HOST_1);
+    assignTask(taskId2, SLAVE_ID, SLAVE_HOST_1);
 
     changeStatus(taskId1, STARTING);
     changeStatus(taskId1, RUNNING);
@@ -1368,35 +1274,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     ScheduledTask rescheduled = Iterables.getOnlyElement(getTasksByStatus(PENDING));
     assertThat(rescheduled.getAncestorId(), is(taskId1));
-  }
-
-  @Test
-  public void testSchedulingOrder() throws Exception {
-    control.replay();
-    buildScheduler();
-
-    TwitterTaskInfo task1 = nonProductionTask("priority", "10");
-    TwitterTaskInfo task2 = productionTask("priority", "0");
-    TwitterTaskInfo task3 = nonProductionTask("priority", "11");
-
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, task1, 2));
-    scheduler.createJob(makeJob(OWNER_B, JOB_A, task2, 2));
-    scheduler.createJob(makeJob(OWNER_A, JOB_B, task3, 2));
-
-    String taskId1a = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)));
-    String taskId1b = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 1)));
-    String taskId2a = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_B, JOB_A), 0)));
-    String taskId2b = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_B, JOB_A), 1)));
-    String taskId3a = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_B), 0)));
-    String taskId3b = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_B), 1)));
-
-    Offer offer = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, FOUR_GB, ONE_GB);
-    sendOffer(offer, taskId2a, SLAVE_HOST_1);
-    sendOffer(offer, taskId2b, SLAVE_HOST_1);
-    sendOffer(offer, taskId1a, SLAVE_HOST_1);
-    sendOffer(offer, taskId1b, SLAVE_HOST_1);
-    sendOffer(offer, taskId3a, SLAVE_HOST_1);
-    sendOffer(offer, taskId3b, SLAVE_HOST_1);
   }
 
   @Test
@@ -1591,12 +1468,10 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(job);
     List<String> taskIds = Ordering.natural().sortedCopy(Tasks.ids(getTasksOwnedBy(OWNER_A)));
 
-    Offer onePortOffer = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, FOUR_GB, ONE_GB,
-        ImmutableSet.of(Pair.of(80, 80)));
     Set<Integer> port = ImmutableSet.of(80);
-    sendOffer(onePortOffer, taskIds.get(0), SLAVE_HOST_1, ImmutableSet.of("foo"), port);
-    sendOffer(onePortOffer, taskIds.get(1), SLAVE_HOST_1, ImmutableSet.of("foo"), port);
-    sendOffer(onePortOffer, taskIds.get(2), SLAVE_HOST_1, ImmutableSet.of("foo"), port);
+    assignTask(taskIds.get(0), SLAVE_ID, SLAVE_HOST_1, port);
+    assignTask(taskIds.get(1), SLAVE_ID, SLAVE_HOST_1, port);
+    assignTask(taskIds.get(2), SLAVE_ID, SLAVE_HOST_1, port);
     changeStatus(queryByOwner(OWNER_A), ASSIGNED);
     changeStatus(queryByOwner(OWNER_A), RUNNING);
 
@@ -1911,8 +1786,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(makeJob(OWNER_A, JOB_A, config, 1));
 
     String taskId = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)));
-    Offer offer = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, FOUR_GB, ONE_GB);
-    sendOffer(offer, taskId, SLAVE_HOST_1);
+    assignTask(taskId, SLAVE_ID, SLAVE_HOST_1);
 
     AssignedTask task = getTask(taskId).getAssignedTask();
     assertThat(task.getTask().getStartCommand(), is(taskId));
@@ -1928,8 +1802,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(makeJob(OWNER_A, JOB_A, config, 1));
 
     String taskId = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)));
-    Offer offer = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, FOUR_GB, ONE_GB);
-    sendOffer(offer, taskId, SLAVE_HOST_1);
+    assignTask(taskId, SLAVE_ID, SLAVE_HOST_1);
 
     AssignedTask task = getTask(taskId).getAssignedTask();
     assertThat(task.getTask().getStartCommand(), is("0"));
@@ -1947,11 +1820,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     String taskId = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)));
 
-    Set<Integer> assignedPorts = ImmutableSet.of(80, 81, 82);
-    Offer threePorts = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, FOUR_GB, ONE_GB,
-        ImmutableSet.of(Pair.of(80, 82)));
-    sendOffer(threePorts, taskId, SLAVE_HOST_1, ImmutableSet.of("one", "two", "three"),
-        assignedPorts);
+    assignTask(taskId, SLAVE_ID, SLAVE_HOST_1, ImmutableSet.of(80, 81, 82));
 
     AssignedTask task = getTask(taskId).getAssignedTask();
 
@@ -1971,10 +1840,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     String taskId = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)));
 
-    Set<Integer> assignedPorts = ImmutableSet.of(80);
-    Offer threePorts = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, FOUR_GB, ONE_GB,
-        ImmutableSet.of(Pair.of(80, 80)));
-    sendOffer(threePorts, taskId, SLAVE_HOST_1, ImmutableSet.of("one"), assignedPorts);
+    assignTask(taskId, SLAVE_ID, SLAVE_HOST_1, ImmutableSet.of(80));
 
     AssignedTask task = getTask(taskId).getAssignedTask();
     assertThat(task.getTask().getStartCommand(), is("80"));
@@ -1985,11 +1851,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     String newTaskId = Tasks.id(getOnlyTask(Query.liveShard(Tasks.jobKey(OWNER_A, JOB_A), 0)));
     assertThat(getTask(newTaskId).getAssignedTask().getTask().getStartCommand(), is("%port:one%"));
 
-    assignedPorts = ImmutableSet.of(86);
-    Offer threeOtherPorts = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, FOUR_GB, ONE_GB,
-        ImmutableSet.of(Pair.of(86, 86)));
-    sendOffer(threeOtherPorts, newTaskId, SLAVE_HOST_1, ImmutableSet.of("one"),
-        assignedPorts);
+    assignTask(newTaskId, SLAVE_ID, SLAVE_HOST_1, ImmutableSet.of(86));
 
     task = getTask(newTaskId).getAssignedTask();
     assertThat(task.getTask().getStartCommand(), is("86"));
@@ -2014,7 +1876,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     String taskId = Tasks.id(getOnlyTask(queryByOwner(OWNER_A)));
     changeStatus(taskId, ASSIGNED);
     changeStatus(taskId, STARTING);
-    changeStatus(taskId, FAILED, "bad stuff happened");
+    changeStatus(taskId, FAILED, Optional.of("bad stuff happened"));
 
     String hostname = getLocalHost();
 
@@ -2032,70 +1894,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       assertEquals(expected.getSecond(), event.getMessage());
       assertEquals(hostname, event.getScheduler());
     }
-  }
-
-  private static class FailureInjectingStorage implements Storage {
-    final Storage delegate;
-    final AtomicBoolean failTransactions = new AtomicBoolean(false);
-
-    FailureInjectingStorage(Storage delegate) {
-      this.delegate = delegate;
-    }
-
-    @Override public void prepare() {
-      delegate.prepare();
-    }
-
-    @Override public void start(MutateWork.NoResult.Quiet initilizationLogic) {
-      delegate.start(initilizationLogic);
-    }
-
-    @Override public <T, E extends Exception> T doInTransaction(final Work<T, E> work)
-        throws StorageException, E {
-
-      return doInWriteTransaction(new MutateWork<T, E>() {
-        @Override public T apply(MutableStoreProvider storeProvider) throws E {
-          return work.apply(storeProvider);
-        }
-      });
-    }
-
-    @Override public <T, E extends Exception> T doInWriteTransaction(MutateWork<T, E> work)
-        throws StorageException, E {
-
-      if (failTransactions.get()) {
-        throw new StorageException("Injected.");
-      }
-      return delegate.doInWriteTransaction(work);
-    }
-
-    @Override public void stop() {
-      delegate.stop();
-    }
-  }
-
-  @Test(expected = StorageException.class)
-  public void testFailedStatusUpdate() throws Exception {
-    FailureInjectingStorage storage = new FailureInjectingStorage(createStorage());
-
-    control.replay();
-    buildScheduler(storage);
-
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, 1));
-
-    String taskId = Tasks.id(getOnlyTask(queryByOwner(OWNER_A)));
-
-    Offer offer = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, FOUR_GB, ONE_GB);
-    sendOffer(offer, taskId, SLAVE_HOST_1);
-
-    TaskStatus status = TaskStatus.newBuilder()
-        .setState(TaskState.TASK_RUNNING)
-        .setTaskId(TaskID.newBuilder().setValue(taskId))
-        .build();
-    scheduler.statusUpdate(status);
-
-    storage.failTransactions.set(true);
-    scheduler.statusUpdate(TaskStatus.newBuilder(status).setState(TaskState.TASK_FINISHED).build());
   }
 
   @Test
@@ -2240,42 +2038,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     return job;
   }
 
-  private static Offer createOffer(SlaveID slave, String slaveHost, double cpu,
-      double ramMb, double diskMb) {
-    return createOffer(slave, slaveHost, cpu, ramMb, diskMb,
-        ImmutableSet.<Pair<Integer, Integer>>of());
-  }
-
-  private static Offer createOffer(SlaveID slave, String slaveHost, double cpu,
-      double ramMb, double diskMb, Set<Pair<Integer, Integer>> ports) {
-
-    Ranges portRanges = Ranges.newBuilder()
-        .addAllRange(Iterables.transform(ports, new Function<Pair<Integer, Integer>, Range>() {
-          @Override public Range apply(Pair<Integer, Integer> range) {
-            return Range.newBuilder().setBegin(range.getFirst()).setEnd(range.getSecond()).build();
-          }
-        }))
-        .build();
-
-    return Offer.newBuilder()
-        .addResources(Resource.newBuilder().setType(Type.SCALAR).setName(Resources.CPUS)
-            .setScalar(Scalar.newBuilder().setValue(cpu)))
-        .addResources(Resource.newBuilder().setType(Type.SCALAR).setName(Resources.RAM_MB)
-            .setScalar(Scalar.newBuilder().setValue(ramMb)))
-        .addResources(Resource.newBuilder().setType(Type.SCALAR).setName(Resources.DISK_MB)
-            .setScalar(Scalar.newBuilder().setValue(diskMb)))
-        .addResources(Resource.newBuilder().setType(Type.RANGES).setName(Resources.PORTS)
-            .setRanges(portRanges))
-        .addAttributes(Attribute.newBuilder().setType(Type.TEXT)
-            .setName(HOST_CONSTRAINT)
-            .setText(Text.newBuilder().setValue(slaveHost)))
-        .setSlaveId(slave)
-        .setHostname(slaveHost)
-        .setFrameworkId(FrameworkID.newBuilder().setValue(FRAMEWORK_ID).build())
-        .setId(OFFER_ID)
-        .build();
-  }
-
   private static TwitterTaskInfo defaultTask(boolean production, String... additionalParams) {
     Preconditions.checkArgument((additionalParams.length % 2) == 0,
         "Additional params count must be even.");
@@ -2344,8 +2106,11 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     return query(owner, jobName, null);
   }
 
-  private TaskQuery query(@Nullable Identity owner, @Nullable String jobName,
+  private TaskQuery query(
+      @Nullable Identity owner,
+      @Nullable String jobName,
       @Nullable Iterable<String> taskIds) {
+
     TaskQuery query = new TaskQuery();
     if (owner != null) {
       query.setOwner(owner);
@@ -2360,19 +2125,19 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     return query;
   }
 
-  public void changeStatus(TaskQuery query, ScheduleStatus status, @Nullable String message) {
+  public void changeStatus(TaskQuery query, ScheduleStatus status, Optional<String> message) {
     scheduler.setTaskStatus(query, status, message);
   }
 
   public void changeStatus(TaskQuery query, ScheduleStatus status) {
-    changeStatus(query, status, null);
+    changeStatus(query, status, Optional.<String>absent());
   }
 
   public void changeStatus(String taskId, ScheduleStatus status) {
-    changeStatus(taskId, status, null);
+    changeStatus(taskId, status, Optional.<String>absent());
   }
 
-  public void changeStatus(String taskId, ScheduleStatus status, @Nullable String message) {
+  public void changeStatus(String taskId, ScheduleStatus status, Optional<String> message) {
     changeStatus(query(Arrays.asList(taskId)), status, message);
   }
 }

@@ -130,4 +130,45 @@ public interface TaskPubsubEvent {
       return Objects.hashCode(taskId, vetoes);
     }
   }
+
+  public static class Rescheduled implements TaskPubsubEvent {
+    private final String role;
+    private final String job;
+    private final int shard;
+
+    public Rescheduled(String role, String job, int shard) {
+      this.role = role;
+      this.job = job;
+      this.shard = shard;
+    }
+
+    public String getRole() {
+      return role;
+    }
+
+    public String getJob() {
+      return job;
+    }
+
+    public int getShard() {
+      return shard;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof Rescheduled)) {
+        return false;
+      }
+
+      Rescheduled other = (Rescheduled) o;
+      return Objects.equal(role, other.role)
+          && Objects.equal(job, other.job)
+          && Objects.equal(shard, other.shard);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hashCode(role, job, shard);
+    }
+  }
 }

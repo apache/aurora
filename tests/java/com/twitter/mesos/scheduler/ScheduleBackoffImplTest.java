@@ -1,7 +1,5 @@
 package com.twitter.mesos.scheduler;
 
-import com.google.common.collect.ImmutableSet;
-
 import org.junit.Before;
 import org.junit.Test;
 
@@ -10,30 +8,49 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.common.util.BackoffStrategy;
 import com.twitter.common.util.testing.FakeTicker;
-import com.twitter.mesos.scheduler.events.TaskPubsubEvent.Deleted;
+import com.twitter.mesos.gen.Identity;
+import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.ScheduleBackoff.ScheduleBackoffImpl;
+import com.twitter.mesos.scheduler.events.TaskPubsubEvent.Rescheduled;
 
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-public class ScheduleBackoffTest extends EasyMockTest {
+public class ScheduleBackoffImplTest extends EasyMockTest {
 
-  private static final String TASK_A = "task_a";
+  private static final Amount<Long, Time> MAX_PENALTY = Amount.of(1L, Time.MINUTES);
+  private static final long MAX_PENALTY_NANOS = MAX_PENALTY.as(Time.NANOSECONDS);
+  private static final String ROLE_A = "role_a";
+  private static final String JOB_A = "job_a";
+  private static final int SHARD_0 = 0;
+  private static final TwitterTaskInfo TASK_A = new TwitterTaskInfo()
+      .setOwner(new Identity(ROLE_A, ROLE_A))
+      .setJobName(JOB_A)
+      .setShardId(SHARD_0);
 
   private FakeTicker ticker;
   private BackoffStrategy strategy;
-  private ScheduleBackoff backoff;
+  private ScheduleBackoffImpl backoff;
 
   @Before
   public void setUp() throws Exception {
     ticker = new FakeTicker();
     strategy = createMock(BackoffStrategy.class);
-    backoff = new ScheduleBackoff(ticker, strategy);
+    backoff = new ScheduleBackoffImpl(ticker, strategy, MAX_PENALTY);
   }
 
   @Test
   public void testNoPenalty() {
     control.replay();
+    assertSchedulable();
+  }
+
+  private void expectSchedulableEdge(long tickNanos) {
+    assertNotSchedulable();
+    tick(tickNanos);
+    assertNotSchedulable();
+    tick(1);
     assertSchedulable();
   }
 
@@ -44,35 +61,40 @@ public class ScheduleBackoffTest extends EasyMockTest {
     control.replay();
 
     rescheduled();
-    assertNotSchedulable();
-    tick(1);
-    assertNotSchedulable();
-    tick(1);
-    assertSchedulable();
+    expectSchedulableEdge(2);
   }
 
   @Test
   public void testPenaltyCapped() {
     expectBackoffCalculation(0, 2);
     expectBackoffCalculation(2, 10);
-    expectBackoffCalculation(10, ScheduleBackoff.MAX_PENALTY.as(Time.NANOSECONDS) * 2);
+    expectBackoffCalculation(10, MAX_PENALTY_NANOS * 2);
+    expectBackoffCalculation(MAX_PENALTY_NANOS, MAX_PENALTY_NANOS);
 
     control.replay();
 
+    // penalty
     rescheduled();
-    assertNotSchedulable();
+    expectSchedulableEdge(2);
+
+    // watch period
     tick(1);
-    assertNotSchedulable();
     rescheduled();
-    assertNotSchedulable();
-    tick(1);
-    assertNotSchedulable();
+
+    // penalty increase
+    expectSchedulableEdge(10);
+
+    // watch period
+    tick(9);
     rescheduled();
-    assertNotSchedulable();
-    tick(ScheduleBackoff.MAX_PENALTY.as(Time.NANOSECONDS) - 1);
-    assertNotSchedulable();
-    tick(1);
+
+    // capped penalty increase
+    expectSchedulableEdge(MAX_PENALTY_NANOS);
+
+    // watch period
     assertSchedulable();
+    tick(MAX_PENALTY_NANOS - 1);
+    rescheduled();
   }
 
   @Test
@@ -83,21 +105,10 @@ public class ScheduleBackoffTest extends EasyMockTest {
     control.replay();
 
     rescheduled();
-    tick(ScheduleBackoff.MAX_PENALTY.as(Time.NANOSECONDS));
+    tick(MAX_PENALTY_NANOS);
     assertSchedulable();
     rescheduled();
     assertNotSchedulable();
-  }
-
-  @Test
-  public void testTaskDeleted() {
-    expectBackoffCalculation(0, 2);
-
-    control.replay();
-
-    rescheduled();
-    deleted();
-    assertSchedulable();
   }
 
   private void expectBackoffCalculation(long oldBackoff, long newBackoff) {
@@ -109,11 +120,7 @@ public class ScheduleBackoffTest extends EasyMockTest {
   }
 
   private void rescheduled() {
-    backoff.onRescheduled(TASK_A);
-  }
-
-  private void deleted() {
-    backoff.onDeleted(new Deleted(ImmutableSet.of(TASK_A)));
+    backoff.onRescheduled(new Rescheduled(ROLE_A, JOB_A, SHARD_0));
   }
 
   private void assertSchedulable() {

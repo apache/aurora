@@ -8,6 +8,7 @@ import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 
+import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Supplier;
@@ -573,27 +574,28 @@ public class TaskStateMachine {
   }
 
   /**
-   * Same as {@link #updateState(ScheduleStatus, Closure, String)}, but uses a noop mutation.
+   * Same as {@link #updateState(ScheduleStatus, Closure, Optional)}, but uses a noop mutation.
    *
    * @param status Status to apply to the task.
    * @param auditMessage The (optional) audit message to associate with the transition.
    * @return {@code true} if the state change was allowed, {@code false} otherwise.
    */
-  public synchronized boolean updateState(ScheduleStatus status,
-      @Nullable String auditMessage) {
+  public synchronized boolean updateState(ScheduleStatus status, Optional<String> auditMessage) {
     return updateState(status, Closures.<ScheduledTask>noop(), auditMessage);
   }
 
   /**
-   * Same as {@link #updateState(ScheduleStatus, Closure, String)}, but omits the audit message.
+   * Same as {@link #updateState(ScheduleStatus, Closure, Optional)}, but omits the audit message.
    *
    * @param status Status to apply to the task.
    * @param mutation Mutate operation to perform while updating the task.
    * @return {@code true} if the state change was allowed, {@code false} otherwise.
    */
-  public synchronized boolean updateState(ScheduleStatus status,
+  public synchronized boolean updateState(
+      ScheduleStatus status,
       Closure<ScheduledTask> mutation) {
-    return updateState(status, mutation, null);
+
+    return updateState(status, mutation, Optional.<String>absent());
   }
 
   /**
@@ -602,15 +604,17 @@ public class TaskStateMachine {
    * will be appended to the work queue.
    *
    * @param status Status to apply to the task.
-   * @param auditMessage The (optional) audit message to associate with the transition.
+   * @param auditMessage The audit message to associate with the transition.
    * @param mutation Mutate operation to perform while updating the task.
    * @return {@code true} if the state change was allowed, {@code false} otherwise.
    */
   public synchronized boolean updateState(final ScheduleStatus status,
       Closure<ScheduledTask> mutation,
-      @Nullable final String auditMessage) {
+      final Optional<String> auditMessage) {
+
     checkNotNull(status);
     checkNotNull(mutation);
+    checkNotNull(auditMessage);
 
     /**
      * Don't bother applying noop state changes.  If we end up modifying task state without a
@@ -625,7 +629,7 @@ public class TaskStateMachine {
               task.addToTaskEvents(new TaskEvent()
                   .setTimestamp(clock.nowMillis())
                   .setStatus(status)
-                  .setMessage(auditMessage)
+                  .setMessage(auditMessage.orNull())
                   .setScheduler(LOCAL_HOST_SUPPLIER.get()));
             }
           });

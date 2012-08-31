@@ -34,11 +34,9 @@ import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
  * <li>serve clients via other methods (normal usage)
  * <li>{@link #stop()}
  * </ol>
- *
- * @author William Farner
  */
 public interface SchedulerCore
-    extends Function<TaskQuery, Iterable<TwitterTaskInfo>>, TaskLauncher, RegisteredListener {
+    extends Function<TaskQuery, Iterable<TwitterTaskInfo>>, RegisteredListener {
 
   /**
    * Prompts the scheduler to prepare for possible activation as the leading scheduler.  This
@@ -164,7 +162,7 @@ public interface SchedulerCore
    * @param status The new state of the tasks.
    * @param message Additional information about the state transition.
    */
-  void setTaskStatus(TaskQuery query, ScheduleStatus status, @Nullable String message);
+  void setTaskStatus(TaskQuery query, ScheduleStatus status, Optional<String> message);
 
   /**
    * Kills a specific set of tasks.

@@ -2,14 +2,13 @@ package com.twitter.mesos.scheduler.events;
 
 import com.google.common.eventbus.EventBus;
 import com.google.inject.Binder;
-import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
 
 import com.twitter.common.base.Closure;
 import com.twitter.common.inject.ProviderMethodModule;
 import com.twitter.mesos.scheduler.SchedulingFilter;
-import com.twitter.mesos.scheduler.events.NotifyingSchedulingFilter.Delegate;
+import com.twitter.mesos.scheduler.events.NotifyingSchedulingFilter.NotifyDelegate;
 import com.twitter.mesos.scheduler.events.TaskPubsubEvent.EventSubscriber;
 
 /**
@@ -30,14 +29,9 @@ public final class TaskEventModule extends ProviderMethodModule {
    * @param filterClass Delegate scheduling filter implementation class.
    */
   public static void bind(Binder binder, final Class<? extends SchedulingFilter> filterClass) {
-    binder.install(new PrivateModule() {
-      @Override protected void configure() {
-        bind(SchedulingFilter.class).annotatedWith(Delegate.class).to(filterClass);
-        bind(SchedulingFilter.class).to(NotifyingSchedulingFilter.class);
-        bind(NotifyingSchedulingFilter.class).in(Singleton.class);
-        expose(SchedulingFilter.class);
-      }
-    });
+    binder.bind(SchedulingFilter.class).annotatedWith(NotifyDelegate.class).to(filterClass);
+    binder.bind(SchedulingFilter.class).to(NotifyingSchedulingFilter.class);
+    binder.bind(NotifyingSchedulingFilter.class).in(Singleton.class);
     binder.install(new TaskEventModule());
   }
 

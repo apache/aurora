@@ -27,13 +27,16 @@ import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.NotNull;
+import com.twitter.common.base.Closure;
 import com.twitter.common.base.Command;
 import com.twitter.common.inject.TimedInterceptor;
 import com.twitter.common.net.pool.DynamicHostSet;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.thrift.ThriftServer;
+import com.twitter.common.util.BackoffStrategy;
 import com.twitter.common.util.Clock;
+import com.twitter.common.util.TruncatedBinaryBackoff;
 import com.twitter.common.zookeeper.ServerSetImpl;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
@@ -42,6 +45,7 @@ import com.twitter.common_internal.zookeeper.ZooKeeperModule;
 import com.twitter.mesos.GuiceUtils;
 import com.twitter.mesos.auth.AuthBindings;
 import com.twitter.mesos.gen.MesosAdmin;
+import com.twitter.mesos.scheduler.BackoffSchedulingFilter.BackoffDelegate;
 import com.twitter.mesos.scheduler.Driver.DriverImpl;
 import com.twitter.mesos.scheduler.DriverFactory.DriverFactoryImpl;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHosts;
@@ -50,9 +54,12 @@ import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveMapper;
 import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
 import com.twitter.mesos.scheduler.PulseMonitor.PulseMonitorImpl;
 import com.twitter.mesos.scheduler.RegisteredListener.FanoutRegisteredListener;
+import com.twitter.mesos.scheduler.ScheduleBackoff.ScheduleBackoffImpl;
+import com.twitter.mesos.scheduler.ScheduleBackoff.ScheduleBackoffImpl.Backoff;
 import com.twitter.mesos.scheduler.SchedulerLifecycle.DriverReference;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.events.TaskEventModule;
+import com.twitter.mesos.scheduler.events.TaskPubsubEvent.EventSubscriber;
 import com.twitter.mesos.scheduler.httphandlers.ServletModule;
 import com.twitter.mesos.scheduler.log.mesos.MesosLogStreamModule;
 import com.twitter.mesos.scheduler.metadata.MetadataModule;
@@ -67,6 +74,8 @@ import com.twitter.mesos.scheduler.storage.AttributeStore.AttributeStoreImpl;
 import com.twitter.mesos.scheduler.storage.log.LogStorageModule;
 import com.twitter.mesos.scheduler.testing.IsolatedSchedulerModule;
 import com.twitter.thrift.ServiceInstance;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Binding module for the twitter mesos scheduler.
@@ -102,6 +111,16 @@ public class SchedulerModule extends AbstractModule {
 
   @CmdLine(name = "auth_mode", help = "Enforces RPC authentication with mesos client.")
   private static final Arg<AuthMode> AUTH_MODE = Arg.create(AuthMode.SECURE);
+
+  @CmdLine(name = "initial_task_reschedule_backoff",
+      help = "Initial backoff delay for a rescheduled task.")
+  private static final Arg<Amount<Long, Time>> INITIAL_RESCHEDULE_BACKOFF =
+      Arg.create(Amount.of(1L, Time.SECONDS));
+
+  @CmdLine(name = "max_task_reschedule_backoff",
+      help = "Maximum backoff delay for a rescheduled task.")
+  private static final Arg<Amount<Long, Time>> MAX_RESCHEDULE_BACKOFF =
+      Arg.create(Amount.of(2L, Time.MINUTES));
 
   private enum AuthMode {
     UNSECURE,
@@ -180,7 +199,20 @@ public class SchedulerModule extends AbstractModule {
       bind(DriverFactoryImpl.class).in(Singleton.class);
     }
 
-    TaskEventModule.bind(binder(), SchedulingFilterImpl.class);
+    bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(Backoff.class)
+        .toInstance(MAX_RESCHEDULE_BACKOFF.get());
+    bind(BackoffStrategy.class).toInstance(
+        new TruncatedBinaryBackoff(INITIAL_RESCHEDULE_BACKOFF.get(), MAX_RESCHEDULE_BACKOFF.get()));
+    bind(ScheduleBackoff.class).to(ScheduleBackoffImpl.class);
+    bind(ScheduleBackoffImpl.class).in(Singleton.class);
+    LifecycleModule.bindStartupAction(binder(), SubscribeTaskEvents.class);
+
+    // Filter layering: notifier filter -> backoff filter -> base impl
+    TaskEventModule.bind(binder(), BackoffSchedulingFilter.class);
+    bind(SchedulingFilter.class).annotatedWith(BackoffDelegate.class)
+        .to(SchedulingFilterImpl.class);
+    bind(SchedulingFilterImpl.class).in(Singleton.class);
+
     install(new MetadataModule());
 
     // updaterTaskProvider handled in provider.
@@ -215,6 +247,10 @@ public class SchedulerModule extends AbstractModule {
 
     bind(RegisteredListener.class).to(FanoutRegisteredListener.class);
     bind(FanoutRegisteredListener.class).in(Singleton.class);
+
+    bind(BootstrapTaskLauncher.class).in(Singleton.class);
+    bind(GcExecutorLauncher.class).in(Singleton.class);
+    bind(UserTaskLauncher.class).in(Singleton.class);
   }
 
   /**
@@ -272,7 +308,24 @@ public class SchedulerModule extends AbstractModule {
   List<TaskLauncher> provideTaskLaunchers(
       BootstrapTaskLauncher bootstrapLauncher,
       GcExecutorLauncher gcLauncher,
-      SchedulerCore scheduler) {
-    return ImmutableList.of(bootstrapLauncher, gcLauncher, scheduler);
+      UserTaskLauncher userTaskLauncher) {
+
+    return ImmutableList.of(bootstrapLauncher, gcLauncher, userTaskLauncher);
+  }
+
+  static class SubscribeTaskEvents implements Command {
+    private final ScheduleBackoff backoff;
+    private final Closure<EventSubscriber> subscribeSink;
+
+    @Inject
+    SubscribeTaskEvents(ScheduleBackoff backoff, Closure<EventSubscriber> subscribeSink) {
+      this.backoff = checkNotNull(backoff);
+      this.subscribeSink = checkNotNull(subscribeSink);
+    }
+
+    @Override
+    public void execute() {
+      subscribeSink.execute(backoff);
+    }
   }
 }

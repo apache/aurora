@@ -610,7 +610,10 @@ public class StateManagerImpl implements StateManager {
 
         if (result == UpdateResult.SUCCESS) {
           for (Integer shard : fetchShardsToKill(jobConfig.get())) {
-            changeState(Query.liveShard(jobKey, shard), KILLING, "Removed during update.");
+            changeState(
+                Query.liveShard(jobKey, shard),
+                KILLING,
+                Optional.of("Removed during update."));
           }
         }
 
@@ -632,13 +635,8 @@ public class StateManagerImpl implements StateManager {
   private abstract static class AttributeConverter
       implements Function<Entry<String, Collection<Protos.Attribute>>, Attribute> { }
 
-  /**
-   * Persists the attributes associated with a host.
-   *
-   * @param slaveHost Host to save attributes for.
-   * @param attributes Attributes associated with the host.
-   */
-  synchronized void saveAttributesFromOffer(
+  @Override
+  public synchronized void saveAttributesFromOffer(
       final String slaveHost,
       List<Protos.Attribute> attributes) {
 
@@ -709,9 +707,14 @@ public class StateManagerImpl implements StateManager {
         Set<ScheduledTask> tasks = (query == null) ? null : taskStore.fetchTasks(query);
 
         operation.execute(tasks, new StateChanger() {
-          @Override public void changeState(Set<String> taskIds, ScheduleStatus state,
+          @Override public void changeState(
+              Set<String> taskIds,
+              ScheduleStatus state,
               String auditMessage) {
-            changeStateInTransaction(taskIds, stateUpdaterWithAuditMessage(state, auditMessage));
+
+            changeStateInTransaction(
+                taskIds,
+                stateUpdaterWithAuditMessage(state, Optional.of(auditMessage)));
           }
         });
       }
@@ -732,34 +735,17 @@ public class StateManagerImpl implements StateManager {
     return changeState(query, stateUpdater(newState));
   }
 
-  /**
-   * Performs a simple state change, transitioning all tasks matching a query to the given
-   * state and applying the given audit message.
-   *
-   * @param query Query to perform, the results of which will be modified.
-   * @param newState State to move the resulting tasks into.
-   * @param auditMessage Audit message to apply along with the state change.
-   * @return the number of successful state changes.
-   */
-  synchronized int changeState(
+  @Override
+  public synchronized int changeState(
       TaskQuery query,
       ScheduleStatus newState,
-      @Nullable String auditMessage) {
+      Optional<String> auditMessage) {
 
     return changeState(query, stateUpdaterWithAuditMessage(newState, auditMessage));
   }
 
-  /**
-   * Assigns a task to a specific slave.
-   * This will modify the task record to reflect the host assignment and return the updated record.
-   *
-   * @param taskId ID of the task to mutate.
-   * @param slaveHost Host name that the task is being assigned to.
-   * @param slaveId ID of the slave that the task is being assigned to.
-   * @param assignedPorts Ports on the host that are being assigned to the task.
-   * @return The updated task record, or {@code null} if the task was not found.
-   */
-  synchronized AssignedTask assignTask(
+  @Override
+  public synchronized AssignedTask assignTask(
       String taskId,
       String slaveHost,
       SlaveID slaveId,
@@ -834,7 +820,7 @@ public class StateManagerImpl implements StateManager {
       LOG.info("Attempting to kill missing task " + missingTaskId);
       driver.killTask(missingTaskId);
     }
-    changeState(Query.byId(missingTaskIds), ScheduleStatus.LOST, "Task timed out.");
+    changeState(Query.byId(missingTaskIds), ScheduleStatus.LOST, Optional.of("Task timed out."));
   }
 
   /**
@@ -884,7 +870,7 @@ public class StateManagerImpl implements StateManager {
     transactionalStorage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
         for (TaskStateMachine stateMachine : getStateMachines(taskIds).values()) {
-          stateMachine.updateState(ScheduleStatus.UNKNOWN, "Dead executor.");
+          stateMachine.updateState(ScheduleStatus.UNKNOWN, Optional.of("Dead executor."));
         }
 
         // Need to process the work queue first to ensure the tasks can be state changed prior
@@ -930,7 +916,10 @@ public class StateManagerImpl implements StateManager {
 
   private static Function<TaskStateMachine, Boolean> stateUpdaterWithAuditMessage(
       final ScheduleStatus state,
-      @Nullable final String auditMessage) {
+      final Optional<String> auditMessage) {
+
+    checkNotNull(state);
+    checkNotNull(auditMessage);
 
     return new Function<TaskStateMachine, Boolean>() {
       @Override public Boolean apply(TaskStateMachine stateMachine) {
@@ -1062,7 +1051,13 @@ public class StateManagerImpl implements StateManager {
 
             taskStore.saveTasks(ImmutableSet.of(task));
 
-            createStateMachine(task).updateState(PENDING, "Rescheduled");
+            createStateMachine(task).updateState(PENDING, Optional.of("Rescheduled"));
+            TwitterTaskInfo taskInfo = task.getAssignedTask().getTask();
+            transactionalStorage.addTaskEvent(
+                new TaskPubsubEvent.Rescheduled(
+                    taskInfo.getOwner().getRole(),
+                    taskInfo.getJobName(),
+                    taskInfo.getShardId()));
             break;
 
           case UPDATE:
@@ -1173,7 +1168,9 @@ public class StateManagerImpl implements StateManager {
     ScheduledTask newTask = taskCreator.apply(newConfig).setAncestorId(taskId);
     taskStore.saveTasks(ImmutableSet.of(newTask));
     createStateMachine(newTask)
-        .updateState(PENDING, "Rescheduled after " + (rollingBack ? "rollback." : "update."));
+        .updateState(
+            PENDING,
+            Optional.of("Rescheduled after " + (rollingBack ? "rollback." : "update.")));
   }
 
   private Map<String, TaskStateMachine> getStateMachines(final Set<String> taskIds) {
