@@ -56,10 +56,11 @@ class HDFSHelper(object):
 
   def __init__(self, cluster, user=None, proxy=True):
     self._cluster = cluster
-    self._uri = Cluster.get(cluster).hadoop_uri
-    self._config = Cluster.get(cluster).hadoop_config
+    cluster_conf = Cluster.get(cluster)
+    self._uri = cluster_conf.hadoop_uri
+    self._config = cluster_conf.hadoop_config
     self._user = user or getpass.getuser()
-    self._proxy = Cluster.get(cluster).proxy if proxy else None
+    self._proxy = cluster_conf.proxy if proxy else None
 
   @property
   def config(self):
