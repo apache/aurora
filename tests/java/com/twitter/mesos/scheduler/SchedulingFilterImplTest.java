@@ -38,7 +38,8 @@ import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import static com.twitter.mesos.scheduler.ConstraintFilter.constraintVeto;
+import static com.twitter.mesos.scheduler.ConstraintFilter.limitVeto;
+import static com.twitter.mesos.scheduler.ConstraintFilter.mismatchVeto;
 import static com.twitter.mesos.scheduler.SchedulingFilterImpl.DEDICATED_HOST_VETO;
 import static com.twitter.mesos.scheduler.SchedulingFilterImpl.ResourceVector.CPU;
 import static com.twitter.mesos.scheduler.SchedulingFilterImpl.ResourceVector.DISK;
@@ -195,8 +196,28 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     Constraint constraint2 = makeConstraint(DEDICATED_ATTRIBUTE, "xxx");
 
     assertVetoes(makeTask(OWNER_A, JOB_A, constraint1, constraint2), HOST_A,
-        constraintVeto(DEDICATED_ATTRIBUTE));
+        mismatchVeto(DEDICATED_ATTRIBUTE));
     assertNoVetoes(makeTask(OWNER_B, JOB_B, constraint1, constraint2), HOST_B);
+  }
+
+  @Test
+  public void testDedicatedMismatchShortCircuits() throws Exception {
+    // Ensures that a dedicated mismatch short-circuits other filter operations, such as
+    // evaluation of limit constraints.  Reduction of task queries is the desired outcome.
+
+    expectGetHostAttributes(HOST_A, host(HOST_A));
+    expectGetHostAttributes(HOST_B, dedicated(OWNER_B.getRole() + "/" + JOB_B), host(HOST_B));
+    control.replay();
+
+    Constraint hostLimit = limitConstraint("host", 1);
+    assertVetoes(
+        makeTask(OWNER_A, JOB_A, hostLimit, makeConstraint(DEDICATED_ATTRIBUTE, "xxx")),
+        HOST_A,
+        mismatchVeto(DEDICATED_ATTRIBUTE));
+    assertVetoes(
+        makeTask(OWNER_B, JOB_A, hostLimit, makeConstraint(DEDICATED_ATTRIBUTE, "xxx")),
+        HOST_B,
+        mismatchVeto(DEDICATED_ATTRIBUTE));
   }
 
   @Test
@@ -241,17 +262,17 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     control.replay();
 
     assertNoVetoes(hostLimitTask(OWNER_A, JOB_A, 2), HOST_A);
-    assertVetoes(hostLimitTask(OWNER_A, JOB_A, 1), HOST_B, constraintVeto(HOST_ATTRIBUTE));
-    assertVetoes(hostLimitTask(OWNER_A, JOB_A, 2), HOST_B, constraintVeto(HOST_ATTRIBUTE));
+    assertVetoes(hostLimitTask(OWNER_A, JOB_A, 1), HOST_B, limitVeto(HOST_ATTRIBUTE));
+    assertVetoes(hostLimitTask(OWNER_A, JOB_A, 2), HOST_B, limitVeto(HOST_ATTRIBUTE));
     assertNoVetoes(hostLimitTask(OWNER_A, JOB_A, 3), HOST_B);
 
-    assertVetoes(rackLimitTask(OWNER_B, JOB_A, 2), HOST_B, constraintVeto(RACK_ATTRIBUTE));
-    assertVetoes(rackLimitTask(OWNER_B, JOB_A, 3), HOST_B, constraintVeto(RACK_ATTRIBUTE));
+    assertVetoes(rackLimitTask(OWNER_B, JOB_A, 2), HOST_B, limitVeto(RACK_ATTRIBUTE));
+    assertVetoes(rackLimitTask(OWNER_B, JOB_A, 3), HOST_B, limitVeto(RACK_ATTRIBUTE));
     assertNoVetoes(rackLimitTask(OWNER_B, JOB_A, 4), HOST_B);
 
     assertNoVetoes(rackLimitTask(OWNER_B, JOB_A, 1), HOST_C);
 
-    assertVetoes(rackLimitTask(OWNER_A, JOB_A, 1), HOST_C, constraintVeto(RACK_ATTRIBUTE));
+    assertVetoes(rackLimitTask(OWNER_A, JOB_A, 1), HOST_C, limitVeto(RACK_ATTRIBUTE));
     assertNoVetoes(rackLimitTask(OWNER_B, JOB_A, 2), HOST_C);
   }
 
@@ -312,7 +333,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     Constraint zoneNegated = jvmConstraint.deepCopy();
     zoneNegated.getConstraint().getValue().setNegated(true);
     assertVetoes(makeTask(OWNER_A, JOB_A, jvmNegated, zoneNegated), HOST_A,
-        constraintVeto("jvm"));
+        mismatchVeto("jvm"));
   }
 
   @Test

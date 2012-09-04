@@ -14,7 +14,6 @@ import com.google.common.collect.Iterables;
 import com.google.common.eventbus.Subscribe;
 import com.google.inject.Inject;
 
-import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.mesos.gen.ScheduleStatus;
@@ -54,12 +53,6 @@ public class NearestFit implements EventSubscriber {
     this(Ticker.systemTicker());
   }
 
-  synchronized void record(String taskId, Set<Veto> vetoes) {
-    Preconditions.checkNotNull(taskId);
-    MorePreconditions.checkNotBlank(vetoes);
-    fitByTask.getUnchecked(taskId).maybeUpdate(vetoes);
-  }
-
   /**
    * Gets the vetoes that represent the nearest fit for the given task.
    *
@@ -95,26 +88,23 @@ public class NearestFit implements EventSubscriber {
     }
   }
 
-  private static final Predicate<Veto> IS_DEDICATED = new Predicate<Veto>() {
+  private static final Predicate<Veto> IS_CONSTRAINT_MISMATCH = new Predicate<Veto>() {
     @Override public boolean apply(Veto veto) {
-      return veto.isDedicatedMismatch();
+      return veto.isConstraintMismatch();
     }
   };
 
   /**
    * Records a task veto event.
    * This will ignore any veto events where any veto returns {@code true} from
-   * {@link Veto#isDedicatedMismatch()}.
+   * {@link Veto#isConstraintMismatch()}.
    *
    * @param vetoEvent Veto event.
    */
   @Subscribe
   public synchronized void vetoed(Vetoed vetoEvent) {
-    Set<Veto> vetoes = vetoEvent.getVetoes();
-    // Suppress any veto events relating to dedicated host/task mismatches.
-    if (!Iterables.any(vetoes, IS_DEDICATED)) {
-      record(vetoEvent.getTaskId(), vetoes);
-    }
+    Preconditions.checkNotNull(vetoEvent);
+    fitByTask.getUnchecked(vetoEvent.getTaskId()).maybeUpdate(vetoEvent.getVetoes());
   }
 
   private static class Fit {
@@ -135,18 +125,35 @@ public class NearestFit implements EventSubscriber {
     /**
      * Updates the nearest fit if the provided vetoes represents a closer fit than the current
      * best fit.
-     * A set of vetoes is considered a better fit if it:
+     * <p>
+     * There are two classes of vetoes: those with and without constraint mismatches. A set of
+     * vetoes without a constraint mismatch is always a better fit than a set with constraint
+     * mismatches.
+     * <p>
+     * If two sets are equivalent in that they do or do not have constraint mismatches, they are
+     * compared by the following criteria:
      * <ul>
-     * <li> has a smaller number of vetoes, irrespective of scores
-     * <li> has the same number of vetoes and a smaller aggregate score
+     *   <li> the one with fewer vetoes is a better fit, irrespective of scores
+     *   <li> if the veto count is equal, the one with the smaller aggregate score is a better fit
      * </ul>
      *
      * @param newVetoes The vetoes for the scheduling assignment with {@code newHost}.
      */
     void maybeUpdate(Set<Veto> newVetoes) {
-      if ((vetoes == null) || (newVetoes.size() < vetoes.size())) {
+      if (vetoes == null) {
         update(newVetoes);
-      } else if ((newVetoes.size() == vetoes.size()) && (score(newVetoes) < score(vetoes))) {
+        return;
+      }
+
+      boolean valueMismatchOld = Iterables.any(vetoes, IS_CONSTRAINT_MISMATCH);
+      boolean valueMismatchNew = Iterables.any(newVetoes, IS_CONSTRAINT_MISMATCH);
+      if (valueMismatchOld == valueMismatchNew) {
+        if (newVetoes.size() < vetoes.size()) {
+          update(newVetoes);
+        } else if ((newVetoes.size() == vetoes.size()) && (score(newVetoes) < score(vetoes))) {
+          update(newVetoes);
+        }
+      } else if (valueMismatchOld) {
         update(newVetoes);
       }
     }

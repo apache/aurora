@@ -23,12 +23,12 @@ public interface SchedulingFilter {
 
     private final String reason;
     private final int score;
-    private final boolean dedicatedMismatch;
+    private final boolean valueMismatch;
 
-    private Veto(String reason, int score, boolean dedicatedMismatch) {
+    private Veto(String reason, int score, boolean valueMismatch) {
       this.reason = reason;
       this.score = Math.min(MAX_SCORE, score);
-      this.dedicatedMismatch = dedicatedMismatch;
+      this.valueMismatch = valueMismatch;
     }
 
     @VisibleForTesting
@@ -38,12 +38,12 @@ public interface SchedulingFilter {
 
     /**
      * Creates a special veto that represents a mismatch between the server and task's configuration
-     * for a dedicated machine pool.
+     * for an attribute..
      *
-     * @param reason Information about the dedicated mismatch.
-     * @return A dedicated veto.
+     * @param reason Information about the value mismatch.
+     * @return A constraint mismatch veto.
      */
-    public static Veto dedicated(String reason) {
+    public static Veto constraintMismatch(String reason) {
       return new Veto(reason, MAX_SCORE, true);
     }
 
@@ -55,8 +55,8 @@ public interface SchedulingFilter {
       return score;
     }
 
-    public boolean isDedicatedMismatch() {
-      return dedicatedMismatch;
+    public boolean isConstraintMismatch() {
+      return valueMismatch;
     }
 
     @Override
@@ -68,12 +68,12 @@ public interface SchedulingFilter {
       Veto other = (Veto) o;
       return Objects.equal(reason, other.reason)
           && (score == other.score)
-          && (dedicatedMismatch == other.dedicatedMismatch);
+          && (valueMismatch == other.valueMismatch);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(reason, score, dedicatedMismatch);
+      return Objects.hashCode(reason, score, valueMismatch);
     }
 
     @Override
@@ -81,7 +81,7 @@ public interface SchedulingFilter {
       return Objects.toStringHelper(this)
           .add("reason", reason)
           .add("score", score)
-          .add("dedicatedMismatch", dedicatedMismatch)
+          .add("valueMismatch", valueMismatch)
           .toString();
     }
   }

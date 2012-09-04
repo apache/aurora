@@ -1,6 +1,7 @@
 package com.twitter.mesos.scheduler;
 
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.Set;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -11,6 +12,7 @@ import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
@@ -18,7 +20,9 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Attribute;
+import com.twitter.mesos.gen.Constraint;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.storage.Storage;
@@ -40,7 +44,8 @@ import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.DED
  */
 public class SchedulingFilterImpl implements SchedulingFilter {
 
-  @VisibleForTesting static final Veto DEDICATED_HOST_VETO = Veto.dedicated("Host is dedicated");
+  @VisibleForTesting static final Veto DEDICATED_HOST_VETO =
+      Veto.constraintMismatch("Host is dedicated");
 
   private static final Optional<Veto> NO_VETO = Optional.absent();
 
@@ -140,6 +145,20 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     );
   }
 
+  private static boolean isValueConstraint(Constraint constraint) {
+    return constraint.getConstraint().isSet(TaskConstraint._Fields.VALUE);
+  }
+
+  private static final Ordering<Constraint> VALUES_FIRST = Ordering.from(
+      new Comparator<Constraint>() {
+        @Override public int compare(Constraint a, Constraint b) {
+          if (a.getConstraint().getSetField() == b.getConstraint().getSetField()) {
+            return 0;
+          }
+          return isValueConstraint(a) ? -1 : 1;
+        }
+      });
+
   private FilterRule getConstraintFilter(final String slaveHost) {
     return new FilterRule() {
       @Override public Iterable<Veto> apply(final TwitterTaskInfo task) {
@@ -163,12 +182,25 @@ public class SchedulingFilterImpl implements SchedulingFilter {
                   }
                 });
 
-            return Optional.presentInstances(Iterables.transform(task.getConstraints(),
-                new ConstraintFilter(
-                    Tasks.jobKey(task),
-                    activeTasksSupplier,
-                    attributeLoader,
-                    attributeLoader.apply(slaveHost))));
+            ConstraintFilter constraintFilter = new ConstraintFilter(
+                Tasks.jobKey(task),
+                activeTasksSupplier,
+                attributeLoader,
+                attributeLoader.apply(slaveHost));
+            ImmutableList.Builder<Veto> vetoes = ImmutableList.builder();
+            for (Constraint constraint : VALUES_FIRST.sortedCopy(task.getConstraints())) {
+              Optional<Veto> veto = constraintFilter.apply(constraint);
+              if (veto.isPresent()) {
+                vetoes.add(veto.get());
+                if (isValueConstraint(constraint)) {
+                  // Break when a value constraint mismatch is found to avoid other
+                  // potentially-expensive operations to satisfy other constraints.
+                  break;
+                }
+              }
+            }
+
+            return vetoes.build();
           }
         });
       }
@@ -195,13 +227,11 @@ public class SchedulingFilterImpl implements SchedulingFilter {
 
   @Override
   public Set<Veto> filter(Resources offer, String slaveHost, TwitterTaskInfo task, String taskId) {
-    Set<Veto> constraintVetoes;
     if (!ConfigurationManager.isDedicated(task) && isDedicated(slaveHost)) {
-      constraintVetoes = ImmutableSet.of(DEDICATED_HOST_VETO);
-    } else {
-      constraintVetoes = ImmutableSet.copyOf(getConstraintFilter(slaveHost).apply(task));
+      return ImmutableSet.of(DEDICATED_HOST_VETO);
     }
 
+    Set<Veto> constraintVetoes = ImmutableSet.copyOf(getConstraintFilter(slaveHost).apply(task));
     return ImmutableSet.copyOf(Sets.union(getResourceVetoes(offer, task), constraintVetoes));
   }
 }

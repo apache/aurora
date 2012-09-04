@@ -10,8 +10,10 @@ import org.junit.Test;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.testing.FakeTicker;
+import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
 import com.twitter.mesos.scheduler.events.TaskPubsubEvent.Deleted;
+import com.twitter.mesos.scheduler.events.TaskPubsubEvent.StateChange;
 import com.twitter.mesos.scheduler.events.TaskPubsubEvent.Vetoed;
 
 import static org.junit.Assert.assertEquals;
@@ -21,7 +23,7 @@ public class NearestFitTest {
   private static final Veto ALMOST = new Veto("Almost", 1);
   private static final Veto NOPE = new Veto("Nope", 5);
   private static final Veto NO_CHANCE = new Veto("No chance", 1000);
-  private static final Veto DEDICATED = Veto.dedicated("Dedicated");
+  private static final Veto KERNEL = Veto.constraintMismatch("2.6.39");
 
   private static final String TASK = "taskId";
 
@@ -74,6 +76,24 @@ public class NearestFitTest {
     ticker.advance(NearestFit.EXPIRATION);
     ticker.advance(Amount.of(1L, Time.SECONDS));
     assertNearest();
+  }
+
+  @Test
+  public void testStateChanged() {
+    vetoed(ALMOST);
+    assertNearest(ALMOST);
+    nearest.stateChanged(new StateChange(TASK, ScheduleStatus.PENDING, ScheduleStatus.ASSIGNED));
+    assertNearest();
+  }
+
+  @Test
+  public void testConstraintMismatch() {
+    vetoed(KERNEL);
+    assertNearest(KERNEL);
+    vetoed(ALMOST);
+    assertNearest(ALMOST);
+    vetoed(KERNEL);
+    assertNearest(ALMOST);
   }
 
   private Set<Veto> vetoes(Veto... vetoes) {
