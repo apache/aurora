@@ -433,6 +433,11 @@ class MesosCLI(cmd.Cmd):
     print 'Package added:'
     MesosCLI._print_package(self._get_packer().add(role, package, file_path))
 
+  @requires.exactly('role', 'package', 'version')
+  def do_package_set_live(self, role, package, version):
+    self._get_packer().set_live(role, package, version)
+    print 'Version %s is now the LIVE vesion' % version
+
   @requires.exactly('role', 'package')
   def do_package_unlock(self, role, package):
     self._get_packer().unlock(role, package)

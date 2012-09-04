@@ -93,6 +93,10 @@ class Packer(object):
     return '%s/%s' % (Packer._role_url(role), package)
 
   @staticmethod
+  def _live_url(role, package):
+    return '%s/%s/live' % (Packer._role_url(role), package)
+
+  @staticmethod
   def _ver_url(role, package, version):
     return '%s/%s' % (Packer._pkg_url(role, package), version)
 
@@ -122,7 +126,6 @@ class Packer(object):
       md5.update(data)
     digest = md5.hexdigest()
 
-    # TODO(wfarner): Come up with a way to show upload progress.
     print()
     upload_progress = Progress()
     stream = CallbackFile(local_file, 'rb', upload_progress.update, 'Uploading')
@@ -146,7 +149,7 @@ class Packer(object):
     return self._api('%s/unlock' % Packer._pkg_url(role, package), auth=True, method='POST')
 
   def set_live(self, role, package, version):
-    return self._api(Packer._pkg_url(role, package),
+    return self._api(Packer._live_url(role, package),
                      auth=True,
                      body='version=%s' % version,
                      method='PUT')
