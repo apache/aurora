@@ -140,6 +140,12 @@ public class SchedulerzHome extends JerseyTemplateServlet {
           ownerJobs.put(role.role, task);
         }
 
+        // Add cron job counts for each role.
+        for (Map.Entry<String, Collection<JobConfiguration>> entry
+            : Multimaps.index(cronScheduler.getJobs(), GET_CRON_OWNER).asMap().entrySet()) {
+          owners.getUnchecked(entry.getKey()).cronJobCount = entry.getValue().size();
+        }
+
         Collection<Role> roles = owners.asMap().values();
         for (Role role : roles) {
           Iterable<ScheduledTask> activeRoleTasks =
@@ -149,12 +155,6 @@ public class SchedulerzHome extends JerseyTemplateServlet {
         }
 
         template.setAttribute("owners", DisplayUtils.ROLE_ORDERING.sortedCopy(roles));
-
-        // Add cron job counts for each role.
-        for (Map.Entry<String, Collection<JobConfiguration>> entry
-            : Multimaps.index(cronScheduler.getJobs(), GET_CRON_OWNER).asMap().entrySet()) {
-          owners.getUnchecked(entry.getKey()).cronJobCount = entry.getValue().size();
-        }
       }
     });
   }
