@@ -37,35 +37,6 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
   }
 
   @Test
-  public void testUpdateSchemaUpgrade() {
-    assertFalse(store.isOldUpdateStoreSchema());
-
-    store.jdbcTemplate.execute("DROP TABLE IF EXISTS update_store");
-    store.jdbcTemplate.execute("DROP INDEX IF EXISTS update_store_job_key_shard_id_idx");
-
-    store.jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS update_store (" +
-        "  job_key VARCHAR(511) NOT NULL," +
-        "  update_token VARCHAR(36) NOT NULL," +
-        "  shard_id INT NOT NULL," +
-        "  config BINARY(2000000) NOT NULL)");
-    store.jdbcTemplate.execute(
-        "CREATE INDEX IF NOT EXISTS update_store_job_key_shard_id_idx" +
-            " ON update_store(job_key, shard_id)");
-
-    assertTrue(store.isOldUpdateStoreSchema());
-    store.maybeUpgradeUpdateStoreSchema();
-
-    store.createSchema();
-    assertFalse(store.isOldUpdateStoreSchema());
-  }
-
-  @Test
-  public void testUpdateSchemaUpgradeNoop() {
-    store.maybeUpgradeUpdateStoreSchema();
-    assertFalse(store.isOldUpdateStoreSchema());
-  }
-
-  @Test
   public void testFrameworkStorage() {
     assertNull(store.fetchFrameworkId());
 

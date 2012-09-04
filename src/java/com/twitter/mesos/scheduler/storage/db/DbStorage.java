@@ -153,23 +153,6 @@ public class DbStorage implements
     this.attributeStore = checkNotNull(attributeStore);
   }
 
-  // TODO(wfarner): Remove this code once schema has been updated in all clusters.
-  @VisibleForTesting
-  boolean isOldUpdateStoreSchema() {
-    return !jdbcTemplate.queryForList(
-        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'UPDATE_STORE'"
-            + " AND COLUMN_NAME = 'JOB_KEY'", String.class).isEmpty();
-  }
-
-  @VisibleForTesting
-  void maybeUpgradeUpdateStoreSchema() {
-    if (isOldUpdateStoreSchema()) {
-      LOG.warning("Old update_store schema found, DROPPING.");
-      jdbcTemplate.execute("DROP TABLE IF EXISTS update_store");
-      jdbcTemplate.execute("DROP INDEX IF EXISTS update_store_job_key_shard_id_idx");
-    }
-  }
-
   @VisibleForTesting
   void createSchema() {
     executeSql(new ClassPathResource("db-task-store-schema.sql", getClass()), false);
@@ -178,12 +161,8 @@ public class DbStorage implements
 
   public synchronized void ensureInitialized() {
     if (!initialized) {
-      maybeUpgradeUpdateStoreSchema();
-
       createSchema();
       initialized = true;
-
-      Preconditions.checkState(!isOldUpdateStoreSchema(), "Update store is using old schema!");
     }
   }
 
