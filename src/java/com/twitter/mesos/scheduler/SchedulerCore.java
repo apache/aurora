@@ -106,11 +106,14 @@ public interface SchedulerCore
    *
    * @param job Updated job configuration.
    * @throws ScheduleException If there was an error in scheduling an update when no active tasks
-   *     are found for a job or an update for the job is already in progress.
+   *                           are found for a job or an update for the job is already in progress.
    * @throws ConfigurationManager.TaskDescriptionException If an invalid task description was given.
-   * @return A unique string identifying the update.
+   * @return A unique update token if an update must be coordinated through
+   *         {@link #updateShards(String, String, java.util.Set, String)} and
+   *         {@link #finishUpdate(String, String, Optional, UpdateResult)}, or an absent value if
+   * the update was completed in-place and no further action is necessary.
    */
-  String startUpdate(JobConfiguration job)
+  Optional<String> initiateJobUpdate(JobConfiguration job)
       throws ScheduleException, ConfigurationManager.TaskDescriptionException;
 
   /**
@@ -121,7 +124,7 @@ public interface SchedulerCore
    * @param jobName Job being updated.
    * @param shards Shards to be updated.
    * @param updateToken A unique string identifying the update, must be provided from
-   *     {@link #startUpdate(JobConfiguration)}.
+   *                    {@link #initiateJobUpdate(JobConfiguration)}.
    * @throws ScheduleException If there was an error in updating the state to UPDATING.
    */
   void updateShards(String role, String jobName, Set<Integer> shards, String updateToken)
@@ -135,7 +138,7 @@ public interface SchedulerCore
    * @param jobName Name of the job being updated.
    * @param shards Shards to be updated.
    * @param updateToken A unique string identifying the update, must be provided from
-   *     {@link #startUpdate(JobConfiguration)}
+   *                    {@link #initiateJobUpdate(JobConfiguration)}
    * @throws ScheduleException If there was an error in updating the state to ROLLBACK.
    */
   void rollbackShards(String role, String jobName, Set<Integer> shards, String updateToken)
@@ -146,11 +149,11 @@ public interface SchedulerCore
    *
    * @param role The job owner.
    * @param jobName Name of the job being updated.
-   * @param updateToken The update token provided from {@link #startUpdate(JobConfiguration)}, or
-   *     not present if the update is being forcibly terminated.
+   * @param updateToken The update token provided from {@link #initiateJobUpdate(JobConfiguration)},
+   *                    or not present if the update is being forcibly terminated.
    * @param result {@code true} if the update was successful, {@code false} otherwise.
    * @throws ScheduleException If an update for the job does not exist or if the update token is
-   *     invalid.
+   *                           invalid.
    */
   void finishUpdate(String role, String jobName, Optional<String> updateToken, UpdateResult result)
       throws ScheduleException;

@@ -44,10 +44,6 @@ import it.sauronsoftware.cron4j.SchedulingPattern;
 
 /**
  * A job scheduler that receives jobs that should be run periodically on a cron schedule.
- *
- * TODO(William Farner): Some more work might be required here.  For example, when the cron job is
- * triggered, we may want to see if the same job is still running and allow the configuration to
- * specify the policy for when that occurs (i.e. overlap or kill the existing job).
  */
 public class CronJobManager extends JobManager {
 
@@ -269,6 +265,10 @@ public class CronJobManager extends JobManager {
     }
   }
 
+  void updateJob(JobConfiguration job) throws ScheduleException {
+    Preconditions.checkArgument(receiveJob(job));
+  }
+
   @Override
   public String getUniqueKey() {
     return MANAGER_KEY;
@@ -345,7 +345,6 @@ public class CronJobManager extends JobManager {
   private JobConfiguration fetchJob(final String jobKey) {
     return storage.doInTransaction(new Work.Quiet<JobConfiguration>() {
       @Override public JobConfiguration apply(Storage.StoreProvider storeProvider) {
-
         return storeProvider.getJobStore().fetchJob(MANAGER_KEY, jobKey);
       }
     });

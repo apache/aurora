@@ -349,11 +349,16 @@ public class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public synchronized String startUpdate(JobConfiguration job)
+  public synchronized Optional<String> initiateJobUpdate(JobConfiguration job)
       throws ScheduleException, ConfigurationManager.TaskDescriptionException {
     checkStarted();
 
     JobConfiguration populated = ConfigurationManager.validateAndPopulate(job);
+
+    if (cronScheduler.hasJob(Tasks.jobKey(job))) {
+      cronScheduler.updateJob(job);
+      return Optional.absent();
+    }
 
     Set<ScheduledTask> existingTasks =
         stateManager.fetchTasks(Query.activeQuery(Tasks.jobKey(job)));
@@ -372,8 +377,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
     }
 
     try {
-      return stateManager.registerUpdate(job.getOwner().getRole(), job.getName(),
-          populated.getTaskConfigs());
+      return Optional.of(stateManager.registerUpdate(job.getOwner().getRole(), job.getName(),
+          populated.getTaskConfigs()));
     } catch (StateManagerImpl.UpdateException e) {
       LOG.log(Level.INFO, "Failed to start update.", e);
       throw new ScheduleException(e.getMessage(), e);

@@ -284,6 +284,10 @@ invoking cancel_update.''')
       update_resp.message = resp.message
       return update_resp
 
+    if not resp.rollingUpdateRequired:
+      log.info('Update successful')
+      return resp
+
     # TODO(William Farner): Cleanly handle connection failures in case the scheduler
     #                       restarts mid-update.
     updater = Updater(config.role(), config.name(), self.client(), time, resp.updateToken,
@@ -294,14 +298,14 @@ invoking cancel_update.''')
     if failed_shards:
       log.info('Update reverted, failures detected on shards %s' % failed_shards)
     else:
-      log.info('Update Successful')
+      log.info('Update successful')
 
     resp = self.client().finishUpdate(
       config.role(), config.name(), UpdateResult.FAILED if failed_shards else UpdateResult.SUCCESS,
       resp.updateToken, self._session_key)
 
     if resp.responseCode != ResponseCode.OK:
-      log.info("Error doing finish update: %s" % resp.message)
+      log.info("Error finalizing update: %s" % resp.message)
 
       # Create a update response and return it
       update_resp = FinishUpdateResponse()
@@ -311,7 +315,7 @@ invoking cancel_update.''')
 
     resp = FinishUpdateResponse()
     resp.responseCode = ResponseCode.WARNING if failed_shards else ResponseCode.OK
-    resp.message = "Update Unsuccessful" if failed_shards else "Update Successful"
+    resp.message = "Update unsuccessful" if failed_shards else "Update successful"
     return resp
 
   def cancel_update(self, role, jobname):

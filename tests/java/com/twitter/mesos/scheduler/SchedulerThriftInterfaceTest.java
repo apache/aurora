@@ -1,5 +1,6 @@
 package com.twitter.mesos.scheduler;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
 import org.easymock.Capture;
@@ -23,6 +24,7 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.SessionKey;
 import com.twitter.mesos.gen.SetQuotaResponse;
+import com.twitter.mesos.gen.StartUpdateResponse;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
@@ -33,11 +35,11 @@ import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
 
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
 import static com.twitter.mesos.scheduler.SchedulerThriftInterface.transitionMessage;
 
-/**
- * @author William Farner
- */
 public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   private static final String ROLE = "bar_role";
@@ -48,14 +50,14 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private SchedulerCore scheduler;
   private SessionValidator sessionValidator;
   private QuotaManager quotaManager;
-  private SchedulerThriftInterface thriftInterface;
+  private SchedulerThriftInterface thrift;
 
   @Before
   public void setUp() {
     scheduler = createMock(SchedulerCore.class);
     sessionValidator = createMock(SessionValidator.class);
     quotaManager = createMock(QuotaManager.class);
-    thriftInterface = new SchedulerThriftInterface(scheduler, sessionValidator, quotaManager,
+    thrift = new SchedulerThriftInterface(scheduler, sessionValidator, quotaManager,
         Amount.of(1L, Time.MILLISECONDS), Amount.of(1L, Time.SECONDS));
   }
 
@@ -67,7 +69,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    CreateJobResponse response = thriftInterface.createJob(job, SESSION);
+    CreateJobResponse response = thrift.createJob(job, SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
   }
 
@@ -80,7 +82,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    CreateJobResponse response = thriftInterface.createJob(job, SESSION);
+    CreateJobResponse response = thrift.createJob(job, SESSION);
     assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
 
@@ -90,7 +92,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    CreateJobResponse response = thriftInterface.createJob(makeJob(), SESSION);
+    CreateJobResponse response = thrift.createJob(makeJob(), SESSION);
     assertEquals(ResponseCode.AUTH_FAILED, response.getResponseCode());
   }
 
@@ -115,7 +117,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .andReturn(ImmutableSet.<ScheduledTask>of());
     control.replay();
 
-    KillResponse response = thriftInterface.killTasks(query, SESSION);
+    KillResponse response = thrift.killTasks(query, SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
     assertEquals(queryCapture.getValue(), query);
     assertEquals(killQueryCapture.getValue(), query);
@@ -144,7 +146,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .andReturn(ImmutableSet.<ScheduledTask>of());
     control.replay();
 
-    KillResponse response = thriftInterface.killTasks(query, SESSION);
+    KillResponse response = thrift.killTasks(query, SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
     assertEquals(queryCapture.getValue(), query);
     assertEquals(killQueryCapture.getValue(), query);
@@ -168,7 +170,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    KillResponse response = thriftInterface.killTasks(query, SESSION);
+    KillResponse response = thrift.killTasks(query, SESSION);
     assertEquals(ResponseCode.AUTH_FAILED, response.getResponseCode());
     assertEquals(queryCapture.getValue(), query);
   }
@@ -186,7 +188,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .andReturn(ImmutableSet.<ScheduledTask>of());
     control.replay();
 
-    KillResponse response = thriftInterface.killTasks(query, SESSION);
+    KillResponse response = thrift.killTasks(query, SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
     assertEquals(killQueryCapture.getValue(), query);
   }
@@ -204,7 +206,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectLastCall().andThrow(new ScheduleException("No jobs matching query"));
     control.replay();
 
-    KillResponse response = thriftInterface.killTasks(query, SESSION);
+    KillResponse response = thrift.killTasks(query, SESSION);
     assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
 
@@ -219,7 +221,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    SetQuotaResponse response = thriftInterface.setQuota(ROLE, quota, SESSION);
+    SetQuotaResponse response = thrift.setQuota(ROLE, quota, SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
   }
 
@@ -233,7 +235,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    SetQuotaResponse response = thriftInterface.setQuota(ROLE, quota, SESSION);
+    SetQuotaResponse response = thrift.setQuota(ROLE, quota, SESSION);
     assertEquals(ResponseCode.AUTH_FAILED, response.getResponseCode());
   }
 
@@ -247,8 +249,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    ForceTaskStateResponse response =
-        thriftInterface.forceTaskState(taskId, status, SESSION);
+    ForceTaskStateResponse response = thrift.forceTaskState(taskId, status, SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
   }
 
@@ -258,9 +259,36 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    ForceTaskStateResponse response =
-        thriftInterface.forceTaskState("task", ScheduleStatus.FAILED, SESSION);
+    ForceTaskStateResponse response = thrift.forceTaskState("task", ScheduleStatus.FAILED, SESSION);
     assertEquals(ResponseCode.AUTH_FAILED, response.getResponseCode());
+  }
+
+  @Test
+  public void testStartUpdate() throws Exception {
+    JobConfiguration job = makeJob();
+    String token = "token";
+
+    expectAuth(ROLE, true);
+    expect(scheduler.initiateJobUpdate(job)).andReturn(Optional.of(token));
+
+    control.replay();
+    StartUpdateResponse resp = thrift.startUpdate(job, SESSION);
+    assertEquals(token, resp.getUpdateToken());
+    assertEquals(ResponseCode.OK, resp.getResponseCode());
+    assertTrue(resp.isRollingUpdateRequired());
+  }
+
+  @Test
+  public void testStartCronUpdate() throws Exception {
+    JobConfiguration job = makeJob();
+
+    expectAuth(ROLE, true);
+    expect(scheduler.initiateJobUpdate(job)).andReturn(Optional.<String>absent());
+
+    control.replay();
+    StartUpdateResponse resp = thrift.startUpdate(job, SESSION);
+    assertEquals(ResponseCode.OK, resp.getResponseCode());
+    assertFalse(resp.isRollingUpdateRequired());
   }
 
   private JobConfiguration makeJob() {

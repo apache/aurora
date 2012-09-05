@@ -312,8 +312,15 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     }
 
     try {
-      response.setUpdateToken(schedulerCore.startUpdate(job));
-      response.setResponseCode(OK).setMessage("Update successfully started.");
+      Optional<String> token = schedulerCore.initiateJobUpdate(job);
+      response.setResponseCode(OK);
+      response.setRollingUpdateRequired(token.isPresent());
+      if (token.isPresent()) {
+        response.setUpdateToken(token.get());
+        response.setMessage("Update successfully started.");
+      } else {
+        response.setMessage("Job successfully updated.");
+      }
     } catch (ScheduleException e) {
       response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
     } catch (ConfigurationManager.TaskDescriptionException e) {
