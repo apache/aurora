@@ -13,6 +13,7 @@ import com.twitter.common.quantity.Time;
 import com.twitter.mesos.scheduler.periodic.HistoryPruner.HistoryPrunerImpl;
 import com.twitter.mesos.scheduler.periodic.HistoryPruner.HistoryPrunerImpl.PruneThreshold;
 import com.twitter.mesos.scheduler.periodic.PeriodicTaskLauncher.PeriodicTaskInterval;
+import com.twitter.mesos.scheduler.periodic.Preempter.PreemptionDelay;
 
 /**
  * Binding module that configures periodic scheduler tasks.
@@ -33,6 +34,11 @@ public class PeriodicTaskModule extends AbstractModule {
       help = "Per-job task history that the scheduler attempts to retain.")
   private static final Arg<Integer> PER_JOB_TASK_HISTORY_GOAL = Arg.create(300);
 
+  @CmdLine(name = "preemption_delay",
+      help = "Time interval after which a pending task becomes eligible to preempt other tasks")
+  private static final Arg<Amount<Long, Time>> PREEMPTION_DELAY =
+      Arg.create(Amount.of(2L, Time.MINUTES));
+
   @Override
   protected void configure() {
     bind(Integer.class).annotatedWith(PruneThreshold.class)
@@ -46,6 +52,8 @@ public class PeriodicTaskModule extends AbstractModule {
         .toInstance(PERIODIC_TASK_INTERVAL.get());
     bind(HistoryPruneRunner.class).in(Singleton.class);
 
+    bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(PreemptionDelay.class)
+        .toInstance(PREEMPTION_DELAY.get());
     bind(Preempter.class).in(Singleton.class);
 
     LifecycleModule.bindStartupAction(binder(), PeriodicTaskLauncher.class);

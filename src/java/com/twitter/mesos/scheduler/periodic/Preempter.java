@@ -1,5 +1,7 @@
 package com.twitter.mesos.scheduler.periodic;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
@@ -14,6 +16,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
 
 import com.twitter.common.quantity.Amount;
@@ -29,6 +32,11 @@ import com.twitter.mesos.scheduler.ScheduleException;
 import com.twitter.mesos.scheduler.SchedulerCore;
 import com.twitter.mesos.scheduler.SchedulingFilter;
 
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import static com.twitter.mesos.Tasks.SCHEDULED_TO_ASSIGNED;
@@ -42,6 +50,14 @@ import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
  * by {@link #preemptionCandidacyDelay}) before it becomes eligible to preempt other tasks.
  */
 class Preempter implements Runnable {
+
+  /**
+   * Binding annotation for the time interval after which a pending task becomes eligible to
+   * preempt other tasks.
+   */
+  @BindingAnnotation
+  @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
+  @interface PreemptionDelay { }
 
   @VisibleForTesting
   static final TaskQuery PENDING_QUERY = Query.byStatus(PENDING);
@@ -86,8 +102,12 @@ class Preempter implements Runnable {
    * @param clock Clock to check current time.
    */
   @Inject
-  Preempter(SchedulerCore scheduler, SchedulingFilter schedulingFilter,
-      Amount<Long, Time> preemptionCandidacyDelay, Clock clock) {
+  Preempter(
+      SchedulerCore scheduler,
+      SchedulingFilter schedulingFilter,
+      @PreemptionDelay Amount<Long, Time> preemptionCandidacyDelay,
+      Clock clock) {
+
     this.scheduler = checkNotNull(scheduler);
     this.schedulingFilter = checkNotNull(schedulingFilter);
     this.preemptionCandidacyDelay = checkNotNull(preemptionCandidacyDelay);
