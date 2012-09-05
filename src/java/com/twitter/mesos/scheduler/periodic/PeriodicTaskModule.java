@@ -46,6 +46,8 @@ public class PeriodicTaskModule extends AbstractModule {
         .toInstance(PERIODIC_TASK_INTERVAL.get());
     bind(HistoryPruneRunner.class).in(Singleton.class);
 
+    bind(Preempter.class).in(Singleton.class);
+
     LifecycleModule.bindStartupAction(binder(), PeriodicTaskLauncher.class);
   }
 

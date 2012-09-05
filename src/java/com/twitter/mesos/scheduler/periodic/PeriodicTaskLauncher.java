@@ -28,7 +28,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * Launcher responsible for scheduling and cleaning up after periodic tasks in the scheduler.
  *
- * @author William Farner
+ * TODO(William Farner): Come up with a way to perform these tasks independently and in a way that
+ * attempts to reduce overlap.
  */
 public class PeriodicTaskLauncher implements Command, Runnable {
 
@@ -36,8 +37,6 @@ public class PeriodicTaskLauncher implements Command, Runnable {
 
   /**
    * Binding annotation for the periodic task execution interval.
-   *
-   * @author William Farner
    */
   @BindingAnnotation
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
@@ -46,6 +45,7 @@ public class PeriodicTaskLauncher implements Command, Runnable {
   private final HistoryPruneRunner pruneRunner;
   private final StateManagerImpl stateManager;
   private final ShutdownRegistry shutdownRegistry;
+  private final Preempter preeempter;
   private final ScheduledExecutorService executor;
   private final Amount<Long, Time> taskInterval;
 
@@ -54,11 +54,14 @@ public class PeriodicTaskLauncher implements Command, Runnable {
       HistoryPruneRunner pruneRunner,
       StateManagerImpl stateManager,
       ShutdownRegistry shutdownRegistry,
+      Preempter preeempter,
       @PeriodicTaskInterval Amount<Long, Time> taskInterval) {
+
 
     this.pruneRunner = checkNotNull(pruneRunner);
     this.stateManager = checkNotNull(stateManager);
     this.shutdownRegistry = checkNotNull(shutdownRegistry);
+    this.preeempter = checkNotNull(preeempter);
     this.taskInterval = checkNotNull(taskInterval);
 
     executor = Executors.newScheduledThreadPool(1,
@@ -88,6 +91,7 @@ public class PeriodicTaskLauncher implements Command, Runnable {
       if (stateManager.isStarted()) {
         pruneRunner.run();
         stateManager.scanOutstandingTasks();
+        preeempter.run();
       } else {
         LOG.fine("Skipping periodic task run since state manager is not started.");
       }
