@@ -124,12 +124,13 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     return ImmutableList.<FilterRule>of(
         new SingleVetoRule() {
           @Override public Optional<Veto> doApply(TwitterTaskInfo task) {
-            return CPU.maybeVeto(available.getNumCpus(), task.getNumCpus());
+            return CPU.maybeVeto(available.getNumCpus(), ThermosResources.getTotalTaskCpus(task));
           }
         },
         new SingleVetoRule() {
           @Override public Optional<Veto> doApply(TwitterTaskInfo task) {
-            return RAM.maybeVeto(available.getRam().as(Data.MB), task.getRamMb());
+            return RAM.maybeVeto(available.getRam().as(Data.MB),
+                ThermosResources.getTotalTaskRam(task).as(Data.MB));
           }
         },
         new SingleVetoRule() {
