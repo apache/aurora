@@ -9,8 +9,6 @@ import org.apache.commons.lang.StringUtils;
  * A simple parser interface to handle value parsing and type casting.
  *
  * @param <T> The value type.
- *
- * @author William Farner
  */
 public interface ValueParser<T> {
 
@@ -139,8 +137,8 @@ public interface ValueParser<T> {
    * Utility class containing a registry of parsers by type class.
    */
   public static final class Registry {
-    private static final ImmutableMap<Class, ValueParser> REGISTRY =
-        ImmutableMap.<Class, ValueParser>of(
+    private static final ImmutableMap<Class<?>, ValueParser<?>> REGISTRY =
+        ImmutableMap.<Class<?>, ValueParser<?>>of(
           String.class, new StringParser(),
           Integer.class, new IntegerParser(),
           Long.class, new LongParser(),
@@ -159,9 +157,10 @@ public interface ValueParser<T> {
      * @param <T> Value parser type.
      * @return An optional value parser for the requested type.
      */
-    @SuppressWarnings("unchecked")
     public static <T> Optional<ValueParser<T>> getParser(Class<T> type) {
-      return Optional.<ValueParser<T>>fromNullable(REGISTRY.get(type));
+      @SuppressWarnings("unchecked")
+      ValueParser<T> valueParser = (ValueParser<T>) REGISTRY.get(type);
+      return Optional.fromNullable(valueParser);
     }
   }
 }

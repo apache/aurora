@@ -1097,7 +1097,7 @@ public class DbStorage implements
   }
 
   private static void setBytes(PreparedStatement preparedStatement, int col,
-      @Nullable TBase struct) throws SQLException {
+      @Nullable TBase<?, ?> struct) throws SQLException {
 
     if (struct == null) {
       preparedStatement.setNull(col, Types.BINARY);
@@ -1106,7 +1106,7 @@ public class DbStorage implements
     }
   }
 
-  private static byte[] getBytes(TBase struct) {
+  private static byte[] getBytes(TBase<?, ?> struct) {
     try {
       return ThriftBinaryCodec.encode(struct);
     } catch (CodingException e) {

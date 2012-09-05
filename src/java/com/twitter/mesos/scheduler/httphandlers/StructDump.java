@@ -60,8 +60,8 @@ public class StructDump extends JerseyTemplateServlet {
   public Response dumpJob(
       @PathParam("task") final String taskId) {
 
-    return dumpEntity("Task " + taskId, new Work.Quiet<TBase>() {
-      @Override public TBase apply(StoreProvider storeProvider) {
+    return dumpEntity("Task " + taskId, new Work.Quiet<TBase<?, ?>>() {
+      @Override public TBase<?, ?> apply(StoreProvider storeProvider) {
         // Deep copy the struct to sidestep any subclass trickery inside the storage system.
         return new ScheduledTask(Iterables.getOnlyElement(
             storeProvider.getTaskStore().fetchTasks(Query.byId(taskId)), null));
@@ -82,18 +82,18 @@ public class StructDump extends JerseyTemplateServlet {
       @PathParam("job") final String job) {
 
     final String key = Tasks.jobKey(role, job);
-    return dumpEntity("Cron job " + key, new Work.Quiet<TBase>() {
+    return dumpEntity("Cron job " + key, new Work.Quiet<TBase<?, ?>>() {
       @Override public TBase apply(StoreProvider storeProvider) {
         return storeProvider.getJobStore().fetchJob(CronJobManager.MANAGER_KEY, key);
       }
     });
   }
 
-  private Response dumpEntity(final String id, final Quiet<TBase> work) {
+  private Response dumpEntity(final String id, final Quiet<TBase<?, ?>> work) {
     return fillTemplate(new Closure<StringTemplate>() {
       @Override public void execute(StringTemplate template) {
         template.setAttribute("id", id);
-        TBase struct = storage.doInTransaction(work);
+        TBase<?, ?> struct = storage.doInTransaction(work);
         if (struct == null) {
           template.setAttribute("exception", "Entity not found");
         } else {

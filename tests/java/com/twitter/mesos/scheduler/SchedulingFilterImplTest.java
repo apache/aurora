@@ -103,10 +103,10 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
   @SuppressWarnings("unchecked")
   private void expectPossibleDoInTransaction() throws Exception {
-    expect(storage.doInTransaction(EasyMock.<Quiet>anyObject()))
+    expect(storage.doInTransaction(EasyMock.<Quiet<?>>anyObject()))
         .andAnswer(new IAnswer<Object>() {
           @Override public Object answer() throws Exception {
-            Quiet arg = (Quiet) EasyMock.getCurrentArguments()[0];
+            Quiet<?> arg = (Quiet<?>) EasyMock.getCurrentArguments()[0];
             return arg.apply(storeProvider);
           }
         }).anyTimes();

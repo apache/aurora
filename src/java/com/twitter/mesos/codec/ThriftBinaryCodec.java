@@ -13,8 +13,6 @@ import org.apache.thrift.protocol.TProtocolFactory;
 
 /**
  * Codec that works for thrift objects.
- *
- * @author William Farner
  */
 public final class ThriftBinaryCodec {
 
@@ -37,7 +35,7 @@ public final class ThriftBinaryCodec {
    * @throws CodingException If the message could not be decoded.
    */
   @Nullable
-  public static <T extends TBase> T decode(Class<T> clazz, @Nullable byte[] buffer)
+  public static <T extends TBase<T, ?>> T decode(Class<T> clazz, @Nullable byte[] buffer)
       throws CodingException {
 
     if (buffer == null) {
@@ -55,7 +53,7 @@ public final class ThriftBinaryCodec {
    * @return A populated message.
    * @throws CodingException If the message could not be decoded.
    */
-  public static <T extends TBase> T decodeNonNull(Class<T> clazz, byte[] buffer)
+  public static <T extends TBase<T, ?>> T decodeNonNull(Class<T> clazz, byte[] buffer)
       throws CodingException {
 
     Preconditions.checkNotNull(clazz);
@@ -82,7 +80,7 @@ public final class ThriftBinaryCodec {
    * @throws CodingException If the object could not be encoded.
    */
   @Nullable
-  public static byte[] encode(@Nullable TBase tBase) throws CodingException {
+  public static byte[] encode(@Nullable TBase<?, ?> tBase) throws CodingException {
     if (tBase == null) {
       return null;
     }
@@ -96,7 +94,7 @@ public final class ThriftBinaryCodec {
    * @return Encoded object.
    * @throws CodingException If the object could not be encoded.
    */
-  public static byte[] encodeNonNull(TBase tBase) throws CodingException {
+  public static byte[] encodeNonNull(TBase<?, ?> tBase) throws CodingException {
     Preconditions.checkNotNull(tBase);
 
     try {

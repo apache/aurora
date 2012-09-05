@@ -136,9 +136,12 @@ public class SchedulerModule extends AbstractModule {
     GuiceUtils.bindExceptionTrap(binder(), Scheduler.class);
 
     // Bind a ZooKeeperClient
-    install(new ZooKeeperModule(
-        ZooKeeperClient.digestCredentials("mesos", "mesos"),
-        ZooKeeperUtils.EVERYONE_READ_CREATOR_ALL));
+    install(
+        ZooKeeperModule.flaggedHostsBuilder()
+            .withFlagOverrides()
+            .withDigestCredentials("mesos", "mesos")
+            .withAcl(ZooKeeperUtils.EVERYONE_READ_CREATOR_ALL)
+            .build());
 
     bind(Key.get(String.class, ClusterName.class)).toInstance(CLUSTER_NAME.get());
 
