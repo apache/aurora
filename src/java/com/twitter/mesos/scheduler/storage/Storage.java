@@ -138,11 +138,11 @@ public interface Storage {
   /**
    * Prepares the underlying storage for serving traffic.
    *
-   * @param initilizationLogic work to perform after this storage system is ready but before
+   * @param initializationLogic work to perform after this storage system is ready but before
    *     allowing general use of
    *     {@link #doInTransaction(com.twitter.mesos.scheduler.storage.Storage.Work)}.
    */
-  void start(MutateWork.NoResult.Quiet initilizationLogic);
+  void start(MutateWork.NoResult.Quiet initializationLogic);
 
   /**
    * Executes the unit of {@code work} in a read-only transaction.

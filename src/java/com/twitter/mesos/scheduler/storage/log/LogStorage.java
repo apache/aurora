@@ -265,7 +265,7 @@ public class LogStorage extends ForwardingStore {
   }
 
   @Override
-  public synchronized void start(final MutateWork.NoResult.Quiet initilizationLogic) {
+  public synchronized void start(final MutateWork.NoResult.Quiet initializationLogic) {
     super.start(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider unused) {
         // Must have the underlying storage started so we can query it for the last checkpoint.
@@ -276,7 +276,7 @@ public class LogStorage extends ForwardingStore {
 
         // Now that we're recovered we should let any mutations done in initializationLogic append
         // to the log, so run it in one of our transactions.
-        doInWriteTransaction(initilizationLogic);
+        doInWriteTransaction(initializationLogic);
       }
     });
 

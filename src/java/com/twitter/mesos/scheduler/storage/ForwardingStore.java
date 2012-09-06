@@ -74,8 +74,8 @@ public class ForwardingStore implements
   }
 
   @Override
-  public void start(MutateWork.NoResult.Quiet initilizationLogic) {
-    storage.start(initilizationLogic);
+  public void start(MutateWork.NoResult.Quiet initializationLogic) {
+    storage.start(initializationLogic);
   }
 
   @Override

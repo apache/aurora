@@ -14,6 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -180,35 +182,21 @@ public class DbStorage implements
   }
 
   @Override
-  public void start(final MutateWork.NoResult.Quiet initilizationLogic) {
-    checkNotNull(initilizationLogic);
+  public void start(final MutateWork.NoResult.Quiet initializationLogic) {
+    checkNotNull(initializationLogic);
 
     doInWriteTransaction(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
         ensureInitialized();
 
-        initilizationLogic.apply(storeProvider);
+        initializationLogic.apply(storeProvider);
         LOG.info("Applied initialization logic.");
       }
     });
   }
 
-  @Override
-  public <T, E extends Exception> T doInTransaction(final Work<T, E> work)
-      throws StorageException, E {
-
-    return doInWriteTransaction(new MutateWork<T, E>() {
-      @Override public T apply(MutableStoreProvider storeProvider) throws E {
-        return work.apply(storeProvider);
-      }
-    });
-  }
-
-  @Override
-  public <T, E extends Exception> T doInWriteTransaction(final MutateWork<T, E> work)
-      throws StorageException, E {
-
-    checkNotNull(work);
+  private <T, E extends Exception> T transaction(
+      final ExceptionalFunction<MutableStoreProvider, T, E> work) throws StorageException, E{
 
     try {
       return ExceptionTransporter.guard(new Function<ExceptionTransporter<E>, T>() {
@@ -236,6 +224,106 @@ public class DbStorage implements
       throw new StorageException("Problem reading or writing to stable storage.", e);
     } catch (TransactionException e) {
       throw new StorageException("Problem executing transaction.", e);
+    }
+  }
+
+  /**
+   * A lock manager that wraps a ReadWriteLock and detects attempts ill-fated attempts to upgrade
+   * a read-locked thread to a write-locked thread, which would otherwise deadlock.
+   */
+  private static class LockManager {
+    private final ReadWriteLock lock = new ReentrantReadWriteLock();
+
+    enum LockMode {
+      NONE,
+      READ,
+      WRITE
+    }
+
+    private LockMode initialLockMode = LockMode.NONE;
+    private int lockCount = 0;
+
+    private void lockAcquired(LockMode mode) {
+      if (initialLockMode == LockMode.NONE) {
+        initialLockMode = mode;
+      }
+      if (initialLockMode == mode) {
+        lockCount++;
+      }
+    }
+
+    private void lockReleased(LockMode mode) {
+      if (initialLockMode == mode) {
+        lockCount--;
+        if (lockCount == 0) {
+          initialLockMode = LockMode.NONE;
+        }
+      }
+    }
+
+    void readLock() {
+      lock.readLock().lock();
+      lockAcquired(LockMode.READ);
+    }
+
+    void readUnlock() {
+      lock.readLock().unlock();
+      lockReleased(LockMode.READ);
+    }
+
+    void writeLock() {
+      Preconditions.checkState(initialLockMode != LockMode.READ,
+          "A read transaction may not be upgraded to a write transaction.");
+
+      lock.writeLock().lock();
+      lockAcquired(LockMode.WRITE);
+    }
+
+    void writeUnlock() {
+      lock.writeLock().unlock();
+      lockReleased(LockMode.WRITE);
+    }
+  }
+
+  private final ThreadLocal<LockManager> lockManager = new ThreadLocal<LockManager>() {
+    @Override protected LockManager initialValue() {
+      return new LockManager();
+    }
+  };
+
+  @Override
+  public <T, E extends Exception> T doInTransaction(final Work<T, E> work)
+      throws StorageException, E {
+
+    checkNotNull(work);
+
+    lockManager.get().readLock();
+    try {
+      return transaction(new ExceptionalFunction<MutableStoreProvider, T, E>() {
+        @Override public T apply(MutableStoreProvider storeProvider) throws E {
+          return work.apply(storeProvider);
+        }
+      });
+    } finally {
+      lockManager.get().readUnlock();
+    }
+  }
+
+  @Override
+  public <T, E extends Exception> T doInWriteTransaction(final MutateWork<T, E> work)
+      throws StorageException, E {
+
+    checkNotNull(work);
+
+    lockManager.get().writeLock();
+    try {
+      return transaction(new ExceptionalFunction<MutableStoreProvider, T, E>() {
+        @Override public T apply(MutableStoreProvider storeProvider) throws E {
+          return work.apply(storeProvider);
+        }
+      });
+    } finally {
+      lockManager.get().writeUnlock();
     }
   }
 
@@ -1097,7 +1185,7 @@ public class DbStorage implements
   }
 
   private static void setBytes(PreparedStatement preparedStatement, int col,
-      @Nullable TBase<?, ?> struct) throws SQLException {
+      @Nullable TBase struct) throws SQLException {
 
     if (struct == null) {
       preparedStatement.setNull(col, Types.BINARY);
@@ -1106,7 +1194,7 @@ public class DbStorage implements
     }
   }
 
-  private static byte[] getBytes(TBase<?, ?> struct) {
+  private static byte[] getBytes(TBase struct) {
     try {
       return ThriftBinaryCodec.encode(struct);
     } catch (CodingException e) {

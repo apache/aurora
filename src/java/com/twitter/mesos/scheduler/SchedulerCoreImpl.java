@@ -162,9 +162,9 @@ public class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public synchronized Set<ScheduledTask> getTasks(TaskQuery query) {
-    checkStarted();
-
+  public Set<ScheduledTask> getTasks(TaskQuery query) {
+    // TODO(William Farner): Remove this method and update all callers to interact directly with
+    // the underlying Storage.
     return stateManager.fetchTasks(query);
   }
 

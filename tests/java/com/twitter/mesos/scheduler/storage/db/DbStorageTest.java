@@ -1,14 +1,18 @@
 package com.twitter.mesos.scheduler.storage.db;
 
 import java.sql.SQLException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ThreadFactory;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import org.junit.Test;
 
+import com.twitter.common.base.Closure;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
@@ -20,12 +24,18 @@ import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.db.testing.DbStorageTestUtil;
 import com.twitter.mesos.scheduler.storage.BaseTaskStoreTest;
+import com.twitter.mesos.scheduler.storage.Storage;
+import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
+import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
+import com.twitter.mesos.scheduler.storage.Storage.Work;
+import com.twitter.mesos.scheduler.storage.Storage.Work.Quiet;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
 
@@ -166,6 +176,131 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
     assertTrue(Iterables.isEmpty(store.fetchJobs("CRON")));
     assertTrue(store.fetchTaskIds(Query.GET_ALL).isEmpty());
     assertTrue(store.fetchUpdateConfigs(role).isEmpty());
+  }
+
+  private Runnable latchedReader(final CountDownLatch myLatch, final CountDownLatch awaitLatch) {
+    return new Runnable() {
+      @Override public void run() {
+        store.doInTransaction(new Work.Quiet<Void>() {
+          @Override public Void apply(StoreProvider storeProvider) {
+            myLatch.countDown();
+            try {
+              awaitLatch.await();
+            } catch (InterruptedException e) {
+              Thread.interrupted();
+              fail(e.getMessage());
+            }
+            return null;
+          }
+        });
+      }
+    };
+  }
+
+  @Test
+  public void testSimultaneousReaders() throws Exception {
+    final CountDownLatch read1Started = new CountDownLatch(1);
+    final CountDownLatch read2Started = new CountDownLatch(1);
+
+    ThreadFactory threadFactory = new ThreadFactoryBuilder().setDaemon(true).build();
+
+    // One of these threads will deadlock if the second read transaction is not allowed to execute
+    // simultaneously.
+    Thread reader1 = threadFactory.newThread(latchedReader(read1Started, read2Started));
+    Thread reader2 = threadFactory.newThread(latchedReader(read2Started, read1Started));
+    reader1.start();
+    reader2.start();
+    reader1.join();
+    reader2.join();
+  }
+
+  static class FakeException extends RuntimeException {
+  }
+
+  private Runnable throwingOp(final Closure<Storage> op) {
+    return new Runnable() {
+      @Override public void run() {
+        try {
+          op.execute(store);
+          fail("Should have thrown.");
+        } catch (FakeException e) {
+          // Expected.
+        }
+      }
+    };
+  }
+
+  @Test
+  public void testLocksReleased() throws Exception {
+    ThreadFactory threadFactory = new ThreadFactoryBuilder().setDaemon(true).build();
+    Thread reader = threadFactory.newThread(throwingOp(new Closure<Storage>() {
+      @Override public void execute(Storage storage) {
+        storage.doInTransaction(new Work.Quiet<Void>() {
+          @Override public Void apply(StoreProvider storeProvider) {
+            throw new FakeException();
+          }
+        });
+      }
+    }));
+    Thread writer1 = threadFactory.newThread(throwingOp(new Closure<Storage>() {
+      @Override public void execute(Storage storage) {
+        storage.doInWriteTransaction(new MutateWork.Quiet<Void>() {
+          @Override public Void apply(MutableStoreProvider storeProvider) {
+            throw new FakeException();
+          }
+        });
+      }
+    }));
+
+    reader.start();
+    writer1.start();
+    reader.join();
+    writer1.join();
+
+    store.doInWriteTransaction(new MutateWork.Quiet<Void>() {
+      @Override public Void apply(MutableStoreProvider storeProvider) {
+        return null;
+      }
+    });
+  }
+
+  @Test
+  public void testNestedTransactions() throws Exception {
+    store.doInWriteTransaction(new MutateWork.Quiet<Void>() {
+      @Override public Void apply(MutableStoreProvider storeProvider) {
+        return store.doInWriteTransaction(new MutateWork.Quiet<Void>() {
+          @Override public Void apply(MutableStoreProvider storeProvider) {
+            return null;
+          }
+        });
+      }
+    });
+  }
+
+  @Test
+  public void testTransactionDowngrade() throws Exception {
+    store.doInWriteTransaction(new MutateWork.Quiet<Void>() {
+      @Override public Void apply(MutableStoreProvider storeProvider) {
+        return store.doInTransaction(new Work.Quiet<Void>() {
+          @Override public Void apply(StoreProvider storeProvider) throws RuntimeException {
+            return null;
+          }
+        });
+      }
+    });
+  }
+
+  @Test(expected = IllegalStateException.class)
+  public void testTransactionUpgrade() throws Exception {
+    store.doInTransaction(new Work.Quiet<Void>() {
+      @Override public Void apply(StoreProvider storeProvider) throws RuntimeException {
+        return store.doInWriteTransaction(new MutateWork.Quiet<Void>() {
+          @Override public Void apply(MutableStoreProvider storeProvider) {
+            return null;
+          }
+        });
+      }
+    });
   }
 
   private JobConfiguration createJobConfig(String name, String role, String user) {
