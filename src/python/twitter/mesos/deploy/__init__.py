@@ -36,15 +36,6 @@ class Deployer(object):
       assert returncode == 0, 'Command failed: "%s", output %s' % (' '.join(cmd), output)
       return output
 
-  def cmd_output(self, cmd):
-    """Runs a command and returns only its stdout"""
-    result = self.run_cmd(cmd)
-    if result:
-      _, output = result
-      return output[0].strip()
-    else:
-      return None
-
   def remote_call(self, host, cmd):
     return self.run_cmd(['ssh', self.ssh_target(host)] + cmd)
 
@@ -64,8 +55,9 @@ class Deployer(object):
   def maybe_run_command(self, runner, cmd):
     if self._verbose or self._dry_run:
       print('%s command: %s' % ('Would run' if self._dry_run else 'Executing', ' '.join(cmd)))
+    if self._dry_run:
       return 0, ''
-    if not self._dry_run:
+    else:
       return runner(cmd)
 
 
