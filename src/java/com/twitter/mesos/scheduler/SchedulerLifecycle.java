@@ -47,10 +47,15 @@ class SchedulerLifecycle implements RegisteredListener {
     void awaitShutdown();
   }
 
-  @CmdLine(name = "max_registration_delay", help =
-      "Max allowable delay to allow the driver to register before aborting")
+  @CmdLine(name = "max_registration_delay",
+      help = "Max allowable delay to allow the driver to register before aborting")
   private static final Arg<Amount<Long, Time>> MAX_REGISTRATION_DELAY =
       Arg.create(Amount.of(1L, Time.MINUTES));
+
+  @CmdLine(name = "max_leading_duration",
+      help = "After leading for this duration, the scheduler should commit suicide.")
+  private static final Arg<Amount<Long, Time>> MAX_LEADING_DURATION =
+      Arg.create(Amount.of(1L, Time.DAYS));
 
   private static final Logger LOG = Logger.getLogger(SchedulerLifecycle.class.getName());
 
@@ -170,6 +175,20 @@ class SchedulerLifecycle implements RegisteredListener {
           } catch (InterruptedException e) {
             LOG.log(Level.WARNING, "Delayed registration check interrupted.", e);
             Thread.currentThread().interrupt();
+          }
+        }
+      });
+
+      startDaemonThread("Leader-Assassin", new Runnable() {
+        @Override public void run() {
+          try {
+            Thread.sleep(MAX_LEADING_DURATION.get().as(Time.MILLISECONDS));
+            LOG.info(
+                "Leader has been active for " + MAX_LEADING_DURATION.get() + ", forcing failover.");
+            onDefeated(null);
+          } catch (InterruptedException e) {
+            LOG.warning("Leader assassin thread interrupted.");
+            Thread.interrupted();
           }
         }
       });
