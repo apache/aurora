@@ -44,7 +44,6 @@ import com.twitter.common.zookeeper.ZooKeeperUtils;
 import com.twitter.common_internal.zookeeper.ZooKeeperModule;
 import com.twitter.mesos.GuiceUtils;
 import com.twitter.mesos.auth.AuthBindings;
-import com.twitter.mesos.gen.MesosAdmin;
 import com.twitter.mesos.scheduler.BackoffSchedulingFilter.BackoffDelegate;
 import com.twitter.mesos.scheduler.Driver.DriverImpl;
 import com.twitter.mesos.scheduler.DriverFactory.DriverFactoryImpl;
@@ -190,7 +189,8 @@ public class SchedulerModule extends AbstractModule {
         .toInstance(new PulseMonitorImpl<String>(EXECUTOR_DEAD_THRESHOLD.get()));
 
     // Bindings for thrift interfaces.
-    bind(MesosAdmin.Iface.class).to(SchedulerThriftInterface.class).in(Singleton.class);
+    LoggingThriftInterface.bind(binder(), SchedulerThriftInterface.class);
+    bind(SchedulerThriftInterface.class).in(Singleton.class);
     bind(ThriftServer.class).to(SchedulerThriftServer.class).in(Singleton.class);
 
     if (ISOLATED_SCHEDULER.get()) {
