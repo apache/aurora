@@ -11,6 +11,14 @@ from pystachio import (
 )
 
 
+# Define constants for resources
+BYTES = 1
+KB = 1024 * BYTES
+MB = 1024 * KB
+GB = 1024 * MB
+TB = 1024 * GB
+
+
 class ThermosContext(Struct):
   ports   = Map(String, Integer)
   task_id = String
