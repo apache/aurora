@@ -14,6 +14,7 @@ import urllib2
 from poster.encode import multipart_encode
 from poster import streaminghttp
 
+from twitter.common import log
 from twitter.mesos.client_wrapper import MesosHelper
 
 
@@ -112,7 +113,7 @@ class Packer(object):
   def delete(self, role, package, version):
     return self._api(Packer._ver_url(role, package, version), auth=True, method='DELETE')
 
-  def add(self, role, package, local_file):
+  def add(self, role, package, local_file, metadata):
     streaminghttp.register_openers()
 
     # Calculate the checksum, reading 16 MiB chunks.
@@ -131,8 +132,12 @@ class Packer(object):
     stream = CallbackFile(local_file, 'rb', upload_progress.update, 'Uploading')
     datagen, headers = multipart_encode({'file': stream})
 
-    selector = Packer.compose_url(Packer._pkg_url(role, package), {'md5sum': digest}, auth=True)
+    query_params = {'md5sum': digest}
+    if metadata:
+      query_params['metadata'] = metadata
+    selector = Packer.compose_url(Packer._pkg_url(role, package), query_params, auth=True)
     url = 'http://%s:%s%s' % (self._host, self._port, selector)
+    log.debug('Sending packer request %s' % url)
 
     file_size = os.path.getsize(local_file)
     upload_start = time.time()

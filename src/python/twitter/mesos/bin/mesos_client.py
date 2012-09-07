@@ -422,6 +422,8 @@ class MesosCLI(cmd.Cmd):
   @staticmethod
   def _print_package(pkg):
     print 'Version: %s' % pkg['id']
+    if 'metadata' in pkg and pkg['metadata']:
+      print 'User metadata:\n  %s' % pkg['metadata']
     for audit in sorted(pkg['auditLog'], key=lambda k: int(k['timestamp'])):
       gmtime = time.strftime('%m/%d/%Y %H:%M:%S UTC',
                              time.gmtime(int(audit['timestamp']) / 1000))
@@ -439,8 +441,20 @@ class MesosCLI(cmd.Cmd):
 
   @requires.exactly('role', 'package', 'file_path')
   def do_package_add_version(self, role, package, file_path):
+    pkg = self._get_packer().add(role, package, file_path, self.options.metadata)
     print 'Package added:'
-    MesosCLI._print_package(self._get_packer().add(role, package, file_path))
+    MesosCLI._print_package(pkg)
+
+  @requires.exactly('role', 'package', 'version')
+  def do_package_get_version(self, role, package, version):
+    pkg = self._get_packer().get_version(role, package, version)
+    if self.options.metadata_only:
+      if not 'metadata' in pkg:
+        _die('Package does not contain any user-specified metadata.')
+      else:
+        print pkg['metadata']
+    else:
+      MesosCLI._print_package(pkg)
 
   @requires.exactly('role', 'package', 'version')
   def do_package_set_live(self, role, package, version):
@@ -492,6 +506,10 @@ The subcommands and their arguments are:
   app.add_option('-E', type='string', nargs=1, action='callback', default=[], metavar='NAME:VALUE',
                  callback=add_binding_to('bindings'), dest='bindings',
                  help='bind an environment name to a value.')
+  app.add_option('--metadata', default='',
+                 help='Metadata to be applied to a package when invoking package_add_version.')
+  app.add_option('--metadata_only', default=False, action='store_true',
+                 help='When fetching a package version, return only the metadata.')
 
 
 def main(args, options):
