@@ -258,7 +258,7 @@ class MesosClientAPI(MesosClientBase):
       query.jobName = jobname
     return self.client().getTasksStatus(query)
 
-  def update_job(self, config, copy_app_from=None):
+  def update_job(self, config, shards=None, copy_app_from=None):
     log.info("Updating job: %s" % config.name())
 
     if copy_app_from is not None:
@@ -292,8 +292,9 @@ invoking cancel_update.''')
     #                       restarts mid-update.
     updater = Updater(config.role(), config.name(), self.client(), time, resp.updateToken,
                       self.session_key())
-    failed_shards = updater.update(
-      config.update_config(), sorted(map(lambda task: task.shardId, config.job().taskConfigs)))
+
+    shardsIds = shards or sorted(map(lambda task: task.shardId, config.job().taskConfigs))
+    failed_shards = updater.update(config.update_config(), shardsIds)
 
     if failed_shards:
       log.info('Update reverted, failures detected on shards %s' % failed_shards)

@@ -276,13 +276,22 @@ class MesosCLI(cmd.Cmd):
     else:
       log.info('No tasks found.')
 
+  def _getshards(self):
+    if not self.options.shards:
+      return None
+
+    try:
+      return map(int, self.options.shards.split(','))
+    except ValueError:
+      _die('Invalid shards list: %s' % self.options.shards)
+
   @requires.exactly('job', 'config')
   def do_update(self, *line):
     """update job config"""
     (jobname, config_file) = line
     config = get_config(jobname, config_file, self._get_packer)
     api = MesosClientAPI(cluster=config.cluster(), verbose=self.options.verbose)
-    resp = api.update_job(config, self.options.copy_app_from)
+    resp = api.update_job(config, self._getshards(), self.options.copy_app_from)
     check_and_log_response(resp)
 
   @requires.exactly('role', 'job')
@@ -466,6 +475,8 @@ The subcommands and their arguments are:
   app.add_option('--cluster', dest='cluster', default=None,
                   help='Cluster to use for commands that do not take configuration, '
                        'e.g. kill, start_cron, get_quota.')
+  app.add_option('--shards', dest='shards', default=None,
+                 help='A comma separated list of shard ids to act on.')
   app.add_option('-o', '--open_browser', dest='open_browser', action='store_true', default=False,
                  help="Open a browser window to the job page after a job mutation.")
   app.add_option('--copy_app_from', dest='copy_app_from', default=None,
