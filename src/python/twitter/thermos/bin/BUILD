@@ -18,5 +18,4 @@ python_binary(
     pants('src/python/twitter/thermos/observer'),
     pants('src/python/twitter/thermos/monitoring'),
   ],
-  platforms = ['linux-x86_64'],
 )

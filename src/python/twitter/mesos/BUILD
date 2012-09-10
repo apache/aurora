@@ -41,7 +41,6 @@ python_binary(
     pants('src/python/twitter/common'),
     pants('src/python/twitter/thermos/base:options')
   ],
-  platforms = ['linux-x86_64'],
 )
 
 python_binary(
@@ -91,5 +90,4 @@ python_binary(
     python_requirement('psutil>=0.5.0'),
     pants('src/python/twitter/common/app'),
   ],
-  platforms = ['linux-x86_64'],
 )

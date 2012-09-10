@@ -12,7 +12,6 @@ python_binary(
     pants('src/python/twitter/thermos/runner'),
     pants('src/thrift/com/twitter/thermos:py-thrift')
   ],
-  platforms = ['linux-x86_64'],
 )
 
 page(name = 'readme', source = 'README.md')

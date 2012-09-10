@@ -69,7 +69,6 @@ python_binary(
   name = 'thermos_executor',
   entry_point = 'twitter.mesos.executor.thermos_executor',
   ignore_errors = True,
-  platforms = ['linux-x86_64'],
   dependencies = [
     pants(':thermos_executor_lib')
   ]
@@ -86,7 +85,6 @@ python_binary(
     pants('src/python/twitter/thermos/config:schema'),
     pants('src/python/twitter/thermos/runner'),
   ],
-  platforms = ['linux-x86_64'],
 )
 
 python_library(
@@ -114,7 +112,6 @@ python_binary(
   name = 'gc_executor',
   source = 'gc_executor.py',
   ignore_errors = True,
-  platforms = ['linux-x86_64'],
   dependencies = [
     pants(':gc_executor_lib')
   ]
