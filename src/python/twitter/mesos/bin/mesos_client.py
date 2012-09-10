@@ -19,6 +19,7 @@ from twitter.common.log.options import LogOptions
 from twitter.mesos.clusters import Cluster
 from twitter.mesos.client_wrapper import MesosClientAPI
 from twitter.mesos.packer import sd_packer_client
+from twitter.mesos.packer.packer_client import Packer
 from twitter.mesos.parsers.mesos_config import MesosConfig
 from twitter.mesos.parsers.pystachio_config import PystachioConfig
 from twitter.mesos.parsers.pystachio_codec import PystachioCodec
@@ -92,7 +93,11 @@ def get_config(jobname, config_file, packer_factory):
 
       role, name, version = package
       log.info('Fetching metadata for package %s/%s version %s.' % package)
-      metadata = packer_factory(config.cluster()).get_version(role, name, version)
+      try:
+        metadata = packer_factory(config.cluster()).get_version(role, name, version)
+      except Packer.Error as e:
+        _die('Failed to fetch package metadata: %s' % e)
+
       latest_audit = sorted(metadata['auditLog'], key=lambda a: a['timestamp'])[-1]
       if latest_audit['state'] == 'DELETED':
         _die('The requested package version has been deleted.')
@@ -415,6 +420,21 @@ class MesosCLI(cmd.Cmd):
       _die('--cluster must be specified')
     return sd_packer_client.create_packer(Cluster.get(cluster))
 
+  @staticmethod
+  def exactly(*args):
+    def wrap(fn):
+      return requires.wrap_function(fn, args, (lambda want, got: len(want) == len(got)))
+    return wrap
+
+  def trap_packer_error(fn):
+    def wrap(self, *args, **kwargs):
+      try:
+        return fn(self, *args, **kwargs)
+      except Packer.Error as e:
+        print 'Request failed: %s' % e
+    return wrap
+
+  @trap_packer_error
   @requires.exactly('role')
   def do_package_list(self, role):
     print '\n'.join(self._get_packer().list_packages(role))
@@ -429,16 +449,19 @@ class MesosCLI(cmd.Cmd):
                              time.gmtime(int(audit['timestamp']) / 1000))
       print '  moved to state %s by %s on %s' % (audit['state'], audit['user'], gmtime)
 
+  @trap_packer_error
   @requires.exactly('role', 'package')
   def do_package_versions(self, role, package):
     for version in self._get_packer().list_versions(role, package):
       MesosCLI._print_package(version)
 
+  @trap_packer_error
   @requires.exactly('role', 'package', 'version')
   def do_package_delete_version(self, role, package, version):
     self._get_packer().delete(role, package, version)
     print 'Version deleted'
 
+  @trap_packer_error
   @requires.exactly('role', 'package', 'file_path')
   def do_package_add_version(self, role, package, file_path):
     pkg = self._get_packer().add(role, package, file_path, self.options.metadata)
@@ -456,11 +479,13 @@ class MesosCLI(cmd.Cmd):
     else:
       MesosCLI._print_package(pkg)
 
+  @trap_packer_error
   @requires.exactly('role', 'package', 'version')
   def do_package_set_live(self, role, package, version):
     self._get_packer().set_live(role, package, version)
     print 'Version %s is now the LIVE vesion' % version
 
+  @trap_packer_error
   @requires.exactly('role', 'package')
   def do_package_unlock(self, role, package):
     self._get_packer().unlock(role, package)
