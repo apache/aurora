@@ -1,11 +1,10 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.google.common.base.Function;
-import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
@@ -23,6 +22,7 @@ import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.ShardUpdateResult;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
@@ -37,7 +37,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.transform;
 
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
-import static com.twitter.mesos.Tasks.SCHEDULED_TO_SHARD_ID;
 import static com.twitter.mesos.Tasks.jobKey;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
 import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
@@ -55,15 +54,6 @@ import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.STOPPED;
 public class SchedulerCoreImpl implements SchedulerCore {
 
   private static final Logger LOG = Logger.getLogger(SchedulerCoreImpl.class.getName());
-
-  private static final Function<TwitterTaskInfo, TwitterTaskInfo> COPY_AND_RESET_START_COMMAND =
-      new Function<TwitterTaskInfo, TwitterTaskInfo>() {
-        @Override public TwitterTaskInfo apply(TwitterTaskInfo task) {
-          TwitterTaskInfo copy = task.deepCopy();
-          ConfigurationManager.resetStartCommand(copy);
-          return copy;
-        }
-      };
 
   private static final Predicate<ScheduledTask> IS_UPDATING = new Predicate<ScheduledTask>() {
     @Override public boolean apply(ScheduledTask task) {
@@ -386,56 +376,33 @@ public class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public synchronized void updateShards(String role, String jobName, Set<Integer> shards,
+  public synchronized Map<Integer, ShardUpdateResult> updateShards(
+      String role,
+      String jobName,
+      Set<Integer> shards,
       String updateToken) throws ScheduleException {
-    checkStarted();
 
-    String jobKey = Tasks.jobKey(role, jobName);
-    Set<ScheduledTask> tasks = stateManager.fetchTasks(Query.liveShards(jobKey, shards));
-
-    // Extract any shard IDs that are being added as a part of this stage in the update.
-    Set<Integer> newShardIds = Sets.difference(shards,
-        ImmutableSet.copyOf(Iterables.transform(tasks, SCHEDULED_TO_SHARD_ID)));
-
-    if (!newShardIds.isEmpty()) {
-      Set<TwitterTaskInfo> newTasks =
-          stateManager.fetchUpdatedTaskConfigs(role, jobName, newShardIds);
-      Set<Integer> unrecognizedShards = Sets.difference(newShardIds,
-          ImmutableSet.copyOf(Iterables.transform(newTasks, Tasks.INFO_TO_SHARD_ID)));
-      if (!unrecognizedShards.isEmpty()) {
-        throw new ScheduleException("Cannot update unrecognized shards " + unrecognizedShards);
-      }
-
-      // Create new tasks, so they will be moved into the PENDING state.
-      stateManager.insertTasks(newTasks);
-    }
-
-    Set<Integer> updateShardIds = Sets.difference(shards, newShardIds);
-    if (!updateShardIds.isEmpty()) {
-      Set<TwitterTaskInfo> oldTasks = ImmutableSet.copyOf(Iterables.transform(tasks,
-          Functions.compose(COPY_AND_RESET_START_COMMAND, Tasks.SCHEDULED_TO_INFO)));
-      // No need to reset the start command here since the updated tasks have not been populated.
-      Set<TwitterTaskInfo> newTasks =
-          stateManager.fetchUpdatedTaskConfigs(role, jobName, updateShardIds);
-
-      Set<TwitterTaskInfo> changedTasks = Sets.difference(newTasks, oldTasks);
-      Set<Integer> changedShards =
-          ImmutableSet.copyOf(Iterables.transform(changedTasks, Tasks.INFO_TO_SHARD_ID));
-
-      if (!changedShards.isEmpty()) {
-        // Initiate update on the existing shards.
-        stateManager.changeState(Query.liveShards(jobKey, changedShards), ScheduleStatus.UPDATING);
-      }
+    try {
+      return stateManager.modifyShards(role, jobName, shards, updateToken, true);
+    } catch (UpdateException e) {
+      LOG.log(Level.INFO, "Failed to update shards for " + Tasks.jobKey(role, jobName), e);
+      throw new ScheduleException(e.getMessage(), e);
     }
   }
 
   @Override
-  public synchronized void rollbackShards(String role, String jobName, Set<Integer> shards,
+  public synchronized Map<Integer, ShardUpdateResult> rollbackShards(
+      String role,
+      String jobName,
+      Set<Integer> shards,
       String updateToken) throws ScheduleException {
-    checkStarted();
 
-    stateManager.changeState(Query.liveShards(Tasks.jobKey(role, jobName), shards),
-        ScheduleStatus.ROLLBACK);
+    try {
+      return stateManager.modifyShards(role, jobName, shards, updateToken, false);
+    } catch (UpdateException e) {
+      LOG.log(Level.INFO, "Failed to roll back shards for " + Tasks.jobKey(role, jobName), e);
+      throw new ScheduleException(e.getMessage(), e);
+    }
   }
 
   @Override
@@ -446,7 +413,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     try {
       stateManager.finishUpdate(role, jobName, updateToken, result, true);
     } catch (StateManagerImpl.UpdateException e) {
-      LOG.log(Level.INFO, "Failed to finish update.", e);
+      LOG.log(Level.INFO, "Failed to finish update for " + Tasks.jobKey(role, jobName), e);
       throw new ScheduleException(e.getMessage(), e);
     }
   }

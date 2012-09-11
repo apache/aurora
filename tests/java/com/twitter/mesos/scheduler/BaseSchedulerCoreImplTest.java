@@ -50,6 +50,7 @@ import com.twitter.mesos.gen.LimitConstraint;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.ShardUpdateResult;
 import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TaskQuery;
@@ -1395,6 +1396,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     }
   }
 
+  // TODO(William Farner): Get rid of this - it's a nightmare to follow.
   private abstract class UpdaterTest {
     UpdaterTest(int numTasks, int additionalTasks) throws Exception {
       control.replay();
@@ -1423,19 +1425,22 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
           numTasks,
           additionalTasks);
 
-      Set<ScheduledTask> tasks = getTasks(Query.byStatus(RUNNING));
-      verify(tasks, job, updatedJob);
-
       scheduler.finishUpdate(OWNER_A.role, JOB_A, updateToken, result);
+      postUpdate();
+      Set<ScheduledTask> tasks = getTasks(Query.activeQuery(Tasks.jobKey(OWNER_A, JOB_A)));
+      verify(tasks, job, updatedJob);
       scheduler.initiateJobUpdate(job);
     }
 
     abstract UpdateResult performRegisteredUpdate(JobConfiguration job, String updateToken,
         Set<Integer> jobShards, int numTasks, int additionalTasks) throws Exception;
 
+    void postUpdate() {
+      // Default no-op.
+    }
+
     abstract void verify(Set<ScheduledTask> tasks, JobConfiguration oldJob,
         JobConfiguration updatedJob);
-
   }
 
   @Test
@@ -1451,7 +1456,11 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         changeStatus(queryByOwner(OWNER_A), ASSIGNED);
         changeStatus(queryByOwner(OWNER_A), RUNNING);
 
-        scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken);
+        ImmutableMap.Builder<Integer, ShardUpdateResult> expected = ImmutableMap.builder();
+        StateManagerImpl.putResults(expected, ShardUpdateResult.RESTARTING, jobShards);
+        assertEquals(
+            expected.build(),
+            scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken));
         assertThat(getTasks(Query.byStatus(UPDATING)).size(), is(numTasks));
 
         changeStatus(queryByOwner(OWNER_A), FINISHED);
@@ -1507,7 +1516,12 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     String role = OWNER_A.getRole();
     String jobKey = Tasks.jobKey(OWNER_A, JOB_A);
 
-    scheduler.updateShards(role, JOB_A, ImmutableSet.of(0, 1, 2), updateToken.get());
+    ImmutableMap.Builder<Integer, ShardUpdateResult> expected = ImmutableMap.builder();
+    expected.put(1, ShardUpdateResult.RESTARTING);
+    StateManagerImpl.putResults(expected, ShardUpdateResult.UNCHANGED, ImmutableSet.of(0, 2));
+    assertEquals(
+        expected.build(),
+        scheduler.updateShards(role, JOB_A, ImmutableSet.of(0, 1, 2), updateToken.get()));
     // Move a few tasks into RUNNING to ensure that the scheduler does not try to kill them
     // in subsequent update batches.
     changeStatus(Query.liveShard(jobKey, 0), FINISHED);
@@ -1517,9 +1531,23 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     changeStatus(Query.liveShard(jobKey, 1), ASSIGNED);
     changeStatus(Query.liveShard(jobKey, 1), RUNNING);
 
-    scheduler.updateShards(role, JOB_A, ImmutableSet.of(3, 4, 5), updateToken.get());
-    scheduler.updateShards(role, JOB_A, ImmutableSet.of(6, 7, 8), updateToken.get());
-    scheduler.updateShards(role, JOB_A, ImmutableSet.of(9), updateToken.get());
+    expected = ImmutableMap.builder();
+    StateManagerImpl.putResults(expected, ShardUpdateResult.ADDED, ImmutableSet.of(3, 4, 5));
+    assertEquals(
+        expected.build(),
+        scheduler.updateShards(role, JOB_A, ImmutableSet.of(3, 4, 5), updateToken.get()));
+
+    expected = ImmutableMap.builder();
+    StateManagerImpl.putResults(expected, ShardUpdateResult.ADDED, ImmutableSet.of(6, 7, 8));
+    assertEquals(
+        expected.build(),
+        scheduler.updateShards(role, JOB_A, ImmutableSet.of(6, 7, 8), updateToken.get()));
+
+    expected = ImmutableMap.builder();
+    StateManagerImpl.putResults(expected, ShardUpdateResult.ADDED, ImmutableSet.of(9));
+    assertEquals(
+        expected.build(),
+        scheduler.updateShards(role, JOB_A, ImmutableSet.of(9), updateToken.get()));
     scheduler.finishUpdate(role, JOB_A, updateToken, UpdateResult.SUCCESS);
 
     assertEquals("echo",
@@ -1529,7 +1557,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testRollback() throws Exception {
-    int numTasks = 10;
+    int numTasks = 4;
     // Kill Tasks called at RUNNING->UPDATING.
     expectKillTask(numTasks);
 
@@ -1539,12 +1567,26 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         changeStatus(queryByOwner(OWNER_A), ASSIGNED);
         changeStatus(queryByOwner(OWNER_A), RUNNING);
 
-        scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken);
+        ImmutableMap.Builder<Integer, ShardUpdateResult> expected = ImmutableMap.builder();
+        StateManagerImpl.putResults(
+            expected,
+            ShardUpdateResult.RESTARTING,
+            ImmutableSet.of(0, 1, 2, 3));
+        assertEquals(
+            expected.build(),
+            scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken));
         assertThat(getTasks(Query.byStatus(UPDATING)).size(), is(numTasks));
 
         changeStatus(queryByOwner(OWNER_A), KILLED);
 
-        scheduler.rollbackShards(OWNER_A.role, JOB_A, jobShards, updateToken);
+        expected = ImmutableMap.builder();
+        StateManagerImpl.putResults(
+            expected,
+            ShardUpdateResult.RESTARTING,
+            ImmutableSet.of(0, 1, 2, 3));
+        assertEquals(
+            expected.build(),
+            scheduler.rollbackShards(OWNER_A.role, JOB_A, jobShards, updateToken));
 
         changeStatus(Query.byStatus(PENDING), ASSIGNED);
         changeStatus(Query.byStatus(ASSIGNED), RUNNING);
@@ -1564,19 +1606,75 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     };
   }
 
+  private static Map<Integer, ShardUpdateResult> shardResults(
+      int lower,
+      int upper,
+      ShardUpdateResult result) {
+
+    ImmutableMap.Builder<Integer, ShardUpdateResult> results = ImmutableMap.builder();
+    for (int i = lower; i <= upper; i++) {
+      results.put(i, result);
+    }
+    return results.build();
+  }
+
+  private static Map<Integer, ShardUpdateResult> shardResults(
+      int numShards,
+      ShardUpdateResult result) {
+
+    return shardResults(0, numShards - 1, result);
+  }
+
+  @Test
+  public void testNoopUpdateRollback() throws Exception {
+    control.replay();
+    buildScheduler();
+
+    int numTasks = 2;
+
+    // Use command line wildcards to detect bugs where command lines with populated wildcards
+    // make tasks appear different.
+    JobConfiguration job = makeJob(OWNER_A, JOB_A, productionTask(), numTasks);
+    scheduler.createJob(job);
+    List<String> taskIds = Ordering.natural().sortedCopy(Tasks.ids(getTasksOwnedBy(OWNER_A)));
+
+    assignTask(taskIds.get(0), SLAVE_ID, SLAVE_HOST_1);
+    assignTask(taskIds.get(1), SLAVE_ID, SLAVE_HOST_1);
+    changeStatus(queryByOwner(OWNER_A), ASSIGNED);
+    changeStatus(queryByOwner(OWNER_A), RUNNING);
+
+    JobConfiguration updatedJob = job.deepCopy();
+
+    Optional<String> updateToken = scheduler.initiateJobUpdate(updatedJob);
+    String role = OWNER_A.getRole();
+
+    assertEquals(
+        shardResults(numTasks, ShardUpdateResult.UNCHANGED),
+        scheduler.updateShards(role, JOB_A, ImmutableSet.of(0, 1), updateToken.get()));
+
+    assertEquals(
+        shardResults(numTasks, ShardUpdateResult.UNCHANGED),
+        scheduler.rollbackShards(role, JOB_A, ImmutableSet.of(0, 1), updateToken.get()));
+
+    scheduler.finishUpdate(role, JOB_A, updateToken, UpdateResult.FAILED);
+  }
+
   @Test
   public void testInvalidTransition() throws Exception {
     // Kill Tasks called at RUNNING->UPDATING and UPDATING->RUNNING (Invalid).
-    int expectedKillTasks = 20;
+    final int numTasks = 4;
+    int expectedKillTasks = 8;
     expectKillTask(expectedKillTasks);
 
-    new UpdaterTest(10, 0) {
+    new UpdaterTest(numTasks, 0) {
       @Override UpdateResult performRegisteredUpdate(JobConfiguration job, String updateToken,
           Set<Integer> jobShards, int numTasks, int additionalTasks) throws Exception {
         changeStatus(queryByOwner(OWNER_A), ASSIGNED);
         changeStatus(queryByOwner(OWNER_A), RUNNING);
 
-        scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken);
+        assertEquals(
+            shardResults(numTasks, ShardUpdateResult.RESTARTING),
+            scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken));
         assertThat(getTasks(Query.byStatus(UPDATING)).size(), is(numTasks));
 
         changeStatus(queryByOwner(OWNER_A), RUNNING);
@@ -1601,14 +1699,15 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testPendingToUpdating() throws Exception {
-    new UpdaterTest(10, 0) {
+    int numTasks = 4;
+    new UpdaterTest(numTasks, 0) {
       @Override UpdateResult performRegisteredUpdate(JobConfiguration job, String updateToken,
           Set<Integer> jobShards, int numTasks, int additionalTasks) throws Exception {
-        scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken);
-        assertThat(getTasks(Query.byStatus(PENDING)).size(), is(numTasks));
 
-        changeStatus(Query.byStatus(PENDING), ASSIGNED);
-        changeStatus(Query.byStatus(ASSIGNED), RUNNING);
+        assertEquals(
+            shardResults(numTasks, ShardUpdateResult.RESTARTING),
+            scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken));
+        assertThat(getTasks(Query.byStatus(PENDING)).size(), is(numTasks));
 
         return SUCCESS;
       }
@@ -1627,24 +1726,27 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testIncreaseShardsUpdate() throws Exception {
-    int numTasks = 5;
+    int numTasks = 2;
     // Kill Tasks called at RUNNING->UPDATING.
     expectKillTask(numTasks);
 
-    new UpdaterTest(numTasks, 5) {
+    new UpdaterTest(numTasks, 2) {
       @Override UpdateResult performRegisteredUpdate(JobConfiguration job, String updateToken,
           Set<Integer> jobShards, int numTasks, int additionalTasks) throws Exception {
         changeStatus(queryByOwner(OWNER_A), ASSIGNED);
         changeStatus(queryByOwner(OWNER_A), RUNNING);
 
-        scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken);
-
+        Map<Integer, ShardUpdateResult> expected =
+            ImmutableMap.<Integer, ShardUpdateResult>builder()
+                .putAll(shardResults(numTasks, ShardUpdateResult.RESTARTING))
+                .putAll(shardResults(2, 3, ShardUpdateResult.ADDED))
+                .build();
+        assertEquals(
+            expected,
+            scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken));
         changeStatus(Query.byStatus(UPDATING), KILLED);
 
         assertThat(getTasks(Query.byStatus(PENDING)).size(), is(numTasks + additionalTasks));
-
-        changeStatus(Query.byStatus(PENDING), ASSIGNED);
-        changeStatus(Query.byStatus(ASSIGNED), RUNNING);
 
         return SUCCESS;
       }
@@ -1663,30 +1765,31 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testDecreaseShardsUpdate() throws Exception {
-    int numTasks = 10;
+    int numTasks = 4;
     expectKillTask(numTasks);
 
-    new UpdaterTest(numTasks, -5) {
+    new UpdaterTest(numTasks, -2) {
       @Override UpdateResult performRegisteredUpdate(JobConfiguration job, String updateToken,
           Set<Integer> jobShards, int numTasks, int additionalTasks) throws Exception {
         changeStatus(queryByOwner(OWNER_A), ASSIGNED);
         changeStatus(queryByOwner(OWNER_A), RUNNING);
 
-        scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken);
-
-        changeStatus(Query.byStatus(UPDATING), KILLED);
+        assertEquals(
+            shardResults(2, ShardUpdateResult.RESTARTING),
+            scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken));
+        changeStatus(Query.byStatus(UPDATING), FINISHED);
 
         assertThat(getTasks(Query.byStatus(PENDING)).size(), is(numTasks + additionalTasks));
-
-        changeStatus(Query.byStatus(RUNNING), KILLING);
-        changeStatus(Query.byStatus(PENDING), ASSIGNED);
-        changeStatus(Query.byStatus(ASSIGNED), RUNNING);
-
         return SUCCESS;
+      }
+
+      @Override void postUpdate() {
+        changeStatus(Query.byStatus(KILLING), FINISHED);
       }
 
       @Override void verify(Set<ScheduledTask> tasks, JobConfiguration oldJob,
           JobConfiguration updatedJob) {
+
         verifyUpdate(tasks, updatedJob, new Closure<ScheduledTask>() {
           @Override public void execute(ScheduledTask state) {
             TwitterTaskInfo task = Tasks.SCHEDULED_TO_INFO.apply(state);
@@ -1699,32 +1802,43 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testIncreaseShardsRollback() throws Exception {
-    int numTasks = 5;
+    final int numTasks = 2;
     // Kill Tasks called at RUNNING->UPDATING.
     expectKillTask(numTasks);
 
-    new UpdaterTest(numTasks, 5) {
+    new UpdaterTest(numTasks, 2) {
       @Override UpdateResult performRegisteredUpdate(JobConfiguration job, String updateToken,
           Set<Integer> jobShards, int numTasks, int additionalTasks) throws Exception {
         changeStatus(queryByOwner(OWNER_A), ASSIGNED);
         changeStatus(queryByOwner(OWNER_A), RUNNING);
 
-        scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken);
-
+        Map<Integer, ShardUpdateResult> expected =
+            ImmutableMap.<Integer, ShardUpdateResult>builder()
+                .putAll(shardResults(numTasks, ShardUpdateResult.RESTARTING))
+                .putAll(shardResults(2, 3, ShardUpdateResult.ADDED))
+                .build();
+        assertEquals(
+            expected,
+            scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken));
         changeStatus(Query.byStatus(UPDATING), KILLED);
 
         assertThat(getTasks(Query.byStatus(PENDING)).size(), is(numTasks + additionalTasks));
 
-        scheduler.rollbackShards(OWNER_A.role, JOB_A, jobShards, updateToken);
-
-        changeStatus(Query.byStatus(PENDING), ASSIGNED);
-        changeStatus(Query.byStatus(ASSIGNED), RUNNING);
+        assertEquals(
+            shardResults(numTasks, ShardUpdateResult.RESTARTING),
+            scheduler.rollbackShards(OWNER_A.role, JOB_A, ImmutableSet.of(0, 1), updateToken));
 
         return UpdateResult.FAILED;
       }
 
+      @Override void postUpdate() {
+        changeStatus(Query.byStatus(KILLING), FINISHED);
+        assertThat(getTasks(Query.activeQuery(Tasks.jobKey(OWNER_A, JOB_A))).size(), is(numTasks));
+      }
+
       @Override void verify(Set<ScheduledTask> tasks, JobConfiguration oldJob,
           JobConfiguration updatedJob) {
+
         verifyUpdate(tasks, oldJob, new Closure<ScheduledTask>() {
           @Override public void execute(ScheduledTask state) {
             TwitterTaskInfo task = Tasks.SCHEDULED_TO_INFO.apply(state);
@@ -1737,7 +1851,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   @Test(expected = ScheduleException.class)
   public void testIncreaseShardsExceedsQuota() throws Exception {
-    int numTasks = 10;
+    int numTasks = DEFAULT_TASKS_IN_QUOTA;
     int additionalTasks = 1;
 
     control.replay();
@@ -1759,10 +1873,10 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testDecreaseShardsRollback() throws Exception {
-    int numTasks = 10;
-    int additionalTasks = -5;
+    final int numTasks = 4;
+    int additionalTasks = -2;
     // Kill Tasks called at RUNNING->UPDATING and PENDING->ROLLBACK
-    int expectedKillTasks = 5;
+    int expectedKillTasks = 2;
     expectKillTask(expectedKillTasks);
 
     new UpdaterTest(numTasks, additionalTasks) {
@@ -1771,18 +1885,22 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         changeStatus(queryByOwner(OWNER_A), ASSIGNED);
         changeStatus(queryByOwner(OWNER_A), RUNNING);
 
-        scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken);
-
+        assertEquals(
+            shardResults(2, ShardUpdateResult.RESTARTING),
+            scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken));
         changeStatus(Query.byStatus(UPDATING), KILLED);
 
         assertThat(getTasks(Query.byStatus(PENDING)).size(), is(numTasks + additionalTasks));
 
-        scheduler.rollbackShards(OWNER_A.role, JOB_A, jobShards, updateToken);
-
-        changeStatus(Query.byStatus(PENDING), ASSIGNED);
-        changeStatus(Query.byStatus(ASSIGNED), RUNNING);
+        assertEquals(
+            shardResults(2, ShardUpdateResult.RESTARTING),
+            scheduler.rollbackShards(OWNER_A.role, JOB_A, jobShards, updateToken));
 
         return UpdateResult.FAILED;
+      }
+
+      @Override void postUpdate() {
+        assertThat(getTasks(Query.activeQuery(Tasks.jobKey(OWNER_A, JOB_A))).size(), is(numTasks));
       }
 
       @Override void verify(Set<ScheduledTask> tasks, JobConfiguration oldJob,

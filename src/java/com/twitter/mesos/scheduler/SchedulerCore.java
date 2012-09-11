@@ -1,5 +1,6 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Map;
 import java.util.Set;
 
 import javax.annotation.Nullable;
@@ -11,6 +12,7 @@ import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.ShardUpdateResult;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
@@ -126,9 +128,13 @@ public interface SchedulerCore
    * @param updateToken A unique string identifying the update, must be provided from
    *                    {@link #initiateJobUpdate(JobConfiguration)}.
    * @throws ScheduleException If there was an error in updating the state to UPDATING.
+   * @return The action taken on each of the shards.
    */
-  void updateShards(String role, String jobName, Set<Integer> shards, String updateToken)
-      throws ScheduleException;
+  Map<Integer, ShardUpdateResult> updateShards(
+      String role,
+      String jobName,
+      Set<Integer> shards,
+      String updateToken) throws ScheduleException;
 
   /**
    * Initiates a rollback of the specified shards.
@@ -140,9 +146,13 @@ public interface SchedulerCore
    * @param updateToken A unique string identifying the update, must be provided from
    *                    {@link #initiateJobUpdate(JobConfiguration)}
    * @throws ScheduleException If there was an error in updating the state to ROLLBACK.
+   * @return The action taken on each of the shards.
    */
-  void rollbackShards(String role, String jobName, Set<Integer> shards, String updateToken)
-      throws ScheduleException;
+  Map<Integer, ShardUpdateResult> rollbackShards(
+      String role,
+      String jobName,
+      Set<Integer> shards,
+      String updateToken) throws ScheduleException;
 
   /**
    * Completes an update.

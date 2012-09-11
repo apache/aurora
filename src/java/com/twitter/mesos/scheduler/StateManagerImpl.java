@@ -26,6 +26,7 @@ import com.google.common.base.Suppliers;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -57,6 +58,7 @@ import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.ShardUpdateResult;
 import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
@@ -81,11 +83,14 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.transform;
 
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
+import static com.twitter.mesos.Tasks.SCHEDULED_TO_SHARD_ID;
 import static com.twitter.mesos.Tasks.jobKey;
 import static com.twitter.mesos.gen.ScheduleStatus.INIT;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.UNKNOWN;
+import static com.twitter.mesos.scheduler.Shards.GET_NEW_CONFIG;
+import static com.twitter.mesos.scheduler.Shards.GET_ORIGINAL_CONFIG;
 
 /**
  * Manager of all persistence-related operations for the scheduler.  Acts as a controller for
@@ -127,20 +132,6 @@ public class StateManagerImpl implements StateManager {
         }
       };
 
-  private static final Predicate<TaskUpdateConfiguration> SELECT_SHARDS_TO_KILL =
-      new Predicate<TaskUpdateConfiguration>() {
-        @Override public boolean apply(TaskUpdateConfiguration config) {
-          return config.getNewConfig() == null;
-        }
-      };
-
-  private static final Function<TaskUpdateConfiguration, Integer> GET_ORIGINAL_SHARD_ID =
-    new Function<TaskUpdateConfiguration, Integer>() {
-      @Override public Integer apply(TaskUpdateConfiguration config) {
-        return config.getOldConfig().getShardId();
-      }
-    };
-
   private static final Function<Protos.Attribute, String> VALUE_CONVERTER =
       new Function<Protos.Attribute, String>() {
         @Override public String apply(Protos.Attribute attribute) {
@@ -167,6 +158,15 @@ public class StateManagerImpl implements StateManager {
       return new Attribute(entry.getKey(), ImmutableSet.copyOf(values));
     }
   };
+
+  private static final Function<TwitterTaskInfo, TwitterTaskInfo> COPY_AND_RESET_START_COMMAND =
+      new Function<TwitterTaskInfo, TwitterTaskInfo>() {
+        @Override public TwitterTaskInfo apply(TwitterTaskInfo task) {
+          TwitterTaskInfo copy = task.deepCopy();
+          ConfigurationManager.resetStartCommand(copy);
+          return copy;
+        }
+      };
 
   private final AtomicLong shardSanityCheckFails = Stats.exportLong("shard_sanity_check_failures");
 
@@ -512,7 +512,7 @@ public class StateManagerImpl implements StateManager {
         }
 
         UpdateStore.Mutable updateStore = storeProvider.getUpdateStore();
-        if (fetchShardUpdateConfig(updateStore, role, job, 0).isPresent()) {
+        if (updateStore.fetchJobUpdateConfig(role, job).isPresent()) {
           throw new UpdateException("Update already in progress for " + jobKey);
         }
 
@@ -535,36 +535,8 @@ public class StateManagerImpl implements StateManager {
     });
   }
 
-  private Optional<TaskUpdateConfiguration> fetchShardUpdateConfig(
-      UpdateStore updateStore,
-      String role,
-      String job,
-      int shard) {
-
-    Optional<JobUpdateConfiguration> optional = updateStore.fetchJobUpdateConfig(role, job);
-    return optional.isPresent()
-        ? fetchShardUpdateConfig(optional.get(), shard)
-        : Optional.<TaskUpdateConfiguration>absent();
-  }
-
-  private Optional<TaskUpdateConfiguration> fetchShardUpdateConfig(
-      JobUpdateConfiguration config,
-      int shard) {
-
-    Set<TaskUpdateConfiguration> matches = fetchShardUpdateConfigs(config, ImmutableSet.of(shard));
-    return Optional.fromNullable(Iterables.getOnlyElement(matches, null));
-  }
-
-  private Set<TaskUpdateConfiguration> fetchShardUpdateConfigs(
-      JobUpdateConfiguration config,
-      Set<Integer> shards) {
-
-    return ImmutableSet.copyOf(Iterables.filter(config.getConfigs(),
-        Predicates.compose(Predicates.in(shards), GET_SHARD)));
-  }
-
   /**
-   * Terminates an in-progress update.
+   * Completes an in-progress update.
    *
    * @param role Role owning the update to finish.
    * @param job Job to finish updating.
@@ -608,8 +580,11 @@ public class StateManagerImpl implements StateManager {
           throw new UpdateException("Invalid update token for " + jobKey);
         }
 
-        if (result == UpdateResult.SUCCESS) {
-          for (Integer shard : fetchShardsToKill(jobConfig.get())) {
+        if (EnumSet.of(UpdateResult.SUCCESS, UpdateResult.FAILED).contains(result)) {
+          // Kill any shards that were removed during the update or rollback.
+          Function<TaskUpdateConfiguration, TwitterTaskInfo> removedSelector =
+              (result == UpdateResult.SUCCESS) ? GET_NEW_CONFIG : GET_ORIGINAL_CONFIG;
+          for (Integer shard : fetchRemovedShards(jobConfig.get(), removedSelector)) {
             changeState(
                 Query.liveShard(jobKey, shard),
                 KILLING,
@@ -623,10 +598,24 @@ public class StateManagerImpl implements StateManager {
     });
   }
 
-  private Set<Integer> fetchShardsToKill(JobUpdateConfiguration jobConfig) {
-    return ImmutableSet.copyOf(Iterables.transform(Iterables.filter(
-        jobConfig.getConfigs(), SELECT_SHARDS_TO_KILL),
-        GET_ORIGINAL_SHARD_ID));
+  private static final Function<TaskUpdateConfiguration, Integer> GET_SHARD_ID =
+      new Function<TaskUpdateConfiguration, Integer>() {
+        @Override public Integer apply(TaskUpdateConfiguration config) {
+          TwitterTaskInfo task = (config.getOldConfig() != null)
+              ? config.getOldConfig()
+              : config.getNewConfig();
+          return task.getShardId();
+        }
+      };
+
+  private Set<Integer> fetchRemovedShards(
+      JobUpdateConfiguration jobConfig,
+      Function<TaskUpdateConfiguration, TwitterTaskInfo> configSelector) {
+
+    return FluentIterable.from(jobConfig.getConfigs())
+        .filter(Predicates.compose(Predicates.isNull(), configSelector))
+        .transform(GET_SHARD_ID)
+        .toImmutableSet();
   }
 
   /**
@@ -731,7 +720,7 @@ public class StateManagerImpl implements StateManager {
    * @return the number of successful state changes.
    */
   @VisibleForTesting
-  public synchronized int changeState(TaskQuery query, ScheduleStatus newState) {
+  synchronized int changeState(TaskQuery query, ScheduleStatus newState) {
     return changeState(query, stateUpdater(newState));
   }
 
@@ -823,36 +812,148 @@ public class StateManagerImpl implements StateManager {
     changeState(Query.byId(missingTaskIds), ScheduleStatus.LOST, Optional.of("Task timed out."));
   }
 
+  @VisibleForTesting
+  static void putResults(
+      ImmutableMap.Builder<Integer, ShardUpdateResult> builder,
+      ShardUpdateResult result,
+      Iterable<Integer> shardIds) {
+
+    for (int shardId : shardIds) {
+      builder.put(shardId, result);
+    }
+  }
+
+  private Set<Integer> getChangedShards(Set<ScheduledTask> tasks, Set<TwitterTaskInfo> compareTo) {
+    Set<TwitterTaskInfo> oldTasks = ImmutableSet.copyOf(Iterables.transform(tasks,
+        Functions.compose(COPY_AND_RESET_START_COMMAND, Tasks.SCHEDULED_TO_INFO)));
+    Set<TwitterTaskInfo> changedTasks = Sets.difference(compareTo, oldTasks);
+    return ImmutableSet.copyOf(Iterables.transform(changedTasks, Tasks.INFO_TO_SHARD_ID));
+  }
+
+  synchronized Map<Integer, ShardUpdateResult> modifyShards(
+      final String role,
+      final String jobName,
+      final Set<Integer> shards,
+      final String updateToken,
+      boolean updating) throws UpdateException {
+
+    final Function<TaskUpdateConfiguration, TwitterTaskInfo> configSelector = updating
+        ? GET_NEW_CONFIG
+        : GET_ORIGINAL_CONFIG;
+    final ScheduleStatus modifyingState = updating
+        ? ScheduleStatus.UPDATING
+        : ScheduleStatus.ROLLBACK;
+
+    managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
+    return transactionalStorage.doInWriteTransaction(
+        new MutateWork<Map<Integer, ShardUpdateResult>, UpdateException>() {
+          @Override public Map<Integer, ShardUpdateResult> apply(
+              MutableStoreProvider store) throws UpdateException {
+
+            ImmutableMap.Builder<Integer, ShardUpdateResult> result = ImmutableMap.builder();
+
+            String jobKey = Tasks.jobKey(role, jobName);
+            Optional<JobUpdateConfiguration> updateConfig =
+                store.getUpdateStore().fetchJobUpdateConfig(role, jobName);
+            if (!updateConfig.isPresent()) {
+              throw new UpdateException("No active update found for " + jobKey);
+            }
+
+            if (!updateConfig.get().getUpdateToken().equals(updateToken)) {
+              throw new UpdateException("Invalid update token for " + jobKey);
+            }
+
+            Set<ScheduledTask> tasks =
+                store.getTaskStore().fetchTasks(Query.liveShards(jobKey, shards));
+
+            // Extract any shard IDs that are being added as a part of this stage in the update.
+            Set<Integer> newShardIds = Sets.difference(shards,
+                ImmutableSet.copyOf(Iterables.transform(tasks, SCHEDULED_TO_SHARD_ID)));
+
+            if (!newShardIds.isEmpty()) {
+              Set<TwitterTaskInfo> newTasks = fetchTaskUpdateConfigs(
+                  updateConfig.get(),
+                  newShardIds,
+                  configSelector);
+              Set<Integer> unrecognizedShards = Sets.difference(newShardIds,
+                  ImmutableSet.copyOf(Iterables.transform(newTasks, Tasks.INFO_TO_SHARD_ID)));
+              if (!unrecognizedShards.isEmpty()) {
+                throw new UpdateException(
+                    "Cannot update unrecognized shards " + unrecognizedShards);
+              }
+
+              // Create new tasks, so they will be moved into the PENDING state.
+              insertTasks(newTasks);
+              putResults(result, ShardUpdateResult.ADDED, newShardIds);
+            }
+
+            Set<Integer> updateShardIds = Sets.difference(shards, newShardIds);
+            if (!updateShardIds.isEmpty()) {
+              Set<TwitterTaskInfo> targetConfigs = fetchTaskUpdateConfigs(
+                  updateConfig.get(),
+                  updateShardIds,
+                  configSelector);
+              Set<Integer> changedShards = getChangedShards(tasks, targetConfigs);
+              if (!changedShards.isEmpty()) {
+                // Initiate update on the existing shards.
+                // TODO(William Farner): The additional query could be avoided here.
+                //                       Consider allowing state changes on tasks by task ID.
+                changeState(Query.liveShards(jobKey, changedShards), modifyingState);
+                putResults(result, ShardUpdateResult.RESTARTING, changedShards);
+              }
+              putResults(
+                  result,
+                  ShardUpdateResult.UNCHANGED,
+                  Sets.difference(updateShardIds, changedShards));
+            }
+
+            return result.build();
+          }
+        });
+  }
+
+  private Optional<TaskUpdateConfiguration> fetchShardUpdateConfig(
+      UpdateStore updateStore,
+      String role,
+      String job,
+      int shard) {
+
+    Optional<JobUpdateConfiguration> optional = updateStore.fetchJobUpdateConfig(role, job);
+    if (optional.isPresent()) {
+      Set<TaskUpdateConfiguration> matches =
+          fetchShardUpdateConfigs(optional.get(), ImmutableSet.of(shard));
+      return Optional.fromNullable(Iterables.getOnlyElement(matches, null));
+    } else {
+      return Optional.absent();
+    }
+  }
+
+  private Set<TaskUpdateConfiguration> fetchShardUpdateConfigs(
+      JobUpdateConfiguration config,
+      Set<Integer> shards) {
+
+    return ImmutableSet.copyOf(Iterables.filter(config.getConfigs(),
+        Predicates.compose(Predicates.in(shards), GET_SHARD)));
+  }
+
   /**
-   * Fetches the updated configuration of a shard.
+   * Fetches the task configurations for shards in the context of an in-progress job update.
    *
-   * @param role Job owner.
-   * @param job Job to fetch updated configs for.
    * @param shards Shards within a job to fetch.
    * @return The task information of the shard.
    */
-  Set<TwitterTaskInfo> fetchUpdatedTaskConfigs(
-      final String role,
-      final String job,
-      final Set<Integer> shards) {
+  private Set<TwitterTaskInfo> fetchTaskUpdateConfigs(
+      JobUpdateConfiguration config,
+      final Set<Integer> shards,
+      final Function<TaskUpdateConfiguration, TwitterTaskInfo> configSelector) {
 
-    checkNotNull(role);
-    checkNotNull(job);
+    checkNotNull(config);
     checkNotBlank(shards);
-    managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
-
-    Set<TaskUpdateConfiguration> configs = readOnlyStorage.doInTransaction(
-        new Work.Quiet<Set<TaskUpdateConfiguration>>() {
-          @Override public Set<TaskUpdateConfiguration> apply(StoreProvider storeProvider) {
-            Optional<JobUpdateConfiguration> config =
-                storeProvider.getUpdateStore().fetchJobUpdateConfig(role, job);
-            return config.isPresent()
-                ? fetchShardUpdateConfigs(config.get(), shards)
-                : ImmutableSet.<TaskUpdateConfiguration>of();
-          }
-        });
-
-    return ImmutableSet.copyOf(Iterables.transform(configs, Shards.GET_NEW_CONFIG));
+    return FluentIterable
+        .from(fetchShardUpdateConfigs(config, shards))
+        .transform(configSelector)
+        .filter(Predicates.notNull())
+        .toImmutableSet();
   }
 
   /**
