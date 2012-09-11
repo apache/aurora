@@ -14,6 +14,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Ordering;
 
 import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.Constants;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
@@ -21,24 +22,8 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 
-import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
-import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
-import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
-import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
-import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
-import static com.twitter.mesos.gen.ScheduleStatus.LOST;
-import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
-import static com.twitter.mesos.gen.ScheduleStatus.PREEMPTING;
-import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
-import static com.twitter.mesos.gen.ScheduleStatus.ROLLBACK;
-import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
-import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
-import static com.twitter.mesos.gen.ScheduleStatus.UPDATING;
-
 /**
  * Utility class providing convenience functions relating to tasks.
- *
- * @author William Farner
  */
 public final class Tasks {
 
@@ -102,15 +87,14 @@ public final class Tasks {
   /**
    * Different states that an active task may be in.
    */
-  public static final EnumSet<ScheduleStatus> ACTIVE_STATES = EnumSet.of(
-      PENDING, ASSIGNED, STARTING, RUNNING, KILLING, RESTARTING, UPDATING, ROLLBACK, PREEMPTING);
+  public static final EnumSet<ScheduleStatus> ACTIVE_STATES =
+      EnumSet.copyOf(Constants.ACTIVE_STATES);
 
   /**
    * Terminal states, which a task should not move from.
    */
-  public static final Set<ScheduleStatus> TERMINAL_STATES = EnumSet.of(
-      FAILED, FINISHED, KILLED, LOST
-  );
+  public static final Set<ScheduleStatus> TERMINAL_STATES =
+      EnumSet.copyOf(Constants.TERMINAL_STATES);
 
   /**
    * Filter that includes only active tasks.

@@ -508,7 +508,7 @@ public class StateManagerImpl implements StateManager {
             Tasks.SCHEDULED_TO_INFO));
 
         if (existingTasks.isEmpty()) {
-          throw new UpdateException("No active tasks found for job" + jobKey);
+          throw new UpdateException("No active tasks found for job " + jobKey);
         }
 
         UpdateStore.Mutable updateStore = storeProvider.getUpdateStore();

@@ -6,12 +6,14 @@ import cmd
 import functools
 import json
 import os
+import pprint
 import subprocess
 import sys
 import time
 from urlparse import urljoin
 import zookeeper
 
+from tempfile import NamedTemporaryFile
 from pystachio import Ref
 
 from twitter.common import app, log
@@ -26,11 +28,10 @@ from twitter.mesos.parsers.pystachio_codec import PystachioCodec
 from twitter.thermos.base.options import add_binding_to
 
 from gen.twitter.mesos.ttypes import *
+from gen.twitter.mesos.constants import ACTIVE_STATES
 
-__authors__ = ['William Farner',
-               'Travis Crawford',
-               'Alex Roetter']
 
+# States for tasks that are running on a machine.
 LIVE_TASK_STATES = set([ScheduleStatus.KILLING,
                         ScheduleStatus.PREEMPTING,
                         ScheduleStatus.RUNNING,
@@ -187,6 +188,41 @@ class MesosCLI(cmd.Cmd):
     check_and_log_response(resp)
     self.handle_open(config.cluster(), api.scheduler(), config.role(), config.name())
 
+  @requires.exactly('job', 'config_file')
+  def do_diff(self, job, config_file):
+    config = get_config(job, config_file, self._get_packer)
+    api = MesosClientAPI(cluster=config.cluster(), verbose=self.options.verbose)
+    resp = self.query(config.role(), job, api=api, statuses=ACTIVE_STATES)
+    if not resp.responseCode:
+      _die('Request failed, server responded with "%s"' % resp.message)
+    remote_tasks = [t.assignedTask.task for t in resp.tasks]
+    resp = api.populate_job_config(config)
+    if not resp.responseCode:
+      _die('Request failed, server responded with "%s"' % resp.message)
+    local_tasks = resp.populated
+
+    pp = pprint.PrettyPrinter(indent=2)
+    def pretty_print_task(task):
+      # The raw configuration is not interesting - we only care about what gets parsed.
+      task.configuration = None
+      return pp.pformat(vars(task))
+
+    def pretty_print_tasks(tasks):
+      shard_ordered = sorted(tasks, key=lambda t: t.shardId)
+      return ',\n'.join([pretty_print_task(t) for t in shard_ordered])
+
+    def dump_tasks(tasks, out_file):
+      out_file.write(pretty_print_tasks(tasks))
+      out_file.write('\n')
+      out_file.flush()
+
+    diff_program = os.environ.get('DIFF_VIEWER', 'diff')
+    with NamedTemporaryFile() as local:
+      dump_tasks(local_tasks, local)
+      with NamedTemporaryFile() as remote:
+        dump_tasks(remote_tasks, remote)
+        subprocess.call([diff_program, remote.name, local.name])
+
   @requires.nothing
   def do_open(self, *args):
     """open --cluster=CLUSTER [role [job]]"""
@@ -235,7 +271,6 @@ class MesosCLI(cmd.Cmd):
   def do_status(self, *line):
     """status role job"""
 
-    ACTIVE_STATES = set([ScheduleStatus.PENDING, ScheduleStatus.STARTING, ScheduleStatus.RUNNING])
     def is_active(task):
       return task.status in ACTIVE_STATES
 
@@ -362,7 +397,7 @@ class MesosCLI(cmd.Cmd):
     query.jobName = job
     query.shardIds = shards
     api = api or MesosClientAPI(cluster=self.options.cluster, verbose=self.options.verbose)
-    return api.client().getTasksStatus(query)
+    return api.query(query)
 
   @requires.exactly('role', 'job', 'shard')
   def do_ssh(self, *line):

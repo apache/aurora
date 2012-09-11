@@ -235,6 +235,9 @@ class MesosClientAPI(MesosClientBase):
     log.info('Creating job %s' % config.name())
     return self.client().createJob(config.job(), self.session_key())
 
+  def populate_job_config(self, config):
+    return self.client().populateJobConfig(config.job())
+
   def start_cronjob(self, role, jobname):
     log.info("Starting cron job: %s" % jobname)
 
@@ -256,6 +259,9 @@ class MesosClientAPI(MesosClientBase):
     query.owner = Identity(role=role)
     if jobname:
       query.jobName = jobname
+    return self.query(query)
+
+  def query(self, query):
     return self.client().getTasksStatus(query)
 
   def update_job(self, config, shards=None, copy_app_from=None):

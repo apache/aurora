@@ -28,6 +28,7 @@ import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.KillResponse;
 import com.twitter.mesos.gen.MesosAdmin;
 import com.twitter.mesos.gen.MesosAdmin.Iface;
+import com.twitter.mesos.gen.PopulateJobResponse;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.RestartResponse;
 import com.twitter.mesos.gen.RollbackShardsResponse;
@@ -118,6 +119,12 @@ class LoggingThriftInterface implements MesosAdmin.Iface {
 
     logUserAction(session, "create job " + Tasks.jobKey(description));
     return delegate.createJob(description, session);
+  }
+
+  @Override
+  public PopulateJobResponse populateJobConfig(JobConfiguration description) throws TException {
+    LOG.info("Request to populate job config " + Tasks.jobKey(description));
+    return delegate.populateJobConfig(description);
   }
 
   @Override

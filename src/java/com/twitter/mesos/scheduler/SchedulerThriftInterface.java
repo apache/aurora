@@ -30,6 +30,7 @@ import com.twitter.mesos.gen.GetQuotaResponse;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.KillResponse;
 import com.twitter.mesos.gen.MesosAdmin;
+import com.twitter.mesos.gen.PopulateJobResponse;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ResponseCode;
 import com.twitter.mesos.gen.RestartResponse;
@@ -48,6 +49,7 @@ import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.UpdateShardsResponse;
 import com.twitter.mesos.scheduler.SchedulerCore.RestartException;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
+import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -163,6 +165,22 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
           .setMessage("Failed to schedule job - " + e.getMessage());
     }
 
+    return response;
+  }
+
+  @Override
+  public PopulateJobResponse populateJobConfig(JobConfiguration description) {
+    checkNotNull(description);
+
+    PopulateJobResponse response = new PopulateJobResponse();
+    try {
+      response.setPopulated(ConfigurationManager.validateAndPopulate(description).getTaskConfigs())
+          .setResponseCode(OK)
+          .setMessage("Tasks populated");
+    } catch (TaskDescriptionException e) {
+      response.setResponseCode(INVALID_REQUEST)
+          .setMessage("Invalid configuration: " + e.getMessage());
+    }
     return response;
   }
 
