@@ -237,6 +237,7 @@ public class SchedulerModule extends AbstractModule {
 
     bind(SchedulerLifecycle.class).in(Singleton.class);
     bind(AttributeStore.Mutable.class).to(AttributeStoreImpl.class);
+    bind(AttributeStoreImpl.class).in(Singleton.class);
 
     QuotaModule.bind(binder());
     PeriodicTaskModule.bind(binder());
