@@ -65,6 +65,23 @@ class Updater(object):
               (self._failures_by_shard[shard], shard, self._max_shard_failures))
     return is_failed
 
+  def _maybe_watch_shards(self, shard_states, batch_shards, restart_threshold, watch_seconds):
+    if shard_states:
+      no_watch_states = (ShardUpdateResult.UNCHANGED, )
+      watch_states = (ShardUpdateResult.RESTARTING, ShardUpdateResult.ADDED)
+
+      unchanged_shards = dict(filter(lambda i: i[1] in no_watch_states, shard_states.iteritems()))
+      if unchanged_shards:
+        log.info('Not watching unchanged shards %s' % unchanged_shards.keys())
+      watch_shards = dict(filter(lambda i: i[1] in watch_states, shard_states.iteritems()))
+    else:
+      log.error('No shard actions returned by scheduler, assuming all shards restarted.')
+      watch_shards = batch_shards
+    if watch_shards:
+      return self.watch_shards(watch_shards, restart_threshold, watch_seconds)
+    else:
+      return []
+
   def update(self, update_config, initial_shards):
     """Performs the job update, blocking until it completes.
     A rollback will be performed if the update was considered a failure based on the
@@ -91,7 +108,10 @@ class Updater(object):
       log.log(debug_if(resp.responseCode == UpdateResponseCode.OK),
         'Response from scheduler: %s (message: %s)' % (
           UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
-      failed_shards = self.watch_shards(batch_shards, update_config['restartThreshold'],
+      failed_shards = self._maybe_watch_shards(
+          resp.shards,
+          batch_shards,
+          update_config['restartThreshold'],
           update_config['watchSecs'])
       log.log(debug_if(not failed_shards), 'Failed shards: %s' % failed_shards)
       remaining_shards += failed_shards
@@ -123,7 +143,10 @@ class Updater(object):
       log.log(debug_if(resp.responseCode == UpdateResponseCode.OK),
         'Response from scheduler: %s (message: %s)'
           % (UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
-      failed_shards += self.watch_shards(batch_shards, update_config['restartThreshold'],
+      failed_shards += self._maybe_watch_shards(
+          resp.shards,
+          batch_shards,
+          update_config['restartThreshold'],
           update_config['watchSecs'])
 
     if failed_shards:

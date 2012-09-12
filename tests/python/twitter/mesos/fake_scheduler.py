@@ -52,6 +52,16 @@ class FakeScheduler:
     """
     self._status_calls.append(statuses)
 
+  def _handle_update(self, name, call_queue, actual_args):
+    assert call_queue, 'Unexpected call to %s(%s)' % (name, str(actual_args))
+    response = call_queue.popleft()
+    expected = response[:-1]
+    assert expected == actual_args, ('Call to %s(%s), expected %s(%s)'
+                                     % (name, str(actual_args), name, str(expected)))
+    resp = UpdateShardsResponse(responseCode=UpdateResponseCode.OK, message='test')
+    resp.shards = response[-1]
+    return resp
+
   def updateShards(self, role, job, shard_ids, update_token, session):
     """Check input paramters with expected paramters queued by expect_restart_tasks.
 
@@ -63,16 +73,11 @@ class FakeScheduler:
 
     Returns an UpdateResponseCode OK
     """
-    assert self._restart_calls, ('Unexpected call to restart_tasks(%s, %s, %s)'
-        % (role, job, shard_ids))
-    response = self._restart_calls.popleft()
-    assert role == response[0] and job == response[1] and shard_ids == response[2], (
-        'Call to restart_tasks(%s, %s, %s), expected restart_tasks(%s, %s, %s)' %
-            (role, job, shard_ids, response[0], response[1], response[2]))
-    resp = UpdateShardsResponse(responseCode = UpdateResponseCode.OK, message = 'test')
-    return resp
+    return self._handle_update('updateShards',
+                               self._restart_calls,
+                               (role, job, shard_ids, update_token))
 
-  def expect_updateShards(self, role, job, shard_ids, update_token):
+  def expect_updateShards(self, role, job, shard_ids, update_token, shard_results):
     """Sets up an expectation for a restart_tasks call to be made.
 
     Arguments:
@@ -81,7 +86,7 @@ class FakeScheduler:
     shard_ids -- set of shards.
     update_token -- unique token identifying the current update.
     """
-    self._restart_calls.append((role, job, shard_ids))
+    self._restart_calls.append((role, job, shard_ids, update_token, shard_results))
 
   def rollbackShards(self, role, job, shard_ids, update_token, session):
     """Check input paramters with expected paramters queued by expect_rollback_tasks.
@@ -94,16 +99,11 @@ class FakeScheduler:
 
     Returns an UpdateResponseCode OK
     """
-    assert self._rollback_calls, ('Unexpected call to rollback_tasks(%s, %s, %s)'
-        % (role, job, shard_ids))
-    response = self._rollback_calls.popleft()
-    assert role == response[0] and job == response[1] and shard_ids == response[2], (
-        'Call to rollback_tasks(%s, %s, %s), expected rollback_tasks(%s, %s, %s)' %
-            (role, job, shard_ids, response[0], response[1], response[2]))
-    resp = UpdateShardsResponse(responseCode = UpdateResponseCode.OK, message = 'test')
-    return resp
+    return self._handle_update('rollbackShards',
+                               self._rollback_calls,
+                               (role, job, shard_ids, update_token))
 
-  def expect_rollbackShards(self, role, job, shard_ids, update_token):
+  def expect_rollbackShards(self, role, job, shard_ids, update_token, shard_results):
     """Sets up an expectation for a rollback_tasks call to be made.
 
     Arguments:
@@ -112,4 +112,4 @@ class FakeScheduler:
     shard_ids -- set of shards.
     update_token -- unique token identifying the current update.
     """
-    self._rollback_calls.append((role, job, shard_ids))
+    self._rollback_calls.append((role, job, shard_ids, update_token, shard_results))

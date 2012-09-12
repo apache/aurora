@@ -63,8 +63,6 @@ import static com.twitter.mesos.gen.ResponseCode.WARNING;
 /**
  * Mesos scheduler thrift server implementation.
  * Interfaces between mesos users and the scheduler core to perform cluster administration tasks.
- *
- * @author William Farner
  */
 public class SchedulerThriftInterface implements MesosAdmin.Iface {
   @VisibleForTesting
@@ -359,9 +357,9 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
 
     UpdateShardsResponse response = new UpdateShardsResponse();
     try {
-      schedulerCore.updateShards(role, jobName, shards, updateToken);
-      response.setResponseCode(UpdateResponseCode.OK).
-          setMessage("Successfully started update of shards: " + shards);
+      response.setShards(schedulerCore.updateShards(role, jobName, shards, updateToken))
+          .setResponseCode(UpdateResponseCode.OK)
+          .setMessage("Successfully started update of shards: " + shards);
     } catch (ScheduleException e) {
       response.setResponseCode(UpdateResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
     }
@@ -380,8 +378,8 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
 
     RollbackShardsResponse response = new RollbackShardsResponse();
     try {
-      schedulerCore.rollbackShards(role, jobName, shards, updateToken);
-      response.setResponseCode(UpdateResponseCode.OK)
+      response.setShards(schedulerCore.rollbackShards(role, jobName, shards, updateToken))
+          .setResponseCode(UpdateResponseCode.OK)
           .setMessage("Successfully started rollback of shards: " + shards);
     } catch (ScheduleException e) {
       response.setResponseCode(UpdateResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
