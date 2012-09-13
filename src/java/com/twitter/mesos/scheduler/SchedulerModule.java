@@ -114,7 +114,7 @@ public class SchedulerModule extends AbstractModule {
   @CmdLine(name = "initial_task_reschedule_backoff",
       help = "Initial backoff delay for a rescheduled task.")
   private static final Arg<Amount<Long, Time>> INITIAL_RESCHEDULE_BACKOFF =
-      Arg.create(Amount.of(1L, Time.SECONDS));
+      Arg.create(Amount.of(10L, Time.SECONDS));
 
   @CmdLine(name = "max_task_reschedule_backoff",
       help = "Maximum backoff delay for a rescheduled task.")
