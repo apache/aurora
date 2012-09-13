@@ -72,7 +72,7 @@ public class LogStorageModule extends AbstractModule {
            help = "Specifies the frequency at which snapshots of local storage are taken and "
                   + "written to the log.")
   private static final Arg<Amount<Long, Time>> SNAPSHOT_INTERVAL =
-      Arg.create(Amount.of(5L, Time.MINUTES));
+      Arg.create(Amount.of(1L, Time.HOURS));
 
   @CmdLine(name = "dlog_max_entry_size",
            help = "Specifies the maximum entry size to append to the log. Larger entries will be "
