@@ -7,7 +7,6 @@ import com.google.common.collect.ImmutableSet;
 
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Identity;
-import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.TaskQuery;
 
@@ -15,8 +14,6 @@ import static org.apache.commons.lang.StringUtils.isEmpty;
 
 /**
  * A utility class to construct storage queries.
- *
- * @author William Farner
  */
 public final class Query {
   public static final TaskQuery GET_ALL = new TaskQuery();
@@ -96,9 +93,5 @@ public final class Query {
 
   public static TaskQuery activeQuery(Identity owner, String jobName) {
     return activeQuery(Tasks.jobKey(owner, jobName));
-  }
-
-  public static TaskQuery activeQuery(JobConfiguration job) {
-    return activeQuery(job.getOwner(), job.getName());
   }
 }

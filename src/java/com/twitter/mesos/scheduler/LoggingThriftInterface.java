@@ -30,7 +30,6 @@ import com.twitter.mesos.gen.MesosAdmin;
 import com.twitter.mesos.gen.MesosAdmin.Iface;
 import com.twitter.mesos.gen.PopulateJobResponse;
 import com.twitter.mesos.gen.Quota;
-import com.twitter.mesos.gen.RestartResponse;
 import com.twitter.mesos.gen.RollbackShardsResponse;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduleStatusResponse;
@@ -189,12 +188,6 @@ class LoggingThriftInterface implements MesosAdmin.Iface {
   public KillResponse killTasks(TaskQuery query, SessionKey session) throws TException {
     logUserAction(session, "kill tasks matching " + query);
     return delegate.killTasks(query, session);
-  }
-
-  @Override
-  public RestartResponse restartTasks(Set<String> taskIds, SessionKey session) throws TException {
-    logUserAction(session, "restart tasks " + taskIds);
-    return delegate.restartTasks(taskIds, session);
   }
 
   @Override

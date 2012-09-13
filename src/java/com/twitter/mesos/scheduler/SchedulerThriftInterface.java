@@ -10,7 +10,6 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
 import com.twitter.common.args.Arg;
@@ -33,7 +32,6 @@ import com.twitter.mesos.gen.MesosAdmin;
 import com.twitter.mesos.gen.PopulateJobResponse;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ResponseCode;
-import com.twitter.mesos.gen.RestartResponse;
 import com.twitter.mesos.gen.RollbackShardsResponse;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduleStatusResponse;
@@ -47,7 +45,6 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResponseCode;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.UpdateShardsResponse;
-import com.twitter.mesos.scheduler.SchedulerCore.RestartException;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
@@ -58,7 +55,6 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.mesos.gen.ResponseCode.AUTH_FAILED;
 import static com.twitter.mesos.gen.ResponseCode.INVALID_REQUEST;
 import static com.twitter.mesos.gen.ResponseCode.OK;
-import static com.twitter.mesos.gen.ResponseCode.WARNING;
 
 /**
  * Mesos scheduler thrift server implementation.
@@ -277,39 +273,6 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     } catch (BackoffHelper.BackoffStoppedException e) {
       response.setResponseCode(ResponseCode.ERROR).setMessage("Tasks were not killed in time.");
     }
-    return response;
-  }
-
-  // TODO(William Farner); This should address a job/shard and not task IDs, and should check to
-  //     ensure that the shards requested exist (reporting failure and ignoring request otherwise).
-  @Override
-  public RestartResponse restartTasks(Set<String> taskIds, SessionKey session) {
-    checkNotBlank(taskIds);
-    checkNotNull(session);
-
-    RestartResponse response = new RestartResponse()
-        .setMessage(taskIds.size() + " tasks scheduled for restart.");
-
-    try {
-      validateSessionKeyForTasks(session, Query.byId(taskIds));
-    } catch (AuthFailedException e) {
-      response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
-      return response;
-    }
-
-    // TODO(wfarner): This is busted, fix when we begin restarting tasks by shard instead of task
-    //     ID.
-    Set<String> tasksRestarting = null;
-    try {
-      schedulerCore.restartTasks(taskIds);
-    } catch (RestartException e) {
-      response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
-    }
-    if (!taskIds.equals(tasksRestarting)) {
-      response.setResponseCode(WARNING)
-          .setMessage("Unable to restart tasks: " + Sets.difference(taskIds, tasksRestarting));
-    }
-
     return response;
   }
 

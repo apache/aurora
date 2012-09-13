@@ -8,11 +8,9 @@ import java.util.logging.Logger;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
 import com.twitter.common.util.StateMachine;
@@ -26,20 +24,16 @@ import com.twitter.mesos.gen.ShardUpdateResult;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
-import com.twitter.mesos.scheduler.StateManagerImpl.StateChanger;
-import com.twitter.mesos.scheduler.StateManagerImpl.StateMutation;
 import com.twitter.mesos.scheduler.StateManagerImpl.UpdateException;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 import com.twitter.mesos.scheduler.quota.Quotas;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.collect.Iterables.transform;
 
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.mesos.Tasks.jobKey;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
-import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.ROLLBACK;
 import static com.twitter.mesos.gen.ScheduleStatus.UPDATING;
 import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.CONSTRUCTED;
@@ -296,40 +290,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
     if (!matchingScheduler && !updateFinished && (tasksAffected == 0)) {
       throw new ScheduleException("No jobs to kill");
     }
-  }
-
-  @Override
-  public synchronized void restartTasks(final Set<String> taskIds) throws RestartException {
-    checkStarted();
-    checkNotBlank(taskIds);
-
-    LOG.info("Restart requested for tasks " + taskIds);
-
-    // TODO(William Farner): Change this (and the thrift interface) to query by shard ID in the
-    //    context of a job instead of task ID.
-
-    stateManager.taskOperation(Query.byId(taskIds),
-        new StateMutation<RestartException>() {
-          @Override public void execute(Set<ScheduledTask> tasks, StateChanger changer)
-              throws RestartException {
-
-            if (tasks.size() != taskIds.size()) {
-              Set<String> unknownTasks = Sets.difference(taskIds, Tasks.ids(tasks));
-              throw new RestartException("Restart requested for unknown tasks " + unknownTasks);
-            } else if (Iterables.any(tasks, Predicates.not(Tasks.ACTIVE_FILTER))) {
-              throw new RestartException("Restart requested for inactive tasks "
-                  + Iterables.filter(tasks, Tasks.ACTIVE_FILTER));
-            }
-
-            Set<String> jobKeys = ImmutableSet.copyOf(transform(tasks, Tasks.SCHEDULED_TO_JOB_KEY));
-            if (jobKeys.size() != 1) {
-              throw new RestartException(
-                  "Task restart request cannot span multiple jobs: " + jobKeys);
-            }
-
-            changer.changeState(Tasks.ids(tasks), RESTARTING, "Restarting by client request");
-          }
-        });
   }
 
   private void ensureHasAdditionalQuota(String role, Quota quota) throws ScheduleException {

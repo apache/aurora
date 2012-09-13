@@ -65,16 +65,6 @@ python_binary(
 )
 
 python_binary(
-  name = 'restart_job',
-  source = 'bin/restart_job.py',
-  dependencies = [
-    pants('src/python/twitter/common/log'),
-    pants(':mesos-lib'),
-    pants('3rdparty/python:git-python')
-  ]
-)
-
-python_binary(
   name = 'thermos_codec',
   source = 'bin/thermos_codec.py',
   dependencies = [

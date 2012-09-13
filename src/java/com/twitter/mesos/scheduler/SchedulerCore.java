@@ -205,14 +205,6 @@ public interface SchedulerCore
   }
 
   /**
-   * Schedules a restart on a set of tasks.
-   *
-   * @param taskIds The tasks to restart.
-   * @throws RestartException If the restart request could not be honored.
-   */
-  void restartTasks(Set<String> taskIds) throws RestartException;
-
-  /**
    * Indicates to the scheduler that tasks were deleted on the assigned host.
    *
    * @param taskIds IDs of tasks that were deleted.

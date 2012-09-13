@@ -57,7 +57,6 @@ import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.ValueConstraint;
-import com.twitter.mesos.scheduler.SchedulerCore.RestartException;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import com.twitter.mesos.scheduler.events.TaskPubsubEvent;
@@ -824,38 +823,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   }
 
   @Test
-  public void testRestartTask() throws Exception {
-    expectKillTask(1);
-
-    control.replay();
-    buildScheduler();
-
-    scheduler.registered(FRAMEWORK_ID);
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, 1));
-    changeStatus(queryByOwner(OWNER_A), ASSIGNED);
-    changeStatus(queryByOwner(OWNER_A), STARTING);
-    changeStatus(queryByOwner(OWNER_A), RUNNING);
-
-    String taskId = Tasks.id(getOnlyTask(queryByOwner(OWNER_A)));
-
-    Set<String> restartRequest = ImmutableSet.of(taskId);
-    scheduler.restartTasks(restartRequest);
-
-    // Mimick the master notifying the scheduler of a task state change.
-    changeStatus(query(restartRequest), KILLED);
-
-    assertThat(getTasks(Query.activeQuery(Tasks.jobKey(OWNER_A, JOB_A))).size(), is(1));
-
-    ScheduledTask restartedTask = getOnlyTask(Query.byStatus(KILLED));
-    assertThat(Tasks.id(restartedTask), is(taskId));
-
-    ScheduledTask newTask = getOnlyTask(Query.byStatus(PENDING));
-    assertThat(newTask.getAncestorId(), is(taskId));
-    assertThat(newTask.getAssignedTask().getTask().getShardId(),
-        is(restartedTask.getAssignedTask().getTask().getShardId()));
-  }
-
-  @Test
   public void testKillTask() throws Exception {
     driver.killTask(EasyMock.<String>anyObject());
     // We only expect three kills because the first test does not move out of PENDING.
@@ -891,37 +858,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
       assertThat(getTasks(Query.activeQuery(OWNER_A, JOB_A)).size(), is(0));
     }
-  }
-
-  @Test(expected = RestartException.class)
-  public void testRestartUnknownTask() throws Exception {
-    control.replay();
-    buildScheduler();
-
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, 1));
-    changeStatus(queryByOwner(OWNER_A), ASSIGNED);
-    changeStatus(queryByOwner(OWNER_A), STARTING);
-    changeStatus(queryByOwner(OWNER_A), RUNNING);
-
-    String taskId = Tasks.id(getOnlyTask(queryByOwner(OWNER_A)));
-
-    Set<String> restartRequest = Sets.newHashSet(taskId + 1);
-    scheduler.restartTasks(restartRequest);
-  }
-
-  @Test(expected = RestartException.class)
-  public void testRestartInactiveTask() throws Exception {
-    control.replay();
-    buildScheduler();
-
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, 1));
-    changeStatus(queryByOwner(OWNER_A), ASSIGNED);
-    changeStatus(queryByOwner(OWNER_A), STARTING);
-    changeStatus(queryByOwner(OWNER_A), RUNNING);
-    changeStatus(queryByOwner(OWNER_A), FINISHED);
-
-    String taskId = Tasks.id(getOnlyTask(queryByOwner(OWNER_A)));
-    scheduler.restartTasks(ImmutableSet.of(taskId));
   }
 
   @Test
