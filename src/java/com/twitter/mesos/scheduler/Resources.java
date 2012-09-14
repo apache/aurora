@@ -11,9 +11,7 @@ import com.google.common.collect.DiscreteDomains;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
-import com.google.common.collect.PeekingIterator;
 import com.google.common.collect.Sets;
 
 import org.apache.commons.lang.builder.EqualsBuilder;
@@ -32,8 +30,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * A container for multiple resource vectors.
- *
- * @author William Farner
  */
 public class Resources {
 
@@ -233,6 +229,16 @@ public class Resources {
         .setScalar(Scalar.newBuilder().setValue(value)).build();
   }
 
+  private static final Function<com.google.common.collect.Range<Integer>, Range> RANGE_TRANSFORM =
+      new Function<com.google.common.collect.Range<Integer>, Range>() {
+        @Override public Range apply(com.google.common.collect.Range<Integer> input) {
+          return Range.newBuilder()
+              .setBegin(input.lowerEndpoint())
+              .setEnd(input.upperEndpoint())
+              .build();
+        }
+      };
+
   /**
    * Creates a mesos resource of integer ranges.
    *
@@ -241,26 +247,12 @@ public class Resources {
    * @return A mesos ranges resource.
    */
   static Resource makeMesosRangeResource(String name, Set<Integer> values) {
-    Ranges.Builder builder = Ranges.newBuilder();
-
-    PeekingIterator<Integer> iterator =
-        Iterators.peekingIterator(Sets.newTreeSet(values).iterator());
-
-    // Build ranges until there are no numbers left.
-    while (iterator.hasNext()) {
-      // Start a new range.
-      int start = iterator.next();
-      int end = start;
-      // Increment the end until the range is non-contiguous.
-      while (iterator.hasNext() && (iterator.peek() == (end + 1))) {
-        end++;
-        iterator.next();
-      }
-
-      builder.addRange(Range.newBuilder().setBegin(start).setEnd(end));
-    }
-
-    return Resource.newBuilder().setName(name).setType(Type.RANGES).setRanges(builder).build();
+    return Resource.newBuilder()
+        .setName(name)
+        .setType(Type.RANGES)
+        .setRanges(Ranges.newBuilder()
+            .addAllRange(Iterables.transform(Numbers.toRanges(values), RANGE_TRANSFORM)))
+        .build();
   }
 
   /**

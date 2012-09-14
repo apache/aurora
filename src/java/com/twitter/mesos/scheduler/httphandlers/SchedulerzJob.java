@@ -1,5 +1,6 @@
 package com.twitter.mesos.scheduler.httphandlers;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumSet;
@@ -17,11 +18,17 @@ import javax.ws.rs.core.Response;
 
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
+import com.google.common.collect.HashBiMap;
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
 import com.google.common.collect.Ordering;
+import com.google.common.collect.Range;
 import com.google.inject.Inject;
 
 import org.antlr.stringtemplate.StringTemplate;
@@ -29,12 +36,16 @@ import org.antlr.stringtemplate.StringTemplate;
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.Constraint;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TaskQuery;
+import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.ClusterName;
+import com.twitter.mesos.scheduler.Numbers;
 import com.twitter.mesos.scheduler.SchedulerCore;
 import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
 import com.twitter.mesos.scheduler.metadata.NearestFit;
@@ -163,6 +174,108 @@ public class SchedulerzJob extends JerseyTemplateServlet {
     return ImmutableList.copyOf(Iterables.limit(Iterables.skip(iterable, offset), PAGE_SIZE));
   }
 
+  private static String scaleMb(long mb) {
+    return (mb >= 1024) ? ((mb / 1024) + " GiB") : (mb + " MiB");
+  }
+
+  private static String humanReadableConstraint(TaskConstraint constraint) {
+    StringBuilder sb = new StringBuilder();
+    switch (constraint.getSetField()) {
+      case VALUE:
+        if (constraint.getValue().isNegated()) {
+          sb.append("not ");
+        }
+        sb.append(Joiner.on(", ").join(constraint.getValue().getValues()));
+        break;
+
+      case LIMIT:
+        sb.append("limit ").append(constraint.getLimit().getLimit());
+        break;
+
+      default:
+        sb.append("Unhandled constraint type " + constraint.getSetField());
+    }
+
+    return sb.toString();
+  }
+
+  private static final Function<TwitterTaskInfo, SchedulingDetails> CONFIG_TO_DETAILS =
+      new Function<TwitterTaskInfo, SchedulingDetails>() {
+        @Override public SchedulingDetails apply(TwitterTaskInfo task) {
+          ImmutableMap.Builder<String, Object> details = ImmutableMap.<String, Object>builder()
+              .put("CPU", task.getNumCpus())
+              .put("RAM" , scaleMb(task.getRamMb()))
+              .put("disk", scaleMb(task.getDiskMb()));
+          if (task.isProduction()) {
+            details.put("production", "true");
+          }
+          if (task.getRequestedPortsSize() > 0) {
+            details.put("ports", Joiner.on(",").join(task.getRequestedPorts()));
+          }
+          for (Constraint constraint : task.getConstraints()) {
+            details.put(constraint.getName(), humanReadableConstraint(constraint.getConstraint()));
+          }
+          return new SchedulingDetails(details.build());
+        }
+      };
+
+  static class SchedulingDetails {
+    final Map<String, Object> details;
+
+    SchedulingDetails(ImmutableMap<String, Object> details) {
+      this.details = details;
+    }
+
+    public Map<String, Object> getDetails() {
+      return details;
+    }
+
+    @Override
+    public int hashCode() {
+      return details.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof SchedulingDetails)) {
+        return false;
+      }
+
+      SchedulingDetails other = (SchedulingDetails) o;
+      return other.details.equals(details);
+    }
+  }
+
+  private static final Function<Range<Integer>, String> RANGE_TOSTRING =
+      new Function<Range<Integer>, String>() {
+        @Override public String apply(Range<Integer> range) {
+          int lower = range.lowerEndpoint();
+          int upper = range.upperEndpoint();
+          return (lower == upper) ? String.valueOf(lower) : (lower + " - " + upper);
+        }
+      };
+
+  private static final Function<Collection<Integer>, String> SHARDS_TOSTRING =
+      new Function<Collection<Integer>, String>() {
+        @Override public String apply(Collection<Integer> shards) {
+          return Joiner.on(", ")
+              .join(Iterables.transform(Numbers.toRanges(shards), RANGE_TOSTRING));
+        }
+      };
+
+  private static Map<String, SchedulingDetails> buildSchedulingTable(
+      Iterable<TwitterTaskInfo> tasks) {
+
+    Map<Integer, TwitterTaskInfo> byShard = Maps.uniqueIndex(tasks, Tasks.INFO_TO_SHARD_ID);
+    Map<Integer, SchedulingDetails> detailsByShard =
+        Maps.transformValues(byShard, CONFIG_TO_DETAILS);
+    Multimap<SchedulingDetails, Integer> shardsByDetails = Multimaps.invertFrom(
+        Multimaps.forMap(detailsByShard), HashMultimap.<SchedulingDetails, Integer>create());
+    Map<SchedulingDetails, String> shardStringsByDetails =
+        Maps.transformValues(shardsByDetails.asMap(), SHARDS_TOSTRING);
+    return HashBiMap.create(shardStringsByDetails).inverse();
+  }
+
   /**
    * Fetches the landing page for a job within a role.
    *
@@ -222,6 +335,9 @@ public class SchedulerzJob extends JerseyTemplateServlet {
             ImmutableList.copyOf(
                 Iterables.transform(offsetAndLimit(liveTasks, offset), taskToStringMap)));
         hasMore = hasMore || liveTasks.size() > (offset + PAGE_SIZE);
+
+        template.setAttribute("schedulingDetails",
+            buildSchedulingTable(Iterables.transform(liveTasks, Tasks.SCHEDULED_TO_INFO)));
 
         if (offset > 0) {
           template.setAttribute("prevOffset", Math.max(0, offset - PAGE_SIZE));
