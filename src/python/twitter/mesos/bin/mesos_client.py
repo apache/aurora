@@ -73,7 +73,6 @@ def synthesize_url(cluster, scheduler=None, role=None, job=None):
 
 def get_config(jobname, config_file, packer_factory):
   """Creates and returns a config object contained in the provided file."""
-
   options = app.get_options()
   config_type, is_json = options.config_type, options.json
   bindings = getattr(options, 'bindings', [])
@@ -138,7 +137,10 @@ class requires(object):
     def wrapped_function(self, line):
       sline = line.split()
       if not comparator(sline, args):
-        _die('Incorrect parameters for %s: %s' % (fn.__name__, ' '.join(sline)))
+        help = 'Incorrect parameters for %s' % fn.__name__
+        if fn.__doc__:
+          help = '%s\n\nsee the help subcommand for more details.' % fn.__doc__.split('\n')[0]
+        _die(help)
       return fn(self, *sline)
     return wrapped_function
 
@@ -174,9 +176,11 @@ class MesosCLI(cmd.Cmd):
       open_url(url)
 
   @requires.exactly('job', 'config')
-  def do_create(self, *line):
-    """create job config"""
-    (jobname, config_file) = line
+  def do_create(self, jobname, config_file):
+    """usage: create job config
+
+    Creates a job based on a configuration file.
+    """
     config = get_config(jobname, config_file, self._get_packer)
     if self.options.cluster is not None:
       log.warning('Deprecation warning: --cluster command line option is no longer supported.'
@@ -190,6 +194,11 @@ class MesosCLI(cmd.Cmd):
 
   @requires.exactly('job', 'config_file')
   def do_diff(self, job, config_file):
+    """usage: diff job config
+
+    Compares a job configuration against a running job.
+    By default the diff will be displayed using 'diff', though you may choose an alternate
+    diff program by specifying the DIFF_VIEWER environment variable."""
     config = get_config(job, config_file, self._get_packer)
     api = MesosClientAPI(cluster=config.cluster(), verbose=self.options.verbose)
     resp = self.query(config.role(), job, api=api, statuses=ACTIVE_STATES)
@@ -225,8 +234,10 @@ class MesosCLI(cmd.Cmd):
 
   @requires.nothing
   def do_open(self, *args):
-    """open --cluster=CLUSTER [role [job]]"""
+    """usage: open --cluster=CLUSTER [role [job]]
 
+    Opens the scheduler page for a role or job in the default web browser.
+    """
     role = job = None
     if len(args) > 0:
       role = args[0]
@@ -240,36 +251,45 @@ class MesosCLI(cmd.Cmd):
     open_url(synthesize_url(self.options.cluster, api.scheduler(), role, job))
 
   @requires.exactly('job', 'config')
-  def do_inspect(self, *line):
-    """inspect job config"""
-    (jobname, config_file) = line
+  def do_inspect(self, jobname, config_file):
+    """usage: inspect job config
+
+    Verifies that a job can be parsed from a configuration file, and displays
+    the parsed configuration.
+    """
     config = get_config(jobname, config_file, self._get_packer)
     cluster = Cluster.get(config.cluster())
     log.info('Parsed job config: %s' % config.job())
 
   @requires.exactly('role', 'job')
-  def do_start_cron(self, *line):
-    """start_cron role job"""
-    (role, jobname) = line
+  def do_start_cron(self, role, jobname):
+    """usage: start_cron --cluster=CLUSTER role job
 
+    Invokes a cron job immediately, out of its normal cron cycle.
+    This does not affect the cron cycle in any way.
+    """
     api = MesosClientAPI(cluster=self.options.cluster, verbose=self.options.verbose)
     resp = api.start_cronjob(role, jobname)
     check_and_log_response(resp)
     self.handle_open(self.options.cluster, api.scheduler(), role, jobname)
 
   @requires.exactly('role', 'job')
-  def do_kill(self, *line):
-    """kill role job"""
-    (role, jobname) = line
+  def do_kill(self, role, jobname):
+    """usage: kill --cluster=CLUSTER role job
 
+    Kills a running job, blocking until all tasks have terminated.
+    """
     api = MesosClientAPI(cluster=self.options.cluster, verbose=self.options.verbose)
     resp = api.kill_job(role, jobname)
     check_and_log_response(resp)
     self.handle_open(self.options.cluster, api.scheduler(), role, jobname)
 
   @requires.exactly('role', 'job')
-  def do_status(self, *line):
-    """status role job"""
+  def do_status(self, role, jobname):
+    """usage: status --cluster=CLUSTER role job
+
+    Fetches and prints information about the active tasks in a job.
+    """
 
     def is_active(task):
       return task.status in ACTIVE_STATES
@@ -300,8 +320,6 @@ class MesosCLI(cmd.Cmd):
                 task.assignedTask.slaveHost,
                 taskString))
 
-    (role, jobname) = line
-
     api = MesosClientAPI(cluster=self.options.cluster, verbose=self.options.verbose)
     resp = api.check_status(role, jobname)
     check_and_log_response(resp)
@@ -326,27 +344,47 @@ class MesosCLI(cmd.Cmd):
       _die('Invalid shards list: %s' % self.options.shards)
 
   @requires.exactly('job', 'config')
-  def do_update(self, *line):
-    """update job config"""
-    (jobname, config_file) = line
+  def do_update(self, jobname, config_file):
+    """usage: update job config
+
+    Performs a rolling upgrade on a running job, using the update configuration
+    within the config file as a control for update velocity and failure tolerance.
+
+    Updates are fully controlled client-side, so aborting an update halts the
+    update and leaves the job in a 'locked' state on the scheduler.
+    Subsequent update attempts will fail until the update is 'unlocked' using the
+    'cancel_update' command.
+
+    The updater only takes action on shards in a job that have changed, meaning
+    that changing a single shard will only induce a restart on the changed shard.
+
+    You may want to consider using the 'diff' subcommand before updating,
+    to preview what changes will take effect.
+    """
     config = get_config(jobname, config_file, self._get_packer)
     api = MesosClientAPI(cluster=config.cluster(), verbose=self.options.verbose)
     resp = api.update_job(config, self._getshards(), self.options.copy_app_from)
     check_and_log_response(resp)
 
   @requires.exactly('role', 'job')
-  def do_cancel_update(self, *line):
-    """cancel_update role job"""
-    (role, jobname) = line
+  def do_cancel_update(self, role, jobname):
+    """usage: cancel_update --cluster=CLUSTER role job
 
+    Unlocks an job for updates.
+    A job may be locked if a client's update session terminated abnormally,
+    or if another user is actively updating the job.  This command should only
+    be used when the user is confident that they are not conflicting with another user.
+    """
     api = MesosClientAPI(cluster=self.options.cluster, verbose=self.options.verbose)
     resp = api.cancel_update(role, jobname)
     check_and_log_response(resp)
 
   @requires.exactly('role')
-  def do_get_quota(self, *line):
-    """get_quota role"""
-    role = line[0]
+  def do_get_quota(self, role):
+    """usage: get_quota --cluster=CLUSTER role
+
+    Prints the production quota that has been allocated to a user.
+    """
     api = MesosClientAPI(cluster=self.options.cluster, verbose=self.options.verbose)
     resp = api.get_quota(role)
     quota = resp.quota
@@ -361,10 +399,12 @@ class MesosCLI(cmd.Cmd):
 
   # TODO(wfarner): Revisit this once we have a better way to add named args per sub-cmmand
   @requires.exactly('role', 'cpu', 'ramMb', 'diskMb')
-  def do_set_quota(self, *line):
-    """set_quota role cpu ramMb diskMb"""
-    (role, cpu_str, ram_mb_str, disk_mb_str) = line
+  def do_set_quota(self, role, cpu_str, ram_mb_str, disk_mb_str):
+    """usage: set_quota --cluster=CLUSTER role cpu ramMb diskMb
 
+    Admin-only command.
+    Alters the amount of production quota allocated to a user.
+    """
     try:
       cpu = float(cpu_str)
       ram_mb = int(ram_mb_str)
@@ -377,9 +417,14 @@ class MesosCLI(cmd.Cmd):
     check_and_log_response(resp)
 
   @requires.exactly('task_id', 'state')
-  def do_force_task_state(self, *line):
-    """force_task_state task_id state"""
-    (task_id, state) = line
+  def do_force_task_state(self, task_id, state):
+    """usage: force_task_state --cluster=CLUSTER task_id state
+
+    Admin-only command.
+    Forcibly induces a state transition on a task.
+    This should never be used under normal circumstances, and any use of this command
+    should be accompanied by a bug indicating why it was necessary.
+    """
     status = ScheduleStatus._NAMES_TO_VALUES.get(state)
     if status is None:
       log.error('Unrecognized status "%s", must be one of [%s]'
@@ -400,8 +445,11 @@ class MesosCLI(cmd.Cmd):
     return api.query(query)
 
   @requires.exactly('role', 'job', 'shard')
-  def do_ssh(self, *line):
-    (role, job, shard) = line
+  def do_ssh(self, role, job, shard):
+    """usage: ssh --cluster=CLUSTER role job shard
+
+    Initiate an SSH session on the machine that a shard is running on.
+    """
     resp = self.query(role, job, set([int(shard)]))
     if not resp.responseCode:
       _die('Request failed, server responded with "%s"' % resp.message)
@@ -409,7 +457,12 @@ class MesosCLI(cmd.Cmd):
 
   @requires.at_least('role', 'job', 'cmd')
   def do_run(self, *line):
-    """run role job cmd"""
+    """usage: run --cluster=CLUSTER role job cmd
+
+    Runs a shell command on all machines currently hosting shards of a job.
+    This feature supports the same command line wildcards that are used to
+    populate a job's commands: %port:PORT_NAME%, %shard_id%, %task_id%.
+    """
     # TODO(William Farner): Add support for invoking on individual shards.
     # This will require some arg refactoring in the client.
     (role, jobs) = line[:2]
@@ -462,6 +515,7 @@ class MesosCLI(cmd.Cmd):
     return wrap
 
   def trap_packer_error(fn):
+    @functools.wraps(fn)
     def wrap(self, *args, **kwargs):
       try:
         return fn(self, *args, **kwargs)
@@ -472,6 +526,10 @@ class MesosCLI(cmd.Cmd):
   @trap_packer_error
   @requires.exactly('role')
   def do_package_list(self, role):
+    """usage: package_list --cluster=CLUSTER role
+
+    Prints the names of packages owned by a user.
+    """
     print '\n'.join(self._get_packer().list_packages(role))
 
   @staticmethod
@@ -487,24 +545,45 @@ class MesosCLI(cmd.Cmd):
   @trap_packer_error
   @requires.exactly('role', 'package')
   def do_package_versions(self, role, package):
+    """usage: package_versions --cluster=CLUSTER role package
+
+    Prints metadata about all of the versions of a package.
+    """
     for version in self._get_packer().list_versions(role, package):
       MesosCLI._print_package(version)
 
   @trap_packer_error
   @requires.exactly('role', 'package', 'version')
   def do_package_delete_version(self, role, package, version):
+    """usage: package_delete_version --cluster=CLUSTER role package version
+
+    Deletes a version of a package.
+    """
     self._get_packer().delete(role, package, version)
     print 'Version deleted'
 
   @trap_packer_error
   @requires.exactly('role', 'package', 'file_path')
   def do_package_add_version(self, role, package, file_path):
+    """usage: package_add_version --cluster=CLUSTER role package file_path
+
+    Uploads a new version of a package.
+    The file will be stored with a name equal to the basename of the supplied file.
+    Likewise, when the package is fetched prior to running a task, it will
+    be stored as the original basename.
+    """
     pkg = self._get_packer().add(role, package, file_path, self.options.metadata)
     print 'Package added:'
     MesosCLI._print_package(pkg)
 
+  @trap_packer_error
   @requires.exactly('role', 'package', 'version')
   def do_package_get_version(self, role, package, version):
+    """usage: package_get_version --cluster=CLUSTER role package version
+
+    Prints the metadata associated with a specific version of a package.
+    This supports version labels 'latest' and 'live'.
+    """
     pkg = self._get_packer().get_version(role, package, version)
     if self.options.metadata_only:
       if not 'metadata' in pkg:
@@ -517,12 +596,23 @@ class MesosCLI(cmd.Cmd):
   @trap_packer_error
   @requires.exactly('role', 'package', 'version')
   def do_package_set_live(self, role, package, version):
+    """usage: package_set_live --cluster=CLUSTER role package version
+
+    Updates the 'live' label of a package to point to a specific version.
+    """
     self._get_packer().set_live(role, package, version)
     print 'Version %s is now the LIVE vesion' % version
 
   @trap_packer_error
   @requires.exactly('role', 'package')
   def do_package_unlock(self, role, package):
+    """usage: package_unlock --cluster=CLUSTER role package
+
+    Unlocks a package.
+    Under normal circumstances, this should not be necessary.  However,
+    in the event of a packer server crash it is possible.  If you find
+    a need to use this, please inform mesos-team so they can investigate.
+    """
     self._get_packer().unlock(role, package)
     print 'Package unlocked'
 
