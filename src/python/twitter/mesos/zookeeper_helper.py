@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 import zookeeper
@@ -9,6 +10,14 @@ from twitter.mesos.location import Location
 from twitter.common import log
 
 class ZookeeperHelper(object):
+  ZOOKEEPER_SILENCED = False
+
+  @classmethod
+  def quiet_zookeeper(cls):
+    if not cls.ZOOKEEPER_SILENCED:
+      zookeeper.set_log_stream(open(os.devnull, 'w'))
+      cls.ZOOKEEPER_SILENCED = True
+
   @staticmethod
   def create_zookeeper_tunnel(cluster, port=2181):
     return TunnelHelper.create_tunnel(Cluster.get(cluster).zk, port)
@@ -22,6 +31,7 @@ class ZookeeperHelper(object):
     if host is not 'localhost' and Location.is_corp():
       host, port = ZookeeperHelper.create_zookeeper_tunnel(cluster, port)
     log.info('Initializing zookeeper client on %s:%d' % (host, port))
+    ZookeeperHelper.quiet_zookeeper()
     return zookeeper.init('%s:%d' % (host, port))
 
   @staticmethod
