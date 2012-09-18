@@ -2032,7 +2032,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     stateManager.scanOutstandingTasks();
     checkOutstandingTimer(ASSIGNED, 0);
-    checkOutstandingTimer(STARTING, 0);
     checkOutstandingTimer(PREEMPTING, 0);
     checkOutstandingTimer(RESTARTING, 0);
     checkOutstandingTimer(KILLING, 0);
@@ -2059,14 +2058,12 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     checkOutstandingTimer(ASSIGNED, tick.as(Time.MILLISECONDS) * 3);
 
     changeStatus(taskA, RUNNING);
-    changeStatus(taskB, STARTING);
     clock.advance(tick);
     changeStatus(taskA, KILLING);
     clock.advance(tick);
 
     stateManager.scanOutstandingTasks();
-    checkOutstandingTimer(ASSIGNED, 0);
-    checkOutstandingTimer(STARTING, tick.as(Time.MILLISECONDS) * 2);
+    checkOutstandingTimer(ASSIGNED, tick.as(Time.MILLISECONDS) * 3);
     checkOutstandingTimer(KILLING, tick.as(Time.MILLISECONDS));
   }
 

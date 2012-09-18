@@ -251,7 +251,6 @@ public class StateManagerImplTest extends EasyMockTest {
     List<List<ScheduleStatus>> testCases =
         ImmutableList.<List<ScheduleStatus>>of(
             ImmutableList.of(PENDING, ASSIGNED),
-            ImmutableList.of(ASSIGNED, STARTING),
             ImmutableList.of(ASSIGNED, RUNNING, PREEMPTING),
             ImmutableList.of(ASSIGNED, RUNNING, RESTARTING),
             ImmutableList.of(ASSIGNED, RUNNING, KILLING),

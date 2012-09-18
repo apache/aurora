@@ -109,7 +109,6 @@ public class StateManagerImpl implements StateManager {
   private static final TaskQuery OUTSTANDING_TASK_QUERY = new TaskQuery().setStatuses(
       EnumSet.of(
           ScheduleStatus.ASSIGNED,
-          ScheduleStatus.STARTING,
           ScheduleStatus.PREEMPTING,
           ScheduleStatus.RESTARTING,
           ScheduleStatus.KILLING,
