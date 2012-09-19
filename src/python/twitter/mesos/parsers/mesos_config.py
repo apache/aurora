@@ -81,7 +81,10 @@ class MesosConfig(ProxyConfig):
       print('WARNING: task.avoid_jobs is deprecated')
 
     if 'package' in task_dict:
-      errors.append('"package" must be specified in at the job level, not the task level')
+      errors.append('"package" must be specified at the job level, not the task level')
+
+    if 'constraints' in task_dict:
+      errors.append('"constraints" must be specified at the job level, not the task level')
 
     # requires
     MesosConfig.assert_in(task_dict, 'num_cpus', Compatibility.numeric, errors)
