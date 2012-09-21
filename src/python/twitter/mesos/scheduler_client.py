@@ -54,9 +54,7 @@ class SchedulerClient(object):
       return LocalSchedulerClient(port, ssl=True)
     else:
       zk_port = 2181 if ':' not in cluster else int(cluster.split(':')[1])
-      # If the cluster is an angrybird cluster, we want to force no tunnel
-      notunnel = (cluster == 'angrybird-local')
-      return ZookeeperSchedulerClient(cluster, zk_port, force_notunnel=notunnel, ssl=True, **kwargs)
+      return ZookeeperSchedulerClient(cluster, zk_port, ssl=True, **kwargs)
 
   def __init__(self, verbose=False, ssl=False, real_host=None):
     self._client = None
@@ -100,16 +98,15 @@ class SchedulerClient(object):
 class ZookeeperSchedulerClient(SchedulerClient):
   SCHEDULER_ZK_PATH = '/twitter/service/mesos-scheduler'
 
-  def __init__(self, cluster, port=2181, force_notunnel=False, ssl=False, verbose=False):
+  def __init__(self, cluster, port=2181, ssl=False, verbose=False):
     SchedulerClient.__init__(self, verbose=verbose, ssl=ssl)
     self._cluster = cluster
     self._zkport = port
-    self._notunnel = force_notunnel
 
   def _connect(self):
     self._zh = ZookeeperHelper.get_zookeeper_handle(self._cluster, self._zkport)
     (self._real_host, host, port) = ZookeeperSchedulerClient._get_scheduler_host_port(
-      self._zh, self._cluster, self._notunnel, verbose=self._verbose)
+      self._zh, self._cluster, verbose=self._verbose)
     zookeeper.close(self._zh)
     return SchedulerClient._connect_scheduler(host, port, self._ssl)
 
@@ -123,7 +120,7 @@ class ZookeeperSchedulerClient(SchedulerClient):
     return TunnelHelper.create_tunnel(remote_host, remote_port)
 
   @staticmethod
-  def _get_scheduler_host_port(zh, cluster, no_tunnel, verbose=False):
+  def _get_scheduler_host_port(zh, cluster, verbose=False):
     """ Use Zookeeper to determine the host and port of the scheduler.
     Returns a host/port reachable from either corp or prod, depending on
     the argument location. Sets up ssh tunnels as appropriate."""
@@ -146,7 +143,8 @@ class ZookeeperSchedulerClient(SchedulerClient):
     real_host = host
 
     # Open a tunnel to the scheduler if necessary
-    if Location.is_corp() and not no_tunnel:
+    if Location.is_corp() and not Cluster.get(cluster).force_notunnel:
+      log.info('Creating ssh tunnel for %s' % cluster)
       host, port = ZookeeperSchedulerClient._open_scheduler_tunnel(cluster, host, port)
 
     zookeeper.set_debug_level(zookeeper.LOG_LEVEL_WARN)
