@@ -38,9 +38,9 @@ class TaskRunnerWrapper(object):
 
   def __init__(self, task_id, mesos_task, role, mesos_ports, checkpoint_root=None, clock=time):
     """
-      :task_id       => task_id assigned by scheduler
+      :task_id     => task_id assigned by scheduler
       :mesos_task  => twitter.mesos.config.schema.MesosTaskInstance object
-      :mesos_ports   => { name => port } dictionary
+      :mesos_ports => { name => port } dictionary
     """
     self._popen = None
     self._dead = threading.Event()
@@ -81,7 +81,7 @@ class TaskRunnerWrapper(object):
       self._sandbox.create(self._mesos_task)
     except Exception as e:
       log.fatal('Could not construct sandbox: %s' % e)
-      raise TaskRunnerWrapper.TaskError('Could not construct sandbox: %s' % e)
+      raise self.TaskError('Could not construct sandbox: %s' % e)
 
     params = dict(log_dir=LogOptions.log_dir(),
                   checkpoint_root=self._checkpoint_root,

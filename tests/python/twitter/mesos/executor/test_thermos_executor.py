@@ -38,13 +38,12 @@ class TestStatusManager(StatusManager):
   WAIT_LIMIT = Amount(1, Time.SECONDS)
 
 
-class TestThermosExecutorTimer(ThermosExecutorTimer):
-  EXECUTOR_TIMEOUT = Amount(1, Time.SECONDS)
+class FastThermosExecutor(ThermosExecutor):
+  STOP_WAIT = Amount(0, Time.SECONDS)
 
-  def __init__(self, *args, **kw):
-    super(TestThermosExecutorTimer, self).__init__(*args, **kw)
-    self.exit_action_event = threading.Event()
-    self.EXIT_ACTION = lambda: self.exit_action_event.set()
+
+class TestThermosExecutorTimer(ThermosExecutorTimer):
+  EXECUTOR_TIMEOUT = Amount(100, Time.MILLISECONDS)
 
 
 class TestTaskRunner(TaskRunnerWrapper):
@@ -56,14 +55,27 @@ class TestTaskRunner(TaskRunnerWrapper):
     TaskRunnerWrapper.__init__(self, task_id, *args, **kwargs)
 
 
+class FailingTaskRunner(TaskRunnerWrapper):
+  def __init__(self, task_id, *args, **kwargs):
+    TaskRunnerWrapper.__init__(self, task_id, *args, **kwargs)
+
+  def start(self):
+    raise self.TaskError('I am an idiot!')
+
+
 class ProxyDriver(object):
   def __init__(self):
     self.method_calls = defaultdict(list)
+    self._stop_event = threading.Event()
 
   def __getattr__(self, attr):
     def enqueue_arguments(*args, **kw):
       self.method_calls[attr].append((args, kw))
     return enqueue_arguments
+
+  def stop(self, *args, **kw):
+    self.method_calls['stop'].append((args, kw))
+    self._stop_event.set()
 
 
 def make_task(thermos_config, assigned_ports={}):
@@ -98,11 +110,12 @@ def sleep60():
     role = getpass.getuser())
 
 
-def make_runner(proxy_driver, checkpoint_root, task, fast_status=False):
+def make_runner(proxy_driver, checkpoint_root, task, fast_status=False,
+    executor_timer_class=TestThermosExecutorTimer):
   runner_class = functools.partial(TestTaskRunner, checkpoint_root=checkpoint_root)
   manager_class = TestStatusManager if fast_status else StatusManager
-  te = ThermosExecutor(runner_class=runner_class, manager_class=manager_class,
-      timeout_handler=TestThermosExecutorTimer)
+  te = FastThermosExecutor(runner_class=runner_class, manager_class=manager_class)
+  executor_timer_class(te, proxy_driver).start()
   task_description = make_task(task)
   te.launchTask(proxy_driver, task_description)
   while not te._runner.is_started():
@@ -129,7 +142,7 @@ def make_runner(proxy_driver, checkpoint_root, task, fast_status=False):
       break
     time.sleep(0.1)
 
-  assert te._launch.is_set()
+  assert te.launched.is_set()
   return runner, te
 
 
@@ -186,7 +199,6 @@ class TestThermosExecutor(object):
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
     assert updates[-1][0][0].state == mesos_pb.TASK_LOST
-    assert not executor._timeout_handler.exit_action_event.is_set()
 
   def test_task_killed(self):
     proxy_driver = ProxyDriver()
@@ -199,7 +211,6 @@ class TestThermosExecutor(object):
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
     assert updates[-1][0][0].state == mesos_pb.TASK_KILLED
-    assert not executor._timeout_handler.exit_action_event.is_set()
 
   def test_killTask(self):
     proxy_driver = ProxyDriver()
@@ -212,7 +223,6 @@ class TestThermosExecutor(object):
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
     assert updates[-1][0][0].state == mesos_pb.TASK_KILLED
-    assert not executor._timeout_handler.exit_action_event.is_set()
 
   def test_shutdown(self):
     proxy_driver = ProxyDriver()
@@ -225,7 +235,6 @@ class TestThermosExecutor(object):
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
     assert updates[-1][0][0].state == mesos_pb.TASK_KILLED
-    assert not executor._timeout_handler.exit_action_event.is_set()
 
   def test_task_lost(self):
     proxy_driver = ProxyDriver()
@@ -238,12 +247,26 @@ class TestThermosExecutor(object):
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
     assert updates[-1][0][0].state == mesos_pb.TASK_LOST
-    assert not executor._timeout_handler.exit_action_event.is_set()
+
+  def test_internal_exception(self):
+    proxy_driver = ProxyDriver()
+
+    with temporary_dir() as tempdir:
+      te = FastThermosExecutor(runner_class=FailingTaskRunner)
+      te.launchTask(proxy_driver, make_task(hello_world()))
+
+    proxy_driver._stop_event.wait(timeout=1.0)
+    assert proxy_driver._stop_event.is_set()
+
+    updates = proxy_driver.method_calls['sendStatusUpdate']
+    assert updates[-1][0][0].state == mesos_pb.TASK_FAILED
 
 
 def test_waiting_executor():
+  proxy_driver = ProxyDriver()
   with temporary_dir() as checkpoint_root:
     runner_class = functools.partial(TestTaskRunner, checkpoint_root=checkpoint_root)
-    te = ThermosExecutor(runner_class=runner_class, timeout_handler=TestThermosExecutorTimer)
-    te._timeout_handler.exit_action_event.wait(timeout=2.0)
-    assert te._timeout_handler.exit_action_event.is_set()
+    te = ThermosExecutor(runner_class=runner_class)
+    TestThermosExecutorTimer(te, proxy_driver).start()
+    proxy_driver._stop_event.wait(timeout=1.0)
+    assert proxy_driver._stop_event.is_set()

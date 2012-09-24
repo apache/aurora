@@ -13,6 +13,7 @@ import mesos
 import mesos_pb2 as mesos_pb
 
 from twitter.common import app, log
+from twitter.common.concurrent import defer
 from twitter.common.log.options import LogOptions
 from twitter.common.quantity import Amount, Time
 
@@ -49,34 +50,31 @@ def default_exit_action():
 
 class ThermosExecutorTimer(threading.Thread):
   EXECUTOR_TIMEOUT = Amount(10, Time.SECONDS)
-  EXIT_ACTION = default_exit_action
 
-  def __init__(self, executor, event):
+  def __init__(self, executor, driver):
     self._executor = executor
-    self._event = event
+    self._driver = driver
     super(ThermosExecutorTimer, self).__init__()
     self.daemon = True
 
   def run(self):
-    self._event.wait(self.EXECUTOR_TIMEOUT.as_(Time.SECONDS))
-    if not self._event.is_set():
+    self._executor.launched.wait(self.EXECUTOR_TIMEOUT.as_(Time.SECONDS))
+    if not self._executor.launched.is_set():
       self._executor.log('Executor timing out on lack of launchTask.')
-      self.EXIT_ACTION()
+      self._driver.stop()
 
 
 class ThermosExecutor(ThermosExecutorBase):
-  def __init__(self, runner_class=RUNNER_CLASS,
-                     manager_class=StatusManager,
-                     timeout_handler=ThermosExecutorTimer):
+  STOP_WAIT = Amount(5, Time.SECONDS)
+
+  def __init__(self, runner_class=RUNNER_CLASS, manager_class=StatusManager):
     ThermosExecutorBase.__init__(self)
     self._runner = None
     self._task_id = None
     self._manager = None
     self._runner_class = runner_class
     self._manager_class = manager_class
-    self._launch = threading.Event()
-    self._timeout_handler = timeout_handler(self, self._launch)
-    self._timeout_handler.start()
+    self.launched = threading.Event()
 
   @staticmethod
   def deserialize_assigned_task(task):
@@ -107,7 +105,7 @@ class ThermosExecutor(ThermosExecutorBase):
     return (MesosTaskInstance(json_blob), assigned_task.assignedPorts)
 
   def launchTask(self, driver, task):
-    self._launch.set()
+    self.launched.set()
     self.log('launchTask got task: %s:%s' % (task.name, task.task_id.value))
 
     if self._runner:
@@ -126,13 +124,19 @@ class ThermosExecutor(ThermosExecutorBase):
     except Exception as e:
       log.fatal('Could not deserialize AssignedTask: %s' % e)
       self.send_update(driver, self._task_id, 'FAILED', "Could not deserialize task: %s" % e)
-      driver.stop()
+      defer(driver.stop, delay=self.STOP_WAIT)
       return
 
     self.send_update(driver, self._task_id, 'STARTING', 'Initializing sandbox.')
 
     self._runner = self._runner_class(self._task_id, mesos_task, mesos_task.role().get(), portmap)
-    self._runner.start()
+    try:
+      self._runner.start()
+    except self._runner.TaskError as e:
+      log.fatal('Task initialization failed: %s' % e)
+      self.send_update(driver, self._task_id, 'FAILED', 'Task initialization failed: %s' % e)
+      defer(driver.stop, delay=self.STOP_WAIT)
+      return
 
     # TODO(wickman)  This should be able to timeout.  Send TASK_LOST after 60 seconds of trying?
     log.debug('Waiting for task to start.')
@@ -170,8 +174,9 @@ class ThermosExecutor(ThermosExecutorBase):
 def main():
   LogOptions.set_disk_log_level('DEBUG')
   thermos_executor = ThermosExecutor()
-  drv = mesos.MesosExecutorDriver(thermos_executor)
-  drv.run()
+  driver = mesos.MesosExecutorDriver(thermos_executor)
+  ThermosExecutorTimer(thermos_executor, driver).start()
+  driver.run()
   log.info('MesosExecutorDriver.run() has finished.')
 
 

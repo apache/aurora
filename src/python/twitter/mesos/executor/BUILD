@@ -59,6 +59,7 @@ python_library(
     pants(':task_runner_wrapper'),
     pants(':thermos_executor_base'),
     pants('src/python/twitter/common/app'),
+    pants('src/python/twitter/common/concurrent'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/quantity'),
     pants('src/python/twitter/mesos/config:schema'),
