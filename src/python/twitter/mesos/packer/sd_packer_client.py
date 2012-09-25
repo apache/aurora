@@ -1,36 +1,37 @@
 import os
 import random
+import sys
 
 from twitter.common import log
 from twitter.common.net.tunnel import TunnelHelper
-from twitter.common.zookeeper.client import ZooKeeper
-from twitter.common.zookeeper.group import Group
 from twitter.mesos.location import Location
-from twitter.mesos.util import serverset_util
+from twitter.mesos.zookeeper_helper import ZookeeperHelper
 
 from twitter.mesos.packer.packer_client import Packer
 
 _ZK_TIMEOUT_SECS = 5
 
+
 def create_packer(cluster):
-  zk_host, zk_port = cluster.packer_zk, 2181
-  if Location.is_corp():
-    zk_host, zk_port = TunnelHelper.create_tunnel(zk_host, zk_port)
+  packer_ss = ZookeeperHelper.get_packer_serverset(cluster)
+  packers = list(packer_ss)
 
-  zk_client = ZooKeeper(servers='%s:%d' % (zk_host, zk_port), timeout_secs=_ZK_TIMEOUT_SECS)
+  if len(packers) == 0:
+    log.fatal('Could not find any packers!')
+    sys.exit(1)
 
-  nodes = zk_client.get_children(cluster.packer_zk_path)
-  log.debug('Found nodes: %s' % ', '.join(nodes))
-  random.shuffle(nodes)
-  target_node = nodes[0]
-  data, _ = zk_client.get(os.path.join(cluster.packer_zk_path, target_node))
+  log.debug('Found nodes:')
+  for packer in packers:
+    log.debug('  %s' % packer)
+  random.shuffle(packers)
 
-  instance = serverset_util.decode_service_instance(data)
-  packer_host, packer_port = instance.serviceEndpoint.host, instance.serviceEndpoint.port
-
+  packer = packers[0]
+  packer_host, packer_port = packer.service_endpoint.host, packer.service_endpoint.port
   log.debug('Selecting host %s:%s' % (packer_host, packer_port))
+
   if Location.is_corp():
     packer_host, packer_port = TunnelHelper.create_tunnel(packer_host, packer_port)
+
   # TODO(wfarner): Fix this in TunnelHelper. We sleep since the tunnel process may still be
   #   starting but not established.
   import time

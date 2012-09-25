@@ -127,19 +127,12 @@ class HDFSHelper(object):
       do_put(abs_src)
 
 
-class MesosHelper(object):
-  @staticmethod
-  def acquire_session_key(owner):
-    key = SessionKey(user=owner)
-    try:
-      SessionKeyHelper.sign_session(key, owner)
-    except Exception as e:
-      log.warning('Cannot use SSH auth: %s' % e)
-      log.warning('Attempting un-authenticated communication')
-      key.nonce = SessionKeyHelper.get_timestamp()
-      key.nonceSig = 'UNAUTHENTICATED'
-    return key
-
+class MesosClientBase(object):
+  """
+  This class is responsible for creating a thrift client
+  to the twitter scheduler. Basically all the dirty work
+  needed by the MesosClientAPI.
+  """
   @staticmethod
   def assert_valid_cluster(cluster):
     assert cluster, "Cluster not specified!"
@@ -158,19 +151,11 @@ class MesosHelper(object):
     else:
       Cluster.assert_exists(cluster)
 
-
-class MesosClientBase(object):
-  """
-  This class is responsible for creating a thrift client
-  to the twitter scheduler. Basically all the dirty work
-  needed by the MesosClientAPI.
-  """
-
   def __init__(self, cluster, verbose=False):
     self._cluster = cluster
     self._session_key = self._client = self._scheduler = None
     self.verbose = verbose
-    MesosHelper.assert_valid_cluster(cluster)
+    self.assert_valid_cluster(cluster)
 
   def with_scheduler(method):
     """Decorator magic to make sure a connection is made to the scheduler"""
@@ -183,7 +168,7 @@ class MesosClientBase(object):
   def requires_auth(method):
     def _wrapper(self, *args, **kwargs):
       if not self._session_key:
-        self._session_key = MesosHelper.acquire_session_key(getpass.getuser())
+        self._session_key = SessionKeyHelper.acquire_session_key(getpass.getuser())
       return method(self, *args, **kwargs)
     return _wrapper
 

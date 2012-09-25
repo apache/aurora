@@ -5,6 +5,10 @@ import base64
 from twitter.common_internal.ods import ODS
 from paramiko import Agent, RSAKey, Message, SSHException
 
+from twitter.common import log
+from gen.twitter.mesos.ttypes import SessionKey
+
+
 class SessionKeyHelper(object):
   class AgentError(Exception): pass
   class LDAPError(Exception): pass
@@ -73,3 +77,15 @@ class SessionKeyHelper(object):
     signed_glob = key.sign_ssh_data(None, message)
     session_key.nonce = ts
     session_key.nonceSig = signed_glob
+
+  @classmethod
+  def acquire_session_key(cls, owner):
+    key = SessionKey(user=owner)
+    try:
+      cls.sign_session(key, owner)
+    except Exception as e:
+      log.warning('Cannot use SSH auth: %s' % e)
+      log.warning('Attempting un-authenticated communication')
+      key.nonce = cls.get_timestamp()
+      key.nonceSig = 'UNAUTHENTICATED'
+    return key

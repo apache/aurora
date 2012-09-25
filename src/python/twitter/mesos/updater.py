@@ -1,7 +1,9 @@
 import collections
 from math import ceil
+
 from gen.twitter.mesos.ttypes import *
 from twitter.common import app, log
+
 
 app.add_option('--mesos_updater_status_check_interval',
   dest='mesos_updater_status_check_interval',
@@ -9,8 +11,10 @@ app.add_option('--mesos_updater_status_check_interval',
   type='int',
   help='How often Mesos runs update loop.')
 
+
 def debug_if(condition):
   return log.DEBUG if condition else log.ERROR
+
 
 class Updater(object):
   """Update the shards of a job in batches."""

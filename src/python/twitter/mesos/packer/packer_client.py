@@ -15,11 +15,10 @@ from poster.encode import multipart_encode
 from poster import streaminghttp
 
 from twitter.common import log
-from twitter.mesos.client_wrapper import MesosHelper
+from twitter.mesos.session_key_helper import SessionKeyHelper
 
 
 class Progress(object):
-
   def __init__(self):
     self._seen = 0
 
@@ -47,7 +46,6 @@ class CallbackFile(file):
 
 
 class Packer(object):
-
   class Error(Exception): pass
 
   def __init__(self, host, port):
@@ -65,7 +63,7 @@ class Packer(object):
   def compose_url(endpoint, query_params={}, auth=False):
     url = endpoint
     if auth:
-      session_key = MesosHelper.acquire_session_key(getpass.getuser())
+      session_key = SessionKeyHelper.acquire_session_key(getpass.getuser())
       auth_params = {
         'user': getpass.getuser(),
         'nonce': session_key.nonce,

@@ -506,7 +506,7 @@ class MesosCLI(cmd.Cmd):
     cluster = cluster or self.options.cluster
     if not cluster:
       _die('--cluster must be specified')
-    return sd_packer_client.create_packer(Cluster.get(cluster))
+    return sd_packer_client.create_packer(cluster)
 
   @staticmethod
   def exactly(*args):

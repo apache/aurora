@@ -17,19 +17,83 @@ python_library(
 )
 
 python_library(
+  name = 'location',
+  sources = ['location.py'],
+)
+
+python_library(
+  name = 'zookeeper_helper',
+  sources = ['zookeeper_helper.py'],
+  dependencies = [
+    pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/common/net:ssh'),
+    pants('src/python/twitter/common/zookeeper'),
+    pants('src/python/twitter/common/zookeeper/serverset'),
+    pants(':clusters'),
+    pants(':location'),
+  ]
+)
+
+python_library(
+  name = 'updater',
+  sources = ['updater.py'],
+  dependencies = [
+    pants('src/python/twitter/common/app'),
+    pants('src/python/twitter/common/log'),
+    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+  ]
+)
+
+python_library(
+  name = 'scheduler_client',
+  sources = ['scheduler_client.py'],
+  dependencies = [
+    pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/common/net:ssh'),
+    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants(':clusters'),
+    pants(':location'),
+    pants(':zookeeper_helper'),
+  ]
+)
+
+python_library(
+  name = 'session_key_helper',
+  sources = ['session_key_helper.py'],
+  dependencies = [
+    pants('src/python/twitter/common/log'),
+    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants('src/python/twitter/common_internal/ods'),
+    pants('3rdparty/python:paramiko'),
+  ]
+)
+
+python_library(
+  name = 'client_wrapper',
+  sources = ['client_wrapper.py'],
+  dependencies = [
+    pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/common/dirutil'),
+    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants(':clusters'),
+    pants(':location'),
+    pants(':scheduler_client'),
+    pants(':session_key_helper'),
+    pants(':updater'),
+  ]
+)
+
+python_library(
   name = 'mesos-lib',
   sources = rglobs('*.py'),
   dependencies = [
-    pants('3rdparty/python:zookeeper'),
-    pants('3rdparty/python:paramiko'),
-    pants('src/python/twitter/common/net:ssh'),
-    pants('src/python/twitter/common/app'),
-    pants('src/python/twitter/common/log'),
-    pants('src/python/twitter/common_internal/ods'),
-    pants('src/python/twitter/mesos/config:schema'),
     pants('src/python/twitter/mesos/packer'),
-    pants('src/thrift/com/twitter/thrift:py-thrift'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants(':clusters'),
+    pants(':location'),
+    pants(':parsers'),
+    pants(':scheduler_client'),
+    pants(':client_wrapper'),
+    pants(':zookeeper_helper'),
   ]
 )
 
@@ -38,7 +102,8 @@ python_binary(
   source = 'bin/mesos_client.py',
   dependencies = [
     pants(':mesos-lib'),
-    pants('src/python/twitter/common'),
+    pants('src/python/twitter/common/app'),
+    pants('src/python/twitter/common/log'),
     pants('src/python/twitter/thermos/base:options')
   ],
 )
