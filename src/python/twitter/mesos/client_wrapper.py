@@ -131,12 +131,23 @@ class HDFSHelper(object):
       do_put(abs_src)
 
 
-class MesosClientBase(object):
+class SchedulerProxy(object):
   """
-  This class is responsible for creating a thrift client
-  to the twitter scheduler. Basically all the dirty work
-  needed by the MesosClientAPI.
+    This class is responsible for creating a reliable thrift client to the
+    twitter scheduler.  Basically all the dirty work needed by the
+    MesosClientAPI.
   """
+  CONNECT_MAXIMUM_WAIT = Amount(1, Time.MINUTES)
+  RPC_RETRY_INTERVAL = Amount(5, Time.SECONDS)
+  RPC_MAXIMUM_WAIT = Amount(10, Time.MINUTES)
+  UNAUTHENTICATED_RPCS = frozenset([
+    'populateJobConfig',
+    'getTasksStatus',
+    'getQuota'
+  ])
+
+  class TimeoutError(Exception): pass
+
   @staticmethod
   def assert_valid_cluster(cluster):
     assert cluster, "Cluster not specified!"
@@ -154,23 +165,6 @@ class MesosClientBase(object):
           assert False, 'Invalid cluster argument: %s' % cluster
     else:
       Cluster.assert_exists(cluster)
-
-class SchedulerProxy(object):
-  """
-    This class is responsible for creating a reliable thrift client to the
-    twitter scheduler.  Basically all the dirty work needed by the
-    MesosClientAPI.
-  """
-  CONNECT_MAXIMUM_WAIT = Amount(1, Time.MINUTES)
-  RPC_RETRY_INTERVAL = Amount(5, Time.SECONDS)
-  RPC_MAXIMUM_WAIT = Amount(10, Time.MINUTES)
-  UNAUTHENTICATED_RPCS = frozenset([
-    'populateJobConfig',
-    'getTasksStatus',
-    'getQuota'
-  ])
-
-  class TimeoutError(Exception): pass
 
   def __init__(self, cluster, verbose=False):
     self.cluster = cluster
