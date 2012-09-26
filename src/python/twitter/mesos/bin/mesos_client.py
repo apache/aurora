@@ -6,6 +6,7 @@ import cmd
 import functools
 import json
 import os
+import posixpath
 import pprint
 import subprocess
 import sys
@@ -71,56 +72,73 @@ def synthesize_url(cluster, scheduler=None, role=None, job=None):
     return urljoin(scheduler_url, 'scheduler/%s/%s' % (role, job))
 
 
+def get_package_uri_from_packer(cluster, package, packer_factory):
+  role, name, version = package
+  log.info('Fetching metadata for package %s/%s version %s in %s.' % (
+      role, name, version, cluster))
+  try:
+    metadata = packer_factory(cluster).get_version(role, name, version)
+  except Packer.Error as e:
+    _die('Failed to fetch package metadata: %s' % e)
+
+  latest_audit = sorted(metadata['auditLog'], key=lambda a: a['timestamp'])[-1]
+  if latest_audit['state'] == 'DELETED':
+    _die('The requested package version has been deleted.')
+  return metadata['uri']
+
+
+def get_package_uri(config, packer_factory):
+  options = app.get_options()
+  cluster, package = config.cluster(), config.package()
+
+  if config.hdfs_path():
+    log.warning('''
+*******************************************************************************
+  hdfs_path in job configurations has been deprecated and will soon be
+  disabled altogether.
+  Please switch to using the package option as soon as possible!
+  For details on how to do this, please consult
+  http://go/mesostutorial
+  and
+  http://confluence.local.twitter.com/display/ENG/Mesos+Configuration+Reference
+*******************************************************************************''')
+
+  if package and options.copy_app_from:
+    _die('copy_app_from may not be used when a package spec is used in the configuration')
+
+  if package:
+    return get_package_uri_from_packer(cluster, package, packer_factory)
+
+  if config.hdfs_path():
+    return config.hdfs_path()
+
+  if options.copy_app_from:
+    return '/mesos/pkg/%s/%s' % (config.role(), posixpath.basename(options.copy_app_from))
+
+
 def get_config(jobname, config_file, packer_factory):
   """Creates and returns a config object contained in the provided file."""
   options = app.get_options()
   config_type, is_json = options.config_type, options.json
   bindings = getattr(options, 'bindings', [])
-  if options.copy_app_from:
-    bindings.append({'mesos': {'package': os.path.basename(options.copy_app_from)}})
 
   if is_json:
     assert config_type == 'thermos', "--json only supported with thermos jobs"
 
   if config_type == 'mesos':
     config = MesosConfig(config_file, jobname)
-    package = config.package()
-    if package:
-      if options.copy_app_from:
-        _die('copy_app_from may not be used when a package spec is used in the configuration')
-      if not isinstance(package, tuple) or len(package) is not 3:
-        _die('package must be a tuple of exactly three elements')
-
-      role, name, version = package
-      log.info('Fetching metadata for package %s/%s version %s.' % package)
-      try:
-        metadata = packer_factory(config.cluster()).get_version(role, name, version)
-      except Packer.Error as e:
-        _die('Failed to fetch package metadata: %s' % e)
-
-      latest_audit = sorted(metadata['auditLog'], key=lambda a: a['timestamp'])[-1]
-      if latest_audit['state'] == 'DELETED':
-        _die('The requested package version has been deleted.')
-      config.set_hdfs_path(metadata['uri'])
-    elif config.hdfs_path():
-      log.warning('''
-*******************************************************************************
-    hdfs_path in job configurations has been deprecated and will soon be
-    disabled altogether.
-    Please switch to using the package option as soon as possible!
-    For details on how to do this, please consult
-    http://go/mesostutorial
-    and
-    http://confluence.local.twitter.com/display/ENG/Mesos+Configuration+Reference
-*******************************************************************************''')
-    return config
   elif config_type == 'thermos':
     loader = PystachioConfig.load_json if is_json else PystachioConfig.load
-    return loader(config_file, jobname, bindings)
+    config = loader(config_file, jobname, bindings)
   elif config_type == 'auto':
-    return PystachioCodec(config_file, jobname)
+    config = PystachioCodec(config_file, jobname)
   else:
     raise ValueError('Unknown config type %s!' % config_type)
+
+  package_uri = get_package_uri(config, packer_factory)
+  if package_uri:
+    config.set_hdfs_path(package_uri)
+  return config
 
 
 def check_and_log_response(resp):
@@ -258,7 +276,6 @@ class MesosCLI(cmd.Cmd):
     the parsed configuration.
     """
     config = get_config(jobname, config_file, self._get_packer)
-    cluster = Cluster.get(config.cluster())
     log.info('Parsed job config: %s' % config.job())
 
   @requires.exactly('role', 'job')
@@ -500,7 +517,6 @@ class MesosCLI(cmd.Cmd):
       proc = subprocess.Popen(full_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
       output = proc.communicate()
       print '\n'.join(['%s:  %s' % (host, line) for line in output[0].splitlines()])
-
 
   def _get_packer(self, cluster=None):
     cluster = cluster or self.options.cluster

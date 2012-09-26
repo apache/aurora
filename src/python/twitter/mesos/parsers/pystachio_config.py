@@ -2,6 +2,7 @@ import copy
 import getpass
 import json
 import os
+import posixpath
 import sys
 
 from pystachio import Empty, Environment, Integer, Ref
@@ -97,6 +98,7 @@ class PystachioConfig(ProxyConfig):
 
   def __init__(self, job):
     self._job = self.sanitize_job(job)
+    self._hdfs_path = None
 
   @staticmethod
   def sanitize_job(job):
@@ -116,26 +118,51 @@ class PystachioConfig(ProxyConfig):
       processes = [proc(max_failures = 100) if process_over_failure_limit(proc) else proc
                    for proc in job.task().processes()]))
 
+  def context(self, instance=None):
+    context = dict(
+      role=self.role(),
+      cluster=self.cluster(),
+      package=posixpath.basename(self._hdfs_path) if self._hdfs_path else None,
+      package_uri=self._hdfs_path,
+      instance=instance
+    )
+    # Filter unspecified values
+    return Environment(mesos = MesosContext(dict((key, val) for key, val in context.items() if val)))
+
   def job(self):
-    return convert_pystachio_to_thrift(self._job)
+    interpolated_job = self._job % self.context()
+    typecheck = interpolated_job.check()
+    if not typecheck.ok():
+      raise self.InvalidConfig(typecheck.message())
+    return convert_pystachio_to_thrift(interpolated_job)
+
+  def task(self, instance):
+    return (self._job % self.context(instance)).task()
 
   def name(self):
-    return str(self._job.name())
+    return self._job.name().get()
 
   def hdfs_path(self):
-    return None
+    return self._hdfs_path
+
+  def set_hdfs_path(self, path):
+    if not isinstance(path, Compatibility.string):
+      raise ValueError('HDFS uri must be a string')
+    self._hdfs_path = path
 
   def role(self):
     return self._job.role().get()
 
   def cluster(self):
-    if self._job.cluster().check().ok():
-      return self._job.cluster().get()
-    else:
-      return None
+    return self._job.cluster().get()
 
   def ports(self):
     return ThermosTaskWrapper(self._job.task(), strict=False).ports()
 
   def update_config(self):
     return MesosConfig.get_update_config(self._job.get())
+
+  def package(self):
+    if self._job.has_package() and self._job.package().check().ok():
+      package = self._job.package() % self.context()
+      return map(str, [package.role(), package.name(), package.version()])

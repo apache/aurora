@@ -1,22 +1,46 @@
 from pystachio import *
 from twitter.thermos.config.schema import *
 
-class Package(Struct):
+class MesosContext(Struct):
+  # The role running the job
+  role        = Required(String)
+
+  # The cluster in which the job is running
+  cluster     = Required(String)
+
+  # The instance id (i.e. replica id, shard id) in the context of a task
+  instance    = Required(Integer)
+
+  # The filename of the package associated with this job
+  package     = String
+
+  # The HDFS URI of the package associated with this job
+  package_uri = String
+
+
+# AppApp layout setup
+class AppPackage(Struct):
   name    = Required(String)
   version = Default(String, 'latest')
 
-class Service(Struct):
+class AppService(Struct):
   name   = Required(String)
   config = String
 
-class Layout(Struct):
-  packages = Default(List(Package), [])
-  services = Default(List(Service), [])
+class AppLayout(Struct):
+  packages = Default(List(AppPackage), [])
+  services = Default(List(AppService), [])
 
-class MesosContext(Struct):
-  role     = Required(String)
-  cluster  = Required(String)
-  instance = Required(Integer)
+
+# Packer package information
+@Provided(mesos=MesosContext)
+class PackerPackage(Struct):
+  name = Required(String)
+  role = Default(String, '{{mesos.role}}')
+  version = Required(String)
+
+Package = PackerPackage
+
 
 class UpdateConfig(Struct):
   batch_size             = Default(Integer, 1)
@@ -25,31 +49,35 @@ class UpdateConfig(Struct):
   max_per_shard_failures = Default(Integer, 0)
   max_total_failures     = Default(Integer, 0)
 
+
 # The thermosConfig populated inside of TwitterTaskInfo.
 @Provided(mesos=MesosContext)
 class MesosTaskInstance(Struct):
   task     = Required(Task)
-  layout   = Layout
+  layout   = AppLayout
   instance = Required(Integer)
   role     = Required(String)
   health_check_interval_secs = Integer
 
-@Provided(mesos=MesosContext)
+
 class MesosJob(Struct):
-  name          = Required(String)
-  role          = Default(String, '{{mesos.role}}')
-  cluster       = Default(String, '{{mesos.cluster}}')
+  name          = Default(String, '{{task.name}}')
+  role          = Required(String)
+  cluster       = Required(String)
   instances     = Default(Integer, 1)
   task          = Required(Task)
   cron_schedule = String
   cron_policy   = Default(String, 'KILL_EXISTING')
-  layout        = Layout
+  layout        = AppLayout
+  package       = PackerPackage
   update_config = Default(UpdateConfig, UpdateConfig())
 
-  # NEW
   constraints       = Map(String, String)
   daemon            = Default(Integer, 0)  # boolean
   max_task_failures = Default(Integer, 1)
   production        = Default(Integer, 0)  # boolean
   priority          = Default(Integer, 0)
   health_check_interval_secs = Default(Integer, 30)
+
+
+Job = MesosJob

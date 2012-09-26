@@ -1,6 +1,5 @@
 from pystachio import Map, String
 
-from twitter.mesos.clusters import Cluster
 from twitter.mesos.config.schema import (
   MesosJob,
   UpdateConfig,
@@ -33,7 +32,7 @@ class PystachioCodec(MesosConfig):
     if self.hdfs_path():
       processes.append(Process(
           name = 'installer',
-          cmdline = 'hadoop --config {{hadoop.config}} fs -copyToLocal %s .' % self.hdfs_path(),
+          cmdline = 'hadoop fs -copyToLocal %s .' % self.hdfs_path(),
           max_failures = 5))
     cmdline = cfg['task']['start_command']
     # rewrite ports in cmdline
@@ -64,6 +63,7 @@ class PystachioCodec(MesosConfig):
     cfg = self._config
     job_dict = dict(
       name = self.name(),
+      cluster = cfg['cluster'],
       role = cfg['role'],
       instances = cfg['instances'],
       task = self.build_task(),
@@ -77,7 +77,7 @@ class PystachioCodec(MesosConfig):
       priority = cfg['task']['priority'])
     if cfg['task'].get('health_check_interval_secs'):
       job_dict['health_check_interval_secs'] = cfg['task']['health_check_interval_secs']
-    return MesosJob(job_dict) % Cluster.get(cfg['cluster']).context()
+    return MesosJob(job_dict)
 
   def job(self):
     return convert_pystachio_to_thrift(self.build())

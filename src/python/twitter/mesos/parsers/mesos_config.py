@@ -148,6 +148,11 @@ class MesosConfig(ProxyConfig):
         job['task'] = MesosConfig.fill_task_defaults(job['task'], errors)
         MesosConfig.validate_task_resources(job['task'], errors)
 
+      if 'package' in job:
+        if not isinstance(job['package'], (list, tuple)) or len(job['package']) != 3:
+          errors.append('Job package must be a tuple of (name, role, version), got: %r' %
+              job['package'])
+
       if errors:
         raise MesosConfig.InvalidConfig('Invalid configuration: %s\n' % '\n'.join(errors))
 
@@ -204,4 +209,5 @@ class MesosConfig(ProxyConfig):
     return self._config['update_config']
 
   def package(self):
+    """Return a 3-tuple of (role, name, version)"""
     return self._config.get('package')

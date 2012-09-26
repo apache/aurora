@@ -10,7 +10,6 @@ from gen.twitter.mesos.ttypes import (
   TwitterTaskInfo,
 )
 
-from twitter.mesos.clusters import Cluster
 from twitter.mesos.config.schema import (
   MesosContext,
   MesosTaskInstance
@@ -26,14 +25,13 @@ __all__ = (
 
 
 def task_instance_from_job(job, instance):
-  context = MesosContext(role=job.role(), instance=instance, cluster=job.cluster())
-  cluster_context = Cluster.get(job.cluster().get()).context()
+  instance_context = MesosContext(instance=instance)
   ti = MesosTaskInstance(task=job.task(),
                          layout=job.layout(),
                          role=job.role(),
                          health_check_interval_secs=job.health_check_interval_secs(),
                          instance=instance)
-  return ti.bind(Environment(mesos=context), cluster_context).interpolate()
+  return ti.bind(instance_context).interpolate()
 
 
 def convert(job):

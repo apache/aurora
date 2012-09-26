@@ -20,6 +20,10 @@ class ProxyConfig(object):
     pass
 
   @abstractmethod
+  def set_hdfs_path(self):
+    pass
+
+  @abstractmethod
   def cluster(self):
     pass
 
@@ -29,4 +33,9 @@ class ProxyConfig(object):
 
   @abstractmethod
   def role(self):
+    pass
+
+  @abstractmethod
+  def package(self):
+    """Return 3-tuple of (role, package_name, version) or None if no package specified."""
     pass

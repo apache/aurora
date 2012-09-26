@@ -5,8 +5,8 @@ from twitter.common.contextutil import temporary_dir
 from twitter.mesos.config.schema import (
   Task,
   Resources,
-  Layout,
-  Package,
+  AppLayout,
+  AppPackage,
   MesosTaskInstance)
 
 from twitter.mesos.executor.sandbox_manager import (
@@ -14,7 +14,7 @@ from twitter.mesos.executor.sandbox_manager import (
   DirectorySandbox,
   AppAppSandbox)
 
-DEFAULT_LAYOUT = Layout(packages = [Package(name="herpderp")])
+DEFAULT_LAYOUT = AppLayout(packages = [AppPackage(name="herpderp")])
 
 TASK_ID = 'wickman-test-taskid-abcdefg'
 MESOS_TASK = MesosTaskInstance(

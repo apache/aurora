@@ -54,7 +54,7 @@ class Process(Struct):
 
 @Provided(thermos = ThermosContext)
 class Task(Struct):
-  name = Required(String)
+  name = Default(String, '{{processes[0].name}}')
   processes = List(Process)
 
   # optionals
