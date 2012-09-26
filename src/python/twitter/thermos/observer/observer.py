@@ -193,7 +193,7 @@ class TaskObserver(threading.Thread, Lockable):
         num=num)
 
   def context(self, task_id):
-    state = self._state(task_id)
+    state = self.raw_state(task_id)
     if state is None or state.header is None:
       return {}
     return ThermosContext(
@@ -204,7 +204,7 @@ class TaskObserver(threading.Thread, Lockable):
 
   @Lockable.sync
   def state(self, task_id):
-    real_state = self._state(task_id)
+    real_state = self.raw_state(task_id)
     if real_state is None or real_state.header is None:
       return {}
     else:
@@ -217,9 +217,10 @@ class TaskObserver(threading.Thread, Lockable):
       )
 
   @Lockable.sync
-  def _state(self, task_id):
+  def raw_state(self, task_id):
     """
-      Return the current runner state of a given task id
+      Return the current runner state (thrift blob: gen.twitter.thermos.ttypes.RunnerState)
+      of a given task id
     """
     if task_id in self._actives:
       return self._muxer.get_state(task_id)
@@ -231,7 +232,7 @@ class TaskObserver(threading.Thread, Lockable):
       path = self._pathspec.given(task_id = task_id).getpath('runner_checkpoint')
       self._states[task_id] = CheckpointDispatcher.from_file(path)
       return self._states[task_id]
-    log.error(TaskObserver.UnexpectedError("Could not find task_id: %s" % task_id))
+    log.error("Could not find task_id: %s" % task_id)
     return None
 
   @Lockable.sync
@@ -244,11 +245,10 @@ class TaskObserver(threading.Thread, Lockable):
     """
     if task_id not in self._actives and task_id not in self._finishes:
       return {}
-    state = self._state(task_id)
+    state = self.raw_state(task_id)
     if state is None or state.header is None:
       return {}
 
-    # XXX(wickman) ProcessHistoryState update
     waiting, running, success, failed, killed = [], [], [], [], []
     for process, runs in state.processes.items():
       # No runs ==> nothing started.
@@ -322,7 +322,7 @@ class TaskObserver(threading.Thread, Lockable):
     if task is None:
       return []
 
-    state = self._state(task_id)
+    state = self.raw_state(task_id)
     if state is None or state.header is None:
       return []
 
@@ -364,7 +364,7 @@ class TaskObserver(threading.Thread, Lockable):
       log.error('Could not find task: %s' % task_id)
       return {}
 
-    state = self._state(task_id)
+    state = self.raw_state(task_id)
     if state is None or state.header is None:
       # TODO(wickman)  Can this happen?
       return {}
@@ -452,7 +452,7 @@ class TaskObserver(threading.Thread, Lockable):
 
       If run is None, return the latest run.
     """
-    state = self._state(task_id)
+    state = self.raw_state(task_id)
     if state is None or state.header is None:
       return {}
     if process not in state.processes:
@@ -483,7 +483,7 @@ class TaskObserver(threading.Thread, Lockable):
 
     if task_id not in self._actives and task_id not in self._finishes:
       return {}
-    state = self._state(task_id)
+    state = self.raw_state(task_id)
     if state is None or state.header is None:
       return {}
 
@@ -525,7 +525,7 @@ class TaskObserver(threading.Thread, Lockable):
 
       TODO(wickman)  Just return the filenames directly?
     """
-    runner_state = self._state(task_id)
+    runner_state = self.raw_state(task_id)
     if runner_state is None:
       return {}
     run = self.get_run_number(runner_state, process, run)
@@ -559,7 +559,7 @@ class TaskObserver(threading.Thread, Lockable):
         (2) it's a valid, existing _file_ within that path
       Returns chroot and the pathname relative to that chroot.
     """
-    runner_state = self._state(task_id)
+    runner_state = self.raw_state(task_id)
     if runner_state is None or runner_state.header is None:
       return None, None
     try:
@@ -584,7 +584,7 @@ class TaskObserver(threading.Thread, Lockable):
       }
     """
     path = path if path is not None else '.'
-    runner_state = self._state(task_id)
+    runner_state = self.raw_state(task_id)
     if runner_state is None:
       return {}
     try:
