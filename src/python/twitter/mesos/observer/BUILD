@@ -10,7 +10,6 @@ python_binary(
     pants('src/python/twitter/common/metrics'),
     pants('src/python/twitter/thermos/observer'),
     pants('src/python/twitter/thermos/monitoring'),
-    python_requirement('psutil')
+    python_requirement('psutil'),
   ],
-  platforms = ['linux-x86_64'],
 )
