@@ -32,12 +32,7 @@ class UpdaterTest(unittest.TestCase):
   def setUp(self):
     self._clock = Clock()
     self._scheduler = FakeScheduler()
-    self._updater = Updater('mesos',
-                            'jimbob',
-                            self._scheduler,
-                            self._clock,
-                            'test_update',
-                            'test_update')
+    self._updater = Updater('mesos', 'jimbob', self._scheduler, self._clock, 'test_update')
     self._update_config = copy.deepcopy(UpdaterTest.UPDATE_CONFIG)
     self._initial_shards = range(10)
 

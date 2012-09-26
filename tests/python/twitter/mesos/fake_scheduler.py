@@ -1,7 +1,8 @@
 from collections import deque
 from gen.twitter.mesos.ttypes import *
 
-class Clock:
+
+class Clock(object):
   """Simulates time for test cases."""
   def __init__(self):
     """Initialize the current time to 0.0"""
@@ -15,7 +16,8 @@ class Clock:
     """Simulate sleep by adding the required sleep time in secs."""
     self._current_time += secs
 
-class FakeScheduler:
+
+class FakeScheduler(object):
   """Performs the functions of a mesos scheduler for testing."""
 
   def __init__(self):
@@ -62,7 +64,7 @@ class FakeScheduler:
     resp.shards = response[-1]
     return resp
 
-  def updateShards(self, role, job, shard_ids, update_token, session):
+  def updateShards(self, role, job, shard_ids, update_token):
     """Check input paramters with expected paramters queued by expect_restart_tasks.
 
     Arguments:
@@ -88,7 +90,7 @@ class FakeScheduler:
     """
     self._restart_calls.append((role, job, shard_ids, update_token, shard_results))
 
-  def rollbackShards(self, role, job, shard_ids, update_token, session):
+  def rollbackShards(self, role, job, shard_ids, update_token):
     """Check input paramters with expected paramters queued by expect_rollback_tasks.
 
     Arguments:

@@ -1,3 +1,4 @@
+import functools
 import getpass
 import os
 import posixpath
@@ -5,6 +6,7 @@ import subprocess
 import time
 
 from twitter.common import log, dirutil
+from twitter.common.quantity import Amount, Time
 from twitter.mesos.clusters import Cluster
 from twitter.mesos.location import Location
 
@@ -12,7 +14,9 @@ from twitter.mesos.scheduler_client import SchedulerClient
 from twitter.mesos.session_key_helper import SessionKeyHelper
 from twitter.mesos.updater import Updater
 
+from gen.twitter.mesos import MesosAdmin
 from gen.twitter.mesos.ttypes import *
+from thrift.transport import TTransport
 
 
 class Command(object):
@@ -151,8 +155,25 @@ class MesosClientBase(object):
     else:
       Cluster.assert_exists(cluster)
 
+class SchedulerProxy(object):
+  """
+    This class is responsible for creating a reliable thrift client to the
+    twitter scheduler.  Basically all the dirty work needed by the
+    MesosClientAPI.
+  """
+  CONNECT_MAXIMUM_WAIT = Amount(1, Time.MINUTES)
+  RPC_RETRY_INTERVAL = Amount(5, Time.SECONDS)
+  RPC_MAXIMUM_WAIT = Amount(10, Time.MINUTES)
+  UNAUTHENTICATED_RPCS = frozenset([
+    'populateJobConfig',
+    'getTasksStatus',
+    'getQuota'
+  ])
+
+  class TimeoutError(Exception): pass
+
   def __init__(self, cluster, verbose=False):
-    self._cluster = cluster
+    self.cluster = cluster
     self._session_key = self._client = self._scheduler = None
     self.verbose = verbose
     self.assert_valid_cluster(cluster)
@@ -165,6 +186,9 @@ class MesosClientBase(object):
       return method(self, *args, **kwargs)
     return _wrapper
 
+  def invalidate(self):
+    self._session_key = self._client = self._scheduler = None
+
   def requires_auth(method):
     def _wrapper(self, *args, **kwargs):
       if not self._session_key:
@@ -175,10 +199,6 @@ class MesosClientBase(object):
   @with_scheduler
   def client(self):
     return self._client
-
-  @with_scheduler
-  def cluster(self):
-    return self._cluster
 
   @requires_auth
   def session_key(self):
@@ -194,17 +214,61 @@ class MesosClientBase(object):
         self._scheduler
         self._client
     """
-    self._scheduler = SchedulerClient.get(self._cluster, verbose=self.verbose)
-    assert self._scheduler, "Could not find scheduler (cluster = %s)" % self._cluster
-    self._client = self._scheduler.get_thrift_client()
-    assert self._client, "Could not construct thrift client."
+    self._scheduler = SchedulerClient.get(self.cluster, verbose=self.verbose)
+    assert self._scheduler, "Could not find scheduler (cluster = %s)" % self.cluster
+    start = time.time()
+    while (time.time() - start) < self.CONNECT_MAXIMUM_WAIT.as_(Time.SECONDS):
+      try:
+        self._client = self._scheduler.get_thrift_client()
+        break
+      except SchedulerClient.CouldNotConnect as e:
+        log.warning('Could not connect to scheduler: %s' % e)
+    if not self._client:
+      raise self.TimeoutError('Timed out trying to connect to scheduler at %s' % self.cluster)
+
+  def __getattr__(self, method_name):
+    # If the method does not exist, getattr will return AttributeError for us.
+    method = getattr(MesosAdmin.Client, method_name)
+    if not callable(method):
+      return method
+
+    @functools.wraps(method)
+    def method_wrapper(*args):
+      start = time.time()
+      while (time.time() - start) < self.RPC_MAXIMUM_WAIT.as_(Time.SECONDS):
+        auth_args = () if method_name in self.UNAUTHENTICATED_RPCS else (self.session_key(),)
+        try:
+          method = getattr(self.client(), method_name)
+          if not callable(method):
+            return method
+          return method(*(args + auth_args))
+        except (TTransport.TTransportException, self.TimeoutError) as e:
+          log.warning('Connection error with scheduler: %s, reconnecting...' % e)
+          self.invalidate()
+          time.sleep(self.RPC_RETRY_INTERVAL.as_(Time.SECONDS))
+      raise self.TimeoutError('Timed out attempting to issue %s to %s' % (
+          method_name, self.cluster))
+
+    return method_wrapper
 
 
-class MesosClientAPI(MesosClientBase):
+class MesosClientAPI(object):
   """This class provides the API to talk to the twitter scheduler"""
 
-  def __init__(self, **kwargs):
-    super(MesosClientAPI, self).__init__(**kwargs)
+  UPDATE_FAILURE_WARNING = """
+Note: if the scheduler detects that an update is in progress (or was not
+properly completed) it will reject subsequent updates.  This is because your
+job is likely in a partially-updated state.  You should only begin another
+update if you are confident that no other team members are updating this
+job, and that the job is in a state suitable for an update.
+
+After checking on the above, you may release the update lock on the job by
+invoking cancel_update.
+"""
+
+  def __init__(self, *args, **kw):
+    self._scheduler = SchedulerProxy(*args, **kw)
+    self._cluster = self._scheduler.cluster
 
   def hdfs_path(self, config, copy_app_from):
     if config.hdfs_path():
@@ -214,19 +278,19 @@ class MesosClientAPI(MesosClientBase):
 
   def create_job(self, config, copy_app_from=None):
     if copy_app_from is not None:
-      HDFSHelper(self.cluster(), config.role(), Location.is_corp()).copy_to(copy_app_from,
+      HDFSHelper(self._cluster, config.role(), Location.is_corp()).copy_to(copy_app_from,
         self.hdfs_path(config, copy_app_from))
 
     log.info('Creating job %s' % config.name())
-    return self.client().createJob(config.job(), self.session_key())
+    return self._scheduler.createJob(config.job())
 
   def populate_job_config(self, config):
-    return self.client().populateJobConfig(config.job())
+    return self._scheduler.populateJobConfig(config.job())
 
   def start_cronjob(self, role, jobname):
     log.info("Starting cron job: %s" % jobname)
 
-    return self.client().startCronJob(role, jobname, self.session_key())
+    return self._scheduler.startCronJob(role, jobname)
 
   def kill_job(self, role, jobname):
     log.info("Killing tasks for job: %s" % jobname)
@@ -235,7 +299,7 @@ class MesosClientAPI(MesosClientBase):
     query.owner = Identity(role=role)
     query.jobName = jobname
 
-    return self.client().killTasks(query, self.session_key())
+    return self._scheduler.killTasks(query)
 
   def check_status(self, role, jobname=None):
     log.info("Checking status of role: %s / job: %s" % (role, jobname))
@@ -247,27 +311,20 @@ class MesosClientAPI(MesosClientBase):
     return self.query(query)
 
   def query(self, query):
-    return self.client().getTasksStatus(query)
+    return self._scheduler.getTasksStatus(query)
 
   def update_job(self, config, shards=None, copy_app_from=None):
     log.info("Updating job: %s" % config.name())
 
     if copy_app_from is not None:
-      HDFSHelper(self.cluster(), config.role(), Location.is_corp()).copy_to(copy_app_from,
+      HDFSHelper(self._cluster, config.role(), Location.is_corp()).copy_to(copy_app_from,
         self.hdfs_path(config, copy_app_from))
 
-    resp = self.client().startUpdate(config.job(), self.session_key())
+    resp = self._scheduler.startUpdate(config.job())
 
     if resp.responseCode != ResponseCode.OK:
       log.info("Error starting update: %s" % resp.message)
-      log.warning('''Note: if the scheduler detects that an update is in progress (or was not
-properly completed) it will reject subsequent updates.  This is because your job is
-likely in a partially-updated state. You should only begin another update if you are
-confident that no other team members are updating this job, and that the job is in a
-state suitable for an update.
-
-After checking on the above, you may release the update lock on the job by
-invoking cancel_update.''')
+      log.warning(self.UPDATE_FAILURE_WARNING)
 
       # Create an update response and return it
       update_resp = FinishUpdateResponse()
@@ -279,10 +336,7 @@ invoking cancel_update.''')
       log.info('Update successful')
       return resp
 
-    # TODO(William Farner): Cleanly handle connection failures in case the scheduler
-    #                       restarts mid-update.
-    updater = Updater(config.role(), config.name(), self.client(), time, resp.updateToken,
-                      self.session_key())
+    updater = Updater(config.role(), config.name(), self._scheduler, time, resp.updateToken)
 
     shardsIds = shards or sorted(map(lambda task: task.shardId, config.job().taskConfigs))
     failed_shards = updater.update(config.update_config(), shardsIds)
@@ -292,9 +346,9 @@ invoking cancel_update.''')
     else:
       log.info('Update successful')
 
-    resp = self.client().finishUpdate(
+    resp = self._scheduler.finishUpdate(
       config.role(), config.name(), UpdateResult.FAILED if failed_shards else UpdateResult.SUCCESS,
-      resp.updateToken, self._session_key)
+      resp.updateToken)
 
     if resp.responseCode != ResponseCode.OK:
       log.info("Error finalizing update: %s" % resp.message)
@@ -313,8 +367,7 @@ invoking cancel_update.''')
   def cancel_update(self, role, jobname):
     log.info("Canceling update on job: %s" % jobname)
 
-    resp = self.client().finishUpdate(role, jobname, UpdateResult.TERMINATE,
-        None, self.session_key())
+    resp = self._scheduler.finishUpdate(role, jobname, UpdateResult.TERMINATE, None)
 
     if resp.responseCode != ResponseCode.OK:
       log.info("Error cancelling the update: %s" % resp.message)
@@ -333,14 +386,14 @@ invoking cancel_update.''')
   def get_quota(self, role):
     log.info("Getting quota for: %s" % role)
 
-    return self.client().getQuota(role)
+    return self._scheduler.getQuota(role)
 
   def set_quota(self, role, cpu, ram_mb, disk_mb):
     log.info("Setting quota for user:%s cpu:%f ram_mb:%d disk_mb: %d"
               % (role, cpu, ram_mb, disk_mb))
 
-    return self.client().setQuota(role, Quota(cpu, ram_mb, disk_mb), self.session_key())
+    return self._scheduler.setQuota(role, Quota(cpu, ram_mb, disk_mb))
 
   def force_task_state(self, task_id, status):
     log.info("Requesting that task %s transition to state %s" % (task_id, status))
-    return self.client().forceTaskState(task_id, status, self.session_key())
+    return self._scheduler.forceTaskState(task_id, status)

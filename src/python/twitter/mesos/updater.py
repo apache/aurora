@@ -16,18 +16,33 @@ def debug_if(condition):
   return log.DEBUG if condition else log.ERROR
 
 
+class Shard(object):
+  def __init__(self, task_id=None, birthday=None, finished=False):
+    self.task_id = task_id
+    self.birthday = birthday
+    self.finished = finished
+    self.healthy = False
+
+  def set_healthy(self, healthy):
+    self.healthy = healthy
+    self.finished = True
+
+  def __str__(self):
+    return ('[id=%s, birthday=%s, healthy=%s, finished=%s'
+            % (self.task_id, self.birthday, self.healthy, self.finished))
+
+
 class Updater(object):
   """Update the shards of a job in batches."""
 
   class InvalidConfigError(Exception): pass
 
-  def __init__(self, role, job_name, scheduler, clock, update_token, session):
+  def __init__(self, role, job_name, scheduler, clock, update_token):
     self._role = role
     self._job_name = job_name
     self._scheduler = scheduler
     self._clock = clock
     self._update_token = update_token
-    self._session = session
     self._total_fail_count = 0
     self._max_total_failures = 0
     self._failures_by_shard = collections.defaultdict(int)
@@ -143,7 +158,7 @@ class Updater(object):
       batch_shards = shards_to_rollback[0 : update_config['batchSize']]
       shards_to_rollback = list(set(shards_to_rollback) - set(batch_shards))
       resp = self._scheduler.rollbackShards(self._role, self._job_name, batch_shards,
-          self._update_token, self._session)
+          self._update_token)
       log.log(debug_if(resp.responseCode == UpdateResponseCode.OK),
         'Response from scheduler: %s (message: %s)'
           % (UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
@@ -165,8 +180,7 @@ class Updater(object):
     Returns a map of the current status of the restarted shards as returned by the scheduler.
     """
     log.info('Restarting shards: %s' % shard_ids)
-    return self._scheduler.updateShards(self._role, self._job_name, shard_ids,
-        self._update_token, self._session)
+    return self._scheduler.updateShards(self._role, self._job_name, shard_ids, self._update_token)
 
   def watch_shards(self, shard_ids, restart_threshold, watch_secs):
     """Monitors the restarted shards.
@@ -186,20 +200,7 @@ class Updater(object):
     start_time = self._clock.time()
     expected_running_by = start_time + restart_threshold
 
-    class Shard:
-      def __init__(self, task_id=None, birthday=None, finished=False):
-        self.task_id = task_id
-        self.birthday = birthday
-        self.finished = finished
-        self.healthy = False
 
-      def set_healthy(self, healthy):
-        self.healthy = healthy
-        self.finished = True
-
-      def __str__(self):
-        return ('[id=%s, birthday=%s, healthy=%s, finished=%s'
-                % (self.task_id, self.birthday, self.healthy, self.finished))
     shards_health = {}
     def shards(finished):
       return dict([(s_id, s) for (s_id, s) in shards_health.items() if s.finished == finished])
