@@ -7,18 +7,14 @@ from twitter.common import log
 from twitter.common.http import HttpServer
 from templating import HttpTemplate
 
-# mixins
-# when things settle, discover mixins instead of static
-# declaration.
-from file_browser import TaskObserverFileBrowser
+from .file_browser import TaskObserverFileBrowser
 from .json import TaskObserverJSONBindings
-BottleObserverMixins = [
+BottleObserverMixins = (
   TaskObserverFileBrowser,
   TaskObserverJSONBindings
-]
+)
 
-__author__ = 'wickman@twitter.com (brian wickman)'
-
+import bottle
 
 class StaticAssets(object):
   """
@@ -116,7 +112,7 @@ class BottleObserver(HttpServer, StaticAssets, BottleObserverMixins):
   def handle_task(self, task_id):
     task = self._observer.task([task_id])
     if not task[task_id]:
-      return HttpServer.Response(status=404)
+      bottle.abort(404, "Failed to find task %s.  Try again shortly." % task_id)
     processes = self._observer.processes([task_id])
     if not processes[task_id]:
       return HttpServer.Response(status=404)

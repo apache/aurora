@@ -10,8 +10,13 @@
 import socket
 import time
 
+try:
+  from twitter.common import app
+  observer_port = app.get_options().twitter_common_http_root_server_port
+except (ImportError, AttributeError) as e:
+  observer_port = 1338
+
 host = socket.gethostname()
-observer_port = 1338
 num_tasks = 20
 
 def pretty_time(seconds=time.time()):

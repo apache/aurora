@@ -1,28 +1,27 @@
-<%doc>
- Template arguments:
-   data
-   task_id
-   filename
-   filelen
-   read (bytes read)
-   offset
-   bytes
-   has_more
-</%doc>
-
 <%def name="download_link()">
   <a href='/download/${task_id}/${filename}'><font size=1>download</font></a>
 </%def>
 
-<%def name="less_link()">
-  <a href='/file/${task_id}/${filename}?offset=${offset-bytes}&bytes=${bytes}'>&#171; prev</a>
-</%def>
-
-<%def name="greater_link()">
-  <a href='/file/${task_id}/${filename}?offset=${offset+bytes}&bytes=${bytes}'>next &#187;</a>
-</%def>
-
 <html>
+
+<head>
+  <meta charset="utf-8">
+  <title></title>
+
+  <style type="text/css">
+    .log {
+      font-family: "Inconsolata", "Monaco", "Courier New", "Courier";
+      line-height:14px;
+      font-size: 12px;
+    }
+
+    .invert {
+      color: #FFFFFF;
+      text-decoration: none;
+      background: #000000;
+    }
+  </style>
+</head>
 
 <link rel="stylesheet"
       type="text/css"
@@ -30,46 +29,53 @@
 <style type="text/css">
 div.tight
 {
-  height:85%;
-  overflow:auto;
+  height:100%;
+  overflow:scroll;
 }
 </style>
 
 <title>file browser ${task_id}</title>
 <body>
- <div class="container">
-  <div class="span12">
-    <strong> path </strong> ${filename}
+  <div> <strong> filename </strong> ${filename} </div>
+  <div> <strong> dl </strong> ${download_link()} </div>
+  <div style="position: absolute; left: 5px; top: 0px;">
+    <p id="indicator" class="log invert"></p>
   </div>
 
-  <div class="span4">
-    ${download_link()}
-  </div>
-  <div class="span4">
-    <strong> size </strong> ${filelen}
-  </div>
-  <div class="span4">
-    <strong> bytes </strong> ${offset}...${offset+read}
-  </div>
-  <div class="span4">
-    % if offset > 0:
-      ${less_link()}
-    % else:
-      &#171; prev
-    % endif
-    % if has_more:
-      ${greater_link()}
-    % else:
-      next &#187;
-    % endif
-  </div>
-
-  <div class="span12 tight">
-<pre>
-${data}
-</pre>
-  </div>
-</div>
-
+  <div id="data" class="log" style="white-space:pre-wrap; background-color:#EEEEEE;"></div>
 </body>
+
+<script src="/assets/jquery.js"></script>
+<script src="/assets/jquery.pailer.js"></script>
+
+<script>
+  function resize() {
+    var margin_left = parseInt($('body').css('margin-left'));
+    var margin_top = parseInt($('body').css('margin-top'));
+    var margin_bottom = parseInt($('body').css('margin-bottom'));
+    $('#data').width($(window).width() - margin_left);
+    $('#data').height($(window).height() - margin_top - margin_bottom);
+  }
+
+  $(window).resize(resize);
+
+  $(document).ready(function() {
+    resize();
+
+    $('#data').pailer({
+      'read': function(options) {
+        var settings = $.extend({
+          'offset': -1,
+          'length': -1
+        }, options);
+
+        var url = "/filedata/${task_id}/${filename}"
+          + '?offset=' + settings.offset
+          + '&length=' + settings.length;
+        return $.getJSON(url);
+      },
+      'indicator': $('#indicator')
+    });
+  });
+</script>
 </html>
