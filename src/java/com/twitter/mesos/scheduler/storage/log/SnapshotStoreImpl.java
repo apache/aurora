@@ -22,6 +22,8 @@ import com.twitter.mesos.scheduler.storage.SnapshotStore;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
+import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
+import com.twitter.mesos.scheduler.storage.Storage.Work;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -42,7 +44,7 @@ public final class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
   );
 
   private static final SnapshotField ATTRIBUTE_FIELD = new SnapshotField() {
-    @Override public void saveToSnapshot(MutableStoreProvider storeProvider, Snapshot snapshot) {
+    @Override public void saveToSnapshot(StoreProvider storeProvider, Snapshot snapshot) {
       snapshot.setHostAttributes(storeProvider.getAttributeStore().getHostAttributes());
     }
 
@@ -60,7 +62,7 @@ public final class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
   private static final Iterable<SnapshotField> SNAPSHOT_FIELDS = Arrays.asList(
       ATTRIBUTE_FIELD,
       new SnapshotField() {
-        @Override public void saveToSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+        @Override public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
           snapshot.setTasks(store.getTaskStore().fetchTasks(Query.GET_ALL));
         }
 
@@ -73,7 +75,7 @@ public final class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         }
       },
       new SnapshotField() {
-        @Override public void saveToSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+        @Override public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
           ImmutableSet.Builder<StoredJob> jobs = ImmutableSet.builder();
           for (String managerId : store.getJobStore().fetchManagerIds()) {
             for (JobConfiguration config : store.getJobStore().fetchJobs(managerId)) {
@@ -95,7 +97,7 @@ public final class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         }
       },
       new SnapshotField() {
-        @Override public void saveToSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+        @Override public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
           snapshot.setSchedulerMetadata(
               new SchedulerMetadata(store.getSchedulerStore().fetchFrameworkId()));
         }
@@ -110,7 +112,7 @@ public final class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         }
       },
       new SnapshotField() {
-        @Override public void saveToSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+        @Override public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
           ImmutableSet.Builder<JobUpdateConfiguration> updates = ImmutableSet.builder();
 
           for (String updatingRole : store.getUpdateStore().fetchUpdatingRoles()) {
@@ -131,7 +133,7 @@ public final class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         }
       },
       new SnapshotField() {
-        @Override public void saveToSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+        @Override public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
           ImmutableSet.Builder<QuotaConfiguration> quotas = ImmutableSet.builder();
           for (String role : store.getQuotaStore().fetchQuotaRoles()) {
             quotas.add(
@@ -168,8 +170,8 @@ public final class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
   }
 
   @Override public Snapshot createSnapshot() {
-    return storage.doInWriteTransaction(new MutateWork.Quiet<Snapshot>() {
-      @Override public Snapshot apply(MutableStoreProvider storeProvider) {
+    return storage.doInTransaction(new Work.Quiet<Snapshot>() {
+      @Override public Snapshot apply(StoreProvider storeProvider) {
         Snapshot snapshot = new Snapshot();
 
         // Capture timestamp to signify the beginning of a snapshot operation, apply after in case
@@ -218,7 +220,7 @@ public final class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
   }
 
   private interface SnapshotField {
-    void saveToSnapshot(MutableStoreProvider storeProvider, Snapshot snapshot);
+    void saveToSnapshot(StoreProvider storeProvider, Snapshot snapshot);
 
     void restoreFromSnapshot(MutableStoreProvider storeProvider, Snapshot snapshot);
   }
