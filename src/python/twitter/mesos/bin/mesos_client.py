@@ -50,16 +50,19 @@ def open_url(url):
   webbrowser.open_new_tab(url)
 
 
-def synthesize_url(cluster, scheduler=None, role=None, job=None):
+def synthesize_url(cluster, role=None, job=None):
   if 'angrybird-local' in cluster:
     # TODO(vinod): Get the correct web port of the leading scheduler from zk!
-    scheduler_url = 'http://%s:5051' % scheduler.real_host
+    scheduler_url = 'http://localhost:5051'
   elif 'localhost' in cluster:
     scheduler_url = 'http://localhost:8081'
   else :
     cluster = Cluster.get(cluster)
-    scheduler_url = cluster.proxy_url if cluster.is_service_proxied else \
-      ('http://%s:8081' % scheduler.real_host)
+    scheduler_url = cluster.proxy_url if cluster.is_service_proxied else None
+
+  if not scheduler_url :
+    log.warning("Couldn't find the proxy url for %s" % cluster)
+    return None
 
   if job and not role:
     _die('If job specified, must specify role!')
@@ -187,11 +190,12 @@ class MesosCLI(cmd.Cmd):
     cmd.Cmd.__init__(self)
     self.options = opts
 
-  def handle_open(self, cluster, scheduler, role, job):
-    url = synthesize_url(cluster, scheduler, role, job)
-    log.info('Job url: %s' % url)
-    if self.options.open_browser:
-      open_url(url)
+  def handle_open(self, cluster, role, job):
+    url = synthesize_url(cluster, role, job)
+    if url:
+      log.info('Job url: %s' % url)
+      if self.options.open_browser:
+        open_url(url)
 
   @requires.exactly('job', 'config')
   def do_create(self, jobname, config_file):
@@ -208,7 +212,7 @@ class MesosCLI(cmd.Cmd):
     api = MesosClientAPI(cluster=config.cluster(), verbose=self.options.verbose)
     resp = api.create_job(config, self.options.copy_app_from)
     check_and_log_response(resp)
-    self.handle_open(config.cluster(), api.scheduler(), config.role(), config.name())
+    self.handle_open(config.cluster(), config.role(), config.name())
 
   @requires.exactly('job', 'config_file')
   def do_diff(self, job, config_file):
@@ -288,7 +292,7 @@ class MesosCLI(cmd.Cmd):
     api = MesosClientAPI(cluster=self.options.cluster, verbose=self.options.verbose)
     resp = api.start_cronjob(role, jobname)
     check_and_log_response(resp)
-    self.handle_open(self.options.cluster, api.scheduler(), role, jobname)
+    self.handle_open(self.options.cluster, role, jobname)
 
   @requires.exactly('role', 'job')
   def do_kill(self, role, jobname):
@@ -299,7 +303,7 @@ class MesosCLI(cmd.Cmd):
     api = MesosClientAPI(cluster=self.options.cluster, verbose=self.options.verbose)
     resp = api.kill_job(role, jobname)
     check_and_log_response(resp)
-    self.handle_open(self.options.cluster, api.scheduler(), role, jobname)
+    self.handle_open(self.options.cluster, role, jobname)
 
   @requires.exactly('role', 'job')
   def do_status(self, role, jobname):

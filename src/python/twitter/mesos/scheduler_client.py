@@ -41,11 +41,10 @@ class SchedulerClient(object):
       zk_port = 2181 if ':' not in cluster else int(cluster.split(':')[1])
       return ZookeeperSchedulerClient(cluster, zk_port, ssl=True, **kwargs)
 
-  def __init__(self, verbose=False, ssl=False, real_host=None):
+  def __init__(self, verbose=False, ssl=False):
     self._client = None
     self._verbose = verbose
     self._ssl = ssl
-    self._real_host = real_host
 
   def get_thrift_client(self):
     if self._client is None:
@@ -56,10 +55,6 @@ class SchedulerClient(object):
   # pair and then delegate the opening to SchedulerClient._connect_scheduler
   def _connect(self):
     return None
-
-  @property
-  def real_host(self):
-    return self._real_host
 
   @staticmethod
   def _connect_scheduler(host, port, with_ssl=False):
