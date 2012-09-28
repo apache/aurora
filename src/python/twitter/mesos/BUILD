@@ -100,6 +100,7 @@ python_library(
   dependencies = [
     pants('src/python/twitter/mesos/packer'),
     pants(':clusters'),
+    pants(':command_runner'),
     pants(':location'),
     pants(':parsers'),
     pants(':scheduler_client'),

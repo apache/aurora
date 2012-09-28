@@ -21,6 +21,7 @@ from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 from twitter.mesos.clusters import Cluster
 from twitter.mesos.client_wrapper import MesosClientAPI
+from twitter.mesos.command_runner import DistributedCommandRunner
 from twitter.mesos.packer import sd_packer_client
 from twitter.mesos.packer.packer_client import Packer
 from twitter.mesos.parsers.mesos_config import MesosConfig
@@ -28,8 +29,8 @@ from twitter.mesos.parsers.pystachio_config import PystachioConfig
 from twitter.mesos.parsers.pystachio_codec import PystachioCodec
 from twitter.thermos.base.options import add_binding_to
 
-from gen.twitter.mesos.ttypes import *
 from gen.twitter.mesos.constants import ACTIVE_STATES, LIVE_STATES
+from gen.twitter.mesos.ttypes import *
 
 
 DEFAULT_USAGE_BANNER = """
@@ -577,52 +578,33 @@ def ssh(role, job, shard):
 
 
 @app.command
+@app.command_option('-t', '--threads', type=int, default=1, dest='num_threads',
+    help='The number of threads to use.')
 @app.command_option(CLUSTER_OPTION)
 @requires.at_least('role', 'job', 'cmd')
 def run(*line):
-  """usage: run --cluster=CLUSTER role job cmd
+  """usage: run --cluster=CLUSTER role job(s) cmd
 
-  Runs a shell command on all machines currently hosting shards of a job.
+  Runs a shell command on all machines currently hosting shards of a
+  comma-separated list of jobs.
+  
   This feature supports the same command line wildcards that are used to
-  populate a job's commands: %port:PORT_NAME%, %shard_id%, %task_id%.
+  populate a job's commands.
+  
+  For Aurora jobs this means %port:PORT_NAME%, %shard_id%, %task_id%.
+  For Thermos jobs this means anything in the {{mesos.*}} and {{thermos.*}} namespaces.
   """
   # TODO(William Farner): Add support for invoking on individual shards.
-  # This will require some arg refactoring in the client.
-  (role, jobs) = line[:2]
-  cmd = list(line[2:])
+  options = app.get_options()
 
-  if not app.get_options().cluster:
+  (role, jobs) = line[:2]
+  command = ' '.join(line[2:])
+
+  if not options.cluster:
     _die('--cluster is required')
 
-  tasks = []
-  api = MesosClientAPI(cluster=app.get_options().cluster, verbose=app.get_options().verbose)
-  for job in jobs.split(','):
-    resp = query(role, job, api=api)
-    if not resp.responseCode:
-      log.error('Failed to query job: %s' % job)
-      continue
-    tasks.extend(resp.tasks)
-
-  def replace(match, replace_val):
-    def _replace(value):
-      return value.replace(match, str(replace_val))
-    return _replace
-
-  # TODO(William Farner): Support parallelization of this process with -t ala loony.
-  for task in tasks:
-    host = task.assignedTask.slaveHost
-    full_cmd = ['ssh', '-n', '-q', host, 'cd', '/var/run/nexus/%task_id%/sandbox;']
-    full_cmd += cmd
-
-    # Populate command line wildcards.
-    full_cmd = map(replace('%shard_id%', task.assignedTask.task.shardId), full_cmd)
-    full_cmd = map(replace('%task_id%', task.assignedTask.taskId), full_cmd)
-    for name, port in task.assignedTask.assignedPorts.items():
-      full_cmd = map(replace('%port:' + name + '%', port), full_cmd)
-
-    proc = subprocess.Popen(full_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    output = proc.communicate()
-    print '\n'.join(['%s:  %s' % (host, line) for line in output[0].splitlines()])
+  dcr = DistributedCommandRunner(options.cluster, role, jobs.split(','))
+  dcr.run(command, parallelism=options.num_threads)
 
 
 def _get_packer(cluster=None):
