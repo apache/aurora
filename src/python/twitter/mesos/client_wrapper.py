@@ -264,6 +264,10 @@ invoking cancel_update.
     self._scheduler = SchedulerProxy(*args, **kw)
     self._cluster = self._scheduler.cluster
 
+  @property
+  def scheduler(self):
+    return self._scheduler
+
   def hdfs_path(self, config, copy_app_from):
     if config.hdfs_path():
       return config.hdfs_path()

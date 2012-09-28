@@ -46,22 +46,15 @@ def _die(msg):
 
 
 def open_url(url):
-  import webbrowser
-  webbrowser.open_new_tab(url)
+  if url is not None:
+    import webbrowser
+    webbrowser.open_new_tab(url)
 
 
-def synthesize_url(cluster, role=None, job=None):
-  if 'angrybird-local' in cluster:
-    # TODO(vinod): Get the correct web port of the leading scheduler from zk!
-    scheduler_url = 'http://localhost:5051'
-  elif 'localhost' in cluster:
-    scheduler_url = 'http://localhost:8081'
-  else :
-    cluster = Cluster.get(cluster)
-    scheduler_url = cluster.proxy_url if cluster.is_service_proxied else None
-
+def synthesize_url(scheduler_client, role=None, job=None):
+  scheduler_url = scheduler_client.url
   if not scheduler_url:
-    log.warning("Couldn't find the proxy url for %s" % cluster)
+    log.warning("Unable to find scheduler web UI!")
     return None
 
   if job and not role:
@@ -73,6 +66,14 @@ def synthesize_url(cluster, role=None, job=None):
     return urljoin(scheduler_url, 'scheduler/%s' % role)
   else:
     return urljoin(scheduler_url, 'scheduler/%s/%s' % (role, job))
+
+
+def handle_open(scheduler_client, role, job):
+  url = synthesize_url(scheduler_client, role, job)
+  if url:
+    log.info('Job url: %s' % url)
+    if app.get_options().open_browser:
+      open_url(url)
 
 
 def get_package_uri_from_packer(cluster, package, packer_factory):
@@ -184,14 +185,6 @@ class requires(object):
     return real_fn
 
 
-def handle_open(cluster, role, job):
-  url = synthesize_url(cluster, role, job)
-  if url:
-    log.info('Job url: %s' % url)
-    if app.get_options().open_browser:
-      open_url(url)
-
-
 COPY_APP_FROM_OPTION = optparse.Option(
     '--copy_app_from',
     dest='copy_app_from',
@@ -252,7 +245,7 @@ def create(jobname, config_file):
   api = MesosClientAPI(cluster=config.cluster(), verbose=app.get_options().verbose)
   resp = api.create_job(config, app.get_options().copy_app_from)
   check_and_log_response(resp)
-  handle_open(config.cluster(), config.role(), config.name())
+  handle_open(api.scheduler.scheduler(), config.role(), config.name())
 
 
 @app.command
@@ -300,10 +293,10 @@ def diff(job, config_file):
       subprocess.call([diff_program, remote.name, local.name])
 
 
-@app.command
+@app.command(name='open')
 @app.command_option(CLUSTER_OPTION)
 @requires.nothing
-def open(*args):
+def do_open(*args):
   """usage: open --cluster=CLUSTER [role [job]]
 
   Opens the scheduler page for a role or job in the default web browser.
@@ -318,7 +311,7 @@ def open(*args):
     _die('--cluster is required')
 
   api = MesosClientAPI(cluster=app.get_options().cluster, verbose=app.get_options().verbose)
-  open_url(synthesize_url(app.get_options().cluster, role, job))
+  open_url(synthesize_url(api.scheduler.scheduler(), role, job))
 
 
 @app.command
@@ -348,7 +341,7 @@ def start_cron(role, jobname):
   api = MesosClientAPI(cluster=app.get_options().cluster, verbose=app.get_options().verbose)
   resp = api.start_cronjob(role, jobname)
   check_and_log_response(resp)
-  handle_open(app.get_options().cluster, role, jobname)
+  handle_open(api.scheduler.scheduler(), role, jobname)
 
 
 @app.command
@@ -363,7 +356,7 @@ def kill(role, jobname):
   api = MesosClientAPI(cluster=app.get_options().cluster, verbose=app.get_options().verbose)
   resp = api.kill_job(role, jobname)
   check_and_log_response(resp)
-  handle_open(app.get_options().cluster, role, jobname)
+  handle_open(api.scheduler.scheduler(), role, jobname)
 
 
 @app.command

@@ -82,14 +82,17 @@ class ZookeeperSchedulerClient(SchedulerClient):
     SchedulerClient.__init__(self, verbose=verbose, ssl=ssl)
     self._cluster = cluster
     self._zkport = port
+    self._endpoint = None
 
   def _connect(self):
     serverset = ZookeeperHelper.get_scheduler_serverset(self._cluster, port=self._zkport)
     serverset_endpoints = list(serverset)
     if len(serverset_endpoints) == 0:
       raise self.CouldNotConnect('No schedulers detected in %s!' % self._cluster)
-    service_instance = serverset_endpoints[0].service_endpoint
-    host, port = self._maybe_tunnel(self._cluster, service_instance.host, service_instance.port)
+    instance = serverset_endpoints[0]
+    self._endpoint = instance.service_endpoint
+    self._http = instance.additional_endpoints.get('http')
+    host, port = self._maybe_tunnel(self._cluster, self._endpoint.host, self._endpoint.port)
     return SchedulerClient._connect_scheduler(host, port, self._ssl)
 
   @classmethod
@@ -99,6 +102,14 @@ class ZookeeperSchedulerClient(SchedulerClient):
       log.info('Creating ssh tunnel for %s' % cluster)
       return TunnelHelper.create_tunnel(host, port)
     return host, port
+
+  @property
+  def url(self):
+    proxy_url = Cluster.get(self._cluster).proxy_url
+    if proxy_url:
+      return proxy_url
+    if self._http:
+      return 'http://%s:%s' % (self._http.host, self._http.port)
 
 
 class LocalSchedulerClient(SchedulerClient):
@@ -110,3 +121,6 @@ class LocalSchedulerClient(SchedulerClient):
   def _connect(self):
     return SchedulerClient._connect_scheduler(self._host, self._port, with_ssl=self._ssl)
 
+  @property
+  def url(self):
+    return 'http://localhost:8081'
