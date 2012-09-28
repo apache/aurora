@@ -616,9 +616,8 @@ def _get_packer(cluster=None):
   cluster = cluster or app.get_options().cluster
   if not cluster:
     _die('--cluster must be specified')
-  return sd_packer_client.create_packer(Cluster.get(cluster))
+  return sd_packer_client.create_packer(cluster)
 
-@staticmethod
 def exactly(*args):
   def wrap(fn):
     return requires.wrap_function(fn, args, (lambda want, got: len(want) == len(got)))
@@ -626,9 +625,9 @@ def exactly(*args):
 
 def trap_packer_error(fn):
   @functools.wraps(fn)
-  def wrap(*args, **kwargs):
+  def wrap(args):
     try:
-      return fn(*args, **kwargs)
+      return fn(args)
     except Packer.Error as e:
       print 'Request failed: %s' % e
   return wrap
@@ -665,7 +664,7 @@ def package_versions(role, package):
   Prints metadata about all of the versions of a package.
   """
   for version in _get_packer().list_versions(role, package):
-    MesosCLI._print_package(version)
+    _print_package(version)
 
 
 @app.command
@@ -699,7 +698,7 @@ def package_add_version(role, package, file_path):
   """
   pkg = _get_packer().add(role, package, file_path, app.get_options().metadata)
   print 'Package added:'
-  MesosCLI._print_package(pkg)
+  _print_package(pkg)
 
 
 @app.command
@@ -724,7 +723,7 @@ def package_get_version(role, package, version):
     else:
       print pkg['metadata']
   else:
-    MesosCLI._print_package(pkg)
+    _print_package(pkg)
 
 
 @app.command
