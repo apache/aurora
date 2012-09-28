@@ -17,11 +17,6 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.Quota;
-import com.twitter.mesos.gen.ScheduledTask;
-import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.gen.storage.JobUpdateConfiguration;
-import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
-import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.db.testing.DbStorageTestUtil;
 import com.twitter.mesos.scheduler.storage.BaseTaskStoreTest;
 import com.twitter.mesos.scheduler.storage.Storage;
@@ -29,7 +24,6 @@ import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
-import com.twitter.mesos.scheduler.storage.Storage.Work.Quiet;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -127,55 +121,6 @@ public class DbStorageTest extends BaseTaskStoreTest<DbStorage> {
 
     store.deleteTasks();
     assertEquals(0, store.getTaskStoreSize());
-  }
-
-  @Test
-  public void testSnapshotting() {
-    String frameworkId = "framework";
-    String role = "jake";
-    String job = "spin";
-    String token = "please";
-    byte[] snapshot1 = store.createSnapshot();
-
-    store.saveFrameworkId(frameworkId);
-    byte[] snapshot2 = store.createSnapshot();
-
-    JobConfiguration fortuneCron = createJobConfig(job, role, job);
-    store.saveAcceptedJob("CRON", fortuneCron);
-
-    ScheduledTask originalTask = makeTask("42");
-    store.saveTasks(ImmutableSet.<ScheduledTask>of(originalTask));
-
-    TwitterTaskInfo originalTaskInfo = originalTask.getAssignedTask().getTask();
-    final TwitterTaskInfo newTaskInfo = originalTaskInfo.deepCopy().setNumCpus(42);
-    TaskUpdateConfiguration updateConfiguration =
-        new TaskUpdateConfiguration(originalTaskInfo, newTaskInfo);
-    store.saveJobUpdateConfig(
-        new JobUpdateConfiguration(role, job, token, ImmutableSet.of(updateConfiguration)));
-    byte[] snapshot3 = store.createSnapshot();
-
-    store.applySnapshot(snapshot1);
-    assertNull(store.fetchFrameworkId());
-    assertTrue(Iterables.isEmpty(store.fetchJobs("CRON")));
-    assertTrue(store.fetchTaskIds(Query.GET_ALL).isEmpty());
-    assertTrue(store.fetchUpdateConfigs(role).isEmpty());
-
-    store.applySnapshot(snapshot3);
-    assertEquals(frameworkId, store.fetchFrameworkId());
-    assertEquals(ImmutableList.of(fortuneCron), ImmutableList.copyOf(store.fetchJobs("CRON")));
-    assertEquals("42", Iterables.getOnlyElement(store.fetchTaskIds(Query.GET_ALL)));
-    JobUpdateConfiguration updateConfig = store.fetchJobUpdateConfig(role, job).get();
-    assertEquals(token, updateConfig .getUpdateToken());
-    TaskUpdateConfiguration config = Iterables.getOnlyElement(updateConfig.getConfigs());
-
-    assertEquals(originalTaskInfo, config.getOldConfig());
-    assertEquals(newTaskInfo, config.getNewConfig());
-
-    store.applySnapshot(snapshot2);
-    assertEquals(frameworkId, store.fetchFrameworkId());
-    assertTrue(Iterables.isEmpty(store.fetchJobs("CRON")));
-    assertTrue(store.fetchTaskIds(Query.GET_ALL).isEmpty());
-    assertTrue(store.fetchUpdateConfigs(role).isEmpty());
   }
 
   private Runnable latchedReader(final CountDownLatch myLatch, final CountDownLatch awaitLatch) {

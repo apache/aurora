@@ -156,16 +156,12 @@ public final class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
   );
 
   private final Clock clock;
-  private final SnapshotStore<byte[]> binarySnapshotStore;
   private final Storage storage;
 
   @Inject
-  public SnapshotStoreImpl(Clock clock,
-      SnapshotStore<byte[]> binarySnapshotStore,
-      Storage storage) {
+  public SnapshotStoreImpl(Clock clock, Storage storage) {
 
     this.clock = checkNotNull(clock);
-    this.binarySnapshotStore = checkNotNull(binarySnapshotStore);
     this.storage = checkNotNull(storage);
   }
 
@@ -200,20 +196,10 @@ public final class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
 
     storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
+        LOG.info("Restoring snapshot.");
 
-        if (snapshot.isSetDataDEPRECATED()) {
-          // TODO(wfarner): Remove this after rolled forward to all clusters.
-          LOG.info("Restoring from old-style snapshot.");
-          checkNewFieldsBlank(snapshot);
-
-          binarySnapshotStore.applySnapshot(snapshot.getDataDEPRECATED());
-          ATTRIBUTE_FIELD.restoreFromSnapshot(storeProvider, snapshot);
-        } else {
-          LOG.info("Restoring from new-style snapshot.");
-
-          for (SnapshotField field : SNAPSHOT_FIELDS) {
-            field.restoreFromSnapshot(storeProvider, snapshot);
-          }
+        for (SnapshotField field : SNAPSHOT_FIELDS) {
+          field.restoreFromSnapshot(storeProvider, snapshot);
         }
       }
     });

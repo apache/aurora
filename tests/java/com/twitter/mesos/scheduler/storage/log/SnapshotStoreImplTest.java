@@ -29,14 +29,10 @@ import com.twitter.mesos.scheduler.storage.testing.StorageTestUtil;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
-/**
- * @author William Farner
- */
 public class SnapshotStoreImplTest extends EasyMockTest {
 
   private static final long NOW = 10335463456L;
 
-  private SnapshotStore<byte[]> binarySnapshotStore;
   private StorageTestUtil storageUtil;
   private SnapshotStore<Snapshot> snapshotStore;
 
@@ -44,23 +40,8 @@ public class SnapshotStoreImplTest extends EasyMockTest {
   public void setUp() {
     FakeClock clock = new FakeClock();
     clock.setNowMillis(NOW);
-    binarySnapshotStore = createMock(new Clazz<SnapshotStore<byte[]>>() { });
     storageUtil = new StorageTestUtil(this);
-    snapshotStore = new SnapshotStoreImpl(clock, binarySnapshotStore, storageUtil.storage);
-  }
-
-  @Test
-  public void testRestoreOldSnapshot() {
-    byte[] snapshotData = "binary snapshot".getBytes();
-
-    storageUtil.expectTransactions();
-    storageUtil.attributeStore.deleteHostAttributes();
-    binarySnapshotStore.applySnapshot(snapshotData);
-
-    control.replay();
-
-    snapshotStore.applySnapshot(new Snapshot()
-        .setDataDEPRECATED(snapshotData));
+    snapshotStore = new SnapshotStoreImpl(clock, storageUtil.storage);
   }
 
   @Test
@@ -109,17 +90,6 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     assertEquals(expected, snapshotStore.createSnapshot());
 
     snapshotStore.applySnapshot(expected);
-  }
-
-  @Test(expected = IllegalStateException.class)
-  public void testRestoreMixedSnapshot() {
-    storageUtil.expectTransactions();
-
-    control.replay();
-
-    snapshotStore.applySnapshot(new Snapshot()
-        .setDataDEPRECATED("binary snapshot".getBytes())
-        .setTasks(ImmutableSet.<ScheduledTask>of()));
   }
 
   private void expectDataWipe() {

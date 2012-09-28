@@ -2,8 +2,6 @@ package com.twitter.mesos.scheduler.storage.db;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -34,7 +32,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
-import com.google.common.io.Files;
 import com.google.common.primitives.Ints;
 import com.google.inject.Inject;
 
@@ -61,8 +58,6 @@ import com.twitter.common.base.ExceptionalClosure;
 import com.twitter.common.base.ExceptionalFunction;
 import com.twitter.common.collections.Pair;
 import com.twitter.common.inject.TimedInterceptor.Timed;
-import com.twitter.common.io.FileUtils;
-import com.twitter.common.io.FileUtils.Temporary;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
@@ -83,7 +78,6 @@ import com.twitter.mesos.scheduler.storage.AttributeStore;
 import com.twitter.mesos.scheduler.storage.JobStore;
 import com.twitter.mesos.scheduler.storage.QuotaStore;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
-import com.twitter.mesos.scheduler.storage.SnapshotStore;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.TaskStore;
 import com.twitter.mesos.scheduler.storage.UpdateStore;
@@ -95,7 +89,6 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
  * A task store that saves data to a database with a JDBC driver.
  */
 public class DbStorage implements
-    SnapshotStore<byte[]>,
     Storage,
     SchedulerStore.Mutable,
     JobStore.Mutable,
@@ -109,7 +102,6 @@ public class DbStorage implements
 
   @VisibleForTesting final JdbcTemplate jdbcTemplate;
   private final TransactionTemplate transactionTemplate;
-  private final Temporary temporary = FileUtils.SYSTEM_TMP;
   private boolean initialized;
   private final AttributeStore.Mutable attributeStore;
 
@@ -355,52 +347,6 @@ public class DbStorage implements
             return stream.readString();
           }
         }, null);
-  }
-
-  @Timed("db_storage_create_snapshot")
-  @Override
-  public byte[] createSnapshot() {
-    try {
-      return temporary.doWithFile(new ExceptionalFunction<File, byte[], IOException>() {
-        @Override public byte[] apply(final File file) throws IOException {
-          transactionTemplate.execute(new TransactionCallbackWithoutResult() {
-            @Override protected void doInTransactionWithoutResult(TransactionStatus status) {
-              jdbcTemplate.execute(
-                  String.format("SCRIPT TO '%s' COMPRESSION GZIP CHARSET 'UTF-8'",
-                      file.getAbsolutePath()));
-            }
-          });
-          return Files.toByteArray(file);
-        }
-      });
-    } catch (IOException e) {
-      throw new IllegalStateException(e);
-    }
-  }
-
-  @Timed("db_storage_apply_snapshot")
-  @Override
-  public void applySnapshot(final byte[] snapshot) {
-    try {
-      temporary.doWithFile(new ExceptionalClosure<File, IOException>() {
-        @Override public void execute(final File file) throws IOException {
-          Files.write(snapshot, file);
-          transactionTemplate.execute(new TransactionCallbackWithoutResult() {
-            @Override protected void doInTransactionWithoutResult(TransactionStatus status) {
-              jdbcTemplate.execute(
-                  String.format(
-                      "DROP ALL OBJECTS; RUNSCRIPT FROM '%s' COMPRESSION GZIP CHARSET 'UTF-8'",
-                      file.getAbsolutePath()));
-            }
-          });
-        }
-      });
-    } catch (IOException e) {
-      throw new IllegalStateException(e);
-    }
-
-    Map<String, ScheduledTask> tasksById = Tasks.mapById(fetchTasks(Query.GET_ALL));
-    LOG.info("Recovered tasks from storage: " + Maps.transformValues(tasksById, Tasks.GET_STATUS));
   }
 
   private void updateSchedulerState(final ConfiguratonKey key,
