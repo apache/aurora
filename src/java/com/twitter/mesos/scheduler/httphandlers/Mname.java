@@ -111,6 +111,7 @@ public class Mname {
 
     UriBuilder redirect = UriBuilder
         .fromPath(forwardRequest.or("/"))
+        .scheme("http")
         .host(assignedTask.getSlaveHost())
         .port(port.get());
     for (Entry<String, List<String>> entry : uriInfo.getQueryParameters().entrySet()) {
