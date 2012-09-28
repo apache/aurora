@@ -9,9 +9,6 @@ import re
 import sys
 import time
 
-
-from pystachio import Ref
-
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 from twitter.common.dirutil import du, tail_f
@@ -38,6 +35,9 @@ from gen.twitter.thermos.ttypes import (
   RunnerCkpt,
   RunnerState,
   TaskState)
+
+from pystachio import Ref
+
 
 app.add_option("--root", dest="root", metavar="PATH",
                default=os.path.join(os.environ['HOME'], '.thermos'),
@@ -94,6 +94,16 @@ def daemonize():
   sys.stdin, sys.stdout, sys.stderr = (open('/dev/null', 'r'),
                                        open('/dev/null', 'a+'),
                                        open('/dev/null', 'a+', 0))
+
+
+def tasks_from_re(expressions, root, state=None):
+  task_ids = [t_id for _, t_id in TaskDetector(root=root).get_task_ids(state=state)]
+  matched_tasks = set()
+  for task_expr in map(re.compile, expressions):
+    for task_id in task_ids:
+      if task_expr.match(task_id):
+        matched_tasks.add(task_id)
+  return matched_tasks
 
 
 def _really_run(task, root, sandbox, task_id=None, user=None, prebound_ports=None, chroot=None,
@@ -299,13 +309,7 @@ def kill(args, options):
     print('Must specify tasks!', file=sys.stderr)
     return
 
-  detector = TaskDetector(root = options.root)
-  active_task_ids = [t_id for _, t_id in detector.get_task_ids(state='active')]
-  matched_tasks = set()
-  for task_expr in map(re.compile, args):
-    for task_id in active_task_ids:
-      if task_expr.match(task_id):
-        matched_tasks.add(task_id)
+  matched_tasks = tasks_from_re(args, options.root, state='active')
 
   if not matched_tasks:
     print('No active tasks matched.')
@@ -374,35 +378,43 @@ def gc(args, options):
                     include_logs = not options.keep_logs,
                     verbose = True, logger = print)
   tgc = TaskGarbageCollector(root=options.root)
-  gc_tasks = DefaultCollector(tgc, **gc_options).run()
+
+  if args:
+    gc_tasks = tasks_from_re(args, options.root, state='finished')
+  else:
+    print('No task ids specified, using default collector.')
+    gc_tasks = [task.task_id for task in DefaultCollector(tgc, **gc_options).run()]
 
   if not gc_tasks:
     print('No tasks to garbage collect.  Exiting')
     return
 
-  if options.dryrun:
-    print('Specified dry-run, skipping.')
-  else:
-    value = 'y'
-    if not options.force:
-      value = raw_input("Continue [y/N]? ") or 'N'
-    if value.lower() == 'y':
-      print('Running gc...')
-      tgc = TaskGarbageCollector(root=options.root)
-      for task in gc_tasks:
-        print('  Task %s ' % task.task_id, end='')
-        print('data %s ' % ('keeping' if options.keep_data else 'deleting'), end='')
-        if not options.keep_data:
-          tgc.erase_data(task.task_id)
-        print('logs %s ' % ('keeping' if options.keep_logs else 'deleting'), end='')
-        if not options.keep_logs:
-          tgc.erase_logs(task.task_id)
-        print('metadata %s ' % ('keeping' if options.keep_metadata else 'deleting'), end='')
-        if not options.keep_metadata:
-          tgc.erase_metadata(task.task_id)
-        print('done.')
+  def maybe(function, *args):
+    if options.dryrun:
+      print('    would run %s%r' % (function.__name__, args))
     else:
-      print('Cancelling gc.')
+      function(*args)
+
+  value = 'y'
+  if not options.force:
+    value = raw_input("Continue [y/N]? ") or 'N'
+  if value.lower() == 'y':
+    print('Running gc...')
+    tgc = TaskGarbageCollector(root=options.root)
+    for task in gc_tasks:
+      print('  Task %s ' % task, end='')
+      print('data (%s) ' % ('keeping' if options.keep_data else 'deleting'), end='')
+      print('logs (%s) ' % ('keeping' if options.keep_logs else 'deleting'), end='')
+      print('metadata (%s) ' % ('keeping' if options.keep_metadata else 'deleting'))
+      if not options.keep_data:
+        maybe(tgc.erase_data, task)
+      if not options.keep_logs:
+        maybe(tgc.erase_logs, task)
+      if not options.keep_metadata:
+        maybe(tgc.erase_metadata, task)
+      print('done.')
+  else:
+    print('Cancelling gc.')
 
 
 # TODO(wickman)  Implement.
