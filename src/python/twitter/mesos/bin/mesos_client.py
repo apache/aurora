@@ -29,15 +29,14 @@ from twitter.mesos.parsers.pystachio_codec import PystachioCodec
 from twitter.thermos.base.options import add_binding_to
 
 from gen.twitter.mesos.ttypes import *
-from gen.twitter.mesos.constants import ACTIVE_STATES
+from gen.twitter.mesos.constants import ACTIVE_STATES, LIVE_STATES
 
 
-# States for tasks that are running on a machine.
-LIVE_TASK_STATES = set([ScheduleStatus.KILLING,
-                        ScheduleStatus.PREEMPTING,
-                        ScheduleStatus.RUNNING,
-                        ScheduleStatus.STARTING,
-                        ScheduleStatus.UPDATING])
+DEFAULT_USAGE_BANNER = """
+mesos client, used to interact with the aurora scheduler.
+
+For questions contact mesos-team@twitter.com.
+"""
 
 
 def _die(msg):
@@ -230,7 +229,23 @@ CLUSTER_OPTION = optparse.Option(
     help='Cluster to invoke the command against.')
 
 
+# This is for binding arbitrary points in the Thermos namespace to specific strings, e.g.
+# if a Thermos configuration has {{jvm.version}}, it can be bound explicitly from the
+# command-line with, for example, -E jvm.version:7
+ENVIRONMENT_BIND_OPTION = optparse.Option(
+    '-E',
+    type='string',
+    nargs=1,
+    action='callback',
+    default=[],
+    metavar='NAME:VALUE',
+    callback=add_binding_to('bindings'),
+    dest='bindings',
+    help='Bind a thermos environment name to a value.')
+
+
 @app.command
+@app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(COPY_APP_FROM_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
 @app.command_option(CONFIG_TYPE_OPTION)
@@ -249,6 +264,7 @@ def create(jobname, config_file):
 
 
 @app.command
+@app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(COPY_APP_FROM_OPTION)
 @app.command_option(CONFIG_TYPE_OPTION)
 @app.command_option(JSON_OPTION)
@@ -315,6 +331,7 @@ def do_open(*args):
 
 
 @app.command
+@app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(CONFIG_TYPE_OPTION)
 @app.command_option(JSON_OPTION)
 @requires.exactly('job', 'config')
@@ -428,6 +445,7 @@ def _getshards():
     dest='shards',
     default=None,
     help='A comma separated list of shard ids to act on.')
+@app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(COPY_APP_FROM_OPTION)
 @app.command_option(CONFIG_TYPE_OPTION)
 @app.command_option(JSON_OPTION)
@@ -533,7 +551,8 @@ def force_task_state(task_id, state):
   resp = api.force_task_state(task_id, status)
   check_and_log_response(resp)
 
-def query(role, job, shards=None, statuses=LIVE_TASK_STATES, api=None):
+
+def query(role, job, shards=None, statuses=LIVE_STATES, api=None):
   query = TaskQuery()
   query.statuses = statuses
   query.owner = Identity(role=role)
@@ -541,6 +560,7 @@ def query(role, job, shards=None, statuses=LIVE_TASK_STATES, api=None):
   query.shardIds = shards
   api = api or MesosClientAPI(cluster=app.get_options().cluster, verbose=app.get_options().verbose)
   return api.query(query)
+
 
 @app.command
 @app.command_option(CLUSTER_OPTION)
@@ -611,10 +631,12 @@ def _get_packer(cluster=None):
     _die('--cluster must be specified')
   return sd_packer_client.create_packer(cluster)
 
+
 def exactly(*args):
   def wrap(fn):
     return requires.wrap_function(fn, args, (lambda want, got: len(want) == len(got)))
   return wrap
+
 
 def trap_packer_error(fn):
   @functools.wraps(fn)
@@ -624,6 +646,7 @@ def trap_packer_error(fn):
     except Packer.Error as e:
       print 'Request failed: %s' % e
   return wrap
+
 
 @app.command
 @trap_packer_error
@@ -748,53 +771,63 @@ def package_unlock(role, package):
   print 'Package unlocked'
 
 
+def make_commands_str(commands):
+  commands.sort()
+  if len(commands) == 1:
+    return str(commands[0])
+  elif len(commands) == 2:
+    return '%s (or %s)' % (str(commands[0]), str(commands[1]))
+  else:
+    return '%s (or any of: %s)' % (str(commands[0]), ' '.join(map(str, commands[1:])))
+
+
+def generate_full_usage():
+  docs_to_commands = collections.defaultdict(list)
+  for (command, doc) in app.get_commands_and_docstrings():
+    docs_to_commands[doc].append(command)
+  def make_docstring(item):
+    (doc_text, commands) = item
+    def format_line(line):
+      return '    %s\n' % line.lstrip()
+    stripped = ''.join(map(format_line, doc_text.splitlines()))
+    return '%s\n%s' % (make_commands_str(commands), stripped)
+  usage = sorted(map(make_docstring, docs_to_commands.items()))
+  return 'Available commands:\n\n' + '\n'.join(usage)
+
+
+def generate_terse_usage():
+  docs_to_commands = collections.defaultdict(list)
+  for (command, doc) in app.get_commands_and_docstrings():
+    docs_to_commands[doc].append(command)
+  usage = '\n    '.join(sorted(map(make_commands_str, docs_to_commands.values())))
+  return """
+Available commands:
+    %s
+
+For more help on an individual command:
+    %s help <command>
+""" % (usage, app.name())
+
+
 @app.command
 def help(args):
   """usage: help [subcommand]
 
   Displays help for using mesos client, or a specific subcommand.
   """
-  if args:
-    if len(args) == 1:
-      subcmd = args[0]
-      if subcmd in globals():
-        print globals()[subcmd].__doc__
-      else:
-        print 'Subcommand %s not found.' % subcmd
-    else:
-      _die('Please specify at most one subcommand to display help for.')
+  if not args:
+    print generate_full_usage()
+    sys.exit(0)
+
+  if len(args) > 1:
+    _die('Please specify at most one subcommand.')
+
+  subcmd = args[0]
+  if subcmd in globals():
+    app.command_parser(subcmd).print_help()
   else:
-    app.help()
-
-
-def generate_usage():
-  usage = ['''mesos client, used to interact with the aurora scheduler.
-
-For help contact mesos-team@twitter.com.
-
-The following subcommands can be used:
-''']
-  docs_to_commands = collections.defaultdict(list)
-  for (command, doc) in app.get_commands_and_docstrings():
-    docs_to_commands[doc].append(command)
-  def make_commands_str(commands):
-    commands.sort()
-    if len(commands) == 1:
-      return str(commands[0])
-    elif len(commands) == 2:
-      return '%s (or %s)' % (str(commands[0]), str(commands[1]))
-    else:
-      return '%s (or any of: %s)' % (str(commands[0]), ' '.join(map(str, commands[1:])))
-
-  def make_docstring(item):
-    (doc_text, commands) = item
-    def format_line(line):
-      return '    %s' % line.lstrip()
-
-    stripped = '\n'.join(map(format_line, doc_text.splitlines()))
-    return '%s\n%s\n\n' % (make_commands_str(commands), stripped)
-  usage.extend(sorted(map(make_docstring, docs_to_commands.items())))
-  app.set_usage('\n    '.join(usage))
+    print 'Subcommand %s not found.' % subcmd
+    sys.exit(1)
 
 
 def set_quiet(option, opt_set, value, parser):
@@ -805,6 +838,10 @@ def set_quiet(option, opt_set, value, parser):
 def set_verbose(option, opt_set, value, parser):
   setattr(parser.values, option.dest, False)
   LogOptions.set_stderr_log_level('DEBUG')
+
+
+def main():
+  app.help()
 
 
 if __name__ == '__main__':
@@ -821,12 +858,9 @@ if __name__ == '__main__':
                  action='callback',
                  callback=set_quiet,
                  help='Quiet logging. (default: %default)')
-  app.add_option('-E', type='string', nargs=1, action='callback', default=[], metavar='NAME:VALUE',
-                 callback=add_binding_to('bindings'), dest='bindings',
-                 help='bind an environment name to a value.')
-  generate_usage()
   LogOptions.set_stderr_log_level('INFO')
   LogOptions.disable_disk_logging()
   app.set_name('mesos-client')
+  app.set_usage(DEFAULT_USAGE_BANNER + generate_terse_usage())
   app.main()
 
