@@ -84,8 +84,19 @@ python_library(
 )
 
 python_library(
+  name = 'command_runner',
+  sources = ['command_runner.py'],
+  dependencies = [
+    pants('3rdparty/python:pystachio'),
+    pants(':client_wrapper'),
+    pants('src/python/twitter/mesos/config:schema'),
+    pants('src/python/twitter/thermos/config:schema'),
+    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+  ]
+)
+
+python_library(
   name = 'mesos-lib',
-  sources = rglobs('*.py'),
   dependencies = [
     pants('src/python/twitter/mesos/packer'),
     pants(':clusters'),
