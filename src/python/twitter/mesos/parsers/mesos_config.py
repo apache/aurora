@@ -104,6 +104,21 @@ class MesosConfig(ProxyConfig):
           ' '.join('%s:%r' % (resource, task_dict.get(resource)) for resource in resources)))
 
   @staticmethod
+  def validate_package_files(maybe_files, errors):
+    if not isinstance(maybe_files, list):
+      errors.append('Job package_files must be a list of files, got: %r' % str(maybe_files))
+      return
+    if not maybe_files:
+      errors.append('Job package_files may not be an empty list.')
+      return
+    for f in maybe_files:
+      if not isinstance(f, str):
+        errors.append('Elements of package_files must be strings, got: %r' % f)
+        continue
+      if not os.path.isfile(f):
+        errors.append('File not found: %s' % f)
+
+  @staticmethod
   def fill_defaults(config):
     """Validates a configuration object.
     This will make sure that the configuration object has the appropriate
@@ -152,6 +167,12 @@ class MesosConfig(ProxyConfig):
         if not isinstance(job['package'], (list, tuple)) or len(job['package']) != 3:
           errors.append('Job package must be a tuple of (name, role, version), got: %r' %
               job['package'])
+
+      if 'package_files' in job:
+        MesosConfig.validate_package_files(job['package_files'], errors)
+
+      if 'package' in job and 'package_files' in job:
+        errors.append('Job package and package_files directives may not be both specified.')
 
       if errors:
         raise MesosConfig.InvalidConfig('Invalid configuration: %s\n' % '\n'.join(errors))
@@ -211,3 +232,7 @@ class MesosConfig(ProxyConfig):
   def package(self):
     """Return a 3-tuple of (role, name, version)"""
     return self._config.get('package')
+
+  def package_files(self):
+    """Returns a list of package file paths"""
+    return self._config.get('package_files')

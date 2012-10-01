@@ -11,6 +11,7 @@ python_tests(name = 'test_mesos_config',
   sources = ['test_mesos_config.py'],
   dependencies = [
     pants('src/python/twitter/mesos:parsers'),
+    python_requirement('mox')
   ]
 )
 
