@@ -32,6 +32,38 @@ class AppLayout(Struct):
   services = Default(List(AppService), [])
 
 
+# The object bound into the {{packer}} namespace.
+# Referenced by
+#  {{packer[role][name][version]}}
+#
+# Where version =
+#    number (integer)
+#    'live' (live package)
+#    'latest' (highest version number)
+#
+# For example if you'd like to create a copy process for a particular
+# package,
+#   copy_latest = Process(
+#     name = 'copy-{{package_name}}',
+#     cmdline = '{{packer[{{role}}][{{package_name}}][latest].command}}')
+#   processes = [
+#     copy_latest.bind(package_name = 'labrat'),
+#     copy_latest.bind(package_name = 'packer')
+#   ]
+class Packer(Struct):
+  package = String
+  package_uri = String
+
+  # 'command' is bound to the command in the context
+  command = String
+
+  tunnel_host = Default(String, 'nest2.corp.twitter.com')
+  local_command = Default(String,
+      'ssh {{tunnel_host}} hadoop fs -cat {{package_uri}} > {{package}}')
+  remote_command = Default(String,
+      'hadoop fs -copyToLocal {{package_uri}} {{package}}')
+
+
 # Packer package information
 @Provided(mesos=MesosContext)
 class PackerPackage(Struct):

@@ -136,6 +136,12 @@ class PystachioConfig(ProxyConfig):
       raise self.InvalidConfig(typecheck.message())
     return convert_pystachio_to_thrift(interpolated_job)
 
+  def bind(self, binding):
+    self._job = self._job.bind(binding)
+
+  def raw(self):
+    return self._job
+
   def task(self, instance):
     return (self._job % self.context(instance)).task()
 

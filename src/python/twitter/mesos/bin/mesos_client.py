@@ -19,9 +19,11 @@ from pystachio import Ref
 
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
+from twitter.common.net.tunnel import TunnelHelper
 from twitter.mesos.clusters import Cluster
 from twitter.mesos.client_wrapper import MesosClientAPI
 from twitter.mesos.command_runner import DistributedCommandRunner
+from twitter.mesos.config.schema import Packer as PackerObject
 from twitter.mesos.packer import sd_packer_client
 from twitter.mesos.packer.packer_client import Packer
 from twitter.mesos.parsers.mesos_config import MesosConfig
@@ -120,6 +122,37 @@ def get_package_uri(config, packer_factory):
     return '/mesos/pkg/%s/%s' % (config.role(), posixpath.basename(options.copy_app_from))
 
 
+def inject_packer_bindings(config, packer_factory, local=False):
+  if not isinstance(config, PystachioConfig):
+    raise ValueError('inject_packer_bindings can only be used with Pystachio configs!')
+
+  def extract_ref(ref):
+    components = ref.components()
+    if len(components) < 4:
+      return None
+    if components[0] != Ref.Dereference('packer'):
+      return None
+    if not all(isinstance(action, Ref.Index) for action in components[1:4]):
+      return None
+    role, package_name, version = (action.value for action in components[1:4])
+    return (role, package_name, version)
+
+  def generate_packer_struct(uri):
+    packer = PackerObject(
+      tunnel_host=app.get_options().tunnel_host,
+      package=posixpath.basename(uri),
+      package_uri=uri)
+    packer = packer(command=packer.local_command() if local else packer.remote_command())
+    return packer
+
+  _, refs = config.raw().interpolate()
+  packages = filter(None, map(extract_ref, set(refs)))
+  for package in set(packages):
+    ref = Ref.from_address('packer[%s][%s][%s]' % package)
+    config.bind({ref: generate_packer_struct(
+      get_package_uri_from_packer(config.cluster(), package, packer_factory))})
+
+
 def get_config(jobname, config_file, packer_factory):
   """Creates and returns a config object contained in the provided file."""
   options = app.get_options()
@@ -134,6 +167,7 @@ def get_config(jobname, config_file, packer_factory):
   elif config_type == 'thermos':
     loader = PystachioConfig.load_json if is_json else PystachioConfig.load
     config = loader(config_file, jobname, bindings)
+    inject_packer_bindings(config, packer_factory)
   elif config_type == 'auto':
     config = PystachioCodec(config_file, jobname)
   else:
@@ -332,6 +366,7 @@ def do_open(*args):
 
 
 @app.command
+@app.command_option(COPY_APP_FROM_OPTION)
 @app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(CONFIG_TYPE_OPTION)
 @app.command_option(JSON_OPTION)
@@ -345,6 +380,7 @@ def inspect(jobname, config_file):
   config = get_config(jobname, config_file, _get_packer)
   cluster = Cluster.get(config.cluster())
   log.info('Parsed job config: %s' % config.job())
+
 
 @app.command
 @app.command_option(CLUSTER_OPTION)
@@ -587,10 +623,10 @@ def run(*line):
 
   Runs a shell command on all machines currently hosting shards of a
   comma-separated list of jobs.
-  
+
   This feature supports the same command line wildcards that are used to
   populate a job's commands.
-  
+
   For Aurora jobs this means %port:PORT_NAME%, %shard_id%, %task_id%.
   For Thermos jobs this means anything in the {{mesos.*}} and {{thermos.*}} namespaces.
   """
