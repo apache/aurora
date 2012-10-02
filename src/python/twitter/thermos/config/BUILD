@@ -2,7 +2,7 @@ python_library(
   name = "schema",
   sources = globs('*.py'),
   dependencies = [
-    pants("3rdparty/python:pystachio"),
+    pants('src/python/twitter/thermos/base:pystachio'),
     pants("src/python/twitter/common/lang"),
     pants("src/python/twitter/thermos/base:planner")
   ]

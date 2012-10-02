@@ -1,3 +1,5 @@
+# TODO(wickman)  This needs some usage/help refactoring.
+
 from __future__ import print_function
 
 from collections import namedtuple
@@ -37,7 +39,7 @@ from gen.twitter.thermos.ttypes import (
   TaskState)
 
 from pystachio import Ref
-
+from pystachio.naming import frozendict
 
 app.add_option("--root", dest="root", metavar="PATH",
                default=os.path.join(os.environ['HOME'], '.thermos'),
@@ -156,7 +158,7 @@ def _really_run(task, root, sandbox, task_id=None, user=None, prebound_ports=Non
 @app.command_option("--daemon", default=False, action='store_true', dest='daemon',
                     help="fork and daemonize the thermos runner.")
 def run(args, options):
-  # TODO(wickman)  This should really be integrated into an AppCmd class.
+
   """Run a thermos task.
 
     Usage: thermos run [options] config [task_name]
@@ -187,6 +189,51 @@ def run(args, options):
               prebound_ports=options.prebound_ports,
               chroot=options.chroot,
               daemon=options.daemon)
+
+
+def inspect_unwrap(obj):
+  if isinstance(obj, frozendict):
+    return dict((key, inspect_unwrap(val)) for (key, val) in obj.items())
+  if isinstance(obj, (list, tuple, set)):
+    return tuple(inspect_unwrap(val) for val in obj)
+  return obj
+
+
+@app.command
+@app.command_option("--task", metavar="TASKNAME", default=None, dest='task',
+                    help="The thermos task within the config that should be run. Only required if "
+                    "there are multiple tasks exported from the thermos configuration.")
+@app.command_option("--task_id", metavar="STRING", default=None, dest='task_id',
+                    help="The id to which this task should be bound, synthesized from the task "
+                    "name if none provided.")
+@app.command_option("--json", default=False, action='store_true', dest='json',
+                    help="Read the source file in json format.")
+@app.command_option("-P", "--port", type="string", nargs=1, action="callback",
+                    callback=add_port_to('prebound_ports'), dest="prebound_ports", default=[],
+                    metavar="NAME:PORT", help="bind named PORT to NAME.")
+@app.command_option("-E", "--environment", type="string", nargs=1, action="callback",
+                    callback=add_binding_to('bindings'), default=[], dest="bindings",
+                    metavar="NAME=VALUE",
+                    help="bind the configuration environment variable NAME to VALUE.")
+def inspect(args, options):
+  """Run a thermos task.
+
+    Usage: thermos inspect [options] config [task_name]
+    Options:
+      --task=TASKNAME		   the thermos task within the config that should be run.  only
+                                   required if there are multiple tasks exported from the thermos
+                                   configuration.
+      --task_id=STRING		   the id to which this task should be bound, synthesized from the
+                                   task name if none provided.
+      --json			   specify that the config is in json format instead of pystachio
+      -P/--port=NAME:PORT	   bind the named port NAME to port number PORT (may be specified
+                                   multiple times to bind multiple names.)
+      -E/--environment=NAME=VALUE  bind the configuration environment variable NAME to
+                                   VALUE.
+  """
+  thermos_task = get_task_from_options(args, options)
+  ti, _ = thermos_task.task().interpolate()
+  pprint.pprint(inspect_unwrap(ti.get()), indent=4)
 
 
 @app.command

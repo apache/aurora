@@ -1,4 +1,11 @@
 python_library(
+  name = 'pystachio',
+  dependencies = [
+    pants('3rdparty/python:pystachio')
+  ]
+)
+
+python_library(
   name = 'ckpt',
   sources = ['ckpt.py'],
   dependencies = [
@@ -23,7 +30,7 @@ python_library(
   sources = ['options.py'],
   dependencies = [
     pants('src/thrift/com/twitter/thermos:py-thrift'),
-    pants('3rdparty/python:pystachio')
+    pants(':pystachio')
   ]
 )
 
