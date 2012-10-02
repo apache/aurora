@@ -142,15 +142,6 @@ python_binary(
 )
 
 python_binary(
-  name = 'thermos_codec',
-  source = 'bin/thermos_codec.py',
-  dependencies = [
-    pants(':mesos-lib'),
-    pants('src/python/twitter/common/app'),
-  ]
-)
-
-python_binary(
   name = 'process_scraper',
   source = 'process_scraper.py',
   dependencies = [
