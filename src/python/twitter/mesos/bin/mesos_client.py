@@ -150,7 +150,8 @@ def inject_packer_bindings(config, local=False):
       tunnel_host=app.get_options().tunnel_host,
       package=posixpath.basename(uri),
       package_uri=uri)
-    packer = packer(command=packer.local_command() if local else packer.remote_command())
+    packer = packer(copy_command=packer.local_copy_command() if local
+                    else packer.remote_copy_command())
     return packer
 
   _, refs = config.raw().interpolate()

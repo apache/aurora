@@ -45,7 +45,7 @@ class AppLayout(Struct):
 # package,
 #   copy_latest = Process(
 #     name = 'copy-{{package_name}}',
-#     cmdline = '{{packer[{{role}}][{{package_name}}][latest].command}}')
+#     cmdline = '{{packer[{{role}}][{{package_name}}][latest].copy_command}}')
 #   processes = [
 #     copy_latest.bind(package_name = 'labrat'),
 #     copy_latest.bind(package_name = 'packer')
@@ -54,13 +54,13 @@ class Packer(Struct):
   package = String
   package_uri = String
 
-  # 'command' is bound to the command in the context
-  command = String
+  # 'copy_command' is bound to the command in the context
+  copy_command = String
 
   tunnel_host = Default(String, 'nest2.corp.twitter.com')
-  local_command = Default(String,
+  local_copy_command = Default(String,
       'ssh {{tunnel_host}} hadoop fs -cat {{package_uri}} > {{package}}')
-  remote_command = Default(String,
+  remote_copy_command = Default(String,
       'hadoop fs -copyToLocal {{package_uri}} {{package}}')
 
 
