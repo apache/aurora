@@ -32,8 +32,4 @@ def create_packer(cluster):
   if Location.is_corp():
     packer_host, packer_port = TunnelHelper.create_tunnel(packer_host, packer_port)
 
-  # TODO(wfarner): Fix this in TunnelHelper. We sleep since the tunnel process may still be
-  #   starting but not established.
-  import time
-  time.sleep(1)
   return Packer(packer_host, packer_port)

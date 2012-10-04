@@ -469,6 +469,7 @@ class TaskRunner(object):
   def close_ckpt(self):
     """Force close the checkpoint stream.  This is necessary for runners terminated through
        exception propagation."""
+    log.debug('Closing the checkpoint stream.')
     self._ckpt.close()
 
   @contextmanager
@@ -809,6 +810,8 @@ class TaskRunner(object):
     """
       Kill all processes associated with this task and set task/process states as KILLED.
     """
+    log.debug('Runner issued kill: force:%s, preemption_wait:%s' % (
+      force, preemption_wait))
     assert terminal_status in (TaskState.KILLED, TaskState.LOST)
     self._preemption_deadline = self._clock.time() + preemption_wait.as_(Time.SECONDS)
     with self.control(force):

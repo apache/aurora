@@ -7,6 +7,7 @@ python_library(
     pants('src/python/twitter/thermos/base'),
     pants('src/python/twitter/thermos/config:schema'),
     pants('src/python/twitter/common/lang'),
+    pants('src/python/twitter/common/http'),
     pants('src/python/twitter/common/quantity'),
     pants('src/python/twitter/thermos/monitoring'),
     python_requirement('bottle'),

@@ -69,6 +69,22 @@ python_library(
 )
 
 python_library(
+  name = 'spawn_local',
+  sources = ['spawn_local.py'],
+  dependencies = [
+    python_requirement('mesos==0.9.0'),
+    python_requirement('thrift'),
+    python_requirement('tornado'),
+    pants('src/python/twitter/common/net:ssh'),
+    pants('src/python/twitter/mesos/executor:sandbox_manager'),
+    pants('src/python/twitter/mesos/executor:task_runner_wrapper'),
+    pants('src/python/twitter/mesos/executor:thermos_executor_lib'),
+    pants('src/python/twitter/thermos/observer'),
+    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+  ]
+)
+
+python_library(
   name = 'client_wrapper',
   sources = ['client_wrapper.py'],
   dependencies = [
@@ -115,6 +131,8 @@ python_binary(
   source = 'bin/mesos_client.py',
   dependencies = [
     pants(':mesos-lib'),
+    pants(':spawn_local'),
+    pants('src/python/twitter/thermos/observer'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/thermos/base:options')

@@ -84,7 +84,7 @@ python_library(
 
 python_binary(
   name = 'thermos_executor',
-  entry_point = 'twitter.mesos.executor.thermos_executor',
+  source = 'thermos_executor_main.py',
   ignore_errors = True,
   dependencies = [
     pants(':thermos_executor_lib')

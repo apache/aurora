@@ -24,17 +24,17 @@ def pretty_time(seconds=time.time()):
 %>
 
 <div class="${type}-container"
-     data-url="http://${host}:${observer_port}/main/${type}/${offset}/${num}">
+     data-url="/main/${type}/${offset}/${num}">
   <div class="row-fluid">
     <div class="span2">
       <a class="refresh-container" href="#"
-         data-url="http://${host}:${observer_port}/main/${type}/${offset-num_tasks}/${num}">
+         data-url="/main/${type}/${offset-num_tasks}/${num}">
          &larr; newer
       </a>
     </div>
     <div class="span2">
       <a class="refresh-container" href="#"
-         data-url="http://${host}:${observer_port}/main/${type}/${offset+num_tasks}/${num}">
+         data-url="/main/${type}/${offset+num_tasks}/${num}">
          older &rarr;
       </a>
     </div>
@@ -68,8 +68,8 @@ def pretty_time(seconds=time.time()):
          <td> ${'%.1fMB' % (row["ram"] / 1024. / 1024.) if row["ram"] > 0 else ""} </td>
          <td> ${'%dGB' % (row["disk"] / 1024 / 1024 / 1024) if row["disk"] > 0 else ""} </td>
 
-         <td> <a href="http://${host}:${observer_port}/task/${row['task_id']}">info</a> </td>
-         <td> <a href="http://${host}:${observer_port}/browse/${row['task_id']}">browse</a> </td>
+         <td> <a href="/task/${row['task_id']}">info</a> </td>
+         <td> <a href="/browse/${row['task_id']}">browse</a> </td>
          <td>
          % if type == 'active':
            % if 'http' in row["ports"]:
@@ -83,7 +83,7 @@ def pretty_time(seconds=time.time()):
              <span class="muted">admin</span>
            % endif
            % if set(row["ports"]) - set(['http', 'admin']):
-             <a href="http://${host}:${observer_port}/task/${row['task_id']}">...</a>
+             <a href="/task/${row['task_id']}">...</a>
            % endif
          % endif
          </td>

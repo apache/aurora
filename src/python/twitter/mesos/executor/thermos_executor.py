@@ -5,12 +5,10 @@ import threading
 import time
 
 # mesos
-import mesos
 import mesos_pb2 as mesos_pb
 
-from twitter.common import app, log
+from twitter.common import log
 from twitter.common.concurrent import defer
-from twitter.common.log.options import LogOptions
 from twitter.common.quantity import Amount, Time
 
 # thermos
@@ -28,16 +26,9 @@ from .resource_manager import ResourceCheckpointer, ResourceManager
 from .status_manager import StatusManager
 
 
-app.configure(module='twitter.common_internal.app.modules.chickadee_handler',
-    service_name='thermos_executor')
-app.configure(debug=True)
-
-
 if 'ANGRYBIRD_THERMOS' in os.environ:
   RUNNER_CLASS = AngrybirdTaskRunner
-  LogOptions.set_log_dir(os.path.join(os.environ['ANGRYBIRD_THERMOS'], 'thermos/log'))
 else:
-  LogOptions.set_log_dir('/var/log/mesos')
   RUNNER_CLASS = ProductionTaskRunner
 
 
@@ -102,6 +93,10 @@ class ThermosExecutor(ThermosExecutorBase):
     except Exception as e:
       raise ValueError('Could not deserialize thermosConfig JSON! %s' % e)
     return (MesosTaskInstance(json_blob), assigned_task.assignedPorts)
+
+  @property
+  def runner(self):
+    return self._runner
 
   def launchTask(self, driver, task):
     self.launched.set()
@@ -180,15 +175,3 @@ class ThermosExecutor(ThermosExecutorBase):
     if self._task_id:
       self.killTask(driver, mesos_pb.TaskID(value=self._task_id))
     self.log('shutdown() returned')
-
-
-def main():
-  LogOptions.set_disk_log_level('DEBUG')
-  thermos_executor = ThermosExecutor()
-  driver = mesos.MesosExecutorDriver(thermos_executor)
-  ThermosExecutorTimer(thermos_executor, driver).start()
-  driver.run()
-  log.info('MesosExecutorDriver.run() has finished.')
-
-
-app.main()

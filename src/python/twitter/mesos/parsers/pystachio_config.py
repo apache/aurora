@@ -14,7 +14,6 @@ from twitter.mesos.clusters import Cluster
 from twitter.mesos.config.schema import (
   MesosContext,
   MesosJob,
-  MesosTaskInstance
 )
 
 from twitter.thermos.config.loader import ThermosTaskWrapper

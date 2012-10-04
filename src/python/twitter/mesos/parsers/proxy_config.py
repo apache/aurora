@@ -1,5 +1,6 @@
 from abc import ABCMeta, abstractmethod
 
+
 class ProxyConfig(object):
   __metaclass__ = ABCMeta
 

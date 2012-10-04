@@ -10,6 +10,7 @@ import posixpath
 import pprint
 import subprocess
 import sys
+import tempfile
 import time
 from urlparse import urljoin
 import zookeeper
@@ -20,8 +21,8 @@ from pystachio import Ref
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 from twitter.common.net.tunnel import TunnelHelper
-from twitter.mesos.clusters import Cluster
 from twitter.mesos.client_wrapper import MesosClientAPI
+from twitter.mesos.clusters import Cluster
 from twitter.mesos.command_runner import DistributedCommandRunner
 from twitter.mesos.config.schema import Packer as PackerObject
 from twitter.mesos.packer import sd_packer_client
@@ -29,6 +30,12 @@ from twitter.mesos.packer.packer_client import Packer
 from twitter.mesos.parsers.mesos_config import MesosConfig
 from twitter.mesos.parsers.pystachio_config import PystachioConfig
 from twitter.mesos.parsers.pystachio_codec import PystachioCodec
+from twitter.mesos.spawn_local import (
+    LocalDriver,
+    build_local_runner,
+    create_executor,
+    create_taskinfo,
+    spawn_observer)
 from twitter.thermos.base.options import add_binding_to
 
 from gen.twitter.mesos.constants import ACTIVE_STATES, LIVE_STATES
@@ -78,12 +85,13 @@ def handle_open(scheduler_client, role, job):
       open_url(url)
 
 
-def get_package_uri_from_packer(cluster, package, packer_factory):
+def get_package_uri_from_packer(cluster, package):
+  cluster = Cluster.get(cluster).packer_redirect or cluster
   role, name, version = package
   log.info('Fetching metadata for package %s/%s version %s in %s.' % (
       role, name, version, cluster))
   try:
-    metadata = packer_factory(cluster).get_version(role, name, version)
+    metadata = sd_packer_client.create_packer(cluster).get_version(role, name, version)
   except Packer.Error as e:
     _die('Failed to fetch package metadata: %s' % e)
 
@@ -93,7 +101,7 @@ def get_package_uri_from_packer(cluster, package, packer_factory):
   return metadata['uri']
 
 
-def get_package_uri(config, packer_factory):
+def get_package_uri(config):
   cluster, package = config.cluster(), config.package()
 
   if config.hdfs_path():
@@ -113,7 +121,7 @@ def get_package_uri(config, packer_factory):
     _die('copy_app_from may not be used when a package spec is used in the configuration')
 
   if package:
-    return get_package_uri_from_packer(cluster, package, packer_factory)
+    return get_package_uri_from_packer(cluster, package)
 
   if config.hdfs_path():
     return config.hdfs_path()
@@ -122,7 +130,7 @@ def get_package_uri(config, packer_factory):
     return '/mesos/pkg/%s/%s' % (config.role(), posixpath.basename(options.copy_app_from))
 
 
-def inject_packer_bindings(config, packer_factory, local=False):
+def inject_packer_bindings(config, local=False):
   if not isinstance(config, PystachioConfig):
     raise ValueError('inject_packer_bindings can only be used with Pystachio configs!')
 
@@ -150,10 +158,10 @@ def inject_packer_bindings(config, packer_factory, local=False):
   for package in set(packages):
     ref = Ref.from_address('packer[%s][%s][%s]' % package)
     config.bind({ref: generate_packer_struct(
-      get_package_uri_from_packer(config.cluster(), package, packer_factory))})
+      get_package_uri_from_packer(config.cluster(), package))})
 
 
-def get_config(jobname, config_file, packer_factory):
+def get_config(jobname, config_file, local=False):
   """Creates and returns a config object contained in the provided file."""
   options = app.get_options()
   config_type, is_json = options.config_type, options.json
@@ -167,13 +175,13 @@ def get_config(jobname, config_file, packer_factory):
   elif config_type == 'thermos':
     loader = PystachioConfig.load_json if is_json else PystachioConfig.load
     config = loader(config_file, jobname, bindings)
-    inject_packer_bindings(config, packer_factory)
+    inject_packer_bindings(config, local=local)
   elif config_type == 'auto':
     config = PystachioCodec(config_file, jobname)
   else:
     raise ValueError('Unknown config type %s!' % config_type)
 
-  package_uri = get_package_uri(config, packer_factory)
+  package_uri = get_package_uri(config)
   if package_uri:
     config.set_hdfs_path(package_uri)
   return config
@@ -291,11 +299,76 @@ def create(jobname, config_file):
 
   Creates a job based on a configuration file.
   """
-  config = get_config(jobname, config_file, _get_packer)
+  config = get_config(jobname, config_file)
+  if config.cluster() == 'local':
+    options = app.get_options()
+    options.shard = 0
+    options.runner = 'build'
+    print('Detected cluster=local, spawning local run.')
+    return really_spawn(jobname, config_file, options)
+
   api = MesosClientAPI(cluster=config.cluster(), verbose=app.get_options().verbose)
   resp = api.create_job(config, app.get_options().copy_app_from)
   check_and_log_response(resp)
   handle_open(api.scheduler.scheduler(), config.role(), config.name())
+
+
+def really_spawn(jobname, config_file, options):
+  config = get_config(jobname, config_file, local=True)
+  if not isinstance(config, PystachioConfig):
+    app.error('spawn command only works with new-style Thermos tasks.')
+
+  checkpoint_root = os.path.expanduser(os.path.join('~', '.thermos'))
+  server_thread, port = spawn_observer(checkpoint_root)
+  task_info = create_taskinfo(config, options.shard)
+  sandbox = tempfile.mkdtemp()
+
+  runner_pex = options.runner if options.runner != 'build' else build_local_runner()
+  if runner_pex is None:
+    app.error('failed to build thermos runner!')
+
+  executor = create_executor(runner_pex, sandbox, checkpoint_root)
+  driver = LocalDriver()
+  executor.launchTask(driver, task_info)
+
+  if options.open_browser:
+    open_url('http://localhost:%d/task/%s' % (port, task_info.task_id.value))
+
+  try:
+    driver.stopped.wait()
+  except KeyboardInterrupt:
+    print('Got interrupt, killing task.')
+
+  executor.shutdown(driver)
+  print('Local spawn completed.')
+  return 0
+
+
+@app.command
+@app.command_option(
+    '--shard',
+    dest='shard',
+    type=int,
+    default=0,
+    help='The shard number to spawn.')
+@app.command_option(
+    '--runner',
+    dest='runner',
+    default='build',
+    help='The thermos_runner.pex to run the task.  If "build", build one automatically. '
+         'This requires that you be running the spawn from within the root of a science repo.')
+@app.command_option(ENVIRONMENT_BIND_OPTION)
+@app.command_option(COPY_APP_FROM_OPTION)
+@app.command_option(OPEN_BROWSER_OPTION)
+@app.command_option(CONFIG_TYPE_OPTION)
+@app.command_option(JSON_OPTION)
+@requires.exactly('job', 'config')
+def spawn(jobname, config_file):
+  """usage: spawn [--shard=number] job config
+
+  Spawns a local run of a task in the specified job.
+  """
+  return really_spawn(jobname, config_file, app.get_options())
 
 
 @app.command
@@ -310,7 +383,7 @@ def diff(job, config_file):
   Compares a job configuration against a running job.
   By default the diff will be displayed using 'diff', though you may choose an alternate
   diff program by specifying the DIFF_VIEWER environment variable."""
-  config = get_config(job, config_file, _get_packer)
+  config = get_config(job, config_file)
   api = MesosClientAPI(cluster=config.cluster(), verbose=app.get_options().verbose)
   resp = query(config.role(), job, api=api, statuses=ACTIVE_STATES)
   if not resp.responseCode:
@@ -366,6 +439,8 @@ def do_open(*args):
 
 
 @app.command
+@app.command_option('--local', dest='local', default=False, action='store_true',
+    help='Inspect the configuration as would be created by the "spawn" command.')
 @app.command_option(COPY_APP_FROM_OPTION)
 @app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(CONFIG_TYPE_OPTION)
@@ -377,8 +452,7 @@ def inspect(jobname, config_file):
   Verifies that a job can be parsed from a configuration file, and displays
   the parsed configuration.
   """
-  config = get_config(jobname, config_file, _get_packer)
-  cluster = Cluster.get(config.cluster())
+  config = get_config(jobname, config_file, local=app.get_options().local)
   log.info('Parsed job config: %s' % config.job())
 
 
@@ -504,10 +578,11 @@ def update(jobname, config_file):
   You may want to consider using the 'diff' subcommand before updating,
   to preview what changes will take effect.
   """
-  config = get_config(jobname, config_file, _get_packer)
+  config = get_config(jobname, config_file)
   api = MesosClientAPI(cluster=config.cluster(), verbose=app.get_options().verbose)
   resp = api.update_job(config, _getshards(), app.get_options().copy_app_from)
   check_and_log_response(resp)
+
 
 @app.command
 @app.command_option(CLUSTER_OPTION)
@@ -651,12 +726,6 @@ def _get_packer(cluster=None):
   if not cluster:
     _die('--cluster must be specified')
   return sd_packer_client.create_packer(cluster)
-
-
-def exactly(*args):
-  def wrap(fn):
-    return requires.wrap_function(fn, args, (lambda want, got: len(want) == len(got)))
-  return wrap
 
 
 def trap_packer_error(fn):

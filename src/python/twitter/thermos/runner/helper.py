@@ -150,8 +150,11 @@ class TaskRunnerHelper(object):
   def safe_signal(cls, pid, sig=signal.SIGTERM):
     try:
       os.kill(pid, sig)
+    except OSError as e:
+      if e.errno not in (errno.ESRCH, errno.EPERM):
+        log.error('Unexpected error in os.kill: %s' % e)
     except Exception as e:
-      log.error('    (error: %s)' % e)
+      log.error('Unexpected error in os.kill: %s' % e)
 
   @classmethod
   def terminate_pid(cls, pid):
