@@ -2,7 +2,7 @@ from multiprocessing.pool import ThreadPool
 import subprocess
 
 from twitter.common import log
-from twitter.mesos.client_wrapper import MesosClientAPI
+from twitter.mesos.client.client_wrapper import MesosClientAPI
 from twitter.mesos.config.schema import MesosContext
 from twitter.thermos.config.schema import ThermosContext
 
