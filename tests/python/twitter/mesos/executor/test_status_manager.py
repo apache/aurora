@@ -174,6 +174,10 @@ class MockRunner(object):
     self._is_alive = True
     self.cleaned = False
     self.qqq = threading.Event()
+    self.killed = threading.Event()
+
+  def kill(self):
+    self.killed.set()
 
   def cleanup(self):
     self.cleaned = True

@@ -1,10 +1,6 @@
-import getpass
 import json
 import os
-import pwd
-import signal
 import sys
-import tempfile
 import threading
 import time
 
@@ -28,6 +24,7 @@ from twitter.mesos.executor.executor_base import ThermosExecutorBase
 from gen.twitter.mesos.ttypes import AssignedTask
 from thrift.TSerialization import deserialize as thrift_deserialize
 
+from .resource_manager import ResourceCheckpointer, ResourceManager
 from .status_manager import StatusManager
 
 
@@ -66,6 +63,7 @@ class ThermosExecutorTimer(threading.Thread):
 
 class ThermosExecutor(ThermosExecutorBase):
   STOP_WAIT = Amount(5, Time.SECONDS)
+  RESOURCE_CHECKPOINT = 'resource_usage.recordio'
 
   def __init__(self, runner_class=RUNNER_CLASS, manager_class=StatusManager):
     ThermosExecutorBase.__init__(self)
@@ -74,6 +72,7 @@ class ThermosExecutor(ThermosExecutorBase):
     self._manager = None
     self._runner_class = runner_class
     self._manager_class = manager_class
+    self._resource_manager = None
     self.launched = threading.Event()
 
   @staticmethod
@@ -146,7 +145,19 @@ class ThermosExecutor(ThermosExecutorBase):
     log.debug('Task started.')
     self.send_update(driver, self._task_id, 'RUNNING')
 
-    self._manager = self._manager_class(self._runner, driver, self._task_id, portmap.get('health'))
+    self._resource_manager = ResourceManager(
+        mesos_task.task().resources(),
+        portmap,
+        self._runner.pid,
+        self._runner.sandbox.root())
+    self._resource_manager.start()
+
+    ResourceCheckpointer(lambda: self._resource_manager.sample,
+        os.path.join(self._runner.artifact_dir, self.RESOURCE_CHECKPOINT),
+        recordio=True).start()
+
+    self._manager = self._manager_class(self._runner, driver, self._task_id,
+        signal_port=portmap.get('health'), resource_manager=self._resource_manager)
     self._manager.start()
 
   def killTask(self, driver, task_id):

@@ -25,7 +25,7 @@ class ProcessMuxer(object):
   def register(self, process_name, watermark=0):
     log.debug('registering %s' % process_name)
     if process_name in self._processes:
-      raise ProcessMuxer.ProcessExists("Process %s is already registered" % task_process.name())
+      raise ProcessMuxer.ProcessExists("Process %s is already registered" % process_name)
     self._processes[process_name] = None
     self._watermarks[process_name] = watermark
 

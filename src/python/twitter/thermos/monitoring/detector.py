@@ -4,8 +4,6 @@ import re
 
 from twitter.thermos.base.path import TaskPath
 
-__author__ = 'wickman@twitter.com (brian wickman)'
-__tested__ = False
 
 class TaskDetector(object):
   """

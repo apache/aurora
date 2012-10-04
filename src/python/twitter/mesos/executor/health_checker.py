@@ -1,9 +1,6 @@
 from abc import ABCMeta, abstractproperty
-import contextlib
 import threading
 import time
-
-from twitter.common import log
 
 __all__ = (
   'Healthy',
@@ -16,6 +13,12 @@ class HealthInterface(object):
 
   @abstractproperty
   def healthy(self):
+    pass
+
+  def run(self):
+    pass
+
+  def stop(self):
     pass
 
 

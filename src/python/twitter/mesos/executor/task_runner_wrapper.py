@@ -9,9 +9,7 @@ import time
 
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
-from twitter.common.contextutil import temporary_file
-from twitter.common.dirutil import chmod_plus_x, safe_rmtree
-from twitter.common.http.mirror_file import MirrorFile
+from twitter.common.dirutil import chmod_plus_x
 from twitter.common.quantity import Amount, Time
 
 from twitter.thermos.base.path import TaskPath
@@ -21,8 +19,9 @@ from twitter.thermos.config.loader import ThermosTaskWrapper
 
 from twitter.mesos.executor.sandbox_manager import (
   AppAppSandbox,
-  SandboxManager,
-  DirectorySandbox)
+  DirectorySandbox,
+  SandboxBase)
+
 
 app.add_option("--checkpoint_root", dest="checkpoint_root", metavar="PATH",
                default="/var/run/thermos",
@@ -36,7 +35,8 @@ class TaskRunnerWrapper(object):
   class TaskError(Exception):
     pass
 
-  def __init__(self, task_id, mesos_task, role, mesos_ports, checkpoint_root=None, clock=time):
+  def __init__(self, task_id, mesos_task, role, mesos_ports, runner_pex, sandbox,
+               checkpoint_root=None, artifact_dir=None, clock=time):
     """
       :task_id     => task_id assigned by scheduler
       :mesos_task  => twitter.mesos.config.schema.MesosTaskInstance object
@@ -47,30 +47,36 @@ class TaskRunnerWrapper(object):
     self._task_id = task_id
     self._mesos_task = mesos_task
     self._task = mesos_task.task()
-    self._task_filename = TaskRunnerWrapper.dump_task(self._task)
     self._ports = mesos_ports
+    self._runner_pex = runner_pex
+    self._sandbox = sandbox
+    if not isinstance(self._sandbox, SandboxBase):
+      raise ValueError('sandbox must be derived from SandboxBase!')
     self._checkpoint_root = checkpoint_root or app.get_options().checkpoint_root
     self._enable_chroot = False
     self._role = role
     self._clock = clock
+    self._artifact_dir = artifact_dir or tempfile.mkdtemp()
+    with open(os.path.join(self._artifact_dir, 'task.json'), 'w') as fp:
+      self._task_filename = fp.name
+      ThermosTaskWrapper(self._task).to_file(self._task_filename)
 
-  @staticmethod
-  def dump_task(task):
-    with temporary_file(cleanup=False) as fp:
-      filename = fp.name
-      ThermosTaskWrapper(task).to_file(filename)
-    return filename
+  @property
+  def pid(self):
+    return self._popen.pid if self._popen else None
+
+  @property
+  def artifact_dir(self):
+    return self._artifact_dir
+
+  @property
+  def sandbox(self):
+    return self._sandbox
 
   def start(self):
     """
       Fork the task runner.
-
-      REQUIRES SUBCLASSES TO DEFINE:
-        self._sandbox (SandboxManager)
-        self._runner_pex (filename)
     """
-    assert hasattr(self, '_sandbox')
-    assert hasattr(self, '_runner_pex')
     assert os.path.exists(self._runner_pex)
     chmod_plus_x(self._runner_pex)
 
@@ -110,7 +116,7 @@ class TaskRunnerWrapper(object):
     return self._monitor.task_state()
 
   def is_started(self):
-    return self._popen is not None
+    return self._popen is not None and self._popen.pid is not None
 
   def is_alive(self):
     """
@@ -138,6 +144,8 @@ class TaskRunnerWrapper(object):
     return False
 
   def cleanup(self):
+    # For subclasses to implement.  Will be called by the status manager on
+    # runner termination.
     pass
 
   def kill(self):
@@ -167,37 +175,51 @@ class TaskRunnerWrapper(object):
       log.error('Could not quitquitquit runner: %s' % e)
 
 
-
 class ProductionTaskRunner(TaskRunnerWrapper):
-  def __init__(self, task_id, mesos_task, *args, **kwargs):
-    TaskRunnerWrapper.__init__(self, task_id, mesos_task, *args, **kwargs)
+  @classmethod
+  def dump_runner(cls, directory):
     import pkg_resources
     import twitter.mesos.executor.resources
-    self._tempdir = tempfile.mkdtemp()
-    os.chmod(self._tempdir, 755)
-    self._runner_pex = os.path.join(self._tempdir, self.PEX_NAME)
-    with open(self._runner_pex, 'w') as fp:
+    runner_pex = os.path.join(directory, cls.PEX_NAME)
+    with open(runner_pex, 'w') as fp:
       fp.write(pkg_resources.resource_stream(twitter.mesos.executor.resources.__name__,
-        self.PEX_NAME).read())
-    if mesos_task.has_layout():
-      self._sandbox = AppAppSandbox(task_id)
-      self._enable_chroot = True
-    else:
-      self._sandbox = DirectorySandbox(task_id)
-      self._enable_chroot = False
+        cls.PEX_NAME).read())
+    return runner_pex
 
-  def cleanup(self):
-    if self._tempdir:
-      safe_rmtree(self._tempdir)
-      self._tempdir = None
+  def __init__(self, task_id, mesos_task, role, mesos_ports, **kwargs):
+    artifact_dir = '.'
+    runner_pex = self.dump_runner(artifact_dir)
+    if mesos_task.has_layout():
+      sandbox = AppAppSandbox(task_id)
+      enable_chroot = True
+    else:
+      sandbox = DirectorySandbox(task_id)
+      enable_chroot = False
+    super(ProductionTaskRunner, self).__init__(
+        task_id,
+        mesos_task,
+        role,
+        mesos_ports,
+        runner_pex,
+        sandbox,
+        artifact_dir=artifact_dir,
+        **kwargs)
+    self._enable_chroot = enable_chroot
 
 
 class AngrybirdTaskRunner(TaskRunnerWrapper):
-  def __init__(self, task_id, *args, **kwargs):
-    TaskRunnerWrapper.__init__(self, task_id, *args, **kwargs)
-    self._angrybird_home = os.environ['ANGRYBIRD_HOME']
-    self._angrybird_logdir = os.environ['ANGRYBIRD_THERMOS']
-    self._sandbox_root = os.path.join(self._angrybird_logdir, 'thermos/lib')
-    self._checkpoint_root = os.path.join(self._angrybird_logdir, 'thermos/run')
-    self._runner_pex = os.path.join(self._angrybird_home, 'science', 'dist', self.PEX_NAME)
-    self._sandbox = DirectorySandbox(task_id, self._sandbox_root)
+  def __init__(self, task_id, mesos_task, role, mesos_ports, **kwargs):
+    angrybird_home = os.environ['ANGRYBIRD_HOME']
+    angrybird_logdir = os.environ['ANGRYBIRD_THERMOS']
+    sandbox_root = os.path.join(angrybird_logdir, 'thermos', 'lib')
+    checkpoint_root = os.path.join(angrybird_logdir, 'thermos', 'run')
+    runner_pex = os.path.join(angrybird_home, 'science', 'dist', self.PEX_NAME)
+    sandbox = DirectorySandbox(task_id, sandbox_root)
+    super(AngrybirdTaskRunner, self).__init__(
+        task_id,
+        mesos_task,
+        role,
+        mesos_ports,
+        runner_pex,
+        sandbox,
+        checkpoint_root=checkpoint_root)

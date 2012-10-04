@@ -47,17 +47,24 @@ class TestThermosExecutorTimer(ThermosExecutorTimer):
 
 
 class TestTaskRunner(TaskRunnerWrapper):
-  def __init__(self, task_id, *args, **kwargs):
-    self._tempdir = tempfile.mkdtemp()
-    self._runner_pex = os.path.join('dist', 'thermos_runner.pex')
-    self._sandbox = DirectorySandbox(task_id, sandbox_root=self._tempdir)
-    self._enable_chroot = False
-    TaskRunnerWrapper.__init__(self, task_id, *args, **kwargs)
+  def __init__(self, task_id, mesos_task, role, mesos_ports, **kwargs):
+    runner_pex = os.path.join('dist', 'thermos_runner.pex')
+    sandbox = DirectorySandbox(task_id, sandbox_root=tempfile.mkdtemp())
+    super(TestTaskRunner, self).__init__(
+        task_id,
+        mesos_task,
+        role,
+        mesos_ports,
+        runner_pex,
+        sandbox, **kwargs)
+
+  def cleanup(self):
+    self._sandbox.destroy()
 
 
-class FailingTaskRunner(TaskRunnerWrapper):
+class FailingTaskRunner(TestTaskRunner):
   def __init__(self, task_id, *args, **kwargs):
-    TaskRunnerWrapper.__init__(self, task_id, *args, **kwargs)
+    super(FailingTaskRunner, self).__init__(task_id, *args, **kwargs)
 
   def start(self):
     raise self.TaskError('I am an idiot!')

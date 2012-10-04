@@ -1,9 +1,29 @@
 python_test_suite(name = 'all',
   dependencies = [
-    pants(':sandbox_manager'),
     pants(':gc_executor'),
-    pants(':thermos_executor'),
+    pants(':resource_manager'),
+    pants(':sandbox_manager'),
     pants(':status_manager'),
+    pants(':thermos_executor'),
+  ]
+)
+
+python_tests(name = 'gc_executor',
+  sources = ['test_gc_executor.py'],
+  soft_dependencies = True,
+  dependencies = [
+    pants('src/python/twitter/common/app'),
+    pants('src/python/twitter/common/quantity'),
+    pants('src/python/twitter/mesos/executor:gc_executor_lib'),
+    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants('src/thrift/com/twitter/thermos:py-thrift')
+  ]
+)
+
+python_tests(name = 'resource_manager',
+  sources = [ 'test_resource_manager.py' ],
+  dependencies = [
+    pants('src/python/twitter/mesos/executor:resource_manager')
   ]
 )
 
@@ -24,18 +44,6 @@ python_tests(name = 'status_manager',
     python_requirement('tornado'),
     pants('src/python/twitter/common/testing'),
     pants('src/python/twitter/mesos/executor:status_manager')
-  ]
-)
-
-python_tests(name = 'gc_executor',
-  sources = ['test_gc_executor.py'],
-  soft_dependencies = True,
-  dependencies = [
-    pants('src/python/twitter/common/app'),
-    pants('src/python/twitter/common/quantity'),
-    pants('src/python/twitter/mesos/executor:gc_executor_lib'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
-    pants('src/thrift/com/twitter/thermos:py-thrift')
   ]
 )
 

@@ -38,6 +38,21 @@ python_library(
 )
 
 python_library(
+  name = 'resource_manager',
+  sources = ['resource_manager.py'],
+  dependencies = [
+    python_requirement('psutil'),
+    python_requirement('thrift'),
+    pants('src/python/twitter/common/dirutil'),
+    pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/common/quantity'),
+    pants('src/python/twitter/common/recordio:recordio-thrift'),
+    pants('src/python/twitter/thermos/monitoring:measure'),
+    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+  ]
+)
+
+python_library(
   name = 'thermos_executor_base',
   sources = ['executor_base.py'],
   dependencies = [
@@ -55,6 +70,7 @@ python_library(
   name = 'thermos_executor_lib',
   sources = ['thermos_executor.py'],
   dependencies = [
+    pants(':resource_manager'),
     pants(':status_manager'),
     pants(':task_runner_wrapper'),
     pants(':thermos_executor_base'),

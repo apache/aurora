@@ -67,7 +67,10 @@ class ThermosExecutorBase(mesos.Executor):
       assert state in self.THERMOS_TO_MESOS_STATES
       update.state = self.THERMOS_TO_MESOS_STATES[state]
     update.task_id.value = task_id
-    update.message = str(message)
+    # TODO(wickman) Once MESOS-1506 is fixed, drop setting .data
+    if message:
+      update.message = str(message)
+      update.data = str(message)
     self.log('Updating %s => %s' % (task_id, state))
     self.log('   Reason: %s' % message)
     driver.sendStatusUpdate(update)

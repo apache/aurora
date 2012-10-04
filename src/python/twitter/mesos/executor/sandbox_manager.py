@@ -1,6 +1,5 @@
 from abc import ABCMeta, abstractmethod
 import os
-import sys
 from twitter.common_internal.appapp import AppFactory
 
 from twitter.common import app, log
@@ -16,6 +15,7 @@ class SandboxBase(object):
 
   class CreationError(Exception):
     pass
+
   class DeletionError(Exception):
     pass
 
@@ -50,9 +50,6 @@ class DirectorySandbox(SandboxBase):
 
   def root(self):
     return self._dir
-
-  def exists(self):
-    return os.path.exists(self._dir)
 
   def exists(self):
     return os.path.exists(self._dir)
