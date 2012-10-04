@@ -89,6 +89,7 @@ python_library(
   dependencies = [
     pants('3rdparty/python:pystachio'),
     pants(':client_wrapper'),
+    pants('src/python/twitter/common/log'),
     pants('src/python/twitter/mesos/config:schema'),
     pants('src/python/twitter/thermos/config:schema'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),

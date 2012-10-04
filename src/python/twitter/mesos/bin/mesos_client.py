@@ -616,6 +616,9 @@ def ssh(role, job, shard):
 @app.command
 @app.command_option('-t', '--threads', type=int, default=1, dest='num_threads',
     help='The number of threads to use.')
+@app.command_option('-e', '--executor_sandbox', action='store_true', default=False,
+    dest='executor_sandbox',
+    help='Run the command in the executor sandbox instead of the task sandbox.')
 @app.command_option(CLUSTER_OPTION)
 @requires.at_least('role', 'job', 'cmd')
 def run(*line):
@@ -640,7 +643,7 @@ def run(*line):
     _die('--cluster is required')
 
   dcr = DistributedCommandRunner(options.cluster, role, jobs.split(','))
-  dcr.run(command, parallelism=options.num_threads)
+  dcr.run(command, parallelism=options.num_threads, executor_sandbox=options.executor_sandbox)
 
 
 def _get_packer(cluster=None):
