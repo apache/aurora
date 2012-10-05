@@ -62,7 +62,10 @@ public interface FileCopier extends ExceptionalFunction<FileCopyRequest, File, F
       } catch (IOException e) {
         LOG.log(Level.SEVERE, "Failed to download file from HDFS", e);
         throw new FileCopyException(e);
-      } catch (NullPointerException e) {
+      } catch (RuntimeException e) {
+        // Portions of the HDFS api we exercise in downloadFileFromHdfs throw unadvertised
+        // RuntimeExceptions so we're forced to trap broadly here.
+        // See: http://jira.local.twitter.com/browse/MESOS-1525 for an example of this.
         LOG.log(Level.SEVERE, "Failed to download file from HDFS", e);
         throw new FileCopyException(e);
       }
