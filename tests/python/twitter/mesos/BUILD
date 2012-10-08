@@ -3,7 +3,9 @@ python_test_suite(name = 'all',
     pants(':updater'),
     pants(':constraints'),
     pants('tests/python/twitter/mesos/parsers:all'),
-    pants('tests/python/twitter/mesos/executor:all')
+    pants('tests/python/twitter/mesos/executor:all'),
+    pants('tests/python/twitter/mesos/packer:all'),
+    pants('tests/python/twitter/mesos/client:all'),
     # Commented out till we fix the zookeeper import problem
     #pants('tests/python/twitter/mesos/angrybird:tests'),
   ]

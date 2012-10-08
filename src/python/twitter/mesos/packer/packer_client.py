@@ -99,6 +99,19 @@ class Packer(object):
   def _ver_url(role, package, version):
     return '%s/%s' % (Packer._pkg_url(role, package), version)
 
+  @staticmethod
+  def compute_checksum(local_file):
+    # Calculate the checksum, reading 16 MiB chunks.
+    checksum_progress = Progress()
+    stream = CallbackFile(local_file, 'rb', checksum_progress.update, 'Calculating checksum')
+    md5 = hashlib.md5()
+    while True:
+      data = stream.read(16777216)
+      if not data:
+        break
+      md5.update(data)
+    return md5.hexdigest()
+
   def list_packages(self, role):
     return json.loads(self._api(Packer._role_url(role)))
 
@@ -111,20 +124,13 @@ class Packer(object):
   def delete(self, role, package, version):
     return self._api(Packer._ver_url(role, package, version), auth=True, method='DELETE')
 
-  def add(self, role, package, local_file, metadata):
+  def add(self, role, package, local_file, metadata, digest=None):
+    if digest is None:
+      digest = Packer.compute_checksum(local_file)
+    return self._add(role, package, local_file, metadata, digest)
+
+  def _add(self, role, package, local_file, metadata, digest):
     streaminghttp.register_openers()
-
-    # Calculate the checksum, reading 16 MiB chunks.
-    checksum_progress = Progress()
-    stream = CallbackFile(local_file, 'rb', checksum_progress.update, 'Calculating checksum')
-    md5 = hashlib.md5()
-    while True:
-      data = stream.read(16777216)
-      if not data:
-        break
-      md5.update(data)
-    digest = md5.hexdigest()
-
     print()
     upload_progress = Progress()
     stream = CallbackFile(local_file, 'rb', upload_progress.update, 'Uploading')

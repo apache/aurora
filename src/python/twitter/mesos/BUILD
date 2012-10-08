@@ -88,7 +88,6 @@ python_library(
     pants(':clusters'),
     pants(':command_runner'),
     pants(':location'),
-    pants(':parsers'),
     pants(':scheduler_client'),
     pants(':zookeeper_helper'),
   ]

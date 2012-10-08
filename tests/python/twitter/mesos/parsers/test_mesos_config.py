@@ -82,7 +82,7 @@ def test_constraints():
        name = 'host', constraint = TaskConstraint(limit = LimitConstraint(limit = 1)))
 
 
-def test_validate_package_files():
+def test_validate_testing_package_files():
   # valid case
   tempfiles = []
   filenames = []
@@ -90,26 +90,31 @@ def test_validate_package_files():
     tempfiles.append(tempfile.NamedTemporaryFile())
     filenames.append(tempfiles[-1].name)
   errors = []
-  MesosConfig.validate_package_files(filenames, errors)
+  MesosConfig.validate_testing_package_files(filenames, errors)
   assert not errors
   # not a string
   errors = []
-  filenames.append(42)
-  MesosConfig.validate_package_files(filenames, errors)
+  not_a_string = list(filenames).append(42)
+  MesosConfig.validate_testing_package_files(not_a_string, errors)
   assert errors
   # not an existing file
   errors = []
-  filenames.append('/__this_file_does_not_exist__')
-  MesosConfig.validate_package_files(filenames, errors)
+  not_a_file = list(filenames).append('/__this_file_does_not_exist__')
+  MesosConfig.validate_testing_package_files(not_a_file, errors)
   assert errors
   # not a list
   errors = []
   filetuple = (filenames[0], filenames[1], filenames[2])
-  MesosConfig.validate_package_files(filetuple, errors)
+  MesosConfig.validate_testing_package_files(filetuple, errors)
   assert errors
   # empty list
   errors = []
-  MesosConfig.validate_package_files([], errors)
+  MesosConfig.validate_testing_package_files([], errors)
+  assert errors
+  # duplicate file basenames
+  errors = []
+  dup_basename = list(filenames).append(os.path.basename(filenames[0]))
+  MesosConfig.validate_testing_package_files(filetuple, errors)
   assert errors
 
 
@@ -118,7 +123,7 @@ def test_package_files():
     'name': 'hello_world',
     'role': 'john_doe',
     'cluster': 'smf1-test',
-    'package_files': ['ein', 'zwei', 'drei'],
+    'TESTING_package_files': ['ein', 'zwei', 'drei'],
     'task': {
       'start_command': 'echo "hello world"',
       'num_cpus': 0.1,
@@ -127,21 +132,21 @@ def test_package_files():
     }
   }
   m = Mox()
-  m.StubOutWithMock(MesosConfig, 'validate_package_files')
-  MesosConfig.validate_package_files(['ein', 'zwei', 'drei'], [])
+  m.StubOutWithMock(MesosConfig, 'validate_testing_package_files')
+  MesosConfig.validate_testing_package_files(['ein', 'zwei', 'drei'], [])
   m.ReplayAll()
   with disk_config(hello_package_files) as filename:
     config = MesosConfig(filename)
   m.VerifyAll()
-  assert ['ein', 'zwei', 'drei'] == config.package_files()
+  assert ['ein', 'zwei', 'drei'] == config.testing_package_files()
 
 
-def test_package_files_and_package_do_not_mix():
+def test_package_and_testing_package_files_do_not_mix():
   package_and_package_files = {
     'name': 'hello_world',
     'role': 'john_doe',
     'cluster': 'smf1-test',
-    'package_files': ['ein', 'zwei', 'drei'],
+    'TESTING_package_files': ['ein', 'zwei', 'drei'],
     'package': ('one', 'two', 3),
     'task': {
       'start_command': 'echo "hello world"',
