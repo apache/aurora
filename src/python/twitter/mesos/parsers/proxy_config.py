@@ -33,6 +33,10 @@ class ProxyConfig(object):
     pass
 
   @abstractmethod
+  def task_links(self):
+    pass
+
+  @abstractmethod
   def role(self):
     pass
 

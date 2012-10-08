@@ -85,10 +85,10 @@ class UpdateConfig(Struct):
 # The thermosConfig populated inside of TwitterTaskInfo.
 @Provided(mesos=MesosContext)
 class MesosTaskInstance(Struct):
-  task     = Required(Task)
-  layout   = AppLayout
-  instance = Required(Integer)
-  role     = Required(String)
+  task                       = Required(Task)
+  layout                     = AppLayout
+  instance                   = Required(Integer)
+  role                       = Required(String)
   health_check_interval_secs = Integer
 
 
@@ -104,12 +104,13 @@ class MesosJob(Struct):
   package       = PackerPackage
   update_config = Default(UpdateConfig, UpdateConfig())
 
-  constraints       = Map(String, String)
-  daemon            = Default(Integer, 0)  # boolean
-  max_task_failures = Default(Integer, 1)
-  production        = Default(Integer, 0)  # boolean
-  priority          = Default(Integer, 0)
+  constraints                = Map(String, String)
+  daemon                     = Default(Integer, 0)  # boolean
+  max_task_failures          = Default(Integer, 1)
+  production                 = Default(Integer, 0)  # boolean
+  priority                   = Default(Integer, 0)
   health_check_interval_secs = Default(Integer, 30)
+  task_links                 = Map(String, String)
 
 
 Job = MesosJob

@@ -73,6 +73,7 @@ class MesosConfig(ProxyConfig):
     task_dict['priority'] = int(task_dict.get('priority', 0))
     task_dict['max_task_failures'] = int(task_dict.get('max_task_failures', 1))
     task_dict['production'] = bool(task_dict.get('production', False))
+    task_dict['task_links'] = task_dict.get('task_links', {})
 
     # deprecated
     if 'max_per_host' in task_dict:
@@ -219,6 +220,9 @@ class MesosConfig(ProxyConfig):
 
   def ports(self):
     return EntityParser.match_ports(self._config['task']['start_command'])
+
+  def task_links(self):
+    return self._config['task_links']
 
   def hdfs_path(self):
     return self._config['task'].get('hdfs_path')

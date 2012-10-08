@@ -393,7 +393,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setStartCommand("ls")
         .setRequestedPorts(ImmutableSet.<String>of())
         .setAvoidJobs(ImmutableSet.<String>of())
-        .setConstraints(ImmutableSet.<Constraint>of());
+        .setConstraints(ImmutableSet.<Constraint>of())
+        .setTaskLinks(ImmutableMap.<String, String>of());
 
     storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {

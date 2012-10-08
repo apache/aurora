@@ -25,6 +25,7 @@ def convert(config):
   task_configuration = dict((k, str(v)) for k, v in config['task'].items())
   task.configuration = task_configuration
   task.requestedPorts = EntityParser.match_ports(config['task']['start_command'])
+  task.taskLinks = config['task']['task_links']
 
   # Replicate task objects to reflect number of instances.
   tasks = []

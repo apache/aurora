@@ -74,7 +74,8 @@ class PystachioCodec(MesosConfig):
       daemon = cfg['task']['daemon'],
       max_task_failures = cfg['task']['max_task_failures'],
       production = cfg['task']['production'],
-      priority = cfg['task']['priority'])
+      priority = cfg['task']['priority'],
+      task_links = cfg.get('task_links', {}),)
     if cfg['task'].get('health_check_interval_secs'):
       job_dict['health_check_interval_secs'] = cfg['task']['health_check_interval_secs']
     return MesosJob(job_dict)

@@ -280,6 +280,7 @@ invoking cancel_update.
         self.hdfs_path(config, copy_app_from))
 
     log.info('Creating job %s' % config.name())
+    log.debug('Full configuration: %s' % config.job())
     return self._scheduler.createJob(config.job())
 
   def populate_job_config(self, config):

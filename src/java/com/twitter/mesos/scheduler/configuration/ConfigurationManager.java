@@ -13,6 +13,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -324,6 +325,25 @@ public final class ConfigurationManager {
       throw new TaskDescriptionException("Task may not be null.");
     }
 
+    if (!config.isSetShardId()) {
+      throw new TaskDescriptionException("Tasks must have a shard ID.");
+    }
+
+    if (!config.isSetRequestedPorts()) {
+      config.setRequestedPorts(ImmutableSet.<String>of());
+    }
+
+    maybeFillLinks(config);
+
+    config.setOwner(job.getOwner());
+    config.setJobName(job.getName());
+
+    // Only one of [daemon=true, cron_schedule] may be set.
+    if (!StringUtils.isEmpty(job.getCronSchedule()) && config.isIsDaemon()) {
+      throw new TaskDescriptionException(
+          "A daemon task may not be run on a cron schedule: " + config);
+    }
+
     if (config.isSetThermosConfig()) {
       config.setConfigParsed(true);
       return config;
@@ -333,25 +353,8 @@ public final class ConfigurationManager {
       throw new TaskDescriptionException("Task configuration may not be null");
     }
 
-    if (!config.isSetShardId()) {
-      throw new TaskDescriptionException("Tasks must have a shard ID.");
-    }
-
-    if (!config.isSetRequestedPorts()) {
-      config.setRequestedPorts(ImmutableSet.<String>of());
-    }
-
-    config.setOwner(job.getOwner());
-    config.setJobName(job.getName());
-
     assertUnset(config);
     populateFields(config);
-
-    // Only one of [daemon=true, cron_schedule] may be set.
-    if (!StringUtils.isEmpty(job.getCronSchedule()) && config.isIsDaemon()) {
-      throw new TaskDescriptionException(
-          "A daemon task may not be run on a cron schedule: " + config);
-    }
 
     config.setConfigParsed(true);
 
@@ -529,6 +532,9 @@ public final class ConfigurationManager {
     // TODO(wfarner): Remove this when new client is fully deployed and all tasks are backfilled.
     maybeFillRequestedPorts(task);
 
+    // TODO(William Farner): Remove this once all tasks are backfilled with links.
+    maybeFillLinks(task);
+
     return task;
   }
 
@@ -558,6 +564,19 @@ public final class ConfigurationManager {
   private static void maybeFillRequestedPorts(TwitterTaskInfo task) {
     if (!task.isSetRequestedPorts()) {
       task.setRequestedPorts(CommandLineExpander.getPortNames(task.getStartCommand()));
+    }
+  }
+
+  private static void maybeFillLinks(TwitterTaskInfo task) {
+    if (task.getTaskLinksSize() == 0) {
+      ImmutableMap.Builder<String, String> links = ImmutableMap.builder();
+      if (task.getRequestedPorts().contains("health")) {
+        links.put("health", "http://%host%:%port:health%");
+      }
+      if (task.getRequestedPorts().contains("http")) {
+        links.put("http", "http://%host%:%port:http%");
+      }
+      task.setTaskLinks(links.build());
     }
   }
 

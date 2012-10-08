@@ -16,11 +16,10 @@ import com.google.common.collect.Sets;
 import org.apache.commons.lang.StringUtils;
 
 import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.TwitterTaskInfo;
 
 /**
  * Utility class to handle command line expansion.
- *
- * @author William Farner
  */
 public final class CommandLineExpander {
 
@@ -33,6 +32,7 @@ public final class CommandLineExpander {
       Pattern.compile(String.format(PORT_FORMAT, "(\\w+)"));
   private static final String SHARD_ID_REGEXP = "%shard_id%";
   private static final String TASK_ID_REGEXP = "%task_id%";
+  private static final String HOST_REGEXP = "%host%";
 
   private CommandLineExpander() {
     // Utility.
@@ -69,6 +69,36 @@ public final class CommandLineExpander {
   }
 
   /**
+   * Expands wildcards in an arbitrary string.
+   *
+   * @param value String to expand.
+   * @param task Context for expansion of wildcards.
+   * @return {@code value} with any wildcards expanded.
+   */
+  public static String expand(String value, AssignedTask task) {
+    String expanded = value;
+    TwitterTaskInfo config = task.getTask();
+
+    expanded = expanded.replaceAll(SHARD_ID_REGEXP, String.valueOf(config.getShardId()));
+    expanded = expanded.replaceAll(TASK_ID_REGEXP, task.getTaskId());
+
+    if (task.isSetSlaveHost()) {
+      expanded = expanded.replaceAll(HOST_REGEXP, task.getSlaveHost());
+    }
+
+    // Expand ports.
+    if (task.isSetAssignedPorts()) {
+      for (Map.Entry<String, Integer> portEntry : task.getAssignedPorts().entrySet()) {
+        expanded = expanded.replaceAll(
+            String.format(PORT_FORMAT, portEntry.getKey()),
+            String.valueOf(portEntry.getValue()));
+      }
+    }
+
+    return expanded;
+  }
+
+  /**
    * Expands the command line in a task, applying the provided allocated ports.
    *
    * @param immutableTask The task containing a command line that should be expanded.
@@ -80,31 +110,17 @@ public final class CommandLineExpander {
    */
   public static AssignedTask expand(AssignedTask immutableTask, Set<Integer> allocatedPorts) {
     AssignedTask task = new AssignedTask(immutableTask);
-    String commandLine = task.getTask().getStartCommand();
 
-    // Expand shard ID.
-    commandLine = commandLine.replaceAll(SHARD_ID_REGEXP,
-        String.valueOf(task.getTask().getShardId()));
-
-    // Expand task ID.
-    commandLine = commandLine.replaceAll(TASK_ID_REGEXP, task.getTaskId());
-
-    // Expand ports.
     Set<String> requestedPorts;
     if (immutableTask.getTask().isSetRequestedPorts()) {
       requestedPorts = immutableTask.getTask().getRequestedPorts();
     } else {
-      requestedPorts = ImmutableSet.<String>of();
+      requestedPorts = ImmutableSet.of();
     }
     Map<String, Integer> ports = getNameMappedPorts(requestedPorts, allocatedPorts);
 
-    for (Map.Entry<String, Integer> portEntry : ports.entrySet()) {
-      commandLine = commandLine.replaceAll(
-          String.format(PORT_FORMAT, portEntry.getKey()), String.valueOf(portEntry.getValue()));
-    }
-
-    task.getTask().setStartCommand(commandLine);
     task.setAssignedPorts(ports);
+    task.getTask().setStartCommand(expand(task.getTask().getStartCommand(), task));
     return task;
   }
 

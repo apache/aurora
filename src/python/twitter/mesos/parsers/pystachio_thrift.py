@@ -73,8 +73,12 @@ def convert(job):
 
   task.owner = owner
   task.requestedPorts = ThermosTaskWrapper(task_raw, strict=False).ports()
-  task.constraints = ThriftCodec.constraints_to_thrift(
-    job.constraints().get() if job.constraints() is not Empty else {})
+
+  def not_empty_or(item, default):
+    return default if item is Empty else item.get()
+
+  task.taskLinks = not_empty_or(job.task_links(), {})
+  task.constraints = ThriftCodec.constraints_to_thrift(not_empty_or(job.constraints(), {}))
 
   # Replicate task objects to reflect number of instances.
   tasks = []

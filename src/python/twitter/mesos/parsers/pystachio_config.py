@@ -164,6 +164,11 @@ class PystachioConfig(ProxyConfig):
   def ports(self):
     return ThermosTaskWrapper(self._job.task(), strict=False).ports()
 
+  def task_links(self):
+    # TODO(wfarner): Need to convert thermos-style template parameters
+    # to those understood by the scheduler (e.g. %shard_id%).
+    return self._job.task_links().get()
+
   def update_config(self):
     return MesosConfig.get_update_config(self._job.get())
 

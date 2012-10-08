@@ -36,6 +36,7 @@ import org.antlr.stringtemplate.StringTemplate;
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.Constants;
 import com.twitter.mesos.gen.Constraint;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.ScheduleStatus;
@@ -45,6 +46,7 @@ import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.ClusterName;
+import com.twitter.mesos.scheduler.CommandLineExpander;
 import com.twitter.mesos.scheduler.Numbers;
 import com.twitter.mesos.scheduler.SchedulerCore;
 import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
@@ -113,7 +115,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
   private final Function<ScheduledTask, Map<String, Object>> taskToStringMap =
       new Function<ScheduledTask, Map<String, Object>>() {
         @Override public Map<String, Object> apply(ScheduledTask scheduledTask) {
-          AssignedTask task = scheduledTask.getAssignedTask();
+          final AssignedTask task = scheduledTask.getAssignedTask();
           ImmutableMap.Builder<String, Object> builder = ImmutableMap.<String, Object>builder()
             .put("taskId", task.getTaskId())
             .put("shardId", task.getTask().getShardId())
@@ -132,12 +134,19 @@ public class SchedulerzJob extends JerseyTemplateServlet {
           }
           builder.put("pendingReason", pendingReason);
 
-          if (task.isSetAssignedPorts()
-              && task.getAssignedPorts().containsKey("health")) {
-            builder.put("healthPort", task.getAssignedPorts().get("health"));
-          } else {
-            builder.put("healthPort", "");
+          Function<String, String> expander = new Function<String, String>() {
+            @Override public String apply(String input) {
+              return CommandLineExpander.expand(input, task);
+            }
+          };
+
+          Map<String, String> links = ImmutableMap.of();
+          if (Constants.LIVE_STATES.contains(scheduledTask.getStatus())) {
+            links =
+                ImmutableMap.copyOf(Maps.transformValues(task.getTask().getTaskLinks(), expander));
           }
+          builder.put("links", links);
+
           if (task.getTask().isSetThermosConfig()
               && task.getTask().getThermosConfig().length != 0) {
             builder.put("executorPort", 1338);
