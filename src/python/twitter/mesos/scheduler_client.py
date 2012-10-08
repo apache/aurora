@@ -3,10 +3,12 @@
 
 import os
 import sys
+import threading
 import time
 
 from twitter.common import log
 from twitter.common.net.tunnel import TunnelHelper
+from twitter.common.quantity import Amount, Time
 from twitter.mesos.clusters import Cluster
 from twitter.mesos.location import Location
 from twitter.mesos.zookeeper_helper import ZookeeperHelper
@@ -19,7 +21,7 @@ from gen.twitter.mesos import MesosAdmin
 
 class SchedulerClient(object):
   THRIFT_RETRIES = 5
-  RETRY_TIMEOUT_SECS = 1.0
+  RETRY_TIMEOUT = Amount(1, Time.SECONDS)
 
   class CouldNotConnect(Exception): pass
 
@@ -70,13 +72,14 @@ class SchedulerClient(object):
         transport.open()
         return schedulerClient
       except TTransport.TTransportException:
-        time.sleep(SchedulerClient.RETRY_TIMEOUT_SECS)
+        time.sleep(SchedulerClient.RETRY_TIMEOUT.as_(Time.SECONDS))
         continue
     raise SchedulerClient.CouldNotConnect('Could not connect to %s:%s' % (host, port))
 
 
 class ZookeeperSchedulerClient(SchedulerClient):
   SCHEDULER_ZK_PATH = '/twitter/service/mesos-scheduler'
+  SERVERSET_TIMEOUT = Amount(10, Time.SECONDS)
 
   def __init__(self, cluster, port=2181, ssl=False, verbose=False):
     SchedulerClient.__init__(self, verbose=verbose, ssl=ssl)
@@ -85,9 +88,14 @@ class ZookeeperSchedulerClient(SchedulerClient):
     self._endpoint = None
 
   def _connect(self):
-    serverset = ZookeeperHelper.get_scheduler_serverset(self._cluster, port=self._zkport)
+    joined = threading.Event()
+    def on_join():
+      joined.set()
+    zk, serverset = ZookeeperHelper.get_scheduler_serverset(self._cluster, port=self._zkport, on_join=on_join)
+    joined.wait(timeout=self.SERVERSET_TIMEOUT.as_(Time.SECONDS))
     serverset_endpoints = list(serverset)
     if len(serverset_endpoints) == 0:
+      zk.close()
       raise self.CouldNotConnect('No schedulers detected in %s!' % self._cluster)
     instance = serverset_endpoints[0]
     self._endpoint = instance.service_endpoint

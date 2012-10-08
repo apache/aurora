@@ -13,8 +13,9 @@ _ZK_TIMEOUT_SECS = 5
 
 
 def create_packer(cluster):
-  packer_ss = ZookeeperHelper.get_packer_serverset(cluster)
+  zk, packer_ss = ZookeeperHelper.get_packer_serverset(cluster)
   packers = list(packer_ss)
+  zk.close()
 
   if len(packers) == 0:
     log.fatal('Could not find any packers!')

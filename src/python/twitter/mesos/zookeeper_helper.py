@@ -32,11 +32,11 @@ class ZookeeperHelper(object):
     return ZooKeeper('%s:%d' % (host, port))
 
   @classmethod
-  def get_scheduler_serverset(cls, cluster, **kw):
-    zk = cls.get_zookeeper_handle(Cluster.get(cluster).zk, **kw)
-    return ServerSet(zk, Cluster.get(cluster).scheduler_zk_path)
+  def get_scheduler_serverset(cls, cluster, port=2181, **kw):
+    zk = cls.get_zookeeper_handle(Cluster.get(cluster).zk, port=port)
+    return zk, ServerSet(zk, Cluster.get(cluster).scheduler_zk_path, **kw)
 
   @classmethod
-  def get_packer_serverset(cls, cluster, **kw):
-    zk = cls.get_zookeeper_handle(Cluster.get(cluster).packer_zk, **kw)
-    return ServerSet(zk, Cluster.get(cluster).packer_zk_path)
+  def get_packer_serverset(cls, cluster, port=2181, **kw):
+    zk = cls.get_zookeeper_handle(Cluster.get(cluster).packer_zk, port=port)
+    return zk, ServerSet(zk, Cluster.get(cluster).packer_zk_path, **kw)
