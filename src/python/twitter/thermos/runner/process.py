@@ -357,7 +357,7 @@ class Process(ProcessBase):
     else:
       sandbox = self._sandbox if not self._use_chroot else '/'
 
-    self._popen = subprocess.Popen(["/bin/sh", "-c", self.cmdline()],
+    self._popen = subprocess.Popen(["/bin/bash", "-c", self.cmdline()],
                                    stderr=self._stderr, stdout=self._stdout, cwd=sandbox)
 
     self._write_process_update(state=ProcessState.RUNNING,

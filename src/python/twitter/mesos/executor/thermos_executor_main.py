@@ -1,6 +1,4 @@
-# mesos
-import mesos
-
+import os
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 
@@ -12,6 +10,7 @@ from twitter.mesos.executor.thermos_executor import (
     ThermosExecutor,
     ThermosExecutorTimer)
 
+import mesos
 
 app.configure(module='twitter.common_internal.app.modules.chickadee_handler',
     service_name='thermos_executor')

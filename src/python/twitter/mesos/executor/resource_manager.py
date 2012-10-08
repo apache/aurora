@@ -115,7 +115,7 @@ class ResourceEnforcer(object):
 
   def __init__(self, pid, portmap={}):
     self._pid = pid
-    self._portmap = portmap
+    self._portmap = dict((number, name) for (name, number) in portmap.items())
     self._nice = None
 
   def parent(self):
@@ -173,18 +173,22 @@ class ResourceEnforcer(object):
   def render_portmap(portmap):
     return '{%s}' % (', '.join('%s=>%s' % (name, port) for name, port in portmap.items()))
 
-  def _enforce_ports(self, _):
+  def get_listening_ports(self):
     for process in self.walk():
       try:
         for connection in process.get_connections():
           if connection.status == 'LISTEN':
             _, port = connection.local_address
-            if self.ENFORCE_PORT_RANGE[0] <= port <= self.ENFORCE_PORT_RANGE[1]:
-              if port not in self._portmap:
-                return self.KillReason('Listening on unallocated port %s.  Portmap is %s' % (
-                    port, self.render_portmap(self._portmap)))
+            yield port
       except ps.error.Error as e:
         log.debug('Unable to collect information about %s: %s' % (process, e))
+
+  def _enforce_ports(self, _):
+    for port in self.get_listening_ports():
+      if self.ENFORCE_PORT_RANGE[0] <= port <= self.ENFORCE_PORT_RANGE[1]:
+        if port not in self._portmap:
+          return self.KillReason('Listening on unallocated port %s.  Portmap is %s' % (
+              port, self.render_portmap(self._portmap)))
 
   def enforce(self, record):
     """
