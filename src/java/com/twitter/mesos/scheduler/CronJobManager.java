@@ -3,6 +3,7 @@ package com.twitter.mesos.scheduler;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
@@ -10,13 +11,18 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Function;
+import com.google.common.base.Functions;
+import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 
 import org.apache.commons.lang.StringUtils;
+import org.springframework.scheduling.SchedulingException;
 
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.args.Arg;
@@ -42,10 +48,74 @@ import it.sauronsoftware.cron4j.Predictor;
 import it.sauronsoftware.cron4j.Scheduler;
 import it.sauronsoftware.cron4j.SchedulingPattern;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 /**
  * A job scheduler that receives jobs that should be run periodically on a cron schedule.
  */
 public class CronJobManager extends JobManager {
+
+  /**
+   * An execution manager that executes work on a cron schedule.
+   */
+  public interface CronScheduler {
+    /**
+     * Schedules a task on a cron schedule.
+     *
+     * @param schedule Cron-style schedule.
+     * @param task Work to run when on the cron schedule.
+     * @return A unique ID to identify the scheduled cron task.
+     */
+    String schedule(String schedule, Runnable task);
+
+    /**
+     * Removes a scheduled cron item.
+     *
+     * @param key Key previously returned from {@link #schedule(String, Runnable)}.
+     */
+    void deschedule(String key);
+
+    /**
+     * Gets the cron schedule associated with a scheduling key.
+     *
+     * @param key Key previously returned from {@link #schedule(String, Runnable)}.
+     * @return The task's cron schedule, if a matching task was found.
+     */
+    Optional<String> getSchedule(String key);
+
+    public static class Cron4jScheduler implements CronScheduler {
+      private final Scheduler scheduler;
+
+      @Inject
+      Cron4jScheduler(ShutdownRegistry shutdownRegistry) {
+        checkNotNull(shutdownRegistry);
+        scheduler = new Scheduler();
+        scheduler.setDaemon(true);
+        scheduler.start();
+        shutdownRegistry.addAction(new Command() {
+          @Override public void execute() {
+            scheduler.stop();
+          }
+        });
+      }
+
+      @Override
+      public String schedule(String schedule, Runnable task) {
+        return scheduler.schedule(schedule, task);
+      }
+
+      @Override
+      public void deschedule(String key) {
+        scheduler.deschedule(key);
+      }
+
+      @Override
+      public Optional<String> getSchedule(String key) {
+        return Optional.fromNullable(scheduler.getSchedulingPattern(key))
+            .transform(Functions.toStringFunction());
+      }
+    }
+  }
 
   public static final String MANAGER_KEY = "CRON";
 
@@ -64,9 +134,6 @@ public class CronJobManager extends JobManager {
   private static final Arg<Amount<Long, Time>> CRON_START_MAX_BACKOFF =
       Arg.create(Amount.of(1L, Time.MINUTES));
 
-  // Cron manager.
-  private final Scheduler scheduler = new Scheduler();
-
   private final AtomicLong cronJobsTriggered = Stats.exportLong("cron_jobs_triggered");
 
   // Maps from the our unique job identifier (<role>/<jobName>) to the unique identifier used
@@ -79,38 +146,44 @@ public class CronJobManager extends JobManager {
   // asynchronous operation.
   private final Map<String, JobConfiguration> pendingRuns =
       Collections.synchronizedMap(Maps.<String, JobConfiguration>newHashMap());
+
+  private final Storage storage;
+  private final CronScheduler cron;
   private final BackoffHelper delayedStartBackoff;
   private final Executor delayedRunExecutor;
 
-  private final Storage storage;
-
   @Inject
-  public CronJobManager(Storage storage, ShutdownRegistry shutdownRegistry) {
-    this(storage, shutdownRegistry, Executors.newCachedThreadPool(
-        new ThreadFactoryBuilder().setDaemon(true).setNameFormat("CronDelay-%d").build()));
+  CronJobManager(Storage storage, CronScheduler cron) {
+    this(
+        storage,
+        cron,
+        Executors.newCachedThreadPool(
+            new ThreadFactoryBuilder().setDaemon(true).setNameFormat("CronDelay-%d").build()));
   }
 
   @VisibleForTesting
-  CronJobManager(Storage storage, ShutdownRegistry shutdownRegistry,
+  CronJobManager(
+      Storage storage,
+      CronScheduler cron,
       Executor delayedRunExecutor) {
-    this.storage = Preconditions.checkNotNull(storage);
+    this.storage = checkNotNull(storage);
+    this.cron = checkNotNull(cron);
     this.delayedStartBackoff =
         new BackoffHelper(CRON_START_INITIAL_BACKOFF.get(), CRON_START_MAX_BACKOFF.get());
-    this.delayedRunExecutor = Preconditions.checkNotNull(delayedRunExecutor);
-
-    scheduler.setDaemon(true);
-    scheduler.start();
-    shutdownRegistry.addAction(new Command() {
-      @Override public void execute() {
-        scheduler.stop();
-      }
-    });
+    this.delayedRunExecutor = checkNotNull(delayedRunExecutor);
 
     Stats.exportSize("cron_num_pending_runs", pendingRuns);
   }
 
   private void mapScheduledJob(JobConfiguration job, String scheduledJobKey) {
-    scheduledJobs.put(Tasks.jobKey(job), scheduledJobKey);
+    String jobKey = Tasks.jobKey(job);
+    synchronized (scheduledJobs) {
+      if (scheduledJobs.containsKey(jobKey)) {
+        throw new SchedulingException("Illegal state - cron schedule already exists for " + jobKey);
+      }
+
+      scheduledJobs.put(jobKey, scheduledJobKey);
+    }
   }
 
   @Override
@@ -146,8 +219,6 @@ public class CronJobManager extends JobManager {
    * @param jobKey Key of the job to start.
    */
   public void startJobNow(final String jobKey) {
-    Preconditions.checkNotNull(jobKey);
-
     JobConfiguration job = fetchJob(jobKey);
     Preconditions.checkArgument(job != null, "No such cron job " + jobKey);
 
@@ -177,7 +248,7 @@ public class CronJobManager extends JobManager {
           if (!hasTasks(query)) {
             LOG.info("Initiating delayed launch of cron " + jobKey);
             JobConfiguration job = pendingRuns.remove(jobKey);
-            Preconditions.checkNotNull(job, "Failed to fetch job for delayed run of " + jobKey);
+            checkNotNull(job, "Failed to fetch job for delayed run of " + jobKey);
             schedulerCore.runJob(job);
             return true;
           } else {
@@ -266,6 +337,9 @@ public class CronJobManager extends JobManager {
   }
 
   void updateJob(JobConfiguration job) throws ScheduleException {
+    String key = scheduledJobs.remove(Tasks.jobKey(job));
+    checkNotNull(key, "Attempted to update unknown job " + Tasks.jobKey(job));
+    cron.deschedule(key);
     Preconditions.checkArgument(receiveJob(job));
   }
 
@@ -275,13 +349,12 @@ public class CronJobManager extends JobManager {
   }
 
   private static boolean hasCronSchedule(JobConfiguration job) {
+    checkNotNull(job);
     return !StringUtils.isEmpty(job.getCronSchedule());
   }
 
   @Override
   public boolean receiveJob(final JobConfiguration job) throws ScheduleException {
-    Preconditions.checkNotNull(job);
-
     if (!hasCronSchedule(job)) {
       return false;
     }
@@ -309,7 +382,7 @@ public class CronJobManager extends JobManager {
 
     LOG.info(String.format("Scheduling cron job %s: %s", Tasks.jobKey(job), job.getCronSchedule()));
     try {
-      return scheduler.schedule(job.getCronSchedule(), new Runnable() {
+      return cron.schedule(job.getCronSchedule(), new Runnable() {
         @Override public void run() {
           // TODO(William Farner): May want to record information about job runs.
           LOG.info("Running cron job: " + Tasks.jobKey(job));
@@ -337,12 +410,11 @@ public class CronJobManager extends JobManager {
 
   @Override
   public boolean hasJob(final String jobKey) {
-    Preconditions.checkNotNull(jobKey);
-
     return fetchJob(jobKey) != null;
   }
 
   private JobConfiguration fetchJob(final String jobKey) {
+    checkNotNull(jobKey);
     return storage.doInTransaction(new Work.Quiet<JobConfiguration>() {
       @Override public JobConfiguration apply(Storage.StoreProvider storeProvider) {
         return storeProvider.getJobStore().fetchJob(MANAGER_KEY, jobKey);
@@ -352,15 +424,13 @@ public class CronJobManager extends JobManager {
 
   @Override
   public boolean deleteJob(final String jobKey) {
-    Preconditions.checkNotNull(jobKey);
-
     if (!hasJob(jobKey)) {
       return false;
     }
 
     String scheduledJobKey = scheduledJobs.remove(jobKey);
     if (scheduledJobKey != null) {
-      scheduler.deschedule(scheduledJobKey);
+      cron.deschedule(scheduledJobKey);
       storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
         @Override protected void execute(Storage.MutableStoreProvider storeProvider) {
           storeProvider.getJobStore().removeJob(jobKey);
@@ -369,5 +439,23 @@ public class CronJobManager extends JobManager {
       LOG.info("Successfully deleted cron job " + jobKey);
     }
     return true;
+  }
+
+  private final Function<String, String> keyToSchedule = new Function<String, String>() {
+    @Override public String apply(String key) {
+      return cron.getSchedule(key).or("Not found.");
+    }
+  };
+
+  public Map<String, String> getScheduledJobs() {
+    synchronized (scheduledJobs) {
+      return ImmutableMap.copyOf(Maps.transformValues(scheduledJobs, keyToSchedule));
+    }
+  }
+
+  public Set<String> getPendingRuns() {
+    synchronized (pendingRuns) {
+      return ImmutableSet.copyOf(pendingRuns.keySet());
+    }
   }
 }

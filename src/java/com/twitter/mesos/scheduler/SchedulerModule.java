@@ -45,6 +45,8 @@ import com.twitter.common_internal.zookeeper.ZooKeeperModule;
 import com.twitter.mesos.GuiceUtils;
 import com.twitter.mesos.auth.AuthBindings;
 import com.twitter.mesos.scheduler.BackoffSchedulingFilter.BackoffDelegate;
+import com.twitter.mesos.scheduler.CronJobManager.CronScheduler;
+import com.twitter.mesos.scheduler.CronJobManager.CronScheduler.Cron4jScheduler;
 import com.twitter.mesos.scheduler.Driver.DriverImpl;
 import com.twitter.mesos.scheduler.DriverFactory.DriverFactoryImpl;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHosts;
@@ -180,6 +182,8 @@ public class SchedulerModule extends AbstractModule {
     bind(new TypeLiteral<PulseMonitor<String>>() { })
         .annotatedWith(GcExecutor.class)
         .toInstance(new PulseMonitorImpl<String>(EXECUTOR_GC_INTERVAL.get()));
+
+    bind(CronScheduler.class).to(Cron4jScheduler.class);
 
     // Bindings for SchedulerCoreImpl.
     bind(CronJobManager.class).in(Singleton.class);
