@@ -93,5 +93,5 @@ class DistributedCommandRunner(object):
 
   def run(self, command, parallelism=1, **kw):
     threadpool = ThreadPool(processes=parallelism)
-    for result in threadpool.imap(self.execute, self.process_arguments(command, **kw)):
+    for result in threadpool.imap_unordered(self.execute, self.process_arguments(command, **kw)):
       print result
