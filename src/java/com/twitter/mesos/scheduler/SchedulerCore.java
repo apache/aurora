@@ -80,12 +80,12 @@ public interface SchedulerCore
   /**
    * Creates a new job, whose tasks will become candidates for scheduling.
    *
-   * @param job The configuration of the job to create tasks for.
+   * @param parsedConfiguration The configuration of the job to create tasks for.
    * @throws ScheduleException If there was an error scheduling a cron job.
    * @throws ConfigurationManager.TaskDescriptionException If an invalid task description was given.
    */
-  void createJob(JobConfiguration job) throws ScheduleException,
-      ConfigurationManager.TaskDescriptionException;
+  void createJob(ParsedConfiguration parsedConfiguration)
+      throws ScheduleException, ConfigurationManager.TaskDescriptionException;
 
   /**
    * Starts a cron job immediately.
@@ -106,17 +106,16 @@ public interface SchedulerCore
   /**
    * Registers an update for a job.
    *
-   * @param job Updated job configuration.
+   * @param parsedConfiguration Updated job configuration.
    * @throws ScheduleException If there was an error in scheduling an update when no active tasks
    *                           are found for a job or an update for the job is already in progress.
-   * @throws ConfigurationManager.TaskDescriptionException If an invalid task description was given.
    * @return A unique update token if an update must be coordinated through
    *         {@link #updateShards(String, String, java.util.Set, String)} and
    *         {@link #finishUpdate(String, String, Optional, UpdateResult)}, or an absent value if
    * the update was completed in-place and no further action is necessary.
    */
-  Optional<String> initiateJobUpdate(JobConfiguration job)
-      throws ScheduleException, ConfigurationManager.TaskDescriptionException;
+  Optional<String> initiateJobUpdate(ParsedConfiguration parsedConfiguration)
+      throws ScheduleException;
 
   /**
    * Initiates an update on shards within a job.
@@ -126,7 +125,7 @@ public interface SchedulerCore
    * @param jobName Job being updated.
    * @param shards Shards to be updated.
    * @param updateToken A unique string identifying the update, must be provided from
-   *                    {@link #initiateJobUpdate(JobConfiguration)}.
+   *                    {@link #initiateJobUpdate(ParsedConfiguration)}.
    * @throws ScheduleException If there was an error in updating the state to UPDATING.
    * @return The action taken on each of the shards.
    */
@@ -144,7 +143,7 @@ public interface SchedulerCore
    * @param jobName Name of the job being updated.
    * @param shards Shards to be updated.
    * @param updateToken A unique string identifying the update, must be provided from
-   *                    {@link #initiateJobUpdate(JobConfiguration)}
+   *                    {@link #initiateJobUpdate(ParsedConfiguration)}
    * @throws ScheduleException If there was an error in updating the state to ROLLBACK.
    * @return The action taken on each of the shards.
    */
@@ -159,7 +158,8 @@ public interface SchedulerCore
    *
    * @param role The job owner.
    * @param jobName Name of the job being updated.
-   * @param updateToken The update token provided from {@link #initiateJobUpdate(JobConfiguration)},
+   * @param updateToken The update token provided from
+   *                    {@link #initiateJobUpdate(ParsedConfiguration)},
    *                    or not present if the update is being forcibly terminated.
    * @param result {@code true} if the update was successful, {@code false} otherwise.
    * @throws ScheduleException If an update for the job does not exist or if the update token is

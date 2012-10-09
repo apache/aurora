@@ -167,21 +167,20 @@ public class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public synchronized void createJob(JobConfiguration job) throws ScheduleException,
-      ConfigurationManager.TaskDescriptionException {
+  public synchronized void createJob(ParsedConfiguration parsedConfiguration)
+      throws ScheduleException, ConfigurationManager.TaskDescriptionException {
     checkStarted();
 
-    final JobConfiguration populated = ConfigurationManager.validateAndPopulate(job);
-
-    if (hasActiveJob(populated)) {
-      throw new ScheduleException("Job already exists: " + jobKey(populated));
+    JobConfiguration job = parsedConfiguration.get();
+    if (hasActiveJob(job)) {
+      throw new ScheduleException("Job already exists: " + jobKey(job));
     }
 
-    ensureHasAdditionalQuota(job.getOwner().getRole(), Quotas.fromJob(populated));
+    ensureHasAdditionalQuota(job.getOwner().getRole(), Quotas.fromJob(job));
 
     boolean accepted = false;
     for (final JobManager manager : jobManagers) {
-      if (manager.receiveJob(populated)) {
+      if (manager.receiveJob(job)) {
         LOG.info("Job accepted by manager: " + manager.getUniqueKey());
         accepted = true;
         break;
@@ -190,7 +189,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
     if (!accepted) {
       LOG.severe("Job was not accepted by any of the configured schedulers, discarding.");
-      LOG.severe("Discarded job: " + populated);
+      LOG.severe("Discarded job: " + job);
       throw new ScheduleException("Job not accepted, discarding.");
     }
   }
@@ -299,12 +298,11 @@ public class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public synchronized Optional<String> initiateJobUpdate(JobConfiguration job)
-      throws ScheduleException, ConfigurationManager.TaskDescriptionException {
+  public synchronized Optional<String> initiateJobUpdate(ParsedConfiguration parsedConfiguration)
+      throws ScheduleException {
     checkStarted();
 
-    JobConfiguration populated = ConfigurationManager.validateAndPopulate(job);
-
+    JobConfiguration job = parsedConfiguration.get();
     if (cronScheduler.hasJob(Tasks.jobKey(job))) {
       cronScheduler.updateJob(job);
       return Optional.absent();
@@ -321,14 +319,14 @@ public class SchedulerCoreImpl implements SchedulerCore {
     if (!existingTasks.isEmpty()) {
       Quota currentJobQuota =
           Quotas.fromTasks(Iterables.transform(existingTasks, Tasks.SCHEDULED_TO_INFO));
-      Quota newJobQuota = Quotas.fromJob(populated);
+      Quota newJobQuota = Quotas.fromJob(job);
       Quota additionalQuota = Quotas.subtract(newJobQuota, currentJobQuota);
       ensureHasAdditionalQuota(job.getOwner().getRole(), additionalQuota);
     }
 
     try {
       return Optional.of(stateManager.registerUpdate(job.getOwner().getRole(), job.getName(),
-          populated.getTaskConfigs()));
+          job.getTaskConfigs()));
     } catch (StateManagerImpl.UpdateException e) {
       LOG.log(Level.INFO, "Failed to start update.", e);
       throw new ScheduleException(e.getMessage(), e);

@@ -147,7 +147,7 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     }
 
     try {
-      schedulerCore.createJob(job);
+      schedulerCore.createJob(ParsedConfiguration.fromUnparsed(job));
       response.setResponseCode(OK)
           .setMessage(String.format("%d new tasks pending for job %s",
               job.getTaskConfigs().size(), Tasks.jobKey(job)));
@@ -291,7 +291,8 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     }
 
     try {
-      Optional<String> token = schedulerCore.initiateJobUpdate(job);
+      Optional<String> token =
+          schedulerCore.initiateJobUpdate(ParsedConfiguration.fromUnparsed(job));
       response.setResponseCode(OK);
       response.setRollingUpdateRequired(token.isPresent());
       if (token.isPresent()) {
