@@ -89,9 +89,10 @@ class ZookeeperSchedulerClient(SchedulerClient):
 
   def _connect(self):
     joined = threading.Event()
-    def on_join():
+    def on_join(elements):
       joined.set()
-    zk, serverset = ZookeeperHelper.get_scheduler_serverset(self._cluster, port=self._zkport, on_join=on_join)
+    zk, serverset = ZookeeperHelper.get_scheduler_serverset(
+        self._cluster, port=self._zkport, on_join=on_join)
     joined.wait(timeout=self.SERVERSET_TIMEOUT.as_(Time.SECONDS))
     serverset_endpoints = list(serverset)
     if len(serverset_endpoints) == 0:
