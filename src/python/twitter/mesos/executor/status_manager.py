@@ -9,8 +9,6 @@ from twitter.common.quantity import Amount, Time
 from gen.twitter.thermos.ttypes import TaskState
 
 from .executor_base import ThermosExecutorBase
-from .health_checker import Healthy, HealthCheckerThread
-from .http_signaler import HttpSignaler
 
 
 class StatusManager(threading.Thread):
@@ -23,50 +21,50 @@ class StatusManager(threading.Thread):
                runner,
                driver,
                task_id,
-               resource_manager=None,
-               signal_port=None,
-               check_interval=None,
+               health_checkers=(),
+               signaler=None,
                clock=time):
     self._driver = driver
     self._runner = runner
     self._task_id = task_id
     self._clock = clock
     self._unhealthy_event = threading.Event()
-    self._resource_manager = resource_manager
-    if signal_port:
-      self._signaler = HttpSignaler(signal_port)
-      self._health_checker = HealthCheckerThread(self._signaler.health, check_interval or 30,
-          clock=clock)
-      self._health_checker.start()
-    else:
-      self._signaler = None
-      self._health_checker = Healthy()
+    self._signaler = signaler
+    self._health_checkers = health_checkers
     threading.Thread.__init__(self)
+    self.daemon = True
 
   @property
   def unhealthy_event(self):
     return self._unhealthy_event
 
   def run(self):
+    for checker in self._health_checkers:
+      checker.start()
+
     def notify_unhealthy():
       self._unhealthy_event.set()
-      self._health_checker.stop()
-    force_status = force_message = None
-    while self._runner.is_alive():
-      if not self._health_checker.healthy:
-        notify_unhealthy()
-        force_status = mesos_pb.TASK_FAILED
-        force_message = 'Failed health check!'
-        break
-      elif self._resource_manager and self._resource_manager.kill_reason:
-        notify_unhealthy()
-        force_status = mesos_pb.TASK_FAILED
-        force_message = 'Killed by resource manager: %s' % self._resource_manager.kill_reason.reason
-        break
-      self._clock.sleep(self.POLL_WAIT.as_(Time.SECONDS))
+      for checker in self._health_checkers:
+        checker.stop()
+
+    force_status = failure_reason = None
+
+    while self._runner.is_alive() and failure_reason is None:
+      for checker in self._health_checkers:
+        if not checker.healthy:
+          notify_unhealthy()
+          force_status = mesos_pb.TASK_FAILED
+          failure_reason = checker.failure_reason.reason
+          print('Got force_status=%s, failure_reason=%s from %s' % (
+              force_status,
+              failure_reason,
+              checker))
+          break
+      else:
+        self._clock.sleep(self.POLL_WAIT.as_(Time.SECONDS))
 
     log.info('Executor polling thread detected termination condition.')
-    self.terminate(force_status, force_message)
+    self.terminate(force_status, failure_reason)
 
   def _terminate_http(self):
     if not self._signaler:

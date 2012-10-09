@@ -33,6 +33,9 @@ from twitter.mesos.executor.status_manager import StatusManager
 from twitter.thermos.runner.runner import TaskRunner
 from twitter.thermos.base.path import TaskPath
 
+if 'THERMOS_DEBUG' in os.environ:
+  LogOptions.set_stderr_log_level('DEBUG')
+  log.init('executor_logger')
 
 class TestStatusManager(StatusManager):
   WAIT_LIMIT = Amount(1, Time.SECONDS)

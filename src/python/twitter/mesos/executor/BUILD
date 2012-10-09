@@ -25,15 +25,35 @@ python_library(
 )
 
 python_library(
-  name = 'status_manager',
-  sources = ['http_signaler.py', 'health_checker.py', 'status_manager.py'],
+  name = 'http_signaler',
+  sources = ['http_signaler.py'],
   dependencies = [
-    pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/lang'),
+  ]
+)
+
+python_library(
+  name = 'health_interface',
+  sources = ['health_interface.py'],
+)
+
+python_library(
+  name = 'health_checker',
+  sources = ['health_checker.py'],
+  dependencies = [
+    pants(':health_interface'),
+  ]
+)
+
+python_library(
+  name = 'discovery_manager',
+  sources = ['discovery_manager.py'],
+  dependencies = [
+    pants(':health_interface'),
+    pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/quantity'),
-    pants('src/thrift/com/twitter/thermos:py-thrift'),
-    pants(':thermos_executor_base'),
-    python_requirement('mesos==0.9.0'),
+    pants('src/python/twitter/common/zookeeper/serverset'),
+    pants('src/python/twitter/common_internal/zookeeper:twitter_service'),
   ]
 )
 
@@ -41,6 +61,7 @@ python_library(
   name = 'resource_manager',
   sources = ['resource_manager.py'],
   dependencies = [
+    pants(':health_interface'),
     python_requirement('psutil'),
     python_requirement('thrift'),
     pants('src/python/twitter/common/dirutil'),
@@ -49,6 +70,29 @@ python_library(
     pants('src/python/twitter/common/recordio:recordio-thrift'),
     pants('src/python/twitter/thermos/monitoring:measure'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+  ]
+)
+
+python_library(
+  name = 'health_interfaces',
+  dependencies = [
+    pants(':health_checker'),
+    pants(':resource_manager'),
+    pants(':discovery_manager'),
+  ]
+)
+
+python_library(
+  name = 'status_manager',
+  sources = ['status_manager.py'],
+  dependencies = [
+    pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/common/lang'),
+    pants('src/python/twitter/common/quantity'),
+    pants('src/thrift/com/twitter/thermos:py-thrift'),
+    pants(':thermos_executor_base'),
+    pants(':health_interfaces'),
+    python_requirement('mesos==0.9.0'),
   ]
 )
 

@@ -11,10 +11,10 @@ from twitter.common.quantity import Amount, Time
 from twitter.common.testing.clock import ThreadedClock
 from twitter.mesos.executor.http_signaler import HttpSignaler
 from twitter.mesos.executor.status_manager import StatusManager
-from twitter.mesos.executor.health_checker import (
+from twitter.mesos.executor.health_interface import (
   Healthy,
-  HealthInterface,
-  HealthCheckerThread)
+  HealthInterface)
+from twitter.mesos.executor.health_checker import HealthCheckerThread
 
 from gen.twitter.thermos.ttypes import TaskState
 
@@ -245,8 +245,10 @@ class TestStatusManager(unittest.TestCase):
   def test_unhealthy_task_overridden(self):
     class FastStatusManager(StatusManager):
       ESCALATION_WAIT = Amount(500, Time.MILLISECONDS)
-    monitor = FastStatusManager(self.runner, self.driver, 'abc', signal_port=self.http.port,
-        check_interval=0.5)
+    signaler = HttpSignaler(self.http.port)
+    checker = HealthCheckerThread(signaler.health, interval_secs=0.5)
+    monitor = FastStatusManager(self.runner, self.driver, 'abc', signaler=signaler,
+        health_checkers=[checker])
     monitor.start()
 
     self.http.health.value = 'bad'

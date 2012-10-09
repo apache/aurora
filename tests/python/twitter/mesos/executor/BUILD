@@ -10,7 +10,6 @@ python_test_suite(name = 'all',
 
 python_tests(name = 'gc_executor',
   sources = ['test_gc_executor.py'],
-  soft_dependencies = True,
   dependencies = [
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/quantity'),
@@ -29,7 +28,6 @@ python_tests(name = 'resource_manager',
 
 python_tests(name = 'sandbox_manager',
   sources = ['test_sandbox_manager.py'],
-  soft_dependencies = True,
   dependencies = [
     pants('src/python/twitter/common/contextutil'),
     pants('src/python/twitter/mesos/config:schema'),
@@ -37,19 +35,30 @@ python_tests(name = 'sandbox_manager',
   ]
 )
 
+python_tests(name = 'discovery_manager',
+  sources = ['test_discovery_manager.py'],
+  dependencies = [
+    pants('src/python/twitter/mesos/config:schema'),
+    pants('src/python/twitter/common/net:ssh'),
+    pants('src/python/twitter/mesos/executor:discovery_manager'),
+    pants('src/python/twitter/common/zookeeper:testing'),
+    pants('src/python/twitter/common/zookeeper/serverset'),
+    pants('src/python/twitter/common_internal/zookeeper:twitter_service')
+  ]
+)
+
 python_tests(name = 'status_manager',
   sources = [ 'test_status_manager.py' ],
-  soft_dependencies = True,
   dependencies = [
     python_requirement('tornado'),
     pants('src/python/twitter/common/testing'),
+    pants('src/python/twitter/mesos/executor:http_signaler'),
     pants('src/python/twitter/mesos/executor:status_manager')
   ]
 )
 
 python_tests(name = 'thermos_executor',
   sources = ['test_thermos_executor.py'],
-  soft_dependencies = True,
   timeout = Amount(5, Time.MINUTES),
   dependencies = [
     pants('src/python/twitter/pants:pants-lib'),

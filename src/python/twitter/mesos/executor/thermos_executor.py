@@ -22,6 +22,7 @@ from twitter.mesos.executor.executor_base import ThermosExecutorBase
 from gen.twitter.mesos.ttypes import AssignedTask
 from thrift.TSerialization import deserialize as thrift_deserialize
 
+from .discovery_manager import DiscoveryManager
 from .resource_manager import ResourceCheckpointer, ResourceManager
 from .status_manager import StatusManager
 
@@ -63,7 +64,6 @@ class ThermosExecutor(ThermosExecutorBase):
     self._manager = None
     self._runner_class = runner_class
     self._manager_class = manager_class
-    self._resource_manager = None
     self.launched = threading.Event()
 
   @staticmethod
@@ -115,19 +115,34 @@ class ThermosExecutor(ThermosExecutorBase):
     log.debug('Task started.')
     self.send_update(driver, self._task_id, 'RUNNING')
 
-    self._resource_manager = ResourceManager(
+    health_checkers = []
+
+    http_signaler = None
+    if portmap.get('health'):
+      http_signaler = HttpSignaler(portmap.get('health'))
+      health_checkers.append(HealthChecker(http_signaler,
+          interval_secs=task.health_check_interval_secs.get()))
+
+    resource_manager = ResourceManager(
         mesos_task.task().resources(),
         portmap,
         self._runner.pid,
         self._runner.sandbox.root())
-    self._resource_manager.start()
+    health_checkers.append(resource_manager)
 
-    ResourceCheckpointer(lambda: self._resource_manager.sample,
+    ResourceCheckpointer(lambda: resource_manager.sample,
         os.path.join(self._runner.artifact_dir, self.RESOURCE_CHECKPOINT),
         recordio=True).start()
 
-    self._manager = self._manager_class(self._runner, driver, self._task_id,
-        signal_port=portmap.get('health'), resource_manager=self._resource_manager)
+    if mesos_task.has_announce() and portmap:
+      health_checkers.append(DiscoveryManager(mesos_task, portmap))
+
+    self._manager = self._manager_class(
+        self._runner,
+        driver,
+        self._task_id,
+        signaler=http_signaler,
+        health_checkers=health_checkers)
     self._manager.start()
 
   def launchTask(self, driver, task):

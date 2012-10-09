@@ -13,6 +13,8 @@ from twitter.thermos.monitoring.measure import ProcessSample
 
 from gen.twitter.mesos.comm.ttypes import TaskResourceSample
 
+from .health_interface import HealthInterface
+
 
 class DiskCollectorThread(threading.Thread):
   def __init__(self, path):
@@ -205,7 +207,7 @@ class ResourceEnforcer(object):
         return kill_reason
 
 
-class ResourceManager(threading.Thread):
+class ResourceManager(HealthInterface, threading.Thread):
   PROCESS_COLLECTION_INTERVAL = Amount(20, Time.SECONDS)
   DISK_COLLECTION_INTERVAL = Amount(1, Time.MINUTES)
   ENFORCEMENT_INTERVAL = Amount(30, Time.SECONDS)
@@ -225,6 +227,7 @@ class ResourceManager(threading.Thread):
     self._max_disk = resources.disk().get()
     self._kill_reason = None
     self._sample = None
+    self._stop_event = threading.Event()
     threading.Thread.__init__(self)
     self.daemon = True
 
@@ -250,6 +253,10 @@ class ResourceManager(threading.Thread):
         diskBytes=self._du.value)
 
   @property
+  def healthy(self):
+    return self._kill_reason is None
+
+  @property
   def kill_reason(self):
     return self._kill_reason
 
@@ -259,7 +266,7 @@ class ResourceManager(threading.Thread):
     next_disk_collection = now
     next_enforcement = now
 
-    while True:
+    while not self._stop_event.is_set():
       now = time.time()
       next_event = max(
           0, min(next_enforcement, next_process_collection, next_disk_collection) - now)
@@ -281,6 +288,12 @@ class ResourceManager(threading.Thread):
         if kill_reason and not self._kill_reason:
           log.info('Resource manager triggering kill reason: %s' % kill_reason)
           self._kill_reason = kill_reason
+
+  def start(self):
+    threading.Thread.start(self)
+
+  def stop(self):
+    self._stop_event.set()
 
 
 class ResourceCheckpointer(threading.Thread):

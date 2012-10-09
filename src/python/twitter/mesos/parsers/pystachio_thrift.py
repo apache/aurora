@@ -31,6 +31,8 @@ def task_instance_from_job(job, instance):
                          role=job.role(),
                          health_check_interval_secs=job.health_check_interval_secs(),
                          instance=instance)
+  if job.has_announce():
+    ti = ti(announce=job.announce())
   return ti.bind(instance_context).interpolate()
 
 

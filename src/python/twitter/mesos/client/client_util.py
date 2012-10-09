@@ -14,6 +14,7 @@ from pystachio import Ref
 from urlparse import urljoin
 from twitter.common import app, log
 from twitter.common.contextutil import temporary_dir, open_zip
+from twitter.common.dirutil import safe_rmtree
 from twitter.mesos.clusters import Cluster
 from twitter.mesos.config.schema import Packer as PackerObject
 from twitter.mesos.packer.packer_client import Packer
@@ -257,25 +258,26 @@ def really_spawn(jobname, config_file, options):
   checkpoint_root = os.path.expanduser(os.path.join('~', '.thermos'))
   server_thread, port = spawn_observer(checkpoint_root)
   task_info = create_taskinfo(config, options.shard)
-  sandbox = tempfile.mkdtemp()
 
-  runner_pex = options.runner if options.runner != 'build' else build_local_runner()
-  if runner_pex is None:
-    app.error('failed to build thermos runner!')
+  with temporary_dir() as sandbox:
+    runner_pex = options.runner if options.runner != 'build' else build_local_runner()
+    if runner_pex is None:
+      app.error('failed to build thermos runner!')
 
-  executor = create_executor(runner_pex, sandbox, checkpoint_root)
-  driver = LocalDriver()
-  executor.launchTask(driver, task_info)
+    executor = create_executor(runner_pex, sandbox, checkpoint_root)
+    driver = LocalDriver()
+    executor.launchTask(driver, task_info)
 
-  if options.open_browser:
-    open_url('http://localhost:%d/task/%s' % (port, task_info.task_id.value))
+    if options.open_browser:
+      open_url('http://localhost:%d/task/%s' % (port, task_info.task_id.value))
 
-  try:
-    driver.stopped.wait()
-  except KeyboardInterrupt:
-    print('Got interrupt, killing task.')
+    try:
+      driver.stopped.wait()
+    except KeyboardInterrupt:
+      print('Got interrupt, killing task.')
 
-  executor.shutdown(driver)
+    executor.shutdown(driver)
+
   print('Local spawn completed.')
   return 0
 

@@ -19,7 +19,7 @@ class DiscoveryManager(HealthInterface):
     assert primary_port in portmap
     hostname = socket.gethostname()
     return Endpoint(hostname, portmap[primary_port]), dict(
-        ((port, Endpoint(hostname, portmap[port])) for port in portmap if port != primary_port))
+        ((port, Endpoint(hostname, portmap[port])) for port in portmap))
 
   def __init__(self, task, portmap, ensemble=None):
     assert task.has_announce()

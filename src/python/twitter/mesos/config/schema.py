@@ -82,6 +82,13 @@ class UpdateConfig(Struct):
   max_total_failures     = Default(Integer, 0)
 
 
+
+class Announcer(Struct):
+  environment  = Default(String, 'prod')
+  strict       = Default(Integer, False)
+  primary_port = Default(String, 'http')
+
+
 # The thermosConfig populated inside of TwitterTaskInfo.
 @Provided(mesos=MesosContext)
 class MesosTaskInstance(Struct):
@@ -89,6 +96,7 @@ class MesosTaskInstance(Struct):
   layout                     = AppLayout
   instance                   = Required(Integer)
   role                       = Required(String)
+  announce                   = Announcer
   health_check_interval_secs = Integer
 
 
@@ -102,6 +110,8 @@ class MesosJob(Struct):
   cron_policy   = Default(String, 'KILL_EXISTING')
   layout        = AppLayout
   package       = PackerPackage
+  announce      = Announcer
+
   update_config = Default(UpdateConfig, UpdateConfig())
 
   constraints                = Map(String, String)
