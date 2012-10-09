@@ -44,3 +44,8 @@ class ProxyConfig(object):
   def package(self):
     """Return 3-tuple of (role, package_name, version) or None if no package specified."""
     pass
+
+  @abstractmethod
+  def package_files(self):
+    """Returns a list of package file paths"""
+    pass

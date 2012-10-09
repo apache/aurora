@@ -105,7 +105,7 @@ class MesosConfig(ProxyConfig):
           ' '.join('%s:%r' % (resource, task_dict.get(resource)) for resource in resources)))
 
   @staticmethod
-  def validate_testing_package_files(maybe_files, errors):
+  def validate_package_files(maybe_files, errors):
     if not isinstance(maybe_files, list):
       errors.append('Job package_files must be a list of files, got: %r' % str(maybe_files))
       return
@@ -179,7 +179,7 @@ class MesosConfig(ProxyConfig):
               job['package'])
 
       if 'TESTING_package_files' in job:
-        MesosConfig.validate_testing_package_files(job['TESTING_package_files'], errors)
+        MesosConfig.validate_package_files(job['TESTING_package_files'], errors)
 
       if 'package' in job and 'TESTING_package_files' in job:
         errors.append('Job package and package_files directives may not be both specified.')
@@ -246,6 +246,6 @@ class MesosConfig(ProxyConfig):
     """Return a 3-tuple of (role, name, version)"""
     return self._config.get('package')
 
-  def testing_package_files(self):
+  def package_files(self):
     """Returns a list of package file paths"""
     return self._config.get('TESTING_package_files')

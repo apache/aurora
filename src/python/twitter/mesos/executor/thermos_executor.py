@@ -98,32 +98,7 @@ class ThermosExecutor(ThermosExecutorBase):
   def runner(self):
     return self._runner
 
-  def launchTask(self, driver, task):
-    self.launched.set()
-    self.log('launchTask got task: %s:%s' % (task.name, task.task_id.value))
-
-    if self._runner:
-      # TODO(wickman) Send LOST immediately for both tasks?
-      log.error('Error!  Already running a task! %s' % self._runner)
-      self.send_update(driver, self._task_id, 'LOST',
-          "Task already running on this executor: %s" % self._task_id)
-      return
-
-    self._slave_id = task.slave_id.value
-    self._task_id = task.task_id.value
-
-    try:
-      assigned_task = ThermosExecutor.deserialize_assigned_task(task)
-      mesos_task, portmap = ThermosExecutor.deserialize_thermos_task(assigned_task)
-    except Exception as e:
-      log.fatal('Could not deserialize AssignedTask: %s' % e)
-      self.send_update(driver, self._task_id, 'FAILED', "Could not deserialize task: %s" % e)
-      defer(driver.stop, delay=self.STOP_WAIT)
-      return
-
-    self.send_update(driver, self._task_id, 'STARTING', 'Initializing sandbox.')
-
-    self._runner = self._runner_class(self._task_id, mesos_task, mesos_task.role().get(), portmap)
+  def _start_runner(self, driver, mesos_task, portmap):
     try:
       self._runner.start()
     except self._runner.TaskError as e:
@@ -154,6 +129,36 @@ class ThermosExecutor(ThermosExecutorBase):
     self._manager = self._manager_class(self._runner, driver, self._task_id,
         signal_port=portmap.get('health'), resource_manager=self._resource_manager)
     self._manager.start()
+
+  def launchTask(self, driver, task):
+    self.launched.set()
+    self.log('launchTask got task: %s:%s' % (task.name, task.task_id.value))
+
+    if self._runner:
+      # TODO(wickman) Send LOST immediately for both tasks?
+      log.error('Error!  Already running a task! %s' % self._runner)
+      self.send_update(driver, self._task_id, 'LOST',
+          "Task already running on this executor: %s" % self._task_id)
+      return
+
+    self._slave_id = task.slave_id.value
+    self._task_id = task.task_id.value
+
+    try:
+      assigned_task = ThermosExecutor.deserialize_assigned_task(task)
+      mesos_task, portmap = ThermosExecutor.deserialize_thermos_task(assigned_task)
+    except Exception as e:
+      log.fatal('Could not deserialize AssignedTask: %s' % e)
+      self.send_update(driver, self._task_id, 'FAILED', "Could not deserialize task: %s" % e)
+      defer(driver.stop, delay=self.STOP_WAIT)
+      return
+
+    self.send_update(driver, self._task_id, 'STARTING', 'Initializing sandbox.')
+
+    # start the process on a separate thread and give the message processing thread back
+    # to the driver
+    self._runner = self._runner_class(self._task_id, mesos_task, mesos_task.role().get(), portmap)
+    defer(lambda: self._start_runner(driver, mesos_task, portmap))
 
   def killTask(self, driver, task_id):
     self.log('killTask() got task_id: %s' % task_id)

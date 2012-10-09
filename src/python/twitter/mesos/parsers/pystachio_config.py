@@ -176,3 +176,6 @@ class PystachioConfig(ProxyConfig):
     if self._job.has_package() and self._job.package().check().ok():
       package = self._job.package() % self.context()
       return map(str, [package.role(), package.name(), package.version()])
+
+  def package_files(self):
+    return []

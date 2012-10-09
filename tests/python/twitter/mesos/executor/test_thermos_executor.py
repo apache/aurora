@@ -183,6 +183,8 @@ class TestThermosExecutor(object):
       te.launchTask(proxy_driver, make_task(hello_world()))
       while te._runner.is_alive():
         time.sleep(0.1)
+      while te._manager is None:
+        time.sleep(0.1)
       te._manager.join()
 
     updates = proxy_driver.method_calls['sendStatusUpdate']

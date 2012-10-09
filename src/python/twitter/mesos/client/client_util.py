@@ -152,7 +152,7 @@ def _get_package_uri_from_packer_and_files(cluster, role, name, package_files):
 def _get_package_uri(config):
   cluster = config.cluster()
   package = config.package()
-  testing_package_files = config.testing_package_files()
+  package_files = config.package_files()
 
   if config.hdfs_path():
     log.warning('''
@@ -173,9 +173,9 @@ def _get_package_uri(config):
   if package:
     return _get_package_uri_from_packer(cluster, package)
 
-  if testing_package_files:
+  if package_files:
     return _get_package_uri_from_packer_and_files(
-        cluster, config.role(), config.name(), testing_package_files)
+        cluster, config.role(), config.name(), package_files)
 
   if config.hdfs_path():
     return config.hdfs_path()
