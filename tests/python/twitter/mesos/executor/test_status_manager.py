@@ -205,7 +205,7 @@ class TestStatusManager(unittest.TestCase):
     self.http.start()
     self.runner = MockRunner()
     self.driver = MockDriver()
-    self.clock = ThreadedClock(hz=10)
+    self.clock = ThreadedClock()
     thread_yield()
 
   def tearDown(self):
