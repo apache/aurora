@@ -27,7 +27,6 @@ import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.NotNull;
-import com.twitter.common.base.Closure;
 import com.twitter.common.base.Command;
 import com.twitter.common.inject.TimedInterceptor;
 import com.twitter.common.net.pool.DynamicHostSet;
@@ -60,7 +59,6 @@ import com.twitter.mesos.scheduler.ScheduleBackoff.ScheduleBackoffImpl.Backoff;
 import com.twitter.mesos.scheduler.SchedulerLifecycle.DriverReference;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.events.TaskEventModule;
-import com.twitter.mesos.scheduler.events.TaskPubsubEvent.EventSubscriber;
 import com.twitter.mesos.scheduler.httphandlers.ServletModule;
 import com.twitter.mesos.scheduler.log.mesos.MesosLogStreamModule;
 import com.twitter.mesos.scheduler.metadata.MetadataModule;
@@ -75,8 +73,6 @@ import com.twitter.mesos.scheduler.storage.AttributeStore.AttributeStoreImpl;
 import com.twitter.mesos.scheduler.storage.log.LogStorageModule;
 import com.twitter.mesos.scheduler.testing.IsolatedSchedulerModule;
 import com.twitter.thrift.ServiceInstance;
-
-import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Binding module for the twitter mesos scheduler.
@@ -212,7 +208,7 @@ public class SchedulerModule extends AbstractModule {
         new TruncatedBinaryBackoff(INITIAL_RESCHEDULE_BACKOFF.get(), MAX_RESCHEDULE_BACKOFF.get()));
     bind(ScheduleBackoff.class).to(ScheduleBackoffImpl.class);
     bind(ScheduleBackoffImpl.class).in(Singleton.class);
-    LifecycleModule.bindStartupAction(binder(), SubscribeTaskEvents.class);
+    TaskEventModule.bindSubscriber(binder(), ScheduleBackoff.class);
 
     // Filter layering: notifier filter -> backoff filter -> base impl
     TaskEventModule.bind(binder(), BackoffSchedulingFilter.class);
@@ -319,21 +315,5 @@ public class SchedulerModule extends AbstractModule {
       UserTaskLauncher userTaskLauncher) {
 
     return ImmutableList.of(bootstrapLauncher, gcLauncher, userTaskLauncher);
-  }
-
-  static class SubscribeTaskEvents implements Command {
-    private final ScheduleBackoff backoff;
-    private final Closure<EventSubscriber> subscribeSink;
-
-    @Inject
-    SubscribeTaskEvents(ScheduleBackoff backoff, Closure<EventSubscriber> subscribeSink) {
-      this.backoff = checkNotNull(backoff);
-      this.subscribeSink = checkNotNull(subscribeSink);
-    }
-
-    @Override
-    public void execute() {
-      subscribeSink.execute(backoff);
-    }
   }
 }
