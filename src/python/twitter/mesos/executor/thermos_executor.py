@@ -22,6 +22,8 @@ from twitter.mesos.executor.executor_base import ThermosExecutorBase
 from gen.twitter.mesos.ttypes import AssignedTask
 from thrift.TSerialization import deserialize as thrift_deserialize
 
+from .health_checker import HealthCheckerThread
+from .http_signaler import HttpSignaler
 from .discovery_manager import DiscoveryManager
 from .resource_manager import ResourceCheckpointer, ResourceManager
 from .status_manager import StatusManager
@@ -120,8 +122,8 @@ class ThermosExecutor(ThermosExecutorBase):
     http_signaler = None
     if portmap.get('health'):
       http_signaler = HttpSignaler(portmap.get('health'))
-      health_checkers.append(HealthChecker(http_signaler,
-          interval_secs=task.health_check_interval_secs.get()))
+      health_checkers.append(HealthCheckerThread(http_signaler,
+          interval_secs=mesos_task.health_check_interval_secs().get()))
 
     resource_manager = ResourceManager(
         mesos_task.task().resources(),

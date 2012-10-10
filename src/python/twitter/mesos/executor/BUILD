@@ -114,6 +114,7 @@ python_library(
   name = 'thermos_executor_lib',
   sources = ['thermos_executor.py'],
   dependencies = [
+    pants(':http_signaler'),
     pants(':resource_manager'),
     pants(':status_manager'),
     pants(':task_runner_wrapper'),
