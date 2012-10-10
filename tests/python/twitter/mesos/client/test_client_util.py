@@ -1,10 +1,7 @@
 import json
 import os
-import os.path
 import pytest
-import shutil
 import tempfile
-import zipfile
 
 import twitter.mesos.packer.packer_client as packer_client
 
@@ -13,9 +10,7 @@ from mox import Mox, IsA
 from twitter.mesos.client import client_util
 from twitter.common.contextutil import temporary_dir, open_zip
 from twitter.mesos.packer import sd_packer_client
-
-def _get_zip_name(job_name):
-  return job_name + client_util._PACKAGE_FILES_SUFFIX + '.zip'
+from twitter.mesos.parsers.mesos_config import MesosConfig
 
 
 def test_zip_package_files():
@@ -37,7 +32,7 @@ def test_zip_package_files():
     # run the test
     zipname = client_util._zip_package_files(job_name, package_file_names, tmp_dir)
     # verify
-    assert zipname == os.path.join(tmp_dir, _get_zip_name(job_name))
+    assert zipname == os.path.join(tmp_dir, MesosConfig.get_package_files_zip_name(job_name))
     assert os.path.isfile(zipname)
     with open_zip(zipname, 'r') as zipf:
       zipf.testzip()
@@ -110,7 +105,7 @@ def _prepare_mocks_for_packer_and_files():
   mocker.StubOutWithMock(sd_packer_client, 'create_packer')
   sd_packer_client.create_packer(cluster).AndReturn(packer)
 
-  zip_name = os.path.join(tmp_dir, _get_zip_name(name))
+  zip_name = os.path.join(tmp_dir, MesosConfig.get_package_files_zip_name(name))
   mocker.StubOutWithMock(client_util, '_zip_package_files')
   client_util._zip_package_files(name, package_files, tmp_dir).AndReturn(zip_name)
 
@@ -187,3 +182,4 @@ def test_get_package_uri_from_packer_and_files_fail_invalid_package_version():
    client_util._get_package_uri_from_packer_and_files(cluster, role, name, package_files)
   mocker.UnsetStubs()
   mocker.VerifyAll()
+

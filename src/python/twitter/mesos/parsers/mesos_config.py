@@ -16,6 +16,8 @@ class MesosConfig(ProxyConfig):
     'maxTotalFailures':    0,
   }
 
+  PACKAGE_FILES_SUFFIX = '__testing_package_files'
+
   @staticmethod
   def execute(config_file):
     """
@@ -130,6 +132,17 @@ class MesosConfig(ProxyConfig):
       basenames.add(base)
 
   @staticmethod
+  def get_package_files_zip_name(job_name):
+    return job_name + MesosConfig.PACKAGE_FILES_SUFFIX + '.zip'
+
+  @staticmethod
+  def _edit_start_command_for_package_files(job):
+    zip_name = MesosConfig.get_package_files_zip_name(job['name'])
+    start_command = job['task']['start_command']
+    job['task']['start_command'] = '(unzip %s && rm %s) || exit 1; %s' % (
+      zip_name, zip_name, start_command)
+
+  @staticmethod
   def fill_defaults(config):
     """Validates a configuration object.
     This will make sure that the configuration object has the appropriate
@@ -167,22 +180,24 @@ class MesosConfig(ProxyConfig):
       if 'cluster' not in job:
         errors.append('Missing required option: cluster')
 
-      if 'task' not in job:
-        errors.append('Missing required option: task')
-      else:
-        job['task'] = MesosConfig.fill_task_defaults(job['task'], errors)
-        MesosConfig.validate_task_resources(job['task'], errors)
-
       if 'package' in job:
         if not isinstance(job['package'], (list, tuple)) or len(job['package']) != 3:
           errors.append('Job package must be a tuple of (name, role, version), got: %r' %
               job['package'])
 
-      if 'TESTING_package_files' in job:
-        MesosConfig.validate_package_files(job['TESTING_package_files'], errors)
+      if 'testing_package_files' in job:
+        MesosConfig.validate_package_files(job['testing_package_files'], errors)
 
-      if 'package' in job and 'TESTING_package_files' in job:
+      if 'package' in job and 'testing_package_files' in job:
         errors.append('Job package and package_files directives may not be both specified.')
+
+      if 'task' not in job:
+        errors.append('Missing required option: task')
+      else:
+        job['task'] = MesosConfig.fill_task_defaults(job['task'], errors)
+        MesosConfig.validate_task_resources(job['task'], errors)
+        if 'testing_package_files' in job:
+          MesosConfig._edit_start_command_for_package_files(job)
 
       if errors:
         raise MesosConfig.InvalidConfig('Invalid configuration: %s\n' % '\n'.join(errors))
@@ -248,4 +263,4 @@ class MesosConfig(ProxyConfig):
 
   def package_files(self):
     """Returns a list of package file paths"""
-    return self._config.get('TESTING_package_files')
+    return self._config.get('testing_package_files')

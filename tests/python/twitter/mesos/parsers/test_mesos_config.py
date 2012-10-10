@@ -118,12 +118,38 @@ def test_validate_package_files():
   assert errors
 
 
+def test_get_package_files_zip_name():
+  job_name = 'foo'
+  assert MesosConfig.get_package_files_zip_name(job_name) ==  (
+    job_name + MesosConfig.PACKAGE_FILES_SUFFIX + '.zip')
+
+
+def test_edit_start_command_for_package_files():
+  hello_package_files = {
+    'name': 'hello_world',
+    'role': 'john_doe',
+    'cluster': 'smf1-test',
+    'testing_package_files': ['ein', 'zwei', 'drei'],
+    'task': {
+      'start_command': 'echo "hello world"',
+      'num_cpus': 0.1,
+      'ram_mb': 64,
+      'disk_mb': 64
+    }
+  }
+  old_start = hello_package_files['task']['start_command']
+  MesosConfig._edit_start_command_for_package_files(hello_package_files)
+  zip_name = MesosConfig.get_package_files_zip_name(hello_package_files['name'])
+  new_start = '(unzip %s && rm %s) || exit 1; %s' % (zip_name, zip_name, old_start)
+  assert new_start == hello_package_files['task']['start_command']
+
+
 def test_package_files():
   hello_package_files = {
     'name': 'hello_world',
     'role': 'john_doe',
     'cluster': 'smf1-test',
-    'TESTING_package_files': ['ein', 'zwei', 'drei'],
+    'testing_package_files': ['ein', 'zwei', 'drei'],
     'task': {
       'start_command': 'echo "hello world"',
       'num_cpus': 0.1,
@@ -134,6 +160,8 @@ def test_package_files():
   m = Mox()
   m.StubOutWithMock(MesosConfig, 'validate_package_files')
   MesosConfig.validate_package_files(['ein', 'zwei', 'drei'], [])
+  m.StubOutWithMock(MesosConfig, '_edit_start_command_for_package_files')
+  MesosConfig._edit_start_command_for_package_files(IsA(dict))
   m.ReplayAll()
   with disk_config(hello_package_files) as filename:
     config = MesosConfig(filename)
@@ -146,7 +174,7 @@ def test_package_and_package_files_do_not_mix():
     'name': 'hello_world',
     'role': 'john_doe',
     'cluster': 'smf1-test',
-    'TESTING_package_files': ['ein', 'zwei', 'drei'],
+    'testing_package_files': ['ein', 'zwei', 'drei'],
     'package': ('one', 'two', 3),
     'task': {
       'start_command': 'echo "hello world"',

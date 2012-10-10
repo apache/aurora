@@ -3,16 +3,12 @@
 
 import collections
 import functools
-import json
 import optparse
 import os
-import posixpath
 import pprint
 import subprocess
 import sys
-import tempfile
 import time
-from urlparse import urljoin
 import zookeeper
 
 import twitter.mesos.client.client_util as client_util
@@ -25,14 +21,10 @@ from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 from twitter.common.net.tunnel import TunnelHelper
 from twitter.mesos.client.client_wrapper import MesosClientAPI
-from twitter.mesos.clusters import Cluster
 from twitter.mesos.command_runner import DistributedCommandRunner
 from twitter.mesos.config.schema import Packer as PackerObject
 from twitter.mesos.packer import sd_packer_client
 from twitter.mesos.packer.packer_client import Packer
-from twitter.mesos.parsers.mesos_config import MesosConfig
-from twitter.mesos.parsers.pystachio_config import PystachioConfig
-from twitter.mesos.parsers.pystachio_codec import PystachioCodec
 
 from twitter.thermos.base.options import add_binding_to
 

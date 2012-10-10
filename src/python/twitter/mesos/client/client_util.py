@@ -5,16 +5,12 @@ import functools
 import json
 import os
 import posixpath
-import shutil
 import sys
-import tempfile
-import zipfile
 
 from pystachio import Ref
 from urlparse import urljoin
 from twitter.common import app, log
 from twitter.common.contextutil import temporary_dir, open_zip
-from twitter.common.dirutil import safe_rmtree
 from twitter.mesos.clusters import Cluster
 from twitter.mesos.config.schema import Packer as PackerObject
 from twitter.mesos.packer.packer_client import Packer
@@ -32,7 +28,7 @@ from twitter.mesos.client.spawn_local import (
 from gen.twitter.mesos.ttypes import *
 
 
-_PACKAGE_FILES_SUFFIX = '__TESTING_package_files'
+_PACKAGE_FILES_SUFFIX = MesosConfig.PACKAGE_FILES_SUFFIX
 
 
 def die(msg):
@@ -72,7 +68,7 @@ def handle_open(scheduler_client, role, job):
 
 
 def _zip_package_files(job_name, package_files, tmp_dir):
-  zipname = os.path.join(tmp_dir, job_name + _PACKAGE_FILES_SUFFIX + '.zip')
+  zipname = os.path.join(tmp_dir, MesosConfig.get_package_files_zip_name(job_name))
   with open_zip(zipname, 'w') as zipf:
     for file_name in package_files:
       zipf.write(file_name, arcname=os.path.basename(file_name))
@@ -96,6 +92,7 @@ def _get_package_uri_from_packer(cluster, package, packer=None):
     die('The requested package version has been deleted.')
   return metadata['uri']
 
+
 def _get_and_verify_metadata(package_version):
   if not isinstance(package_version, dict):
     die('packer.get_version did nor return a dict %r' % package_version)
@@ -116,8 +113,9 @@ def _get_and_verify_metadata(package_version):
     die('metadata in package_version does not have md5sum: %r' % package_version)
   return metadata
 
+
 def _get_package_uri_from_packer_and_files(cluster, role, name, package_files):
-  log.warning('DEVELOPMENT-ONLY FEATURE USED: TESTING_package_files')
+  log.warning('DEVELOPMENT-ONLY FEATURE USED: testing_package_files')
   with temporary_dir(root_dir=os.getcwd()) as tmp_dir:
     packer = sd_packer_client.create_packer(cluster)
     zip_name = _zip_package_files(name, package_files, tmp_dir)

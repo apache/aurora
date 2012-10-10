@@ -5,6 +5,7 @@ python_library(
     pants('3rdparty/python:pystachio'),
     pants('src/python/twitter/common/lang'),
     pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/mesos/client'),
     pants('src/python/twitter/mesos/config:schema'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
     pants(':clusters')
