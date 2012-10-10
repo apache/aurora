@@ -291,12 +291,15 @@ invoking cancel_update.
 
     return self._scheduler.startCronJob(role, jobname)
 
-  def kill_job(self, role, jobname):
+  def kill_job(self, role, jobname, shards=None):
     log.info("Killing tasks for job: %s" % jobname)
 
     query = TaskQuery()
     query.owner = Identity(role=role)
     query.jobName = jobname
+    if shards is not None:
+      log.info("Shards to be killed: %s" % shards)
+      query.shardIds = frozenset([int(s) for s in shards])
 
     return self._scheduler.killTasks(query)
 

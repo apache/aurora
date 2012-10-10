@@ -54,6 +54,11 @@ OPEN_BROWSER_OPTION = optparse.Option(
     default=False,
     help='Open a browser window to the job page after a job mutation.')
 
+SHARDS_OPTION = optparse.Option(
+    '--shards',
+    dest='shards',
+    default=None,
+    help='A comma separated list of shard ids to act on.')
 
 CONFIG_TYPE_OPTION = optparse.Option(
     '-c',
@@ -256,14 +261,17 @@ def start_cron(role, jobname):
 @app.command
 @app.command_option(CLUSTER_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
+@app.command_option(SHARDS_OPTION)
 @requires.exactly('role', 'job')
 def kill(role, jobname):
-  """usage: kill --cluster=CLUSTER role job
+  """usage: kill --cluster=CLUSTER --shards=shards role job
 
   Kills a running job, blocking until all tasks have terminated.
+  Kills all shards if no shard-ids are specified.
+
   """
   api = MesosClientAPI(cluster=app.get_options().cluster, verbose=app.get_options().verbose)
-  resp = api.kill_job(role, jobname)
+  resp = api.kill_job(role, jobname, _getshards())
   client_util.check_and_log_response(resp)
   client_util.handle_open(api.scheduler.scheduler(), role, jobname)
 
@@ -332,11 +340,7 @@ def _getshards():
 
 
 @app.command
-@app.command_option(
-    '--shards',
-    dest='shards',
-    default=None,
-    help='A comma separated list of shard ids to act on.')
+@app.command_option(SHARDS_OPTION)
 @app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(COPY_APP_FROM_OPTION)
 @app.command_option(CONFIG_TYPE_OPTION)
