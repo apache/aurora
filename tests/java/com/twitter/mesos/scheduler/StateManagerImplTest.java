@@ -14,6 +14,7 @@ import com.google.common.testing.TearDown;
 import org.apache.mesos.Protos.SlaveID;
 import org.easymock.EasyMock;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.springframework.transaction.TransactionException;
 
@@ -33,7 +34,6 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
-import com.twitter.mesos.scheduler.db.testing.DbStorageTestUtil;
 import com.twitter.mesos.scheduler.events.TaskPubsubEvent;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
@@ -41,6 +41,7 @@ import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
 import com.twitter.mesos.scheduler.storage.Storage.StorageException;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
+import com.twitter.mesos.scheduler.storage.mem.MemStorage;
 
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
@@ -409,6 +410,7 @@ public class StateManagerImplTest extends EasyMockTest {
     assertVarCount(UNKNOWN, 1);
   }
 
+  @Ignore("TODO(William Farner): Remove this test completely once DbStorage is removed.")
   @Test
   public void testTransactionalStateTransitions() throws Exception {
     control.replay();
@@ -494,7 +496,7 @@ public class StateManagerImplTest extends EasyMockTest {
   }
 
   private Storage createStorage() throws Exception {
-    return DbStorageTestUtil.setupStorage(this);
+    return new MemStorage();
   }
 
   private static TwitterTaskInfo makeTask(String owner, String job, int shard) {

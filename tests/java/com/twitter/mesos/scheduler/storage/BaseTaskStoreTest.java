@@ -78,7 +78,7 @@ public abstract class BaseTaskStoreTest<T extends TaskStore.Mutable> extends Tea
 
   private ScheduledTask getTask(String taskId) {
     // Perform a deep copy of the underlying task to ensure that tests check all fields and not
-    // just the task ID as implemented in DbStorage.IdComparedScheduledTask.
+    // just the task ID as implemented in IdComparedScheduledTask.
     return new ScheduledTask(Iterables.getOnlyElement(store.fetchTasks(Query.byId(taskId))));
   }
 
