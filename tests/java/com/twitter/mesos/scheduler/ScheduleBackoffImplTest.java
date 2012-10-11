@@ -11,7 +11,7 @@ import com.twitter.common.util.testing.FakeTicker;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.ScheduleBackoff.ScheduleBackoffImpl;
-import com.twitter.mesos.scheduler.events.TaskPubsubEvent.Rescheduled;
+import com.twitter.mesos.scheduler.events.PubsubEvent.TaskRescheduled;
 
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertFalse;
@@ -120,7 +120,7 @@ public class ScheduleBackoffImplTest extends EasyMockTest {
   }
 
   private void rescheduled() {
-    backoff.onRescheduled(new Rescheduled(ROLE_A, JOB_A, SHARD_0));
+    backoff.onRescheduled(new TaskRescheduled(ROLE_A, JOB_A, SHARD_0));
   }
 
   private void assertSchedulable() {

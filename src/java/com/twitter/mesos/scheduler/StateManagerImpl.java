@@ -68,7 +68,7 @@ import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.TransactionalStorage.SideEffect;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
-import com.twitter.mesos.scheduler.events.TaskPubsubEvent;
+import com.twitter.mesos.scheduler.events.PubsubEvent;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
@@ -236,7 +236,7 @@ public class StateManagerImpl implements StateManager {
       final Clock clock,
       MutableState mutableState,
       Driver driver,
-      Closure<TaskPubsubEvent> taskEventSink) {
+      Closure<PubsubEvent> taskEventSink) {
 
     checkNotNull(storage);
     this.clock = checkNotNull(clock);
@@ -1154,7 +1154,7 @@ public class StateManagerImpl implements StateManager {
             createStateMachine(task).updateState(PENDING, Optional.of("Rescheduled"));
             TwitterTaskInfo taskInfo = task.getAssignedTask().getTask();
             transactionalStorage.addTaskEvent(
-                new TaskPubsubEvent.Rescheduled(
+                new PubsubEvent.TaskRescheduled(
                     taskInfo.getOwner().getRole(),
                     taskInfo.getJobName(),
                     taskInfo.getShardId()));
@@ -1180,7 +1180,7 @@ public class StateManagerImpl implements StateManager {
               }
             });
             transactionalStorage.addTaskEvent(
-                new TaskPubsubEvent.StateChange(
+                new PubsubEvent.TaskStateChange(
                     stateMachine.getTaskId(),
                     stateMachine.getPreviousState(),
                     stateMachine.getState()));
@@ -1227,7 +1227,7 @@ public class StateManagerImpl implements StateManager {
           }
         });
         transactionalStorage.addTaskEvent(
-            new TaskPubsubEvent.Deleted(ImmutableSet.copyOf(taskIds)));
+            new PubsubEvent.TasksDeleted(ImmutableSet.copyOf(taskIds)));
 
         taskStore.deleteTasks(taskIds);
       }

@@ -18,10 +18,10 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
-import com.twitter.mesos.scheduler.events.TaskPubsubEvent.Deleted;
-import com.twitter.mesos.scheduler.events.TaskPubsubEvent.EventSubscriber;
-import com.twitter.mesos.scheduler.events.TaskPubsubEvent.StateChange;
-import com.twitter.mesos.scheduler.events.TaskPubsubEvent.Vetoed;
+import com.twitter.mesos.scheduler.events.PubsubEvent.EventSubscriber;
+import com.twitter.mesos.scheduler.events.PubsubEvent.TaskStateChange;
+import com.twitter.mesos.scheduler.events.PubsubEvent.TasksDeleted;
+import com.twitter.mesos.scheduler.events.PubsubEvent.Vetoed;
 
 /**
  * Tracks vetoes against scheduling decisions and maintains the closest fit among all the vetoes
@@ -71,7 +71,7 @@ public class NearestFit implements EventSubscriber {
    * @param deletedEvent Task deleted event.
    */
   @Subscribe
-  public synchronized void remove(Deleted deletedEvent) {
+  public synchronized void remove(TasksDeleted deletedEvent) {
     fitByTask.invalidateAll(deletedEvent.getTaskIds());
   }
 
@@ -82,7 +82,7 @@ public class NearestFit implements EventSubscriber {
    * @param stateChangeEvent Task state change.
    */
   @Subscribe
-  public synchronized void stateChanged(StateChange stateChangeEvent) {
+  public synchronized void stateChanged(TaskStateChange stateChangeEvent) {
     if (stateChangeEvent.getOldState() == ScheduleStatus.PENDING) {
       fitByTask.invalidate(stateChangeEvent.getTaskId());
     }

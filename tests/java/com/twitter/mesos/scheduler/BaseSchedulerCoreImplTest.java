@@ -59,7 +59,7 @@ import com.twitter.mesos.gen.ValueConstraint;
 import com.twitter.mesos.scheduler.CronJobManager.CronScheduler;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
-import com.twitter.mesos.scheduler.events.TaskPubsubEvent;
+import com.twitter.mesos.scheduler.events.PubsubEvent;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 import com.twitter.mesos.scheduler.quota.QuotaManager.QuotaManagerImpl;
 import com.twitter.mesos.scheduler.quota.Quotas;
@@ -133,14 +133,14 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private CronJobManager cron;
   private QuotaManager quotaManager;
   private FakeClock clock;
-  private Closure<TaskPubsubEvent> eventSink;
+  private Closure<PubsubEvent> eventSink;
 
   @Before
   public void setUp() throws Exception {
     driver = createMock(Driver.class);
     clock = new FakeClock();
-    eventSink = createMock(new Clazz<Closure<TaskPubsubEvent>>() { });
-    eventSink.execute(EasyMock.<TaskPubsubEvent>anyObject());
+    eventSink = createMock(new Clazz<Closure<PubsubEvent>>() { });
+    eventSink.execute(EasyMock.<PubsubEvent>anyObject());
     cronScheduler = createMock(CronScheduler.class);
     expectLastCall().anyTimes();
   }

@@ -13,7 +13,7 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.Resources;
 import com.twitter.mesos.scheduler.SchedulingFilter;
 import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
-import com.twitter.mesos.scheduler.events.TaskPubsubEvent.Vetoed;
+import com.twitter.mesos.scheduler.events.PubsubEvent.Vetoed;
 
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
@@ -33,13 +33,13 @@ public class NotifyingSchedulingFilterTest extends EasyMockTest {
 
   private SchedulingFilter filter;
 
-  private Closure<TaskPubsubEvent> eventSink;
+  private Closure<PubsubEvent> eventSink;
   private SchedulingFilter delegate;
 
   @Before
   public void setUp() {
     delegate = createMock(SchedulingFilter.class);
-    eventSink = createMock(new Clazz<Closure<TaskPubsubEvent>>() { });
+    eventSink = createMock(new Clazz<Closure<PubsubEvent>>() { });
     filter = new NotifyingSchedulingFilter(delegate, eventSink);
   }
 

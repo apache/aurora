@@ -16,8 +16,8 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.BackoffStrategy;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.events.TaskPubsubEvent.EventSubscriber;
-import com.twitter.mesos.scheduler.events.TaskPubsubEvent.Rescheduled;
+import com.twitter.mesos.scheduler.events.PubsubEvent.EventSubscriber;
+import com.twitter.mesos.scheduler.events.PubsubEvent.TaskRescheduled;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -99,7 +99,7 @@ public interface ScheduleBackoff extends EventSubscriber {
      * @param rescheduled Rescheduled notification.
      */
     @Subscribe
-    public void onRescheduled(Rescheduled rescheduled) {
+    public void onRescheduled(TaskRescheduled rescheduled) {
       String key = makeKey(rescheduled);
       Penalty penalty = taskPenalties.getIfPresent(key);
       long waitTimeNs;
@@ -115,7 +115,7 @@ public interface ScheduleBackoff extends EventSubscriber {
       taskPenalties.put(key, new Penalty(ticker.read(), waitTimeNs));
     }
 
-    private static String makeKey(Rescheduled rescheduled) {
+    private static String makeKey(TaskRescheduled rescheduled) {
       return makeKey(rescheduled.getRole(), rescheduled.getJob(), rescheduled.getShard());
     }
 

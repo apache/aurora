@@ -7,7 +7,7 @@ import com.google.common.collect.Lists;
 
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
-import com.twitter.mesos.scheduler.events.TaskPubsubEvent;
+import com.twitter.mesos.scheduler.events.PubsubEvent;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
@@ -20,18 +20,18 @@ import static com.google.common.base.Preconditions.checkNotNull;
 class TransactionalStorage {
   private boolean inTransaction = false;
   private final List<SideEffect> sideEffects = Lists.newLinkedList();
-  private final List<TaskPubsubEvent> events = Lists.newLinkedList();
+  private final List<PubsubEvent> events = Lists.newLinkedList();
 
   private final Storage storage;
   private final MutableState mutableState;
   private final Closure<MutableStoreProvider> transactionFinalizer;
-  private final Closure<TaskPubsubEvent> taskEventSink;
+  private final Closure<PubsubEvent> taskEventSink;
 
   TransactionalStorage(
       Storage storage,
       MutableState mutableState,
       Closure<MutableStoreProvider> transactionFinalizer,
-      Closure<TaskPubsubEvent> taskEventSink) {
+      Closure<PubsubEvent> taskEventSink) {
 
     this.storage = checkNotNull(storage);
     this.mutableState = checkNotNull(mutableState);
@@ -44,7 +44,7 @@ class TransactionalStorage {
     sideEffects.add(Preconditions.checkNotNull(sideEffect));
   }
 
-  void addTaskEvent(TaskPubsubEvent notice) {
+  void addTaskEvent(PubsubEvent notice) {
     Preconditions.checkState(inTransaction);
     events.add(Preconditions.checkNotNull(notice));
   }
@@ -153,7 +153,7 @@ class TransactionalStorage {
   }
 
   private void sendPubsubEvents() {
-    for (TaskPubsubEvent event : events) {
+    for (PubsubEvent event : events) {
       taskEventSink.execute(event);
     }
   }

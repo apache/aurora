@@ -11,7 +11,7 @@ import com.twitter.common.base.Closure;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.Resources;
 import com.twitter.mesos.scheduler.SchedulingFilter;
-import com.twitter.mesos.scheduler.events.TaskPubsubEvent.Vetoed;
+import com.twitter.mesos.scheduler.events.PubsubEvent.Vetoed;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -33,12 +33,12 @@ class NotifyingSchedulingFilter implements SchedulingFilter {
   public @interface NotifyDelegate { }
 
   private final SchedulingFilter delegate;
-  private final Closure<TaskPubsubEvent> eventSink;
+  private final Closure<PubsubEvent> eventSink;
 
   @Inject
   NotifyingSchedulingFilter(
       @NotifyDelegate SchedulingFilter delegate,
-      Closure<TaskPubsubEvent> eventSink) {
+      Closure<PubsubEvent> eventSink) {
 
     this.delegate = checkNotNull(delegate);
     this.eventSink = checkNotNull(eventSink);

@@ -12,9 +12,9 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.util.testing.FakeTicker;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
-import com.twitter.mesos.scheduler.events.TaskPubsubEvent.Deleted;
-import com.twitter.mesos.scheduler.events.TaskPubsubEvent.StateChange;
-import com.twitter.mesos.scheduler.events.TaskPubsubEvent.Vetoed;
+import com.twitter.mesos.scheduler.events.PubsubEvent.TaskStateChange;
+import com.twitter.mesos.scheduler.events.PubsubEvent.TasksDeleted;
+import com.twitter.mesos.scheduler.events.PubsubEvent.Vetoed;
 
 import static org.junit.Assert.assertEquals;
 
@@ -65,7 +65,7 @@ public class NearestFitTest {
   @Test
   public void testRemove() {
     vetoed(NO_CHANCE);
-    nearest.remove(new Deleted(ImmutableSet.of(TASK)));
+    nearest.remove(new TasksDeleted(ImmutableSet.of(TASK)));
     assertNearest();
   }
 
@@ -82,7 +82,8 @@ public class NearestFitTest {
   public void testStateChanged() {
     vetoed(ALMOST);
     assertNearest(ALMOST);
-    nearest.stateChanged(new StateChange(TASK, ScheduleStatus.PENDING, ScheduleStatus.ASSIGNED));
+    nearest.stateChanged(
+        new TaskStateChange(TASK, ScheduleStatus.PENDING, ScheduleStatus.ASSIGNED));
     assertNearest();
   }
 

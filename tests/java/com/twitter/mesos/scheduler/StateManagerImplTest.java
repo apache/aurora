@@ -34,7 +34,7 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
-import com.twitter.mesos.scheduler.events.TaskPubsubEvent;
+import com.twitter.mesos.scheduler.events.PubsubEvent;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
@@ -71,7 +71,7 @@ public class StateManagerImplTest extends EasyMockTest {
   private static final String HOST_A = "host_a";
 
   private Driver driver;
-  private Closure<TaskPubsubEvent> eventSink;
+  private Closure<PubsubEvent> eventSink;
   private StateManagerImpl stateManager;
   private MutableState mutableState;
   private final FakeClock clock = new FakeClock();
@@ -84,8 +84,8 @@ public class StateManagerImplTest extends EasyMockTest {
     resetStats();
 
     driver = createMock(Driver.class);
-    eventSink = createMock(new Clazz<Closure<TaskPubsubEvent>>() { });
-    eventSink.execute(EasyMock.<TaskPubsubEvent>anyObject());
+    eventSink = createMock(new Clazz<Closure<PubsubEvent>>() { });
+    eventSink.execute(EasyMock.<PubsubEvent>anyObject());
     // TODO(William Farner): Rework StateManagerImpl to accept a task ID generator and allow for
     // easy verification of pubsub events.
     expectLastCall().anyTimes();

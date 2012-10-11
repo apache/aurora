@@ -26,6 +26,8 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.scheduler.StateManagerImpl.UpdateException;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
+import com.twitter.mesos.scheduler.events.PubsubEvent.Interceptors.Event;
+import com.twitter.mesos.scheduler.events.PubsubEvent.Interceptors.Notify;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 import com.twitter.mesos.scheduler.quota.Quotas;
 
@@ -128,6 +130,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     return storedFrameworkId;
   }
 
+  @Notify(after = Event.StorageStarted)
   @Override
   public synchronized void start() {
     checkLifecycleState(INITIALIZED);
@@ -139,6 +142,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     }
   }
 
+  @Notify(after = Event.DriverRegistered)
   @Override
   public synchronized void registered(String frameworkId) {
     checkStarted();
