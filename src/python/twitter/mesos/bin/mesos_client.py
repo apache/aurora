@@ -104,6 +104,15 @@ ENVIRONMENT_BIND_OPTION = optparse.Option(
     help='Bind a thermos environment name to a value.')
 
 
+EXECUTOR_SANDBOX_OPTION = optparse.Option(
+    '-e',
+    '--executor_sandbox',
+    action='store_true',
+    default=False,
+    dest='executor_sandbox',
+    help='Run the command in the executor sandbox instead of the task sandbox.')
+
+
 @app.command
 @app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(COPY_APP_FROM_OPTION)
@@ -461,6 +470,7 @@ def query(role, job, shards=None, statuses=LIVE_STATES, api=None):
 
 @app.command
 @app.command_option(CLUSTER_OPTION)
+@app.command_option(EXECUTOR_SANDBOX_OPTION)
 @requires.exactly('role', 'job', 'shard')
 def ssh(role, job, shard):
   """usage: ssh --cluster=CLUSTER role job shard
@@ -470,15 +480,17 @@ def ssh(role, job, shard):
   resp = query(role, job, set([int(shard)]))
   if not resp.responseCode:
     client_util.die('Request failed, server responded with "%s"' % resp.message)
-  return subprocess.call(['ssh', resp.tasks[0].assignedTask.slaveHost])
+
+  command = DistributedCommandRunner.substitute('bash',
+      resp.tasks[0], executor_sandbox=app.get_options().executor_sandbox)
+  return subprocess.call(['ssh', '-t', resp.tasks[0].assignedTask.slaveHost,
+      command])
 
 
 @app.command
 @app.command_option('-t', '--threads', type=int, default=1, dest='num_threads',
     help='The number of threads to use.')
-@app.command_option('-e', '--executor_sandbox', action='store_true', default=False,
-    dest='executor_sandbox',
-    help='Run the command in the executor sandbox instead of the task sandbox.')
+@app.command_option(EXECUTOR_SANDBOX_OPTION)
 @app.command_option(CLUSTER_OPTION)
 @requires.at_least('role', 'job', 'cmd')
 def run(*line):
