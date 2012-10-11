@@ -57,7 +57,6 @@ public class PeriodicTaskLauncher implements Command, Runnable {
       Preempter preeempter,
       @PeriodicTaskInterval Amount<Long, Time> taskInterval) {
 
-
     this.pruneRunner = checkNotNull(pruneRunner);
     this.stateManager = checkNotNull(stateManager);
     this.shutdownRegistry = checkNotNull(shutdownRegistry);
@@ -90,7 +89,6 @@ public class PeriodicTaskLauncher implements Command, Runnable {
     try {
       if (stateManager.isStarted()) {
         pruneRunner.run();
-        stateManager.scanOutstandingTasks();
         preeempter.run();
       } else {
         LOG.fine("Skipping periodic task run since state manager is not started.");

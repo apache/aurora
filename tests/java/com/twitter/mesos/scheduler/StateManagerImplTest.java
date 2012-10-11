@@ -1,11 +1,9 @@
 package com.twitter.mesos.scheduler;
 
-import java.util.List;
 import java.util.Set;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -19,8 +17,6 @@ import org.junit.Test;
 import org.springframework.transaction.TransactionException;
 
 import com.twitter.common.base.Closure;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stat;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.testing.EasyMockTest;
@@ -53,12 +49,9 @@ import static org.junit.Assert.fail;
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
 import static com.twitter.mesos.gen.ScheduleStatus.INIT;
-import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
 import static com.twitter.mesos.gen.ScheduleStatus.LOST;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
-import static com.twitter.mesos.gen.ScheduleStatus.PREEMPTING;
-import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.ROLLBACK;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
@@ -245,54 +238,6 @@ public class StateManagerImplTest extends EasyMockTest {
     assertVarCount("jim", "myJob", UNKNOWN, 0);
     assertVarCount(KILLING, 0);
     assertVarCount(UNKNOWN, 0);
-  }
-
-  @Test
-  public void testTimedoutTask() throws Exception {
-    List<List<ScheduleStatus>> testCases =
-        ImmutableList.<List<ScheduleStatus>>of(
-            ImmutableList.of(PENDING, ASSIGNED),
-            ImmutableList.of(ASSIGNED, RUNNING, PREEMPTING),
-            ImmutableList.of(ASSIGNED, RUNNING, RESTARTING),
-            ImmutableList.of(ASSIGNED, RUNNING, KILLING),
-            ImmutableList.of(ASSIGNED, RUNNING, UPDATING),
-            ImmutableList.of(ASSIGNED, RUNNING, UPDATING, ROLLBACK));
-
-    driver.killTask(EasyMock.<String>anyObject());
-    // Six extra kills that are encountered while transition during test prep:
-    // PREEMPTING, RESTARTING, KILLING, UPDATING, (UPDATING, ROLLBACK).
-    expectLastCall().times(testCases.size() + 6);
-
-    control.replay();
-
-    for (List<ScheduleStatus> testCase : testCases) {
-      ScheduleStatus finalStatus = Iterables.getLast(testCase);
-      TwitterTaskInfo taskInfo = makeTask("jim", "lost_" + finalStatus, 0);
-      String taskId = insertTask(taskInfo);
-
-      for (ScheduleStatus state : testCase) {
-        if (state == UPDATING) {
-          stateManager.registerUpdate(taskInfo.getOwner().getRole(), taskInfo.getJobName(),
-              ImmutableSet.of(taskInfo));
-        }
-        changeState(taskId, state);
-      }
-
-      clock.advance(StateManagerImpl.TRANSIENT_TASK_STATE_TIMEOUT.get());
-      clock.advance(Amount.of(1L, Time.MILLISECONDS));
-      stateManager.scanOutstandingTasks();
-      changeState(taskId, KILLED);
-
-      Set<ScheduledTask> active =
-          stateManager.fetchTasks(Query.activeQuery(taskInfo.getOwner(), taskInfo.getJobName()));
-
-      if (finalStatus == KILLING) {
-        assertTrue(active.isEmpty());
-      } else {
-        assertEquals(1, active.size());
-        assertEquals(PENDING, Iterables.getOnlyElement(active).getStatus());
-      }
-    }
   }
 
   @Test

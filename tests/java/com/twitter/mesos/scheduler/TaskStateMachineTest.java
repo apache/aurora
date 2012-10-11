@@ -2,7 +2,6 @@ package com.twitter.mesos.scheduler;
 
 import java.util.Set;
 
-import com.google.common.base.Predicate;
 import com.google.common.base.Supplier;
 
 import org.easymock.EasyMock;
@@ -50,13 +49,9 @@ import static com.twitter.mesos.scheduler.WorkCommand.RESCHEDULE;
 import static com.twitter.mesos.scheduler.WorkCommand.UPDATE;
 import static com.twitter.mesos.scheduler.WorkCommand.UPDATE_STATE;
 
-/**
- * @author William Farner
- */
 public class TaskStateMachineTest extends EasyMockTest {
 
   private Supplier<Boolean> isJobUpdating;
-  private Predicate<ScheduledTask> taskTimeoutFilter;
   private WorkSink workSink;
   private FakeClock clock;
   private TaskStateMachine stateMachine;
@@ -64,15 +59,14 @@ public class TaskStateMachineTest extends EasyMockTest {
   @Before
   public void setUp() {
     isJobUpdating = createMock(new Clazz<Supplier<Boolean>>() { });
-    taskTimeoutFilter = createMock(new Clazz<Predicate<ScheduledTask>>() { });
     workSink = createMock(WorkSink.class);
     clock = new FakeClock();
     stateMachine = makeStateMachine("test", makeTask(false));
   }
 
   private TaskStateMachine makeStateMachine(String taskId, ScheduledTask task) {
-    return new TaskStateMachine(taskId, taskId /* Job key */, task,
-        isJobUpdating, workSink, taskTimeoutFilter, clock, INIT);
+    return new TaskStateMachine(
+        taskId, taskId /* Job key */, task, isJobUpdating, workSink, clock, INIT);
   }
 
   @Test
@@ -178,29 +172,6 @@ public class TaskStateMachineTest extends EasyMockTest {
     control.replay();
 
     transition(stateMachine, PENDING, KILLING);
-  }
-
-  @Test
-  public void testMissingAssignedRescheduledAfterGracePeriod() {
-    expectWork(UPDATE_STATE).times(3);
-    expect(taskTimeoutFilter.apply(EasyMock.<ScheduledTask>anyObject()))
-        .andReturn(false)
-        .times(2);
-    expect(taskTimeoutFilter.apply(EasyMock.<ScheduledTask>anyObject())).andReturn(true);
-    expectWork(RESCHEDULE);
-
-    control.replay();
-
-    // Move the task into ASSIGNED, and simulate two attempts to move it to UNKNOWN.
-    // This could be triggered by an executor sending a full state update that does not include
-    // the task, for example if the executor had not received the task when the message was sent.
-    transition(stateMachine, PENDING, ASSIGNED, UNKNOWN);
-    transition(stateMachine, UNKNOWN);
-    assertThat(stateMachine.getState(), is(ScheduleStatus.ASSIGNED));
-    // The filter was configured to mark the task as timed out on the third call, the task is
-    // missing.
-    transition(stateMachine, UNKNOWN);
-    assertThat(stateMachine.getState(), is(ScheduleStatus.LOST));
   }
 
   @Test

@@ -8,7 +8,6 @@ import java.util.logging.Logger;
 import javax.annotation.Nullable;
 
 import com.google.common.base.Optional;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
@@ -25,6 +24,8 @@ import com.twitter.common.stats.Stats;
 import com.twitter.common.zookeeper.ServerSet;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.thrift.Status;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * The central driver of the scheduler runtime lifecycle.  Handles the transitions from startup and
@@ -69,16 +70,18 @@ class SchedulerLifecycle implements RegisteredListener {
   private final DriverReference driverRef;
 
   @Inject
-  SchedulerLifecycle(DriverFactory driverFactory,
+  SchedulerLifecycle(
+      DriverFactory driverFactory,
       SchedulerCore scheduler,
       Lifecycle lifecycle,
       Driver driver,
       DriverReference driverRef) {
-    this.driverFactory = Preconditions.checkNotNull(driverFactory);
-    this.scheduler = Preconditions.checkNotNull(scheduler);
-    this.lifecycle = Preconditions.checkNotNull(lifecycle);
-    this.driver  = Preconditions.checkNotNull(driver);
-    this.driverRef = Preconditions.checkNotNull(driverRef);
+
+    this.driverFactory = checkNotNull(driverFactory);
+    this.scheduler = checkNotNull(scheduler);
+    this.lifecycle = checkNotNull(lifecycle);
+    this.driver  = checkNotNull(driver);
+    this.driverRef = checkNotNull(driverRef);
   }
 
   /**
@@ -106,8 +109,7 @@ class SchedulerLifecycle implements RegisteredListener {
   static class DriverReference implements Supplier<Optional<SchedulerDriver>> {
     private volatile Optional<SchedulerDriver> driver = Optional.absent();
 
-    @Override
-    public Optional<SchedulerDriver> get() {
+    @Override public Optional<SchedulerDriver> get() {
       return driver;
     }
 
@@ -194,8 +196,7 @@ class SchedulerLifecycle implements RegisteredListener {
       });
     }
 
-    @Override
-    public void onDefeated(@Nullable ServerSet.EndpointStatus status) {
+    @Override public void onDefeated(@Nullable ServerSet.EndpointStatus status) {
       LOG.info("Lost leadership, committing suicide.");
 
       try {
@@ -212,8 +213,7 @@ class SchedulerLifecycle implements RegisteredListener {
       }
     }
 
-    @Override
-    public void awaitShutdown() {
+    @Override public void awaitShutdown() {
       lifecycle.awaitShutdown();
     }
   }

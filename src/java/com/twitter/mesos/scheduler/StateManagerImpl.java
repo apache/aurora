@@ -19,13 +19,9 @@ import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -34,8 +30,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
-import com.google.common.collect.Ordering;
-import com.google.common.collect.Ranges;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.Atomics;
 import com.google.inject.Inject;
@@ -43,11 +37,7 @@ import com.google.inject.Inject;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.SlaveID;
 
-import com.twitter.common.args.Arg;
-import com.twitter.common.args.CmdLine;
 import com.twitter.common.base.Closure;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.Clock;
 import com.twitter.common.util.StateMachine;
@@ -97,23 +87,7 @@ import static com.twitter.mesos.scheduler.Shards.GET_ORIGINAL_CONFIG;
  * persisted state machine transitions, and their side-effects.
  */
 public class StateManagerImpl implements StateManager {
-
-  @VisibleForTesting
-  @CmdLine(name = "transient_task_state_timeout",
-      help = "The amount of time after which to treat a task stuck in a transient state as LOST.")
-  static final Arg<Amount<Long, Time>> TRANSIENT_TASK_STATE_TIMEOUT =
-      Arg.create(Amount.of(5L, Time.MINUTES));
-
   private static final Logger LOG = Logger.getLogger(StateManagerImpl.class.getName());
-
-  private static final TaskQuery OUTSTANDING_TASK_QUERY = new TaskQuery().setStatuses(
-      EnumSet.of(
-          ScheduleStatus.ASSIGNED,
-          ScheduleStatus.PREEMPTING,
-          ScheduleStatus.RESTARTING,
-          ScheduleStatus.KILLING,
-          ScheduleStatus.UPDATING,
-          ScheduleStatus.ROLLBACK));
 
   private static final Function<TaskUpdateConfiguration, Integer> GET_SHARD =
       new Function<TaskUpdateConfiguration, Integer>() {
@@ -205,9 +179,6 @@ public class StateManagerImpl implements StateManager {
         }
       };
 
-  private final Function<ScheduledTask, Long> latestStateDuration;
-  private final Predicate<ScheduledTask> taskTimedOut;
-
   private final Driver driver;
   private final Clock clock;
 
@@ -255,18 +226,6 @@ public class StateManagerImpl implements StateManager {
         return storage.doInTransaction(work);
       }
     };
-
-    this.latestStateDuration = Functions.compose(
-        new Function<Iterable<TaskEvent>, Long>() {
-          @Override public Long apply(Iterable<TaskEvent> events) {
-            return clock.nowMillis() - Iterables.getLast(events).getTimestamp();
-          }
-        },
-        Tasks.GET_TASK_EVENTS);
-
-    this.taskTimedOut = Predicates.compose(
-        Ranges.greaterThan(TRANSIENT_TASK_STATE_TIMEOUT.get().as(Time.MILLISECONDS)),
-        latestStateDuration);
 
     this.driver = checkNotNull(driver);
 
@@ -768,50 +727,6 @@ public class StateManagerImpl implements StateManager {
   }
 
   @VisibleForTesting
-  final LoadingCache<ScheduleStatus, AtomicLong> maxOutstandingTimes =
-      CacheBuilder.newBuilder().build(CacheLoader.from(
-          new Function<ScheduleStatus, AtomicLong>() {
-            @Override public AtomicLong apply(ScheduleStatus status) {
-              return Stats.exportLong("scheduler_max_" + status + "_waiting_ms");
-            }
-          }));
-
-  /**
-   * Scans any outstanding tasks and attempts to kill any tasks that have timed out; additionally
-   * reports stats on the maximum time a task has spent in each outstanding state.
-   */
-  public synchronized void scanOutstandingTasks() {
-    managerState.checkState(State.STARTED);
-
-    Set<ScheduledTask> outstandingTasks = fetchTasks(OUTSTANDING_TASK_QUERY);
-
-    Multimap<ScheduleStatus, Long> stateDurations =
-        Multimaps.transformValues(Multimaps.index(outstandingTasks, Tasks.GET_STATUS),
-        latestStateDuration);
-    Ordering<Long> ordering = Ordering.natural();
-
-    for (ScheduleStatus status : OUTSTANDING_TASK_QUERY.getStatuses()) {
-      long highest = Iterables.getLast(ordering.sortedCopy(stateDurations.get(status)), 0L);
-      maxOutstandingTimes.getUnchecked(status).set(highest);
-    }
-
-    if (outstandingTasks.isEmpty()) {
-      return;
-    }
-
-    LOG.info("Checking " + outstandingTasks.size() + " outstanding tasks.");
-    Iterable<ScheduledTask> missingTasks = Iterables.filter(outstandingTasks, taskTimedOut);
-
-    // Kill any timed out tasks.
-    Set<String> missingTaskIds = Tasks.ids(missingTasks);
-    for (String missingTaskId : missingTaskIds) {
-      LOG.info("Attempting to kill missing task " + missingTaskId);
-      driver.killTask(missingTaskId);
-    }
-    changeState(Query.byId(missingTaskIds), ScheduleStatus.LOST, Optional.of("Task timed out."));
-  }
-
-  @VisibleForTesting
   static void putResults(
       ImmutableMap.Builder<Integer, ShardUpdateResult> builder,
       ShardUpdateResult result,
@@ -1306,7 +1221,6 @@ public class StateManagerImpl implements StateManager {
           task,
           taskUpdateChecker(role, job),
           workSink,
-          taskTimedOut,
           clock,
           task.getStatus());
     }
@@ -1320,7 +1234,6 @@ public class StateManagerImpl implements StateManager {
         // Since the task doesn't exist, its job cannot be updating.
         Suppliers.ofInstance(false),
         workSink,
-        taskTimedOut,
         clock,
         INIT);
     stateMachine.updateState(UNKNOWN);
@@ -1344,7 +1257,6 @@ public class StateManagerImpl implements StateManager {
         Iterables.getOnlyElement(fetchTasks(Query.byId(taskId))),
         taskUpdateChecker(role, job),
         workSink,
-        taskTimedOut,
         clock,
         initialState);
 

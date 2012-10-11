@@ -10,7 +10,6 @@ import javax.annotation.Nullable;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.base.Throwables;
@@ -42,7 +41,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
  *     abstractly from the consumption side.
  */
 public class TaskStateMachine {
-
   private static final Logger LOG = Logger.getLogger(TaskStateMachine.class.getName());
 
   private static final AtomicLong ILLEGAL_TRANSITIONS =
@@ -164,8 +162,6 @@ public class TaskStateMachine {
    * @param task Read-only task that this state machine manages.
    * @param isJobUpdating Supplier to test whether the task's job is currently in a rolling update.
    * @param workSink Work sink to receive transition response actions
-   * @param taskTimedOut Filter to determine if a task has timed out
-   *      (and should be considered lost).
    * @param clock Clock to use for reading the current time.
    * @param initialState The state to begin the state machine at.  All legal transitions will be
    *     added, but this allows the state machine to 'skip' states, for instance when a task is
@@ -177,7 +173,6 @@ public class TaskStateMachine {
       final ScheduledTask task,
       final Supplier<Boolean> isJobUpdating,
       final WorkSink workSink,
-      final Predicate<ScheduledTask> taskTimedOut,
       final Clock clock,
       final ScheduleStatus initialState) {
 
@@ -205,6 +200,8 @@ public class TaskStateMachine {
             break;
 
           case LOST:
+            addWork(WorkCommand.KILL);
+            // fall through
           case KILLED:
             addWork(WorkCommand.RESCHEDULE, transition.getTo().getMutation());
             break;
@@ -320,19 +317,14 @@ public class TaskStateMachine {
                             addWork(WorkCommand.RESCHEDULE);
                             break;
 
+                          case LOST:
+                            addWork(WorkCommand.RESCHEDULE);
+                            // fall through
                           case KILLING:
                             addWork(WorkCommand.KILL);
                             break;
 
-                          case LOST:
-                            addWork(WorkCommand.RESCHEDULE);
-                            break;
-
                           case UNKNOWN:
-                            // Determine if we have been waiting too long on this task.
-                            if (taskTimedOut.apply(task)) {
-                              updateState(ScheduleStatus.LOST);
-                            }
                             break;
 
                            default:
@@ -525,10 +517,12 @@ public class TaskStateMachine {
             addWork(WorkCommand.KILL);
             break;
 
+          case LOST:
+            addWork(WorkCommand.KILL);
+            // fall through
           case FINISHED:
           case FAILED:
           case KILLED:
-          case LOST:
             addWork(rollback ? WorkCommand.ROLLBACK : WorkCommand.UPDATE);
             break;
 
