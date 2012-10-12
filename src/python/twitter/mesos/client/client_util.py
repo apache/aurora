@@ -6,9 +6,10 @@ import json
 import os
 import posixpath
 import sys
+import tempfile
+import webbrowser
 
 from pystachio import Ref
-from urlparse import urljoin
 from twitter.common import app, log
 from twitter.common.contextutil import temporary_dir, open_zip
 from twitter.mesos.clusters import Cluster
@@ -18,12 +19,6 @@ from twitter.mesos.packer import sd_packer_client
 from twitter.mesos.parsers.mesos_config import MesosConfig
 from twitter.mesos.parsers.pystachio_config import PystachioConfig
 from twitter.mesos.parsers.pystachio_codec import PystachioCodec
-from twitter.mesos.client.spawn_local import (
-  LocalDriver,
-  build_local_runner,
-  create_executor,
-  create_taskinfo,
-  spawn_observer)
 
 from gen.twitter.mesos.ttypes import *
 
@@ -34,37 +29,6 @@ _PACKAGE_FILES_SUFFIX = MesosConfig.PACKAGE_FILES_SUFFIX
 def die(msg):
   log.fatal(msg)
   sys.exit(1)
-
-
-def open_url(url):
-  if url is not None:
-    import webbrowser
-    webbrowser.open_new_tab(url)
-
-
-def synthesize_url(scheduler_client, role=None, job=None):
-  scheduler_url = scheduler_client.url
-  if not scheduler_url:
-    log.warning("Unable to find scheduler web UI!")
-    return None
-
-  if job and not role:
-    die('If job specified, must specify role!')
-
-  if not role and not job:
-    return urljoin(scheduler_url, 'scheduler')
-  elif role and not job:
-    return urljoin(scheduler_url, 'scheduler/%s' % role)
-  else:
-    return urljoin(scheduler_url, 'scheduler/%s/%s' % (role, job))
-
-
-def handle_open(scheduler_client, role, job):
-  url = synthesize_url(scheduler_client, role, job)
-  if url:
-    log.info('Job url: %s' % url)
-    if app.get_options().open_browser:
-      open_url(url)
 
 
 def _zip_package_files(job_name, package_files, tmp_dir):
@@ -148,44 +112,46 @@ def _get_package_uri_from_packer_and_files(cluster, role, name, package_files):
   return _get_package_uri_from_packer(cluster, package_tuple, packer)
 
 
-def _get_package_uri(config):
+def _get_package_uri(config, copy_app_from=None):
   cluster = config.cluster()
   package = config.package()
-  package_files = config.package_files()
 
   if config.hdfs_path():
     log.warning('''
 *******************************************************************************
-  hdfs_path in job configurations has been deprecated and will soon be
-  disabled altogether.
+  hdfs_path and --copy_app_from have been deprecated and will soon be disabled
+  altogether.
+
   Please switch to using the package option as soon as possible!
   For details on how to do this, please consult
+
   http://go/mesostutorial
   and
   http://confluence.local.twitter.com/display/ENG/Mesos+Configuration+Reference
 *******************************************************************************''')
 
-  options = app.get_options()
-  if package and options.copy_app_from:
+  if package and copy_app_from:
     die('copy_app_from may not be used when a package spec is used in the configuration')
+
+  if copy_app_from:
+    return '/mesos/pkg/%s/%s' % (config.role(), posixpath.basename(copy_app_from))
 
   if package:
     return _get_package_uri_from_packer(cluster, package)
 
-  if package_files:
+  if config.package_files():
     return _get_package_uri_from_packer_and_files(
-        cluster, config.role(), config.name(), package_files)
+        cluster, config.role(), config.name(), config.package_files())
 
   if config.hdfs_path():
     return config.hdfs_path()
 
-  if options.copy_app_from:
-    return '/mesos/pkg/%s/%s' % (config.role(), posixpath.basename(options.copy_app_from))
 
-
-def _inject_packer_bindings(config, local=False):
-  if not isinstance(config, PystachioConfig):
+def _inject_packer_bindings(config, force_local=False):
+  if isinstance(config, MesosConfig):
     raise ValueError('inject_packer_bindings can only be used with Pystachio configs!')
+
+  local = config.cluster() == 'local' or force_local
 
   def extract_ref(ref):
     components = ref.components()
@@ -215,27 +181,36 @@ def _inject_packer_bindings(config, local=False):
       _get_package_uri_from_packer(config.cluster(), package))})
 
 
-def get_config(jobname, config_file, local=False):
+def get_config(jobname,
+               config_file,
+               copy_app_from=None,
+               config_type='mesos',
+               json=False,
+               force_local=False,
+               bindings=()):
   """Creates and returns a config object contained in the provided file."""
-  options = app.get_options()
-  config_type, is_json = options.config_type, options.json
-  bindings = getattr(options, 'bindings', [])
-
-  if is_json:
-    assert config_type == 'thermos', "--json only supported with thermos jobs"
+  if config_type != 'thermos':
+    if json:
+      raise ValueError('JSON input only supported for Thermos configs.')
+    if bindings:
+      raise ValueError('Environment bindings only supported for Thermos configs.')
 
   if config_type == 'mesos':
     config = MesosConfig(config_file, jobname)
   elif config_type == 'thermos':
-    loader = PystachioConfig.load_json if is_json else PystachioConfig.load
+    loader = PystachioConfig.load_json if json else PystachioConfig.load
     config = loader(config_file, jobname, bindings)
-    _inject_packer_bindings(config, local=local)
   elif config_type == 'auto':
-    config = PystachioCodec(config_file, jobname)
+    config = PystachioConfig(PystachioCodec(config_file, jobname).build())
   else:
     raise ValueError('Unknown config type %s!' % config_type)
+  return populate_namespaces(config, force_local=force_local, copy_app_from=copy_app_from)
 
-  package_uri = _get_package_uri(config)
+
+def populate_namespaces(config, copy_app_from=None, force_local=False):
+  """Populate additional bindings in the config, e.g. packer bindings."""
+  _inject_packer_bindings(config, force_local)
+  package_uri = _get_package_uri(config, copy_app_from=copy_app_from)
   if package_uri:
     config.set_hdfs_path(package_uri)
   return config
@@ -246,38 +221,6 @@ def check_and_log_response(resp):
       % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
   if resp.responseCode != ResponseCode.OK:
     sys.exit(1)
-
-
-def really_spawn(jobname, config_file, options):
-  config = get_config(jobname, config_file, local=True)
-  if not isinstance(config, PystachioConfig):
-    app.error('spawn command only works with new-style Thermos tasks.')
-
-  checkpoint_root = os.path.expanduser(os.path.join('~', '.thermos'))
-  server_thread, port = spawn_observer(checkpoint_root)
-  task_info = create_taskinfo(config, options.shard)
-
-  with temporary_dir() as sandbox:
-    runner_pex = options.runner if options.runner != 'build' else build_local_runner()
-    if runner_pex is None:
-      app.error('failed to build thermos runner!')
-
-    executor = create_executor(runner_pex, sandbox, checkpoint_root)
-    driver = LocalDriver()
-    executor.launchTask(driver, task_info)
-
-    if options.open_browser:
-      open_url('http://localhost:%d/task/%s' % (port, task_info.task_id.value))
-
-    try:
-      driver.stopped.wait()
-    except KeyboardInterrupt:
-      print('Got interrupt, killing task.')
-
-    executor.shutdown(driver)
-
-  print('Local spawn completed.')
-  return 0
 
 
 class requires(object):

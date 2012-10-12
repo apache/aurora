@@ -4,7 +4,6 @@ import getpass
 import hashlib
 import httplib
 import json
-import mimetypes
 import os
 import sys
 import time

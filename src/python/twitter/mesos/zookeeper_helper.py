@@ -1,6 +1,4 @@
 import os
-import sys
-import time
 import zookeeper
 
 from twitter.common.net.tunnel import TunnelHelper

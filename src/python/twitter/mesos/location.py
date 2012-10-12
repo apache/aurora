@@ -1,4 +1,3 @@
-import re
 import socket
 
 class Location(object):

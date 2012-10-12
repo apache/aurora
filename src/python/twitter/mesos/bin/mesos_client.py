@@ -3,33 +3,38 @@
 
 import collections
 import functools
+import getpass
 import optparse
+from optparse import OptionValueError
 import os
 import pprint
 import subprocess
 import sys
-import time
-import zookeeper
-
-import twitter.mesos.client.client_util as client_util
-from twitter.mesos.client.client_util import requires
-
 from tempfile import NamedTemporaryFile
-from pystachio import Ref
+from time import gmtime, strftime
+from urlparse import urljoin
+import zookeeper
 
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
-from twitter.common.net.tunnel import TunnelHelper
+from twitter.common.quantity import Amount, Data
+from twitter.common.quantity.parse_simple import parse_data_into
+from twitter.mesos.client import client_util
 from twitter.mesos.client.client_wrapper import MesosClientAPI
+from twitter.mesos.client.client_util import requires
+from twitter.mesos.client.quickrun import Quickrun
+from twitter.mesos.client.spawn_local import spawn_local
+from twitter.mesos.clusters import Cluster
 from twitter.mesos.command_runner import DistributedCommandRunner
-from twitter.mesos.config.schema import Packer as PackerObject
 from twitter.mesos.packer import sd_packer_client
 from twitter.mesos.packer.packer_client import Packer
-
 from twitter.thermos.base.options import add_binding_to
 
 from gen.twitter.mesos.constants import ACTIVE_STATES, LIVE_STATES
-from gen.twitter.mesos.ttypes import *
+from gen.twitter.mesos.ttypes import (
+    Identity,
+    ScheduleStatus,
+    TaskQuery)
 
 
 DEFAULT_USAGE_BANNER = """
@@ -37,6 +42,31 @@ mesos client, used to interact with the aurora scheduler.
 
 For questions contact mesos-team@twitter.com.
 """
+
+def synthesize_url(scheduler_client, role=None, job=None):
+  scheduler_url = scheduler_client.url
+  if not scheduler_url:
+    log.warning("Unable to find scheduler web UI!")
+    return None
+
+  if job and not role:
+    client_util.die('If job specified, must specify role!')
+
+  scheduler_url = urljoin(scheduler_url, 'scheduler')
+  if role:
+    scheduler_url = urljoin(scheduler_url, role)
+    if job:
+      scheduler_url = urljoin(scheduler_url, job)
+  return scheduler_url
+
+
+def handle_open(scheduler_client, role, job):
+  url = synthesize_url(scheduler_client, role, job)
+  if url:
+    log.info('Job url: %s' % url)
+    if app.get_options().open_browser:
+      import webbrowser
+      webbrowser.open_new_tab(url)
 
 
 COPY_APP_FROM_OPTION = optparse.Option(
@@ -113,6 +143,15 @@ EXECUTOR_SANDBOX_OPTION = optparse.Option(
     help='Run the command in the executor sandbox instead of the task sandbox.')
 
 
+def make_spawn_options(options):
+  return dict((name, getattr(options, name)) for name in (
+      'copy_app_from',
+      'config_type',
+      'json',
+      'shard',
+      'bindings'))
+
+
 @app.command
 @app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(COPY_APP_FROM_OPTION)
@@ -125,31 +164,25 @@ def create(jobname, config_file):
 
   Creates a job based on a configuration file.
   """
-  config = client_util.get_config(jobname, config_file)
+  options = app.get_options()
+  config = client_util.get_config(jobname, config_file, options.copy_app_from, options.config_type,
+      options.json)
   if config.cluster() == 'local':
-    options = app.get_options()
     options.shard = 0
     options.runner = 'build'
     print('Detected cluster=local, spawning local run.')
-    return client_util.really_spawn(jobname, config_file, options)
+    return spawn_local('build', jobname, config_file, **make_spawn_options(options))
 
   api = MesosClientAPI(cluster=config.cluster(), verbose=app.get_options().verbose)
   resp = api.create_job(config, app.get_options().copy_app_from)
   client_util.check_and_log_response(resp)
-  client_util.handle_open(api.scheduler.scheduler(), config.role(), config.name())
+  handle_open(api.scheduler.scheduler(), config.role(), config.name())
 
 
 @app.command
-@app.command_option(
-    '--shard',
-    dest='shard',
-    type=int,
-    default=0,
+@app.command_option('--shard', dest='shard', type=int, default=0,
     help='The shard number to spawn.')
-@app.command_option(
-    '--runner',
-    dest='runner',
-    default='build',
+@app.command_option('--runner', dest='runner', default='build',
     help='The thermos_runner.pex to run the task.  If "build", build one automatically. '
          'This requires that you be running the spawn from within the root of a science repo.')
 @app.command_option(ENVIRONMENT_BIND_OPTION)
@@ -163,7 +196,99 @@ def spawn(jobname, config_file):
 
   Spawns a local run of a task in the specified job.
   """
-  return client_util.really_spawn(jobname, config_file, app.get_options())
+  options = app.get_options()
+  return spawn_local(options.runner, jobname, config_file, **make_spawn_options(options))
+
+
+def parse_package(option, _, value, parser):
+  if value is None:
+    return
+  splits = value.split(':')
+  if len(splits) != 3:
+    raise OptionValueError('Expected package to be of the form role:name:version')
+  setattr(parser.values, option.dest, tuple(splits))
+
+
+RUNTASK_INSTANCE_LIMIT = 25
+RUNTASK_CPU_LIMIT = 50
+RUNTASK_RAM_LIMIT = Amount(50, Data.GB)
+RUNTASK_DISK_LIMIT = Amount(500, Data.GB)
+
+
+def task_is_expensive(options):
+  """A metric to determine whether or not we require the user to double-take."""
+  if options.yes_i_really_want_to_run_an_expensive_job:
+    return False
+
+  errors = []
+  if options.instances > RUNTASK_INSTANCE_LIMIT:
+    errors.append('your task has more than %d instances (actual: %d)' % (
+        RUNTASK_INSTANCE_LIMIT, options.instances))
+
+  if options.instances * options.cpus > RUNTASK_CPU_LIMIT:
+    errors.append('aggregate CPU is over %.1f cores (actual: %.1f)' % (
+        RUNTASK_CPU_LIMIT, options.instances * options.cpus))
+
+  if options.instances * options.ram > RUNTASK_RAM_LIMIT:
+    errors.append('aggregate RAM is over %s (actual: %s)' % (
+        RUNTASK_RAM_LIMIT, options.instances * options.ram))
+
+  if options.instances * options.disk > RUNTASK_DISK_LIMIT:
+    errors.append('aggregate disk is over %s (actual: %s)' % (
+        RUNTASK_DISK_LIMIT, options.instances * options.disk))
+
+  if errors:
+    log.error('You must specify --yes_i_really_want_to_run_an_expensive_job because:')
+    for op in errors:
+      log.error('  - %s' % op)
+    return True
+
+
+@app.command
+@app.command_option('-i', '--instances', type=int, default=1, dest='instances',
+    help='The number of instances to create.')
+@app.command_option('-c', '--cpu', type=float, default=1.0, dest='cpus',
+    help='The amount of cpu (float) to allocate per instance.')
+@app.command_option('-r', '--ram', nargs=1, action='callback', dest='ram',
+    default=Amount(1, Data.GB), metavar='AMOUNT', type='string',
+    callback=parse_data_into('ram', default='1G'),
+    help='Amount of RAM per instance, e.g. "1512mb" or "5G".')
+@app.command_option('-d', '--disk', nargs=1, action='callback', dest='disk',
+    default=Amount(1, Data.GB), metavar='AMOUNT', type='string',
+    callback=parse_data_into('disk'),
+    help='Amount of disk per instance, e.g. "1512mb" or "5G"')
+@app.command_option('-p', '--package', type='string', default=None,
+    metavar='ROLE:NAME:VERSION', action='callback', callback=parse_package,
+    help='Package to stage into sandbox prior to task invocation.  Package takes packer '
+         'role, name, version strings.')
+@app.command_option('-n', '--name', type='string', dest='name',
+    default='quickrun-' + strftime('%Y%m%d-%H%M%S'),
+    help='The job name to use.  By default an ephemeral name is generated automatically.')
+@app.command_option('--announce', default=False, action='store_true', dest='announce',
+    help='Announce a serverset for this job.')
+@app.command_option('--role', type='string', default=getpass.getuser(), metavar='ROLE',
+    help='Role in which to run the task.')
+@app.command_option('--yes_i_really_want_to_run_an_expensive_job', default=False,
+    action='store_true', dest='yes_i_really_want_to_run_an_expensive_job',
+    help='Yes, you really want to run a potentially resource intensive job.')
+@app.command_option(ENVIRONMENT_BIND_OPTION)
+@app.command_option(OPEN_BROWSER_OPTION)
+def runtask(args, options):
+  """usage: runtask cluster -- cmdline
+
+  Run an Aurora task consisting of a simple command "cmdline" in a cluster.  Meant for
+  one-off tasks or testing.
+  """
+  if len(args) < 2:
+    app.error('Must specify cluster and command-line for runtask command!')
+  cluster = args[0]
+  Cluster.assert_exists(cluster)
+  cmdline = ' '.join(args[1:])
+  if task_is_expensive(options):
+    client_util.die('Task too expensive.')
+  qr = Quickrun(cluster, cmdline, options)
+  api = MesosClientAPI(cluster=cluster)
+  qr.run(api)
 
 
 @app.command
@@ -178,7 +303,9 @@ def diff(job, config_file):
   Compares a job configuration against a running job.
   By default the diff will be displayed using 'diff', though you may choose an alternate
   diff program by specifying the DIFF_VIEWER environment variable."""
-  config = client_util.get_config(job, config_file)
+  options = app.get_options()
+  config = client_util.get_config(job, config_file, options.copy_app_from, options.config_type,
+      options.json, False, options.bindings)
   api = MesosClientAPI(cluster=config.cluster(), verbose=app.get_options().verbose)
   resp = query(config.role(), job, api=api, statuses=ACTIVE_STATES)
   if not resp.responseCode:
@@ -220,17 +347,18 @@ def do_open(*args):
 
   Opens the scheduler page for a role or job in the default web browser.
   """
+  options = app.get_options()
   role = job = None
   if len(args) > 0:
     role = args[0]
   if len(args) > 1:
     job = args[1]
 
-  if not app.get_options().cluster:
+  if not options.cluster:
     client_util.die('--cluster is required')
 
-  api = MesosClientAPI(cluster=app.get_options().cluster, verbose=app.get_options().verbose)
-  client_util.open_url(client_util.synthesize_url(api.scheduler.scheduler(), role, job))
+  api = MesosClientAPI(cluster=options.cluster, verbose=options.verbose)
+  open_url(synthesize_url(api.scheduler.scheduler(), role, job))
 
 
 @app.command
@@ -247,7 +375,9 @@ def inspect(jobname, config_file):
   Verifies that a job can be parsed from a configuration file, and displays
   the parsed configuration.
   """
-  config = client_util.get_config(jobname, config_file, local=app.get_options().local)
+  options = app.get_options()
+  config = client_util.get_config(jobname, config_file, options.copy_app_from,
+      options.config_type, options.json, False, options.bindings)
   log.info('Parsed job config: %s' % config.job())
 
 
@@ -264,7 +394,7 @@ def start_cron(role, jobname):
   api = MesosClientAPI(cluster=app.get_options().cluster, verbose=app.get_options().verbose)
   resp = api.start_cronjob(role, jobname)
   client_util.check_and_log_response(resp)
-  client_util.handle_open(api.scheduler.scheduler(), role, jobname)
+  handle_open(api.scheduler.scheduler(), role, jobname)
 
 
 @app.command
@@ -282,7 +412,7 @@ def kill(role, jobname):
   api = MesosClientAPI(cluster=app.get_options().cluster, verbose=app.get_options().verbose)
   resp = api.kill_job(role, jobname, _getshards())
   client_util.check_and_log_response(resp)
-  client_util.handle_open(api.scheduler.scheduler(), role, jobname)
+  handle_open(api.scheduler.scheduler(), role, jobname)
 
 
 @app.command
@@ -338,14 +468,14 @@ def status(role, jobname):
     log.info('No tasks found.')
 
 
-def _getshards():
-  if not app.get_options().shards:
+def _getshards(shards):
+  if not shards:
     return None
 
   try:
-    return map(int, app.get_options().shards.split(','))
+    return map(int, shards.split(','))
   except ValueError:
-    client_util.die('Invalid shards list: %s' % app.get_options().shards)
+    client_util.die('Invalid shards list: %r' % shards)
 
 
 @app.command
@@ -372,9 +502,11 @@ def update(jobname, config_file):
   You may want to consider using the 'diff' subcommand before updating,
   to preview what changes will take effect.
   """
-  config = client_util.get_config(jobname, config_file)
-  api = MesosClientAPI(cluster=config.cluster(), verbose=app.get_options().verbose)
-  resp = api.update_job(config, _getshards(), app.get_options().copy_app_from)
+  options = app.get_options()
+  config = client_util.get_config(jobname, config_file, options.copy_app_from,
+      options.config_type, options.json, force_local=False, bindings=options.bindings)
+  api = MesosClientAPI(cluster=config.cluster(), verbose=options.verbose)
+  resp = api.update_job(config, _getshards(options.shards), options.copy_app_from)
   client_util.check_and_log_response(resp)
 
 
@@ -552,8 +684,7 @@ def _print_package(pkg):
   if 'metadata' in pkg and pkg['metadata']:
     print 'User metadata:\n  %s' % pkg['metadata']
   for audit in sorted(pkg['auditLog'], key=lambda k: int(k['timestamp'])):
-    gmtime = time.strftime('%m/%d/%Y %H:%M:%S UTC',
-                           time.gmtime(int(audit['timestamp']) / 1000))
+    gmtime = strftime('%m/%d/%Y %H:%M:%S UTC', gmtime(int(audit['timestamp']) / 1000))
     print '  moved to state %s by %s on %s' % (audit['state'], audit['user'], gmtime)
 
 
@@ -717,12 +848,12 @@ def help(args):
     sys.exit(1)
 
 
-def set_quiet(option, opt_set, value, parser):
+def set_quiet(option, _1, _2, parser):
   setattr(parser.values, option.dest, True)
   LogOptions.set_stderr_log_level('NONE')
 
 
-def set_verbose(option, opt_set, value, parser):
+def set_verbose(option, _1, _2, parser):
   setattr(parser.values, option.dest, False)
   LogOptions.set_stderr_log_level('DEBUG')
 

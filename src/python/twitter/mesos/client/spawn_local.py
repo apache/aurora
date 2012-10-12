@@ -1,11 +1,15 @@
 import os
 import subprocess
+import tempfile
 import threading
 import time
+import webbrowser
 
 from twitter.common import log
+from twitter.common.contextutil import temporary_dir
 from twitter.common.http import HttpServer
 from twitter.common.net.tunnel import TunnelHelper
+from twitter.mesos.client.client_util import get_config
 from twitter.mesos.executor.sandbox_manager import DirectorySandbox
 from twitter.mesos.executor.task_runner_wrapper import TaskRunnerWrapper
 from twitter.mesos.executor.thermos_executor import ThermosExecutor
@@ -13,6 +17,7 @@ from twitter.thermos.observer.observer import TaskObserver
 from twitter.thermos.observer.http import BottleObserver
 
 from mesos import ExecutorDriver
+import mesos_pb2 as mesos_pb
 
 
 def spawn_observer(checkpoint_root):
@@ -71,6 +76,7 @@ class LocalDriver(ExecutorDriver):
     self.stopped = threading.Event()
     # TODO(wickman) Add __init__ to ExecutorDriver in mesos core.
     # ExecutorDriver.__init__(self, *args, **kw)
+    self.started = threading.Event()
 
   def stop(self):
     log.info('LocalDriver.stop called.')
@@ -78,6 +84,8 @@ class LocalDriver(ExecutorDriver):
 
   def sendStatusUpdate(self, status):
     log.info('LocalDriver.sendStatusUpdate(%s)' % status)
+    if status.state == mesos_pb.TASK_RUNNING:
+      self.started.set()
 
   def sendFrameworkMessage(self, data):
     log.info('LocalDriver.sendFrameworkMessage(%s)' % data)
@@ -89,9 +97,7 @@ def create_taskinfo(proxy_config, shard_id=0):
       TaskInfo,
       TaskID,
       SlaveID)
-  from gen.twitter.mesos.ttypes import (
-      AssignedTask,
-      TwitterTaskInfo)
+  from gen.twitter.mesos.ttypes import AssignedTask
   from thrift.TSerialization import serialize as thrift_serialize
 
   job_configuration = proxy_config.job()
@@ -113,3 +119,46 @@ def create_taskinfo(proxy_config, shard_id=0):
     data=thrift_serialize(assigned_task))
 
   return task_info
+
+
+def spawn_local(runner, jobname, config_file, copy_app_from=None, config_type='mesos',
+                json=False, shard=0, bindings=()):
+  """
+    Spawn a local run of a task.
+  """
+  if config_type == 'mesos':
+    config_type = 'auto'
+
+  config = get_config(jobname, config_file, copy_app_from, config_type, json, force_local=True,
+      bindings=bindings)
+
+  checkpoint_root = os.path.expanduser(os.path.join('~', '.thermos'))
+  _, port = spawn_observer(checkpoint_root)
+  task_info = create_taskinfo(config, shard)
+
+  with temporary_dir() as sandbox:
+    runner_pex = runner if runner != 'build' else build_local_runner()
+    if runner_pex is None:
+      print('failed to build thermos runner!')
+      return 1
+
+    executor = create_executor(runner_pex, sandbox, checkpoint_root)
+    driver = LocalDriver()
+    executor.launchTask(driver, task_info)
+
+    # wait for the driver to start, then another small sleep for the task to be registered
+    # TODO(wickman) Just urlopen until it no longer gives a 404?
+    driver.started.wait(timeout=5.0)
+    time.sleep(1.0)
+
+    webbrowser.open_new_tab('http://localhost:%d/task/%s' % (port, task_info.task_id.value))
+
+    try:
+      driver.stopped.wait()
+    except KeyboardInterrupt:
+      print('Got interrupt, killing task.')
+
+    executor.shutdown(driver)
+
+  print('Local spawn completed.')
+  return 0
