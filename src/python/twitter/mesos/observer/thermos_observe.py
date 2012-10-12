@@ -1,5 +1,6 @@
 from __future__ import print_function
 
+from datetime import datetime
 import socket
 import sys
 import threading
@@ -31,9 +32,11 @@ app.configure(module='twitter.common_internal.app.modules.chickadee_handler',
 
 
 class MesosObserverVars(threading.Thread):
-  COLLECTION_INTERVAL = Amount(15, Time.SECONDS)
+  COLLECTION_INTERVAL = Amount(30, Time.SECONDS)
   METRIC_NAMESPACE = 'observer'
-  THERMOS_EXECUTOR_BINARY = './thermos_executor.pex'
+  EXECUTOR_BINARY = './thermos_executor.pex'
+  STATUS_MAP = dict((getattr(psutil, status_name), status_name) for status_name in dir(psutil)
+                    if status_name.startswith('STATUS_'))
 
   def __init__(self, observer):
     self._observer = observer
@@ -48,17 +51,31 @@ class MesosObserverVars(threading.Thread):
     metrics = self.metrics()
     self.orphaned_runners = metrics.register(MutatorGauge('orphaned_runners', 0))
     self.orphaned_tasks = metrics.register(MutatorGauge('orphaned_tasks', 0))
+    self.orphaned_executors = metrics.register(MutatorGauge('orphaned_executors', 0))
     self.active_tasks = metrics.register(MutatorGauge('active_tasks', 0))
     self.finished_tasks = metrics.register(MutatorGauge('finished_tasks', 0))
 
   def collect(self):
     self.collect_orphans()
     self.collect_actives()
+    self.collect_unparented_executors()
 
   def collect_actives(self):
     counts = self._observer.task_id_count()
     self.active_tasks.write(counts['active'])
     self.finished_tasks.write(counts['finished'])
+
+  def collect_unparented_executors(self):
+    def is_orphan_executor(proc):
+      if proc.ppid == 1 and len(proc.cmdline) >= 2:
+        if proc.cmdline[0].startswith('python') and proc.cmdline[1] == self.EXECUTOR_BINARY:
+          log.debug('Orphaned executor: pid=%d status=%s cwd=%s age=%s' % (
+               proc.pid,
+               self.STATUS_MAP.get(proc.status, 'UNKNOWN'),
+               proc.getcwd(),
+               datetime.now() - datetime.fromtimestamp(proc.create_time)))
+          return True
+    self.orphaned_executors.write(len(filter(is_orphan_executor, psutil.process_iter())))
 
   def collect_orphans(self):
     orphaned_tasks, orphaned_runners = 0, 0
@@ -73,18 +90,15 @@ class MesosObserverVars(threading.Thread):
       try:
         runner = psutil.Process(status.runner_pid)
       except psutil.NoSuchProcess:
-        log.debug('Detected orphaned task: %s' % task.header.task_id)
         orphaned_tasks += 1
         continue
       try:
         executor = psutil.Process(runner.ppid)
       except psutil.NoSuchProcess:
-        log.debug('Detected orphaned runner: %s' % task.header.task_id)
         orphaned_runners += 1
         continue
       # reparented by init
       if executor.pid == 1:
-        log.debug('Detected orphaned runner: %s' % task.header.task_id)
         orphaned_runners += 1
     self.orphaned_runners.write(orphaned_runners)
     self.orphaned_tasks.write(orphaned_tasks)
