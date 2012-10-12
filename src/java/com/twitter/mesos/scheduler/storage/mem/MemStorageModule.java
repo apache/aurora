@@ -10,7 +10,12 @@ import com.google.inject.Singleton;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Closures;
 import com.twitter.common.inject.Bindings.KeyFactory;
+import com.twitter.mesos.scheduler.storage.JobStore;
+import com.twitter.mesos.scheduler.storage.QuotaStore;
+import com.twitter.mesos.scheduler.storage.SchedulerStore;
 import com.twitter.mesos.scheduler.storage.Storage;
+import com.twitter.mesos.scheduler.storage.TaskStore;
+import com.twitter.mesos.scheduler.storage.UpdateStore;
 
 /**
  * Binding module for an in-memory storage system.
@@ -62,10 +67,22 @@ public final class MemStorageModule extends PrivateModule {
     this.bindAdditional = bindAdditional;
   }
 
+  private <T> void bindStore(Class<T> binding, Class<? extends T> impl) {
+    bind(binding).to(impl);
+    bind(impl).in(Singleton.class);
+  }
+
   @Override
   protected void configure() {
     bind(storageKey).to(MemStorage.class);
     bind(MemStorage.class).in(Singleton.class);
+
+    bindStore(SchedulerStore.Mutable.class, MemSchedulerStore.class);
+    bindStore(JobStore.Mutable.class, MemJobStore.class);
+    bindStore(TaskStore.Mutable.class, MemTaskStore.class);
+    bindStore(UpdateStore.Mutable.class, MemUpdateStore.class);
+    bindStore(QuotaStore.Mutable.class, MemQuotaStore.class);
+
     expose(storageKey);
     bindAdditional.execute(binder());
   }

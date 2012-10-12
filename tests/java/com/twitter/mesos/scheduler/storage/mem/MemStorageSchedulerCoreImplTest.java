@@ -7,6 +7,6 @@ public class MemStorageSchedulerCoreImplTest extends BaseSchedulerCoreImplTest {
 
   @Override
   protected Storage createStorage() {
-    return new MemStorage();
+    return MemStorage.newEmptyStorage();
   }
 }

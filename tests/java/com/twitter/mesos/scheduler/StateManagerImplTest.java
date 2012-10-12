@@ -441,7 +441,7 @@ public class StateManagerImplTest extends EasyMockTest {
   }
 
   private Storage createStorage() throws Exception {
-    return new MemStorage();
+    return MemStorage.newEmptyStorage();
   }
 
   private static TwitterTaskInfo makeTask(String owner, String job, int shard) {

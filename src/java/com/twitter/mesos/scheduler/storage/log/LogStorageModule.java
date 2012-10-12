@@ -143,8 +143,10 @@ public class LogStorageModule extends AbstractModule {
         exposeBinding(binder, UpdateStore.Mutable.class, updateStore);
         exposeBinding(binder, QuotaStore.Mutable.class, quotaStore);
 
-        // Expose the jdbc url for tools
-        binder.expose(Key.get(String.class, JdbcUrl.class));
+        if (!USE_NEW_IN_MEM_STORAGE.get()) {
+          // Expose the jdbc url for tools
+          binder.expose(Key.get(String.class, JdbcUrl.class));
+        }
       }
     };
 

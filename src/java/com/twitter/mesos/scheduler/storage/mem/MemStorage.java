@@ -3,6 +3,7 @@ package com.twitter.mesos.scheduler.storage.mem;
 import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.inject.Inject;
 
 import com.twitter.mesos.scheduler.storage.AttributeStore;
 import com.twitter.mesos.scheduler.storage.AttributeStore.AttributeStoreImpl;
@@ -26,17 +27,14 @@ public class MemStorage implements Storage {
   private final MutableStoreProvider storeProvider;
   private final LockManager lockManager = new LockManager();
 
-  /**
-   * Creates a new empty in-memory storage.
-   */
-  @VisibleForTesting
-  public MemStorage() {
-    final SchedulerStore.Mutable schedulerStore = new MemSchedulerStore();
-    final JobStore.Mutable jobStore = new MemJobStore();
-    final TaskStore.Mutable taskStore = new MemTaskStore();
-    final UpdateStore.Mutable updateStore = new MemUpdateStore();
-    final QuotaStore.Mutable quotaStore = new MemQuotaStore();
-    final AttributeStore.Mutable attributeStore = new AttributeStoreImpl();
+  @Inject
+  MemStorage(
+      final SchedulerStore.Mutable schedulerStore,
+      final JobStore.Mutable jobStore,
+      final TaskStore.Mutable taskStore,
+      final UpdateStore.Mutable updateStore,
+      final QuotaStore.Mutable quotaStore,
+      final AttributeStore.Mutable attributeStore) {
 
     storeProvider = new MutableStoreProvider() {
       @Override public SchedulerStore.Mutable getSchedulerStore() {
@@ -63,6 +61,20 @@ public class MemStorage implements Storage {
         return attributeStore;
       }
     };
+  }
+
+  /**
+   * Creates a new empty in-memory storage for use in testing.
+   */
+  @VisibleForTesting
+  public static MemStorage newEmptyStorage() {
+    return new MemStorage(
+        new MemSchedulerStore(),
+        new MemJobStore(),
+        new MemTaskStore(),
+        new MemUpdateStore(),
+        new MemQuotaStore(),
+        new AttributeStoreImpl());
   }
 
   @Override

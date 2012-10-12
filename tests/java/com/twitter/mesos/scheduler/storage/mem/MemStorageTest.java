@@ -40,7 +40,7 @@ public class MemStorageTest extends TearDownTestCase {
         new ExecutorServiceShutdown(executor, Amount.of(1L, Time.SECONDS)).execute();
       }
     });
-    storage = new MemStorage();
+    storage = MemStorage.newEmptyStorage();
   }
 
   @Test
