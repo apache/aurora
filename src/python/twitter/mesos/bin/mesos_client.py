@@ -409,8 +409,9 @@ def kill(role, jobname):
   Kills all shards if no shard-ids are specified.
 
   """
-  api = MesosClientAPI(cluster=app.get_options().cluster, verbose=app.get_options().verbose)
-  resp = api.kill_job(role, jobname, _getshards())
+  options = app.get_options()
+  api = MesosClientAPI(cluster=options.cluster, verbose=options.verbose)
+  resp = api.kill_job(role, jobname, _getshards(options.shards))
   client_util.check_and_log_response(resp)
   handle_open(api.scheduler.scheduler(), role, jobname)
 
