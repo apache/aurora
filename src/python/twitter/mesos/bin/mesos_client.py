@@ -685,8 +685,8 @@ def _print_package(pkg):
   if 'metadata' in pkg and pkg['metadata']:
     print 'User metadata:\n  %s' % pkg['metadata']
   for audit in sorted(pkg['auditLog'], key=lambda k: int(k['timestamp'])):
-    gmtime = strftime('%m/%d/%Y %H:%M:%S UTC', gmtime(int(audit['timestamp']) / 1000))
-    print '  moved to state %s by %s on %s' % (audit['state'], audit['user'], gmtime)
+    gmtime_str = strftime('%m/%d/%Y %H:%M:%S UTC', gmtime(int(audit['timestamp']) / 1000))
+    print '  moved to state %s by %s on %s' % (audit['state'], audit['user'], gmtime_str)
 
 
 @app.command
