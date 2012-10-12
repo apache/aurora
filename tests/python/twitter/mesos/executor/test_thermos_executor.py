@@ -22,6 +22,7 @@ from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_rmtree
 from twitter.common.quantity import Amount, Time, Data
 from twitter.mesos.config.schema import (
+  MB,
   MesosTaskInstance,
   Task,
   Process,
@@ -106,7 +107,7 @@ def hello_world():
                 processes = [
                   Process(name = 'hello_world', cmdline = 'echo hello world')
                 ],
-                resources = Resources(cpu=1.0, ram=1024, disk=1024)),
+                resources = Resources(cpu=1.0, ram=16*MB, disk=32*MB)),
     instance = 0,
     role = getpass.getuser())
 
@@ -117,7 +118,7 @@ def sleep60():
                 processes = [
                   Process(name = 'sleep60', cmdline = 'sleep 60')
                 ],
-                resources = Resources(cpu=1.0, ram=1024, disk=1024)),
+                resources = Resources(cpu=1.0, ram=16*MB, disk=32*MB)),
     instance = 0,
     role = getpass.getuser())
 
