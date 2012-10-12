@@ -13,7 +13,9 @@ from twitter.thermos.monitoring.measure import ProcessSample
 
 from gen.twitter.mesos.comm.ttypes import TaskResourceSample
 
-from .health_interface import HealthInterface
+from .health_interface import (
+    FailureReason,
+    HealthInterface)
 
 
 class DiskCollectorThread(threading.Thread):
@@ -104,17 +106,6 @@ class ResourceEnforcer(object):
 
   ENFORCE_PORT_RANGE = (31000, 32000)
 
-  class KillReason(object):
-    def __init__(self, reason):
-      self._reason = reason
-
-    @property
-    def reason(self):
-      return self._reason
-
-    def __repr__(self):
-      return 'KillReason(%r)' % self._reason
-
   def __init__(self, pid, portmap={}):
     self._pid = pid
     self._portmap = dict((number, name) for (name, number) in portmap.items())
@@ -163,12 +154,12 @@ class ResourceEnforcer(object):
   def _enforce_ram(self, record):
     if record.ramRssBytes > record.reservedRamBytes:
       # TODO(wickman) Add human-readable resource ranging support to twitter.common.
-      return self.KillReason('RAM limit exceeded.  Reserved %s bytes vs resident %s bytes' % (
+      return FailureReason('RAM limit exceeded.  Reserved %s bytes vs resident %s bytes' % (
           record.reservedRamBytes, record.ramRssBytes))
 
   def _enforce_disk(self, record):
     if record.diskBytes > record.reservedDiskBytes:
-      return self.KillReason('Disk limit exceeded.  Reserved %s bytes vs used %s bytes.' % (
+      return FailureReason('Disk limit exceeded.  Reserved %s bytes vs used %s bytes.' % (
           record.reservedDiskBytes, record.diskBytes))
 
   @staticmethod
@@ -189,7 +180,7 @@ class ResourceEnforcer(object):
     for port in self.get_listening_ports():
       if self.ENFORCE_PORT_RANGE[0] <= port <= self.ENFORCE_PORT_RANGE[1]:
         if port not in self._portmap:
-          return self.KillReason('Listening on unallocated port %s.  Portmap is %s' % (
+          return FailureReason('Listening on unallocated port %s.  Portmap is %s' % (
               port, self.render_portmap(self._portmap)))
 
   def enforce(self, record):
@@ -257,7 +248,7 @@ class ResourceManager(HealthInterface, threading.Thread):
     return self._kill_reason is None
 
   @property
-  def kill_reason(self):
+  def failure_reason(self):
     return self._kill_reason
 
   def run(self):

@@ -55,7 +55,7 @@ class StatusManager(threading.Thread):
           notify_unhealthy()
           force_status = mesos_pb.TASK_FAILED
           failure_reason = checker.failure_reason.reason
-          print('Got force_status=%s, failure_reason=%s from %s' % (
+          log.info('Got force_status=%s, failure_reason=%s from %s' % (
               force_status,
               failure_reason,
               checker))

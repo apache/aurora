@@ -21,10 +21,6 @@ from twitter.mesos.config.schema import (
 from twitter.mesos.executor.discovery_manager import DiscoveryManager
 
 
-LogOptions.set_stderr_log_level('google:DEBUG')
-log.init('disco_manager')
-
-
 def hello_world(announce=False, **kw):
   mti = MesosTaskInstance(
     task = Task(name = 'hello_world',
