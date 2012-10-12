@@ -192,7 +192,9 @@ class ResourceEnforcer(object):
          ram
          disk
     """
-    for enforcer in (self._enforce_ram, self._enforce_disk, self._enforce_ports, self._enforce_cpu):
+    # TODO(wickman) Due to MESOS-1585, port enforcement has been unwired.  If you would like to
+    # add it back, simply add self._enforce_ports into the list of enforcers.
+    for enforcer in (self._enforce_ram, self._enforce_disk, self._enforce_cpu):
       kill_reason = enforcer(record)
       if kill_reason:
         return kill_reason
