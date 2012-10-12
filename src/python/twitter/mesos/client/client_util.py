@@ -196,7 +196,7 @@ def get_config(jobname,
       raise ValueError('Environment bindings only supported for Thermos configs.')
 
   if config_type == 'mesos':
-    config = MesosConfig(config_file, jobname)
+    return MesosConfig(config_file, jobname)
   elif config_type == 'thermos':
     loader = PystachioConfig.load_json if json else PystachioConfig.load
     config = loader(config_file, jobname, bindings)
