@@ -1,5 +1,6 @@
 python_test_suite(name = 'all',
   dependencies = [
+    pants(':discovery_manager'),
     pants(':gc_executor'),
     pants(':resource_manager'),
     pants(':sandbox_manager'),

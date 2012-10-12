@@ -5,7 +5,7 @@ from twitter.common.contextutil import temporary_file
 from twitter.mesos.parsers.pystachio_codec import PystachioCodec
 from twitter.thermos.config.schema import Resources, Process, Task
 
-from pystachio import String, Integer, Map, Empty
+from pystachio import String, Integer, Map, Empty, Ref
 
 
 HELLO_WORLD = {
@@ -121,3 +121,12 @@ def test_config_with_other_replacements():
   main_process = main_process[0]
   assert main_process.cmdline() == String(
       "echo {{mesos.instance}} {{thermos.task_id}} {{thermos.ports[http]}}")
+
+
+def test_config_with_package():
+  hwc = copy.deepcopy(HELLO_WORLD)
+  hwc['package'] = ('jane', 'package', 'live')
+  job = convert(hwc)
+  assert len(job.task().processes().get()) == 2
+  pi, refs = job.task().processes()[0].interpolate()
+  assert Ref.from_address('packer[jane][package][live].copy_command') in refs

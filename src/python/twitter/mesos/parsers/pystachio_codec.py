@@ -2,6 +2,7 @@ from pystachio import Map, String
 
 from twitter.mesos.config.schema import (
   MesosJob,
+  PackerPackage,
   UpdateConfig,
 )
 from twitter.thermos.config.loader import ThermosTaskValidator
@@ -26,14 +27,22 @@ class PystachioCodec(MesosConfig):
   def build_update_config(self):
     return UpdateConfig(self.get_update_config(self._config, snaked=True))
 
+  def build_package(self, package_tuple):
+    return PackerPackage(
+      role = package_tuple[0],
+      name = package_tuple[1],
+      version = str(package_tuple[2]))
+
   def build_task(self):
     cfg = self._config
     processes = []
+    installer_command = Process(name = 'installer', max_failures = 5)
     if self.hdfs_path():
-      processes.append(Process(
-          name = 'installer',
-          cmdline = 'hadoop fs -copyToLocal %s .' % self.hdfs_path(),
-          max_failures = 5))
+      processes.append(installer_command(
+          cmdline = 'hadoop fs -copyToLocal %s .' % self.hdfs_path()))
+    elif self.package():
+      processes.append(installer_command(
+          cmdline = '{{packer[%s][%s][%s].copy_command}}' % self.package()))
     cmdline = cfg['task']['start_command']
     # rewrite ports in cmdline
     for port in EntityParser.match_ports(cmdline):
@@ -48,7 +57,6 @@ class PystachioCodec(MesosConfig):
     task_dict = dict(
       name = self.name(),
       processes = processes,
-
       resources = Resources(
         cpu  = cfg['task']['num_cpus'],
         ram  = cfg['task']['ram_mb'] * 1048576,
@@ -63,8 +71,8 @@ class PystachioCodec(MesosConfig):
     cfg = self._config
     job_dict = dict(
       name = self.name(),
-      cluster = cfg['cluster'],
       role = cfg['role'],
+      cluster = cfg['cluster'],
       instances = cfg['instances'],
       task = self.build_task(),
       cron_schedule = cfg['cron_schedule'],
