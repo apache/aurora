@@ -196,10 +196,11 @@ def get_config(jobname,
       raise ValueError('Environment bindings only supported for Thermos configs.')
 
   if config_type == 'mesos':
-    return MesosConfig(config_file, jobname)
+    config = MesosConfig(config_file, jobname)
   elif config_type == 'thermos':
     loader = PystachioConfig.load_json if json else PystachioConfig.load
     config = loader(config_file, jobname, bindings)
+    _inject_packer_bindings(config, force_local)
   elif config_type == 'auto':
     config = PystachioConfig(PystachioCodec(config_file, jobname).build())
   else:
@@ -209,7 +210,6 @@ def get_config(jobname,
 
 def populate_namespaces(config, copy_app_from=None, force_local=False):
   """Populate additional bindings in the config, e.g. packer bindings."""
-  _inject_packer_bindings(config, force_local)
   package_uri = _get_package_uri(config, copy_app_from=copy_app_from)
   if package_uri:
     config.set_hdfs_path(package_uri)
