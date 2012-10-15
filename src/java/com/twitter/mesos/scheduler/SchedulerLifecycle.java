@@ -21,8 +21,10 @@ import com.twitter.common.args.CmdLine;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
+import com.twitter.common.zookeeper.Group;
 import com.twitter.common.zookeeper.ServerSet;
 import com.twitter.common.zookeeper.SingletonService;
+import com.twitter.common.zookeeper.SingletonService.LeaderControl;
 import com.twitter.thrift.Status;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -123,14 +125,18 @@ class SchedulerLifecycle implements RegisteredListener {
    */
   private class SchedulerCandidateImpl implements SchedulerCandidate {
 
-    @Override public void onLeading(ServerSet.EndpointStatus status) {
+    @Override public void onLeading(LeaderControl control) {
       LOG.info("Elected as leading scheduler!");
       try {
         lead();
-        status.update(Status.ALIVE);
-      } catch (ServerSet.UpdateException e) {
+        control.advertise();
+      } catch (Group.JoinException e) {
+        LOG.log(Level.SEVERE, "Failed to advertise leader, shutting down.", e);
+        lifecycle.shutdown();
+      } catch (InterruptedException e) {
         LOG.log(Level.SEVERE, "Failed to update endpoint status, shutting down.", e);
         lifecycle.shutdown();
+        Thread.currentThread().interrupt();
       } catch (RuntimeException e) {
         LOG.log(Level.SEVERE, "Unexpected exception attempting to lead, shutting down.", e);
         lifecycle.shutdown();
