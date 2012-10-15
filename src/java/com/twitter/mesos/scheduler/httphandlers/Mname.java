@@ -5,7 +5,10 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -38,6 +41,9 @@ import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 
 /**
  * Simple redirector from the canonical name of a task to its configured HTTP port.
+ *
+ * <p>Forwards for GET, PUT, POST and DELETE requests using HTTP 307 allowing compliant clients to
+ * seamlessly perform re-directed mutations.
  */
 @Path("/mname")
 public class Mname {
@@ -74,10 +80,85 @@ public class Mname {
     return get(role, job, shardId, uriInfo, Optional.of(forward));
   }
 
+  @PUT
+  @Path("/{role}/{job}/{shard}/{forward}")
+  @Produces(MediaType.TEXT_HTML)
+  public Response putWithForwardRequest(
+      @PathParam("role") String role,
+      @PathParam("job") String job,
+      @PathParam("shard") int shardId,
+      @PathParam("forward") String forward,
+      @Context UriInfo uriInfo) {
+
+    return get(role, job, shardId, uriInfo, Optional.of(forward));
+  }
+
+  @POST
+  @Path("/{role}/{job}/{shard}/{forward}")
+  @Produces(MediaType.TEXT_HTML)
+  public Response postWithForwardRequest(
+      @PathParam("role") String role,
+      @PathParam("job") String job,
+      @PathParam("shard") int shardId,
+      @PathParam("forward") String forward,
+      @Context UriInfo uriInfo) {
+
+    return get(role, job, shardId, uriInfo, Optional.of(forward));
+  }
+
+  @DELETE
+  @Path("/{role}/{job}/{shard}/{forward}")
+  @Produces(MediaType.TEXT_HTML)
+  public Response deleteWithForwardRequest(
+      @PathParam("role") String role,
+      @PathParam("job") String job,
+      @PathParam("shard") int shardId,
+      @PathParam("forward") String forward,
+      @Context UriInfo uriInfo) {
+
+    return get(role, job, shardId, uriInfo, Optional.of(forward));
+  }
+
   @GET
   @Path("/{role}/{job}/{shard}")
   @Produces(MediaType.TEXT_HTML)
   public Response get(
+      @PathParam("role") String role,
+      @PathParam("job") String job,
+      @PathParam("shard") int shardId,
+      @Context UriInfo uriInfo) {
+
+    return get(role, job, shardId, uriInfo, Optional.<String>absent());
+  }
+
+  @PUT
+  @Path("/{role}/{job}/{shard}")
+  @Produces(MediaType.TEXT_HTML)
+  public Response put(
+      @PathParam("role") String role,
+      @PathParam("job") String job,
+      @PathParam("shard") int shardId,
+      @Context UriInfo uriInfo) {
+
+    return get(role, job, shardId, uriInfo, Optional.<String>absent());
+  }
+
+  @POST
+  @Path("/{role}/{job}/{shard}")
+  @Produces(MediaType.TEXT_HTML)
+  public Response post(
+      @PathParam("role") String role,
+      @PathParam("job") String job,
+      @PathParam("shard") int shardId,
+      @Context UriInfo uriInfo) {
+
+    return get(role, job, shardId, uriInfo, Optional.<String>absent());
+  }
+
+  @DELETE
+  @Path("/{role}/{job}/{shard}")
+  @Produces(MediaType.TEXT_HTML)
+  public Response delete(
       @PathParam("role") String role,
       @PathParam("job") String job,
       @PathParam("shard") int shardId,
