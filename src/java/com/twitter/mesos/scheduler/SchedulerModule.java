@@ -28,6 +28,7 @@ import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.NotNull;
 import com.twitter.common.base.Command;
+import com.twitter.common.inject.Bindings;
 import com.twitter.common.inject.TimedInterceptor;
 import com.twitter.common.net.pool.DynamicHostSet;
 import com.twitter.common.quantity.Amount;
@@ -36,11 +37,15 @@ import com.twitter.common.thrift.ThriftServer;
 import com.twitter.common.util.BackoffStrategy;
 import com.twitter.common.util.Clock;
 import com.twitter.common.util.TruncatedBinaryBackoff;
-import com.twitter.common.zookeeper.ServerSetImpl;
+import com.twitter.common.zookeeper.Candidate;
+import com.twitter.common.zookeeper.ServerSet;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
-import com.twitter.common.zookeeper.ZooKeeperUtils;
-import com.twitter.common_internal.zookeeper.ZooKeeperModule;
+import com.twitter.common_internal.zookeeper.TwitterServerSet;
+import com.twitter.common_internal.zookeeper.TwitterServerSet.Service;
+import com.twitter.common_internal.zookeeper.TwitterServerSetModule;
+import com.twitter.common_internal.zookeeper.legacy.ServerSetMigrationModule;
+import com.twitter.common_internal.zookeeper.legacy.ServerSetMigrationModule.ServiceDiscovery;
 import com.twitter.mesos.GuiceUtils;
 import com.twitter.mesos.auth.AuthBindings;
 import com.twitter.mesos.scheduler.BackoffSchedulingFilter.BackoffDelegate;
@@ -81,11 +86,6 @@ import com.twitter.thrift.ServiceInstance;
 public class SchedulerModule extends AbstractModule {
   private static final Logger LOG = Logger.getLogger(SchedulerModule.class.getName());
 
-  @NotNull
-  @CmdLine(name = "mesos_scheduler_ns",
-      help = "The name service name for the mesos scheduler thrift server.")
-  private static final Arg<String> MESOS_SCHEDULER_NAME_SPEC = Arg.create();
-
   @CmdLine(name = "executor_dead_threashold", help =
       "Time after which the scheduler will consider an executor dead and attempt to revive it.")
   private static final Arg<Amount<Long, Time>> EXECUTOR_DEAD_THRESHOLD =
@@ -120,6 +120,11 @@ public class SchedulerModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> MAX_RESCHEDULE_BACKOFF =
       Arg.create(Amount.of(2L, Time.MINUTES));
 
+  @CmdLine(name = "dual_publish",
+      help = "If enabled the scheduler will dual publish its leadership in the legacy"
+          + " -zk_endpoints cluster and the local service discovery cluster.")
+  private static final Arg<Boolean> DUAL_PUBLISH = Arg.create(false);
+
   private enum AuthMode {
     UNSECURE,
     ANGRYBIRD_UNSECURE,
@@ -132,14 +137,6 @@ public class SchedulerModule extends AbstractModule {
     TimedInterceptor.bind(binder());
     GuiceUtils.bindJNIContextClassLoader(binder(), Scheduler.class);
     GuiceUtils.bindExceptionTrap(binder(), Scheduler.class);
-
-    // Bind a ZooKeeperClient
-    install(
-        ZooKeeperModule.flaggedHostsBuilder()
-            .withFlagOverrides()
-            .withDigestCredentials("mesos", "mesos")
-            .withAcl(ZooKeeperUtils.EVERYONE_READ_CREATOR_ALL)
-            .build());
 
     bind(Key.get(String.class, ClusterName.class)).toInstance(CLUSTER_NAME.get());
 
@@ -194,10 +191,31 @@ public class SchedulerModule extends AbstractModule {
     bind(SchedulerThriftInterface.class).in(Singleton.class);
     bind(ThriftServer.class).to(SchedulerThriftServer.class).in(Singleton.class);
 
+    Service schedulerService = new Service("mesos", CLUSTER_NAME.get(), "scheduler");
+    bind(Service.class).toInstance(schedulerService);
+    if (DUAL_PUBLISH.get()) {
+      install(
+          new ServerSetMigrationModule(
+              schedulerService,
+              Optional.of(ZooKeeperClient.digestCredentials("mesos", "mesos")),
+              Optional.<String>absent())); // let the existing flagged legacy ss path be taken
+    } else {
+      install(
+          TwitterServerSetModule
+              .authenticatedZooKeeperModule(schedulerService)
+              .withFlagOverrides()
+              .build(Bindings.annotatedKeyFactory(ServiceDiscovery.class)));
+      install(
+          new TwitterServerSetModule(
+              Key.get(ServerSet.class),
+              Bindings.annotatedKeyFactory(ServiceDiscovery.class),
+              schedulerService));
+    }
+
     if (ISOLATED_SCHEDULER.get()) {
       install(new IsolatedSchedulerModule());
     } else {
-      MesosLogStreamModule.bind(binder());
+      MesosLogStreamModule.bind(binder(), Bindings.annotatedKeyFactory(ServiceDiscovery.class));
       LogStorageModule.bind(binder());
       bind(DriverFactory.class).to(DriverFactoryImpl.class);
       bind(DriverFactoryImpl.class).in(Singleton.class);
@@ -300,14 +318,29 @@ public class SchedulerModule extends AbstractModule {
 
   @Provides
   @Singleton
-  SingletonService provideSingletonService(ZooKeeperClient zkClient, List<ACL> acl) {
-    return new SingletonService(zkClient, MESOS_SCHEDULER_NAME_SPEC.get(), acl);
+  SingletonService provideSingletonService(
+      Service schedulerService,
+      ServerSet serverSet,
+      @ServiceDiscovery ZooKeeperClient client,
+      @ServiceDiscovery List<ACL> acl) {
+
+    // We vie for candidacy in the SD cluster since this is a private action, but we dual publish
+    // our leadership in the compound ServerSet so that old mesos clients can still find us.
+    // TODO(John Sirois): After the mesos client is deployed come back and eliminate dual
+    // publishing.
+    String path = TwitterServerSet.getPath(schedulerService);
+    Candidate candidate = SingletonService.createSingletonCandidate(client, path, acl);
+    return new SingletonService(serverSet, candidate);
   }
 
   @Provides
   @Singleton
-  DynamicHostSet<ServiceInstance> provideSchedulerHostSet(ZooKeeperClient zkClient, List<ACL> acl) {
-    return new ServerSetImpl(zkClient, acl, MESOS_SCHEDULER_NAME_SPEC.get());
+  DynamicHostSet<ServiceInstance> provideSchedulerHostSet(
+      Service schedulerService,
+      @ServiceDiscovery ZooKeeperClient zkClient) {
+
+    // For the leader-redirect servlet.
+    return TwitterServerSet.create(zkClient, schedulerService);
   }
 
   @Provides

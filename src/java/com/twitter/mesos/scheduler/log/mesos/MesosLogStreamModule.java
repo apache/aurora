@@ -1,6 +1,8 @@
 package com.twitter.mesos.scheduler.log.mesos;
 
 import java.io.File;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 import java.net.InetSocketAddress;
 import java.util.List;
 
@@ -8,6 +10,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.inject.Binder;
+import com.google.inject.BindingAnnotation;
 import com.google.inject.Key;
 import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
@@ -19,13 +22,18 @@ import org.apache.zookeeper.common.PathUtils;
 
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
+import com.twitter.common.inject.Bindings;
+import com.twitter.common.inject.Bindings.KeyFactory;
+import com.twitter.common.inject.Bindings.Rebinder;
 import com.twitter.common.net.InetSocketAddressHelper;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.zookeeper.ZooKeeperClient.Credentials;
-import com.twitter.common_internal.zookeeper.ZooKeeper;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.storage.LogEntry;
+
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Binds a native mesos Log implementation.
@@ -87,43 +95,47 @@ public class MesosLogStreamModule extends PrivateModule {
   private static final Arg<Amount<Long, Time>> WRITE_TIMEOUT =
       Arg.create(Amount.of(3L, Time.SECONDS));
 
+  @Retention(RUNTIME)
+  @Target(PARAMETER)
+  @BindingAnnotation
+  private @interface LogBinding { }
+
   /**
    * Binds a distributed {@link com.twitter.mesos.scheduler.log.Log} that uses the mesos core native
    * log implementation.
    *
    * @param binder a guice binder to bind the distributed log with
+   * @param zkKeys The keys the ZooKeeper server connection can be retrieved with.
    */
-  public static void bind(Binder binder) {
-    binder.install(new MesosLogStreamModule());
+  public static void bind(Binder binder, KeyFactory zkKeys) {
+    binder.install(new MesosLogStreamModule(
+        Key.get(com.twitter.mesos.scheduler.log.Log.class),
+        zkKeys,
+        LOG_PATH.get(),
+        ZK_LOG_GROUP_PATH.get()));
   }
 
-  private final Key<com.twitter.mesos.scheduler.log.Log> key;
+  private final Key<com.twitter.mesos.scheduler.log.Log> logKey;
   private final File logPath;
   private final String zkPath;
-
-  /**
-   * Creates a module that binds the mesos native log using a log path and zookeeper coordination
-   * path from command line flags.
-   */
-  public MesosLogStreamModule() {
-    this(Key.get(com.twitter.mesos.scheduler.log.Log.class),
-        LOG_PATH.get(),
-        ZK_LOG_GROUP_PATH.get());
-  }
+  private final KeyFactory zkKeys;
 
   /**
    * Creates a module that binds the mesos native log to the given key.
    *
-   * @param key The key to bind the native log implementation to.
+   * @param logKey The key to bind the native log implementation to.
+   * @param zkKeys The keys the ZooKeeper server connection can be retrieved with.
    * @param logPath The path to the native log data directory.
    * @param zkPath The zookeeper path to use for replica coordination.
    */
   public MesosLogStreamModule(
-      Key<com.twitter.mesos.scheduler.log.Log> key,
+      Key<com.twitter.mesos.scheduler.log.Log> logKey,
+      KeyFactory zkKeys,
       File logPath,
       String zkPath) {
 
-    this.key = Preconditions.checkNotNull(key);
+    this.logKey = Preconditions.checkNotNull(logKey);
+    this.zkKeys = Preconditions.checkNotNull(zkKeys);
     this.logPath = Preconditions.checkNotNull(logPath);
 
     PathUtils.validatePath(zkPath);
@@ -132,23 +144,26 @@ public class MesosLogStreamModule extends PrivateModule {
 
   @Override
   protected void configure() {
-    requireBinding(Credentials.class);
-    requireBinding(Key.get(new TypeLiteral<List<InetSocketAddress>>() { }, ZooKeeper.class));
-    requireBinding(Key.get(new TypeLiteral<Amount<Integer, Time>>() { }, ZooKeeper.class));
+    Rebinder rebinder = Bindings.rebinder(binder(), LogBinding.class);
+    rebinder.rebind(zkKeys.create(new TypeLiteral<List<InetSocketAddress>>() { }));
+    rebinder.rebind(zkKeys.create(new TypeLiteral<Amount<Integer, Time>>() { }));
+    rebinder.rebind(zkKeys.create(Credentials.class));
 
     bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(MesosLog.ReadTimeout.class)
         .toInstance(READ_TIMEOUT.get());
     bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(MesosLog.WriteTimeout.class)
         .toInstance(WRITE_TIMEOUT.get());
 
-    bind(key).to(MesosLog.class).in(Singleton.class);
-    expose(key);
+    bind(logKey).to(MesosLog.class).in(Singleton.class);
+    expose(logKey);
   }
 
   @Provides
   @Singleton
-  Log provideLog(@ZooKeeper List<InetSocketAddress> endpoints,
-                 Credentials credentials, @ZooKeeper Amount<Integer, Time> sessionTimeout) {
+  Log provideLog(
+      @LogBinding List<InetSocketAddress> endpoints,
+      @LogBinding Credentials credentials,
+      @LogBinding Amount<Integer, Time> sessionTimeout) {
 
     File parentDir = logPath.getParentFile();
     if (!parentDir.exists() && !parentDir.mkdirs()) {

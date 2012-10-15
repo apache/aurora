@@ -34,8 +34,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * A {@code Log} implementation backed by a true distributed log in mesos core.
- *
- * @author John Sirois
  */
 public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
 
@@ -86,13 +84,13 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
    * @param noopEntry A no-op log entry blob.
    */
   @Inject
-    public MesosLog(
-        Provider<Log> logFactory,
-        Provider<Log.Reader> readerFactory,
-        @ReadTimeout Amount<Long, Time> readTimeout,
-        Provider<Log.Writer> writerFactory,
-        @WriteTimeout Amount<Long, Time> writeTimeout,
-        @NoopEntry byte[] noopEntry) {
+  public MesosLog(
+      Provider<Log> logFactory,
+      Provider<Log.Reader> readerFactory,
+      @ReadTimeout Amount<Long, Time> readTimeout,
+      Provider<Log.Writer> writerFactory,
+      @WriteTimeout Amount<Long, Time> writeTimeout,
+      @NoopEntry byte[] noopEntry) {
 
     this.logFactory = Preconditions.checkNotNull(logFactory);
 
