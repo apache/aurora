@@ -103,9 +103,8 @@ class SchedulerManager(object):
     print 'Temporarily disabling monit for the scheduler on %s' % host
     self._deployer.remote_check_call(host, ['sudo', 'monit', 'unmonitor', 'mesos-scheduler'])
     self.fetch_scheduler_http(host, 'quitquitquit')
-    print 'Waiting for scheduler to stop cleanly'
     if self._really_deploy:
-      print 'Waiting for the scheduler to start'
+      print 'Waiting for scheduler to stop cleanly'
       time.sleep(5)
     print 'Stopping scheduler via monit'
     self._deployer.remote_check_call(host, ['sudo', 'monit', 'stop', 'mesos-scheduler'])
