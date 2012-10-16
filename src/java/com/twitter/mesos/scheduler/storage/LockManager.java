@@ -18,33 +18,41 @@ public class LockManager {
     WRITE
   }
 
-  private LockMode initialLockMode = LockMode.NONE;
-  private int lockCount = 0;
+  private static class LockState {
+    LockMode initialLockMode = LockMode.NONE;
+    int lockCount = 0;
 
-  private void lockAcquired(LockMode mode) {
-    if (initialLockMode == LockMode.NONE) {
-      initialLockMode = mode;
+    private void lockAcquired(LockMode mode) {
+      if (initialLockMode == LockMode.NONE) {
+        initialLockMode = mode;
+      }
+      if (initialLockMode == mode) {
+        lockCount++;
+      }
     }
-    if (initialLockMode == mode) {
-      lockCount++;
-    }
-  }
 
-  private void lockReleased(LockMode mode) {
-    if (initialLockMode == mode) {
-      lockCount--;
-      if (lockCount == 0) {
-        initialLockMode = LockMode.NONE;
+    private void lockReleased(LockMode mode) {
+      if (initialLockMode == mode) {
+        lockCount--;
+        if (lockCount == 0) {
+          initialLockMode = LockMode.NONE;
+        }
       }
     }
   }
+
+  private final ThreadLocal<LockState> lockState = new ThreadLocal<LockState>() {
+    @Override protected LockState initialValue() {
+      return new LockState();
+    }
+  };
 
   /**
    * Blocks until this thread has acquired a read lock.
    */
   public void readLock() {
     lock.readLock().lock();
-    lockAcquired(LockMode.READ);
+    lockState.get().lockAcquired(LockMode.READ);
   }
 
   /**
@@ -52,18 +60,18 @@ public class LockManager {
    */
   public void readUnlock() {
     lock.readLock().unlock();
-    lockReleased(LockMode.READ);
+    lockState.get().lockReleased(LockMode.READ);
   }
 
   /**
    * Blocks until this thread has acquired a write lock.
    */
   public void writeLock() {
-    Preconditions.checkState(initialLockMode != LockMode.READ,
+    Preconditions.checkState(lockState.get().initialLockMode != LockMode.READ,
         "A read transaction may not be upgraded to a write transaction.");
 
     lock.writeLock().lock();
-    lockAcquired(LockMode.WRITE);
+    lockState.get().lockAcquired(LockMode.WRITE);
   }
 
   /**
@@ -71,6 +79,6 @@ public class LockManager {
    */
   public void writeUnlock() {
     lock.writeLock().unlock();
-    lockReleased(LockMode.WRITE);
+    lockState.get().lockReleased(LockMode.WRITE);
   }
 }
