@@ -19,10 +19,6 @@ import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskInfo;
 
-import com.twitter.common.args.Arg;
-import com.twitter.common.args.CmdLine;
-import com.twitter.common.args.constraints.NotNull;
-import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.mesos.Protobufs;
@@ -31,6 +27,8 @@ import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.AssignedTask;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+
+import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**
  * A factory to create mesos task objects.
@@ -54,42 +52,48 @@ public interface MesosTaskFactory {
 
     private static final String THERMOS_EXECUTOR_ID_PREFIX = "thermos-";
 
-    // TODO(wfarner): Push these args out to a module once java executor is gone.
+    static class ExecutorConfig {
+      private final String oldExecutorPath;
+      private final String thermosExecutorPath;
 
-    @NotNull
-    @CmdLine(name = "executor_path", help = "Path to the executor launch script.")
-    private static final Arg<String> EXECUTOR_PATH = Arg.create();
+      ExecutorConfig(String oldExecutorPath, String thermosExecutorPath) {
+        this.oldExecutorPath = checkNotBlank(oldExecutorPath);
+        this.thermosExecutorPath = checkNotBlank(thermosExecutorPath);
+      }
 
-    @NotNull
-    @CmdLine(name = "thermos_executor_path", help = "Path to the thermos executor launch script.")
-    private static final Arg<String> THERMOS_EXECUTOR_PATH = Arg.create();
+      String getOldExecutorPath() {
+        return oldExecutorPath;
+      }
+
+      String getThermosExecutorPath() {
+        return thermosExecutorPath;
+      }
+    }
 
     // These are hard-coded to avoid risk posed due to MESOS-911.
     private static final double EXECUTOR_CPUS = 0.25;
     private static final Amount<Double, Data> EXECUTOR_RAM = Amount.of(3d, Data.GB);
 
-    private final String exepath;
+    private final String oldExePath;
+    private final String thermosExePath;
     private final double cpus;
     private final Amount<Double, Data> ram;
 
     @Inject
-    MesosTaskFactoryImpl() {
-      this(EXECUTOR_PATH.get());
+    MesosTaskFactoryImpl(ExecutorConfig executorConfig) {
+      this(executorConfig, EXECUTOR_CPUS, EXECUTOR_RAM);
     }
 
     @VisibleForTesting
-    MesosTaskFactoryImpl(String executorPath) {
-      this(executorPath, EXECUTOR_CPUS, EXECUTOR_RAM);
-    }
-
-    @VisibleForTesting
-    MesosTaskFactoryImpl(String executorPath, double cpus, Amount<Double, Data> ram) {
+    MesosTaskFactoryImpl(ExecutorConfig executorConfig, double cpus, Amount<Double, Data> ram) {
+      Preconditions.checkNotNull(executorConfig);
       Preconditions.checkArgument(cpus > 0);
 
       Preconditions.checkNotNull(ram);
       Preconditions.checkArgument(ram.getValue() > 0);
 
-      this.exepath = MorePreconditions.checkNotBlank(executorPath);
+      this.oldExePath = executorConfig.getOldExecutorPath();
+      this.thermosExePath = executorConfig.getThermosExecutorPath();
       this.cpus = cpus;
       this.ram = ram;
     }
@@ -128,7 +132,7 @@ public interface MesosTaskFactory {
       ExecutorInfo executor;
       if (Tasks.IS_THERMOS_TASK.apply(task.getTask())) {
         executor = ExecutorInfo.newBuilder()
-            .setCommand(CommandUtil.create(THERMOS_EXECUTOR_PATH.get()))
+            .setCommand(CommandUtil.create(thermosExePath))
             .setExecutorId(
                 ExecutorID.newBuilder().setValue(THERMOS_EXECUTOR_ID_PREFIX + task.getTaskId()))
             .addResources(Resources.makeMesosResource(Resources.CPUS, ThermosResources.CPUS))
@@ -136,7 +140,7 @@ public interface MesosTaskFactory {
                 Resources.makeMesosResource(Resources.RAM_MB, ThermosResources.RAM.as(Data.MB)))
             .build();
       } else {
-        executor = ExecutorInfo.newBuilder().setCommand(CommandUtil.create(exepath))
+        executor = ExecutorInfo.newBuilder().setCommand(CommandUtil.create(oldExePath))
             .setExecutorId(DEFAULT_EXECUTOR_ID)
             .addResources(Resources.makeMesosResource(Resources.CPUS, cpus))
             .addResources(Resources.makeMesosResource(Resources.RAM_MB, ram.as(Data.MB)))

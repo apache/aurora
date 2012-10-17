@@ -18,6 +18,7 @@ import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -54,6 +55,8 @@ import com.twitter.mesos.scheduler.log.Log.Stream;
 import com.twitter.mesos.scheduler.log.Log.Stream.InvalidPositionException;
 import com.twitter.mesos.scheduler.log.Log.Stream.StreamAccessException;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 /**
  * Manages opening, reading from and writing to a {@link Log}.
  */
@@ -74,11 +77,14 @@ public final class LogManager {
   private final ShutdownRegistry shutdownRegistry;
 
   @Inject
-  LogManager(Log log, @MaxEntrySize Amount<Integer, Data> maxEntrySize,
+  LogManager(
+      Log log,
+      @MaxEntrySize Amount<Integer, Data> maxEntrySize,
       ShutdownRegistry shutdownRegistry) {
-    this.log = Preconditions.checkNotNull(log);
-    this.maxEntrySize = Preconditions.checkNotNull(maxEntrySize);
-    this.shutdownRegistry = Preconditions.checkNotNull(shutdownRegistry);
+
+    this.log = checkNotNull(log);
+    this.maxEntrySize = checkNotNull(maxEntrySize);
+    this.shutdownRegistry = checkNotNull(shutdownRegistry);
   }
 
   /**
@@ -106,6 +112,14 @@ public final class LogManager {
    */
   public static class StreamManager {
 
+    private static MessageDigest createDigest() {
+      try {
+        return MessageDigest.getInstance("MD5");
+      } catch (NoSuchAlgorithmException e) {
+        throw new IllegalStateException("Could not find provider for standard algorithm 'MD5'", e);
+      }
+    }
+
     private static class Vars {
       final AtomicInteger unSnapshottedTransactions =
           Stats.exportInt("scheduler_log_un_snapshotted_transactions");
@@ -120,17 +134,13 @@ public final class LogManager {
 
     private final Object writeMutex = new Object();
     private final Stream stream;
-    private final int maxEntrySizeBytes;
-    private final MessageDigest messageDigest;
+    private final MessageDigest digest;
+    private final EntrySerializer entrySerializer;
 
     StreamManager(Stream stream, Amount<Integer, Data> maxEntrySize) {
-      this.stream = Preconditions.checkNotNull(stream);
-      maxEntrySizeBytes = Preconditions.checkNotNull(maxEntrySize).as(Data.BYTES);
-      try {
-        messageDigest = MessageDigest.getInstance("MD5");
-      } catch (NoSuchAlgorithmException e) {
-        throw new IllegalStateException("Could not find provider for standard algorithm 'MD5'", e);
-      }
+      this.stream = checkNotNull(stream);
+      digest = createDigest();
+      entrySerializer = new EntrySerializer(digest, maxEntrySize);
     }
 
     /**
@@ -168,7 +178,7 @@ public final class LogManager {
       FrameHeader header = frame.getHeader();
       byte[][] chunks = new byte[header.chunkCount][];
 
-      messageDigest.reset();
+      digest.reset();
       for (int i = 0; i < header.chunkCount; i++) {
         if (!entries.hasNext()) {
           logBadFrame(header, i);
@@ -185,10 +195,10 @@ public final class LogManager {
           return logEntry;
         }
         byte[] chunkData = chunkFrame.getChunk().getData();
-        messageDigest.update(chunkData);
+        digest.update(chunkData);
         chunks[i] = chunkData;
       }
-      if (!Arrays.equals(header.getChecksum(), messageDigest.digest())) {
+      if (!Arrays.equals(header.getChecksum(), digest.digest())) {
         throw new CodingException("Read back a framed log entry that failed its checksum");
       }
       return decodeLogEntry(Bytes.concat(chunks));
@@ -267,7 +277,8 @@ public final class LogManager {
     @Timed("scheduler_log_append")
     private Position appendAndGetPosition(LogEntry logEntry) throws CodingException {
       Position firstPosition = null;
-      byte[][] entries = createEntries(encode(logEntry));
+      LOG.info("Saving log entry " + logEntry);
+      byte[][] entries = entrySerializer.serialize(logEntry);
       synchronized (writeMutex) { // ensure all sub-entries are written as a unit
         for (byte[] entry : entries) {
           Position position = stream.append(entry);
@@ -281,35 +292,59 @@ public final class LogManager {
       return firstPosition;
     }
 
-    private byte[][] createEntries(byte[] entry) throws CodingException {
-      if (entry.length <= maxEntrySizeBytes) {
-        return new byte[][] {entry};
+    @VisibleForTesting
+    public static class EntrySerializer {
+      private final MessageDigest digest;
+      private final int maxEntrySizeBytes;
+
+      private EntrySerializer(MessageDigest digest, Amount<Integer, Data> maxEntrySize) {
+        this.digest = checkNotNull(digest);
+        maxEntrySizeBytes = maxEntrySize.as(Data.BYTES);
       }
 
-      int chunks = (int) Math.ceil(entry.length / (double) maxEntrySizeBytes);
-      byte[][] frames = new byte[chunks + 1][];
-
-      frames[0] = encode(Frame.header(new FrameHeader(chunks, ByteBuffer.wrap(checksum(entry)))));
-      for (int i = 0; i < chunks; i++) {
-        int offset = i * maxEntrySizeBytes;
-        ByteBuffer chunk =
-            ByteBuffer.wrap(entry, offset, Math.min(maxEntrySizeBytes, entry.length - offset));
-        frames[i + 1] = encode(Frame.chunk(new FrameChunk(chunk)));
+      public EntrySerializer(Amount<Integer, Data> maxEntrySize) {
+        this(createDigest(), maxEntrySize);
       }
-      return frames;
-    }
 
-    private byte[] checksum(byte[] data) {
-      messageDigest.reset();
-      return messageDigest.digest(data);
-    }
+      /**
+       * Serializes a log entry and splits it into chunks no larger than {@code maxEntrySizeBytes}.
+       *
+       * @param logEntry The log entry to serialize.
+       * @return Serialized and chunked log entry.
+       * @throws CodingException If the entry could not be serialized.
+       */
+      @VisibleForTesting
+      public byte[][] serialize(LogEntry logEntry) throws CodingException {
+        byte[] entry = encode(logEntry);
+        if (entry.length <= maxEntrySizeBytes) {
+          return new byte[][] {entry};
+        }
 
-    private byte[] encode(Frame frame) throws CodingException {
-      return encode(LogEntry.frame(frame));
-    }
+        int chunks = (int) Math.ceil(entry.length / (double) maxEntrySizeBytes);
+        byte[][] frames = new byte[chunks + 1][];
 
-    private byte[] encode(LogEntry entry) throws CodingException {
-      return ThriftBinaryCodec.encodeNonNull(entry);
+        frames[0] = encode(Frame.header(new FrameHeader(chunks, ByteBuffer.wrap(checksum(entry)))));
+        for (int i = 0; i < chunks; i++) {
+          int offset = i * maxEntrySizeBytes;
+          ByteBuffer chunk =
+              ByteBuffer.wrap(entry, offset, Math.min(maxEntrySizeBytes, entry.length - offset));
+          frames[i + 1] = encode(Frame.chunk(new FrameChunk(chunk)));
+        }
+        return frames;
+      }
+
+      private byte[] checksum(byte[] data) {
+        digest.reset();
+        return digest.digest(data);
+      }
+
+      private static byte[] encode(Frame frame) throws CodingException {
+        return encode(LogEntry.frame(frame));
+      }
+
+      private static byte[] encode(LogEntry entry) throws CodingException {
+        return ThriftBinaryCodec.encodeNonNull(entry);
+      }
     }
 
     /**

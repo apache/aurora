@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.logging.Logger;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
@@ -26,9 +27,7 @@ import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
-import com.twitter.common.args.constraints.NotNull;
 import com.twitter.common.base.Command;
-import com.twitter.common.inject.Bindings;
 import com.twitter.common.inject.TimedInterceptor;
 import com.twitter.common.net.pool.DynamicHostSet;
 import com.twitter.common.quantity.Amount;
@@ -43,8 +42,6 @@ import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.common_internal.zookeeper.TwitterServerSet;
 import com.twitter.common_internal.zookeeper.TwitterServerSet.Service;
-import com.twitter.common_internal.zookeeper.TwitterServerSetModule;
-import com.twitter.common_internal.zookeeper.legacy.ServerSetMigrationModule;
 import com.twitter.common_internal.zookeeper.legacy.ServerSetMigrationModule.ServiceDiscovery;
 import com.twitter.mesos.GuiceUtils;
 import com.twitter.mesos.auth.AuthBindings;
@@ -52,7 +49,6 @@ import com.twitter.mesos.scheduler.BackoffSchedulingFilter.BackoffDelegate;
 import com.twitter.mesos.scheduler.CronJobManager.CronScheduler;
 import com.twitter.mesos.scheduler.CronJobManager.CronScheduler.Cron4jScheduler;
 import com.twitter.mesos.scheduler.Driver.DriverImpl;
-import com.twitter.mesos.scheduler.DriverFactory.DriverFactoryImpl;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHosts;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHostsImpl;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveMapper;
@@ -67,7 +63,6 @@ import com.twitter.mesos.scheduler.TaskAssigner.TaskAssignerImpl;
 import com.twitter.mesos.scheduler.async.AsyncModule;
 import com.twitter.mesos.scheduler.events.TaskEventModule;
 import com.twitter.mesos.scheduler.httphandlers.ServletModule;
-import com.twitter.mesos.scheduler.log.mesos.MesosLogStreamModule;
 import com.twitter.mesos.scheduler.metadata.MetadataModule;
 import com.twitter.mesos.scheduler.periodic.BootstrapTaskLauncher;
 import com.twitter.mesos.scheduler.periodic.BootstrapTaskLauncher.Bootstrap;
@@ -77,8 +72,6 @@ import com.twitter.mesos.scheduler.periodic.PeriodicTaskModule;
 import com.twitter.mesos.scheduler.quota.QuotaModule;
 import com.twitter.mesos.scheduler.storage.AttributeStore;
 import com.twitter.mesos.scheduler.storage.AttributeStore.AttributeStoreImpl;
-import com.twitter.mesos.scheduler.storage.log.LogStorageModule;
-import com.twitter.mesos.scheduler.testing.IsolatedSchedulerModule;
 import com.twitter.thrift.ServiceInstance;
 
 /**
@@ -97,19 +90,8 @@ public class SchedulerModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> EXECUTOR_GC_INTERVAL =
       Arg.create(Amount.of(1L, Time.HOURS));
 
-  @NotNull
-  @CmdLine(name = "cluster_name", help = "Name to identify the cluster being served.")
-  private static final Arg<String> CLUSTER_NAME = Arg.create();
-
   @CmdLine(name = "gc_executor_path", help = "Path to the gc executor launch script.")
   private static final Arg<String> GC_EXECUTOR_PATH = Arg.create(null);
-
-  @CmdLine(name = "testing_isolated_scheduler",
-      help = "If true, run in a testing mode with the scheduler isolated from other components.")
-  private static final Arg<Boolean> ISOLATED_SCHEDULER = Arg.create(false);
-
-  @CmdLine(name = "auth_mode", help = "Enforces RPC authentication with mesos client.")
-  private static final Arg<AuthMode> AUTH_MODE = Arg.create(AuthMode.SECURE);
 
   @CmdLine(name = "initial_task_reschedule_backoff",
       help = "Initial backoff delay for a rescheduled task.")
@@ -121,15 +103,19 @@ public class SchedulerModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> MAX_RESCHEDULE_BACKOFF =
       Arg.create(Amount.of(2L, Time.MINUTES));
 
-  @CmdLine(name = "dual_publish",
-      help = "If enabled the scheduler will dual publish its leadership in the legacy"
-          + " -zk_endpoints cluster and the local service discovery cluster.")
-  private static final Arg<Boolean> DUAL_PUBLISH = Arg.create(false);
-
-  private enum AuthMode {
+  @VisibleForTesting
+  enum AuthMode {
     UNSECURE,
     ANGRYBIRD_UNSECURE,
     SECURE
+  }
+
+  private final String clusterName;
+  private final AuthMode authMode;
+
+  SchedulerModule(String clusterName, AuthMode authMode) {
+    this.clusterName = clusterName;
+    this.authMode = authMode;
   }
 
   @Override
@@ -139,7 +125,7 @@ public class SchedulerModule extends AbstractModule {
     GuiceUtils.bindJNIContextClassLoader(binder(), Scheduler.class);
     GuiceUtils.bindExceptionTrap(binder(), Scheduler.class);
 
-    bind(Key.get(String.class, ClusterName.class)).toInstance(CLUSTER_NAME.get());
+    bind(Key.get(String.class, ClusterName.class)).toInstance(clusterName);
 
     bind(Driver.class).to(DriverImpl.class);
     bind(DriverImpl.class).in(Singleton.class);
@@ -152,7 +138,7 @@ public class SchedulerModule extends AbstractModule {
     bind(MesosTaskFactory.class).to(MesosTaskFactoryImpl.class);
 
     // Bindings for MesosSchedulerImpl.
-    switch(AUTH_MODE.get()) {
+    switch(authMode) {
       case SECURE:
         LOG.info("Using secure authentication mode");
         AuthBindings.bindLdapAuth(binder());
@@ -169,7 +155,7 @@ public class SchedulerModule extends AbstractModule {
         break;
 
        default:
-         throw new IllegalArgumentException("Invalid authentication mode: " + AUTH_MODE.get());
+         throw new IllegalArgumentException("Invalid authentication mode: " + authMode);
     }
 
     bind(SchedulerCore.class).to(SchedulerCoreImpl.class).in(Singleton.class);
@@ -193,36 +179,6 @@ public class SchedulerModule extends AbstractModule {
     LoggingThriftInterface.bind(binder(), SchedulerThriftInterface.class);
     bind(SchedulerThriftInterface.class).in(Singleton.class);
     bind(ThriftServer.class).to(SchedulerThriftServer.class).in(Singleton.class);
-
-    Service schedulerService = new Service("mesos", CLUSTER_NAME.get(), "scheduler");
-    bind(Service.class).toInstance(schedulerService);
-    if (DUAL_PUBLISH.get()) {
-      install(
-          new ServerSetMigrationModule(
-              schedulerService,
-              Optional.of(ZooKeeperClient.digestCredentials("mesos", "mesos")),
-              Optional.<String>absent())); // let the existing flagged legacy ss path be taken
-    } else {
-      install(
-          TwitterServerSetModule
-              .authenticatedZooKeeperModule(schedulerService)
-              .withFlagOverrides()
-              .build(Bindings.annotatedKeyFactory(ServiceDiscovery.class)));
-      install(
-          new TwitterServerSetModule(
-              Key.get(ServerSet.class),
-              Bindings.annotatedKeyFactory(ServiceDiscovery.class),
-              schedulerService));
-    }
-
-    if (ISOLATED_SCHEDULER.get()) {
-      install(new IsolatedSchedulerModule());
-    } else {
-      MesosLogStreamModule.bind(binder(), Bindings.annotatedKeyFactory(ServiceDiscovery.class));
-      LogStorageModule.bind(binder());
-      bind(DriverFactory.class).to(DriverFactoryImpl.class);
-      bind(DriverFactoryImpl.class).in(Singleton.class);
-    }
 
     bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(Backoff.class)
         .toInstance(MAX_RESCHEDULE_BACKOFF.get());

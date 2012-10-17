@@ -1,5 +1,7 @@
 package com.twitter.mesos.scheduler;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
@@ -10,6 +12,7 @@ import javax.annotation.Nullable;
 import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
 
 import org.apache.mesos.Protos;
@@ -25,7 +28,11 @@ import com.twitter.common.zookeeper.Group;
 import com.twitter.common.zookeeper.ServerSet;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.SingletonService.LeaderControl;
-import com.twitter.thrift.Status;
+
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -60,6 +67,14 @@ class SchedulerLifecycle implements RegisteredListener {
   private static final Arg<Amount<Long, Time>> MAX_LEADING_DURATION =
       Arg.create(Amount.of(1L, Time.DAYS));
 
+  /**
+   * Binding annotation to attach to the flag indicating whether to initiate application shutdown
+   * when the driver returns from {@link Driver#run()}.
+   */
+  @BindingAnnotation
+  @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
+  public @interface ShutdownOnDriverExit { }
+
   private static final Logger LOG = Logger.getLogger(SchedulerLifecycle.class.getName());
 
   private final DriverFactory driverFactory;
@@ -70,6 +85,7 @@ class SchedulerLifecycle implements RegisteredListener {
 
   private final Driver driver;
   private final DriverReference driverRef;
+  private final boolean shutdownAfterRunning;
 
   @Inject
   SchedulerLifecycle(
@@ -77,13 +93,15 @@ class SchedulerLifecycle implements RegisteredListener {
       SchedulerCore scheduler,
       Lifecycle lifecycle,
       Driver driver,
-      DriverReference driverRef) {
+      DriverReference driverRef,
+      @ShutdownOnDriverExit boolean shutdownAfterRunning) {
 
     this.driverFactory = checkNotNull(driverFactory);
     this.scheduler = checkNotNull(scheduler);
     this.lifecycle = checkNotNull(lifecycle);
     this.driver  = checkNotNull(driver);
     this.driverRef = checkNotNull(driverRef);
+    this.shutdownAfterRunning = shutdownAfterRunning;
   }
 
   /**
@@ -163,7 +181,9 @@ class SchedulerLifecycle implements RegisteredListener {
         @Override public void run() {
           Protos.Status status = driver.run();
           LOG.info("Driver completed with exit code " + status);
-          lifecycle.shutdown();
+          if (shutdownAfterRunning) {
+            lifecycle.shutdown();
+          }
         }
       });
 
@@ -207,7 +227,7 @@ class SchedulerLifecycle implements RegisteredListener {
 
       try {
         if (status != null) {
-          status.update(Status.DEAD);
+          status.leave();
         }
 
         driver.stop(); // shut down incoming offers

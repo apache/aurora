@@ -2,6 +2,7 @@ package com.twitter.mesos.scheduler.storage.log;
 
 import java.lang.annotation.Annotation;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
 import com.google.inject.Key;
@@ -83,7 +84,8 @@ public class LogStorageModule extends AbstractModule {
   @CmdLine(name = "dlog_max_entry_size",
            help = "Specifies the maximum entry size to append to the log. Larger entries will be "
                   + "split across entry Frames.")
-  private static final Arg<Amount<Integer, Data>> MAX_LOG_ENTRY_SIZE =
+  @VisibleForTesting
+  public static final Arg<Amount<Integer, Data>> MAX_LOG_ENTRY_SIZE =
       Arg.create(Amount.of(512, Data.KB));
 
   @CmdLine(name = "use_new_in_mem_store",

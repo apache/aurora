@@ -16,6 +16,7 @@ import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
+import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl.ExecutorConfig;
 
 import static org.junit.Assert.assertEquals;
 
@@ -36,7 +37,7 @@ public class MesosTaskFactoryImplTest {
 
   @Before
   public void setUp() {
-    taskFactory = new MesosTaskFactoryImpl(EXECUTOR_PATH);
+    taskFactory = new MesosTaskFactoryImpl(new ExecutorConfig(EXECUTOR_PATH, "unused"));
   }
 
   @Test
