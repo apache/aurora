@@ -616,8 +616,8 @@ def query(role, job, shards=None, statuses=LIVE_STATES, api=None):
 @app.command
 @app.command_option(CLUSTER_OPTION)
 @app.command_option(EXECUTOR_SANDBOX_OPTION)
-@requires.exactly('role', 'job', 'shard')
-def ssh(role, job, shard):
+@requires.at_least('role', 'job', 'shard')
+def ssh(role, job, shard, *args):
   """usage: ssh --cluster=CLUSTER role job shard
 
   Initiate an SSH session on the machine that a shard is running on.
@@ -626,10 +626,10 @@ def ssh(role, job, shard):
   if not resp.responseCode:
     client_util.die('Request failed, server responded with "%s"' % resp.message)
 
-  command = DistributedCommandRunner.substitute('bash',
+  remote_cmd = 'bash' if not args else ' '.join(args)
+  command = DistributedCommandRunner.substitute(remote_cmd,
       resp.tasks[0], executor_sandbox=app.get_options().executor_sandbox)
-  return subprocess.call(['ssh', '-t', resp.tasks[0].assignedTask.slaveHost,
-      command])
+  return subprocess.call(['ssh', '-t', resp.tasks[0].assignedTask.slaveHost, command])
 
 
 @app.command
