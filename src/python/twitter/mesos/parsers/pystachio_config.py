@@ -179,3 +179,6 @@ class PystachioConfig(ProxyConfig):
 
   def package_files(self):
     return []
+
+  def is_dedicated(self):
+    return self._job.has_constraints() and 'dedicated' in self._job.constraints()

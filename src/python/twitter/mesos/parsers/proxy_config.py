@@ -49,3 +49,8 @@ class ProxyConfig(object):
   def package_files(self):
     """Returns a list of package file paths"""
     pass
+
+  @abstractmethod
+  def is_dedicated(self):
+    """Returns True if this is a configuration for a dedicated job."""
+    pass

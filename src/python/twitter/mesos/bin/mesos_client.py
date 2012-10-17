@@ -4,6 +4,7 @@
 import collections
 import functools
 import getpass
+import math
 import optparse
 from optparse import OptionValueError
 import os
@@ -506,6 +507,17 @@ def update(jobname, config_file):
   options = app.get_options()
   config = client_util.get_config(jobname, config_file, options.copy_app_from,
       options.config_type, options.json, force_local=False, bindings=options.bindings)
+  if config.is_dedicated():
+    job_size = len(config.job().taskConfigs)
+    min_failure_threshold = int(math.ceil(job_size * 0.02))
+    if config.update_config()['maxTotalFailures'] < min_failure_threshold:
+      client_util.die('''Since this is a dedicated job, you must set your max_total_failures in
+your update configuration to no less than 2%% of your job size.
+Based on your job size (%s) you should use max_total_failures >= %s.
+
+See http://confluence.local.twitter.com/display/Aurora/Aurora+Configuration+Referencefor details.
+''' % (job_size, min_failure_threshold))
+
   api = MesosClientAPI(cluster=config.cluster(), verbose=options.verbose)
   resp = api.update_job(config, _getshards(options.shards), options.copy_app_from)
   client_util.check_and_log_response(resp)

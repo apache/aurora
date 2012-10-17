@@ -264,3 +264,8 @@ class MesosConfig(ProxyConfig):
   def package_files(self):
     """Returns a list of package file paths"""
     return self._config.get('testing_package_files')
+
+  def is_dedicated(self):
+    constraints = self._config.get('constraints')
+    return constraints and 'dedicated' in constraints
+
