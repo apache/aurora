@@ -18,6 +18,7 @@ import javax.ws.rs.core.Response;
 
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
+import com.google.common.base.Optional;
 import com.google.common.collect.HashBiMap;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
@@ -312,6 +313,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
             statusFilter = ScheduleStatus.valueOf(filterArg.toUpperCase());
           } catch (IllegalArgumentException e) {
             template.setAttribute("exception", "Invalid status type: " + filterArg);
+            return;
           }
         }
 
@@ -324,29 +326,39 @@ public class SchedulerzJob extends JerseyTemplateServlet {
 
         boolean hasMore = false;
 
-        Set<ScheduledTask> activeTasks;
+        Optional<TaskQuery> activeQuery = Optional.absent();
+        Optional<TaskQuery> completedQuery = Optional.absent();
         if (statusFilter != null) {
           query.setStatuses(FILTER_MAP.get(statusFilter));
-          activeTasks = scheduler.getTasks(query);
+          if (Tasks.isActive(statusFilter)) {
+            activeQuery = Optional.of(query);
+          } else {
+            completedQuery = Optional.of(query);
+          }
         } else {
-          activeTasks = scheduler.getTasks(new TaskQuery(query).setStatuses(Tasks.ACTIVE_STATES));
-          List<ScheduledTask> completedTasks = Lists.newArrayList(
-              scheduler.getTasks(new TaskQuery(query).setStatuses(Tasks.TERMINAL_STATES)));
+          activeQuery = Optional.of(new TaskQuery(query).setStatuses(Tasks.ACTIVE_STATES));
+          completedQuery = Optional.of(new TaskQuery(query).setStatuses(Tasks.TERMINAL_STATES));
+        }
+
+        if (activeQuery.isPresent()) {
+          Set<ScheduledTask> activeTasks = scheduler.getTasks(activeQuery.get());
+          List<ScheduledTask> liveTasks = SHARD_ID_COMPARATOR.sortedCopy(activeTasks);
+          template.setAttribute("activeTasks",
+              ImmutableList.copyOf(
+                  Iterables.transform(offsetAndLimit(liveTasks, offset), taskToStringMap)));
+          hasMore = hasMore || liveTasks.size() > (offset + PAGE_SIZE);
+          template.setAttribute("schedulingDetails",
+              buildSchedulingTable(Iterables.transform(liveTasks, Tasks.SCHEDULED_TO_INFO)));
+        }
+        if (completedQuery.isPresent()) {
+          List<ScheduledTask> completedTasks =
+              Lists.newArrayList(scheduler.getTasks(completedQuery.get()));
           Collections.sort(completedTasks, REVERSE_CHRON_COMPARATOR);
           template.setAttribute("completedTasks",
               ImmutableList.copyOf(
                   Iterables.transform(offsetAndLimit(completedTasks, offset), taskToStringMap)));
-          hasMore = completedTasks.size() > offset + PAGE_SIZE;
+          hasMore = completedTasks.size() > (offset + PAGE_SIZE);
         }
-
-        List<ScheduledTask> liveTasks = SHARD_ID_COMPARATOR.sortedCopy(activeTasks);
-        template.setAttribute("activeTasks",
-            ImmutableList.copyOf(
-                Iterables.transform(offsetAndLimit(liveTasks, offset), taskToStringMap)));
-        hasMore = hasMore || liveTasks.size() > (offset + PAGE_SIZE);
-
-        template.setAttribute("schedulingDetails",
-            buildSchedulingTable(Iterables.transform(liveTasks, Tasks.SCHEDULED_TO_INFO)));
 
         if (offset > 0) {
           template.setAttribute("prevOffset", Math.max(0, offset - PAGE_SIZE));
