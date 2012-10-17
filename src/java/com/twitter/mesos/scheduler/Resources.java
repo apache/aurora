@@ -308,7 +308,9 @@ public class Resources {
    * @return The set of ports grabbed.
    * @throws InsufficientResourcesException if not enough ports were available.
    */
-  static Set<Integer> getPorts(Offer offer, int numPorts) throws InsufficientResourcesException {
+  public static Set<Integer> getPorts(Offer offer, int numPorts)
+      throws InsufficientResourcesException {
+
     checkNotNull(offer);
 
     if (numPorts == 0) {

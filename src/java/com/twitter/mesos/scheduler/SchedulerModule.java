@@ -63,6 +63,7 @@ import com.twitter.mesos.scheduler.ScheduleBackoff.ScheduleBackoffImpl;
 import com.twitter.mesos.scheduler.ScheduleBackoff.ScheduleBackoffImpl.Backoff;
 import com.twitter.mesos.scheduler.SchedulerLifecycle.DriverReference;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
+import com.twitter.mesos.scheduler.TaskAssigner.TaskAssignerImpl;
 import com.twitter.mesos.scheduler.async.AsyncModule;
 import com.twitter.mesos.scheduler.events.TaskEventModule;
 import com.twitter.mesos.scheduler.httphandlers.ServletModule;
@@ -146,6 +147,8 @@ public class SchedulerModule extends AbstractModule {
     bind(new TypeLiteral<Supplier<Optional<SchedulerDriver>>>() { }).to(DriverReference.class);
     bind(DriverReference.class).in(Singleton.class);
 
+    bind(TaskAssigner.class).to(TaskAssignerImpl.class);
+    bind(TaskAssignerImpl.class).in(Singleton.class);
     bind(MesosTaskFactory.class).to(MesosTaskFactoryImpl.class);
 
     // Bindings for MesosSchedulerImpl.

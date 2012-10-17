@@ -31,6 +31,7 @@ import org.apache.mesos.Protos.Value.Ranges;
 import org.apache.mesos.Protos.Value.Scalar;
 import org.apache.mesos.Protos.Value.Text;
 import org.apache.mesos.Protos.Value.Type;
+import org.easymock.EasyMock;
 import org.easymock.IExpectationSetters;
 import org.junit.Before;
 import org.junit.Test;
@@ -45,7 +46,6 @@ import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
 import com.twitter.mesos.scheduler.storage.Storage.StorageException;
 
 import static org.easymock.EasyMock.expect;
@@ -72,17 +72,15 @@ public class UserTaskLauncherTest extends EasyMockTest {
   private static final Offer OFFER = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, 1024, 1024);
 
   private StateManager stateManager;
-  private MesosTaskFactory taskFactory;
-  private SchedulingFilter schedulingFilter;
+  private TaskAssigner assigner;
 
   private TaskLauncher launcher;
 
   @Before
   public void setUp() {
     stateManager = createMock(StateManager.class);
-    taskFactory = createMock(MesosTaskFactory.class);
-    schedulingFilter = createMock(SchedulingFilter.class);
-    launcher = new UserTaskLauncher(stateManager, taskFactory, schedulingFilter);
+    assigner = createMock(TaskAssigner.class);
+    launcher = new UserTaskLauncher(stateManager, assigner);
     stateManager.saveAttributesFromOffer(SLAVE_HOST_1, OFFER.getAttributesList());
     expectLastCall().anyTimes();
   }
@@ -99,7 +97,8 @@ public class UserTaskLauncherTest extends EasyMockTest {
     ScheduledTask task = task(config());
 
     pendingTasks(task);
-    expectScheduleFilter(task, new Veto("fake", 1));
+    expect(assigner.maybeAssign(EasyMock.<Offer>anyObject(), EasyMock.eq(task)))
+        .andReturn(Optional.<TaskInfo>absent());
 
     control.replay();
 
@@ -107,16 +106,9 @@ public class UserTaskLauncherTest extends EasyMockTest {
   }
 
   private void expectAssignTask(ScheduledTask task, Offer offer) throws Exception {
-    expectScheduleFilter(task);
     AssignedTask assigned = task.getAssignedTask().deepCopy()
         .setSlaveHost(offer.getHostname())
         .setAssignedPorts(ImmutableMap.<String, Integer>of());
-    expect(stateManager.assignTask(
-        Tasks.id(task),
-        offer.getHostname(),
-        offer.getSlaveId(),
-        ImmutableSet.<Integer>of()))
-        .andReturn(assigned);
 
     TaskInfo taskInfo =
         TaskInfo.newBuilder().setName(Tasks.jobKey(task))
@@ -129,7 +121,7 @@ public class UserTaskLauncherTest extends EasyMockTest {
                 .setExecutorId(ExecutorID.newBuilder().setValue("fake")))
             .build();
 
-    expect(taskFactory.createFrom(assigned, offer.getSlaveId())).andReturn(taskInfo);
+    expect(assigner.maybeAssign(offer, task)).andReturn(Optional.of(taskInfo));
   }
 
   @Test
@@ -204,16 +196,6 @@ public class UserTaskLauncherTest extends EasyMockTest {
     return new TwitterTaskInfo()
         .setJobName("job_a")
         .setOwner(new Identity("user", "role"));
-  }
-
-  private void expectScheduleFilter(ScheduledTask task, Veto... vetoes) {
-    Set<Veto> allVetoes = ImmutableSet.<Veto>builder().add(vetoes).build();
-    expect(schedulingFilter.filter(
-        Resources.from(OFFER),
-        SLAVE_HOST_1,
-        task.getAssignedTask().getTask(),
-        Tasks.id(task)))
-        .andReturn(allVetoes);
   }
 
   private static Offer createOffer(SlaveID slave, String slaveHost, double cpu,
