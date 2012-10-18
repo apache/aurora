@@ -174,7 +174,13 @@ class ThermosExecutor(ThermosExecutorBase):
 
     # start the process on a separate thread and give the message processing thread back
     # to the driver
-    self._runner = self._runner_class(self._task_id, mesos_task, mesos_task.role().get(), portmap)
+    try:
+      self._runner = self._runner_class(self._task_id, mesos_task, mesos_task.role().get(), portmap)
+    except self._runner_class.TaskError as e:
+      self.send_update(driver, self._task_id, 'FAILED', str(e))
+      defer(driver.stop, delay=self.STOP_WAIT)
+      return
+
     defer(lambda: self._start_runner(driver, mesos_task, portmap))
 
   def killTask(self, driver, task_id):

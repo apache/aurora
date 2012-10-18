@@ -57,9 +57,13 @@ class TaskRunnerWrapper(object):
     self._role = role
     self._clock = clock
     self._artifact_dir = artifact_dir or tempfile.mkdtemp()
-    with open(os.path.join(self._artifact_dir, 'task.json'), 'w') as fp:
-      self._task_filename = fp.name
-      ThermosTaskWrapper(self._task).to_file(self._task_filename)
+
+    try:
+      with open(os.path.join(self._artifact_dir, 'task.json'), 'w') as fp:
+        self._task_filename = fp.name
+        ThermosTaskWrapper(self._task).to_file(self._task_filename)
+    except ThermosTaskWrapper.InvalidTask as e:
+      raise self.TaskError('Failed to load task: %s' % e)
 
   @property
   def pid(self):
