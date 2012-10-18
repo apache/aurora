@@ -1,8 +1,10 @@
 import os
+import socket
 import subprocess
 import tempfile
 import threading
 import time
+import urllib2
 import webbrowser
 
 from twitter.common import log
@@ -33,6 +35,21 @@ def spawn_observer(checkpoint_root):
   server_thread.daemon = True
   server_thread.start()
   return server_thread, random_port
+
+
+def wait_and_spawn_browser(url):
+  # wait for the task to be registered
+  end = time.time() + 5.0
+  while time.time() < end:
+    try:
+      urllib2.urlopen(url)
+    except (urllib2.HTTPError, urllib2.URLError) as e:
+      time.sleep(0.5)
+    else:
+      webbrowser.open_new_tab(url)
+      break
+  else:
+    log.error("Timed out waiting for task to be registered to observer")
 
 
 def make_local_runner_wrapper(runner_pex, sandbox_root, checkpoint_root):
@@ -122,7 +139,7 @@ def create_taskinfo(proxy_config, shard_id=0):
 
 
 def spawn_local(runner, jobname, config_file, copy_app_from=None, config_type='mesos',
-                json=False, shard=0, bindings=()):
+                json=False, open_browser=False, shard=0, bindings=()):
   """
     Spawn a local run of a task.
   """
@@ -146,12 +163,12 @@ def spawn_local(runner, jobname, config_file, copy_app_from=None, config_type='m
     driver = LocalDriver()
     executor.launchTask(driver, task_info)
 
-    # wait for the driver to start, then another small sleep for the task to be registered
-    # TODO(wickman) Just urlopen until it no longer gives a 404?
+    # wait for the driver to start
     driver.started.wait(timeout=5.0)
-    time.sleep(1.0)
 
-    webbrowser.open_new_tab('http://localhost:%d/task/%s' % (port, task_info.task_id.value))
+    if open_browser:
+      wait_and_spawn_browser(
+        'http://%s:%d/task/%s' % (socket.gethostname(), port, task_info.task_id.value))
 
     try:
       driver.stopped.wait()

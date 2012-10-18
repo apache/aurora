@@ -149,6 +149,7 @@ def make_spawn_options(options):
       'copy_app_from',
       'config_type',
       'json',
+      'open_browser',
       'shard',
       'bindings'))
 
