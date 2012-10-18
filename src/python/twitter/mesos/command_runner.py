@@ -17,8 +17,8 @@ from gen.twitter.mesos.ttypes import (
 class DistributedCommandRunner(object):
   @staticmethod
   def execute(args):
-    hostname, command = args
-    ssh_command = ['ssh', '-n', '-q', hostname, command]
+    hostname, role, command = args
+    ssh_command = ['ssh', '-n', '-q', '%s@%s' % (role, hostname), command]
     po = subprocess.Popen(ssh_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     output = po.communicate()
     return '\n'.join('%s:  %s' % (hostname, line) for line in output[0].splitlines())
@@ -89,7 +89,8 @@ class DistributedCommandRunner(object):
   def process_arguments(self, command, **kw):
     for task in self.resolve():
       host = task.assignedTask.slaveHost
-      yield (host, self.substitute(command, task, **kw))
+      role = task.assignedTask.task.owner.role
+      yield (host, role, self.substitute(command, task, **kw))
 
   def run(self, command, parallelism=1, **kw):
     threadpool = ThreadPool(processes=parallelism)

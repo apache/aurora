@@ -360,7 +360,9 @@ def do_open(*args):
     client_util.die('--cluster is required')
 
   api = MesosClientAPI(cluster=options.cluster, verbose=options.verbose)
-  open_url(synthesize_url(api.scheduler.scheduler(), role, job))
+
+  import webbrowser
+  webbrowser.open_new_tab(synthesize_url(api.scheduler.scheduler(), role, job))
 
 
 @app.command
@@ -630,7 +632,9 @@ def ssh(role, job, shard, *args):
   remote_cmd = 'bash' if not args else ' '.join(args)
   command = DistributedCommandRunner.substitute(remote_cmd,
       resp.tasks[0], executor_sandbox=app.get_options().executor_sandbox)
-  return subprocess.call(['ssh', '-t', resp.tasks[0].assignedTask.slaveHost, command])
+  role = resp.tasks[0].assignedTask.task.owner.role
+  return subprocess.call(
+      ['ssh', '-t', '%s@%s' % (role, resp.tasks[0].assignedTask.slaveHost), command])
 
 
 @app.command
