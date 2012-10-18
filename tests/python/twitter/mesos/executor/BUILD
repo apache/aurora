@@ -38,6 +38,7 @@ python_tests(name = 'sandbox_manager',
 
 python_tests(name = 'discovery_manager',
   sources = ['test_discovery_manager.py'],
+  timeout = Amount(5, Time.MINUTES),
   dependencies = [
     pants('src/python/twitter/mesos/config:schema'),
     pants('src/python/twitter/common/net:ssh'),
