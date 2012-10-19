@@ -7,12 +7,15 @@ import java.util.logging.Logger;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
+import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
 
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.ExecutorID;
+import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.Status;
+import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.SchedulerDriver;
 
 import com.twitter.common.stats.Stats;
@@ -32,6 +35,21 @@ import static org.apache.mesos.Protos.Status.DRIVER_RUNNING;
  * Also ensures the driver is only asked for when needed.
  */
 public interface Driver {
+
+  /**
+   * Launches a task.
+   *
+   * @param offerId ID of the resource offer to accept with the task.
+   * @param task Task to launch.
+   */
+  void launchTask(OfferID offerId, TaskInfo task);
+
+  /**
+   * Declines a resource offer.
+   *
+   * @param offerId ID of the offer to decline.
+   */
+  void declineOffer(OfferID offerId);
 
   /**
    * Sends a kill task request for the given {@code taskId} to the mesos master.
@@ -102,9 +120,20 @@ public interface Driver {
     }
 
     private synchronized SchedulerDriver get(State expected) {
+      // TODO(William Farner): Formalize the failure case here by throwing a checked exception.
       stateMachine.checkState(expected);
       // This will and should fail if the driver is not present.
       return driverSupplier.get().get();
+    }
+
+    @Override
+    public void launchTask(OfferID offerId, TaskInfo task) {
+      get(State.RUNNING).launchTasks(offerId, ImmutableList.of(task));
+    }
+
+    @Override
+    public void declineOffer(OfferID offerId) {
+      get(State.RUNNING).declineOffer(offerId);
     }
 
     @Override

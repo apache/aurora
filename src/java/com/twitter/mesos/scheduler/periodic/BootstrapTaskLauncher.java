@@ -14,6 +14,7 @@ import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
 
 import org.apache.mesos.Protos.Offer;
+import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.Protos.TaskStatus;
 
@@ -108,5 +109,10 @@ public class BootstrapTaskLauncher implements TaskLauncher {
         task,
         ImmutableMap.<String, Integer>of());
     return taskFactory.createFrom(assignedTask, offer.getSlaveId());
+  }
+
+  @Override
+  public void cancelOffer(OfferID offer) {
+    // No-op.
   }
 }

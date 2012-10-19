@@ -1,23 +1,21 @@
 package com.twitter.mesos.scheduler;
 
-import java.util.SortedSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableSortedSet;
-import com.google.common.collect.Iterables;
+import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
 
 import org.apache.mesos.Protos.Offer;
+import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.Protos.TaskStatus;
 
 import com.twitter.mesos.StateTranslator;
-import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduleStatus;
-import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
+import com.twitter.mesos.scheduler.async.TaskScheduler;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -28,13 +26,13 @@ class UserTaskLauncher implements TaskLauncher {
 
   private static final Logger LOG = Logger.getLogger(UserTaskLauncher.class.getName());
 
+  private final TaskScheduler taskScheduler;
   private final StateManager stateManager;
-  private final TaskAssigner assigner;
 
   @Inject
-  UserTaskLauncher(StateManager stateManager, TaskAssigner assigner) {
+  UserTaskLauncher(TaskScheduler taskScheduler, StateManager stateManager) {
+    this.taskScheduler = checkNotNull(taskScheduler);
     this.stateManager = checkNotNull(stateManager);
-    this.assigner = checkNotNull(assigner);
   }
 
   @Override
@@ -42,25 +40,7 @@ class UserTaskLauncher implements TaskLauncher {
     checkNotNull(offer);
 
     stateManager.saveAttributesFromOffer(offer.getHostname(), offer.getAttributesList());
-    Iterable<ScheduledTask> schedulable =
-        stateManager.fetchTasks(Query.byStatus(ScheduleStatus.PENDING));
-
-    if (Iterables.isEmpty(schedulable)) {
-      return Optional.absent();
-    }
-
-    SortedSet<ScheduledTask> candidates = ImmutableSortedSet.copyOf(
-        Tasks.SCHEDULING_ORDER.onResultOf(Tasks.SCHEDULED_TO_ASSIGNED),
-        schedulable);
-
-    LOG.fine("Candidates for offer: " + Tasks.ids(candidates));
-
-    for (ScheduledTask task : candidates) {
-      Optional<TaskInfo> assignment = assigner.maybeAssign(offer, task);
-      if (assignment.isPresent()) {
-        return assignment;
-      }
-    }
+    taskScheduler.offer(ImmutableList.of(offer));
 
     return Optional.absent();
   }
@@ -71,21 +51,22 @@ class UserTaskLauncher implements TaskLauncher {
     TaskQuery query = Query.byId(status.getTaskId().getValue());
 
     try {
-      if (stateManager.fetchTasks(query).isEmpty()) {
-        LOG.severe("Failed to find task id " + status.getTaskId());
+      ScheduleStatus translatedState = StateTranslator.get(status.getState());
+      if (translatedState == null) {
+        LOG.severe("Failed to look up task state translation for: " + status.getState());
       } else {
-        ScheduleStatus translatedState = StateTranslator.get(status.getState());
-        if (translatedState == null) {
-          LOG.severe("Failed to look up task state translation for: " + status.getState());
-        } else {
-          stateManager.changeState(query, translatedState, Optional.fromNullable(info));
-          return true;
-        }
+        stateManager.changeState(query, translatedState, Optional.fromNullable(info));
+        return true;
       }
     } catch (SchedulerException e) {
       LOG.log(Level.WARNING, "Failed to update status for: " + status, e);
       throw e;
     }
     return false;
+  }
+
+  @Override
+  public void cancelOffer(OfferID offer) {
+    taskScheduler.cancelOffer(offer);
   }
 }

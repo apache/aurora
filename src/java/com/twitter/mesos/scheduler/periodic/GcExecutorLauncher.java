@@ -19,6 +19,7 @@ import com.google.protobuf.ByteString;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.ExecutorInfo;
 import org.apache.mesos.Protos.Offer;
+import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.Protos.TaskStatus;
@@ -144,5 +145,10 @@ public class GcExecutorLauncher implements TaskLauncher {
     } else {
       return false;
     }
+  }
+
+  @Override
+  public void cancelOffer(OfferID offer) {
+    // No-op.
   }
 }

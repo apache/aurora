@@ -124,9 +124,11 @@ public class MesosSchedulerImpl implements Scheduler {
 
       slaveMapper.addSlave(offer.getHostname(), offer.getSlaveId());
 
-      Optional<TaskInfo> task = Optional.absent();
-
+      // Ordering of task launchers is important here, since offers are consumed greedily.
+      // TODO(William Farner): Refactor this area of code now that the primary task launcher
+      // is asynchronous.
       for (TaskLauncher launcher : taskLaunchers) {
+        Optional<TaskInfo> task = Optional.absent();
         try {
           task = launcher.createTask(offer);
         } catch (SchedulerException e) {
@@ -140,22 +142,18 @@ public class MesosSchedulerImpl implements Scheduler {
             break;
           } else {
             LOG.warning("Insufficient resources to launch task " + task);
-            task = Optional.absent();
           }
         }
-      }
-
-      if (!task.isPresent()) {
-        // For a given offer, if we fail to process it we can always launch with an empty set of
-        // tasks to signal the core we have processed the offer and just not used any of it.
-        driver.launchTasks(offer.getId(), ImmutableList.<TaskInfo>of());
       }
     }
   }
 
   @Override
-  public void offerRescinded(SchedulerDriver schedulerDriver, OfferID offerID) {
-    LOG.info("Offer rescinded but we don't care " + offerID);
+  public void offerRescinded(SchedulerDriver schedulerDriver, OfferID offerId) {
+    LOG.info("Offer rescinded: " + offerId);
+    for (TaskLauncher launcher : taskLaunchers) {
+      launcher.cancelOffer(offerId);
+    }
   }
 
   @AllowUnchecked

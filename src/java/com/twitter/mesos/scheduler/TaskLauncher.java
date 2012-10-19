@@ -3,6 +3,7 @@ package com.twitter.mesos.scheduler;
 import com.google.common.base.Optional;
 
 import org.apache.mesos.Protos.Offer;
+import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.Protos.TaskStatus;
 
@@ -14,6 +15,9 @@ public interface TaskLauncher {
   /**
    * Grants a resource offer to the task launcher, which will be passed to any subsequent task
    * launchers if this one does not accept.
+   * <p>
+   * A task launcher may choose to retain an offer for later use.  Any retained offers must be
+   * cleaned up with {@link #cancelOffer(OfferID)}.
    *
    * @param offer The resource offer.
    * @return A task, absent if the launcher chooses not to accept the offer.
@@ -30,4 +34,11 @@ public interface TaskLauncher {
    * other launchers, {@code false} otherwise.
    */
   boolean statusUpdate(TaskStatus status);
+
+  /**
+   * Informs the launcher that a previously-advertised offer is canceled and may not be used.
+   *
+   * @param offer The canceled offer.
+   */
+  void cancelOffer(OfferID offer);
 }

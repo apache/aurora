@@ -14,6 +14,7 @@ import com.google.common.collect.Iterables;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
 import com.google.inject.Key;
+import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
@@ -182,10 +183,18 @@ public class SchedulerModule extends AbstractModule {
 
     bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(Backoff.class)
         .toInstance(MAX_RESCHEDULE_BACKOFF.get());
-    bind(BackoffStrategy.class).toInstance(
-        new TruncatedBinaryBackoff(INITIAL_RESCHEDULE_BACKOFF.get(), MAX_RESCHEDULE_BACKOFF.get()));
-    bind(ScheduleBackoff.class).to(ScheduleBackoffImpl.class);
-    bind(ScheduleBackoffImpl.class).in(Singleton.class);
+
+    install(new PrivateModule() {
+      @Override protected void configure() {
+        bind(BackoffStrategy.class).toInstance(
+            new TruncatedBinaryBackoff(
+                INITIAL_RESCHEDULE_BACKOFF.get(),
+                MAX_RESCHEDULE_BACKOFF.get()));
+        bind(ScheduleBackoff.class).to(ScheduleBackoffImpl.class);
+        bind(ScheduleBackoffImpl.class).in(Singleton.class);
+        expose(ScheduleBackoff.class);
+      }
+    });
     TaskEventModule.bindSubscriber(binder(), ScheduleBackoff.class);
 
     // Filter layering: notifier filter -> backoff filter -> base impl
