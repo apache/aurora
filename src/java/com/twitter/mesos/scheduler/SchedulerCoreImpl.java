@@ -34,6 +34,7 @@ import com.twitter.mesos.scheduler.quota.Quotas;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
+import static com.twitter.mesos.Tasks.ACTIVE_STATES;
 import static com.twitter.mesos.Tasks.jobKey;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
 import static com.twitter.mesos.gen.ScheduleStatus.ROLLBACK;
@@ -287,6 +288,11 @@ public class SchedulerCoreImpl implements SchedulerCore {
               query.getJobKey(), e.getMessage()));
         }
       }
+    }
+
+    // Unless statuses were specifically supplied, only attempt to kill active tasks.
+    if (query.getStatusesSize() == 0) {
+      query.setStatuses(ACTIVE_STATES);
     }
 
     int tasksAffected = stateManager.changeState(query, KILLING, Optional.of("Killed by " + user));
