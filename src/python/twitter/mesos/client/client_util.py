@@ -1,13 +1,13 @@
 '''Library of utilities called by the mesos client binary
 '''
 
+from __future__ import print_function
+
 import functools
 import json
 import os
 import posixpath
 import sys
-import tempfile
-import webbrowser
 
 from pystachio import Ref
 from twitter.common import app, log
@@ -16,11 +16,13 @@ from twitter.mesos.clusters import Cluster
 from twitter.mesos.config.schema import Packer as PackerObject
 from twitter.mesos.packer.packer_client import Packer
 from twitter.mesos.packer import sd_packer_client
-from twitter.mesos.parsers.mesos_config import MesosConfig
-from twitter.mesos.parsers.pystachio_config import PystachioConfig
-from twitter.mesos.parsers.pystachio_codec import PystachioCodec
+from twitter.mesos.parsers import (
+    FormatDetector,
+    MesosConfig,
+    PystachioCodec,
+    PystachioConfig)
 
-from gen.twitter.mesos.ttypes import *
+from gen.twitter.mesos.ttypes import ResponseCode
 
 
 _PACKAGE_FILES_SUFFIX = MesosConfig.PACKAGE_FILES_SUFFIX
@@ -181,35 +183,51 @@ def _inject_packer_bindings(config, force_local=False):
       _get_package_uri_from_packer(config.cluster(), package))})
 
 
+MESOS_CONFIG_DEPRECATION_MESSAGE = """
+You are using a deprecated configuration format.  Please upgrade to the Thermos
+configuration format:
+
+  Migration quick guide:
+    http://confluence.twitter.biz/display/Aurora/Thermos+Migration+Quick+Guide
+
+  Updated user guide:
+    http://confluence.twitter.biz/display/Aurora/User+Guide
+
+  Updated configuration reference:
+    http://confluence.twitter.biz/display/Aurora/Aurora+Configuration+Reference
+"""
+
 def get_config(jobname,
                config_file,
                copy_app_from=None,
-               config_type='mesos',
                json=False,
                force_local=False,
-               bindings=()):
+               bindings=(),
+               translate=False):
   """Creates and returns a config object contained in the provided file."""
-  if config_type != 'thermos':
-    if json:
-      raise ValueError('JSON input only supported for Thermos configs.')
-    if bindings:
-      raise ValueError('Environment bindings only supported for Thermos configs.')
+  config_type = 'thermos' if json else FormatDetector.autodetect(config_file)
+
+  if bindings and config_type != 'thermos':
+    raise ValueError('Environment bindings only supported for Thermos configs.')
+
+  assert config_type in ('mesos', 'thermos')
 
   if config_type == 'mesos':
-    config = MesosConfig(config_file, jobname)
-  elif config_type == 'thermos':
+    print(MESOS_CONFIG_DEPRECATION_MESSAGE, file=sys.stderr)
+    if translate:
+      config = PystachioConfig(PystachioCodec(config_file, jobname).build())
+    else:
+      config = MesosConfig(config_file, jobname)
+  else:
     loader = PystachioConfig.load_json if json else PystachioConfig.load
     config = loader(config_file, jobname, bindings)
-    _inject_packer_bindings(config, force_local)
-  elif config_type == 'auto':
-    config = PystachioConfig(PystachioCodec(config_file, jobname).build())
-  else:
-    raise ValueError('Unknown config type %s!' % config_type)
   return populate_namespaces(config, force_local=force_local, copy_app_from=copy_app_from)
 
 
 def populate_namespaces(config, copy_app_from=None, force_local=False):
   """Populate additional bindings in the config, e.g. packer bindings."""
+  if isinstance(config, PystachioConfig):
+    _inject_packer_bindings(config, force_local)
   package_uri = _get_package_uri(config, copy_app_from=copy_app_from)
   if package_uri:
     config.set_hdfs_path(package_uri)

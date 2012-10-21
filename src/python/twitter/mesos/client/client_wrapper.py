@@ -15,7 +15,14 @@ from twitter.mesos.session_key_helper import SessionKeyHelper
 from twitter.mesos.updater import Updater
 
 from gen.twitter.mesos import MesosAdmin
-from gen.twitter.mesos.ttypes import *
+from gen.twitter.mesos.ttypes import (
+    FinishUpdateResponse,
+    Identity,
+    ResponseCode,
+    Quota,
+    TaskQuery,
+    UpdateResult)
+
 from thrift.transport import TTransport
 
 

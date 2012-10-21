@@ -47,3 +47,20 @@ class EntityParser(object):
   @staticmethod
   def match_ports(str):
     return set(EntityParser.PORT_RE.findall(str))
+
+
+class FormatDetector(object):
+  THERMOS_CALLS = frozenset(('Job', 'Task', 'Process', 'include', 'export'))
+
+  @classmethod
+  def autodetect(cls, filename):
+    import ast
+    with open(filename, 'r') as fp:
+      config = ast.parse(fp.read(), filename)
+    def detect_call(node):
+      if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+        return node.func.id
+    if set(filter(None, map(detect_call, ast.walk(config)))).intersection(cls.THERMOS_CALLS):
+      return 'thermos'
+    else:
+      return 'mesos'

@@ -55,9 +55,9 @@ def synthesize_url(scheduler_client, role=None, job=None):
 
   scheduler_url = urljoin(scheduler_url, 'scheduler')
   if role:
-    scheduler_url = urljoin(scheduler_url, role)
+    scheduler_url += '/' + role
     if job:
-      scheduler_url = urljoin(scheduler_url, job)
+      scheduler_url += '/' + job
   return scheduler_url
 
 
@@ -85,23 +85,12 @@ OPEN_BROWSER_OPTION = optparse.Option(
     default=False,
     help='Open a browser window to the job page after a job mutation.')
 
+
 SHARDS_OPTION = optparse.Option(
     '--shards',
     dest='shards',
     default=None,
     help='A comma separated list of shard ids to act on.')
-
-CONFIG_TYPE_OPTION = optparse.Option(
-    '-c',
-    '--config_type',
-    type='choice',
-    action='store',
-    dest='config_type',
-    choices=['mesos', 'thermos', 'auto'],
-    default='mesos',
-    help='The type of the configuration file supplied.  Options are `mesos`, the '
-         'new `thermos` format, or `auto`, which automatically converts from '
-         'mesos to thermos configs.')
 
 
 JSON_OPTION = optparse.Option(
@@ -110,7 +99,7 @@ JSON_OPTION = optparse.Option(
     dest='json',
     default=False,
     action='store_true',
-    help='If specified, configuration is read in JSON format.')
+    help='If specified, configuration is read in JSON format.  Only works with Thermos tasks.')
 
 
 CLUSTER_OPTION = optparse.Option(
@@ -147,7 +136,6 @@ EXECUTOR_SANDBOX_OPTION = optparse.Option(
 def make_spawn_options(options):
   return dict((name, getattr(options, name)) for name in (
       'copy_app_from',
-      'config_type',
       'json',
       'open_browser',
       'shard',
@@ -158,7 +146,6 @@ def make_spawn_options(options):
 @app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(COPY_APP_FROM_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
-@app.command_option(CONFIG_TYPE_OPTION)
 @app.command_option(JSON_OPTION)
 @requires.exactly('job', 'config')
 def create(jobname, config_file):
@@ -167,8 +154,7 @@ def create(jobname, config_file):
   Creates a job based on a configuration file.
   """
   options = app.get_options()
-  config = client_util.get_config(jobname, config_file, options.copy_app_from, options.config_type,
-      options.json)
+  config = client_util.get_config(jobname, config_file, options.copy_app_from, options.json)
   if config.cluster() == 'local':
     options.shard = 0
     options.runner = 'build'
@@ -190,7 +176,6 @@ def create(jobname, config_file):
 @app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(COPY_APP_FROM_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
-@app.command_option(CONFIG_TYPE_OPTION)
 @app.command_option(JSON_OPTION)
 @requires.exactly('job', 'config')
 def spawn(jobname, config_file):
@@ -296,7 +281,6 @@ def runtask(args, options):
 @app.command
 @app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(COPY_APP_FROM_OPTION)
-@app.command_option(CONFIG_TYPE_OPTION)
 @app.command_option(JSON_OPTION)
 @requires.exactly('job', 'config')
 def diff(job, config_file):
@@ -306,8 +290,8 @@ def diff(job, config_file):
   By default the diff will be displayed using 'diff', though you may choose an alternate
   diff program by specifying the DIFF_VIEWER environment variable."""
   options = app.get_options()
-  config = client_util.get_config(job, config_file, options.copy_app_from, options.config_type,
-      options.json, False, options.bindings)
+  config = client_util.get_config(job, config_file, options.copy_app_from, options.json, False,
+      options.bindings)
   api = MesosClientAPI(cluster=config.cluster(), verbose=app.get_options().verbose)
   resp = query(config.role(), job, api=api, statuses=ACTIVE_STATES)
   if not resp.responseCode:
@@ -370,7 +354,6 @@ def do_open(*args):
     help='Inspect the configuration as would be created by the "spawn" command.')
 @app.command_option(COPY_APP_FROM_OPTION)
 @app.command_option(ENVIRONMENT_BIND_OPTION)
-@app.command_option(CONFIG_TYPE_OPTION)
 @app.command_option(JSON_OPTION)
 @requires.exactly('job', 'config')
 def inspect(jobname, config_file):
@@ -380,8 +363,8 @@ def inspect(jobname, config_file):
   the parsed configuration.
   """
   options = app.get_options()
-  config = client_util.get_config(jobname, config_file, options.copy_app_from,
-      options.config_type, options.json, False, options.bindings)
+  config = client_util.get_config(jobname, config_file, options.copy_app_from, options.json,
+      False, options.bindings)
   log.info('Parsed job config: %s' % config.job())
 
 
@@ -487,7 +470,6 @@ def _getshards(shards):
 @app.command_option(SHARDS_OPTION)
 @app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(COPY_APP_FROM_OPTION)
-@app.command_option(CONFIG_TYPE_OPTION)
 @app.command_option(JSON_OPTION)
 @requires.exactly('job', 'config')
 def update(jobname, config_file):
@@ -508,8 +490,8 @@ def update(jobname, config_file):
   to preview what changes will take effect.
   """
   options = app.get_options()
-  config = client_util.get_config(jobname, config_file, options.copy_app_from,
-      options.config_type, options.json, force_local=False, bindings=options.bindings)
+  config = client_util.get_config(jobname, config_file, options.copy_app_from, options.json,
+      force_local=False, bindings=options.bindings)
   if config.is_dedicated():
     job_size = len(config.job().taskConfigs)
     min_failure_threshold = int(math.ceil(job_size * 0.02))

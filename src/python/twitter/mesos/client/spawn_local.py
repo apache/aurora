@@ -138,16 +138,13 @@ def create_taskinfo(proxy_config, shard_id=0):
   return task_info
 
 
-def spawn_local(runner, jobname, config_file, copy_app_from=None, config_type='mesos',
-                json=False, open_browser=False, shard=0, bindings=()):
+def spawn_local(runner, jobname, config_file, copy_app_from=None, json=False, open_browser=False,
+                shard=0, bindings=()):
   """
     Spawn a local run of a task.
   """
-  if config_type == 'mesos':
-    config_type = 'auto'
-
-  config = get_config(jobname, config_file, copy_app_from, config_type, json, force_local=True,
-      bindings=bindings)
+  config = get_config(jobname, config_file, copy_app_from, json, force_local=True,
+      bindings=bindings, translate=True)
 
   checkpoint_root = os.path.expanduser(os.path.join('~', '.thermos'))
   _, port = spawn_observer(checkpoint_root)

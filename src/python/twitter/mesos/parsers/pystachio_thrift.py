@@ -1,7 +1,7 @@
 import copy
 import getpass
 import json
-from pystachio import Empty, Environment
+import sys
 
 from gen.twitter.mesos.ttypes import (
   CronCollisionPolicy,
@@ -14,9 +14,12 @@ from twitter.mesos.config.schema import (
   MesosContext,
   MesosTaskInstance
 )
+
 from twitter.thermos.config.loader import ThermosTaskWrapper
 
 from .base import ThriftCodec
+
+from pystachio import Empty, Environment
 
 __all__ = (
   'InvalidConfig',
@@ -33,7 +36,7 @@ def task_instance_from_job(job, instance):
                          instance=instance)
   if job.has_announce():
     ti = ti(announce=job.announce())
-  return ti.bind(instance_context).interpolate()
+  return ti.bind(mesos = instance_context).interpolate()
 
 
 def convert(job):
@@ -87,7 +90,7 @@ def convert(job):
   for k in range(job.instances().get()):
     task_copy = copy.deepcopy(task)
     task_copy.shardId = k
-    underlying, _ = task_instance_from_job(job, k)
+    underlying, refs = task_instance_from_job(job, k)
     if not underlying.check().ok():
       raise ValueError('Task not fully specified: %s' % underlying.check().message())
     task_copy.thermosConfig = json.dumps(underlying.get())

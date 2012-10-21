@@ -130,7 +130,9 @@ class PystachioConfig(ProxyConfig):
 
   def job(self):
     interpolated_job = self._job % self.context()
-    typecheck = interpolated_job.check()
+    # Typecheck against the Job with a dummy {{mesos.instance}} populated.  It is the only free
+    # variable that gets unwrapped at the Task level.
+    typecheck = interpolated_job.bind(Environment(mesos=Environment(instance=0))).check()
     if not typecheck.ok():
       raise self.InvalidConfig(typecheck.message())
     return convert_pystachio_to_thrift(interpolated_job)

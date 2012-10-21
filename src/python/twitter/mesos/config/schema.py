@@ -1,6 +1,7 @@
 from pystachio import *
 from twitter.thermos.config.schema import *
 
+
 class MesosContext(Struct):
   # The role running the job
   role        = Required(String)
@@ -90,7 +91,6 @@ class Announcer(Struct):
 
 
 # The thermosConfig populated inside of TwitterTaskInfo.
-@Provided(mesos=MesosContext)
 class MesosTaskInstance(Struct):
   task                       = Required(Task)
   layout                     = AppLayout
