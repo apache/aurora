@@ -34,13 +34,11 @@ import com.twitter.common.inject.Bindings.KeyFactory;
 import com.twitter.common.zookeeper.Group;
 import com.twitter.common.zookeeper.ServerSet;
 import com.twitter.common.zookeeper.SingletonService;
-import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.common.zookeeper.ZooKeeperUtils;
 import com.twitter.common_internal.webassets.BlueprintModule;
 import com.twitter.common_internal.zookeeper.TwitterServerSet.Service;
 import com.twitter.common_internal.zookeeper.TwitterServerSetModule;
 import com.twitter.common_internal.zookeeper.ZooKeeperModule;
-import com.twitter.common_internal.zookeeper.legacy.ServerSetMigrationModule;
 import com.twitter.common_internal.zookeeper.legacy.ServerSetMigrationModule.ServiceDiscovery;
 import com.twitter.mesos.scheduler.DriverFactory.DriverFactoryImpl;
 import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl.ExecutorConfig;
@@ -85,11 +83,6 @@ public class SchedulerMain extends AbstractApplication {
   @CmdLine(name = "thermos_executor_path", help = "Path to the thermos executor launch script.")
   private static final Arg<String> THERMOS_EXECUTOR_PATH = Arg.create();
 
-  @CmdLine(name = "dual_publish",
-      help = "If enabled the scheduler will dual publish its leadership in the legacy"
-          + " -zk_endpoints cluster and the local service discovery cluster.")
-  private static final Arg<Boolean> DUAL_PUBLISH = Arg.create(false);
-
   @Inject private SingletonService schedulerService;
   @Inject private LocalServiceRegistry serviceRegistry;
   @Inject private SchedulerLifecycle schedulerLifecycle;
@@ -127,29 +120,22 @@ public class SchedulerMain extends AbstractApplication {
         .add(serviceBinder)
         .add(additionalModules);
 
-    if (DUAL_PUBLISH.get()) {
-      modules.add(new ServerSetMigrationModule(
-          schedulerService,
-          Optional.of(ZooKeeperClient.digestCredentials("mesos", "mesos")),
-          Optional.<String>absent())); // use the existing flagged legacy ss path
+    KeyFactory zkClientKeyFactory = Bindings.annotatedKeyFactory(ServiceDiscovery.class);
+    if (zkHost.isPresent()) {
+      modules.add(ZooKeeperModule.builder(ImmutableSet.of(zkHost.get()))
+          .withDigestCredentials(schedulerService.getRole(), schedulerService.getRole())
+          .withAcl(ZooKeeperUtils.EVERYONE_READ_CREATOR_ALL)
+          .build(zkClientKeyFactory));
     } else {
-      KeyFactory zkClientKeyFactory = Bindings.annotatedKeyFactory(ServiceDiscovery.class);
-      if (zkHost.isPresent()) {
-        modules.add(ZooKeeperModule.builder(ImmutableSet.of(zkHost.get()))
-            .withDigestCredentials(schedulerService.getRole(), schedulerService.getRole())
-            .withAcl(ZooKeeperUtils.EVERYONE_READ_CREATOR_ALL)
-            .build(zkClientKeyFactory));
-      } else {
-        modules.add(TwitterServerSetModule
-            .authenticatedZooKeeperModule(schedulerService)
-            .withFlagOverrides()
-            .build(zkClientKeyFactory));
-      }
-      modules.add(new TwitterServerSetModule(
-          Key.get(ServerSet.class),
-          zkClientKeyFactory,
-          schedulerService));
+      modules.add(TwitterServerSetModule
+          .authenticatedZooKeeperModule(schedulerService)
+          .withFlagOverrides()
+          .build(zkClientKeyFactory));
     }
+    modules.add(new TwitterServerSetModule(
+        Key.get(ServerSet.class),
+        zkClientKeyFactory,
+        schedulerService));
 
     if (!ISOLATED_SCHEDULER.get()) {
       modules.add(new AbstractModule() {
