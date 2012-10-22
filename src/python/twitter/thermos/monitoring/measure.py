@@ -71,9 +71,6 @@ class ProcessSample(_ProcessSample):
     threads = int(average([sample.threads for sample in samples]))
     return ProcessSample(rate, user, system, rss, vms, nice, status, threads)
 
-  def __init__(self, *args, **kw):
-    _ProcessSample.__init__(self, *args, **kw)
-
   def __add__(self, other):
     if self.nice is not None and other.nice is None:
       nice = self.nice

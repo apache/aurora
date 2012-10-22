@@ -154,9 +154,8 @@ class TaskRunnerWrapper(object):
 
   def kill(self):
     """
-      Kill the underlying runner process.
+      Kill the underlying runner process, if it exists.
     """
-    assert self._popen is not None
     if self.is_alive():
       log.info('Runner is alive, sending SIGINT')
       try:

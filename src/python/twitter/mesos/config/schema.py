@@ -24,13 +24,8 @@ class AppPackage(Struct):
   name    = Required(String)
   version = Default(String, 'latest')
 
-class AppService(Struct):
-  name   = Required(String)
-  config = String
-
 class AppLayout(Struct):
   packages = Default(List(AppPackage), [])
-  services = Default(List(AppService), [])
 
 
 # The object bound into the {{packer}} namespace.

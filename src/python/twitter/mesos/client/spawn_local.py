@@ -12,7 +12,7 @@ from twitter.common.contextutil import temporary_dir
 from twitter.common.http import HttpServer
 from twitter.common.net.tunnel import TunnelHelper
 from twitter.mesos.client.client_util import get_config
-from twitter.mesos.executor.sandbox_manager import DirectorySandbox
+from twitter.mesos.executor.sandbox_manager import AppAppSandbox, DirectorySandbox
 from twitter.mesos.executor.task_runner_wrapper import TaskRunnerWrapper
 from twitter.mesos.executor.thermos_executor import ThermosExecutor
 from twitter.thermos.observer.observer import TaskObserver
@@ -55,12 +55,20 @@ def wait_and_spawn_browser(url):
 def make_local_runner_wrapper(runner_pex, sandbox_root, checkpoint_root):
   class LocalTaskRunner(TaskRunnerWrapper):
     def __init__(self, task_id, mesos_task, role, mesos_ports, **kw):
+      if mesos_task.has_layout():
+        if os.uname()[0] != 'Linux':
+          raise self.TaskError("app-app sandboxes are only available on Linux")
+        sandbox = AppAppSandbox(task_id)
+        enable_chroot = True
+      else:
+        sandbox = DirectorySandbox(task_id, sandbox_root)
+        enable_chroot = False
       super(LocalTaskRunner, self).__init__(
-        task_id, mesos_task, role, mesos_ports, runner_pex,
-        DirectorySandbox(task_id, sandbox_root),
+        task_id, mesos_task, role, mesos_ports, runner_pex, sandbox,
         artifact_dir=sandbox_root,
         checkpoint_root=checkpoint_root,
         **kw)
+      self._enable_chroot = enable_chroot
   return LocalTaskRunner
 
 

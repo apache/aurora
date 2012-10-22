@@ -62,7 +62,7 @@ python_library(
   sources = ['resource_manager.py'],
   dependencies = [
     pants(':health_interface'),
-    python_requirement('psutil'),
+    python_requirement('psutil>=0.5.0'),
     python_requirement('thrift'),
     pants('src/python/twitter/common/dirutil'),
     pants('src/python/twitter/common/log'),

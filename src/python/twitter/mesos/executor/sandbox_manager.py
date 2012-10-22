@@ -25,22 +25,18 @@ class SandboxBase(object):
   @abstractmethod
   def root(self):
     """Return the root path of the sandbox."""
-    pass
 
   @abstractmethod
   def exists(self):
     """Returns true if the sandbox appears to exist."""
-    pass
 
   @abstractmethod
   def create(self, *args, **kw):
     """Create the sandbox."""
-    pass
 
   @abstractmethod
   def destroy(self, *args, **kw):
     """Destroy the sandbox."""
-    pass
 
 
 class DirectorySandbox(SandboxBase):
@@ -79,7 +75,7 @@ class AppAppSandbox(SandboxBase):
     self._task_id = task_id
     self._app = AppFactory.get()
     self._layout = None
-    self._layouts = self._app.layout_list(layout_name=task_id)
+    self._layouts = self._app.layout_list(name=task_id)
 
     if len(self._layouts) > 0:
       self._layout = self._layouts[0]
@@ -92,36 +88,14 @@ class AppAppSandbox(SandboxBase):
     kw = {
       'name': task_id,
       'packages': [],
-      'services': {},
       'size': mesos_task.task().resources().disk().get()
     }
 
     layout = mesos_task.layout()
-    for service in layout().services():
-      service_name = service.name().get()
-      if service_name not in appobj.service_backends():
-        raise SandboxBase.CreationError('Could not create layout: unknown Service: %s' % (
-          service_name))
-      kw['services'][appobj.service_backends()[service_name]] = (
-        service.config().get() if service.has_config() else None)
 
     for package in layout().packages():
       package_name, package_version = package.name().get(), package.version().get()
-      while True:
-        if package_version == 'latest':
-          found_packages = appobj.package_list(package_name=package_name, repo=True, limit=1)
-        else:
-          found_packages = appobj.package_list(package_name=package_name,
-            package_revision=package_version, repo=True, limit=1)
-        if len(found_packages) != 1:
-          raise SandboxBase.CreationError('Ambiguous package specification: %s' % package)
-        pkg = found_packages[0]
-        if pkg.package_path and not pkg.verify():
-          log.warning('Package is cached locally but appears to be corrupt, uninstalling!')
-          appobj.package_uninstall([pkg])
-        else:
-          break
-      kw['packages'].append(pkg)
+      kw['packages'].append('%s=%s' % (package_name, package_version))
 
     return kw
 
@@ -131,14 +105,15 @@ class AppAppSandbox(SandboxBase):
     return self._layout.root
 
   def create(self, mesos_task):
+    from app.commands.layout_create import LayoutCreateError, NeedSuperuser
     if self._layout:
       raise SandboxBase.CreationError('Layout %s already exists!' % self._layout)
     kw = AppAppSandbox.layout_create_args_from_task(self._app, self._task_id, mesos_task)
     try:
-      self._layout, _ = self._app.layout_create(**kw)
-    except Exception as e:
-      log.fatal('Could not create layout!')
-      raise SandboxBase.CreationError('Could not create layout!  %s' % e)
+      self._layout = self._app.layout_create(**kw)
+    except (LayoutCreateError, NeedSuperuser) as e:
+      log.fatal('Could not create app-app layout!')
+      raise SandboxBase.CreationError('Could not create app-app layout!  %s' % e)
     self._layouts = [self._layout]
 
   def destroy(self):
@@ -148,7 +123,7 @@ class AppAppSandbox(SandboxBase):
     for layout in self._layouts:
       if not self._app.layout_destroy(layout_name=layout.name,
                                       layout_revision=layout.revision, force=True):
-        errors.append('Could not destroy Layout(%s, %s)' % (layout.name, layout.revision))
+        errors.append('Could not destroy %s' % layout)
     if errors:
       raise SandboxBase.DeletionError('Failed:\n%s' % '\n'.join(errors))
 
