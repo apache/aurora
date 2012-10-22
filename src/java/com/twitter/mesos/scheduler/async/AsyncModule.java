@@ -44,6 +44,11 @@ public class AsyncModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> MAX_SCHEDULE_DELAY =
       Arg.create(Amount.of(30L, Time.SECONDS));
 
+  @CmdLine(name = "max_offer_hold_time",
+      help = "Maximum amount of time to hold a resource offer before declining.")
+  private static final Arg<Amount<Long, Time>> MAX_OFFER_HOLD_TIME =
+      Arg.create(Amount.of(5L, Time.MINUTES));
+
   @Override
   protected void configure() {
     // AsyncModule itself is not a subclass of PrivateModule because TaskEventModule internally uses
@@ -68,7 +73,12 @@ public class AsyncModule extends AbstractModule {
 
         bind(TaskTimeout.class).in(Singleton.class);
         expose(TaskTimeout.class);
-
+      }
+    });
+    binder().install(new PrivateModule() {
+      @Override protected void configure() {
+        bind(new TypeLiteral<Amount<Long, Time>>() { })
+            .toInstance(MAX_OFFER_HOLD_TIME.get());
         bind(BackoffStrategy.class).toInstance(
             new TruncatedBinaryBackoff(INITIAL_SCHEDULE_DELAY.get(), MAX_SCHEDULE_DELAY.get()));
         bind(TaskScheduler.class).to(TaskSchedulerImpl.class);

@@ -85,6 +85,9 @@ import static com.twitter.mesos.scheduler.Shards.GET_ORIGINAL_CONFIG;
 /**
  * Manager of all persistence-related operations for the scheduler.  Acts as a controller for
  * persisted state machine transitions, and their side-effects.
+ *
+ * TODO(William Farner): Re-evaluate thread safety here, specifically risk of races that
+ * modify managerState.
  */
 public class StateManagerImpl implements StateManager {
   private static final Logger LOG = Logger.getLogger(StateManagerImpl.class.getName());
@@ -260,7 +263,7 @@ public class StateManagerImpl implements StateManager {
    * @return The persisted framework ID, or {@code null} if no framework ID exists in the store.
    */
   @Nullable
-  synchronized String initialize() {
+  String initialize() {
     managerState.transition(State.INITIALIZED);
 
     // Note: Do not attempt to mutate tasks here.  Any task mutations made here will be
@@ -298,9 +301,8 @@ public class StateManagerImpl implements StateManager {
    *
    * @param frameworkId Updated framework ID.
    */
-  synchronized void setFrameworkId(final String frameworkId) {
+  void setFrameworkId(final String frameworkId) {
     checkNotNull(frameworkId);
-
     managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
 
     transactionalStorage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
@@ -321,7 +323,7 @@ public class StateManagerImpl implements StateManager {
   /**
    * Instructs the state manager to start.
    */
-  synchronized void start() {
+  void start() {
     managerState.transition(State.STARTED);
 
     transactionalStorage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
@@ -390,14 +392,14 @@ public class StateManagerImpl implements StateManager {
    *
    * @return {@code true} if in the STARTED state, {@code false} otherwise.
    */
-  public synchronized boolean isStarted() {
+  public boolean isStarted() {
     return managerState.getState() == State.STARTED;
   }
 
   /**
    * Instructs the state manager to stop, and shut down the backing storage.
    */
-  synchronized void stop() {
+  void stop() {
     managerState.transition(State.STOPPED);
 
     transactionalStorage.stop();
@@ -409,7 +411,7 @@ public class StateManagerImpl implements StateManager {
    * @param tasks Tasks to insert.
    * @return Generated task IDs for the tasks inserted.
    */
-  synchronized Set<String> insertTasks(Set<TwitterTaskInfo> tasks) {
+  Set<String> insertTasks(Set<TwitterTaskInfo> tasks) {
     checkNotNull(tasks);
 
     final Set<ScheduledTask> scheduledTasks = ImmutableSet.copyOf(transform(tasks, taskCreator));
@@ -449,7 +451,7 @@ public class StateManagerImpl implements StateManager {
    *     is already in progress.
    * @return A unique string identifying the update.
    */
-  synchronized String registerUpdate(
+  String registerUpdate(
       final String role,
       final String job,
       final Set<TwitterTaskInfo> updatedTasks) throws UpdateException {
@@ -506,7 +508,7 @@ public class StateManagerImpl implements StateManager {
    * @throws UpdateException If an update is not in-progress for the job, or the non-null token
    *     does not match the stored token.
    */
-  synchronized boolean finishUpdate(
+  boolean finishUpdate(
        final String role,
        final String job,
        final Optional<String> updateToken,
@@ -583,7 +585,7 @@ public class StateManagerImpl implements StateManager {
       implements Function<Entry<String, Collection<Protos.Attribute>>, Attribute> { }
 
   @Override
-  public synchronized void saveAttributesFromOffer(
+  public void saveAttributesFromOffer(
       final String slaveHost,
       List<Protos.Attribute> attributes) {
 
@@ -641,7 +643,7 @@ public class StateManagerImpl implements StateManager {
    * @param <E> Type of exception thrown by the state change.
    * @throws E If the operation fails.
    */
-  synchronized <E extends Exception> void taskOperation(
+  <E extends Exception> void taskOperation(
       final TaskQuery query,
       final StateMutation<E> operation) throws E {
 
@@ -678,12 +680,12 @@ public class StateManagerImpl implements StateManager {
    * @return the number of successful state changes.
    */
   @VisibleForTesting
-  synchronized int changeState(TaskQuery query, ScheduleStatus newState) {
+  int changeState(TaskQuery query, ScheduleStatus newState) {
     return changeState(query, stateUpdater(newState));
   }
 
   @Override
-  public synchronized int changeState(
+  public int changeState(
       TaskQuery query,
       ScheduleStatus newState,
       Optional<String> auditMessage) {
@@ -692,7 +694,7 @@ public class StateManagerImpl implements StateManager {
   }
 
   @Override
-  public synchronized AssignedTask assignTask(
+  public AssignedTask assignTask(
       String taskId,
       String slaveHost,
       SlaveID slaveId,
@@ -744,7 +746,7 @@ public class StateManagerImpl implements StateManager {
     return ImmutableSet.copyOf(Iterables.transform(changedTasks, Tasks.INFO_TO_SHARD_ID));
   }
 
-  synchronized Map<Integer, ShardUpdateResult> modifyShards(
+  Map<Integer, ShardUpdateResult> modifyShards(
       final String role,
       final String jobName,
       final Set<Integer> shards,
@@ -878,7 +880,7 @@ public class StateManagerImpl implements StateManager {
    * @param taskIds IDs of tasks to abandon.
    * @throws IllegalStateException If the manager is not in a state to service abandon requests.
    */
-  synchronized void abandonTasks(final Set<String> taskIds) throws IllegalStateException {
+  void abandonTasks(final Set<String> taskIds) throws IllegalStateException {
     checkNotBlank(taskIds);
     managerState.checkState(State.STARTED);
 
@@ -1128,7 +1130,7 @@ public class StateManagerImpl implements StateManager {
    *
    * @param taskIds IDs of tasks to delete.
    */
-  public synchronized void deleteTasks(final Set<String> taskIds) {
+  public void deleteTasks(final Set<String> taskIds) {
     transactionalStorage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(final MutableStoreProvider storeProvider) {
         final TaskStore.Mutable taskStore = storeProvider.getTaskStore();

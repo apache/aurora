@@ -35,6 +35,7 @@ import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.BackoffStrategy;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
@@ -123,6 +124,7 @@ public interface TaskScheduler extends EventSubscriber {
       this.driver = checkNotNull(driver);
       this.executor = checkNotNull(executor);
 
+      LOG.info("Declining resource offers not accepted for " + offerExpiry);
       offers = CacheBuilder.newBuilder()
           .expireAfterWrite(offerExpiry.as(Time.MILLISECONDS), TimeUnit.MILLISECONDS)
           .ticker(ticker)
@@ -135,6 +137,11 @@ public interface TaskScheduler extends EventSubscriber {
             }
           })
           .build();
+      Stats.export(new StatImpl<Long>("outstanding_offers") {
+        @Override public Long read() {
+          return offers.size();
+        }
+      });
     }
 
     @Inject
@@ -199,6 +206,7 @@ public interface TaskScheduler extends EventSubscriber {
 
     private void addTask(String taskId, long delayMillis, boolean cancelIfPresent) {
       removeTask(taskId, cancelIfPresent);
+      LOG.fine("Evaluating task " + taskId + " in " + delayMillis + " ms");
       PendingTask task = new PendingTask(taskId, delayMillis);
       futures.put(
           taskId,
@@ -255,6 +263,7 @@ public interface TaskScheduler extends EventSubscriber {
 
       private void runInTransaction(StoreProvider store) {
         removeTask(taskId, false);
+        LOG.fine("Attempting to schedule task " + taskId);
         ScheduledTask task =
             Iterables.getOnlyElement(store.getTaskStore().fetchTasks(selfQuery), null);
         if (task == null) {
@@ -337,7 +346,10 @@ public interface TaskScheduler extends EventSubscriber {
 
       synchronized void maybeDecline() {
         if (shouldDecline) {
+          LOG.fine("Declining offer " + offer.getId());
           driver.declineOffer(offer.getId());
+        } else {
+          LOG.fine("Removing (not declining) offer " + offer.getId());
         }
       }
     }
