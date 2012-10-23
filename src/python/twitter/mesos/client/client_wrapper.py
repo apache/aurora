@@ -26,6 +26,7 @@ from gen.twitter.mesos.ttypes import (
 from thrift.transport import TTransport
 
 
+# TODO(vinod): Kill this in favor of twitter.common.util.command_util, once it has proxy support.
 class Command(object):
   @classmethod
   def maybe_tunnel(cls, cmd, host, user):
@@ -62,27 +63,18 @@ class Command(object):
   del logged
 
 
+# TODO(vinod): Kill this in favor of twitter.common.fs.HDFSHelper, once it has proxy support.
 class HDFSHelper(object):
   """Helper class for performing HDFS operations."""
 
-  def __init__(self, cluster, user=None, proxy=True):
-    self._cluster = cluster
-    cluster_conf = Cluster.get(cluster)
-    self._uri = cluster_conf.hadoop_uri
-    self._config = cluster_conf.hadoop_config
+  def __init__(self, config, user=None, proxy=None):
+    self._config = config
+    self._proxy = proxy
     self._user = user or getpass.getuser()
-    self._proxy = cluster_conf.proxy if proxy else None
 
   @property
   def config(self):
     return self._config
-
-  @property
-  def uri(self):
-    return self._uri
-
-  def join(self, *paths):
-    return posixpath.join(self._uri, *paths)
 
   def call(self, cmd, *args, **kwargs):
     """Runs hadoop fs command (via proxy if necessary) with the given command and args.
@@ -98,18 +90,17 @@ class HDFSHelper(object):
     Copy file(s) in hdfs to local path (via proxy if necessary).
     NOTE: If src matches multiple files, make sure dst is a directory!
     """
-    log.info('Copying %s -> %s' % (self.join(src), dst))
+    log.info('HDFS copying %s -> %s' % (src, dst))
 
-    hdfs_src = self.join(src)
     if self._proxy:
       scratch_dir = Command('mktemp -d', user=self._user, host=self._proxy).check_output()
       try:
-        self.call('-get', hdfs_src, scratch_dir)
+        self.call('-get', src, scratch_dir)
         Command('scp -rq %s@%s:%s/*' % (self._user, self._proxy, scratch_dir)).call()
       finally:
         Command('rm -rf %s' % scratch_dir, user=self._user, host=self._proxy).call()
     else:
-      self.call('-get', hdfs_src, dst)
+      self.call('-get', src, dst)
 
   def copy_to(self, src, dst):
     """
@@ -118,13 +109,12 @@ class HDFSHelper(object):
     abs_src = os.path.expanduser(src)
     dst_dir = os.path.dirname(dst)
     assert os.path.exists(abs_src), 'File does not exist, cannot copy: %s' % abs_src
-    log.info('Copying %s -> %s' % (abs_src, self.join(dst_dir)))
+    log.info('HDFS copying %s -> %s' % (abs_src, dst_dir))
 
     def do_put(source):
-      hdfs_dst = self.join(dst)
-      if not self.call('-test', '-e', hdfs_dst, check=False):
-        self.call('-rm', '-skipTrash', hdfs_dst)
-      self.call('-put', source, hdfs_dst)
+      if not self.call('-test', '-e', dst, check=False):
+        self.call('-rm', '-skipTrash', dst)
+      self.call('-put', source, dst)
 
     if self._proxy:
       scratch_dir = Command('mktemp -d', user=self._user, host=self._proxy).check_output()
@@ -283,8 +273,10 @@ invoking cancel_update.
 
   def create_job(self, config, copy_app_from=None):
     if copy_app_from is not None:
-      HDFSHelper(self._cluster, config.role(), Location.is_corp()).copy_to(copy_app_from,
-        self.hdfs_path(config, copy_app_from))
+      cluster = Cluster.get(self._cluster)
+      proxy = cluster.proxy if Location.is_corp() else None
+      HDFSHelper(cluster.config, config.role(), proxy).copy_to(
+        copy_app_from, self.hdfs_path(config, copy_app_from))
 
     log.info('Creating job %s' % config.name())
     log.debug('Full configuration: %s' % config.job())
@@ -326,8 +318,10 @@ invoking cancel_update.
     log.info("Updating job: %s" % config.name())
 
     if copy_app_from is not None:
-      HDFSHelper(self._cluster, config.role(), Location.is_corp()).copy_to(copy_app_from,
-        self.hdfs_path(config, copy_app_from))
+      cluster = Cluster.get(self._cluster)
+      proxy = cluster.proxy if Location.is_corp() else None
+      HDFSHelper(cluster.config, config.role(), proxy).copy_to(
+        copy_app_from, self.hdfs_path(config, copy_app_from))
 
     resp = self._scheduler.startUpdate(config.job())
 
