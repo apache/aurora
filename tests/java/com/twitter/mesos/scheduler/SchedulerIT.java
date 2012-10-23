@@ -32,6 +32,7 @@ import org.apache.mesos.SchedulerDriver;
 import org.easymock.IAnswer;
 import org.easymock.IMocksControl;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.twitter.common.application.ShutdownStage;
@@ -72,6 +73,7 @@ import static org.easymock.EasyMock.createControl;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 
+@Ignore("TODO(William Farner): Fix this and close MESOS-1657")
 public class SchedulerIT extends BaseZooKeeperTest {
 
   private static final String CLUSTER_NAME = "integration_test_cluster";
