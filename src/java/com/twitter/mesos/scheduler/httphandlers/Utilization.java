@@ -247,12 +247,12 @@ public class Utilization {
       return cpu;
     }
 
-    public long getRamMb() {
-      return ramMb;
+    public long getRamGb() {
+      return ramMb / 1024;
     }
 
-    public long getDiskMb() {
-      return diskMb;
+    public long getDiskGb() {
+      return diskMb / 1024;
     }
   }
 }
