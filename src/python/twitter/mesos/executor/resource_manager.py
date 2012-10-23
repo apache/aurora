@@ -148,8 +148,11 @@ class ResourceEnforcer(object):
       self._nice = nice_level
     if self._nice is not None:
       for process in self.walk():
-        if process.nice != self._nice:
-          process.nice = self._nice
+        try:
+          if process.nice != self._nice:
+            process.nice = self._nice
+        except ps.error.Error as e:
+          log.error('Unable to adjust nice of %s: %s' % (process, e))
 
   def _enforce_ram(self, record):
     if record.ramRssBytes > record.reservedRamBytes:
