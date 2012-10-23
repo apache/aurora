@@ -8,10 +8,10 @@ from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 from twitter.common.process import ProcessProviderFactory
 from twitter.common.quantity import Amount, Time, Data
+from twitter.thermos.base.ckpt import CheckpointDispatcher
 from twitter.thermos.base.path import TaskPath
 from twitter.thermos.runner.inspector import CheckpointInspector
 from twitter.thermos.runner.helper import TaskKiller
-from twitter.thermos.runner.runner import TaskRunner
 from twitter.thermos.monitoring.detector import TaskDetector
 from twitter.thermos.monitoring.garbage import (
   TaskGarbageCollector,
@@ -22,8 +22,6 @@ from twitter.mesos.executor.sandbox_manager import (
 from twitter.mesos.executor.executor_base import ThermosExecutorBase
 from gen.twitter.mesos.comm.ttypes import AdjustRetainedTasks
 from gen.twitter.mesos.ttypes import ScheduleStatus
-
-import mesos_pb2 as mesos_pb
 
 # thrifts
 from thrift.TSerialization import deserialize as thrift_deserialize
@@ -111,7 +109,7 @@ class ThermosGCExecutor(ThermosExecutorBase):
             'Scheduler thought %s was in terminal state so we killed it.' % task_id)
           terminated_tasks.add(task_id)
       elif task_id in finished_tasks and not self.twitter_status_is_terminal(task_state):
-        _, state = get_state(task_id)
+        runner_ckpt, state = get_state(task_id)
         if state is None or state.statuses is None:
           self.log('Failed to replay %s, state: %s' % (runner_ckpt, state))
           continue
