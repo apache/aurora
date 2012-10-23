@@ -6,6 +6,7 @@ import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
+import java.util.logging.Logger;
 
 import javax.annotation.Nonnegative;
 
@@ -31,6 +32,7 @@ import com.twitter.common.args.constraints.CanRead;
 import com.twitter.common.args.constraints.NotNull;
 import com.twitter.common.inject.Bindings;
 import com.twitter.common.inject.Bindings.KeyFactory;
+import com.twitter.common.logging.RootLogConfig;
 import com.twitter.common.zookeeper.Group;
 import com.twitter.common.zookeeper.ServerSet;
 import com.twitter.common.zookeeper.SingletonService;
@@ -53,6 +55,8 @@ import com.twitter.mesos.scheduler.testing.IsolatedSchedulerModule;
  * Launcher for the twitter mesos scheduler.
  */
 public class SchedulerMain extends AbstractApplication {
+
+  private static final Logger LOG = Logger.getLogger(SchedulerMain.class.getName());
 
   @CmdLine(name = "testing_isolated_scheduler",
       help = "If true, run in a testing mode with the scheduler isolated from other components.")
@@ -86,6 +90,7 @@ public class SchedulerMain extends AbstractApplication {
   @Inject private SingletonService schedulerService;
   @Inject private LocalServiceRegistry serviceRegistry;
   @Inject private SchedulerLifecycle schedulerLifecycle;
+  @Inject private Optional<RootLogConfig.Configuration> glogConfig;
 
   private static Iterable<? extends Module> getSystemModules() {
     return Arrays.asList(
@@ -193,6 +198,13 @@ public class SchedulerMain extends AbstractApplication {
 
   @Override
   public void run() {
+    if (glogConfig.isPresent()) {
+      // Setup log4j to match our jul glog config in order to pick up zookeeper logging.
+      Log4jConfigurator.configureConsole(glogConfig.get());
+    } else {
+      LOG.warning("Running without expected glog configuration.");
+    }
+
     SchedulerLifecycle.SchedulerCandidate candidate = schedulerLifecycle.prepare();
 
     Optional<InetSocketAddress> primarySocket = serviceRegistry.getPrimarySocket();
