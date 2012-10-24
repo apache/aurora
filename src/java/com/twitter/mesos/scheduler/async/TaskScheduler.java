@@ -3,9 +3,9 @@ package com.twitter.mesos.scheduler.async;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -166,9 +166,10 @@ public interface TaskScheduler extends EventSubscriber {
     }
 
     private static ScheduledExecutorService createThreadPool(ShutdownRegistry shutdownRegistry) {
-      final ScheduledExecutorService executor = Executors.newScheduledThreadPool(
+      final ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(
           1,
           new ThreadFactoryBuilder().setDaemon(true).setNameFormat("TaskScheduler-%d").build());
+      Stats.exportSize("schedule_queue_size", executor.getQueue());
       shutdownRegistry.addAction(new Command() {
         @Override public void execute() {
           new ExecutorServiceShutdown(executor, Amount.of(1L, Time.SECONDS)).execute();

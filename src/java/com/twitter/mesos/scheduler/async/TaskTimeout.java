@@ -82,6 +82,7 @@ class TaskTimeout implements EventSubscriber {
   private void maybeCancel(String taskId) {
     Context context = futures.remove(taskId);
     if (context != null) {
+      LOG.fine("Canceling state timeout for task " + taskId);
       context.future.cancel(false);
     }
   }
@@ -92,6 +93,7 @@ class TaskTimeout implements EventSubscriber {
     long timeElapsed = Math.max(0, clock.nowMillis() - timestampMillis);
     long timeoutRemaining = Math.max(0, timeoutMillis - timeElapsed);
 
+    LOG.fine("Timing out task " + taskId + " in " + timeoutRemaining + " ms.");
     Future<?> timeoutHandler = executor.schedule(
         new TimedOutTaskHandler(taskId),
         timeoutRemaining,
@@ -119,7 +121,6 @@ class TaskTimeout implements EventSubscriber {
   @Subscribe
   public void storageStarted(StorageStarted event) {
     Set<ScheduledTask> transientTasks = stateManager.fetchTasks(TRANSIENT_QUERY);
-    LOG.info("Setting up timeout watches for " + transientTasks.size() + " transient tasks.");
     for (ScheduledTask task : transientTasks) {
       registerTimeout(
           Tasks.id(task),
@@ -137,22 +138,22 @@ class TaskTimeout implements EventSubscriber {
 
     @Override public void run() {
       Context context = futures.get(taskId);
-      if (context == null) {
-        LOG.warning("Timeout context not found for " + taskId + ", task may have changed states.");
-        return;
-      }
-
-      LOG.info("Timeout reached for task " + taskId);
-      // This query acts as a CAS by including the state that we expect the task to be in if the
-      // timeout is still valid.  Ideally, the future would have already been canceled, but in the
-      // event of a state transition race, including transientState prevents an unintended
-      // task timeout.
-      TaskQuery query = new TaskQuery()
-          .setTaskIds(ImmutableSet.of(taskId))
-          .setStatuses(ImmutableSet.of(context.transientState));
       try {
-        // Note: This requires LOST transitions trigger Driver.killTask.
-        stateManager.changeState(query, ScheduleStatus.LOST, TIMEOUT_MESSAGE);
+        if (context == null) {
+          LOG.warning("Timeout context not found for " + taskId);
+          return;
+        }
+
+        LOG.info("Timeout reached for task " + taskId);
+        // This query acts as a CAS by including the state that we expect the task to be in if the
+        // timeout is still valid.  Ideally, the future would have already been canceled, but in the
+        // event of a state transition race, including transientState prevents an unintended
+        // task timeout.
+        TaskQuery query = new TaskQuery()
+            .setTaskIds(ImmutableSet.of(taskId))
+            .setStatuses(ImmutableSet.of(context.transientState));
+          // Note: This requires LOST transitions trigger Driver.killTask.
+          stateManager.changeState(query, ScheduleStatus.LOST, TIMEOUT_MESSAGE);
       } finally {
         futures.remove(taskId);
       }

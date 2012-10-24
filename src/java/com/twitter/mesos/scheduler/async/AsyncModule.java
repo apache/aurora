@@ -61,8 +61,8 @@ public class AsyncModule extends AbstractModule {
         // Don't worry about clean shutdown, these can be daemon and cleanup-free.
         final ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(
             ASYNC_WORKER_THREADS.get(),
-            new ThreadFactoryBuilder().setNameFormat("AsyncHandler-%d").setDaemon(true).build());
-        Stats.exportSize("async_queue_size", executor.getQueue());
+            new ThreadFactoryBuilder().setNameFormat("TaskTimeout-%d").setDaemon(true).build());
+        Stats.exportSize("timeout_queue_size", executor.getQueue());
         Stats.export(new StatImpl<Long>("async_tasks_completed") {
           @Override public Long read() {
             return executor.getCompletedTaskCount();
