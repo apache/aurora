@@ -4,19 +4,23 @@ import time
 
 from twitter.common import app
 from twitter.common.app.modules.http import RootServer
+from twitter.thermos.base.path import TaskPath
 from twitter.thermos.observer.observer import TaskObserver
 from twitter.thermos.observer.http import BottleObserver
+
 
 app.add_option("--root",
                dest="root",
                metavar="DIR",
-               default="/var/run/thermos",
+               default=TaskPath.DEFAULT_CHECKPOINT_ROOT,
                help="root checkpoint directory for thermos task runners")
+
 
 app.configure(module='twitter.common.app.modules.http',
     port=1338, host=socket.gethostname(), enable=True, framework='tornado')
 app.configure(module='twitter.common.app.modules.scribe_exception_handler',
     category='test_thermos_observer_exceptions')
+
 
 def main(args, opts):
   if args:
@@ -34,5 +38,6 @@ def main(args, opts):
   # app that indicates sleeping forever until e.g.  a signal.
   while True:
     time.sleep(10)
+
 
 app.main()

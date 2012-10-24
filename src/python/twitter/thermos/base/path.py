@@ -1,5 +1,6 @@
 import os
 
+
 class TaskPath(object):
   """
     Handle the resolution / detection of the path structure for thermos tasks.
@@ -36,6 +37,7 @@ class TaskPath(object):
   class UnknownPath(Exception): pass
   class UnderspecifiedPath(Exception): pass
 
+  DEFAULT_CHECKPOINT_ROOT = "/var/run/thermos"
   KNOWN_KEYS = [ 'root', 'task_id', 'state', 'process', 'run' ]
 
   DIR_TEMPLATE = {
@@ -50,6 +52,8 @@ class TaskPath(object):
   def __init__(self, **kw):
     self._filename = None
     # initialize with self-interpolating values
+    if 'root' not in kw:
+      kw['root'] = self.DEFAULT_CHECKPOINT_ROOT
     self._data = dict((key, '%%(%s)s' % key) for key in TaskPath.KNOWN_KEYS)
     self._data.update(kw)
 

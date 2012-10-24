@@ -42,7 +42,7 @@ from pystachio import Ref
 from pystachio.naming import frozendict
 
 app.add_option("--root", dest="root", metavar="PATH",
-               default=os.path.join(os.environ['HOME'], '.thermos'),
+               default=TaskPath.DEFAULT_CHECKPOINT_ROOT,
                help="the thermos config root")
 
 

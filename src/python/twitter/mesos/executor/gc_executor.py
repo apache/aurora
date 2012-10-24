@@ -27,7 +27,7 @@ from gen.twitter.mesos.ttypes import ScheduleStatus
 from thrift.TSerialization import deserialize as thrift_deserialize
 
 app.add_option("--checkpoint_root", dest="checkpoint_root", metavar="PATH",
-               default="/var/run/thermos",
+               default=TaskPath.DEFAULT_CHECKPOINT_ROOT,
                help="the checkpoint root from which we garbage collect")
 
 

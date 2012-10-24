@@ -24,7 +24,7 @@ from twitter.mesos.executor.sandbox_manager import (
 
 
 app.add_option("--checkpoint_root", dest="checkpoint_root", metavar="PATH",
-               default="/var/run/thermos",
+               default=TaskPath.DEFAULT_CHECKPOINT_ROOT,
                help="the path where we will store workflow logs and checkpoints")
 
 

@@ -10,6 +10,7 @@ from twitter.common import app, log
 from twitter.common.app.modules.http import RootServer
 from twitter.common.metrics import MutatorGauge, RootMetrics
 from twitter.common.quantity import Amount, Time
+from twitter.thermos.base.path import TaskPath
 from twitter.thermos.observer.observer import TaskObserver
 from twitter.thermos.observer.http import BottleObserver
 
@@ -21,7 +22,7 @@ import psutil
 app.add_option("--root",
                dest="root",
                metavar="DIR",
-               default="/var/run/thermos",
+               default=TaskPath.DEFAULT_CHECKPOINT_ROOT,
                help="root checkpoint directory for thermos task runners")
 
 
