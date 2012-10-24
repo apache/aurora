@@ -67,14 +67,17 @@ class MesosObserverVars(threading.Thread):
 
   def collect_unparented_executors(self):
     def is_orphan_executor(proc):
-      if proc.ppid == 1 and len(proc.cmdline) >= 2:
-        if proc.cmdline[0].startswith('python') and proc.cmdline[1] == self.EXECUTOR_BINARY:
-          log.debug('Orphaned executor: pid=%d status=%s cwd=%s age=%s' % (
-               proc.pid,
-               self.STATUS_MAP.get(proc.status, 'UNKNOWN'),
-               proc.getcwd(),
-               datetime.now() - datetime.fromtimestamp(proc.create_time)))
-          return True
+      try:
+        if proc.ppid == 1 and len(proc.cmdline) >= 2:
+          if proc.cmdline[0].startswith('python') and proc.cmdline[1] == self.EXECUTOR_BINARY:
+            log.debug('Orphaned executor: pid=%d status=%s cwd=%s age=%s' % (
+                 proc.pid,
+                 self.STATUS_MAP.get(proc.status, 'UNKNOWN'),
+                 proc.getcwd(),
+                 datetime.now() - datetime.fromtimestamp(proc.create_time)))
+            return True
+      except psutil.error.Error as e:
+        log.error('Failed to collect stats for %s: %s' % (proc, e))
     self.orphaned_executors.write(len(filter(is_orphan_executor, psutil.process_iter())))
 
   def collect_orphans(self):
