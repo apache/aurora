@@ -275,7 +275,7 @@ invoking cancel_update.
     if copy_app_from is not None:
       cluster = Cluster.get(self._cluster)
       proxy = cluster.proxy if Location.is_corp() else None
-      HDFSHelper(cluster.config, config.role(), proxy).copy_to(
+      HDFSHelper(cluster.hadoop_config, config.role(), proxy).copy_to(
         copy_app_from, self.hdfs_path(config, copy_app_from))
 
     log.info('Creating job %s' % config.name())
@@ -320,7 +320,7 @@ invoking cancel_update.
     if copy_app_from is not None:
       cluster = Cluster.get(self._cluster)
       proxy = cluster.proxy if Location.is_corp() else None
-      HDFSHelper(cluster.config, config.role(), proxy).copy_to(
+      HDFSHelper(cluster.hadoop_config, config.role(), proxy).copy_to(
         copy_app_from, self.hdfs_path(config, copy_app_from))
 
     resp = self._scheduler.startUpdate(config.job())
