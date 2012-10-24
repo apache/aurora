@@ -3,12 +3,15 @@ package com.twitter.mesos.scheduler;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
@@ -32,7 +35,6 @@ import org.apache.mesos.SchedulerDriver;
 import org.easymock.IAnswer;
 import org.easymock.IMocksControl;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import com.twitter.common.application.ShutdownStage;
@@ -72,15 +74,19 @@ import static org.easymock.EasyMock.aryEq;
 import static org.easymock.EasyMock.createControl;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
+import static org.junit.Assert.fail;
 
-@Ignore("TODO(William Farner): Fix this and close MESOS-1657")
 public class SchedulerIT extends BaseZooKeeperTest {
+
+  private static final Logger LOG = Logger.getLogger(SchedulerIT.class.getName());
 
   private static final String CLUSTER_NAME = "integration_test_cluster";
   private static final String FRAMEWORK_ID = "integration_test_framework_id";
 
   private ExecutorService executor = Executors.newCachedThreadPool(
-      new ThreadFactoryBuilder().setNameFormat("SchedulerMain-%d").setDaemon(true).build());
+      new ThreadFactoryBuilder().setNameFormat("SchedulerIT-%d").setDaemon(true).build());
+  private AtomicReference<Optional<RuntimeException>> mainException =
+      Atomics.newReference(Optional.<RuntimeException>absent());
 
   private IMocksControl control;
   private Injector injector;
@@ -98,6 +104,11 @@ public class SchedulerIT extends BaseZooKeeperTest {
     control = createControl();
     addTearDown(new TearDown() {
       @Override public void tearDown() {
+        if (mainException.get().isPresent()) {
+          RuntimeException e = mainException.get().get();
+          LOG.log(Level.SEVERE, "Scheduler main exited with an exception", e);
+          fail(e.getMessage());
+        }
         control.verify();
       }
     });
@@ -150,16 +161,20 @@ public class SchedulerIT extends BaseZooKeeperTest {
 
     // Mimic AppLauncher running main.
     final SchedulerMain main = injector.getInstance(SchedulerMain.class);
-    final Future<?> mainFuture = executor.submit(new Runnable() {
+    executor.submit(new Runnable() {
       @Override public void run() {
-        main.run();
+        try {
+          main.run();
+        } catch (RuntimeException e) {
+          mainException.set(Optional.of(e));
+          executor.shutdownNow();
+        }
       }
     });
     addTearDown(new TearDown() {
       @Override public void tearDown() throws Exception {
         shutdown.execute();
         new ExecutorServiceShutdown(executor, Amount.of(1L, Time.SECONDS)).execute();
-        mainFuture.get();
       }
     });
   }
@@ -169,22 +184,27 @@ public class SchedulerIT extends BaseZooKeeperTest {
   }
 
   private HostAndPort awaitSchedulerReady() throws Exception {
-    final CountDownLatch schedulerReady = new CountDownLatch(1);
-    final AtomicReference<HostAndPort> thriftEndpoint = Atomics.newReference();
-    ServerSet schedulerService =
-        TwitterServerSet.create(zkClient, SchedulerMain.createService(CLUSTER_NAME));
-    schedulerService.monitor(new HostChangeMonitor<ServiceInstance>() {
-      @Override public void onChange(ImmutableSet<ServiceInstance> hostSet) {
-        if (!hostSet.isEmpty()) {
-          Endpoint endpoint = Iterables.getOnlyElement(hostSet).getServiceEndpoint();
-          thriftEndpoint.set(HostAndPort.fromParts(endpoint.getHost(), endpoint.getPort()));
-          schedulerReady.countDown();
-        }
+    Future<HostAndPort> monitor = executor.submit(new Callable<HostAndPort>() {
+      @Override public HostAndPort call() throws Exception {
+        final AtomicReference<HostAndPort> thriftEndpoint = Atomics.newReference();
+        ServerSet schedulerService =
+            TwitterServerSet.create(zkClient, SchedulerMain.createService(CLUSTER_NAME));
+        final CountDownLatch schedulerReady = new CountDownLatch(1);
+        schedulerService.monitor(new HostChangeMonitor<ServiceInstance>() {
+          @Override public void onChange(ImmutableSet<ServiceInstance> hostSet) {
+            if (!hostSet.isEmpty()) {
+              Endpoint endpoint = Iterables.getOnlyElement(hostSet).getServiceEndpoint();
+              thriftEndpoint.set(HostAndPort.fromParts(endpoint.getHost(), endpoint.getPort()));
+              schedulerReady.countDown();
+            }
+          }
+        });
+        schedulerReady.await();
+        return thriftEndpoint.get();
       }
     });
 
-    schedulerReady.await();
-    return thriftEndpoint.get();
+    return monitor.get();
   }
 
   private AtomicInteger curPosition = new AtomicInteger();

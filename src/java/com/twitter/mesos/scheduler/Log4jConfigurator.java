@@ -22,12 +22,9 @@ final class Log4jConfigurator {
    * Configures log4j to log to stderr with a glog format.
    *
    * @param glogConfig The glog configuration in effect.
-   * @throws IllegalArgumentException If the {@code glogConfig} is not configured for stderr
-   *     logging.
    */
   static void configureConsole(Configuration glogConfig) {
     Preconditions.checkNotNull(glogConfig);
-    Preconditions.checkArgument(glogConfig.isLogToStderr() || glogConfig.isAlsoLogToStderr());
 
     BasicConfigurator.configure(
         new ConsoleAppender(new GlogLayout(), ConsoleAppender.SYSTEM_ERR));
