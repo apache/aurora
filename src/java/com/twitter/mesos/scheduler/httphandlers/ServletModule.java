@@ -69,6 +69,8 @@ public class ServletModule extends AbstractModule {
       }
 
       @Override protected void configureServlets() {
+        bind(HttpStatsFilter.class).in(Singleton.class);
+        filter("/scheduler*").through(HttpStatsFilter.class);
         bind(LeaderRedirectFilter.class).in(Singleton.class);
         registerJerseyEndpoint("/mname", Mname.class);
         registerJerseyEndpoint(
