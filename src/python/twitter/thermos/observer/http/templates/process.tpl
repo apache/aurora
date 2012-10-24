@@ -23,6 +23,7 @@ Template arguments:
 <%!
 import socket
 import time
+from xml.sax.saxutils import escape
 
 def pretty_time(seconds=time.time()):
   return time.strftime('%m/%d %H:%M:%S', time.gmtime(seconds))
@@ -64,7 +65,7 @@ def pretty_time(seconds=time.time()):
   <strong> cmdline </strong><br>
   <div class="container">
 <pre>
-${process["cmdline"]}
+${escape(process["cmdline"])}
 </pre>
   </div><br><br>
 
