@@ -1,13 +1,16 @@
 package com.twitter.mesos.scheduler.httphandlers;
 
+import java.util.List;
 import java.util.Map;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.Status;
 
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
@@ -103,14 +106,14 @@ public class SchedulerzRole extends JerseyTemplateServlet {
             case RESTARTING:
             case UPDATING:
             case RUNNING:
+            case KILLING:
+            case PREEMPTING:
+            case ROLLBACK:
               job.activeTaskCount++;
               break;
 
-            case KILLING:
             case KILLED:
             case FINISHED:
-            case PREEMPTING:
-            case ROLLBACK:
               job.finishedTaskCount++;
               break;
 
@@ -125,7 +128,8 @@ public class SchedulerzRole extends JerseyTemplateServlet {
           }
         }
 
-        template.setAttribute("jobs", DisplayUtils.JOB_ORDERING.sortedCopy(jobs.values()));
+        List<Job> sortedJobs = DisplayUtils.JOB_ORDERING.sortedCopy(jobs.values());
+        template.setAttribute("jobs", sortedJobs);
 
         Iterable<JobConfiguration> cronJobs = Iterables.filter(
             cronScheduler.getJobs(), new Predicate<JobConfiguration>() {
@@ -133,6 +137,11 @@ public class SchedulerzRole extends JerseyTemplateServlet {
             return job.getOwner().getRole().equals(role);
           }
         });
+
+        if (sortedJobs.isEmpty() && Iterables.isEmpty(cronJobs)) {
+          throw new WebApplicationException(
+              Response.status(Status.NOT_FOUND).entity("No jobs found for role " + role).build());
+        }
 
         cronJobs = DisplayUtils.JOB_CONFIG_ORDERING.sortedCopy(cronJobs);
         Iterable<CronJob> cronJobObjs = Iterables.transform(cronJobs,

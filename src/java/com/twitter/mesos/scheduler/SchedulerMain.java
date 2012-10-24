@@ -37,7 +37,6 @@ import com.twitter.common.zookeeper.Group;
 import com.twitter.common.zookeeper.ServerSet;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperUtils;
-import com.twitter.common_internal.webassets.BlueprintModule;
 import com.twitter.common_internal.zookeeper.TwitterServerSet.Service;
 import com.twitter.common_internal.zookeeper.TwitterServerSetModule;
 import com.twitter.common_internal.zookeeper.ZooKeeperModule;
@@ -96,8 +95,7 @@ public class SchedulerMain extends AbstractApplication {
     return Arrays.asList(
         new HttpModule(),
         new LogModule(),
-        new StatsModule(),
-        new BlueprintModule()
+        new StatsModule()
     );
   }
 

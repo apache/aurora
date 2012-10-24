@@ -121,19 +121,20 @@ public class SchedulerzJob extends JerseyTemplateServlet {
             .put("taskId", task.getTaskId())
             .put("shardId", task.getTask().getShardId())
             .put("slaveHost", task.isSetSlaveHost() ? task.getSlaveHost() : "")
-            .put("taskEvents", scheduledTask.isSetTaskEvents()
-                ? scheduledTask.getTaskEvents() : Lists.newArrayList());
+            .put("status", scheduledTask.getStatus())
+            .put("statusTimestamp", Iterables.getLast(scheduledTask.getTaskEvents()).getTimestamp())
+            .put("taskEvents", scheduledTask.getTaskEvents());
 
-          String pendingReason = "";
           if (scheduledTask.getStatus() == ScheduleStatus.PENDING) {
+            String pendingReason;
             Set<Veto> vetoes = nearestFit.getNearestFit(task.getTaskId());
             if (vetoes.isEmpty()) {
               pendingReason = "No matching hosts.";
             } else {
               pendingReason = Joiner.on(",").join(Iterables.transform(vetoes, GET_REASON));
             }
+            builder.put("pendingReason", pendingReason);
           }
-          builder.put("pendingReason", pendingReason);
 
           Function<String, String> expander = new Function<String, String>() {
             @Override public String apply(String input) {
@@ -151,9 +152,18 @@ public class SchedulerzJob extends JerseyTemplateServlet {
           if (task.getTask().isSetThermosConfig()
               && task.getTask().getThermosConfig().length != 0) {
             builder.put("executorPort", 1338);
+            if (task.isSetSlaveHost()) {
+              builder.put("executorUri",
+                  "http://" + task.getSlaveHost() + ":1338/task/" + task.getTaskId());
+            }
           } else {
             builder.put("executorPort", 1337);
+            if (task.isSetSlaveHost()) {
+              builder.put("executorUri",
+                  "http://" + task.getSlaveHost() + ":1337/task?task=" + task.getTaskId());
+            }
           }
+
           return builder.build();
         }
       };
@@ -346,7 +356,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
           template.setAttribute("activeTasks",
               ImmutableList.copyOf(
                   Iterables.transform(offsetAndLimit(liveTasks, offset), taskToStringMap)));
-          hasMore = hasMore || liveTasks.size() > (offset + PAGE_SIZE);
+          hasMore = hasMore || (liveTasks.size() > (offset + PAGE_SIZE));
           template.setAttribute("schedulingDetails",
               buildSchedulingTable(Iterables.transform(liveTasks, Tasks.SCHEDULED_TO_INFO)));
         }
@@ -357,9 +367,10 @@ public class SchedulerzJob extends JerseyTemplateServlet {
           template.setAttribute("completedTasks",
               ImmutableList.copyOf(
                   Iterables.transform(offsetAndLimit(completedTasks, offset), taskToStringMap)));
-          hasMore = completedTasks.size() > (offset + PAGE_SIZE);
+          hasMore = hasMore || (completedTasks.size() > (offset + PAGE_SIZE));
         }
 
+        template.setAttribute("offset", offset);
         if (offset > 0) {
           template.setAttribute("prevOffset", Math.max(0, offset - PAGE_SIZE));
         }

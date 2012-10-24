@@ -1,7 +1,6 @@
 package com.twitter.mesos.scheduler.httphandlers;
 
-import java.util.Collection;
-import java.util.Map;
+import java.util.Set;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -13,10 +12,7 @@ import com.google.common.base.Function;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
@@ -25,7 +21,7 @@ import org.antlr.stringtemplate.StringTemplate;
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.JobConfiguration;
-import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.CronJobManager;
 import com.twitter.mesos.scheduler.Query;
@@ -48,20 +44,6 @@ public class SchedulerzHome extends JerseyTemplateServlet {
       return role;
     }
   };
-
-  private static final Function<ScheduledTask, String> GET_JOB_NAME =
-      new Function<ScheduledTask, String>() {
-        @Override public String apply(ScheduledTask task) {
-          return task.getAssignedTask().getTask().getJobName();
-        }
-      };
-
-  private static final Function<JobConfiguration, String> GET_CRON_OWNER =
-      new Function<JobConfiguration, String>() {
-        @Override public String apply(JobConfiguration job) {
-          return job.getOwner().getRole();
-        }
-      };
 
   private final SchedulerCore scheduler;
   private final CronJobManager cronScheduler;
@@ -95,66 +77,27 @@ public class SchedulerzHome extends JerseyTemplateServlet {
   @Produces(MediaType.TEXT_HTML)
   public Response get() {
     return fillTemplate(new Closure<StringTemplate>() {
-      @Override
-      public void execute(StringTemplate template) {
+      @Override public void execute(StringTemplate template) {
         template.setAttribute("cluster_name", clusterName);
 
         LoadingCache<String, Role> owners =
             CacheBuilder.newBuilder().build(CacheLoader.from(CREATE_ROLE));
-        Multimap<String, ScheduledTask> ownerJobs = HashMultimap.create();
 
-        for (ScheduledTask task : scheduler.getTasks(Query.GET_ALL)) {
-          Role role = owners.getUnchecked(task.getAssignedTask().getTask().getOwner().getRole());
-          switch (task.getStatus()) {
-            case INIT:
-            case PENDING:
-              role.pendingTaskCount++;
-              break;
+        // TODO(William Farner): Render this page without an expensive query.
+        for (TwitterTaskInfo task
+            : Iterables.transform(scheduler.getTasks(Query.GET_ALL), Tasks.SCHEDULED_TO_INFO)) {
 
-            case ASSIGNED:
-            case STARTING:
-            case RESTARTING:
-            case UPDATING:
-            case RUNNING:
-              role.activeTaskCount++;
-              break;
-
-            case KILLING:
-            case KILLED:
-            case FINISHED:
-            case PREEMPTING:
-            case ROLLBACK:
-              role.finishedTaskCount++;
-              break;
-
-            case LOST:
-            case FAILED:
-            case UNKNOWN:
-              role.failedTaskCount++;
-              break;
-
-            default:
-              throw new IllegalArgumentException("Unsupported status: " + task.getStatus());
-          }
-
-          ownerJobs.put(role.role, task);
+          owners.getUnchecked(task.getOwner().getRole()).accumulate(task);
         }
 
         // Add cron job counts for each role.
-        for (Map.Entry<String, Collection<JobConfiguration>> entry
-            : Multimaps.index(cronScheduler.getJobs(), GET_CRON_OWNER).asMap().entrySet()) {
-          owners.getUnchecked(entry.getKey()).cronJobCount = entry.getValue().size();
+        for (JobConfiguration job : cronScheduler.getJobs()) {
+          owners.getUnchecked(job.getOwner().getRole()).accumulate(job);
         }
 
-        Collection<Role> roles = owners.asMap().values();
-        for (Role role : roles) {
-          Iterable<ScheduledTask> activeRoleTasks =
-              Iterables.filter(ownerJobs.get(role.role), Tasks.ACTIVE_FILTER);
-          role.jobCount = Sets.newHashSet(Iterables.transform(
-              activeRoleTasks, GET_JOB_NAME)).size();
-        }
-
-        template.setAttribute("owners", DisplayUtils.ROLE_ORDERING.sortedCopy(roles));
+        template.setAttribute(
+            "owners",
+            DisplayUtils.ROLE_ORDERING.sortedCopy(owners.asMap().values()));
       }
     });
   }
@@ -164,39 +107,27 @@ public class SchedulerzHome extends JerseyTemplateServlet {
    */
   static class Role {
     private String role;
-    private int jobCount;
-    private int cronJobCount;
-    private int pendingTaskCount = 0;
-    private int activeTaskCount = 0;
-    private int finishedTaskCount = 0;
-    private int failedTaskCount = 0;
+    private Set<String> jobs = Sets.newHashSet();
+    private Set<String> cronJobs = Sets.newHashSet();
+
+    private void accumulate(TwitterTaskInfo task) {
+      jobs.add(task.getJobName());
+    }
+
+    private void accumulate(JobConfiguration job) {
+      cronJobs.add(job.getName());
+    }
 
     public String getRole() {
       return role;
     }
 
     public int getJobCount() {
-      return jobCount;
+      return jobs.size();
     }
 
     public int getCronJobCount() {
-      return cronJobCount;
-    }
-
-    public int getPendingTaskCount() {
-      return pendingTaskCount;
-    }
-
-    public int getActiveTaskCount() {
-      return activeTaskCount;
-    }
-
-    public int getFinishedTaskCount() {
-      return finishedTaskCount;
-    }
-
-    public int getFailedTaskCount() {
-      return failedTaskCount;
+      return cronJobs.size();
     }
   }
 }
