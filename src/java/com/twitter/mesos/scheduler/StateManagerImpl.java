@@ -57,12 +57,12 @@ import com.twitter.mesos.gen.storage.JobUpdateConfiguration;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.TransactionalStorage.SideEffect;
+import com.twitter.mesos.scheduler.TransactionalStorage.SideEffectWork;
+import com.twitter.mesos.scheduler.TransactionalStorage.TransactionFinalizer;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.events.PubsubEvent;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
-import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
-import com.twitter.mesos.scheduler.storage.Storage.MutateWork.NoResult;
 import com.twitter.mesos.scheduler.storage.Storage.StorageException;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
@@ -146,7 +146,7 @@ public class StateManagerImpl implements StateManager {
 
   private final AtomicLong shardSanityCheckFails = Stats.exportLong("shard_sanity_check_failures");
 
-  private final TransactionalStorage transactionalStorage;
+  private final TransactionalStorage txStorage;
 
   // TODO(William Farner): Eliminate this and update all callers to use Storage directly.
   interface ReadOnlyStorage {
@@ -215,14 +215,13 @@ public class StateManagerImpl implements StateManager {
     checkNotNull(storage);
     this.clock = checkNotNull(clock);
 
-    Closure<MutableStoreProvider> transactionFinalizer = new Closure<MutableStoreProvider>() {
-      @Override public void execute(MutableStoreProvider storeProvider) {
-        processWorkQueueInTransaction(storeProvider);
+    TransactionFinalizer finalizer = new TransactionFinalizer() {
+      @Override public void finalize(SideEffectWork<?, ?> work, MutableStoreProvider store) {
+        processWorkQueueInTransaction(work, store);
       }
     };
 
-    transactionalStorage =
-        new TransactionalStorage(storage, mutableState, transactionFinalizer, taskEventSink);
+    txStorage = new TransactionalStorage(storage, mutableState, finalizer, taskEventSink);
     readOnlyStorage = new ReadOnlyStorage() {
       @Override public <T, E extends Exception> T doInTransaction(Work<T, E> work)
           throws StorageException, E {
@@ -254,7 +253,7 @@ public class StateManagerImpl implements StateManager {
    * Prompts the state manager to prepare for possible activation in the leading scheduler process.
    */
   void prepare() {
-    transactionalStorage.prepare();
+    txStorage.prepare();
   }
 
   /**
@@ -269,12 +268,12 @@ public class StateManagerImpl implements StateManager {
     // Note: Do not attempt to mutate tasks here.  Any task mutations made here will be
     // overwritten if a snapshot is applied.
 
-    transactionalStorage.start(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(final MutableStoreProvider storeProvider) {
+    txStorage.start(txStorage.new NoResultSideEffectWork() {
+      @Override public void execute(final MutableStoreProvider storeProvider) {
         for (ScheduledTask task : storeProvider.getTaskStore().fetchTasks(Query.GET_ALL)) {
-          createStateMachine(task, task.getStatus());
+          createStateMachine(this, task, task.getStatus());
         }
-        transactionalStorage.addSideEffect(new SideEffect() {
+        addSideEffect(new SideEffect() {
           @Override public void mutate(MutableState state) {
             state.getVars().beginExporting();
           }
@@ -305,7 +304,7 @@ public class StateManagerImpl implements StateManager {
     checkNotNull(frameworkId);
     managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
 
-    transactionalStorage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+    txStorage.doInWriteTransaction(txStorage.new NoResultSideEffectWork() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getSchedulerStore().saveFrameworkId(frameworkId);
       }
@@ -326,7 +325,7 @@ public class StateManagerImpl implements StateManager {
   void start() {
     managerState.transition(State.STARTED);
 
-    transactionalStorage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+    txStorage.doInWriteTransaction(txStorage.new NoResultSideEffectWork() {
       @Override protected void execute(final MutableStoreProvider storeProvider) {
         for (String id : storeProvider.getJobStore().fetchManagerIds()) {
           for (JobConfiguration job : storeProvider.getJobStore().fetchJobs(id)) {
@@ -361,7 +360,7 @@ public class StateManagerImpl implements StateManager {
                 // IllegalStateException (see DriverImpl).
                 // driver.killTask(Tasks.id(task));
 
-                transactionalStorage.addSideEffect(new SideEffect() {
+                addSideEffect(new SideEffect() {
                   @Override public void mutate(MutableState state) {
                     state.getVars().adjustCount(
                         Tasks.jobKey(task),
@@ -402,7 +401,7 @@ public class StateManagerImpl implements StateManager {
   void stop() {
     managerState.transition(State.STOPPED);
 
-    transactionalStorage.stop();
+    txStorage.stop();
   }
 
   /**
@@ -416,12 +415,12 @@ public class StateManagerImpl implements StateManager {
 
     final Set<ScheduledTask> scheduledTasks = ImmutableSet.copyOf(transform(tasks, taskCreator));
 
-    transactionalStorage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+    txStorage.doInWriteTransaction(txStorage.new NoResultSideEffectWork() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getTaskStore().saveTasks(scheduledTasks);
 
         for (ScheduledTask task : scheduledTasks) {
-          createStateMachine(task).updateState(PENDING);
+          createStateMachine(this, task).updateState(PENDING);
         }
       }
     });
@@ -460,7 +459,7 @@ public class StateManagerImpl implements StateManager {
     checkNotBlank(job);
     checkNotBlank(updatedTasks);
 
-    return transactionalStorage.doInWriteTransaction(new MutateWork<String, UpdateException>() {
+    return txStorage.doInWriteTransaction(txStorage.new SideEffectWork<String, UpdateException>() {
       @Override public String apply(MutableStoreProvider storeProvider) throws UpdateException {
         String jobKey = Tasks.jobKey(role, job);
         Set<TwitterTaskInfo> existingTasks = ImmutableSet.copyOf(Iterables.transform(
@@ -519,7 +518,7 @@ public class StateManagerImpl implements StateManager {
     checkNotBlank(role);
     checkNotBlank(job);
 
-    return transactionalStorage.doInWriteTransaction(new MutateWork<Boolean, UpdateException>() {
+    return txStorage.doInWriteTransaction(txStorage.new SideEffectWork<Boolean, UpdateException>() {
       @Override public Boolean apply(MutableStoreProvider storeProvider) throws UpdateException {
         UpdateStore.Mutable updateStore = storeProvider.getUpdateStore();
 
@@ -600,7 +599,7 @@ public class StateManagerImpl implements StateManager {
     final Set<Attribute> attrs = Sets.newHashSet(
         Iterables.transform(valuesByName.asMap().entrySet(), ATTRIBUTE_CONVERTER));
 
-    transactionalStorage.execute(new NoResult.Quiet() {
+    txStorage.doInWriteTransaction(txStorage.new NoResultSideEffectWork() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getAttributeStore().saveHostAttributes(new HostAttributes(slaveHost, attrs));
       }
@@ -632,42 +631,6 @@ public class StateManagerImpl implements StateManager {
      * A state mutation that does not throw a checked exception.
      */
     interface Quiet extends StateMutation<RuntimeException> { }
-  }
-
-  /**
-   * Performs an operation on the state based on a fixed query.
-   *
-   * @param query The query to perform, whose tasks will be made available to the callback via
-   *    the provided {@link StateChanger}.
-   * @param operation Operation to be performed.
-   * @param <E> Type of exception thrown by the state change.
-   * @throws E If the operation fails.
-   */
-  <E extends Exception> void taskOperation(
-      final TaskQuery query,
-      final StateMutation<E> operation) throws E {
-
-    checkNotNull(query);
-    checkNotNull(operation);
-
-    transactionalStorage.doInWriteTransaction(new NoResult<E>() {
-      @Override protected void execute(MutableStoreProvider storeProvider) throws E {
-        final TaskStore taskStore = storeProvider.getTaskStore();
-        Set<ScheduledTask> tasks = (query == null) ? null : taskStore.fetchTasks(query);
-
-        operation.execute(tasks, new StateChanger() {
-          @Override public void changeState(
-              Set<String> taskIds,
-              ScheduleStatus state,
-              String auditMessage) {
-
-            changeStateInTransaction(
-                taskIds,
-                stateUpdaterWithAuditMessage(state, Optional.of(auditMessage)));
-          }
-        });
-      }
-    });
   }
 
   /**
@@ -761,8 +724,8 @@ public class StateManagerImpl implements StateManager {
         : ScheduleStatus.ROLLBACK;
 
     managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
-    return transactionalStorage.doInWriteTransaction(
-        new MutateWork<Map<Integer, ShardUpdateResult>, UpdateException>() {
+    return txStorage.doInWriteTransaction(
+        txStorage.new SideEffectWork<Map<Integer, ShardUpdateResult>, UpdateException>() {
           @Override public Map<Integer, ShardUpdateResult> apply(
               MutableStoreProvider store) throws UpdateException {
 
@@ -884,7 +847,7 @@ public class StateManagerImpl implements StateManager {
     checkNotBlank(taskIds);
     managerState.checkState(State.STARTED);
 
-    transactionalStorage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+    txStorage.doInWriteTransaction(txStorage.new NoResultSideEffectWork() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
         for (TaskStateMachine stateMachine : getStateMachines(taskIds).values()) {
           stateMachine.updateState(ScheduleStatus.UNKNOWN, Optional.of("Dead executor."));
@@ -892,7 +855,7 @@ public class StateManagerImpl implements StateManager {
 
         // Need to process the work queue first to ensure the tasks can be state changed prior
         // to deletion.
-        processWorkQueueInTransaction(storeProvider);
+        processWorkQueueInTransaction(this, storeProvider);
         deleteTasks(taskIds);
       }
     });
@@ -915,7 +878,7 @@ public class StateManagerImpl implements StateManager {
       final TaskQuery query,
       final Function<TaskStateMachine, Boolean> stateChange) {
 
-    return transactionalStorage.doInWriteTransaction(new MutateWork.Quiet<Integer>() {
+    return txStorage.doInWriteTransaction(txStorage.new QuietSideEffectWork<Integer>() {
       @Override public Integer apply(MutableStoreProvider storeProvider) {
         return changeStateInTransaction(
             storeProvider.getTaskStore().fetchTaskIds(query), stateChange);
@@ -1039,7 +1002,10 @@ public class StateManagerImpl implements StateManager {
         .toString().replaceAll("[^\\w-]", sep);  // Constrain character set.
   }
 
-  private void processWorkQueueInTransaction(MutableStoreProvider storeProvider) {
+  private void processWorkQueueInTransaction(
+      SideEffectWork<?, ?> sideEffectWork,
+      MutableStoreProvider storeProvider) {
+
     managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
     for (final WorkEntry work : Iterables.consumingIterable(workQueue)) {
       final TaskStateMachine stateMachine = work.stateMachine;
@@ -1068,9 +1034,10 @@ public class StateManagerImpl implements StateManager {
 
             taskStore.saveTasks(ImmutableSet.of(task));
 
-            createStateMachine(task).updateState(PENDING, Optional.of("Rescheduled"));
+            createStateMachine(sideEffectWork, task)
+                .updateState(PENDING, Optional.of("Rescheduled"));
             TwitterTaskInfo taskInfo = task.getAssignedTask().getTask();
-            transactionalStorage.addTaskEvent(
+            sideEffectWork.addTaskEvent(
                 new PubsubEvent.TaskRescheduled(
                     taskInfo.getOwner().getRole(),
                     taskInfo.getJobName(),
@@ -1079,7 +1046,11 @@ public class StateManagerImpl implements StateManager {
 
           case UPDATE:
           case ROLLBACK:
-            maybeRescheduleForUpdate(storeProvider, taskId, work.command == WorkCommand.ROLLBACK);
+            maybeRescheduleForUpdate(
+                sideEffectWork,
+                storeProvider,
+                taskId,
+                work.command == WorkCommand.ROLLBACK);
             break;
 
           case UPDATE_STATE:
@@ -1089,14 +1060,15 @@ public class StateManagerImpl implements StateManager {
                 work.mutation.execute(task);
               }
             });
-            transactionalStorage.addSideEffect(new SideEffect() {
-              @Override public void mutate(MutableState state) {
+            sideEffectWork.addSideEffect(new SideEffect() {
+              @Override
+              public void mutate(MutableState state) {
                 state.getVars()
                     .adjustCount(stateMachine.getJobKey(), stateMachine.getPreviousState(),
                         stateMachine.getState());
               }
             });
-            transactionalStorage.addTaskEvent(
+            sideEffectWork.addTaskEvent(
                 new PubsubEvent.TaskStateChange(
                     stateMachine.getTaskId(),
                     stateMachine.getPreviousState(),
@@ -1131,20 +1103,19 @@ public class StateManagerImpl implements StateManager {
    * @param taskIds IDs of tasks to delete.
    */
   public void deleteTasks(final Set<String> taskIds) {
-    transactionalStorage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+    txStorage.doInWriteTransaction(txStorage.new NoResultSideEffectWork() {
       @Override protected void execute(final MutableStoreProvider storeProvider) {
         final TaskStore.Mutable taskStore = storeProvider.getTaskStore();
         final Iterable<ScheduledTask> tasks = taskStore.fetchTasks(Query.byId(taskIds));
 
-        transactionalStorage.addSideEffect(new SideEffect() {
+        addSideEffect(new SideEffect() {
           @Override public void mutate(MutableState state) {
             for (ScheduledTask task : tasks) {
               state.getVars().decrementCount(Tasks.jobKey(task), task.getStatus());
             }
           }
         });
-        transactionalStorage.addTaskEvent(
-            new PubsubEvent.TasksDeleted(ImmutableSet.copyOf(taskIds)));
+        addTaskEvent(new PubsubEvent.TasksDeleted(ImmutableSet.copyOf(taskIds)));
 
         taskStore.deleteTasks(taskIds);
       }
@@ -1152,7 +1123,10 @@ public class StateManagerImpl implements StateManager {
   }
 
   private void maybeRescheduleForUpdate(
-      MutableStoreProvider storeProvider, String taskId, boolean rollingBack) {
+      SideEffectWork<?, ?> sideEffectWork,
+      MutableStoreProvider storeProvider,
+      String taskId,
+      boolean rollingBack) {
     TaskStore.Mutable taskStore = storeProvider.getTaskStore();
 
     TwitterTaskInfo oldConfig = Tasks.SCHEDULED_TO_INFO.apply(
@@ -1184,7 +1158,7 @@ public class StateManagerImpl implements StateManager {
     ConfigurationManager.resetStartCommand(newConfig);
     ScheduledTask newTask = taskCreator.apply(newConfig).setAncestorId(taskId);
     taskStore.saveTasks(ImmutableSet.of(newTask));
-    createStateMachine(newTask)
+    createStateMachine(sideEffectWork, newTask)
         .updateState(
             PENDING,
             Optional.of("Rescheduled after " + (rollingBack ? "rollback." : "update.")));
@@ -1242,12 +1216,18 @@ public class StateManagerImpl implements StateManager {
     return stateMachine;
   }
 
-  private TaskStateMachine createStateMachine(ScheduledTask task) {
-    return createStateMachine(task, INIT);
+  private TaskStateMachine createStateMachine(
+      SideEffectWork<?, ?> sideEffectWork,
+      ScheduledTask task) {
+
+    return createStateMachine(sideEffectWork, task, INIT);
   }
 
   private TaskStateMachine createStateMachine(
-      final ScheduledTask task, final ScheduleStatus initialState) {
+      SideEffectWork<?, ?> sideEffectWork,
+      final ScheduledTask task,
+      final ScheduleStatus initialState) {
+
     final String taskId = Tasks.id(task);
     String role = task.getAssignedTask().getTask().getOwner().getRole();
     String job = task.getAssignedTask().getTask().getJobName();
@@ -1262,7 +1242,7 @@ public class StateManagerImpl implements StateManager {
         clock,
         initialState);
 
-    transactionalStorage.addSideEffect(new SideEffect() {
+    sideEffectWork.addSideEffect(new SideEffect() {
       @Override public void mutate(MutableState state) {
         state.getVars().incrementCount(jobKey, initialState);
       }

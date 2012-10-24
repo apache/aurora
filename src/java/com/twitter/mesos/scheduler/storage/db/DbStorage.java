@@ -218,19 +218,14 @@ public class DbStorage implements
     }
   }
 
-  private final ThreadLocal<LockManager> lockManager = new ThreadLocal<LockManager>() {
-    @Override protected LockManager initialValue() {
-      return new LockManager();
-    }
-  };
-
+  private final LockManager lockManager = new LockManager();
   @Override
   public <T, E extends Exception> T doInTransaction(final Work<T, E> work)
       throws StorageException, E {
 
     checkNotNull(work);
 
-    lockManager.get().readLock();
+    lockManager.readLock();
     try {
       return transaction(new ExceptionalFunction<MutableStoreProvider, T, E>() {
         @Override public T apply(MutableStoreProvider storeProvider) throws E {
@@ -238,7 +233,7 @@ public class DbStorage implements
         }
       });
     } finally {
-      lockManager.get().readUnlock();
+      lockManager.readUnlock();
     }
   }
 
@@ -248,7 +243,7 @@ public class DbStorage implements
 
     checkNotNull(work);
 
-    lockManager.get().writeLock();
+    lockManager.writeLock();
     try {
       return transaction(new ExceptionalFunction<MutableStoreProvider, T, E>() {
         @Override public T apply(MutableStoreProvider storeProvider) throws E {
@@ -256,7 +251,7 @@ public class DbStorage implements
         }
       });
     } finally {
-      lockManager.get().writeUnlock();
+      lockManager.writeUnlock();
     }
   }
 
