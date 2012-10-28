@@ -121,8 +121,7 @@ public class LogStorageModule extends AbstractModule {
       quotaStore = DbStorage.class;
     }
 
-    // TODO(wfarner): Figure out why checkstyle wants this formatting to be so crazy.
-    Closure < PrivateBinder > bindAdditional = new Closure<PrivateBinder>() {
+    Closure<PrivateBinder>  bindAdditional = new Closure<PrivateBinder>() {
       private <T> void exposeBinding(
           PrivateBinder binder,
           Class<T> binding,
