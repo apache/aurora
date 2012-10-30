@@ -149,6 +149,37 @@ def _get_package_uri(config, copy_app_from=None):
     return config.hdfs_path()
 
 
+PACKAGE_DEPRECATION_WARNING = """
+Job.package is deprecated.  Instead use the {{packer}} namespace directly.
+
+See the packer section of the Configuration Reference page for more information:
+http://confluence.twitter.biz/display/Aurora/Aurora+Configuration+Reference#AuroraConfigurationReference-%7B%7Bpacker%7D%7Dnamespace
+"""
+
+PACKAGE_UNDERSPECIFIED_WARNING = """
+You've specified Job.package in your configuration but not referenced {{mesos.package}}
+or {{mesos.package_uri}}.  We no longer copy package artifacts directly into your
+sandbox prior to invocation, so you must copy them by adding:
+
+  %s
+
+either as a process or into a process in your Task.
+"""
+
+
+def _warn_on_unspecified_package_bindings(config):
+  if not isinstance(config, PystachioConfig) or not config.package():
+    return
+
+  print(PACKAGE_DEPRECATION_WARNING, file=sys.stderr)
+
+  _, refs = config.raw().interpolate()
+  p_uri, p = Ref.from_address('mesos.package_uri'), Ref.from_address('mesos.package')
+  if p not in refs and p_uri not in refs:
+    print(PACKAGE_UNDERSPECIFIED_WARNING % (
+        '{{package[%s][%s][%s].copy_command}}' % tuple(config.package())))
+
+
 def _inject_packer_bindings(config, force_local=False):
   if isinstance(config, MesosConfig):
     raise ValueError('inject_packer_bindings can only be used with Pystachio configs!')
@@ -228,6 +259,7 @@ def populate_namespaces(config, copy_app_from=None, force_local=False):
   """Populate additional bindings in the config, e.g. packer bindings."""
   if isinstance(config, PystachioConfig):
     _inject_packer_bindings(config, force_local)
+    _warn_on_unspecified_package_bindings(config)
   package_uri = _get_package_uri(config, copy_app_from=copy_app_from)
   if package_uri:
     config.set_hdfs_path(package_uri)

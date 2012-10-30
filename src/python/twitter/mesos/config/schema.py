@@ -13,9 +13,11 @@ class MesosContext(Struct):
   instance    = Required(Integer)
 
   # The filename of the package associated with this job
+  # DEPRECATED in favor of using {{packer[role][package][version].package}}
   package     = String
 
   # The HDFS URI of the package associated with this job
+  # DEPRECATED in favor of using {{packer[role][package][version].package_uri}}
   package_uri = String
 
 
@@ -104,7 +106,7 @@ class MesosJob(Struct):
   cron_schedule = String
   cron_policy   = Default(String, 'KILL_EXISTING')
   layout        = AppLayout
-  package       = PackerPackage
+  package       = PackerPackage  # DEPRECATED in favor of {{packer}} namespaces.
   announce      = Announcer
 
   update_config = Default(UpdateConfig, UpdateConfig())
