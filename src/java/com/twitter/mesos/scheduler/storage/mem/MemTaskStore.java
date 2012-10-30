@@ -37,6 +37,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
  *
  * TODO(William Farner): Once deployed, study performance to determine if DbStorage's
  * IdComparedScheduledTask should be adopted here as well.
+ *
+ * TODO(William Farner): Eliminate indexes, use transactional maps.
  */
 public class MemTaskStore implements TaskStore.Mutable {
 
@@ -225,7 +227,7 @@ public class MemTaskStore implements TaskStore.Mutable {
       scanItems = tasks.values();
     } else {
       scanItems =
-          Maps.filterKeys(tasks,  Predicates.and(Lists.transform(indexResults, IN))).values();
+          Maps.filterKeys(tasks, Predicates.and(Lists.transform(indexResults, IN))).values();
     }
 
     // Apply the query against the working set.
