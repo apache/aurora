@@ -161,7 +161,7 @@ def create(jobname, config_file):
     print('Detected cluster=local, spawning local run.')
     return spawn_local('build', jobname, config_file, **make_spawn_options(options))
 
-  api = MesosClientAPI(cluster=config.cluster(), verbose=app.get_options().verbose)
+  api = MesosClientAPI(cluster=config.cluster(), verbose=app.get_options().verbosity == 'verbose')
   resp = api.create_job(config, app.get_options().copy_app_from)
   client_util.check_and_log_response(resp)
   handle_open(api.scheduler.scheduler(), config.role(), config.name())
@@ -292,7 +292,7 @@ def diff(job, config_file):
   options = app.get_options()
   config = client_util.get_config(job, config_file, options.copy_app_from, options.json, False,
       options.bindings)
-  api = MesosClientAPI(cluster=config.cluster(), verbose=app.get_options().verbose)
+  api = MesosClientAPI(cluster=config.cluster(), verbose=app.get_options().verbosity == 'verbose')
   resp = query(config.role(), job, api=api, statuses=ACTIVE_STATES)
   if not resp.responseCode:
     client_util.die('Request failed, server responded with "%s"' % resp.message)
@@ -343,7 +343,7 @@ def do_open(*args):
   if not options.cluster:
     client_util.die('--cluster is required')
 
-  api = MesosClientAPI(cluster=options.cluster, verbose=options.verbose)
+  api = MesosClientAPI(cluster=options.cluster, verbose=options.verbosity == 'verbose')
 
   import webbrowser
   webbrowser.open_new_tab(synthesize_url(api.scheduler.scheduler(), role, job))
@@ -378,7 +378,8 @@ def start_cron(role, jobname):
   Invokes a cron job immediately, out of its normal cron cycle.
   This does not affect the cron cycle in any way.
   """
-  api = MesosClientAPI(cluster=app.get_options().cluster, verbose=app.get_options().verbose)
+  api = MesosClientAPI(cluster=app.get_options().cluster,
+      verbose=app.get_options().verbosity == 'verbose')
   resp = api.start_cronjob(role, jobname)
   client_util.check_and_log_response(resp)
   handle_open(api.scheduler.scheduler(), role, jobname)
@@ -397,7 +398,7 @@ def kill(role, jobname):
 
   """
   options = app.get_options()
-  api = MesosClientAPI(cluster=options.cluster, verbose=options.verbose)
+  api = MesosClientAPI(cluster=options.cluster, verbose=options.verbosity == 'verbose')
   resp = api.kill_job(role, jobname, _getshards(options.shards))
   client_util.check_and_log_response(resp)
   handle_open(api.scheduler.scheduler(), role, jobname)
@@ -441,7 +442,8 @@ def status(role, jobname):
               task.assignedTask.slaveHost,
               taskString))
 
-  api = MesosClientAPI(cluster=app.get_options().cluster, verbose=app.get_options().verbose)
+  api = MesosClientAPI(cluster=app.get_options().cluster,
+      verbose=app.get_options().verbosity == 'verbose')
   resp = api.check_status(role, jobname)
   client_util.check_and_log_response(resp)
 
@@ -503,7 +505,7 @@ Based on your job size (%s) you should use max_total_failures >= %s.
 See http://confluence.local.twitter.com/display/Aurora/Aurora+Configuration+Referencefor details.
 ''' % (job_size, min_failure_threshold))
 
-  api = MesosClientAPI(cluster=config.cluster(), verbose=options.verbose)
+  api = MesosClientAPI(cluster=config.cluster(), verbose=options.verbosity == 'verbose')
   resp = api.update_job(config, _getshards(options.shards), options.copy_app_from)
   client_util.check_and_log_response(resp)
 
@@ -519,7 +521,8 @@ def cancel_update(role, jobname):
   or if another user is actively updating the job.  This command should only
   be used when the user is confident that they are not conflicting with another user.
   """
-  api = MesosClientAPI(cluster=app.get_options().cluster, verbose=app.get_options().verbose)
+  api = MesosClientAPI(cluster=app.get_options().cluster,
+      verbose=app.get_options().verbosity == 'verbose')
   resp = api.cancel_update(role, jobname)
   client_util.check_and_log_response(resp)
 
@@ -532,7 +535,8 @@ def get_quota(role):
 
   Prints the production quota that has been allocated to a user.
   """
-  api = MesosClientAPI(cluster=app.get_options().cluster, verbose=app.get_options().verbose)
+  api = MesosClientAPI(cluster=app.get_options().cluster,
+      verbose=app.get_options().verbosity == 'verbose')
   resp = api.get_quota(role)
   quota = resp.quota
 
@@ -561,7 +565,8 @@ def set_quota(role, cpu_str, ram_mb_str, disk_mb_str):
   except ValueError:
     log.error('Invalid value')
 
-  api = MesosClientAPI(cluster=app.get_options().cluster, verbose=app.get_options().verbose)
+  api = MesosClientAPI(cluster=app.get_options().cluster,
+      verbose=app.get_options().verbosity == 'verbose')
   resp = api.set_quota(role, cpu, ram_mb, disk_mb)
   client_util.check_and_log_response(resp)
 
@@ -583,7 +588,8 @@ def force_task_state(task_id, state):
               % (state, ', '.join(ScheduleStatus._NAMES_TO_VALUES.keys())))
     sys.exit(1)
 
-  api = MesosClientAPI(cluster=app.get_options().cluster, verbose=app.get_options().verbose)
+  api = MesosClientAPI(cluster=app.get_options().cluster,
+      verbose=app.get_options().verbosity == 'verbose')
   resp = api.force_task_state(task_id, status)
   client_util.check_and_log_response(resp)
 
@@ -594,7 +600,8 @@ def query(role, job, shards=None, statuses=LIVE_STATES, api=None):
   query.owner = Identity(role=role)
   query.jobName = job
   query.shardIds = shards
-  api = api or MesosClientAPI(cluster=app.get_options().cluster, verbose=app.get_options().verbose)
+  api = api or MesosClientAPI(cluster=app.get_options().cluster,
+      verbose=app.get_options().verbosity == 'verbose')
   return api.query(query)
 
 
@@ -651,10 +658,11 @@ def run(*line):
 
 
 def _get_packer(cluster=None):
-  cluster = cluster or app.get_options().cluster
+  options = app.get_options()
+  cluster = cluster or options.cluster
   if not cluster:
     client_util.die('--cluster must be specified')
-  return sd_packer_client.create_packer(cluster)
+  return sd_packer_client.create_packer(cluster, verbose=options.verbosity in ('normal', 'verbose'))
 
 
 def trap_packer_error(fn):
@@ -849,12 +857,12 @@ def help(args):
 
 
 def set_quiet(option, _1, _2, parser):
-  setattr(parser.values, option.dest, True)
+  setattr(parser.values, option.dest, 'quiet')
   LogOptions.set_stderr_log_level('NONE')
 
 
 def set_verbose(option, _1, _2, parser):
-  setattr(parser.values, option.dest, False)
+  setattr(parser.values, option.dest, 'verbose')
   LogOptions.set_stderr_log_level('DEBUG')
 
 
@@ -865,14 +873,14 @@ def main():
 if __name__ == '__main__':
   app.interspersed_args(True)
   app.add_option('-v',
-                 dest='verbose',
-                 default=False,
+                 dest='verbosity',
+                 default='normal',
                  action='callback',
                  callback=set_verbose,
                  help='Verbose logging. (default: %default)')
   app.add_option('-q',
-                 dest='verbose',
-                 default=False,
+                 dest='verbosity',
+                 default='normal',
                  action='callback',
                  callback=set_quiet,
                  help='Quiet logging. (default: %default)')

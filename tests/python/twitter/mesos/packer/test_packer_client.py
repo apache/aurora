@@ -12,7 +12,7 @@ def test_compute_checksum():
   temp_file = tempfile.NamedTemporaryFile(mode='w')
   temp_file.write(text)
   temp_file.flush()
-  assert digest == packer_client.Packer.compute_checksum(temp_file.name)
+  assert digest == packer_client.Packer('foo', 1234).compute_checksum(temp_file.name)
 
 def prepare_add(mocker):
   packer = packer_client.Packer('host', 'port')

@@ -21,11 +21,19 @@ class Progress(object):
   def __init__(self):
     self._seen = 0
 
+  def emit(self, value):
+    sys.stdout.write(value + '\r')
+    sys.stdout.flush()
+
   def update(self, total, size, name):
     self._seen += size
     pct = self._seen * 100 / total
-    sys.stdout.write('%s: %s%%\r' % (name, pct))
-    sys.stdout.flush()
+    self.emit('%s: %s%%' % (name, pct))
+
+
+class QuietProgress(Progress):
+  def emit(self, value):
+    pass
 
 
 class CallbackFile(file):
@@ -47,10 +55,11 @@ class CallbackFile(file):
 class Packer(object):
   class Error(Exception): pass
 
-  def __init__(self, host, port):
+  def __init__(self, host, port, verbose=True):
     self._host = host
     self._port = port
     self._client = None
+    self._verbose = verbose
 
   def _get_client(self):
     # TODO(William Farner): Use HTTPS (MESOS-873)
@@ -98,10 +107,9 @@ class Packer(object):
   def _ver_url(role, package, version):
     return '%s/%s' % (Packer._pkg_url(role, package), version)
 
-  @staticmethod
-  def compute_checksum(local_file):
+  def compute_checksum(self, local_file):
     # Calculate the checksum, reading 16 MiB chunks.
-    checksum_progress = Progress()
+    checksum_progress = Progress() if self._verbose else QuietProgress()
     stream = CallbackFile(local_file, 'rb', checksum_progress.update, 'Calculating checksum')
     md5 = hashlib.md5()
     while True:
@@ -125,13 +133,16 @@ class Packer(object):
 
   def add(self, role, package, local_file, metadata, digest=None):
     if digest is None:
-      digest = Packer.compute_checksum(local_file)
+      digest = self.compute_checksum(local_file)
     return self._add(role, package, local_file, metadata, digest)
 
   def _add(self, role, package, local_file, metadata, digest):
     streaminghttp.register_openers()
-    print()
-    upload_progress = Progress()
+    if self._verbose:
+      print()
+      upload_progress = Progress()
+    else:
+      upload_progress = QuietProgress()
     stream = CallbackFile(local_file, 'rb', upload_progress.update, 'Uploading')
     datagen, headers = multipart_encode({'file': stream})
 
@@ -148,7 +159,8 @@ class Packer(object):
       request = urllib2.Request(url, datagen, headers)
       resp = urllib2.urlopen(request).read()
       upload_secs = time.time() - upload_start
-      print('Average upload rate: %s KB/s' % (int(file_size / 1024 / upload_secs)))
+      if self._verbose:
+        print('Average upload rate: %s KB/s' % (int(file_size / 1024 / upload_secs)))
       return json.loads(resp)
     except urllib2.HTTPError as e:
       raise Packer.Error(e.read())
@@ -161,3 +173,5 @@ class Packer(object):
                      auth=True,
                      body='version=%s' % version,
                      method='PUT')
+
+

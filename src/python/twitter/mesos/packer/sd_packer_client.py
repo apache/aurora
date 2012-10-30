@@ -11,7 +11,7 @@ from twitter.mesos.packer.packer_client import Packer
 _ZK_TIMEOUT_SECS = 5
 
 
-def create_packer(cluster):
+def create_packer(cluster, **kw):
   zk, packer_ss = ZookeeperHelper.get_packer_serverset(cluster)
   packers = list(packer_ss)
   zk.close()
@@ -32,4 +32,4 @@ def create_packer(cluster):
   if Location.is_corp():
     packer_host, packer_port = TunnelHelper.create_tunnel(packer_host, packer_port)
 
-  return Packer(packer_host, packer_port)
+  return Packer(packer_host, packer_port, **kw)

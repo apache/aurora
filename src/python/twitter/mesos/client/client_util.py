@@ -85,7 +85,7 @@ def _get_package_uri_from_packer_and_files(cluster, role, name, package_files):
   with temporary_dir(root_dir=os.getcwd()) as tmp_dir:
     packer = sd_packer_client.create_packer(cluster)
     zip_name = _zip_package_files(name, package_files, tmp_dir)
-    digest = Packer.compute_checksum(zip_name)
+    digest = packer.compute_checksum(zip_name)
     package_name = name + _PACKAGE_FILES_SUFFIX
     package_tuple = (role, package_name, 'latest')
     package_version = None
