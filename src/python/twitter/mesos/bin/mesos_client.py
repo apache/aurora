@@ -29,6 +29,7 @@ from twitter.mesos.clusters import Cluster
 from twitter.mesos.command_runner import DistributedCommandRunner
 from twitter.mesos.packer import sd_packer_client
 from twitter.mesos.packer.packer_client import Packer
+from twitter.mesos.parsers import MesosConfig
 from twitter.thermos.base.options import add_binding_to
 
 from gen.twitter.mesos.constants import ACTIVE_STATES, LIVE_STATES
@@ -133,6 +134,13 @@ EXECUTOR_SANDBOX_OPTION = optparse.Option(
     help='Run the command in the executor sandbox instead of the task sandbox.')
 
 
+def maybe_retranslate(jobname, config_file, *args, **kw):
+  config = client_util.get_config(jobname, config_file, *args, **kw)
+  if Cluster.get(config.cluster()).thermos_autotranslate and isinstance(config, MesosConfig):
+    return client_util.get_config(jobname, config_file, *args, translate=True, **kw)
+  return config
+
+
 def make_spawn_options(options):
   return dict((name, getattr(options, name)) for name in (
       'copy_app_from',
@@ -154,7 +162,8 @@ def create(jobname, config_file):
   Creates a job based on a configuration file.
   """
   options = app.get_options()
-  config = client_util.get_config(jobname, config_file, options.copy_app_from, options.json)
+  config = maybe_retranslate(jobname, config_file, options.copy_app_from, options.json)
+
   if config.cluster() == 'local':
     options.shard = 0
     options.runner = 'build'
@@ -290,7 +299,7 @@ def diff(job, config_file):
   By default the diff will be displayed using 'diff', though you may choose an alternate
   diff program by specifying the DIFF_VIEWER environment variable."""
   options = app.get_options()
-  config = client_util.get_config(job, config_file, options.copy_app_from, options.json, False,
+  config = maybe_retranslate(job, config_file, options.copy_app_from, options.json, False,
       options.bindings)
   api = MesosClientAPI(cluster=config.cluster(), verbose=app.get_options().verbosity == 'verbose')
   resp = query(config.role(), job, api=api, statuses=ACTIVE_STATES)
@@ -363,7 +372,7 @@ def inspect(jobname, config_file):
   the parsed configuration.
   """
   options = app.get_options()
-  config = client_util.get_config(jobname, config_file, options.copy_app_from, options.json,
+  config = maybe_retranslate(jobname, config_file, options.copy_app_from, options.json,
       False, options.bindings)
   log.info('Parsed job config: %s' % config.job())
 
@@ -492,7 +501,7 @@ def update(jobname, config_file):
   to preview what changes will take effect.
   """
   options = app.get_options()
-  config = client_util.get_config(jobname, config_file, options.copy_app_from, options.json,
+  config = maybe_retranslate(jobname, config_file, options.copy_app_from, options.json,
       force_local=False, bindings=options.bindings)
   if config.is_dedicated():
     job_size = len(config.job().taskConfigs)
