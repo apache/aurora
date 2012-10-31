@@ -174,3 +174,19 @@ def python_options(*options, **kw_options):
       python_options(a=23, boo='foo') == '-a 23 --boo foo'
   """
   return ' '.join(__render_options('-', '--', *options, **kw_options))
+
+
+def sequential(task):
+  """Add a constraint that makes all processes within a task run sequentially."""
+  def maybe_constrain(task):
+    return {'constraints': order(*task.processes())} if task.processes() is not Empty else {}
+  if task.constraints() is Empty or task.constraints() == List(Constraint)([]):
+    return task(**maybe_constrain(task))
+  raise ValueError('Cannot turn a Task with existing constraints into a SequentialTask!')
+
+
+# TODO(wickman) Consider creating a separate SequentialTask type by replicating the Task
+# type and overriding the .get() method on SequentialTask.
+def SequentialTask(*args, **kw):
+  """A Task whose processes are always sequential."""
+  return sequential(Task(*args, **kw))
