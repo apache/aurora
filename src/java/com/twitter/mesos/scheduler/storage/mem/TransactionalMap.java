@@ -13,6 +13,7 @@ import com.google.common.collect.Maps;
 
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Closures;
+import com.twitter.mesos.scheduler.storage.Transactional;
 
 /**
  * A map that wraps another map implementation, adding the ability to perform transactions.

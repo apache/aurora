@@ -61,5 +61,8 @@ public interface TaskStore {
      * @return Immutable copies of only the tasks that were mutated.
      */
     ImmutableSet<ScheduledTask> mutateTasks(TaskQuery query, Closure<ScheduledTask> mutator);
+
+    public interface Transactioned extends Mutable, Transactional {
+    }
   }
 }

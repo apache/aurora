@@ -6,6 +6,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.common.testing.TearDown;
 import com.google.common.testing.junit4.TearDownTestCase;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -16,7 +18,13 @@ import org.junit.Test;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
+import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.ScheduleStatus;
+import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.storage.Storage;
+import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
+import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
 
@@ -76,5 +84,106 @@ public class MemStorageTest extends TearDownTestCase {
     assertEquals("fastResult", fastResult);
     slowReadFinished.countDown();
     assertEquals("slowResult", future.get());
+  }
+
+  private ScheduledTask makeTask(String taskId) {
+    return new ScheduledTask().setAssignedTask(new AssignedTask().setTaskId(taskId));
+  }
+
+  private class CustomException extends RuntimeException {
+  }
+
+  private <T, E extends RuntimeException> void expectWriteFail(MutateWork<T, E> work) {
+    try {
+      storage.doInWriteTransaction(work);
+      fail("Expected a CustomException.");
+    } catch (CustomException e) {
+      // Expected.
+    }
+  }
+
+  private void expectTasks(final String... taskIds) {
+    storage.doInTransaction(new Work.Quiet<Void>() {
+      @Override public Void apply(StoreProvider storeProvider) {
+        assertEquals(
+            ImmutableSet.builder().add(taskIds).build(),
+            storeProvider.getTaskStore().fetchTaskIds(Query.GET_ALL));
+        return null;
+      }
+    });
+  }
+
+  @Test
+  public void testTransactions() {
+    expectWriteFail(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider storeProvider) {
+        storeProvider.getTaskStore().saveTasks(ImmutableSet.of(makeTask("a"), makeTask("b")));
+        throw new CustomException();
+      }
+    });
+    expectTasks();
+
+    storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider storeProvider) {
+        storeProvider.getTaskStore().saveTasks(ImmutableSet.of(makeTask("a"), makeTask("b")));
+      }
+    });
+    expectTasks("a", "b");
+
+    expectWriteFail(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider storeProvider) {
+        storeProvider.getTaskStore().deleteTasks();
+        throw new CustomException();
+      }
+    });
+    expectTasks("a", "b");
+
+    expectWriteFail(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider storeProvider) {
+        ScheduledTask a =
+            Iterables.getOnlyElement(storeProvider.getTaskStore().fetchTasks(Query.byId("a")));
+        a.setStatus(ScheduleStatus.RUNNING)
+            .setAncestorId("z");
+        throw new CustomException();
+      }
+    });
+    expectTasks("a", "b");
+    storage.doInTransaction(new Work.Quiet<Void>() {
+      @Override
+      public Void apply(StoreProvider storeProvider) {
+        assertEquals(
+            makeTask("a"),
+            Iterables.getOnlyElement(storeProvider.getTaskStore().fetchTasks(Query.byId("a"))));
+        return null;
+      }
+    });
+
+    // Nested transaction where inner transaction fails.
+    expectWriteFail(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider storeProvider) {
+        storeProvider.getTaskStore().saveTasks(ImmutableSet.of(makeTask("c")));
+        storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+          @Override protected void execute(MutableStoreProvider storeProvider) {
+            storeProvider.getTaskStore().saveTasks(ImmutableSet.of(makeTask("d")));
+            throw new CustomException();
+          }
+        });
+      }
+    });
+    expectTasks("a", "b");
+
+    // Nested transaction where outer transaction fails.
+    expectWriteFail(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider storeProvider) {
+        storeProvider.getTaskStore().saveTasks(ImmutableSet.of(makeTask("c")));
+        storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+          @Override protected void execute(MutableStoreProvider storeProvider) {
+            storeProvider.getTaskStore().saveTasks(ImmutableSet.of(makeTask("d")));
+          }
+        });
+        throw new CustomException();
+      }
+    });
+    expectTasks("a", "b");
   }
 }

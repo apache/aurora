@@ -30,6 +30,10 @@ public interface AttributeStore {
    */
   Set<HostAttributes> getHostAttributes();
 
+  /**
+   * Attributes are considered mostly ephemeral and extremely low risk when inconsistency
+   * is present.  As a result, this is the only store lacking a {@link Transactional} sub-interface.
+   */
   public interface Mutable extends AttributeStore {
 
     /**

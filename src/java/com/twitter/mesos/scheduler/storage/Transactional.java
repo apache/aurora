@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler.storage.mem;
+package com.twitter.mesos.scheduler.storage;
 
 /**
  * A state-bearing entity that honors transactions.  Any state modifications made since the most
@@ -6,7 +6,7 @@ package com.twitter.mesos.scheduler.storage.mem;
  *
  * TODO(William Farner): Rename this to Revertable.
  */
-interface Transactional {
+public interface Transactional {
 
   /**
    * Commits any modifications made since the last commit or rollback.  Upon completion of a

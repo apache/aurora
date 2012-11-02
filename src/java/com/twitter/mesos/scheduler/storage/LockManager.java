@@ -22,13 +22,16 @@ public class LockManager {
     LockMode initialLockMode = LockMode.NONE;
     int lockCount = 0;
 
-    private void lockAcquired(LockMode mode) {
+    private boolean lockAcquired(LockMode mode) {
+      boolean stateChanged = false;
       if (initialLockMode == LockMode.NONE) {
         initialLockMode = mode;
+        stateChanged = true;
       }
       if (initialLockMode == mode) {
         lockCount++;
       }
+      return stateChanged;
     }
 
     private void lockReleased(LockMode mode) {
@@ -65,13 +68,16 @@ public class LockManager {
 
   /**
    * Blocks until this thread has acquired a write lock.
+   *
+   * @return {@code true} if the lock was newly-acquired, or {@code false} if this thread previously
+   *         secured the write lock and has yet to release it.
    */
-  public void writeLock() {
+  public boolean writeLock() {
     Preconditions.checkState(lockState.get().initialLockMode != LockMode.READ,
         "A read transaction may not be upgraded to a write transaction.");
 
     lock.writeLock().lock();
-    lockState.get().lockAcquired(LockMode.WRITE);
+    return lockState.get().lockAcquired(LockMode.WRITE);
   }
 
   /**

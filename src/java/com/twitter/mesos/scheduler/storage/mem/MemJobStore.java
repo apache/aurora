@@ -6,9 +6,6 @@ import java.util.Set;
 import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
@@ -22,46 +19,60 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * An in-memory job store.
  */
-public class MemJobStore implements JobStore.Mutable {
+public class MemJobStore implements JobStore.Mutable.Transactioned {
 
   private static final Function<JobConfiguration, JobConfiguration> DEEP_COPY =
       Util.deepCopier(JobConfiguration.class);
 
-  private final LoadingCache<String, Manager> managers = CacheBuilder.newBuilder()
-      .build(new CacheLoader<String, Manager>() {
-        @Override public Manager load(String key) {
-          return new Manager();
-        }
-      });
+  private final TransactionalMap<String, Manager> managers =
+      TransactionalMap.wrap(Maps.<String, Manager>newHashMap());
+
+  private Manager getOrCreate(String managerId) {
+    Manager manager = managers.get(managerId);
+    if (manager == null) {
+      manager = new Manager();
+      managers.put(managerId, manager);
+    }
+    return manager;
+  }
+
+  @Override
+  public void commit() {
+    managers.commit();
+  }
+
+  @Override
+  public void rollback() {
+    managers.rollback();
+  }
 
   @Override
   public void saveAcceptedJob(String managerId, JobConfiguration jobConfig) {
     checkNotNull(managerId);
     checkNotNull(jobConfig);
 
-    managers.getUnchecked(managerId).jobs.put(Tasks.jobKey(jobConfig), DEEP_COPY.apply(jobConfig));
+    getOrCreate(managerId).jobs.put(Tasks.jobKey(jobConfig), DEEP_COPY.apply(jobConfig));
   }
 
   @Override
   public void removeJob(String jobKey) {
     checkNotNull(jobKey);
 
-    for (Manager manager : managers.asMap().values()) {
+    for (Manager manager : managers.values()) {
       manager.jobs.remove(jobKey);
     }
   }
 
   @Override
   public void deleteJobs() {
-    managers.invalidateAll();
-    managers.cleanUp();
+    managers.clear();
   }
 
   @Override
   public Iterable<JobConfiguration> fetchJobs(String managerId) {
     checkNotNull(managerId);
 
-    @Nullable Manager manager = managers.getIfPresent(managerId);
+    @Nullable Manager manager = managers.get(managerId);
     if (manager == null) {
       return ImmutableSet.of();
     }
@@ -77,7 +88,7 @@ public class MemJobStore implements JobStore.Mutable {
     checkNotNull(managerId);
     checkNotNull(jobKey);
 
-    @Nullable Manager manager = managers.getIfPresent(managerId);
+    @Nullable Manager manager = managers.get(managerId);
     if (manager == null) {
       return null;
     }
@@ -87,7 +98,7 @@ public class MemJobStore implements JobStore.Mutable {
 
   @Override
   public Set<String> fetchManagerIds() {
-    return ImmutableSet.copyOf(managers.asMap().keySet());
+    return ImmutableSet.copyOf(managers.keySet());
   }
 
   private static class Manager {

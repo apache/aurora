@@ -1,30 +1,21 @@
 package com.twitter.mesos.scheduler.storage.mem;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
 import com.google.common.collect.FluentIterable;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Multimaps;
 
 import org.apache.commons.lang.StringUtils;
 
 import com.twitter.common.base.Closure;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.mesos.Tasks;
-import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
@@ -37,10 +28,10 @@ import static com.google.common.base.Preconditions.checkNotNull;
  *
  * TODO(William Farner): Once deployed, study performance to determine if DbStorage's
  * IdComparedScheduledTask should be adopted here as well.
- *
- * TODO(William Farner): Eliminate indexes, use transactional maps.
+ * TODO(William Farner): With sufficient evidence from query patterns, use the task ID to
+ * limit the working set for query scans.
  */
-public class MemTaskStore implements TaskStore.Mutable {
+public class MemTaskStore implements TaskStore.Mutable.Transactioned {
 
   /**
    * COPIER is separate from deepCopy to capture timing information.  Only the instrumented
@@ -55,8 +46,18 @@ public class MemTaskStore implements TaskStore.Mutable {
         }
       };
 
-  private final Map<String, ScheduledTask> tasks = Maps.newHashMap();
-  private final Set<Index> indices = ImmutableSet.of(new StatusIndex(), new IdIndex());
+  private final TransactionalMap<String, ScheduledTask> tasks =
+      TransactionalMap.wrap(Maps.<String, ScheduledTask>newHashMap());
+
+  @Override
+  public void commit() {
+    tasks.commit();
+  }
+
+  @Override
+  public void rollback() {
+    tasks.rollback();
+  }
 
   @Timed("mem_storage_deep_copies")
   protected ScheduledTask deepCopy(ScheduledTask input) {
@@ -89,18 +90,12 @@ public class MemTaskStore implements TaskStore.Mutable {
     Set<ScheduledTask> immutable =
         FluentIterable.from(newTasks).transform(deepCopy).toImmutableSet();
     tasks.putAll(Maps.uniqueIndex(immutable, Tasks.SCHEDULED_TO_ID));
-    for (Index index : indices) {
-      index.insert(immutable);
-    }
   }
 
   @Timed("mem_storage_delete_all_tasks")
   @Override
   public void deleteTasks() {
     tasks.clear();
-    for (Index index : indices) {
-      index.invalidateAll();
-    }
   }
 
   @Timed("mem_storage_delete_tasks")
@@ -108,11 +103,9 @@ public class MemTaskStore implements TaskStore.Mutable {
   public void deleteTasks(Set<String> taskIds) {
     checkNotNull(taskIds);
 
-    Map<String, ScheduledTask> deleted = Maps.filterKeys(tasks, Predicates.in(taskIds));
-    Set<ScheduledTask> deletedTasks = ImmutableSet.copyOf(deleted.values());
-    tasks.keySet().removeAll(ImmutableSet.copyOf(deleted.keySet()));
-    for (Index index : indices) {
-      index.invalidate(deletedTasks);
+    // TransactionalMap does not presently support keySet modification, requiring iteration here.
+    for (String id : taskIds) {
+      tasks.remove(id);
     }
   }
 
@@ -135,9 +128,6 @@ public class MemTaskStore implements TaskStore.Mutable {
         // further mutation impossible.
         ScheduledTask updated = deepCopy.apply(mutable);
         mutated.put(Tasks.id(mutable), updated);
-        for (Index index : indices) {
-          index.update(original, updated);
-        }
       }
     }
 
@@ -206,130 +196,7 @@ public class MemTaskStore implements TaskStore.Mutable {
   }
 
   private FluentIterable<ScheduledTask> mutableMatches(TaskQuery query) {
-    // Check for index matches.
-    ImmutableList.Builder<Set<String>> indexResultBuilder = ImmutableList.builder();
-    for (Index index : indices) {
-      Optional<Set<String>> indexResult = index.lookup(query);
-      if (indexResult.isPresent()) {
-        if (indexResult.get().isEmpty()) {
-          // An index matched the query but contained no results, therefore no matches in the store.
-          return FluentIterable.from(ImmutableSet.<ScheduledTask>of());
-        } else {
-          indexResultBuilder.add(indexResult.get());
-        }
-      }
-    }
-
-    List<Set<String>> indexResults = indexResultBuilder.build();
-    Iterable<ScheduledTask> scanItems;
-    if (indexResults.isEmpty()) {
-      // No index matches - a full scan is required.
-      scanItems = tasks.values();
-    } else {
-      scanItems =
-          Maps.filterKeys(tasks, Predicates.and(Lists.transform(indexResults, IN))).values();
-    }
-
     // Apply the query against the working set.
-    return FluentIterable.from(scanItems).filter(queryFilter(query));
-  }
-
-  private static final Function<Set<String>, Predicate<String>> IN =
-      new Function<Set<String>, Predicate<String>>() {
-        @Override public Predicate<String> apply(Set<String> set) {
-          return Predicates.in(set);
-        }
-      };
-
-  private interface Index {
-    Optional<Set<String>> NO_INDEX_MATCH = Optional.absent();
-
-    /**
-     * Searches for task IDs in the index that match the query.
-     * <p>
-     * If the result is present, this means the query is applicable to the index, and any tasks
-     * <b>not</b> present in the result should not be considered a match for the query.  If the
-     * result is an empty set, then there are no tasks matching the query.  If the result is absent,
-     * the query is not applicable to this index.
-     *
-     * @param query Query to perform against the index.
-     * @return IDs of tasks matching this index, absent if the query does not apply to the index.
-     */
-    Optional<Set<String>> lookup(TaskQuery query);
-
-    void update(ScheduledTask old, ScheduledTask updated);
-
-    void insert(Set<ScheduledTask> tasks);
-
-    void invalidate(Set<ScheduledTask> task);
-
-    void invalidateAll();
-  }
-
-  private class IdIndex implements Index {
-    @Override public Optional<Set<String>> lookup(TaskQuery query) {
-      // There are two distinct but subtly-different conditions to handle specially here:
-      //   - Task IDs unset: query did not specify an ID condition, which should match all tasks.
-      //   - Task IDs empty: query specified an empty ID condition, which should have no matches.
-      if (query.getTaskIds() == null) {
-        return NO_INDEX_MATCH;
-      }
-
-      Set<String> matches = FluentIterable.from(tasks.keySet())
-          .filter(Predicates.in(query.getTaskIds()))
-          .toImmutableSet();
-      return Optional.of(matches);
-    }
-
-    @Override public void update(ScheduledTask old, ScheduledTask updated) {
-      // No-op.
-    }
-
-    @Override public void insert(Set<ScheduledTask> newTasks) {
-      // No-op.
-    }
-
-    @Override public void invalidate(Set<ScheduledTask> task) {
-      // No-op.
-    }
-
-    @Override public void invalidateAll() {
-      // No-op.
-    }
-  }
-
-  private static class StatusIndex implements Index {
-    private final Multimap<ScheduleStatus, String> idsByStatus = HashMultimap.create();
-
-    @Override public Optional<Set<String>> lookup(TaskQuery query) {
-      if (query.getStatusesSize() == 0) {
-        return NO_INDEX_MATCH;
-      }
-
-      Multimap<ScheduleStatus, String> matches =
-          Multimaps.filterKeys(idsByStatus, Predicates.in(query.getStatuses()));
-      return Optional.<Set<String>>of(ImmutableSet.copyOf(matches.values()));
-    }
-
-    @Override public void update(ScheduledTask old, ScheduledTask updated) {
-      invalidate(ImmutableSet.of(old));
-      insert(ImmutableSet.of(updated));
-    }
-
-    @Override public void insert(Set<ScheduledTask> tasks) {
-      for (ScheduledTask task : tasks) {
-        idsByStatus.put(task.getStatus(), Tasks.id(task));
-      }
-    }
-
-    @Override public void invalidate(Set<ScheduledTask> tasks) {
-      for (ScheduledTask task : tasks) {
-        idsByStatus.remove(task.getStatus(), Tasks.id(task));
-      }
-    }
-
-    @Override public void invalidateAll() {
-      idsByStatus.clear();
-    }
+    return FluentIterable.from(tasks.values()).filter(queryFilter(query));
   }
 }

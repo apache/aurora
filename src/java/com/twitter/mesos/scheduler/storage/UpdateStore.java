@@ -57,5 +57,8 @@ public interface UpdateStore {
      * Deletes all update configurations.
      */
     void deleteShardUpdateConfigs();
+
+    public interface Transactioned extends Mutable, Transactional {
+    }
   }
 }

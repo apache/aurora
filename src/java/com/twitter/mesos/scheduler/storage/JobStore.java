@@ -64,5 +64,8 @@ public interface JobStore {
      * Deletes all jobs.
      */
     void deleteJobs();
+
+    public interface Transactioned extends Mutable, Transactional {
+    }
   }
 }

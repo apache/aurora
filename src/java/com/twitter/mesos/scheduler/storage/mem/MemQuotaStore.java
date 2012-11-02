@@ -1,6 +1,5 @@
 package com.twitter.mesos.scheduler.storage.mem;
 
-import java.util.Map;
 import java.util.Set;
 
 import javax.annotation.Nullable;
@@ -18,11 +17,22 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * An in-memory quota store.
  */
-public class MemQuotaStore implements QuotaStore.Mutable {
+public class MemQuotaStore implements QuotaStore.Mutable.Transactioned {
 
   private static final Function<Quota, Quota> DEEP_COPY = Util.deepCopier(Quota.class);
 
-  private final Map<String, Quota> quotas = Maps.newHashMap();
+  private final TransactionalMap<String, Quota> quotas =
+      TransactionalMap.wrap(Maps.<String, Quota>newHashMap());
+
+  @Override
+  public void commit() {
+    quotas.commit();
+  }
+
+  @Override
+  public void rollback() {
+    quotas.rollback();
+  }
 
   @Override
   public void deleteQuotas() {

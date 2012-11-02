@@ -3,6 +3,7 @@ package com.twitter.mesos.scheduler.storage.mem;
 import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
 
 import com.twitter.mesos.scheduler.storage.AttributeStore;
@@ -14,6 +15,7 @@ import com.twitter.mesos.scheduler.storage.SchedulerStore;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutateWork.NoResult.Quiet;
 import com.twitter.mesos.scheduler.storage.TaskStore;
+import com.twitter.mesos.scheduler.storage.Transactional;
 import com.twitter.mesos.scheduler.storage.UpdateStore;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -26,14 +28,15 @@ public class MemStorage implements Storage {
 
   private final MutableStoreProvider storeProvider;
   private final LockManager lockManager = new LockManager();
+  private final Iterable<Transactional> transactionals;
 
   @Inject
   MemStorage(
-      final SchedulerStore.Mutable schedulerStore,
-      final JobStore.Mutable jobStore,
-      final TaskStore.Mutable taskStore,
-      final UpdateStore.Mutable updateStore,
-      final QuotaStore.Mutable quotaStore,
+      final SchedulerStore.Mutable.Transactioned schedulerStore,
+      final JobStore.Mutable.Transactioned jobStore,
+      final TaskStore.Mutable.Transactioned taskStore,
+      final UpdateStore.Mutable.Transactioned updateStore,
+      final QuotaStore.Mutable.Transactioned quotaStore,
       final AttributeStore.Mutable attributeStore) {
 
     storeProvider = new MutableStoreProvider() {
@@ -61,6 +64,12 @@ public class MemStorage implements Storage {
         return attributeStore;
       }
     };
+    transactionals = ImmutableList.of(
+        schedulerStore,
+        jobStore,
+        taskStore,
+        updateStore,
+        quotaStore);
   }
 
   /**
@@ -102,16 +111,37 @@ public class MemStorage implements Storage {
     }
   }
 
+  private void commit() {
+    for (Transactional transactional : transactionals) {
+      transactional.commit();
+    }
+  }
+
+  private void rollback() {
+    for (Transactional transactional : transactionals) {
+      transactional.rollback();
+    }
+  }
+
   @Override
   public <T, E extends Exception> T doInWriteTransaction(MutateWork<T, E> work)
       throws StorageException, E {
 
     checkNotNull(work);
 
-    lockManager.writeLock();
+    boolean committed = false;
+    boolean topLevelTransaction = lockManager.writeLock();
     try {
-      return work.apply(storeProvider);
+      T result =  work.apply(storeProvider);
+      if (topLevelTransaction) {
+        commit();
+        committed = true;
+      }
+      return result;
     } finally {
+      if (topLevelTransaction && !committed) {
+        rollback();
+      }
       lockManager.writeUnlock();
     }
   }
