@@ -50,7 +50,7 @@ def _read_chunk(filename, offset=None, length=None):
       return {}
 
   if data:
-    return dict(offset=offset, length=len(data), data=escape(data.decode('ascii', 'replace')))
+    return dict(offset=offset, length=len(data), data=escape(data.decode('utf8', 'replace')))
 
   return dict(offset=offset, length=0)
 
