@@ -6,6 +6,7 @@ import subprocess
 import time
 
 from twitter.common import log, dirutil
+from twitter.common.lang import Compatibility
 from twitter.common.quantity import Amount, Time
 from twitter.mesos.clusters import Cluster
 from twitter.mesos.location import Location
@@ -292,8 +293,12 @@ invoking cancel_update.
 
   def kill_job(self, role, jobname, shards=None):
     log.info("Killing tasks for job: %s" % jobname)
+    if not isinstance(jobname, Compatibility.string) or not jobname:
+      raise ValueError('jobname must be a non-empty string!')
 
     query = TaskQuery()
+    # TODO(wickman)  Allow us to send user=getpass.getuser() without it resulting in filtering jobs
+    # only submitted by a particular user.
     query.owner = Identity(role=role)
     query.jobName = jobname
     if shards is not None:

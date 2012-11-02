@@ -153,12 +153,12 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
             }
           }
         }
-        if (!StringUtils.isEmpty(query.getJobName())) {
+        if (query.getJobName() != null) {
           if (!query.getJobName().equals(config.getJobName())) {
             return false;
           }
         }
-        if (!StringUtils.isEmpty(query.getJobKey())) {
+        if (query.getJobKey() != null) {
           if (!query.getJobKey().equals(Tasks.jobKey(config))) {
             return false;
           }

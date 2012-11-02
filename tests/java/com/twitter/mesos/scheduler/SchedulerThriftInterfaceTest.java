@@ -210,6 +210,16 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testKillTasksInvalidJobname() throws Exception {
+    TaskQuery query = new TaskQuery()
+        .setOwner(ROLE_IDENTITY)
+        .setJobName("");
+    control.replay();
+    KillResponse response = thrift.killTasks(query, SESSION);
+    assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
+  }
+
+  @Test
   public void testKillNonExistentTasks() throws Exception {
     TaskQuery query = new TaskQuery()
         .setOwner(ROLE_IDENTITY)

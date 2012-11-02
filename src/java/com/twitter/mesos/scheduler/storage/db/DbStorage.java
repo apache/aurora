@@ -990,10 +990,10 @@ public class DbStorage implements
         whereClauseBuilder.equals("job_user", Types.VARCHAR, query.getOwner().getUser());
       }
     }
-    if (!StringUtils.isEmpty(query.getJobName())) {
+    if (query.getJobName() != null) {
       whereClauseBuilder.equals("job_name", Types.VARCHAR, query.getJobName());
     }
-    if (!StringUtils.isEmpty(query.getJobKey())) {
+    if (query.getJobKey() != null) {
       whereClauseBuilder.equals("job_key", Types.VARCHAR, query.getJobKey());
     }
 

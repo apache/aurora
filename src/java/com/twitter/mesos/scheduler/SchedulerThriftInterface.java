@@ -12,6 +12,8 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
 
+import org.apache.commons.lang.StringUtils;
+
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.NotEmpty;
@@ -224,14 +226,21 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
 
   @Override
   public KillResponse killTasks(final TaskQuery query, SessionKey session) {
+    // TODO(wfarner): Determine whether this is a useful function, or if it should simply be
+    //     switched to 'killJob'.
+
     checkNotNull(query);
     checkNotNull(session);
     checkNotNull(session.getUser());
 
-    // TODO(wfarner): Determine whether this is a useful function, or if it should simply be
-    //     switched to 'killJob'.
-    LOG.info("Received kill request for tasks: " + query);
+    LOG.info("Received kill request from " + session.getUser() + "for tasks: " + query);
     KillResponse response = new KillResponse();
+
+    if (query.getJobName() != null && StringUtils.isBlank(query.getJobName())) {
+      response.setResponseCode(INVALID_REQUEST).setMessage(
+          String.format("Invalid job name: '%s'", query.getJobName()));
+      return response;
+    }
 
     if (isAdmin(session)) {
       LOG.info("Granting kill query to admin user: " + query);
