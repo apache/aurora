@@ -103,6 +103,10 @@ python_binary(
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/thermos/base:options')
   ],
+  platforms = (
+    'linux-x86_64',
+    'macosx-10.6-x86_64',
+  )
 )
 
 python_binary(
