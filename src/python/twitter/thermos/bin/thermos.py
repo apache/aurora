@@ -482,7 +482,7 @@ def monitor(args, options):
 def status(args, options):
   """Get the status of task(s).
 
-    Usage: thermos [options] status [task_name(s) or task_regexp(s)]
+    Usage: thermos status [options] [task_name(s) or task_regexp(s)]
 
     Options:
       --verbosity=LEVEL     Verbosity level for logging. [default: 0]
