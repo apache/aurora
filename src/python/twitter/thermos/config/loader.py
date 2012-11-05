@@ -35,14 +35,15 @@ class ThermosProcessWrapper(object):
     for ref in uninterp:
       subscope = port_scope.scoped_to(ref)
       if subscope is not None:
-        assert subscope.is_index()
+        if not subscope.is_index():
+          raise self.InvalidProcess('Process has invalid ports scoping!')
         ports.append(subscope.action().value)
     return ports
 
   @staticmethod
   def assert_valid_process_name(name):
-    assert ThermosProcessWrapper.VALID_PROCESS_NAME_RE.match(name), (
-      'Invalid process name: %s' % name)
+    if not ThermosProcessWrapper.VALID_PROCESS_NAME_RE.match(name):
+      raise ThermosProcessWrapper.InvalidProcess('Invalid process name: %s' % name)
 
 
 class ThermosTaskWrapper(object):
@@ -64,7 +65,10 @@ class ThermosTaskWrapper(object):
     ports = set()
     if ti.has_processes():
       for process in ti.processes():
-        ports.update(ThermosProcessWrapper(process).ports())
+        try:
+          ports.update(ThermosProcessWrapper(process).ports())
+        except ThermosProcessWrapper.InvalidProcess:
+          raise self.InvalidTask('Task has invalid process: %s' % process)
     return ports
 
   def to_json(self):

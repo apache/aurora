@@ -15,7 +15,9 @@ from twitter.mesos.config.schema import (
   MesosTaskInstance
 )
 
-from twitter.thermos.config.loader import ThermosTaskWrapper
+from twitter.thermos.config.loader import (
+  ThermosTaskValidator,
+  ThermosTaskWrapper)
 
 from .base import ThriftCodec
 
@@ -91,6 +93,10 @@ def convert(job):
     task_copy = copy.deepcopy(task)
     task_copy.shardId = k
     underlying, refs = task_instance_from_job(job, k)
+    try:
+      ThermosTaskValidator.assert_valid_task(underlying.task())
+    except ThermosTaskValidator.InvalidTaskError as e:
+      raise ValueError('Task is invalid: %s' % e)
     if not underlying.check().ok():
       raise ValueError('Task not fully specified: %s' % underlying.check().message())
     task_copy.thermosConfig = json.dumps(underlying.get())
