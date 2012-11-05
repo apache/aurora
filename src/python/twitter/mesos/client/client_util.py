@@ -180,6 +180,23 @@ def _warn_on_unspecified_package_bindings(config):
         '{{package[%s][%s][%s].copy_command}}' % tuple(config.package())))
 
 
+ANNOUNCE_ERROR = """
+Announcer specified primary port as '%(primary_port)s' but no processes have bound that port.
+If you would like to utilize this port, you must bind {{thermos.ports[%(primary_port)s]}} into
+a Process bound in your Task.
+"""
+
+
+def _validate_announce_configuration(config):
+  if not config.raw().has_announce():
+    return
+  primary_port = config.raw().announce().primary_port().get()
+  if primary_port not in config.ports():
+    print(ANNOUNCE_ERROR % {'primary_port': primary_port}, file=sys.stderr)
+    raise config.InvalidConfig("Announcer specified primary port as "
+        '%s but no processes have bound that port!' % primary_port)
+
+
 def _inject_packer_bindings(config, force_local=False):
   if isinstance(config, MesosConfig):
     raise ValueError('inject_packer_bindings can only be used with Pystachio configs!')
@@ -260,6 +277,7 @@ def populate_namespaces(config, copy_app_from=None, force_local=False):
   if isinstance(config, PystachioConfig):
     _inject_packer_bindings(config, force_local)
     _warn_on_unspecified_package_bindings(config)
+    _validate_announce_configuration(config)
   package_uri = _get_package_uri(config, copy_app_from=copy_app_from)
   if package_uri:
     config.set_hdfs_path(package_uri)

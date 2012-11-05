@@ -50,12 +50,15 @@ class TestDiscoveryManager(object):
     cls.ZK.close()
 
   def test_assertions(self):
+    # Must be constructed with an announce object
     with pytest.raises(AssertionError):
-      # announce off
       DiscoveryManager(hello_world(), {})
-    with pytest.raises(AssertionError):
-      # announce on, no ports specified
-      DiscoveryManager(hello_world(announce=True), {})
+
+    dm = DiscoveryManager(hello_world(announce=True), {})
+    assert not dm.healthy
+
+    dm = DiscoveryManager(hello_world(announce=True), {'poop': 1234})
+    assert not dm.healthy
 
   @classmethod
   def make_ss(cls, task, **kw):

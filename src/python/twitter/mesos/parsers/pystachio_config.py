@@ -164,6 +164,11 @@ class PystachioConfig(ProxyConfig):
     return self._job.cluster().get()
 
   def ports(self):
+    # Strictly speaking this is wrong -- it is possible to do things like
+    #   {{thermos.ports[instance_{{mesos.instance}}]}}
+    # which can only be extracted post-unwrapping.  This means that validating
+    # the state of the announce configuration could be problematic if people
+    # try to do complicated things.
     return ThermosTaskWrapper(self._job.task(), strict=False).ports()
 
   def task_links(self):

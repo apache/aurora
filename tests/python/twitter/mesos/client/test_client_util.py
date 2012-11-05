@@ -8,9 +8,10 @@ import twitter.mesos.packer.packer_client as packer_client
 from mox import Mox, IsA
 
 from twitter.mesos.client import client_util
-from twitter.common.contextutil import temporary_dir, open_zip
+from twitter.common.contextutil import temporary_dir, temporary_file, open_zip
 from twitter.mesos.packer import sd_packer_client
 from twitter.mesos.parsers.mesos_config import MesosConfig
+from twitter.mesos.parsers.proxy_config import ProxyConfig
 
 
 def test_zip_package_files():
@@ -183,3 +184,39 @@ def test_get_package_uri_from_packer_and_files_fail_invalid_package_version():
   mocker.UnsetStubs()
   mocker.VerifyAll()
 
+
+MESOS_CONFIG_BASE = """
+HELLO_WORLD = Job(
+  name = 'hello_world',
+  role = 'john_doe',
+  cluster = 'smf1-test',
+  %s
+  task = Task(
+    name = 'main',
+    processes = [Process(name = 'hello_world', cmdline = 'echo {{thermos.ports[http]}}')],
+    resources = Resources(cpu = 0.1, ram = 64 * MB, disk = 64 * MB),
+  )
+)
+jobs = [HELLO_WORLD]
+"""
+
+MESOS_CONFIG_WITH_ANNOUNCE = MESOS_CONFIG_BASE % 'announce = Announcer(primary_port="http"),'
+MESOS_CONFIG_WITH_INVALID_ANNOUNCE = MESOS_CONFIG_BASE % (
+    'announce = Announcer(primary_port="blah"),')
+MESOS_CONFIG_WITHOUT_ANNOUNCE = MESOS_CONFIG_BASE % ''
+
+
+def test_get_config_fails_invalid_announce():
+  with temporary_file() as fp:
+    fp.write(MESOS_CONFIG_WITHOUT_ANNOUNCE)
+    fp.flush()
+    client_util.get_config('hello_world', fp.name)
+  with temporary_file() as fp:
+    fp.write(MESOS_CONFIG_WITH_ANNOUNCE)
+    fp.flush()
+    client_util.get_config('hello_world', fp.name)
+  with temporary_file() as fp:
+    fp.write(MESOS_CONFIG_WITH_INVALID_ANNOUNCE)
+    fp.flush()
+    with pytest.raises(ProxyConfig.InvalidConfig):
+      client_util.get_config('hello_world', fp.name)
