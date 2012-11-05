@@ -5,14 +5,10 @@ import socket
 
 from twitter.common import log
 from twitter.common.http import HttpServer
-from templating import HttpTemplate
 
 from .file_browser import TaskObserverFileBrowser
 from .json import TaskObserverJSONBindings
-BottleObserverMixins = (
-  TaskObserverFileBrowser,
-  TaskObserverJSONBindings
-)
+from .templating import HttpTemplate
 
 import bottle
 
@@ -50,6 +46,12 @@ class StaticAssets(object):
     else:
       return HttpServer.Response(status=404)
 
+BottleObserverMixins = (
+  StaticAssets,
+  TaskObserverFileBrowser,
+  TaskObserverJSONBindings
+)
+
 def _flatten(lists):
   out = []
   for item in lists:
@@ -65,7 +67,7 @@ class ListExpansionMetaclass(type):
     return type(name, tuple(parents), attrs)
 
 
-class BottleObserver(HttpServer, StaticAssets, BottleObserverMixins):
+class BottleObserver(HttpServer, BottleObserverMixins):
   """
     A bottle wrapper around a Thermos TaskObserver.
   """
@@ -129,7 +131,21 @@ class BottleObserver(HttpServer, StaticAssets, BottleObserverMixins):
       processes = processes,
       chroot = state.get('sandbox', ''),
       launch_time = state.get('launch_time', 0),
-      hostname = state.get('hostname', 'localhost')
+      hostname = state.get('hostname', 'localhost'),
+    )
+
+  @HttpServer.route("/rawtask/:task_id")
+  @HttpServer.mako_view(HttpTemplate.load('rawtask'))
+  def handle_rawtask(self, task_id):
+    task = self._observer.task([task_id])
+    if not task[task_id]:
+      bottle.abort(404, "Failed to find task %s.  Try again shortly." % task_id)
+    task = task[task_id]
+    state = self._observer.state(task_id)
+    return dict(
+      hostname = state.get('hostname', 'localhost'),
+      task_id = task_id,
+      task_struct = task['task_struct']
     )
 
   @HttpServer.route("/process/:task_id/:process_id")

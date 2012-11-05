@@ -1,3 +1,15 @@
+<%doc>
+ Template arguments:
+  task_id
+  statuses
+  user
+  ports
+  processes
+  chroot
+  launch_time
+  hostname
+</%doc>
+
 <html>
 <title>thermos(${hostname})</title>
 
@@ -37,6 +49,7 @@
           <dd> <strong> chroot </strong> <a href="/browse/${task_id}">browse</a> </dd>
           <dd> <strong> hostname </strong> <a href="/">${hostname}</a> </dd>
           <dd> <strong> launch time </strong> ${pretty_time(launch_time)} </dd>
+          <dd> <strong> task config </strong> <a href="/rawtask/${task_id}">view</a> </dd>
       </dl>
     </div>
   </div>

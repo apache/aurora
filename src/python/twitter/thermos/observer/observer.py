@@ -156,7 +156,7 @@ class TaskObserver(threading.Thread, Lockable):
 
       type = (all|active|finished|None) [default: all]
       offset = offset into the list of task_ids [default: 0]
-      num = number of results to return [default: return rest]
+      num = number of results to return [default: return 20]
 
       Returns {
         task_ids: [task_id_1, ..., task_id_N],
@@ -283,6 +283,12 @@ class TaskObserver(threading.Thread, Lockable):
     task_map = self.task_ids(type, offset, num)
     task_ids = task_map['task_ids']
     tasks = self.task(task_ids)
+    if type in ('active', 'finished'):
+      task_count = self.task_id_count()[type]
+    elif type == 'all':
+      task_count = sum(self.task_id_count().values())
+    else:
+      raise ValueError('Unknown task type %s' % type)
     def task_row(tid):
       task = tasks[tid]
       if task:
@@ -299,7 +305,8 @@ class TaskObserver(threading.Thread, Lockable):
       tasks=filter(None, map(task_row, task_ids)),
       type=task_map['type'],
       offset=task_map['offset'],
-      num=task_map['num'])
+      num=task_map['num'],
+      task_count=task_count)
 
   def _sample(self, task_id):
     sample = self._measurer.sample_by_task_id(task_id).to_dict()
@@ -387,7 +394,8 @@ class TaskObserver(threading.Thread, Lockable):
        user = task.user().get(),
        resource_consumption = self._sample(task_id),
        ports = state.header.ports,
-       processes = self._task_processes(task_id)
+       processes = self._task_processes(task_id),
+       task_struct = task
     )
 
   @Lockable.sync

@@ -4,6 +4,7 @@
   offset
   num
   tasks
+  task_count
 </%doc>
 
 <%!
@@ -21,29 +22,34 @@ num_tasks = 20
 
 def pretty_time(seconds=time.time()):
   return time.strftime('%m/%d %H:%M:%S', time.gmtime(seconds))
+
 %>
 
 <div class="${type}-container"
      data-url="/main/${type}/${offset}/${num}">
   <div class="row-fluid">
     <div class="span2">
+    % if offset > 0:
       <a class="refresh-container" href="#"
          data-url="/main/${type}/${offset-num_tasks}/${num}">
          &larr; newer
       </a>
+    % endif
     </div>
+    % if offset + num_tasks < task_count:
     <div class="span2">
       <a class="refresh-container" href="#"
          data-url="/main/${type}/${offset+num_tasks}/${num}">
          older &rarr;
       </a>
     </div>
+    % endif
   </div>
   <div class="content" id="defaultLayout">
      <table class="table table-bordered table-condensed table-striped">
      <thead>
        <tr>
-         <th colspan=4> ${type} tasks ${offset}...${offset+num_tasks-1} </th>
+         <th colspan=4> ${type} tasks ${offset}...${min(task_count, offset+num_tasks-1)} of ${task_count} </th>
          <th colspan=3> resources </th>
          <th colspan=3> links </th>
        </tr>
