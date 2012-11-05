@@ -1,6 +1,7 @@
 import os
 import threading
 import time
+from operator import attrgetter
 
 import psutil as ps
 from thrift.TSerialization import serialize as thrift_serialize
@@ -19,6 +20,7 @@ from .health_interface import (
 
 
 class DiskCollectorThread(threading.Thread):
+  """ Thread to calculate aggregate disk usage under a given path """
   def __init__(self, path):
     self.path = path
     self.value = None
@@ -35,6 +37,7 @@ class DiskCollectorThread(threading.Thread):
 
 
 class DiskCollection(object):
+  """ Spawn a background thread to sample disk usage """
   def __init__(self, root):
     self._root = root
     self._thread = None
@@ -54,33 +57,52 @@ class DiskCollection(object):
 
 
 class ProcessCollection(object):
-  @classmethod
-  def collect(cls, pid):
-    try:
-      parent_process = ps.Process(pid)
-      parent = ProcessSample.process_to_sample(parent_process)
-      children = map(ProcessSample.process_to_sample, parent_process.get_children(recursive=True))
-      return len(children) + 1, sum(children, parent)
-    except ps.error.Error as e:
-      log.warning('Error during process sampling: %s' % e)
-      return 0, ProcessSample.empty()
-
+  """ Collect resource consumption statistics for a process and its children """
   def __init__(self, pid):
     self._pid = pid
+    self._process = None
+    self._sampled_tree = {} # pid => ProcessSample
     self._sample = None
     self._stamp = None
     self._rate = 0.0
     self._procs = 1
 
-  def sample(self):
-    last_sample, last_stamp = self._sample, self._stamp
-    self._procs, self._sample = self.collect(self._pid)
-    self._stamp = time.time()
 
-    # the rate calculation appears to be broken, fix it here for now
-    if last_sample and last_stamp:
-      self._rate = ((self._sample.user + self._sample.system) - (
-        last_sample.user + last_sample.system)) / (self._stamp - last_stamp)
+  def sample(self):
+    """ Collate and aggregate ProcessSamples for process and children """
+    try:
+      last_sample, last_stamp = self._sample, self._stamp
+      if self._process is None:
+        self._process = ps.Process(self._pid)
+      parent = self._process
+      parent_sample = ProcessSample.process_to_sample(parent)
+      new_samples = dict(
+          (proc.pid, ProcessSample.process_to_sample(proc))
+          for proc in parent.get_children(recursive=True)
+      )
+      new_samples[self._pid] = parent_sample
+
+    except ps.error.Error as e:
+      log.warning('Error during process sampling: %s' % e)
+      self._sample = ProcessSample.empty()
+      self._rate = 0.0
+
+    else:
+      last_stamp = self._stamp
+      self._stamp = time.time()
+      # for most stats, calculate simple sum to aggregate
+      self._sample = sum(new_samples.itervalues(), ProcessSample.empty())
+      # cpu consumption is more complicated
+      # We require at least 2 generations of a process before we can calculate rate, so for all
+      # current processes that were not running in the previous sample, compare to an empty sample
+      if self._sampled_tree and last_stamp:
+        procs = set(new_samples) - set(self._sampled_tree)
+        new = [new_samples[pid] for pid in procs]
+        old = [self._sampled_tree.get(pid, ProcessSample.empty()) for pid in procs]
+        new_user_sys = sum(map(attrgetter('user'), new)) + sum(map(attrgetter('system'), new))
+        old_user_sys = sum(map(attrgetter('user'), old)) + sum(map(attrgetter('system'), old))
+        self._rate = (new_user_sys - old_user_sys) / (self._stamp - last_stamp)
+      self._sampled_tree = new_samples
 
   @property
   def value(self):
@@ -92,10 +114,12 @@ class ProcessCollection(object):
 
   @property
   def procs(self):
-    return self._procs
+    return len(self._sampled_tree)
 
 
 class ResourceEnforcer(object):
+  """ Examine a task's resource consumption and determine whether it needs to be killed or
+  adjusted """
   NICE_INCREMENT = 5            # Increment nice by this amount
   NICE_BACKOFF   = 1            # Decrement nice by this amount
   NICE_BACKOFF_THRESHOLD = 0.8  # Decrement nice once cpu drops below this percentage of max
@@ -204,6 +228,8 @@ class ResourceEnforcer(object):
 
 
 class ResourceManager(HealthInterface, threading.Thread):
+  """ Manage resources consumed by a process and its children """
+
   PROCESS_COLLECTION_INTERVAL = Amount(20, Time.SECONDS)
   DISK_COLLECTION_INTERVAL = Amount(1, Time.MINUTES)
   ENFORCEMENT_INTERVAL = Amount(30, Time.SECONDS)
@@ -229,22 +255,20 @@ class ResourceManager(HealthInterface, threading.Thread):
 
   @property
   def sample(self):
-    return self._sample
-
-  def _collect_sample(self, now):
-    sample = self._ps.value
-    self._sample = TaskResourceSample(
+    now = time.time()
+    ps_sample = self._ps.value
+    return TaskResourceSample(
         microTimestamp=int(now * 1e6),
         reservedCpuRate=self._max_cpu,
         reservedRamBytes=self._max_ram,
         reservedDiskBytes=self._max_disk,
         cpuRate=self._ps.rate,
-        cpuUserSecs=sample.user,
-        cpuSystemSecs=sample.system,
+        cpuUserSecs=ps_sample.user,
+        cpuSystemSecs=ps_sample.system,
         cpuNice=self._enforcer.nice,
-        ramRssBytes=sample.rss,
-        ramVssBytes=sample.vms,
-        numThreads=sample.threads,
+        ramRssBytes=ps_sample.rss,
+        ramVssBytes=ps_sample.vms,
+        numThreads=ps_sample.threads,
         numProcesses=self._ps.procs,
         diskBytes=self._du.value)
 
@@ -257,6 +281,7 @@ class ResourceManager(HealthInterface, threading.Thread):
     return self._kill_reason
 
   def run(self):
+    """ Periodically sample resources and conduct enforcement """
     now = time.time()
     next_process_collection = now
     next_disk_collection = now
@@ -278,7 +303,6 @@ class ResourceManager(HealthInterface, threading.Thread):
         self._du.sample()
         log.debug('Sampled disk bytes: %.1fMB' % (self._du.value / 1024. / 1024.))
       if now > next_enforcement:
-        self._collect_sample(now)
         next_enforcement = now + self.ENFORCEMENT_INTERVAL.as_(Time.SECONDS)
         kill_reason = self._enforcer.enforce(self.sample)
         if kill_reason and not self._kill_reason:

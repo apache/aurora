@@ -14,21 +14,12 @@ __tested__ = False
 
 _ProcessSample = namedtuple('_ProcessSample', 'rate user system rss vms nice status threads')
 class ProcessSample(_ProcessSample):
-  @staticmethod
-  def get(pid_or_process, with_children=True, memoized={}):
-    if isinstance(pid_or_process, int):
-      process = Process(pid_or_process)
-    else:
-      process = pid_or_process
-    if not with_children:
-      return ProcessSample.process_to_sample(process, memoized)
-    else:
-      return sum(map(partial(ProcessSample.process_to_sample, memoized=memoized),
-        process.get_children()), ProcessSample.process_to_sample(process, memoized))
-
+  """ Sample of statistics about a single process's resource consumption """
   @staticmethod
   def process_to_sample(process, memoized={}):
     try:
+      # the nonblocking get_cpu_percent call is stateful on a particular Process object, and hence
+      # >2 consecutive calls are required before it will return a non-zero value
       rate = process.get_cpu_percent(0.0) / 100.0
       user, system = process.get_cpu_times()
       rss, vms = process.get_memory_info()
@@ -36,40 +27,13 @@ class ProcessSample(_ProcessSample):
       status = process.status
       threads = process.get_num_threads()
       return ProcessSample(rate, user, system, rss, vms, nice, status, threads)
-    except (AccessDenied, NoSuchProcess):
+    except (AccessDenied, NoSuchProcess) as e:
+      log.warning('Error during process sampling [pid=%s]: %s' % (process.pid, e))
       return ProcessSample.empty()
 
   @staticmethod
   def empty():
     return ProcessSample(rate=0, user=0, system=0, rss=0, vms=0, nice=None, status=None, threads=0)
-
-  @staticmethod
-  def aggregate(samples):
-    if len(samples) == 0:
-      return ProcessSample.empty()
-
-    def average(values):
-      return sum(map(float, values)) / len(values) if len(values) > 0 else 0
-
-    def mode(values):
-      if len(values) == 0:
-        return None
-      elif len(values) == 1:
-        return values[0]
-      else:
-        agg = defaultdict(int)
-        for value in values: agg[value] += 1
-        return sorted(agg.items(), key=lambda x: x[1])[-1][0]
-
-    rate    = average([sample.rate for sample in samples])
-    user    = average([sample.user for sample in samples])
-    system  = average([sample.system for sample in samples])
-    rss     = max([sample.rss for sample in samples])
-    vms     = max([sample.vms for sample in samples])
-    nice    = average(filter(None, [sample.nice for sample in samples]))
-    status  = mode(filter(None, [sample.status for sample in samples]))
-    threads = int(average([sample.threads for sample in samples]))
-    return ProcessSample(rate, user, system, rss, vms, nice, status, threads)
 
   def __add__(self, other):
     if self.nice is not None and other.nice is None:
@@ -169,7 +133,6 @@ class ProcessState(object):
 class TaskMeasurer(threading.Thread):
   """
     Class responsible for polling CPU/RAM/DISK usage from live processes.
-    Sublcassed from thread, runs in a background thread.  Control with start()/join().
   """
 
   class InternalError(Exception): pass
