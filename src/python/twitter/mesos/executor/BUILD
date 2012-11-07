@@ -156,6 +156,7 @@ python_library(
     pants(':sandbox_manager'),
     pants(':thermos_executor_base'),
     pants('src/python/twitter/common/app'),
+    pants('src/python/twitter/common/concurrent'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/process'),
     pants('src/python/twitter/common/quantity'),

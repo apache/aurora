@@ -3,16 +3,18 @@ import os
 import threading
 import time
 
-from thrift.TSerialization import serialize
+from thrift.TSerialization import serialize as thrift_serialize
+from thrift.TSerialization import deserialize as thrift_deserialize
 import mesos_pb2 as mesos
 
 from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_rmtree
 from twitter.common.quantity import Amount, Time, Data
-from gen.twitter.mesos.ttypes import ScheduleStatus
-from gen.twitter.mesos.comm.ttypes import AdjustRetainedTasks
-from gen.twitter.thermos.ttypes import ProcessState
 from twitter.mesos.executor.gc_executor import ThermosGCExecutor
+
+from gen.twitter.mesos.ttypes import ScheduleStatus
+from gen.twitter.mesos.comm.ttypes import AdjustRetainedTasks, SchedulerMessage
+from gen.twitter.thermos.ttypes import ProcessState
 
 
 class ProxyDriver(object):
@@ -59,7 +61,7 @@ def serialize_art(art, task_id='default_task_id'):
   td = mesos.TaskInfo()
   td.slave_id.value = 'ignore_me'
   td.task_id.value = task_id
-  td.data = serialize(art)
+  td.data = thrift_serialize(art)
   return td
 
 
@@ -75,6 +77,8 @@ class FakeClock(object):
 
 
 class TestThermosGCExecutor(ThermosGCExecutor):
+  PERSISTENCE_WAIT = Amount(100, Time.MILLISECONDS)
+
   def __init__(self, *args, **kw):
     ThermosGCExecutor.__init__(self, *args, clock=FakeClock(), **kw)
     self._task_garbage_collections = set()
@@ -121,6 +125,8 @@ def test_state_reconciliation():
     })
 
     tgce.launchTask(proxy_driver, serialize_art(art, 'gc_executor_task_id'))
+    proxy_driver.stopped.wait(timeout=1.0)
+    assert proxy_driver.stopped.is_set()
 
   assert len(proxy_driver.method_calls['sendStatusUpdate']) == 2
   assert len(proxy_driver.method_calls['sendStatusUpdate'][0]) == 2 # args, kw
@@ -133,9 +139,7 @@ def test_state_reconciliation():
   update = proxy_driver.method_calls['sendStatusUpdate'][1][0][0]
   assert update.task_id.value == 'gc_executor_task_id'
   assert update.state == mesos.TASK_FINISHED
-
-  proxy_driver.stopped.wait(timeout=1.0)
-  assert proxy_driver.stopped.is_set()
+  assert 'sendFrameworkMessage' not in proxy_driver.method_calls
 
 
 def test_gc_with_loss():
@@ -150,6 +154,8 @@ def test_gc_with_loss():
 
     art = AdjustRetainedTasks(retainedTasks={})
     tgce.launchTask(proxy_driver, serialize_art(art, 'gc_executor_task_id'))
+    proxy_driver.stopped.wait(timeout=1.0)
+    assert proxy_driver.stopped.is_set()
 
   assert len(proxy_driver.method_calls['sendStatusUpdate']) == 2
   assert len(tgce._task_garbage_collections) == len(FINISHED_TASKS)
@@ -157,12 +163,14 @@ def test_gc_with_loss():
   assert update.task_id.value == 'sleep60-lost'
   assert update.state == mesos.TASK_LOST
 
+  assert len(proxy_driver.method_calls['sendFrameworkMessage']) == 1
+  scheduler_message = SchedulerMessage()
+  thrift_deserialize(scheduler_message, proxy_driver.method_calls['sendFrameworkMessage'][0][0][0])
+  assert set(tgce._task_garbage_collections) == scheduler_message.deletedTasks.taskIds
+
   update = proxy_driver.method_calls['sendStatusUpdate'][1][0][0]
   assert update.task_id.value == 'gc_executor_task_id'
   assert update.state == mesos.TASK_FINISHED
-
-  proxy_driver.stopped.wait(timeout=1.0)
-  assert proxy_driver.stopped.is_set()
 
 
 def test_gc_without_loss():
@@ -177,13 +185,17 @@ def test_gc_without_loss():
 
     art = AdjustRetainedTasks(retainedTasks={})
     tgce.launchTask(proxy_driver, serialize_art(art, 'gc_executor_task_id'))
+    proxy_driver.stopped.wait(timeout=1.0)
+    assert proxy_driver.stopped.is_set()
 
   assert len(proxy_driver.method_calls['sendStatusUpdate']) == 1
   assert len(tgce._task_garbage_collections) == len(FINISHED_TASKS)
 
+  assert len(proxy_driver.method_calls['sendFrameworkMessage']) == 1
+  scheduler_message = SchedulerMessage()
+  thrift_deserialize(scheduler_message, proxy_driver.method_calls['sendFrameworkMessage'][0][0][0])
+  assert set(tgce._task_garbage_collections) == scheduler_message.deletedTasks.taskIds
+
   update = proxy_driver.method_calls['sendStatusUpdate'][0][0][0]
   assert update.task_id.value == 'gc_executor_task_id'
   assert update.state == mesos.TASK_FINISHED
-
-  proxy_driver.stopped.wait(timeout=1.0)
-  assert proxy_driver.stopped.is_set()

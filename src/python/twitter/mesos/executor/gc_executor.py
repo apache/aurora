@@ -5,6 +5,7 @@ import threading
 import time
 
 from twitter.common import app, log
+from twitter.common.concurrent import defer
 from twitter.common.log.options import LogOptions
 from twitter.common.process import ProcessProviderFactory
 from twitter.common.quantity import Amount, Time, Data
@@ -14,17 +15,21 @@ from twitter.thermos.runner.inspector import CheckpointInspector
 from twitter.thermos.runner.helper import TaskKiller
 from twitter.thermos.monitoring.detector import TaskDetector
 from twitter.thermos.monitoring.garbage import (
-  TaskGarbageCollector,
-  DefaultCollector)
+    TaskGarbageCollector,
+    DefaultCollector)
 from twitter.mesos.executor.sandbox_manager import (
-  DirectorySandbox,
-  AppAppSandbox)
+    DirectorySandbox,
+    AppAppSandbox)
 from twitter.mesos.executor.executor_base import ThermosExecutorBase
-from gen.twitter.mesos.comm.ttypes import AdjustRetainedTasks
+from gen.twitter.mesos.comm.ttypes import (
+    AdjustRetainedTasks,
+    DeletedTasks,
+    SchedulerMessage)
 from gen.twitter.mesos.ttypes import ScheduleStatus
 
 # thrifts
 from thrift.TSerialization import deserialize as thrift_deserialize
+from thrift.TSerialization import serialize as thrift_serialize
 
 app.add_option("--checkpoint_root", dest="checkpoint_root", metavar="PATH",
                default=TaskPath.DEFAULT_CHECKPOINT_ROOT,
@@ -136,8 +141,8 @@ class ThermosGCExecutor(ThermosExecutorBase):
       if not latest_runner:
         log.warning('  - Task has no registered runners.')
         continue
-      runner_pid, runner_uid, runner_timestamp = latest_runner
-      if runner_pid in ps.pids() and is_our_pid(runner_pid, runner_uid, runner_timestamp):
+      runner_pid, runner_uid, timestamp_ms = latest_runner
+      if runner_pid in ps.pids() and is_our_pid(runner_pid, runner_uid, timestamp_ms / 1000.0):
         log.info('  - Runner appears healthy.')
         continue
       # Runner is dead
@@ -177,25 +182,29 @@ class ThermosGCExecutor(ThermosExecutorBase):
     for task_id in set(retained_task_ids).intersection(gc_task_ids):
       self.log('Skipping garbage collection for %s because explicitly directed by scheduler.' %
         task_id)
-    for task_id in gc_task_ids - set(retained_task_ids):
+    actual_gc_tasks = gc_task_ids - set(retained_task_ids)
+    for task_id in actual_gc_tasks:
       self.garbage_collect_task(task_id, tgc)
+    return actual_gc_tasks
+
+  def run_gc(self, driver, task, retain_tasks):
+    self.reconcile_states(driver, retain_tasks.retainedTasks)
+    gc_tasks = self.garbage_collect(retain_tasks.retainedTasks.keys())
+    if gc_tasks:
+      driver.sendFrameworkMessage(
+          thrift_serialize(SchedulerMessage(deletedTasks=DeletedTasks(taskIds=gc_tasks))))
+      # TODO(wickman) Remove this once external MESOS-243 is resolved.
+      self._clock.sleep(self.PERSISTENCE_WAIT.as_(Time.SECONDS))
+    self.send_update(driver, task.task_id.value, 'FINISHED',
+      "Garbage collection finished.")
+    defer(driver.stop, clock=self._clock, delay=self.PERSISTENCE_WAIT)
 
   def launchTask(self, driver, task):
     self._slave_id = task.slave_id.value
     self.log('launchTask called.')
     retain_tasks = AdjustRetainedTasks()
     thrift_deserialize(retain_tasks, task.data)
-    self.reconcile_states(driver, retain_tasks.retainedTasks)
-    self.garbage_collect(retain_tasks.retainedTasks.keys())
-    self.send_update(driver, task.task_id.value, 'FINISHED',
-      "Garbage collection finished.")
-    class ShutdownThread(threading.Thread):
-      def run(thread_self):
-        self.log('Shutdown timer started.')
-        self._clock.sleep(self.PERSISTENCE_WAIT.as_(Time.SECONDS))
-        self.log('Stopping driver.')
-        driver.stop()
-    ShutdownThread().start()
+    defer(lambda: self.run_gc(driver, task, retain_tasks))
 
   def killTask(self, driver, task_id):
     self.log('killTask() got task_id: %s, ignoring.' % task_id)
