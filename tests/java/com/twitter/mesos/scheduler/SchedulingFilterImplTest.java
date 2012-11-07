@@ -115,6 +115,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   @Test
   public void testMeetsOffer() throws Exception {
     expectGetHostAttributes(HOST_A, host(HOST_A)).atLeastOnce();
+    expectGetTasks().times(2);
 
     control.replay();
 
@@ -125,6 +126,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   @Test
   public void testSufficientPorts() throws Exception {
     expectGetHostAttributes(HOST_A, host(HOST_A)).atLeastOnce();
+    expectGetTasks().times(4);
 
     control.replay();
 
@@ -151,6 +153,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   @Test
   public void testInsufficientResources() throws Exception {
     expectGetHostAttributes(HOST_A, host(HOST_A)).atLeastOnce();
+    expectGetTasks().times(4);
 
     control.replay();
 

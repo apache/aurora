@@ -361,6 +361,25 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     assertEquals(INVALID_REQUEST, thrift.createJob(makeJob(task), SESSION).getResponseCode());
   }
 
+  @Test
+  public void testCreateJobPopulateDefaults() throws Exception {
+    TwitterTaskInfo task = new TwitterTaskInfo()
+        .setThermosConfig(new byte[] {1, 2, 3})  // Arbitrary opaque data.
+        .setNumCpus(1.0)
+        .setRamMb(1024)
+        .setDiskMb(1024)
+        .setOwner(new Identity("role", "user"))
+        .setJobName("job");
+    JobConfiguration job = makeJob(task);
+
+    expectAuth(ROLE, true);
+    scheduler.createJob(ParsedConfiguration.fromUnparsed(job));
+
+    control.replay();
+
+    assertEquals(ResponseCode.OK, thrift.createJob(job, SESSION).getResponseCode());
+  }
+
   private Set<TwitterTaskInfo> taskCopies(TwitterTaskInfo task, int copies) {
     ImmutableSet.Builder<TwitterTaskInfo> tasks = ImmutableSet.builder();
     for (int i = 0; i < copies; i++) {

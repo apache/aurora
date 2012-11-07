@@ -55,6 +55,7 @@ import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.ValueConstraint;
 import com.twitter.mesos.scheduler.CronJobManager.CronScheduler;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
+import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import com.twitter.mesos.scheduler.events.PubsubEvent;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
@@ -298,10 +299,13 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     assignTask(storedTaskId, SLAVE_ID, SLAVE_HOST_1);
 
-    // Since task fields are backfilled with defaults, the production flag and thermos config
-    // should be filled.
+    // Since task fields are backfilled with defaults, additional flags should be filled.
+    TwitterTaskInfo expected = new TwitterTaskInfo(storedTask)
+        .setProduction(false)
+        .setThermosConfig(new byte[] {})
+        .setConstraints(ImmutableSet.of(ConfigurationManager.hostLimitConstraint(1)));
     assertEquals(
-        new TwitterTaskInfo(storedTask).setProduction(false).setThermosConfig(new byte[] {}),
+        expected,
         getTask(storedTaskId).getAssignedTask().getTask());
     assertEquals(ASSIGNED, getTask(storedTaskId).getStatus());
   }

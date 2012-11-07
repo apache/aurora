@@ -3,6 +3,7 @@ package com.twitter.mesos.scheduler.configuration;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
@@ -32,6 +33,7 @@ import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.LimitConstraint;
 import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.gen.TwitterTaskInfo._Fields;
 import com.twitter.mesos.gen.ValueConstraint;
 import com.twitter.mesos.scheduler.CommandLineExpander;
 import com.twitter.mesos.scheduler.ThermosJank;
@@ -61,6 +63,65 @@ public final class ConfigurationManager {
 
   private static final int MAX_IDENTIFIER_LENGTH = 255;
 
+  private interface FieldSanitizer {
+    void sanitize(TwitterTaskInfo task) throws TaskDescriptionException;
+  }
+
+  private static class DefaultField implements FieldSanitizer {
+    private final _Fields field;
+    private final Object defaultValue;
+
+    DefaultField(_Fields field, Object defaultValue) {
+      this.field = field;
+      this.defaultValue = defaultValue;
+    }
+
+    @Override public void sanitize(TwitterTaskInfo task) {
+      if (!task.isSet(field)) {
+        task.setFieldValue(field, defaultValue);
+      }
+    }
+  }
+
+  private static class RequiredField implements FieldSanitizer {
+    private final _Fields field;
+
+    RequiredField(_Fields field) {
+      this.field = field;
+    }
+
+    @Override public void sanitize(TwitterTaskInfo task) throws TaskDescriptionException {
+      if (!task.isSet(field)) {
+        throw new TaskDescriptionException("Field " + field.getFieldName() + " is required.");
+      }
+    }
+  }
+
+  // TODO(William Farner): Write a test case to validate fix for no host limit on thermos tasks.
+  private static final Iterable<FieldSanitizer> SANITIZERS = ImmutableList.<FieldSanitizer>builder()
+      .add(new RequiredField(_Fields.NUM_CPUS))
+      .add(new RequiredField(_Fields.RAM_MB))
+      .add(new RequiredField(_Fields.DISK_MB))
+      .add(new DefaultField(_Fields.IS_DAEMON, false))
+      .add(new DefaultField(_Fields.PRIORITY, 0))
+      .add(new DefaultField(_Fields.PRODUCTION, false))
+      .add(new DefaultField(_Fields.HEALTH_CHECK_INTERVAL_SECS, 30))
+      .add(new DefaultField(_Fields.MAX_TASK_FAILURES, 1))
+      .add(new DefaultField(_Fields.TASK_LINKS, Sets.<String>newHashSet()))
+      .add(new DefaultField(_Fields.REQUESTED_PORTS, Sets.<String>newHashSet()))
+      .add(new DefaultField(_Fields.CONSTRAINTS, Sets.<Constraint>newHashSet()))
+      .add(new FieldSanitizer() {
+        @Override public void sanitize(TwitterTaskInfo task) {
+          Constraint hostConstraint =
+              Iterables.find(task.getConstraints(), hasName(HOST_CONSTRAINT), null);
+          if (hostConstraint == null) {
+            task.addToConstraints(hostLimitConstraint(1));
+          }
+        }
+      })
+      .build();
+
+  // TODO(William Farner): Remove this once all tasks are moved to thermos.
   private static final List<Field<?>> FIELDS = ImmutableList.<Field<?>>builder()
       .add(new TypedField<String>(String.class, "hdfs_path", null) {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetHdfsPath(); }
@@ -290,8 +351,7 @@ public final class ConfigurationManager {
         "Task count changed after populating fields.");
 
     // Ensure that all production flags are equal.
-    int numProductionTasks =
-        Iterables.size(Iterables.filter(modifiedConfigs, Tasks.IS_PRODUCTION));
+    int numProductionTasks = Iterables.size(Iterables.filter(modifiedConfigs, Tasks.IS_PRODUCTION));
     if ((numProductionTasks != 0) && (numProductionTasks != modifiedConfigs.size())) {
       throw new TaskDescriptionException("Tasks within a job must use the same production flag.");
     }
@@ -345,6 +405,7 @@ public final class ConfigurationManager {
     }
 
     if (config.isSetThermosConfig()) {
+      sanitize(config);
       config.setConfigParsed(true);
       return config;
     }
@@ -491,8 +552,15 @@ public final class ConfigurationManager {
     }
   }
 
+  private static void sanitize(TwitterTaskInfo task) throws TaskDescriptionException {
+    for (FieldSanitizer sanitizer : SANITIZERS) {
+      sanitizer.sanitize(task);
+    }
+  }
+
   private static TwitterTaskInfo populateFields(TwitterTaskInfo task)
       throws TaskDescriptionException {
+
     Map<String, String> config = task.getConfiguration();
 
     fillDataFields(task);
@@ -522,7 +590,6 @@ public final class ConfigurationManager {
   @VisibleForTesting
   public static TwitterTaskInfo applyDefaultsIfUnset(TwitterTaskInfo task) {
     fillDataFields(task);
-
     for (Field<?> field : FIELDS) {
       if (!field.isSet(task)) {
         field.applyDefault(task);
@@ -534,6 +601,12 @@ public final class ConfigurationManager {
 
     // TODO(William Farner): Remove this once all tasks are backfilled with links.
     maybeFillLinks(task);
+
+    try {
+      sanitize(task);
+    } catch (TaskDescriptionException e) {
+      LOG.log(Level.WARNING, "Failed to sanitize task " + task, e);
+    }
 
     return task;
   }
