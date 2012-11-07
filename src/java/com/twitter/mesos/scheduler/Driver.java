@@ -182,8 +182,8 @@ public interface Driver {
 
       String logMessage = String.format("Attempting to send message to %s/%s",
           slave.getValue(), executor.getValue());
-      Level level = Level.INFO;
-      if (LOG.isLoggable(Level.FINE)) {
+      Level level = Level.FINE;
+      if (LOG.isLoggable(Level.FINEST)) {
         level = Level.FINE;
         logMessage += " - " + message;
       }
@@ -194,8 +194,6 @@ public interface Driver {
         LOG.severe(
             String.format("Attempt to send message failed with code %s [%s]", status, message));
         messageFailures.incrementAndGet();
-      } else {
-        LOG.info("Message successfully sent");
       }
     }
   }

@@ -277,7 +277,6 @@ public final class LogManager {
     @Timed("scheduler_log_append")
     private Position appendAndGetPosition(LogEntry logEntry) throws CodingException {
       Position firstPosition = null;
-      LOG.info("Saving log entry " + logEntry);
       byte[][] entries = entrySerializer.serialize(logEntry);
       synchronized (writeMutex) { // ensure all sub-entries are written as a unit
         for (byte[] entry : entries) {
