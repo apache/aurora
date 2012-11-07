@@ -363,12 +363,12 @@ class TaskRunner(object):
       if checkpoint is None or checkpoint.header is None:
         return None
       return cls(task.tasks()[0].task(), checkpoint_root, checkpoint.header.sandbox, task_id,
-          portmap=checkpoint.header.ports)
+          portmap=checkpoint.header.ports, log_dir=checkpoint.header.log_dir)
     except Exception as e:
       log.error('Failed to reconstitute checkpoint in TaskRunner.get: %s' % e, exc_info=True)
       return None
 
-  def __init__(self, task, checkpoint_root, sandbox,
+  def __init__(self, task, checkpoint_root, sandbox, log_dir=None,
                task_id=None, portmap=None, user=None, chroot=False, clock=time,
                universal_handler=None):
     """
@@ -380,6 +380,8 @@ class TaskRunner(object):
                           disabled for this task.]
 
       optional:
+        log_dir (string) = directory to house stdout/stderr logs. If not specified, logs will be
+                           written into the sandbox directory under .logs/
         task_id (string) = bind to this task id.  if not specified, will synthesize an id based
                            upon task.name()
         portmap (dict)   = a map (string => integer) from name to port, e.g. { 'http': 80 }
@@ -399,7 +401,8 @@ class TaskRunner(object):
     else:
       self._task_id = task_id
     self._launch_time = launch_time
-    self._pathspec = TaskPath(root = checkpoint_root, task_id = self._task_id)
+    self._log_dir = log_dir or os.path.join(sandbox, '.logs')
+    self._pathspec = TaskPath(root=checkpoint_root, task_id=self._task_id, log_dir=self._log_dir)
     self._portmap = portmap or {}
     try:
       ThermosTaskValidator.assert_valid_task(task)
@@ -557,6 +560,7 @@ class TaskRunner(object):
         task_id = self._task_id,
         launch_time_ms = int(self._launch_time*1000),
         sandbox = self._sandbox,
+        log_dir = self._log_dir,
         hostname = socket.gethostname(),
         user = self._user,
         ports = self._portmap)
@@ -596,8 +600,8 @@ class TaskRunner(object):
         sequence_number = current_run.seq + 1
       log.debug('_set_process_status(%s <= %s, seq=%s[auto])' % (process_name,
         ProcessState._VALUES_TO_NAMES.get(process_state), sequence_number))
-    runner_ckpt = RunnerCkpt(process_status = ProcessStatus(
-      process = process_name, state = process_state, seq = sequence_number, **kw))
+    runner_ckpt = RunnerCkpt(process_status=ProcessStatus(
+      process=process_name, state=process_state, seq=sequence_number, **kw))
     self._dispatcher.dispatch(self._state, runner_ckpt, self._recovery)
 
   def _task_process_from_process_name(self, process_name, sequence_number):
@@ -606,12 +610,12 @@ class TaskRunner(object):
       correct run number and fully interpolated commandline.
     """
     run_number = len(self.state.processes[process_name])-1
-    pathspec = self._pathspec.given(process = process_name, run = run_number)
+    pathspec = self._pathspec.given(process=process_name, run=run_number)
     process = self._process_map.get(process_name)
-    context = ThermosContext(task_id = self._task_id,
-                             user = self._user,
-                             ports = self._portmap)
-    process, uninterp = (process % Environment(thermos = context)).interpolate()
+    context = ThermosContext(task_id=self._task_id,
+                             user=self._user,
+                             ports=self._portmap)
+    process, uninterp = (process % Environment(thermos=context)).interpolate()
     assert len(uninterp) == 0, 'Failed to interpolate process, missing:\n%s' % (
       '\n'.join(str(ref) for ref in uninterp))
     # close the ckpt on the Process, also consider closing down logging or recreating the

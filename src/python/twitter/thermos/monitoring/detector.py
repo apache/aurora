@@ -32,16 +32,18 @@ class TaskDetector(object):
       if state is None or task_state == state:
         yield (task_state, task_id)
 
-  def get_process_runs(self, task_id):
-    paths = glob.glob(self._pathspec.given(root = self._root_dir,
-                                           task_id = task_id,
-                                           process = '*',
-                                           run = '*')
+  def get_process_runs(self, task_id, log_dir):
+    paths = glob.glob(self._pathspec.given(root=self._root_dir,
+                                           task_id=task_id,
+                                           log_dir=log_dir,
+                                           process='*',
+                                           run='*')
                                     .getpath('process_logdir'))
-    path_re = re.compile(self._pathspec.given(root = re.escape(self._root_dir),
-                                              task_id = re.escape(task_id),
-                                              process = '(\S+)',
-                                              run = '(\d+)')
+    path_re = re.compile(self._pathspec.given(root=re.escape(self._root_dir),
+                                              task_id=re.escape(task_id),
+                                              log_dir=log_dir,
+                                              process='(\S+)',
+                                              run='(\d+)')
                                        .getpath('process_logdir'))
     for path in paths:
       try:
@@ -50,17 +52,20 @@ class TaskDetector(object):
         continue
       yield process, int(run)
 
-  def get_process_logs(self, task_id):
-    for process, run in self.get_process_runs(task_id):
-      base_path = self._pathspec.given(root=self._root_dir, task_id=task_id, process=process,
-        run=run).getpath('process_logdir')
+  def get_process_logs(self, task_id, log_dir):
+    for process, run in self.get_process_runs(task_id, log_dir):
       for logtype in ('stdout', 'stderr'):
-        path = os.path.join(base_path, logtype)
+        path = (self._pathspec.with_filename(logtype).given(root=self._root_dir,
+                                                           task_id=task_id,
+                                                           log_dir=log_dir,
+                                                           process=process,
+                                                           run=run)
+                                                     .getpath('process_logdir'))
         if os.path.exists(path):
           yield path
 
   def get_checkpoint(self, task_id):
-    return self._pathspec.given(root=self._root_dir, task_id = task_id).getpath('runner_checkpoint')
+    return self._pathspec.given(root=self._root_dir, task_id=task_id).getpath('runner_checkpoint')
 
   def get_process_checkpoints(self, task_id):
     matching_paths = glob.glob(self._pathspec.given(root=self._root_dir,

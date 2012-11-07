@@ -488,7 +488,7 @@ def status(args, options):
       --verbosity=LEVEL     Verbosity level for logging. [default: 0]
       --only=TYPE	    Only print tasks of TYPE (options: active finished)
   """
-  detector = TaskDetector(root = options.root)
+  detector = TaskDetector(root=options.root)
 
   def format_task(task_id):
     checkpoint_filename = detector.get_checkpoint(task_id)
@@ -570,8 +570,11 @@ def tail(args, options):
   if len(args) not in (1, 2):
     app.error('Expected at most two arguments (task and optional process), got %d' % len(args))
 
-  detector = TaskDetector(root = options.root)
-  process_runs = [(process, run) for (process, run) in detector.get_process_runs(args[0])]
+  task_id = args[0]
+  detector = TaskDetector(root=options.root)
+  checkpoint = CheckpointDispatcher.from_file(detector.get_checkpoint(task_id))
+  log_dir = checkpoint.header.log_dir
+  process_runs = [(process, run) for (process, run) in detector.get_process_runs(task_id, log_dir)]
   if len(args) == 2:
     process_runs = [(process, run) for (process, run) in process_runs if process == args[1]]
 
@@ -587,8 +590,8 @@ def tail(args, options):
   process = processes.pop()
   run = max([run for _, run in process_runs])
 
-  logdir = TaskPath(root = options.root, task_id = args[0], process = process,
-     run = run).getpath('process_logdir')
+  logdir = TaskPath(root=options.root, task_id=args[0], process=process,
+     run=run, log_dir=log_dir).getpath('process_logdir')
   logfile = os.path.join(logdir, 'stderr' if options.use_stderr else 'stdout')
 
   monitor = TaskMonitor(TaskPath(root = options.root), args[0])

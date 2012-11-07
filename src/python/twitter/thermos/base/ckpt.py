@@ -119,9 +119,7 @@ class CheckpointDispatcher(object):
     CheckpointDispatcher.
   """
 
-  class Error(Exception):
-    pass
-
+  class Error(Exception): pass
   class ErrorRecoveringState(Error): pass
   class InvalidSequenceNumber(Error): pass
   class InvalidHandler(Error): pass
@@ -205,7 +203,7 @@ class CheckpointDispatcher(object):
           ProcessState._VALUES_TO_NAMES.get(process_state.state),
           ProcessState._VALUES_TO_NAMES.get(process_state_update.state)))
 
-    # [CREATION] => WAITING
+    # CREATION => WAITING
     if process_state_update.state == ProcessState.WAITING:
       assert_process_state_in(None)
       required_fields = ['seq', 'state', 'process']

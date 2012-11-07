@@ -65,6 +65,7 @@ struct RunnerHeader {
   1: string task_id
   2: i64    launch_time_ms  // kill this
   3: string sandbox
+  7: string log_dir
   4: string hostname        // kill this
   5: string user
   6: map<string, i64> ports

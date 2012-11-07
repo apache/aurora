@@ -5,8 +5,8 @@ class TaskPath(object):
   """
     Handle the resolution / detection of the path structure for thermos tasks.
 
-    This is used by the runner to determine where it should be dumping checkpoints,
-    and by the observer to determine how to detect the running tasks on the system.
+    This is used by the runner to determine where it should be dumping checkpoints and writing
+    stderr/stdout, and by the observer to determine how to detect the running tasks on the system.
 
     Examples:
       pathspec = TaskPath(root = "/var/run/thermos")
@@ -38,22 +38,25 @@ class TaskPath(object):
   class UnderspecifiedPath(Exception): pass
 
   DEFAULT_CHECKPOINT_ROOT = "/var/run/thermos"
-  KNOWN_KEYS = [ 'root', 'task_id', 'state', 'process', 'run' ]
+  KNOWN_KEYS = [ 'root', 'task_id', 'state', 'process', 'run', 'log_dir' ]
 
   DIR_TEMPLATE = {
             'task_path': ['%(root)s',       'tasks',   '%(state)s', '%(task_id)s'],
       'checkpoint_path': ['%(root)s', 'checkpoints', '%(task_id)s'],
     'runner_checkpoint': ['%(root)s', 'checkpoints', '%(task_id)s', 'runner'],
    'process_checkpoint': ['%(root)s', 'checkpoints', '%(task_id)s', 'coordinator.%(process)s'],
-      'process_logbase': ['%(root)s',        'logs', '%(task_id)s'],
-       'process_logdir': ['%(root)s',        'logs', '%(task_id)s', '%(process)s', '%(run)s']
+      'process_logbase': ['%(log_dir)s', '%(task_id)s'],
+       'process_logdir': ['%(log_dir)s', '%(task_id)s', '%(process)s', '%(run)s']
   }
 
   def __init__(self, **kw):
     self._filename = None
     # initialize with self-interpolating values
-    if 'root' not in kw:
+    if kw.get('root') is None:
       kw['root'] = self.DEFAULT_CHECKPOINT_ROOT
+    # Before log_dir was added explicitly to RunnerHeader, it resolved to %(root)s/logs
+    if kw.get('log_dir') is None:
+      kw['log_dir'] = os.path.join(kw['root'], 'logs')
     self._data = dict((key, '%%(%s)s' % key) for key in TaskPath.KNOWN_KEYS)
     self._data.update(kw)
 
@@ -64,14 +67,14 @@ class TaskPath(object):
     return TaskPath(**eval_dict)
 
   def with_filename(self, filename):
-    """ Return a WorkingPath with the specific filename appended to the end of paths """
+    """ Return a TaskPath with the specific filename appended to the end of the path """
     wp = TaskPath(**self._data)
     wp._filename = filename
     return wp
 
   def getpath(self, pathname):
     if pathname not in TaskPath.DIR_TEMPLATE:
-      raise TaskPath.UnknownPath("Internal error, unknown id: %s" % pathname)
+      raise self.UnknownPath("Internal error, unknown id: %s" % pathname)
     path = list(TaskPath.DIR_TEMPLATE[pathname]) # copy
     if self._filename: path += [self._filename]
     path = os.path.join(*path)

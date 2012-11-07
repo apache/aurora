@@ -169,7 +169,7 @@ class ProcessBase(object):
     self._fork_time = fork_time
 
   def ckpt_file(self):
-    return self._pathspec.given(process = self.name()).getpath('process_checkpoint')
+    return self._pathspec.getpath('process_checkpoint')
 
   def _setup_ckpt(self):
     """Set up the checkpoint: must be run on the parent."""
@@ -298,7 +298,7 @@ class Process(ProcessBase):
     kw['platform'] = RealPlatform(fork=fork)
     ProcessBase.__init__(self, *args, **kw)
     if self._use_chroot and self._sandbox is None:
-      raise Process.UnspecifiedSandbox('If using chroot, must specify sandbox!')
+      raise self.UnspecifiedSandbox('If using chroot, must specify sandbox!')
 
   def _chroot(self):
     """
@@ -315,7 +315,7 @@ class Process(ProcessBase):
       user = pwd.getpwnam(self._user)
       current_user = pwd.getpwuid(os.getuid())
     except KeyError:
-      raise ProcessBase.UnknownUserError('Unable to get pwent information in order to setuid!')
+      raise self.UnknownUserError('Unable to get pwent information in order to setuid!')
 
     if user.pw_uid == current_user.pw_uid:
       return

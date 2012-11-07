@@ -45,11 +45,14 @@ class TaskGarbageCollector(object):
         yield path
 
   def get_logs(self, task_id, with_size=True):
-    for path in self._detector.get_process_logs(task_id):
-      if with_size:
-        yield path, safe_bsize(path)
-      else:
-        yield path
+    state = self.state(task_id)
+    if state and state.header:
+      log_dir = state.header.log_dir
+      for path in self._detector.get_process_logs(task_id, log_dir):
+        if with_size:
+          yield path, safe_bsize(path)
+        else:
+          yield path
 
   def get_data(self, task_id, with_size=True):
     state = self.state(task_id)

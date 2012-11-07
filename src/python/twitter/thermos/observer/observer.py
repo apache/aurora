@@ -41,7 +41,7 @@ class TaskObserver(threading.Thread, Lockable):
   class UnexpectedState(Exception): pass
 
   def __init__(self, root):
-    self._pathspec = TaskPath(root = root)
+    self._pathspec = TaskPath(root=root)
     self._detector = TaskDetector(root)
     self._muxer = TaskMuxer(self._pathspec)
     self._measurer = TaskMeasurer(self._muxer)
@@ -513,7 +513,7 @@ class TaskObserver(threading.Thread, Lockable):
     return dict((task_id, self._processes(task_id)) for task_id in task_ids)
 
   @Lockable.sync
-  def get_run_number(self, runner_state, process, run = None):
+  def get_run_number(self, runner_state, process, run=None):
     if runner_state is not None and runner_state.processes is not None:
       run = run if run is not None else -1
       if run < len(runner_state.processes[process]):
@@ -534,12 +534,13 @@ class TaskObserver(threading.Thread, Lockable):
       TODO(wickman)  Just return the filenames directly?
     """
     runner_state = self.raw_state(task_id)
-    if runner_state is None:
+    if runner_state is None or runner_state.header is None:
       return {}
     run = self.get_run_number(runner_state, process, run)
     if run is None:
       return {}
-    log_path = self._pathspec.given(task_id = task_id, process = process, run = run).getpath('process_logdir')
+    log_path = self._pathspec.given(task_id=task_id, process=process, run=run,
+                                    log_dir=runner_state.header.log_dir).getpath('process_logdir')
     return dict(
       stdout = [log_path, 'stdout'],
       stderr = [log_path, 'stderr']
