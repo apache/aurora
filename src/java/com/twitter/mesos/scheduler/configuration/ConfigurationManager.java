@@ -207,34 +207,6 @@ public final class ConfigurationManager {
           task.setMaxTaskFailures(value);
         }
       })
-      .add(new TypedField<Integer>(Integer.class, "max_per_host", 1) {
-        @Override boolean isSet(TwitterTaskInfo task) { return task.isSetMaxPerHost(); }
-
-        @Override void apply(TwitterTaskInfo task, Integer value) throws TaskDescriptionException {
-          task.setMaxPerHost(value);
-
-          Constraint hostConstraint =
-              Iterables.find(task.getConstraints(), hasName(HOST_CONSTRAINT), null);
-          if (hostConstraint == null) {
-            LOG.info("Task configuration uses deprecated max_per_host.");
-
-            // TODO(wfarner): Remove this once the mesos client is updated to supply it.
-            task.addToConstraints(hostLimitConstraint(1));
-          }
-        }
-      })
-      .add(new Field<Set<String>>("avoid_jobs", ImmutableSet.<String>of()) {
-        @Override boolean isSet(TwitterTaskInfo task) { return task.isSetAvoidJobs(); }
-
-        @Override Set<String> parse(String raw) throws ParseException {
-          return getSet(raw, String.class);
-        }
-
-        @Override public void apply(TwitterTaskInfo task, Set<String> value)
-            throws TaskDescriptionException {
-          task.setAvoidJobs(value);
-        }
-      })
       .build();
 
   private ConfigurationManager() {

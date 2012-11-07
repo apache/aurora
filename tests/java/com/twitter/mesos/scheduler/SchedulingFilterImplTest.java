@@ -452,8 +452,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         .setJobName(jobName)
         .setNumCpus(cpus)
         .setRamMb(ramMb)
-        .setDiskMb(diskMb)
-        .setMaxPerHost(1));
+        .setDiskMb(diskMb));
   }
 
   private TwitterTaskInfo makeTask(int cpus, long ramMb, long diskMb) throws Exception {

@@ -277,7 +277,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setShardId(0)
         .setStartCommand("ls")
         .setRequestedPorts(ImmutableSet.<String>of())
-        .setAvoidJobs(ImmutableSet.<String>of())
         .setConstraints(ImmutableSet.<Constraint>of())
         .setTaskLinks(ImmutableMap.<String, String>of());
 
@@ -370,8 +369,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setRamMb(ONE_GB)
         .setDiskMb(500)
         .setShardId(0)
-        .setStartCommand("ls %port:foo%")
-        .setAvoidJobs(ImmutableSet.<String>of());
+        .setStartCommand("ls %port:foo%");
 
     storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
