@@ -44,7 +44,6 @@ import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
 import com.twitter.mesos.scheduler.storage.Storage.StorageException;
 import com.twitter.mesos.scheduler.storage.mem.MemStorage;
 
-
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
@@ -67,7 +66,6 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   private BackoffStrategy retryStrategy;
   private Driver driver;
   private ScheduledExecutorService executor;
-  private FakeTicker ticker;
   private ScheduledFuture<?> future;
 
   private TaskSchedulerImpl scheduler;
@@ -80,9 +78,17 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     retryStrategy = createMock(BackoffStrategy.class);
     driver = createMock(Driver.class);
     executor = createMock(ScheduledExecutorService.class);
-    ticker = new FakeTicker();
     future = createMock(ScheduledFuture.class);
+  }
 
+  private void replayAndCreateScheduler() {
+    expect(executor.scheduleAtFixedRate(
+        EasyMock.<Runnable>anyObject(),
+        EasyMock.eq(TaskSchedulerImpl.OFFER_CLEANUP_INTERVAL_SECS),
+        EasyMock.eq(TaskSchedulerImpl.OFFER_CLEANUP_INTERVAL_SECS),
+        EasyMock.eq(TimeUnit.SECONDS)))
+        .andReturn(createMock(ScheduledFuture.class));
+    control.replay();
     scheduler = new TaskSchedulerImpl(
         storage,
         stateManager,
@@ -91,7 +97,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
         driver,
         executor,
         OFFER_EXPIRY,
-        ticker);
+        new FakeTicker());
   }
 
   @After
@@ -137,7 +143,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
   @Test
   public void testNoTasks() {
-    control.replay();
+    replayAndCreateScheduler();
 
     sendOffer(makeOffer("a"));
     sendOffer(makeOffer("b"));
@@ -149,7 +155,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectTaskWatch(10, 20);
     expectCancel(true);
 
-    control.replay();
+    replayAndCreateScheduler();
 
     insertTasks(makeTask("a", PENDING));
     changeState("a", INIT, PENDING);
@@ -178,7 +184,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectTaskWatch(10);
     expectCancel(true);
 
-    control.replay();
+    replayAndCreateScheduler();
 
     insertTasks(
         makeTask("a", KILLED),
@@ -193,7 +199,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   public void testTaskMissing() {
     Capture<Runnable> timeoutCapture = expectTaskWatch(10);
 
-    control.replay();
+    replayAndCreateScheduler();
 
     changeState("a", INIT, PENDING);
     timeoutCapture.getValue().run();
@@ -220,7 +226,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectTaskWatch(10, 20);
     expectCancel(true);
 
-    control.replay();
+    replayAndCreateScheduler();
 
     sendOffer(offer);
     insertTasks(task);
@@ -257,7 +263,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
         TaskSchedulerImpl.NOT_REGISTERED_MSG))
         .andReturn(1);
 
-    control.replay();
+    replayAndCreateScheduler();
 
     insertTasks(task);
     changeState("a", INIT, PENDING);
@@ -282,7 +288,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expect(assigner.maybeAssign(offer, task)).andReturn(Optional.of(mesosTask));
     driver.launchTask(offer.getId(), mesosTask);
 
-    control.replay();
+    replayAndCreateScheduler();
 
     insertTasks(task);
     changeState("a", INIT, PENDING);

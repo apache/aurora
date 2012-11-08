@@ -20,6 +20,7 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
@@ -83,6 +84,14 @@ public interface TaskScheduler extends EventSubscriber {
   void cancelOffer(OfferID offer);
 
   /**
+   * Gets the offers that the scheduler is holding.
+   *
+   * @return A snapshot of the offers that the scheduler is currently holding.
+   */
+  @VisibleForTesting
+  Iterable<Offer> getOffers();
+
+  /**
    * A task scheduler that learns of pending tasks via internal pubsub notifications.
    * <p>
    * Additionally, it will automatically return resource offers after a configurable amount of time.
@@ -90,6 +99,9 @@ public interface TaskScheduler extends EventSubscriber {
   class TaskSchedulerImpl implements TaskScheduler {
 
     private static final Logger LOG = Logger.getLogger(TaskSchedulerImpl.class.getName());
+
+    @VisibleForTesting
+    static final long OFFER_CLEANUP_INTERVAL_SECS = 5;
 
     @VisibleForTesting
     final Map<String, Future<?>> futures =
@@ -137,6 +149,21 @@ public interface TaskScheduler extends EventSubscriber {
             }
           })
           .build();
+
+      // Proactively expire/remove offers that have expired.  Unless this is performed manually,
+      // cache entries are only removed when the cache is accessed, potentially leading to long
+      // delays in offer defragmentation.
+      Runnable cleanup = new Runnable() {
+        @Override public void run() {
+          offers.cleanUp();
+        }
+      };
+      executor.scheduleAtFixedRate(
+          cleanup,
+          OFFER_CLEANUP_INTERVAL_SECS,
+          OFFER_CLEANUP_INTERVAL_SECS,
+          TimeUnit.SECONDS);
+
       Stats.export(new StatImpl<Long>("outstanding_offers") {
         @Override public Long read() {
           return offers.size();
@@ -180,6 +207,8 @@ public interface TaskScheduler extends EventSubscriber {
 
     @Override
     public void offer(Collection<Offer> newOffers) {
+      // TODO(William Farner): If there are multiple offers for the same slave, return them
+      // to allow for offer defragmentation.
       this.offers.putAll(Maps.uniqueIndex(Iterables.transform(newOffers, wrap), GET_ID));
     }
 
@@ -196,6 +225,18 @@ public interface TaskScheduler extends EventSubscriber {
         offer.disableDecline();
       }
       offers.invalidate(offerId);
+    }
+
+    private static final Function<ExpiringOffer, Offer> GET_OFFER =
+        new Function<ExpiringOffer, Offer>() {
+          @Override public Offer apply(ExpiringOffer offer) {
+            return offer.offer;
+          }
+        };
+
+    @Override
+    public Iterable<Offer> getOffers() {
+      return FluentIterable.from(offers.asMap().values()).transform(GET_OFFER).toImmutableList();
     }
 
     private void removeTask(String taskId, boolean cancelIfPresent) {

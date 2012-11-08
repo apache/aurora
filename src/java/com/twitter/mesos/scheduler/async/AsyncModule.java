@@ -47,7 +47,7 @@ public class AsyncModule extends AbstractModule {
   @CmdLine(name = "max_offer_hold_time",
       help = "Maximum amount of time to hold a resource offer before declining.")
   private static final Arg<Amount<Long, Time>> MAX_OFFER_HOLD_TIME =
-      Arg.create(Amount.of(5L, Time.MINUTES));
+      Arg.create(Amount.of(1L, Time.MINUTES));
 
   @Override
   protected void configure() {
