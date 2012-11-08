@@ -61,7 +61,7 @@ public class DbStorageModule extends PrivateModule {
     binder.install(new DbStorageModule(key, bindAdditional));
 
     if (exposeDbAdmin.get()) {
-      DbUtil.bindAdminInterface(binder, "/scheduler/storage");
+      DbUtil.bindAdminInterface(binder, "/dbstorage");
     }
   }
 
