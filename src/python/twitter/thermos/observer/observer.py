@@ -108,7 +108,8 @@ class TaskObserver(threading.Thread, Lockable):
   @Lockable.sync
   def _read_task(self, task_id):
     """
-      Given a task id, read it.  Memoize already-read tasks.
+      Given a task id, read the corresponding task from disk and return a ThermosTask.
+      Memoizes already-read tasks.
     """
     task = self._tasks.get(task_id, None)
     if task:
@@ -137,9 +138,20 @@ class TaskObserver(threading.Thread, Lockable):
     return None
 
   @Lockable.sync
+  def task_count(self):
+    """
+      Return the count of tasks that could be ready properly from disk.
+      This may be <= self.task_id_count()
+    """
+    return dict(
+      active = sum(bool(self._read_task(t)) for t in self._actives),
+      finished = sum(bool(self._read_task(t)) for t in self._finishes)
+    )
+
+  @Lockable.sync
   def task_id_count(self):
     """
-      Return the list of active and finished task_ids.
+      Return the raw count of active and finished task_ids from the TaskDetector.
     """
     return dict(
       active = len(self._actives),
@@ -284,13 +296,14 @@ class TaskObserver(threading.Thread, Lockable):
     task_ids = task_map['task_ids']
     tasks = self.task(task_ids)
     if type in ('active', 'finished'):
-      task_count = self.task_id_count()[type]
+      task_count = self.task_count()[type]
     elif type == 'all':
-      task_count = sum(self.task_id_count().values())
+      task_count = sum(self.task_count().values())
     else:
       raise ValueError('Unknown task type %s' % type)
     def task_row(tid):
       task = tasks[tid]
+      # tasks include those which could not be found properly and are hence empty {}
       if task:
         return dict(
             task_id=tid,
