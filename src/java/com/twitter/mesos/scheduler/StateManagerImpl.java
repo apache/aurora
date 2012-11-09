@@ -338,46 +338,49 @@ public class StateManagerImpl implements StateManager {
           @Override public void execute(final ScheduledTask task) {
             ConfigurationManager.applyDefaultsIfUnset(task.getAssignedTask().getTask());
 
-            // Perform a sanity check on the number of active shards.
-            Set<String> activeTasksInShard = activeShards(
-                storeProvider.getTaskStore(),
-                Tasks.jobKey(task),
-                Tasks.SCHEDULED_TO_SHARD_ID.apply(task));
+            TaskEvent latestEvent = task.isSetTaskEvents()
+                ? Iterables.getLast(task.getTaskEvents(), null) : null;
+            if ((latestEvent == null) || (latestEvent.getStatus() != task.getStatus())) {
+              LOG.severe("Task " + Tasks.id(task) + " has no event for current status.");
+              task.addToTaskEvents(new TaskEvent(clock.nowMillis(), task.getStatus())
+                  .setMessage("Synthesized missing event."));
+            }
 
-            if (activeTasksInShard.size() > 1) {
-              shardSanityCheckFails.incrementAndGet();
-              LOG.severe("Active shard sanity check failed when loading " + Tasks.id(task)
-                  + ", active tasks found: " + activeTasksInShard);
+            if (Tasks.isActive(task.getStatus())) {
+              // Perform a sanity check on the number of active shards.
+              Set<String> activeTasksInShard = activeShards(
+                  storeProvider.getTaskStore(),
+                  Tasks.jobKey(task),
+                  Tasks.SCHEDULED_TO_SHARD_ID.apply(task));
 
-              // We want to keep exactly one task from this shard, so sort the IDs and keep the
-              // highest (newest) in the hopes that it is legitimately running.
-              if (!Tasks.id(task).equals(Iterables.getLast(Sets.newTreeSet(activeTasksInShard)))) {
-                task.setStatus(ScheduleStatus.KILLED);
-                task.addToTaskEvents(new TaskEvent(clock.nowMillis(), ScheduleStatus.KILLED)
-                    .setMessage("Killed duplicate shard."));
-                // TODO(wfarner); Circle back if this is necessary.  Currently there's a race
-                // condition between the time the scheduler is actually available without hitting
-                // IllegalStateException (see DriverImpl).
-                // driver.killTask(Tasks.id(task));
+              if (activeTasksInShard.size() > 1) {
+                shardSanityCheckFails.incrementAndGet();
+                LOG.severe("Active shard sanity check failed when loading " + Tasks.id(task)
+                    + ", active tasks found: " + activeTasksInShard);
 
-                addSideEffect(new SideEffect() {
-                  @Override public void mutate(MutableState state) {
-                    state.getVars().adjustCount(
-                        Tasks.jobKey(task),
-                        task.getStatus(),
-                        ScheduleStatus.KILLED);
-                  }
-                });
-              } else {
-                LOG.info("Retaining task " + Tasks.id(task));
-              }
-            } else {
-              TaskEvent latestEvent = task.isSetTaskEvents()
-                  ? Iterables.getLast(task.getTaskEvents(), null) : null;
-              if ((latestEvent == null) || (latestEvent.getStatus() != task.getStatus())) {
-                LOG.severe("Task " + Tasks.id(task) + " has no event for current status.");
-                task.addToTaskEvents(new TaskEvent(clock.nowMillis(), task.getStatus())
-                    .setMessage("Synthesized missing event."));
+                // We want to keep exactly one task from this shard, so sort the IDs and keep the
+                // highest (newest) in the hopes that it is legitimately running.
+                String newestTask = Iterables.getLast(Sets.newTreeSet(activeTasksInShard));
+                if (!Tasks.id(task).equals(newestTask)) {
+                  task.setStatus(ScheduleStatus.KILLED);
+                  task.addToTaskEvents(new TaskEvent(clock.nowMillis(), ScheduleStatus.KILLED)
+                      .setMessage("Killed duplicate shard."));
+                  // TODO(wfarner); Circle back if this is necessary.  Currently there's a race
+                  // condition between the time the scheduler is actually available without hitting
+                  // IllegalStateException (see DriverImpl).
+                  // driver.killTask(Tasks.id(task));
+
+                  addSideEffect(new SideEffect() {
+                    @Override public void mutate(MutableState state) {
+                      state.getVars().adjustCount(
+                          Tasks.jobKey(task),
+                          task.getStatus(),
+                          ScheduleStatus.KILLED);
+                    }
+                  });
+                } else {
+                  LOG.info("Retaining task " + Tasks.id(task));
+                }
               }
             }
           }
