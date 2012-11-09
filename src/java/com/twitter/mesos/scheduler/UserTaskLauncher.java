@@ -3,6 +3,8 @@ package com.twitter.mesos.scheduler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.annotation.Nullable;
+
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
@@ -47,7 +49,14 @@ class UserTaskLauncher implements TaskLauncher {
 
   @Override
   public synchronized boolean statusUpdate(TaskStatus status) {
-    String info = status.hasData() ? status.getData().toStringUtf8() : null;
+    @Nullable String message = null;
+    if (status.hasMessage()) {
+      message = status.getMessage();
+    } else if (status.hasData()) {
+      // TODO(William Farner): Once thermos executor has full deployment, this may be removed.
+      message = status.getData().toStringUtf8();
+    }
+
     TaskQuery query = Query.byId(status.getTaskId().getValue());
 
     try {
@@ -55,7 +64,7 @@ class UserTaskLauncher implements TaskLauncher {
       if (translatedState == null) {
         LOG.severe("Failed to look up task state translation for: " + status.getState());
       } else {
-        stateManager.changeState(query, translatedState, Optional.fromNullable(info));
+        stateManager.changeState(query, translatedState, Optional.fromNullable(message));
         return true;
       }
     } catch (SchedulerException e) {
