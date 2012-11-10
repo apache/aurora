@@ -10,7 +10,6 @@ import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.Exists;
 import com.twitter.common.args.constraints.IsDirectory;
-import com.twitter.common.args.constraints.NotNull;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.mesos.gen.storage.Snapshot;
@@ -26,9 +25,10 @@ public class BackupModule extends PrivateModule {
   private static final Arg<Amount<Long, Time>> BACKUP_INTERVAL =
       Arg.create(Amount.of(6L, Time.HOURS));
 
+  // TODO(William Farner): Uncomment once this module is used.
+  // @NotNull
   @Exists
   @IsDirectory
-  @NotNull
   @CmdLine(name = "backup_dir", help = "Directory to store backups under.")
   private static final Arg<File> BACKUP_DIR = Arg.create();
 
