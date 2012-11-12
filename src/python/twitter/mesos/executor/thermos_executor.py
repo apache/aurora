@@ -85,7 +85,7 @@ class ThermosExecutor(ThermosExecutorBase):
     """
       Deserialize MesosTaskInstance from a AssignedTask thrift.
       Returns twitter.mesos.config.schema.MesosTaskInstance and the map of
-      assigned by the scheduler.
+      ports assigned by the scheduler.
     """
     thermos_task = assigned_task.task.thermosConfig
     if not thermos_task:
@@ -101,6 +101,13 @@ class ThermosExecutor(ThermosExecutorBase):
     return self._runner
 
   def _start_runner(self, driver, mesos_task, portmap):
+    """
+      Commence running a task.
+        - Start the RunnerWrapper to fork TaskRunner (to control actual processes)
+        - Set up necessary HealthCheckers
+        - Set up ResourceCheckpointer
+        - Set up StatusManager, and attach HealthCheckers
+    """
     try:
       self._runner.start()
     except self._runner.TaskError as e:
@@ -147,7 +154,15 @@ class ThermosExecutor(ThermosExecutorBase):
         health_checkers=health_checkers)
     self._manager.start()
 
+  """ Mesos Executor API methods follow """
+
   def launchTask(self, driver, task):
+    """
+      Invoked when a task has been launched on this executor (initiated via Scheduler::launchTasks).
+      Note that this task can be realized with a thread, a process, or some simple computation,
+      however, no other callbacks will be invoked on this executor until this callback has returned.
+
+    """
     self.launched.set()
     self.log('launchTask got task: %s:%s' % (task.name, task.task_id.value))
 
@@ -184,6 +199,13 @@ class ThermosExecutor(ThermosExecutorBase):
     defer(lambda: self._start_runner(driver, mesos_task, portmap))
 
   def killTask(self, driver, task_id):
+    """
+     Invoked when a task running within this executor has been killed (via
+     SchedulerDriver::killTask). Note that no status update will be sent on behalf of the executor,
+     the executor is responsible for creating a new TaskStatus (i.e., with TASK_KILLED) and invoking
+     ExecutorDriver::sendStatusUpdate.
+
+    """
     self.log('killTask() got task_id: %s' % task_id)
     if self._runner is None:
       log.error('Got killTask but no task running!')
@@ -199,6 +221,13 @@ class ThermosExecutor(ThermosExecutorBase):
     self.log('killTask() returned')
 
   def shutdown(self, driver):
+    """
+     Invoked when the executor should terminate all of its currently running tasks. Note that after
+     Mesos has determined that an executor has terminated any tasks that the executor did not send
+     terminal status updates for (e.g., TASK_KILLED, TASK_FINISHED, TASK_FAILED, etc) a TASK_LOST
+     status update will be created.
+
+    """
     self.log('shutdown() called')
     if self._task_id:
       self.killTask(driver, mesos_pb.TaskID(value=self._task_id))

@@ -196,7 +196,8 @@ class ProductionTaskRunner(TaskRunnerWrapper):
       sandbox = AppAppSandbox(task_id)
       enable_chroot = True
     else:
-      sandbox = DirectorySandbox(task_id)
+      sandbox_root = os.path.join(artifact_dir, 'sandbox')
+      sandbox = DirectorySandbox(task_id, sandbox_root=sandbox_root)
       enable_chroot = False
     super(ProductionTaskRunner, self).__init__(
         task_id,

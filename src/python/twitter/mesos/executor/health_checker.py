@@ -5,8 +5,8 @@ from .health_interface import HealthInterface, FailureReason
 
 
 class HealthCheckerThread(HealthInterface, threading.Thread):
-  def __init__(self, http_signaler, interval_secs=30, initial_interval_secs=None, clock=time):
-    self._checker = http_signaler
+  def __init__(self, health_checker, interval_secs=30, initial_interval_secs=None, clock=time):
+    self._checker = health_checker
     self._interval = interval_secs
     if initial_interval_secs is not None:
       self._initial_interval = initial_interval_secs

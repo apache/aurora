@@ -40,6 +40,7 @@ class SandboxBase(object):
 
 
 class DirectorySandbox(SandboxBase):
+  """ Basic sandbox implementation using a directory on the filesystem """
   def __init__(self, task_id, sandbox_root=None):
     SandboxBase.__init__(self, task_id, sandbox_root)
     self._dir = os.path.join(self._sandbox_root, task_id)
@@ -69,11 +70,12 @@ class DirectorySandbox(SandboxBase):
 
 
 class AppAppSandbox(SandboxBase):
-  def __init__(self, task_id):
+  """ Sandbox implementation using an app-app layout as a sandbox """
+  def __init__(self, task_id, sandbox_root=None):
     SandboxBase.__init__(self, task_id)
 
     self._task_id = task_id
-    self._app = AppFactory.get()
+    self._app = AppFactory.get(root=sandbox_root)
     self._layout = None
     self._layouts = self._app.layout_list(name=task_id)
 
