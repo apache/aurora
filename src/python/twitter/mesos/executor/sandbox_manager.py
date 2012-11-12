@@ -75,7 +75,7 @@ class AppAppSandbox(SandboxBase):
     SandboxBase.__init__(self, task_id)
 
     self._task_id = task_id
-    self._app = AppFactory.get(root=sandbox_root)
+    self._app = AppFactory.get()
     self._layout = None
     self._layouts = self._app.layout_list(name=task_id)
 
