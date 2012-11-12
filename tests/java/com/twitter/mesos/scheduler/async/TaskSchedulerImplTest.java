@@ -25,7 +25,7 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.common.util.BackoffStrategy;
-import com.twitter.common.util.testing.FakeTicker;
+import com.twitter.common.util.testing.FakeClock;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduleStatus;
@@ -44,6 +44,7 @@ import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
 import com.twitter.mesos.scheduler.storage.Storage.StorageException;
 import com.twitter.mesos.scheduler.storage.mem.MemStorage;
 
+import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
@@ -67,8 +68,10 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   private Driver driver;
   private ScheduledExecutorService executor;
   private ScheduledFuture<?> future;
+  private FakeClock clock;
 
   private TaskSchedulerImpl scheduler;
+  private Capture<Runnable> expirationCapture;
 
   @Before
   public void setUp() {
@@ -79,11 +82,13 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     driver = createMock(Driver.class);
     executor = createMock(ScheduledExecutorService.class);
     future = createMock(ScheduledFuture.class);
+    clock = new FakeClock();
   }
 
   private void replayAndCreateScheduler() {
+    expirationCapture = createCapture();
     expect(executor.scheduleAtFixedRate(
-        EasyMock.<Runnable>anyObject(),
+        capture(expirationCapture),
         EasyMock.eq(TaskSchedulerImpl.OFFER_CLEANUP_INTERVAL_SECS),
         EasyMock.eq(TaskSchedulerImpl.OFFER_CLEANUP_INTERVAL_SECS),
         EasyMock.eq(TimeUnit.SECONDS)))
@@ -97,7 +102,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
         driver,
         executor,
         OFFER_EXPIRY,
-        new FakeTicker());
+        clock);
   }
 
   @After
@@ -109,7 +114,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     return Offer.newBuilder()
         .setId(OfferID.newBuilder().setValue(offerId))
         .setFrameworkId(FrameworkID.newBuilder().setValue("framework_id"))
-        .setSlaveId(SlaveID.newBuilder().setValue("slave_id"))
+        .setSlaveId(SlaveID.newBuilder().setValue("slave_id-" + offerId))
         .setHostname("hostname")
         .build();
   }
@@ -260,7 +265,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
             .setTaskIds(ImmutableSet.of("a"))
             .setStatuses(ImmutableSet.of(PENDING)),
         LOST,
-        TaskSchedulerImpl.NOT_REGISTERED_MSG))
+        TaskSchedulerImpl.LAUNCH_FAILED_MSG))
         .andReturn(1);
 
     replayAndCreateScheduler();
@@ -295,5 +300,41 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     sendOffer(offer);
     timeoutCapture.getValue().run();
     timeoutCapture2.getValue().run();
+  }
+
+  @Test
+  public void testExpiration() {
+    Offer offerA = makeOffer("offerA");
+    ScheduledTask task = makeTask("a", PENDING);
+    Capture<Runnable> timeoutCapture = expectTaskWatch(10);
+    expect(assigner.maybeAssign(offerA, task)).andReturn(Optional.<TaskInfo>absent());
+    Capture<Runnable> timeoutCapture2 = expectTaskWatch(10, 20);
+    driver.declineOffer(offerA.getId());
+    expectTaskWatch(20, 30);
+    expectCancel(true);
+
+    replayAndCreateScheduler();
+
+    insertTasks(task);
+    changeState("a", INIT, PENDING);
+    sendOffer(offerA);
+    timeoutCapture.getValue().run();
+    clock.advance(OFFER_EXPIRY);
+    expirationCapture.getValue().run();
+    timeoutCapture2.getValue().run();
+    scheduler.tasksDeleted(new TasksDeleted(ImmutableSet.of("a")));
+  }
+
+  @Test
+  public void testOneOfferPerSlave() {
+    Offer offerA = makeOffer("offerA");
+    Offer offerB = makeOffer("offerB").toBuilder().setSlaveId(offerA.getSlaveId()).build();
+    driver.declineOffer(offerA.getId());
+    driver.declineOffer(offerB.getId());
+
+    replayAndCreateScheduler();
+
+    sendOffer(offerA);
+    sendOffer(offerB);
   }
 }

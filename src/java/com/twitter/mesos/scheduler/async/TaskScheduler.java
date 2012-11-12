@@ -2,6 +2,7 @@ package com.twitter.mesos.scheduler.async;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -15,11 +16,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Ticker;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.RemovalListener;
-import com.google.common.cache.RemovalNotification;
+import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -30,15 +27,16 @@ import com.google.inject.Inject;
 
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
+import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskInfo;
 
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
-import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.BackoffStrategy;
+import com.twitter.common.util.Clock;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduledTask;
@@ -111,9 +109,8 @@ public interface TaskScheduler extends EventSubscriber {
     private final StateManager stateManager;
     private final TaskAssigner assigner;
     private final BackoffStrategy pendingRetryStrategy;
-    private final Driver driver;
     private final ScheduledExecutorService executor;
-    private final Cache<OfferID, ExpiringOffer> offers;
+    private final Offers offers;
 
     private final AtomicLong scheduleAttemptsFired = Stats.exportLong("schedule_attempts_fired");
     private final AtomicLong scheduleAttemptsFailed = Stats.exportLong("schedule_attempts_failed");
@@ -127,48 +124,25 @@ public interface TaskScheduler extends EventSubscriber {
         Driver driver,
         final ScheduledExecutorService executor,
         Amount<Long, Time> offerExpiry,
-        Ticker ticker) {
+        Clock clock) {
 
       this.storage = checkNotNull(storage);
       this.stateManager = checkNotNull(stateManager);
       this.assigner = checkNotNull(assigner);
       this.pendingRetryStrategy = checkNotNull(pendingRetryStrategy);
-      this.driver = checkNotNull(driver);
       this.executor = checkNotNull(executor);
+      this.offers = new Offers(driver, offerExpiry, clock);
 
       LOG.info("Declining resource offers not accepted for " + offerExpiry);
-      offers = CacheBuilder.newBuilder()
-          .expireAfterWrite(offerExpiry.as(Time.MILLISECONDS), TimeUnit.MILLISECONDS)
-          .ticker(ticker)
-          .removalListener(new RemovalListener<OfferID, ExpiringOffer>() {
-            @Override public void onRemoval(RemovalNotification<OfferID, ExpiringOffer> removal) {
-              ExpiringOffer offer = removal.getValue();
-              if (offer != null) {
-                offer.maybeDecline();
-              }
-            }
-          })
-          .build();
-
-      // Proactively expire/remove offers that have expired.  Unless this is performed manually,
-      // cache entries are only removed when the cache is accessed, potentially leading to long
-      // delays in offer defragmentation.
-      Runnable cleanup = new Runnable() {
-        @Override public void run() {
-          offers.cleanUp();
-        }
-      };
       executor.scheduleAtFixedRate(
-          cleanup,
+          new Runnable() {
+            @Override public void run() {
+              offers.declineExpired();
+            }
+          },
           OFFER_CLEANUP_INTERVAL_SECS,
           OFFER_CLEANUP_INTERVAL_SECS,
           TimeUnit.SECONDS);
-
-      Stats.export(new StatImpl<Long>("outstanding_offers") {
-        @Override public Long read() {
-          return offers.size();
-        }
-      });
     }
 
     @Inject
@@ -189,7 +163,7 @@ public interface TaskScheduler extends EventSubscriber {
           driver,
           createThreadPool(shutdownRegistry),
           offerExpiry,
-          Ticker.systemTicker());
+          Clock.SYSTEM_CLOCK);
     }
 
     private static ScheduledExecutorService createThreadPool(ShutdownRegistry shutdownRegistry) {
@@ -207,9 +181,9 @@ public interface TaskScheduler extends EventSubscriber {
 
     @Override
     public void offer(Collection<Offer> newOffers) {
-      // TODO(William Farner): If there are multiple offers for the same slave, return them
-      // to allow for offer defragmentation.
-      this.offers.putAll(Maps.uniqueIndex(Iterables.transform(newOffers, wrap), GET_ID));
+      for (Offer offer : newOffers) {
+        offers.receive(offer);
+      }
     }
 
     @Override
@@ -218,13 +192,7 @@ public interface TaskScheduler extends EventSubscriber {
 
       // The small risk of inconsistency is acceptable here - if we have an accept/remove race
       // on an offer, the master will mark the task as LOST and it will be retried.
-      ExpiringOffer offer = offers.getIfPresent(offerId);
-      if (offer != null) {
-        // Declining the offer would be a no-op, so we disable decline here to prevent an
-        // auto-decline when it is invalidated.
-        offer.disableDecline();
-      }
-      offers.invalidate(offerId);
+      offers.remove(offerId);
     }
 
     private static final Function<ExpiringOffer, Offer> GET_OFFER =
@@ -236,7 +204,7 @@ public interface TaskScheduler extends EventSubscriber {
 
     @Override
     public Iterable<Offer> getOffers() {
-      return FluentIterable.from(offers.asMap().values()).transform(GET_OFFER).toImmutableList();
+      return offers.getAll();
     }
 
     private void removeTask(String taskId, boolean cancelIfPresent) {
@@ -288,7 +256,8 @@ public interface TaskScheduler extends EventSubscriber {
     }
 
     @VisibleForTesting
-    static final Optional<String> NOT_REGISTERED_MSG = Optional.of("Scheduler is not registered.");
+    static final Optional<String> LAUNCH_FAILED_MSG =
+        Optional.of("Unknown exception attempting to schedule task.");
 
     private class PendingTask implements Runnable {
       final String taskId;
@@ -306,46 +275,33 @@ public interface TaskScheduler extends EventSubscriber {
       private void runInTransaction(StoreProvider store) {
         removeTask(taskId, false);
         LOG.fine("Attempting to schedule task " + taskId);
-        ScheduledTask task =
+        final ScheduledTask task =
             Iterables.getOnlyElement(store.getTaskStore().fetchTasks(selfQuery), null);
         if (task == null) {
           LOG.warning("Failed to look up task " + taskId);
         } else {
-          // According to docs for CacheBuilder, cache iterators are weakly consistent
-          // and never throw ConcurrentModificationException.
-          for (Map.Entry<OfferID, ExpiringOffer> entry : offers.asMap().entrySet()) {
-            ExpiringOffer expiring = entry.getValue();
-            Offer offer = expiring.offer;
-            Optional<TaskInfo> assignment = assigner.maybeAssign(offer, task);
-            if (assignment.isPresent()) {
-              expiring.disableDecline();
-              offers.invalidate(offer.getId());
-              try {
-                driver.launchTask(offer.getId(), assignment.get());
-              } catch (RuntimeException e) {
-                // TODO(William Farner): Catch only the checked exception produced by Driver
-                // once it changes from throwing IllegalStateException when the driver is not yet
-                // registered.
-
-                LOG.log(Level.WARNING, "Failed to launch task.", e);
-                scheduleAttemptsFailed.incrementAndGet();
-
-                // The attempt to schedule the task failed, so we need to backpedal on the
-                // assignment.
-                stateManager.changeState(selfQuery, LOST, NOT_REGISTERED_MSG);
-
-                // Break out completely to avoid retrying this task.  It is in the LOST state
-                // and a new task will move to PENDING to replace it.
-                // Should the state change fail due to storage issues, that's okay.  The task will
-                // time out in the ASSIGNED state and be moved to LOST.
-                return;
-              }
-              return;
+          Function<ExpiringOffer, Optional<TaskInfo>> assignment =
+              new Function<ExpiringOffer, Optional<TaskInfo>>() {
+                @Override public Optional<TaskInfo> apply(ExpiringOffer expiring) {
+                  return assigner.maybeAssign(expiring.offer, task);
+                }
+              };
+          try {
+            if (!offers.launchFirst(assignment)) {
+              // Task could not be scheduled.
+              retryLater();
             }
-          }
+          } catch (Offers.LaunchException e) {
+            LOG.log(Level.WARNING, "Failed to launch task.", e);
+            scheduleAttemptsFailed.incrementAndGet();
 
-          // Task could not be scheduled.
-          retryLater();
+            // The attempt to schedule the task failed, so we need to backpedal on the
+            // assignment.
+            // It is in the LOST state and a new task will move to PENDING to replace it.
+            // Should the state change fail due to storage issues, that's okay.  The task will
+            // time out in the ASSIGNED state and be moved to LOST.
+            stateManager.changeState(selfQuery, LOST, LAUNCH_FAILED_MSG);
+          }
         }
       }
 
@@ -371,43 +327,109 @@ public interface TaskScheduler extends EventSubscriber {
       }
     }
 
-    /**
-     * An expiring offer, which will decline itself unless declining is explicitly disabled.
-     */
-    private class ExpiringOffer {
+    private static class ExpiringOffer {
       final Offer offer;
-      boolean shouldDecline = true;
+      final long expirationMs;
 
-      ExpiringOffer(Offer offer) {
+      ExpiringOffer(Offer offer, long expirationMs) {
         this.offer = offer;
-      }
-
-      synchronized void disableDecline() {
-        shouldDecline = false;
-      }
-
-      synchronized void maybeDecline() {
-        if (shouldDecline) {
-          LOG.fine("Declining offer " + offer.getId());
-          driver.declineOffer(offer.getId());
-        } else {
-          LOG.fine("Removing (not declining) offer " + offer.getId());
-        }
+        this.expirationMs = expirationMs;
       }
     }
 
-    private final Function<Offer, ExpiringOffer> wrap =
-        new Function<Offer, ExpiringOffer>() {
-          @Override public ExpiringOffer apply(Offer offer) {
-            return new ExpiringOffer(offer);
+    private static class Offers {
+      private final Map<OfferID, ExpiringOffer> offers = Maps.newHashMap();
+      private final Driver driver;
+      private final long offerExpiryMs;
+      private final Clock clock;
+      private final Predicate<ExpiringOffer> isExpired;
+
+      Offers(Driver driver, Amount<Long, Time> offerExpiry, final Clock clock) {
+        this.driver = driver;
+        this.offerExpiryMs = offerExpiry.as(Time.MILLISECONDS);
+        this.clock = clock;
+        isExpired = new Predicate<ExpiringOffer>() {
+          @Override public boolean apply(ExpiringOffer expiring) {
+            return clock.nowMillis() >= expiring.expirationMs;
           }
         };
 
-    private static final Function<ExpiringOffer, OfferID> GET_ID =
-        new Function<ExpiringOffer, OfferID>() {
-          @Override public OfferID apply(ExpiringOffer offer) {
-            return offer.offer.getId();
+        Stats.exportSize("outstanding_offers", offers);
+      }
+
+      synchronized void remove(OfferID id) {
+        offers.remove(id);
+      }
+
+      private static Predicate<ExpiringOffer> isSlave(final SlaveID slave) {
+        return new Predicate<ExpiringOffer>() {
+          @Override public boolean apply(ExpiringOffer expiring) {
+            return expiring.offer.getSlaveId().equals(slave);
           }
         };
+      }
+
+      synchronized void receive(Offer offer) {
+        List<ExpiringOffer> sameSlave = FluentIterable.from(offers.values())
+            .filter(isSlave(offer.getSlaveId()))
+            .toImmutableList();
+        if (sameSlave.isEmpty()) {
+          offers.put(offer.getId(), new ExpiringOffer(offer, clock.nowMillis() + offerExpiryMs));
+        } else {
+          LOG.info("Returning " + (sameSlave.size() + 1)
+              + " offers for " + offer.getSlaveId().getValue() + " for compaction.");
+          decline(offer.getId());
+          for (ExpiringOffer expiring : sameSlave) {
+            decline(expiring.offer.getId());
+          }
+        }
+      }
+
+      synchronized void decline(OfferID id) {
+        LOG.fine("Declining offer " + id);
+        remove(id);
+        driver.declineOffer(id);
+      }
+
+      synchronized boolean launchFirst(Function<ExpiringOffer, Optional<TaskInfo>> acceptor)
+          throws LaunchException {
+
+        for (ExpiringOffer expiring : offers.values()) {
+          Optional<TaskInfo> assignment = acceptor.apply(expiring);
+          if (assignment.isPresent()) {
+            OfferID id = expiring.offer.getId();
+            remove(id);
+            try {
+              driver.launchTask(id, assignment.get());
+            } catch (RuntimeException e) {
+              // TODO(William Farner): Catch only the checked exception produced by Driver
+              // once it changes from throwing IllegalStateException when the driver is not yet
+              // registered.
+              throw new LaunchException("Failed to launch task.", e);
+            }
+            return true;
+          }
+        }
+        return false;
+      }
+
+      static class LaunchException extends Exception {
+        LaunchException(String msg, Throwable cause) {
+          super(msg, cause);
+        }
+      }
+
+      synchronized void declineExpired() {
+        for (ExpiringOffer expired
+            : FluentIterable.from(offers.values()).filter(isExpired).toImmutableList()) {
+
+          decline(expired.offer.getId());
+        }
+      }
+
+      synchronized List<Offer> getAll() {
+        return FluentIterable.from(offers.values()).transform(GET_OFFER).toImmutableList();
+      }
+    }
   }
 }

@@ -10,21 +10,14 @@ import javax.ws.rs.core.Response;
 
 import com.google.common.base.Function;
 import com.google.common.collect.FluentIterable;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.inject.Inject;
 
 import org.apache.mesos.Protos.Attribute;
 import org.apache.mesos.Protos.ExecutorID;
-import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.Offer;
-import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.Resource;
-import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.Value.Range;
-import org.apache.mesos.Protos.Value.Scalar;
-import org.apache.mesos.Protos.Value.Text;
-import org.apache.mesos.Protos.Value.Type;
 
 import com.twitter.mesos.scheduler.async.TaskScheduler;
 
@@ -49,22 +42,8 @@ public class Offers {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   public Response getOffers() {
-    Offer offer = Offer.newBuilder()
-        .setFrameworkId(FrameworkID.newBuilder().setValue("framework-id"))
-        .setSlaveId(SlaveID.newBuilder().setValue("slave-id"))
-        .setHostname("hostname")
-        .setId(OfferID.newBuilder().setValue("offer-id"))
-        .addAttributes(Attribute.newBuilder().setName("attr")
-            .setType(Type.TEXT)
-            .setText(Text.newBuilder().setValue("some text")))
-        .addResources(Resource.newBuilder().setName("cpu")
-            .setType(Type.SCALAR)
-            .setScalar(Scalar.newBuilder().setValue(16.7)))
-        .build();
-
     return Response.ok(
-        FluentIterable.from(ImmutableList.<Offer>builder().addAll(scheduler.getOffers())
-            .add(offer).build()).transform(TO_BEAN).toImmutableList()).build();
+        FluentIterable.from(scheduler.getOffers()).transform(TO_BEAN).toImmutableList()).build();
   }
 
   private static final Function<ExecutorID, String> EXECUTOR_ID_TOSTRING =
