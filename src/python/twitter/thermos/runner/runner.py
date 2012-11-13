@@ -362,8 +362,9 @@ class TaskRunner(object):
       checkpoint = CheckpointDispatcher.from_file(task_checkpoint)
       if checkpoint is None or checkpoint.header is None:
         return None
-      return cls(task.tasks()[0].task(), checkpoint_root, checkpoint.header.sandbox, task_id,
-          portmap=checkpoint.header.ports, log_dir=checkpoint.header.log_dir)
+      return cls(task.tasks()[0].task(), checkpoint_root, checkpoint.header.sandbox,
+                 log_dir=checkpoint.header.log_dir, task_id=task_id,
+                 portmap=checkpoint.header.ports)
     except Exception as e:
       log.error('Failed to reconstitute checkpoint in TaskRunner.get: %s' % e, exc_info=True)
       return None
