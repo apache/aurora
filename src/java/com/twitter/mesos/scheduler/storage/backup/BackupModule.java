@@ -2,6 +2,7 @@ package com.twitter.mesos.scheduler.storage.backup;
 
 import java.io.File;
 
+import com.google.common.base.Function;
 import com.google.inject.PrivateModule;
 import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
@@ -15,9 +16,11 @@ import com.twitter.common.quantity.Time;
 import com.twitter.mesos.gen.storage.Snapshot;
 import com.twitter.mesos.scheduler.storage.SnapshotStore;
 import com.twitter.mesos.scheduler.storage.backup.StorageBackup.SnapshotDelegate;
+import com.twitter.mesos.scheduler.storage.backup.TemporaryStorage.TemporaryStorageFactory;
 
 /**
- * A module that will periodically save full storage backups to local disk.
+ * A module that will periodically save full storage backups to local disk and makes those backups
+ * available for on-line recovery.
  */
 public class BackupModule extends PrivateModule {
 
@@ -52,5 +55,8 @@ public class BackupModule extends PrivateModule {
     bind(type).to(StorageBackup.class);
     bind(StorageBackup.class).in(Singleton.class);
     expose(type);
+
+    bind(new TypeLiteral<Function<Snapshot, TemporaryStorage>>() { })
+        .to(TemporaryStorageFactory.class);
   }
 }

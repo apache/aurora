@@ -85,7 +85,8 @@ class StorageBackup implements SnapshotStore<Snapshot> {
     return snapshot;
   }
 
-  private String createBackupName() {
+  @VisibleForTesting
+  String createBackupName() {
     return backupDateFormat.format(new Date(clock.nowMillis()));
   }
 
