@@ -177,7 +177,7 @@ def _warn_on_unspecified_package_bindings(config):
   p_uri, p = Ref.from_address('mesos.package_uri'), Ref.from_address('mesos.package')
   if p not in refs and p_uri not in refs:
     print(PACKAGE_UNDERSPECIFIED_WARNING % (
-        '{{package[%s][%s][%s].copy_command}}' % tuple(config.package())))
+        '{{packer[%s][%s][%s].copy_command}}' % tuple(config.package())))
 
 
 ANNOUNCE_ERROR = """
