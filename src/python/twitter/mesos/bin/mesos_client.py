@@ -29,7 +29,7 @@ from twitter.mesos.clusters import Cluster
 from twitter.mesos.command_runner import DistributedCommandRunner
 from twitter.mesos.packer import sd_packer_client
 from twitter.mesos.packer.packer_client import Packer
-from twitter.mesos.parsers import MesosConfig
+from twitter.mesos.parsers import MesosConfig, PystachioConfig
 from twitter.thermos.base.options import add_binding_to
 
 from gen.twitter.mesos.constants import ACTIVE_STATES, LIVE_STATES
@@ -135,7 +135,10 @@ EXECUTOR_SANDBOX_OPTION = optparse.Option(
 
 
 def maybe_retranslate(jobname, config_file, *args, **kw):
-  config = client_util.get_config(jobname, config_file, *args, **kw)
+  try:
+    config = client_util.get_config(jobname, config_file, *args, **kw)
+  except PystachioConfig.InvalidConfig as err:
+    client_util.die("Invalid configuration: %s" % err)
   if Cluster.get(config.cluster()).thermos_autotranslate and isinstance(config, MesosConfig):
     return client_util.get_config(jobname, config_file, *args, translate=True, **kw)
   return config

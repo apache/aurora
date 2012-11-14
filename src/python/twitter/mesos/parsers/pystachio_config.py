@@ -96,6 +96,13 @@ class PystachioConfig(ProxyConfig):
     return PystachioConfig(MesosConfigLoader.load_json(filename, name, bindings))
 
   def __init__(self, job):
+    def has(pystachio_type, thing):
+      return getattr(pystachio_type, 'has_%s' % thing)()
+    for required in ("cluster", "task", "role"):
+      if not has(job, required):
+        raise self.InvalidConfig('%s required for job "%s"' % (required.capitalize(), job.name()))
+    if not has(job.task(), 'processes'):
+      raise self.InvalidConfig('Processes required for task on job "%s"' % job.name())
     self._job = self.sanitize_job(job)
     self._hdfs_path = None
 
@@ -126,7 +133,7 @@ class PystachioConfig(ProxyConfig):
       instance=instance
     )
     # Filter unspecified values
-    return Environment(mesos = MesosContext(dict((key, val) for key, val in context.items() if val)))
+    return Environment(mesos = MesosContext(dict((k,v) for k,v in context.items() if v)))
 
   def job(self):
     interpolated_job = self._job % self.context()
