@@ -245,6 +245,10 @@ configuration format:
     http://confluence.twitter.biz/display/Aurora/Aurora+Configuration+Reference
 """
 
+def really_translate(translate=False):
+  return os.environ.get('THERMOS_AUTOTRANSLATE', str(translate)).lower() in ('true', '1')
+
+
 def get_config(jobname,
                config_file,
                copy_app_from=None,
@@ -262,7 +266,7 @@ def get_config(jobname,
 
   if config_type == 'mesos':
     print(MESOS_CONFIG_DEPRECATION_MESSAGE, file=sys.stderr)
-    if translate:
+    if really_translate(translate):
       config = PystachioConfig(PystachioCodec(config_file, jobname).build())
     else:
       config = MesosConfig(config_file, jobname)
