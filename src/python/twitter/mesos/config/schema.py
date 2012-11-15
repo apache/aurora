@@ -104,7 +104,8 @@ class MesosJob(Struct):
   instances     = Default(Integer, 1)
   task          = Required(Task)
   cron_schedule = String
-  cron_policy   = Default(String, 'KILL_EXISTING')
+  cron_policy   = String          # these two are aliases of each other.  default is KILL_EXISTING
+  cron_collision_policy = String  # if unspecified.
   layout        = AppLayout
   package       = PackerPackage  # DEPRECATED in favor of {{packer}} namespaces.
   announce      = Announcer

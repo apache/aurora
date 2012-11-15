@@ -3,6 +3,15 @@ import getpass
 import json
 import sys
 
+from twitter.common import log
+from twitter.mesos.config.schema import (
+  MesosContext,
+  MesosTaskInstance
+)
+from twitter.thermos.config.loader import (
+  ThermosTaskValidator,
+  ThermosTaskWrapper)
+
 from gen.twitter.mesos.ttypes import (
   CronCollisionPolicy,
   Identity,
@@ -10,18 +19,9 @@ from gen.twitter.mesos.ttypes import (
   TwitterTaskInfo,
 )
 
-from twitter.mesos.config.schema import (
-  MesosContext,
-  MesosTaskInstance
-)
-
-from twitter.thermos.config.loader import (
-  ThermosTaskValidator,
-  ThermosTaskWrapper)
+from pystachio import Empty, Environment
 
 from .base import ThriftCodec
-
-from pystachio import Empty, Environment
 
 __all__ = (
   'InvalidConfig',
@@ -39,6 +39,25 @@ def task_instance_from_job(job, instance):
   if job.has_announce():
     ti = ti(announce=job.announce())
   return ti.bind(mesos = instance_context).interpolate()
+
+
+def translate_cron_policy(policy):
+  cron_policy = CronCollisionPolicy._NAMES_TO_VALUES.get(policy.get())
+  if cron_policy is None:
+    raise ValueError('Invalid cron policy: %s' % policy.get())
+  return cron_policy
+
+
+def select_cron_policy(cron_policy, cron_collision_policy):
+  if cron_policy is Empty and cron_collision_policy is Empty:
+    return CronCollisionPolicy.KILL_EXISTING
+  elif cron_policy is not Empty and cron_collision_policy is Empty:
+    log.warning('cron_policy is deprecated.  use cron_collision_policy instead.')
+    return translate_cron_policy(cron_policy)
+  elif cron_policy is Empty and cron_collision_policy is not Empty:
+    return translate_cron_policy(cron_collision_policy)
+  else:
+    raise ValueError('Specified both cron_policy and cron_collision_policy!')
 
 
 def convert(job):
@@ -103,9 +122,7 @@ def convert(job):
     tasks.append(task_copy)
 
   cron_schedule = job.cron_schedule().get() if job.has_cron_schedule() else ''
-  cron_policy = CronCollisionPolicy._NAMES_TO_VALUES.get(job.cron_policy().get())
-  if cron_policy is None:
-    raise ValueError('Invalid cron policy: %s' % job.cron_policy().get())
+  cron_policy = select_cron_policy(job.cron_policy(), job.cron_collision_policy())
 
   return JobConfiguration(
     str(job.name()),

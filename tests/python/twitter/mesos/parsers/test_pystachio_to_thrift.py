@@ -134,3 +134,27 @@ def test_config_with_bad_resources():
   for resource in bad_resources:
     with pytest.raises(ValueError):
       convert_pystachio_to_thrift(HELLO_WORLD(task = hwtask(resources = resource)))
+
+
+def test_cron_policy_alias():
+  cron_schedule = '*/10 * * * *'
+  CRON_HELLO_WORLD = HELLO_WORLD(cron_schedule=cron_schedule)
+
+  tti = convert_pystachio_to_thrift(CRON_HELLO_WORLD)
+  assert tti.cronSchedule == cron_schedule
+  assert tti.cronCollisionPolicy == CronCollisionPolicy.KILL_EXISTING
+
+  tti = convert_pystachio_to_thrift(CRON_HELLO_WORLD(cron_policy='RUN_OVERLAP'))
+  assert tti.cronSchedule == cron_schedule
+  assert tti.cronCollisionPolicy == CronCollisionPolicy.RUN_OVERLAP
+
+  tti = convert_pystachio_to_thrift(CRON_HELLO_WORLD(cron_collision_policy='RUN_OVERLAP'))
+  assert tti.cronSchedule == cron_schedule
+  assert tti.cronCollisionPolicy == CronCollisionPolicy.RUN_OVERLAP
+
+  with pytest.raises(ValueError):
+    tti = convert_pystachio_to_thrift(CRON_HELLO_WORLD(cron_policy='RUN_OVERLAP',
+                                                       cron_collision_policy='RUN_OVERLAP'))
+
+  with pytest.raises(ValueError):
+    tti = convert_pystachio_to_thrift(CRON_HELLO_WORLD(cron_collision_policy='GARBAGE'))

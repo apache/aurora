@@ -76,7 +76,7 @@ class PystachioCodec(MesosConfig):
       instances = cfg['instances'],
       task = self.build_task(),
       cron_schedule = cfg['cron_schedule'],
-      cron_policy = cfg['cron_collision_policy'],
+      cron_collision_policy = cfg['cron_collision_policy'],
       update_config = self.build_update_config(),
       constraints = self.build_constraints(),
       daemon = cfg['task']['daemon'],
