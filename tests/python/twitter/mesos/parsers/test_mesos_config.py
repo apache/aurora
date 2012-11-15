@@ -11,6 +11,7 @@ import tempfile
 from twitter.common.contextutil import temporary_file
 from twitter.mesos.parsers.mesos_config import MesosConfig
 from twitter.mesos.parsers.mesos_thrift import convert as mesos_to_thrift
+from twitter.mesos.parsers.pystachio_config import MesosConfigLoader
 
 from gen.twitter.mesos.ttypes import (
   Constraint,
@@ -37,6 +38,14 @@ def disk_config(job):
     print('HELLO_WORLD = %r\njobs = [HELLO_WORLD]' % job, file=fp)
     fp.flush()
     yield fp.name
+
+
+def test_load_into():
+  with disk_config(HELLO_WORLD) as filename:
+    env = MesosConfigLoader.load_into(filename)
+    assert 'jobs' in env and len(env['jobs']) == 1
+    hello_world = env['jobs'][0]
+    assert hello_world['name'] == 'hello_world'
 
 
 def test_simple_config():
@@ -186,7 +195,3 @@ def test_package_and_package_files_do_not_mix():
   with disk_config(package_and_package_files) as filename:
     with pytest.raises(MesosConfig.InvalidConfig):
       MesosConfig(filename)
-
-
-
-

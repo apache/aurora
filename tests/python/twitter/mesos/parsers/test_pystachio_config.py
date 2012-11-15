@@ -85,6 +85,15 @@ jobs = 1234
 """
 
 
+def test_load_into():
+  with temporary_file() as fp:
+    fp.write(MESOS_CONFIG)
+    fp.flush()
+    env = MesosConfigLoader.load_into(fp.name)
+    assert 'jobs' in env and len(env['jobs']) == 1
+    hello_world = env['jobs'][0]
+    assert hello_world.name().get() == 'hello_world'
+
 
 def test_simple_config():
   with temporary_file() as fp:
