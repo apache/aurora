@@ -2,6 +2,7 @@
 """
 
 import collections
+from datetime import datetime
 import functools
 import getpass
 import math
@@ -442,6 +443,9 @@ def status(role, jobname):
       taskString += '\n\tports: %s' % assigned_task.assignedPorts
     taskString += '\n\tfailure count: %s (max %s)' % (scheduled_task.failureCount,
                                                       taskInfo.maxTaskFailures)
+    taskString += '\n\tevents:'
+    for event in scheduled_task.taskEvents:
+      taskString += '\n\t\t %s %s: %s' % (datetime.fromtimestamp(event.timestamp / 1000), ScheduleStatus._VALUES_TO_NAMES[event.status], event.message)
     return taskString
 
   def print_tasks(tasks):
