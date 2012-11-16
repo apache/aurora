@@ -15,9 +15,12 @@ import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Ordering;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 
@@ -37,10 +40,12 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.CronCollisionPolicy;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
+import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
+import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.events.PubsubEvent.EventSubscriber;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
-import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
 
 import it.sauronsoftware.cron4j.InvalidPatternException;
@@ -50,10 +55,12 @@ import it.sauronsoftware.cron4j.SchedulingPattern;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
+
 /**
  * A job scheduler that receives jobs that should be run periodically on a cron schedule.
  */
-public class CronJobManager extends JobManager {
+public class CronJobManager extends JobManager implements EventSubscriber {
 
   /**
    * An execution manager that executes work on a cron schedule.
@@ -264,7 +271,11 @@ public class CronJobManager extends JobManager {
   }
 
   private boolean hasTasks(TaskQuery query) {
-    return !schedulerCore.getTasks(query).isEmpty();
+    return !getTasks(query).isEmpty();
+  }
+
+  private Set<ScheduledTask> getTasks(TaskQuery query) {
+    return schedulerCore.getTasks(query);
   }
 
   /**
@@ -273,17 +284,18 @@ public class CronJobManager extends JobManager {
    * @param job The config of the job to be triggered.
    */
   @VisibleForTesting
-  void cronTriggered(final JobConfiguration job) {
+  void cronTriggered(JobConfiguration job) {
     LOG.info(String.format("Cron triggered for %s at %s with policy %s",
         Tasks.jobKey(job), new Date(), job.getCronCollisionPolicy()));
     cronJobsTriggered.incrementAndGet();
 
-    boolean runJob = false;
+    Optional<JobConfiguration> runJob = Optional.absent();
 
-    TaskQuery query = Query.activeQuery(job.getOwner(), job.getName());
+    final TaskQuery activeQuery = Query.activeQuery(job.getOwner(), job.getName());
+    Set<ScheduledTask> activeTasks = getTasks(activeQuery);
 
-    if (!hasTasks(query)) {
-      runJob = true;
+    if (activeTasks.isEmpty()) {
+      runJob = Optional.of(job);
     } else {
       // Assign a default collision policy.
       CronCollisionPolicy collisionPolicy = (job.getCronCollisionPolicy() == null)
@@ -293,13 +305,13 @@ public class CronJobManager extends JobManager {
       switch (collisionPolicy) {
         case KILL_EXISTING:
           try {
-            schedulerCore.killTasks(query, CRON_USER);
+            schedulerCore.killTasks(activeQuery, CRON_USER);
             // Check immediately if the tasks are gone.  This could happen if the existing tasks
             // were pending.
-            if (!hasTasks(query)) {
-              runJob = true;
+            if (!hasTasks(activeQuery)) {
+              runJob = Optional.of(job);
             } else {
-              delayedRun(query, job);
+              delayedRun(activeQuery, job);
             }
           } catch (ScheduleException e) {
             LOG.log(Level.SEVERE, "Failed to kill job.", e);
@@ -310,19 +322,26 @@ public class CronJobManager extends JobManager {
           break;
 
         case RUN_OVERLAP:
-          boolean hasPendingTasks = storage.doInTransaction(new Work.Quiet<Boolean>() {
-            @Override public Boolean apply(StoreProvider storeProvider) {
-              return !storeProvider.getTaskStore().fetchTasks(new TaskQuery()
-                  .setOwner(job.getOwner())
-                  .setJobName(job.getName())
-                  .setStatuses(ImmutableSet.of(ScheduleStatus.PENDING))).isEmpty();
-            }
-          });
-
-          if (!hasPendingTasks) {
-            runJob = true;
-          } else {
+          Map<Integer, ScheduledTask> byShard =
+              Maps.uniqueIndex(activeTasks, Tasks.SCHEDULED_TO_SHARD_ID);
+          Map<Integer, ScheduleStatus> existingTasks =
+              Maps.transformValues(byShard, Tasks.GET_STATUS);
+          if (existingTasks.isEmpty()) {
+            runJob = Optional.of(job);
+          } else if (Iterables.any(existingTasks.values(), Predicates.equalTo(PENDING))) {
             LOG.info("Job " + Tasks.jobKey(job) + " has pending tasks, suppressing run.");
+          } else {
+            // To safely overlap this run, we need to adjust the shard IDs of the overlapping
+            // run (maintaining the role/job/shard UUID invariant).
+            int shardOffset = Ordering.natural().max(existingTasks.keySet()) + 1;
+            LOG.info("Adjusting shard IDs of " + Tasks.jobKey(job) + " by " + shardOffset
+                + " for overlapping cron run.");
+            JobConfiguration adjusted = job.deepCopy();
+            for (TwitterTaskInfo task : adjusted.getTaskConfigs()) {
+              task.setShardId(task.getShardId() + shardOffset);
+            }
+
+            runJob = Optional.of(adjusted);
           }
           break;
 
@@ -331,8 +350,8 @@ public class CronJobManager extends JobManager {
       }
     }
 
-    if (runJob) {
-      schedulerCore.runJob(job);
+    if (runJob.isPresent()) {
+      schedulerCore.runJob(runJob.get());
     }
   }
 

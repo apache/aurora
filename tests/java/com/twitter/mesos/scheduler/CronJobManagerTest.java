@@ -12,10 +12,14 @@ import org.junit.Test;
 
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.Tasks;
+import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.CronCollisionPolicy;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
+import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.CronJobManager.CronScheduler;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
@@ -201,6 +205,30 @@ public class CronJobManagerTest extends EasyMockTest {
 
     cron.receiveJob(job);
     cron.updateJob(updated);
+  }
+
+  @Test
+  public void testRunOverlapNoShardCollision() throws Exception {
+    TwitterTaskInfo task = new TwitterTaskInfo().setShardId(0);
+    ScheduledTask scheduledTask = new ScheduledTask()
+        .setStatus(ScheduleStatus.RUNNING)
+        .setAssignedTask(new AssignedTask().setTask(task));
+
+    JobConfiguration job = makeJob()
+        .setTaskConfigs(ImmutableSet.of(task))
+        .setCronCollisionPolicy(CronCollisionPolicy.RUN_OVERLAP);
+    expect(cronScheduler.schedule(eq(job.getCronSchedule()), EasyMock.<Runnable>anyObject()))
+        .andReturn("key");
+    expect(scheduler.getTasks((TaskQuery) anyObject())).andReturn(ImmutableSet.of(scheduledTask));
+
+    JobConfiguration shardAdjusted = job.deepCopy()
+        .setTaskConfigs(ImmutableSet.of(task.deepCopy().setShardId(1)));
+    scheduler.runJob(shardAdjusted);
+
+    control.replay();
+
+    cron.receiveJob(job);
+    cron.startJobNow(Tasks.jobKey(job));
   }
 
   private JobConfiguration makeJob() {
