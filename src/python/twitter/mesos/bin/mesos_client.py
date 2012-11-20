@@ -140,7 +140,8 @@ def maybe_retranslate(jobname, config_file, *args, **kw):
     config = client_util.get_config(jobname, config_file, *args, **kw)
   except PystachioConfig.InvalidConfig as err:
     client_util.die("Invalid configuration: %s" % err)
-  if Cluster.get(config.cluster()).thermos_autotranslate and isinstance(config, MesosConfig):
+  if config.cluster().startswith('localhost') or (
+      Cluster.get(config.cluster()).thermos_autotranslate and isinstance(config, MesosConfig)):
     return client_util.get_config(jobname, config_file, *args, translate=True, **kw)
   return config
 
