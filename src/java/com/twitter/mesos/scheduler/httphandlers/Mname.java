@@ -68,7 +68,7 @@ public class Mname {
   }
 
   @GET
-  @Path("/{role}/{job}/{shard}/{forward}")
+  @Path("/{role}/{job}/{shard}/{forward:.+}")
   @Produces(MediaType.TEXT_HTML)
   public Response getWithForwardRequest(
       @PathParam("role") String role,
@@ -81,7 +81,7 @@ public class Mname {
   }
 
   @PUT
-  @Path("/{role}/{job}/{shard}/{forward}")
+  @Path("/{role}/{job}/{shard}/{forward:.+}")
   @Produces(MediaType.TEXT_HTML)
   public Response putWithForwardRequest(
       @PathParam("role") String role,
@@ -94,7 +94,7 @@ public class Mname {
   }
 
   @POST
-  @Path("/{role}/{job}/{shard}/{forward}")
+  @Path("/{role}/{job}/{shard}/{forward:.+}")
   @Produces(MediaType.TEXT_HTML)
   public Response postWithForwardRequest(
       @PathParam("role") String role,
@@ -107,7 +107,7 @@ public class Mname {
   }
 
   @DELETE
-  @Path("/{role}/{job}/{shard}/{forward}")
+  @Path("/{role}/{job}/{shard}/{forward:.+}")
   @Produces(MediaType.TEXT_HTML)
   public Response deleteWithForwardRequest(
       @PathParam("role") String role,
