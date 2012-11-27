@@ -72,7 +72,7 @@ ${escape(process["cmdline"])}
 
   <strong> runs </strong>
   <div class="container">
-     <table class="table table-bordered table-condensed table-striped">
+     <table class="table table-bordered table-condensed table-striped" style="empty-cells:show;">
      <thead>
        <tr>
          <th colspan=2> </th>

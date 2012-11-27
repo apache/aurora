@@ -46,7 +46,7 @@ def pretty_time(seconds=time.time()):
     % endif
   </div>
   <div class="content" id="defaultLayout">
-     <table class="table table-bordered table-condensed table-striped">
+     <table class="table table-bordered table-condensed table-striped" style="empty-cells:show;">
      <thead>
        <tr>
          <th colspan=4> ${type} tasks ${offset}...${min(task_count, offset+num_tasks-1)} of ${task_count} </th>

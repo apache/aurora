@@ -55,7 +55,7 @@
   </div>
 
   <div class="content" id="taskLayout">
-     <table class="table table-bordered table-condensed table-striped">
+     <table class="table table-bordered table-condensed table-striped" style="empty-cells:show;">
      <thead>
        <tr>
          <th colspan=1> task status </th>
@@ -74,7 +74,7 @@
   </div>
 
   <div class="content" id="processesLayout">
-     <table class="table table-bordered table-condensed table-striped">
+     <table class="table table-bordered table-condensed table-striped" style="empty-cells:show;">
      <thead>
        <tr>
          <th colspan=3> process </th>
