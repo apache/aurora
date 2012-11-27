@@ -1,5 +1,6 @@
 package com.twitter.mesos.scheduler;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
@@ -24,7 +25,8 @@ public final class ParsedConfiguration {
 
   private final JobConfiguration parsed;
 
-  private ParsedConfiguration(JobConfiguration parsed) throws TaskDescriptionException {
+  @VisibleForTesting
+  ParsedConfiguration(JobConfiguration parsed) throws TaskDescriptionException {
     this.parsed = parsed;
   }
 
@@ -62,5 +64,10 @@ public final class ParsedConfiguration {
   @Override
   public int hashCode() {
     return parsed.hashCode();
+  }
+
+  @Override
+  public String toString() {
+    return parsed.toString();
   }
 }

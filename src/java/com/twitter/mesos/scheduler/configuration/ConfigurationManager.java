@@ -121,7 +121,6 @@ public final class ConfigurationManager {
       })
       .build();
 
-  // TODO(William Farner): Remove this once all tasks are moved to thermos.
   private static final List<Field<?>> FIELDS = ImmutableList.<Field<?>>builder()
       .add(new TypedField<String>(String.class, "hdfs_path", null) {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetHdfsPath(); }
@@ -376,18 +375,16 @@ public final class ConfigurationManager {
           "A daemon task may not be run on a cron schedule: " + config);
     }
 
-    if (config.isSetThermosConfig()) {
-      sanitize(config);
-      config.setConfigParsed(true);
-      return config;
+    if (!config.isSetThermosConfig()) {
+      if (config.getConfiguration() == null) {
+        throw new TaskDescriptionException("Task configuration may not be null");
+      }
+
+      assertUnset(config);
+      populateFields(config);
     }
 
-    if (config.getConfiguration() == null) {
-      throw new TaskDescriptionException("Task configuration may not be null");
-    }
-
-    assertUnset(config);
-    populateFields(config);
+    sanitize(config);
 
     config.setConfigParsed(true);
 

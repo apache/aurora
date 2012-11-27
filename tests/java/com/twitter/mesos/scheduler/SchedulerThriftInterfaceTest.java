@@ -1,5 +1,6 @@
 package com.twitter.mesos.scheduler;
 
+import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -39,6 +40,7 @@ import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.ValueConstraint;
+import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 
 import static org.easymock.EasyMock.capture;
@@ -368,12 +370,77 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setNumCpus(1.0)
         .setRamMb(1024)
         .setDiskMb(1024)
-        .setOwner(new Identity("role", "user"))
-        .setJobName("job");
+        .setOwner(ROLE_IDENTITY)
+        .setJobName(JOB_NAME);
     JobConfiguration job = makeJob(task);
 
     expectAuth(ROLE, true);
-    scheduler.createJob(ParsedConfiguration.fromUnparsed(job));
+
+    JobConfiguration parsed = job.deepCopy();
+    for (TwitterTaskInfo parsedTask : parsed.getTaskConfigs()) {
+      parsedTask.setConfigParsed(true)
+          .setHealthCheckIntervalSecs(30)
+          .setShardId(0)
+          .setNumCpus(1.0)
+          .setPriority(0)
+          .setRamMb(1024)
+          .setDiskMb(1024)
+          .setIsDaemon(false)
+          .setProduction(false)
+          .setRequestedPorts(ImmutableSet.<String>of())
+          .setTaskLinks(ImmutableMap.<String, String>of())
+          .setConstraints(ImmutableSet.of(ConfigurationManager.hostLimitConstraint(1)))
+          .setMaxTaskFailures(1);
+    }
+    // Task configs are placed in a HashSet after deepCopy, equals() does not play nicely between
+    // HashSet and ImmutableSet - dropping an ImmutableSet in place keeps equals() happy.
+    parsed.setTaskConfigs(ImmutableSet.copyOf(parsed.getTaskConfigs()));
+
+    scheduler.createJob(new ParsedConfiguration(parsed));
+
+    control.replay();
+
+    assertEquals(ResponseCode.OK, thrift.createJob(job, SESSION).getResponseCode());
+  }
+
+  @Test
+  public void testCreateJobOldConfigPopulateDefaults() throws Exception {
+    TwitterTaskInfo task = new TwitterTaskInfo()
+        .setOwner(ROLE_IDENTITY)
+        .setJobName(JOB_NAME)
+        .setConfiguration(ImmutableMap.<String, String>builder()
+            .put("start_command", "echo")
+            .put("num_cpus", "1.0")
+            .put("ram_mb", "1024")
+            .put("disk_mb", "1024")
+            .build());
+    JobConfiguration job = makeJob(task);
+
+    expectAuth(ROLE, true);
+
+    JobConfiguration parsed = job.deepCopy();
+    for (TwitterTaskInfo parsedTask : parsed.getTaskConfigs()) {
+      parsedTask.setConfigParsed(true)
+          .setHealthCheckIntervalSecs(30)
+          .setStartCommand("echo")
+          .setThermosConfig(new byte[] {})
+          .setShardId(0)
+          .setNumCpus(1.0)
+          .setPriority(0)
+          .setRamMb(1024)
+          .setDiskMb(1024)
+          .setIsDaemon(false)
+          .setProduction(false)
+          .setRequestedPorts(ImmutableSet.<String>of())
+          .setTaskLinks(ImmutableMap.<String, String>of())
+          .setConstraints(ImmutableSet.of(ConfigurationManager.hostLimitConstraint(1)))
+          .setMaxTaskFailures(1);
+    }
+    // Task configs are placed in a HashSet after deepCopy, equals() does not play nicely between
+    // HashSet and ImmutableSet - dropping an ImmutableSet in place keeps equals() happy.
+    parsed.setTaskConfigs(ImmutableSet.copyOf(parsed.getTaskConfigs()));
+
+    scheduler.createJob(new ParsedConfiguration(parsed));
 
     control.replay();
 
