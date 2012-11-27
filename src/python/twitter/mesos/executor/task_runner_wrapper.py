@@ -57,6 +57,7 @@ class TaskRunnerWrapper(object):
     self._role = role
     self._clock = clock
     self._artifact_dir = artifact_dir or tempfile.mkdtemp()
+    self._kill_signal = threading.Event()
 
     try:
       with open(os.path.join(self._artifact_dir, 'task.json'), 'w') as fp:
@@ -156,6 +157,11 @@ class TaskRunnerWrapper(object):
     """
       Kill the underlying runner process, if it exists.
     """
+    if self._kill_signal.is_set():
+      log.warning('Duplicate kill signal received, ignoring.')
+      return
+
+    self._kill_signal.set()
     if self.is_alive():
       log.info('Runner is alive, sending SIGINT')
       try:

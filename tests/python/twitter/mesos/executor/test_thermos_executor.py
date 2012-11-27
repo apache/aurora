@@ -124,7 +124,7 @@ def sleep60():
 
 
 def make_runner(proxy_driver, checkpoint_root, task, fast_status=False,
-    executor_timer_class=TestThermosExecutorTimer):
+                executor_timer_class=TestThermosExecutorTimer):
   runner_class = functools.partial(TestTaskRunner, checkpoint_root=checkpoint_root)
   manager_class = TestStatusManager if fast_status else StatusManager
   te = FastThermosExecutor(runner_class=runner_class, manager_class=manager_class)
@@ -231,7 +231,9 @@ class TestThermosExecutor(object):
     proxy_driver = ProxyDriver()
 
     with temporary_dir() as checkpoint_root:
-      runner, executor = make_runner(proxy_driver, checkpoint_root, sleep60())
+      _, executor = make_runner(proxy_driver, checkpoint_root, sleep60())
+      # send two, expect at most one delivered
+      executor.killTask(proxy_driver, mesos_pb.TaskID(value='sleep60-001'))
       executor.killTask(proxy_driver, mesos_pb.TaskID(value='sleep60-001'))
       executor._manager.join()
 
@@ -243,7 +245,7 @@ class TestThermosExecutor(object):
     proxy_driver = ProxyDriver()
 
     with temporary_dir() as checkpoint_root:
-      runner, executor = make_runner(proxy_driver, checkpoint_root, sleep60())
+      _, executor = make_runner(proxy_driver, checkpoint_root, sleep60())
       executor.shutdown(proxy_driver)
       executor._manager.join()
 
