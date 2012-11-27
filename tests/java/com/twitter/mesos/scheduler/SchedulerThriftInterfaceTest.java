@@ -1,6 +1,5 @@
 package com.twitter.mesos.scheduler;
 
-import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
