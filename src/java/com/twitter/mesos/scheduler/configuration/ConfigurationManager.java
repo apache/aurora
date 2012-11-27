@@ -50,6 +50,7 @@ public final class ConfigurationManager {
   public static final String DEDICATED_ATTRIBUTE = "dedicated";
 
   @VisibleForTesting public static final String HOST_CONSTRAINT = "host";
+  @VisibleForTesting public static final String RACK_CONSTRAINT = "rack";
   @VisibleForTesting public static final String START_COMMAND_FIELD = "start_command";
 
   @VisibleForTesting
@@ -121,9 +122,7 @@ public final class ConfigurationManager {
       .add(new DefaultField(_Fields.CONSTRAINTS, Sets.<Constraint>newHashSet()))
       .add(new FieldSanitizer() {
         @Override public void sanitize(TwitterTaskInfo task) {
-          Constraint hostConstraint =
-              Iterables.find(task.getConstraints(), hasName(HOST_CONSTRAINT), null);
-          if (hostConstraint == null) {
+          if (!Iterables.any(task.getConstraints(), hasName(HOST_CONSTRAINT))) {
             task.addToConstraints(hostLimitConstraint(1));
           }
         }
@@ -137,6 +136,15 @@ public final class ConfigurationManager {
             if (CONSTRAIN_LEGACY_EXECUTOR.get()) {
               task.addToConstraints(LEGACY_EXECUTOR);
             }
+          }
+        }
+      })
+      .add(new FieldSanitizer() {
+        @Override public void sanitize(TwitterTaskInfo task) {
+          if (!isDedicated(task)
+              && !Iterables.any(task.getConstraints(), hasName(RACK_CONSTRAINT))) {
+
+            task.addToConstraints(rackLimitConstraint(1));
           }
         }
       })
@@ -523,6 +531,11 @@ public final class ConfigurationManager {
   @VisibleForTesting
   public static Constraint hostLimitConstraint(int limit) {
     return new Constraint(HOST_CONSTRAINT, TaskConstraint.limit(new LimitConstraint(limit)));
+  }
+
+  @VisibleForTesting
+  public static Constraint rackLimitConstraint(int limit) {
+    return new Constraint(RACK_CONSTRAINT, TaskConstraint.limit(new LimitConstraint(limit)));
   }
 
   private static Predicate<Constraint> hasName(final String name) {
