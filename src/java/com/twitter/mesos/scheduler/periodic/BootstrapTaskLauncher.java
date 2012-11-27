@@ -8,11 +8,14 @@ import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
+import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
 
+import org.apache.mesos.Protos.Attribute;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.TaskInfo;
@@ -27,6 +30,7 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.MesosTaskFactory;
 import com.twitter.mesos.scheduler.PulseMonitor;
 import com.twitter.mesos.scheduler.TaskLauncher;
+import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -66,8 +70,21 @@ public class BootstrapTaskLauncher implements TaskLauncher {
     this.taskFactory = checkNotNull(taskFactory);
   }
 
+  private static final Predicate<Attribute> IS_LEGACY_EXECUTOR = new Predicate<Attribute>() {
+    @Override public boolean apply(Attribute attribute) {
+      return ConfigurationManager.EXECUTOR_CONSTRAINT.equals(attribute.getName())
+          && ConfigurationManager.LEGACY_EXECUTOR_VALUE.equals(attribute.getText().getValue());
+    }
+  };
+
   @Override
   public Optional<TaskInfo> createTask(Offer offer) {
+    // Only launch bootstrap tasks on hosts tagged with the legacy executor attribute.
+    if (ConfigurationManager.CONSTRAIN_LEGACY_EXECUTOR.get()
+        && !Iterables.any(offer.getAttributesList(), IS_LEGACY_EXECUTOR)) {
+      return Optional.absent();
+    }
+
     String hostname = offer.getHostname();
     if (pulseMonitor.isAlive(offer.getHostname())) {
       return Optional.absent();

@@ -149,8 +149,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
           }
           builder.put("links", links);
 
-          if (task.getTask().isSetThermosConfig()
-              && task.getTask().getThermosConfig().length != 0) {
+          if (Tasks.isThermos(task.getTask())) {
             builder.put("executorPort", 1338);
             if (task.isSetSlaveHost()) {
               builder.put("executorUri",

@@ -22,7 +22,7 @@ public final class ThermosResources {
    * have been observed using 48-54MB RSS, setting to 128MB to be extra
    * vigilant initially.
    */
-  public static final Amount<Double, Data> RAM = Amount.of(128d, Data.MB);
+  public static final Amount<Long, Data> RAM = Amount.of(128L, Data.MB);
 
   private ThermosResources() {
     // Utility class
@@ -50,7 +50,7 @@ public final class ThermosResources {
    */
   public static Amount<Double, Data> getTotalTaskRam(TwitterTaskInfo task) {
     if (Tasks.IS_THERMOS_TASK.apply(task)) {
-      return Amount.of(task.getRamMb() + RAM.as(Data.MB), Data.MB);
+      return Amount.of((double) task.getRamMb() + RAM.as(Data.MB), Data.MB);
     } else {
       return Amount.of((double) task.getRamMb(), Data.MB);
     }

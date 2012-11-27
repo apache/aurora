@@ -1,5 +1,6 @@
 package com.twitter.mesos.scheduler.periodic;
 
+import org.apache.mesos.Protos.Attribute;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
@@ -8,6 +9,8 @@ import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.Protos.TaskState;
 import org.apache.mesos.Protos.TaskStatus;
+import org.apache.mesos.Protos.Value.Text;
+import org.apache.mesos.Protos.Value.Type;
 import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
@@ -16,6 +19,7 @@ import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.scheduler.MesosTaskFactory;
 import com.twitter.mesos.scheduler.PulseMonitor;
+import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
@@ -27,11 +31,15 @@ public class BootstrapTaskLauncherTest extends EasyMockTest {
   private static final String HOST = "slave-host";
 
   private static final Offer OFFER = Offer.newBuilder()
-        .setSlaveId(SlaveID.newBuilder().setValue("slave-id"))
-        .setHostname(HOST)
-        .setFrameworkId(FrameworkID.newBuilder().setValue("framework-id").build())
-        .setId(OfferID.newBuilder().setValue("offer-id"))
-        .build();
+      .setSlaveId(SlaveID.newBuilder().setValue("slave-id"))
+      .setHostname(HOST)
+      .setFrameworkId(FrameworkID.newBuilder().setValue("framework-id").build())
+      .setId(OfferID.newBuilder().setValue("offer-id"))
+      .addAttributes(Attribute.newBuilder()
+          .setName(ConfigurationManager.EXECUTOR_CONSTRAINT)
+          .setType(Type.TEXT)
+          .setText(Text.newBuilder().setValue(ConfigurationManager.LEGACY_EXECUTOR_VALUE)))
+      .build();
 
   private static final TaskStatus BOOTSTRAP_STATUS = TaskStatus.newBuilder()
       .setTaskId(TaskID.newBuilder().setValue(BootstrapTaskLauncher.TASK_ID_PREFIX + "foo"))
@@ -85,5 +93,13 @@ public class BootstrapTaskLauncherTest extends EasyMockTest {
   public void testIgnoresOtherStatusUpdates() {
     control.replay();
     assertFalse(bootstrap.statusUpdate(OTHER_STATUS));
+  }
+
+  @Test
+  public void testOnlyLegacyHosts() {
+    control.replay();
+
+    Offer offer = Offer.newBuilder(OFFER).removeAttributes(0).build();
+    assertFalse(bootstrap.createTask(offer).isPresent());
   }
 }

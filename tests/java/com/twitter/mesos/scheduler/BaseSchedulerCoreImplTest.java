@@ -85,6 +85,7 @@ import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.UPDATING;
 import static com.twitter.mesos.gen.UpdateResult.SUCCESS;
 import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
+import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.LEGACY_EXECUTOR;
 import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.hostLimitConstraint;
 import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.populateFields;
 
@@ -302,7 +303,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     TwitterTaskInfo expected = new TwitterTaskInfo(storedTask)
         .setProduction(false)
         .setThermosConfig(new byte[] {})
-        .setConstraints(ImmutableSet.of(ConfigurationManager.hostLimitConstraint(1)));
+        .setConstraints(ImmutableSet.of(
+            ConfigurationManager.hostLimitConstraint(1),
+            LEGACY_EXECUTOR));
     assertEquals(
         expected,
         getTask(storedTaskId).getAssignedTask().getTask());

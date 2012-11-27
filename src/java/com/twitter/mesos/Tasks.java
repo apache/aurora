@@ -187,4 +187,10 @@ public final class Tasks {
   public static Map<String, ScheduledTask> mapById(Iterable<ScheduledTask> tasks) {
     return Maps.uniqueIndex(tasks, SCHEDULED_TO_ID);
   }
+
+  public static boolean isThermos(TwitterTaskInfo task) {
+    // Length check is an artifact of thrift 0.5.0 NPE workaround from ConfigurationManager.
+    // See MESOS-370.
+    return task.isSetThermosConfig() && (task.getThermosConfig().length > 0);
+  }
 }

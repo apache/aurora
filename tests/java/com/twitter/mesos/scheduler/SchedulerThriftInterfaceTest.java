@@ -432,7 +432,9 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
           .setProduction(false)
           .setRequestedPorts(ImmutableSet.<String>of())
           .setTaskLinks(ImmutableMap.<String, String>of())
-          .setConstraints(ImmutableSet.of(ConfigurationManager.hostLimitConstraint(1)))
+          .setConstraints(ImmutableSet.of(
+              ConfigurationManager.hostLimitConstraint(1),
+              ConfigurationManager.LEGACY_EXECUTOR))
           .setMaxTaskFailures(1);
     }
     // Task configs are placed in a HashSet after deepCopy, equals() does not play nicely between

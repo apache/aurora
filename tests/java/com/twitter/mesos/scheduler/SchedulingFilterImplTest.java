@@ -1,6 +1,7 @@
 package com.twitter.mesos.scheduler;
 
 import java.util.Arrays;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.collect.ImmutableSet;
@@ -75,8 +76,10 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   private static final int DEFAULT_CPUS = 4;
   private static final long DEFAULT_RAM = 1000;
   private static final long DEFAULT_DISK = 2000;
-  private static final Resources DEFAULT_OFFER = new Resources(DEFAULT_CPUS,
-      Amount.of(DEFAULT_RAM, Data.MB), Amount.of(DEFAULT_DISK, Data.MB), 0);
+  private static final Resources DEFAULT_OFFER = new Resources(
+      DEFAULT_CPUS + ThermosResources.CPUS,
+      Amount.of(DEFAULT_RAM + ThermosResources.RAM.as(Data.MB), Data.MB),
+      Amount.of(DEFAULT_DISK, Data.MB), 0);
 
   private final AtomicLong taskIdCounter = new AtomicLong();
 
@@ -130,7 +133,9 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
     control.replay();
 
-    Resources twoPorts = new Resources(DEFAULT_CPUS, Amount.of(DEFAULT_RAM, Data.MB),
+    Resources twoPorts = new Resources(
+        DEFAULT_OFFER.getNumCpus(),
+        DEFAULT_OFFER.getRam(),
         Amount.of(DEFAULT_DISK, Data.MB), 2);
 
     TwitterTaskInfo noPortTask = makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
@@ -142,9 +147,10 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     TwitterTaskInfo threePortTask = makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
         .setRequestedPorts(ImmutableSet.of("one", "two", "three"));
 
-    assertTrue(defaultFilter.filter(twoPorts, HOST_A, noPortTask, TASK_ID).isEmpty());
-    assertTrue(defaultFilter.filter(twoPorts, HOST_A, onePortTask, TASK_ID).isEmpty());
-    assertTrue(defaultFilter.filter(twoPorts, HOST_A, twoPortTask, TASK_ID).isEmpty());
+    Set<Veto> none = ImmutableSet.of();
+    assertEquals(none, defaultFilter.filter(twoPorts, HOST_A, noPortTask, TASK_ID));
+    assertEquals(none, defaultFilter.filter(twoPorts, HOST_A, onePortTask, TASK_ID));
+    assertEquals(none, defaultFilter.filter(twoPorts, HOST_A, twoPortTask, TASK_ID));
     assertEquals(
         ImmutableSet.of(PORTS.veto(1)),
         defaultFilter.filter(twoPorts, HOST_A, threePortTask, TASK_ID));
@@ -452,7 +458,8 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         .setJobName(jobName)
         .setNumCpus(cpus)
         .setRamMb(ramMb)
-        .setDiskMb(diskMb));
+        .setDiskMb(diskMb)
+        .setThermosConfig(new byte[]{0}));
   }
 
   private TwitterTaskInfo makeTask(int cpus, long ramMb, long diskMb) throws Exception {

@@ -57,6 +57,11 @@ public final class ConfigurationManager {
   @CmdLine(name = "max_tasks_per_job", help = "Maximum number of allowed tasks in a single job.")
   public static final Arg<Integer> MAX_TASKS_PER_JOB = Arg.create(500);
 
+  @Positive
+  @CmdLine(name = "constrain_legacy_executor",
+      help = "If true, only allow the legacy executor to run on specially-tagged machines.")
+  public static final Arg<Boolean> CONSTRAIN_LEGACY_EXECUTOR = Arg.create(true);
+
   private static final Logger LOG = Logger.getLogger(ConfigurationManager.class.getName());
 
   private static final Pattern GOOD_IDENTIFIER_PATTERN = Pattern.compile("[\\w\\-\\.]+");
@@ -97,7 +102,11 @@ public final class ConfigurationManager {
     }
   }
 
-  // TODO(William Farner): Write a test case to validate fix for no host limit on thermos tasks.
+  public static final String EXECUTOR_CONSTRAINT = "executor";
+  public static final String LEGACY_EXECUTOR_VALUE = "legacy";
+  @VisibleForTesting
+  public static final Constraint LEGACY_EXECUTOR = new Constraint(EXECUTOR_CONSTRAINT,
+      TaskConstraint.value(new ValueConstraint(false, ImmutableSet.of(LEGACY_EXECUTOR_VALUE))));
   private static final Iterable<FieldSanitizer> SANITIZERS = ImmutableList.<FieldSanitizer>builder()
       .add(new RequiredField(_Fields.NUM_CPUS))
       .add(new RequiredField(_Fields.RAM_MB))
@@ -116,6 +125,18 @@ public final class ConfigurationManager {
               Iterables.find(task.getConstraints(), hasName(HOST_CONSTRAINT), null);
           if (hostConstraint == null) {
             task.addToConstraints(hostLimitConstraint(1));
+          }
+        }
+      })
+      // TODO(William Farner): Remove this once the old executor is retired.
+      .add(new FieldSanitizer() {
+        @Override public void sanitize(TwitterTaskInfo task) throws TaskDescriptionException {
+          // Apply an executor:legacy constraint to all non-thermos tasks.
+          if (!Tasks.isThermos(task)) {
+            Iterables.removeIf(task.getConstraints(), hasName(LEGACY_EXECUTOR.getName()));
+            if (CONSTRAIN_LEGACY_EXECUTOR.get()) {
+              task.addToConstraints(LEGACY_EXECUTOR);
+            }
           }
         }
       })
