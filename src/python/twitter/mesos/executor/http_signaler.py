@@ -3,9 +3,9 @@ from twitter.common.lang import Compatibility
 
 if Compatibility.PY3:
   from urllib.request import urlopen
-  from urllib.error import URLError
+  from urllib.error import URLError, HTTPError
 else:
-  from urllib2 import urlopen, URLError
+  from urllib2 import urlopen, URLError, HTTPError
 
 
 class HttpSignaler(object):
@@ -23,7 +23,7 @@ class HttpSignaler(object):
       with contextlib.closing(urlopen(self.url(endpoint), data, timeout=self.TIMEOUT_SECS)) as fp:
         response = fp.read().strip().lower()
         return response == expected_response if expected_response is not None else True
-    except URLError as e:
+    except (URLError, HTTPError) as e:
       return False
 
   def health(self):

@@ -129,7 +129,7 @@ class ThermosExecutor(ThermosExecutorBase):
     http_signaler = None
     if portmap.get('health'):
       http_signaler = HttpSignaler(portmap.get('health'))
-      health_checkers.append(HealthCheckerThread(http_signaler,
+      health_checkers.append(HealthCheckerThread(http_signaler.health,
           interval_secs=mesos_task.health_check_interval_secs().get()))
 
     resource_manager = ResourceManager(
