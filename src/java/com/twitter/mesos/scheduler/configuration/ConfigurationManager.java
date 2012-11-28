@@ -142,6 +142,8 @@ public final class ConfigurationManager {
       .add(new FieldSanitizer() {
         @Override public void sanitize(TwitterTaskInfo task) {
           if (!isDedicated(task)
+              && task.isProduction()
+              && task.isIsDaemon()
               && !Iterables.any(task.getConstraints(), hasName(RACK_CONSTRAINT))) {
 
             task.addToConstraints(rackLimitConstraint(1));

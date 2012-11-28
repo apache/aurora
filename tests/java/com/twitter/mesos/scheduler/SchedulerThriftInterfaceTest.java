@@ -369,6 +369,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setNumCpus(1.0)
         .setRamMb(1024)
         .setDiskMb(1024)
+        .setIsDaemon(true)
+        .setProduction(true)
         .setOwner(ROLE_IDENTITY)
         .setJobName(JOB_NAME);
     JobConfiguration job = makeJob(task);
@@ -384,8 +386,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
           .setPriority(0)
           .setRamMb(1024)
           .setDiskMb(1024)
-          .setIsDaemon(false)
-          .setProduction(false)
+          .setIsDaemon(true)
+          .setProduction(true)
           .setRequestedPorts(ImmutableSet.<String>of())
           .setTaskLinks(ImmutableMap.<String, String>of())
           .setConstraints(ImmutableSet.of(
@@ -414,6 +416,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
             .put("num_cpus", "1.0")
             .put("ram_mb", "1024")
             .put("disk_mb", "1024")
+            .put("daemon", "true")
+            .put("production", "true")
             .build());
     JobConfiguration job = makeJob(task);
 
@@ -430,8 +434,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
           .setPriority(0)
           .setRamMb(1024)
           .setDiskMb(1024)
-          .setIsDaemon(false)
-          .setProduction(false)
+          .setIsDaemon(true)
+          .setProduction(true)
           .setRequestedPorts(ImmutableSet.<String>of())
           .setTaskLinks(ImmutableMap.<String, String>of())
           .setConstraints(ImmutableSet.of(

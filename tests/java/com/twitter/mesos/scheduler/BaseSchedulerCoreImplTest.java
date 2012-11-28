@@ -305,7 +305,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setThermosConfig(new byte[] {})
         .setConstraints(ImmutableSet.of(
             ConfigurationManager.hostLimitConstraint(1),
-            ConfigurationManager.rackLimitConstraint(1),
             LEGACY_EXECUTOR));
     assertEquals(
         expected,
