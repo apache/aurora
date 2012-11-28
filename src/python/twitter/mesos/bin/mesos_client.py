@@ -636,8 +636,8 @@ def ssh(role, job, shard, *args):
     client_util.die('Request failed, server responded with "%s"' % resp.message)
 
   remote_cmd = 'bash' if not args else ' '.join(args)
-  command = DistributedCommandRunner.substitute(remote_cmd,
-      resp.tasks[0], executor_sandbox=app.get_options().executor_sandbox)
+  command = DistributedCommandRunner.substitute(remote_cmd, resp.tasks[0],
+      app.get_options().cluster, executor_sandbox=app.get_options().executor_sandbox)
   role = resp.tasks[0].assignedTask.task.owner.role
   return subprocess.call(
       ['ssh', '-t', '%s@%s' % (role, resp.tasks[0].assignedTask.slaveHost), command])

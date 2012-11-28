@@ -1,8 +1,10 @@
 from multiprocessing.pool import ThreadPool
+import posixpath
 import subprocess
 
 from twitter.common import log
 from twitter.mesos.client.client_wrapper import MesosClientAPI
+from twitter.mesos.clusters import Cluster
 from twitter.mesos.config.schema import MesosContext
 from twitter.thermos.config.schema import ThermosContext
 
@@ -24,15 +26,24 @@ class DistributedCommandRunner(object):
     return '\n'.join('%s:  %s' % (hostname, line) for line in output[0].splitlines())
 
   @classmethod
-  def thermos_sandbox(cls, executor_sandbox=False):
+  def thermos_sandbox(cls, cluster, executor_sandbox=False):
     if executor_sandbox:
-      return '/var/tmp/mesos/slaves/*/frameworks/*/executors/thermos-{{thermos.task_id}}/runs/0'
+      return posixpath.join(
+          '%(slave_root)s',
+          'slaves/*/frameworks/*/executors/thermos-{{thermos.task_id}}/runs',
+          '%(slave_run_directory)s'
+      ) % cls.sandbox_args(cluster)
     else:
       return '/var/lib/thermos/{{thermos.task_id}}'
 
   @classmethod
-  def substitute_thermos(cls, command, task, **kw):
-    prefix_command = 'cd %s;' % cls.thermos_sandbox(**kw)
+  def sandbox_args(cls, cluster):
+    cluster = Cluster.get(cluster)
+    return {'slave_root': cluster.slave_root, 'slave_run_directory': cluster.slave_run_directory}
+
+  @classmethod
+  def substitute_thermos(cls, command, task, cluster, **kw):
+    prefix_command = 'cd %s;' % cls.thermos_sandbox(cluster, **kw)
     thermos_namespace = ThermosContext(
         task_id=task.assignedTask.taskId,
         ports=task.assignedTask.assignedPorts,
@@ -46,15 +57,19 @@ class DistributedCommandRunner(object):
     return command.get()
 
   @classmethod
-  def aurora_sandbox(cls, executor_sandbox=False):
+  def aurora_sandbox(cls, cluster, executor_sandbox=False):
     if executor_sandbox:
-      return '/var/tmp/mesos/slaves/*/frameworks/*/executors/twitter/runs/0'
+      return posixpath.join(
+          '%(slave_root)s',
+          'slaves/*/frameworks/*/executors/twitter/runs',
+          '%(slave_run_directory)s'
+      ) % cls.sandbox_args(cluster)
     else:
       return '/var/run/nexus/%task_id%/sandbox'
 
   @classmethod
-  def substitute_aurora(cls, command, task, **kw):
-    command = ('cd %s;' % cls.aurora_sandbox(**kw)) + command
+  def substitute_aurora(cls, command, task, cluster, **kw):
+    command = ('cd %s;' % cls.aurora_sandbox(cluster, **kw)) + command
     command = command.replace('%shard_id%', str(task.assignedTask.task.shardId))
     command = command.replace('%task_id%', task.assignedTask.taskId)
     for name, port in task.assignedTask.assignedPorts.items():
@@ -62,17 +77,18 @@ class DistributedCommandRunner(object):
     return command
 
   @classmethod
-  def substitute(cls, command, task, **kw):
+  def substitute(cls, command, task, cluster, **kw):
     if task.assignedTask.task.thermosConfig:
-      return cls.substitute_thermos(command, task, **kw)
+      return cls.substitute_thermos(command, task, cluster, **kw)
     else:
-      return cls.substitute_aurora(command, task, **kw)
+      return cls.substitute_aurora(command, task, cluster, **kw)
 
   @classmethod
   def query_from(cls, role, job):
     return TaskQuery(statuses=LIVE_STATES, owner=Identity(role), jobName=job)
 
   def __init__(self, cluster, role, jobs):
+    self._cluster = cluster
     self._api = MesosClientAPI(cluster=cluster)
     self._role = role
     self._jobs = jobs
@@ -90,7 +106,7 @@ class DistributedCommandRunner(object):
     for task in self.resolve():
       host = task.assignedTask.slaveHost
       role = task.assignedTask.task.owner.role
-      yield (host, role, self.substitute(command, task, **kw))
+      yield (host, role, self.substitute(command, task, self._cluster, **kw))
 
   def run(self, command, parallelism=1, **kw):
     threadpool = ThreadPool(processes=parallelism)

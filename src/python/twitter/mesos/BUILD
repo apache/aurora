@@ -73,6 +73,7 @@ python_library(
   name = 'command_runner',
   sources = ['command_runner.py'],
   dependencies = [
+    pants(':clusters'),
     pants('3rdparty/python:pystachio'),
     pants('src/python/twitter/mesos/client'),
     pants('src/python/twitter/mesos/config:schema'),
