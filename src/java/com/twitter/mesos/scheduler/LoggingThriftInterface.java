@@ -21,11 +21,15 @@ import org.apache.thrift.TException;
 
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.CreateJobResponse;
+import com.twitter.mesos.gen.DrainHostsResponse;
+import com.twitter.mesos.gen.EndMaintenanceResponse;
 import com.twitter.mesos.gen.FinishUpdateResponse;
 import com.twitter.mesos.gen.ForceTaskStateResponse;
 import com.twitter.mesos.gen.GetQuotaResponse;
+import com.twitter.mesos.gen.Hosts;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.KillResponse;
+import com.twitter.mesos.gen.MaintenanceStatusResponse;
 import com.twitter.mesos.gen.MesosAdmin;
 import com.twitter.mesos.gen.MesosAdmin.Iface;
 import com.twitter.mesos.gen.PopulateJobResponse;
@@ -36,6 +40,7 @@ import com.twitter.mesos.gen.ScheduleStatusResponse;
 import com.twitter.mesos.gen.SessionKey;
 import com.twitter.mesos.gen.SetQuotaResponse;
 import com.twitter.mesos.gen.StartCronResponse;
+import com.twitter.mesos.gen.StartMaintenanceResponse;
 import com.twitter.mesos.gen.StartUpdateResponse;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.UpdateResult;
@@ -195,4 +200,36 @@ class LoggingThriftInterface implements MesosAdmin.Iface {
     LOG.info("Request to fetch quota for " + ownerRole);
     return delegate.getQuota(ownerRole);
   }
+
+  @Override
+  public StartMaintenanceResponse startMaintenance(
+      Hosts hosts, SessionKey session) throws TException {
+
+    logUserAction(session, "Starting cluster maintenance on hosts " + hosts);
+    return delegate.startMaintenance(hosts, session);
+  }
+
+  @Override
+  public DrainHostsResponse drainHosts(Hosts hostNames, SessionKey session) throws TException {
+    logUserAction(session, "Draining tasks off maintenance hosts " + hostNames);
+    return delegate.drainHosts(hostNames, session);
+  }
+
+  @Override
+  public MaintenanceStatusResponse maintenanceStatus(
+      Hosts hosts,
+      SessionKey session) throws TException {
+
+    logUserAction(session, "Gathering maintenance status of hosts " + hosts);
+    return delegate.maintenanceStatus(hosts, session);
+  }
+
+  @Override
+  public EndMaintenanceResponse endMaintenance(
+      Hosts hosts,
+      SessionKey session) throws TException {
+
+    logUserAction(session, "Ending cluster maintenance for " + hosts);
+    return delegate.endMaintenance(hosts, session);  }
+
 }

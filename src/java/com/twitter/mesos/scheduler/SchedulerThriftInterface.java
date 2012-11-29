@@ -13,6 +13,7 @@ import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
 
 import org.apache.commons.lang.StringUtils;
+import org.apache.thrift.TException;
 
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
@@ -25,11 +26,15 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.auth.SessionValidator;
 import com.twitter.mesos.auth.SessionValidator.AuthFailedException;
 import com.twitter.mesos.gen.CreateJobResponse;
+import com.twitter.mesos.gen.DrainHostsResponse;
+import com.twitter.mesos.gen.EndMaintenanceResponse;
 import com.twitter.mesos.gen.FinishUpdateResponse;
 import com.twitter.mesos.gen.ForceTaskStateResponse;
 import com.twitter.mesos.gen.GetQuotaResponse;
+import com.twitter.mesos.gen.Hosts;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.KillResponse;
+import com.twitter.mesos.gen.MaintenanceStatusResponse;
 import com.twitter.mesos.gen.MesosAdmin;
 import com.twitter.mesos.gen.PopulateJobResponse;
 import com.twitter.mesos.gen.Quota;
@@ -41,6 +46,7 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.SessionKey;
 import com.twitter.mesos.gen.SetQuotaResponse;
 import com.twitter.mesos.gen.StartCronResponse;
+import com.twitter.mesos.gen.StartMaintenanceResponse;
 import com.twitter.mesos.gen.StartUpdateResponse;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
@@ -320,8 +326,13 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
   }
 
   @Override
-  public UpdateShardsResponse updateShards(String role, String jobName,
-      Set<Integer> shards, String updateToken, SessionKey session) {
+  public UpdateShardsResponse updateShards(
+      String role,
+      String jobName,
+      Set<Integer> shards,
+      String updateToken,
+      SessionKey session) {
+
     checkNotBlank(role);
     checkNotBlank(jobName);
     checkNotBlank(shards);
@@ -341,8 +352,13 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
   }
 
   @Override
-  public RollbackShardsResponse rollbackShards(String role, String jobName,
-      Set<Integer> shards, String updateToken, SessionKey session) {
+  public RollbackShardsResponse rollbackShards(
+      String role,
+      String jobName,
+      Set<Integer> shards,
+      String updateToken,
+      SessionKey session) {
+
     checkNotBlank(role);
     checkNotBlank(jobName);
     checkNotBlank(shards);
@@ -362,8 +378,13 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
   }
 
   @Override
-  public FinishUpdateResponse finishUpdate(String role, String jobName,
-      UpdateResult updateResult, String updateToken, SessionKey session) {
+  public FinishUpdateResponse finishUpdate(
+      String role,
+      String jobName,
+      UpdateResult updateResult,
+      String updateToken,
+      SessionKey session) {
+
     checkNotBlank(role);
     checkNotBlank(jobName);
     checkNotNull(session);
@@ -386,6 +407,37 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
   public GetQuotaResponse getQuota(String ownerRole) {
     checkNotBlank(ownerRole);
     return new GetQuotaResponse().setQuota(quotaManager.getQuota(ownerRole));
+  }
+
+  @Override
+  public StartMaintenanceResponse startMaintenance(
+      Hosts hosts,
+      SessionKey session) throws TException {
+
+    throw new UnsupportedOperationException("Cluster maintenance has not been implemented yet.");
+  }
+
+  @Override
+  public DrainHostsResponse drainHosts(
+      Hosts hosts,
+      SessionKey session) throws TException {
+
+    throw new UnsupportedOperationException("Cluster maintenance has not been implemented yet.");
+  }
+
+  @Override
+  public MaintenanceStatusResponse maintenanceStatus(
+      Hosts hosts,
+      SessionKey session) throws TException {
+
+    throw new UnsupportedOperationException("Cluster maintenance has not been implemented yet.");
+  }
+
+  @Override
+  public EndMaintenanceResponse endMaintenance(
+      Hosts hosts, SessionKey session) throws TException {
+
+    throw new UnsupportedOperationException("Cluster maintenance has not been implemented yet.");
   }
 
   private void assertAdmin(SessionKey session) throws AuthFailedException {
@@ -420,7 +472,9 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
   }
 
   @Override
-  public ForceTaskStateResponse forceTaskState(String taskId, ScheduleStatus status,
+  public ForceTaskStateResponse forceTaskState(
+      String taskId,
+      ScheduleStatus status,
       SessionKey session) {
 
     checkNotBlank(taskId);
