@@ -405,3 +405,24 @@ invoking cancel_update.
   def force_task_state(self, task_id, status):
     log.info("Requesting that task %s transition to state %s" % (task_id, status))
     return self._scheduler.forceTaskState(task_id, status)
+
+  def perform_backup(self):
+    return self._scheduler.performBackup()
+
+  def list_backups(self):
+    return self._scheduler.listBackups()
+
+  def stage_recovery(self, backup_id):
+    return self._scheduler.stageRecovery(backup_id)
+
+  def query_recovery(self, query):
+    return self._scheduler.queryRecovery(query)
+
+  def delete_recovery_tasks(self, query):
+    return self._scheduler.deleteRecoveryTasks(query)
+
+  def commit_recovery(self):
+    return self._scheduler.commitRecovery()
+
+  def unload_recovery(self):
+    return self._scheduler.unloadRecovery()

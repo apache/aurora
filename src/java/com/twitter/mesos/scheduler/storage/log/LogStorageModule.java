@@ -19,13 +19,11 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Clock;
-import com.twitter.mesos.gen.storage.Snapshot;
 import com.twitter.mesos.scheduler.db.DbUtil.Builder.JdbcUrl;
 import com.twitter.mesos.scheduler.log.Log;
 import com.twitter.mesos.scheduler.storage.JobStore;
 import com.twitter.mesos.scheduler.storage.QuotaStore;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
-import com.twitter.mesos.scheduler.storage.SnapshotStore;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.TaskStore;
 import com.twitter.mesos.scheduler.storage.UpdateStore;
@@ -55,7 +53,6 @@ import com.twitter.mesos.scheduler.storage.mem.MemUpdateStore;
  * <ul>
  *   <li>jdbc URL keyed by {@link JdbcUrl}</li>
  *   <li>{@link Storage}</li>
- *   <li>{@link SnapshotStore}</li>
  *   <li>Keyed by {@link LogStorage.WriteBehind}
  *     <ul>
  *       <li>{@link SchedulerStore}</li>
@@ -133,11 +130,6 @@ public class LogStorageModule extends AbstractModule {
       }
 
       @Override public void execute(PrivateBinder binder) {
-        TypeLiteral<SnapshotStore<Snapshot>> snapshotStoreType =
-            new TypeLiteral<SnapshotStore<Snapshot>>() { };
-        binder.bind(snapshotStoreType).to(SnapshotStoreImpl.class);
-        binder.expose(snapshotStoreType);
-
         exposeBinding(binder, SchedulerStore.Mutable.class, schedulerStore);
         exposeBinding(binder, JobStore.Mutable.class, jobStore);
         exposeBinding(binder, TaskStore.Mutable.class, taskStore);

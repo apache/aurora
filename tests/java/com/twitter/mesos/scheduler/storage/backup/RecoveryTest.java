@@ -25,6 +25,8 @@ import com.twitter.mesos.gen.storage.StoredJob;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.storage.SnapshotStore;
 import com.twitter.mesos.scheduler.storage.backup.Recovery.RecoveryException;
+import com.twitter.mesos.scheduler.storage.backup.Recovery.RecoveryImpl;
+import com.twitter.mesos.scheduler.storage.backup.StorageBackup.StorageBackupImpl;
 import com.twitter.mesos.scheduler.storage.backup.TemporaryStorage.TemporaryStorageFactory;
 
 import static org.easymock.EasyMock.expect;
@@ -42,8 +44,8 @@ public class RecoveryTest extends EasyMockTest {
 
   private SnapshotStore<Snapshot> snapshotStore;
   private FakeClock clock;
-  private StorageBackup storageBackup;
-  private Recovery recovery;
+  private StorageBackupImpl storageBackup;
+  private RecoveryImpl recovery;
 
   @Before
   public void setUp() {
@@ -57,8 +59,8 @@ public class RecoveryTest extends EasyMockTest {
     snapshotStore = createMock(new Clazz<SnapshotStore<Snapshot>>() { });
     clock = new FakeClock();
     TemporaryStorageFactory factory = new TemporaryStorageFactory();
-    storageBackup = new StorageBackup(snapshotStore, clock, INTERVAL, backupDir);
-    recovery = new Recovery(backupDir, snapshotStore, factory);
+    storageBackup = new StorageBackupImpl(snapshotStore, clock, INTERVAL, backupDir);
+    recovery = new RecoveryImpl(backupDir, snapshotStore, factory);
   }
 
   @Test
@@ -75,7 +77,7 @@ public class RecoveryTest extends EasyMockTest {
     String backup1 = storageBackup.createBackupName();
     assertEquals(ImmutableSet.of(backup1), recovery.listBackups());
 
-    recovery.loadBackup(backup1);
+    recovery.stage(backup1);
     assertEquals(SNAPSHOT1.getTasks(), recovery.query(Query.GET_ALL));
     recovery.commit();
   }
@@ -91,7 +93,7 @@ public class RecoveryTest extends EasyMockTest {
     clock.advance(INTERVAL);
     storageBackup.createSnapshot();
     String backup1 = storageBackup.createBackupName();
-    recovery.loadBackup(backup1);
+    recovery.stage(backup1);
     assertEquals(SNAPSHOT1.getTasks(), recovery.query(Query.GET_ALL));
     recovery.deleteTasks(Query.byId(Tasks.id(TASK2)));
     assertEquals(modified.getTasks(), recovery.query(Query.GET_ALL));
@@ -111,27 +113,27 @@ public class RecoveryTest extends EasyMockTest {
     clock.advance(INTERVAL);
     storageBackup.createSnapshot();
     String backup1 = storageBackup.createBackupName();
-    recovery.loadBackup(backup1);
+    recovery.stage(backup1);
     recovery.commit();
 
     clock.advance(INTERVAL);
     storageBackup.createSnapshot();
     String backup2 = storageBackup.createBackupName();
-    recovery.loadBackup(backup2);
+    recovery.stage(backup2);
     assertEquals(SNAPSHOT2.getTasks(), recovery.query(Query.GET_ALL));
     recovery.commit();
 
     clock.advance(INTERVAL);
     storageBackup.createSnapshot();
     String backup3 = storageBackup.createBackupName();
-    recovery.loadBackup(backup3);
+    recovery.stage(backup3);
     recovery.unload();
   }
 
   @Test(expected = RecoveryException.class)
   public void testLoadUnknownBackup() throws Exception {
     control.replay();
-    recovery.loadBackup("foo");
+    recovery.stage("foo");
   }
 
   @Test(expected = RecoveryException.class)

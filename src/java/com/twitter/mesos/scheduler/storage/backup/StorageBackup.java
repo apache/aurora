@@ -36,85 +36,97 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * A backup routine that layers over a snapshot store and periodically writes snapshots to
  * local disk.
  */
-class StorageBackup implements SnapshotStore<Snapshot> {
-
-  private static final Logger LOG = Logger.getLogger(StorageBackup.class.getName());
+public interface StorageBackup {
 
   /**
-   * Binding annotation that the underlying {@link SnapshotStore} must be bound with.
+   * Perform a storage backup immediately, blocking until it is complete.
    */
-  @BindingAnnotation
-  @Target({FIELD, PARAMETER, METHOD}) @Retention(RUNTIME)
-  @interface SnapshotDelegate { }
+  void backupNow();
 
-  private final SnapshotStore<Snapshot> delegate;
-  private final Clock clock;
-  private final long backupIntervalMs;
-  private volatile long nextSnapshotMs;
-  private final File backupDir;
-  private final DateFormat backupDateFormat;
+  class StorageBackupImpl implements StorageBackup, SnapshotStore<Snapshot> {
+    private static final Logger LOG = Logger.getLogger(StorageBackup.class.getName());
 
-  @VisibleForTesting
-  final AtomicLong successes = Stats.exportLong("scheduler_backup_success");
-  @VisibleForTesting
-  final AtomicLong failures = Stats.exportLong("scheduler_backup_failed");
+    /**
+     * Binding annotation that the underlying {@link SnapshotStore} must be bound with.
+     */
+    @BindingAnnotation
+    @Target({FIELD, PARAMETER, METHOD}) @Retention(RUNTIME)
+    @interface SnapshotDelegate { }
 
-  @Inject
-  StorageBackup(
-      @SnapshotDelegate SnapshotStore<Snapshot> delegate,
-      Clock clock,
-      Amount<Long, Time> backupInterval,
-      File backupDir) {
+    private final SnapshotStore<Snapshot> delegate;
+    private final Clock clock;
+    private final long backupIntervalMs;
+    private volatile long nextSnapshotMs;
+    private final File backupDir;
+    private final DateFormat backupDateFormat;
 
-    this.delegate = checkNotNull(delegate);
-    this.clock = checkNotNull(clock);
-    this.backupDir = checkNotNull(backupDir);
-    backupDateFormat = new SimpleDateFormat("yyyy-MM-dd-HH-mm");
-    backupIntervalMs = backupInterval.as(Time.MILLISECONDS);
-    nextSnapshotMs = clock.nowMillis() + backupIntervalMs;
-  }
+    @VisibleForTesting
+    final AtomicLong successes = Stats.exportLong("scheduler_backup_success");
+    @VisibleForTesting
+    final AtomicLong failures = Stats.exportLong("scheduler_backup_failed");
 
-  @Override
-  public Snapshot createSnapshot() {
-    Snapshot snapshot = delegate.createSnapshot();
-    if (clock.nowMillis() >= nextSnapshotMs) {
-      nextSnapshotMs += backupIntervalMs;
-      save(snapshot);
+    @Inject
+    StorageBackupImpl(
+        @SnapshotDelegate SnapshotStore<Snapshot> delegate,
+        Clock clock,
+        Amount<Long, Time> backupInterval,
+        File backupDir) {
+
+      this.delegate = checkNotNull(delegate);
+      this.clock = checkNotNull(clock);
+      this.backupDir = checkNotNull(backupDir);
+      backupDateFormat = new SimpleDateFormat("yyyy-MM-dd-HH-mm");
+      backupIntervalMs = backupInterval.as(Time.MILLISECONDS);
+      nextSnapshotMs = clock.nowMillis() + backupIntervalMs;
     }
 
-    return snapshot;
-  }
+    @Override public Snapshot createSnapshot() {
+      Snapshot snapshot = delegate.createSnapshot();
+      if (clock.nowMillis() >= nextSnapshotMs) {
+        nextSnapshotMs += backupIntervalMs;
+        save(snapshot);
+      }
 
-  @VisibleForTesting
-  String createBackupName() {
-    return backupDateFormat.format(new Date(clock.nowMillis()));
-  }
+      return snapshot;
+    }
 
-  private void save(Snapshot snapshot) {
-    String backupName = createBackupName();
-    String tempBackupName = "temp_" + backupName;
-    File tempFile = new File(backupDir, tempBackupName);
-    try {
-      byte[] backup = ThriftBinaryCodec.encodeNonNull(snapshot);
-      Files.write(backup, tempFile);
-      Files.move(tempFile, new File(backupDir, backupName));
-      successes.incrementAndGet();
-    } catch (IOException e) {
-      failures.incrementAndGet();
-      LOG.log(Level.SEVERE, "Failed to prepare backup " + backupName + ": " + e, e);
-    } catch (CodingException e) {
-      LOG.log(Level.SEVERE, "Failed to encode backup " + backupName + ": " + e, e);
-      failures.incrementAndGet();
-    } finally {
-      if (tempFile.exists()) {
-        LOG.info("Deleting incomplete backup file " + tempFile);
-        tempFile.delete();
+    @Override public void backupNow() {
+      nextSnapshotMs = clock.nowMillis();
+      createSnapshot();
+    }
+
+    @VisibleForTesting
+    String createBackupName() {
+      return backupDateFormat.format(new Date(clock.nowMillis()));
+    }
+
+    private void save(Snapshot snapshot) {
+      String backupName = createBackupName();
+      String tempBackupName = "temp_" + backupName;
+      File tempFile = new File(backupDir, tempBackupName);
+      LOG.info("Saving backup to " + tempFile);
+      try {
+        byte[] backup = ThriftBinaryCodec.encodeNonNull(snapshot);
+        Files.write(backup, tempFile);
+        Files.move(tempFile, new File(backupDir, backupName));
+        successes.incrementAndGet();
+      } catch (IOException e) {
+        failures.incrementAndGet();
+        LOG.log(Level.SEVERE, "Failed to prepare backup " + backupName + ": " + e, e);
+      } catch (CodingException e) {
+        LOG.log(Level.SEVERE, "Failed to encode backup " + backupName + ": " + e, e);
+        failures.incrementAndGet();
+      } finally {
+        if (tempFile.exists()) {
+          LOG.info("Deleting incomplete backup file " + tempFile);
+          tempFile.delete();
+        }
       }
     }
-  }
 
-  @Override
-  public void applySnapshot(Snapshot snapshot) {
-    delegate.applySnapshot(snapshot);
+    @Override
+    public void applySnapshot(Snapshot snapshot) {
+      delegate.applySnapshot(snapshot);
+    }
   }
 }

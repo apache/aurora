@@ -1,6 +1,7 @@
 package com.twitter.mesos.scheduler;
 
 import java.util.Set;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -25,7 +26,9 @@ import com.twitter.common.util.BackoffHelper;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.auth.SessionValidator;
 import com.twitter.mesos.auth.SessionValidator.AuthFailedException;
+import com.twitter.mesos.gen.CommitRecoveryResponse;
 import com.twitter.mesos.gen.CreateJobResponse;
+import com.twitter.mesos.gen.DeleteRecoveryTasksResponse;
 import com.twitter.mesos.gen.DrainHostsResponse;
 import com.twitter.mesos.gen.EndMaintenanceResponse;
 import com.twitter.mesos.gen.FinishUpdateResponse;
@@ -34,9 +37,12 @@ import com.twitter.mesos.gen.GetQuotaResponse;
 import com.twitter.mesos.gen.Hosts;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.KillResponse;
+import com.twitter.mesos.gen.ListBackupsResponse;
 import com.twitter.mesos.gen.MaintenanceStatusResponse;
 import com.twitter.mesos.gen.MesosAdmin;
+import com.twitter.mesos.gen.PerformBackupResponse;
 import com.twitter.mesos.gen.PopulateJobResponse;
+import com.twitter.mesos.gen.QueryRecoveryResponse;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ResponseCode;
 import com.twitter.mesos.gen.RollbackShardsResponse;
@@ -45,22 +51,28 @@ import com.twitter.mesos.gen.ScheduleStatusResponse;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.SessionKey;
 import com.twitter.mesos.gen.SetQuotaResponse;
+import com.twitter.mesos.gen.StageRecoveryResponse;
 import com.twitter.mesos.gen.StartCronResponse;
 import com.twitter.mesos.gen.StartMaintenanceResponse;
 import com.twitter.mesos.gen.StartUpdateResponse;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.gen.UnloadRecoveryResponse;
 import com.twitter.mesos.gen.UpdateResponseCode;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.UpdateShardsResponse;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
+import com.twitter.mesos.scheduler.storage.backup.Recovery;
+import com.twitter.mesos.scheduler.storage.backup.Recovery.RecoveryException;
+import com.twitter.mesos.scheduler.storage.backup.StorageBackup;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.mesos.gen.ResponseCode.AUTH_FAILED;
+import static com.twitter.mesos.gen.ResponseCode.ERROR;
 import static com.twitter.mesos.gen.ResponseCode.INVALID_REQUEST;
 import static com.twitter.mesos.gen.ResponseCode.OK;
 
@@ -103,25 +115,44 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
 
   private final SchedulerCore schedulerCore;
   private final SessionValidator sessionValidator;
-
   private final QuotaManager quotaManager;
+  private final StorageBackup backup;
+  private final Recovery recovery;
   private final Amount<Long, Time> killTaskInitialBackoff;
-
   private final Amount<Long, Time> killTaskMaxBackoff;
 
   @Inject
-  public SchedulerThriftInterface(SchedulerCore schedulerCore, SessionValidator sessionValidator,
-      QuotaManager quotaManager) {
-    this(schedulerCore, sessionValidator, quotaManager,
-        KILL_TASK_INITIAL_BACKOFF.get(), KILL_TASK_MAX_BACKOFF.get());
+  SchedulerThriftInterface(
+      SchedulerCore schedulerCore,
+      SessionValidator sessionValidator,
+      QuotaManager quotaManager,
+      StorageBackup backup,
+      Recovery recovery) {
+
+    this(schedulerCore,
+        sessionValidator,
+        quotaManager,
+        backup,
+        recovery,
+        KILL_TASK_INITIAL_BACKOFF.get(),
+        KILL_TASK_MAX_BACKOFF.get());
   }
 
   @VisibleForTesting
-  SchedulerThriftInterface(SchedulerCore schedulerCore, SessionValidator sessionValidator,
-      QuotaManager quotaManager, Amount<Long, Time> initialBackoff, Amount<Long, Time> maxBackoff) {
+  SchedulerThriftInterface(
+      SchedulerCore schedulerCore,
+      SessionValidator sessionValidator,
+      QuotaManager quotaManager,
+      StorageBackup backup,
+      Recovery recovery,
+      Amount<Long, Time> initialBackoff,
+      Amount<Long, Time> maxBackoff) {
+
     this.schedulerCore = checkNotNull(schedulerCore);
     this.sessionValidator = checkNotNull(sessionValidator);
     this.quotaManager = checkNotNull(quotaManager);
+    this.backup = checkNotNull(backup);
+    this.recovery = checkNotNull(recovery);
     this.killTaskInitialBackoff = checkNotNull(initialBackoff);
     this.killTaskMaxBackoff = checkNotNull(maxBackoff);
   }
@@ -284,9 +315,9 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     } catch (InterruptedException e) {
       LOG.warning("Interrupted while trying to kill tasks: " + e);
       Thread.currentThread().interrupt();
-      response.setResponseCode(ResponseCode.ERROR).setMessage("killTasks thread was interrupted.");
+      response.setResponseCode(ERROR).setMessage("killTasks thread was interrupted.");
     } catch (BackoffHelper.BackoffStoppedException e) {
-      response.setResponseCode(ResponseCode.ERROR).setMessage("Tasks were not killed in time.");
+      response.setResponseCode(ERROR).setMessage("Tasks were not killed in time.");
     }
     return response;
   }
@@ -465,7 +496,7 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
       quotaManager.setQuota(ownerRole, quota);
       response.setResponseCode(OK).setMessage("Quota applied.");
     } catch (AuthFailedException e) {
-      response.setResponseCode(ResponseCode.AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
+      response.setResponseCode(AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
     }
 
     return response;
@@ -487,7 +518,114 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
       schedulerCore.setTaskStatus(Query.byId(taskId), status, transitionMessage(session.getUser()));
       response.setResponseCode(OK).setMessage("Transition attempted.");
     } catch (AuthFailedException e) {
+      response.setResponseCode(AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
+    }
+
+    return response;
+  }
+
+  @Override
+  public PerformBackupResponse performBackup(SessionKey session) {
+    PerformBackupResponse response = new PerformBackupResponse().setResponseCode(OK);
+    try {
+      assertAdmin(session);
+      backup.backupNow();
+    } catch (AuthFailedException e) {
+      response.setResponseCode(AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
+    }
+
+    return response;
+  }
+
+  @Override
+  public ListBackupsResponse listBackups(SessionKey session) {
+    ListBackupsResponse response = new ListBackupsResponse().setResponseCode(OK);
+    try {
+      assertAdmin(session);
+      response.setBackups(recovery.listBackups());
+    } catch (AuthFailedException e) {
+      response.setResponseCode(AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
+    }
+
+    return response;
+  }
+
+  @Override
+  public StageRecoveryResponse stageRecovery(String backupId, SessionKey session) {
+    StageRecoveryResponse response = new StageRecoveryResponse().setResponseCode(OK);
+    try {
+      assertAdmin(session);
+      recovery.stage(backupId);
+    } catch (AuthFailedException e) {
       response.setResponseCode(ResponseCode.AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
+    } catch (RecoveryException e) {
+      response.setResponseCode(ERROR).setMessage(e.getMessage());
+      LOG.log(Level.WARNING, "Failed to stage recovery: " + e, e);
+    }
+
+    return response;
+  }
+
+  @Override
+  public QueryRecoveryResponse queryRecovery(TaskQuery query, SessionKey session) {
+    QueryRecoveryResponse response = new QueryRecoveryResponse().setResponseCode(OK);
+    try {
+      assertAdmin(session);
+      response.setTasks(recovery.query(query));
+    } catch (AuthFailedException e) {
+      response.setResponseCode(ResponseCode.AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
+      LOG.log(Level.WARNING, "Failed to query recovery: " + e, e);
+    } catch (RecoveryException e) {
+      response.setResponseCode(ERROR).setMessage(e.getMessage());
+      LOG.log(Level.WARNING, "Failed to query recovery: " + e, e);
+    }
+
+    return response;
+  }
+
+  @Override
+  public DeleteRecoveryTasksResponse deleteRecoveryTasks(TaskQuery query, SessionKey session) {
+    DeleteRecoveryTasksResponse response = new DeleteRecoveryTasksResponse().setResponseCode(OK);
+    try {
+      assertAdmin(session);
+      recovery.deleteTasks(query);
+    } catch (AuthFailedException e) {
+      response.setResponseCode(ResponseCode.AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
+    } catch (RecoveryException e) {
+      response.setResponseCode(ERROR).setMessage(e.getMessage());
+      LOG.log(Level.WARNING, "Failed to delete recovery tasks: " + e, e);
+    }
+
+    return response;
+  }
+
+  @Override
+  public CommitRecoveryResponse commitRecovery(SessionKey session) {
+    // TODO(William Farner): As it stands, this is not be enough to apply the backup in a way
+    //                       such that all state is internally-consistent.  For example, cron jobs
+    //                       will not reflect changes.  The safest route may be to
+    //                       commit, write a snapshot to the distributed log, then commit suicide.
+    CommitRecoveryResponse response = new CommitRecoveryResponse().setResponseCode(OK);
+    try {
+      assertAdmin(session);
+      recovery.commit();
+    } catch (AuthFailedException e) {
+      response.setResponseCode(ResponseCode.AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
+    } catch (RecoveryException e) {
+      response.setResponseCode(ERROR).setMessage(e.getMessage());
+    }
+
+    return response;
+  }
+
+  @Override
+  public UnloadRecoveryResponse unloadRecovery(SessionKey session) {
+    UnloadRecoveryResponse response = new UnloadRecoveryResponse().setResponseCode(OK);
+    try {
+      assertAdmin(session);
+      recovery.unload();
+    } catch (AuthFailedException e) {
+      response.setResponseCode(AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
     }
 
     return response;

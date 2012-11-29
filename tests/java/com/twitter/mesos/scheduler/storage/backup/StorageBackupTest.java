@@ -24,6 +24,7 @@ import com.twitter.mesos.gen.storage.SchedulerMetadata;
 import com.twitter.mesos.gen.storage.Snapshot;
 import com.twitter.mesos.gen.storage.StoredJob;
 import com.twitter.mesos.scheduler.storage.SnapshotStore;
+import com.twitter.mesos.scheduler.storage.backup.StorageBackup.StorageBackupImpl;
 
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
@@ -35,7 +36,7 @@ public class StorageBackupTest extends EasyMockTest {
   private SnapshotStore<Snapshot> delegate;
   private FakeClock clock;
   private File backupDir;
-  private StorageBackup storageBackup;
+  private StorageBackupImpl storageBackup;
 
   @Before
   public void setUp() {
@@ -43,7 +44,7 @@ public class StorageBackupTest extends EasyMockTest {
     clock = new FakeClock();
     backupDir = FileUtils.createTempDir();
     clock.advance(Amount.of(365 * 30L, Time.DAYS));
-    storageBackup = new StorageBackup(delegate, clock, INTERVAL, backupDir);
+    storageBackup = new StorageBackupImpl(delegate, clock, INTERVAL, backupDir);
   }
 
   @Test

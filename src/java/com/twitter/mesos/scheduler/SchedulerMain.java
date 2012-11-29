@@ -29,6 +29,8 @@ import com.twitter.common.application.modules.StatsModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.CanRead;
+import com.twitter.common.args.constraints.Exists;
+import com.twitter.common.args.constraints.IsDirectory;
 import com.twitter.common.args.constraints.NotNull;
 import com.twitter.common.inject.Bindings;
 import com.twitter.common.inject.Bindings.KeyFactory;
@@ -47,7 +49,9 @@ import com.twitter.mesos.scheduler.SchedulerLifecycle.ShutdownOnDriverExit;
 import com.twitter.mesos.scheduler.SchedulerModule.AuthMode;
 import com.twitter.mesos.scheduler.ThriftServerLauncher.ThriftConfiguration;
 import com.twitter.mesos.scheduler.log.mesos.MesosLogStreamModule;
+import com.twitter.mesos.scheduler.storage.backup.BackupModule;
 import com.twitter.mesos.scheduler.storage.log.LogStorageModule;
+import com.twitter.mesos.scheduler.storage.log.SnapshotStoreImpl;
 import com.twitter.mesos.scheduler.testing.IsolatedSchedulerModule;
 
 /**
@@ -86,6 +90,12 @@ public class SchedulerMain extends AbstractApplication {
   @CmdLine(name = "thermos_executor_path", help = "Path to the thermos executor launch script.")
   private static final Arg<String> THERMOS_EXECUTOR_PATH = Arg.create();
 
+  @NotNull
+  @Exists
+  @IsDirectory
+  @CmdLine(name = "backup_dir", help = "Directory to store backups under.")
+  private static final Arg<File> BACKUP_DIR = Arg.create();
+
   @Inject private SingletonService schedulerService;
   @Inject private LocalServiceRegistry serviceRegistry;
   @Inject private SchedulerLifecycle schedulerLifecycle;
@@ -108,6 +118,7 @@ public class SchedulerMain extends AbstractApplication {
       final String clusterName,
       AuthMode authMode,
       final Optional<InetSocketAddress> zkHost,
+      File backupDir,
       Module... additionalModules) {
 
     final Service schedulerService = createService(clusterName);
@@ -139,6 +150,7 @@ public class SchedulerMain extends AbstractApplication {
         Key.get(ServerSet.class),
         zkClientKeyFactory,
         schedulerService));
+    modules.add(new BackupModule(backupDir, SnapshotStoreImpl.class));
 
     if (!ISOLATED_SCHEDULER.get()) {
       modules.add(new AbstractModule() {
@@ -190,6 +202,7 @@ public class SchedulerMain extends AbstractApplication {
         CLUSTER_NAME.get(),
         AUTH_MODE.get(),
         Optional.<InetSocketAddress>absent(),
+        BACKUP_DIR.get(),
         configModule,
         additional);
   }

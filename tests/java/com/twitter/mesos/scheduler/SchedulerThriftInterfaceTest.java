@@ -41,6 +41,8 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.ValueConstraint;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
+import com.twitter.mesos.scheduler.storage.backup.Recovery;
+import com.twitter.mesos.scheduler.storage.backup.StorageBackup;
 
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.eq;
@@ -67,6 +69,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private SchedulerCore scheduler;
   private SessionValidator sessionValidator;
   private QuotaManager quotaManager;
+  private StorageBackup backup;
+  private Recovery recovery;
   private SchedulerThriftInterface thrift;
 
   @Before
@@ -74,8 +78,16 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     scheduler = createMock(SchedulerCore.class);
     sessionValidator = createMock(SessionValidator.class);
     quotaManager = createMock(QuotaManager.class);
-    thrift = new SchedulerThriftInterface(scheduler, sessionValidator, quotaManager,
-        Amount.of(1L, Time.MILLISECONDS), Amount.of(1L, Time.SECONDS));
+    backup = createMock(StorageBackup.class);
+    recovery = createMock(Recovery.class);
+    thrift = new SchedulerThriftInterface(
+        scheduler,
+        sessionValidator,
+        quotaManager,
+        backup,
+        recovery,
+        Amount.of(1L, Time.MILLISECONDS),
+        Amount.of(1L, Time.SECONDS));
   }
 
   @Test

@@ -1,5 +1,6 @@
 package com.twitter.mesos.scheduler;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
@@ -43,6 +44,7 @@ import com.twitter.common.application.modules.AppLauncherModule;
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.base.Command;
 import com.twitter.common.base.ExceptionalCommand;
+import com.twitter.common.io.FileUtils;
 import com.twitter.common.net.pool.DynamicHostSet.HostChangeMonitor;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -97,6 +99,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
   private Stream logStream;
   private EntrySerializer entrySerializer;
   private ZooKeeperClient zkClient;
+  private File backupDir;
   private Command shutdown;
 
   @Before
@@ -110,6 +113,12 @@ public class SchedulerIT extends BaseZooKeeperTest {
           fail(e.getMessage());
         }
         control.verify();
+      }
+    });
+    backupDir = FileUtils.createTempDir();
+    addTearDown(new TearDown() {
+      @Override public void tearDown() throws Exception {
+        org.apache.commons.io.FileUtils.deleteDirectory(backupDir);
       }
     });
 
@@ -148,6 +157,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
             CLUSTER_NAME,
             AuthMode.UNSECURE,
             Optional.of(InetSocketAddress.createUnresolved("localhost", getPort())),
+            backupDir,
             testModule,
             new LifecycleModule(),
             new AppLauncherModule()));

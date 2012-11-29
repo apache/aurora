@@ -20,7 +20,9 @@ import org.aopalliance.intercept.MethodInvocation;
 import org.apache.thrift.TException;
 
 import com.twitter.mesos.Tasks;
+import com.twitter.mesos.gen.CommitRecoveryResponse;
 import com.twitter.mesos.gen.CreateJobResponse;
+import com.twitter.mesos.gen.DeleteRecoveryTasksResponse;
 import com.twitter.mesos.gen.DrainHostsResponse;
 import com.twitter.mesos.gen.EndMaintenanceResponse;
 import com.twitter.mesos.gen.FinishUpdateResponse;
@@ -29,20 +31,25 @@ import com.twitter.mesos.gen.GetQuotaResponse;
 import com.twitter.mesos.gen.Hosts;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.KillResponse;
+import com.twitter.mesos.gen.ListBackupsResponse;
 import com.twitter.mesos.gen.MaintenanceStatusResponse;
 import com.twitter.mesos.gen.MesosAdmin;
 import com.twitter.mesos.gen.MesosAdmin.Iface;
+import com.twitter.mesos.gen.PerformBackupResponse;
 import com.twitter.mesos.gen.PopulateJobResponse;
+import com.twitter.mesos.gen.QueryRecoveryResponse;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.RollbackShardsResponse;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduleStatusResponse;
 import com.twitter.mesos.gen.SessionKey;
 import com.twitter.mesos.gen.SetQuotaResponse;
+import com.twitter.mesos.gen.StageRecoveryResponse;
 import com.twitter.mesos.gen.StartCronResponse;
 import com.twitter.mesos.gen.StartMaintenanceResponse;
 import com.twitter.mesos.gen.StartUpdateResponse;
 import com.twitter.mesos.gen.TaskQuery;
+import com.twitter.mesos.gen.UnloadRecoveryResponse;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.UpdateShardsResponse;
 
@@ -199,6 +206,54 @@ class LoggingThriftInterface implements MesosAdmin.Iface {
   public GetQuotaResponse getQuota(String ownerRole) throws TException {
     LOG.info("Request to fetch quota for " + ownerRole);
     return delegate.getQuota(ownerRole);
+  }
+
+  @Override
+  public PerformBackupResponse performBackup(SessionKey session) throws TException {
+    logUserAction(session, "perform backup immediately");
+    return delegate.performBackup(session);
+  }
+
+  @Override
+  public ListBackupsResponse listBackups(SessionKey session) throws TException {
+    logUserAction(session, "list backups");
+    return delegate.listBackups(session);
+  }
+
+  @Override
+  public StageRecoveryResponse stageRecovery(String backupId, SessionKey session)
+      throws TException {
+
+    logUserAction(session, "stage backup " + backupId);
+    return delegate.stageRecovery(backupId, session);
+  }
+
+  @Override
+  public QueryRecoveryResponse queryRecovery(TaskQuery query, SessionKey session)
+      throws TException {
+
+    logUserAction(session, "query recovery for " + query);
+    return delegate.queryRecovery(query, session);
+  }
+
+  @Override
+  public DeleteRecoveryTasksResponse deleteRecoveryTasks(TaskQuery query, SessionKey session)
+      throws TException {
+
+    logUserAction(session, "delete recovery tasks matching " + query);
+    return delegate.deleteRecoveryTasks(query, session);
+  }
+
+  @Override
+  public CommitRecoveryResponse commitRecovery(SessionKey session) throws TException {
+    logUserAction(session, "commit staged recovery");
+    return delegate.commitRecovery(session);
+  }
+
+  @Override
+  public UnloadRecoveryResponse unloadRecovery(SessionKey session) throws TException {
+    logUserAction(session, "unload staged recovery");
+    return delegate.unloadRecovery(session);
   }
 
   @Override

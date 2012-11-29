@@ -155,6 +155,16 @@ def make_spawn_options(options):
       'bindings'))
 
 
+def is_verbose():
+  return app.get_options().verbosity == 'verbose'
+
+
+def create_client(cluster=None):
+  if cluster is None:
+    cluster = app.get_options().cluster
+  return MesosClientAPI(cluster=app.get_options().cluster, verbose=is_verbose())
+
+
 @app.command
 @app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(COPY_APP_FROM_OPTION)
@@ -175,7 +185,7 @@ def create(jobname, config_file):
     print('Detected cluster=local, spawning local run.')
     return spawn_local('build', jobname, config_file, **make_spawn_options(options))
 
-  api = MesosClientAPI(cluster=config.cluster(), verbose=app.get_options().verbosity == 'verbose')
+  api = create_client(config.cluster())
   resp = api.create_job(config, app.get_options().copy_app_from)
   client_util.check_and_log_response(resp)
   handle_open(api.scheduler.scheduler(), config.role(), config.name())
@@ -306,7 +316,7 @@ def diff(job, config_file):
   options = app.get_options()
   config = maybe_retranslate(job, config_file, options.copy_app_from, options.json, False,
       options.bindings)
-  api = MesosClientAPI(cluster=config.cluster(), verbose=app.get_options().verbosity == 'verbose')
+  api = create_client(config.cluster())
   resp = query(config.role(), job, api=api, statuses=ACTIVE_STATES)
   if not resp.responseCode:
     client_util.die('Request failed, server responded with "%s"' % resp.message)
@@ -357,7 +367,7 @@ def do_open(*args):
   if not options.cluster:
     client_util.die('--cluster is required')
 
-  api = MesosClientAPI(cluster=options.cluster, verbose=options.verbosity == 'verbose')
+  api = create_client()
 
   import webbrowser
   webbrowser.open_new_tab(synthesize_url(api.scheduler.scheduler(), role, job))
@@ -392,8 +402,7 @@ def start_cron(role, jobname):
   Invokes a cron job immediately, out of its normal cron cycle.
   This does not affect the cron cycle in any way.
   """
-  api = MesosClientAPI(cluster=app.get_options().cluster,
-      verbose=app.get_options().verbosity == 'verbose')
+  api = create_client()
   resp = api.start_cronjob(role, jobname)
   client_util.check_and_log_response(resp)
   handle_open(api.scheduler.scheduler(), role, jobname)
@@ -411,9 +420,8 @@ def kill(role, jobname):
   Kills all shards if no shard-ids are specified.
 
   """
-  options = app.get_options()
-  api = MesosClientAPI(cluster=options.cluster, verbose=options.verbosity == 'verbose')
-  resp = api.kill_job(role, jobname, _getshards(options.shards))
+  api = create_client()
+  resp = api.kill_job(role, jobname, _getshards(app.get_options().shards))
   client_util.check_and_log_response(resp)
   handle_open(api.scheduler.scheduler(), role, jobname)
 
@@ -446,7 +454,9 @@ def status(role, jobname):
                                                       taskInfo.maxTaskFailures)
     taskString += '\n\tevents:'
     for event in scheduled_task.taskEvents:
-      taskString += '\n\t\t %s %s: %s' % (datetime.fromtimestamp(event.timestamp / 1000), ScheduleStatus._VALUES_TO_NAMES[event.status], event.message)
+      taskString += '\n\t\t %s %s: %s' % (datetime.fromtimestamp(event.timestamp / 1000),
+                                          ScheduleStatus._VALUES_TO_NAMES[event.status],
+                                          event.message)
     return taskString
 
   def print_tasks(tasks):
@@ -459,9 +469,7 @@ def status(role, jobname):
               task.assignedTask.slaveHost,
               taskString))
 
-  api = MesosClientAPI(cluster=app.get_options().cluster,
-      verbose=app.get_options().verbosity == 'verbose')
-  resp = api.check_status(role, jobname)
+  resp = create_client().check_status(role, jobname)
   client_util.check_and_log_response(resp)
 
   if resp.tasks:
@@ -522,7 +530,7 @@ Based on your job size (%s) you should use max_total_failures >= %s.
 See http://confluence.local.twitter.com/display/Aurora/Aurora+Configuration+Referencefor details.
 ''' % (job_size, min_failure_threshold))
 
-  api = MesosClientAPI(cluster=config.cluster(), verbose=options.verbosity == 'verbose')
+  api = create_client(config.cluster())
   resp = api.update_job(config, _getshards(options.shards), options.copy_app_from)
   client_util.check_and_log_response(resp)
 
@@ -538,9 +546,7 @@ def cancel_update(role, jobname):
   or if another user is actively updating the job.  This command should only
   be used when the user is confident that they are not conflicting with another user.
   """
-  api = MesosClientAPI(cluster=app.get_options().cluster,
-      verbose=app.get_options().verbosity == 'verbose')
-  resp = api.cancel_update(role, jobname)
+  resp = create_client().cancel_update(role, jobname)
   client_util.check_and_log_response(resp)
 
 
@@ -552,9 +558,7 @@ def get_quota(role):
 
   Prints the production quota that has been allocated to a user.
   """
-  api = MesosClientAPI(cluster=app.get_options().cluster,
-      verbose=app.get_options().verbosity == 'verbose')
-  resp = api.get_quota(role)
+  resp = create_client().get_quota(role)
   quota = resp.quota
 
   quota_fields = [
@@ -582,9 +586,7 @@ def set_quota(role, cpu_str, ram_mb_str, disk_mb_str):
   except ValueError:
     log.error('Invalid value')
 
-  api = MesosClientAPI(cluster=app.get_options().cluster,
-      verbose=app.get_options().verbosity == 'verbose')
-  resp = api.set_quota(role, cpu, ram_mb, disk_mb)
+  resp = create_client().set_quota(role, cpu, ram_mb, disk_mb)
   client_util.check_and_log_response(resp)
 
 
@@ -605,10 +607,107 @@ def force_task_state(task_id, state):
               % (state, ', '.join(ScheduleStatus._NAMES_TO_VALUES.keys())))
     sys.exit(1)
 
-  api = MesosClientAPI(cluster=app.get_options().cluster,
-      verbose=app.get_options().verbosity == 'verbose')
-  resp = api.force_task_state(task_id, status)
+  resp = create_client().force_task_state(task_id, status)
   client_util.check_and_log_response(resp)
+
+
+@app.command
+@app.command_option(CLUSTER_OPTION)
+@requires.nothing
+def scheduler_backup_now():
+  """usage: scheduler_backup_now --cluster=CLUSTER
+
+  Admin-only command.
+  Immediately initiates a full storage backup.
+  """
+  client_util.check_and_log_response(create_client().perform_backup())
+
+
+@app.command
+@app.command_option(CLUSTER_OPTION)
+@requires.nothing
+def scheduler_list_backups():
+  """usage: scheduler_list_backups --cluster=CLUSTER
+
+  Admin-only command.
+  Lists backups available for recovery.
+  """
+  resp = create_client().list_backups()
+  client_util.check_and_log_response(resp)
+  log.info('%s available backups:' % len(resp.backups))
+  for backup in resp.backups:
+    log.info(backup)
+
+
+@app.command
+@app.command_option(CLUSTER_OPTION)
+@requires.exactly('backup_id')
+def scheduler_stage_recovery(backup_id):
+  """usage: scheduler_stage_recovery --cluster=CLUSTER backup_id
+
+  Admin-only command.
+  Stages a backup for recovery.
+  """
+  client_util.check_and_log_response(create_client().stage_recovery(backup_id))
+
+
+@app.command
+@app.command_option(CLUSTER_OPTION)
+@requires.nothing
+def scheduler_print_recovery_tasks():
+  """usage: scheduler_print_recovery_tasks --cluster=CLUSTER
+
+  Admin-only command.
+  Prints all active tasks in a staged recovery.
+  """
+  resp = create_client().query_recovery(TaskQuery(statuses=ACTIVE_STATES))
+  client_util.check_and_log_response(resp)
+  log.info('Role\tJob\tShard\tStatus\tTask ID')
+  for task in resp.tasks:
+    assigned = task.assignedTask
+    conf = assigned.task
+    log.info('\t'.join((conf.owner.role,
+                        conf.jobName,
+                        str(conf.shardId),
+                        ScheduleStatus._VALUES_TO_NAMES[task.status],
+                        assigned.taskId)))
+
+
+@app.command
+@app.command_option(CLUSTER_OPTION)
+@requires.exactly('task_ids')
+def scheduler_delete_recovery_tasks(task_ids):
+  """usage: scheduler_delete_recovery_tasks --cluster=CLUSTER task_ids
+
+  Admin-only command.
+  Deletes a comma-separated list of task IDs from a staged recovery.
+  """
+  ids = set(task_ids.split(','))
+  client_util.check_and_log_response(create_client().delete_recovery_tasks(TaskQuery(taskIds=ids)))
+
+
+@app.command
+@app.command_option(CLUSTER_OPTION)
+@requires.nothing
+def scheduler_commit_recovery():
+  """usage: scheduler_commit_recovery --cluster=CLUSTER
+
+  Admin-only command.
+  Commits a staged recovery.
+  """
+  client_util.check_and_log_response(create_client().commit_recovery())
+
+
+@app.command
+@app.command_option(CLUSTER_OPTION)
+@requires.nothing
+def scheduler_unload_recovery():
+  """usage: scheduler_unload_recovery --cluster=CLUSTER
+
+  Admin-only command.
+  Unloads a staged recovery.
+  """
+  client_util.check_and_log_response(create_client().unload_recovery())
 
 
 def query(role, job, shards=None, statuses=LIVE_STATES, api=None):
@@ -617,8 +716,7 @@ def query(role, job, shards=None, statuses=LIVE_STATES, api=None):
   query.owner = Identity(role=role)
   query.jobName = job
   query.shardIds = shards
-  api = api or MesosClientAPI(cluster=app.get_options().cluster,
-      verbose=app.get_options().verbosity == 'verbose')
+  api = api or create_client()
   return api.query(query)
 
 
