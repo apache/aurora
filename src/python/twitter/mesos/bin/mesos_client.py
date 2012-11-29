@@ -162,7 +162,7 @@ def is_verbose():
 def create_client(cluster=None):
   if cluster is None:
     cluster = app.get_options().cluster
-  return MesosClientAPI(cluster=app.get_options().cluster, verbose=is_verbose())
+  return MesosClientAPI(cluster=cluster, verbose=is_verbose())
 
 
 @app.command
