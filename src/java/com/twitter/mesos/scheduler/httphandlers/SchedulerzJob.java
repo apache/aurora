@@ -222,6 +222,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
       new Function<TwitterTaskInfo, SchedulingDetails>() {
         @Override public SchedulingDetails apply(TwitterTaskInfo task) {
           ImmutableMap.Builder<String, Object> details = ImmutableMap.<String, Object>builder()
+              .put("contact", task.isSetContactEmail() ? task.getContactEmail() : "none")
               .put("CPU", task.getNumCpus())
               .put("RAM" , scaleMb(task.getRamMb()))
               .put("disk", scaleMb(task.getDiskMb()));

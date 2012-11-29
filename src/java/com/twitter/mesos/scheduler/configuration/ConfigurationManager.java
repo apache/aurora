@@ -58,10 +58,13 @@ public final class ConfigurationManager {
   @CmdLine(name = "max_tasks_per_job", help = "Maximum number of allowed tasks in a single job.")
   public static final Arg<Integer> MAX_TASKS_PER_JOB = Arg.create(500);
 
-  @Positive
   @CmdLine(name = "constrain_legacy_executor",
       help = "If true, only allow the legacy executor to run on specially-tagged machines.")
   public static final Arg<Boolean> CONSTRAIN_LEGACY_EXECUTOR = Arg.create(true);
+
+  @CmdLine(name = "require_contact_email",
+      help = "If true, reject jobs that do not specify a contact email address.")
+  public static final Arg<Boolean> REQUIRE_CONTACT_EMAIL = Arg.create(true);
 
   private static final Logger LOG = Logger.getLogger(ConfigurationManager.class.getName());
 
@@ -324,6 +327,13 @@ public final class ConfigurationManager {
       populateFields(copy, config);
       if (!shardIds.add(config.getShardId())) {
         throw new TaskDescriptionException("Duplicate shard ID " + config.getShardId());
+      }
+
+      if (REQUIRE_CONTACT_EMAIL.get()
+          && (!config.isSetContactEmail()
+              || !config.getContactEmail().matches("[^@]+@twitter.com"))) {
+        throw new TaskDescriptionException(
+            "A valid twitter.com contact email address is required.");
       }
 
       Constraint constraint = getDedicatedConstraint(config);

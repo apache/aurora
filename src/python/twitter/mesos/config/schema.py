@@ -119,6 +119,7 @@ class MesosJob(Struct):
   priority                   = Default(Integer, 0)
   health_check_interval_secs = Default(Integer, 30)
   task_links                 = Map(String, String)
+  contact                    = String
 
 
 Job = MesosJob

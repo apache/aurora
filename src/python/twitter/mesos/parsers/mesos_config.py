@@ -163,7 +163,7 @@ class MesosConfig(ProxyConfig):
     for job in config['jobs']:
       errors = []
       if 'name' not in job:
-        errors.append('Missing required option: name')
+        errors.append('Missing required field: name')
       elif job['name'] in jobs:
         errors.append('Duplicate job definition')
       if 'owner' in job:
@@ -178,7 +178,7 @@ class MesosConfig(ProxyConfig):
           errors.append('Must specify role.')
 
       if 'cluster' not in job:
-        errors.append('Missing required option: cluster')
+        errors.append('Missing required field: cluster')
 
       if 'package' in job:
         if not isinstance(job['package'], (list, tuple)) or len(job['package']) != 3:
@@ -192,12 +192,17 @@ class MesosConfig(ProxyConfig):
         errors.append('Job package and package_files directives may not be both specified.')
 
       if 'task' not in job:
-        errors.append('Missing required option: task')
+        errors.append('Missing required field: task')
       else:
         job['task'] = MesosConfig.fill_task_defaults(job['task'], errors)
         MesosConfig.validate_task_resources(job['task'], errors)
         if 'testing_package_files' in job:
           MesosConfig._edit_start_command_for_package_files(job)
+
+      if 'contact' not in job:
+        print('--------------------------------------------------------------------')
+        print('WARNING: A contact email address will soon be required for all jobs.')
+        print('--------------------------------------------------------------------')
 
       if errors:
         raise MesosConfig.InvalidConfig('Invalid configuration: %s\n' % '\n'.join(errors))

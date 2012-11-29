@@ -81,6 +81,7 @@ def convert(job):
   task.priority = job.priority().get()
   if job.has_health_check_interval_secs():
     task.healthCheckIntervalSecs = job.health_check_interval_secs().get()
+  task.contactEmail = job.contact().get()
 
   # task components
   if not task_raw.has_resources():

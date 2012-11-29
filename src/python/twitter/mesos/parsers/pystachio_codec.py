@@ -69,6 +69,12 @@ class PystachioCodec(MesosConfig):
   def build(self):
     """Returns a configuration in the MesosJob pystachio schema."""
     cfg = self._config
+    if 'contact' not in cfg:
+      print('---------------------------------------------------------------------')
+      print('WARNING: A contact email address will soon be required for all jobs.')
+      print('This is specified with the contact field in your Job() specification.')
+      print('---------------------------------------------------------------------')
+
     job_dict = dict(
       name = self.name(),
       role = cfg['role'],
@@ -83,7 +89,9 @@ class PystachioCodec(MesosConfig):
       max_task_failures = cfg['task']['max_task_failures'],
       production = cfg['task']['production'],
       priority = cfg['task']['priority'],
-      task_links = cfg.get('task_links', {}),)
+      task_links = cfg.get('task_links', {}),
+      contact = cfg.get('contact', ''),
+    )
     if cfg['task'].get('health_check_interval_secs'):
       job_dict['health_check_interval_secs'] = cfg['task']['health_check_interval_secs']
     return MesosJob(job_dict)

@@ -430,25 +430,29 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    TwitterTaskInfo task = new TwitterTaskInfo().setConfiguration(
-        ImmutableMap.<String, String>builder()
-            .put("start_command", "date")
-            .put("num_cpus", "1.0")
-            .put("ram_mb", "1024")
-            .put("disk_mb", "1024")
-            .build());
+    TwitterTaskInfo task = new TwitterTaskInfo()
+        .setContactEmail("testing@twitter.com")
+        .setConfiguration(
+            ImmutableMap.<String, String>builder()
+                .put("start_command", "date")
+                .put("num_cpus", "1.0")
+                .put("ram_mb", "1024")
+                .put("disk_mb", "1024")
+                .build());
 
     scheduler.createJob(makeJob(OWNER_A, JOB_A, task, 1));
     assertTaskCount(1);
 
-    TwitterTaskInfo task2 = new TwitterTaskInfo().setConfiguration(
-        ImmutableMap.<String, String>builder()
-            .put("start_command", "date")
-            .put("hdfs_path", "")
-            .put("num_cpus", "1.0")
-            .put("ram_mb", "1024")
-            .put("disk_mb", "1024")
-            .build());
+    TwitterTaskInfo task2 = new TwitterTaskInfo()
+        .setContactEmail("testing@twitter.com")
+        .setConfiguration(
+            ImmutableMap.<String, String>builder()
+              .put("start_command", "date")
+              .put("hdfs_path", "")
+              .put("num_cpus", "1.0")
+              .put("ram_mb", "1024")
+              .put("disk_mb", "1024")
+              .build());
     scheduler.createJob(makeJob(OWNER_A, JOB_B, task2, 1));
     assertTaskCount(2);
   }
@@ -491,6 +495,30 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     } catch (TaskDescriptionException e) {
       // Expected.
     }
+  }
+
+  private void expectRejected(ParsedConfiguration job) throws Exception {
+    try {
+      scheduler.createJob(job);
+      fail("Job should have been rejected.");
+    } catch (TaskDescriptionException e) {
+      // Expected.
+    }
+  }
+
+  @Test(expected = TaskDescriptionException.class)
+  public void testRequiresContactEmail() throws Exception {
+    control.replay();
+    buildScheduler();
+
+    TwitterTaskInfo task = defaultTask(false);
+    task.unsetContactEmail();
+
+    expectRejected(makeJob(OWNER_A, JOB_A, task, 1));
+    task.setContactEmail("invalid");
+    expectRejected(makeJob(OWNER_A, JOB_A, task, 1));
+    task.setContactEmail("steve@aol.com");
+    expectRejected(makeJob(OWNER_A, JOB_A, task, 1));
   }
 
   @Test
@@ -1939,6 +1967,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     // Avoid hitting per-host scheduling constraints.
     task.addToConstraints(hostLimitConstraint(100));
+    task.setContactEmail("testing@twitter.com");
     return task;
   }
 

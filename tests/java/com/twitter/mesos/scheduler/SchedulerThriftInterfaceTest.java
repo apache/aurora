@@ -365,6 +365,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testCreateJobPopulateDefaults() throws Exception {
     TwitterTaskInfo task = new TwitterTaskInfo()
+        .setContactEmail("testing@twitter.com")
         .setThermosConfig(new byte[] {1, 2, 3})  // Arbitrary opaque data.
         .setNumCpus(1.0)
         .setRamMb(1024)
@@ -411,6 +412,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     TwitterTaskInfo task = new TwitterTaskInfo()
         .setOwner(ROLE_IDENTITY)
         .setJobName(JOB_NAME)
+        .setContactEmail("testing@twitter.com")
         .setConfiguration(ImmutableMap.<String, String>builder()
             .put("start_command", "echo")
             .put("num_cpus", "1.0")
@@ -618,7 +620,9 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
       params.put(additionalParams[i], additionalParams[i + 1]);
     }
 
-    return new TwitterTaskInfo().setConfiguration(params);
+    return new TwitterTaskInfo()
+        .setContactEmail("testing@twitter.com")
+        .setConfiguration(params);
   }
 
   private static TwitterTaskInfo productionTask(String... additionalParams) {
