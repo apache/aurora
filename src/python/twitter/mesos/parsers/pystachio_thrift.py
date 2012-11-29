@@ -73,6 +73,9 @@ def convert(job):
   MB = 1024 * 1024
   task = TwitterTaskInfo()
 
+  def not_empty_or(item, default):
+    return default if item is Empty else item.get()
+
   # job components
   task.jobName = job.name().get()
   task.production = bool(job.production().get())
@@ -81,7 +84,7 @@ def convert(job):
   task.priority = job.priority().get()
   if job.has_health_check_interval_secs():
     task.healthCheckIntervalSecs = job.health_check_interval_secs().get()
-  task.contactEmail = job.contact().get()
+  task.contactEmail = not_empty_or(job.contact(), None)
 
   # task components
   if not task_raw.has_resources():
@@ -100,10 +103,6 @@ def convert(job):
 
   task.owner = owner
   task.requestedPorts = ThermosTaskWrapper(task_raw, strict=False).ports()
-
-  def not_empty_or(item, default):
-    return default if item is Empty else item.get()
-
   task.taskLinks = not_empty_or(job.task_links(), {})
   task.constraints = ThriftCodec.constraints_to_thrift(not_empty_or(job.constraints(), {}))
 
