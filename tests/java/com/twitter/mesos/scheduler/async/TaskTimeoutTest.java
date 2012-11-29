@@ -95,7 +95,7 @@ public class TaskTimeoutTest extends EasyMockTest {
   }
 
   private void changeState(String taskId, ScheduleStatus from, ScheduleStatus to) {
-    timeout.recordStateChange(new TaskStateChange(taskId, from, to));
+    timeout.recordStateChange(new TaskStateChange(taskId, from, new ScheduledTask().setStatus(to)));
   }
 
   private void changeState(ScheduleStatus from, ScheduleStatus to) {

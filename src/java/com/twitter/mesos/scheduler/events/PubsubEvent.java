@@ -7,6 +7,7 @@ import java.util.Set;
 import com.google.common.base.Objects;
 
 import com.twitter.mesos.gen.ScheduleStatus;
+import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
 
 import static java.lang.annotation.ElementType.METHOD;
@@ -61,12 +62,12 @@ public interface PubsubEvent {
   public static class TaskStateChange implements PubsubEvent {
     private final String taskId;
     private final ScheduleStatus oldState;
-    private final ScheduleStatus newState;
+    private final ScheduledTask task;
 
-    public TaskStateChange(String taskId, ScheduleStatus oldState, ScheduleStatus newState) {
+    public TaskStateChange(String taskId, ScheduleStatus oldState, ScheduledTask task) {
       this.taskId = checkNotNull(taskId);
       this.oldState = checkNotNull(oldState);
-      this.newState = checkNotNull(newState);
+      this.task = checkNotNull(task);
     }
 
     public String getTaskId() {
@@ -77,8 +78,12 @@ public interface PubsubEvent {
       return oldState;
     }
 
+    public ScheduledTask getTask() {
+      return task;
+    }
+
     public ScheduleStatus getNewState() {
-      return newState;
+      return task.getStatus();
     }
 
     @Override
@@ -90,12 +95,12 @@ public interface PubsubEvent {
       TaskStateChange other = (TaskStateChange) o;
       return Objects.equal(taskId, other.taskId)
           && Objects.equal(oldState, other.oldState)
-          && Objects.equal(newState, other.newState);
+          && Objects.equal(task, other.task);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(taskId, oldState, newState);
+      return Objects.hashCode(taskId, oldState, task);
     }
   }
 

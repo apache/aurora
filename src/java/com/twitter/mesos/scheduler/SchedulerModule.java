@@ -196,6 +196,8 @@ public class SchedulerModule extends AbstractModule {
       }
     });
     TaskEventModule.bindSubscriber(binder(), ScheduleBackoff.class);
+    bind(LostTaskStats.class).in(Singleton.class);
+    TaskEventModule.bindSubscriber(binder(), LostTaskStats.class);
 
     // Filter layering: notifier filter -> backoff filter -> base impl
     TaskEventModule.bind(binder(), BackoffSchedulingFilter.class);

@@ -11,6 +11,7 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.testing.FakeTicker;
 import com.twitter.mesos.gen.ScheduleStatus;
+import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
 import com.twitter.mesos.scheduler.events.PubsubEvent.TaskStateChange;
 import com.twitter.mesos.scheduler.events.PubsubEvent.TasksDeleted;
@@ -82,8 +83,10 @@ public class NearestFitTest {
   public void testStateChanged() {
     vetoed(ALMOST);
     assertNearest(ALMOST);
-    nearest.stateChanged(
-        new TaskStateChange(TASK, ScheduleStatus.PENDING, ScheduleStatus.ASSIGNED));
+    nearest.stateChanged(new TaskStateChange(
+        TASK,
+        ScheduleStatus.PENDING,
+        new ScheduledTask().setStatus(ScheduleStatus.ASSIGNED)));
     assertNearest();
   }
 

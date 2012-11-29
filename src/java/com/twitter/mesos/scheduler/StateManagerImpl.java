@@ -1,10 +1,12 @@
 package com.twitter.mesos.scheduler;
 
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
@@ -26,7 +28,6 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
@@ -163,7 +164,18 @@ public class StateManagerImpl implements StateManager {
       .build();
 
   // Work queue to receive state machine side effect work.
-  private final Queue<WorkEntry> workQueue = Lists.newLinkedList();
+  // Items are sorted to place DELETE entries last.  This is to ensure that within a transaction,
+  // a delete is always processed after a state transition.
+  private final Queue<WorkEntry> workQueue = new PriorityQueue<WorkEntry>(10,
+      new Comparator<WorkEntry>() {
+        @Override public int compare(WorkEntry a, WorkEntry b) {
+          if ((a.command == WorkCommand.DELETE) != (b.command == WorkCommand.DELETE)) {
+            return (a.command == WorkCommand.DELETE) ? 1 : -1;
+          } else {
+            return 0;
+          }
+        }
+      });
 
   // Adapt the work queue into a sink.
   private final TaskStateMachine.WorkSink workSink = new TaskStateMachine.WorkSink() {
@@ -1064,16 +1076,17 @@ public class StateManagerImpl implements StateManager {
             sideEffectWork.addSideEffect(new SideEffect() {
               @Override
               public void mutate(MutableState state) {
-                state.getVars()
-                    .adjustCount(stateMachine.getJobKey(), stateMachine.getPreviousState(),
-                        stateMachine.getState());
+                state.getVars().adjustCount(
+                    stateMachine.getJobKey(),
+                    stateMachine.getPreviousState(),
+                    stateMachine.getState());
               }
             });
             sideEffectWork.addTaskEvent(
                 new PubsubEvent.TaskStateChange(
                     stateMachine.getTaskId(),
                     stateMachine.getPreviousState(),
-                    stateMachine.getState()));
+                    Iterables.getOnlyElement(taskStore.fetchTasks(idQuery))));
             break;
 
           case DELETE:
