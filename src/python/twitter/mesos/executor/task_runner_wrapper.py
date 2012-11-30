@@ -95,6 +95,7 @@ class TaskRunnerWrapper(object):
       raise self.TaskError('Could not construct sandbox: %s' % e)
 
     params = dict(log_dir=LogOptions.log_dir(),
+                  log_to_disk="DEBUG",
                   checkpoint_root=self._checkpoint_root,
                   sandbox=self._sandbox.root(),
                   task_id=self._task_id,
@@ -109,8 +110,6 @@ class TaskRunnerWrapper(object):
       cmdline_args.extend(['--enable_chroot'])
     for name, port in self._ports.items():
       cmdline_args.extend(['--port=%s:%s' % (name, port)])
-    if 'THERMOS_DEBUG' in os.environ:
-      cmdline_args.extend(['--log_to_disk=DEBUG'])
     log.info('Forking off runner with cmdline: %s' % ' '.join(cmdline_args))
     self._popen = subprocess.Popen(cmdline_args)
 

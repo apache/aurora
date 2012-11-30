@@ -12,7 +12,7 @@ app.add_option("--thermos_json", dest = "thermos_json", default=None,
 app.add_option("--sandbox", dest = "sandbox", metavar = "PATH", default=None,
                help = "the sandbox in which this task should run")
 app.add_option("--checkpoint_root", dest = "checkpoint_root", metavar = "PATH", default=None,
-               help = "the path where we will store task logs and checkpoints")
+               help = "the path where we will store checkpoints")
 app.add_option("--task_id", dest = "task_id", metavar = "STRING", default = None,
                help = "The id to which this task should be bound, created if it does not exist.")
 app.add_option("--setuid", dest = "setuid", metavar = "USER", default = None,
