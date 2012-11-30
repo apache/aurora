@@ -40,6 +40,7 @@ class StatusManager(threading.Thread):
 
   def run(self):
     for checker in self._health_checkers:
+      log.debug("Starting checker: %s" % checker)
       checker.start()
 
     def notify_unhealthy():
@@ -152,6 +153,10 @@ class StatusManager(threading.Thread):
     task_state = mesos_pb._TASKSTATE.values_by_number.get(update.state)
     log.info('Sending terminal state update: %s' % (task_state.name if task_state else 'UNKNOWN'))
     self._driver.sendStatusUpdate(update)
+
+    for checker in self._health_checkers:
+      log.debug('Terminating %s' % checker)
+      checker.stop()
 
     # the executor is ephemeral and we just submitted a terminal task state, so shutdown
     log.info('Stopping executor.')

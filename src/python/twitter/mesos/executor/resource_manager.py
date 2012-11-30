@@ -1,16 +1,12 @@
 import os
 import threading
 import time
-from operator import attrgetter
 
 import psutil as ps
-from thrift.TSerialization import serialize as thrift_serialize
 
 from twitter.common import log
-from twitter.common.dirutil import du
 from twitter.common.quantity import Amount, Time
-from twitter.common.recordio import ThriftRecordWriter
-from twitter.thermos.monitoring.measure import ProcessSample
+from twitter.thermos.monitoring.resource import TaskResourceMonitor
 
 from gen.twitter.mesos.comm.ttypes import TaskResourceSample
 
@@ -18,108 +14,10 @@ from .health_interface import (
     FailureReason,
     HealthInterface)
 
-
-class DiskCollectorThread(threading.Thread):
-  """ Thread to calculate aggregate disk usage under a given path """
-  def __init__(self, path):
-    self.path = path
-    self.value = None
-    self.event = threading.Event()
-    threading.Thread.__init__(self)
-    self.daemon = True
-
-  def run(self):
-    self.value = du(self.path)
-    self.event.set()
-
-  def finished(self):
-    return self.event.is_set()
-
-
-class DiskCollection(object):
-  """ Spawn a background thread to sample disk usage """
-  def __init__(self, root):
-    self._root = root
-    self._thread = None
-    self._value = 0
-
-  def sample(self):
-    if self._thread is None:
-      self._thread = DiskCollectorThread(self._root)
-      self._thread.start()
-
-  @property
-  def value(self):
-    if self._thread is not None and self._thread.finished():
-      self._value = self._thread.value
-      self._thread = None
-    return self._value
-
-
-class ProcessCollection(object):
-  """ Collect resource consumption statistics for a process and its children """
-  def __init__(self, pid):
-    self._pid = pid
-    self._process = None
-    self._sampled_tree = {} # pid => ProcessSample
-    self._sample = None
-    self._stamp = None
-    self._rate = 0.0
-    self._procs = 1
-
-
-  def sample(self):
-    """ Collate and aggregate ProcessSamples for process and children """
-    try:
-      last_sample, last_stamp = self._sample, self._stamp
-      if self._process is None:
-        self._process = ps.Process(self._pid)
-      parent = self._process
-      parent_sample = ProcessSample.process_to_sample(parent)
-      new_samples = dict(
-          (proc.pid, ProcessSample.process_to_sample(proc))
-          for proc in parent.get_children(recursive=True)
-      )
-      new_samples[self._pid] = parent_sample
-
-    except ps.error.Error as e:
-      log.warning('Error during process sampling: %s' % e)
-      self._sample = ProcessSample.empty()
-      self._rate = 0.0
-
-    else:
-      last_stamp = self._stamp
-      self._stamp = time.time()
-      # for most stats, calculate simple sum to aggregate
-      self._sample = sum(new_samples.itervalues(), ProcessSample.empty())
-      # cpu consumption is more complicated
-      # We require at least 2 generations of a process before we can calculate rate, so for all
-      # current processes that were not running in the previous sample, compare to an empty sample
-      if self._sampled_tree and last_stamp:
-        procs = set(new_samples) - set(self._sampled_tree)
-        new = [new_samples[pid] for pid in procs]
-        old = [self._sampled_tree.get(pid, ProcessSample.empty()) for pid in procs]
-        new_user_sys = sum(map(attrgetter('user'), new)) + sum(map(attrgetter('system'), new))
-        old_user_sys = sum(map(attrgetter('user'), old)) + sum(map(attrgetter('system'), old))
-        self._rate = (new_user_sys - old_user_sys) / (self._stamp - last_stamp)
-      self._sampled_tree = new_samples
-
-  @property
-  def value(self):
-    return self._sample
-
-  @property
-  def rate(self):
-    return self._rate
-
-  @property
-  def procs(self):
-    return len(self._sampled_tree)
-
-
 class ResourceEnforcer(object):
   """ Examine a task's resource consumption and determine whether it needs to be killed or
   adjusted """
+  # TODO(jon): rework to not directly require psutil to inspect/adjust processes.
   NICE_INCREMENT = 5            # Increment nice by this amount
   NICE_BACKOFF   = 1            # Decrement nice by this amount
   NICE_BACKOFF_THRESHOLD = 0.8  # Decrement nice once cpu drops below this percentage of max
@@ -128,48 +26,65 @@ class ResourceEnforcer(object):
   PRIO_NORMAL    = 0
   PRIO_MAX       = 20
 
+  # On Linux, the maximum niceness for a process is actually 19 (even though PRIO_MAX is
+  # defined as 20 at the kernel level).
+  if os.uname()[0] == 'Linux':
+    PRIO_MAX = 19
+
   ENFORCE_PORT_RANGE = (31000, 32000)
 
-  def __init__(self, pid, portmap={}):
-    self._pid = pid
+  def __init__(self, resources, task_monitor, portmap={}):
+    """
+      resources: Resources object specifying cpu, ram, disk limits for the task
+      task_monitor: TaskMonitor exposing attributes about the task
+    """
+    self._max_cpu = resources.cpu().get()
+    self._max_ram = resources.ram().get()
+    self._max_disk = resources.disk().get()
+    self._task_monitor = task_monitor
     self._portmap = dict((number, name) for (name, number) in portmap.items())
     self._nice = None
 
-  def parent(self):
-    return ps.Process(self._pid)
-
   @property
   def nice(self):
+    """ Reflects the niceness of the processes in the task """
     return self._nice or self.PRIO_NORMAL
 
+  def parents(self):
+    """ List the current constituent Processes of the task (which may have child processes) """
+    for process in self._task_monitor.get_active_processes():
+      try:
+        yield ps.Process(process[0].pid)
+      except ps.error.Error as e:
+        log.error('Error when collecting process %d: %s' % (process[0].pid, e))
+
   def walk(self):
-    try:
-      parent = self.parent()
-      for child in parent.get_children(recursive=True):
-        yield child
+    """ Generator yielding every Process in the task, including all of their children """
+    for parent in self.parents():
       yield parent
-    except ps.error.Error as e:
-      log.debug('Error when collecting process information: %s' % e)
+      try:
+        for child in parent.get_children(recursive=True):
+          yield child
+      except ps.error.Error as e:
+        log.debug('Error when collecting process information: %s' % e)
 
   # TODO(wickman): Setting a uniform nice level might not be the intended
-  # solution if the parent is already renicing subprocesses.  Should we just
+  # solution if the parents are already renicing subprocesses.  Should we just
   # add niceness rather than setting it?
-  def _enforce_cpu(self, record):
+  def _enforce_cpu(self, sample):
     nice_level = None
-    try:
-      parent = self.parent()
-    except ps.error.Error as e:
-      log.debug('Unable to collect information about the parent: %s' % e)
-      return
-    if record.cpuRate > record.reservedCpuRate and parent.nice < self.PRIO_MAX:
-      nice_level = min(self.PRIO_MAX, parent.nice + self.NICE_INCREMENT)
-    elif record.cpuRate < record.reservedCpuRate * self.NICE_BACKOFF_THRESHOLD and (
-        parent.nice != self.PRIO_NORMAL):
-      nice_level = max(self.PRIO_NORMAL, parent.nice - self.NICE_BACKOFF)
-    if nice_level is not None:
-      log.debug('Adjusting nice level from %s=>%s' % (
-        self._nice if self._nice is not None else parent.nice, nice_level))
-      self._nice = nice_level
+    for parent in self.parents():
+      log.debug('Checking CPU rate for %s' % parent.pid)
+      if sample.cpuRate > self._max_cpu and parent.nice < self.PRIO_MAX:
+        log.debug('CPU rate too high - adjusting nice level')
+        nice_level = min(self.PRIO_MAX, parent.nice + self.NICE_INCREMENT)
+      elif sample.cpuRate < self._max_cpu * self.NICE_BACKOFF_THRESHOLD and (
+          parent.nice != self.PRIO_NORMAL):
+        nice_level = max(self.PRIO_NORMAL, parent.nice - self.NICE_BACKOFF)
+      if nice_level is not None:
+        log.debug('Adjusting nice level from %s=>%s' % (
+          self._nice if self._nice is not None else parent.nice, nice_level))
+        self._nice = nice_level
     if self._nice is not None:
       for process in self.walk():
         try:
@@ -178,16 +93,16 @@ class ResourceEnforcer(object):
         except ps.error.Error as e:
           log.error('Unable to adjust nice of %s: %s' % (process, e))
 
-  def _enforce_ram(self, record):
-    if record.ramRssBytes > record.reservedRamBytes:
+  def _enforce_ram(self, sample):
+    if sample.ramRssBytes > self._max_ram:
       # TODO(wickman) Add human-readable resource ranging support to twitter.common.
       return FailureReason('RAM limit exceeded.  Reserved %s bytes vs resident %s bytes' % (
-          record.reservedRamBytes, record.ramRssBytes))
+          self._max_ram, sample.ramRssBytes))
 
-  def _enforce_disk(self, record):
-    if record.diskBytes > record.reservedDiskBytes:
+  def _enforce_disk(self, sample):
+    if sample.diskBytes > self._max_disk:
       return FailureReason('Disk limit exceeded.  Reserved %s bytes vs used %s bytes.' % (
-          record.reservedDiskBytes, record.diskBytes))
+          self._max_disk, sample.diskBytes))
 
   @staticmethod
   def render_portmap(portmap):
@@ -210,7 +125,7 @@ class ResourceEnforcer(object):
           return FailureReason('Listening on unallocated port %s.  Portmap is %s' % (
               port, self.render_portmap(self._portmap)))
 
-  def enforce(self, record):
+  def enforce(self, sample):
     """
       Enforce resource constraints.
 
@@ -222,28 +137,27 @@ class ResourceEnforcer(object):
     # TODO(wickman) Due to MESOS-1585, port enforcement has been unwired.  If you would like to
     # add it back, simply add self._enforce_ports into the list of enforcers.
     for enforcer in (self._enforce_ram, self._enforce_disk, self._enforce_cpu):
-      kill_reason = enforcer(record)
+      log.debug("Running enforcer: %s" % enforcer)
+      kill_reason = enforcer(sample)
       if kill_reason:
         return kill_reason
 
 
 class ResourceManager(HealthInterface, threading.Thread):
-  """ Manage resources consumed by a process and its children """
+  """ Manage resources consumed by a Task """
 
   PROCESS_COLLECTION_INTERVAL = Amount(20, Time.SECONDS)
   DISK_COLLECTION_INTERVAL = Amount(1, Time.MINUTES)
   ENFORCEMENT_INTERVAL = Amount(30, Time.SECONDS)
 
-  def __init__(self, resources, portmap, pid, sandbox):
+  def __init__(self, resources, task_monitor, sandbox):
     """
-      resources: Resources object (cpu, ram, disk limits)
-      portmap: dict { string => integer }
-      pid: pid of the root in which to measure (presumably task runner)
+      resources: Resources object specifying cpu, ram, disk limits for the task
+      task_monitor: TaskMonitor exposing attributes about the task
       sandbox: the directory that we should monitor for disk usage
     """
-    self._ps = ProcessCollection(pid)
-    self._du = DiskCollection(sandbox)
-    self._enforcer = ResourceEnforcer(pid, portmap)
+    self._resource_monitor = TaskResourceMonitor(task_monitor, sandbox)
+    self._enforcer = ResourceEnforcer(resources, task_monitor)
     self._max_cpu = resources.cpu().get()
     self._max_ram = resources.ram().get()
     self._max_disk = resources.disk().get()
@@ -253,24 +167,43 @@ class ResourceManager(HealthInterface, threading.Thread):
     threading.Thread.__init__(self)
     self.daemon = True
 
+  # TODO(jon): clean this shit up
+  @property
+  def _num_procs(self):
+    """ Total number of processes the task consists of (including child processes) """
+    return self._resource_monitor.sample()[1].num_procs
+
+  @property
+  def _ps_sample(self):
+    """ ProcessSample representing the aggregate resource consumption of the Task's processes """
+    return self._resource_monitor.sample()[1].process_sample
+
+  @property
+  def _disk_sample(self):
+    """ Integer in bytes representing the disk consumption in the Task's sandbox """
+    return self._resource_monitor.sample()[1].disk_usage
+
   @property
   def sample(self):
+    """ Return a TaskResourceSample representing the total resource consumption of the Task """
+    # TODO(jon): switch this to using ResourceResult (or similar) instead, push TaskResourceSample
+    # into the checkpointer only
     now = time.time()
-    ps_sample = self._ps.value
     return TaskResourceSample(
         microTimestamp=int(now * 1e6),
         reservedCpuRate=self._max_cpu,
         reservedRamBytes=self._max_ram,
         reservedDiskBytes=self._max_disk,
-        cpuRate=self._ps.rate,
-        cpuUserSecs=ps_sample.user,
-        cpuSystemSecs=ps_sample.system,
+        cpuRate=self._ps_sample.rate,
+        cpuUserSecs=self._ps_sample.user,
+        cpuSystemSecs=self._ps_sample.system,
         cpuNice=self._enforcer.nice,
-        ramRssBytes=ps_sample.rss,
-        ramVssBytes=ps_sample.vms,
-        numThreads=ps_sample.threads,
-        numProcesses=self._ps.procs,
-        diskBytes=self._du.value)
+        ramRssBytes=self._ps_sample.rss,
+        ramVssBytes=self._ps_sample.vms,
+        numThreads=self._ps_sample.threads,
+        numProcesses=self._num_procs,
+        diskBytes=self._disk_sample
+    )
 
   @property
   def healthy(self):
@@ -281,32 +214,25 @@ class ResourceManager(HealthInterface, threading.Thread):
     return self._kill_reason
 
   def run(self):
-    """ Periodically sample resources and conduct enforcement """
+    """ Periodically aggregate resources and conduct enforcement if necessary """
     now = time.time()
     next_process_collection = now
     next_disk_collection = now
     next_enforcement = now
+    self._resource_monitor.start()
 
     while not self._stop_event.is_set():
       now = time.time()
       next_event = max(
           0, min(next_enforcement, next_process_collection, next_disk_collection) - now)
       time.sleep(next_event)
-
       now = time.time()
-      if now > next_process_collection:
-        next_process_collection = now + self.PROCESS_COLLECTION_INTERVAL.as_(Time.SECONDS)
-        self._ps.sample()
-        log.debug('Sampled CPU percentage: %.2f' % (100. * self._ps.rate))
-      if now > next_disk_collection:
-        next_disk_collection = now + self.DISK_COLLECTION_INTERVAL.as_(Time.SECONDS)
-        self._du.sample()
-        log.debug('Sampled disk bytes: %.1fMB' % (self._du.value / 1024. / 1024.))
       if now > next_enforcement:
         next_enforcement = now + self.ENFORCEMENT_INTERVAL.as_(Time.SECONDS)
+        # TODO(jon): pass enforcer ProcessSample et al instead; it doesn't need TaskResourceSample
         kill_reason = self._enforcer.enforce(self.sample)
         if kill_reason and not self._kill_reason:
-          log.info('Resource manager triggering kill reason: %s' % kill_reason)
+          log.info('ResourceManager triggering kill - reason: %s' % kill_reason)
           self._kill_reason = kill_reason
 
   def start(self):
@@ -316,33 +242,3 @@ class ResourceManager(HealthInterface, threading.Thread):
     self._stop_event.set()
 
 
-class ResourceCheckpointer(threading.Thread):
-  COLLECTION_INTERVAL = Amount(1, Time.MINUTES)
-
-  @staticmethod
-  def recordio_writer(checkpoint):
-    trw = ThriftRecordWriter(open(checkpoint, 'wb'))
-    trw.set_sync(True)
-    return trw
-
-  @staticmethod
-  def static_writer(checkpoint):
-    class Writer(object):
-      def write(self, record):
-        with open(checkpoint + '~', 'wb') as fp:
-          fp.write(thrift_serialize(record))
-        os.rename(checkpoint + '~', checkpoint)
-    return Writer()
-
-  def __init__(self, sample_provider, filename, recordio=False):
-    self._sample_provider = sample_provider
-    self._output = self.recordio_writer(filename) if recordio else self.static_writer(filename)
-    threading.Thread.__init__(self)
-    self.daemon = True
-
-  def run(self):
-    while True:
-      time.sleep(self.COLLECTION_INTERVAL.as_(Time.SECONDS))
-      sample = self._sample_provider()
-      if sample:
-        self._output.write(sample)

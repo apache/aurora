@@ -17,7 +17,8 @@ __tested__ = False
 
 class TaskMonitor(object):
   """
-    Class responsible for monitoring an individual Thermos Task via its runner checkpoint.
+    Class responsible for reconstructing and monitoring the state of an individual Thermos task via
+    its runner checkpoint. Also exports information on active processes in the task.
   """
 
   def __init__(self, pathspec, task_id):

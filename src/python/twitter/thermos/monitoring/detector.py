@@ -7,7 +7,8 @@ from twitter.thermos.base.path import TaskPath
 
 class TaskDetector(object):
   """
-    Helper class in front of TaskPath to detect active/finished/running tasks.
+    Helper class in front of TaskPath to detect active/finished/running tasks. Performs no
+    introspection on the state of a task; merely detects based on file paths on disk.
   """
   class MatchingError(Exception): pass
 

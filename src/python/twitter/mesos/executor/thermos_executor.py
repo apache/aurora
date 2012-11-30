@@ -18,6 +18,9 @@ from twitter.mesos.executor.task_runner_wrapper import (
   AngrybirdTaskRunner)
 from twitter.mesos.executor.executor_base import ThermosExecutorBase
 
+from twitter.thermos.base.path import TaskPath
+from twitter.thermos.monitoring.monitor import TaskMonitor
+
 # thrifts
 from gen.twitter.mesos.ttypes import AssignedTask
 from thrift.TSerialization import deserialize as thrift_deserialize
@@ -25,7 +28,8 @@ from thrift.TSerialization import deserialize as thrift_deserialize
 from .health_checker import HealthCheckerThread
 from .http_signaler import HttpSignaler
 from .discovery_manager import DiscoveryManager
-from .resource_manager import ResourceCheckpointer, ResourceManager
+from .resource_checkpoints import ResourceCheckpointer
+from .resource_manager import ResourceManager
 from .status_manager import StatusManager
 
 
@@ -132,11 +136,12 @@ class ThermosExecutor(ThermosExecutorBase):
       health_checkers.append(HealthCheckerThread(http_signaler.health,
           interval_secs=mesos_task.health_check_interval_secs().get()))
 
+    task_path = TaskPath(root=self._runner._checkpoint_root, task_id=self._task_id)
     resource_manager = ResourceManager(
         mesos_task.task().resources(),
-        portmap,
-        self._runner.pid,
-        self._runner.sandbox.root())
+        TaskMonitor(task_path, self._task_id),
+        self._runner.sandbox.root()
+    )
     health_checkers.append(resource_manager)
 
     ResourceCheckpointer(lambda: resource_manager.sample,

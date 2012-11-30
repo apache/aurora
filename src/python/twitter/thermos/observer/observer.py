@@ -11,8 +11,9 @@ from twitter.common.lang import Lockable
 from twitter.common.recordio import ThriftRecordReader
 
 from twitter.thermos.monitoring.detector import TaskDetector
-from twitter.thermos.monitoring.muxer import TaskMuxer
-from twitter.thermos.monitoring.measure import TaskMeasurer
+from twitter.thermos.monitoring.monitor import TaskMonitor
+from twitter.thermos.monitoring.process import ProcessSample
+from twitter.thermos.monitoring.resource import ResourceMonitorBase, TaskResourceMonitor
 
 from twitter.thermos.base.path import TaskPath
 from twitter.thermos.base.ckpt import CheckpointDispatcher
@@ -24,8 +25,6 @@ from twitter.thermos.config.loader import (
   ThermosProcessWrapper)
 
 from gen.twitter.thermos.ttypes import *
-
-__author__ = 'wickman@twitter.com (brian wickman)'
 
 
 class TaskObserver(threading.Thread, Lockable):
@@ -40,20 +39,28 @@ class TaskObserver(threading.Thread, Lockable):
   class UnexpectedError(Exception): pass
   class UnexpectedState(Exception): pass
 
-  def __init__(self, root):
+  def __init__(self, root, resource_monitor_class=TaskResourceMonitor):
     self._pathspec = TaskPath(root=root)
     self._detector = TaskDetector(root)
-    self._muxer = TaskMuxer(self._pathspec)
-    self._measurer = TaskMeasurer(self._muxer)
-    self._measurer.start()
+    if not issubclass(resource_monitor_class, ResourceMonitorBase):
+      raise ValueError("resource monitor class must implement ResourceMonitorBase!")
+    self._resource_monitor = resource_monitor_class
+    # TODO(jon): this is kind of ridiculous; these multiple structs for tracking which tasks are
+    # being observed should be consolidated
     self._states = {}
-    self._actives = set()   # set of active task_ids
-    self._finishes = set()  # set of finished task_ids
-    self._tasks = {}        # task_id => ThermosTask
-    self._stat = {}         # task_id => mtime of task file
+    self._actives = set()            # set of active task_ids
+    self._finishes = set()           # set of finished task_ids
+    self._tasks = {}                 # task_id => ThermosTask
+    self._task_monitors = {}         # task_id => TaskMonitor
+    self._resource_monitors = {}     # task_id => ResourceMonitor implementation
+    self._stat = {}                  # task_id => mtime of task file
+    self._stop_event = threading.Event()
     threading.Thread.__init__(self)
     Lockable.__init__(self)
     self.daemon = True
+
+  def stop(self):
+    self._stop_event.set()
 
   def run(self):
     """
@@ -61,7 +68,7 @@ class TaskObserver(threading.Thread, Lockable):
       checkpoint root for new tasks, or transitions of tasks from active to
       finished state.
     """
-    while True:
+    while not self._stop_event.is_set():
       time.sleep(1)
 
       active_tasks = [task_id for _, task_id in self._detector.get_task_ids(state='active')]
@@ -72,16 +79,24 @@ class TaskObserver(threading.Thread, Lockable):
           if active in self._finishes:
             log.error('Found an active (%s) in finished tasks?' % active)
           if active not in self._actives:
+            task_monitor = TaskMonitor(self._pathspec, active)
+            if not task_monitor.get_state().header:
+              log.info('Unable to load task "%s"' % active)
+              continue
+            self._task_monitors[active] = task_monitor
             self._actives.add(active)    # add to active list
-            self._muxer.add(active)      # add to checkpoint monitor
             self._read_task(active)      # read and memoize ThermosTask object
+            sandbox = self._task_monitors[active].get_state().header.sandbox
+            self._resource_monitors[active] = self._resource_monitor(task_monitor, sandbox)
             self._stat[active] = self._get_stat(active)
-            log.debug('pid %s -> active' % active)
+            log.debug('task_id %s -> active' % active)
         for finished in finished_tasks:
           if finished in self._actives:
-            log.debug('pid %s active -> finished' % finished)
-            self._actives.remove(finished) # remove from actives
-            self._muxer.remove(finished)   # remove from checkpoint monitor
+            log.debug('task_id %s active -> finished' % finished)
+            self._actives.remove(finished)              # remove from actives
+            self._task_monitors.pop(finished)           # remove from task monitors
+            rm = self._resource_monitors.pop(finished)  # remove from resource monitors
+            rm.kill()                                   # terminate resource monitor thread
           if finished not in self._stat:
             self._stat[finished] = self._get_stat(finished)
           self._finishes.add(finished)
@@ -235,7 +250,7 @@ class TaskObserver(threading.Thread, Lockable):
       of a given task id
     """
     if task_id in self._actives:
-      return self._muxer.get_state(task_id)
+      return self._task_monitors[task_id].get_state()
     elif task_id in self._states:
       # memoized finished state
       return self._states[task_id]
@@ -322,9 +337,11 @@ class TaskObserver(threading.Thread, Lockable):
       task_count=task_count)
 
   def _sample(self, task_id):
-    sample = self._measurer.sample_by_task_id(task_id).to_dict()
-    sample['disk'] = 0
-    return sample
+    if task_id not in self._resource_monitors:
+      return ProcessSample.empty().to_dict()
+    else:
+      resource_sample = self._resource_monitors[task_id].sample()[1]
+      return resource_sample.process_sample.to_dict()
 
   @Lockable.sync
   def task_statuses(self, task_id):
@@ -420,8 +437,9 @@ class TaskObserver(threading.Thread, Lockable):
 
   @Lockable.sync
   def _get_process_resource_consumption(self, task_id, process_name):
-    sample = self._measurer.sample_by_process(task_id, process_name).to_dict()
-    sample['disk'] = 0
+    if task_id not in self._resource_monitors:
+      return ProcessSample.empty().to_dict()
+    sample = self._resource_monitors[task_id].sample_by_process(process_name).to_dict()
     log.debug('Resource consumption (%s, %s) => %s' % (task_id, process_name, sample))
     return sample
 
@@ -458,7 +476,7 @@ class TaskObserver(threading.Thread, Lockable):
       return d
 
   @Lockable.sync
-  def process(self, task_id, process, run = None):
+  def process(self, task_id, process, run=None):
     """
       Returns a process run, where the schema is given below:
 
@@ -484,7 +502,7 @@ class TaskObserver(threading.Thread, Lockable):
     if not tup:
       return {}
     if tup.get('state') == 'RUNNING':
-      tup.update(used = self._get_process_resource_consumption(task_id, process))
+      tup.update(used=self._get_process_resource_consumption(task_id, process))
     return tup
 
   @Lockable.sync

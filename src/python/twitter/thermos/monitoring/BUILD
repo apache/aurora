@@ -17,16 +17,6 @@ python_library(
 )
 
 python_library(
-  name = 'measure',
-  sources = ['measure.py'],
-  dependencies = [
-    python_requirement('psutil>=0.5.0'),
-    pants('src/python/twitter/common/log'),
-    pants('src/python/twitter/common/quantity'),
-  ]
-)
-
-python_library(
   name = 'monitor',
   sources = ['monitor.py'],
   dependencies = [
@@ -38,11 +28,39 @@ python_library(
 )
 
 python_library(
-  name = 'muxer',
-  sources = ['muxer.py'],
+  name = 'disk',
+  sources = ['disk.py'],
   dependencies = [
+    pants('src/python/twitter/common/dirutil'),
+  ]
+)
+
+python_library(
+  name = 'process',
+  sources = ['process.py'],
+)
+
+python_library(
+  name = 'process_collector_psutil',
+  sources = ['process_collector_psutil.py'],
+  dependencies = [
+    pants(':process'),
+    python_requirement('psutil>=0.5.0'),
+  ]
+)
+
+python_library(
+  name = 'resource',
+  sources = ['resource.py'],
+  dependencies = [
+    pants('src/python/twitter/common'),
+    pants('src/python/twitter/common/collections'),
     pants('src/python/twitter/common/lang'),
-    pants(':monitor')
+    pants('src/python/twitter/common/quantity'),
+    pants(':disk'),
+    pants(':process'),
+    pants(':process_collector_psutil'),
+    pants(':monitor'),
   ]
 )
 
@@ -50,9 +68,10 @@ python_library(
   name = 'monitoring',
   dependencies = [
     pants(':detector'),
+    pants(':disk'),
     pants(':garbage'),
-    pants(':measure'),
     pants(':monitor'),
-    pants(':muxer')
+    pants(':process'),
+    pants(':resource')
   ]
 )

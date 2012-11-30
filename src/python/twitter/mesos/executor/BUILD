@@ -70,13 +70,22 @@ python_library(
   sources = ['resource_manager.py'],
   dependencies = [
     pants(':health_interface'),
+    pants(':resource_checkpoints'),
     python_requirement('psutil>=0.5.0'),
-    python_requirement('thrift'),
     pants('src/python/twitter/common/dirutil'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/quantity'),
+    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+  ]
+)
+
+python_library(
+  name = 'resource_checkpoints',
+  sources = ['resource_checkpoints.py'],
+  dependencies = [
+    python_requirement('thrift'),
+    pants('src/python/twitter/common/quantity'),
     pants('src/python/twitter/common/recordio:recordio-thrift'),
-    pants('src/python/twitter/thermos/monitoring:measure'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
   ]
 )
