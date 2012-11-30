@@ -19,7 +19,6 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Clock;
-import com.twitter.mesos.scheduler.db.DbUtil.Builder.JdbcUrl;
 import com.twitter.mesos.scheduler.log.Log;
 import com.twitter.mesos.scheduler.storage.JobStore;
 import com.twitter.mesos.scheduler.storage.QuotaStore;
@@ -27,8 +26,6 @@ import com.twitter.mesos.scheduler.storage.SchedulerStore;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.TaskStore;
 import com.twitter.mesos.scheduler.storage.UpdateStore;
-import com.twitter.mesos.scheduler.storage.db.DbStorage;
-import com.twitter.mesos.scheduler.storage.db.DbStorageModule;
 import com.twitter.mesos.scheduler.storage.log.LogManager.MaxEntrySize;
 import com.twitter.mesos.scheduler.storage.log.LogStorage.ShutdownGracePeriod;
 import com.twitter.mesos.scheduler.storage.log.LogStorage.SnapshotInterval;
@@ -51,7 +48,6 @@ import com.twitter.mesos.scheduler.storage.mem.MemUpdateStore;
  * <p/>
  * Exposes bindings for storage components:
  * <ul>
- *   <li>jdbc URL keyed by {@link JdbcUrl}</li>
  *   <li>{@link Storage}</li>
  *   <li>Keyed by {@link LogStorage.WriteBehind}
  *     <ul>
@@ -85,10 +81,6 @@ public class LogStorageModule extends AbstractModule {
   public static final Arg<Amount<Integer, Data>> MAX_LOG_ENTRY_SIZE =
       Arg.create(Amount.of(512, Data.KB));
 
-  @CmdLine(name = "use_new_in_mem_store",
-      help = "If true, use the new in-memory storage system.  If false, use H2 in-mem.")
-  private static final Arg<Boolean> USE_NEW_IN_MEM_STORAGE = Arg.create(false);
-
   private static <T> Key<T> createKey(Class<T> clazz) {
     return Key.get(clazz, LogStorage.WriteBehind.class);
   }
@@ -99,24 +91,11 @@ public class LogStorageModule extends AbstractModule {
    * @param binder a guice binder to bind the storage with
    */
   public static void bind(Binder binder) {
-    final Class<? extends SchedulerStore.Mutable> schedulerStore;
-    final Class<? extends JobStore.Mutable> jobStore;
-    final Class<? extends TaskStore.Mutable> taskStore;
-    final Class<? extends UpdateStore.Mutable> updateStore;
-    final Class<? extends QuotaStore.Mutable> quotaStore;
-    if (USE_NEW_IN_MEM_STORAGE.get()) {
-      schedulerStore = MemSchedulerStore.class;
-      jobStore = MemJobStore.class;
-      taskStore = MemTaskStore.class;
-      updateStore = MemUpdateStore.class;
-      quotaStore = MemQuotaStore.class;
-    } else {
-      schedulerStore = DbStorage.class;
-      jobStore = DbStorage.class;
-      taskStore = DbStorage.class;
-      updateStore = DbStorage.class;
-      quotaStore = DbStorage.class;
-    }
+    final Class<? extends SchedulerStore.Mutable> schedulerStore = MemSchedulerStore.class;
+    final Class<? extends JobStore.Mutable> jobStore = MemJobStore.class;
+    final Class<? extends TaskStore.Mutable> taskStore = MemTaskStore.class;
+    final Class<? extends UpdateStore.Mutable> updateStore = MemUpdateStore.class;
+    final Class<? extends QuotaStore.Mutable> quotaStore = MemQuotaStore.class;
 
     Closure<PrivateBinder>  bindAdditional = new Closure<PrivateBinder>() {
       private <T> void exposeBinding(
@@ -135,23 +114,13 @@ public class LogStorageModule extends AbstractModule {
         exposeBinding(binder, TaskStore.Mutable.class, taskStore);
         exposeBinding(binder, UpdateStore.Mutable.class, updateStore);
         exposeBinding(binder, QuotaStore.Mutable.class, quotaStore);
-
-        if (!USE_NEW_IN_MEM_STORAGE.get()) {
-          // Expose the jdbc url for tools
-          binder.expose(Key.get(String.class, JdbcUrl.class));
-        }
       }
     };
 
-    if (USE_NEW_IN_MEM_STORAGE.get()) {
-      MemStorageModule.bind(
-          binder,
-          Bindings.annotatedKeyFactory(LogStorage.WriteBehind.class),
-          bindAdditional);
-    } else {
-      DbStorageModule.bind(binder, LogStorage.WriteBehind.class, bindAdditional);
-    }
-
+    MemStorageModule.bind(
+        binder,
+        Bindings.annotatedKeyFactory(LogStorage.WriteBehind.class),
+        bindAdditional);
     binder.install(new LogStorageModule());
   }
 

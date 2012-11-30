@@ -14,7 +14,6 @@ import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
-import org.springframework.transaction.TransactionException;
 
 import com.twitter.common.base.Closure;
 import com.twitter.common.stats.Stat;
@@ -125,7 +124,7 @@ public class StateManagerImplTest extends EasyMockTest {
             // Inject the failure after the work is performed in the transaction, so that we can
             // check for unintended side effects remaining.
             if ((transactionsUntilFailure != 0) && (--transactionsUntilFailure == 0)) {
-              throw new TransactionException("Injected storage failure.") { };
+              throw new StorageException("Injected storage failure.") { };
             }
             return result;
           }

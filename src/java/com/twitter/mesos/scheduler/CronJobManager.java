@@ -25,7 +25,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 
 import org.apache.commons.lang.StringUtils;
-import org.springframework.scheduling.SchedulingException;
 
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.args.Arg;
@@ -185,10 +184,9 @@ public class CronJobManager extends JobManager implements EventSubscriber {
   private void mapScheduledJob(JobConfiguration job, String scheduledJobKey) {
     String jobKey = Tasks.jobKey(job);
     synchronized (scheduledJobs) {
-      if (scheduledJobs.containsKey(jobKey)) {
-        throw new SchedulingException("Illegal state - cron schedule already exists for " + jobKey);
-      }
-
+      Preconditions.checkState(
+          !scheduledJobs.containsKey(jobKey),
+          "Illegal state - cron schedule already exists for " + jobKey);
       scheduledJobs.put(jobKey, scheduledJobKey);
     }
   }

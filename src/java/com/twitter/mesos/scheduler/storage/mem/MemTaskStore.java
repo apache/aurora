@@ -26,7 +26,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * An in-memory task store.
  *
- * TODO(William Farner): Once deployed, study performance to determine if DbStorage's
+ * TODO(William Farner): Once deployed, study performance to determine if (now gone) DbStorage's
  * IdComparedScheduledTask should be adopted here as well.
  * TODO(William Farner): With sufficient evidence from query patterns, use the task ID to
  * limit the working set for query scans.

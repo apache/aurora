@@ -511,8 +511,6 @@ public class LogStorage extends ForwardingStore {
   public void deleteTasks() {
     doInWriteTransaction(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
-        // TODO(John Sirois): this forces an id fetch whereas DbStorage skips a fetch when it can
-        // doing DELETE FROM WHERE ... perhaps this is the best we can do.
         deleteTasks(storeProvider.getTaskStore().fetchTaskIds(Query.GET_ALL));
       }
     });
