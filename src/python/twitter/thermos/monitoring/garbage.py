@@ -6,7 +6,7 @@ import os
 import sys
 import time
 
-from twitter.common.dirutil import safe_rmtree, safe_bsize
+from twitter.common.dirutil import safe_delete, safe_rmtree, safe_bsize
 from twitter.common.quantity import Amount, Data, Time
 from twitter.thermos.base.ckpt import CheckpointDispatcher
 from twitter.thermos.base.path import TaskPath
@@ -47,8 +47,7 @@ class TaskGarbageCollector(object):
   def get_logs(self, task_id, with_size=True):
     state = self.state(task_id)
     if state and state.header:
-      log_dir = state.header.log_dir
-      for path in self._detector.get_process_logs(task_id, log_dir):
+      for path in self._detector.get_process_logs(task_id, state.header.log_dir):
         if with_size:
           yield path, safe_bsize(path)
         else:
@@ -72,13 +71,16 @@ class TaskGarbageCollector(object):
 
   def erase_metadata(self, task_id):
     for fn in self.get_metadata(task_id, with_size=False):
-      os.unlink(fn)
+      safe_delete(fn)
     safe_rmtree(TaskPath(root=self._root, task_id=task_id).getpath('checkpoint_path'))
 
   def erase_logs(self, task_id):
     for fn in self.get_logs(task_id, with_size=False):
-      os.unlink(fn)
-    safe_rmtree(TaskPath(root=self._root, task_id=task_id).getpath('process_logbase'))
+      safe_delete(fn)
+    state = self.state(task_id)
+    if state and state.header:
+      safe_rmtree(TaskPath(root=self._root, task_id=task_id, log_dir=state.header.log_dir)
+                  .getpath('process_logbase'))
 
   def erase_data(self, task_id):
     # TODO(wickman)
@@ -86,8 +88,9 @@ class TaskGarbageCollector(object):
     # $HOME or / or similar.  Perhaps put a guard somewhere?
     for fn in self.get_data(task_id, with_size=False):
       os.unlink(fn)
-    if self.state(task_id).header.sandbox:
-      safe_rmtree(self.state(task_id).header.sandbox)
+    state = self.state(task_id)
+    if state and state.header and state.header.sandbox:
+      safe_rmtree(state.header.sandbox)
 
 
 class TaskGarbageCollectionPolicy(object):

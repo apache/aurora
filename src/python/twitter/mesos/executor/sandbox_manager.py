@@ -147,6 +147,7 @@ class SandboxManager(object):
     raise SandboxManager.UnknownError('Unknown sandbox manager: %s' %
       app.get_options().sandbox_manager)
 
+
 app.add_option('--sandbox_manager', dest='sandbox_manager',
                type="choice", choices=SandboxManager.MANAGERS.keys(),
                default='DirectorySandbox',

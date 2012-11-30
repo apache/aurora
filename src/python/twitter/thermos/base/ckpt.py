@@ -124,19 +124,29 @@ class CheckpointDispatcher(object):
   class InvalidSequenceNumber(Error): pass
   class InvalidHandler(Error): pass
 
-  @staticmethod
-  def from_file(filename, truncate=False):
-    state = RunnerState(processes = {})
-    builder = CheckpointDispatcher()
-    with open(filename, 'r') as fp:
+  @classmethod
+  def iter_updates(cls, filename):
+    with open(filename) as fp:
       rr = ThriftRecordReader(fp, RunnerCkpt)
-      try:
-        for process_update in rr:
-          builder.dispatch(state, process_update, truncate=truncate)
-        return state
-      except CheckpointDispatcher.Error as e:
-        log.error('Failed to recover from %s: %s' % (filename, e))
-        return None
+      for update in rr:
+        yield update
+
+  @classmethod
+  def iter_statuses(cls, filename):
+    for update in cls.iter_updates(filename):
+      if update.task_status:
+        yield update.task_status
+
+  @classmethod
+  def from_file(cls, filename, truncate=False):
+    state = RunnerState(processes = {})
+    builder = cls()
+    try:
+      for update in cls.iter_updates(filename):
+        builder.dispatch(state, update, truncate=truncate)
+      return state
+    except cls.Error as e:
+      log.error('Failed to recover from %s: %s' % (filename, e))
 
   def __init__(self):
     self._task_handlers = []

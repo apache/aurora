@@ -196,7 +196,7 @@ class ProductionTaskRunner(TaskRunnerWrapper):
     return runner_pex
 
   def __init__(self, task_id, mesos_task, role, mesos_ports, **kwargs):
-    artifact_dir = '.'
+    artifact_dir = os.path.realpath('.')
     runner_pex = self.dump_runner(artifact_dir)
     if mesos_task.has_layout():
       sandbox = AppAppSandbox(task_id)

@@ -25,6 +25,14 @@ python_library(
 )
 
 python_library(
+  name = 'executor_detector',
+  sources = ['executor_detector.py'],
+  dependencies = [
+    pants('src/python/twitter/common/string'),
+  ]
+)
+
+python_library(
   name = 'http_signaler',
   sources = ['http_signaler.py'],
   dependencies = [
@@ -92,7 +100,7 @@ python_library(
     pants('src/thrift/com/twitter/thermos:py-thrift'),
     pants(':thermos_executor_base'),
     pants(':health_interfaces'),
-    python_requirement('mesos==0.9.0'),
+    python_requirement('mesos'),
   ]
 )
 
@@ -106,7 +114,7 @@ python_library(
     pants('src/python/twitter/common/log'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
     pants('src/thrift/com/twitter/thermos:py-thrift'),
-    python_requirement('mesos==0.9.0'),
+    python_requirement('mesos'),
   ]
 )
 
@@ -153,9 +161,9 @@ python_library(
   name = 'gc_executor_lib',
   sources = ['gc_executor.py'],
   dependencies = [
+    pants(':executor_detector'),
     pants(':sandbox_manager'),
     pants(':thermos_executor_base'),
-    pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/concurrent'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/process'),
@@ -168,14 +176,12 @@ python_library(
   ]
 )
 
-# This is sort of annoying.
-# TODO(wickman) python_binary targets should probably also include their
-# un-relocated source.
 python_binary(
   name = 'gc_executor',
-  source = 'gc_executor.py',
+  source = 'gc_executor_main.py',
   ignore_errors = True,
   dependencies = [
-    pants(':gc_executor_lib')
+    pants(':gc_executor_lib'),
+    pants('src/python/twitter/common/app'),
   ]
 )

@@ -22,6 +22,16 @@ class ThermosExecutorBase(mesos.Executor):
     TaskState.LOST: mesos_pb.TASK_LOST
   }
 
+  THERMOS_TO_TWITTER_STATES = {
+    TaskState.ACTIVE: ScheduleStatus.RUNNING,
+    TaskState.CLEANING: ScheduleStatus.RUNNING,
+    TaskState.FINALIZING: ScheduleStatus.RUNNING,
+    TaskState.SUCCESS: ScheduleStatus.FINISHED,
+    TaskState.FAILED: ScheduleStatus.FAILED,
+    TaskState.KILLED: ScheduleStatus.KILLED,
+    TaskState.LOST: ScheduleStatus.LOST
+  }
+
   @staticmethod
   def twitter_status_is_terminal(status):
     return status in (ScheduleStatus.FAILED, ScheduleStatus.FINISHED, ScheduleStatus.KILLED,
