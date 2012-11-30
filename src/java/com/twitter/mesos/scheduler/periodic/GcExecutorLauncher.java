@@ -63,7 +63,9 @@ public class GcExecutorLauncher implements TaskLauncher {
   public @interface GcExecutor { }
 
   private static final Resources GC_EXECUTOR_RESOURCES =
-      new Resources(0.2, Amount.of(64L, Data.MB), Amount.of(16L, Data.MB), 0);
+      new Resources(0.19, Amount.of(63L, Data.MB), Amount.of(15L, Data.MB), 0);
+  private static final Resources ALMOST_EMPTY_TASK_RESOURCES =
+      new Resources(0.01, Amount.of(1L, Data.MB), Amount.of(1L, Data.MB), 0);
 
   private static final String SYSTEM_TASK_PREFIX = "system-gc-";
   private static final String EXECUTOR_PREFIX = "gc-";
@@ -126,14 +128,15 @@ public class GcExecutorLauncher implements TaskLauncher {
     String uuid = UUID.randomUUID().toString();
     ExecutorInfo.Builder executor = ExecutorInfo.newBuilder()
         .setExecutorId(ExecutorID.newBuilder().setValue(EXECUTOR_PREFIX + uuid))
+        .addAllResources(GC_EXECUTOR_RESOURCES.toResourceList())
         .setCommand(CommandUtil.create(gcExecutorPath.get()));
 
     return Optional.of(TaskInfo.newBuilder().setName("system-gc")
         .setTaskId(TaskID.newBuilder().setValue(SYSTEM_TASK_PREFIX + uuid))
         .setSlaveId(offer.getSlaveId())
-        .addAllResources(GC_EXECUTOR_RESOURCES.toResourceList())
         .setData(ByteString.copyFrom(data))
         .setExecutor(executor)
+        .addAllResources(ALMOST_EMPTY_TASK_RESOURCES.toResourceList())
         .build());
   }
 
