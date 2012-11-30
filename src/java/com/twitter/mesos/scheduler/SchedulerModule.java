@@ -65,8 +65,6 @@ import com.twitter.mesos.scheduler.async.AsyncModule;
 import com.twitter.mesos.scheduler.events.TaskEventModule;
 import com.twitter.mesos.scheduler.httphandlers.ServletModule;
 import com.twitter.mesos.scheduler.metadata.MetadataModule;
-import com.twitter.mesos.scheduler.periodic.BootstrapTaskLauncher;
-import com.twitter.mesos.scheduler.periodic.BootstrapTaskLauncher.Bootstrap;
 import com.twitter.mesos.scheduler.periodic.GcExecutorLauncher;
 import com.twitter.mesos.scheduler.periodic.GcExecutorLauncher.GcExecutor;
 import com.twitter.mesos.scheduler.periodic.PeriodicTaskModule;
@@ -80,11 +78,6 @@ import com.twitter.thrift.ServiceInstance;
  */
 public class SchedulerModule extends AbstractModule {
   private static final Logger LOG = Logger.getLogger(SchedulerModule.class.getName());
-
-  @CmdLine(name = "executor_dead_threashold", help =
-      "Time after which the scheduler will consider an executor dead and attempt to revive it.")
-  private static final Arg<Amount<Long, Time>> EXECUTOR_DEAD_THRESHOLD =
-      Arg.create(Amount.of(10L, Time.MINUTES));
 
   @CmdLine(name = "executor_gc_interval",
       help = "Interval on which to run the GC executor on a host to clean up dead tasks.")
@@ -172,9 +165,6 @@ public class SchedulerModule extends AbstractModule {
     // Bindings for SchedulerCoreImpl.
     bind(CronJobManager.class).in(Singleton.class);
     bind(ImmediateJobManager.class).in(Singleton.class);
-    bind(new TypeLiteral<PulseMonitor<String>>() { })
-        .annotatedWith(Bootstrap.class)
-        .toInstance(new PulseMonitorImpl<String>(EXECUTOR_DEAD_THRESHOLD.get()));
 
     // Bindings for thrift interfaces.
     LoggingThriftInterface.bind(binder(), SchedulerThriftInterface.class);
@@ -241,7 +231,6 @@ public class SchedulerModule extends AbstractModule {
     bind(RegisteredListener.class).to(FanoutRegisteredListener.class);
     bind(FanoutRegisteredListener.class).in(Singleton.class);
 
-    bind(BootstrapTaskLauncher.class).in(Singleton.class);
     bind(GcExecutorLauncher.class).in(Singleton.class);
     bind(UserTaskLauncher.class).in(Singleton.class);
 
@@ -316,10 +305,9 @@ public class SchedulerModule extends AbstractModule {
   @Provides
   @Singleton
   List<TaskLauncher> provideTaskLaunchers(
-      BootstrapTaskLauncher bootstrapLauncher,
       GcExecutorLauncher gcLauncher,
       UserTaskLauncher userTaskLauncher) {
 
-    return ImmutableList.of(bootstrapLauncher, gcLauncher, userTaskLauncher);
+    return ImmutableList.of(gcLauncher, userTaskLauncher);
   }
 }
