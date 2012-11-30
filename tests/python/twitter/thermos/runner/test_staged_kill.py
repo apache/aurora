@@ -54,6 +54,10 @@ class RunnerBase(object):
   @classmethod
   def wait_until_running(cls, monitor):
     while True:
+      procs = monitor.get_state().processes
+      if 'process' in procs:
+        # check the process hasn't died unexpectedly
+        assert procs['process'][0].return_code is None
       active_processes = monitor.get_active_processes()
       if len(active_processes) == 0:
         time.sleep(0.1)
@@ -210,7 +214,7 @@ class TestRunnerKillProcessTrappingSIGTERM(RunnerBase):
 
 
 SIMPLEFORK_SCRIPT = """
-cat <<EOF | python -
+cat <<EOF | %(INTERPRETER)s -
 from __future__ import print_function
 import os
 import time
@@ -228,7 +232,7 @@ else:
   while not os.path.exists('exit.txt'):
     time.sleep(0.1)
 EOF
-"""
+""" % { 'INTERPRETER': sys.executable }
 
 class TestRunnerKillProcessGroup(RunnerBase):
   @classmethod
