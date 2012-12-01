@@ -7,6 +7,7 @@ import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
@@ -197,6 +198,20 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
 
   private FluentIterable<ScheduledTask> mutableMatches(TaskQuery query) {
     // Apply the query against the working set.
-    return FluentIterable.from(tasks.values()).filter(queryFilter(query));
+    Iterable<ScheduledTask> from;
+    if (query.isSetTaskIds()) {
+      ImmutableList.Builder<ScheduledTask> matches = ImmutableList.builder();
+      for (String id : query.getTaskIds()) {
+        ScheduledTask match = tasks.get(id);
+        if (match != null) {
+          matches.add(match);
+        }
+      }
+      from = matches.build();
+    } else {
+      from = tasks.values();
+    }
+
+    return FluentIterable.from(from).filter(queryFilter(query));
   }
 }
