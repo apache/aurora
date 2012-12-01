@@ -6,6 +6,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
 
+import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.mesos.scheduler.storage.AttributeStore;
 import com.twitter.mesos.scheduler.storage.AttributeStore.AttributeStoreImpl;
 import com.twitter.mesos.scheduler.storage.JobStore;
@@ -99,6 +100,7 @@ public class MemStorage implements Storage {
     LOG.info("Applied initialization logic.");
   }
 
+  @Timed("mem_storage_read_transaction")
   @Override
   public <T, E extends Exception> T doInTransaction(Work<T, E> work) throws StorageException, E {
     checkNotNull(work);
@@ -123,6 +125,7 @@ public class MemStorage implements Storage {
     }
   }
 
+  @Timed("mem_storage_write_transaction")
   @Override
   public <T, E extends Exception> T doInWriteTransaction(MutateWork<T, E> work)
       throws StorageException, E {
