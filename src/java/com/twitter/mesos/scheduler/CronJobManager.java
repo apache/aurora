@@ -10,6 +10,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.annotation.Nullable;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
@@ -276,6 +278,10 @@ public class CronJobManager extends JobManager implements EventSubscriber {
     return schedulerCore.getTasks(query);
   }
 
+  public static CronCollisionPolicy orDefault(@Nullable CronCollisionPolicy policy) {
+    return Optional.fromNullable(policy).or(CronCollisionPolicy.KILL_EXISTING);
+  }
+
   /**
    * Triggers execution of a cron job, depending on the cron collision policy for the job.
    *
@@ -296,9 +302,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
       runJob = Optional.of(job);
     } else {
       // Assign a default collision policy.
-      CronCollisionPolicy collisionPolicy = (job.getCronCollisionPolicy() == null)
-          ? CronCollisionPolicy.KILL_EXISTING
-          : job.getCronCollisionPolicy();
+      CronCollisionPolicy collisionPolicy = orDefault(job.getCronCollisionPolicy());
 
       switch (collisionPolicy) {
         case KILL_EXISTING:

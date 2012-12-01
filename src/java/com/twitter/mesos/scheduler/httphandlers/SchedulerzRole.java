@@ -14,9 +14,12 @@ import javax.ws.rs.core.Response.Status;
 
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.inject.Inject;
 
 import org.antlr.stringtemplate.StringTemplate;
@@ -85,15 +88,17 @@ public class SchedulerzRole extends JerseyTemplateServlet {
         }
         template.setAttribute("role", role);
 
-        Map<String, Job> jobs = Maps.newHashMap();
-        for (ScheduledTask task : scheduler.getTasks(Query.byRole(role))) {
-          Job job = jobs.get(task.getAssignedTask().getTask().getJobName());
+        LoadingCache<String, Job> jobs = CacheBuilder.newBuilder().build(
+            new CacheLoader<String, Job>() {
+              @Override public Job load(String jobName) {
+                Job job = new Job();
+                job.name = jobName;
+                return job;
+              }
+            });
 
-          if (job == null) {
-            job = new Job();
-            job.name = task.getAssignedTask().getTask().getJobName();
-            jobs.put(job.name, job);
-          }
+        for (ScheduledTask task : scheduler.getTasks(Query.byRole(role))) {
+          Job job = jobs.getUnchecked(task.getAssignedTask().getTask().getJobName());
 
           switch (task.getStatus()) {
             case INIT:
@@ -128,7 +133,7 @@ public class SchedulerzRole extends JerseyTemplateServlet {
           }
         }
 
-        List<Job> sortedJobs = DisplayUtils.JOB_ORDERING.sortedCopy(jobs.values());
+        List<Job> sortedJobs = DisplayUtils.JOB_ORDERING.sortedCopy(jobs.asMap().values());
         template.setAttribute("jobs", sortedJobs);
 
         Iterable<JobConfiguration> cronJobs = Iterables.filter(
@@ -144,15 +149,17 @@ public class SchedulerzRole extends JerseyTemplateServlet {
         }
 
         cronJobs = DisplayUtils.JOB_CONFIG_ORDERING.sortedCopy(cronJobs);
-        Iterable<CronJob> cronJobObjs = Iterables.transform(cronJobs,
-            new Function<JobConfiguration, CronJob>() {
-              @Override public CronJob apply(JobConfiguration job) {
-                CronJob cronJob = new CronJob();
-                cronJob.name = job.getName();
-                cronJob.pendingTaskCount = job.getTaskConfigsSize();
-                cronJob.cronSchedule = job.getCronSchedule();
-                cronJob.nextRun = CronJobManager.predictNextRun(cronJob.cronSchedule).getTime();
-                return cronJob;
+        Iterable<Map<?, ?>> cronJobObjs = Iterables.transform(cronJobs,
+            new Function<JobConfiguration, Map<?, ?>>() {
+              @Override public Map<?, ?> apply(JobConfiguration job) {
+                return ImmutableMap.<Object, Object>builder()
+                    .put("name", job.getName())
+                    .put("pendingTaskCount", job.getTaskConfigsSize())
+                    .put("cronSchedule", job.getCronSchedule())
+                    .put("nextRun", CronJobManager.predictNextRun(job.cronSchedule).getTime())
+                    .put("cronCollisionPolicy",
+                        CronJobManager.orDefault(job.getCronCollisionPolicy()))
+                    .build();
               }
             });
 
@@ -191,19 +198,6 @@ public class SchedulerzRole extends JerseyTemplateServlet {
 
     public int getFailedTaskCount() {
       return failedTaskCount;
-    }
-  }
-
-  class CronJob extends Job {
-    String cronSchedule;
-    long nextRun;
-
-    public String getCronSchedule() {
-      return cronSchedule;
-    }
-
-    public long getNextRun() {
-      return nextRun;
     }
   }
 }
