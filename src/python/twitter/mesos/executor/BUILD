@@ -75,6 +75,7 @@ python_library(
     pants('src/python/twitter/common/dirutil'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/quantity'),
+    pants('src/python/twitter/thermos/monitoring:resource'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
   ]
 )

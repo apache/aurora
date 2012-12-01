@@ -1,45 +1,57 @@
 import random
 
+from twitter.mesos.config.schema import Resources as _Resources
 from twitter.mesos.executor.health_interface import FailureReason
 from twitter.mesos.executor.resource_manager import ResourceEnforcer
+from twitter.thermos.base.path import TaskPath
 from gen.twitter.mesos.comm.ttypes import TaskResourceSample
 
+class DummyTaskMonitor(object):
+  def get_active_processes(self):
+    return
+    yield
+
+Resources = _Resources(cpu=0, ram=0, disk=0)
+
+def resource_enforcer_maker(**kw):
+  return ResourceEnforcer(
+    resources=Resources(**kw),
+    task_monitor=DummyTaskMonitor(),
+    portmap={}
+  )
 
 def test_resource_enforcer():
   TRS = TaskResourceSample
-  enf = ResourceEnforcer(pid=-1)
+  RE = resource_enforcer_maker
 
   # cpu only niced
-  assert enf.enforce(TRS(reservedCpuRate=1, cpuRate=0.9)) is None
-  assert enf.enforce(TRS(reservedCpuRate=0.9, cpuRate=1)) is None
+  assert RE(cpu=1).enforce(TRS(cpuRate=0.9)) is None
+  assert RE(cpu=0.9).enforce(TRS(cpuRate=1)) is None
 
   # ram
   for (k, v) in {'ramRssBytes': 1, 'ramRssBytes': 2, 'ramVssBytes': 1, 'ramVssBytes': 3}.items():
-    assert enf.enforce(TRS(reservedRamBytes=2, **{k:v})) is None
-  kr = enf.enforce(TRS(reservedRamBytes=2, ramRssBytes=3))
+    assert RE(ram=2).enforce(TRS(**{k:v})) is None
+  kr = RE(ram=2).enforce(TRS(ramRssBytes=3))
   assert isinstance(kr, FailureReason)
   assert kr.reason.startswith('RAM')
 
   # disk
-  assert enf.enforce(TRS(reservedDiskBytes=2, diskBytes=1)) is None
-  kr = enf.enforce(TRS(reservedDiskBytes=1, diskBytes=2))
+  assert RE(disk=2).enforce(TRS(diskBytes=1)) is None
+  kr = RE(disk=1).enforce(TRS(diskBytes=2))
   assert isinstance(kr, FailureReason)
   assert kr.reason.startswith('Disk')
 
   # ordered
-  kr = enf.enforce(
-      TRS(reservedRamBytes=2, ramRssBytes=3,
-          reservedDiskBytes=3, diskBytes=2))
+  kr = RE(ram=2, disk=3).enforce(TRS(ramRssBytes=3, diskBytes=2))
   assert isinstance(kr, FailureReason) and kr.reason.startswith('RAM')
-  kr = enf.enforce(
-      TRS(reservedRamBytes=3, ramRssBytes=2,
-          reservedDiskBytes=2, diskBytes=3))
+  kr = RE(ram=3, disk=2).enforce(TRS(ramRssBytes=2, diskBytes=3))
   assert isinstance(kr, FailureReason) and kr.reason.startswith('Disk')
 
 
 class FakeResourceEnforcer(ResourceEnforcer):
   def __init__(self, portmap={}, listening_ports=frozenset()):
-    super(FakeResourceEnforcer, self).__init__(-1, portmap=portmap)
+    super(FakeResourceEnforcer, self).__init__(
+        resources=Resources(), task_monitor=DummyTaskMonitor(), portmap=portmap)
     self._listening_ports = listening_ports
 
   def get_listening_ports(self):

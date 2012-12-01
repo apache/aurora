@@ -23,6 +23,7 @@ python_tests(name = 'gc_executor',
 python_tests(name = 'resource_manager',
   sources = [ 'test_resource_manager.py' ],
   dependencies = [
+    pants('src/python/twitter/mesos/config:schema'),
     pants('src/python/twitter/mesos/executor:resource_manager')
   ]
 )
