@@ -22,7 +22,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public class MemJobStore implements JobStore.Mutable.Transactioned {
 
   private static final Function<JobConfiguration, JobConfiguration> DEEP_COPY =
-      Util.deepCopier(JobConfiguration.class);
+      Util.deepCopier();
 
   private final TransactionalMap<String, Manager> managers =
       TransactionalMap.wrap(Maps.<String, Manager>newHashMap());

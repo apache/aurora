@@ -21,7 +21,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public class MemUpdateStore implements UpdateStore.Mutable.Transactioned {
 
   private static final Function<JobUpdateConfiguration, JobUpdateConfiguration> DEEP_COPY =
-      Util.deepCopier(JobUpdateConfiguration.class);
+      Util.deepCopier();
 
   private final TransactionalMap<String, JobUpdateConfiguration> configs =
       TransactionalMap.wrap(Maps.<String, JobUpdateConfiguration>newHashMap());

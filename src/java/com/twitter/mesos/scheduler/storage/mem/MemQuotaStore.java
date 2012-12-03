@@ -19,7 +19,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 public class MemQuotaStore implements QuotaStore.Mutable.Transactioned {
 
-  private static final Function<Quota, Quota> DEEP_COPY = Util.deepCopier(Quota.class);
+  private static final Function<Quota, Quota> DEEP_COPY = Util.deepCopier();
 
   private final TransactionalMap<String, Quota> quotas =
       TransactionalMap.wrap(Maps.<String, Quota>newHashMap());

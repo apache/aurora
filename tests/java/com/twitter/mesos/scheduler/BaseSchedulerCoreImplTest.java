@@ -302,6 +302,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     // Since task fields are backfilled with defaults, additional flags should be filled.
     TwitterTaskInfo expected = new TwitterTaskInfo(storedTask)
         .setProduction(false)
+        .setHealthCheckIntervalSecs(30)
+        .setMaxTaskFailures(1)
         .setThermosConfig(new byte[] {})
         .setConstraints(ImmutableSet.of(
             ConfigurationManager.hostLimitConstraint(1),

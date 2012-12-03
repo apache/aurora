@@ -12,7 +12,6 @@ import javax.annotation.Nullable;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
-import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -156,28 +155,28 @@ public final class ConfigurationManager {
       .build();
 
   private static final List<Field<?>> FIELDS = ImmutableList.<Field<?>>builder()
-      .add(new TypedField<String>(String.class, "hdfs_path", null) {
+      .add(new TypedField<String>(String.class, false, "hdfs_path", null) {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetHdfsPath(); }
 
         @Override void apply(TwitterTaskInfo task, String value) throws TaskDescriptionException {
           task.setHdfsPath(value);
         }
       })
-      .add(new TypedField<String>(String.class, START_COMMAND_FIELD) {
+      .add(new TypedField<String>(String.class, true, START_COMMAND_FIELD, "") {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetStartCommand(); }
 
         @Override void apply(TwitterTaskInfo task, String value) throws TaskDescriptionException {
           task.setStartCommand(value);
         }
       })
-      .add(new TypedField<Boolean>(Boolean.class, "daemon", false) {
+      .add(new TypedField<Boolean>(Boolean.class, false, "daemon", false) {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetIsDaemon(); }
 
         @Override void apply(TwitterTaskInfo task, Boolean value) throws TaskDescriptionException {
           task.setIsDaemon(value);
         }
       })
-      .add(new TypedField<Double>(Double.class, "num_cpus") {
+      .add(new TypedField<Double>(Double.class, true, "num_cpus", 1.0) {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetNumCpus(); }
 
         @Override void apply(TwitterTaskInfo task, Double value) throws TaskDescriptionException {
@@ -188,7 +187,7 @@ public final class ConfigurationManager {
           task.setNumCpus(value);
         }
       })
-      .add(new TypedField<Integer>(Integer.class, "ram_mb") {
+      .add(new TypedField<Integer>(Integer.class, true, "ram_mb", 1024) {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetRamMb(); }
 
         @Override void apply(TwitterTaskInfo task, Integer value) throws TaskDescriptionException {
@@ -199,7 +198,7 @@ public final class ConfigurationManager {
           task.setRamMb(value);
         }
       })
-      .add(new TypedField<Integer>(Integer.class, "disk_mb") {
+      .add(new TypedField<Integer>(Integer.class, true, "disk_mb", 1024) {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetDiskMb(); }
 
         @Override void apply(TwitterTaskInfo task, Integer value) throws TaskDescriptionException {
@@ -210,21 +209,21 @@ public final class ConfigurationManager {
           task.setDiskMb(value);
         }
       })
-      .add(new TypedField<Integer>(Integer.class, "priority", 0) {
+      .add(new TypedField<Integer>(Integer.class, false, "priority", 0) {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetPriority(); }
 
         @Override void apply(TwitterTaskInfo task, Integer value) throws TaskDescriptionException {
           task.setPriority(value);
         }
       })
-      .add(new TypedField<Boolean>(Boolean.class, "production", false) {
+      .add(new TypedField<Boolean>(Boolean.class, false, "production", false) {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetProduction(); }
 
         @Override void apply(TwitterTaskInfo task, Boolean value) throws TaskDescriptionException {
           task.setProduction(value);
         }
       })
-      .add(new TypedField<Integer>(Integer.class, "health_check_interval_secs", 30) {
+      .add(new TypedField<Integer>(Integer.class, false, "health_check_interval_secs", 30) {
         @Override boolean isSet(TwitterTaskInfo task) {
           return task.isSetHealthCheckIntervalSecs();
         }
@@ -233,7 +232,7 @@ public final class ConfigurationManager {
           task.setHealthCheckIntervalSecs(value);
         }
       })
-      .add(new TypedField<Integer>(Integer.class, "max_task_failures", 1) {
+      .add(new TypedField<Integer>(Integer.class, false, "max_task_failures", 1) {
         @Override boolean isSet(TwitterTaskInfo task) { return task.isSetMaxTaskFailures(); }
 
         @Override void apply(TwitterTaskInfo task, Integer value) throws TaskDescriptionException {
@@ -457,16 +456,10 @@ public final class ConfigurationManager {
     private final T defaultValue;
     private final boolean required;
 
-    private Field(String key) {
-      this.key = key;
-      this.defaultValue = null;
-      this.required = true;
-    }
-
-    private Field(String key, T defaultValue) {
+    private Field(boolean required, String key, T defaultValue) {
+      this.required = required;
       this.key = key;
       this.defaultValue = defaultValue;
-      this.required = false;
     }
 
     abstract boolean isSet(TwitterTaskInfo task);
@@ -511,13 +504,8 @@ public final class ConfigurationManager {
   private abstract static class TypedField<T> extends Field<T> {
     private final ValueParser<T> parser;
 
-    TypedField(Class<T> type, String key) {
-      super(key);
-      this.parser = ValueParser.Registry.getParser(type).get();
-    }
-
-    TypedField(Class<T> type, String key, T defaultValue) {
-      super(key, defaultValue);
+    TypedField(Class<T> type, boolean required, String key, T defaultValue) {
+      super(required, key, defaultValue);
       this.parser = ValueParser.Registry.getParser(type).get();
     }
 
@@ -675,17 +663,5 @@ public final class ConfigurationManager {
     public TaskDescriptionException(String msg) {
       super(msg);
     }
-  }
-
-  @SuppressWarnings("unchecked")
-  private static <T> Set<T> getSet(String value, Class<T> type)
-    throws ParseException {
-    ImmutableSet.Builder<T> builder = ImmutableSet.builder();
-    if (!StringUtils.isEmpty(value)) {
-      for (String item : Splitter.on(',').split(value)) {
-        builder.add(ValueParser.Registry.getParser(type).get().parse(item));
-      }
-    }
-    return builder.build();
   }
 }

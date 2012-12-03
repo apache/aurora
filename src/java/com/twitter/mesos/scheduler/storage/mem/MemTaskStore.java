@@ -39,7 +39,7 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
    * {@link #deepCopy(ScheduledTask)} should interact directly with {@code COPIER}.
    */
   private static final Function<ScheduledTask, ScheduledTask> COPIER =
-      Util.deepCopier(ScheduledTask.class);
+      Util.deepCopier();
   private final Function<ScheduledTask, ScheduledTask> deepCopy =
       new Function<ScheduledTask, ScheduledTask>() {
         @Override public ScheduledTask apply(ScheduledTask input) {
