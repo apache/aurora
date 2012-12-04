@@ -31,7 +31,7 @@ def spawn_observer(checkpoint_root):
   random_port = TunnelHelper.get_random_port()
   class ServerThread(threading.Thread):
     def run(self):
-      server.run('0.0.0.0', random_port, 'tornado')
+      server.run('0.0.0.0', random_port, 'cherrypy')
   server_thread = ServerThread()
   server_thread.daemon = True
   server_thread.start()

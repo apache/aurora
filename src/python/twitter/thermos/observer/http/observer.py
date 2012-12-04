@@ -10,8 +10,6 @@ from .file_browser import TaskObserverFileBrowser
 from .json import TaskObserverJSONBindings
 from .templating import HttpTemplate
 
-import bottle
-
 class StaticAssets(object):
   """
     Serve the /assets directory.
@@ -114,7 +112,7 @@ class BottleObserver(HttpServer, BottleObserverMixins):
   def handle_task(self, task_id):
     task = self._observer.task([task_id])
     if not task[task_id]:
-      bottle.abort(404, "Failed to find task %s.  Try again shortly." % task_id)
+      HttpServer.abort(404, "Failed to find task %s.  Try again shortly." % task_id)
     processes = self._observer.processes([task_id])
     if not processes[task_id]:
       return HttpServer.Response(status=404)
@@ -139,7 +137,7 @@ class BottleObserver(HttpServer, BottleObserverMixins):
   def handle_rawtask(self, task_id):
     task = self._observer.task([task_id])
     if not task[task_id]:
-      bottle.abort(404, "Failed to find task %s.  Try again shortly." % task_id)
+      HttpServer.abort(404, "Failed to find task %s.  Try again shortly." % task_id)
     task = task[task_id]
     state = self._observer.state(task_id)
     return dict(

@@ -25,7 +25,7 @@ app.add_option("--root",
 
 
 app.configure(module='twitter.common.app.modules.http',
-    port=1338, host=socket.gethostname(), enable=True, framework='tornado')
+    port=1338, host=socket.gethostname(), enable=True, framework='cherrypy')
 app.configure(module='twitter.common_internal.app.modules.chickadee_handler',
     service_name='thermos_observer')
 

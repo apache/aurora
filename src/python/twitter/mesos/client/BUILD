@@ -2,9 +2,9 @@ python_library(
   name = 'client',
   sources = globs('*.py'),
   dependencies = [
+    python_requirement('cherrypy'),
     python_requirement('mesos==0.9.0'),
     python_requirement('thrift'),
-    python_requirement('tornado'),
     pants('src/python/twitter/common/dirutil'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/net:ssh'),

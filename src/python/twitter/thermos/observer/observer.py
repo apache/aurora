@@ -338,10 +338,14 @@ class TaskObserver(threading.Thread, Lockable):
 
   def _sample(self, task_id):
     if task_id not in self._resource_monitors:
-      return ProcessSample.empty().to_dict()
+      sample = ProcessSample.empty().to_dict()
+      sample['disk'] = 0
     else:
       resource_sample = self._resource_monitors[task_id].sample()[1]
-      return resource_sample.process_sample.to_dict()
+      sample = resource_sample.process_sample.to_dict()
+      sample['disk'] = resource_sample.disk_usage
+    log.debug("Got sample for task %s: %s" % (task_id, sample))
+    return sample
 
   @Lockable.sync
   def task_statuses(self, task_id):
