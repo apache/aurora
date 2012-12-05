@@ -9,8 +9,7 @@ python_tests(name = 'test_planner',
   sources = ['test_planner.py'],
   dependencies = [
     pants('src/python/twitter/thermos/base:planner'),
-  ],
-  coverage = 'twitter.thermos.base.planner'
+  ]
 )
 
 python_tests(name = 'test_task_planner',
@@ -19,5 +18,5 @@ python_tests(name = 'test_task_planner',
     pants('src/python/twitter/common/testing'),
     pants('src/python/twitter/thermos/base:planner'),
     pants('src/python/twitter/thermos/config:schema'),
-  ],
+  ]
 )

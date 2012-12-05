@@ -17,8 +17,7 @@ python_tests(name = 'gc_executor',
     pants('src/python/twitter/mesos/executor:gc_executor_lib'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
     pants('src/thrift/com/twitter/thermos:py-thrift')
-  ],
-  coverage = 'twitter.mesos.executor.gc_executor'
+  ]
 )
 
 python_tests(name = 'resource_manager',
@@ -35,7 +34,7 @@ python_tests(name = 'sandbox_manager',
     pants('src/python/twitter/common/contextutil'),
     pants('src/python/twitter/mesos/config:schema'),
     pants('src/python/twitter/mesos/executor:sandbox_manager'),
-  ],
+  ]
 )
 
 python_tests(name = 'discovery_manager',
