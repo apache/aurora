@@ -161,7 +161,7 @@ def run(args, options):
 
   """Run a thermos task.
 
-    Usage: thermos run [options] config [task_name]
+    Usage: thermos run [options] config
     Options:
       --user=USER		   run as this user.  if not $USER, must have setuid privilege.
       --enable_chroot		   chroot into the sandbox for this task, requires superuser
@@ -201,13 +201,11 @@ def inspect_unwrap(obj):
 
 @app.command
 @app.command_option("--task", metavar="TASKNAME", default=None, dest='task',
-                    help="The thermos task within the config that should be run. Only required if "
-                    "there are multiple tasks exported from the thermos configuration.")
-@app.command_option("--task_id", metavar="STRING", default=None, dest='task_id',
-                    help="The id to which this task should be bound, synthesized from the task "
-                    "name if none provided.")
+                    help="The thermos task within the config that should be inspected. Only "
+                    "required if there are multiple tasks exported from the thermos "
+                    "configuration.")
 @app.command_option("--json", default=False, action='store_true', dest='json',
-                    help="Read the source file in json format.")
+                    help="Read the source file in json format instead of pystachio.")
 @app.command_option("-P", "--port", type="string", nargs=1, action="callback",
                     callback=add_port_to('prebound_ports'), dest="prebound_ports", default=[],
                     metavar="NAME:PORT", help="bind named PORT to NAME.")
@@ -216,15 +214,13 @@ def inspect_unwrap(obj):
                     metavar="NAME=VALUE",
                     help="bind the configuration environment variable NAME to VALUE.")
 def inspect(args, options):
-  """Run a thermos task.
+  """Inspect a thermos config and display the evaluated task
 
-    Usage: thermos inspect [options] config [task_name]
+    Usage: thermos inspect [options] config
     Options:
-      --task=TASKNAME		   the thermos task within the config that should be run.  only
+      --task=TASKNAME		   the thermos task within the config that should be inspected. Only
                                    required if there are multiple tasks exported from the thermos
                                    configuration.
-      --task_id=STRING		   the id to which this task should be bound, synthesized from the
-                                   task name if none provided.
       --json			   specify that the config is in json format instead of pystachio
       -P/--port=NAME:PORT	   bind the named port NAME to port number PORT (may be specified
                                    multiple times to bind multiple names.)
