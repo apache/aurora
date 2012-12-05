@@ -57,10 +57,6 @@ public final class ConfigurationManager {
   @CmdLine(name = "max_tasks_per_job", help = "Maximum number of allowed tasks in a single job.")
   public static final Arg<Integer> MAX_TASKS_PER_JOB = Arg.create(500);
 
-  @CmdLine(name = "constrain_legacy_executor",
-      help = "If true, only allow the legacy executor to run on specially-tagged machines.")
-  public static final Arg<Boolean> CONSTRAIN_LEGACY_EXECUTOR = Arg.create(true);
-
   @CmdLine(name = "require_contact_email",
       help = "If true, reject jobs that do not specify a contact email address.")
   public static final Arg<Boolean> REQUIRE_CONTACT_EMAIL = Arg.create(true);
@@ -135,9 +131,7 @@ public final class ConfigurationManager {
           // Apply an executor:legacy constraint to all non-thermos tasks.
           if (!Tasks.isThermos(task)) {
             Iterables.removeIf(task.getConstraints(), hasName(LEGACY_EXECUTOR.getName()));
-            if (CONSTRAIN_LEGACY_EXECUTOR.get()) {
-              task.addToConstraints(LEGACY_EXECUTOR);
-            }
+            task.addToConstraints(LEGACY_EXECUTOR);
           }
         }
       })
