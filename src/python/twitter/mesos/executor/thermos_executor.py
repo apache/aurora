@@ -70,6 +70,8 @@ class ThermosExecutor(ThermosExecutorBase):
     self._manager = None
     self._runner_class = runner_class
     self._manager_class = manager_class
+    # To catch killTasks sent while the runner initialization is occurring
+    self._abort_runner = threading.Event()
     self.launched = threading.Event()
 
   @staticmethod
@@ -113,10 +115,27 @@ class ThermosExecutor(ThermosExecutorBase):
         - Set up StatusManager, and attach HealthCheckers
     """
     try:
+      self._runner.initialize()
+    except self._runner.TaskError as e:
+      msg = 'Initialization of task runner failed: %s' % e
+      log.fatal(msg)
+      self.send_update(driver, self._task_id, 'FAILED', msg)
+      defer(driver.stop, delay=self.STOP_WAIT)
+      return
+
+    if self._abort_runner.is_set():
+      msg = 'Task killed during initialization'
+      log.fatal(msg)
+      self.send_update(driver, self._task_id, 'KILLED', msg)
+      defer(driver.stop, delay=self.STOP_WAIT)
+      return
+
+    try:
       self._runner.start()
     except self._runner.TaskError as e:
-      log.fatal('Task initialization failed: %s' % e)
-      self.send_update(driver, self._task_id, 'FAILED', 'Task initialization failed: %s' % e)
+      msg = 'Task initialization failed: %s' % e
+      log.fatal(msg)
+      self.send_update(driver, self._task_id, 'FAILED', msg)
       defer(driver.stop, delay=self.STOP_WAIT)
       return
 
@@ -215,6 +234,10 @@ class ThermosExecutor(ThermosExecutorBase):
       return
     if task_id.value != self._task_id:
       log.error('Got killTask for a different task than what we are running!')
+      return
+    if not self._runner.is_initialized():
+      log.error('Got killTask for task with incomplete sandbox - aborting runner start')
+      self._abort_runner.set()
       return
     if self.thermos_status_is_terminal(self._runner.task_state()):
       log.error('Got killTask for task in terminal state!')

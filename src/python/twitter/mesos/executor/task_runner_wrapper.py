@@ -43,12 +43,15 @@ class TaskRunnerWrapper(object):
       :mesos_ports => { name => port } dictionary
     """
     self._popen = None
+    self._monitor = None
     self._dead = threading.Event()
     self._task_id = task_id
     self._mesos_task = mesos_task
     self._task = mesos_task.task()
     self._ports = mesos_ports
     self._runner_pex = runner_pex
+    if not os.path.exists(self._runner_pex):
+      raise self.TaskError('Specified runner pex does not exist!')
     self._sandbox = sandbox
     if not isinstance(self._sandbox, SandboxBase):
       raise ValueError('sandbox must be derived from SandboxBase!')
@@ -78,21 +81,26 @@ class TaskRunnerWrapper(object):
   def sandbox(self):
     return self._sandbox
 
-  def start(self):
+  def initialize(self):
     """
-      Fork the task runner.
+      Initialize the sandbox for the task runner. Depending on the implementation, this may take
+      some time to complete.
     """
-    assert os.path.exists(self._runner_pex)
-    chmod_plus_x(self._runner_pex)
-
-    self._monitor = TaskMonitor(TaskPath(root=self._checkpoint_root), self._task_id)
-
     try:
       log.info('Creating sandbox.')
       self._sandbox.create(self._mesos_task)
     except Exception as e:
       log.fatal('Could not construct sandbox: %s' % e)
       raise self.TaskError('Could not construct sandbox: %s' % e)
+
+  def start(self):
+    """
+      Fork the task runner.
+    """
+    if not self.is_initialized():
+      raise self.TaskError('Cannot start task runner before initialization')
+    chmod_plus_x(self._runner_pex)
+    self._monitor = TaskMonitor(TaskPath(root=self._checkpoint_root), self._task_id)
 
     params = dict(log_dir=LogOptions.log_dir(),
                   log_to_disk="DEBUG",
@@ -111,13 +119,19 @@ class TaskRunnerWrapper(object):
     for name, port in self._ports.items():
       cmdline_args.extend(['--port=%s:%s' % (name, port)])
     log.info('Forking off runner with cmdline: %s' % ' '.join(cmdline_args))
-    self._popen = subprocess.Popen(cmdline_args)
+    try:
+      self._popen = subprocess.Popen(cmdline_args)
+    except OSError as e:
+      raise self.TaskError(e)
 
   def state(self):
-    return self._monitor.get_state()
+    return self._monitor.get_state() if self._monitor else None
 
   def task_state(self):
-    return self._monitor.task_state()
+    return self._monitor.task_state() if self._monitor else None
+
+  def is_initialized(self):
+    return self._sandbox.exists()
 
   def is_started(self):
     return self._popen is not None and self._popen.pid is not None
