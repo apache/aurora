@@ -7,7 +7,7 @@ from .gc_executor import ThermosGCExecutor
 import mesos
 
 
-LogOptions.set_log_dir('/var/log/mesos')
+LogOptions.set_log_dir('executor_logs')
 LogOptions.set_disk_log_level('DEBUG')
 app.configure(module='twitter.common_internal.app.modules.chickadee_handler',
     service_name='thermos_gc_executor')
