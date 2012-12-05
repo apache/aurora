@@ -36,12 +36,6 @@ from twitter.thermos.runner.helper import TaskRunnerHelper
 from twitter.thermos.runner.runner import TaskRunnerUniversalHandler
 from thrift.TSerialization import serialize as thrift_serialize
 
-if 'PEX_COVERAGE' in os.environ:
-  import coverage
-  cov = coverage.coverage(auto_data=True, data_suffix=True,
-    data_file='.coverage.' + os.environ['PEX_COVERAGE'])
-  cov.start()
-
 random.seed(%(random_seed)d)
 
 log.init('runner_base')
