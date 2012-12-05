@@ -117,6 +117,8 @@ class TaskResourceMonitor(ResourceMonitorBase, threading.Thread):
     self.daemon = True
 
   def sample(self):
+    if not self.is_alive():
+      log.warning("TaskResourceMonitor not running - sample may be inaccurate")
     return self.sample_at(time.time())
 
   def sample_at(self, timestamp):

@@ -88,6 +88,7 @@ class TaskObserver(threading.Thread, Lockable):
             self._read_task(active)      # read and memoize ThermosTask object
             sandbox = self._task_monitors[active].get_state().header.sandbox
             self._resource_monitors[active] = self._resource_monitor(task_monitor, sandbox)
+            self._resource_monitors[active].start()
             self._stat[active] = self._get_stat(active)
             log.debug('task_id %s -> active' % active)
         for finished in finished_tasks:
