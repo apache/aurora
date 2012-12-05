@@ -33,8 +33,6 @@ import com.twitter.mesos.scheduler.quota.Quotas;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import static org.apache.commons.lang.StringUtils.isEmpty;
-
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.mesos.Tasks.ACTIVE_STATES;
 import static com.twitter.mesos.Tasks.jobKey;
@@ -263,10 +261,9 @@ public class SchedulerCoreImpl implements SchedulerCore {
   }
 
   private static boolean specifiesJobOnly(TaskQuery query) {
-    boolean specifiesJob = (query.getOwner() != null)
-        && !isEmpty(query.getOwner().getRole())
-        && !isEmpty(query.getJobName());
-    return specifiesJob && (query.getStatusesSize() == 0) && (query.getTaskIdsSize() == 0);
+    return Query.isJobScoped(query)
+        && (query.getStatusesSize() == 0)
+        && (query.getTaskIdsSize() == 0);
   }
 
   @Override

@@ -41,25 +41,25 @@ public class StorageBenchmark extends AbstractApplication {
   @CmdLine(name = "queried_job_active_stages",
       help = "Test stages for active task count of the job queried.")
   private static final Arg<List<Integer>> ACTIVE_STAGES =
-      Arg.create((List<Integer>) ImmutableList.<Integer>of(1000, 10000));
+      Arg.create((List<Integer>) ImmutableList.<Integer>of(100, 1000, 10000));
 
   @CmdLine(name = "queried_job_inactive_stages",
       help = "Test stages for inactive task count of the job queried.")
   private static final Arg<List<Integer>> INACTIVE_STAGES =
-      Arg.create((List<Integer>) ImmutableList.<Integer>of(1000, 10000));
+      Arg.create((List<Integer>) ImmutableList.<Integer>of(100, 1000, 10000));
 
   @CmdLine(name = "dormant_task_stages",
       help = "Test stages dormant task count (tasks that are not queried).")
   private static final Arg<List<Integer>> DORMANT_STAGES =
-      Arg.create((List<Integer>) ImmutableList.<Integer>of(1000, 10000));
+      Arg.create((List<Integer>) ImmutableList.<Integer>of(1000, 10000, 100000));
 
   @CmdLine(name = "fetches", help = "Number of fetch operations to perform in each test stage.")
   private static final Arg<Integer> FETCHES = Arg.create(10000);
 
   enum QueryType {
     BY_ID,
-    BY_ROLE,
     BY_JOB,
+    BY_ROLE,
     ALL
   }
 

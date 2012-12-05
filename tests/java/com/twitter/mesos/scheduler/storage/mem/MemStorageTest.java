@@ -19,8 +19,10 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
@@ -87,7 +89,12 @@ public class MemStorageTest extends TearDownTestCase {
   }
 
   private ScheduledTask makeTask(String taskId) {
-    return new ScheduledTask().setAssignedTask(new AssignedTask().setTaskId(taskId));
+    return new ScheduledTask().setAssignedTask(
+        new AssignedTask()
+            .setTaskId(taskId)
+            .setTask(new TwitterTaskInfo()
+                .setOwner(new Identity().setRole("owner-" + taskId))
+                .setJobName("job-" + taskId)));
   }
 
   private class CustomException extends RuntimeException {

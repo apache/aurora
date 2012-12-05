@@ -10,6 +10,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.common.base.Closure;
+import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.ScheduleStatus;
@@ -17,7 +18,6 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.Query;
-import com.twitter.mesos.scheduler.storage.TaskStore;
 
 import static org.junit.Assert.assertEquals;
 
@@ -28,7 +28,7 @@ public class MemTaskStoreTest {
   private static final ScheduledTask TASK_C = makeTask("c");
   private static final ScheduledTask TASK_D = makeTask("d");
 
-  private TaskStore.Mutable store;
+  private MemTaskStore store;
 
   @Before
   public void setUp() {
@@ -144,6 +144,81 @@ public class MemTaskStoreTest {
     assertStoreContents(TASK_A.deepCopy().setStatus(ScheduleStatus.ASSIGNED));
   }
 
+  private void beforeAndAfterCommit(Runnable work) {
+    work.run();
+    store.commit();
+    work.run();
+  }
+
+  @Test
+  public void testConsistentJobIndex() {
+    final ScheduledTask a = makeTask("a", "jim", "job");
+    final ScheduledTask b = makeTask("b", "jim", "job");
+    final ScheduledTask c = makeTask("c", "jim", "job2");
+    final ScheduledTask d = makeTask("d", "joe", "job");
+    final TaskQuery jimsJob = Query.byJob("jim", "job");
+    final TaskQuery jimsJob2 = Query.byJob("jim", "job2");
+    final TaskQuery joesJob = Query.byJob("joe", "job");
+
+    store.saveTasks(ImmutableSet.of(a, b, c, d));
+    beforeAndAfterCommit(new Runnable() {
+      @Override public void run() {
+        assertQueryResults(jimsJob, a, b);
+        assertQueryResults(jimsJob2, c);
+        assertQueryResults(joesJob, d);
+      }
+    });
+
+    store.deleteTasks(ImmutableSet.of(Tasks.id(b)));
+    beforeAndAfterCommit(new Runnable() {
+      @Override public void run() {
+        assertQueryResults(jimsJob, a);
+        assertQueryResults(jimsJob2, c);
+        assertQueryResults(joesJob, d);
+      }
+    });
+
+    store.mutateTasks(jimsJob, new Closure<ScheduledTask>() {
+      @Override public void execute(ScheduledTask task) {
+        task.setStatus(ScheduleStatus.RUNNING);
+      }
+    });
+    // Change 'a' locally to make subsequent equality checks pass.
+    a.setStatus(ScheduleStatus.RUNNING);
+    beforeAndAfterCommit(new Runnable() {
+      @Override public void run() {
+        assertQueryResults(jimsJob, a);
+        assertQueryResults(jimsJob2, c);
+        assertQueryResults(joesJob, d);
+      }
+    });
+
+    store.deleteTasks(ImmutableSet.of(Tasks.id(d)));
+    assertQueryResults(joesJob);
+    store.rollback();
+    assertQueryResults(jimsJob, a);
+    assertQueryResults(jimsJob2, c);
+    assertQueryResults(joesJob, d);
+
+    store.deleteTasks(ImmutableSet.of(Tasks.id(d)));
+    beforeAndAfterCommit(new Runnable() {
+      @Override public void run() {
+        assertQueryResults(jimsJob, a);
+        assertQueryResults(jimsJob2, c);
+        assertQueryResults(joesJob);
+      }
+    });
+
+    store.saveTasks(ImmutableSet.of(b));
+    beforeAndAfterCommit(new Runnable() {
+      @Override public void run() {
+        assertQueryResults(jimsJob, a, b);
+        assertQueryResults(jimsJob2, c);
+        assertQueryResults(joesJob);
+      }
+    });
+  }
+
   private void assertStoreContents(ScheduledTask... tasks) {
     assertQueryResults(Query.GET_ALL, tasks);
   }
@@ -154,14 +229,18 @@ public class MemTaskStoreTest {
         store.fetchTasks(query));
   }
 
-  private static ScheduledTask makeTask(String id) {
+  private static ScheduledTask makeTask(String id, String role, String jobName) {
     return new ScheduledTask()
         .setStatus(ScheduleStatus.PENDING)
         .setAssignedTask(new AssignedTask()
             .setTaskId(id)
             .setTask(new TwitterTaskInfo()
                 .setShardId(0)
-                .setJobName("job-" + id)
-                .setOwner(new Identity("role-" + id, "user-" + id))));
+                .setJobName(jobName)
+                .setOwner(new Identity(role, role))));
+  }
+
+  private static ScheduledTask makeTask(String id) {
+    return makeTask(id, "role-" + id, "job-" + id);
   }
 }

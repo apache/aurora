@@ -1,5 +1,6 @@
 package com.twitter.mesos.scheduler.storage.mem;
 
+import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
 
@@ -11,6 +12,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Multimaps;
+import com.google.common.collect.Sets;
 
 import org.apache.commons.lang.StringUtils;
 
@@ -20,17 +23,13 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.storage.TaskStore;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * An in-memory task store.
- *
- * TODO(William Farner): Once deployed, study performance to determine if (now gone) DbStorage's
- * IdComparedScheduledTask should be adopted here as well.
- * TODO(William Farner): With sufficient evidence from query patterns, use the task ID to
- * limit the working set for query scans.
  */
 public class MemTaskStore implements TaskStore.Mutable.Transactioned {
 
@@ -49,15 +48,19 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
 
   private final TransactionalMap<String, ScheduledTask> tasks =
       TransactionalMap.wrap(Maps.<String, ScheduledTask>newHashMap());
+  private final TransactionalMap<String, Set<String>> tasksByJobKey =
+      TransactionalMap.wrap(Maps.<String, Set<String>>newHashMap());
 
   @Override
   public void commit() {
     tasks.commit();
+    tasksByJobKey.commit();
   }
 
   @Override
   public void rollback() {
     tasks.rollback();
+    tasksByJobKey.rollback();
   }
 
   @Timed("mem_storage_deep_copies")
@@ -81,6 +84,13 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
     return mutableMatches(query).transform(Tasks.SCHEDULED_TO_ID).toImmutableSet();
   }
 
+  private Map<String, Collection<String>> taskIdsByJobKey(Iterable<ScheduledTask> toIndex) {
+    return Multimaps.transformValues(
+        Multimaps.index(toIndex, Tasks.SCHEDULED_TO_JOB_KEY),
+        Tasks.SCHEDULED_TO_ID)
+        .asMap();
+  }
+
   @Timed("mem_storage_save_tasks")
   @Override
   public void saveTasks(Set<ScheduledTask> newTasks) {
@@ -91,12 +101,29 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
     Set<ScheduledTask> immutable =
         FluentIterable.from(newTasks).transform(deepCopy).toImmutableSet();
     tasks.putAll(Maps.uniqueIndex(immutable, Tasks.SCHEDULED_TO_ID));
+
+    // Update job key index.
+    for (Map.Entry<String, Collection<String>> entry : taskIdsByJobKey(immutable).entrySet()) {
+      ImmutableSet.Builder<String> newIds = ImmutableSet.builder();
+      newIds.addAll(entry.getValue());
+      Set<String> existingIds = tasksByJobKey.get(entry.getKey());
+      if (existingIds != null) {
+        newIds.addAll(existingIds);
+      }
+
+      // This is subtle but important: when modifying the items associated with a key, we must
+      // re-insert rather than updating the contents of the set.  The transactional map has no
+      // awareness of the contents of a value, so modifying the value set would break the
+      // transactional guarantee.
+      tasksByJobKey.put(entry.getKey(), newIds.build());
+    }
   }
 
   @Timed("mem_storage_delete_all_tasks")
   @Override
   public void deleteTasks() {
     tasks.clear();
+    tasksByJobKey.clear();
   }
 
   @Timed("mem_storage_delete_tasks")
@@ -105,8 +132,26 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
     checkNotNull(taskIds);
 
     // TransactionalMap does not presently support keySet modification, requiring iteration here.
+    ImmutableList.Builder<ScheduledTask> gone = ImmutableList.builder();
     for (String id : taskIds) {
-      tasks.remove(id);
+      ScheduledTask task = tasks.remove(id);
+      if (task != null) {
+        gone.add(task);
+      }
+    }
+    for (Map.Entry<String, Collection<String>> entry : taskIdsByJobKey(gone.build()).entrySet()) {
+      Set<String> existingIds = tasksByJobKey.get(entry.getKey());
+      if (existingIds == null) {
+        throw new IllegalStateException(
+            "Index inconsistency - job for tasks not present in index: " + entry.getValue());
+      }
+
+      Set<String> newIds = Sets.difference(existingIds, ImmutableSet.copyOf(entry.getValue()));
+      if (newIds.isEmpty()) {
+        tasksByJobKey.remove(entry.getKey());
+      } else {
+        tasksByJobKey.put(entry.getKey(), newIds);
+      }
     }
   }
 
@@ -191,18 +236,30 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
     return mutableMatches(query).transform(deepCopy);
   }
 
+  private Iterable<ScheduledTask> fromIdIndex(Iterable<String> taskIds) {
+    ImmutableList.Builder<ScheduledTask> matches = ImmutableList.builder();
+    for (String id : taskIds) {
+      ScheduledTask match = tasks.get(id);
+      if (match != null) {
+        matches.add(match);
+      }
+    }
+    return matches.build();
+  }
+
   private FluentIterable<ScheduledTask> mutableMatches(TaskQuery query) {
     // Apply the query against the working set.
     Iterable<ScheduledTask> from;
     if (query.isSetTaskIds()) {
-      ImmutableList.Builder<ScheduledTask> matches = ImmutableList.builder();
-      for (String id : query.getTaskIds()) {
-        ScheduledTask match = tasks.get(id);
-        if (match != null) {
-          matches.add(match);
-        }
+      from = fromIdIndex(query.getTaskIds());
+    } else if (Query.isJobScoped(query)) {
+      Collection<String> taskIds =
+          tasksByJobKey.get(Tasks.jobKey(query.getOwner().getRole(), query.getJobName()));
+      if (taskIds == null) {
+        from = ImmutableList.of();
+      } else {
+        from = fromIdIndex(taskIds);
       }
-      from = matches.build();
     } else {
       from = tasks.values();
     }

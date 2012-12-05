@@ -28,9 +28,11 @@ import com.twitter.common.util.BackoffStrategy;
 import com.twitter.common.util.testing.FakeClock;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
+import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.Driver;
 import com.twitter.mesos.scheduler.StateManager;
 import com.twitter.mesos.scheduler.TaskAssigner;
@@ -173,7 +175,9 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     return new ScheduledTask()
         .setStatus(status)
         .setAssignedTask(new AssignedTask()
-            .setTaskId(taskId));
+            .setTaskId(taskId)
+            .setTask(new TwitterTaskInfo()
+                .setOwner(new Identity().setRole("role-" + taskId).setUser("user-" + taskId))));
   }
 
   private void insertTasks(final ScheduledTask task, final ScheduledTask... tasks) {

@@ -9,6 +9,8 @@ import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.TaskQuery;
 
+import static org.apache.commons.lang.StringUtils.isEmpty;
+
 /**
  * A utility class to construct storage queries.
  */
@@ -57,5 +59,19 @@ public final class Query {
     return new TaskQuery()
         .setOwner(new Identity().setRole(role))
         .setJobName(job);
+  }
+
+  /**
+   * Checks whether a query is scoped to a specific job.
+   * A query scoped to a job specifies a role and job name.
+   *
+   * @param query Query to test.
+   * @return {@code true} if the query specifies at least a role and job name,
+   *         otherwise {@code false}.
+   */
+  public static boolean isJobScoped(TaskQuery query) {
+    return (query.getOwner() != null)
+        && !isEmpty(query.getOwner().getRole())
+        && !isEmpty(query.getJobName());
   }
 }

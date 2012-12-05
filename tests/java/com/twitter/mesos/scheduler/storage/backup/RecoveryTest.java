@@ -16,7 +16,9 @@ import com.twitter.common.util.testing.FakeClock;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.HostAttributes;
+import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.storage.JobUpdateConfiguration;
 import com.twitter.mesos.gen.storage.QuotaConfiguration;
 import com.twitter.mesos.gen.storage.SchedulerMetadata;
@@ -153,6 +155,10 @@ public class RecoveryTest extends EasyMockTest {
   }
 
   private static ScheduledTask makeTask(String taskId) {
-    return new ScheduledTask().setAssignedTask(new AssignedTask().setTaskId(taskId));
+    return new ScheduledTask().setAssignedTask(
+        new AssignedTask()
+            .setTaskId(taskId)
+            .setTask(new TwitterTaskInfo()
+                .setOwner(new Identity().setRole("role-" + taskId).setUser("user-" + taskId))));
   }
 }
