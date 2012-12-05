@@ -58,7 +58,7 @@ public class MemTaskStoreTest {
     assertQueryResults(Query.byId(ImmutableSet.of("a", "d")), TASK_A, TASK_D);
     assertQueryResults(Query.byRole("role-c"), TASK_C);
     assertQueryResults(Query.byStatus(ScheduleStatus.PENDING), TASK_A, TASK_B, TASK_C, TASK_D);
-    assertQueryResults(Query.liveShard("role-a/job-a", 0), TASK_A);
+    assertQueryResults(Query.liveShard("role-a", "job-a", 0), TASK_A);
     assertQueryResults(Query.activeQuery(new Identity().setRole("role-b"), "job-b"), TASK_B);
 
     // Explicitly call out the current differing behaviors for types of empty query conditions.

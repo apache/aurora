@@ -36,7 +36,6 @@ import static javax.ws.rs.core.Response.Status.NOT_FOUND;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import static com.twitter.mesos.Tasks.jobKey;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 
 /**
@@ -175,7 +174,7 @@ public class Mname {
       Optional<String> forwardRequest) {
 
     ScheduledTask task = Iterables.getOnlyElement(
-        scheduler.getTasks(Query.liveShard(jobKey(role, job), shardId)), null);
+        scheduler.getTasks(Query.liveShard(role, job, shardId)), null);
     if (task == null) {
       return respond(NOT_FOUND, "No such live shard found.");
     }

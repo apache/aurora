@@ -46,6 +46,7 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Attribute;
 import com.twitter.mesos.gen.HostAttributes;
+import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
@@ -75,7 +76,6 @@ import static com.google.common.collect.Iterables.transform;
 
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.mesos.Tasks.SCHEDULED_TO_SHARD_ID;
-import static com.twitter.mesos.Tasks.jobKey;
 import static com.twitter.mesos.gen.ScheduleStatus.INIT;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
@@ -323,10 +323,16 @@ public class StateManagerImpl implements StateManager {
     });
   }
 
-  private static Set<String> activeShards(TaskStore taskStore, String jobKey, int shardId) {
+  private static Set<String> activeShards(
+      TaskStore taskStore,
+      String role,
+      String job,
+      int shardId) {
+
     TaskQuery query = new TaskQuery()
         .setStatuses(Tasks.ACTIVE_STATES)
-        .setJobKey(jobKey)
+        .setOwner(new Identity().setRole(role))
+        .setJobName(job)
         .setShardIds(ImmutableSet.of(shardId));
     return taskStore.fetchTaskIds(query);
   }
@@ -362,7 +368,8 @@ public class StateManagerImpl implements StateManager {
               // Perform a sanity check on the number of active shards.
               Set<String> activeTasksInShard = activeShards(
                   storeProvider.getTaskStore(),
-                  Tasks.jobKey(task),
+                  Tasks.getRole(task),
+                  Tasks.getJob(task),
                   Tasks.SCHEDULED_TO_SHARD_ID.apply(task));
 
               if (activeTasksInShard.size() > 1) {
@@ -385,7 +392,8 @@ public class StateManagerImpl implements StateManager {
                   addSideEffect(new SideEffect() {
                     @Override public void mutate(MutableState state) {
                       state.getVars().adjustCount(
-                          Tasks.jobKey(task),
+                          Tasks.getRole(task),
+                          Tasks.getJob(task),
                           task.getStatus(),
                           ScheduleStatus.KILLED);
                     }
@@ -478,7 +486,7 @@ public class StateManagerImpl implements StateManager {
       @Override public String apply(MutableStoreProvider storeProvider) throws UpdateException {
         String jobKey = Tasks.jobKey(role, job);
         Set<TwitterTaskInfo> existingTasks = ImmutableSet.copyOf(Iterables.transform(
-            storeProvider.getTaskStore().fetchTasks(Query.activeQuery(jobKey)),
+            storeProvider.getTaskStore().fetchTasks(Query.activeQuery(role, job)),
             Tasks.SCHEDULED_TO_INFO));
 
         if (existingTasks.isEmpty()) {
@@ -560,7 +568,7 @@ public class StateManagerImpl implements StateManager {
               (result == UpdateResult.SUCCESS) ? GET_NEW_CONFIG : GET_ORIGINAL_CONFIG;
           for (Integer shard : fetchRemovedShards(jobConfig.get(), removedSelector)) {
             changeState(
-                Query.liveShard(jobKey, shard),
+                Query.liveShard(role, job, shard),
                 KILLING,
                 Optional.of("Removed during update."));
           }
@@ -758,7 +766,7 @@ public class StateManagerImpl implements StateManager {
             }
 
             Set<ScheduledTask> tasks =
-                store.getTaskStore().fetchTasks(Query.liveShards(jobKey, shards));
+                store.getTaskStore().fetchTasks(Query.liveShards(role, jobName, shards));
 
             // Extract any shard IDs that are being added as a part of this stage in the update.
             Set<Integer> newShardIds = Sets.difference(shards,
@@ -792,7 +800,7 @@ public class StateManagerImpl implements StateManager {
                 // Initiate update on the existing shards.
                 // TODO(William Farner): The additional query could be avoided here.
                 //                       Consider allowing state changes on tasks by task ID.
-                changeState(Query.liveShards(jobKey, changedShards), modifyingState);
+                changeState(Query.liveShards(role, jobName, changedShards), modifyingState);
                 putResults(result, ShardUpdateResult.RESTARTING, changedShards);
               }
               putResults(
@@ -1007,7 +1015,9 @@ public class StateManagerImpl implements StateManager {
     return new StringBuilder()
         .append(clock.nowMillis())               // Allows chronological sorting.
         .append(sep)
-        .append(jobKey(task))                    // Identification and collision prevention.
+        .append(task.getOwner().getRole())       // Identification and collision prevention.
+        .append(sep)
+        .append(task.getJobName())
         .append(sep)
         .append(task.getShardId())               // Collision prevention within job.
         .append(sep)
@@ -1077,7 +1087,8 @@ public class StateManagerImpl implements StateManager {
               @Override
               public void mutate(MutableState state) {
                 state.getVars().adjustCount(
-                    stateMachine.getJobKey(),
+                    stateMachine.getRole(),
+                    stateMachine.getJobName(),
                     stateMachine.getPreviousState(),
                     stateMachine.getState());
               }
@@ -1125,7 +1136,10 @@ public class StateManagerImpl implements StateManager {
         addSideEffect(new SideEffect() {
           @Override public void mutate(MutableState state) {
             for (ScheduledTask task : tasks) {
-              state.getVars().decrementCount(Tasks.jobKey(task), task.getStatus());
+              state.getVars().decrementCount(
+                  Tasks.getRole(task),
+                  Tasks.getJob(task),
+                  task.getStatus());
             }
           }
         });
@@ -1202,12 +1216,13 @@ public class StateManagerImpl implements StateManager {
 
   private TaskStateMachine getStateMachine(String taskId, ScheduledTask task) {
     if (task != null) {
-      String role = task.getAssignedTask().getTask().getOwner().getRole();
-      String job = task.getAssignedTask().getTask().getJobName();
+      String role = Tasks.getRole(task);
+      String job = Tasks.getJob(task);
 
       return new TaskStateMachine(
           Tasks.id(task),
-          Tasks.jobKey(task),
+          role,
+          job,
           task,
           taskUpdateChecker(role, job),
           workSink,
@@ -1220,6 +1235,7 @@ public class StateManagerImpl implements StateManager {
         taskId,
         null,
         // The task is unknown, so there is no matching task to fetch.
+        null,
         null,
         // Since the task doesn't exist, its job cannot be updating.
         Suppliers.ofInstance(false),
@@ -1243,13 +1259,13 @@ public class StateManagerImpl implements StateManager {
       final ScheduleStatus initialState) {
 
     final String taskId = Tasks.id(task);
-    String role = task.getAssignedTask().getTask().getOwner().getRole();
-    String job = task.getAssignedTask().getTask().getJobName();
+    final String role = Tasks.getRole(task);
+    final String job = Tasks.getJob(task);
 
-    final String jobKey = Tasks.jobKey(task);
     TaskStateMachine stateMachine = new TaskStateMachine(
         taskId,
-        jobKey,
+        role,
+        job,
         Iterables.getOnlyElement(fetchTasks(Query.byId(taskId))),
         taskUpdateChecker(role, job),
         workSink,
@@ -1258,7 +1274,7 @@ public class StateManagerImpl implements StateManager {
 
     sideEffectWork.addSideEffect(new SideEffect() {
       @Override public void mutate(MutableState state) {
-        state.getVars().incrementCount(jobKey, initialState);
+        state.getVars().incrementCount(role, job, initialState);
       }
     });
 

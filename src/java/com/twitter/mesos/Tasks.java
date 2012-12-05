@@ -19,7 +19,6 @@ import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
-import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 
 /**
@@ -63,13 +62,6 @@ public final class Tasks {
 
   public static final Function<ScheduledTask, Integer> SCHEDULED_TO_SHARD_ID =
       Functions.compose(INFO_TO_SHARD_ID, SCHEDULED_TO_INFO);
-
-  public static final Function<ScheduledTask, Iterable<TaskEvent>> GET_TASK_EVENTS =
-      new Function<ScheduledTask, Iterable<TaskEvent>>() {
-        @Override public Iterable<TaskEvent> apply(ScheduledTask task) {
-          return task.getTaskEvents();
-        }
-      };
 
   public static final Function<TwitterTaskInfo, String> INFO_TO_JOB_KEY =
       new Function<TwitterTaskInfo, String>() {
@@ -192,5 +184,13 @@ public final class Tasks {
     // Length check is an artifact of thrift 0.5.0 NPE workaround from ConfigurationManager.
     // See MESOS-370.
     return task.isSetThermosConfig() && (task.getThermosConfig().length > 0);
+  }
+
+  public static String getRole(ScheduledTask task) {
+    return task.getAssignedTask().getTask().getOwner().getRole();
+  }
+
+  public static String getJob(ScheduledTask task) {
+    return task.getAssignedTask().getTask().getJobName();
   }
 }

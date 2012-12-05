@@ -19,7 +19,7 @@ public class ImmediateJobManager extends JobManager {
   }
 
   @Override
-  public boolean hasJob(String jobKey) {
-    return !schedulerCore.getTasks(Query.activeQuery(jobKey)).isEmpty();
+  public boolean hasJob(String role, String job) {
+    return !schedulerCore.getTasks(Query.activeQuery(role, job)).isEmpty();
   }
 }

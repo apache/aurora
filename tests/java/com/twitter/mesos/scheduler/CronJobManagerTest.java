@@ -11,7 +11,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.common.testing.EasyMockTest;
-import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.CronCollisionPolicy;
 import com.twitter.mesos.gen.Identity;
@@ -71,7 +70,7 @@ public class CronJobManagerTest extends EasyMockTest {
     control.replay();
 
     cron.receiveJob(job);
-    cron.startJobNow(Tasks.jobKey(job));
+    cron.startJobNow(job.getOwner().getRole(), job.getName());
   }
 
   @Test
@@ -102,7 +101,7 @@ public class CronJobManagerTest extends EasyMockTest {
     control.replay();
 
     cron.receiveJob(job);
-    cron.startJobNow(Tasks.jobKey(job));
+    cron.startJobNow(job.getOwner().getRole(), job.getName());
     delayLaunchCapture.getValue().run();
   }
 
@@ -143,12 +142,12 @@ public class CronJobManagerTest extends EasyMockTest {
     control.replay();
 
     cron.receiveJob(job);
-    cron.startJobNow(Tasks.jobKey(job));
+    cron.startJobNow(job.getOwner().getRole(), job.getName());
     delayLaunchCapture.getValue().run();
 
     // Start the job again.  Since the previous delayed start completed, this should repeat the
     // entire process.
-    cron.startJobNow(Tasks.jobKey(job));
+    cron.startJobNow(job.getOwner().getRole(), job.getName());
     delayLaunchCapture.getValue().run();
   }
 
@@ -184,9 +183,9 @@ public class CronJobManagerTest extends EasyMockTest {
 
     // Attempt to trick the cron manager into launching multiple times, or launching multiple
     // pollers.
-    cron.startJobNow(Tasks.jobKey(job));
-    cron.startJobNow(Tasks.jobKey(job));
-    cron.startJobNow(Tasks.jobKey(job));
+    cron.startJobNow(job.getOwner().getRole(), job.getName());
+    cron.startJobNow(job.getOwner().getRole(), job.getName());
+    cron.startJobNow(job.getOwner().getRole(), job.getName());
     delayLaunchCapture.getValue().run();
   }
 
@@ -228,7 +227,7 @@ public class CronJobManagerTest extends EasyMockTest {
     control.replay();
 
     cron.receiveJob(job);
-    cron.startJobNow(Tasks.jobKey(job));
+    cron.startJobNow(job.getOwner().getRole(), job.getName());
   }
 
   private JobConfiguration makeJob() {

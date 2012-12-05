@@ -33,6 +33,8 @@ import com.twitter.mesos.scheduler.quota.Quotas;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import static org.apache.commons.lang.StringUtils.isEmpty;
+
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.mesos.Tasks.ACTIVE_STATES;
 import static com.twitter.mesos.Tasks.jobKey;
@@ -205,12 +207,11 @@ public class SchedulerCoreImpl implements SchedulerCore {
     checkNotBlank(job);
     checkStarted();
 
-    String key = Tasks.jobKey(role, job);
-    if (!cronScheduler.hasJob(key)) {
-      throw new ScheduleException("Cron job does not exist for " + key);
+    if (!cronScheduler.hasJob(role, job)) {
+      throw new ScheduleException("Cron job does not exist for " + Tasks.jobKey(role, job));
     }
 
-    cronScheduler.startJobNow(key);
+    cronScheduler.startJobNow(role, job);
   }
 
   @Override
@@ -246,7 +247,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
   private static Predicate<JobManager> managerHasJob(final JobConfiguration job) {
     return new Predicate<JobManager>() {
       @Override public boolean apply(JobManager manager) {
-        return manager.hasJob(jobKey(job));
+        return manager.hasJob(job.getOwner().getRole(), job.getName());
       }
     };
   }
@@ -261,6 +262,13 @@ public class SchedulerCoreImpl implements SchedulerCore {
     stateManager.changeState(query, status, message);
   }
 
+  private static boolean specifiesJobOnly(TaskQuery query) {
+    boolean specifiesJob = (query.getOwner() != null)
+        && !isEmpty(query.getOwner().getRole())
+        && !isEmpty(query.getJobName());
+    return specifiesJob && (query.getStatusesSize() == 0) && (query.getTaskIdsSize() == 0);
+  }
+
   @Override
   public synchronized void killTasks(TaskQuery query, String user) throws ScheduleException {
     checkStarted();
@@ -270,11 +278,12 @@ public class SchedulerCoreImpl implements SchedulerCore {
     boolean matchingScheduler = false;
     boolean updateFinished = false;
 
-    if (Query.specifiesJobOnly(query)) {
+    if (specifiesJobOnly(query)) {
       // If this looks like a query for all tasks in a job, instruct the scheduler modules to
       // delete the job.
       for (JobManager manager : jobManagers) {
-        matchingScheduler = manager.deleteJob(Query.getJobKey(query).get()) || matchingScheduler;
+        matchingScheduler =
+            manager.deleteJob(query.getOwner().getRole(), query.getJobName()) || matchingScheduler;
       }
 
       String role = query.getOwner().getRole();
@@ -284,8 +293,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
           updateFinished = stateManager.finishUpdate(
               role, job, Optional.<String>absent(), UpdateResult.TERMINATE, false);
         } catch (UpdateException e) {
-          LOG.severe(String.format("Could not terminate job update for %s\n%s",
-              query.getJobKey(), e.getMessage()));
+          LOG.severe(
+              String.format("Could not terminate job update for %s\n%s", query, e.getMessage()));
         }
       }
     }
@@ -313,13 +322,13 @@ public class SchedulerCoreImpl implements SchedulerCore {
     checkStarted();
 
     JobConfiguration job = parsedConfiguration.get();
-    if (cronScheduler.hasJob(Tasks.jobKey(job))) {
+    if (cronScheduler.hasJob(job.getOwner().getRole(), job.getName())) {
       cronScheduler.updateJob(job);
       return Optional.absent();
     }
 
     Set<ScheduledTask> existingTasks =
-        stateManager.fetchTasks(Query.activeQuery(Tasks.jobKey(job)));
+        stateManager.fetchTasks(Query.activeQuery(job.getOwner(), job.getName()));
 
     // Reject if any existing task for the job is in UPDATING/ROLLBACK
     if (Iterables.any(existingTasks, IS_UPDATING)) {
@@ -393,7 +402,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     // TODO(William Farner): Throw SchedulingException if either task doesn't exist, etc.
 
     stateManager.changeState(Query.byId(task.getTaskId()), ScheduleStatus.PREEMPTING,
-        Optional.of("Preempting in favor of " + Tasks.jobKey(preemptingTask)));
+        Optional.of("Preempting in favor of " + preemptingTask.getTaskId()));
   }
 
   @Override

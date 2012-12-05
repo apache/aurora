@@ -56,18 +56,20 @@ public abstract class JobManager {
   /**
    * Checks whether this manager is storing a job with the given key.
    *
-   * @param jobKey Key of the job
+   * @param role Job owner.
+   * @param job Job name.
    * @return {@code true} if the manager has a matching job, {@code false} otherwise.
    */
-  public abstract boolean hasJob(String jobKey);
+  public abstract boolean hasJob(String role, String job);
 
   /**
    * Instructs the manager to delete any jobs with the given key.
    *
-   * @param jobKey Key for the job to delete.
+   * @param role Job owner.
+   * @param job Job name.
    * @return {@code true} if a matching job was deleted.
    */
-  public boolean deleteJob(String jobKey) {
+  public boolean deleteJob(String role, String job) {
     // Optionally overridden by implementing class.
     return false;
   }

@@ -14,6 +14,7 @@ import com.twitter.common.testing.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskEvent;
@@ -66,7 +67,14 @@ public class TaskStateMachineTest extends EasyMockTest {
 
   private TaskStateMachine makeStateMachine(String taskId, ScheduledTask task) {
     return new TaskStateMachine(
-        taskId, taskId /* Job key */, task, isJobUpdating, workSink, clock, INIT);
+        taskId,
+        Tasks.getRole(task),
+        Tasks.getJob(task),
+        task,
+        isJobUpdating,
+        workSink,
+        clock,
+        INIT);
   }
 
   @Test
@@ -342,6 +350,8 @@ public class TaskStateMachineTest extends EasyMockTest {
             new AssignedTask()
                 .setTask(
                     new TwitterTaskInfo()
+                        .setOwner(new Identity().setRole("roleA"))
+                        .setJobName("jobA")
                         .setIsDaemon(daemon)));
   }
 }

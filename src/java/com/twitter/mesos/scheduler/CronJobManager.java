@@ -223,13 +223,15 @@ public class CronJobManager extends JobManager implements EventSubscriber {
   /**
    * Triggers execution of a job.
    *
-   * @param jobKey Key of the job to start.
+   * @param role Owner of the job to start.
+   * @param job Name of the job to start.
    */
-  public void startJobNow(final String jobKey) {
-    JobConfiguration job = fetchJob(jobKey);
-    Preconditions.checkArgument(job != null, "No such cron job " + jobKey);
+  public void startJobNow(String role, String job) {
+    String key = Tasks.jobKey(role, job);
+    JobConfiguration jobConfig = fetchJob(key);
+    Preconditions.checkArgument(jobConfig != null, "No such cron job " + key);
 
-    cronTriggered(job);
+    cronTriggered(jobConfig);
   }
 
   private void delayedRun(final TaskQuery query, final JobConfiguration job) {
@@ -430,8 +432,8 @@ public class CronJobManager extends JobManager implements EventSubscriber {
   }
 
   @Override
-  public boolean hasJob(final String jobKey) {
-    return fetchJob(jobKey) != null;
+  public boolean hasJob(String role, String job) {
+    return fetchJob(Tasks.jobKey(role, job)) != null;
   }
 
   private JobConfiguration fetchJob(final String jobKey) {
@@ -444,11 +446,12 @@ public class CronJobManager extends JobManager implements EventSubscriber {
   }
 
   @Override
-  public boolean deleteJob(final String jobKey) {
-    if (!hasJob(jobKey)) {
+  public boolean deleteJob(String role, String job) {
+    if (!hasJob(role, job)) {
       return false;
     }
 
+    final String jobKey = Tasks.jobKey(role, job);
     String scheduledJobKey = scheduledJobs.remove(jobKey);
     if (scheduledJobKey != null) {
       cron.deschedule(scheduledJobKey);

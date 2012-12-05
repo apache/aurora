@@ -76,7 +76,8 @@ public class TaskStateMachine {
       });
 
   private final String taskId;
-  private final String jobKey;
+  private final String role;
+  private final String jobName;
   private final WorkSink workSink;
   private final StateMachine<State> stateMachine;
   private ScheduleStatus previousState = null;
@@ -157,8 +158,8 @@ public class TaskStateMachine {
    * Creates a new task state machine.
    *
    * @param taskId ID of the task managed by this state machine.
-   * @param jobKey Key of the job that this task is associated with, or {@code null} if the
-   *     associated job is unknown.
+   * @param role Role that owns this task.
+   * @param jobName JOb that this task is a part of.
    * @param task Read-only task that this state machine manages.
    * @param isJobUpdating Supplier to test whether the task's job is currently in a rolling update.
    * @param workSink Work sink to receive transition response actions
@@ -169,7 +170,8 @@ public class TaskStateMachine {
    */
   public TaskStateMachine(
       final String taskId,
-      @Nullable String jobKey,
+      @Nullable String role,
+      @Nullable String jobName,
       final ScheduledTask task,
       final Supplier<Boolean> isJobUpdating,
       final WorkSink workSink,
@@ -177,7 +179,8 @@ public class TaskStateMachine {
       final ScheduleStatus initialState) {
 
     this.taskId = MorePreconditions.checkNotBlank(taskId);
-    this.jobKey = jobKey;
+    this.role = role;
+    this.jobName = jobName;
     this.workSink = checkNotNull(workSink);
     this.clock = checkNotNull(clock);
     checkNotNull(initialState);
@@ -651,14 +654,14 @@ public class TaskStateMachine {
     return taskId;
   }
 
-  /**
-   * Gets the task key of this state machine.
-   *
-   * @return The state machine's job key, or {@code null} if no job key is available.
-   */
   @Nullable
-  public String getJobKey() {
-    return jobKey;
+  public String getRole() {
+    return role;
+  }
+
+  @Nullable
+  public String getJobName() {
+    return jobName;
   }
 
   /**

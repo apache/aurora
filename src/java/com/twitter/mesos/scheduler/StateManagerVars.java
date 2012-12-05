@@ -109,19 +109,28 @@ class StateManagerVars {
       return "task_store_" + status;
     }
 
-    public void incrementCount(String jobKey, ScheduleStatus status) {
+    private static String statPrefix(String role, String job) {
+      return role + "_" + job;
+    }
+
+    public void incrementCount(String role, String job, ScheduleStatus status) {
       varsByStatus.getUnchecked(status).increment();
-      varsByJobKeyAndStatus.getUnchecked(Pair.of(jobKey, status)).increment();
+      varsByJobKeyAndStatus.getUnchecked(Pair.of(statPrefix(role, job), status)).increment();
     }
 
-    public void decrementCount(String jobKey, ScheduleStatus status) {
+    public void decrementCount(String role, String job, ScheduleStatus status) {
       varsByStatus.getUnchecked(status).decrement();
-      varsByJobKeyAndStatus.getUnchecked(Pair.of(jobKey, status)).decrement();
+      varsByJobKeyAndStatus.getUnchecked(Pair.of(statPrefix(role, job), status)).decrement();
     }
 
-    public void adjustCount(String jobKey, ScheduleStatus oldStatus, ScheduleStatus newStatus) {
-      decrementCount(jobKey, oldStatus);
-      incrementCount(jobKey, newStatus);
+    public void adjustCount(
+        String role,
+        String job,
+        ScheduleStatus oldStatus,
+        ScheduleStatus newStatus) {
+
+      decrementCount(role, job, oldStatus);
+      incrementCount(role, job, newStatus);
     }
 
     public void beginExporting() {
