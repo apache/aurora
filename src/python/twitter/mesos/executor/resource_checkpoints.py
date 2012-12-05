@@ -7,6 +7,7 @@ import time
 from thrift.TSerialization import serialize as thrift_serialize
 
 from twitter.common import log
+from twitter.common.exceptions import ExceptionalThread
 from twitter.common.quantity import Amount, Time
 from twitter.common.recordio import ThriftRecordReader
 from twitter.common.recordio import ThriftRecordWriter
@@ -20,7 +21,7 @@ from twitter.thermos.monitoring.resource import (
 from gen.twitter.mesos.comm.ttypes import TaskResourceSample
 
 
-class CheckpointResourceMonitor(TaskResourceMonitor, threading.Thread):
+class CheckpointResourceMonitor(TaskResourceMonitor, ExceptionalThread):
   """ Monitor designed to expose resource utilisation from a checkpointed history """
 
   MAX_HISTORY = 10000
@@ -64,7 +65,7 @@ class CheckpointResourceMonitor(TaskResourceMonitor, threading.Thread):
     self._history = ResourceHistory(self.MAX_HISTORY, initialize=False)
     self._wait_interval = wait_interval.as_(Time.SECONDS)
     self._kill_signal = threading.Event()
-    threading.Thread.__init__(self)
+    ExceptionalThread.__init__(self)
     self.daemon = True
     log.debug("Initialising resource sample history from %s..." % filename)
     count = 0
@@ -95,7 +96,7 @@ class CheckpointResourceMonitor(TaskResourceMonitor, threading.Thread):
     raise NotImplementedError("CheckpointResourceMonitor does not support per-process sampling.")
 
 
-class ResourceCheckpointer(threading.Thread):
+class ResourceCheckpointer(ExceptionalThread):
   """ Thread to periodically log snapshots of resource consumption to a file """
   COLLECTION_INTERVAL = Amount(1, Time.MINUTES)
 
@@ -122,7 +123,7 @@ class ResourceCheckpointer(threading.Thread):
     """
     self._sample_provider = sample_provider
     self._output = self.recordio_writer(filename) if recordio else self.static_writer(filename)
-    threading.Thread.__init__(self)
+    super(ResourceCheckpointer, self).__init__()
     self.daemon = True
 
   def run(self):

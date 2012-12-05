@@ -1,10 +1,11 @@
 import threading
 import time
 
+from twitter.common.exceptions import ExceptionalThread
 from .health_interface import HealthInterface, FailureReason
 
 
-class HealthCheckerThread(HealthInterface, threading.Thread):
+class HealthCheckerThread(HealthInterface, ExceptionalThread):
   def __init__(self, health_checker, interval_secs=30, initial_interval_secs=None, clock=time):
     self._checker = health_checker
     self._interval = interval_secs
@@ -34,7 +35,7 @@ class HealthCheckerThread(HealthInterface, threading.Thread):
       self._clock.sleep(self._interval)
 
   def start(self):
-    threading.Thread.start(self)
+    ExceptionalThread.start(self)
 
   def stop(self):
     self._dead.set()

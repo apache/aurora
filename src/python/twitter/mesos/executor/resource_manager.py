@@ -5,6 +5,7 @@ import time
 import psutil as ps
 
 from twitter.common import log
+from twitter.common.exceptions import ExceptionalThread
 from twitter.common.quantity import Amount, Time
 from twitter.thermos.monitoring.resource import TaskResourceMonitor
 
@@ -13,6 +14,7 @@ from gen.twitter.mesos.comm.ttypes import TaskResourceSample
 from .health_interface import (
     FailureReason,
     HealthInterface)
+
 
 class ResourceEnforcer(object):
   """ Examine a task's resource consumption and determine whether it needs to be killed or
@@ -143,7 +145,7 @@ class ResourceEnforcer(object):
         return kill_reason
 
 
-class ResourceManager(HealthInterface, threading.Thread):
+class ResourceManager(HealthInterface, ExceptionalThread):
   """ Manage resources consumed by a Task """
 
   PROCESS_COLLECTION_INTERVAL = Amount(20, Time.SECONDS)
@@ -164,7 +166,7 @@ class ResourceManager(HealthInterface, threading.Thread):
     self._kill_reason = None
     self._sample = None
     self._stop_event = threading.Event()
-    threading.Thread.__init__(self)
+    ExceptionalThread.__init__(self)
     self.daemon = True
 
   # TODO(jon): clean this shit up
@@ -236,9 +238,7 @@ class ResourceManager(HealthInterface, threading.Thread):
           self._kill_reason = kill_reason
 
   def start(self):
-    threading.Thread.start(self)
+    ExceptionalThread.start(self)
 
   def stop(self):
     self._stop_event.set()
-
-

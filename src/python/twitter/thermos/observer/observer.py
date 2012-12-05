@@ -7,6 +7,7 @@ import threading
 from collections import defaultdict
 
 from twitter.common import log
+from twitter.common.exceptions import ExceptionalThread
 from twitter.common.lang import Lockable
 from twitter.common.recordio import ThriftRecordReader
 
@@ -27,7 +28,7 @@ from twitter.thermos.config.loader import (
 from gen.twitter.thermos.ttypes import *
 
 
-class TaskObserver(threading.Thread, Lockable):
+class TaskObserver(ExceptionalThread, Lockable):
   """
     The task observer monitors the thermos checkpoint root for active/finished
     tasks.  It is used to be the oracle of the state of all thermos tasks on
@@ -55,12 +56,15 @@ class TaskObserver(threading.Thread, Lockable):
     self._resource_monitors = {}     # task_id => ResourceMonitor implementation
     self._stat = {}                  # task_id => mtime of task file
     self._stop_event = threading.Event()
-    threading.Thread.__init__(self)
+    ExceptionalThread.__init__(self)
     Lockable.__init__(self)
     self.daemon = True
 
   def stop(self):
     self._stop_event.set()
+
+  def start(self):
+    ExceptionalThread.start(self)
 
   def run(self):
     """

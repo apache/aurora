@@ -4,6 +4,7 @@ import time
 import mesos_pb2 as mesos_pb
 
 from twitter.common import log
+from twitter.common.exceptions import ExceptionalThread
 from twitter.common.quantity import Amount, Time
 
 from gen.twitter.thermos.ttypes import TaskState
@@ -11,7 +12,7 @@ from gen.twitter.thermos.ttypes import TaskState
 from .executor_base import ThermosExecutorBase
 
 
-class StatusManager(threading.Thread):
+class StatusManager(ExceptionalThread):
   POLL_WAIT = Amount(500, Time.MILLISECONDS)
   WAIT_LIMIT = Amount(1, Time.MINUTES)
   ESCALATION_WAIT = Amount(5, Time.SECONDS)
@@ -31,7 +32,7 @@ class StatusManager(threading.Thread):
     self._unhealthy_event = threading.Event()
     self._signaler = signaler
     self._health_checkers = health_checkers
-    threading.Thread.__init__(self)
+    super(StatusManager, self).__init__()
     self.daemon = True
 
   @property

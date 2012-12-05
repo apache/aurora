@@ -50,6 +50,7 @@ python_library(
   sources = ['health_checker.py'],
   dependencies = [
     pants(':health_interface'),
+    pants('src/python/twitter/common/exceptions')
   ]
 )
 
@@ -73,6 +74,7 @@ python_library(
     pants(':resource_checkpoints'),
     python_requirement('psutil>=0.5.0'),
     pants('src/python/twitter/common/dirutil'),
+    pants('src/python/twitter/common/exceptions'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/quantity'),
     pants('src/python/twitter/thermos/monitoring:resource'),
@@ -85,6 +87,7 @@ python_library(
   sources = ['resource_checkpoints.py'],
   dependencies = [
     python_requirement('thrift'),
+    pants('src/python/twitter/common/exceptions'),
     pants('src/python/twitter/common/quantity'),
     pants('src/python/twitter/common/recordio:recordio-thrift'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
@@ -104,6 +107,7 @@ python_library(
   name = 'status_manager',
   sources = ['status_manager.py'],
   dependencies = [
+    pants('src/python/twitter/common/exceptions'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/lang'),
     pants('src/python/twitter/common/quantity'),
@@ -139,6 +143,7 @@ python_library(
     pants(':thermos_executor_base'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/concurrent'),
+    pants('src/python/twitter/common/exceptions'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/quantity'),
     pants('src/python/twitter/mesos/config:schema'),

@@ -6,6 +6,7 @@ import time
 
 from twitter.common import app, log
 from twitter.common.app.modules.http import RootServer
+from twitter.common.exceptions import ExceptionalThread
 from twitter.common.metrics import MutatorGauge, RootMetrics
 from twitter.common.quantity import Amount, Time
 from twitter.thermos.base.path import TaskPath
@@ -30,7 +31,7 @@ app.configure(module='twitter.common_internal.app.modules.chickadee_handler',
     service_name='thermos_observer')
 
 
-class MesosObserverVars(threading.Thread):
+class MesosObserverVars(ExceptionalThread):
   COLLECTION_INTERVAL = Amount(30, Time.SECONDS)
   METRIC_NAMESPACE = 'observer'
   EXECUTOR_BINARY = './thermos_executor.pex'

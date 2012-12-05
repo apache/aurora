@@ -9,6 +9,7 @@ import mesos_pb2 as mesos_pb
 
 from twitter.common import log
 from twitter.common.concurrent import defer
+from twitter.common.exceptions import ExceptionalThread
 from twitter.common.quantity import Amount, Time
 
 # thermos
@@ -43,7 +44,7 @@ def default_exit_action():
   sys.exit(0)
 
 
-class ThermosExecutorTimer(threading.Thread):
+class ThermosExecutorTimer(ExceptionalThread):
   EXECUTOR_TIMEOUT = Amount(10, Time.SECONDS)
 
   def __init__(self, executor, driver):
