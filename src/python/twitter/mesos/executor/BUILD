@@ -174,7 +174,7 @@ python_binary(
 
 python_library(
   name = 'gc_executor_lib',
-  sources = ['gc_executor.py'],
+  sources = ['gc_executor.py', 'gc_executor_main.py'],
   dependencies = [
     pants(':executor_detector'),
     pants(':sandbox_manager'),
@@ -193,7 +193,7 @@ python_library(
 
 python_binary(
   name = 'gc_executor',
-  source = 'gc_executor_main.py',
+  entry_point = 'twitter.mesos.executor.gc_executor_main',
   ignore_errors = True,
   dependencies = [
     pants(':gc_executor_lib'),
