@@ -130,12 +130,3 @@ python_binary(
     pants('src/python/twitter/mesos/deploy')
   ]
 )
-
-python_binary(
-  name = 'process_scraper',
-  source = 'process_scraper.py',
-  dependencies = [
-    python_requirement('psutil>=0.5.0'),
-    pants('src/python/twitter/common/app'),
-  ],
-)

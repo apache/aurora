@@ -237,21 +237,7 @@ class AuroraBuilder(Builder):
 
   @property
   def commands(self):
-    return [
-      './pants goal bundle mesos:scheduler --bundle-archive=zip',
-      './pants goal bundle mesos:executor-cdh2 --bundle-outdir=dist/cdh2 --bundle-archive=zip',
-      './pants goal bundle mesos:executor-cdh3 --bundle-outdir=dist/cdh3 --bundle-archive=zip',
-      './pants src/python/twitter/mesos:process_scraper',
-    ]
-
-  @property
-  def artifacts(self):
-    executor_dist = 'dist/%s/mesos-executor.zip' % self._cluster.hadoop_version
-    return {
-      'mesos/scripts/executor.sh': '$cluster/$dc-$cluster-executor.sh',
-      executor_dist:  '$cluster/mesos-executor.zip',
-      'dist/process_scraper.pex':  '$cluster/process_scraper.pex'
-    }
+    return ['./pants goal bundle mesos:scheduler --bundle-archive=zip']
 
   def preprocess(self):
     self.check_call('rm -f pants.pex')
