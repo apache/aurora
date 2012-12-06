@@ -27,8 +27,7 @@ MESOS_TASK = MesosTaskInstance(
 def test_directory_sandbox():
   with temporary_dir() as d:
     ds = DirectorySandbox(TASK_ID, sandbox_root=d)
-    assert ds.root() == os.path.join(d, TASK_ID)
-    assert not os.path.exists(ds.root())
+    assert ds.root() == d
     ds.create(MESOS_TASK)
     assert os.path.exists(ds.root())
     root_stat = os.stat(ds.root())

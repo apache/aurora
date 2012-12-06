@@ -1,8 +1,17 @@
 python_test_suite(name = 'all',
   dependencies = [
+    pants(':test_pathspec'),
     pants(':test_planner'),
     pants(':test_task_planner'),
   ]
+)
+
+python_tests(name = 'test_pathspec',
+  sources = ['test_pathspec.py'],
+  dependencies = [
+    pants('src/python/twitter/thermos/base:path'),
+  ],
+  coverage = 'twitter.thermos.base.path'
 )
 
 python_tests(name = 'test_planner',

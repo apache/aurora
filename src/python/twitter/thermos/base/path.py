@@ -39,15 +39,22 @@ class TaskPath(object):
 
   DEFAULT_CHECKPOINT_ROOT = "/var/run/thermos"
   KNOWN_KEYS = [ 'root', 'task_id', 'state', 'process', 'run', 'log_dir' ]
+  LEGACY_KNOWN_KEYS = KNOWN_KEYS[:-1]
 
   DIR_TEMPLATE = {
             'task_path': ['%(root)s',       'tasks',   '%(state)s', '%(task_id)s'],
       'checkpoint_path': ['%(root)s', 'checkpoints', '%(task_id)s'],
     'runner_checkpoint': ['%(root)s', 'checkpoints', '%(task_id)s', 'runner'],
    'process_checkpoint': ['%(root)s', 'checkpoints', '%(task_id)s', 'coordinator.%(process)s'],
-      'process_logbase': ['%(log_dir)s', '%(task_id)s'],
-       'process_logdir': ['%(log_dir)s', '%(task_id)s', '%(process)s', '%(run)s']
+      'process_logbase': ['%(log_dir)s'],
+       'process_logdir': ['%(log_dir)s', '%(process)s', '%(run)s']
   }
+
+  LEGACY_DIR_TEMPLATE = DIR_TEMPLATE.copy()
+  LEGACY_DIR_TEMPLATE.update(
+      process_logbase = ['%(root)s', 'logs', '%(task_id)s'],
+      process_logdir  = ['%(root)s', 'logs', '%(task_id)s', '%(process)s', '%(run)s']
+  )
 
   def __init__(self, **kw):
     self._filename = None
@@ -55,9 +62,11 @@ class TaskPath(object):
     if kw.get('root') is None:
       kw['root'] = self.DEFAULT_CHECKPOINT_ROOT
     # Before log_dir was added explicitly to RunnerHeader, it resolved to %(root)s/logs
-    if kw.get('log_dir') is None:
-      kw['log_dir'] = os.path.join(kw['root'], 'logs')
-    self._data = dict((key, '%%(%s)s' % key) for key in TaskPath.KNOWN_KEYS)
+    if kw.get('log_dir'):
+      self._template, keys = self.DIR_TEMPLATE, self.KNOWN_KEYS
+    else:
+      self._template, keys = self.LEGACY_DIR_TEMPLATE, self.LEGACY_KNOWN_KEYS
+    self._data = dict((key, '%%(%s)s' % key) for key in keys)
     self._data.update(kw)
 
   def given(self, **kw):
@@ -73,10 +82,12 @@ class TaskPath(object):
     return wp
 
   def getpath(self, pathname):
-    if pathname not in TaskPath.DIR_TEMPLATE:
+    if pathname not in self._template:
       raise self.UnknownPath("Internal error, unknown id: %s" % pathname)
-    path = list(TaskPath.DIR_TEMPLATE[pathname]) # copy
-    if self._filename: path += [self._filename]
+    path = self._template[pathname][:]
+
+    if self._filename:
+      path += [self._filename]
     path = os.path.join(*path)
     interpolated_path = path % self._data
     try:

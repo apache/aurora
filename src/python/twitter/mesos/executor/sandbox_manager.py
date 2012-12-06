@@ -22,6 +22,9 @@ class SandboxBase(object):
   def __init__(self, task_id, sandbox_root=None):
     self._sandbox_root = sandbox_root or app.get_options().sandbox_root
 
+  # TODO(wickman) root should probably be an abstractproperty.  In general much of this
+  # code should be cleaned up and many accessors should be converted to properties to
+  # be consistent with the rest of the code base.
   @abstractmethod
   def root(self):
     """Return the root path of the sandbox."""
@@ -43,30 +46,29 @@ class DirectorySandbox(SandboxBase):
   """ Basic sandbox implementation using a directory on the filesystem """
   def __init__(self, task_id, sandbox_root=None):
     SandboxBase.__init__(self, task_id, sandbox_root)
-    self._dir = os.path.join(self._sandbox_root, task_id)
 
   def root(self):
-    return self._dir
+    return self._sandbox_root
 
   def exists(self):
-    return os.path.exists(self._dir)
+    return os.path.exists(self.root())
 
   def create(self, mesos_task):
     import grp, pwd
     if mesos_task.has_layout():
       log.warning('DirectorySandbox got task with layout! %s' % mesos_task.layout())
-    log.debug('DirectorySandbox: mkdir %s' % self._dir)
-    safe_mkdir(self._dir)
+    log.debug('DirectorySandbox: mkdir %s' % self.root())
+    safe_mkdir(self.root())
     user = mesos_task.role().get()
     pwent = pwd.getpwnam(user)
     grent = grp.getgrgid(pwent.pw_gid)
-    log.debug('DirectorySandbox: chown %s:%s %s' % (user, grent.gr_name, self._dir))
-    os.chown(self._dir, pwent.pw_uid, pwent.pw_gid)
-    log.debug('DirectorySandbox: chmod 700 %s' % self._dir)
-    os.chmod(self._dir, 0700)
+    log.debug('DirectorySandbox: chown %s:%s %s' % (user, grent.gr_name, self.root()))
+    os.chown(self.root(), pwent.pw_uid, pwent.pw_gid)
+    log.debug('DirectorySandbox: chmod 700 %s' % self.root())
+    os.chmod(self.root(), 0700)
 
   def destroy(self):
-    safe_rmtree(self._dir)
+    safe_rmtree(self.root())
 
 
 class AppAppSandbox(SandboxBase):
