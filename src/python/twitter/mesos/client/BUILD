@@ -3,7 +3,7 @@ python_library(
   sources = globs('*.py'),
   dependencies = [
     python_requirement('cherrypy'),
-    python_requirement('mesos==0.9.0'),
+    python_requirement('mesos'),
     python_requirement('thrift'),
     pants('src/python/twitter/common/dirutil'),
     pants('src/python/twitter/common/log'),
