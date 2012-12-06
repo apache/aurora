@@ -53,6 +53,7 @@ import com.twitter.mesos.scheduler.SchedulerException;
 import com.twitter.mesos.scheduler.log.Log.Stream.InvalidPositionException;
 import com.twitter.mesos.scheduler.log.Log.Stream.StreamAccessException;
 import com.twitter.mesos.scheduler.storage.AttributeStore;
+import com.twitter.mesos.scheduler.storage.DistributedSnapshotStore;
 import com.twitter.mesos.scheduler.storage.ForwardingStore;
 import com.twitter.mesos.scheduler.storage.JobStore;
 import com.twitter.mesos.scheduler.storage.QuotaStore;
@@ -102,7 +103,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * <p>If the op fails to apply to local storage we will never write the op to the log and if the op
  * fails to apply to the log, it'll throw and abort the local storage transaction as well.
  */
-public class LogStorage extends ForwardingStore {
+public class LogStorage extends ForwardingStore implements DistributedSnapshotStore {
 
   /**
    * A service that can schedule an action to be executed periodically.
@@ -416,9 +417,17 @@ public class LogStorage extends ForwardingStore {
       @Override protected void execute(MutableStoreProvider unused)
           throws CodingException, InvalidPositionException, StreamAccessException {
 
-        streamManager.snapshot(snapshotStore.createSnapshot());
+        persist(snapshotStore.createSnapshot());
       }
     });
+  }
+
+  @Timed("scheduler_log_snapshot_persist")
+  @Override
+  public void persist(Snapshot snapshot)
+      throws CodingException, InvalidPositionException, StreamAccessException {
+
+    streamManager.snapshot(snapshot);
   }
 
   @Override

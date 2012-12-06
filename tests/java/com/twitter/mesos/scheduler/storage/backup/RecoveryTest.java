@@ -5,9 +5,11 @@ import java.io.File;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.testing.TearDown;
 
+import org.easymock.Capture;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.twitter.common.base.Command;
 import com.twitter.common.io.FileUtils;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -25,13 +27,18 @@ import com.twitter.mesos.gen.storage.SchedulerMetadata;
 import com.twitter.mesos.gen.storage.Snapshot;
 import com.twitter.mesos.gen.storage.StoredJob;
 import com.twitter.mesos.scheduler.Query;
+import com.twitter.mesos.scheduler.storage.DistributedSnapshotStore;
 import com.twitter.mesos.scheduler.storage.SnapshotStore;
+import com.twitter.mesos.scheduler.storage.Storage;
+import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
+import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
 import com.twitter.mesos.scheduler.storage.backup.Recovery.RecoveryException;
 import com.twitter.mesos.scheduler.storage.backup.Recovery.RecoveryImpl;
 import com.twitter.mesos.scheduler.storage.backup.StorageBackup.StorageBackupImpl;
 import com.twitter.mesos.scheduler.storage.backup.StorageBackup.StorageBackupImpl.BackupConfig;
 import com.twitter.mesos.scheduler.storage.backup.TemporaryStorage.TemporaryStorageFactory;
 
+import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
@@ -46,6 +53,10 @@ public class RecoveryTest extends EasyMockTest {
   private static final Snapshot SNAPSHOT3 = makeSnapshot(TASK3);
 
   private SnapshotStore<Snapshot> snapshotStore;
+  private DistributedSnapshotStore distributedStore;
+  private Storage primaryStorage;
+  private MutableStoreProvider storeProvider;
+  private Command shutDownNow;
   private FakeClock clock;
   private StorageBackupImpl storageBackup;
   private RecoveryImpl recovery;
@@ -59,17 +70,24 @@ public class RecoveryTest extends EasyMockTest {
       }
     });
     snapshotStore = createMock(new Clazz<SnapshotStore<Snapshot>>() { });
+    distributedStore = createMock(DistributedSnapshotStore.class);
+    primaryStorage = createMock(Storage.class);
+    storeProvider = createMock(MutableStoreProvider.class);
+    shutDownNow = createMock(Command.class);
     clock = new FakeClock();
     TemporaryStorageFactory factory = new TemporaryStorageFactory();
     storageBackup =
         new StorageBackupImpl(snapshotStore, clock, new BackupConfig(backupDir, 5, INTERVAL));
-    recovery = new RecoveryImpl(backupDir, snapshotStore, factory);
+    recovery = new RecoveryImpl(backupDir, factory, primaryStorage, distributedStore, shutDownNow);
   }
 
   @Test
   public void testRecover() throws Exception {
     expect(snapshotStore.createSnapshot()).andReturn(SNAPSHOT1);
-    snapshotStore.applySnapshot(SNAPSHOT1);
+    Capture<MutateWork<?, ?>> transaction = createCapture();
+    expect(primaryStorage.doInWriteTransaction(capture(transaction))).andReturn(null);
+    distributedStore.persist(SNAPSHOT1);
+    shutDownNow.execute();
 
     control.replay();
 
@@ -83,13 +101,17 @@ public class RecoveryTest extends EasyMockTest {
     recovery.stage(backup1);
     assertEquals(SNAPSHOT1.getTasks(), recovery.query(Query.GET_ALL));
     recovery.commit();
+    transaction.getValue().apply(storeProvider);
   }
 
   @Test
   public void testModifySnapshotBeforeCommit() throws Exception {
     expect(snapshotStore.createSnapshot()).andReturn(SNAPSHOT1);
     Snapshot modified = SNAPSHOT1.deepCopy().setTasks(ImmutableSet.of(TASK1));
-    snapshotStore.applySnapshot(modified);
+    Capture<MutateWork<?, ?>> transaction = createCapture();
+    expect(primaryStorage.doInWriteTransaction(capture(transaction))).andReturn(null);
+    distributedStore.persist(modified);
+    shutDownNow.execute();
 
     control.replay();
 
@@ -101,36 +123,7 @@ public class RecoveryTest extends EasyMockTest {
     recovery.deleteTasks(Query.byId(Tasks.id(TASK2)));
     assertEquals(modified.getTasks(), recovery.query(Query.GET_ALL));
     recovery.commit();
-  }
-
-  @Test
-  public void testLoadOverwrite() throws Exception {
-    expect(snapshotStore.createSnapshot()).andReturn(SNAPSHOT1);
-    snapshotStore.applySnapshot(SNAPSHOT1);
-    expect(snapshotStore.createSnapshot()).andReturn(SNAPSHOT2);
-    snapshotStore.applySnapshot(SNAPSHOT2);
-    expect(snapshotStore.createSnapshot()).andReturn(SNAPSHOT3);
-
-    control.replay();
-
-    clock.advance(INTERVAL);
-    storageBackup.createSnapshot();
-    String backup1 = storageBackup.createBackupName();
-    recovery.stage(backup1);
-    recovery.commit();
-
-    clock.advance(INTERVAL);
-    storageBackup.createSnapshot();
-    String backup2 = storageBackup.createBackupName();
-    recovery.stage(backup2);
-    assertEquals(SNAPSHOT2.getTasks(), recovery.query(Query.GET_ALL));
-    recovery.commit();
-
-    clock.advance(INTERVAL);
-    storageBackup.createSnapshot();
-    String backup3 = storageBackup.createBackupName();
-    recovery.stage(backup3);
-    recovery.unload();
+    transaction.getValue().apply(storeProvider);
   }
 
   @Test(expected = RecoveryException.class)

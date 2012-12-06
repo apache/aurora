@@ -13,12 +13,16 @@ import com.google.common.io.Files;
 import com.google.common.util.concurrent.Atomics;
 import com.google.inject.Inject;
 
+import com.twitter.common.base.Command;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.storage.Snapshot;
-import com.twitter.mesos.scheduler.storage.SnapshotStore;
+import com.twitter.mesos.scheduler.storage.DistributedSnapshotStore;
+import com.twitter.mesos.scheduler.storage.Storage;
+import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
+import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -88,20 +92,26 @@ public interface Recovery {
 
   class RecoveryImpl implements Recovery {
     private final File backupDir;
-    private final SnapshotStore<Snapshot> snapshotStore;
     private final Function<Snapshot, TemporaryStorage> tempStorageFactory;
     private final AtomicReference<PendingRecovery> recovery;
+    private final Storage primaryStorage;
+    private final DistributedSnapshotStore distributedStore;
+    private final Command shutDownNow;
 
     @Inject
     RecoveryImpl(
         File backupDir,
-        SnapshotStore<Snapshot> snapshotStore,
-        Function<Snapshot, TemporaryStorage> tempStorageFactory) {
+        Function<Snapshot, TemporaryStorage> tempStorageFactory,
+        Storage primaryStorage,
+        DistributedSnapshotStore distributedStore,
+        Command shutDownNow) {
 
       this.backupDir = checkNotNull(backupDir);
-      this.snapshotStore = checkNotNull(snapshotStore);
       this.tempStorageFactory = checkNotNull(tempStorageFactory);
       this.recovery = Atomics.newReference();
+      this.primaryStorage = checkNotNull(primaryStorage);
+      this.distributedStore = checkNotNull(distributedStore);
+      this.shutDownNow = checkNotNull(shutDownNow);
     }
 
     @Override public Set<String> listBackups() {
@@ -161,8 +171,16 @@ public interface Recovery {
       }
 
       void commit() {
-        snapshotStore.applySnapshot(tempStorage.toSnapshot());
-        unload();
+        primaryStorage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+          @Override protected void execute(MutableStoreProvider storeProvider) {
+            try {
+              distributedStore.persist(tempStorage.toSnapshot());
+              shutDownNow.execute();
+            } catch (CodingException e) {
+              throw new IllegalStateException("Failed to encode snapshot.", e);
+            }
+          }
+        });
       }
 
       Set<ScheduledTask> query(final TaskQuery query) {

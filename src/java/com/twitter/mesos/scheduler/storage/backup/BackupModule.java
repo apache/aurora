@@ -3,12 +3,16 @@ package com.twitter.mesos.scheduler.storage.backup;
 import java.io.File;
 
 import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
+import com.google.inject.Inject;
 import com.google.inject.PrivateModule;
 import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 
+import com.twitter.common.application.Lifecycle;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
+import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.mesos.gen.storage.Snapshot;
@@ -62,8 +66,21 @@ public class BackupModule extends PrivateModule {
     bind(new TypeLiteral<Function<Snapshot, TemporaryStorage>>() { })
         .to(TemporaryStorageFactory.class);
 
+    bind(Command.class).to(LifecycleHook.class);
     bind(Recovery.class).to(RecoveryImpl.class);
     bind(RecoveryImpl.class).in(Singleton.class);
     expose(Recovery.class);
+  }
+
+  static class LifecycleHook implements Command {
+    private final Lifecycle lifecycle;
+
+    @Inject LifecycleHook(Lifecycle lifecycle) {
+      this.lifecycle = Preconditions.checkNotNull(lifecycle);
+    }
+
+    @Override public void execute() {
+      lifecycle.shutdown();
+    }
   }
 }
