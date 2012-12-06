@@ -68,12 +68,26 @@ class TestTaskRunner(TaskRunnerWrapper):
     self._sandbox.destroy()
 
 
-class FailingTaskRunner(TestTaskRunner):
-  def __init__(self, task_id, *args, **kwargs):
-    super(FailingTaskRunner, self).__init__(task_id, *args, **kwargs)
-
+class FailingStartingTaskRunner(TestTaskRunner):
   def start(self):
     raise self.TaskError('I am an idiot!')
+
+
+class FailingInitializingTaskRunner(TestTaskRunner):
+  def initialize(self):
+    raise self.TaskError('I am another idiot!')
+
+
+class SlowInitializingTaskRunner(TestTaskRunner):
+  def __init__(self, *args, **kwargs):
+    super(SlowInitializingTaskRunner, self).__init__(*args, **kwargs)
+    self.is_initialized = lambda: False
+    self._init_start = threading.Event()
+    self._init_done = threading.Event()
+  def initialize(self):
+    self._init_start.wait()
+    self.is_initialized = lambda: True
+    self._init_done.set()
 
 
 class ProxyDriver(object):
@@ -136,8 +150,8 @@ def make_runner(proxy_driver, checkpoint_root, task, fast_status=False,
   while te._runner.task_state() != TaskState.ACTIVE:
     time.sleep(0.1)
 
-  task_json = TaskPath(root = checkpoint_root, task_id = task_description.task_id.value,
-                       state = 'active').getpath('task_path')
+  task_json = TaskPath(root=checkpoint_root, task_id=task_description.task_id.value,
+                       state='active').getpath('task_path')
   while not os.path.exists(task_json):
     time.sleep(0.1)
 
@@ -265,12 +279,11 @@ class TestThermosExecutor(object):
     assert len(updates) == 3
     assert updates[-1][0][0].state == mesos_pb.TASK_LOST
 
-  def test_internal_exception(self):
+  def test_failing_runner_start(self):
     proxy_driver = ProxyDriver()
 
-    with temporary_dir() as tempdir:
-      te = FastThermosExecutor(runner_class=FailingTaskRunner)
-      te.launchTask(proxy_driver, make_task(hello_world()))
+    te = FastThermosExecutor(runner_class=FailingStartingTaskRunner)
+    te.launchTask(proxy_driver, make_task(hello_world()))
 
     proxy_driver._stop_event.wait(timeout=1.0)
     assert proxy_driver._stop_event.is_set()
@@ -278,6 +291,41 @@ class TestThermosExecutor(object):
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert updates[-1][0][0].state == mesos_pb.TASK_FAILED
 
+  def test_failing_runner_initialize(self):
+    proxy_driver = ProxyDriver()
+
+    te = FastThermosExecutor(runner_class=FailingInitializingTaskRunner)
+    te.launchTask(proxy_driver, make_task(hello_world()))
+
+    proxy_driver._stop_event.wait(timeout=1.0)
+    assert proxy_driver._stop_event.is_set()
+
+    updates = proxy_driver.method_calls['sendStatusUpdate']
+    assert updates[-1][0][0].state == mesos_pb.TASK_FAILED
+
+  def test_killTask_during_runner_initialize(self):
+    proxy_driver = ProxyDriver()
+
+    task = make_task(hello_world())
+    te = FastThermosExecutor(runner_class=SlowInitializingTaskRunner)
+    te.launchTask(proxy_driver, task)
+    te.killTask(proxy_driver, mesos_pb.TaskID(value=task.task_id.value))
+    assert te._abort_runner.is_set()
+    assert not te._runner.is_initialized()
+    # we've simulated a "slow" initialization by blocking it until the killTask was sent - so now,
+    # trigger the initialization to complete
+    te._runner._init_start.set()
+    # however, wait on the runner to definitely finish its initialization before continuing
+    # (otherwise, this function races ahead too fast)
+    te._runner._init_done.wait()
+    assert te._runner.is_initialized()
+
+    proxy_driver._stop_event.wait(timeout=1.0)
+    assert proxy_driver._stop_event.is_set()
+
+    updates = proxy_driver.method_calls['sendStatusUpdate']
+    assert len(updates) == 2
+    assert updates[-1][0][0].state == mesos_pb.TASK_KILLED
 
 def test_waiting_executor():
   proxy_driver = ProxyDriver()
