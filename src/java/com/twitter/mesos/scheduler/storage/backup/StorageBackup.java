@@ -1,17 +1,22 @@
 package com.twitter.mesos.scheduler.storage.backup;
 
 import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Function;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Ordering;
 import com.google.common.io.Files;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
@@ -46,6 +51,21 @@ public interface StorageBackup {
   class StorageBackupImpl implements StorageBackup, SnapshotStore<Snapshot> {
     private static final Logger LOG = Logger.getLogger(StorageBackup.class.getName());
 
+    private static final String FILE_PREFIX = "scheduler-backup-";
+    private final BackupConfig config;
+
+    static class BackupConfig {
+      final File dir;
+      final int maxBackups;
+      final Amount<Long, Time> interval;
+
+      BackupConfig(File dir, int maxBackups, Amount<Long, Time> interval) {
+        this.dir = checkNotNull(dir);
+        this.maxBackups = maxBackups;
+        this.interval = checkNotNull(interval);
+      }
+    }
+
     /**
      * Binding annotation that the underlying {@link SnapshotStore} must be bound with.
      */
@@ -57,7 +77,6 @@ public interface StorageBackup {
     private final Clock clock;
     private final long backupIntervalMs;
     private volatile long nextSnapshotMs;
-    private final File backupDir;
     private final DateFormat backupDateFormat;
 
     @VisibleForTesting
@@ -69,14 +88,13 @@ public interface StorageBackup {
     StorageBackupImpl(
         @SnapshotDelegate SnapshotStore<Snapshot> delegate,
         Clock clock,
-        Amount<Long, Time> backupInterval,
-        File backupDir) {
+        BackupConfig config) {
 
       this.delegate = checkNotNull(delegate);
       this.clock = checkNotNull(clock);
-      this.backupDir = checkNotNull(backupDir);
+      this.config = checkNotNull(config);
       backupDateFormat = new SimpleDateFormat("yyyy-MM-dd-HH-mm");
-      backupIntervalMs = backupInterval.as(Time.MILLISECONDS);
+      backupIntervalMs = config.interval.as(Time.MILLISECONDS);
       nextSnapshotMs = clock.nowMillis() + backupIntervalMs;
     }
 
@@ -97,18 +115,18 @@ public interface StorageBackup {
 
     @VisibleForTesting
     String createBackupName() {
-      return backupDateFormat.format(new Date(clock.nowMillis()));
+      return FILE_PREFIX + backupDateFormat.format(new Date(clock.nowMillis()));
     }
 
     private void save(Snapshot snapshot) {
       String backupName = createBackupName();
       String tempBackupName = "temp_" + backupName;
-      File tempFile = new File(backupDir, tempBackupName);
+      File tempFile = new File(config.dir, tempBackupName);
       LOG.info("Saving backup to " + tempFile);
       try {
         byte[] backup = ThriftBinaryCodec.encodeNonNull(snapshot);
         Files.write(backup, tempFile);
-        Files.move(tempFile, new File(backupDir, backupName));
+        Files.move(tempFile, new File(config.dir, backupName));
         successes.incrementAndGet();
       } catch (IOException e) {
         failures.incrementAndGet();
@@ -122,7 +140,36 @@ public interface StorageBackup {
           tempFile.delete();
         }
       }
+
+      File[] backups = config.dir.listFiles(BACKUP_FILTER);
+      if (backups == null) {
+        LOG.severe("Failed to list backup dir " + config.dir);
+      } else {
+        int backupsToDelete = backups.length - config.maxBackups;
+        if (backupsToDelete > 0) {
+          List<File> toDelete = Ordering.natural()
+              .onResultOf(FILE_NAME)
+              .sortedCopy(ImmutableList.copyOf(backups)).subList(0, backupsToDelete);
+          LOG.info("Deleting " + backupsToDelete + " outdated backups: " + toDelete);
+          for (File outdated : toDelete) {
+            outdated.delete();
+          }
+        }
+      }
     }
+
+    private static final FilenameFilter BACKUP_FILTER = new FilenameFilter() {
+      @Override public boolean accept(File file, String s) {
+        return s.startsWith(FILE_PREFIX);
+      }
+    };
+
+    @VisibleForTesting
+    static final Function<File, String> FILE_NAME = new Function<File, String>() {
+      @Override public String apply(File file) {
+        return file.getName();
+      }
+    };
 
     @Override
     public void applySnapshot(Snapshot snapshot) {

@@ -15,6 +15,7 @@ import com.twitter.mesos.gen.storage.Snapshot;
 import com.twitter.mesos.scheduler.storage.SnapshotStore;
 import com.twitter.mesos.scheduler.storage.backup.Recovery.RecoveryImpl;
 import com.twitter.mesos.scheduler.storage.backup.StorageBackup.StorageBackupImpl;
+import com.twitter.mesos.scheduler.storage.backup.StorageBackup.StorageBackupImpl.BackupConfig;
 import com.twitter.mesos.scheduler.storage.backup.TemporaryStorage.TemporaryStorageFactory;
 
 /**
@@ -26,6 +27,10 @@ public class BackupModule extends PrivateModule {
   @CmdLine(name = "backup_interval", help = "Minimum interval on which to write a storage backup.")
   private static final Arg<Amount<Long, Time>> BACKUP_INTERVAL =
       Arg.create(Amount.of(6L, Time.HOURS));
+
+  @CmdLine(name = "max_saved_backups",
+      help = "Maximum number of backups to retain before deleting the oldest backups.")
+  private static final Arg<Integer> MAX_SAVED_BACKUPS = Arg.create(10);
 
   private final File backupDir;
   private final Class<? extends SnapshotStore<Snapshot>> snapshotStore;
@@ -44,7 +49,9 @@ public class BackupModule extends PrivateModule {
   protected void configure() {
     TypeLiteral<SnapshotStore<Snapshot>> type = new TypeLiteral<SnapshotStore<Snapshot>>() { };
     bind(type).annotatedWith(StorageBackupImpl.SnapshotDelegate.class).to(snapshotStore);
-    bind(new TypeLiteral<Amount<Long, Time>>() { }).toInstance(BACKUP_INTERVAL.get());
+
+    bind(BackupConfig.class)
+        .toInstance(new BackupConfig(backupDir, MAX_SAVED_BACKUPS.get(), BACKUP_INTERVAL.get()));
     bind(File.class).toInstance(backupDir);
     bind(type).to(StorageBackupImpl.class);
     bind(StorageBackup.class).to(StorageBackupImpl.class);

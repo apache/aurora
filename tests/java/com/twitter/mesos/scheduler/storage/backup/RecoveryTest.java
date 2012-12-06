@@ -29,6 +29,7 @@ import com.twitter.mesos.scheduler.storage.SnapshotStore;
 import com.twitter.mesos.scheduler.storage.backup.Recovery.RecoveryException;
 import com.twitter.mesos.scheduler.storage.backup.Recovery.RecoveryImpl;
 import com.twitter.mesos.scheduler.storage.backup.StorageBackup.StorageBackupImpl;
+import com.twitter.mesos.scheduler.storage.backup.StorageBackup.StorageBackupImpl.BackupConfig;
 import com.twitter.mesos.scheduler.storage.backup.TemporaryStorage.TemporaryStorageFactory;
 
 import static org.easymock.EasyMock.expect;
@@ -57,11 +58,11 @@ public class RecoveryTest extends EasyMockTest {
         org.apache.commons.io.FileUtils.deleteDirectory(backupDir);
       }
     });
-    backupDir.deleteOnExit();
     snapshotStore = createMock(new Clazz<SnapshotStore<Snapshot>>() { });
     clock = new FakeClock();
     TemporaryStorageFactory factory = new TemporaryStorageFactory();
-    storageBackup = new StorageBackupImpl(snapshotStore, clock, INTERVAL, backupDir);
+    storageBackup =
+        new StorageBackupImpl(snapshotStore, clock, new BackupConfig(backupDir, 5, INTERVAL));
     recovery = new RecoveryImpl(backupDir, snapshotStore, factory);
   }
 
