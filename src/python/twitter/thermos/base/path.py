@@ -73,7 +73,9 @@ class TaskPath(object):
     """ Perform further interpolation of the templates given the kwargs """
     eval_dict = dict(self._data) # copy
     eval_dict.update(kw)
-    return TaskPath(**eval_dict)
+    tp = TaskPath(**eval_dict)
+    tp._filename = self._filename
+    return tp
 
   def with_filename(self, filename):
     """ Return a TaskPath with the specific filename appended to the end of the path """

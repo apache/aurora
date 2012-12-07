@@ -62,7 +62,6 @@ class TaskDetector(object):
                                                            process=process,
                                                            run=run)
                                                      .getpath('process_logdir'))
-        path = os.path.join(path, logtype)
         if os.path.exists(path):
           yield path
 
