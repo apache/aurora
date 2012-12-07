@@ -240,8 +240,13 @@ class ThermosGCExecutor(ThermosExecutorBase):
     self._collector.erase_metadata(task_id)
 
   def garbage_collect(self, force_delete=frozenset()):
-    retained_executors = set(iter(self.linked_executors))
     active_tasks, finished_tasks = self.partition_tasks()
+    retained_executors = set(iter(self.linked_executors))
+    self.log('Executor sandboxes retained by Mesos:')
+    for r_e in sorted(retained_executors):
+      self.log('  %s' % r_e)
+    else:
+      self.log('  None')
     for task_id in active_tasks - retained_executors:
       self.log('ERROR: Active task %s had its executor sandbox pulled.' % task_id)
     gc_tasks = finished_tasks - retained_executors
