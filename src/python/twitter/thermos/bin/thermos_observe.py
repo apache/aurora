@@ -17,7 +17,7 @@ app.add_option("--root",
 
 
 app.configure(module='twitter.common.app.modules.http',
-    port=1338, host=socket.gethostname(), enable=True, framework='cherrypy')
+    port=1338, host='0.0.0.0', enable=True, framework='cherrypy')
 app.configure(module='twitter.common.app.modules.scribe_exception_handler',
     category='test_thermos_observer_exceptions')
 
