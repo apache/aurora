@@ -62,7 +62,7 @@ def make_local_runner_wrapper(runner_pex, sandbox_root, checkpoint_root):
         sandbox = AppAppSandbox(task_id)
         enable_chroot = True
       else:
-        sandbox = DirectorySandbox(task_id, sandbox_root)
+        sandbox = DirectorySandbox(task_id, os.path.join(sandbox_root, 'sandbox'))
         enable_chroot = False
       super(LocalTaskRunner, self).__init__(
         task_id, mesos_task, role, mesos_ports, runner_pex, sandbox,
