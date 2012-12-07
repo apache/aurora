@@ -266,6 +266,9 @@ class MesosConfig(ProxyConfig):
     """Return a 3-tuple of (role, name, version)"""
     return self._config.get('package')
 
+  def add_package(self, package):
+    self._config['package'] = package
+
   def package_files(self):
     """Returns a list of package file paths"""
     return self._config.get('testing_package_files')

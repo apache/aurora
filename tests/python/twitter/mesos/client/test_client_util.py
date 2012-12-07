@@ -150,8 +150,9 @@ def test_get_package_uri_from_packer_and_files_success():
         packer.delete(role, package_name, package_version['id'])
 
     package_tuple = (role, package_name, 'latest')
-    mocker.StubOutWithMock(client_util, '_get_package_uri_from_packer')
-    client_util._get_package_uri_from_packer(cluster, package_tuple, packer)
+    mocker.StubOutWithMock(client_util, '_get_package_data')
+    mocker.StubOutWithMock(client_util, '_extract_package_uri')
+    client_util._extract_package_uri(client_util._get_package_data(cluster, package_tuple, packer))
 
     mocker.ReplayAll()
     client_util._get_package_uri_from_packer_and_files(

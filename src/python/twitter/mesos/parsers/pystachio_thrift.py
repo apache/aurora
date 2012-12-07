@@ -16,6 +16,7 @@ from gen.twitter.mesos.ttypes import (
   CronCollisionPolicy,
   Identity,
   JobConfiguration,
+  Package,
   TwitterTaskInfo,
 )
 
@@ -60,9 +61,7 @@ def select_cron_policy(cron_policy, cron_collision_policy):
     raise ValueError('Specified both cron_policy and cron_collision_policy!')
 
 
-def convert(job):
-  uninterpolated_vars = set()
-
+def convert(job, packages=[]):
   if not job.role().check().ok():
     raise ValueError(job.role().check().message())
 
@@ -85,6 +84,9 @@ def convert(job):
   if job.has_health_check_interval_secs():
     task.healthCheckIntervalSecs = job.health_check_interval_secs().get()
   task.contactEmail = not_empty_or(job.contact(), None)
+
+  # Add package tuples (role, package_name, version) to a task, to display in the scheduler UI.
+  task.packages = [Package(str(p[0]), str(p[1]), int(p[2])) for p in packages] if packages else []
 
   # task components
   if not task_raw.has_resources():

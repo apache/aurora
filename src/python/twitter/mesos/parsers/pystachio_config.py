@@ -108,6 +108,7 @@ class PystachioConfig(ProxyConfig):
       raise self.InvalidConfig('Processes required for task on job "%s"' % job.name())
     self._job = self.sanitize_job(job)
     self._hdfs_path = None
+    self._packages = []
 
   @staticmethod
   def sanitize_job(job):
@@ -145,7 +146,7 @@ class PystachioConfig(ProxyConfig):
     typecheck = interpolated_job.bind(Environment(mesos=Environment(instance=0))).check()
     if not typecheck.ok():
       raise self.InvalidConfig(typecheck.message())
-    return convert_pystachio_to_thrift(interpolated_job)
+    return convert_pystachio_to_thrift(interpolated_job, self._packages)
 
   def bind(self, binding):
     self._job = self._job.bind(binding)
@@ -188,6 +189,9 @@ class PystachioConfig(ProxyConfig):
 
   def update_config(self):
     return MesosConfig.get_update_config(self._job.get())
+
+  def add_package(self, package):
+    self._packages.append(package)
 
   def package(self):
     if self._job.has_package() and self._job.package().check().ok():

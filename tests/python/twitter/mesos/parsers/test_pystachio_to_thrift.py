@@ -158,3 +158,14 @@ def test_cron_policy_alias():
 
   with pytest.raises(ValueError):
     tti = convert_pystachio_to_thrift(CRON_HELLO_WORLD(cron_collision_policy='GARBAGE'))
+
+def test_packages_in_config():
+  job = convert_pystachio_to_thrift(HELLO_WORLD, packages = [('alpha', 'beta', 1)])
+  assert len(job.taskConfigs) == 1
+  tti = iter(job.taskConfigs).next()
+
+  assert len(tti.packages) == 1
+  pi = iter(tti.packages).next()
+  assert pi.role == 'alpha'
+  assert pi.name == 'beta'
+  assert pi.version == 1

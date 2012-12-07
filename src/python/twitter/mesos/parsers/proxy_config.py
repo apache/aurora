@@ -46,6 +46,11 @@ class ProxyConfig(object):
     pass
 
   @abstractmethod
+  def add_package(self, package):
+    """Add a 3-tuple of (role, package_name, version)"""
+    pass
+
+  @abstractmethod
   def package_files(self):
     """Returns a list of package file paths"""
     pass

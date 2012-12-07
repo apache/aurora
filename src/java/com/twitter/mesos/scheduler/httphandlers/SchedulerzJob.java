@@ -40,6 +40,7 @@ import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Constants;
 import com.twitter.mesos.gen.Constraint;
 import com.twitter.mesos.gen.Identity;
+import com.twitter.mesos.gen.Package;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskConstraint;
@@ -235,6 +236,11 @@ public class SchedulerzJob extends JerseyTemplateServlet {
           for (Constraint constraint : task.getConstraints()) {
             details.put(constraint.getName(), humanReadableConstraint(constraint.getConstraint()));
           }
+          if (task.isSetPackages()) {
+            details.put(
+                "packages",
+                Joiner.on(',').join(Iterables.transform(task.getPackages(), PACKAGE_TOSTRING)));
+          }
           return new SchedulingDetails(details.build());
         }
       };
@@ -265,6 +271,13 @@ public class SchedulerzJob extends JerseyTemplateServlet {
       return other.details.equals(details);
     }
   }
+
+  private static final Function<Package, String> PACKAGE_TOSTRING =
+      new Function<Package, String>() {
+        @Override public String apply(Package pkg) {
+          return pkg.getRole() + "/" + pkg.getName() + " v" + pkg.getVersion();
+        }
+      };
 
   private static final Function<Range<Integer>, String> RANGE_TOSTRING =
       new Function<Range<Integer>, String>() {

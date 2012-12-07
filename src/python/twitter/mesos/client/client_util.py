@@ -41,7 +41,7 @@ def _zip_package_files(job_name, package_files, tmp_dir):
   return zipname
 
 
-def _get_package_uri_from_packer(cluster, package, packer=None):
+def _get_package_data(cluster, package, packer=None):
   cluster = Cluster.get(cluster).packer_redirect or cluster
   role, name, version = package
   log.info('Fetching metadata for package %s/%s version %s in %s.' % (
@@ -49,10 +49,12 @@ def _get_package_uri_from_packer(cluster, package, packer=None):
   try:
     if packer is None:
       packer = sd_packer_client.create_packer(cluster)
-    metadata = packer.get_version(role, name, version)
+    return packer.get_version(role, name, version)
   except Packer.Error as e:
     die('Failed to fetch package metadata: %s' % e)
 
+
+def _extract_package_uri(metadata):
   latest_audit = sorted(metadata['auditLog'], key=lambda a: a['timestamp'])[-1]
   if latest_audit['state'] == 'DELETED':
     die('The requested package version has been deleted.')
@@ -111,11 +113,12 @@ def _get_package_uri_from_packer_and_files(cluster, role, name, package_files):
     else:
       log.info('Not uploading package_files: unchanged package')
 
-  return _get_package_uri_from_packer(cluster, package_tuple, packer)
+  return _extract_package_uri(_get_package_data(cluster, package_tuple, packer))
 
 
 def _get_package_uri(config, copy_app_from=None):
   cluster = config.cluster()
+  # Deprecated PackerPackage object.
   package = config.package()
 
   if config.hdfs_path():
@@ -138,8 +141,10 @@ def _get_package_uri(config, copy_app_from=None):
   if copy_app_from:
     return '/mesos/pkg/%s/%s' % (config.role(), posixpath.basename(copy_app_from))
 
+  # Usage of PackerPackage object has been deprecated.
+  # TODO(Sathya Hariesh): Remove this when the deprecation cycle is complete.
   if package:
-    return _get_package_uri_from_packer(cluster, package)
+    return _extract_package_uri(_get_package_data(cluster, package))
 
   if config.package_files():
     return _get_package_uri_from_packer_and_files(
@@ -227,8 +232,9 @@ def _inject_packer_bindings(config, force_local=False):
   packages = filter(None, map(extract_ref, set(refs)))
   for package in set(packages):
     ref = Ref.from_address('packer[%s][%s][%s]' % package)
-    config.bind({ref: generate_packer_struct(
-      _get_package_uri_from_packer(config.cluster(), package))})
+    package_data = _get_package_data(config.cluster(), package)
+    config.bind({ref: generate_packer_struct(_extract_package_uri(package_data))})
+    config.add_package((package[0], package[1], package_data['id']))
 
 
 MESOS_CONFIG_DEPRECATION_MESSAGE = """
