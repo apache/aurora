@@ -147,7 +147,7 @@ class ThickTestThermosGCExecutor(ThinTestThermosGCExecutor):
   def maybe_terminate_unknown_task(self, task_id):
     self._maybe_terminate.add(task_id)
 
-  def get_state(self, task_id):
+  def get_states(self, task_id):
     if task_id in self._active_tasks:
       return [(self._clock.time(), self._active_tasks[task_id])]
     elif task_id in self._finished_tasks:
@@ -237,7 +237,7 @@ def test_state_reconciliation_nexist_terminal():
     assert rgc == set(['foo'])
 
 
-def test_real_get_state():
+def test_real_get_states():
   # TODO(wickman) Test actual state reconstruction code.
   pass
 
