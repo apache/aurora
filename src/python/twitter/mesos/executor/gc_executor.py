@@ -160,7 +160,7 @@ class ThermosGCExecutor(ThermosExecutorBase):
         local_gc.add(task_id)
       if task_id in local_finished and task_id in sched_active:
         self.log('Task %s finished but scheduler thinks active.' % task_id)
-        states = self.get_state(task_id)
+        states = self.get_states(task_id)
         if len(states) > 0:
           _, last_state = states[-1]
           updates[task_id] = self.THERMOS_TO_TWITTER_STATES.get(last_state, ScheduleStatus.UNKNOWN)
