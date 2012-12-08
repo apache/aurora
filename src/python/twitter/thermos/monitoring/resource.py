@@ -93,7 +93,9 @@ class TaskResourceMonitor(ResourceMonitorBase, threading.Thread):
 
   def __init__(self, task_monitor, sandbox,
                process_collector=ProcessTreeCollector, disk_collector=DiskCollector,
-               collection_interval=Amount(15, Time.SECONDS), history_time=Amount(1, Time.HOURS)):
+               process_collection_interval=Amount(20, Time.SECONDS),
+               disk_collection_interval=Amount(1, Time.MINUTES),
+               history_time=Amount(1, Time.HOURS)):
     """
       task_monitor: TaskMonitor object specifying the task whose resources should be monitored
       sandbox: Directory for which to monitor disk utilisation
@@ -107,10 +109,13 @@ class TaskResourceMonitor(ResourceMonitorBase, threading.Thread):
     self._sandbox = sandbox
     self._process_collector_factory = process_collector
     self._disk_collector = disk_collector(self._sandbox)
-    self._collection_interval = collection_interval.as_(Time.SECONDS)
-    history_length = int(history_time.as_(Time.MINUTES) / collection_interval.as_(Time.MINUTES))
+    self._process_collection_interval = process_collection_interval.as_(Time.SECONDS)
+    self._disk_collection_interval = disk_collection_interval.as_(Time.SECONDS)
+    min_collection_interval = min(self._process_collection_interval, self._disk_collection_interval)
+    history_length = int(history_time.as_(Time.SECONDS) / min_collection_interval)
     if history_length > self.MAX_HISTORY:
       raise ValueError("Requested history length too large")
+    log.debug("Initialising ResourceHistory of length %s" % history_length)
     self._history = ResourceHistory(history_length)
     self._kill_signal = threading.Event()
     threading.Thread.__init__(self)
@@ -149,35 +154,51 @@ class TaskResourceMonitor(ResourceMonitorBase, threading.Thread):
   def run(self):
     """Thread entrypoint. Loop indefinitely, polling collectors at self._collection_interval and
     collating samples."""
+
     log.debug('Commencing resource monitoring for task "%s"' % self._task_id)
+    next_process_collection = 0
+    next_disk_collection = 0
+
     while not self._kill_signal.is_set():
+
       now = time.time()
-      actives = set(self._get_active_processes())
-      current = set(self._process_collectors)
-      for process in current - actives:
-        log.debug('Process "%s" (pid %s) no longer active, removing from monitored processes' %
-                 (process.process, process.pid))
-        self._process_collectors.pop(process)
-      for process in actives - current:
-        log.debug('Adding process "%s" (pid %s) to resource monitoring' %
-                 (process.process, process.pid))
-        self._process_collectors[process] = self._process_collector_factory(process.pid)
-      for process, collector in self._process_collectors.iteritems():
-        log.debug('Collecting sample for process "%s" (pid %s) and children' %
-                 (process.process, process.pid))
-        collector.sample()
-      log.debug('Collecting disk sample')
-      self._disk_collector.sample()
-      try:
-        aggregated_procs = sum(map(attrgetter('procs'), self._process_collectors.values()))
-        aggregated_sample = sum(map(attrgetter('value'), self._process_collectors.values()),
-                                ProcessSample.empty())
-        self._history.add(now, self.ResourceResult(aggregated_procs, aggregated_sample,
-                                                   self._disk_collector.value))
-        log.debug("Recorded sample at %s" % now)
-      except ValueError as err:
-        log.warning("Error recording sample: %s" % err)
-      self._kill_signal.wait(timeout=max(0, self._collection_interval - (time.time() - now)))
+
+      if now > next_process_collection:
+        next_process_collection = now + self._process_collection_interval
+        actives = set(self._get_active_processes())
+        current = set(self._process_collectors)
+        for process in current - actives:
+          log.debug('Process "%s" (pid %s) no longer active, removing from monitored processes' %
+                   (process.process, process.pid))
+          self._process_collectors.pop(process)
+        for process in actives - current:
+          log.debug('Adding process "%s" (pid %s) to resource monitoring' %
+                   (process.process, process.pid))
+          self._process_collectors[process] = self._process_collector_factory(process.pid)
+        for process, collector in self._process_collectors.iteritems():
+          log.debug('Collecting sample for process "%s" (pid %s) and children' %
+                   (process.process, process.pid))
+          collector.sample()
+
+      if now > next_disk_collection:
+        next_disk_collection = now + self._disk_collection_interval
+        log.debug('Collecting disk sample')
+        self._disk_collector.sample()
+        try:
+          aggregated_procs = sum(map(attrgetter('procs'), self._process_collectors.values()))
+          aggregated_sample = sum(map(attrgetter('value'), self._process_collectors.values()),
+                                  ProcessSample.empty())
+          self._history.add(now, self.ResourceResult(aggregated_procs, aggregated_sample,
+                                                     self._disk_collector.value))
+          log.debug("Recorded sample at %s" % now)
+        except ValueError as err:
+          log.warning("Error recording sample: %s" % err)
+
+      # Sleep until it's time for the next disk collection, the next process collection, or we've been killed
+      now = time.time()
+      self._kill_signal.wait(
+        timeout=max(0, next_process_collection - now, next_disk_collection - now))
+
     log.debug('Stopping resource monitoring for task "%s"' % self._task_id)
 
 

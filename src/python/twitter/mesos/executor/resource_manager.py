@@ -148,18 +148,19 @@ class ResourceEnforcer(object):
 class ResourceManager(HealthInterface, ExceptionalThread):
   """ Manage resources consumed by a Task """
 
-  PROCESS_COLLECTION_INTERVAL = Amount(20, Time.SECONDS)
-  DISK_COLLECTION_INTERVAL = Amount(1, Time.MINUTES)
-  ENFORCEMENT_INTERVAL = Amount(30, Time.SECONDS)
-
-  def __init__(self, resources, task_monitor, sandbox):
+  def __init__(self, resources, task_monitor, sandbox,
+               enforcement_interval=Amount(30, Time.SECONDS)):
     """
       resources: Resources object specifying cpu, ram, disk limits for the task
       task_monitor: TaskMonitor exposing attributes about the task
       sandbox: the directory that we should monitor for disk usage
+      enforcement_interval: how often resource enforcement should be conducted
     """
     self._resource_monitor = TaskResourceMonitor(task_monitor, sandbox)
     self._enforcer = ResourceEnforcer(resources, task_monitor)
+    self._enforcement_interval = enforcement_interval.as_(Time.SECONDS)
+    if self._enforcement_interval <= 0:
+      raise ValueError('Resource enforcement interval must be >= 0')
     self._max_cpu = resources.cpu().get()
     self._max_ram = resources.ram().get()
     self._max_disk = resources.disk().get()
@@ -216,26 +217,18 @@ class ResourceManager(HealthInterface, ExceptionalThread):
     return self._kill_reason
 
   def run(self):
-    """ Periodically aggregate resources and conduct enforcement if necessary """
-    now = time.time()
-    next_process_collection = now
-    next_disk_collection = now
-    next_enforcement = now
+    """ Periodically conduct enforcement. Resources are aggregated in the background thread of the
+    ResourceMonitor. """
+
     self._resource_monitor.start()
 
     while not self._stop_event.is_set():
-      now = time.time()
-      next_event = max(
-          0, min(next_enforcement, next_process_collection, next_disk_collection) - now)
-      time.sleep(next_event)
-      now = time.time()
-      if now > next_enforcement:
-        next_enforcement = now + self.ENFORCEMENT_INTERVAL.as_(Time.SECONDS)
-        # TODO(jon): pass enforcer ProcessSample et al instead; it doesn't need TaskResourceSample
-        kill_reason = self._enforcer.enforce(self.sample)
-        if kill_reason and not self._kill_reason:
-          log.info('ResourceManager triggering kill - reason: %s' % kill_reason)
-          self._kill_reason = kill_reason
+      # TODO(jon): pass enforcer ProcessSample et al instead; it doesn't need TaskResourceSample
+      kill_reason = self._enforcer.enforce(self.sample)
+      if kill_reason and not self._kill_reason:
+        log.info('ResourceManager triggering kill - reason: %s' % kill_reason)
+        self._kill_reason = kill_reason
+      self._stop_event.wait(timeout=self._enforcement_interval)
 
   def start(self):
     ExceptionalThread.start(self)
