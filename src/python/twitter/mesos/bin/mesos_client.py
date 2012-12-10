@@ -895,6 +895,18 @@ def package_set_live(role, package, version):
   _get_packer().set_live(role, package, version)
   print 'Version %s is now the LIVE vesion' % version
 
+@app.command
+@trap_packer_error
+@app.command_option(CLUSTER_OPTION)
+@requires.exactly('role', 'package')
+def package_unset_live(role, package):
+  """usage: package_unset_live --cluster=CLUSTER role package
+
+  Removes the 'live' label of a package if it exists.
+  """
+  _get_packer().unset_live(role, package)
+  print 'LIVE label unset'
+
 
 @app.command
 @trap_packer_error

@@ -174,4 +174,5 @@ class Packer(object):
                      body='version=%s' % version,
                      method='PUT')
 
-
+  def unset_live(self, role, package):
+    return self._api(Packer._live_url(role, package), auth=True, method='DELETE')
