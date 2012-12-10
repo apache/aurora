@@ -360,6 +360,9 @@ public class CronJobManager extends JobManager implements EventSubscriber {
   }
 
   void updateJob(JobConfiguration job) throws ScheduleException {
+    if (!hasCronSchedule(job)) {
+      throw new ScheduleException("A cron job may not be updated to a non-cron job.");
+    }
     String key = scheduledJobs.remove(Tasks.jobKey(job));
     checkNotNull(key, "Attempted to update unknown job " + Tasks.jobKey(job));
     cron.deschedule(key);

@@ -22,6 +22,8 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.CronJobManager.CronScheduler;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
+import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
+import com.twitter.mesos.scheduler.storage.Storage.Work;
 import com.twitter.mesos.scheduler.storage.mem.MemStorage;
 
 import static org.easymock.EasyMock.anyObject;
@@ -29,6 +31,8 @@ import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
 public class CronJobManagerTest extends EasyMockTest {
 
@@ -38,6 +42,7 @@ public class CronJobManagerTest extends EasyMockTest {
   private SchedulerCore scheduler;
   private Executor delayExecutor;
   private Capture<Runnable> delayLaunchCapture;
+  private Storage storage;
 
   private CronScheduler cronScheduler;
   private CronJobManager cron;
@@ -47,7 +52,7 @@ public class CronJobManagerTest extends EasyMockTest {
     scheduler = createMock(SchedulerCore.class);
     delayExecutor = createMock(Executor.class);
     delayLaunchCapture = createCapture();
-    Storage storage = MemStorage.newEmptyStorage();
+    storage = MemStorage.newEmptyStorage();
     storage.prepare();
     storage.start(MutateWork.NOOP);
     cronScheduler = createMock(CronScheduler.class);
@@ -228,6 +233,44 @@ public class CronJobManagerTest extends EasyMockTest {
 
     cron.receiveJob(job);
     cron.startJobNow(job.getOwner().getRole(), job.getName());
+  }
+
+  @Test
+  public void testConsistentState() throws Exception {
+    JobConfiguration job = makeJob();
+    JobConfiguration updated = makeJob().setCronSchedule("1 2 3 4 5");
+
+    expect(cronScheduler.schedule(eq(job.getCronSchedule()), EasyMock.<Runnable>anyObject()))
+        .andReturn("key");
+    cronScheduler.deschedule("key");
+    expect(cronScheduler.schedule(eq(updated.getCronSchedule()), EasyMock.<Runnable>anyObject()))
+        .andReturn("key2");
+
+    control.replay();
+
+    cron.receiveJob(job);
+    assertEquals(ImmutableSet.of(job), getCronJobs());
+
+    JobConfiguration failedUpdate = updated.deepCopy();
+    failedUpdate.unsetCronSchedule();
+    try {
+      cron.updateJob(failedUpdate);
+      fail();
+    } catch (ScheduleException e) {
+      // Expected.
+    }
+    assertEquals(ImmutableSet.of(job), getCronJobs());
+
+    cron.updateJob(updated);
+    assertEquals(ImmutableSet.of(updated), getCronJobs());
+  }
+
+  private Iterable<JobConfiguration> getCronJobs() {
+    return storage.doInTransaction(new Work.Quiet<Iterable<JobConfiguration>>() {
+      @Override public Iterable<JobConfiguration> apply(StoreProvider storeProvider) {
+        return storeProvider.getJobStore().fetchJobs(CronJobManager.MANAGER_KEY);
+      }
+    });
   }
 
   private JobConfiguration makeJob() {
