@@ -229,7 +229,7 @@ class SchedulerManager(object):
 class AuroraBuilder(Builder):
   @property
   def project(self):
-    return 'mesos'
+    return 'aurora'
 
   @property
   def test_commands(self):
