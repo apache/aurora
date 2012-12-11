@@ -100,7 +100,7 @@ class TaskObserverFileBrowser(object):
       return {}
     offset = self.Request.GET.get('offset', -1)
     length = self.Request.GET.get('length', -1)
-    chroot, path = self._observer.file_path(task_id, path)
+    chroot, path = self._observer.valid_file(task_id, path)
     if chroot is None or path is None:
       return {}
     return _read_chunk(os.path.join(chroot, path), offset, length)
@@ -111,9 +111,12 @@ class TaskObserverFileBrowser(object):
   def handle_dir(self, task_id, path=None):
     if path == "":
       path = None
-    return self._observer.files(task_id, path)
+    chroot, path = self._observer.valid_path(task_id, path)
+    return dict(task_id=task_id, chroot=chroot, path=path)
 
   @HttpServer.route("/download/:task_id/:path#.+#")
   def handle_download(self, task_id, path=None):
-    root_task_id = self._observer.files(task_id)
-    return bottle.static_file(path, root = root_task_id['chroot'], download=True)
+    chroot, path = self._observer.valid_path(task_id, path)
+    if path is None:
+      bottle.abort(404, "No such file")
+    return bottle.static_file(path, root=chroot, download=True)

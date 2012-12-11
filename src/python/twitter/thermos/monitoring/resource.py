@@ -1,4 +1,17 @@
-""" Monitor the resource consumption of a Thermos task """
+"""Monitor the resource consumption of Thermos tasks
+
+This module contains classes used to monitor the resource consumption (e.g. CPU, RAM, disk) of
+Thermos tasks. Resource monitoring of a Thermos task typically treats the task as an aggregate of
+all the processes within it. Importantly, this excludes the process(es) of Thermos itself (i.e. the
+TaskRunner and any other wrappers involved in launching a task).
+
+The ResourceMonitorBase defines the interface for other components (for example, the Thermos
+TaskObserver) to interact with and retrieve information about a Task's resource consumption.  The
+canonical/reference implementation of a ResourceMonitor is the TaskResourceMonitor, a thread which
+actively monitors resources for a particular task by periodically polling process information and
+disk consumption and retaining a limited (FIFO) in-memory history of this data.
+
+"""
 
 import threading
 import time
@@ -50,6 +63,7 @@ class ResourceMonitorBase(ResourceMonitorMetaBase):
     Returns a tuple of (timestamp, ProcessSample)
     """
 
+
 class ResourceHistory(object):
   """Simple class to contain a RingBuffer (fixed-length FIFO) history of resource samples, with the
        mapping: timestamp => (number_of_procs, ProcessSample, disk_usage_in_bytes)
@@ -81,6 +95,7 @@ class ResourceHistory(object):
 
   def __repr__(self):
     return 'ResourceHistory(%s)' % ', '.join([str(r) for r in self._values])
+
 
 class TaskResourceMonitor(ResourceMonitorBase, threading.Thread):
   """ Lightweight thread to aggregate resource consumption for a task's constituent processes.
@@ -194,11 +209,10 @@ class TaskResourceMonitor(ResourceMonitorBase, threading.Thread):
         except ValueError as err:
           log.warning("Error recording sample: %s" % err)
 
-      # Sleep until it's time for the next disk collection, the next process collection, or we've been killed
+      # Sleep until it's time for the next disk collection, the next process collection, or we've
+      # been killed
       now = time.time()
       self._kill_signal.wait(
         timeout=max(0, next_process_collection - now, next_disk_collection - now))
 
     log.debug('Stopping resource monitoring for task "%s"' % self._task_id)
-
-

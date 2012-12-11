@@ -1,4 +1,9 @@
-""" Represent resource consumption statistics for processes """
+"""Represent resource consumption statistics for processes
+
+This module exposes one class: the ProcessSample, used to represent resource consumption. A single
+ProcessSample might correspond to one individual process, or to an aggregate of multiple processes.
+
+"""
 
 from collections import namedtuple
 

@@ -1,4 +1,13 @@
-""" Sample disk usage under a particular path """
+"""Sample disk usage under a particular path
+
+This module provides a simple thread which can be used to gather information on the disk utilisation
+under a particular path.
+
+Currently, it uses a basic brute-force approach (os.stat()ing every file within the path), but it
+should be updated to instead update the disk utilisation dynamically by using inotify or similar to
+monitor for disk changes.
+
+"""
 
 import threading
 

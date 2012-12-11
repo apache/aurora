@@ -1,3 +1,9 @@
+"""Detect Thermos tasks on disk
+
+This module contains the TaskDetector, used to detect Thermos tasks within a given checkpoint root.
+
+"""
+
 import glob
 import os
 import re

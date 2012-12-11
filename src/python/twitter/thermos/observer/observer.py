@@ -1,14 +1,24 @@
+"""Observe Thermos tasks on a system
+
+This module provides a number of classes for exposing information about running (active) and
+finished Thermos tasks on a system. The primary entry point is the TaskObserver, a thread which
+polls a designated Thermos checkpoint root and collates information about all tasks it discovers.
+
+"""
 import os
 import errno
 import time
 import json
 import urllib
 import threading
+from abc import abstractmethod, abstractproperty
 from collections import defaultdict
+from operator import attrgetter
 
 from twitter.common import log
 from twitter.common.exceptions import ExceptionalThread
-from twitter.common.lang import Lockable
+from twitter.common.lang import AbstractClass, Lockable
+from twitter.common.quantity import Amount, Time
 from twitter.common.recordio import ThriftRecordReader
 
 from twitter.thermos.monitoring.detector import TaskDetector
@@ -28,9 +38,133 @@ from twitter.thermos.config.loader import (
 from gen.twitter.thermos.ttypes import *
 
 
+def safe_mtime(path):
+  try:
+    return os.path.getmtime(path)
+  except OSError:
+    return None
+
+
+class ObservedTask(AbstractClass):
+  """ Represents a Task being observed """
+  def __init__(self, task_id, pathspec):
+    self._task_id = task_id
+    self._pathspec = pathspec
+    self._mtime = self._get_mtime()
+
+  @abstractproperty
+  def type(self):
+    """Indicates the type of task (active or finished)"""
+
+  def _read_task(self, memoized={}):
+    """Read the corresponding task from disk and return a ThermosTask.  Memoizes already-read tasks.
+    """
+    if self._task_id not in memoized:
+      path = self._pathspec.given(task_id=self._task_id, state=self.type).getpath('task_path')
+      if os.path.exists(path):
+        task = ThermosTaskWrapper.from_file(path)
+        if task is None:
+          log.error('Error reading ThermosTask from %s in observer.' % path)
+        else:
+          context = self.context(self._task_id)
+          if not context:
+            log.warning('Task not yet available: %s' % self._task_id)
+          task = task.task() % Environment(thermos=context)
+          memoized[self._task_id] = task
+
+    return memoized.get(self._task_id, None)
+
+  def _get_mtime(self):
+    """Retrieve the mtime of the task's state directory"""
+    get_path = lambda state: self._pathspec.given(
+      task_id=self._task_id, state=state).getpath('task_path')
+    mtime = safe_mtime(get_path('active'))
+    if mtime is None:
+      mtime = safe_mtime(get_path('finished'))
+    if mtime is None:
+      log.error("Couldn't get mtime for task %s!" % self._task_id)
+    return mtime
+
+  def context(self, task_id):
+    state = self.state
+    if state.header is None:
+      return None
+    return ThermosContext(
+      ports = state.header.ports if state.header.ports else {},
+      task_id = state.header.task_id,
+      user = state.header.user,
+    )
+
+  @property
+  def task(self):
+    """Return a ThermosTask representing this task"""
+    return self._read_task()
+
+  @property
+  def task_id(self):
+    """Return the task's task_id"""
+    return self._task_id
+
+  @property
+  def mtime(self):
+    """Return mtime of task file"""
+    return self._mtime
+
+  @abstractproperty
+  def state(self):
+    """Return state of task (gen.twitter.thermos.ttypes.RunnerState)"""
+
+
+class ActiveObservedTask(ObservedTask):
+  """An active Task known by the TaskObserver"""
+  def __init__(self, task_id, pathspec, task_monitor, resource_monitor):
+    super(ActiveObservedTask, self).__init__(task_id, pathspec)
+    self._task_monitor = task_monitor
+    self._resource_monitor = resource_monitor
+
+  @property
+  def type(self):
+    return 'active'
+
+  @property
+  def state(self):
+    """Return a RunnerState representing the current state of task, retrieved from TaskMonitor"""
+    return self.task_monitor.get_state()
+
+  @property
+  def task_monitor(self):
+    """Return a TaskMonitor monitoring this task"""
+    return self._task_monitor
+
+  @property
+  def resource_monitor(self):
+    """Return a ResourceMonitor implementation monitoring this task's resources"""
+    return self._resource_monitor
+
+
+class FinishedObservedTask(ObservedTask):
+  """A finished Task known by the TaskObserver"""
+  def __init__(self, task_id, pathspec):
+    super(FinishedObservedTask, self).__init__(task_id, pathspec)
+    self._state = None
+
+  @property
+  def type(self):
+    return 'finished'
+
+  @property
+  def state(self):
+    """Return final state of Task (RunnerState, read from disk and cached for future access)"""
+    if self._state is None:
+      path = self._pathspec.given(task_id=self._task_id).getpath('runner_checkpoint')
+      self._state = CheckpointDispatcher.from_file(path)
+    return self._state
+
+
+
 class TaskObserver(ExceptionalThread, Lockable):
   """
-    The task observer monitors the thermos checkpoint root for active/finished
+    The TaskObserver monitors the thermos checkpoint root for active/finished
     tasks.  It is used to be the oracle of the state of all thermos tasks on
     a machine.
 
@@ -40,31 +174,78 @@ class TaskObserver(ExceptionalThread, Lockable):
   class UnexpectedError(Exception): pass
   class UnexpectedState(Exception): pass
 
+  POLLING_INTERVAL = Amount(1, Time.SECONDS)
+
   def __init__(self, root, resource_monitor_class=TaskResourceMonitor):
     self._pathspec = TaskPath(root=root)
     self._detector = TaskDetector(root)
     if not issubclass(resource_monitor_class, ResourceMonitorBase):
       raise ValueError("resource monitor class must implement ResourceMonitorBase!")
     self._resource_monitor = resource_monitor_class
-    # TODO(jon): this is kind of ridiculous; these multiple structs for tracking which tasks are
-    # being observed should be consolidated
-    self._states = {}
-    self._actives = set()            # set of active task_ids
-    self._finishes = set()           # set of finished task_ids
-    self._tasks = {}                 # task_id => ThermosTask
-    self._task_monitors = {}         # task_id => TaskMonitor
-    self._resource_monitors = {}     # task_id => ResourceMonitor implementation
-    self._stat = {}                  # task_id => mtime of task file
+    self._active_tasks = {}    # task_id => ActiveObservedTask
+    self._finished_tasks = {}  # task_id => FinishedObservedTask
     self._stop_event = threading.Event()
     ExceptionalThread.__init__(self)
     Lockable.__init__(self)
     self.daemon = True
+
+  @property
+  def active_tasks(self):
+    """Return a dictionary of active Tasks"""
+    return self._active_tasks
+
+  @property
+  def finished_tasks(self):
+    """Return a dictionary of finished Tasks"""
+    return self._finished_tasks
+
+  @property
+  def all_tasks(self):
+    """Return a dictionary of all Tasks known by the TaskObserver"""
+    return dict(self.active_tasks.items() + self.finished_tasks.items())
 
   def stop(self):
     self._stop_event.set()
 
   def start(self):
     ExceptionalThread.start(self)
+
+  @Lockable.sync
+  def add_active_task(self, task_id):
+    if task_id in self.finished_tasks:
+      log.error('Found an active task (%s) in finished tasks?' % task_id)
+      return
+    task_monitor = TaskMonitor(self._pathspec, task_id)
+    if not task_monitor.get_state().header:
+      log.info('Unable to load task "%s"' % task_id)
+      return
+    sandbox = task_monitor.get_state().header.sandbox
+    resource_monitor = self._resource_monitor(task_monitor, sandbox)
+    resource_monitor.start()
+    self._active_tasks[task_id] = ActiveObservedTask(
+      task_id=task_id, pathspec=self._pathspec,
+      task_monitor=task_monitor, resource_monitor=resource_monitor
+    )
+
+  @Lockable.sync
+  def add_finished_task(self, task_id):
+    self._finished_tasks[task_id] = FinishedObservedTask(
+      task_id=task_id, pathspec=self._pathspec
+    )
+
+  @Lockable.sync
+  def active_to_finished(self, task_id):
+    self.remove_active_task(task_id)
+    self.add_finished_task(task_id)
+
+  @Lockable.sync
+  def remove_active_task(self, task_id):
+    task = self.active_tasks.pop(task_id)
+    task.resource_monitor.kill()
+
+  @Lockable.sync
+  def remove_finished_task(self, task_id):
+    self.finished_tasks.pop(task_id)
 
   def run(self):
     """
@@ -73,89 +254,43 @@ class TaskObserver(ExceptionalThread, Lockable):
       finished state.
     """
     while not self._stop_event.is_set():
-      time.sleep(1)
+      time.sleep(self.POLLING_INTERVAL.as_(Time.SECONDS))
 
       active_tasks = [task_id for _, task_id in self._detector.get_task_ids(state='active')]
       finished_tasks = [task_id for _, task_id in self._detector.get_task_ids(state='finished')]
 
       with self.lock:
-        for active in active_tasks:
-          if active in self._finishes:
-            log.error('Found an active (%s) in finished tasks?' % active)
-          if active not in self._actives:
-            task_monitor = TaskMonitor(self._pathspec, active)
-            if not task_monitor.get_state().header:
-              log.info('Unable to load task "%s"' % active)
-              continue
-            self._task_monitors[active] = task_monitor
-            self._actives.add(active)    # add to active list
-            self._read_task(active)      # read and memoize ThermosTask object
-            sandbox = self._task_monitors[active].get_state().header.sandbox
-            self._resource_monitors[active] = self._resource_monitor(task_monitor, sandbox)
-            self._resource_monitors[active].start()
-            self._stat[active] = self._get_stat(active)
-            log.debug('task_id %s -> active' % active)
-        for finished in finished_tasks:
-          if finished in self._actives:
-            log.debug('task_id %s active -> finished' % finished)
-            self._actives.remove(finished)              # remove from actives
-            self._task_monitors.pop(finished)           # remove from task monitors
-            rm = self._resource_monitors.pop(finished)  # remove from resource monitors
-            rm.kill()                                   # terminate resource monitor thread
-          if finished not in self._stat:
-            self._stat[finished] = self._get_stat(finished)
-          self._finishes.add(finished)
 
-  def _get_stat(self, task_id):
-    ps = self._pathspec.given(task_id=task_id)
-    try:
-      return os.path.getmtime(ps.given(state='active').getpath('task_path'))
-    except OSError as e:
-      if e.errno != errno.ENOENT:
-        raise
-      return os.path.getmtime(ps.given(state='finished').getpath('task_path'))
+        # Ensure all tasks currently detected on the system are observed appropriately
+        for active in active_tasks:
+          if active not in self.active_tasks:
+            log.debug('task_id %s (unknown) -> active' % active)
+            self.add_active_task(active)
+        for finished in finished_tasks:
+          if finished in self.active_tasks:
+            log.debug('task_id %s active -> finished' % finished)
+            self.active_to_finished(finished)
+          elif finished not in self.finished_tasks:
+            log.debug('task_id %s (unknown) -> finished' % finished)
+            self.add_finished_task(finished)
+
+        # Remove ObservedTasks for tasks no longer detected on the system
+        for unknown in set(self.active_tasks) - set(active_tasks + finished_tasks):
+          log.debug('task_id %s active -> (unknown)' % unknown)
+          self.remove_active_task(unknown)
+        for unknown in set(self.finished_tasks) - set(active_tasks + finished_tasks):
+          log.debug('task_id %s finished -> (unknown)' % unknown)
+          self.remove_finished_task(unknown)
+
 
   @Lockable.sync
   def process_from_name(self, task_id, process_id):
-    task = self._read_task(task_id)
-    if task is None:
-      return None
-    for process in task.processes():
-      if process.name().get() == process_id:
-        return process
-    return None
-
-  @Lockable.sync
-  def _read_task(self, task_id):
-    """
-      Given a task id, read the corresponding task from disk and return a ThermosTask.
-      Memoizes already-read tasks.
-    """
-    task = self._tasks.get(task_id, None)
-    if task:
-      return task
-
-    task_id_map = {
-      'active': self._actives,
-      'finished': self._finishes
-    }
-
-    for state_type, task_idset in task_id_map.iteritems():
-      if task_id in task_idset:
-        path = self._pathspec.given(task_id=task_id, state=state_type).getpath('task_path')
-        if os.path.exists(path):
-          task = ThermosTaskWrapper.from_file(path)
-          if task is None:
-            log.error('Error reading ThermosTask from %s in observer.' % path)
-          else:
-            context = self.context(task_id)
-            if not context:
-              log.warning('Task not yet available: %s' % task_id)
-              return None
-            task = task.task() % Environment(thermos = context)
-            self._tasks[task_id] = task
-            return task
-    return None
+    if task_id in self.all_tasks:
+      task = self.all_tasks[task_id].task
+      if task:
+        for process in task.processes():
+          if process.name().get() == process_id:
+            return process
 
   @Lockable.sync
   def task_count(self):
@@ -164,8 +299,9 @@ class TaskObserver(ExceptionalThread, Lockable):
       This may be <= self.task_id_count()
     """
     return dict(
-      active = sum(bool(self._read_task(t)) for t in self._actives),
-      finished = sum(bool(self._read_task(t)) for t in self._finishes)
+      active = len(self.active_tasks),
+      finished = len(self.finished_tasks),
+      all = len(self.all_tasks),
     )
 
   @Lockable.sync
@@ -173,69 +309,32 @@ class TaskObserver(ExceptionalThread, Lockable):
     """
       Return the raw count of active and finished task_ids from the TaskDetector.
     """
+    num_active = len(list(self._detector.get_task_ids(state='active')))
+    num_finished = len(list(self._detector.get_task_ids(state='finished')))
     return dict(
-      active = len(self._actives),
-      finished = len(self._finishes)
+      active = num_active,
+      finished = num_finished,
+      all = num_active + num_finished,
     )
 
-  @Lockable.sync
-  def task_ids(self, type=None, offset=None, num=None):
-    """
-      Return the list of task_ids in a browser-friendly format.
-      Task ids are sorted by interest:
-        - active tasks are sorted by start time
-        - finished tasks are sorted by completion time
+  def _get_tasks_of_type(self, type):
+    """Convenience function to return all tasks of a given type"""
+    tasks = {
+      'active':   self.active_tasks,
+      'finished': self.finished_tasks,
+      'all':      self.all_tasks,
+    }.get(type, None)
 
-      type = (all|active|finished|None) [default: all]
-      offset = offset into the list of task_ids [default: 0]
-      num = number of results to return [default: return 20]
-
-      Returns {
-        task_ids: [task_id_1, ..., task_id_N],
-        type: query type,
-        offset: next offset,
-        num: next num
-      }
-    """
-    num = num or 20
-    offset = offset or 0
-    type = type or 'all'
-
-    if type == 'all':
-      tids = list(self._actives) + list(self._finishes)
-    elif type == 'active':
-      tids = list(self._actives)
-    elif type == 'finished':
-      tids = list(self._finishes)
-    else:
-      raise ValueError('Unknown task type %s' % type)
-
-    tids = sorted([(tid, self._stat.get(tid, 0)) for tid in tids], key=lambda pair: pair[1],
-        reverse=True)
-
-    end = num
-    if offset < 0:
-      offset = offset % len(tids) if len(tids) > abs(offset) else 0
-    end += offset
-
-    return dict(
-        task_ids=[v[0] for v in tids[offset:end]],
-        type=type,
-        offset=offset,
-        num=num)
-
-  def context(self, task_id):
-    state = self.raw_state(task_id)
-    if state is None or state.header is None:
+    if tasks is None:
+      log.error('Unknown task type %s' % type)
       return {}
-    return ThermosContext(
-      ports = state.header.ports if state.header and state.header.ports else {},
-      task_id = state.header.task_id,
-      user = state.header.user,
-    )
+
+    return tasks
+
 
   @Lockable.sync
   def state(self, task_id):
+    """Return a dict containing mapped information about a task's state"""
     real_state = self.raw_state(task_id)
     if real_state is None or real_state.header is None:
       return {}
@@ -248,24 +347,17 @@ class TaskObserver(ExceptionalThread, Lockable):
         user = real_state.header.user
       )
 
+
   @Lockable.sync
   def raw_state(self, task_id):
     """
       Return the current runner state (thrift blob: gen.twitter.thermos.ttypes.RunnerState)
       of a given task id
     """
-    if task_id in self._actives:
-      return self._task_monitors[task_id].get_state()
-    elif task_id in self._states:
-      # memoized finished state
-      return self._states[task_id]
-    else:
-      # unread finished state, let's read and memoize.
-      path = self._pathspec.given(task_id = task_id).getpath('runner_checkpoint')
-      self._states[task_id] = CheckpointDispatcher.from_file(path)
-      return self._states[task_id]
-    log.error("Could not find task_id: %s" % task_id)
-    return None
+    if task_id not in self.all_tasks:
+      return None
+    return self.all_tasks[task_id].state
+
 
   @Lockable.sync
   def _task_processes(self, task_id):
@@ -275,7 +367,7 @@ class TaskObserver(ExceptionalThread, Lockable):
       Returns a map from state to processes in that state, where possible
       states are: waiting, running, success, failed.
     """
-    if task_id not in self._actives and task_id not in self._finishes:
+    if task_id not in self.all_tasks:
       return {}
     state = self.raw_state(task_id)
     if state is None or state.header is None:
@@ -312,21 +404,55 @@ class TaskObserver(ExceptionalThread, Lockable):
 
   @Lockable.sync
   def main(self, type=None, offset=None, num=None):
-    task_map = self.task_ids(type, offset, num)
-    task_ids = task_map['task_ids']
-    tasks = self.task(task_ids)
-    if type in ('active', 'finished'):
-      task_count = self.task_count()[type]
-    elif type == 'all':
-      task_count = sum(self.task_count().values())
-    else:
-      raise ValueError('Unknown task type %s' % type)
-    def task_row(tid):
-      task = tasks[tid]
+    """Return a set of information about tasks, optionally filtered
+
+      Args:
+        type = (all|active|finished|None) [default: all]
+        offset = offset into the list of task_ids [default: 0]
+        num = number of results to return [default: 20]
+
+      Tasks are sorted by interest:
+        - active tasks are sorted by start time
+        - finished tasks are sorted by completion time
+
+      Returns:
+        {
+          tasks: [task_id_1, ..., task_id_N],
+          type: query type,
+          offset: next offset,
+          num: next num
+        }
+
+    """
+    type = type or 'all'
+    offset = offset or 0
+    num = num or 20
+
+    # Get a list of all ObservedTasks of requested type
+    tasks = sorted((task for task in self._get_tasks_of_type(type).values()),
+                   key=attrgetter('mtime'), reverse=True)
+
+    # Filter by requested offset + number of results
+    end = num
+    if offset < 0:
+      offset = offset % len(tasks) if len(tasks) > abs(offset) else 0
+    end += offset
+    tasks = tasks[offset:end]
+
+#    # Gather filtered set of task_ids representing tasks of interest
+#    task_map = self.task_ids(type, offset, num)
+#    task_ids = task_map['task_ids']
+#
+#    tasks = dict((task_id, self._task(task_id)) for task_id in self._get_tasks_of_type(type)
+#                  if task_id in task_ids)
+
+    def task_row(observed_task):
+      """Generate an output row for a Task"""
+      task = self._task(observed_task.task_id)
       # tasks include those which could not be found properly and are hence empty {}
       if task:
         return dict(
-            task_id=tid,
+            task_id=observed_task.task_id,
             name=task['name'],
             role=task['user'],
             launch_timestamp=task['launch_timestamp'],
@@ -334,22 +460,26 @@ class TaskObserver(ExceptionalThread, Lockable):
             state_timestamp=task['state_timestamp'],
             ports=task['ports'],
             **task['resource_consumption'])
+
     return dict(
-      tasks=filter(None, map(task_row, task_ids)),
-      type=task_map['type'],
-      offset=task_map['offset'],
-      num=task_map['num'],
-      task_count=task_count)
+      tasks=filter(None, map(task_row, tasks)),
+      type=type,
+      offset=offset,
+      num=num,
+      task_count=self.task_count()[type],
+    )
+
 
   def _sample(self, task_id):
-    if task_id not in self._resource_monitors:
+    if task_id not in self.active_tasks:
+      log.debug("Task %s not found in active tasks" % task_id)
       sample = ProcessSample.empty().to_dict()
       sample['disk'] = 0
     else:
-      resource_sample = self._resource_monitors[task_id].sample()[1]
+      resource_sample = self.active_tasks[task_id].resource_monitor.sample()[1]
       sample = resource_sample.process_sample.to_dict()
       sample['disk'] = resource_sample.disk_usage
-    log.debug("Got sample for task %s: %s" % (task_id, sample))
+      log.debug("Got sample for task %s: %s" % (task_id, sample))
     return sample
 
   @Lockable.sync
@@ -361,10 +491,10 @@ class TaskObserver(ExceptionalThread, Lockable):
     """
 
     # Unknown task_id.
-    if task_id not in self._actives and task_id not in self._finishes:
+    if task_id not in self.all_tasks:
       return []
 
-    task = self._read_task(task_id)
+    task = self.all_tasks[task_id]
     if task is None:
       return []
 
@@ -376,6 +506,7 @@ class TaskObserver(ExceptionalThread, Lockable):
     return [
       (TaskState._VALUES_TO_NAMES.get(state.state, 'UNKNOWN'), state.timestamp_ms / 1000)
       for state in state.statuses]
+
 
   @Lockable.sync
   def _task(self, task_id):
@@ -399,12 +530,11 @@ class TaskObserver(ExceptionalThread, Lockable):
          }
       }
     """
-
     # Unknown task_id.
-    if task_id not in self._actives and task_id not in self._finishes:
+    if task_id not in self.all_tasks:
       return {}
 
-    task = self._read_task(task_id)
+    task = self.all_tasks[task_id].task
     if task is None:
       # TODO(wickman)  Can this happen?
       log.error('Could not find task: %s' % task_id)
@@ -438,17 +568,11 @@ class TaskObserver(ExceptionalThread, Lockable):
     )
 
   @Lockable.sync
-  def task(self, task_ids):
-    """
-      Return a map from task_id => task, given the task schema from _task.
-    """
-    return dict((task_id, self._task(task_id)) for task_id in task_ids)
-
-  @Lockable.sync
   def _get_process_resource_consumption(self, task_id, process_name):
-    if task_id not in self._resource_monitors:
+    if task_id not in self.active_tasks:
+      log.debug("Task %s not found in active tasks" % task_id)
       return ProcessSample.empty().to_dict()
-    sample = self._resource_monitors[task_id].sample_by_process(process_name).to_dict()
+    sample = self.active_tasks[task_id].resource_monitor.sample_by_process(process_name).to_dict()
     log.debug('Resource consumption (%s, %s) => %s' % (task_id, process_name, sample))
     return sample
 
@@ -529,7 +653,7 @@ class TaskObserver(ExceptionalThread, Lockable):
       defined by process().
     """
 
-    if task_id not in self._actives and task_id not in self._finishes:
+    if task_id not in self.all_tasks:
       return {}
     state = self.raw_state(task_id)
     if state is None or state.header is None:
@@ -601,11 +725,21 @@ class TaskObserver(ExceptionalThread, Lockable):
     return (None, None)
 
   @Lockable.sync
-  def file_path(self, task_id, path):
+  def valid_file(self, task_id, path):
+    """
+      Like valid_path, but also verify the given path is a file
+    """
+    chroot, path = self.valid_path(task_id, path)
+    if chroot and path and os.path.isfile(os.path.join(chroot, path)):
+      return chroot, path
+    return None, None
+
+  @Lockable.sync
+  def valid_path(self, task_id, path):
     """
       Given a task_id and a path within that task_id's sandbox, verify:
         (1) it's actually in the sandbox and not outside
-        (2) it's a valid, existing _file_ within that path
+        (2) it's a valid, existing path
       Returns chroot and the pathname relative to that chroot.
     """
     runner_state = self.raw_state(task_id)
@@ -617,36 +751,38 @@ class TaskObserver(ExceptionalThread, Lockable):
       return None, None
     chroot, path = self._sanitize_path(chroot, path)
     if chroot and path:
-      if os.path.isfile(os.path.join(chroot, path)):
-        return chroot, path
+      return chroot, path
     return None, None
 
   @Lockable.sync
-  def files(self, task_id, path = None):
+  def files(self, task_id, path=None):
     """
       Returns dictionary
       {
+        task_id: task_id
         chroot: absolute directory on machine
         path: sanitized relative path w.r.t. chroot
         dirs: list of directories
         files: list of files
       }
     """
+    # TODO(jon): DEPRECATED: most of the necessary logic is handled directly in the templates.
+    # Also, global s/chroot/sandbox/?
+    empty = dict(task_id=task_id, chroot=None, path=None, dirs=None, files=None)
     path = path if path is not None else '.'
     runner_state = self.raw_state(task_id)
     if runner_state is None:
-      return {}
+      return empty
     try:
       chroot = runner_state.header.sandbox
     except:
-      return {}
+      return empty
     if chroot is None:  # chroot-less job
-      return dict(task_id=task_id, chroot=None, path=None, dirs=None, files=None)
+      return empty
     chroot, path = self._sanitize_path(chroot, path)
-    if chroot is None or path is None:
-      return {}
-    if os.path.isfile(os.path.join(chroot, path)):
-      return {}
+    if (chroot is None or path is None
+        or not os.path.isdir(os.path.join(chroot, path))):
+      return empty
     names = os.listdir(os.path.join(chroot, path))
     dirs, files = [], []
     for name in names:
@@ -655,9 +791,9 @@ class TaskObserver(ExceptionalThread, Lockable):
       else:
         files.append(name)
     return dict(
-      task_id = task_id,
-      chroot = chroot,
-      path = path,
-      dirs = dirs,
-      files = files
+      task_id=task_id,
+      chroot=chroot,
+      path=path,
+      dirs=dirs,
+      files=files
     )

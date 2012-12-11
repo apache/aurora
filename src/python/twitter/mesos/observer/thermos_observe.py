@@ -82,8 +82,7 @@ class MesosObserverVars(ExceptionalThread):
 
   def collect_orphans(self):
     orphaned_tasks, orphaned_runners = 0, 0
-    task_states = (self._observer.raw_state(task_id) for task_id in
-        self._observer.task_ids(type='active', num=sys.maxint)['task_ids'])
+    task_states = (task.state for task_id, task in self._observer.active_tasks.items())
     for task in filter(None, task_states):
       if not task.header or not task.statuses or len(task.statuses) == 0:
         continue

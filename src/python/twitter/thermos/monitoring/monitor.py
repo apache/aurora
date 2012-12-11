@@ -1,3 +1,13 @@
+"""Monitor the state of Thermos tasks on a system
+
+This module contains the TaskMonitor, used to reconstruct the state of active or finished Thermos
+tasks based on their checkpoint streams. It exposes two key pieces of information about a Task, both
+as their corresponding Thrift structs:
+  - a RunnerState, representing the latest state of the Task
+  - a list of ProcessStates, representing the processes currently running within the Task
+
+"""
+
 import os
 import copy
 import errno
@@ -32,10 +42,9 @@ class TaskMonitor(object):
 
   def _apply_states(self):
     """
-      Given task_id, os.stat() its corresponding checkpoint stream and
-      determine if there are new ckpt records.  Attempt to read those
-      records and update the high watermark for that stream.  Returns
-      true if new states were applied.
+      os.stat() the corresponding checkpoint stream of this task and determine if there are new ckpt
+      records.  Attempt to read those records and update the high watermark for that stream.
+      Returns True if new states were applied, False otherwise.
     """
     ckpt_offset = None
     try:
@@ -77,7 +86,7 @@ class TaskMonitor(object):
 
   def get_state(self):
     """
-      Get the latest state of the task_id.
+      Get the latest state of this Task.
     """
     with self._lock:
       self._apply_states()

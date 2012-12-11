@@ -1,3 +1,10 @@
+"""HTTP interface to the Thermos TaskObserver
+
+This modules provides an HTTP server which exposes information about Thermos tasks running on a
+system. To do this, it relies heavily on the Thermos TaskObserver.
+
+"""
+
 import os
 import mimetypes
 import pkg_resources
@@ -110,15 +117,11 @@ class BottleObserver(HttpServer, BottleObserverMixins):
   @HttpServer.route("/task/:task_id")
   @HttpServer.mako_view(HttpTemplate.load('task'))
   def handle_task(self, task_id):
-    task = self._observer.task([task_id])
-    if not task[task_id]:
-      HttpServer.abort(404, "Failed to find task %s.  Try again shortly." % task_id)
+    task = self.get_task(task_id)
     processes = self._observer.processes([task_id])
     if not processes[task_id]:
       return HttpServer.Response(status=404)
-    context = self._observer.context(task_id)
     processes = processes[task_id]
-    task = task[task_id]
     state = self._observer.state(task_id)
 
     return dict(
@@ -132,13 +135,16 @@ class BottleObserver(HttpServer, BottleObserverMixins):
       hostname = state.get('hostname', 'localhost'),
     )
 
+  def get_task(self, task_id):
+    task = self._observer._task(task_id)
+    if not task:
+      HttpServer.abort(404, "Failed to find task %s.  Try again shortly." % task_id)
+    return task
+
   @HttpServer.route("/rawtask/:task_id")
   @HttpServer.mako_view(HttpTemplate.load('rawtask'))
   def handle_rawtask(self, task_id):
-    task = self._observer.task([task_id])
-    if not task[task_id]:
-      HttpServer.abort(404, "Failed to find task %s.  Try again shortly." % task_id)
-    task = task[task_id]
+    task = self.get_task(task_id)
     state = self._observer.state(task_id)
     return dict(
       hostname = state.get('hostname', 'localhost'),
