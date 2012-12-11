@@ -17,14 +17,12 @@ app.configure(module='twitter.common_internal.app.modules.chickadee_handler',
 app.configure(debug=True)
 
 
-if 'META_THERMOS_ROOT' in os.environ:
-  CHECKPOINT_ROOT = os.path.join(os.environ['META_THERMOS_ROOT'], 'checkpoints')
-else:
-  CHECKPOINT_ROOT = TaskPath.DEFAULT_CHECKPOINT_ROOT
-
-
 def main():
-  thermos_gc_executor = ThermosGCExecutor(checkpoint_root=CHECKPOINT_ROOT)
+  checkpoint_root, mesos_root = TaskPath.DEFAULT_CHECKPOINT_ROOT, None
+  if 'META_THERMOS_ROOT' in os.environ:
+    mesos_root = os.environ['META_THERMOS_ROOT']
+    checkpoint_root = os.path.join(mesos_root, 'checkpoints')
+  thermos_gc_executor = ThermosGCExecutor(checkpoint_root=checkpoint_root, mesos_root=mesos_root)
   drv = mesos.MesosExecutorDriver(thermos_gc_executor)
   drv.run()
   log.info('MesosExecutorDriver.run() has finished.')

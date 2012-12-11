@@ -184,6 +184,7 @@ python_library(
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/process'),
     pants('src/python/twitter/common/quantity'),
+    pants('src/python/twitter/mesos:clusters'),
     pants('src/python/twitter/mesos/config:schema'),
     pants('src/python/twitter/thermos/runner'),
     pants('src/python/twitter/thermos/runner:inspector'),

@@ -7,6 +7,7 @@ from twitter.common import log
 from twitter.common.concurrent import defer
 from twitter.common.process import ProcessProviderFactory
 from twitter.common.quantity import Amount, Time, Data
+from twitter.mesos.clusters import Cluster
 from twitter.thermos.base.ckpt import CheckpointDispatcher
 from twitter.thermos.base.path import TaskPath
 from twitter.thermos.runner.inspector import CheckpointInspector
@@ -47,9 +48,15 @@ class ThermosGCExecutor(ThermosExecutorBase):
   #    launch task t4
   MINIMUM_KILL_AGE = Amount(10, Time.MINUTES)
 
-  def __init__(self, checkpoint_root, verbose=True, task_killer=TaskKiller, clock=time):
+  def __init__(self,
+               checkpoint_root,
+               mesos_root=None,
+               verbose=True,
+               task_killer=TaskKiller,
+               clock=time):
     ThermosExecutorBase.__init__(self)
     self._slave_id = None
+    self._mesos_root = mesos_root or Cluster.DEFAULT_MESOS_ROOT
     self._detector = ExecutorDetector()
     self._collector = TaskGarbageCollector(root=checkpoint_root)
     self._clock = clock
@@ -257,7 +264,7 @@ class ThermosGCExecutor(ThermosExecutorBase):
   @property
   def linked_executors(self):
     thermos_executor_prefix = 'thermos-'
-    for executor in self._detector:
+    for executor in self._detector.find(root=self._mesos_root):
       if executor.executor_id.startswith(thermos_executor_prefix):
         yield executor.executor_id[len(thermos_executor_prefix):]
 
