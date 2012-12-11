@@ -211,6 +211,9 @@ class ProductionTaskRunner(TaskRunnerWrapper):
   def __init__(self, task_id, mesos_task, role, mesos_ports, **kwargs):
     artifact_dir = os.path.realpath('.')
     runner_pex = self.dump_runner(artifact_dir)
+    if 'META_THERMOS_ROOT' in os.environ:
+      kwargs['checkpoint_root'] = os.path.join(os.environ['META_THERMOS_ROOT'],
+          'checkpoints')
     if mesos_task.has_layout():
       sandbox = AppAppSandbox(task_id)
       enable_chroot = True

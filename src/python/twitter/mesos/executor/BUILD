@@ -29,6 +29,7 @@ python_library(
   sources = ['executor_detector.py'],
   dependencies = [
     pants('src/python/twitter/common/string'),
+    pants('src/python/twitter/mesos:clusters'),
   ]
 )
 
