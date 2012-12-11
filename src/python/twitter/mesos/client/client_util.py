@@ -116,30 +116,10 @@ def _get_package_uri_from_packer_and_files(cluster, role, name, package_files):
   return _extract_package_uri(_get_package_data(cluster, package_tuple, packer))
 
 
-def _get_package_uri(config, copy_app_from=None):
+def _get_package_uri(config):
   cluster = config.cluster()
   # Deprecated PackerPackage object.
   package = config.package()
-
-  if config.hdfs_path():
-    log.warning('''
-*******************************************************************************
-  hdfs_path and --copy_app_from have been deprecated and will soon be disabled
-  altogether.
-
-  Please switch to using the package option as soon as possible!
-  For details on how to do this, please consult
-
-  http://go/mesostutorial
-  and
-  http://confluence.local.twitter.com/display/ENG/Mesos+Configuration+Reference
-*******************************************************************************''')
-
-  if package and copy_app_from:
-    die('copy_app_from may not be used when a package spec is used in the configuration')
-
-  if copy_app_from:
-    return '/mesos/pkg/%s/%s' % (config.role(), posixpath.basename(copy_app_from))
 
   # Usage of PackerPackage object has been deprecated.
   # TODO(Sathya Hariesh): Remove this when the deprecation cycle is complete.
@@ -149,9 +129,6 @@ def _get_package_uri(config, copy_app_from=None):
   if config.package_files():
     return _get_package_uri_from_packer_and_files(
         cluster, config.role(), config.name(), config.package_files())
-
-  if config.hdfs_path():
-    return config.hdfs_path()
 
 
 PACKAGE_DEPRECATION_WARNING = """
@@ -257,7 +234,6 @@ def really_translate(translate=False):
 
 def get_config(jobname,
                config_file,
-               copy_app_from=None,
                json=False,
                force_local=False,
                bindings=(),
@@ -279,18 +255,15 @@ def get_config(jobname,
   else:
     loader = PystachioConfig.load_json if json else PystachioConfig.load
     config = loader(config_file, jobname, bindings)
-  return populate_namespaces(config, force_local=force_local, copy_app_from=copy_app_from)
+  return populate_namespaces(config, force_local=force_local)
 
 
-def populate_namespaces(config, copy_app_from=None, force_local=False):
+def populate_namespaces(config, force_local=False):
   """Populate additional bindings in the config, e.g. packer bindings."""
   if isinstance(config, PystachioConfig):
     _inject_packer_bindings(config, force_local)
     _warn_on_unspecified_package_bindings(config)
     _validate_announce_configuration(config)
-  package_uri = _get_package_uri(config, copy_app_from=copy_app_from)
-  if package_uri:
-    config.set_hdfs_path(package_uri)
   return config
 
 

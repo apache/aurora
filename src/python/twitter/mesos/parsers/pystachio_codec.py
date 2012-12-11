@@ -37,10 +37,7 @@ class PystachioCodec(MesosConfig):
     cfg = self._config
     processes = []
     installer_command = Process(name = 'installer', max_failures = 5)
-    if self.hdfs_path():
-      processes.append(installer_command(
-          cmdline = 'hadoop fs -copyToLocal %s .' % self.hdfs_path()))
-    elif self.package():
+    if self.package():
       processes.append(installer_command(
           cmdline = '{{packer[%s][%s][%s].copy_command}}' % self.package()))
     cmdline = cfg['task']['start_command']

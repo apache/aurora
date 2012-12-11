@@ -1,15 +1,11 @@
 import functools
 import getpass
-import os
-import posixpath
-import subprocess
 import time
 
-from twitter.common import log, dirutil
+from twitter.common import log
 from twitter.common.lang import Compatibility
 from twitter.common.quantity import Amount, Time
 from twitter.mesos.clusters import Cluster
-from twitter.mesos.location import Location
 
 from twitter.mesos.scheduler_client import SchedulerClient
 from twitter.mesos.session_key_helper import SessionKeyHelper
@@ -25,108 +21,6 @@ from gen.twitter.mesos.ttypes import (
     UpdateResult)
 
 from thrift.transport import TTransport
-
-
-# TODO(vinod): Kill this in favor of twitter.common.util.command_util, once it has proxy support.
-class Command(object):
-  @classmethod
-  def maybe_tunnel(cls, cmd, host, user):
-    return cmd if host is None else ['ssh', '-t', '%s@%s' % (user, host), ' '.join(cmd)]
-
-  def __init__(self, cmd, user=None, host=None, verbose=False):
-    self._verbose = verbose
-    if isinstance(cmd, str):
-      cmd = [cmd]
-    elif not isinstance(cmd, list):
-      raise ValueError('Command takes a string or a list!  Got %s' % type(cmd))
-
-    self._cmd = self.maybe_tunnel(cmd, host, user or getpass.getuser())
-
-  def logged(fn):
-    def real_fn(self, *args, **kw):
-      if self._verbose:
-        print('Running command: %s' % self._cmd)
-      return fn(self, *args, **kw)
-    return real_fn
-
-  @logged
-  def call(self):
-    return subprocess.call(self._cmd)
-
-  @logged
-  def check_call(self):
-    return subprocess.check_call(self._cmd)
-
-  @logged
-  def check_output(self):
-    return subprocess.Popen(self._cmd, stdout=subprocess.PIPE).communicate()[0].rstrip('\r\n')
-
-  del logged
-
-
-# TODO(vinod): Kill this in favor of twitter.common.fs.HDFSHelper, once it has proxy support.
-class HDFSHelper(object):
-  """Helper class for performing HDFS operations."""
-
-  def __init__(self, config, user=None, proxy=None):
-    self._config = config
-    self._proxy = proxy
-    self._user = user or getpass.getuser()
-
-  @property
-  def config(self):
-    return self._config
-
-  def call(self, cmd, *args, **kwargs):
-    """Runs hadoop fs command (via proxy if necessary) with the given command and args.
-    Checks the result of the call by default but this can be disabled with check=False.
-    """
-    log.info("Running hadoop fs %s %s" % (cmd, list(args)))
-    cmd = Command(['hadoop', '--config', self._config, 'fs', cmd] + list(args),
-                   self._user, self._proxy)
-    return cmd.check_call() if kwargs.get('check', False) else cmd.call()
-
-  def copy_from(self, src, dst):
-    """
-    Copy file(s) in hdfs to local path (via proxy if necessary).
-    NOTE: If src matches multiple files, make sure dst is a directory!
-    """
-    log.info('HDFS copying %s -> %s' % (src, dst))
-
-    if self._proxy:
-      scratch_dir = Command('mktemp -d', user=self._user, host=self._proxy).check_output()
-      try:
-        self.call('-get', src, scratch_dir)
-        Command('scp -rq %s@%s:%s/*' % (self._user, self._proxy, scratch_dir)).call()
-      finally:
-        Command('rm -rf %s' % scratch_dir, user=self._user, host=self._proxy).call()
-    else:
-      self.call('-get', src, dst)
-
-  def copy_to(self, src, dst):
-    """
-    Copy the local file src to a hadoop path dst.
-    """
-    abs_src = os.path.expanduser(src)
-    dst_dir = os.path.dirname(dst)
-    assert os.path.exists(abs_src), 'File does not exist, cannot copy: %s' % abs_src
-    log.info('HDFS copying %s -> %s' % (abs_src, dst_dir))
-
-    def do_put(source):
-      if not self.call('-test', '-e', dst, check=False):
-        self.call('-rm', '-skipTrash', dst)
-      self.call('-put', source, dst)
-
-    if self._proxy:
-      scratch_dir = Command('mktemp -d', user=self._user, host=self._proxy).check_output()
-      Command('chmod 755 %s' % scratch_dir, user=self._user, host=self._proxy).check_call()
-      try:
-        Command(['scp', abs_src, '%s@%s:%s' % (self._user, self._proxy, scratch_dir)]).check_call()
-        do_put(os.path.join(scratch_dir, os.path.basename(abs_src)))
-      finally:
-        Command('rm -rf %s' % scratch_dir, user=self._user, host=self._proxy).call()
-    else:
-      do_put(abs_src)
 
 
 class SchedulerProxy(object):
@@ -266,19 +160,7 @@ invoking cancel_update.
   def scheduler(self):
     return self._scheduler
 
-  def hdfs_path(self, config, copy_app_from):
-    if config.hdfs_path():
-      return config.hdfs_path()
-    else:
-      return '/mesos/pkg/%s/%s' % (config.role(), os.path.basename(copy_app_from))
-
-  def create_job(self, config, copy_app_from=None):
-    if copy_app_from is not None:
-      cluster = Cluster.get(self._cluster)
-      proxy = cluster.proxy if Location.is_corp() else None
-      HDFSHelper(cluster.hadoop_config, config.role(), proxy).copy_to(
-        copy_app_from, self.hdfs_path(config, copy_app_from))
-
+  def create_job(self, config):
     log.info('Creating job %s' % config.name())
     log.debug('Full configuration: %s' % config.job())
     return self._scheduler.createJob(config.job())
@@ -319,17 +201,9 @@ invoking cancel_update.
   def query(self, query):
     return self._scheduler.getTasksStatus(query)
 
-  def update_job(self, config, shards=None, copy_app_from=None):
+  def update_job(self, config, shards=None):
     log.info("Updating job: %s" % config.name())
-
-    if copy_app_from is not None:
-      cluster = Cluster.get(self._cluster)
-      proxy = cluster.proxy if Location.is_corp() else None
-      HDFSHelper(cluster.hadoop_config, config.role(), proxy).copy_to(
-        copy_app_from, self.hdfs_path(config, copy_app_from))
-
     resp = self._scheduler.startUpdate(config.job())
-
     if resp.responseCode != ResponseCode.OK:
       log.info("Error starting update: %s" % resp.message)
       log.warning(self.UPDATE_FAILURE_WARNING)

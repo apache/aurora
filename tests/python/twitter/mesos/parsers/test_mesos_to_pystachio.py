@@ -58,17 +58,6 @@ def test_simple_config():
   )
 
 
-def test_config_with_copy():
-  hello_world_with_copy = copy.deepcopy(HELLO_WORLD)
-  hello_world_with_copy['task']['hdfs_path'] = '/mesos/pkg/john_doe/package.zip'
-  job = convert(hello_world_with_copy)
-  assert len(list(job.task().processes())) == 2
-  constraints = job.task().constraints()
-  assert len(list(constraints)) == 1
-  assert constraints[0].order()[0] == String('installer')
-  assert constraints[0].order()[1] == job.name()
-
-
 def test_config_with_options():
   hwc = copy.deepcopy(HELLO_WORLD)
   hwc['task']['production'] = True

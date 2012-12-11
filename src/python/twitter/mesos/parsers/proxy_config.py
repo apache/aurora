@@ -17,14 +17,6 @@ class ProxyConfig(object):
     pass
 
   @abstractmethod
-  def hdfs_path(self):
-    pass
-
-  @abstractmethod
-  def set_hdfs_path(self):
-    pass
-
-  @abstractmethod
   def cluster(self):
     pass
 

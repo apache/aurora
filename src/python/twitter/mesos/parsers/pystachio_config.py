@@ -107,7 +107,6 @@ class PystachioConfig(ProxyConfig):
     if not has(job.task(), 'processes'):
       raise self.InvalidConfig('Processes required for task on job "%s"' % job.name())
     self._job = self.sanitize_job(job)
-    self._hdfs_path = None
     self._packages = []
 
   @staticmethod
@@ -132,8 +131,6 @@ class PystachioConfig(ProxyConfig):
     context = dict(
       role=self.role(),
       cluster=self.cluster(),
-      package=posixpath.basename(self._hdfs_path) if self._hdfs_path else None,
-      package_uri=self._hdfs_path,
       instance=instance
     )
     # Filter unspecified values
@@ -159,14 +156,6 @@ class PystachioConfig(ProxyConfig):
 
   def name(self):
     return self._job.name().get()
-
-  def hdfs_path(self):
-    return self._hdfs_path
-
-  def set_hdfs_path(self, path):
-    if not isinstance(path, Compatibility.string):
-      raise ValueError('HDFS uri must be a string')
-    self._hdfs_path = path
 
   def role(self):
     return self._job.role().get()

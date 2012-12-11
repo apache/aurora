@@ -16,7 +16,7 @@ class MesosContext(Struct):
   # DEPRECATED in favor of using {{packer[role][package][version].package}}
   package     = String
 
-  # The HDFS URI of the package associated with this job
+  # The URI of the package associated with this job
   # DEPRECATED in favor of using {{packer[role][package][version].package_uri}}
   package_uri = String
 

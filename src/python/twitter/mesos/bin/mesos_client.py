@@ -15,7 +15,6 @@ import sys
 from tempfile import NamedTemporaryFile
 from time import gmtime, strftime
 from urlparse import urljoin
-import zookeeper
 
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
@@ -70,13 +69,6 @@ def handle_open(scheduler_client, role, job):
     if app.get_options().open_browser:
       import webbrowser
       webbrowser.open_new_tab(url)
-
-
-COPY_APP_FROM_OPTION = optparse.Option(
-    '--copy_app_from',
-    dest='copy_app_from',
-    default=None,
-    help='Local path to use for the app (will copy to the cluster)  (default: %default)')
 
 
 OPEN_BROWSER_OPTION = optparse.Option(
@@ -148,7 +140,6 @@ def maybe_retranslate(jobname, config_file, *args, **kw):
 
 def make_spawn_options(options):
   return dict((name, getattr(options, name)) for name in (
-      'copy_app_from',
       'json',
       'open_browser',
       'shard',
@@ -167,7 +158,6 @@ def create_client(cluster=None):
 
 @app.command
 @app.command_option(ENVIRONMENT_BIND_OPTION)
-@app.command_option(COPY_APP_FROM_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
 @app.command_option(JSON_OPTION)
 @requires.exactly('job', 'config')
@@ -177,7 +167,7 @@ def create(jobname, config_file):
   Creates a job based on a configuration file.
   """
   options = app.get_options()
-  config = maybe_retranslate(jobname, config_file, options.copy_app_from, options.json)
+  config = maybe_retranslate(jobname, config_file, options.json)
 
   if config.cluster() == 'local':
     options.shard = 0
@@ -186,7 +176,7 @@ def create(jobname, config_file):
     return spawn_local('build', jobname, config_file, **make_spawn_options(options))
 
   api = create_client(config.cluster())
-  resp = api.create_job(config, app.get_options().copy_app_from)
+  resp = api.create_job(config)
   client_util.check_and_log_response(resp)
   handle_open(api.scheduler.scheduler(), config.role(), config.name())
 
@@ -198,7 +188,6 @@ def create(jobname, config_file):
     help='The thermos_runner.pex to run the task.  If "build", build one automatically. '
          'This requires that you be running the spawn from within the root of a science repo.')
 @app.command_option(ENVIRONMENT_BIND_OPTION)
-@app.command_option(COPY_APP_FROM_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
 @app.command_option(JSON_OPTION)
 @requires.exactly('job', 'config')
@@ -304,7 +293,6 @@ def runtask(args, options):
 
 @app.command
 @app.command_option(ENVIRONMENT_BIND_OPTION)
-@app.command_option(COPY_APP_FROM_OPTION)
 @app.command_option(JSON_OPTION)
 @requires.exactly('job', 'config')
 def diff(job, config_file):
@@ -314,8 +302,7 @@ def diff(job, config_file):
   By default the diff will be displayed using 'diff', though you may choose an alternate
   diff program by specifying the DIFF_VIEWER environment variable."""
   options = app.get_options()
-  config = maybe_retranslate(job, config_file, options.copy_app_from, options.json, False,
-      options.bindings)
+  config = maybe_retranslate(job, config_file, options.json, False, options.bindings)
   api = create_client(config.cluster())
   resp = query(config.role(), job, api=api, statuses=ACTIVE_STATES)
   if not resp.responseCode:
@@ -376,7 +363,6 @@ def do_open(*args):
 @app.command
 @app.command_option('--local', dest='local', default=False, action='store_true',
     help='Inspect the configuration as would be created by the "spawn" command.')
-@app.command_option(COPY_APP_FROM_OPTION)
 @app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(JSON_OPTION)
 @requires.exactly('job', 'config')
@@ -387,8 +373,7 @@ def inspect(jobname, config_file):
   the parsed configuration.
   """
   options = app.get_options()
-  config = maybe_retranslate(jobname, config_file, options.copy_app_from, options.json,
-      False, options.bindings)
+  config = maybe_retranslate(jobname, config_file, options.json, False, options.bindings)
   log.info('Parsed job config: %s' % config.job())
 
 
@@ -443,11 +428,9 @@ def status(role, jobname):
     taskInfo = assigned_task.task
     taskString = ''
     if taskInfo:
-      taskString += '''\tHDFS path: %s
-\tcpus: %s, ram: %s MB, disk: %s MB''' % (taskInfo.hdfsPath,
-                                        taskInfo.numCpus,
-                                        taskInfo.ramMb,
-                                        taskInfo.diskMb)
+      taskString += '''cpus: %s, ram: %s MB, disk: %s MB''' % (taskInfo.numCpus,
+                                                               taskInfo.ramMb,
+                                                               taskInfo.diskMb)
     if assigned_task.assignedPorts:
       taskString += '\n\tports: %s' % assigned_task.assignedPorts
     taskString += '\n\tfailure count: %s (max %s)' % (scheduled_task.failureCount,
@@ -496,7 +479,6 @@ def _getshards(shards):
 @app.command
 @app.command_option(SHARDS_OPTION)
 @app.command_option(ENVIRONMENT_BIND_OPTION)
-@app.command_option(COPY_APP_FROM_OPTION)
 @app.command_option(JSON_OPTION)
 @requires.exactly('job', 'config')
 def update(jobname, config_file):
@@ -517,7 +499,7 @@ def update(jobname, config_file):
   to preview what changes will take effect.
   """
   options = app.get_options()
-  config = maybe_retranslate(jobname, config_file, options.copy_app_from, options.json,
+  config = maybe_retranslate(jobname, config_file, options.json,
       force_local=False, bindings=options.bindings)
   if config.is_dedicated():
     job_size = len(config.job().taskConfigs)
@@ -531,7 +513,7 @@ See http://confluence.local.twitter.com/display/Aurora/Aurora+Configuration+Refe
 ''' % (job_size, min_failure_threshold))
 
   api = create_client(config.cluster())
-  resp = api.update_job(config, _getshards(options.shards), options.copy_app_from)
+  resp = api.update_job(config, _getshards(options.shards))
   client_util.check_and_log_response(resp)
 
 
