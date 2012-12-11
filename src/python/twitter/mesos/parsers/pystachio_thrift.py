@@ -86,7 +86,7 @@ def convert(job, packages=[]):
   task.contactEmail = not_empty_or(job.contact(), None)
 
   # Add package tuples (role, package_name, version) to a task, to display in the scheduler UI.
-  task.packages = [Package(str(p[0]), str(p[1]), int(p[2])) for p in packages] if packages else []
+  task.packages = [Package(str(p[0]), str(p[1]), int(p[2])) for p in packages] if packages else None
 
   # task components
   if not task_raw.has_resources():

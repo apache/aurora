@@ -236,7 +236,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
           for (Constraint constraint : task.getConstraints()) {
             details.put(constraint.getName(), humanReadableConstraint(constraint.getConstraint()));
           }
-          if (task.isSetPackages()) {
+          if (task.getPackagesSize() > 0) {
             details.put(
                 "packages",
                 Joiner.on(',').join(Iterables.transform(task.getPackages(), PACKAGE_TOSTRING)));
