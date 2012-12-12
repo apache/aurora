@@ -138,12 +138,14 @@ class TestHealthChecker(unittest.TestCase):
     clock = ThreadedClock()
     hct = HealthCheckerThread(lambda: False, interval_secs=5, clock=clock)
     hct.start()
+    thread_yield()
     assert hct.healthy
     clock.tick(6)
     assert hct.healthy
     clock.tick(3)
     assert hct.healthy
     clock.tick(5)
+    thread_yield()
     assert not hct.healthy
     hct.stop()
 
