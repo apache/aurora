@@ -71,13 +71,7 @@ class Builder(object):
 
   def __init__(self, cluster, release=None, hotfix=None, verbose=False):
     assert not (release is not None and hotfix), 'Cannot specify both release and hotfix.'
-    # TODO(Sathya Hariesh): Remove this mapping when vert moves out of tags for releases
-    release_clusters = {
-      'smf1-test': 'smf1-test',
-      'smfd': 'smfd-devel',
-      'smf1': 'smf1-prod',
-      'atla': 'atla-prod'}
-    self._release = self._get_release(release_clusters[cluster], release) if not hotfix else None
+    self._release = self._get_release(cluster, release) if not hotfix else None
     self._cluster = Cluster.get(cluster)
     self._hotfix = bool(hotfix)
     self._verbose = verbose
