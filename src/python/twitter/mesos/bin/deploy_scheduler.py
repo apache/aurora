@@ -237,7 +237,7 @@ class AuroraBuilder(Builder):
 
   @property
   def commands(self):
-    return ['./pants goal bundle mesos:scheduler --bundle-archive=zip']
+    return ['./pants goal bundle aurora:scheduler --bundle-archive=zip']
 
   def preprocess(self):
     self.check_call('rm -f pants.pex')
