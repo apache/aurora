@@ -176,11 +176,11 @@ class TaskRunnerWrapper(object):
 
     self._kill_signal.set()
     if self.is_alive():
-      log.info('Runner is alive, sending SIGINT')
+      log.info('Runner is alive, sending SIGUSR1')
       try:
-        self._popen.send_signal(signal.SIGINT)
+        self._popen.send_signal(signal.SIGUSR1)
       except OSError as e:
-        log.error('Got OSError on SIGINT: %s' % e)
+        log.error('Got OSError sending SIGUSR1: %s' % e)
     else:
       log.info('Runner is dead, skipping kill.')
 

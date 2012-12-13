@@ -1,4 +1,8 @@
+import functools
 import os
+import signal
+import sys
+import traceback
 
 from twitter.common import app, options, log
 
@@ -39,6 +43,17 @@ def get_task_from_options(opts):
   return task
 
 
+def runner_teardown(runner, signal_name, _=None, frame=None):
+  log.info('Thermos runner got %s, shutting down.' % signal_name)
+  log.info('Interrupted frame:')
+  if frame:
+    for line in ''.join(traceback.format_stack(frame)).splitlines():
+      log.info(line)
+  runner.close_ckpt()
+  runner.kill()
+  sys.exit(0)
+
+
 def main(args, opts):
   assert opts.thermos_json and os.path.exists(opts.thermos_json)
   assert opts.sandbox
@@ -52,6 +67,7 @@ def main(args, opts):
 
   task_runner = TaskRunner(thermos_task.task, opts.checkpoint_root, opts.sandbox,
     task_id=opts.task_id, user=opts.setuid, portmap=prebound_ports, chroot=opts.chroot)
+  signal.signal(signal.SIGUSR1, functools.partial(runner_teardown, task_runner, 'SIGUSR1'))
 
   try:
     task_runner.run()
@@ -60,9 +76,7 @@ def main(args, opts):
   except TaskRunner.PermissionError:
     app.error('Could not get permission to perform %s!' % opts.action)
   except KeyboardInterrupt:
-    log.info('Thermos runner got SIGINT, shutting down.')
-    task_runner.close_ckpt()
-    task_runner.kill()
+    runner_teardown(task_runner, 'SIGINT')
 
 
 app.main()
