@@ -1,3 +1,11 @@
+"""Thermos garbage-collection (GC) executor
+
+This module containts the Thermos GC executor, responsible for garbage collecting old tasks and
+reconciling task states with the Mesos scheduler. It is intended to be run periodically on Mesos
+slaves utilising the Thermos executor.
+
+"""
+
 import os
 import pwd
 import threading
@@ -109,16 +117,19 @@ class ThermosGCExecutor(ThermosExecutorBase):
   def reconcile_states(self, driver, retained_tasks):
     """Reconcile states that the scheduler thinks tasks are in vs what they really are in.
 
-       Local      vs   Scheduler  => Action
-
-        ACTIVE          ACTIVE   => no-op
-        ACTIVE         TERMINAL  => maybe kill task*
-        ACTIVE         !EXISTS   => maybe kill task*
-       TERMINAL         ACTIVE   => send actual status**
-       TERMINAL        TERMINAL  => no-op
-       TERMINAL        !EXISTS   => gc locally
-       !EXISTS          ACTIVE   => send LOST**
-       !EXISTS         TERMINAL  => gc remotely
+        Local    vs   Scheduler  => Action
+       ===================================
+        ACTIVE         ACTIVE    => no-op
+        ACTIVE        STARTING   => no-op
+        ACTIVE        TERMINAL   => maybe kill task*
+        ACTIVE        !EXISTS    => maybe kill task*
+       TERMINAL        ACTIVE    => send actual status**
+       TERMINAL       STARTING   => send actual status**
+       TERMINAL       TERMINAL   => no-op
+       TERMINAL       !EXISTS    => gc locally
+       !EXISTS         ACTIVE    => send LOST**
+       !EXISTS        STARTING   => no-op
+       !EXISTS        TERMINAL   => gc remotely
 
        * - Only kill if this does not appear to be a race condition.
        ** - These appear to have no effect
@@ -129,18 +140,21 @@ class ThermosGCExecutor(ThermosExecutorBase):
          !EXISTS  | TERMINAL             => delete
     """
     def partition(rt):
-      active, finished = set(), set()
+      active, starting, finished = set(), set(), set()
       for task_id, schedule_status in rt.items():
         if self.twitter_status_is_terminal(schedule_status):
           finished.add(task_id)
+        elif (schedule_status == ScheduleStatus.STARTING or
+              schedule_status == ScheduleStatus.ASSIGNED):
+          starting.add(task_id)
         else:
           active.add(task_id)
-      return active, finished
+      return active, starting, finished
 
     local_active, local_finished = self.partition_tasks()
-    sched_active, sched_finished = partition(retained_tasks)
+    sched_active, sched_starting, sched_finished = partition(retained_tasks)
     local_task_ids = local_active | local_finished
-    sched_task_ids = sched_active | sched_finished
+    sched_task_ids = sched_active | sched_starting | sched_finished
     all_task_ids = local_task_ids | sched_task_ids
 
     self.log('Told to retain the following task ids:')
@@ -159,14 +173,14 @@ class ThermosGCExecutor(ThermosExecutorBase):
     updates = {}
 
     for task_id in all_task_ids:
-      if task_id in local_active and task_id not in sched_active:
+      if task_id in local_active and task_id not in sched_active and task_id not in sched_starting:
         self.log('Inspecting %s for termination.' % task_id)
         self.maybe_terminate_unknown_task(task_id)
       if task_id in local_finished and task_id not in sched_task_ids:
         self.log('Queueing task_id %s for local deletion.' % task_id)
         local_gc.add(task_id)
-      if task_id in local_finished and task_id in sched_active:
-        self.log('Task %s finished but scheduler thinks active.' % task_id)
+      if task_id in local_finished and task_id in sched_active or task_id in sched_starting:
+        self.log('Task %s finished but scheduler thinks active/starting.' % task_id)
         states = self.get_states(task_id)
         if len(states) > 0:
           _, last_state = states[-1]
@@ -182,6 +196,8 @@ class ThermosGCExecutor(ThermosExecutorBase):
         self.log('Know nothing about task %s, telling scheduler of LOSS.' % task_id)
         updates[task_id] = ScheduleStatus.LOST
         self.send_update(driver, task_id, 'LOST', 'Executor found no trace of %s' % task_id)
+      if task_id not in local_task_ids and task_id in sched_starting:
+        self.log('Know nothing about task %s, but scheduler says STARTING - passing' % task_id)
 
     return local_gc, remote_gc, updates
 
@@ -269,6 +285,9 @@ class ThermosGCExecutor(ThermosExecutorBase):
         yield executor.executor_id[len(thermos_executor_prefix):]
 
   def run(self, driver, task, retain_tasks):
+    """
+      retain_tasks: mapping of task_id => ScheduleStatus
+    """
     local_gc, remote_gc, _ = self.reconcile_states(driver, retain_tasks)
     self.clean_orphans(driver)
     delete_tasks = set(retain_tasks).intersection(self.garbage_collect(local_gc)) | remote_gc

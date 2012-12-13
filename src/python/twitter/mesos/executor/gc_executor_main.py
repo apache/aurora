@@ -1,3 +1,10 @@
+"""Command-line entry point to the Thermos GC executor
+
+This module wraps the Thermos GC executor to allow it to be compiled into an executable, so that it
+can be launched by Mesos.
+
+"""
+
 import os
 
 from twitter.common import app, log

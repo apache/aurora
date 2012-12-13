@@ -1,4 +1,5 @@
 from collections import defaultdict
+from itertools import product
 import os
 import threading
 import time
@@ -159,28 +160,18 @@ def make_pair(*args, **kw):
   return ThickTestThermosGCExecutor(*args, **kw), ProxyDriver()
 
 
-def mix(iter1, iter2):
-  for st0 in iter1:
-    for st1 in iter2:
-      yield (st0, st1)
-
-
-def lmix(iter1, iter2):
-  return list(mix(iter1, iter2))
-
-
 def llen(*iterables):
   return tuple(len(iterable) for iterable in iterables)
 
 
 def test_state_reconciliation_no_ops():
-  for st0, st1 in mix(THERMOS_LIVES, LIVE_STATES):
+  for st0, st1 in product(THERMOS_LIVES, LIVE_STATES):
     tgc, driver = make_pair({'foo': st0}, {})
     lgc, rgc, updates = tgc.reconcile_states(driver, {'foo': st1})
     assert tgc.len_results == (0, 0, 0, 0)
     assert llen(lgc, rgc, updates) == (0, 0, 0)
 
-  for st0, st1 in mix(THERMOS_TERMINALS, TERMINAL_STATES):
+  for st0, st1 in product(THERMOS_TERMINALS, TERMINAL_STATES):
     tgc, driver = make_pair({}, {'foo': st0})
     lgc, rgc, updates = tgc.reconcile_states(driver, {'foo': st1})
     assert tgc.len_results == (0, 0, 0, 0)
@@ -188,7 +179,7 @@ def test_state_reconciliation_no_ops():
 
 
 def test_state_reconciliation_active_terminal():
-  for st0, st1 in mix(THERMOS_LIVES, TERMINAL_STATES):
+  for st0, st1 in product(THERMOS_LIVES, TERMINAL_STATES):
     tgc, driver = make_pair({'foo': st0}, {})
     lgc, rgc, updates = tgc.reconcile_states(driver, {'foo': st1})
     assert tgc.len_results == (0, 0, 0, 1)
@@ -204,7 +195,7 @@ def test_state_reconciliation_active_nexist():
 
 
 def test_state_reconciliation_terminal_active():
-  for st0, st1 in mix(THERMOS_TERMINALS, LIVE_STATES):
+  for st0, st1 in product(THERMOS_TERMINALS, LIVE_STATES):
     tgc, driver = make_pair({}, {'foo': st0})
     lgc, rgc, updates = tgc.reconcile_states(driver, {'foo': st1})
     assert tgc.len_results == (0, 0, 0, 0)
@@ -212,7 +203,7 @@ def test_state_reconciliation_terminal_active():
 
 
 def test_state_reconciliation_terminal_nexist():
-  for st0, st1 in mix(THERMOS_TERMINALS, LIVE_STATES):
+  for st0, st1 in product(THERMOS_TERMINALS, LIVE_STATES):
     tgc, driver = make_pair({}, {'foo': st0})
     lgc, rgc, updates = tgc.reconcile_states(driver, {})
     assert tgc.len_results == (0, 0, 0, 0)

@@ -8,7 +8,7 @@ import time
 import mesos_pb2 as mesos_pb
 
 from twitter.common import log
-from twitter.common.concurrent import defer
+from twitter.common.concurrent import deadline, defer, Timeout
 from twitter.common.exceptions import ExceptionalThread
 from twitter.common.quantity import Amount, Time
 
@@ -140,11 +140,22 @@ class ThermosExecutor(ThermosExecutorBase):
       defer(driver.stop, delay=self.STOP_WAIT)
       return
 
-    # TODO(wickman)  This should be able to timeout.  Send TASK_LOST after 60 seconds of trying?
-    log.debug('Waiting for task to start.')
-    while not self._runner.is_started():
-      log.debug('   - sleeping...')
-      time.sleep(Amount(250, Time.MILLISECONDS).as_(Time.SECONDS))
+    def wait_for_task():
+      while not self._runner.is_started():
+        log.debug('   - sleeping...')
+        time.sleep(Amount(250, Time.MILLISECONDS).as_(Time.SECONDS))
+
+    try:
+      log.debug('Waiting for task to start.')
+      deadline(wait_for_task, timeout=Amount(1, Time.MINUTES))
+    except Timeout:
+      msg = 'Timed out waiting for task to start!'
+      log.fatal(msg)
+      self._runner.lose()
+      self.send_update(driver, self._task_id, 'LOST', msg)
+      defer(driver.stop, delay=self.STOP_WAIT)
+      return
+
     log.debug('Task started.')
     self.send_update(driver, self._task_id, 'RUNNING')
 

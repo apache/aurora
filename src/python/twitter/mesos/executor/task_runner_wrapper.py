@@ -17,7 +17,9 @@ from twitter.thermos.runner import TaskRunner
 from twitter.thermos.monitoring.monitor import TaskMonitor
 from twitter.thermos.config.loader import ThermosTaskWrapper
 
-from twitter.mesos.executor.sandbox_manager import (
+from gen.twitter.thermos.ttypes import TaskState
+
+from .sandbox_manager import (
   AppAppSandbox,
   DirectorySandbox,
   SandboxBase)
@@ -134,7 +136,7 @@ class TaskRunnerWrapper(object):
     return self._sandbox.exists()
 
   def is_started(self):
-    return self._popen is not None and self._popen.pid is not None
+    return self.task_state() == TaskState.ACTIVE
 
   def is_alive(self):
     """
@@ -166,23 +168,29 @@ class TaskRunnerWrapper(object):
     # runner termination.
     pass
 
-  def kill(self):
+  def terminate_runner(self, as_loss=False):
     """
-      Kill the underlying runner process, if it exists.
+      Terminate the underlying runner process, if it exists.
     """
     if self._kill_signal.is_set():
-      log.warning('Duplicate kill signal received, ignoring.')
+      log.warning('Duplicate kill/lose signal received, ignoring.')
       return
-
     self._kill_signal.set()
     if self.is_alive():
-      log.info('Runner is alive, sending SIGUSR1')
+      sig = 'SIGUSR2' if as_loss else 'SIGUSR1'
+      log.info('Runner is alive, sending %s' % sig)
       try:
-        self._popen.send_signal(signal.SIGUSR1)
+        self._popen.send_signal(getattr(signal, sig))
       except OSError as e:
-        log.error('Got OSError sending SIGUSR1: %s' % e)
+        log.error('Got OSError sending %s: %s' % (sig, e))
     else:
       log.info('Runner is dead, skipping kill.')
+
+  def kill(self):
+    self.terminate_runner()
+
+  def lose(self):
+    self.terminate_runner(as_loss=True)
 
   def quitquitquit(self):
     """Bind to the process tree of a Thermos task and kill it with impunity."""

@@ -832,8 +832,7 @@ class TaskRunner(object):
     """
       Mark a task as LOST and kill any straggling processes.
     """
-    return self.kill(force, preemption_wait=Amount(0, Time.SECONDS),
-        terminal_status=TaskState.LOST)
+    self.kill(force, preemption_wait=Amount(0, Time.SECONDS), terminal_status=TaskState.LOST)
 
   def _kill(self):
     processes = TaskRunnerHelper.scantree(self._state, clock=self._clock)
