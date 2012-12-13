@@ -179,7 +179,7 @@ class ThermosGCExecutor(ThermosExecutorBase):
       if task_id in local_finished and task_id not in sched_task_ids:
         self.log('Queueing task_id %s for local deletion.' % task_id)
         local_gc.add(task_id)
-      if task_id in local_finished and task_id in sched_active or task_id in sched_starting:
+      if task_id in local_finished and (task_id in sched_active or task_id in sched_starting):
         self.log('Task %s finished but scheduler thinks active/starting.' % task_id)
         states = self.get_states(task_id)
         if len(states) > 0:

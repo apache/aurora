@@ -37,6 +37,8 @@ FINISHED_TASKS = {
 THERMOS_LIVES = (TaskState.ACTIVE, TaskState.CLEANING, TaskState.FINALIZING)
 THERMOS_TERMINALS = (TaskState.SUCCESS, TaskState.FAILED, TaskState.KILLED, TaskState.LOST)
 
+STARTING_STATES = (ScheduleStatus.STARTING, ScheduleStatus.ASSIGNED)
+
 
 if 'THERMOS_DEBUG' in os.environ:
   from twitter.common import log
@@ -165,14 +167,30 @@ def llen(*iterables):
 
 
 def test_state_reconciliation_no_ops():
+  # active vs. active
   for st0, st1 in product(THERMOS_LIVES, LIVE_STATES):
     tgc, driver = make_pair({'foo': st0}, {})
     lgc, rgc, updates = tgc.reconcile_states(driver, {'foo': st1})
     assert tgc.len_results == (0, 0, 0, 0)
     assert llen(lgc, rgc, updates) == (0, 0, 0)
 
+  # terminal vs. terminal
   for st0, st1 in product(THERMOS_TERMINALS, TERMINAL_STATES):
     tgc, driver = make_pair({}, {'foo': st0})
+    lgc, rgc, updates = tgc.reconcile_states(driver, {'foo': st1})
+    assert tgc.len_results == (0, 0, 0, 0)
+    assert llen(lgc, rgc, updates) == (0, 0, 0)
+
+  # active vs. starting
+  for st0, st1 in product(THERMOS_LIVES, STARTING_STATES):
+    tgc, driver = make_pair({'foo': st0}, {})
+    lgc, rgc, updates = tgc.reconcile_states(driver, {'foo': st1})
+    assert tgc.len_results == (0, 0, 0, 0)
+    assert llen(lgc, rgc, updates) == (0, 0, 0)
+
+  # nexist vs. starting
+  for st1 in STARTING_STATES:
+    tgc, driver = make_pair({}, {})
     lgc, rgc, updates = tgc.reconcile_states(driver, {'foo': st1})
     assert tgc.len_results == (0, 0, 0, 0)
     assert llen(lgc, rgc, updates) == (0, 0, 0)
@@ -195,6 +213,14 @@ def test_state_reconciliation_active_nexist():
 
 
 def test_state_reconciliation_terminal_active():
+  for st0, st1 in product(THERMOS_TERMINALS, LIVE_STATES):
+    tgc, driver = make_pair({}, {'foo': st0})
+    lgc, rgc, updates = tgc.reconcile_states(driver, {'foo': st1})
+    assert tgc.len_results == (0, 0, 0, 0)
+    assert llen(lgc, rgc, updates) == (0, 0, 1)
+
+
+def test_state_reconciliation_terminal_starting():
   for st0, st1 in product(THERMOS_TERMINALS, LIVE_STATES):
     tgc, driver = make_pair({}, {'foo': st0})
     lgc, rgc, updates = tgc.reconcile_states(driver, {'foo': st1})
@@ -256,6 +282,14 @@ def test_gc_with_loss():
   assert len(proxy_driver.updates) == 2
   assert proxy_driver.updates[0][0] == mesos.TASK_LOST
   assert proxy_driver.updates[0][1] == ACTIVE_TASKS[0]
+
+
+def test_gc_with_starting_task():
+  tgce, proxy_driver = run_gc_with(
+    active_executors=set(ACTIVE_TASKS), retained_tasks={ACTIVE_TASKS[0]: ScheduleStatus.STARTING})
+  assert len(tgce._kills) == 0
+  assert len(tgce.gcs) == len(FINISHED_TASKS)
+  assert len(proxy_driver.messages) == 0
 
 
 def test_gc_without_task_missing():
