@@ -8,9 +8,9 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
 import com.twitter.common.base.Closure;
-import com.twitter.mesos.gen.Attribute;
 import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.MaintenanceMode;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
@@ -227,7 +227,7 @@ public class ForwardingStore implements
   }
 
   @Override
-  public Iterable<Attribute> getHostAttributes(String host) {
+  public Optional<HostAttributes> getHostAttributes(String host) {
     return attributeStore.getHostAttributes(host);
   }
 
@@ -239,5 +239,10 @@ public class ForwardingStore implements
   @Override
   public void deleteHostAttributes() {
     attributeStore.deleteHostAttributes();
+  }
+
+  @Override
+  public boolean setMaintenanceMode(String host, MaintenanceMode mode) {
+    return attributeStore.setMaintenanceMode(host, mode);
   }
 }

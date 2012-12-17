@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterators;
@@ -550,27 +551,34 @@ public class LogStorageTest extends EasyMockTest {
     final String host = "hostname";
     final Set<Attribute> attributes =
         ImmutableSet.of(new Attribute().setName("attr").setValues(ImmutableSet.of("value")));
-    final HostAttributes hostAttributes = new HostAttributes()
+    final Optional<HostAttributes> hostAttributes = Optional.of(new HostAttributes()
         .setHost(host)
-        .setAttributes(attributes);
+        .setAttributes(attributes));
 
     new MutationFixture() {
       @Override protected void setupExpectations() throws Exception {
         storageUtil.expectTransactions();
         expect(storageUtil.attributeStore.getHostAttributes(host))
-            .andReturn(ImmutableList.<Attribute>of());
-        storageUtil.attributeStore.saveHostAttributes(hostAttributes);
-        expect(storageUtil.attributeStore.getHostAttributes(host)).andReturn(attributes);
-        expectStreamTransaction(Op.saveHostAttributes(new SaveHostAttributes(hostAttributes)));
-        expect(storageUtil.attributeStore.getHostAttributes(host)).andReturn(attributes);
-        expect(storageUtil.attributeStore.getHostAttributes(host)).andReturn(attributes);
+            .andReturn(Optional.<HostAttributes>absent());
+
+        // Each logStorage save invokes get, save, get to the underlying attribute store.
+        storageUtil.attributeStore.saveHostAttributes(hostAttributes.get());
+        expect(storageUtil.attributeStore.getHostAttributes(host)).andReturn(hostAttributes);
+        expectStreamTransaction(
+            Op.saveHostAttributes(new SaveHostAttributes(hostAttributes.get())));
+        expect(storageUtil.attributeStore.getHostAttributes(host)).andReturn(hostAttributes);
+
+        expect(storageUtil.attributeStore.getHostAttributes(host)).andReturn(hostAttributes);
+        storageUtil.attributeStore.saveHostAttributes(hostAttributes.get());
+        expect(storageUtil.attributeStore.getHostAttributes(host)).andReturn(hostAttributes);
+        expect(storageUtil.attributeStore.getHostAttributes(host)).andReturn(hostAttributes);
       }
 
       @Override protected void performMutations() {
-        logStorage.saveHostAttributes(hostAttributes);
-        assertEquals(attributes, logStorage.getHostAttributes(host));
-        logStorage.saveHostAttributes(hostAttributes);
-        assertEquals(attributes, logStorage.getHostAttributes(host));
+        logStorage.saveHostAttributes(hostAttributes.get());
+        assertEquals(hostAttributes, logStorage.getHostAttributes(host));
+        logStorage.saveHostAttributes(hostAttributes.get());
+        assertEquals(hostAttributes, logStorage.getHostAttributes(host));
       }
     };
   }

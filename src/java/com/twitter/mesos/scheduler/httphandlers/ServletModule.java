@@ -83,6 +83,7 @@ public class ServletModule extends AbstractModule {
         registerJerseyEndpoint("/utilization", Utilization.class);
         registerJerseyEndpoint("/cron", Cron.class);
         registerJerseyEndpoint("/offers", Offers.class);
+        registerJerseyEndpoint("/maintenance", Maintenance.class);
       }
     });
 

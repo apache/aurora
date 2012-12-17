@@ -213,6 +213,17 @@ public class TaskStateMachineTest extends EasyMockTest {
   }
 
   @Test
+  public void testRestartedTask() {
+    expectWork(UPDATE_STATE).times(6);
+    expectWork(KILL);
+    expectWork(RESCHEDULE);
+
+    control.replay();
+
+    transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, RESTARTING, FINISHED);
+  }
+
+  @Test
   public void testRogueRestartedTask() {
     expectWork(UPDATE_STATE).times(5);
     expectWork(KILL).times(2);

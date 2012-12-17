@@ -15,6 +15,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.inject.BindingAnnotation;
@@ -28,9 +29,9 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
-import com.twitter.mesos.gen.Attribute;
 import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.MaintenanceMode;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
@@ -606,17 +607,37 @@ public class LogStorage extends ForwardingStore implements DistributedSnapshotSt
 
   @Timed("scheduler_save_host_attribute")
   @Override
-  public void saveHostAttributes(final HostAttributes hostAttributes) {
+  public void saveHostAttributes(final HostAttributes attrs) {
     doInWriteTransaction(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider unused) {
-        Set<Attribute> savedAttributes =
-            ImmutableSet.copyOf(LogStorage.super.getHostAttributes(hostAttributes.getHost()));
-        if (!savedAttributes.equals(hostAttributes.getAttributes())) {
-          log(Op.saveHostAttributes(new SaveHostAttributes(hostAttributes)));
-          LogStorage.super.saveHostAttributes(hostAttributes);
+        // Pass the updated attributes upstream, and then check if the stored value changes.
+        // We do this since different parts of the system write partial HostAttributes objects
+        // and they are merged together internally.
+        // TODO(William Farner): Split out a separate method
+        //                       saveAttributes(String host, Iterable<Attributes>) to simplify this.
+        Optional<HostAttributes> saved = LogStorage.super.getHostAttributes(attrs.getHost());
+        LogStorage.super.saveHostAttributes(attrs);
+        Optional<HostAttributes> updated = LogStorage.super.getHostAttributes(attrs.getHost());
+        if (!saved.equals(updated)) {
+          log(Op.saveHostAttributes(new SaveHostAttributes(updated.get())));
         }
       }
     });
+  }
+
+  @Override
+  public boolean setMaintenanceMode(final String host, final MaintenanceMode mode) {
+    doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider unused) {
+        Optional<HostAttributes> saved = LogStorage.super.getHostAttributes(host);
+        if (saved.isPresent()) {
+          HostAttributes attributes = saved.get().setMode(mode);
+          log(Op.saveHostAttributes(new SaveHostAttributes(attributes)));
+          LogStorage.super.saveHostAttributes(attributes);
+        }
+      }
+    });
+    return false;
   }
 
   private void log(Op op) {

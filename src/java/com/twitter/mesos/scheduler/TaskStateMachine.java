@@ -205,6 +205,9 @@ public class TaskStateMachine {
           case LOST:
             addWork(WorkCommand.KILL);
             // fall through
+
+          case FINISHED:
+          case FAILED:
           case KILLED:
             addWork(WorkCommand.RESCHEDULE, transition.getTo().getMutation());
             break;

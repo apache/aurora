@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 
@@ -19,6 +20,7 @@ import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Attribute;
 import com.twitter.mesos.gen.Constraint;
+import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.LimitConstraint;
 import com.twitter.mesos.gen.ScheduledTask;
@@ -413,11 +415,14 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         .andReturn(ImmutableSet.copyOf(tasks));
   }
 
-  private IExpectationSetters<Iterable<Attribute>> expectGetHostAttributes(
+  private IExpectationSetters<Optional<HostAttributes>> expectGetHostAttributes(
       String host,
       Attribute... attributes) {
 
-    return expect(attributeStore.getHostAttributes(host)).andReturn(Arrays.asList(attributes));
+    HostAttributes hostAttributes = new HostAttributes()
+        .setHost(host)
+        .setAttributes(ImmutableSet.<Attribute>builder().add(attributes).build());
+    return expect(attributeStore.getHostAttributes(host)).andReturn(Optional.of(hostAttributes));
   }
 
   private ScheduledTask makeScheduledTask(Identity owner, String jobName, String host) {

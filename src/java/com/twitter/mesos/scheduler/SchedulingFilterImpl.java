@@ -25,6 +25,7 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
+import com.twitter.mesos.scheduler.storage.AttributeStore;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work.Quiet;
@@ -171,7 +172,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
           @Override public Iterable<Veto> apply(final StoreProvider storeProvider) {
             AttributeLoader attributeLoader = new AttributeLoader() {
               @Override public Iterable<Attribute> apply(String host) {
-                return storeProvider.getAttributeStore().getHostAttributes(host);
+                return AttributeStore.Util.attributesOrNone(storeProvider, host);
               }
             };
 
@@ -219,7 +220,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   private boolean isDedicated(final String slaveHost) {
     Iterable<Attribute> slaveAttributes = storage.doInTransaction(new Quiet<Iterable<Attribute>>() {
       @Override public Iterable<Attribute> apply(final StoreProvider storeProvider) {
-        return storeProvider.getAttributeStore().getHostAttributes(slaveHost);
+        return AttributeStore.Util.attributesOrNone(storeProvider, slaveHost);
       }
     });
 

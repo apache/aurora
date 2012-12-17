@@ -50,6 +50,7 @@ import com.twitter.mesos.scheduler.BackoffSchedulingFilter.BackoffDelegate;
 import com.twitter.mesos.scheduler.CronJobManager.CronScheduler;
 import com.twitter.mesos.scheduler.CronJobManager.CronScheduler.Cron4jScheduler;
 import com.twitter.mesos.scheduler.Driver.DriverImpl;
+import com.twitter.mesos.scheduler.MaintenanceController.MaintenanceControllerImpl;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHosts;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHostsImpl;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveMapper;
@@ -235,6 +236,9 @@ public class SchedulerModule extends AbstractModule {
     bind(UserTaskLauncher.class).in(Singleton.class);
 
     install(new AsyncModule());
+
+    bind(MaintenanceController.class).to(MaintenanceControllerImpl.class);
+    bind(MaintenanceControllerImpl.class).in(Singleton.class);
   }
 
   /**

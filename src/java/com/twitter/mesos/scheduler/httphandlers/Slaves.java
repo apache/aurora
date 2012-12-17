@@ -1,8 +1,9 @@
 package com.twitter.mesos.scheduler.httphandlers;
 
-import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
+import javax.annotation.Nullable;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -13,12 +14,16 @@ import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Ordering;
 import com.google.inject.Inject;
 
 import org.antlr.stringtemplate.StringTemplate;
 
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.gen.Attribute;
+import com.twitter.mesos.gen.HostAttributes;
+import com.twitter.mesos.gen.MaintenanceMode;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHosts;
 import com.twitter.mesos.scheduler.storage.Storage;
@@ -41,13 +46,6 @@ public class Slaves extends JerseyTemplateServlet {
   private final SlaveHosts slaveHosts;
   private Storage storage;
 
-  private final Function<Map.Entry<String, SlaveID>, Slave> slaveMapping =
-      new Function<Map.Entry<String, SlaveID>, Slave>() {
-        @Override public Slave apply(Map.Entry<String, SlaveID> input) {
-          return new Slave(input.getKey(), input.getValue(), getHostAttributes(input.getKey()));
-        }
-      };
-
   /**
    * Injected constructor.
    *
@@ -67,13 +65,20 @@ public class Slaves extends JerseyTemplateServlet {
     this.storage = checkNotNull(storage);
   }
 
-  private List<Attribute> getHostAttributes(final String key) {
-    return ImmutableList.copyOf(storage.doInTransaction(new Work.Quiet<Iterable<Attribute>>() {
-      @Override public Iterable<Attribute> apply(StoreProvider storeProvider) {
-        return storeProvider.getAttributeStore().getHostAttributes(key);
+  private Iterable<HostAttributes> getHostAttributes() {
+    return storage.doInTransaction(new Work.Quiet<Iterable<HostAttributes>>() {
+      @Override public Iterable<HostAttributes> apply(StoreProvider storeProvider) {
+        return storeProvider.getAttributeStore().getHostAttributes();
       }
-    }));
+    });
   }
+
+  private static final Function<HostAttributes, String> ATTR_HOST =
+      new Function<HostAttributes, String>() {
+        @Override public String apply(HostAttributes attributes) {
+          return attributes.getHost();
+        }
+      };
 
   /**
    * Fetches the listing of known slaves.
@@ -86,11 +91,29 @@ public class Slaves extends JerseyTemplateServlet {
     return fillTemplate(new Closure<StringTemplate>() {
       @Override public void execute(StringTemplate template) {
         template.setAttribute("cluster_name", clusterName);
-        template.setAttribute("slaves", ImmutableList.copyOf(
-            Iterables.transform(slaveHosts.getSlaves().entrySet(), slaveMapping)));
+
+        Map<String, SlaveID> hostToId = slaveHosts.getSlaves();
+        final Map<String, HostAttributes> hostToAttributes =
+            Maps.uniqueIndex(getHostAttributes(), ATTR_HOST);
+        Iterable<Slave> slaves = Iterables.transform(hostToId.entrySet(),
+            new Function<Entry<String, SlaveID>, Slave>() {
+              @Override public Slave apply(Entry<String, SlaveID> entry) {
+                HostAttributes attributes = hostToAttributes.get(entry.getKey());
+                return new Slave(entry.getKey(), entry.getValue(), attributes);
+              }
+            });
+
+        template.setAttribute("slaves", ImmutableList.copyOf(slaves));
       }
     });
   }
+
+  private static final Ordering<Attribute> ATTR_ORDER = Ordering.natural().onResultOf(
+      new Function<Attribute, String>() {
+        @Override public String apply(Attribute attr) {
+          return attr .getName();
+        }
+      });
 
   /**
    * Template object to represent a slave.
@@ -98,12 +121,19 @@ public class Slaves extends JerseyTemplateServlet {
   private static class Slave {
     final String host;
     final SlaveID id;
-    final List<Attribute> attributes;
+    final MaintenanceMode mode;
+    final Iterable<Attribute> attributes;
 
-    Slave(String host, SlaveID id, List<Attribute> attributes) {
+    Slave(String host, SlaveID id, @Nullable HostAttributes attributes) {
       this.host = host;
       this.id = id;
-      this.attributes = attributes;
+      if (attributes != null) {
+        this.mode = attributes.getMode();
+        this.attributes = ATTR_ORDER.sortedCopy(attributes.getAttributes());
+      } else {
+        this.mode = null;
+        this.attributes = ImmutableList.of();
+      }
     }
 
     public String getHost() {
@@ -114,8 +144,19 @@ public class Slaves extends JerseyTemplateServlet {
       return id;
     }
 
+    public MaintenanceMode getMode() {
+      return mode;
+    }
+
+    private static final Function<Attribute, String> ATTR_TO_STRING =
+        new Function<Attribute, String>() {
+          @Override public String apply(Attribute attr) {
+            return attr.getName() + "=[" + Joiner.on(",").join(attr.getValues()) + "]";
+          }
+        };
+
     public String getAttributes() {
-      return Joiner.on(", ").join(attributes);
+      return Joiner.on(", ").join(Iterables.transform(attributes, ATTR_TO_STRING));
     }
   }
 }

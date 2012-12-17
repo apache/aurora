@@ -12,6 +12,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 
 import org.easymock.Capture;
+import org.easymock.IExpectationSetters;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -23,17 +24,23 @@ import com.twitter.mesos.auth.SessionValidator.AuthFailedException;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Constraint;
 import com.twitter.mesos.gen.CreateJobResponse;
+import com.twitter.mesos.gen.DrainHostsResponse;
+import com.twitter.mesos.gen.EndMaintenanceResponse;
 import com.twitter.mesos.gen.ForceTaskStateResponse;
+import com.twitter.mesos.gen.HostStatus;
+import com.twitter.mesos.gen.Hosts;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.KillResponse;
 import com.twitter.mesos.gen.LimitConstraint;
+import com.twitter.mesos.gen.MaintenanceStatusResponse;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ResponseCode;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.SessionKey;
 import com.twitter.mesos.gen.SetQuotaResponse;
+import com.twitter.mesos.gen.StartMaintenanceResponse;
 import com.twitter.mesos.gen.StartUpdateResponse;
 import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.gen.TaskQuery;
@@ -49,11 +56,14 @@ import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
-
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import static com.twitter.mesos.gen.MaintenanceMode.DRAINING;
+import static com.twitter.mesos.gen.MaintenanceMode.NONE;
+import static com.twitter.mesos.gen.MaintenanceMode.SCHEDULED;
 import static com.twitter.mesos.gen.ResponseCode.INVALID_REQUEST;
+import static com.twitter.mesos.gen.ResponseCode.OK;
 import static com.twitter.mesos.scheduler.SchedulerThriftInterface.transitionMessage;
 import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.MAX_TASKS_PER_JOB;
@@ -71,6 +81,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private QuotaManager quotaManager;
   private StorageBackup backup;
   private Recovery recovery;
+  private MaintenanceController maintenance;
   private SchedulerThriftInterface thrift;
 
   @Before
@@ -80,12 +91,14 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     quotaManager = createMock(QuotaManager.class);
     backup = createMock(StorageBackup.class);
     recovery = createMock(Recovery.class);
+    maintenance = createMock(MaintenanceController.class);
     thrift = new SchedulerThriftInterface(
         scheduler,
         sessionValidator,
         quotaManager,
         backup,
         recovery,
+        maintenance,
         Amount.of(1L, Time.MILLISECONDS),
         Amount.of(1L, Time.SECONDS));
   }
@@ -585,6 +598,45 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     assertEquals(INVALID_REQUEST, thrift.createJob(job, SESSION).getResponseCode());
   }
 
+  @Test
+  public void testHostMaintenance() throws Exception {
+    expectAdminAuth(true).times(6);
+    Set<String> hostnames = ImmutableSet.of("a");
+    Set<HostStatus> none = ImmutableSet.of(new HostStatus("a", NONE));
+    Set<HostStatus> scheduled = ImmutableSet.of(new HostStatus("a", SCHEDULED));
+    Set<HostStatus> draining = ImmutableSet.of(new HostStatus("a", DRAINING));
+    Set<HostStatus> drained = ImmutableSet.of(new HostStatus("a", DRAINING));
+    expect(maintenance.getStatus(hostnames)).andReturn(none);
+    expect(maintenance.startMaintenance(hostnames)).andReturn(scheduled);
+    expect(maintenance.drain(hostnames)).andReturn(draining);
+    expect(maintenance.getStatus(hostnames)).andReturn(draining);
+    expect(maintenance.getStatus(hostnames)).andReturn(drained);
+    expect(maintenance.endMaintenance(hostnames)).andReturn(none);
+
+    control.replay();
+
+    Hosts hosts = new Hosts(hostnames);
+
+    assertEquals(
+        new MaintenanceStatusResponse().setResponseCode(OK).setStatuses(none),
+        thrift.maintenanceStatus(hosts, SESSION));
+    assertEquals(
+        new StartMaintenanceResponse().setResponseCode(OK).setStatuses(scheduled),
+        thrift.startMaintenance(hosts, SESSION));
+    assertEquals(
+        new DrainHostsResponse().setResponseCode(OK).setStatuses(draining),
+        thrift.drainHosts(hosts, SESSION));
+    assertEquals(
+        new MaintenanceStatusResponse().setResponseCode(OK).setStatuses(draining),
+        thrift.maintenanceStatus(hosts, SESSION));
+    assertEquals(
+        new MaintenanceStatusResponse().setResponseCode(OK).setStatuses(drained),
+        thrift.maintenanceStatus(hosts, SESSION));
+    assertEquals(
+        new EndMaintenanceResponse().setResponseCode(OK).setStatuses(none),
+        thrift.endMaintenance(hosts, SESSION));
+  }
+
   private JobConfiguration makeJob() {
     return makeJob(nonProductionTask());
   }
@@ -604,15 +656,19 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setTaskConfigs(tasks);
   }
 
-  private void expectAuth(String role, boolean allowed) throws AuthFailedException {
+  private IExpectationSetters<?> expectAuth(String role, boolean allowed)
+      throws AuthFailedException {
+
     sessionValidator.checkAuthenticated(SESSION, role);
     if (!allowed) {
-      expectLastCall().andThrow(new AuthFailedException("Denied!"));
+      return expectLastCall().andThrow(new AuthFailedException("Denied!"));
+    } else {
+      return expectLastCall();
     }
   }
 
-  private void expectAdminAuth(boolean allowed) throws AuthFailedException {
-    expectAuth(SchedulerThriftInterface.ADMIN_ROLE.get(), allowed);
+  private IExpectationSetters<?> expectAdminAuth(boolean allowed) throws AuthFailedException {
+    return expectAuth(SchedulerThriftInterface.ADMIN_ROLE.get(), allowed);
   }
 
   private static TwitterTaskInfo defaultTask(boolean production, String... additionalParams) {

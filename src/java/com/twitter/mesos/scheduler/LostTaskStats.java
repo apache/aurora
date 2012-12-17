@@ -22,6 +22,7 @@ import com.twitter.mesos.gen.Attribute;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.scheduler.events.PubsubEvent.EventSubscriber;
 import com.twitter.mesos.scheduler.events.PubsubEvent.TaskStateChange;
+import com.twitter.mesos.scheduler.storage.AttributeStore;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
@@ -76,7 +77,7 @@ class LostTaskStats implements EventSubscriber {
       Optional<String> rack = storage.doInTransaction(new Work.Quiet<Optional<String>>() {
         @Override public Optional<String> apply(StoreProvider storeProvider) {
           Optional<Attribute> rack = FluentIterable
-              .from(storeProvider.getAttributeStore().getHostAttributes(host))
+              .from(AttributeStore.Util.attributesOrNone(storeProvider, host))
               .firstMatch(IS_RACK);
           return rack.transform(ATTR_VALUE);
         }

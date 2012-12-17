@@ -14,7 +14,6 @@ import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
 
 import org.apache.commons.lang.StringUtils;
-import org.apache.thrift.TException;
 
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
@@ -118,6 +117,7 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
   private final QuotaManager quotaManager;
   private final StorageBackup backup;
   private final Recovery recovery;
+  private final MaintenanceController maintenance;
   private final Amount<Long, Time> killTaskInitialBackoff;
   private final Amount<Long, Time> killTaskMaxBackoff;
 
@@ -127,13 +127,15 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
       SessionValidator sessionValidator,
       QuotaManager quotaManager,
       StorageBackup backup,
-      Recovery recovery) {
+      Recovery recovery,
+      MaintenanceController maintenance) {
 
     this(schedulerCore,
         sessionValidator,
         quotaManager,
         backup,
         recovery,
+        maintenance,
         KILL_TASK_INITIAL_BACKOFF.get(),
         KILL_TASK_MAX_BACKOFF.get());
   }
@@ -145,6 +147,7 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
       QuotaManager quotaManager,
       StorageBackup backup,
       Recovery recovery,
+      MaintenanceController maintenance,
       Amount<Long, Time> initialBackoff,
       Amount<Long, Time> maxBackoff) {
 
@@ -153,6 +156,7 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     this.quotaManager = checkNotNull(quotaManager);
     this.backup = checkNotNull(backup);
     this.recovery = checkNotNull(recovery);
+    this.maintenance = checkNotNull(maintenance);
     this.killTaskInitialBackoff = checkNotNull(initialBackoff);
     this.killTaskMaxBackoff = checkNotNull(maxBackoff);
   }
@@ -441,34 +445,59 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
   }
 
   @Override
-  public StartMaintenanceResponse startMaintenance(
-      Hosts hosts,
-      SessionKey session) throws TException {
+  public StartMaintenanceResponse startMaintenance(Hosts hosts, SessionKey session) {
+    StartMaintenanceResponse response = new StartMaintenanceResponse();
+    try {
+      assertAdmin(session);
+      response.setStatuses(maintenance.startMaintenance(hosts.getHostNames()));
+      response.setResponseCode(OK);
+    } catch (AuthFailedException e) {
+      response.setResponseCode(AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
+    }
 
-    throw new UnsupportedOperationException("Cluster maintenance has not been implemented yet.");
+    return response;
   }
 
   @Override
-  public DrainHostsResponse drainHosts(
-      Hosts hosts,
-      SessionKey session) throws TException {
+  public DrainHostsResponse drainHosts(Hosts hosts, SessionKey session) {
+    DrainHostsResponse response = new DrainHostsResponse();
+    try {
+      assertAdmin(session);
+      response.setStatuses(maintenance.drain(hosts.getHostNames()));
+      response.setResponseCode(OK);
+    } catch (AuthFailedException e) {
+      response.setResponseCode(AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
+    }
 
-    throw new UnsupportedOperationException("Cluster maintenance has not been implemented yet.");
+    return response;
   }
 
   @Override
-  public MaintenanceStatusResponse maintenanceStatus(
-      Hosts hosts,
-      SessionKey session) throws TException {
+  public MaintenanceStatusResponse maintenanceStatus(Hosts hosts, SessionKey session) {
+    MaintenanceStatusResponse response = new MaintenanceStatusResponse();
+    try {
+      assertAdmin(session);
+      response.setStatuses(maintenance.getStatus(hosts.getHostNames()));
+      response.setResponseCode(OK);
+    } catch (AuthFailedException e) {
+      response.setResponseCode(AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
+    }
 
-    throw new UnsupportedOperationException("Cluster maintenance has not been implemented yet.");
+    return response;
   }
 
   @Override
-  public EndMaintenanceResponse endMaintenance(
-      Hosts hosts, SessionKey session) throws TException {
+  public EndMaintenanceResponse endMaintenance(Hosts hosts, SessionKey session) {
+    EndMaintenanceResponse response = new EndMaintenanceResponse();
+    try {
+      assertAdmin(session);
+      response.setStatuses(maintenance.endMaintenance(hosts.getHostNames()));
+      response.setResponseCode(OK);
+    } catch (AuthFailedException e) {
+      response.setResponseCode(AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
+    }
 
-    throw new UnsupportedOperationException("Cluster maintenance has not been implemented yet.");
+    return response;
   }
 
   private void assertAdmin(SessionKey session) throws AuthFailedException {

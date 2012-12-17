@@ -624,7 +624,8 @@ public class StateManagerImpl implements StateManager {
 
     txStorage.doInWriteTransaction(txStorage.new NoResultSideEffectWork() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getAttributeStore().saveHostAttributes(new HostAttributes(slaveHost, attrs));
+        storeProvider.getAttributeStore().saveHostAttributes(
+            new HostAttributes().setHost(slaveHost).setAttributes(attrs));
       }
     });
   }
