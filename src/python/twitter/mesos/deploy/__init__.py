@@ -172,7 +172,6 @@ class HDFSDeployer(object):
   STAGE_DIR = '~/release_staging'
   DC_WILDCARD = '$dc'
   CLUSTER_WILDCARD = '$cluster'
-  HDFS_BIN_DIR = '/mesos/pkg/mesos/bin'
 
   def __init__(self, cluster, dry_run=True, verbose=False):
     self._really_deploy = not dry_run
@@ -180,6 +179,7 @@ class HDFSDeployer(object):
     self._deployer = Deployer(self.REMOTE_USER, dry_run, verbose)
     self._cluster_name = cluster
     self._cluster = Cluster.get(cluster)
+    self._hdfs_bin_dir = self._cluster.hadoop_bin_dir
 
   def hadoop(self):
     return ['hadoop', '--config', self._cluster.hadoop_config, 'fs']
@@ -228,7 +228,7 @@ class HDFSDeployer(object):
       self.CLUSTER_WILDCARD: self._cluster.local_name,
     }
     for local_file, hdfs_target in builder.artifacts.items():
-      hdfs_target = posixpath.join(self.HDFS_BIN_DIR, hdfs_target)
+      hdfs_target = posixpath.join(self._hdfs_bin_dir, hdfs_target)
       for wildcard, value in wildcards.items():
         local_file = local_file.replace(wildcard, value)
         hdfs_target = hdfs_target.replace(wildcard, value)
