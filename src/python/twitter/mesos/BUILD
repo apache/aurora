@@ -111,6 +111,20 @@ python_binary(
 )
 
 python_binary(
+  name = 'mesos_admin',
+  source = 'bin/mesos_admin.py',
+  dependencies = [
+    pants(':mesos-lib'),
+    pants('src/python/twitter/common/app'),
+    pants('src/python/twitter/common/log')
+  ],
+  platforms = (
+    'linux-x86_64',
+    'macosx-10.6-x86_64',
+  )
+)
+
+python_binary(
   name = 'deploy_scheduler',
   source = 'bin/deploy_scheduler.py',
   dependencies = [
