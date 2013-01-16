@@ -100,7 +100,7 @@ CLUSTER_OPTION = optparse.Option(
     '--cluster',
     dest='cluster',
     default=None,
-    help='Cluster to invoke the command against.')
+    help="Cluster to invoke this command against (choose from %s)." % Cluster.get_list())
 
 
 # This is for binding arbitrary points in the Thermos namespace to specific strings, e.g.
@@ -617,8 +617,21 @@ def run(*line):
 def _get_packer(cluster=None):
   options = app.get_options()
   cluster = cluster or options.cluster
+
+  packer_enabled_clusters = [c.name for c in Cluster.get_all() if c.packer_zk or c.packer_redirect]
+  
   if not cluster:
-    client_util.die('--cluster must be specified')
+    client_util.die(
+      '--cluster must be specified. Valid clusters for this command are %s' %
+      packer_enabled_clusters)
+  elif cluster not in Cluster.get_list():
+    client_util.die(
+      'Cluster "%s" does not exist. Valid, Packer-enabled clusters are %s' %
+      (cluster, packer_enabled_clusters))
+  elif cluster not in packer_enabled_clusters:
+    client_util.die(
+      'Cluster "%s" is not Packer-enabled. Packer is currently available for %s' %
+      (cluster, packer_enabled_clusters))
   return sd_packer_client.create_packer(cluster, verbose=options.verbosity in ('normal', 'verbose'))
 
 
