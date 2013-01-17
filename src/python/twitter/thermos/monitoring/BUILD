@@ -32,6 +32,9 @@ python_library(
   sources = ['disk.py'],
   dependencies = [
     pants('src/python/twitter/common/dirutil'),
+    pants('src/python/twitter/common/exceptions'),
+    pants('src/python/twitter/common/log'),
+    python_requirement('watchdog'),
   ]
 )
 
