@@ -565,6 +565,11 @@ def query(role, job, shards=None, statuses=LIVE_STATES, api=None):
 @app.command
 @app.command_option(CLUSTER_OPTION)
 @app.command_option(EXECUTOR_SANDBOX_OPTION)
+@app.command_option('--user', dest='ssh_user', default=None,
+                    help="ssh as this user instead of the role.")
+@app.command_option('-L', dest='tunnels', action='append', metavar='PORT:NAME',
+                    default=[],
+                    help="Add tunnel from local port PORT to remote named port NAME.")
 @requires.at_least('role', 'job', 'shard')
 def ssh(role, job, shard, *args):
   """usage: ssh --cluster=CLUSTER role job shard
@@ -572,15 +577,33 @@ def ssh(role, job, shard, *args):
   Initiate an SSH session on the machine that a shard is running on.
   """
   resp = query(role, job, set([int(shard)]))
+  options = app.get_options()
+
   if not resp.responseCode:
     client_util.die('Request failed, server responded with "%s"' % resp.message)
 
   remote_cmd = 'bash' if not args else ' '.join(args)
   command = DistributedCommandRunner.substitute(remote_cmd, resp.tasks[0],
-      app.get_options().cluster, executor_sandbox=app.get_options().executor_sandbox)
+      options.cluster, executor_sandbox=options.executor_sandbox)
+
+  ssh_command = ['ssh', '-t']
+
   role = resp.tasks[0].assignedTask.task.owner.role
-  return subprocess.call(
-      ['ssh', '-t', '%s@%s' % (role, resp.tasks[0].assignedTask.slaveHost), command])
+  slave_host = resp.tasks[0].assignedTask.slaveHost
+
+  for tunnel in options.tunnels:
+    try:
+      port, name = tunnel.split(':')
+      port = int(port)
+    except ValueError:
+      client_util.die('Could not parse tunnel: %s.  Must be of form PORT:NAME' % tunnel)
+    if name not in resp.tasks[0].assignedTask.assignedPorts:
+      client_util.die('Task %s has no port named %s' % (resp.tasks[0].assignedTask.taskId, name))
+    ssh_command += [
+        '-L', '%d:%s:%d' % (port, slave_host, resp.tasks[0].assignedTask.assignedPorts[name])]
+
+  ssh_command += ['%s@%s' % (options.ssh_user or role, slave_host), command]
+  return subprocess.call(ssh_command)
 
 
 @app.command
@@ -619,7 +642,7 @@ def _get_packer(cluster=None):
   cluster = cluster or options.cluster
 
   packer_enabled_clusters = [c.name for c in Cluster.get_all() if c.packer_zk or c.packer_redirect]
-  
+
   if not cluster:
     client_util.die(
       '--cluster must be specified. Valid clusters for this command are %s' %
