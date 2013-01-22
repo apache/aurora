@@ -9,10 +9,8 @@ from twitter.mesos.config.schema import (
   AppPackage,
   MesosTaskInstance)
 
-from twitter.mesos.executor.sandbox_manager import (
-  SandboxManager,
-  DirectorySandbox,
-  AppAppSandbox)
+from twitter.mesos.executor.sandbox_manager import DirectorySandbox
+
 
 DEFAULT_LAYOUT = AppLayout(packages = [AppPackage(name="herpderp")])
 
@@ -24,14 +22,17 @@ MESOS_TASK = MesosTaskInstance(
   layout = DEFAULT_LAYOUT
 )
 
+
 def test_directory_sandbox():
   with temporary_dir() as d:
-    ds = DirectorySandbox(TASK_ID, sandbox_root=d)
-    assert ds.root() == d
-    ds.create(MESOS_TASK)
-    assert os.path.exists(ds.root())
-    root_stat = os.stat(ds.root())
-    assert root_stat.st_uid == os.getuid()
-    assert root_stat.st_mode & 0777 == 0700  # chmod 700
-    ds.destroy()
-    assert not os.path.exists(ds.root())
+    ds1 = DirectorySandbox(os.path.join(d, 'task1'))
+    ds2 = DirectorySandbox(os.path.join(d, 'task2'))
+    ds1.create(MESOS_TASK)
+    ds2.create(MESOS_TASK)
+    assert os.path.exists(ds1.root)
+    assert os.path.exists(ds2.root)
+    ds1.destroy()
+    assert not os.path.exists(ds1.root)
+    assert os.path.exists(ds2.root)
+    ds2.destroy()
+    assert not os.path.exists(ds2.root)

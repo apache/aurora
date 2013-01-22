@@ -29,9 +29,7 @@ from gen.twitter.mesos.comm.ttypes import (
     SchedulerMessage)
 from gen.twitter.mesos.ttypes import ScheduleStatus
 
-from .sandbox_manager import (
-    DirectorySandbox,
-    AppAppSandbox)
+from .sandbox_manager import AppAppSandbox, DirectorySandbox
 from .executor_base import ThermosExecutorBase
 from .executor_detector import ExecutorDetector
 
@@ -99,6 +97,14 @@ class ThermosGCExecutor(ThermosExecutorBase):
     runner_ckpt = pathspec.getpath('runner_checkpoint')
     statuses = CheckpointDispatcher.iter_statuses(runner_ckpt)
     return [(state.timestamp_ms / 1000.0, state.state) for state in statuses]
+
+  def get_sandbox(self, task_id):
+    """Returns the sandbox of the task, or None if it has not yet been initialized."""
+    pathspec = TaskPath(root=self._checkpoint_root, task_id=task_id)
+    runner_ckpt = pathspec.getpath('runner_checkpoint')
+    for update in CheckpointDispatcher.iter_updates(runner_ckpt):
+      if update.header:
+        return update.header.sandbox
 
   def maybe_terminate_unknown_task(self, task_id):
     """Terminate a task if we believe the scheduler doesn't know about it.
@@ -245,18 +251,23 @@ class ThermosGCExecutor(ThermosExecutorBase):
 
     return updates
 
-  def _gc(self, task_id):
-    directory_sandbox = DirectorySandbox(task_id)
-    if directory_sandbox.exists():
-      self.log('Destroying DirectorySandbox for %s' % task_id)
-      directory_sandbox.destroy()
+  def _erase_sandbox(self, task_id):
+    appapp_sandbox = AppAppSandbox(task_id)
+    if appapp_sandbox.exists():
+      self.log('Destroying AppAppSandbox for %s' % task_id)
+      appapp_sandbox.destroy()
     else:
-      appapp_sandbox = AppAppSandbox(task_id)
-      if appapp_sandbox.exists():
-        self.log('Destroying AppAppSandbox for %s' % task_id)
-        appapp_sandbox.destroy()
+      header_sandbox = self.get_sandbox(task_id)
+      directory_sandbox = DirectorySandbox(header_sandbox) if header_sandbox else None
+      if directory_sandbox and directory_sandbox.exists():
+        self.log('Destroying DirectorySandbox for %s' % task_id)
+        directory_sandbox.destroy()
       else:
-        self.log('ERROR: Could not identify the sandbox manager for %s!' % task_id)
+        self.log('Found no sandboxes for %s' % task_id)
+
+  def _gc(self, task_id):
+    self.log('Erasing sandbox for %s' % task_id)
+    self._erase_sandbox(task_id)
     self.log('Erasing logs for %s' % task_id)
     self._collector.erase_logs(task_id)
     self.log('Erasing metadata for %s' % task_id)

@@ -26,15 +26,19 @@ class DistributedCommandRunner(object):
     return '\n'.join('%s:  %s' % (hostname, line) for line in output[0].splitlines())
 
   @classmethod
+  def make_executor_path(cls, cluster, executor_name):
+    parameters = cls.sandbox_args(cluster)
+    parameters.update(executor_name=executor_name)
+    return posixpath.join(
+        '%(slave_root)s',
+        'slaves/*/frameworks/*/executors/%(executor_name)s/runs',
+        '%(slave_run_directory)s'
+    ) % parameters
+
+  @classmethod
   def thermos_sandbox(cls, cluster, executor_sandbox=False):
-    if executor_sandbox:
-      return posixpath.join(
-          '%(slave_root)s',
-          'slaves/*/frameworks/*/executors/thermos-{{thermos.task_id}}/runs',
-          '%(slave_run_directory)s'
-      ) % cls.sandbox_args(cluster)
-    else:
-      return '/var/lib/thermos/{{thermos.task_id}}'
+    sandbox = cls.make_executor_path(cluster, 'thermos-{{thermos.task_id}}')
+    return sandbox if executor_sandbox else posixpath.join(sandbox, 'sandbox')
 
   @classmethod
   def sandbox_args(cls, cluster):
@@ -59,11 +63,7 @@ class DistributedCommandRunner(object):
   @classmethod
   def aurora_sandbox(cls, cluster, executor_sandbox=False):
     if executor_sandbox:
-      return posixpath.join(
-          '%(slave_root)s',
-          'slaves/*/frameworks/*/executors/twitter/runs',
-          '%(slave_run_directory)s'
-      ) % cls.sandbox_args(cluster)
+      return cls.make_executor_path(cluster, 'twitter')
     else:
       return '/var/run/nexus/%task_id%/sandbox'
 

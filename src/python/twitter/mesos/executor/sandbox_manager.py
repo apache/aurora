@@ -1,31 +1,19 @@
-from abc import ABCMeta, abstractmethod
+from abc import abstractmethod, abstractproperty
 import os
-from twitter.common_internal.appapp import AppFactory
 
 from twitter.common import app, log
 from twitter.common.dirutil import safe_mkdir, safe_rmtree
+from twitter.common.lang import AbstractClass
+from twitter.common_internal.appapp import AppFactory
 
-app.add_option('--sandbox_root', dest='sandbox_root', metavar='PATH',
-               default='/var/lib/thermos',
-               help="The path where we will create DirectorySandbox sandboxes. [default: %default]")
-
-
-class SandboxBase(object):
-  __metaclass__ = ABCMeta
-
+class SandboxBase(AbstractClass):
   class CreationError(Exception):
     pass
 
   class DeletionError(Exception):
     pass
 
-  def __init__(self, task_id, sandbox_root=None):
-    self._sandbox_root = sandbox_root or app.get_options().sandbox_root
-
-  # TODO(wickman) root should probably be an abstractproperty.  In general much of this
-  # code should be cleaned up and many accessors should be converted to properties to
-  # be consistent with the rest of the code base.
-  @abstractmethod
+  @abstractproperty
   def root(self):
     """Return the root path of the sandbox."""
 
@@ -44,38 +32,37 @@ class SandboxBase(object):
 
 class DirectorySandbox(SandboxBase):
   """ Basic sandbox implementation using a directory on the filesystem """
-  def __init__(self, task_id, sandbox_root=None):
-    SandboxBase.__init__(self, task_id, sandbox_root)
+  def __init__(self, root):
+    self._root = root
 
+  @property
   def root(self):
-    return self._sandbox_root
+    return self._root
 
   def exists(self):
-    return os.path.exists(self.root())
+    return os.path.exists(self.root)
 
   def create(self, mesos_task):
     import grp, pwd
     if mesos_task.has_layout():
       log.warning('DirectorySandbox got task with layout! %s' % mesos_task.layout())
-    log.debug('DirectorySandbox: mkdir %s' % self.root())
-    safe_mkdir(self.root())
+    log.debug('DirectorySandbox: mkdir %s' % self.root)
+    safe_mkdir(self.root)
     user = mesos_task.role().get()
     pwent = pwd.getpwnam(user)
     grent = grp.getgrgid(pwent.pw_gid)
-    log.debug('DirectorySandbox: chown %s:%s %s' % (user, grent.gr_name, self.root()))
-    os.chown(self.root(), pwent.pw_uid, pwent.pw_gid)
-    log.debug('DirectorySandbox: chmod 700 %s' % self.root())
-    os.chmod(self.root(), 0700)
+    log.debug('DirectorySandbox: chown %s:%s %s' % (user, grent.gr_name, self.root))
+    os.chown(self.root, pwent.pw_uid, pwent.pw_gid)
+    log.debug('DirectorySandbox: chmod 700 %s' % self.root)
+    os.chmod(self.root, 0700)
 
   def destroy(self):
-    safe_rmtree(self.root())
+    safe_rmtree(self.root)
 
 
 class AppAppSandbox(SandboxBase):
   """ Sandbox implementation using an app-app layout as a sandbox """
-  def __init__(self, task_id, sandbox_root=None):
-    SandboxBase.__init__(self, task_id)
-
+  def __init__(self, task_id):
     self._task_id = task_id
     self._app = AppFactory.get()
     self._layout = None
@@ -103,6 +90,7 @@ class AppAppSandbox(SandboxBase):
 
     return kw
 
+  @property
   def root(self):
     if self._layout is None:
       raise Exception("There is no layout associated with this sandbox!")
@@ -130,29 +118,3 @@ class AppAppSandbox(SandboxBase):
         errors.append('Could not destroy %s' % layout)
     if errors:
       raise SandboxBase.DeletionError('Failed:\n%s' % '\n'.join(errors))
-
-
-class SandboxManager(object):
-  class UnknownError(Exception):
-    pass
-
-  MANAGERS = {
-    'DirectorySandbox': DirectorySandbox,
-    'AppAppSandbox': AppAppSandbox
-  }
-
-  @staticmethod
-  def get(*args, **kw):
-    manager = app.get_options().sandbox_manager
-    if manager in SandboxManager.MANAGERS:
-      return SandboxManager.MANAGERS[manager](*args, **kw)
-    raise SandboxManager.UnknownError('Unknown sandbox manager: %s' %
-      app.get_options().sandbox_manager)
-
-
-app.add_option('--sandbox_manager', dest='sandbox_manager',
-               type="choice", choices=SandboxManager.MANAGERS.keys(),
-               default='DirectorySandbox',
-               help="The sandbox creation mechanism to use for the Thermos executor.  Can be one "
-                    "of DirectorySandbox (for standard directory-based apps) or AppAppSandbox for "
-                    "AppApp layouts. [default: %default]")

@@ -55,14 +55,15 @@ class TestThermosExecutorTimer(ThermosExecutorTimer):
 class TestTaskRunner(TaskRunnerWrapper):
   def __init__(self, task_id, mesos_task, role, mesos_ports, **kwargs):
     runner_pex = os.path.join('dist', 'thermos_runner.pex')
-    sandbox = DirectorySandbox(task_id, sandbox_root=tempfile.mkdtemp())
+    sandbox = DirectorySandbox(tempfile.mkdtemp())
     super(TestTaskRunner, self).__init__(
         task_id,
         mesos_task,
         role,
         mesos_ports,
         runner_pex,
-        sandbox, **kwargs)
+        sandbox,
+        **kwargs)
 
   def cleanup(self):
     self._sandbox.destroy()

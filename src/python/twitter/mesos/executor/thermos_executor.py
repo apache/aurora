@@ -171,7 +171,7 @@ class ThermosExecutor(ThermosExecutorBase):
     resource_manager = ResourceManager(
         mesos_task.task().resources(),
         TaskMonitor(task_path, self._task_id),
-        self._runner.sandbox.root()
+        self._runner.sandbox.root
     )
     health_checkers.append(resource_manager)
 

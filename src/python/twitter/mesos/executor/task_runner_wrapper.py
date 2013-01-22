@@ -19,10 +19,7 @@ from twitter.thermos.config.loader import ThermosTaskWrapper
 
 from gen.twitter.thermos.ttypes import TaskState
 
-from .sandbox_manager import (
-  AppAppSandbox,
-  DirectorySandbox,
-  SandboxBase)
+from .sandbox_manager import AppAppSandbox, DirectorySandbox, SandboxBase
 
 
 app.add_option("--checkpoint_root", dest="checkpoint_root", metavar="PATH",
@@ -107,7 +104,7 @@ class TaskRunnerWrapper(object):
     params = dict(log_dir=LogOptions.log_dir(),
                   log_to_disk="DEBUG",
                   checkpoint_root=self._checkpoint_root,
-                  sandbox=self._sandbox.root(),
+                  sandbox=self._sandbox.root,
                   task_id=self._task_id,
                   thermos_json=self._task_filename)
 
@@ -226,8 +223,7 @@ class ProductionTaskRunner(TaskRunnerWrapper):
       sandbox = AppAppSandbox(task_id)
       enable_chroot = True
     else:
-      sandbox_root = os.path.join(artifact_dir, 'sandbox')
-      sandbox = DirectorySandbox(task_id, sandbox_root=sandbox_root)
+      sandbox = DirectorySandbox(os.path.join(artifact_dir, 'sandbox'))
       enable_chroot = False
     super(ProductionTaskRunner, self).__init__(
         task_id,
@@ -248,7 +244,7 @@ class AngrybirdTaskRunner(TaskRunnerWrapper):
     sandbox_root = os.path.join(angrybird_logdir, 'thermos', 'lib')
     checkpoint_root = os.path.join(angrybird_logdir, 'thermos', 'run')
     runner_pex = os.path.join(angrybird_home, 'science', 'dist', self.PEX_NAME)
-    sandbox = DirectorySandbox(task_id, sandbox_root)
+    sandbox = DirectorySandbox(os.path.join(sandbox_root, task_id))
     super(AngrybirdTaskRunner, self).__init__(
         task_id,
         mesos_task,
