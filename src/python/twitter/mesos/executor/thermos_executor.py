@@ -101,13 +101,13 @@ class ThermosExecutor(ThermosExecutorBase):
       json_blob = json.loads(thermos_task)
     except Exception as e:
       raise ValueError('Could not deserialize thermosConfig JSON! %s' % e)
-    return (MesosTaskInstance(json_blob), assigned_task.assignedPorts)
+    return (MesosTaskInstance(json_blob), assigned_task.assignedPorts, assigned_task.task.shardId)
 
   @property
   def runner(self):
     return self._runner
 
-  def _start_runner(self, driver, mesos_task, portmap):
+  def _start_runner(self, driver, mesos_task, portmap, shard_id):
     """
       Commence running a task.
         - Start the RunnerWrapper to fork TaskRunner (to control actual processes)
@@ -180,7 +180,7 @@ class ThermosExecutor(ThermosExecutorBase):
         recordio=True).start()
 
     if mesos_task.has_announce() and portmap:
-      health_checkers.append(DiscoveryManager(mesos_task, portmap))
+      health_checkers.append(DiscoveryManager(mesos_task, portmap, shard_id))
 
     self._manager = self._manager_class(
         self._runner,
@@ -213,7 +213,7 @@ class ThermosExecutor(ThermosExecutorBase):
 
     try:
       assigned_task = ThermosExecutor.deserialize_assigned_task(task)
-      mesos_task, portmap = ThermosExecutor.deserialize_thermos_task(assigned_task)
+      mesos_task, portmap, shard_id = ThermosExecutor.deserialize_thermos_task(assigned_task)
     except Exception as e:
       log.fatal('Could not deserialize AssignedTask: %s' % e)
       self.send_update(driver, self._task_id, 'FAILED', "Could not deserialize task: %s" % e)
@@ -231,7 +231,7 @@ class ThermosExecutor(ThermosExecutorBase):
       defer(driver.stop, delay=self.STOP_WAIT)
       return
 
-    defer(lambda: self._start_runner(driver, mesos_task, portmap))
+    defer(lambda: self._start_runner(driver, mesos_task, portmap, shard_id))
 
   def killTask(self, driver, task_id):
     """

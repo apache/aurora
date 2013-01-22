@@ -22,7 +22,7 @@ class DiscoveryManager(HealthInterface):
     return Endpoint(hostname, portmap[primary_port]), dict(
         ((port, Endpoint(hostname, portmap[port])) for port in portmap))
 
-  def __init__(self, task, portmap, ensemble=None):
+  def __init__(self, task, portmap, shard, ensemble=None):
     assert task.has_announce()
     announce_config = task.announce()
     self._strict = bool(announce_config.strict().get())
@@ -42,6 +42,7 @@ class DiscoveryManager(HealthInterface):
           additional=additional,
           strict=True,
           failure_callback=self.on_failure,
+          shard=shard,
           ensemble=ensemble)
 
 
