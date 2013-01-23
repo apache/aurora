@@ -1,5 +1,6 @@
 import json
 import os
+import socket
 import sys
 import threading
 import time
@@ -180,7 +181,8 @@ class ThermosExecutor(ThermosExecutorBase):
         recordio=True).start()
 
     if mesos_task.has_announce() and portmap:
-      health_checkers.append(DiscoveryManager(mesos_task, portmap, shard_id))
+      health_checkers.append(
+          DiscoveryManager(mesos_task, socket.gethostbyname(), portmap, shard_id))
 
     self._manager = self._manager_class(
         self._runner,

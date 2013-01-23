@@ -11,25 +11,32 @@ from .health_interface import HealthInterface
 
 class DiscoveryManager(HealthInterface):
   @staticmethod
-  def join_keywords(portmap, primary_port):
+  def join_keywords(hostname, portmap, primary_port, stats_port):
     """
       Generate primary, additional endpoints from a portmap and primary_port.
       primary_port must be a name in the portmap dictionary.
     """
     if primary_port not in portmap:
       raise ValueError('Cannot create Endpoint if primary port is not in portmap!')
-    hostname = socket.gethostname()
-    return Endpoint(hostname, portmap[primary_port]), dict(
-        ((port, Endpoint(hostname, portmap[port])) for port in portmap))
+    if stats_port not in portmap:
+      raise ValueError('Cannot create Endpoint if stats port is not in portmap!')
+    additional_endpoints = dict(
+        (port, Endpoint(hostname, portmap[port])) for port in portmap)
+    additional_endpoints.update(aurora=Endpoint(hostname, portmap[stats_port]))
+    return Endpoint(hostname, portmap[primary_port]), additional_endpoints
 
-  def __init__(self, task, portmap, shard, ensemble=None):
+  def __init__(self, task, hostname, portmap, shard, ensemble=None):
     assert task.has_announce()
     announce_config = task.announce()
     self._strict = bool(announce_config.strict().get())
     self._unhealthy = threading.Event()
 
     try:
-      primary, additional = self.join_keywords(portmap, announce_config.primary_port().get())
+      primary, additional = self.join_keywords(
+          hostname,
+          portmap,
+          announce_config.primary_port().get(),
+          announce_config.stats_port().get())
     except ValueError:
       self._service = None
       self._unhealthy.set()
@@ -44,7 +51,6 @@ class DiscoveryManager(HealthInterface):
           failure_callback=self.on_failure,
           shard=shard,
           ensemble=ensemble)
-
 
   def on_failure(self):
     if self._strict:

@@ -168,15 +168,20 @@ If you would like to utilize this port, you must bind {{thermos.ports[%(primary_
 a Process bound in your Task.
 """
 
-
 def _validate_announce_configuration(config):
   if not config.raw().has_announce():
     return
   primary_port = config.raw().announce().primary_port().get()
+  stats_port = config.raw().announce().stats_port().get()
   if primary_port not in config.ports():
     print(ANNOUNCE_ERROR % {'primary_port': primary_port}, file=sys.stderr)
     raise config.InvalidConfig("Announcer specified primary port as "
         '%s but no processes have bound that port!' % primary_port)
+  if stats_port not in config.ports():
+    raise config.InvalidConfig('Declared stats port "%s" is not bound to a process!' % stats_port)
+  if 'aurora' in config.ports() and stats_port != 'aurora':
+    raise config.InvalidConfig('Specified named port "aurora" conflicts with stats port "%s"' %
+        stats_port)
 
 
 def _inject_packer_bindings(config, force_local=False):

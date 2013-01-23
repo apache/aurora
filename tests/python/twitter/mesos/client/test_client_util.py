@@ -204,23 +204,36 @@ HELLO_WORLD = Job(
 jobs = [HELLO_WORLD]
 """
 
-MESOS_CONFIG_WITH_ANNOUNCE = MESOS_CONFIG_BASE % 'announce = Announcer(primary_port="http"),'
+MESOS_CONFIG_WITH_ANNOUNCE_1 = MESOS_CONFIG_BASE % 'announce = Announcer(primary_port="http"),'
+MESOS_CONFIG_WITH_ANNOUNCE_2 = MESOS_CONFIG_BASE % (
+    'announce = Announcer(primary_port="http", stats_port="http"),')
 MESOS_CONFIG_WITH_INVALID_ANNOUNCE = MESOS_CONFIG_BASE % (
     'announce = Announcer(primary_port="blah"),')
+MESOS_CONFIG_WITH_INVALID_STATS = MESOS_CONFIG_BASE % (
+    'announce = Announcer(primary_port="http", stats_port="blah"),')
 MESOS_CONFIG_WITHOUT_ANNOUNCE = MESOS_CONFIG_BASE % ''
-
+MESOS_CONFIG_WITH_DUPE_AURORA = """
+HELLO_WORLD = Job(name = 'hello_world', role = 'john_doe', cluster = 'smf1-test',
+  announce = Announcer(primary_port="blah", stats_port="blah"),
+  task = Task(name = 'main',
+    processes = [Process(name = 'hello_world',
+                 cmdline = 'echo {{thermos.ports[blah]}} {{thermos.ports[aurora]}}')],
+    resources = Resources(cpu = 0.1, ram = 64 * MB, disk = 64 * MB)))
+jobs = [HELLO_WORLD]
+"""
 
 def test_get_config_fails_invalid_announce():
-  with temporary_file() as fp:
-    fp.write(MESOS_CONFIG_WITHOUT_ANNOUNCE)
-    fp.flush()
-    client_util.get_config('hello_world', fp.name)
-  with temporary_file() as fp:
-    fp.write(MESOS_CONFIG_WITH_ANNOUNCE)
-    fp.flush()
-    client_util.get_config('hello_world', fp.name)
-  with temporary_file() as fp:
-    fp.write(MESOS_CONFIG_WITH_INVALID_ANNOUNCE)
-    fp.flush()
-    with pytest.raises(ProxyConfig.InvalidConfig):
+  for good_config in (MESOS_CONFIG_WITH_ANNOUNCE_1, MESOS_CONFIG_WITH_ANNOUNCE_2,
+                      MESOS_CONFIG_WITHOUT_ANNOUNCE):
+    with temporary_file() as fp:
+      fp.write(good_config)
+      fp.flush()
       client_util.get_config('hello_world', fp.name)
+
+  for bad_config in (MESOS_CONFIG_WITH_INVALID_ANNOUNCE, MESOS_CONFIG_WITH_INVALID_STATS,
+                     MESOS_CONFIG_WITH_DUPE_AURORA):
+    with temporary_file() as fp:
+      fp.write(bad_config)
+      fp.flush()
+      with pytest.raises(ProxyConfig.InvalidConfig):
+        client_util.get_config('hello_world', fp.name)

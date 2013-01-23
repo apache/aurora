@@ -85,6 +85,7 @@ class Announcer(Struct):
   environment  = Default(String, 'prod')
   strict       = Default(Integer, False)
   primary_port = Default(String, 'http')
+  stats_port   = Default(String, 'http')
 
 
 # The thermosConfig populated inside of TwitterTaskInfo.

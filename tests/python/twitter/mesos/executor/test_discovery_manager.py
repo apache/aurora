@@ -1,6 +1,5 @@
 import getpass
 import pytest
-import socket
 import threading
 
 from twitter.common import log
@@ -52,21 +51,61 @@ class TestDiscoveryManager(object):
   def test_assertions(self):
     # Must be constructed with an announce object
     with pytest.raises(AssertionError):
-      DiscoveryManager(hello_world(), {}, 0)
+      DiscoveryManager(hello_world(), 'asdf', {}, 0)
 
-    dm = DiscoveryManager(hello_world(announce=True), {}, 0)
+    dm = DiscoveryManager(hello_world(announce=True), 'asdf', {}, 0)
     assert not dm.healthy
 
-    dm = DiscoveryManager(hello_world(announce=True), {'poop': 1234}, 0)
+    dm = DiscoveryManager(hello_world(announce=True), 'asdf', {'poop': 1234}, 0)
     assert not dm.healthy
+
+  def test_join_keywords(self):
+    me = 'my.host.name'
+
+    BAD_JOINS = (
+      (me, {}, 'http', 'http'),
+      (me, {}, 'http', 'blah'),
+      (me, {'http':80}, 'http', 'blah'),
+      (me, {'blah':80}, 'http', 'blah'),
+    )
+
+    join1 = (me, {'http': 80, 'blah': 8080}, 'http', 'http')
+    join1_primary, join1_additional = DiscoveryManager.join_keywords(*join1)
+    assert join1_primary == Endpoint(me, 80)
+    assert join1_additional == {
+      'http': Endpoint(me, 80),
+      'blah': Endpoint(me, 8080),
+      'aurora': Endpoint(me, 80)
+    }
+
+    join2 = (me, {'http': 80, 'blah': 8080}, 'http', 'blah')
+    join2_primary, join2_additional = DiscoveryManager.join_keywords(*join2)
+    assert join2_primary == Endpoint(me, 80)
+    assert join2_additional == {
+      'http': Endpoint(me, 80),
+      'blah': Endpoint(me, 8080),
+      'aurora': Endpoint(me, 8080)
+    }
+
+    join3 = (me, {'http':80}, 'http', 'http')
+    join3_primary, join3_additional = DiscoveryManager.join_keywords(*join3)
+    assert join3_primary == Endpoint(me, 80)
+    assert join3_additional == {
+      'http': Endpoint(me, 80),
+      'aurora': Endpoint(me, 80)
+    }
+
+    for join in BAD_JOINS:
+      with pytest.raises(ValueError):
+        DiscoveryManager.join_keywords(*join)
 
   @classmethod
   def make_ss(cls, task, **kw):
     return ServerSet(cls.ZK, TwitterService.zkpath(
         task.role(), task.announce().environment(), task.task().name()), **kw)
 
-  def _make_manager(self, task, portmap, shard):
-    dm = DiscoveryManager(task, portmap, shard, ensemble=self.ZKSERVER.ensemble)
+  def _make_manager(self, task, host, portmap, shard):
+    dm = DiscoveryManager(task, host, portmap, shard, ensemble=self.ZKSERVER.ensemble)
     join_event = threading.Event()
     exit_event = threading.Event()
     def on_join(_):
@@ -77,9 +116,10 @@ class TestDiscoveryManager(object):
     return (dm, join_event, exit_event, ss)
 
   def test_basic_registration(self):
+    me = 'foo.bar.baz'
     portmap = {'http': TunnelHelper.get_random_port()}
     task = hello_world(announce=True, primary_port='http')
-    dm, join_event, exit_event, ss = self._make_manager(task, portmap, 23)
+    dm, join_event, exit_event, ss = self._make_manager(task, me, portmap, 23)
 
     try:
       join_event.wait(timeout=1.0)
@@ -89,7 +129,11 @@ class TestDiscoveryManager(object):
       assert len(instances) == 1
 
       instance = instances[0]
-      assert instance.service_endpoint == Endpoint(socket.gethostname(), portmap['http'])
+      assert instance.service_endpoint == Endpoint(me, portmap['http'])
+      assert instance.additional_endpoints == {
+        'http': Endpoint(me, portmap['http']),
+        'aurora': Endpoint(me, portmap['http']),
+      }
       assert instance.shard == 23
 
       assert dm.healthy
@@ -99,8 +143,8 @@ class TestDiscoveryManager(object):
     exit_event.wait(timeout=1.0)
     assert exit_event.is_set()
 
-  def _make_manager_and_cancel(self, task, portmap, shard, assertion_callback):
-    dm, join_event, exit_event, ss = self._make_manager(task, portmap, shard)
+  def _make_manager_and_cancel(self, task, host, portmap, shard, assertion_callback):
+    dm, join_event, exit_event, ss = self._make_manager(task, host, portmap, shard)
 
     try:
       join_event.wait(timeout=1.0)
@@ -122,6 +166,7 @@ class TestDiscoveryManager(object):
       disco_manager._unhealthy.wait(timeout=1.0)
       assert not disco_manager.healthy
     self._make_manager_and_cancel(hello_world(announce=True, primary_port='http', strict=True),
+                                  'asdf',
                                   {'http': TunnelHelper.get_random_port()},
                                   43,
                                   assertion_callback)
@@ -134,6 +179,7 @@ class TestDiscoveryManager(object):
       assert join_event.is_set()
       assert disco_manager.healthy
     self._make_manager_and_cancel(hello_world(announce=True, primary_port='http', strict=False),
+                                  'asdf',
                                   {'http': TunnelHelper.get_random_port()},
                                   17,
                                   assertion_callback)
