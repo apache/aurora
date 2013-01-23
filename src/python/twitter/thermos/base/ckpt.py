@@ -1,3 +1,5 @@
+import os
+
 from twitter.common import log
 from twitter.common.recordio import ThriftRecordReader
 from gen.twitter.thermos.ttypes import (

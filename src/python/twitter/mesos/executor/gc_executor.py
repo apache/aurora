@@ -103,8 +103,8 @@ class ThermosGCExecutor(ThermosExecutorBase):
     pathspec = TaskPath(root=self._checkpoint_root, task_id=task_id)
     runner_ckpt = pathspec.getpath('runner_checkpoint')
     for update in CheckpointDispatcher.iter_updates(runner_ckpt):
-      if update.header:
-        return update.header.sandbox
+      if update.runner_header and update.runner_header.sandbox:
+        return update.runner_header.sandbox
 
   def maybe_terminate_unknown_task(self, task_id):
     """Terminate a task if we believe the scheduler doesn't know about it.

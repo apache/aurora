@@ -255,29 +255,35 @@ def test_state_reconciliation_nexist_terminal():
 
 
 def test_real_get_states():
-  # TODO(wickman) Test actual state reconstruction code.
-  pass
+  with temporary_dir() as td:
+    setup_tree(td)
+    executor = ThinTestThermosGCExecutor(td)
+    for task in FINISHED_TASKS:
+      states = executor.get_states(task)
+      assert isinstance(states, list) and len(states) > 0
+      assert executor.get_sandbox(task) is not None
 
 
 def run_gc_with(active_executors, retained_tasks, lose=False):
   proxy_driver = ProxyDriver()
   with temporary_dir() as td:
     setup_tree(td, lose=lose)
-    tgce = ThinTestThermosGCExecutor(td, active_executors=active_executors)
+    executor = ThinTestThermosGCExecutor(td, active_executors=active_executors)
     art = AdjustRetainedTasks(retainedTasks=retained_tasks)
-    tgce.launchTask(proxy_driver, serialize_art(art, 'gc_executor_task_id'))
+    executor.launchTask(proxy_driver, serialize_art(art, 'gc_executor_task_id'))
     proxy_driver.stopped.wait(timeout=1.0)
     assert proxy_driver.stopped.is_set()
   assert len(proxy_driver.updates) >= 1
   assert proxy_driver.updates[-1][0] == mesos.TASK_FINISHED
   assert proxy_driver.updates[-1][1] == 'gc_executor_task_id'
-  return tgce, proxy_driver
+  return executor, proxy_driver
 
 
 def test_gc_with_loss():
-  tgce, proxy_driver = run_gc_with(active_executors=set(ACTIVE_TASKS), retained_tasks={}, lose=True)
-  assert len(tgce._kills) == len(ACTIVE_TASKS)
-  assert len(tgce.gcs) == len(FINISHED_TASKS)
+  executor, proxy_driver = run_gc_with(active_executors=set(ACTIVE_TASKS), retained_tasks={},
+      lose=True)
+  assert len(executor._kills) == len(ACTIVE_TASKS)
+  assert len(executor.gcs) == len(FINISHED_TASKS)
   assert len(proxy_driver.messages) == 0
   assert len(proxy_driver.updates) == 2
   assert proxy_driver.updates[0][0] == mesos.TASK_LOST
@@ -285,45 +291,46 @@ def test_gc_with_loss():
 
 
 def test_gc_with_starting_task():
-  tgce, proxy_driver = run_gc_with(
+  executor, proxy_driver = run_gc_with(
     active_executors=set(ACTIVE_TASKS), retained_tasks={ACTIVE_TASKS[0]: ScheduleStatus.STARTING})
-  assert len(tgce._kills) == 0
-  assert len(tgce.gcs) == len(FINISHED_TASKS)
+  assert len(executor._kills) == 0
+  assert len(executor.gcs) == len(FINISHED_TASKS)
   assert len(proxy_driver.messages) == 0
 
 
 def test_gc_without_task_missing():
-  tgce, proxy_driver = run_gc_with(active_executors=set(ACTIVE_TASKS), retained_tasks={}, lose=False)
-  assert len(tgce._kills) == len(ACTIVE_TASKS)
-  assert len(tgce.gcs) == len(FINISHED_TASKS)
+  executor, proxy_driver = run_gc_with(active_executors=set(ACTIVE_TASKS), retained_tasks={},
+      lose=False)
+  assert len(executor._kills) == len(ACTIVE_TASKS)
+  assert len(executor.gcs) == len(FINISHED_TASKS)
   assert len(proxy_driver.messages) == 0
 
 
 def test_gc_without_loss():
-  tgce, proxy_driver = run_gc_with(active_executors=set(ACTIVE_TASKS),
+  executor, proxy_driver = run_gc_with(active_executors=set(ACTIVE_TASKS),
       retained_tasks={ACTIVE_TASKS[0]: ScheduleStatus.RUNNING})
-  assert len(tgce._kills) == 0
-  assert len(tgce.gcs) == len(FINISHED_TASKS)
+  assert len(executor._kills) == 0
+  assert len(executor.gcs) == len(FINISHED_TASKS)
   assert len(proxy_driver.messages) == 0
 
 
 def test_gc_withheld():
-  tgce, proxy_driver = run_gc_with(active_executors=set([ACTIVE_TASKS[0], 'failure']),
+  executor, proxy_driver = run_gc_with(active_executors=set([ACTIVE_TASKS[0], 'failure']),
       retained_tasks={ACTIVE_TASKS[0]: ScheduleStatus.RUNNING,
                       'failure': ScheduleStatus.FAILED})
-  assert len(tgce._kills) == 0
-  assert len(tgce.gcs) == len(FINISHED_TASKS) - 1
+  assert len(executor._kills) == 0
+  assert len(executor.gcs) == len(FINISHED_TASKS) - 1
   assert len(proxy_driver.messages) == 0
 
 """
 TODO(wickman)  Uncomment when external MESOS-317 is fixed.
 
 def test_gc_withheld_and_executor_missing():
-  tgce, proxy_driver = run_gc_with(active_executors=set(ACTIVE_TASKS),
+  executor, proxy_driver = run_gc_with(active_executors=set(ACTIVE_TASKS),
       retained_tasks={ACTIVE_TASKS[0]: ScheduleStatus.RUNNING,
                       'failure': ScheduleStatus.FAILED})
-  assert len(tgce._kills) == 0
-  assert len(tgce.gcs) == len(FINISHED_TASKS)
+  assert len(executor._kills) == 0
+  assert len(executor.gcs) == len(FINISHED_TASKS)
   assert len(proxy_driver.messages) == 1
   assert proxy_driver.messages[0].deletedTasks.taskIds == set(['failure'])
 """
