@@ -182,7 +182,7 @@ class ThermosExecutor(ThermosExecutorBase):
 
     if mesos_task.has_announce() and portmap:
       health_checkers.append(
-          DiscoveryManager(mesos_task, socket.gethostbyname(), portmap, shard_id))
+          DiscoveryManager(mesos_task, socket.gethostname(), portmap, shard_id))
 
     self._manager = self._manager_class(
         self._runner,
