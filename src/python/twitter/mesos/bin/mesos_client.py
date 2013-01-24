@@ -21,8 +21,8 @@ from twitter.common.log.options import LogOptions
 from twitter.common.quantity import Amount, Data
 from twitter.common.quantity.parse_simple import parse_data_into
 from twitter.mesos.client import client_util
-from twitter.mesos.client.client_wrapper import MesosClientAPI
-from twitter.mesos.client.client_util import requires
+from twitter.mesos.client.client_wrapper import MesosClientAPI, create_client
+from twitter.mesos.client.client_util import requires, query_scheduler
 from twitter.mesos.client.quickrun import Quickrun
 from twitter.mesos.client.spawn_local import spawn_local
 from twitter.mesos.clusters import Cluster
@@ -144,16 +144,6 @@ def make_spawn_options(options):
       'open_browser',
       'shard',
       'bindings'))
-
-
-def is_verbose():
-  return app.get_options().verbosity == 'verbose'
-
-
-def create_client(cluster=None):
-  if cluster is None:
-    cluster = app.get_options().cluster
-  return MesosClientAPI(cluster=cluster, verbose=is_verbose())
 
 
 @app.command
@@ -304,7 +294,7 @@ def diff(job, config_file):
   options = app.get_options()
   config = maybe_retranslate(job, config_file, options.json, False, options.bindings)
   api = create_client(config.cluster())
-  resp = query(config.role(), job, api=api, statuses=ACTIVE_STATES)
+  resp = query_scheduler(api, config.role(), job, statuses=ACTIVE_STATES)
   if not resp.responseCode:
     client_util.die('Request failed, server responded with "%s"' % resp.message)
   remote_tasks = [t.assignedTask.task for t in resp.tasks]
@@ -552,16 +542,6 @@ def get_quota(role):
            (role, '\n\t'.join(['%s\t%s' % (k, v) for (k, v) in quota_fields])))
 
 
-def query(role, job, shards=None, statuses=LIVE_STATES, api=None):
-  query = TaskQuery()
-  query.statuses = statuses
-  query.owner = Identity(role=role)
-  query.jobName = job
-  query.shardIds = shards
-  api = api or create_client()
-  return api.query(query)
-
-
 @app.command
 @app.command_option(CLUSTER_OPTION)
 @app.command_option(EXECUTOR_SANDBOX_OPTION)
@@ -576,7 +556,7 @@ def ssh(role, job, shard, *args):
 
   Initiate an SSH session on the machine that a shard is running on.
   """
-  resp = query(role, job, set([int(shard)]))
+  resp = query_scheduler(create_client(), role, job, set([int(shard)]))
   options = app.get_options()
 
   if not resp.responseCode:

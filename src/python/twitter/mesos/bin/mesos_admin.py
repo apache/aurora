@@ -8,11 +8,12 @@ import sys
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 from twitter.mesos.client import client_util
-from twitter.mesos.client.client_wrapper import MesosClientAPI
-from twitter.mesos.client.client_util import requires
+from twitter.mesos.client.client_wrapper import create_client
+from twitter.mesos.client.client_util import requires, query_scheduler
 
-from gen.twitter.mesos.constants import ACTIVE_STATES
+from gen.twitter.mesos.constants import ACTIVE_STATES, TERMINAL_STATES
 from gen.twitter.mesos.ttypes import (
+    ResponseCode,
     ScheduleStatus,
     TaskQuery)
 
@@ -31,14 +32,92 @@ CLUSTER_OPTION = optparse.Option(
     help='Cluster to invoke the command against.')
 
 
-def is_verbose():
-  return app.get_options().verbosity == 'verbose'
+@app.command
+@app.command_option(CLUSTER_OPTION)
+@app.command_option('--force', dest='force', default=False, action='store_true',
+    help='Force expensive queries to run.')
+@app.command_option('--shards', dest='shards', default=None,
+    help='Only match given shards of a job.')
+@app.command_option('--states', dest='states', default='RUNNING',
+    help='Only match tasks with given state(s).')
+@app.command_option('-l', '--listformat', dest='listformat',
+    default="%role%/%jobName%/%shardId% %status%",
+    help='Format string of job/task items to print out.')
+def query(args, options):
+  """usage: query --cluster=CLUSTER [--shards=N[,N,...]]
+                                    [--states=State[,State,...]]
+                                    [role [job]]
 
+  Query Mesos about jobs and tasks.
+  """
+  def _convert_fmt_string(fmtstr):
+    import re
+    def convert(match):
+      return "%%(%s)s" % match.group(1)
+    return re.sub(r'%(\w+)%', convert, fmtstr)
 
-def create_client(cluster=None):
-  if cluster is None:
-    cluster = app.get_options().cluster
-  return MesosClientAPI(cluster=cluster, verbose=is_verbose())
+  def flatten_task(t, d={}):
+    for key in t.__dict__.keys():
+      val = getattr(t, key)
+      try:
+        val.__dict__.keys()
+      except AttributeError:
+        d[key] = val
+      else:
+        flatten_task(val, d)
+
+    return d
+
+  def map_values(d):
+    default_value = lambda v: v
+    mapping = {
+      'status': lambda v: ScheduleStatus._VALUES_TO_NAMES[v],
+    }
+    return dict(
+      (k, mapping.get(k, default_value)(v)) for (k, v) in d.items()
+    )
+
+  for state in options.states.split(','):
+    if state not in ScheduleStatus._NAMES_TO_VALUES:
+      msg = "Unknown state '%s' specified.  Valid states are:\n" % state
+      msg += ','.join(ScheduleStatus._NAMES_TO_VALUES.keys())
+      client_util.die(msg)
+
+  # Role, Job, Shards, States, and the listformat
+  role = args[0] if len(args) > 0 else None
+  job = args[1] if len(args) > 1 else None
+  shards = set(map(int, options.shards.split(','))) if options.shards else set()
+  states = set(map(ScheduleStatus._NAMES_TO_VALUES.get, options.states.split(','))) if options.states else ACTIVE_STATES | TERMINAL_STATES
+  listformat = _convert_fmt_string(options.listformat)
+
+  #  Figure out "expensive" queries here and bone if they do not have --force
+  #  - Does not specify role
+  if role is None and not options.force:
+    client_util.die('--force is required for expensive queries (no role specified)')
+
+  #  - Does not specify job
+  if job is None and not options.force:
+    client_util.die('--force is required for expensive queries (no job specified)')
+
+  #  - Specifies status outside of ACTIVE_STATES
+  if not (states <= ACTIVE_STATES) and not options.force:
+    client_util.die('--force is required for expensive queries (states outside ACTIVE states')
+
+  api = create_client(options.cluster)
+  query_info = query_scheduler(api, role, job, shards=shards, statuses=states)
+  if query_info.responseCode != ResponseCode.OK:
+    client_util.die('Failed to query scheduler: %s' % query_info.message)
+  if query_info.tasks is None:
+    return
+
+  try:
+    for task in query_info.tasks:
+      d = flatten_task(task)
+      print listformat % map_values(d)
+  except KeyError:
+    msg = "Unknown key in format string.  Valid keys are:\n"
+    msg += ','.join(d.keys())
+    client_util.die(msg)
 
 
 @app.command

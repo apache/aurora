@@ -2,7 +2,7 @@ import functools
 import getpass
 import time
 
-from twitter.common import log
+from twitter.common import app, log
 from twitter.common.lang import Compatibility
 from twitter.common.quantity import Amount, Time
 from twitter.mesos.clusters import Cluster
@@ -300,3 +300,12 @@ invoking cancel_update.
 
   def unload_recovery(self):
     return self._scheduler.unloadRecovery()
+
+
+def is_verbose():
+  return app.get_options().verbosity == 'verbose'
+
+def create_client(cluster=None):
+  if cluster is None:
+    cluster = app.get_options().cluster
+  return MesosClientAPI(cluster=cluster, verbose=is_verbose())

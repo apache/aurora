@@ -22,7 +22,12 @@ from twitter.mesos.parsers import (
     PystachioCodec,
     PystachioConfig)
 
-from gen.twitter.mesos.ttypes import ResponseCode
+from twitter.mesos.client.client_wrapper import MesosClientAPI
+from gen.twitter.mesos.constants import LIVE_STATES
+from gen.twitter.mesos.ttypes import (
+    Identity,
+    ResponseCode,
+    TaskQuery)
 
 
 _PACKAGE_FILES_SUFFIX = MesosConfig.PACKAGE_FILES_SUFFIX
@@ -310,3 +315,13 @@ class requires(object):
     def real_fn(line):
       return fn(*line)
     return real_fn
+
+
+def query_scheduler(api, role, job, shards=None, statuses=LIVE_STATES):
+  """Query Aurora Scheduler for Job information."""
+  query = TaskQuery()
+  query.statuses = statuses
+  query.owner = Identity(role=role)
+  query.jobName = job
+  query.shardIds = shards
+  return api.query(query)
