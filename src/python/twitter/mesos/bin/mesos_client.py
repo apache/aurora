@@ -491,8 +491,16 @@ def update(jobname, config_file):
   options = app.get_options()
   config = maybe_retranslate(jobname, config_file, options.json,
       force_local=False, bindings=options.bindings)
+
+  job_size = len(config.job().taskConfigs)
+  if config.update_config()['maxTotalFailures'] >= job_size:
+    client_util.die('''max_total_failures in update_config must be lesser than the job size.
+Based on your job size (%s) you should use max_total_failures <= %s.
+
+See http://confluence.local.twitter.com/display/Aurora/Aurora+Configuration+Reference for details.
+''' % (job_size, job_size-1))
+
   if config.is_dedicated():
-    job_size = len(config.job().taskConfigs)
     min_failure_threshold = int(math.ceil(job_size * 0.02))
     if config.update_config()['maxTotalFailures'] < min_failure_threshold:
       client_util.die('''Since this is a dedicated job, you must set your max_total_failures in

@@ -10,7 +10,7 @@ from .mesos_thrift import convert as convert_mesos_to_thrift
 class MesosConfig(ProxyConfig):
   UPDATE_CONFIG_DEFAULTS = {
     'batchSize':           1,
-    'restartThreshold':   30,
+    'restartThreshold':   60,
     'watchSecs':          30,
     'maxPerShardFailures': 0,
     'maxTotalFailures':    0,

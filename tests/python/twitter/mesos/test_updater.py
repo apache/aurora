@@ -99,8 +99,8 @@ class UpdaterTest(unittest.TestCase):
 
   def test_tasks_stuck_in_starting(self):
     """Tasks 1, 2, 3 fail to move into RUNNING when restarted - Complete rollback performed."""
-    self._update_config['maxTotalFailures'] = 5
-    self._update_config['maxPerShardFailures'] = 2
+    self._update_config['maxTotalFailures'] = 2
+    self._update_config['maxPerShardFailures'] = 1
     self.expect_restart([0, 1, 2])
     self.expect_get_statuses({})
     self.expect_restart([0, 1, 2])
@@ -111,7 +111,7 @@ class UpdaterTest(unittest.TestCase):
 
   def test_single_failed_shard(self):
     """All tasks fail to move into running state when re-started - Complete rollback performed."""
-    self._update_config['maxTotalFailures'] = 5
+    self._update_config['maxTotalFailures'] = 0
     self._update_config['maxPerShardFailures'] = 2
     self.expect_restart([0, 1, 2])
     self.expect_get_statuses({1: RUNNING, 2: RUNNING})
@@ -145,8 +145,8 @@ class UpdaterTest(unittest.TestCase):
 
   def test_case_unknown_state(self):
     """All tasks move into an unexpected state - Complete rollback performed."""
-    self._update_config['maxTotalFailures'] = 5
-    self._update_config['maxPerShardFailures'] = 2
+    self._update_config['maxTotalFailures'] = 2
+    self._update_config['maxPerShardFailures'] = 1
     self.expect_restart([0, 1, 2])
     self.expect_get_statuses({0: RUNNING, 1: RUNNING, 2: RUNNING}, num_calls=1)
     self.expect_get_statuses({}, num_calls=1)

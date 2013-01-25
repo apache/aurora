@@ -43,8 +43,8 @@ class Updater(object):
     self._scheduler = scheduler
     self._clock = clock
     self._update_token = update_token
-    self._total_fail_count = 0
-    self._max_total_failures = 0
+    self._max_per_shard_failures = 0
+    self._max_failed_shards = 0
     self._failures_by_shard = collections.defaultdict(int)
 
   @staticmethod
@@ -59,29 +59,24 @@ class Updater(object):
 
   def update_failure_counts(self, failed_shards):
     """Update the failure counts metrics based upon a batch of failed shards."""
-    self._total_fail_count += len(failed_shards)
     for shard in failed_shards:
       self._failures_by_shard[shard] += 1
 
-  def exceeded_total_fail_count(self):
-    """Checks if the total number of failures is greater than a threshold."""
-    return self._total_fail_count > self._max_total_failures
-
   def exceeded_shard_fail_count(self):
     """Checks if the per shard failure is greater than a threshold."""
-    return any(map(lambda num_failures: num_failures > self._max_shard_failures,
-      self._failures_by_shard.values()))
+    return sum(count > self._max_per_shard_failures for count in self._failures_by_shard.values())
 
   def is_failed_update(self, failed_shards):
-    is_failed = self.exceeded_total_fail_count() or self.exceeded_shard_fail_count()
+    total_failed_shards = self.exceeded_shard_fail_count()
+    is_failed = total_failed_shards > self._max_failed_shards
 
     if is_failed:
-      log.error('%s failures observed, maximum allowed is %s' % (self._total_fail_count,
-          self._max_total_failures))
-      for shard in self._failures_by_shard:
-        if self._failures_by_shard[shard] > self._max_shard_failures:
+      log.error('%s failed shards observed, maximum allowed is %s' % (total_failed_shards,
+          self._max_failed_shards))
+      for shard, failure_count in self._failures_by_shard.items():
+        if failure_count > self._max_per_shard_failures:
           log.error('%s shard failures for shard %s, maximum allowed is %s' %
-              (self._failures_by_shard[shard], shard, self._max_shard_failures))
+              (failure_count, shard, self._max_per_shard_failures))
     return is_failed
 
   def _maybe_watch_shards(self, shard_states, batch_shards, restart_threshold, watch_seconds):
@@ -115,8 +110,8 @@ class Updater(object):
     Updater.validate_config(update_config)
 
     failed_shards = []
-    self._max_total_failures = update_config['maxTotalFailures']
-    self._max_shard_failures = update_config['maxPerShardFailures']
+    self._max_failed_shards = update_config['maxTotalFailures']
+    self._max_per_shard_failures = update_config['maxPerShardFailures']
     remaining_shards = initial_shards[:]
 
     log.info('Starting job update.')
