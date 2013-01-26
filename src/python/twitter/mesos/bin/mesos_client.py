@@ -501,7 +501,7 @@ See http://confluence.local.twitter.com/display/Aurora/Aurora+Configuration+Refe
 ''' % (job_size, job_size-1))
 
   if config.is_dedicated():
-    min_failure_threshold = int(math.ceil(job_size * 0.02))
+    min_failure_threshold = int(math.floor(job_size * 0.02))
     if config.update_config()['maxTotalFailures'] < min_failure_threshold:
       client_util.die('''Since this is a dedicated job, you must set your max_total_failures in
 your update configuration to no less than 2%% of your job size.
