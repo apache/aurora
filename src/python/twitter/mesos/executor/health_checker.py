@@ -39,4 +39,3 @@ class HealthCheckerThread(HealthInterface, ExceptionalThread):
 
   def stop(self):
     self._dead.set()
-

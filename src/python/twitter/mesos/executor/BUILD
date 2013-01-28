@@ -44,6 +44,7 @@ python_library(
 python_library(
   name = 'health_interface',
   sources = ['health_interface.py'],
+  dependencies = [python_requirement('mesos')]
 )
 
 python_library(
@@ -52,6 +53,14 @@ python_library(
   dependencies = [
     pants(':health_interface'),
     pants('src/python/twitter/common/exceptions')
+  ]
+)
+
+python_library(
+  name = 'kill_manager',
+  sources = ['kill_manager.py'],
+  dependencies = [
+    pants(':health_interface'),
   ]
 )
 
@@ -99,6 +108,7 @@ python_library(
   name = 'health_interfaces',
   dependencies = [
     pants(':health_checker'),
+    pants(':kill_manager'),
     pants(':resource_manager'),
     pants(':discovery_manager'),
   ]

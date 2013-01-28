@@ -27,9 +27,10 @@ from twitter.thermos.monitoring.monitor import TaskMonitor
 from gen.twitter.mesos.ttypes import AssignedTask
 from thrift.TSerialization import deserialize as thrift_deserialize
 
+from .discovery_manager import DiscoveryManager
 from .health_checker import HealthCheckerThread
 from .http_signaler import HttpSignaler
-from .discovery_manager import DiscoveryManager
+from .kill_manager import KillManager
 from .resource_checkpoints import ResourceCheckpointer
 from .resource_manager import ResourceManager
 from .status_manager import StatusManager
@@ -72,6 +73,7 @@ class ThermosExecutor(ThermosExecutorBase):
     self._manager = None
     self._runner_class = runner_class
     self._manager_class = manager_class
+    self._kill_manager = KillManager()
     # To catch killTasks sent while the runner initialization is occurring
     self._abort_runner = threading.Event()
     self.launched = threading.Event()
@@ -184,6 +186,8 @@ class ThermosExecutor(ThermosExecutorBase):
       health_checkers.append(
           DiscoveryManager(mesos_task, socket.gethostname(), portmap, shard_id))
 
+    health_checkers.append(self._kill_manager)
+
     self._manager = self._manager_class(
         self._runner,
         driver,
@@ -235,6 +239,20 @@ class ThermosExecutor(ThermosExecutorBase):
 
     defer(lambda: self._start_runner(driver, mesos_task, portmap, shard_id))
 
+  def _signal_kill_manager(self, driver, task_id, reason):
+    if self._runner is None:
+      log.error('Was asked to kill task but no task running!')
+      return
+    if task_id.value != self._task_id:
+      log.error('Asked to kill a task other than what we are running!')
+      return
+    if not self._runner.is_initialized():
+      log.error('Asked to kill task with incomplete sandbox - aborting runner start')
+      self._abort_runner.set()
+      return
+    self.log('Activating kill manager.')
+    self._kill_manager.kill(reason)
+
   def killTask(self, driver, task_id):
     """
      Invoked when a task running within this executor has been killed (via
@@ -243,22 +261,7 @@ class ThermosExecutor(ThermosExecutorBase):
      ExecutorDriver::sendStatusUpdate.
     """
     self.log('killTask got task_id: %s' % task_id)
-    if self._runner is None:
-      log.error('Got killTask but no task running!')
-      return
-    if task_id.value != self._task_id:
-      log.error('Got killTask for a different task than what we are running!')
-      return
-    if not self._runner.is_initialized():
-      log.error('Got killTask for task with incomplete sandbox - aborting runner start')
-      self._abort_runner.set()
-      return
-    if self.thermos_status_is_terminal(self._runner.task_state()):
-      log.error('Got killTask for task in terminal state!')
-      return
-    self.log('killTask calling TaskRunnerWrapper.kill')
-    self._runner.kill()
-    self.log('killTask returned')
+    self._signal_kill_manager(driver, task_id, "Instructed to kill task.")
 
   def shutdown(self, driver):
     """
@@ -270,5 +273,6 @@ class ThermosExecutor(ThermosExecutorBase):
     """
     self.log('shutdown called')
     if self._task_id:
-      self.killTask(driver, mesos_pb.TaskID(value=self._task_id))
+      self._signal_kill_manager(driver, mesos_pb.TaskID(value=self._task_id),
+          "Told to shut down executor.")
     self.log('shutdown returned')

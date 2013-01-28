@@ -2,8 +2,6 @@ import os
 import threading
 import time
 
-import psutil as ps
-
 from twitter.common import log
 from twitter.common.exceptions import ExceptionalThread
 from twitter.common.quantity import Amount, Time
@@ -14,6 +12,9 @@ from gen.twitter.mesos.comm.ttypes import TaskResourceSample
 from .health_interface import (
     FailureReason,
     HealthInterface)
+
+import mesos_pb2 as mesos_pb
+import psutil as ps
 
 
 class ResourceEnforcer(object):
@@ -99,12 +100,12 @@ class ResourceEnforcer(object):
     if sample.ramRssBytes > self._max_ram:
       # TODO(wickman) Add human-readable resource ranging support to twitter.common.
       return FailureReason('RAM limit exceeded.  Reserved %s bytes vs resident %s bytes' % (
-          self._max_ram, sample.ramRssBytes))
+          self._max_ram, sample.ramRssBytes), status=mesos_pb.TASK_KILLED)
 
   def _enforce_disk(self, sample):
     if sample.diskBytes > self._max_disk:
       return FailureReason('Disk limit exceeded.  Reserved %s bytes vs used %s bytes.' % (
-          self._max_disk, sample.diskBytes))
+          self._max_disk, sample.diskBytes), status=mesos_pb.TASK_KILLED)
 
   @staticmethod
   def render_portmap(portmap):
@@ -125,7 +126,7 @@ class ResourceEnforcer(object):
       if self.ENFORCE_PORT_RANGE[0] <= port <= self.ENFORCE_PORT_RANGE[1]:
         if port not in self._portmap:
           return FailureReason('Listening on unallocated port %s.  Portmap is %s' % (
-              port, self.render_portmap(self._portmap)))
+              port, self.render_portmap(self._portmap)), status=mesos_pb.TASK_KILLED)
 
   def enforce(self, sample):
     """

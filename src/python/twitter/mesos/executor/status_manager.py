@@ -13,18 +13,21 @@ from .executor_base import ThermosExecutorBase
 
 
 class StatusManager(ExceptionalThread):
+  """
+    An agent that periodically checks the health of a task via HealthInterfaces that
+    provide HTTP health checking, resource consumption, etc.
+
+    If any of the health managers return a false health check, the Status Manager is
+    responsible for enforcing the "graceful" shutdown cycle via /quitquitquit and
+    /abortabortabort.
+  """
+
   POLL_WAIT = Amount(500, Time.MILLISECONDS)
   WAIT_LIMIT = Amount(1, Time.MINUTES)
   ESCALATION_WAIT = Amount(5, Time.SECONDS)
   PERSISTENCE_WAIT = Amount(5, Time.SECONDS)
 
-  def __init__(self,
-               runner,
-               driver,
-               task_id,
-               health_checkers=(),
-               signaler=None,
-               clock=time):
+  def __init__(self, runner, driver, task_id, health_checkers=(), signaler=None, clock=time):
     self._driver = driver
     self._runner = runner
     self._task_id = task_id
@@ -49,24 +52,20 @@ class StatusManager(ExceptionalThread):
       for checker in self._health_checkers:
         checker.stop()
 
-    force_status = failure_reason = None
+    failure_reason = None
 
     while self._runner.is_alive() and failure_reason is None:
       for checker in self._health_checkers:
         if not checker.healthy:
           notify_unhealthy()
-          force_status = mesos_pb.TASK_FAILED
-          failure_reason = checker.failure_reason.reason
-          log.info('Got force_status=%s, failure_reason=%s from %s' % (
-              force_status,
-              failure_reason,
-              checker))
+          failure_reason = checker.failure_reason
+          log.info('Got %s from %s' % (failure_reason, checker.__class__.__name__))
           break
       else:
         self._clock.sleep(self.POLL_WAIT.as_(Time.SECONDS))
 
     log.info('Executor polling thread detected termination condition.')
-    self.terminate(force_status, failure_reason)
+    self.terminate(failure_reason)
 
   def _terminate_http(self):
     if not self._signaler:
@@ -112,18 +111,17 @@ class StatusManager(ExceptionalThread):
       self._clock.sleep(self.POLL_WAIT.as_(Time.SECONDS))
       wait_limit -= self.POLL_WAIT
 
-  def terminate(self, force_status=None, force_message=None):
+  def terminate(self, failure_reason=None):
     if not self._terminate_http():
       self._terminate_runner()
 
     self._wait_for_rebind()
 
     last_state = self._runner.task_state()
-    mesos_status = mesos_pb._TASKSTATE.values_by_number.get(force_status)
-    log.info("State we've accepted: Thermos(%s) [force_status=Mesos(%s), force_message=%s]" % (
-        TaskState._VALUES_TO_NAMES.get(last_state, '(unknown)'),
-        mesos_status.name if mesos_status else 'None',
-        force_message))
+    log.info("State we've accepted: Thermos(%s) / Failure: %s" % (
+        TaskState._VALUES_TO_NAMES.get(last_state, 'unknown'),
+        failure_reason))
+
     finish_state = None
     if last_state == TaskState.ACTIVE:
       log.error("Runner is dead but task state unexpectedly ACTIVE!")
@@ -132,25 +130,20 @@ class StatusManager(ExceptionalThread):
       # safe because the task_runner_wrapper will have the same view and won't block.
       self._runner.quitquitquit()
       finish_state = mesos_pb.TASK_LOST
-    elif last_state == TaskState.SUCCESS:
-      finish_state = mesos_pb.TASK_FINISHED
-    elif last_state == TaskState.FAILED:
-      finish_state = mesos_pb.TASK_FAILED
-    elif last_state == TaskState.KILLED:
-      finish_state = mesos_pb.TASK_KILLED
-    elif last_state == TaskState.LOST:
-      finish_state = mesos_pb.TASK_LOST
     else:
-      log.error("Unknown task state! %s" % TaskState._VALUES_TO_NAMES.get(last_state, '(unknown)'))
-      finish_state = mesos_pb.TASK_FAILED
+      try:
+        finish_state = ThermosExecutorBase.THERMOS_TO_MESOS_STATES[last_state]
+      except KeyError:
+        log.error("Unknown task state = %r!" % last_state)
+        finish_state = mesos_pb.TASK_FAILED
 
     update = mesos_pb.TaskStatus()
     update.task_id.value = self._task_id
-    update.state = force_status if force_status is not None else finish_state
-    if force_message:
+    update.state = failure_reason.status if failure_reason is not None else finish_state
+    if failure_reason and failure_reason.reason:
       # TODO(wickman) Once MESOS-1506 is fixed, drop setting .data
-      update.data = force_message
-      update.message = force_message
+      update.data = failure_reason.reason
+      update.message = failure_reason.reason
     task_state = mesos_pb._TASKSTATE.values_by_number.get(update.state)
     log.info('Sending terminal state update: %s' % (task_state.name if task_state else 'UNKNOWN'))
     self._driver.sendStatusUpdate(update)

@@ -60,7 +60,6 @@ class MainHandler(tornado.web.RequestHandler):
     self.event = event
 
   def _record(self):
-    print('%s called: %s' % (self.request.method, self.request))
     self.requests.add((self.request.method, self.request.uri))
     self.write(self.health.value)
     self.event.set()
