@@ -1,12 +1,24 @@
 import os
-import pytest
-from runner_base import RunnerTestBase
+from textwrap import dedent
 
-from twitter.thermos.config.schema import Task, Process, Resources
+from twitter.thermos.config.schema import (
+  order,
+  Process,
+  Resources,
+  SequentialTask,
+  Task,
+  Tasks,
+)
+
 from gen.twitter.thermos.ttypes import (
   TaskState,
   ProcessState
 )
+
+from runner_base import RunnerTestBase
+
+import pytest
+
 
 class TestRunnerBasic(RunnerTestBase):
   portmap = {'named_port': 8123}
@@ -63,15 +75,14 @@ class TestRunnerBasic(RunnerTestBase):
       assert history[-1].state == ProcessState.SUCCESS
       if len(history) > 1:
         for run in range(len(history)-1):
-          assert history[run].state != ProcessState.SUCCESS, \
-            "nonterminal processes must not be in SUCCESS state!"
+          assert history[run].state != ProcessState.SUCCESS, (
+            "nonterminal processes must not be in SUCCESS state!")
 
   def test_runner_processes_have_monotonically_increasing_timestamps(self):
     for process in self.state.processes:
       for run in self.state.processes[process]:
         assert run.fork_time < run.start_time
         assert run.start_time < run.stop_time
-
 
 
 class TestConcurrencyBasic(RunnerTestBase):
@@ -100,3 +111,57 @@ class TestConcurrencyBasic(RunnerTestBase):
     runs.sort()
     assert runs[1] - runs[0] > 1.0
     assert runs[2] - runs[1] > 1.0
+
+
+class TestRunnerEnvironment(RunnerTestBase):
+  @classmethod
+  def task(cls):
+    setup_bashrc = Process(name = "setup_bashrc", cmdline = dedent(
+    """
+    mkdir -p .profile.d
+    cat <<EOF > .thermos_profile
+    for i in .profile.d/*.sh ; do
+      if [ -r "\\$i" ]; then
+        . \\$i
+      fi
+    done
+    EOF
+    """))
+
+    setup_foo = Process(name = "setup_foo", cmdline = dedent(
+    """
+    cat <<EOF > .profile.d/setup_foo.sh
+    export FOO=1
+    EOF
+    """))
+
+    setup_bar = Process(name = "setup_bar", cmdline = dedent(
+    """
+    cat <<EOF > .profile.d/setup_bar.sh
+    export BAR=2
+    EOF
+    """))
+
+    foo_recipe = SequentialTask(processes = [setup_bashrc, setup_foo])
+    bar_recipe = SequentialTask(processes = [setup_bashrc, setup_bar])
+    all_recipes = Tasks.combine(foo_recipe, bar_recipe)
+
+    run = Process(name = "run", cmdline = dedent(
+    """
+    echo $FOO $BAR > expected_output.txt
+    """
+    ))
+
+    my_task = Task(processes = [run],
+                   resources = Resources(cpu = 1.0, ram = 16*1024*1024, disk = 16*1024))
+    return Tasks.concat(all_recipes, my_task, name = "my_task")
+
+  def test_runner_state_success(self):
+    assert self.state.statuses[-1].state == TaskState.SUCCESS
+
+  def test_runner_processes_have_expected_output(self):
+    expected_output_file = os.path.join(self.runner.sandbox, self.runner.task_id,
+                                        'expected_output.txt')
+    assert os.path.exists(expected_output_file)
+    with open(expected_output_file, 'rb') as fp:
+      assert fp.read().strip() == b"1 2"

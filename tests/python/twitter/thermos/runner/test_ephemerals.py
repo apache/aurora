@@ -8,6 +8,7 @@ from gen.twitter.thermos.ttypes import (
   ProcessState
 )
 
+
 class TestEphemeralTask(RunnerTestBase):
   @classmethod
   def task(cls):

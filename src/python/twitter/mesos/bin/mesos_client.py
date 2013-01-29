@@ -1,6 +1,8 @@
 """Command-line client for managing jobs with the Twitter mesos scheduler.
 """
 
+from __future__ import print_function
+
 import collections
 from datetime import datetime
 import functools
@@ -353,6 +355,8 @@ def do_open(*args):
 @app.command
 @app.command_option('--local', dest='local', default=False, action='store_true',
     help='Inspect the configuration as would be created by the "spawn" command.')
+@app.command_option('--raw', dest='raw', default=False, action='store_true',
+    help='Show the raw configuration.')
 @app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(JSON_OPTION)
 @requires.exactly('job', 'config')
@@ -364,7 +368,51 @@ def inspect(jobname, config_file):
   """
   options = app.get_options()
   config = maybe_retranslate(jobname, config_file, options.json, False, options.bindings)
-  log.info('Parsed job config: %s' % config.job())
+  if options.raw:
+    print('Parsed job config: %s' % config.job())
+    return
+
+  job = config.raw()
+  print('Job level information')
+  print('  name:       %s' % job.name())
+  print('  role:       %s' % job.role())
+  print('  contact:    %s' % job.role())
+  print('  cluster:    %s' % job.cluster())
+  print('  instances:  %s' % job.instances())
+  if job.has_cron_schedule():
+    print('  cron:')
+    print('     schedule: %s' % job.cron_schedule())
+    print('     policy:   %s' % job.cron_collision_policy())
+  if job.has_constraints():
+    print('  constraints:')
+    for constraint, value in job.constraints().items():
+      print('    %s: %s' % (constraint, value))
+  print('  daemon:     %s' % bool(job.daemon().get()))
+  print('  production: %s' % bool(job.production().get()))
+  print()
+
+  task = job.task()
+  print('Task level information')
+  print('  name: %s' % task.name())
+  if len(task.constraints().get()) > 0:
+    print('  constraints:')
+    for constraint in task.constraints():
+      print('    %s' % (' < '.join(st.get() for st in constraint.order())))
+  print()
+
+  processes = task.processes()
+  for process in processes:
+    print('Process %s:' % process.name())
+    if process.daemon().get():
+      print('  daemon')
+    if process.ephemeral().get():
+      print('  ephemeral')
+    if process.final().get():
+      print('  final')
+    print('  cmdline:')
+    for line in process.cmdline().get().splitlines():
+      print('    ' + line)
+    print()
 
 
 @app.command
@@ -652,7 +700,7 @@ def trap_packer_error(fn):
     try:
       return fn(args)
     except Packer.Error as e:
-      print 'Request failed: %s' % e
+      print('Request failed: %s' % e)
   return wrap
 
 
@@ -665,16 +713,16 @@ def package_list(role):
 
   Prints the names of packages owned by a user.
   """
-  print '\n'.join(_get_packer().list_packages(role))
+  print('\n'.join(_get_packer().list_packages(role)))
 
 
 def _print_package(pkg):
-  print 'Version: %s' % pkg['id']
+  print('Version: %s' % pkg['id'])
   if 'metadata' in pkg and pkg['metadata']:
-    print 'User metadata:\n  %s' % pkg['metadata']
+    print('User metadata:\n  %s' % pkg['metadata'])
   for audit in sorted(pkg['auditLog'], key=lambda k: int(k['timestamp'])):
     gmtime_str = strftime('%m/%d/%Y %H:%M:%S UTC', gmtime(int(audit['timestamp']) / 1000))
-    print '  moved to state %s by %s on %s' % (audit['state'], audit['user'], gmtime_str)
+    print('  moved to state %s by %s on %s' % (audit['state'], audit['user'], gmtime_str))
 
 
 @app.command
@@ -700,7 +748,7 @@ def package_delete_version(role, package, version):
   Deletes a version of a package.
   """
   _get_packer().delete(role, package, version)
-  print 'Version deleted'
+  print('Version deleted')
 
 
 @app.command
@@ -720,7 +768,7 @@ def package_add_version(role, package, file_path):
   be stored as the original basename.
   """
   pkg = _get_packer().add(role, package, file_path, app.get_options().metadata)
-  print 'Package added:'
+  print('Package added:')
   _print_package(pkg)
 
 
@@ -744,7 +792,7 @@ def package_get_version(role, package, version):
     if not 'metadata' in pkg:
       client_util.die('Package does not contain any user-specified metadata.')
     else:
-      print pkg['metadata']
+      print(pkg['metadata'])
   else:
     _print_package(pkg)
 
@@ -759,7 +807,7 @@ def package_set_live(role, package, version):
   Updates the 'live' label of a package to point to a specific version.
   """
   _get_packer().set_live(role, package, version)
-  print 'Version %s is now the LIVE vesion' % version
+  print('Version %s is now the LIVE vesion' % version)
 
 @app.command
 @trap_packer_error
@@ -771,7 +819,7 @@ def package_unset_live(role, package):
   Removes the 'live' label of a package if it exists.
   """
   _get_packer().unset_live(role, package)
-  print 'LIVE label unset'
+  print('LIVE label unset')
 
 
 @app.command
@@ -787,7 +835,7 @@ def package_unlock(role, package):
   a need to use this, please inform mesos-team so they can investigate.
   """
   _get_packer().unlock(role, package)
-  print 'Package unlocked'
+  print('Package unlocked')
 
 
 def make_commands_str(commands):
@@ -835,7 +883,7 @@ def help(args):
   Displays help for using mesos client, or a specific subcommand.
   """
   if not args:
-    print generate_full_usage()
+    print(generate_full_usage())
     sys.exit(0)
 
   if len(args) > 1:
@@ -845,7 +893,7 @@ def help(args):
   if subcmd in globals():
     app.command_parser(subcmd).print_help()
   else:
-    print 'Subcommand %s not found.' % subcmd
+    print('Subcommand %s not found.' % subcmd)
     sys.exit(1)
 
 

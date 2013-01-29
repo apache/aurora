@@ -285,6 +285,8 @@ class Process(ProcessBase):
   """
     Encapsulate a running process for a task.
   """
+  RCFILE = '.thermos_profile'
+
   def __init__(self, *args, **kw):
     """
       See ProcessBase.__init__
@@ -307,47 +309,40 @@ class Process(ProcessBase):
     os.chdir(self._sandbox)
     os.chroot(self._sandbox)
 
-  def _setuid(self):
-    """
-      Drop privileges to the user supplied in Process creation (if necessary.)
-    """
+  def _getpwuid(self):
+    """Returns a tuple of the user (i.e. --user) and current user."""
     try:
-      user = pwd.getpwnam(self._user)
       current_user = pwd.getpwuid(os.getuid())
+      user = pwd.getpwnam(self._user) if self._user else current_user
     except KeyError:
-      raise self.UnknownUserError('Unable to get pwent information in order to setuid!')
+      raise self.UnknownUserError('Unable to get pwent information!')
+    return user, current_user
 
+  def _setuid(self):
+    """Drop privileges to the user supplied in Process creation (if necessary.)"""
+    user, current_user = self._getpwuid()
     if user.pw_uid == current_user.pw_uid:
       return
 
-    def drop_privs():
-      uid, gid = user.pw_uid, user.pw_gid
-      username = user.pw_name
-      group_ids = [group.gr_gid for group in grp.getgrall() if username in group.gr_mem]
-      os.setgroups(group_ids)
-      os.setgid(gid)
-      os.setuid(uid)
-
-    def update_environment():
-      username, homedir = user.pw_name, user.pw_dir
-      os.unsetenv('MAIL')
-      os.putenv('HOME', homedir)
-      for attr in ('LOGNAME', 'USER', 'USERNAME'):
-        os.putenv(attr, username)
-
-    drop_privs()
-    update_environment()
+    uid, gid = user.pw_uid, user.pw_gid
+    username = user.pw_name
+    group_ids = [group.gr_gid for group in grp.getgrall() if username in group.gr_mem]
+    os.setgroups(group_ids)
+    os.setgid(gid)
+    os.setuid(uid)
 
   def execute(self):
     assert self._stderr
     assert self._stdout
 
+    user, _ = self._getpwuid()
+    username, homedir = user.pw_name, user.pw_dir
+
     # TODO(wickman) reconsider setsid now that we're invoking in a subshell
     os.setsid()
     if self._use_chroot:
       self._chroot()
-    if self._user:
-      self._setuid()
+    self._setuid()
 
     # start process
     start_time = self._platform.clock().time()
@@ -357,8 +352,22 @@ class Process(ProcessBase):
     else:
       sandbox = self._sandbox if not self._use_chroot else '/'
 
+    thermos_profile = os.path.join(sandbox, self.RCFILE)
+    env = {
+      'HOME': homedir if self._use_chroot else sandbox,
+      'LOGNAME': username,
+      'USER': username,
+      'PATH': os.environ['PATH']
+    }
+
+    if os.path.exists(thermos_profile):
+      env.update(BASH_ENV=thermos_profile)
+
     self._popen = subprocess.Popen(["/bin/bash", "-c", self.cmdline()],
-                                   stderr=self._stderr, stdout=self._stdout, cwd=sandbox)
+                                   stderr=self._stderr,
+                                   stdout=self._stdout,
+                                   cwd=sandbox,
+                                   env=env)
 
     self._write_process_update(state=ProcessState.RUNNING,
                                pid=self._popen.pid,
