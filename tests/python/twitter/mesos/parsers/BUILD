@@ -1,9 +1,17 @@
 python_test_suite(name = 'all',
   dependencies = [
+    pants(':test_base'),
     pants(':test_mesos_config'),
     pants(':test_mesos_to_pystachio'),
     pants(':test_pystachio_to_thrift'),
     pants(':test_pystachio_config'),
+  ]
+)
+
+python_tests(name = 'test_base',
+  sources = ['test_base.py'],
+  dependencies = [
+    pants('src/python/twitter/mesos:parsers'),
   ]
 )
 

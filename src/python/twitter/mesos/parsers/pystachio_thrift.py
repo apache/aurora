@@ -35,11 +35,12 @@ def task_instance_from_job(job, instance):
   ti = MesosTaskInstance(task=job.task(),
                          layout=job.layout(),
                          role=job.role(),
+                         environment=job.environment(),
                          health_check_interval_secs=job.health_check_interval_secs(),
                          instance=instance)
   if job.has_announce():
     ti = ti(announce=job.announce())
-  return ti.bind(mesos = instance_context).interpolate()
+  return ti.bind(mesos=instance_context).interpolate()
 
 
 def translate_cron_policy(policy):

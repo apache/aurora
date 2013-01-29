@@ -18,7 +18,7 @@ from twitter.mesos.config.schema import (
 
 from twitter.thermos.config.loader import ThermosTaskWrapper
 
-from .base import ThriftCodec
+from .base import PortResolver, ThriftCodec
 from .mesos_config import MesosConfig
 from .proxy_config import ProxyConfig
 from .pystachio_thrift import convert as convert_pystachio_to_thrift
@@ -169,7 +169,15 @@ class PystachioConfig(ProxyConfig):
     # which can only be extracted post-unwrapping.  This means that validating
     # the state of the announce configuration could be problematic if people
     # try to do complicated things.
-    return ThermosTaskWrapper(self._job.task(), strict=False).ports()
+    #
+    # This should only return the list of ports that need allocation.  In other words
+    # we take the ports referenced by processes (referenced_ports), remove the ones
+    # that have already been preallocated ("bound") by the portmap, then
+    # add the ones that need to be allocated to fulfill their duty in the portmap.
+    referenced_ports = ThermosTaskWrapper(self._job.task(), strict=False).ports()
+    portmap = PortResolver.resolve(self._job.announce().portmap().get()
+                                   if self._job.has_announce() else {})
+    return PortResolver.unallocated(portmap) | (referenced_ports - PortResolver.bound(portmap))
 
   def task_links(self):
     # TODO(wfarner): Need to convert thermos-style template parameters

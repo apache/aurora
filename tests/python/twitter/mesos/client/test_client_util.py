@@ -3,16 +3,16 @@ import os
 import pytest
 import tempfile
 
-import twitter.mesos.packer.packer_client as packer_client
-
-from mox import Mox, IsA
-
 from twitter.mesos.client import client_util
 from twitter.common.contextutil import temporary_dir, temporary_file, open_zip
+from twitter.mesos.config.schema import Announcer, Job, Resources, Task, MB
 from twitter.mesos.packer import sd_packer_client
+import twitter.mesos.packer.packer_client as packer_client
 from twitter.mesos.parsers.mesos_config import MesosConfig
 from twitter.mesos.parsers.proxy_config import ProxyConfig
+from twitter.mesos.parsers.pystachio_config import PystachioConfig
 
+from mox import Mox, IsA
 
 def test_zip_package_files():
   job_name = 'spangled'
@@ -206,23 +206,16 @@ jobs = [HELLO_WORLD]
 
 MESOS_CONFIG_WITH_ANNOUNCE_1 = MESOS_CONFIG_BASE % 'announce = Announcer(primary_port="http"),'
 MESOS_CONFIG_WITH_ANNOUNCE_2 = MESOS_CONFIG_BASE % (
-    'announce = Announcer(primary_port="http", stats_port="http"),')
-MESOS_CONFIG_WITH_INVALID_ANNOUNCE = MESOS_CONFIG_BASE % (
-    'announce = Announcer(primary_port="blah"),')
+ '''announce = Announcer(
+       primary_port = "http",
+       portmap = {"aurora": "http"}),
+ ''')
 MESOS_CONFIG_WITH_INVALID_STATS = MESOS_CONFIG_BASE % (
     'announce = Announcer(primary_port="http", stats_port="blah"),')
 MESOS_CONFIG_WITHOUT_ANNOUNCE = MESOS_CONFIG_BASE % ''
-MESOS_CONFIG_WITH_DUPE_AURORA = """
-HELLO_WORLD = Job(name = 'hello_world', role = 'john_doe', cluster = 'smf1-test',
-  announce = Announcer(primary_port="blah", stats_port="blah"),
-  task = Task(name = 'main',
-    processes = [Process(name = 'hello_world',
-                 cmdline = 'echo {{thermos.ports[blah]}} {{thermos.ports[aurora]}}')],
-    resources = Resources(cpu = 0.1, ram = 64 * MB, disk = 64 * MB)))
-jobs = [HELLO_WORLD]
-"""
 
-def test_get_config_fails_invalid_announce():
+
+def test_get_config_announces():
   for good_config in (MESOS_CONFIG_WITH_ANNOUNCE_1, MESOS_CONFIG_WITH_ANNOUNCE_2,
                       MESOS_CONFIG_WITHOUT_ANNOUNCE):
     with temporary_file() as fp:
@@ -230,10 +223,41 @@ def test_get_config_fails_invalid_announce():
       fp.flush()
       client_util.get_config('hello_world', fp.name)
 
-  for bad_config in (MESOS_CONFIG_WITH_INVALID_ANNOUNCE, MESOS_CONFIG_WITH_INVALID_STATS,
-                     MESOS_CONFIG_WITH_DUPE_AURORA):
-    with temporary_file() as fp:
-      fp.write(bad_config)
-      fp.flush()
-      with pytest.raises(ProxyConfig.InvalidConfig):
-        client_util.get_config('hello_world', fp.name)
+
+def test_environment_names():
+  BAD = ('Prod', ' prod', 'prod ', 'tEst', 'production', 'staging 2', 'staging', 'stagingA')
+  GOOD = ('prod', 'devel', 'test', 'staging001', 'staging1', 'staging1234')
+  base_job = Job(
+      name='hello_world', role='john_doe', cluster='smf1-test',
+      task = Task(name='main', processes = [],
+                  resources = Resources(cpu = 0.1, ram = 64 * MB, disk = 64 * MB)))
+
+  client_util._validate_environment_name(PystachioConfig(base_job))
+  for env_name in GOOD:
+    client_util._validate_environment_name(PystachioConfig(base_job(environment=env_name)))
+  for env_name in BAD:
+    with pytest.raises(ValueError):
+      client_util._validate_environment_name(PystachioConfig(base_job(environment=env_name)))
+
+
+def test_dedicated_portmap():
+  base_job = Job(
+      name='hello_world', role='john_doe', cluster='smf1-test',
+      task = Task(name='main', processes = [],
+                  resources = Resources(cpu = 0.1, ram = 64 * MB, disk = 64 * MB)))
+
+  client_util._validate_announce_configuration(PystachioConfig(base_job))
+  client_util._validate_announce_configuration(
+      PystachioConfig(base_job(constraints = {'dedicated': 'mesos-team'})))
+  client_util._validate_announce_configuration(
+      PystachioConfig(base_job(constraints = {'dedicated': 'mesos-team'},
+                               announce = Announcer(portmap={'http': 80}))))
+
+  with pytest.raises(ValueError):
+    client_util._validate_announce_configuration(
+        PystachioConfig(base_job(announce=Announcer(portmap={'http': 80}))))
+
+  with pytest.raises(ValueError):
+    client_util._validate_announce_configuration(
+        PystachioConfig(base_job(announce=Announcer(portmap={'http': 80}),
+                                 constraints = {'foo': 'bar'})))

@@ -2,6 +2,8 @@ import pytest
 
 from twitter.common.contextutil import temporary_file
 from twitter.mesos.config.schema import (
+  Announcer,
+  Empty,
   Integer,
   MesosJob,
   Process,
@@ -150,3 +152,33 @@ def test_empty_config():
     fp.flush()
     with pytest.raises(MesosConfigLoader.BadConfig):
       MesosConfigLoader.load(fp.name)
+
+
+def test_ports():
+  def make_config(announce, *ports):
+    process = Process(name = 'hello',
+                      cmdline = ' '.join('{{thermos.ports[%s]}}' % port for port in ports))
+    return PystachioConfig(MesosJob(
+        name = 'hello_world', role = 'john_doe', cluster = 'smf1-test',
+        announce = announce,
+        task = Task(name = 'main', processes = [process],
+                    resources =  Resources(cpu = 0.1, ram = 64 * 1048576, disk = 64 * 1048576))))
+
+  announce = Announcer(portmap = {'http': 80})
+  assert make_config(announce).ports() == set()
+  assert make_config(announce, 'http').ports() == set()
+  assert make_config(announce, 'http', 'thrift').ports() == set(['thrift'])
+
+  announce = Announcer(portmap = {'http': 'aurora'})
+  assert make_config(announce).ports() == set(['aurora'])
+  assert make_config(announce, 'http').ports() == set(['aurora'])
+  assert make_config(announce, 'http', 'thrift').ports() == set(['thrift', 'aurora'])
+
+  announce = Announcer(portmap = {'aurora': 'http'})
+  assert make_config(announce).ports() == set(['http'])
+  assert make_config(announce, 'http').ports() == set(['http'])
+  assert make_config(announce, 'http', 'thrift').ports() == set(['http', 'thrift'])
+
+  assert make_config(Empty).ports() == set()
+  assert make_config(Empty, 'http').ports() == set(['http'])
+  assert make_config(Empty, 'http', 'thrift').ports() == set(['http', 'thrift'])

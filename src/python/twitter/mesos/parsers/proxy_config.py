@@ -24,6 +24,9 @@ class ProxyConfig(object):
   def ports(self):
     pass
 
+  def static_ports(self):
+    return {}
+
   @abstractmethod
   def task_links(self):
     pass

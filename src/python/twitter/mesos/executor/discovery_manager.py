@@ -10,54 +10,51 @@ from .health_interface import HealthInterface
 
 
 class DiscoveryManager(HealthInterface):
+  DEFAULT_ACL_ROLE = 'mesos'
+
   @staticmethod
-  def join_keywords(hostname, portmap, primary_port, stats_port):
+  def join_keywords(hostname, portmap, primary_port):
     """
       Generate primary, additional endpoints from a portmap and primary_port.
       primary_port must be a name in the portmap dictionary.
     """
-    if primary_port not in portmap:
-      raise ValueError('Cannot create Endpoint if primary port is not in portmap!')
-    if stats_port not in portmap:
-      raise ValueError('Cannot create Endpoint if stats port is not in portmap!')
+    # Do int check as stop-gap measure against incompatible downstream clients.
     additional_endpoints = dict(
-        (port, Endpoint(hostname, portmap[port])) for port in portmap)
-    additional_endpoints.update(aurora=Endpoint(hostname, portmap[stats_port]))
-    return Endpoint(hostname, portmap[primary_port]), additional_endpoints
+        (name, Endpoint(hostname, port)) for (name, port) in portmap.items()
+        if isinstance(port, int))
+
+    # It's possible for the primary port to not have been allocated if this task
+    # is using autoregistration, so register with a port of 0.
+    return Endpoint(hostname, portmap.get(primary_port, 0)), additional_endpoints
 
   def __init__(self, task, hostname, portmap, shard, ensemble=None):
     assert task.has_announce()
     announce_config = task.announce()
-    self._strict = bool(announce_config.strict().get())
     self._unhealthy = threading.Event()
 
     try:
       primary, additional = self.join_keywords(
           hostname,
           portmap,
-          announce_config.primary_port().get(),
-          announce_config.stats_port().get())
+          announce_config.primary_port().get())
     except ValueError:
       self._service = None
       self._unhealthy.set()
     else:
       self._service = TwitterService(
           task.role().get(),
-          announce_config.environment().get(),
+          task.environment().get(),
           task.task().name(),
           primary,
           additional=additional,
-          strict=True,
           failure_callback=self.on_failure,
           shard=shard,
-          ensemble=ensemble)
+          ensemble=ensemble,
+          auth_role=self.DEFAULT_ACL_ROLE)
 
   def on_failure(self):
-    if self._strict:
-      self._unhealthy.set()
-    else:
-      if self._service:
-        self._service.rejoin()
+    if self._service:
+      self._service.rejoin()
 
   @property
   def healthy(self):

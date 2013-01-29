@@ -7,6 +7,7 @@ import functools
 import json
 import os
 import posixpath
+import re
 import sys
 
 from pystachio import Ref
@@ -167,26 +168,40 @@ def _warn_on_unspecified_package_bindings(config):
         '{{packer[%s][%s][%s].copy_command}}' % tuple(config.package())))
 
 
-ANNOUNCE_ERROR = """
+ANNOUNCE_WARNING = """
 Announcer specified primary port as '%(primary_port)s' but no processes have bound that port.
-If you would like to utilize this port, you must bind {{thermos.ports[%(primary_port)s]}} into
-a Process bound in your Task.
+If you would like to utilize this port, you should listen on {{thermos.ports[%(primary_port)s]}}
+from some Process bound to your task.
 """
 
 def _validate_announce_configuration(config):
   if not config.raw().has_announce():
     return
+
   primary_port = config.raw().announce().primary_port().get()
-  stats_port = config.raw().announce().stats_port().get()
   if primary_port not in config.ports():
-    print(ANNOUNCE_ERROR % {'primary_port': primary_port}, file=sys.stderr)
-    raise config.InvalidConfig("Announcer specified primary port as "
-        '%s but no processes have bound that port!' % primary_port)
-  if stats_port not in config.ports():
-    raise config.InvalidConfig('Declared stats port "%s" is not bound to a process!' % stats_port)
-  if 'aurora' in config.ports() and stats_port != 'aurora':
-    raise config.InvalidConfig('Specified named port "aurora" conflicts with stats port "%s"' %
-        stats_port)
+    print(ANNOUNCE_WARNING % {'primary_port': primary_port}, file=sys.stderr)
+
+  if config.raw().has_announce() and not config.raw().has_constraints() or (
+      'dedicated' not in config.raw().constraints()):
+    for port in config.raw().announce().portmap().get().values():
+      try:
+        print('Trying port: %s' % port)
+        port = int(port)
+      except ValueError:
+        continue
+      raise ValueError('Job must be dedicated in order to specify static ports!')
+
+
+STAGING_RE = re.compile('^staging\d+$')
+
+def _validate_environment_name(config):
+  env_name = str(config.raw().environment())
+  if STAGING_RE.match(env_name):
+    return
+  if env_name not in ('prod', 'devel', 'test'):
+    raise ValueError('Environment name should be one of "prod", "devel", "test" or '
+                     'staging<number>!  Got %s' % env_name)
 
 
 def _inject_packer_bindings(config, force_local=False):
@@ -274,6 +289,7 @@ def populate_namespaces(config, force_local=False):
     _inject_packer_bindings(config, force_local)
     _warn_on_unspecified_package_bindings(config)
     _validate_announce_configuration(config)
+    _validate_environment_name(config)
   return config
 
 

@@ -19,6 +19,7 @@ from twitter.mesos.executor.task_runner_wrapper import (
   ProductionTaskRunner,
   AngrybirdTaskRunner)
 from twitter.mesos.executor.executor_base import ThermosExecutorBase
+from twitter.mesos.parsers.base import PortResolver
 
 from twitter.thermos.base.path import TaskPath
 from twitter.thermos.monitoring.monitor import TaskMonitor
@@ -198,6 +199,20 @@ class ThermosExecutor(ThermosExecutorBase):
 
   """ Mesos Executor API methods follow """
 
+  def resolve_ports(self, mesos_task, portmap):
+    """Given a mesos task and the portmap of resolved ports from the scheduler,
+       create a fully resolved map of port name => port number for the thermos
+       runner and discovery manager."""
+    task_portmap = mesos_task.announce().portmap().get() if mesos_task.has_announce() else {}
+    task_portmap.update(portmap)
+    task_portmap = PortResolver.resolve(task_portmap)
+
+    for name, port in task_portmap.items():
+      if not isinstance(port, int):
+        log.warning('Task has unmapped port: %s => %s' % (name, port))
+
+    return dict((name, port) for (name, port) in task_portmap.items() if isinstance(port, int))
+
   def launchTask(self, driver, task):
     """
       Invoked when a task has been launched on this executor (initiated via Scheduler::launchTasks).
@@ -227,6 +242,9 @@ class ThermosExecutor(ThermosExecutorBase):
       return
 
     self.send_update(driver, self._task_id, 'STARTING', 'Initializing sandbox.')
+
+    # Fully resolve the portmap
+    portmap = self.resolve_ports(mesos_task, portmap)
 
     # start the process on a separate thread and give the message processing thread back
     # to the driver

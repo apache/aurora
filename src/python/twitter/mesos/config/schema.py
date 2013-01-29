@@ -82,10 +82,17 @@ class UpdateConfig(Struct):
 
 
 class Announcer(Struct):
-  environment  = Default(String, 'prod')
-  strict       = Default(Integer, False)
   primary_port = Default(String, 'http')
-  stats_port   = Default(String, 'http')
+
+  # Portmap can either alias two ports together, e.g.
+  #   aurora <= http
+  # Or it can be used to alias static ports to endpoints, e.g.
+  #   http <= 80
+  #   https <= 443
+  #   aurora <= https
+  portmap      = Default(Map(String, String), {
+    'aurora': '{{primary_port}}'
+  })
 
 
 # The thermosConfig populated inside of TwitterTaskInfo.
@@ -95,21 +102,23 @@ class MesosTaskInstance(Struct):
   instance                   = Required(Integer)
   role                       = Required(String)
   announce                   = Announcer
+  environment                = Default(String, 'prod')
   health_check_interval_secs = Integer
 
 
 class MesosJob(Struct):
   name          = Default(String, '{{task.name}}')
   role          = Required(String)
+  contact       = String
   cluster       = Required(String)
+  environment   = Default(String, 'devel')
   instances     = Default(Integer, 1)
   task          = Required(Task)
+  announce      = Announcer
+
   cron_schedule = String
   cron_policy   = String          # these two are aliases of each other.  default is KILL_EXISTING
   cron_collision_policy = String  # if unspecified.
-  layout        = AppLayout
-  package       = PackerPackage  # DEPRECATED in favor of {{packer}} namespaces.
-  announce      = Announcer
 
   update_config = Default(UpdateConfig, UpdateConfig())
 
@@ -120,7 +129,12 @@ class MesosJob(Struct):
   priority                   = Default(Integer, 0)
   health_check_interval_secs = Default(Integer, 30)
   task_links                 = Map(String, String)
-  contact                    = String
+  primary_port               = Default(String, 'http')
+  stats_port                 = Default(String, 'http')  # if specified, your application should
+                                                        # export its stats here.
+
+  layout        = AppLayout      # DEPRECATED in favor of directory sandboxes
+  package       = PackerPackage  # DEPRECATED in favor of {{packer}} namespaces.
 
 
 Job = MesosJob
