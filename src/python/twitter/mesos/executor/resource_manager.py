@@ -20,20 +20,6 @@ import psutil as ps
 class ResourceEnforcer(object):
   """ Examine a task's resource consumption and determine whether it needs to be killed or
   adjusted """
-  # TODO(jon): rework to not directly require psutil to inspect/adjust processes.
-  NICE_INCREMENT = 5            # Increment nice by this amount
-  NICE_BACKOFF   = 1            # Decrement nice by this amount
-  NICE_BACKOFF_THRESHOLD = 0.8  # Decrement nice once cpu drops below this percentage of max
-
-  PRIO_MIN       = -20          # POSIX nice/renice priority bands
-  PRIO_NORMAL    = 0
-  PRIO_MAX       = 20
-
-  # On Linux, the maximum niceness for a process is actually 19 (even though PRIO_MAX is
-  # defined as 20 at the kernel level).
-  if os.uname()[0] == 'Linux':
-    PRIO_MAX = 19
-
   ENFORCE_PORT_RANGE = (31000, 32000)
 
   def __init__(self, resources, task_monitor, portmap={}):
@@ -46,12 +32,6 @@ class ResourceEnforcer(object):
     self._max_disk = resources.disk().get()
     self._task_monitor = task_monitor
     self._portmap = dict((number, name) for (name, number) in portmap.items())
-    self._nice = None
-
-  @property
-  def nice(self):
-    """ Reflects the niceness of the processes in the task """
-    return self._nice or self.PRIO_NORMAL
 
   def parents(self):
     """ List the current constituent Processes of the task (which may have child processes) """
@@ -70,31 +50,6 @@ class ResourceEnforcer(object):
           yield child
       except ps.error.Error as e:
         log.debug('Error when collecting process information: %s' % e)
-
-  # TODO(wickman): Setting a uniform nice level might not be the intended
-  # solution if the parents are already renicing subprocesses.  Should we just
-  # add niceness rather than setting it?
-  def _enforce_cpu(self, sample):
-    nice_level = None
-    for parent in self.parents():
-      log.debug('Checking CPU rate for %s' % parent.pid)
-      if sample.cpuRate > self._max_cpu and parent.nice < self.PRIO_MAX:
-        log.debug('CPU rate too high - adjusting nice level')
-        nice_level = min(self.PRIO_MAX, parent.nice + self.NICE_INCREMENT)
-      elif sample.cpuRate < self._max_cpu * self.NICE_BACKOFF_THRESHOLD and (
-          parent.nice != self.PRIO_NORMAL):
-        nice_level = max(self.PRIO_NORMAL, parent.nice - self.NICE_BACKOFF)
-      if nice_level is not None:
-        log.debug('Adjusting nice level from %s=>%s' % (
-          self._nice if self._nice is not None else parent.nice, nice_level))
-        self._nice = nice_level
-    if self._nice is not None:
-      for process in self.walk():
-        try:
-          if process.nice != self._nice:
-            process.nice = self._nice
-        except ps.error.Error as e:
-          log.error('Unable to adjust nice of %s: %s' % (process, e))
 
   def _enforce_ram(self, sample):
     if sample.ramRssBytes > self._max_ram:
@@ -139,7 +94,7 @@ class ResourceEnforcer(object):
     """
     # TODO(wickman) Due to MESOS-1585, port enforcement has been unwired.  If you would like to
     # add it back, simply add self._enforce_ports into the list of enforcers.
-    for enforcer in (self._enforce_ram, self._enforce_disk, self._enforce_cpu):
+    for enforcer in (self._enforce_ram, self._enforce_disk):
       log.debug("Running enforcer: %s" % enforcer)
       kill_reason = enforcer(sample)
       if kill_reason:
@@ -201,7 +156,7 @@ class ResourceManager(HealthInterface, ExceptionalThread):
         cpuRate=self._ps_sample.rate,
         cpuUserSecs=self._ps_sample.user,
         cpuSystemSecs=self._ps_sample.system,
-        cpuNice=self._enforcer.nice,
+        cpuNice=0,
         ramRssBytes=self._ps_sample.rss,
         ramVssBytes=self._ps_sample.vms,
         numThreads=self._ps_sample.threads,
