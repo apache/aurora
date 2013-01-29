@@ -3,6 +3,8 @@ package com.twitter.mesos.scheduler.storage.mem;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
@@ -17,8 +19,12 @@ import com.google.common.collect.Sets;
 
 import org.apache.commons.lang.StringUtils;
 
+import com.twitter.common.args.Arg;
+import com.twitter.common.args.CmdLine;
 import com.twitter.common.base.Closure;
 import com.twitter.common.inject.TimedInterceptor.Timed;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
@@ -33,6 +39,13 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 public class MemTaskStore implements TaskStore.Mutable.Transactioned {
 
+  private static final Logger LOG = Logger.getLogger(MemTaskStore.class.getName());
+
+  @CmdLine(name = "slow_query_log_threshold",
+      help = "Log all queries that take at least this long to execute.")
+  private static final Arg<Amount<Long, Time>> SLOW_QUERY_LOG_THRESHOLD =
+      Arg.create(Amount.of(25L, Time.MILLISECONDS));
+
   /**
    * COPIER is separate from deepCopy to capture timing information.  Only the instrumented
    * {@link #deepCopy(ScheduledTask)} should interact directly with {@code COPIER}.
@@ -45,6 +58,8 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
           return deepCopy(input);
         }
       };
+
+  private final long slowQueryThresholdNanos = SLOW_QUERY_LOG_THRESHOLD.get().as(Time.NANOSECONDS);
 
   private final TransactionalMap<String, ScheduledTask> tasks =
       TransactionalMap.wrap(Maps.<String, ScheduledTask>newHashMap());
@@ -73,7 +88,15 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
   public ImmutableSet<ScheduledTask> fetchTasks(TaskQuery query) {
     checkNotNull(query);
 
-    return immutableMatches(query).toImmutableSet();
+    long start = System.nanoTime();
+    ImmutableSet<ScheduledTask> result = immutableMatches(query).toImmutableSet();
+    long durationNanos = System.nanoTime() - start;
+    Level level = (durationNanos >= slowQueryThresholdNanos) ? Level.INFO : Level.FINE;
+    if (LOG.isLoggable(level)) {
+      LOG.log(level, "Query took " + durationNanos + " ms: " + query);
+    }
+
+    return result;
   }
 
   @Timed("mem_storage_fetch_task_ids")
