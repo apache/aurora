@@ -1,10 +1,14 @@
 import contextlib
+
+from twitter.common import log
 from twitter.common.lang import Compatibility
 
 if Compatibility.PY3:
+  from http.client import HTTPException
   from urllib.request import urlopen
   from urllib.error import URLError, HTTPError
 else:
+  from httplib import HTTPException
   from urllib2 import urlopen, URLError, HTTPError
 
 
@@ -23,7 +27,8 @@ class HttpSignaler(object):
       with contextlib.closing(urlopen(self.url(endpoint), data, timeout=self.TIMEOUT_SECS)) as fp:
         response = fp.read().strip().lower()
         return response == expected_response if expected_response is not None else True
-    except (URLError, HTTPError) as e:
+    except (URLError, HTTPError, HTTPException) as e:
+      log.warning('Failed to signal %s: %s' % (self.url(endpoint), e))
       return False
 
   def health(self):
