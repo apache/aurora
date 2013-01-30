@@ -102,7 +102,14 @@ CLUSTER_OPTION = optparse.Option(
     '--cluster',
     dest='cluster',
     default=None,
-    help="Cluster to invoke this command against (choose from %s)." % Cluster.get_list())
+    help='Cluster to invoke this command against (choose from %s).' % Cluster.get_list())
+
+
+ENV_OPTION = optparse.Option(
+    '--env',
+    dest='env',
+    default=None,
+    help='Environment to match when selecting a job from a configuration.')
 
 
 # This is for binding arbitrary points in the Thermos namespace to specific strings, e.g.
@@ -117,7 +124,7 @@ ENVIRONMENT_BIND_OPTION = optparse.Option(
     metavar='NAME:VALUE',
     callback=add_binding_to('bindings'),
     dest='bindings',
-    help='Bind a thermos environment name to a value.')
+    help='Bind a thermos mustache variable name to a value.')
 
 
 EXECUTOR_SANDBOX_OPTION = optparse.Option(
@@ -133,7 +140,7 @@ def maybe_retranslate(jobname, config_file, *args, **kw):
   try:
     config = client_util.get_config(jobname, config_file, *args, **kw)
   except PystachioConfig.InvalidConfig as err:
-    client_util.die("Invalid configuration: %s" % err)
+    client_util.die('Invalid configuration: %s' % err)
   if config.cluster().startswith('localhost') or (
       Cluster.get(config.cluster()).thermos_autotranslate and isinstance(config, MesosConfig)):
     return client_util.get_config(jobname, config_file, *args, translate=True, **kw)
@@ -151,6 +158,8 @@ def make_spawn_options(options):
 @app.command
 @app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
+@app.command_option(CLUSTER_OPTION)
+@app.command_option(ENV_OPTION)
 @app.command_option(JSON_OPTION)
 @requires.exactly('job', 'config')
 def create(jobname, config_file):
@@ -159,7 +168,12 @@ def create(jobname, config_file):
   Creates a job based on a configuration file.
   """
   options = app.get_options()
-  config = maybe_retranslate(jobname, config_file, options.json)
+  config = maybe_retranslate(
+      jobname,
+      config_file,
+      options.json,
+      select_cluster=options.cluster,
+      select_env=options.env)
 
   if config.cluster() == 'local':
     options.shard = 0
@@ -285,6 +299,8 @@ def runtask(args, options):
 
 @app.command
 @app.command_option(ENVIRONMENT_BIND_OPTION)
+@app.command_option(CLUSTER_OPTION)
+@app.command_option(ENV_OPTION)
 @app.command_option(JSON_OPTION)
 @requires.exactly('job', 'config')
 def diff(job, config_file):
@@ -294,7 +310,14 @@ def diff(job, config_file):
   By default the diff will be displayed using 'diff', though you may choose an alternate
   diff program by specifying the DIFF_VIEWER environment variable."""
   options = app.get_options()
-  config = maybe_retranslate(job, config_file, options.json, False, options.bindings)
+  config = maybe_retranslate(
+      job,
+      config_file,
+      options.json,
+      False,
+      options.bindings,
+      select_cluster=options.cluster,
+      select_env=options.env)
   api = create_client(config.cluster())
   resp = query_scheduler(api, config.role(), job, statuses=ACTIVE_STATES)
   if not resp.responseCode:
@@ -358,6 +381,8 @@ def do_open(*args):
 @app.command_option('--raw', dest='raw', default=False, action='store_true',
     help='Show the raw configuration.')
 @app.command_option(ENVIRONMENT_BIND_OPTION)
+@app.command_option(CLUSTER_OPTION)
+@app.command_option(ENV_OPTION)
 @app.command_option(JSON_OPTION)
 @requires.exactly('job', 'config')
 def inspect(jobname, config_file):
@@ -367,7 +392,14 @@ def inspect(jobname, config_file):
   the parsed configuration.
   """
   options = app.get_options()
-  config = maybe_retranslate(jobname, config_file, options.json, False, options.bindings)
+  config = maybe_retranslate(
+      jobname,
+      config_file,
+      options.json,
+      False,
+      options.bindings,
+      select_cluster=options.cluster,
+      select_env=options.env)
   if options.raw:
     print('Parsed job config: %s' % config.job())
     return
@@ -517,6 +549,8 @@ def _getshards(shards):
 @app.command
 @app.command_option(SHARDS_OPTION)
 @app.command_option(ENVIRONMENT_BIND_OPTION)
+@app.command_option(CLUSTER_OPTION)
+@app.command_option(ENV_OPTION)
 @app.command_option(JSON_OPTION)
 @requires.exactly('job', 'config')
 def update(jobname, config_file):
@@ -537,8 +571,14 @@ def update(jobname, config_file):
   to preview what changes will take effect.
   """
   options = app.get_options()
-  config = maybe_retranslate(jobname, config_file, options.json,
-      force_local=False, bindings=options.bindings)
+  config = maybe_retranslate(
+      jobname,
+      config_file,
+      options.json,
+      force_local=False,
+      bindings=options.bindings,
+      select_cluster=options.cluster,
+      select_env=options.env)
 
   job_size = len(config.job().taskConfigs)
   if config.update_config()['maxTotalFailures'] >= job_size:

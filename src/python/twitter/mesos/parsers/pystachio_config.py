@@ -41,17 +41,34 @@ class MesosConfigLoader(object):
   class BadConfig(Exception): pass
 
   @staticmethod
-  def pick(job_list, name, bindings):
+  def pick(job_list, name, bindings, select_cluster=None, select_env=None):
     if not job_list:
       raise ValueError('No jobs specified!')
     if name is None:
       if len(job_list) > 1:
         raise ValueError('Configuration has multiple jobs but no job name specified!')
       return job_list[0].bind(*bindings) if bindings else job_list[0]
-    for job in job_list:
-      if str(job.name()) == name:
-        return job.bind(*bindings) if bindings else job
-    raise ValueError('Could not find job named %s!' % name)
+
+    # TODO(wfarner): Rework this and calling code to make name optional as well.
+    def match_name(job):
+      return str(job.name()) == name
+    def match_cluster(job):
+      return select_cluster is None or str(job.cluster()) == select_cluster
+    def match_env(job):
+      return select_env is None or str(job.environment()) == select_env
+    matches = [j for j in job_list if match_name(j) and match_cluster(j) and match_env(j)]
+    if len(matches) == 0:
+      msg = 'Could not find job with name %s' % name
+      if select_cluster:
+        msg = '%s, cluster %s' % (msg, select_cluster)
+      if select_env:
+        msg = '%s, env %s' % (msg, select_env)
+      raise ValueError(msg)
+    elif len(matches) > 1:
+      raise ValueError('Multiple jobs match, please disambiguate by specifying a cluster or env.')
+    else:
+      job = matches[0]
+      return job.bind(*bindings) if bindings else job
 
   @staticmethod
   def load_into(filename):
@@ -74,12 +91,12 @@ class MesosConfigLoader(object):
     return environment
 
   @staticmethod
-  def load(filename, name=None, bindings=None):
+  def load(filename, name=None, bindings=None, select_cluster=None, select_env=None):
     env = MesosConfigLoader.load_into(filename)
     job_list = env.get('jobs', [])
     if not isinstance(job_list, list) or len(job_list) == 0:
-      raise MesosConfigLoader.BadConfig("Could not extract any jobs from %s" % filename)
-    return MesosConfigLoader.pick(job_list, name, bindings)
+      raise MesosConfigLoader.BadConfig('Could not extract any jobs from %s' % filename)
+    return MesosConfigLoader.pick(job_list, name, bindings, select_cluster, select_env)
 
   @staticmethod
   def load_json(filename, name=None, bindings=None):
@@ -91,11 +108,15 @@ class MesosConfigLoader(object):
 
 class PystachioConfig(ProxyConfig):
   @staticmethod
-  def load(filename, name=None, bindings=None):
-    return PystachioConfig(MesosConfigLoader.load(filename, name, bindings))
+  def load(filename, name=None, bindings=None, select_cluster=None, select_env=None):
+    return PystachioConfig(MesosConfigLoader.load(filename,
+                                                  name,
+                                                  bindings,
+                                                  select_cluster,
+                                                  select_env))
 
   @staticmethod
-  def load_json(filename, name=None, bindings=None):
+  def load_json(filename, name=None, bindings=None, select_cluster=None, select_env=None):
     return PystachioConfig(MesosConfigLoader.load_json(filename, name, bindings))
 
   def __init__(self, job):
@@ -162,6 +183,9 @@ class PystachioConfig(ProxyConfig):
 
   def cluster(self):
     return self._job.cluster().get()
+
+  def environment(self):
+    return self._job.environment().get()
 
   def ports(self):
     # Strictly speaking this is wrong -- it is possible to do things like

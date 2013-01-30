@@ -264,7 +264,9 @@ def get_config(jobname,
                json=False,
                force_local=False,
                bindings=(),
-               translate=False):
+               translate=False,
+               select_cluster=None,
+               select_env=None):
   """Creates and returns a config object contained in the provided file."""
   config_type = 'thermos' if json else FormatDetector.autodetect(config_file)
 
@@ -281,7 +283,11 @@ def get_config(jobname,
       config = MesosConfig(config_file, jobname)
   else:
     loader = PystachioConfig.load_json if json else PystachioConfig.load
-    config = loader(config_file, jobname, bindings)
+    config = loader(config_file,
+                    jobname,
+                    bindings,
+                    select_cluster=select_cluster,
+                    select_env=select_env)
   return populate_namespaces(config, force_local=force_local)
 
 
