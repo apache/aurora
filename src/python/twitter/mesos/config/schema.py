@@ -102,7 +102,7 @@ class MesosTaskInstance(Struct):
   instance                   = Required(Integer)
   role                       = Required(String)
   announce                   = Announcer
-  environment                = Default(String, 'prod')
+  environment                = String
   health_check_interval_secs = Integer
 
 
@@ -111,7 +111,7 @@ class MesosJob(Struct):
   role          = Required(String)
   contact       = String
   cluster       = Required(String)
-  environment   = Default(String, 'devel')
+  environment   = String
   instances     = Default(Integer, 1)
   task          = Required(Task)
   announce      = Announcer

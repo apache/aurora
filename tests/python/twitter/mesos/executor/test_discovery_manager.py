@@ -79,7 +79,10 @@ class TestDiscoveryManager(object):
   @classmethod
   def make_ss(cls, task, **kw):
     return ServerSet(cls.ZK, TwitterService.zkpath(
-        task.role().get(), task.environment(), task.task().name()), **kw)
+        task.role().get(),
+        task.environment() if task.has_environment() else 'devel',
+        task.task().name()),
+        **kw)
 
   def _make_manager(self, task, host, portmap, shard):
     dm = DiscoveryManager(task, host, portmap, shard, ensemble=self.ZKSERVER.ensemble)

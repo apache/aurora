@@ -43,7 +43,7 @@ class DiscoveryManager(HealthInterface):
     else:
       self._service = TwitterService(
           task.role().get(),
-          task.environment().get(),
+          task.environment().get() if task.has_environment() else 'devel',
           task.task().name(),
           primary,
           additional=additional,

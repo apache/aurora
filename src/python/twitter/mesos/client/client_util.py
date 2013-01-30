@@ -193,9 +193,11 @@ def _validate_announce_configuration(config):
       raise ValueError('Job must be dedicated in order to specify static ports!')
 
 
-STAGING_RE = re.compile('^staging\d+$')
+STAGING_RE = re.compile(r'^staging\d+$')
 
 def _validate_environment_name(config):
+  if not config.raw().has_environment():
+    return
   env_name = str(config.raw().environment())
   if STAGING_RE.match(env_name):
     return
