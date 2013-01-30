@@ -42,7 +42,6 @@ public class PeriodicTaskLauncher implements Command, Runnable {
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
   public @interface PeriodicTaskInterval { }
 
-  private final HistoryPruneRunner pruneRunner;
   private final StateManagerImpl stateManager;
   private final ShutdownRegistry shutdownRegistry;
   private final Preempter preeempter;
@@ -51,13 +50,11 @@ public class PeriodicTaskLauncher implements Command, Runnable {
 
   @Inject
   PeriodicTaskLauncher(
-      HistoryPruneRunner pruneRunner,
       StateManagerImpl stateManager,
       ShutdownRegistry shutdownRegistry,
       Preempter preeempter,
       @PeriodicTaskInterval Amount<Long, Time> taskInterval) {
 
-    this.pruneRunner = checkNotNull(pruneRunner);
     this.stateManager = checkNotNull(stateManager);
     this.shutdownRegistry = checkNotNull(shutdownRegistry);
     this.preeempter = checkNotNull(preeempter);
@@ -88,7 +85,6 @@ public class PeriodicTaskLauncher implements Command, Runnable {
   public void run() {
     try {
       if (stateManager.isStarted()) {
-        pruneRunner.run();
         preeempter.run();
       } else {
         LOG.fine("Skipping periodic task run since state manager is not started.");

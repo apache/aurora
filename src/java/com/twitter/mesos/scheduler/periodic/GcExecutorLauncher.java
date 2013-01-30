@@ -2,16 +2,12 @@ package com.twitter.mesos.scheduler.periodic;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Logger;
 
 import com.google.common.base.Optional;
-import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
 import com.google.protobuf.ByteString;
@@ -31,6 +27,7 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.comm.AdjustRetainedTasks;
 import com.twitter.mesos.scheduler.CommandUtil;
 import com.twitter.mesos.scheduler.PulseMonitor;
@@ -44,10 +41,6 @@ import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-
-import static com.twitter.mesos.scheduler.periodic.HistoryPruneRunner.IS_THERMOS;
-import static com.twitter.mesos.scheduler.periodic.HistoryPruneRunner.TASK_TO_HOST;
-import static com.twitter.mesos.scheduler.periodic.HistoryPruneRunner.retainedTasksMessage;
 
 /**
  * A task launcher that periodically initiates a garbage-collecting executor on a host.
@@ -73,19 +66,16 @@ public class GcExecutorLauncher implements TaskLauncher {
   private final PulseMonitor<String> pulseMonitor;
   private final Optional<String> gcExecutorPath;
   private final StateManager stateManager;
-  private final HistoryPruner historyPruner;
 
   @Inject
   GcExecutorLauncher(
       @GcExecutor PulseMonitor<String> pulseMonitor,
       @GcExecutor Optional<String> gcExecutorPath,
-      StateManager stateManager,
-      HistoryPruner historyPruner) {
+      StateManager stateManager) {
 
     this.gcExecutorPath = checkNotNull(gcExecutorPath);
     this.pulseMonitor = checkNotNull(pulseMonitor);
     this.stateManager = checkNotNull(stateManager);
-    this.historyPruner = checkNotNull(historyPruner);
   }
 
   @Override
@@ -94,23 +84,10 @@ public class GcExecutorLauncher implements TaskLauncher {
       return Optional.absent();
     }
 
-    Set<ScheduledTask> allInactiveTasks =
-        stateManager.fetchTasks(HistoryPruneRunner.INACTIVE_QUERY);
-    Set<ScheduledTask> inactiveThermosTasks =
-        ImmutableSet.copyOf(Iterables.filter(allInactiveTasks, IS_THERMOS));
-    Set<ScheduledTask> prunedTasks =
-        HistoryPruneRunner.getPrunedTasks(inactiveThermosTasks, historyPruner);
-
-    String host = offer.getHostname();
-
-    Predicate<ScheduledTask> sameHost =
-        Predicates.compose(Predicates.equalTo(host), TASK_TO_HOST);
-    Set<ScheduledTask> hostPruned = ImmutableSet.copyOf(Iterables.filter(prunedTasks, sameHost));
-    Map<String, ScheduledTask> hostPrunedById = Tasks.mapById(hostPruned);
-    Set<ScheduledTask> onHost = ImmutableSet.copyOf(Iterables.filter(
-        stateManager.fetchTasks(HistoryPruneRunner.hostQuery(host)), IS_THERMOS));
-
-    AdjustRetainedTasks message = retainedTasksMessage(onHost, hostPruned);
+    Set<ScheduledTask> tasksOnHost =
+        stateManager.fetchTasks(new TaskQuery().setSlaveHost(offer.getHostname()));
+    AdjustRetainedTasks message = new AdjustRetainedTasks()
+        .setRetainedTasks(Maps.transformValues(Tasks.mapById(tasksOnHost), Tasks.GET_STATUS));
     byte[] data;
     try {
       data = ThriftBinaryCodec.encode(message);
@@ -120,10 +97,6 @@ public class GcExecutorLauncher implements TaskLauncher {
     }
 
     pulseMonitor.pulse(offer.getHostname());
-
-    if (!hostPrunedById.isEmpty()) {
-      stateManager.deleteTasks(hostPrunedById.keySet());
-    }
 
     String uuid = UUID.randomUUID().toString();
     ExecutorInfo.Builder executor = ExecutorInfo.newBuilder()

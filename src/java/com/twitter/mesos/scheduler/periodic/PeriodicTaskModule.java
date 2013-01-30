@@ -10,8 +10,6 @@ import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
-import com.twitter.mesos.scheduler.periodic.HistoryPruner.HistoryPrunerImpl;
-import com.twitter.mesos.scheduler.periodic.HistoryPruner.HistoryPrunerImpl.PruneThreshold;
 import com.twitter.mesos.scheduler.periodic.PeriodicTaskLauncher.PeriodicTaskInterval;
 import com.twitter.mesos.scheduler.periodic.Preempter.PreemptionDelay;
 
@@ -25,15 +23,6 @@ public class PeriodicTaskModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> PERIODIC_TASK_INTERVAL =
       Arg.create(Amount.of(2L, Time.MINUTES));
 
-  @CmdLine(name = "history_prune_threshold",
-      help = "Time after which the scheduler will prune terminated task history.")
-  private static final Arg<Amount<Long, Time>> HISTORY_PRUNE_THRESHOLD =
-      Arg.create(Amount.of(2L, Time.DAYS));
-
-  @CmdLine(name = "per_job_task_history_goal",
-      help = "Per-job task history that the scheduler attempts to retain.")
-  private static final Arg<Integer> PER_JOB_TASK_HISTORY_GOAL = Arg.create(300);
-
   @CmdLine(name = "preemption_delay",
       help = "Time interval after which a pending task becomes eligible to preempt other tasks")
   private static final Arg<Amount<Long, Time>> PREEMPTION_DELAY =
@@ -41,16 +30,9 @@ public class PeriodicTaskModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    bind(Integer.class).annotatedWith(PruneThreshold.class)
-        .toInstance(PER_JOB_TASK_HISTORY_GOAL.get());
-    bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(PruneThreshold.class)
-        .toInstance(HISTORY_PRUNE_THRESHOLD.get());
-    bind(HistoryPruner.class).to(HistoryPrunerImpl.class);
-    bind(HistoryPrunerImpl.class).in(Singleton.class);
 
     bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(PeriodicTaskInterval.class)
         .toInstance(PERIODIC_TASK_INTERVAL.get());
-    bind(HistoryPruneRunner.class).in(Singleton.class);
 
     bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(PreemptionDelay.class)
         .toInstance(PREEMPTION_DELAY.get());

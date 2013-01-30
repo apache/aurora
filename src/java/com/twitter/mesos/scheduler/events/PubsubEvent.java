@@ -30,14 +30,14 @@ public interface PubsubEvent {
    * Event sent when tasks were deleted.
    */
   public static class TasksDeleted implements PubsubEvent {
-    private final Set<String> taskIds;
+    private final Set<ScheduledTask> tasks;
 
-    public TasksDeleted(Set<String> taskIds) {
-      this.taskIds = checkNotNull(taskIds);
+    public TasksDeleted(Set<ScheduledTask> tasks) {
+      this.tasks = checkNotNull(tasks);
     }
 
-    public Set<String> getTaskIds() {
-      return taskIds;
+    public Set<ScheduledTask> getTasks() {
+      return tasks;
     }
 
     @Override
@@ -47,12 +47,12 @@ public interface PubsubEvent {
       }
 
       TasksDeleted other = (TasksDeleted) o;
-      return Objects.equal(taskIds, other.taskIds);
+      return Objects.equal(tasks, other.tasks);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(taskIds);
+      return Objects.hashCode(tasks);
     }
   }
 

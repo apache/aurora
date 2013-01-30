@@ -10,6 +10,7 @@ import org.junit.Test;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.testing.FakeTicker;
+import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
@@ -66,8 +67,12 @@ public class NearestFitTest {
   @Test
   public void testRemove() {
     vetoed(NO_CHANCE);
-    nearest.remove(new TasksDeleted(ImmutableSet.of(TASK)));
+    nearest.remove(new TasksDeleted(ImmutableSet.of(makeTask())));
     assertNearest();
+  }
+
+  private ScheduledTask makeTask() {
+    return new ScheduledTask().setAssignedTask(new AssignedTask().setTaskId(TASK));
   }
 
   @Test

@@ -1144,7 +1144,7 @@ public class StateManagerImpl implements StateManager {
             }
           }
         });
-        addTaskEvent(new PubsubEvent.TasksDeleted(ImmutableSet.copyOf(taskIds)));
+        addTaskEvent(new PubsubEvent.TasksDeleted(ImmutableSet.copyOf(tasks)));
 
         taskStore.deleteTasks(taskIds);
       }

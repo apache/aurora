@@ -20,6 +20,8 @@ import com.twitter.common.util.TruncatedBinaryBackoff;
 import com.twitter.mesos.scheduler.async.TaskScheduler.TaskSchedulerImpl;
 import com.twitter.mesos.scheduler.events.TaskEventModule;
 
+import static com.twitter.mesos.scheduler.async.HistoryPruner.PruneThreshold;
+
 /**
  * Binding module for async task management.
  */
@@ -49,26 +51,34 @@ public class AsyncModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> MAX_OFFER_HOLD_TIME =
       Arg.create(Amount.of(1L, Time.MINUTES));
 
+  @CmdLine(name = "history_prune_threshold",
+      help = "Time after which the scheduler will prune terminated task history.")
+  private static final Arg<Amount<Long, Time>> HISTORY_PRUNE_THRESHOLD =
+      Arg.create(Amount.of(2L, Time.DAYS));
+
+  @CmdLine(name = "per_job_task_history_goal",
+      help = "Per-job task history that the scheduler attempts to retain.")
+  private static final Arg<Integer> PER_JOB_TASK_HISTORY_GOAL = Arg.create(300);
+
   @Override
   protected void configure() {
+    // Don't worry about clean shutdown, these can be daemon and cleanup-free.
+    final ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(
+        ASYNC_WORKER_THREADS.get(),
+        new ThreadFactoryBuilder().setNameFormat("AsyncProcessor-%d").setDaemon(true).build());
+    Stats.exportSize("timeout_queue_size", executor.getQueue());
+    Stats.export(new StatImpl<Long>("async_tasks_completed") {
+      @Override public Long read() {
+        return executor.getCompletedTaskCount();
+      }
+    });
+
     // AsyncModule itself is not a subclass of PrivateModule because TaskEventModule internally uses
     // a MultiBinder, which cannot span multiple injectors.
     binder().install(new PrivateModule() {
       @Override protected void configure() {
         bind(new TypeLiteral<Amount<Long, Time>>() { })
             .toInstance(TRANSIENT_TASK_STATE_TIMEOUT.get());
-
-        // Don't worry about clean shutdown, these can be daemon and cleanup-free.
-        final ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(
-            ASYNC_WORKER_THREADS.get(),
-            new ThreadFactoryBuilder().setNameFormat("TaskTimeout-%d").setDaemon(true).build());
-        Stats.exportSize("timeout_queue_size", executor.getQueue());
-        Stats.export(new StatImpl<Long>("async_tasks_completed") {
-          @Override public Long read() {
-            return executor.getCompletedTaskCount();
-          }
-        });
-
         bind(ScheduledExecutorService.class).toInstance(executor);
 
         bind(TaskTimeout.class).in(Singleton.class);
@@ -86,8 +96,21 @@ public class AsyncModule extends AbstractModule {
         expose(TaskScheduler.class);
       }
     });
+    binder().install(new PrivateModule() {
+      @Override protected void configure() {
+        bind(Integer.class).annotatedWith(PruneThreshold.class)
+            .toInstance(PER_JOB_TASK_HISTORY_GOAL.get());
+        bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(PruneThreshold.class)
+            .toInstance(HISTORY_PRUNE_THRESHOLD.get());
+        bind(ScheduledExecutorService.class).toInstance(executor);
+
+        bind(HistoryPruner.class).in(Singleton.class);
+        expose(HistoryPruner.class);
+      }
+    });
 
     TaskEventModule.bindSubscriber(binder(), TaskScheduler.class);
     TaskEventModule.bindSubscriber(binder(), TaskTimeout.class);
+    TaskEventModule.bindSubscriber(binder(), HistoryPruner.class);
   }
 }

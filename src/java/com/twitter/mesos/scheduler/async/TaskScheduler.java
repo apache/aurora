@@ -235,8 +235,8 @@ public interface TaskScheduler extends EventSubscriber {
 
     @Subscribe
     public void tasksDeleted(TasksDeleted deletion) {
-      for (String taskId : deletion.getTaskIds()) {
-        removeTask(taskId, true);
+      for (ScheduledTask task : deletion.getTasks()) {
+        removeTask(Tasks.id(task), true);
       }
     }
 

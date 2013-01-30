@@ -168,7 +168,11 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     insertTasks(makeTask("a", PENDING));
     changeState("a", INIT, PENDING);
     timeoutCapture.getValue().run();
-    scheduler.tasksDeleted(new TasksDeleted(ImmutableSet.of("a", "b")));
+    scheduler.tasksDeleted(new TasksDeleted(ImmutableSet.of(makeTask("a"), makeTask("b"))));
+  }
+
+  private ScheduledTask makeTask(String taskId) {
+    return makeTask(taskId, KILLED);
   }
 
   private ScheduledTask makeTask(String taskId, ScheduleStatus status) {
@@ -202,7 +206,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
         makeTask("c", RUNNING));
     scheduler.storageStarted(new StorageStarted());
     changeState("c", RUNNING, FINISHED);
-    scheduler.tasksDeleted(new TasksDeleted(ImmutableSet.of("b")));
+    scheduler.tasksDeleted(new TasksDeleted(ImmutableSet.of(makeTask("b", KILLED))));
   }
 
   @Test
@@ -248,7 +252,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     insertTasks(makeTask("b", PENDING));
     changeState("b", INIT, PENDING);
     timeoutCapture3.getValue().run();
-    scheduler.tasksDeleted(new TasksDeleted(ImmutableSet.of("b")));
+    scheduler.tasksDeleted(new TasksDeleted(ImmutableSet.of(makeTask("b", KILLED))));
   }
 
   @Test
@@ -327,7 +331,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     clock.advance(OFFER_EXPIRY);
     expirationCapture.getValue().run();
     timeoutCapture2.getValue().run();
-    scheduler.tasksDeleted(new TasksDeleted(ImmutableSet.of("a")));
+    scheduler.tasksDeleted(new TasksDeleted(ImmutableSet.of(makeTask("a", KILLED))));
   }
 
   @Test

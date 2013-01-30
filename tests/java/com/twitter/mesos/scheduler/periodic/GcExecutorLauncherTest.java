@@ -22,6 +22,7 @@ import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.comm.AdjustRetainedTasks;
 import com.twitter.mesos.scheduler.PulseMonitor;
@@ -50,17 +51,14 @@ public class GcExecutorLauncherTest extends EasyMockTest {
   private final AtomicInteger taskIdCounter = new AtomicInteger();
 
   private StateManager stateManager;
-  private HistoryPruner pruner;
   private PulseMonitor<String> hostMonitor;
   private GcExecutorLauncher gcExecutorLauncher;
 
   @Before
   public void setUp() {
     stateManager = createMock(StateManager.class);
-    pruner = createMock(HistoryPruner.class);
     hostMonitor = createMock(new Clazz<PulseMonitor<String>>() { });
-    gcExecutorLauncher =
-        new GcExecutorLauncher(hostMonitor, Optional.of("nonempty"), stateManager, pruner);
+    gcExecutorLauncher = new GcExecutorLauncher(hostMonitor, Optional.of("nonempty"), stateManager);
   }
 
   @Test
@@ -74,19 +72,12 @@ public class GcExecutorLauncherTest extends EasyMockTest {
 
     // Service second createTask - prune no tasks.
     expect(hostMonitor.isAlive(HOST)).andReturn(false);
-    expectGetInactiveTasks(thermosPrunedTask, thermosTask, nonThermosTask);
-    expect(pruner.apply(ImmutableSet.of(thermosPrunedTask, thermosTask)))
-        .andReturn(ImmutableSet.<ScheduledTask>of());
     expectGetTasksByHost(HOST, thermosPrunedTask, thermosTask, nonThermosTask);
     hostMonitor.pulse(HOST);
 
     // Service third createTask - prune one tasks.
     expect(hostMonitor.isAlive(HOST)).andReturn(false);
-    expectGetInactiveTasks(thermosPrunedTask, thermosTask, nonThermosTask);
-    expect(pruner.apply(ImmutableSet.of(thermosPrunedTask, thermosTask)))
-        .andReturn(ImmutableSet.of(thermosPrunedTask));
-    expectGetTasksByHost(HOST, thermosPrunedTask, thermosTask, nonThermosTask);
-    stateManager.deleteTasks(ImmutableSet.<String>of(Tasks.id(thermosPrunedTask)));
+    expectGetTasksByHost(HOST, thermosPrunedTask);
     hostMonitor.pulse(HOST);
 
     control.replay();
@@ -98,16 +89,12 @@ public class GcExecutorLauncherTest extends EasyMockTest {
     // Second call - no tasks pruned.
     taskInfo = gcExecutorLauncher.createTask(OFFER);
     assertTrue(taskInfo.isPresent());
-    assertRetainedTasks(taskInfo.get(), thermosTask, thermosPrunedTask);
+    assertRetainedTasks(taskInfo.get(), thermosPrunedTask, thermosTask, nonThermosTask);
 
-    thermosPrunedTask.setStatus(FAILED);
-    thermosTask.setStatus(FAILED);
-    nonThermosTask.setStatus(FAILED);
-
-    // Third call - one task pruned.
+    // Third call - two tasks pruned.
     taskInfo = gcExecutorLauncher.createTask(OFFER);
     assertTrue(taskInfo.isPresent());
-    assertRetainedTasks(taskInfo.get(), thermosTask);
+    assertRetainedTasks(taskInfo.get(), thermosPrunedTask);
   }
 
   private static void assertRetainedTasks(TaskInfo taskInfo, ScheduledTask... tasks)
@@ -130,13 +117,8 @@ public class GcExecutorLauncherTest extends EasyMockTest {
                 .setThermosConfig(isThermos ? new byte[] {1, 2, 3} : new byte[] {})));
   }
 
-  private void expectGetInactiveTasks(ScheduledTask... tasks) {
-    expect(stateManager.fetchTasks(HistoryPruneRunner.INACTIVE_QUERY))
-        .andReturn(ImmutableSet.<ScheduledTask>builder().add(tasks).build());
-  }
-
   private void expectGetTasksByHost(String host, ScheduledTask... tasks) {
-    expect(stateManager.fetchTasks(HistoryPruneRunner.hostQuery(host)))
+    expect(stateManager.fetchTasks(new TaskQuery().setSlaveHost(host)))
         .andReturn(ImmutableSet.<ScheduledTask>builder().add(tasks).build());
   }
 }

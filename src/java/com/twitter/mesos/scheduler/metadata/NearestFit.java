@@ -16,6 +16,7 @@ import com.google.inject.Inject;
 
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
 import com.twitter.mesos.scheduler.events.PubsubEvent.EventSubscriber;
@@ -72,7 +73,7 @@ public class NearestFit implements EventSubscriber {
    */
   @Subscribe
   public synchronized void remove(TasksDeleted deletedEvent) {
-    fitByTask.invalidateAll(deletedEvent.getTaskIds());
+    fitByTask.invalidateAll(Tasks.ids(deletedEvent.getTasks()));
   }
 
   /**
