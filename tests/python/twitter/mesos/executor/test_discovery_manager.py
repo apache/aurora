@@ -41,8 +41,7 @@ class TestDiscoveryManager(object):
   def setup_class(cls):
     cls.ZKSERVER = ZookeeperServer()
     cls.ZK = ZooKeeper(cls.ZKSERVER.ensemble,
-         authentication=('digest', '%(user)s:%(user)s' % {
-            'user': DiscoveryManager.DEFAULT_ACL_ROLE}))
+         authentication=('digest', '%(user)s:%(user)s' % {'user': getpass.getuser()}))
 
   @classmethod
   def teardown_class(cls):

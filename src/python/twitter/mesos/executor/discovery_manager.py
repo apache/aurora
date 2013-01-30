@@ -49,8 +49,7 @@ class DiscoveryManager(HealthInterface):
           additional=additional,
           failure_callback=self.on_failure,
           shard=shard,
-          ensemble=ensemble,
-          auth_role=self.DEFAULT_ACL_ROLE)
+          ensemble=ensemble)
 
   def on_failure(self):
     if self._service:
