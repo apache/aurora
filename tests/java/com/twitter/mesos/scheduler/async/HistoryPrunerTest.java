@@ -28,7 +28,6 @@ import com.twitter.mesos.scheduler.StateManager;
 import com.twitter.mesos.scheduler.events.PubsubEvent;
 import com.twitter.mesos.scheduler.events.PubsubEvent.StorageStarted;
 
-import static org.easymock.EasyMock.anyChar;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
