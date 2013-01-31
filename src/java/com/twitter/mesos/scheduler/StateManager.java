@@ -23,7 +23,9 @@ public interface StateManager {
    *
    * @param query Query to perform.
    * @return Tasks found matching the query.
+   * @deprecated Please perform queries directly on a Storage instance.
    */
+  @Deprecated
   Set<ScheduledTask> fetchTasks(TaskQuery query);
 
   /**

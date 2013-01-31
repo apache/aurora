@@ -704,6 +704,7 @@ public class StateManagerImpl implements StateManager {
    * @param query Query to perform.
    * @return A read-only view of the tasks matching the query.
    */
+  @Override
   public Set<ScheduledTask> fetchTasks(final TaskQuery query) {
     checkNotNull(query);
     managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));

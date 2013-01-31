@@ -5,7 +5,6 @@ import java.util.Set;
 
 import javax.annotation.Nullable;
 
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
 
 import com.twitter.mesos.gen.AssignedTask;
@@ -14,7 +13,6 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.ShardUpdateResult;
 import com.twitter.mesos.gen.TaskQuery;
-import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 
@@ -37,8 +35,7 @@ import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
  * <li>{@link #stop()}
  * </ol>
  */
-public interface SchedulerCore
-    extends Function<TaskQuery, Iterable<TwitterTaskInfo>>, RegisteredListener {
+public interface SchedulerCore extends RegisteredListener {
 
   /**
    * Prompts the scheduler to prepare for possible activation as the leading scheduler.  This
@@ -74,7 +71,9 @@ public interface SchedulerCore
    *
    * @param query The query to identify tasks.
    * @return A set of task objects.
+   * @deprecated Please perform queries directly on a Storage instance.
    */
+  @Deprecated
   Set<ScheduledTask> getTasks(TaskQuery query);
 
   /**
@@ -194,15 +193,6 @@ public interface SchedulerCore
    * @throws ScheduleException If a problem occurs while trying to perform the preemption.
    */
   void preemptTask(AssignedTask task, AssignedTask preemptingTask) throws ScheduleException;
-
-  /**
-   * Thrown when a task restart failed.
-   */
-  class RestartException extends Exception {
-    RestartException(String msg) {
-      super(msg);
-    }
-  }
 
   /**
    * Indicates to the scheduler that tasks were deleted on the assigned host.

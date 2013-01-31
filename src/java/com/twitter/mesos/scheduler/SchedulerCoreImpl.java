@@ -157,11 +157,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
     return stateManager.fetchTasks(query);
   }
 
-  @Override
-  public Iterable<TwitterTaskInfo> apply(TaskQuery query) {
-    return Iterables.transform(getTasks(query), Tasks.SCHEDULED_TO_INFO);
-  }
-
   private boolean hasActiveJob(JobConfiguration job) {
     return Iterables.any(jobManagers, managerHasJob(job));
   }

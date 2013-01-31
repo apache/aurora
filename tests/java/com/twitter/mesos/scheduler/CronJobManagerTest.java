@@ -1,16 +1,17 @@
 package com.twitter.mesos.scheduler;
 
-import java.util.Set;
 import java.util.concurrent.Executor;
 
 import com.google.common.collect.ImmutableSet;
 
 import org.easymock.Capture;
 import org.easymock.EasyMock;
+import org.easymock.IExpectationSetters;
 import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.common.testing.EasyMockTest;
+import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.CronCollisionPolicy;
 import com.twitter.mesos.gen.Identity;
@@ -20,18 +21,13 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.CronJobManager.CronScheduler;
-import com.twitter.mesos.scheduler.storage.Storage;
-import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
-import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
-import com.twitter.mesos.scheduler.storage.Storage.Work;
-import com.twitter.mesos.scheduler.storage.mem.MemStorage;
+import com.twitter.mesos.scheduler.storage.testing.StorageTestUtil;
 
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
 public class CronJobManagerTest extends EasyMockTest {
@@ -42,32 +38,56 @@ public class CronJobManagerTest extends EasyMockTest {
   private SchedulerCore scheduler;
   private Executor delayExecutor;
   private Capture<Runnable> delayLaunchCapture;
-  private Storage storage;
+  private StorageTestUtil storageUtil;
 
   private CronScheduler cronScheduler;
   private CronJobManager cron;
+  private JobConfiguration job;
 
   @Before
   public void setUp() throws Exception {
     scheduler = createMock(SchedulerCore.class);
     delayExecutor = createMock(Executor.class);
     delayLaunchCapture = createCapture();
-    storage = MemStorage.newEmptyStorage();
-    storage.prepare();
-    storage.start(MutateWork.NOOP);
+    storageUtil = new StorageTestUtil(this);
+    storageUtil.expectTransactions();
     cronScheduler = createMock(CronScheduler.class);
-    cron = new CronJobManager(storage, cronScheduler, delayExecutor);
+    cron = new CronJobManager(storageUtil.storage, cronScheduler, delayExecutor);
     cron.schedulerCore = scheduler;
+    job = makeJob();
+  }
+
+  private IExpectationSetters<?> expectTaskQuery(TaskQuery query, ScheduledTask... result) {
+    return expect(storageUtil.taskStore.fetchTasks(query))
+        .andReturn(ImmutableSet.<ScheduledTask>builder().add(result).build());
+  }
+
+  private void expectJobAccepted(JobConfiguration savedJob) {
+    storageUtil.jobStore.saveAcceptedJob(CronJobManager.MANAGER_KEY, savedJob);
+    expect(cronScheduler.schedule(eq(savedJob.getCronSchedule()), EasyMock.<Runnable>anyObject()))
+        .andReturn("key");
+  }
+
+  private void expectJobAccepted() {
+    expectJobAccepted(job);
+  }
+
+  private IExpectationSetters<?> expectJobFetch() {
+    return expect(storageUtil.jobStore.fetchJob(CronJobManager.MANAGER_KEY, Tasks.jobKey(job)))
+        .andReturn(job);
+  }
+
+  private IExpectationSetters<?> expectActiveTaskFetch(ScheduledTask... activeTasks) {
+    TaskQuery query = Query.activeQuery(job.getOwner().getRole(), job.getName());
+    return expect(storageUtil.taskStore.fetchTasks(query))
+        .andReturn(ImmutableSet.<ScheduledTask>builder().add(activeTasks).build());
   }
 
   @Test
   public void testStart() throws Exception {
-    JobConfiguration job = makeJob();
-
-    expect(scheduler.getTasks((TaskQuery) anyObject())).andReturn(ImmutableSet.<ScheduledTask>of());
-    expect(cronScheduler.schedule(eq(job.getCronSchedule()), EasyMock.<Runnable>anyObject()))
-        .andReturn("key");
-
+    expectJobAccepted();
+    expectJobFetch();
+    expectActiveTaskFetch();
 
     // Job is executed immediately since there are no existing tasks to kill.
     scheduler.runJob(job);
@@ -80,14 +100,11 @@ public class CronJobManagerTest extends EasyMockTest {
 
   @Test
   public void testDelayedStart() throws Exception {
-    JobConfiguration job = makeJob();
-    Set<ScheduledTask> oneTask = ImmutableSet.of(new ScheduledTask());
-
-    expect(cronScheduler.schedule(eq(job.getCronSchedule()), EasyMock.<Runnable>anyObject()))
-        .andReturn("key");
+    expectJobAccepted();
+    expectJobFetch();
 
     // Query to test if live tasks exist for the job.
-    expect(scheduler.getTasks((TaskQuery) anyObject())).andReturn(oneTask);
+    expectActiveTaskFetch(new ScheduledTask());
 
     // Live tasks exist, so the cron manager must delay the cron launch.
     delayExecutor.execute(capture(delayLaunchCapture));
@@ -96,10 +113,10 @@ public class CronJobManagerTest extends EasyMockTest {
     scheduler.killTasks((TaskQuery) anyObject(), eq(CronJobManager.CRON_USER));
 
     // Immediate query and delayed query.
-    expect(scheduler.getTasks((TaskQuery) anyObject())).andReturn(oneTask).times(2);
+    expectActiveTaskFetch(new ScheduledTask()).times(2);
 
     // Simulate the live task disappearing.
-    expect(scheduler.getTasks((TaskQuery) anyObject())).andReturn(ImmutableSet.<ScheduledTask>of());
+    expectActiveTaskFetch();
 
     scheduler.runJob(job);
 
@@ -112,14 +129,11 @@ public class CronJobManagerTest extends EasyMockTest {
 
   @Test
   public void testDelayedStartResets() throws Exception {
-    JobConfiguration job = makeJob();
-    Set<ScheduledTask> oneTask = ImmutableSet.of(new ScheduledTask());
-
-    expect(cronScheduler.schedule(eq(job.getCronSchedule()), EasyMock.<Runnable>anyObject()))
-        .andReturn("key");
+    expectJobAccepted();
+    expectJobFetch();
 
     // Query to test if live tasks exist for the job.
-    expect(scheduler.getTasks((TaskQuery) anyObject())).andReturn(oneTask);
+    expectActiveTaskFetch(new ScheduledTask());
 
     // Live tasks exist, so the cron manager must delay the cron launch.
     delayExecutor.execute(capture(delayLaunchCapture));
@@ -128,21 +142,21 @@ public class CronJobManagerTest extends EasyMockTest {
     scheduler.killTasks((TaskQuery) anyObject(), eq(CronJobManager.CRON_USER));
 
     // Immediate query and delayed query.
-    expect(scheduler.getTasks((TaskQuery) anyObject())).andReturn(oneTask).times(2);
+    expectActiveTaskFetch(new ScheduledTask()).times(2);
 
     // Simulate the live task disappearing.
-    expect(scheduler.getTasks((TaskQuery) anyObject())).andReturn(ImmutableSet.<ScheduledTask>of());
+    expectActiveTaskFetch();
 
     // Round two.
-    expect(scheduler.getTasks((TaskQuery) anyObject())).andReturn(oneTask);
+    expectJobFetch();
+    expectActiveTaskFetch(new ScheduledTask());
     delayExecutor.execute(capture(delayLaunchCapture));
     scheduler.killTasks((TaskQuery) anyObject(), eq(CronJobManager.CRON_USER));
-    expect(scheduler.getTasks((TaskQuery) anyObject())).andReturn(oneTask).times(2);
-    expect(scheduler.getTasks((TaskQuery) anyObject())).andReturn(ImmutableSet.<ScheduledTask>of());
+    expectActiveTaskFetch(new ScheduledTask()).times(2);
+    expectActiveTaskFetch();
 
     scheduler.runJob(job);
-
-    scheduler.runJob(job);
+    expectLastCall().times(2);
 
     control.replay();
 
@@ -158,27 +172,25 @@ public class CronJobManagerTest extends EasyMockTest {
 
   @Test
   public void testDelayedStartMultiple() throws Exception {
-    JobConfiguration job = makeJob();
-    Set<ScheduledTask> oneTask = ImmutableSet.of(new ScheduledTask());
-
-    expect(cronScheduler.schedule(eq(job.getCronSchedule()), EasyMock.<Runnable>anyObject()))
-        .andReturn("key");
+    expectJobAccepted();
+    expectJobFetch();
 
     // Query to test if live tasks exist for the job.
-    expect(scheduler.getTasks((TaskQuery) anyObject())).andReturn(oneTask).times(3);
+    expectActiveTaskFetch(new ScheduledTask()).times(3);
 
     // Live tasks exist, so the cron manager must delay the cron launch.
     delayExecutor.execute(capture(delayLaunchCapture));
 
     // The cron manager will then try to initiate the kill.
+    expectJobFetch().times(2);
     scheduler.killTasks((TaskQuery) anyObject(), eq(CronJobManager.CRON_USER));
     expectLastCall().times(3);
 
     // Immediate queries and delayed query.
-    expect(scheduler.getTasks((TaskQuery) anyObject())).andReturn(oneTask).times(4);
+    expectActiveTaskFetch(new ScheduledTask()).times(4);
 
     // Simulate the live task disappearing.
-    expect(scheduler.getTasks((TaskQuery) anyObject())).andReturn(ImmutableSet.<ScheduledTask>of());
+    expectActiveTaskFetch();
 
     scheduler.runJob(job);
 
@@ -196,14 +208,11 @@ public class CronJobManagerTest extends EasyMockTest {
 
   @Test
   public void testUpdate() throws Exception {
-    JobConfiguration job = makeJob();
     JobConfiguration updated = makeJob().setCronSchedule("1 2 3 4 5");
 
-    expect(cronScheduler.schedule(eq(job.getCronSchedule()), EasyMock.<Runnable>anyObject()))
-        .andReturn("key");
+    expectJobAccepted();
     cronScheduler.deschedule("key");
-    expect(cronScheduler.schedule(eq(updated.getCronSchedule()), EasyMock.<Runnable>anyObject()))
-        .andReturn("key2");
+    expectJobAccepted(updated);
 
     control.replay();
 
@@ -218,12 +227,12 @@ public class CronJobManagerTest extends EasyMockTest {
         .setStatus(ScheduleStatus.RUNNING)
         .setAssignedTask(new AssignedTask().setTask(task));
 
-    JobConfiguration job = makeJob()
+    job = makeJob()
         .setTaskConfigs(ImmutableSet.of(task))
         .setCronCollisionPolicy(CronCollisionPolicy.RUN_OVERLAP);
-    expect(cronScheduler.schedule(eq(job.getCronSchedule()), EasyMock.<Runnable>anyObject()))
-        .andReturn("key");
-    expect(scheduler.getTasks((TaskQuery) anyObject())).andReturn(ImmutableSet.of(scheduledTask));
+    expectJobAccepted();
+    expectJobFetch();
+    expectActiveTaskFetch(scheduledTask);
 
     JobConfiguration shardAdjusted = job.deepCopy()
         .setTaskConfigs(ImmutableSet.of(task.deepCopy().setShardId(1)));
@@ -237,19 +246,15 @@ public class CronJobManagerTest extends EasyMockTest {
 
   @Test
   public void testConsistentState() throws Exception {
-    JobConfiguration job = makeJob();
     JobConfiguration updated = makeJob().setCronSchedule("1 2 3 4 5");
 
-    expect(cronScheduler.schedule(eq(job.getCronSchedule()), EasyMock.<Runnable>anyObject()))
-        .andReturn("key");
+    expectJobAccepted();
     cronScheduler.deschedule("key");
-    expect(cronScheduler.schedule(eq(updated.getCronSchedule()), EasyMock.<Runnable>anyObject()))
-        .andReturn("key2");
+    expectJobAccepted(updated);
 
     control.replay();
 
     cron.receiveJob(job);
-    assertEquals(ImmutableSet.of(job), getCronJobs());
 
     JobConfiguration failedUpdate = updated.deepCopy();
     failedUpdate.unsetCronSchedule();
@@ -259,18 +264,8 @@ public class CronJobManagerTest extends EasyMockTest {
     } catch (ScheduleException e) {
       // Expected.
     }
-    assertEquals(ImmutableSet.of(job), getCronJobs());
 
     cron.updateJob(updated);
-    assertEquals(ImmutableSet.of(updated), getCronJobs());
-  }
-
-  private Iterable<JobConfiguration> getCronJobs() {
-    return storage.doInTransaction(new Work.Quiet<Iterable<JobConfiguration>>() {
-      @Override public Iterable<JobConfiguration> apply(StoreProvider storeProvider) {
-        return storeProvider.getJobStore().fetchJobs(CronJobManager.MANAGER_KEY);
-      }
-    });
   }
 
   private JobConfiguration makeJob() {

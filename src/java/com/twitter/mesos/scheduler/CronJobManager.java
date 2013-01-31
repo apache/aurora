@@ -47,6 +47,7 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.events.PubsubEvent.EventSubscriber;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
+import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
 
 import it.sauronsoftware.cron4j.InvalidPatternException;
@@ -276,8 +277,12 @@ public class CronJobManager extends JobManager implements EventSubscriber {
     return !getTasks(query).isEmpty();
   }
 
-  private Set<ScheduledTask> getTasks(TaskQuery query) {
-    return schedulerCore.getTasks(query);
+  private Set<ScheduledTask> getTasks(final TaskQuery query) {
+    return storage.doInTransaction(new Work.Quiet<Set<ScheduledTask>>() {
+      @Override public Set<ScheduledTask> apply(StoreProvider storeProvider) {
+        return storeProvider.getTaskStore().fetchTasks(query);
+      }
+    });
   }
 
   public static CronCollisionPolicy orDefault(@Nullable CronCollisionPolicy policy) {
