@@ -11,26 +11,7 @@ from twitter.common.zookeeper.client import ZooKeeper
 from twitter.common.zookeeper.serverset import ServerSet, Endpoint
 from twitter.common.zookeeper.test_server import ZookeeperServer
 from twitter.common_internal.zookeeper.twitter_service import TwitterService
-from twitter.mesos.config.schema import (
-  MesosTaskInstance,
-  Announcer,
-  Task,
-  Process,
-  Resources)
 from twitter.mesos.executor.discovery_manager import DiscoveryManager
-
-
-def hello_world(announce=False, **kw):
-  mti = MesosTaskInstance(
-    task = Task(name = 'hello_world',
-                processes = [
-                  Process(name = 'hello_world', cmdline = 'echo hello world')
-                ],
-                resources = Resources(cpu=1.0, ram=1024, disk=1024)),
-    instance = 0,
-    role = getpass.getuser())
-
-  return mti(announce=Announcer(**kw)) if announce else mti
 
 
 class TestDiscoveryManager(object):
@@ -47,11 +28,6 @@ class TestDiscoveryManager(object):
   def teardown_class(cls):
     cls.ZKSERVER.stop()
     cls.ZK.close()
-
-  def test_assertions(self):
-    # Must be constructed with an announce object
-    with pytest.raises(AssertionError):
-      DiscoveryManager(hello_world(), 'asdf', {}, 0)
 
   def test_join_keywords(self):
     me = 'my.host.name'
@@ -76,29 +52,26 @@ class TestDiscoveryManager(object):
     }
 
   @classmethod
-  def make_ss(cls, task, **kw):
-    return ServerSet(cls.ZK, TwitterService.zkpath(
-        task.role().get(),
-        task.environment() if task.has_environment() else 'devel',
-        task.task().name()),
-        **kw)
+  def make_ss(cls, role, environment, jobname, **kw):
+    return ServerSet(cls.ZK, TwitterService.zkpath(role, environment, jobname), **kw)
 
-  def _make_manager(self, task, host, portmap, shard):
-    dm = DiscoveryManager(task, host, portmap, shard, ensemble=self.ZKSERVER.ensemble)
+  def _make_manager(self, *args):
+    role, environment, jobname = args[0:3]
+    dm = DiscoveryManager(*args, ensemble=self.ZKSERVER.ensemble)
     join_event = threading.Event()
     exit_event = threading.Event()
     def on_join(_):
       join_event.set()
     def on_exit(_):
       exit_event.set()
-    ss = self.make_ss(task, on_join=on_join, on_leave=on_exit)
+    ss = self.make_ss(role, environment, jobname, on_join=on_join, on_leave=on_exit)
     return (dm, join_event, exit_event, ss)
 
   def test_basic_registration(self):
-    me = 'foo.bar.baz'
+    me = 'foo.bar.baz.com'
     portmap = {'http': TunnelHelper.get_random_port(), 'bar': TunnelHelper.get_random_port()}
-    task = hello_world(announce=True, primary_port='http')
-    dm, join_event, exit_event, ss = self._make_manager(task, me, portmap, 23)
+    dm, join_event, exit_event, ss = self._make_manager(
+        getpass.getuser(), 'devel', 'my_job', me, 'http', portmap, 23)
 
     try:
       join_event.wait(timeout=1.0)
@@ -123,9 +96,10 @@ class TestDiscoveryManager(object):
     assert exit_event.is_set()
 
   def test_rejoin(self):
-    task = hello_world(announce=True, primary_port='http')
-    dm, join_event, exit_event, ss = self._make_manager(task, 'asdf',
-        {'http': TunnelHelper.get_random_port()}, 17)
+    me = 'foo.bar.baz.com'
+    dm, join_event, exit_event, ss = self._make_manager(
+        getpass.getuser(), 'prod', 'my_job', me, 'http', {'http': TunnelHelper.get_random_port()},
+        17)
 
     try:
       join_event.wait(timeout=10.0)
@@ -134,6 +108,7 @@ class TestDiscoveryManager(object):
 
       members = ss._group.list()
       assert len(members) == 1
+      old_instance = list(ss)[0]
       ss.cancel(members[0])
 
       exit_event.wait(timeout=10.0)
@@ -141,6 +116,7 @@ class TestDiscoveryManager(object):
 
       join_event.wait(timeout=10.0)
       assert join_event.is_set()
+      assert list(ss)[0] == old_instance
 
       assert dm.healthy
 

@@ -105,13 +105,13 @@ class ThermosExecutor(ThermosExecutorBase):
       json_blob = json.loads(thermos_task)
     except Exception as e:
       raise ValueError('Could not deserialize thermosConfig JSON! %s' % e)
-    return (MesosTaskInstance(json_blob), assigned_task.assignedPorts, assigned_task.task.shardId)
+    return MesosTaskInstance(json_blob)
 
   @property
   def runner(self):
     return self._runner
 
-  def _start_runner(self, driver, mesos_task, portmap, shard_id):
+  def _start_runner(self, driver, assigned_task, mesos_task, portmap):
     """
       Commence running a task.
         - Start the RunnerWrapper to fork TaskRunner (to control actual processes)
@@ -183,9 +183,16 @@ class ThermosExecutor(ThermosExecutorBase):
         os.path.join(self._runner.artifact_dir, self.RESOURCE_CHECKPOINT),
         recordio=True).start()
 
-    if mesos_task.has_announce() and portmap:
-      health_checkers.append(
-          DiscoveryManager(mesos_task, socket.gethostname(), portmap, shard_id))
+    if mesos_task.has_announce():
+      discovery_manager = DiscoveryManager(
+          mesos_task.role().get(),
+          mesos_task.environment().get() if mesos_task.has_environment() else 'devel',
+          assigned_task.task.jobName,
+          socket.gethostname(),
+          mesos_task.announce().primary_port().get(),
+          portmap,
+          assigned_task.task.shardId)
+      health_checkers.append(discovery_manager)
 
     health_checkers.append(self._kill_manager)
 
@@ -234,7 +241,7 @@ class ThermosExecutor(ThermosExecutorBase):
 
     try:
       assigned_task = ThermosExecutor.deserialize_assigned_task(task)
-      mesos_task, portmap, shard_id = ThermosExecutor.deserialize_thermos_task(assigned_task)
+      mesos_task = ThermosExecutor.deserialize_thermos_task(assigned_task)
     except Exception as e:
       log.fatal('Could not deserialize AssignedTask: %s' % e)
       self.send_update(driver, self._task_id, 'FAILED', "Could not deserialize task: %s" % e)
@@ -244,7 +251,7 @@ class ThermosExecutor(ThermosExecutorBase):
     self.send_update(driver, self._task_id, 'STARTING', 'Initializing sandbox.')
 
     # Fully resolve the portmap
-    portmap = self.resolve_ports(mesos_task, portmap)
+    portmap = self.resolve_ports(mesos_task, assigned_task.assignedPorts)
 
     # start the process on a separate thread and give the message processing thread back
     # to the driver
@@ -255,7 +262,7 @@ class ThermosExecutor(ThermosExecutorBase):
       defer(driver.stop, delay=self.STOP_WAIT)
       return
 
-    defer(lambda: self._start_runner(driver, mesos_task, portmap, shard_id))
+    defer(lambda: self._start_runner(driver, assigned_task, mesos_task, portmap))
 
   def _signal_kill_manager(self, driver, task_id, reason):
     if self._runner is None:

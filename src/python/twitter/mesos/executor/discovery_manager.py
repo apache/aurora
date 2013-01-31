@@ -27,24 +27,26 @@ class DiscoveryManager(HealthInterface):
     # is using autoregistration, so register with a port of 0.
     return Endpoint(hostname, portmap.get(primary_port, 0)), additional_endpoints
 
-  def __init__(self, task, hostname, portmap, shard, ensemble=None):
-    assert task.has_announce()
-    announce_config = task.announce()
+  def __init__(self, role,
+                     environment,
+                     jobname,
+                     hostname,
+                     primary_port,
+                     portmap,
+                     shard,
+                     ensemble=None):
     self._unhealthy = threading.Event()
 
     try:
-      primary, additional = self.join_keywords(
-          hostname,
-          portmap,
-          announce_config.primary_port().get())
+      primary, additional = self.join_keywords(hostname, portmap, primary_port)
     except ValueError:
       self._service = None
       self._unhealthy.set()
     else:
       self._service = TwitterService(
-          task.role().get(),
-          task.environment().get() if task.has_environment() else 'devel',
-          task.task().name(),
+          role,
+          environment,
+          jobname,
           primary,
           additional=additional,
           failure_callback=self.on_failure,
