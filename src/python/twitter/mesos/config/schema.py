@@ -129,9 +129,6 @@ class MesosJob(Struct):
   priority                   = Default(Integer, 0)
   health_check_interval_secs = Default(Integer, 30)
   task_links                 = Map(String, String)
-  primary_port               = Default(String, 'http')
-  stats_port                 = Default(String, 'http')  # if specified, your application should
-                                                        # export its stats here.
 
   layout        = AppLayout      # DEPRECATED in favor of directory sandboxes
   package       = PackerPackage  # DEPRECATED in favor of {{packer}} namespaces.
