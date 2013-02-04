@@ -14,7 +14,6 @@ import com.google.common.collect.Iterables;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
 import com.google.inject.Key;
-import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
@@ -34,9 +33,7 @@ import com.twitter.common.net.pool.DynamicHostSet;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.thrift.ThriftServer;
-import com.twitter.common.util.BackoffStrategy;
 import com.twitter.common.util.Clock;
-import com.twitter.common.util.TruncatedBinaryBackoff;
 import com.twitter.common.zookeeper.Candidate;
 import com.twitter.common.zookeeper.ServerSet;
 import com.twitter.common.zookeeper.SingletonService;
@@ -46,7 +43,6 @@ import com.twitter.common_internal.zookeeper.TwitterServerSet.Service;
 import com.twitter.common_internal.zookeeper.legacy.ServerSetMigrationModule.ServiceDiscovery;
 import com.twitter.mesos.GuiceUtils;
 import com.twitter.mesos.auth.AuthBindings;
-import com.twitter.mesos.scheduler.BackoffSchedulingFilter.BackoffDelegate;
 import com.twitter.mesos.scheduler.CronJobManager.CronScheduler;
 import com.twitter.mesos.scheduler.CronJobManager.CronScheduler.Cron4jScheduler;
 import com.twitter.mesos.scheduler.Driver.DriverImpl;
@@ -57,8 +53,6 @@ import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveMapper;
 import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
 import com.twitter.mesos.scheduler.PulseMonitor.PulseMonitorImpl;
 import com.twitter.mesos.scheduler.RegisteredListener.FanoutRegisteredListener;
-import com.twitter.mesos.scheduler.ScheduleBackoff.ScheduleBackoffImpl;
-import com.twitter.mesos.scheduler.ScheduleBackoff.ScheduleBackoffImpl.Backoff;
 import com.twitter.mesos.scheduler.SchedulerLifecycle.DriverReference;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.TaskAssigner.TaskAssignerImpl;
@@ -87,16 +81,6 @@ public class SchedulerModule extends AbstractModule {
 
   @CmdLine(name = "gc_executor_path", help = "Path to the gc executor launch script.")
   private static final Arg<String> GC_EXECUTOR_PATH = Arg.create(null);
-
-  @CmdLine(name = "initial_task_reschedule_backoff",
-      help = "Initial backoff delay for a rescheduled task.")
-  private static final Arg<Amount<Long, Time>> INITIAL_RESCHEDULE_BACKOFF =
-      Arg.create(Amount.of(10L, Time.SECONDS));
-
-  @CmdLine(name = "max_task_reschedule_backoff",
-      help = "Maximum backoff delay for a rescheduled task.")
-  private static final Arg<Amount<Long, Time>> MAX_RESCHEDULE_BACKOFF =
-      Arg.create(Amount.of(2L, Time.MINUTES));
 
   @VisibleForTesting
   enum AuthMode {
@@ -172,28 +156,11 @@ public class SchedulerModule extends AbstractModule {
     bind(SchedulerThriftInterface.class).in(Singleton.class);
     bind(ThriftServer.class).to(SchedulerThriftServer.class).in(Singleton.class);
 
-    bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(Backoff.class)
-        .toInstance(MAX_RESCHEDULE_BACKOFF.get());
-
-    install(new PrivateModule() {
-      @Override protected void configure() {
-        bind(BackoffStrategy.class).toInstance(
-            new TruncatedBinaryBackoff(
-                INITIAL_RESCHEDULE_BACKOFF.get(),
-                MAX_RESCHEDULE_BACKOFF.get()));
-        bind(ScheduleBackoff.class).to(ScheduleBackoffImpl.class);
-        bind(ScheduleBackoffImpl.class).in(Singleton.class);
-        expose(ScheduleBackoff.class);
-      }
-    });
-    TaskEventModule.bindSubscriber(binder(), ScheduleBackoff.class);
     bind(LostTaskStats.class).in(Singleton.class);
     TaskEventModule.bindSubscriber(binder(), LostTaskStats.class);
 
-    // Filter layering: notifier filter -> backoff filter -> base impl
-    TaskEventModule.bind(binder(), BackoffSchedulingFilter.class);
-    bind(SchedulingFilter.class).annotatedWith(BackoffDelegate.class)
-        .to(SchedulingFilterImpl.class);
+    // Filter layering: notifier filter -> base impl
+    TaskEventModule.bind(binder(), SchedulingFilterImpl.class);
     bind(SchedulingFilterImpl.class).in(Singleton.class);
 
     install(new MetadataModule());

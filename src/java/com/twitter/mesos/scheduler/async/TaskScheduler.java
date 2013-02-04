@@ -226,7 +226,7 @@ public interface TaskScheduler extends EventSubscriber {
     @Subscribe
     public void taskChangedState(TaskStateChange stateChange) {
       // TODO(William Farner): Use the ancestry of a task to check if the task is flapping, use
-      // this to implement scheduling backoff (inducing a longer delay) and remove ScheduleBackoff.
+      // this to implement scheduling backoff (inducing a longer delay).
       String taskId = stateChange.getTaskId();
       if (stateChange.getNewState() == PENDING) {
         addTask(taskId, pendingRetryStrategy.calculateBackoffMs(0), true);
