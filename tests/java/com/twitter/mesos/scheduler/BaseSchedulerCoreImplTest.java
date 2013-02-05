@@ -123,6 +123,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   private Driver driver;
   private StateManagerImpl stateManager;
+  private Storage storage;
   private SchedulerCoreImpl scheduler;
   private CronScheduler cronScheduler;
   private CronJobManager cron;
@@ -160,8 +161,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setDiskMb(quota.getDiskMb() * factor);
   }
 
-  private void buildScheduler(Storage storage) throws Exception {
-    ImmediateJobManager immediateManager = new ImmediateJobManager();
+  private void buildScheduler(Storage newStorage) throws Exception {
+    this.storage = newStorage;
+    ImmediateJobManager immediateManager = new ImmediateJobManager(storage);
     cron = new CronJobManager(storage, cronScheduler);
     stateManager = new StateManagerImpl(storage, clock, new MutableState(), driver, eventSink);
     quotaManager = new QuotaManagerImpl(storage);
@@ -218,7 +220,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(job);
     assertTaskCount(numTasks);
 
-    Set<ScheduledTask> tasks = scheduler.getTasks(queryJob(OWNER_A, JOB_A));
+    Set<ScheduledTask> tasks = Storage.Util.fetchTasks(storage, queryJob(OWNER_A, JOB_A));
     assertEquals(numTasks, tasks.size());
     for (ScheduledTask state : tasks) {
       assertEquals(PENDING, state.getStatus());
@@ -264,8 +266,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     control.replay();
 
-    Storage storage = createStorage();
-
+    storage = createStorage();
     storage.start(MutateWork.NOOP);
 
     final TwitterTaskInfo storedTask = new TwitterTaskInfo()
@@ -325,8 +326,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   public void testShardUniquenessCorrection() throws Exception {
     control.replay();
 
-    Storage storage = createStorage();
-
+    storage = createStorage();
     storage.start(MutateWork.NOOP);
 
     final AtomicInteger taskId = new AtomicInteger();
@@ -362,8 +362,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     control.replay();
 
-    Storage storage = createStorage();
-
+    storage = createStorage();
     storage.start(MutateWork.NOOP);
 
     final TwitterTaskInfo storedTask = new TwitterTaskInfo()
@@ -406,8 +405,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     control.replay();
 
-    Storage storage = createStorage();
-
+    storage = createStorage();
     storage.start(MutateWork.NOOP);
 
     storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
@@ -984,7 +982,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(makeJob(OWNER_A, JOB_A, 1));
     assertTaskCount(1);
 
-    Set<ScheduledTask> tasks = scheduler.getTasks(queryJob(OWNER_A, JOB_A));
+    Set<ScheduledTask> tasks = Storage.Util.fetchTasks(storage, queryJob(OWNER_A, JOB_A));
     assertEquals(1, tasks.size());
 
     String taskId = Tasks.id(Iterables.get(tasks, 0));
@@ -1040,7 +1038,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(makeJob(OWNER_A, JOB_A, task, 1));
     assertTaskCount(1);
 
-    Set<ScheduledTask> tasks = scheduler.getTasks(queryJob(OWNER_A, JOB_A));
+    Set<ScheduledTask> tasks = Storage.Util.fetchTasks(storage, queryJob(OWNER_A, JOB_A));
     assertEquals(1, tasks.size());
 
     changeStatus(Query.byStatus(PENDING), ASSIGNED);
@@ -1082,8 +1080,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.killTasks(queryJob(OWNER_A, JOB_A + "2"), OWNER_A.getUser());
     assertTaskCount(5);
 
-    for (ScheduledTask state : scheduler.getTasks(Query.GET_ALL)) {
-      assertEquals(JOB_A, state.getAssignedTask().getTask().getJobName());
+    for (ScheduledTask state : Storage.Util.fetchTasks(storage, Query.GET_ALL)) {
+      assertEquals(JOB_A, Tasks.getJob(state));
     }
   }
 
@@ -1898,7 +1896,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   }
 
   private void assertTaskCount(int numTasks) {
-    assertEquals(numTasks, scheduler.getTasks(Query.GET_ALL).size());
+    assertEquals(numTasks, Storage.Util.fetchTasks(storage, Query.GET_ALL).size());
   }
 
   private static ParsedConfiguration makeCronJob(
@@ -1984,19 +1982,19 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   }
 
   private ScheduledTask getOnlyTask(TaskQuery query) {
-    return Iterables.getOnlyElement(scheduler.getTasks(query));
+    return Iterables.getOnlyElement(Storage.Util.fetchTasks(storage, query));
   }
 
   private Set<ScheduledTask> getTasks(TaskQuery query) {
-    return scheduler.getTasks(query);
+    return Storage.Util.fetchTasks(storage, query);
   }
 
   private Set<ScheduledTask> getTasksByStatus(ScheduleStatus status) {
-    return scheduler.getTasks(Query.byStatus(status));
+    return Storage.Util.fetchTasks(storage, Query.byStatus(status));
   }
 
   private Set<ScheduledTask> getTasksOwnedBy(Identity owner) {
-    return scheduler.getTasks(query(owner, null, null));
+    return Storage.Util.fetchTasks(storage, query(owner, null, null));
   }
 
   private TaskQuery query(Iterable<String> taskIds) {

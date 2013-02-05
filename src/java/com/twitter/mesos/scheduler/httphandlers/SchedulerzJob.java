@@ -50,9 +50,9 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.CommandLineExpander;
 import com.twitter.mesos.scheduler.Numbers;
-import com.twitter.mesos.scheduler.SchedulerCore;
 import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
 import com.twitter.mesos.scheduler.metadata.NearestFit;
+import com.twitter.mesos.scheduler.storage.Storage;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -168,24 +168,24 @@ public class SchedulerzJob extends JerseyTemplateServlet {
         }
       };
 
-  private final SchedulerCore scheduler;
+  private final Storage storage;
   private final String clusterName;
   private final NearestFit nearestFit;
 
   /**
    * Creates a new job servlet.
    *
-   * @param scheduler Core scheduler.
+   * @param storage Backing store to fetch tasks from.
    * @param clusterName Name of the serving cluster.
    */
   @Inject
   public SchedulerzJob(
-      SchedulerCore scheduler,
+      Storage storage,
       @ClusterName String clusterName,
       NearestFit nearestFit) {
 
     super("schedulerzjob");
-    this.scheduler = checkNotNull(scheduler);
+    this.storage = checkNotNull(storage);
     this.clusterName = checkNotBlank(clusterName);
     this.nearestFit = checkNotNull(nearestFit);
   }
@@ -364,7 +364,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
         }
 
         if (activeQuery.isPresent()) {
-          Set<ScheduledTask> activeTasks = scheduler.getTasks(activeQuery.get());
+          Set<ScheduledTask> activeTasks = Storage.Util.fetchTasks(storage, activeQuery.get());
           List<ScheduledTask> liveTasks = SHARD_ID_COMPARATOR.sortedCopy(activeTasks);
           template.setAttribute("activeTasks",
               ImmutableList.copyOf(
@@ -375,7 +375,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
         }
         if (completedQuery.isPresent()) {
           List<ScheduledTask> completedTasks =
-              Lists.newArrayList(scheduler.getTasks(completedQuery.get()));
+              Lists.newArrayList(Storage.Util.fetchTasks(storage, completedQuery.get()));
           Collections.sort(completedTasks, REVERSE_CHRON_COMPARATOR);
           template.setAttribute("completedTasks",
               ImmutableList.copyOf(

@@ -35,8 +35,8 @@ import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.ClusterName;
-import com.twitter.mesos.scheduler.SchedulerCore;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
+import com.twitter.mesos.scheduler.storage.Storage;
 
 /**
  * A servlet to give an aggregate view of cluster resources consumed, grouped by category.
@@ -46,19 +46,19 @@ public class Utilization {
 
   private static final TaskQuery ALL_ACTIVE = new TaskQuery().setStatuses(Tasks.ACTIVE_STATES);
 
-  private final SchedulerCore scheduler;
+  private final Storage storage;
   private final String clusterName;
   private final StringTemplateHelper templateHelper;
 
   @Inject
-  Utilization(SchedulerCore scheduler, @ClusterName String clusterName) {
+  Utilization(Storage storage, @ClusterName String clusterName) {
     templateHelper = new StringTemplateHelper(getClass(), "utilization", true);
-    this.scheduler = Preconditions.checkNotNull(scheduler);
+    this.storage = Preconditions.checkNotNull(storage);
     this.clusterName = MorePreconditions.checkNotBlank(clusterName);
   }
 
   private Iterable<TwitterTaskInfo> getTasks(TaskQuery query) {
-    return Iterables.transform(scheduler.getTasks(query), Tasks.SCHEDULED_TO_INFO);
+    return Iterables.transform(Storage.Util.fetchTasks(storage, query), Tasks.SCHEDULED_TO_INFO);
   }
 
   private String fillTemplate(final Iterable<? extends Metric> metrics) {

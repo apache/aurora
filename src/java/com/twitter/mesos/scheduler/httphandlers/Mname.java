@@ -30,7 +30,7 @@ import com.google.inject.Inject;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.scheduler.Query;
-import com.twitter.mesos.scheduler.SchedulerCore;
+import com.twitter.mesos.scheduler.storage.Storage;
 
 import static javax.ws.rs.core.Response.Status.NOT_FOUND;
 
@@ -50,11 +50,11 @@ public class Mname {
   private static final Set<String> HTTP_PORT_NAMES = ImmutableSet.of(
       "health", "http", "HTTP", "web");
 
-  private final SchedulerCore scheduler;
+  private final Storage storage;
 
   @Inject
-  public Mname(SchedulerCore scheduler) {
-    this.scheduler = checkNotNull(scheduler);
+  public Mname(Storage storage) {
+    this.storage = checkNotNull(storage);
   }
 
   @GET
@@ -174,7 +174,7 @@ public class Mname {
       Optional<String> forwardRequest) {
 
     ScheduledTask task = Iterables.getOnlyElement(
-        scheduler.getTasks(Query.liveShard(role, job, shardId)), null);
+        Storage.Util.fetchTasks(storage, Query.liveShard(role, job, shardId)), null);
     if (task == null) {
       return respond(NOT_FOUND, "No such live shard found.");
     }

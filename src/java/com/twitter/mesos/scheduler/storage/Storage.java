@@ -1,5 +1,9 @@
 package com.twitter.mesos.scheduler.storage;
 
+import com.google.common.collect.ImmutableSet;
+
+import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.SchedulerException;
 
 /**
@@ -177,4 +181,31 @@ public interface Storage {
    * Prepares the underlying storage system for clean shutdown.
    */
   void stop();
+
+  /**
+   * Utility functions for interacting with a Storage instance.
+   */
+  public final class Util {
+
+    private Util() {
+      // Utility class.
+    }
+
+    /**
+     * Fetches tasks from the {@link TaskStore} for {@code storage} in a read transaction.
+     * This is intended for convenience, and should only be used in instances where no other
+     * transactional work is performed with the result.
+     *
+     * @param storage Storage instance to query from.
+     * @param query Query to perform.
+     * @return Tasks returned from the query.
+     */
+    public static ImmutableSet<ScheduledTask> fetchTasks(Storage storage, final TaskQuery query) {
+      return storage.doInTransaction(new Work.Quiet<ImmutableSet<ScheduledTask>>() {
+        @Override public ImmutableSet<ScheduledTask> apply(StoreProvider storeProvider) {
+          return storeProvider.getTaskStore().fetchTasks(query);
+        }
+      });
+    }
+  }
 }

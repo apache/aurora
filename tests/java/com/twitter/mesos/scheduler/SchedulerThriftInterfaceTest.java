@@ -11,7 +11,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 
-import org.easymock.Capture;
 import org.easymock.IExpectationSetters;
 import org.junit.Before;
 import org.junit.Test;
@@ -50,9 +49,8 @@ import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 import com.twitter.mesos.scheduler.storage.backup.Recovery;
 import com.twitter.mesos.scheduler.storage.backup.StorageBackup;
+import com.twitter.mesos.scheduler.storage.testing.StorageTestUtil;
 
-import static org.easymock.EasyMock.capture;
-import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
@@ -76,6 +74,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private static final Identity ROLE_IDENTITY = new Identity(ROLE, USER);
   private static final SessionKey SESSION = new SessionKey().setUser(USER);
 
+  private StorageTestUtil storageUtil;
   private SchedulerCore scheduler;
   private SessionValidator sessionValidator;
   private QuotaManager quotaManager;
@@ -86,6 +85,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Before
   public void setUp() {
+    storageUtil = new StorageTestUtil(this);
+    storageUtil.expectTransactions();
     scheduler = createMock(SchedulerCore.class);
     sessionValidator = createMock(SessionValidator.class);
     quotaManager = createMock(QuotaManager.class);
@@ -93,6 +94,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     recovery = createMock(Recovery.class);
     maintenance = createMock(MaintenanceController.class);
     thrift = new SchedulerThriftInterface(
+        storageUtil.storage,
         scheduler,
         sessionValidator,
         quotaManager,
@@ -150,19 +152,13 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     expectAdminAuth(false);
     expectAuth(ROLE, true);
-    Capture<TaskQuery> queryCapture = new Capture<TaskQuery>();
-    expect(scheduler.getTasks(capture(queryCapture)))
-        .andReturn(ImmutableSet.of(task));
-    Capture<TaskQuery> killQueryCapture = new Capture<TaskQuery>();
-    scheduler.killTasks(capture(killQueryCapture), eq(USER));
-    expect(scheduler.getTasks(capture(queryCapture)))
-        .andReturn(ImmutableSet.<ScheduledTask>of());
+    storageUtil.expectTaskFetch(query, task);
+    scheduler.killTasks(query, USER);
+    storageUtil.expectTaskFetch(query);
     control.replay();
 
     KillResponse response = thrift.killTasks(query, SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
-    assertEquals(queryCapture.getValue(), query);
-    assertEquals(killQueryCapture.getValue(), query);
   }
 
   @Test
@@ -177,21 +173,14 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     expectAdminAuth(false);
     expectAuth(ROLE, true);
-    Capture<TaskQuery> queryCapture = new Capture<TaskQuery>();
-    expect(scheduler.getTasks(capture(queryCapture)))
-        .andReturn(ImmutableSet.of(task));
-    Capture<TaskQuery> killQueryCapture = new Capture<TaskQuery>();
-    scheduler.killTasks(capture(killQueryCapture), eq(USER));
-    expect(scheduler.getTasks(capture(queryCapture)))
-        .andReturn(ImmutableSet.of(task)).times(2);
-    expect(scheduler.getTasks(capture(queryCapture)))
-        .andReturn(ImmutableSet.<ScheduledTask>of());
+    storageUtil.expectTaskFetch(query, task);
+    scheduler.killTasks(query, USER);
+    storageUtil.expectTaskFetch(query, task).times(2);
+    storageUtil.expectTaskFetch(query);
     control.replay();
 
     KillResponse response = thrift.killTasks(query, SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
-    assertEquals(queryCapture.getValue(), query);
-    assertEquals(killQueryCapture.getValue(), query);
   }
 
   @Test
@@ -206,15 +195,12 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     expectAdminAuth(false);
     expectAuth(ROLE, false);
-    Capture<TaskQuery> queryCapture = new Capture<TaskQuery>();
-    expect(scheduler.getTasks(capture(queryCapture)))
-        .andReturn(ImmutableSet.of(task));
+    storageUtil.expectTaskFetch(query, task);
 
     control.replay();
 
     KillResponse response = thrift.killTasks(query, SESSION);
     assertEquals(ResponseCode.AUTH_FAILED, response.getResponseCode());
-    assertEquals(queryCapture.getValue(), query);
   }
 
   @Test
@@ -224,15 +210,12 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setJobName("foo_job");
 
     expectAdminAuth(true);
-    Capture<TaskQuery> killQueryCapture = new Capture<TaskQuery>();
-    scheduler.killTasks(capture(killQueryCapture), eq(USER));
-    expect(scheduler.getTasks(capture(killQueryCapture)))
-        .andReturn(ImmutableSet.<ScheduledTask>of());
+    scheduler.killTasks(query, USER);
+    storageUtil.expectTaskFetch(query);
     control.replay();
 
     KillResponse response = thrift.killTasks(query, SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
-    assertEquals(killQueryCapture.getValue(), query);
   }
 
   @Test
@@ -253,8 +236,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     expectAdminAuth(true);
 
-    Capture<TaskQuery> killQueryCapture = new Capture<TaskQuery>();
-    scheduler.killTasks(capture(killQueryCapture), eq(USER));
+    scheduler.killTasks(query, USER);
     expectLastCall().andThrow(new ScheduleException("No jobs matching query"));
     control.replay();
 

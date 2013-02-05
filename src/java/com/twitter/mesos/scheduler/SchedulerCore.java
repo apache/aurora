@@ -10,7 +10,6 @@ import com.google.common.base.Optional;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
-import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.ShardUpdateResult;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.UpdateResult;
@@ -65,16 +64,6 @@ public interface SchedulerCore extends RegisteredListener {
    */
   @Override
   void registered(String frameworkId);
-
-  /**
-   * Fetches information about all registered tasks for a job.
-   *
-   * @param query The query to identify tasks.
-   * @return A set of task objects.
-   * @deprecated Please perform queries directly on a Storage instance.
-   */
-  @Deprecated
-  Set<ScheduledTask> getTasks(TaskQuery query);
 
   /**
    * Creates a new job, whose tasks will become candidates for scheduling.

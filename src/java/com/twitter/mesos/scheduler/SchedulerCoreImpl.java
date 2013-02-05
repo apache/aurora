@@ -150,13 +150,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
     stateManager.setFrameworkId(frameworkId);
   }
 
-  @Override
-  public Set<ScheduledTask> getTasks(TaskQuery query) {
-    // TODO(William Farner): Remove this method and update all callers to interact directly with
-    // the underlying Storage.
-    return stateManager.fetchTasks(query);
-  }
-
   private boolean hasActiveJob(JobConfiguration job) {
     return Iterables.any(jobManagers, managerHasJob(job));
   }

@@ -47,7 +47,6 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.events.PubsubEvent.EventSubscriber;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
-import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
 
 import it.sauronsoftware.cron4j.InvalidPatternException;
@@ -274,15 +273,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
   }
 
   private boolean hasTasks(TaskQuery query) {
-    return !getTasks(query).isEmpty();
-  }
-
-  private Set<ScheduledTask> getTasks(final TaskQuery query) {
-    return storage.doInTransaction(new Work.Quiet<Set<ScheduledTask>>() {
-      @Override public Set<ScheduledTask> apply(StoreProvider storeProvider) {
-        return storeProvider.getTaskStore().fetchTasks(query);
-      }
-    });
+    return !Storage.Util.fetchTasks(storage, query).isEmpty();
   }
 
   public static CronCollisionPolicy orDefault(@Nullable CronCollisionPolicy policy) {
@@ -303,7 +294,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
     Optional<JobConfiguration> runJob = Optional.absent();
 
     final TaskQuery activeQuery = Query.activeQuery(job.getOwner(), job.getName());
-    Set<ScheduledTask> activeTasks = getTasks(activeQuery);
+    Set<ScheduledTask> activeTasks = Storage.Util.fetchTasks(storage, activeQuery);
 
     if (activeTasks.isEmpty()) {
       runJob = Optional.of(job);

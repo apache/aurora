@@ -63,6 +63,7 @@ import com.twitter.mesos.gen.UpdateShardsResponse;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
+import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.backup.Recovery;
 import com.twitter.mesos.scheduler.storage.backup.Recovery.RecoveryException;
 import com.twitter.mesos.scheduler.storage.backup.StorageBackup;
@@ -112,6 +113,7 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
       },
       Tasks.SCHEDULED_TO_INFO);
 
+  private final Storage storage;
   private final SchedulerCore schedulerCore;
   private final SessionValidator sessionValidator;
   private final QuotaManager quotaManager;
@@ -123,6 +125,7 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
 
   @Inject
   SchedulerThriftInterface(
+      Storage storage,
       SchedulerCore schedulerCore,
       SessionValidator sessionValidator,
       QuotaManager quotaManager,
@@ -130,7 +133,8 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
       Recovery recovery,
       MaintenanceController maintenance) {
 
-    this(schedulerCore,
+    this(storage,
+        schedulerCore,
         sessionValidator,
         quotaManager,
         backup,
@@ -142,6 +146,7 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
 
   @VisibleForTesting
   SchedulerThriftInterface(
+      Storage storage,
       SchedulerCore schedulerCore,
       SessionValidator sessionValidator,
       QuotaManager quotaManager,
@@ -151,6 +156,7 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
       Amount<Long, Time> initialBackoff,
       Amount<Long, Time> maxBackoff) {
 
+    this.storage = checkNotNull(storage);
     this.schedulerCore = checkNotNull(schedulerCore);
     this.sessionValidator = checkNotNull(sessionValidator);
     this.quotaManager = checkNotNull(quotaManager);
@@ -163,7 +169,7 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
 
   private void validateSessionKeyForTasks(SessionKey session, TaskQuery taskQuery)
       throws AuthFailedException {
-    Set<ScheduledTask> tasks = schedulerCore.getTasks(taskQuery);
+    Set<ScheduledTask> tasks = Storage.Util.fetchTasks(storage, taskQuery);
     for (String role : ImmutableSet.copyOf(Iterables.transform(tasks, GET_ROLE))) {
       sessionValidator.checkAuthenticated(session, role);
     }
@@ -251,7 +257,7 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
   public ScheduleStatusResponse getTasksStatus(TaskQuery query) {
     checkNotNull(query);
 
-    Set<ScheduledTask> tasks = schedulerCore.getTasks(query);
+    Set<ScheduledTask> tasks = Storage.Util.fetchTasks(storage, query);
 
     ScheduleStatusResponse response = new ScheduleStatusResponse();
     if (tasks.isEmpty()) {
@@ -306,7 +312,7 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     try {
       backoff.doUntilSuccess(new Supplier<Boolean>() {
         @Override public Boolean get() {
-          if (schedulerCore.getTasks(activeQuery).isEmpty()) {
+          if (Storage.Util.fetchTasks(storage, activeQuery).isEmpty()) {
             LOG.info("Tasks all killed, done waiting.");
             return true;
           } else {

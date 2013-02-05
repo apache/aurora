@@ -21,11 +21,12 @@ import org.antlr.stringtemplate.StringTemplate;
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.CronJobManager;
 import com.twitter.mesos.scheduler.Query;
-import com.twitter.mesos.scheduler.SchedulerCore;
+import com.twitter.mesos.scheduler.storage.Storage;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -45,25 +46,25 @@ public class SchedulerzHome extends JerseyTemplateServlet {
     }
   };
 
-  private final SchedulerCore scheduler;
+  private final Storage storage;
   private final CronJobManager cronScheduler;
   private final String clusterName;
 
   /**
    * Creates a new scheduler home servlet.
    *
-   * @param scheduler Core scheduler.
+   * @param storage Backing store to fetch tasks from.
    * @param cronScheduler Cron scheduler.
    * @param clusterName Name of the serving cluster.
    */
   @Inject
   public SchedulerzHome(
-      SchedulerCore scheduler,
+      Storage storage,
       CronJobManager cronScheduler,
       @ClusterName String clusterName) {
 
     super("schedulerzhome");
-    this.scheduler = checkNotNull(scheduler);
+    this.storage = checkNotNull(storage);
     this.cronScheduler = checkNotNull(cronScheduler);
     this.clusterName = checkNotBlank(clusterName);
   }
@@ -84,9 +85,8 @@ public class SchedulerzHome extends JerseyTemplateServlet {
             CacheBuilder.newBuilder().build(CacheLoader.from(CREATE_ROLE));
 
         // TODO(William Farner): Render this page without an expensive query.
-        for (TwitterTaskInfo task
-            : Iterables.transform(scheduler.getTasks(Query.GET_ALL), Tasks.SCHEDULED_TO_INFO)) {
-
+        Set<ScheduledTask> tasks = Storage.Util.fetchTasks(storage, Query.GET_ALL);
+        for (TwitterTaskInfo task : Iterables.transform(tasks, Tasks.SCHEDULED_TO_INFO)) {
           owners.getUnchecked(task.getOwner().getRole()).accumulate(task);
         }
 

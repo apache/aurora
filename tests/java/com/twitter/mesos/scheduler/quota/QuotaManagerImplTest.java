@@ -187,15 +187,11 @@ public class QuotaManagerImplTest extends EasyMockTest {
     assertFalse(quotaManager.hasRemaining(ROLE, new Quota(2, 2, 2)));
   }
 
-  private IExpectationSetters<ImmutableSet<ScheduledTask>> expectTaskQuery() {
-    return expect(storageUtil.taskStore.fetchTasks(ACTIVE_QUERY));
+  private IExpectationSetters<?> returnTasks(ScheduledTask... tasks) {
+    return storageUtil.expectTaskFetch(ACTIVE_QUERY, tasks);
   }
 
-  private IExpectationSetters<ImmutableSet<ScheduledTask>> returnTasks(ScheduledTask... tasks) {
-    return expectTaskQuery().andReturn(ImmutableSet.<ScheduledTask>builder().add(tasks).build());
-  }
-
-  private IExpectationSetters<ImmutableSet<ScheduledTask>> returnNoTasks() {
+  private IExpectationSetters<?> returnNoTasks() {
     return returnTasks();
   }
 

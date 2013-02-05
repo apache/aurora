@@ -30,8 +30,8 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.CronJobManager;
 import com.twitter.mesos.scheduler.Query;
-import com.twitter.mesos.scheduler.SchedulerCore;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
+import com.twitter.mesos.scheduler.storage.Storage;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -43,7 +43,7 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 @Path("/scheduler/{role}")
 public class SchedulerzRole extends JerseyTemplateServlet {
 
-  private final SchedulerCore scheduler;
+  private final Storage storage;
   private final CronJobManager cronScheduler;
   private final String clusterName;
   private final QuotaManager quotaManager;
@@ -51,20 +51,20 @@ public class SchedulerzRole extends JerseyTemplateServlet {
   /**
    * Creates a new role servlet.
    *
-   * @param scheduler Core scheduler.
+   * @param storage Backing store to fetch tasks from.
    * @param cronScheduler Cron scheduler.
    * @param clusterName Name of the serving cluster.
    * @param quotaManager Resource quota manager.
    */
   @Inject
   public SchedulerzRole(
-      SchedulerCore scheduler,
+      Storage storage,
       CronJobManager cronScheduler,
       @ClusterName String clusterName,
       QuotaManager quotaManager) {
 
     super("schedulerzrole");
-    this.scheduler = checkNotNull(scheduler);
+    this.storage = checkNotNull(storage);
     this.cronScheduler = checkNotNull(cronScheduler);
     this.clusterName = checkNotBlank(clusterName);
     this.quotaManager = checkNotNull(quotaManager);
@@ -97,7 +97,7 @@ public class SchedulerzRole extends JerseyTemplateServlet {
               }
             });
 
-        for (ScheduledTask task : scheduler.getTasks(Query.byRole(role))) {
+        for (ScheduledTask task : Storage.Util.fetchTasks(storage, Query.byRole(role))) {
           Job job = jobs.getUnchecked(task.getAssignedTask().getTask().getJobName());
 
           switch (task.getStatus()) {

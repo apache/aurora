@@ -31,6 +31,7 @@ import com.twitter.mesos.scheduler.Resources;
 import com.twitter.mesos.scheduler.ScheduleException;
 import com.twitter.mesos.scheduler.SchedulerCore;
 import com.twitter.mesos.scheduler.SchedulingFilter;
+import com.twitter.mesos.scheduler.storage.Storage;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -88,6 +89,7 @@ class Preempter implements Runnable {
     }
   };
 
+  private Storage storage;
   private final SchedulerCore scheduler;
   private final SchedulingFilter schedulingFilter;
   private final Amount<Long, Time> preemptionCandidacyDelay;
@@ -96,6 +98,7 @@ class Preempter implements Runnable {
   /**
    * Creates a new preempter.
    *
+   * @param storage Backing store for tasks.
    * @param scheduler Scheduler to fetch task information from, and instruct when preempting tasks.
    * @param schedulingFilter Filter to identify whether tasks may reside on given host machines.
    * @param preemptionCandidacyDelay Time a task must be PENDING before it may preempt other tasks.
@@ -103,11 +106,13 @@ class Preempter implements Runnable {
    */
   @Inject
   Preempter(
+      Storage storage,
       SchedulerCore scheduler,
       SchedulingFilter schedulingFilter,
       @PreemptionDelay Amount<Long, Time> preemptionCandidacyDelay,
       Clock clock) {
 
+    this.storage = checkNotNull(storage);
     this.scheduler = checkNotNull(scheduler);
     this.schedulingFilter = checkNotNull(schedulingFilter);
     this.preemptionCandidacyDelay = checkNotNull(preemptionCandidacyDelay);
@@ -116,7 +121,7 @@ class Preempter implements Runnable {
 
   private List<AssignedTask> fetch(TaskQuery query, Predicate<ScheduledTask> filter) {
     return Lists.newArrayList(Iterables.transform(
-        Iterables.filter(scheduler.getTasks(query), filter), SCHEDULED_TO_ASSIGNED));
+        Iterables.filter(Storage.Util.fetchTasks(storage, query), filter), SCHEDULED_TO_ASSIGNED));
   }
 
   private List<AssignedTask> fetch(TaskQuery query) {

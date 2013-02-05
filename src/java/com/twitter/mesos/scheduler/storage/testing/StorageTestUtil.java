@@ -1,10 +1,14 @@
 package com.twitter.mesos.scheduler.storage.testing;
 
+import com.google.common.collect.ImmutableSet;
+
 import org.easymock.Capture;
 import org.easymock.IAnswer;
 import org.easymock.IExpectationSetters;
 
 import com.twitter.common.testing.EasyMockTest;
+import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.storage.AttributeStore;
 import com.twitter.mesos.scheduler.storage.JobStore;
 import com.twitter.mesos.scheduler.storage.QuotaStore;
@@ -92,5 +96,10 @@ public class StorageTestUtil {
   public void expectTransactions() {
     expectTransaction().anyTimes();
     expectWriteTransaction().anyTimes();
+  }
+
+  public IExpectationSetters<?> expectTaskFetch(TaskQuery query, ScheduledTask... result) {
+    return expect(taskStore.fetchTasks(query))
+        .andReturn(ImmutableSet.<ScheduledTask>builder().add(result).build());
   }
 }

@@ -23,6 +23,7 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.Resources;
 import com.twitter.mesos.scheduler.SchedulerCore;
 import com.twitter.mesos.scheduler.SchedulingFilter;
+import com.twitter.mesos.scheduler.storage.testing.StorageTestUtil;
 
 import static org.easymock.EasyMock.expect;
 
@@ -45,6 +46,7 @@ public class PreempterTest extends EasyMockTest {
 
   private static final Amount<Long, Time> PREEMPTION_DELAY = Amount.of(30L, Time.SECONDS);
 
+  private StorageTestUtil storageUtil;
   private SchedulerCore scheduler;
   private SchedulingFilter schedulingFilter;
   private FakeClock clock;
@@ -52,10 +54,17 @@ public class PreempterTest extends EasyMockTest {
 
   @Before
   public void setUp() {
+    storageUtil = new StorageTestUtil(this);
+    storageUtil.expectTransactions();
     scheduler = createMock(SchedulerCore.class);
     schedulingFilter = createMock(SchedulingFilter.class);
     clock = new FakeClock();
-    preempter = new Preempter(scheduler, schedulingFilter, PREEMPTION_DELAY, clock);
+    preempter = new Preempter(
+        storageUtil.storage,
+        scheduler,
+        schedulingFilter,
+        PREEMPTION_DELAY,
+        clock);
   }
 
   // TODO(wfarner): Put together a SchedulerPreempterIntegrationTest as well.
@@ -70,13 +79,11 @@ public class PreempterTest extends EasyMockTest {
   }
 
   private void expectGetPendingTasks(ScheduledTask... returnedTasks) {
-    expect(scheduler.getTasks(Preempter.PENDING_QUERY))
-        .andReturn(ImmutableSet.<ScheduledTask>builder().add(returnedTasks).build());
+    storageUtil.expectTaskFetch(Preempter.PENDING_QUERY, returnedTasks);
   }
 
   private void expectGetActiveTasks(ScheduledTask... returnedTasks) {
-    expect(scheduler.getTasks(Preempter.ACTIVE_NOT_PENDING_QUERY))
-        .andReturn(ImmutableSet.<ScheduledTask>builder().add(returnedTasks).build());
+    storageUtil.expectTaskFetch(Preempter.ACTIVE_NOT_PENDING_QUERY, returnedTasks);
   }
 
   @Test

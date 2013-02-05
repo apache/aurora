@@ -57,11 +57,6 @@ public class CronJobManagerTest extends EasyMockTest {
     job = makeJob();
   }
 
-  private IExpectationSetters<?> expectTaskQuery(TaskQuery query, ScheduledTask... result) {
-    return expect(storageUtil.taskStore.fetchTasks(query))
-        .andReturn(ImmutableSet.<ScheduledTask>builder().add(result).build());
-  }
-
   private void expectJobAccepted(JobConfiguration savedJob) {
     storageUtil.jobStore.saveAcceptedJob(CronJobManager.MANAGER_KEY, savedJob);
     expect(cronScheduler.schedule(eq(savedJob.getCronSchedule()), EasyMock.<Runnable>anyObject()))
@@ -79,8 +74,7 @@ public class CronJobManagerTest extends EasyMockTest {
 
   private IExpectationSetters<?> expectActiveTaskFetch(ScheduledTask... activeTasks) {
     TaskQuery query = Query.activeQuery(job.getOwner().getRole(), job.getName());
-    return expect(storageUtil.taskStore.fetchTasks(query))
-        .andReturn(ImmutableSet.<ScheduledTask>builder().add(activeTasks).build());
+    return storageUtil.expectTaskFetch(query, activeTasks);
   }
 
   @Test
