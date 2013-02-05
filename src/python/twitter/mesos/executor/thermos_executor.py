@@ -206,7 +206,8 @@ class ThermosExecutor(ThermosExecutorBase):
 
   """ Mesos Executor API methods follow """
 
-  def resolve_ports(self, mesos_task, portmap):
+  @classmethod
+  def resolve_ports(cls, mesos_task, portmap):
     """Given a mesos task and the portmap of resolved ports from the scheduler,
        create a fully resolved map of port name => port number for the thermos
        runner and discovery manager."""
