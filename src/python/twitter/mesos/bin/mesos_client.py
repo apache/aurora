@@ -98,11 +98,18 @@ JSON_OPTION = optparse.Option(
     help='If specified, configuration is read in JSON format.  Only works with Thermos tasks.')
 
 
-CLUSTER_OPTION = optparse.Option(
+def make_cluster_option(explanation):
+  return optparse.Option(
     '--cluster',
     dest='cluster',
     default=None,
-    help='Cluster to invoke this command against (choose from %s).' % Cluster.get_list())
+    help=explanation)
+
+CLUSTER_CONFIG_OPTION = make_cluster_option(
+  'Cluster to match when selecting a job from a configuration. Optional if only one job matching '
+  'the given job name exists in the config.')
+CLUSTER_INVOKE_OPTION = make_cluster_option(
+  'Cluster to invoke this command against (choose from %s)' % Cluster.get_list())
 
 
 ENV_OPTION = optparse.Option(
@@ -158,7 +165,7 @@ def make_spawn_options(options):
 @app.command
 @app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
-@app.command_option(CLUSTER_OPTION)
+@app.command_option(CLUSTER_CONFIG_OPTION)
 @app.command_option(ENV_OPTION)
 @app.command_option(JSON_OPTION)
 @requires.exactly('job', 'config')
@@ -299,7 +306,7 @@ def runtask(args, options):
 
 @app.command
 @app.command_option(ENVIRONMENT_BIND_OPTION)
-@app.command_option(CLUSTER_OPTION)
+@app.command_option(CLUSTER_CONFIG_OPTION)
 @app.command_option(ENV_OPTION)
 @app.command_option(JSON_OPTION)
 @requires.exactly('job', 'config')
@@ -352,7 +359,7 @@ def diff(job, config_file):
 
 
 @app.command(name='open')
-@app.command_option(CLUSTER_OPTION)
+@app.command_option(CLUSTER_INVOKE_OPTION)
 @requires.nothing
 def do_open(*args):
   """usage: open --cluster=CLUSTER [role [job]]
@@ -381,7 +388,7 @@ def do_open(*args):
 @app.command_option('--raw', dest='raw', default=False, action='store_true',
     help='Show the raw configuration.')
 @app.command_option(ENVIRONMENT_BIND_OPTION)
-@app.command_option(CLUSTER_OPTION)
+@app.command_option(CLUSTER_CONFIG_OPTION)
 @app.command_option(ENV_OPTION)
 @app.command_option(JSON_OPTION)
 @requires.exactly('job', 'config')
@@ -448,7 +455,7 @@ def inspect(jobname, config_file):
 
 
 @app.command
-@app.command_option(CLUSTER_OPTION)
+@app.command_option(CLUSTER_INVOKE_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
 @requires.exactly('role', 'job')
 def start_cron(role, jobname):
@@ -464,7 +471,7 @@ def start_cron(role, jobname):
 
 
 @app.command
-@app.command_option(CLUSTER_OPTION)
+@app.command_option(CLUSTER_INVOKE_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
 @app.command_option(SHARDS_OPTION)
 @requires.exactly('role', 'job')
@@ -482,7 +489,7 @@ def kill(role, jobname):
 
 
 @app.command
-@app.command_option(CLUSTER_OPTION)
+@app.command_option(CLUSTER_INVOKE_OPTION)
 @requires.exactly('role', 'job')
 def status(role, jobname):
   """usage: status --cluster=CLUSTER role job
@@ -549,7 +556,7 @@ def _getshards(shards):
 @app.command
 @app.command_option(SHARDS_OPTION)
 @app.command_option(ENVIRONMENT_BIND_OPTION)
-@app.command_option(CLUSTER_OPTION)
+@app.command_option(CLUSTER_CONFIG_OPTION)
 @app.command_option(ENV_OPTION)
 @app.command_option(JSON_OPTION)
 @requires.exactly('job', 'config')
@@ -604,7 +611,7 @@ See http://confluence.local.twitter.com/display/Aurora/Aurora+Configuration+Refe
 
 
 @app.command
-@app.command_option(CLUSTER_OPTION)
+@app.command_option(CLUSTER_INVOKE_OPTION)
 @requires.exactly('role', 'job')
 def cancel_update(role, jobname):
   """usage: cancel_update --cluster=CLUSTER role job
@@ -619,7 +626,7 @@ def cancel_update(role, jobname):
 
 
 @app.command
-@app.command_option(CLUSTER_OPTION)
+@app.command_option(CLUSTER_INVOKE_OPTION)
 @requires.exactly('role')
 def get_quota(role):
   """usage: get_quota --cluster=CLUSTER role
@@ -639,7 +646,7 @@ def get_quota(role):
 
 
 @app.command
-@app.command_option(CLUSTER_OPTION)
+@app.command_option(CLUSTER_INVOKE_OPTION)
 @app.command_option(EXECUTOR_SANDBOX_OPTION)
 @app.command_option('--user', dest='ssh_user', default=None,
                     help="ssh as this user instead of the role.")
@@ -686,7 +693,7 @@ def ssh(role, job, shard, *args):
 @app.command_option('-t', '--threads', type=int, default=1, dest='num_threads',
     help='The number of threads to use.')
 @app.command_option(EXECUTOR_SANDBOX_OPTION)
-@app.command_option(CLUSTER_OPTION)
+@app.command_option(CLUSTER_INVOKE_OPTION)
 @requires.at_least('role', 'job', 'cmd')
 def run(*line):
   """usage: run --cluster=CLUSTER role job(s) cmd
@@ -746,7 +753,7 @@ def trap_packer_error(fn):
 
 @app.command
 @trap_packer_error
-@app.command_option(CLUSTER_OPTION)
+@app.command_option(CLUSTER_INVOKE_OPTION)
 @requires.exactly('role')
 def package_list(role):
   """usage: package_list --cluster=CLUSTER role
@@ -767,7 +774,7 @@ def _print_package(pkg):
 
 @app.command
 @trap_packer_error
-@app.command_option(CLUSTER_OPTION)
+@app.command_option(CLUSTER_INVOKE_OPTION)
 @requires.exactly('role', 'package')
 def package_versions(role, package):
   """usage: package_versions --cluster=CLUSTER role package
@@ -780,7 +787,7 @@ def package_versions(role, package):
 
 @app.command
 @trap_packer_error
-@app.command_option(CLUSTER_OPTION)
+@app.command_option(CLUSTER_INVOKE_OPTION)
 @requires.exactly('role', 'package', 'version')
 def package_delete_version(role, package, version):
   """usage: package_delete_version --cluster=CLUSTER role package version
@@ -793,7 +800,7 @@ def package_delete_version(role, package, version):
 
 @app.command
 @trap_packer_error
-@app.command_option(CLUSTER_OPTION)
+@app.command_option(CLUSTER_INVOKE_OPTION)
 @app.command_option(
     '--metadata',
     default='',
@@ -814,7 +821,7 @@ def package_add_version(role, package, file_path):
 
 @app.command
 @trap_packer_error
-@app.command_option(CLUSTER_OPTION)
+@app.command_option(CLUSTER_INVOKE_OPTION)
 @app.command_option(
     '--metadata_only',
     default=False,
@@ -839,7 +846,7 @@ def package_get_version(role, package, version):
 
 @app.command
 @trap_packer_error
-@app.command_option(CLUSTER_OPTION)
+@app.command_option(CLUSTER_INVOKE_OPTION)
 @requires.exactly('role', 'package', 'version')
 def package_set_live(role, package, version):
   """usage: package_set_live --cluster=CLUSTER role package version
@@ -851,7 +858,7 @@ def package_set_live(role, package, version):
 
 @app.command
 @trap_packer_error
-@app.command_option(CLUSTER_OPTION)
+@app.command_option(CLUSTER_INVOKE_OPTION)
 @requires.exactly('role', 'package')
 def package_unset_live(role, package):
   """usage: package_unset_live --cluster=CLUSTER role package
@@ -864,7 +871,7 @@ def package_unset_live(role, package):
 
 @app.command
 @trap_packer_error
-@app.command_option(CLUSTER_OPTION)
+@app.command_option(CLUSTER_INVOKE_OPTION)
 @requires.exactly('role', 'package')
 def package_unlock(role, package):
   """usage: package_unlock --cluster=CLUSTER role package
