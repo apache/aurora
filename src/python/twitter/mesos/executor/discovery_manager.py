@@ -10,7 +10,7 @@ from .health_interface import HealthInterface
 
 
 class DiscoveryManager(HealthInterface):
-  DEFAULT_ACL_ROLE = 'mesos'
+  DEFAULT_ACL_PATH = '/etc/twkeys/mesos/zookeeper/service.yml'
 
   @staticmethod
   def join_keywords(hostname, portmap, primary_port):
@@ -26,6 +26,22 @@ class DiscoveryManager(HealthInterface):
     # It's possible for the primary port to not have been allocated if this task
     # is using autoregistration, so register with a port of 0.
     return Endpoint(hostname, portmap.get(primary_port, 0)), additional_endpoints
+
+  @classmethod
+  def super_credentials(cls):
+    try:
+      with open(cls.DEFAULT_ACL_PATH) as fp:
+        super_creds = fp.read().rstrip().split(':', 1)
+        if len(super_creds) != 2:
+          log.error('Bad ACL, expected format of super:credentials')
+          return
+        user, blob = super_creds
+        if user == 'super':
+          return ('digest', 'super:%s' % blob)
+        else:
+          log.error('Bad ACL, expected super user, got %s' % user)
+    except (OSError, IOError) as e:
+      log.warning('Failed to open zookeeper ACL file: %s' % e)
 
   def __init__(self, role,
                      environment,
@@ -51,7 +67,8 @@ class DiscoveryManager(HealthInterface):
           additional=additional,
           failure_callback=self.on_failure,
           shard=shard,
-          ensemble=ensemble)
+          ensemble=ensemble,
+          credentials=self.super_credentials())
 
   def on_failure(self):
     if self._service:

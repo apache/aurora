@@ -1,4 +1,5 @@
 import getpass
+import os
 import pytest
 import threading
 
@@ -122,3 +123,24 @@ class TestDiscoveryManager(object):
 
     finally:
       dm.stop()
+
+
+def test_acls():
+  with temporary_dir() as td:
+    class AltDiscoveryManager(DiscoveryManager):
+      DEFAULT_ACL_PATH = os.path.join(td, 'service.yml')
+
+    assert AltDiscoveryManager.super_credentials() == None
+
+    def expected_creds(data):
+      with open(os.path.join(td, 'service.yml'), 'wb') as fp:
+        fp.write(data)
+      return AltDiscoveryManager.super_credentials()
+
+    assert expected_creds('') is None
+    assert expected_creds('dingdong') is None
+    assert expected_creds('super') is None
+    assert expected_creds('super:') == ('digest', 'super:')
+    assert expected_creds('super::') == ('digest', 'super::')
+    assert expected_creds('frank:gore') is None
+    assert expected_creds('super:dup:er:') == ('digest', 'super:dup:er:')
