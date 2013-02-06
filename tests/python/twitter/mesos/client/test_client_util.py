@@ -225,8 +225,8 @@ def test_get_config_announces():
 
 
 def test_environment_names():
-  BAD = ('Prod', ' prod', 'prod ', 'tEst', 'production', 'staging 2', 'staging', 'stagingA')
-  GOOD = ('prod', 'devel', 'test', 'staging001', 'staging1', 'staging1234')
+  BAD = ('Prod', ' prod', 'prod ', 'tEst', 'production', 'staging 2', 'stagingA')
+  GOOD = ('prod', 'devel', 'test', 'staging', 'staging001', 'staging1', 'staging1234')
   base_job = Job(
       name='hello_world', role='john_doe', cluster='smf1-test',
       task = Task(name='main', processes = [],
