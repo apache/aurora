@@ -2,18 +2,19 @@ import pytest
 
 from twitter.common.collections import OrderedDict
 from twitter.thermos.config.schema import (
+  Constraint,
+  List,
+  Process,
+  Resources,
+  SequentialTask,
+  Task,
+  Tasks,
+  Units,
   combine_tasks,
   concat_tasks,
   java_options,
   order,
   python_options,
-  Units,
-  List,
-  Constraint,
-  Process,
-  Task,
-  Resources,
-  SequentialTask
 )
 
 
@@ -45,7 +46,7 @@ def test_add_resources():
 
   assert reduce(Units.resources_sum, [r100, r010, r001]) == r111
   assert Units.resources_sum(r111, r111) == r222
-  assert r222 == Units.resources_sum([r100, r010, r001, r111, Resources()])
+  assert r222 == Units.resources_sum(r100, r010, r001, r111, Resources())
 
 
 def test_combine_tasks():
@@ -56,10 +57,10 @@ def test_combine_tasks():
   r100 = Resources(cpu=1, ram=0, disk=0)
   r010 = Resources(cpu=0, ram=1, disk=0)
   r001 = Resources(cpu=0, ram=0, disk=1)
-  r111 = Units.resources_sum([r100, r010, r001])
+  r111 = Units.resources_sum(r100, r010, r001)
 
   t1 = Task(name="p1p2", processes=[p1, p2], constraints=order(p1, p2),
-            resources=Units.resources_sum([r100, r010]))
+            resources=Units.resources_sum(r100, r010))
   t2 = Task(name="p3p4", processes=[p3, p4], constraints=order(p3, p4),
             resources=r001)
 

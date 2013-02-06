@@ -45,7 +45,7 @@ class Units(object):
     return Resources() if resources is Empty else resources
 
   @classmethod
-  def resources_sum(cls, resources):
+  def resources_sum(cls, *resources):
     """Add two Resources objects together."""
     def add_unit(f1, f2):
       return (0 if f1 is Empty else f1.get()) + (0 if f2 is Empty else f2.get())
@@ -124,7 +124,7 @@ class Tasks(object):
       return Task()
     base = cls._combine_processes(*tasks)
     return base(
-      resources=Units.resources_sum(task.resources() for task in tasks),
+      resources=Units.resources_sum(*(task.resources() for task in tasks)),
       constraints=Units.constraints_merge(tasks),
       **kw
     )
