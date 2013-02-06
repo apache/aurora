@@ -51,6 +51,14 @@ python_tests(name = 'discovery_manager',
   ]
 )
 
+python_tests(name = 'http_signaler',
+  sources = [ 'test_http_signaler.py' ],
+  dependencies = [
+    pants('src/python/twitter/common/exceptions'),
+    pants('src/python/twitter/mesos/executor:http_signaler'),
+  ]
+)
+
 python_tests(name = 'status_manager',
   sources = [ 'test_status_manager.py' ],
   dependencies = [
@@ -74,3 +82,4 @@ python_tests(name = 'thermos_executor',
     pants('src/python/twitter/mesos/executor:thermos_executor_lib'),
   ]
 )
+

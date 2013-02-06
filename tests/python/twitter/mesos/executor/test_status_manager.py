@@ -11,9 +11,6 @@ from twitter.common.quantity import Amount, Time
 from twitter.common.testing.clock import ThreadedClock
 from twitter.mesos.executor.http_signaler import HttpSignaler
 from twitter.mesos.executor.status_manager import StatusManager
-from twitter.mesos.executor.health_interface import (
-  Healthy,
-  HealthInterface)
 from twitter.mesos.executor.health_checker import HealthCheckerThread
 
 from gen.twitter.thermos.ttypes import TaskState
@@ -72,6 +69,7 @@ class MainHandler(tornado.web.RequestHandler):
 
 
 class HttpThread(threading.Thread):
+  # TODO(jon): consolidate with SignalServer in test_http_signaler?
   def __init__(self):
     self.health = HealthStatus()
     self.requests = Requests()

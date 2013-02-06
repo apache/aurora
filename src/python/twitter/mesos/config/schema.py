@@ -103,7 +103,7 @@ class MesosTaskInstance(Struct):
   role                       = Required(String)
   announce                   = Announcer
   environment                = String
-  health_check_interval_secs = Integer
+  health_check_interval_secs = Default(Integer, 30)
 
 
 class MesosJob(Struct):

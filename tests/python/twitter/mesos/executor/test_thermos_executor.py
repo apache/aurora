@@ -34,6 +34,7 @@ from twitter.mesos.executor.status_manager import StatusManager
 from twitter.thermos.runner.runner import TaskRunner
 from twitter.thermos.base.path import TaskPath
 
+from test_http_signaler import SignalServer, UnhealthyHandler
 
 if 'THERMOS_DEBUG' in os.environ:
   LogOptions.set_stderr_log_level('DEBUG')
@@ -134,17 +135,18 @@ def sleep60():
                   Process(name = 'sleep60', cmdline = 'sleep 60')
                 ],
                 resources = Resources(cpu=1.0, ram=16*MB, disk=32*MB)),
+    health_check_interval_secs = 0.1,
     instance = 0,
     role = getpass.getuser())
 
 
-def make_runner(proxy_driver, checkpoint_root, task, fast_status=False,
+def make_runner(proxy_driver, checkpoint_root, task, ports={}, fast_status=False,
                 executor_timer_class=TestThermosExecutorTimer):
   runner_class = functools.partial(TestTaskRunner, checkpoint_root=checkpoint_root)
   manager_class = TestStatusManager if fast_status else StatusManager
   te = FastThermosExecutor(runner_class=runner_class, manager_class=manager_class)
   executor_timer_class(te, proxy_driver).start()
-  task_description = make_task(task)
+  task_description = make_task(task, assigned_ports=ports)
   te.launchTask(proxy_driver, task_description)
   while not te._runner.is_started():
     time.sleep(0.1)
@@ -279,6 +281,18 @@ class TestThermosExecutor(object):
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
     assert updates[-1][0][0].state == mesos_pb.TASK_LOST
+
+  def test_task_health_failed(self):
+    proxy_driver = ProxyDriver()
+    with SignalServer(UnhealthyHandler) as port:
+      with temporary_dir() as checkpoint_root:
+        _, executor = make_runner(proxy_driver, checkpoint_root, sleep60(), ports={'health': port},
+                                 fast_status=True)
+        executor._manager.join()
+
+    updates = proxy_driver.method_calls['sendStatusUpdate']
+    assert len(updates) == 3
+    assert updates[-1][0][0].state == mesos_pb.TASK_FAILED
 
   def test_failing_runner_start(self):
     proxy_driver = ProxyDriver()

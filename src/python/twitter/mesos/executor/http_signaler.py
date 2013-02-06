@@ -13,6 +13,7 @@ else:
 
 
 class HttpSignaler(object):
+  """Simple HTTP endpoint wrapper to check health or trigger quitquitquit/abortabortabort"""
   TIMEOUT_SECS = 1.0
 
   def __init__(self, port, host='localhost'):
@@ -28,7 +29,10 @@ class HttpSignaler(object):
         response = fp.read().strip().lower()
         return response == expected_response if expected_response is not None else True
     except (URLError, HTTPError, HTTPException) as e:
-      log.warning('Failed to signal %s: %s' % (self.url(endpoint), e))
+      # the type of an HTTPException is typically more useful than its contents (since for example
+      # BadStatusLines are often empty)
+      err = e.__class__.__name__ if isinstance(e, HTTPException) else e
+      log.warning('Failed to signal %s: %s' % (self.url(endpoint), err))
       return False
 
   def health(self):

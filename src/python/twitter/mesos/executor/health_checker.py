@@ -6,6 +6,11 @@ from .health_interface import HealthInterface, FailureReason
 
 
 class HealthCheckerThread(HealthInterface, ExceptionalThread):
+  """Generic, HealthInterface-conforming thread for arbitrary periodic health checks
+
+    health_checker should be a callable returning a boolean indicating the health of the service.
+
+  """
   def __init__(self, health_checker, interval_secs=30, initial_interval_secs=None, clock=time):
     self._checker = health_checker
     self._interval = interval_secs
