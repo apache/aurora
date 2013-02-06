@@ -6,6 +6,7 @@ from twitter.common.lang import Compatibility
 
 from .schema import (
    Constraint,
+   GB,
    Process,
    Resources,
    Task,
@@ -28,6 +29,9 @@ __all__ = (
 
   # the automatically-sequential version of a task
   'SequentialTask',
+
+  # create a simple task from a command line + name
+  'SimpleTask',
 
   # helper classes
   'Options',
@@ -108,6 +112,10 @@ class Processes(object):
 class Tasks(object):
   """Helper class for Task objects."""
 
+  SIMPLE_CPU  = 1.0
+  SIMPLE_RAM  = 1 * GB
+  SIMPLE_DISK = 1 * GB
+
   @classmethod
   def _combine_processes(cls, *tasks):
     """Given multiple tasks, merge their processes together, retaining the identity of the first
@@ -144,6 +152,16 @@ class Tasks(object):
           if p1 != p2:
             base_constraints.extend(Processes.order(p1, p2))
     return base(constraints=base_constraints, **kw)
+
+  @classmethod
+  def simple(cls, name, command):
+    """Create a usable Task from a provided name + command line and a default set of resources"""
+    return Task(
+      name=name,
+      processes=[Process(name=name, cmdline=command)],
+      resources=Resources(cpu=cls.SIMPLE_CPU,
+                          ram=cls.SIMPLE_RAM,
+                          disk=cls.SIMPLE_DISK))
 
   @classmethod
   def sequential(cls, task):
@@ -214,6 +232,10 @@ class Options(object):
     return ' '.join(cls.render_options('-', '--', *options, **kw_options))
 
 
+def SimpleTask(name, command):
+  """A simple command-line Task with default resources"""
+  return Tasks.simple(name, command)
+
 def SequentialTask(*args, **kw):
   """A Task whose processes are always sequential."""
   return Tasks.sequential(Task(*args, **kw))
@@ -225,6 +247,5 @@ java_options = Options.java
 
 combine_tasks = Tasks.combine
 concat_tasks = Tasks.concat
-
 
 order = Processes.order

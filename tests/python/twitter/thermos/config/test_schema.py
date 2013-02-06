@@ -83,6 +83,19 @@ def test_combine_tasks():
       order(p2, p3) + order(p2, p4))
 
 
+def test_simple_task():
+  name, command = 'simple_thing', 'echo hello'
+  st = SimpleTask(name, command)
+  assert isinstance(st, Task)
+  assert st.name().get() == name
+  assert len(st.constraints().get()) == 0
+  assert len(st.processes().get()) == 1
+  assert st.processes().get()[0]['cmdline'] == command
+  assert st.resources() == Resources(cpu=Tasks.SIMPLE_CPU,
+                                     ram=Tasks.SIMPLE_RAM,
+                                     disk=Tasks.SIMPLE_DISK)
+
+
 def test_tasklets():
   install_thermosrc = Process(name='install_thermosrc')
   setup_py3k = Process(name='setup_py3k')
@@ -99,6 +112,7 @@ def test_tasklets():
   # minimization since many constraints are redundant.
   for p in (install_thermosrc, setup_py3k, setup_ruby19, setup_php):
     assert p in my_new_task.processes()
+
 
 
 def test_render_options():
