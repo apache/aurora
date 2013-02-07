@@ -1,14 +1,20 @@
 package com.twitter.mesos.scheduler.async;
 
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import org.easymock.Capture;
 import org.easymock.EasyMock;
+import org.easymock.IAnswer;
+import org.easymock.IExpectationSetters;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -16,6 +22,7 @@ import org.junit.Test;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.EasyMockTest;
+import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 import com.twitter.common.util.testing.FakeClock;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
@@ -32,6 +39,7 @@ import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
@@ -78,6 +86,16 @@ public class HistoryPrunerTest extends EasyMockTest {
     pruner.storageStarted(new StorageStarted());
   }
 
+  private IExpectationSetters<?> expectAsyncTaskDelete() {
+    expect(executor.submit(EasyMock.<Runnable>anyObject()));
+    return expectLastCall().andAnswer(new IAnswer<Future<?>>() {
+      @Override public Future<?> answer() {
+        ((Runnable) EasyMock.getCurrentArguments()[0]).run();
+        return null;
+      }
+    });
+  }
+
   @Test
   public void testStorageStartWithoutPruning() {
     long taskATimestamp = clock.nowMillis();
@@ -91,7 +109,8 @@ public class HistoryPrunerTest extends EasyMockTest {
     expectOneTaskWatch(taskATimestamp);
     expectOneTaskWatch(taskBTimestamp);
 
-    expectCancelFutureTimes(2);
+    expectAsyncTaskDelete();
+    expectCancelFuture().times(2);
 
     control.replay();
 
@@ -130,10 +149,11 @@ public class HistoryPrunerTest extends EasyMockTest {
     stateManager.deleteTasks(Tasks.ids(a));
 
     // Cancel future and delete pruned task "b"
+    expectAsyncTaskDelete();
     expectCancelFuture();
     stateManager.deleteTasks(Tasks.ids(b));
 
-    expectCancelFutureTimes(3);
+    expectCancelFuture().times(3);
 
     control.replay();
 
@@ -147,6 +167,7 @@ public class HistoryPrunerTest extends EasyMockTest {
   public void testStateChange() {
     expectDefaultTaskWatch();
 
+    expectAsyncTaskDelete();
     expectCancelFuture();
 
     control.replay();
@@ -175,7 +196,6 @@ public class HistoryPrunerTest extends EasyMockTest {
     clock.advance(ONE_HOUR);
     // Execute future to prune task "a" from the system.
     capture.getValue().run();
-
   }
 
   @Test
@@ -187,7 +207,8 @@ public class HistoryPrunerTest extends EasyMockTest {
     expectCancelFuture();
     stateManager.deleteTasks(ImmutableSet.of("a"));
 
-    expectCancelFutureTimes(2);
+    expectAsyncTaskDelete();
+    expectCancelFuture().times(2);
 
     control.replay();
 
@@ -207,6 +228,7 @@ public class HistoryPrunerTest extends EasyMockTest {
     ScheduledTask b = makeTask("b", FINISHED);
     expectGetInactiveTasks(a);
     expectDefaultTaskWatch();
+    expectAsyncTaskDelete().times(2);
     expectCancelFuture();
 
     control.replay();
@@ -218,6 +240,69 @@ public class HistoryPrunerTest extends EasyMockTest {
 
     // No-Op
     pruner.tasksDeleted(new TasksDeleted(ImmutableSet.of(b)));
+  }
+
+  @Test
+  public void testThreadSafeEvents() throws Exception {
+    // This tests against regression where deleting a task causes an event to be fired
+    // synchronously (on the EventBus) from a separate thread.  This posed a problem because
+    // the event handler was synchronized, causing the EventBus thread to deadlock acquiring
+    // the lock held by the thread deleting tasks.
+
+    final ScheduledExecutorService realExecutor = Executors.newScheduledThreadPool(1,
+        new ThreadFactoryBuilder()
+            .setDaemon(true)
+            .setNameFormat("testThreadSafeEvents-executor")
+            .build());
+    pruner = new HistoryPruner(
+        realExecutor,
+        stateManager,
+        clock,
+        Amount.of(1L, Time.MILLISECONDS),
+        PER_JOB_HISTORY);
+
+    final CountDownLatch deleteCalled = new CountDownLatch(1);
+    final CountDownLatch eventDelivered = new CountDownLatch(1);
+    final String id = "a";
+
+    Thread eventDispatch = new Thread() {
+      @Override public void run() {
+        try {
+          deleteCalled.await();
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          fail("Interrupted while awaiting for delete call.");
+          return;
+        }
+        pruner.tasksDeleted(new TasksDeleted(ImmutableSet.of(makeTask(id, ScheduleStatus.KILLED))));
+        eventDelivered.countDown();
+      }
+    };
+    eventDispatch.setDaemon(true);
+    eventDispatch.setName(getClass().getName() + "-EventDispatch");
+    eventDispatch.start();
+
+    // Expect task "a" to be pruned when future is activated.
+    stateManager.deleteTasks(ImmutableSet.of(id));
+    expectLastCall().andAnswer(new IAnswer<Void>() {
+      @Override public Void answer() {
+        deleteCalled.countDown();
+        try {
+          eventDelivered.await();
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          fail("Interrupted while awaiting for event delivery.");
+        }
+        return null;
+      }
+    });
+
+    control.replay();
+
+    // Capture future for inactive task "a"
+    changeState(id, RUNNING, KILLED);
+    eventDelivered.await();
+    new ExecutorServiceShutdown(realExecutor, Amount.of(1L, Time.MINUTES)).execute();
   }
 
   private Capture<Runnable> expectDefaultTaskWatch() {
@@ -242,12 +327,8 @@ public class HistoryPrunerTest extends EasyMockTest {
     return capture;
   }
 
-  private void expectCancelFutureTimes(int count) {
-    expect(future.cancel(false)).andReturn(true).times(count);
-  }
-
-  private void expectCancelFuture() {
-    expectCancelFutureTimes(1);
+  private IExpectationSetters<?> expectCancelFuture() {
+    return expect(future.cancel(false)).andReturn(true);
   }
 
   private ScheduledTask changeState(ScheduleStatus from, ScheduleStatus to) {

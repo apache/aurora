@@ -4,6 +4,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.util.Collection;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -116,14 +117,8 @@ public class HistoryPruner implements EventSubscriber {
     }
   }
 
-  /**
-   * When triggered, removes the tasks scheduled for pruning and cancels any existing future.
-   *
-   * @param event A new TasksDeleted event.
-   */
-  @Subscribe
-  public synchronized void tasksDeleted(TasksDeleted event) {
-    for (ScheduledTask task : event.getTasks()) {
+  private synchronized void delete(Set<ScheduledTask> tasks) {
+    for (ScheduledTask task : tasks) {
       String id = Tasks.id(task);
       tasksByJob.remove(Tasks.jobKey(task), id);
       Future<?> future = futures.remove(id);
@@ -131,6 +126,21 @@ public class HistoryPruner implements EventSubscriber {
         future.cancel(false);
       }
     }
+  }
+
+  /**
+   * When triggered, removes the tasks scheduled for pruning and cancels any existing future.
+   *
+   * @param event A new TasksDeleted event.
+   */
+  @Subscribe
+  public void tasksDeleted(final TasksDeleted event) {
+    // This is 'eventually consistent', which is deemed to be okay in this case.
+    executor.submit(new Runnable() {
+      @Override public void run() {
+        delete(event.getTasks());
+      }
+    });
   }
 
   @VisibleForTesting
