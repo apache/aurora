@@ -5,13 +5,14 @@ import hashlib
 import httplib
 import json
 import os
+import socket
 import sys
 import time
 import urllib
 import urllib2
 
 from poster.encode import multipart_encode
-from poster import streaminghttp
+from poster.streaminghttp import StreamingHTTPHandler
 
 from twitter.common import log
 from twitter.mesos.session_key_helper import SessionKeyHelper
@@ -137,7 +138,6 @@ class Packer(object):
     return self._add(role, package, local_file, metadata, digest)
 
   def _add(self, role, package, local_file, metadata, digest):
-    streaminghttp.register_openers()
     if self._verbose:
       print()
       upload_progress = Progress()
@@ -157,13 +157,17 @@ class Packer(object):
     upload_start = time.time()
     try:
       request = urllib2.Request(url, datagen, headers)
-      resp = urllib2.urlopen(request).read()
+      opener = urllib2.build_opener(StreamingHTTPHandler)
+      conn = opener.open(request, None, socket._GLOBAL_DEFAULT_TIMEOUT)
+      resp = conn.read()
       upload_secs = time.time() - upload_start
       if self._verbose:
         print('Average upload rate: %s KB/s' % (int(file_size / 1024 / upload_secs)))
       return json.loads(resp)
     except urllib2.HTTPError as e:
-      raise Packer.Error(e.read())
+      raise Packer.Error('HTTP %s: %s' % (e.code, e.msg))
+    except urllib2.URLError as e:
+      raise Packer.Error('Failed to upload to packer: %s' % e)
 
   def unlock(self, role, package):
     return self._api('%s/unlock' % Packer._pkg_url(role, package), auth=True, method='POST')
