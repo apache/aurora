@@ -13,16 +13,17 @@ disk consumption and retaining a limited (FIFO) in-memory history of this data.
 
 """
 
+import platform
 import threading
 import time
-from abc import ABCMeta, abstractmethod
+from abc import abstractmethod
 from bisect import bisect_left
 from collections import namedtuple
 from operator import attrgetter
 
 from twitter.common import log
 from twitter.common.collections import RingBuffer
-from twitter.common.lang import InheritDocstringsMetaclass
+from twitter.common.lang import Interface
 from twitter.common.quantity import Amount, Time
 
 from .disk import DiskCollector
@@ -31,10 +32,7 @@ from .process import ProcessSample
 from .process_collector_psutil import ProcessTreeCollector
 
 
-class ResourceMonitorMetaclass(ABCMeta, InheritDocstringsMetaclass): pass
-ResourceMonitorMetaBase = ResourceMonitorMetaclass('ResourceMonitorMetaBase', (object, ), {})
-
-class ResourceMonitorBase(ResourceMonitorMetaBase):
+class ResourceMonitorBase(Interface):
   """ Defines the interface for interacting with a ResourceMonitor """
 
   class Error(Exception): pass
@@ -58,9 +56,9 @@ class ResourceMonitorBase(ResourceMonitorMetaBase):
 
   @abstractmethod
   def sample_by_process(self, process_name):
-    """ Return a sample of the resource consumption of a specific process in the task
+    """ Return a sample of the resource consumption of a specific process in the task right now
 
-    Returns a tuple of (timestamp, ProcessSample)
+    Returns a ProcessSample
     """
 
 
@@ -197,7 +195,7 @@ class TaskResourceMonitor(ResourceMonitorBase, threading.Thread):
 
       if now > next_disk_collection:
         next_disk_collection = now + self._disk_collection_interval
-        log.debug('Collecting disk sample')
+        log.debug('Collecting disk sample for %s' % self._sandbox)
         self._disk_collector.sample()
         try:
           aggregated_procs = sum(map(attrgetter('procs'), self._process_collectors.values()))

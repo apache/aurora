@@ -10,6 +10,8 @@ python_binary(
     pants('src/python/twitter/common/metrics'),
     pants('src/python/twitter/thermos/observer'),
     pants('src/python/twitter/thermos/monitoring'),
+    pants('src/python/twitter/mesos:clusters'),
+    pants('src/python/twitter/mesos/executor:resource_checkpoints'),
     python_requirement('psutil'),
   ],
 )

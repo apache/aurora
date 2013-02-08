@@ -88,6 +88,7 @@ python_library(
     pants('src/python/twitter/common/exceptions'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/quantity'),
+    pants('src/python/twitter/thermos/monitoring:disk'),
     pants('src/python/twitter/thermos/monitoring:resource'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
   ]
@@ -97,6 +98,7 @@ python_library(
   name = 'resource_checkpoints',
   sources = ['resource_checkpoints.py'],
   dependencies = [
+    pants(':executor_detector'),
     python_requirement('thrift'),
     pants('src/python/twitter/common/exceptions'),
     pants('src/python/twitter/common/quantity'),

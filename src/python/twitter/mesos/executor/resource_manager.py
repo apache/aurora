@@ -5,6 +5,7 @@ import time
 from twitter.common import log
 from twitter.common.exceptions import ExceptionalThread
 from twitter.common.quantity import Amount, Time
+from twitter.thermos.monitoring.disk import DiskCollector
 from twitter.thermos.monitoring.resource import TaskResourceMonitor
 
 from gen.twitter.mesos.comm.ttypes import TaskResourceSample
@@ -112,7 +113,8 @@ class ResourceManager(HealthInterface, ExceptionalThread):
       sandbox: the directory that we should monitor for disk usage
       enforcement_interval: how often resource enforcement should be conducted
     """
-    self._resource_monitor = TaskResourceMonitor(task_monitor, sandbox)
+    self._resource_monitor = TaskResourceMonitor(
+      task_monitor, sandbox, disk_collector=DiskCollector)
     self._enforcer = ResourceEnforcer(resources, task_monitor)
     self._enforcement_interval = enforcement_interval.as_(Time.SECONDS)
     if self._enforcement_interval <= 0:

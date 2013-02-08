@@ -18,6 +18,8 @@ from twitter.thermos.monitoring.resource import (
   TaskResourceMonitor
 )
 
+from .executor_detector import ExecutorDetector
+
 from gen.twitter.mesos.comm.ttypes import TaskResourceSample
 
 
@@ -50,9 +52,31 @@ class CheckpointResourceMonitor(TaskResourceMonitor, ExceptionalThread):
       sample.diskBytes,
     )
 
-  def __init__(self, filename, wait_interval=Amount(15, Time.SECONDS)):
+  MESOS_ROOT = None
+  RESOURCE_CHECKPOINT = 'resource_usage.recordio'
+
+
+  def __init__(self, task_monitor, sandbox, wait_interval=Amount(15, Time.SECONDS)):
     """
     """
+    if self.MESOS_ROOT is None:
+      raise self.Error("MESOS_ROOT must be set before initialization!")
+    self._task_monitor = task_monitor
+    self._task_id = task_monitor._task_id
+    self._sandbox = sandbox
+    self._detector = ExecutorDetector()
+    def get_artifact_dir():
+      thermos_executor_prefix = 'thermos-'
+      for executor in self._detector.find(root=self.MESOS_ROOT):
+        id = executor.executor_id
+        if (id.startswith(thermos_executor_prefix) and self._task_id in id):
+          return self._detector.path(executor)
+    self._artifact_dir = get_artifact_dir()
+    if self._artifact_dir is None:
+      raise self.Error("Could not locate artifact directory for %s" % self._task_id)
+
+    filename = os.path.join(self._artifact_dir, self.RESOURCE_CHECKPOINT)
+
     try:
       fh = open(filename)
       # TODO(jon): create separate recordios for each day, so we don't have to replay the entire
@@ -63,6 +87,7 @@ class CheckpointResourceMonitor(TaskResourceMonitor, ExceptionalThread):
     self._filename = filename
     self._reader = ThriftRecordReader(fh, TaskResourceSample)
     self._history = ResourceHistory(self.MAX_HISTORY, initialize=False)
+    self._resource_allocations = {}
     self._wait_interval = wait_interval.as_(Time.SECONDS)
     self._kill_signal = threading.Event()
     ExceptionalThread.__init__(self)
@@ -72,6 +97,7 @@ class CheckpointResourceMonitor(TaskResourceMonitor, ExceptionalThread):
     while not self._kill_signal.is_set():
       sample = self._reader.read()
       if not sample: break
+      if not self._resource_allocations: self._get_resource_allocations(sample)
       self._add_sample_to_history(sample)
       count += 1
     log.debug("Done (got %d resource samples)" % count)
@@ -81,6 +107,11 @@ class CheckpointResourceMonitor(TaskResourceMonitor, ExceptionalThread):
       sample.microTimestamp / 1e6,
       self.sample_to_resource_result(sample)
     )
+
+  def _get_resource_allocations(self, sample):
+    self._resource_allocations['disk'] = sample.reservedDiskBytes
+    self._resource_allocations['cpu'] = sample.reservedCpuRate
+    self._resource_allocations['ram'] = sample.reservedRamBytes
 
   def run(self):
     """Thread entrypoint. Loop indefinitely, polling checkpointed history for new samples."""
@@ -93,7 +124,8 @@ class CheckpointResourceMonitor(TaskResourceMonitor, ExceptionalThread):
       self._kill_signal.wait(timeout=self._wait_interval)
 
   def sample_by_process(self, process_name):
-    raise NotImplementedError("CheckpointResourceMonitor does not support per-process sampling.")
+    log.error("CheckpointResourceMonitor does not support per-process sampling!")
+    return ProcessSample.empty()
 
 
 class ResourceCheckpointer(ExceptionalThread):

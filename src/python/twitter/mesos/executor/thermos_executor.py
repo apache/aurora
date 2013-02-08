@@ -15,12 +15,7 @@ from twitter.common.quantity import Amount, Time
 
 # thermos
 from twitter.mesos.config.schema import MesosTaskInstance
-from twitter.mesos.executor.task_runner_wrapper import (
-  ProductionTaskRunner,
-  AngrybirdTaskRunner)
-from twitter.mesos.executor.executor_base import ThermosExecutorBase
 from twitter.mesos.parsers.base import PortResolver
-
 from twitter.thermos.base.path import TaskPath
 from twitter.thermos.monitoring.monitor import TaskMonitor
 
@@ -29,12 +24,16 @@ from gen.twitter.mesos.ttypes import AssignedTask
 from thrift.TSerialization import deserialize as thrift_deserialize
 
 from .discovery_manager import DiscoveryManager
+from .executor_base import ThermosExecutorBase
 from .health_checker import HealthCheckerThread
 from .http_signaler import HttpSignaler
 from .kill_manager import KillManager
 from .resource_checkpoints import ResourceCheckpointer
 from .resource_manager import ResourceManager
 from .status_manager import StatusManager
+from .task_runner_wrapper import (
+  ProductionTaskRunner,
+  AngrybirdTaskRunner)
 
 
 if 'ANGRYBIRD_THERMOS' in os.environ:
