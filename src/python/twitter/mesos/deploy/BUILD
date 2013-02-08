@@ -4,6 +4,7 @@ python_library(
   dependencies = [
     pants('src/python/twitter/common/git'),
     pants('src/python/twitter/mesos:clusters'),
-    pants('src/python/twitter/vert:vert-lib')
+    pants('src/python/twitter/vert:base'),
+    pants('src/python/twitter/vert:backends')
   ]
 )
