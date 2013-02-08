@@ -148,13 +148,13 @@ def create_taskinfo(proxy_config, shard_id=0):
 
 
 def spawn_local(runner, jobname, config_file, json=False, open_browser=False,
-                shard=0, bindings=()):
+                shard=0, bindings=(), cluster=None, env=None):
   """
     Spawn a local run of a task.
   """
   try:
     config = get_config(jobname, config_file, json, force_local=True,
-        bindings=bindings, translate=True)
+        bindings=bindings, translate=True, select_cluster=cluster, select_env=env)
   except PystachioConfig.InvalidConfig as err:
     die("Invalid configuration: %s" % err)
 

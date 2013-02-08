@@ -159,7 +159,9 @@ def make_spawn_options(options):
       'json',
       'open_browser',
       'shard',
-      'bindings'))
+      'bindings',
+      'cluster',
+      'env'))
 
 
 @app.command
