@@ -8,7 +8,9 @@ from .health_interface import HealthInterface, FailureReason
 class HealthCheckerThread(HealthInterface, ExceptionalThread):
   """Generic, HealthInterface-conforming thread for arbitrary periodic health checks
 
-    health_checker should be a callable returning a boolean indicating the health of the service.
+    health_checker should be a callable returning a tuple of (boolean, reason), indicating
+    respectively the health of the service and the reason for its failure (or None if the service is
+    still healthy).
 
   """
   def __init__(self, health_checker, interval_secs=30, initial_interval_secs=None, clock=time):
@@ -19,7 +21,10 @@ class HealthCheckerThread(HealthInterface, ExceptionalThread):
     else:
       self._initial_interval = interval_secs * 2
     self._dead = threading.Event()
-    self._healthy = True if self._initial_interval > 0 else self._checker()
+    if self._initial_interval > 0:
+      self._healthy, self._reason = True, None
+    else:
+      self._healthy, self._reason = self._checker()
     self._clock = clock
     super(HealthCheckerThread, self).__init__()
     self.daemon = True
@@ -31,12 +36,12 @@ class HealthCheckerThread(HealthInterface, ExceptionalThread):
   @property
   def failure_reason(self):
     if not self.healthy:
-      return FailureReason('Failed health check!')
+      return FailureReason('Failed health check! %s' % self._reason)
 
   def run(self):
     self._clock.sleep(self._initial_interval)
     while not self._dead.is_set():
-      self._healthy = self._checker()
+      self._healthy, self._reason = self._checker()
       self._clock.sleep(self._interval)
 
   def start(self):

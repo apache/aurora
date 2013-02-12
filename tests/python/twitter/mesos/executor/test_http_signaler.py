@@ -45,10 +45,14 @@ class SignalServer(ExceptionalThread):
 
 def test_health():
   with SignalServer(HealthyHandler) as port:
-    assert HttpSignaler(port).health()
+    assert HttpSignaler(port).health() == (True, None)
   with SignalServer(UnhealthyHandler) as port:
-    assert not HttpSignaler(port).health()
+    health, reason = HttpSignaler(port).health()
+    assert not health
+    assert reason.startswith('Response differs from expected response')
+
+  # general HTTP exceptions
   with SignalServer(BadHandler) as port:
-    assert not HttpSignaler(port).health()
+    assert not HttpSignaler(port).health()[0]
   with SignalServer(SlowHandler) as port:
-    assert not FastHttpSignaler(port).health()
+    assert not FastHttpSignaler(port).health()[0]

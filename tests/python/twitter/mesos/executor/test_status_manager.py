@@ -101,25 +101,25 @@ class TestSignaler(unittest.TestCase):
 
   def test_basic_ok(self):
     signaler = HttpSignaler(self.http.port)
-    assert signaler.health()
+    assert signaler.health()[0]
     assert self.http.requests.q == [('GET', '/health')]
-    assert signaler.quitquitquit()
-    assert signaler.abortabortabort()
+    assert signaler.quitquitquit()[0]
+    assert signaler.abortabortabort()[0]
     assert self.http.requests.q == [('GET', '/health'),
                                     ('POST', '/quitquitquit'),
                                     ('POST', '/abortabortabort')]
 
     self.http.requests.clear()
     self.http.health.value = 'bad'
-    assert not signaler.health()
+    assert not signaler.health()[0]
     assert self.http.requests.q == [('GET', '/health')]
 
   def test_faulty_server(self):
     signaler = HttpSignaler(self.http.port)
-    assert signaler.health()
+    assert signaler.health()[0]
     self.http.stop()
     thread_yield()
-    assert not signaler.health()
+    assert not signaler.health()[0]
 
 
 class TestHealthChecker(unittest.TestCase):
@@ -133,7 +133,7 @@ class TestHealthChecker(unittest.TestCase):
 
   def test_initial_interval_2x(self):
     clock = ThreadedClock()
-    hct = HealthCheckerThread(lambda: False, interval_secs=5, clock=clock)
+    hct = HealthCheckerThread(lambda: (False, 'Bad health check'), interval_secs=5, clock=clock)
     hct.start()
     thread_yield()
     assert hct.healthy
@@ -148,7 +148,8 @@ class TestHealthChecker(unittest.TestCase):
 
   def test_initial_interval_whatev(self):
     clock = ThreadedClock()
-    hct = HealthCheckerThread(lambda: False, interval_secs=5, initial_interval_secs=0, clock=clock)
+    hct = HealthCheckerThread(
+      lambda: (False, 'Bad health check'), interval_secs=5, initial_interval_secs=0, clock=clock)
     hct.start()
     assert not hct.healthy
     hct.stop()
@@ -266,5 +267,5 @@ class TestStatusManager(unittest.TestCase):
     assert self.driver.stop_event.is_set()
     assert len(self.driver.updates) == 1
     assert self.driver.updates[0].state == mesos_pb.TASK_FAILED
-    assert self.driver.updates[0].message == 'Failed health check!'
+    assert self.driver.updates[0].message.startswith('Failed health check!')
     assert self.runner.cleaned
