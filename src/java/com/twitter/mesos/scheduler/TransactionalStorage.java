@@ -1,8 +1,9 @@
 package com.twitter.mesos.scheduler;
 
-import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -19,9 +20,12 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * Transactional wrapper around the persistent storage and mutable state.
  */
 class TransactionalStorage {
+  @VisibleForTesting
+  final Queue<SideEffect> sideEffects = Lists.newLinkedList();
+  @VisibleForTesting
+  final Queue<PubsubEvent> events = Lists.newLinkedList();
+
   private AtomicBoolean inTransaction = new AtomicBoolean(false);
-  private final List<SideEffect> sideEffects = Lists.newLinkedList();
-  private final List<PubsubEvent> events = Lists.newLinkedList();
 
   private final Storage storage;
   private final MutableState mutableState;
@@ -156,19 +160,22 @@ class TransactionalStorage {
           // once this is assessed.
           transactionFinalizer.finalize(work, storeProvider);
           if (topLevelTransaction) {
-            for (SideEffect sideEffect : sideEffects) {
-              sideEffect.mutate(mutableState);
-            }
-            for (PubsubEvent event : events) {
-              taskEventSink.execute(event);
+            // Since an event execution can spawn a side-effect, we loop until we process all events
+            // and side-effects.
+            while (!sideEffects.isEmpty() || !events.isEmpty()) {
+              if (!sideEffects.isEmpty()) {
+                sideEffects.remove().mutate(mutableState);
+              }
+
+              if (!events.isEmpty()) {
+                taskEventSink.execute(events.remove());
+              }
             }
           }
           return result;
         } finally {
           if (topLevelTransaction) {
             inTransaction.set(false);
-            sideEffects.clear();
-            events.clear();
           }
         }
       }

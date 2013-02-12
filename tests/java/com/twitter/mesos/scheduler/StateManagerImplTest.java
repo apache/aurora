@@ -11,6 +11,8 @@ import com.google.common.testing.TearDown;
 
 import org.apache.mesos.Protos.SlaveID;
 import org.easymock.EasyMock;
+import org.easymock.IAnswer;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -39,6 +41,7 @@ import com.twitter.mesos.scheduler.storage.Storage.Work;
 import com.twitter.mesos.scheduler.storage.mem.MemStorage;
 
 import static org.easymock.EasyMock.expectLastCall;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -77,12 +80,13 @@ public class StateManagerImplTest extends EasyMockTest {
 
     driver = createMock(Driver.class);
     eventSink = createMock(new Clazz<Closure<PubsubEvent>>() { });
-    eventSink.execute(EasyMock.<PubsubEvent>anyObject());
-    // TODO(William Farner): Rework StateManagerImpl to accept a task ID generator and allow for
-    // easy verification of pubsub events.
-    expectLastCall().anyTimes();
-
     stateManager = createStateManager();
+  }
+
+  @After
+  public void validateCompletion() {
+    assertTrue(stateManager.txStorage.events.isEmpty());
+    assertTrue(stateManager.txStorage.sideEffects.isEmpty());
   }
 
   /**
@@ -149,8 +153,17 @@ public class StateManagerImplTest extends EasyMockTest {
     return manager;
   }
 
+  private void expectPubSubEvent() {
+    // TODO(William Farner): Rework StateManagerImpl to accept a task ID generator and allow for
+    // easy verification of pubsub events.
+    eventSink.execute(EasyMock.isA(PubsubEvent.class));
+    expectLastCall().anyTimes();
+  }
+
   @Test
   public void testAbandonRunningTask() {
+    expectPubSubEvent();
+
     control.replay();
 
     Set<String> taskIds = insertTasks(
@@ -185,6 +198,8 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @Test
   public void testAbandonFinishedTask() {
+    expectPubSubEvent();
+
     control.replay();
 
     Set<String> taskIds = insertTasks(
@@ -204,6 +219,8 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @Test
   public void testKillPendingTask() {
+    expectPubSubEvent();
+
     control.replay();
 
     String taskId = insertTask(makeTask("jim", "myJob", 0));
@@ -221,6 +238,8 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @Test
   public void testLostKillingTask() {
+    expectPubSubEvent();
+
     driver.killTask(EasyMock.<String>anyObject());
 
     control.replay();
@@ -241,6 +260,8 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @Test
   public void testInitNormallyHidden() throws Exception {
+    expectPubSubEvent();
+
     control.replay();
 
     insertTask(makeTask("jim", "myJob", 0));
@@ -251,6 +272,8 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @Test
   public void testUpdate() throws Exception {
+    expectPubSubEvent();
+
     control.replay();
     TwitterTaskInfo taskInfo = makeTask("jim", "myJob", 0);
 
@@ -272,6 +295,8 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @Test
   public void testRollback() throws Exception {
+    expectPubSubEvent();
+
     driver.killTask(EasyMock.<String>anyObject());
     expectLastCall().times(2);
 
@@ -316,6 +341,8 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @Test
   public void testTracksInit() throws Exception {
+    expectPubSubEvent();
+
     final TwitterTaskInfo task = makeTask("jim", "myJob", 0);
 
     // Insert a task in the INIT state, and restart the state manager.
@@ -335,6 +362,8 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @Test
   public void testTracksUnknown() throws Exception {
+    expectPubSubEvent();
+
     final TwitterTaskInfo task = makeTask("jim", "myJob", 0);
 
     // Insert a task in the INIT state, and restart the state manager.
@@ -357,6 +386,8 @@ public class StateManagerImplTest extends EasyMockTest {
   @Ignore("TODO(William Farner): Remove this test completely once DbStorage is removed.")
   @Test
   public void testTransactionalStateTransitions() throws Exception {
+    expectPubSubEvent();
+
     control.replay();
 
     failNthTransaction(1);
@@ -384,6 +415,8 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @Test
   public void testDelayedStatExport() throws Exception {
+    expectPubSubEvent();
+
     resetStats();
 
     control.replay();
@@ -401,6 +434,26 @@ public class StateManagerImplTest extends EasyMockTest {
     for (ScheduleStatus status : ScheduleStatus.values()) {
       assertVarCount(status, 0);
     }
+  }
+
+  @Test
+  public void testNestedEvents() {
+    // Trigger an event that triggers a side-effect and a PubSub event twice.
+    eventSink.execute(EasyMock.<PubsubEvent>anyObject());
+    expectLastCall().andAnswer(new IAnswer<Void>() {
+      @Override public Void answer() throws Throwable {
+        stateManager.deleteTasks(ImmutableSet.of("taskA"));
+        return null;
+      }
+    }).times(2);
+
+    // Final event sink execution that adds no side effect or event.
+    eventSink.execute(EasyMock.isA(PubsubEvent.class));
+    expectLastCall();
+
+    control.replay();
+
+    insertTask(makeTask("jim", "myJob", 0));
   }
 
   private String insertTask(TwitterTaskInfo task) {

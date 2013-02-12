@@ -144,15 +144,17 @@ public class HistoryPrunerTest extends EasyMockTest {
     expectDefaultTaskWatch();
     expectDefaultTaskWatch();
 
-    // Cancel future and delete pruned task "a"
+    // Cancel future and delete pruned task "a" asynchronously.
+    expectAsyncTaskDelete();
     expectCancelFuture();
     stateManager.deleteTasks(Tasks.ids(a));
 
-    // Cancel future and delete pruned task "b"
+    // Cancel future and delete pruned task "b" asynchronously.
     expectAsyncTaskDelete();
     expectCancelFuture();
     stateManager.deleteTasks(Tasks.ids(b));
 
+    expectAsyncTaskDelete();
     expectCancelFuture().times(3);
 
     control.replay();
@@ -203,7 +205,8 @@ public class HistoryPrunerTest extends EasyMockTest {
     // Future for tasks - a,b,c
     expectDefaultTaskWatchTimes(3);
 
-    // Cancel future and delete task "a" when history goal is exceeded.
+    // Cancel future and delete task "a" asynchronously when history goal is exceeded.
+    expectAsyncTaskDelete();
     expectCancelFuture();
     stateManager.deleteTasks(ImmutableSet.of("a"));
 

@@ -3,6 +3,7 @@ package com.twitter.mesos.scheduler.async;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Future;
@@ -67,7 +68,7 @@ public class HistoryPruner implements EventSubscriber {
   private final Clock clock;
   private final long pruneThresholdMillis;
   private final int perJobHistoryGoal;
-  private final Map<String, Future<?>> futures = Maps.newHashMap();
+  private final Map<String, Future<?>> taskIdToFuture = Maps.newHashMap();
 
   @BindingAnnotation
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
@@ -121,7 +122,7 @@ public class HistoryPruner implements EventSubscriber {
     for (ScheduledTask task : tasks) {
       String id = Tasks.id(task);
       tasksByJob.remove(Tasks.jobKey(task), id);
-      Future<?> future = futures.remove(id);
+      Future<?> future = taskIdToFuture.remove(id);
       if (future != null) {
         future.cancel(false);
       }
@@ -151,9 +152,9 @@ public class HistoryPruner implements EventSubscriber {
   private void registerInactiveTask(
       final String jobKey,
       final String taskId,
-      long timeoutRemaining) {
+      long timeRemaining) {
 
-    LOG.fine("Prune task " + taskId + " in " + timeoutRemaining + " ms.");
+    LOG.fine("Prune task " + taskId + " in " + timeRemaining + " ms.");
     // Insert the latest inactive task at the tail.
     tasksByJob.put(jobKey, taskId);
     Runnable runnable = new Runnable() {
@@ -161,22 +162,30 @@ public class HistoryPruner implements EventSubscriber {
         pruneTask(jobKey, taskId);
       }
     };
-    futures.put(taskId, executor.schedule(runnable, timeoutRemaining, TimeUnit.MILLISECONDS));
+    taskIdToFuture.put(taskId, executor.schedule(runnable, timeRemaining, TimeUnit.MILLISECONDS));
 
+    ImmutableSet.Builder<String> pruneTaskIds = ImmutableSet.builder();
     Collection<String> tasks = tasksByJob.get(jobKey);
+    Iterator<String> iterator = tasks.iterator();
     while (tasks.size() > perJobHistoryGoal) {
       // Pick oldest task from the head. Guaranteed by LinkedHashMultimap based on insertion order.
-      String pruneTaskId = tasks.iterator().next();
-      tasks.remove(pruneTaskId);
-      try {
-        LOG.fine("Pruning inactive task " + pruneTaskId);
-        stateManager.deleteTasks(ImmutableSet.of(pruneTaskId));
-      } finally {
-        Future<?> future = futures.remove(pruneTaskId);
-        if (future != null) {
-          future.cancel(false);
-        }
+      String id = iterator.next();
+      iterator.remove();
+      pruneTaskIds.add(id);
+      Future<?> future = taskIdToFuture.remove(id);
+      if (future != null) {
+        future.cancel(false);
       }
+    }
+
+    // Deferred to prevent triggering an event within an event handler.
+    final Set<String> ids = pruneTaskIds.build();
+    if (!ids.isEmpty()) {
+      executor.submit(new Runnable() {
+        @Override public void run() {
+          stateManager.deleteTasks(ids);
+        }
+      });
     }
   }
 
@@ -186,7 +195,7 @@ public class HistoryPruner implements EventSubscriber {
       stateManager.deleteTasks(ImmutableSet.of(taskId));
     } finally {
       tasksByJob.remove(jobKey, taskId);
-      futures.remove(taskId);
+      taskIdToFuture.remove(taskId);
     }
   }
 }

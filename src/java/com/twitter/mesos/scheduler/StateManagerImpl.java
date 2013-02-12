@@ -147,7 +147,8 @@ public class StateManagerImpl implements StateManager {
 
   private final AtomicLong shardSanityCheckFails = Stats.exportLong("shard_sanity_check_failures");
 
-  private final TransactionalStorage txStorage;
+  @VisibleForTesting
+  final TransactionalStorage txStorage;
 
   // TODO(William Farner): Eliminate this and update all callers to use Storage directly.
   interface ReadOnlyStorage {
