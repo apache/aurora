@@ -8,7 +8,7 @@ from twitter.common.git import branch
 from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_mkdir
 from twitter.mesos.clusters import Cluster
-from twitter.vert.release import EnvRelease
+from twitter.vert.backends.tag import TagBackend
 
 import git
 
@@ -71,7 +71,7 @@ class Builder(object):
 
   def __init__(self, cluster, release=None, hotfix=None, verbose=False):
     assert not (release is not None and hotfix), 'Cannot specify both release and hotfix.'
-    self._release = self._get_release(cluster, release) if not hotfix else None
+    self._deploy = self._get_deploy(cluster, release) if not hotfix else None
     self._cluster = Cluster.get(cluster)
     self._hotfix = bool(hotfix)
     self._verbose = verbose
@@ -102,18 +102,13 @@ class Builder(object):
         print('stderr: %s' % line)
       sys.exit(1)
 
-  def _get_release(self, cluster, release=None):
-    if release is None:
-      env_release = EnvRelease.latest(self.project, cluster)
-      if env_release is None:
-        raise self.ReleaseNotFound('Could not find latest release of %s!' % cluster)
-    else:
-      env_releases = filter(lambda rel: rel.number == release,
-                            EnvRelease.list(self.project, cluster))
-      if len(env_releases) != 1:
-        raise self.ReleaseNotFound('Could not find environment release of release %s' % release)
-      env_release = env_releases[0]
-    return env_release
+  def _get_deploy(self, cluster, release=None):
+    backend = TagBackend()
+    deploy = backend.latest_deploy(self.project, cluster) if release is None else (
+        backend.get_deploy(self.project, cluster, release))
+    if deploy is None:
+      raise self.ReleaseNotFound('Could not find release for %s!' % cluster)
+    return deploy
 
   def _check_tag(self):
     """
@@ -127,11 +122,7 @@ class Builder(object):
     if self._hotfix:
       return repo.head.commit.hexsha
 
-    failed, _, _ = self.call('git ls-remote --exit-code --tags origin %s' % self._release.tag())
-    if failed:
-      raise self.InvalidDeployTag('The tag %s was not found on origin' % self._release.tag())
-
-    return self._release.get_commit()
+    return self._deploy.release.revision
 
   @property
   def test_commands(self):
