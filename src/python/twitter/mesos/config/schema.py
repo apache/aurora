@@ -48,7 +48,7 @@ class AppLayout(Struct):
 #     copy_latest.bind(package_name = 'labrat'),
 #     copy_latest.bind(package_name = 'packer')
 #   ]
-class Packer(Struct):
+class PackerObject(Struct):
   package = String
   package_uri = String
 
@@ -135,3 +135,6 @@ class MesosJob(Struct):
 
 
 Job = MesosJob
+
+
+from .helpers import *

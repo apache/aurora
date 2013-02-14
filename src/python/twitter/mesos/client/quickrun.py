@@ -13,15 +13,16 @@ from twitter.mesos.client.client_util import populate_namespaces
 from twitter.mesos.config.schema import (
     Constraint,
     Job,
+    Packer,
     Process,
     Resources,
     Task)
 from twitter.mesos.parsers.pystachio_config import PystachioConfig
 from gen.twitter.mesos.ttypes import (
-   Identity,
-   ResponseCode,
-   ScheduleStatus,
-   TaskQuery)
+    Identity,
+    ResponseCode,
+    ScheduleStatus,
+    TaskQuery)
 
 from thrift.transport import TTransport
 
@@ -49,8 +50,8 @@ class Quickrun(object):
   def config(self, cluster, command, options):
     processes = [Process(name=options.name, cmdline=command)]
     if options.package:
-      processes.insert(0, Process(name='installer',
-          cmdline='{{packer[%s][%s][%s].copy_command}}' % options.package))
+      role, name, version = options.package
+      processes.insert(0, Packer.copy(name, role=role, version=version))
     task = Task(
         name=options.name,
         processes=processes,
@@ -60,7 +61,7 @@ class Quickrun(object):
                             disk=options.disk.as_(Data.BYTES)))
     job = Job(task=task, instances=options.instances, role=options.role, cluster=cluster)
     if options.announce:
-      job = job(announce=Announcer(environment='test'), daemon=True)
+      job = job(announce=Announcer(), environment='test', daemon=True)
     return populate_namespaces(PystachioConfig(job))
 
   def _iter_active_slaves(self, client):

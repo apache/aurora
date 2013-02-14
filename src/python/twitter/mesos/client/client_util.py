@@ -14,7 +14,7 @@ from pystachio import Ref
 from twitter.common import app, log
 from twitter.common.contextutil import temporary_dir, open_zip
 from twitter.mesos.clusters import Cluster
-from twitter.mesos.config.schema import Packer as PackerObject
+from twitter.mesos.config.schema import PackerObject
 from twitter.mesos.packer.packer_client import Packer
 from twitter.mesos.packer import sd_packer_client
 from twitter.mesos.parsers import (
