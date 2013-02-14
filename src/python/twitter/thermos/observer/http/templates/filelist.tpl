@@ -113,6 +113,8 @@ div.tight
   %>\
 % endif
 
+<% listing.sort() %>
+
 % for fn in listing:
 <%
   try:
