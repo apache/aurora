@@ -204,6 +204,8 @@ def create(jobname, config_file):
          'This requires that you be running the spawn from within the root of a science repo.')
 @app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
+@app.command_option(CLUSTER_CONFIG_OPTION)
+@app.command_option(ENV_OPTION)
 @app.command_option(JSON_OPTION)
 @requires.exactly('job', 'config')
 def spawn(jobname, config_file):
