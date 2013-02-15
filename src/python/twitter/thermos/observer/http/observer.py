@@ -126,6 +126,7 @@ class BottleObserver(HttpServer, BottleObserverMixins):
 
     return dict(
       task_id = task_id,
+      task = task,
       statuses = self._observer.task_statuses(task_id),
       user = task['user'],
       ports = task['ports'],

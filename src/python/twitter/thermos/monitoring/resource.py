@@ -197,15 +197,16 @@ class TaskResourceMonitor(ResourceMonitorBase, threading.Thread):
         next_disk_collection = now + self._disk_collection_interval
         log.debug('Collecting disk sample for %s' % self._sandbox)
         self._disk_collector.sample()
-        try:
-          aggregated_procs = sum(map(attrgetter('procs'), self._process_collectors.values()))
-          aggregated_sample = sum(map(attrgetter('value'), self._process_collectors.values()),
-                                  ProcessSample.empty())
-          self._history.add(now, self.ResourceResult(aggregated_procs, aggregated_sample,
-                                                     self._disk_collector.value))
-          log.debug("Recorded sample at %s" % now)
-        except ValueError as err:
-          log.warning("Error recording sample: %s" % err)
+
+      try:
+        aggregated_procs = sum(map(attrgetter('procs'), self._process_collectors.values()))
+        aggregated_sample = sum(map(attrgetter('value'), self._process_collectors.values()),
+                                ProcessSample.empty())
+        self._history.add(now, self.ResourceResult(aggregated_procs, aggregated_sample,
+                                                   self._disk_collector.value))
+        log.debug("Recorded resource sample at %s" % now)
+      except ValueError as err:
+        log.warning("Error recording resource sample: %s" % err)
 
       # Sleep until it's time for the next disk collection, the next process collection, or we've
       # been killed

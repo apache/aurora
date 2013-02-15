@@ -1,6 +1,7 @@
 <%doc>
  Template arguments:
   task_id
+  task
   statuses
   user
   ports
@@ -24,6 +25,10 @@
 
  def pretty_time(seconds=time.time()):
    return time.strftime('%m/%d %H:%M:%S', time.gmtime(seconds))
+
+ def get(task, typ):
+   return task['resource_consumption'][typ]
+
 %>
 
 <div class="container">
@@ -54,23 +59,45 @@
     </div>
   </div>
 
-  <div class="content" id="taskLayout">
-     <table class="table table-bordered table-condensed table-striped" style="empty-cells:show;">
-     <thead>
-       <tr>
-         <th colspan=1> task status </th>
-         <th colspan=1> time </th>
-       </tr>
-      </thead>
+  <div class="row-fluid">
+    <div class="span8" id="taskLayout">
+       <table class="table table-bordered table-condensed table-striped" style="empty-cells:show;">
+       <thead>
+         <tr>
+           <th colspan=1> task status </th>
+           <th colspan=1> time </th>
+         </tr>
+        </thead>
 
-      <tbody>
-      % for status, timestamp in sorted(statuses, key=lambda status: status[1]):
-       <tr>
-         <td> ${status} </td> <td> ${pretty_time(timestamp)} </td>
-       </tr>
-      % endfor
-     </tbody>
-     </table>
+        <tbody>
+        % for status, timestamp in sorted(statuses, key=lambda status: status[1]):
+         <tr>
+           <td> ${status} </td> <td> ${pretty_time(timestamp)} </td>
+         </tr>
+        % endfor
+       </tbody>
+       </table>
+    </div>
+
+    <div class="span4" id="taskResources">
+       <table class="table table-bordered table-condensed table-striped" style="empty-cells:show;">
+       <thead>
+         <tr>
+           <th> cpu </th>
+           <th> ram </th>
+           <th> disk </th>
+         </tr>
+        </thead>
+
+        <tbody>
+         <tr>
+           <td> ${'%.3f' % get(task, 'cpu')} </td>
+           <td> ${'%.1fMB' % (get(task, 'ram') / 1024. / 1024.)} </td>
+           <td> ${'%.1fGB' % (get(task, 'disk') / 1024. / 1024. / 1024.)} </td>
+         </tr>
+       </tbody>
+       </table>
+    </div>
   </div>
 
   <div class="content" id="processesLayout">
