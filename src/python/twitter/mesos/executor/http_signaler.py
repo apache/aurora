@@ -1,4 +1,5 @@
 import contextlib
+from socket import timeout as SocketTimeout
 
 from twitter.common import log
 from twitter.common.lang import Compatibility
@@ -40,8 +41,8 @@ class HttpSignaler(object):
           return (True, None)
     except (URLError, HTTPError, HTTPException) as e:
       # the type of an HTTPException is typically more useful than its contents (since for example
-      # BadStatusLines are often empty)
-      err = e.__class__.__name__ if isinstance(e, HTTPException) else e
+      # BadStatusLines are often empty). likewise with socket.timeout.
+      err = e.__class__.__name__ if isinstance(e, (HTTPException, SocketTimeout)) else e
       reason = 'Failed to signal %s: %s' % (self.url(endpoint), err)
       return (False, reason)
 
