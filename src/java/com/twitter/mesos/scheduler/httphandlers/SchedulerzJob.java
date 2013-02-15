@@ -149,21 +149,11 @@ public class SchedulerzJob extends JerseyTemplateServlet {
                 ImmutableMap.copyOf(Maps.transformValues(task.getTask().getTaskLinks(), expander));
           }
           builder.put("links", links);
-
-          if (Tasks.isThermos(task.getTask())) {
-            builder.put("executorPort", 1338);
-            if (task.isSetSlaveHost()) {
-              builder.put("executorUri",
-                  "http://" + task.getSlaveHost() + ":1338/task/" + task.getTaskId());
-            }
-          } else {
-            builder.put("executorPort", 1337);
-            if (task.isSetSlaveHost()) {
-              builder.put("executorUri",
-                  "http://" + task.getSlaveHost() + ":1337/task?task=" + task.getTaskId());
-            }
+          builder.put("executorPort", 1338);
+          if (task.isSetSlaveHost()) {
+            builder.put("executorUri",
+                "http://" + task.getSlaveHost() + ":1338/task/" + task.getTaskId());
           }
-
           return builder.build();
         }
       };

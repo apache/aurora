@@ -88,15 +88,6 @@ public final class Tasks {
   public static final Set<ScheduleStatus> TERMINAL_STATES =
       EnumSet.copyOf(Constants.TERMINAL_STATES);
 
-  /**
-   * Filter that includes only active tasks.
-   */
-  public static final Predicate<ScheduledTask> ACTIVE_FILTER = new Predicate<ScheduledTask>() {
-      @Override public boolean apply(ScheduledTask task) {
-        return isActive(task.getStatus());
-      }
-    };
-
   public static final Predicate<TwitterTaskInfo> IS_PRODUCTION =
       new Predicate<TwitterTaskInfo>() {
         @Override public boolean apply(TwitterTaskInfo task) {
@@ -178,20 +169,6 @@ public final class Tasks {
 
   public static Map<String, ScheduledTask> mapById(Iterable<ScheduledTask> tasks) {
     return Maps.uniqueIndex(tasks, SCHEDULED_TO_ID);
-  }
-
-  /**
-   * TODO(wfarner): Remove this and all uses of it.
-   *
-   * @param task Task to check whether it is a thermos or non-thermos task.
-   * @return {@code true} if the task is thermos, {@code false} otherwise.
-   * @deprecated This method is soon to disappear.
-   */
-  @Deprecated
-  public static boolean isThermos(TwitterTaskInfo task) {
-    // Length check is an artifact of thrift 0.5.0 NPE workaround from ConfigurationManager.
-    // See MESOS-370.
-    return task.isSetThermosConfig() && (task.getThermosConfig().length > 0);
   }
 
   public static String getRole(ScheduledTask task) {

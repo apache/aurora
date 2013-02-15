@@ -122,11 +122,6 @@ public final class ConfigurationManager {
     }
   }
 
-  public static final String EXECUTOR_CONSTRAINT = "executor";
-  public static final String LEGACY_EXECUTOR_VALUE = "legacy";
-  @VisibleForTesting
-  public static final Constraint LEGACY_EXECUTOR = new Constraint(EXECUTOR_CONSTRAINT,
-      TaskConstraint.value(new ValueConstraint(false, ImmutableSet.of(LEGACY_EXECUTOR_VALUE))));
   private static final Iterable<FieldSanitizer> SANITIZERS = ImmutableList.<FieldSanitizer>builder()
       .add(new RequiredField<Number>(_Fields.NUM_CPUS, new GreaterThan(0.0, "num_cpus")))
           .add(new RequiredField<Number>(_Fields.RAM_MB, new GreaterThan(0.0, "ram_mb")))
@@ -144,16 +139,6 @@ public final class ConfigurationManager {
             public void sanitize(TwitterTaskInfo task) {
               if (!Iterables.any(task.getConstraints(), hasName(HOST_CONSTRAINT))) {
                 task.addToConstraints(hostLimitConstraint(1));
-              }
-            }
-          })
-          // TODO(William Farner): Remove this once the old executor is retired.
-          .add(new FieldSanitizer() {
-            @Override public void sanitize(TwitterTaskInfo task) throws TaskDescriptionException {
-              // Apply an executor:legacy constraint to all non-thermos tasks.
-              if (!Tasks.isThermos(task)) {
-                Iterables.removeIf(task.getConstraints(), hasName(LEGACY_EXECUTOR.getName()));
-                task.addToConstraints(LEGACY_EXECUTOR);
               }
             }
           })
