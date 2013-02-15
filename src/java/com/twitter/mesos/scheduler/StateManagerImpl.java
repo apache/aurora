@@ -18,7 +18,6 @@ import javax.annotation.Nullable;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
-import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
@@ -135,15 +134,6 @@ public class StateManagerImpl implements StateManager {
       return new Attribute(entry.getKey(), ImmutableSet.copyOf(values));
     }
   };
-
-  private static final Function<TwitterTaskInfo, TwitterTaskInfo> COPY_AND_RESET_START_COMMAND =
-      new Function<TwitterTaskInfo, TwitterTaskInfo>() {
-        @Override public TwitterTaskInfo apply(TwitterTaskInfo task) {
-          TwitterTaskInfo copy = task.deepCopy();
-          ConfigurationManager.resetStartCommand(copy);
-          return copy;
-        }
-      };
 
   private final AtomicLong shardSanityCheckFails = Stats.exportLong("shard_sanity_check_failures");
 
@@ -632,33 +622,6 @@ public class StateManagerImpl implements StateManager {
   }
 
   /**
-   * An entity that may modify state of tasks by ID.
-   */
-  interface StateChanger {
-
-    /**
-     * Changes the state of tasks.
-     *
-     * @param taskIds IDs of the tasks to modify.
-     * @param state New state to apply to the tasks.
-     * @param auditMessage Audit message to associate with the transition.
-     */
-    void changeState(Set<String> taskIds, ScheduleStatus state, String auditMessage);
-  }
-
-  /**
-   * A mutation performed on the results of a query.
-   */
-  interface StateMutation<E extends Exception> {
-    void execute(Set<ScheduledTask> tasks, StateChanger changer) throws E;
-
-    /**
-     * A state mutation that does not throw a checked exception.
-     */
-    interface Quiet extends StateMutation<RuntimeException> { }
-  }
-
-  /**
    * Performs a simple state change, transitioning all tasks matching a query to the given
    * state.
    * No audit message will be applied with the transition.
@@ -729,8 +692,8 @@ public class StateManagerImpl implements StateManager {
   }
 
   private Set<Integer> getChangedShards(Set<ScheduledTask> tasks, Set<TwitterTaskInfo> compareTo) {
-    Set<TwitterTaskInfo> oldTasks = ImmutableSet.copyOf(Iterables.transform(tasks,
-        Functions.compose(COPY_AND_RESET_START_COMMAND, Tasks.SCHEDULED_TO_INFO)));
+    Set<TwitterTaskInfo> oldTasks =
+        ImmutableSet.copyOf(Iterables.transform(tasks, Tasks.SCHEDULED_TO_INFO));
     Set<TwitterTaskInfo> changedTasks = Sets.difference(compareTo, oldTasks);
     return ImmutableSet.copyOf(Iterables.transform(changedTasks, Tasks.INFO_TO_SHARD_ID));
   }
@@ -946,17 +909,9 @@ public class StateManagerImpl implements StateManager {
 
     final Closure<ScheduledTask> mutation = new Closure<ScheduledTask>() {
       @Override public void execute(ScheduledTask task) {
-        AssignedTask assigned;
-        TwitterTaskInfo info = task.getAssignedTask().getTask();
-        if (Tasks.isThermos(info)) {
-          assigned = task.getAssignedTask();
-          assigned.setAssignedPorts(CommandLineExpander.getNameMappedPorts(
-              assigned.getTask().getRequestedPorts(), assignedPorts));
-        } else {
-          assigned = CommandLineExpander.expand(task.getAssignedTask(), assignedPorts);
-        }
-
-        task.setAssignedTask(assigned);
+        AssignedTask assigned = task.getAssignedTask();
+        assigned.setAssignedPorts(CommandLineExpander.getNameMappedPorts(
+            assigned.getTask().getRequestedPorts(), assignedPorts));
         assigned.setSlaveHost(slaveHost)
             .setSlaveId(slaveId.getValue());
       }
@@ -1050,7 +1005,6 @@ public class StateManagerImpl implements StateManager {
             task.getAssignedTask().unsetSlaveId();
             task.getAssignedTask().unsetSlaveHost();
             task.getAssignedTask().unsetAssignedPorts();
-            ConfigurationManager.resetStartCommand(task.getAssignedTask().getTask());
             task.unsetTaskEvents();
             task.setAncestorId(taskId);
             String newTaskId = generateTaskId(task.getAssignedTask().getTask());
@@ -1186,7 +1140,6 @@ public class StateManagerImpl implements StateManager {
       return;
     }
 
-    ConfigurationManager.resetStartCommand(newConfig);
     ScheduledTask newTask = taskCreator.apply(newConfig).setAncestorId(taskId);
     taskStore.saveTasks(ImmutableSet.of(newTask));
     createStateMachine(sideEffectWork, newTask)

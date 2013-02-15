@@ -1,15 +1,12 @@
 package com.twitter.mesos.scheduler;
 
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Set;
 
 import com.google.common.base.Optional;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Maps;
 
 import org.easymock.IExpectationSetters;
 import org.junit.Before;
@@ -333,9 +330,9 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     TwitterTaskInfo task = productionTask();
-    task.getConfiguration().remove("num_cpus");
-    task.getConfiguration().remove("ram_mb");
-    task.getConfiguration().remove("disk_mb");
+    task.unsetNumCpus();
+    task.unsetRamMb();
+    task.unsetDiskMb();
     assertEquals(INVALID_REQUEST, thrift.createJob(makeJob(task), SESSION).getResponseCode());
   }
 
@@ -344,8 +341,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, true);
     control.replay();
 
-    TwitterTaskInfo task = productionTask();
-    task.getConfiguration().put("num_cpus", "0.0");
+    TwitterTaskInfo task = productionTask().setNumCpus(0.0);
     assertEquals(INVALID_REQUEST, thrift.createJob(makeJob(task), SESSION).getResponseCode());
   }
 
@@ -354,8 +350,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, true);
     control.replay();
 
-    TwitterTaskInfo task = productionTask();
-    task.getConfiguration().put("ram_mb", "-123");
+    TwitterTaskInfo task = productionTask().setRamMb(-123);
     assertEquals(INVALID_REQUEST, thrift.createJob(makeJob(task), SESSION).getResponseCode());
   }
 
@@ -364,8 +359,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, true);
     control.replay();
 
-    TwitterTaskInfo task = productionTask();
-    task.getConfiguration().put("disk_mb", "0");
+    TwitterTaskInfo task = productionTask().setDiskMb(0);
     assertEquals(INVALID_REQUEST, thrift.createJob(makeJob(task), SESSION).getResponseCode());
   }
 
@@ -387,8 +381,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     JobConfiguration parsed = job.deepCopy();
     for (TwitterTaskInfo parsedTask : parsed.getTaskConfigs()) {
-      parsedTask.setConfigParsed(true)
-          .setHealthCheckIntervalSecs(30)
+      parsedTask.setHealthCheckIntervalSecs(30)
           .setShardId(0)
           .setNumCpus(1.0)
           .setPriority(0)
@@ -414,60 +407,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     assertEquals(ResponseCode.OK, thrift.createJob(job, SESSION).getResponseCode());
   }
 
-  @Test
-  public void testCreateJobOldConfigPopulateDefaults() throws Exception {
-    TwitterTaskInfo task = new TwitterTaskInfo()
-        .setOwner(ROLE_IDENTITY)
-        .setJobName(JOB_NAME)
-        .setContactEmail("testing@twitter.com")
-        .setConfiguration(ImmutableMap.<String, String>builder()
-            .put("start_command", "echo")
-            .put("num_cpus", "1.0")
-            .put("ram_mb", "1024")
-            .put("disk_mb", "1024")
-            .put("daemon", "true")
-            .put("production", "true")
-            .build());
-    JobConfiguration job = makeJob(task);
-
-    expectAuth(ROLE, true);
-
-    JobConfiguration parsed = job.deepCopy();
-    for (TwitterTaskInfo parsedTask : parsed.getTaskConfigs()) {
-      parsedTask.setConfigParsed(true)
-          .setHealthCheckIntervalSecs(30)
-          .setStartCommand("echo")
-          .setThermosConfig(new byte[] {})
-          .setShardId(0)
-          .setNumCpus(1.0)
-          .setPriority(0)
-          .setRamMb(1024)
-          .setDiskMb(1024)
-          .setIsDaemon(true)
-          .setProduction(true)
-          .setRequestedPorts(ImmutableSet.<String>of())
-          .setTaskLinks(ImmutableMap.<String, String>of())
-          .setConstraints(ImmutableSet.of(
-              ConfigurationManager.hostLimitConstraint(1),
-              ConfigurationManager.rackLimitConstraint(1),
-              ConfigurationManager.LEGACY_EXECUTOR))
-          .setMaxTaskFailures(1);
-    }
-    // Task configs are placed in a HashSet after deepCopy, equals() does not play nicely between
-    // HashSet and ImmutableSet - dropping an ImmutableSet in place keeps equals() happy.
-    parsed.setTaskConfigs(ImmutableSet.copyOf(parsed.getTaskConfigs()));
-
-    scheduler.createJob(new ParsedConfiguration(parsed));
-
-    control.replay();
-
-    assertEquals(ResponseCode.OK, thrift.createJob(job, SESSION).getResponseCode());
-  }
-
   private Set<TwitterTaskInfo> taskCopies(TwitterTaskInfo task, int copies) {
     ImmutableSet.Builder<TwitterTaskInfo> tasks = ImmutableSet.builder();
     for (int i = 0; i < copies; i++) {
-      tasks.add(task.deepCopy().setStartCommand(String.valueOf(i)));
+      tasks.add(task.deepCopy().setShardId(i));
     }
     return tasks.build();
   }
@@ -484,12 +427,15 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testUpdateJobExceedsTaskLimit() throws Exception {
     expectAuth(ROLE, true);
+    JobConfiguration job = makeJob(taskCopies(nonProductionTask(), MAX_TASKS_PER_JOB.get()));
+    scheduler.createJob(ParsedConfiguration.fromUnparsed(job));
     expectAuth(ROLE, true);
     control.replay();
 
-    thrift.createJob(makeJob(taskCopies(nonProductionTask(), MAX_TASKS_PER_JOB.get())), SESSION);
-    JobConfiguration job = makeJob(taskCopies(nonProductionTask(), MAX_TASKS_PER_JOB.get() + 1));
-    assertEquals(INVALID_REQUEST, thrift.startUpdate(job, SESSION).getResponseCode());
+    thrift.createJob(job, SESSION);
+    JobConfiguration updated =
+        makeJob(taskCopies(nonProductionTask(), MAX_TASKS_PER_JOB.get() + 1));
+    assertEquals(INVALID_REQUEST, thrift.startUpdate(updated, SESSION).getResponseCode());
   }
 
   @Test
@@ -559,8 +505,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, true);
     control.replay();
 
+    // Tasks are internally placed in a Set, so a differentiating value is needed to prevent
+    // them from colliding.
     JobConfiguration job =
-        makeJob(productionTask("start_command", "1"), productionTask("start_command", "2"));
+        makeJob(productionTask().setNumCpus(1.0), productionTask().setNumCpus(2.0));
     for (TwitterTaskInfo task : job.getTaskConfigs()) {
       task.setShardId(0);
     }
@@ -572,8 +520,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, true);
     control.replay();
 
-    JobConfiguration job =
-        makeJob(productionTask("start_command", "1"), productionTask("start_command", "2"));
+    JobConfiguration job = makeJob(productionTask(), productionTask());
     job.setTaskConfigs(ImmutableSet.of(
         Iterables.get(job.getTaskConfigs(), 0).setShardId(0),
         Iterables.get(job.getTaskConfigs(), 0).setShardId(2)));
@@ -653,34 +600,22 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     return expectAuth(SchedulerThriftInterface.ADMIN_ROLE.get(), allowed);
   }
 
-  private static TwitterTaskInfo defaultTask(boolean production, String... additionalParams) {
-    Preconditions.checkArgument((additionalParams.length % 2) == 0,
-        "Additional params count must be even.");
-
-    Map<String, String> params = Maps.newHashMap(ImmutableMap.<String, String>builder()
-        .put("start_command", "date")
-        .put("num_cpus", "1.0")
-        .put("ram_mb", "1024")
-        .put("disk_mb", "1024")
-        .put("hdfs_path", "/fake/path")
-        .put("production", Boolean.toString(production))
-        .build());
-
-    for (int i = 0; i < additionalParams.length; i += 2) {
-      params.put(additionalParams[i], additionalParams[i + 1]);
-    }
-
+  private static TwitterTaskInfo defaultTask(boolean production) {
     return new TwitterTaskInfo()
         .setContactEmail("testing@twitter.com")
-        .setConfiguration(params);
+        .setThermosConfig("data".getBytes())
+        .setNumCpus(1)
+        .setRamMb(1024)
+        .setDiskMb(1024)
+        .setProduction(production);
   }
 
-  private static TwitterTaskInfo productionTask(String... additionalParams) {
-    return defaultTask(true, additionalParams);
+  private static TwitterTaskInfo productionTask() {
+    return defaultTask(true);
   }
 
-  private static TwitterTaskInfo nonProductionTask(String... additionalParams) {
-    return defaultTask(false, additionalParams);
+  private static TwitterTaskInfo nonProductionTask() {
+    return defaultTask(false);
   }
 
   private static Constraint dedicatedConstraint(int value) {

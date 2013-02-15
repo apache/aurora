@@ -64,7 +64,7 @@ public class MemUpdateStoreTest {
         .setRole("role-" + id)
         .setConfigs(ImmutableSet.of(
             new TaskUpdateConfiguration(
-                new TwitterTaskInfo().setJobName(id).setStartCommand("old"),
-                new TwitterTaskInfo().setJobName(id).setStartCommand("new"))));
+                new TwitterTaskInfo().setJobName(id).setRequestedPorts(ImmutableSet.of("old")),
+                new TwitterTaskInfo().setJobName(id).setRequestedPorts(ImmutableSet.of("new")))));
   }
 }

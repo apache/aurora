@@ -180,6 +180,14 @@ public final class Tasks {
     return Maps.uniqueIndex(tasks, SCHEDULED_TO_ID);
   }
 
+  /**
+   * TODO(wfarner): Remove this and all uses of it.
+   *
+   * @param task Task to check whether it is a thermos or non-thermos task.
+   * @return {@code true} if the task is thermos, {@code false} otherwise.
+   * @deprecated This method is soon to disappear.
+   */
+  @Deprecated
   public static boolean isThermos(TwitterTaskInfo task) {
     // Length check is an artifact of thrift 0.5.0 NPE workaround from ConfigurationManager.
     // See MESOS-370.

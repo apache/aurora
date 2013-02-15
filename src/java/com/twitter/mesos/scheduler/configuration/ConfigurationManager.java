@@ -1,7 +1,6 @@
 package com.twitter.mesos.scheduler.configuration;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -17,6 +16,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 import org.apache.commons.lang.StringUtils;
@@ -34,9 +34,6 @@ import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.TwitterTaskInfo._Fields;
 import com.twitter.mesos.gen.ValueConstraint;
-import com.twitter.mesos.scheduler.CommandLineExpander;
-import com.twitter.mesos.scheduler.ThermosJank;
-import com.twitter.mesos.scheduler.configuration.ValueParser.ParseException;
 
 /**
  * Manages translation from a string-mapped configuration to a concrete configuration type, and
@@ -50,7 +47,6 @@ public final class ConfigurationManager {
 
   @VisibleForTesting public static final String HOST_CONSTRAINT = "host";
   @VisibleForTesting public static final String RACK_CONSTRAINT = "rack";
-  @VisibleForTesting public static final String START_COMMAND_FIELD = "start_command";
 
   @VisibleForTesting
   @Positive
@@ -87,17 +83,42 @@ public final class ConfigurationManager {
     }
   }
 
-  private static class RequiredField implements FieldSanitizer {
-    private final _Fields field;
+  private interface Validator<T> {
+    void validate(T value) throws TaskDescriptionException;
+  }
 
-    RequiredField(_Fields field) {
+  private static class GreaterThan implements Validator<Number> {
+    private final double min;
+    private final String label;
+
+    GreaterThan(double min, String label) {
+      this.min = min;
+      this.label = label;
+    }
+
+    @Override public void validate(Number value) throws TaskDescriptionException {
+      if (this.min >= value.doubleValue()) {
+        throw new TaskDescriptionException(label + " must be greater than " + this.min);
+      }
+    }
+  }
+
+  private static class RequiredField<T> implements FieldSanitizer {
+    final _Fields field;
+    final Validator<T> validator;
+
+    RequiredField(_Fields field, Validator<T> validator) {
       this.field = field;
+      this.validator = validator;
     }
 
     @Override public void sanitize(TwitterTaskInfo task) throws TaskDescriptionException {
       if (!task.isSet(field)) {
         throw new TaskDescriptionException("Field " + field.getFieldName() + " is required.");
       }
+      @SuppressWarnings("unchecked")
+      T value = (T) task.getFieldValue(field);
+      validator.validate(value);
     }
   }
 
@@ -107,133 +128,47 @@ public final class ConfigurationManager {
   public static final Constraint LEGACY_EXECUTOR = new Constraint(EXECUTOR_CONSTRAINT,
       TaskConstraint.value(new ValueConstraint(false, ImmutableSet.of(LEGACY_EXECUTOR_VALUE))));
   private static final Iterable<FieldSanitizer> SANITIZERS = ImmutableList.<FieldSanitizer>builder()
-      .add(new RequiredField(_Fields.NUM_CPUS))
-      .add(new RequiredField(_Fields.RAM_MB))
-      .add(new RequiredField(_Fields.DISK_MB))
-      .add(new DefaultField(_Fields.IS_DAEMON, false))
-      .add(new DefaultField(_Fields.PRIORITY, 0))
-      .add(new DefaultField(_Fields.PRODUCTION, false))
-      .add(new DefaultField(_Fields.HEALTH_CHECK_INTERVAL_SECS, 30))
-      .add(new DefaultField(_Fields.MAX_TASK_FAILURES, 1))
-      .add(new DefaultField(_Fields.TASK_LINKS, Sets.<String>newHashSet()))
-      .add(new DefaultField(_Fields.REQUESTED_PORTS, Sets.<String>newHashSet()))
-      .add(new DefaultField(_Fields.CONSTRAINTS, Sets.<Constraint>newHashSet()))
-      .add(new FieldSanitizer() {
-        @Override public void sanitize(TwitterTaskInfo task) {
-          if (!Iterables.any(task.getConstraints(), hasName(HOST_CONSTRAINT))) {
-            task.addToConstraints(hostLimitConstraint(1));
-          }
-        }
-      })
-      // TODO(William Farner): Remove this once the old executor is retired.
-      .add(new FieldSanitizer() {
-        @Override public void sanitize(TwitterTaskInfo task) throws TaskDescriptionException {
-          // Apply an executor:legacy constraint to all non-thermos tasks.
-          if (!Tasks.isThermos(task)) {
-            Iterables.removeIf(task.getConstraints(), hasName(LEGACY_EXECUTOR.getName()));
-            task.addToConstraints(LEGACY_EXECUTOR);
-          }
-        }
-      })
-      .add(new FieldSanitizer() {
-        @Override public void sanitize(TwitterTaskInfo task) {
-          if (!isDedicated(task)
-              && task.isProduction()
-              && task.isIsDaemon()
-              && !Iterables.any(task.getConstraints(), hasName(RACK_CONSTRAINT))) {
+      .add(new RequiredField<Number>(_Fields.NUM_CPUS, new GreaterThan(0.0, "num_cpus")))
+          .add(new RequiredField<Number>(_Fields.RAM_MB, new GreaterThan(0.0, "ram_mb")))
+          .add(new RequiredField<Number>(_Fields.DISK_MB, new GreaterThan(0.0, "disk_mb")))
+          .add(new DefaultField(_Fields.IS_DAEMON, false))
+          .add(new DefaultField(_Fields.PRIORITY, 0))
+          .add(new DefaultField(_Fields.PRODUCTION, false))
+          .add(new DefaultField(_Fields.HEALTH_CHECK_INTERVAL_SECS, 30))
+          .add(new DefaultField(_Fields.MAX_TASK_FAILURES, 1))
+          .add(new DefaultField(_Fields.TASK_LINKS, Maps.<String, String>newHashMap()))
+          .add(new DefaultField(_Fields.REQUESTED_PORTS, Sets.<String>newHashSet()))
+          .add(new DefaultField(_Fields.CONSTRAINTS, Sets.<Constraint>newHashSet()))
+          .add(new FieldSanitizer() {
+            @Override
+            public void sanitize(TwitterTaskInfo task) {
+              if (!Iterables.any(task.getConstraints(), hasName(HOST_CONSTRAINT))) {
+                task.addToConstraints(hostLimitConstraint(1));
+              }
+            }
+          })
+          // TODO(William Farner): Remove this once the old executor is retired.
+          .add(new FieldSanitizer() {
+            @Override public void sanitize(TwitterTaskInfo task) throws TaskDescriptionException {
+              // Apply an executor:legacy constraint to all non-thermos tasks.
+              if (!Tasks.isThermos(task)) {
+                Iterables.removeIf(task.getConstraints(), hasName(LEGACY_EXECUTOR.getName()));
+                task.addToConstraints(LEGACY_EXECUTOR);
+              }
+            }
+          })
+          .add(new FieldSanitizer() {
+            @Override public void sanitize(TwitterTaskInfo task) {
+              if (!isDedicated(task)
+                  && task.isProduction()
+                  && task.isIsDaemon()
+                  && !Iterables.any(task.getConstraints(), hasName(RACK_CONSTRAINT))) {
 
-            task.addToConstraints(rackLimitConstraint(1));
-          }
-        }
-      })
-      .build();
-
-  private static final List<Field<?>> FIELDS = ImmutableList.<Field<?>>builder()
-      .add(new TypedField<String>(String.class, false, "hdfs_path", null) {
-        @Override boolean isSet(TwitterTaskInfo task) { return task.isSetHdfsPath(); }
-
-        @Override void apply(TwitterTaskInfo task, String value) throws TaskDescriptionException {
-          task.setHdfsPath(value);
-        }
-      })
-      .add(new TypedField<String>(String.class, true, START_COMMAND_FIELD, "") {
-        @Override boolean isSet(TwitterTaskInfo task) { return task.isSetStartCommand(); }
-
-        @Override void apply(TwitterTaskInfo task, String value) throws TaskDescriptionException {
-          task.setStartCommand(value);
-        }
-      })
-      .add(new TypedField<Boolean>(Boolean.class, false, "daemon", false) {
-        @Override boolean isSet(TwitterTaskInfo task) { return task.isSetIsDaemon(); }
-
-        @Override void apply(TwitterTaskInfo task, Boolean value) throws TaskDescriptionException {
-          task.setIsDaemon(value);
-        }
-      })
-      .add(new TypedField<Double>(Double.class, true, "num_cpus", 1.0) {
-        @Override boolean isSet(TwitterTaskInfo task) { return task.isSetNumCpus(); }
-
-        @Override void apply(TwitterTaskInfo task, Double value) throws TaskDescriptionException {
-          if (value <= 0) {
-            throw new TaskDescriptionException("Task must reserve > 0 cores.");
-          }
-
-          task.setNumCpus(value);
-        }
-      })
-      .add(new TypedField<Integer>(Integer.class, true, "ram_mb", 1024) {
-        @Override boolean isSet(TwitterTaskInfo task) { return task.isSetRamMb(); }
-
-        @Override void apply(TwitterTaskInfo task, Integer value) throws TaskDescriptionException {
-          if (value <= 0) {
-            throw new TaskDescriptionException("Task ram reservation must be > 0 MB.");
-          }
-
-          task.setRamMb(value);
-        }
-      })
-      .add(new TypedField<Integer>(Integer.class, true, "disk_mb", 1024) {
-        @Override boolean isSet(TwitterTaskInfo task) { return task.isSetDiskMb(); }
-
-        @Override void apply(TwitterTaskInfo task, Integer value) throws TaskDescriptionException {
-          if (value <= 0) {
-            throw new TaskDescriptionException("Task disk reservation must be > 0 MB.");
-          }
-
-          task.setDiskMb(value);
-        }
-      })
-      .add(new TypedField<Integer>(Integer.class, false, "priority", 0) {
-        @Override boolean isSet(TwitterTaskInfo task) { return task.isSetPriority(); }
-
-        @Override void apply(TwitterTaskInfo task, Integer value) throws TaskDescriptionException {
-          task.setPriority(value);
-        }
-      })
-      .add(new TypedField<Boolean>(Boolean.class, false, "production", false) {
-        @Override boolean isSet(TwitterTaskInfo task) { return task.isSetProduction(); }
-
-        @Override void apply(TwitterTaskInfo task, Boolean value) throws TaskDescriptionException {
-          task.setProduction(value);
-        }
-      })
-      .add(new TypedField<Integer>(Integer.class, false, "health_check_interval_secs", 30) {
-        @Override boolean isSet(TwitterTaskInfo task) {
-          return task.isSetHealthCheckIntervalSecs();
-        }
-
-        @Override void apply(TwitterTaskInfo task, Integer value) throws TaskDescriptionException {
-          task.setHealthCheckIntervalSecs(value);
-        }
-      })
-      .add(new TypedField<Integer>(Integer.class, false, "max_task_failures", 1) {
-        @Override boolean isSet(TwitterTaskInfo task) { return task.isSetMaxTaskFailures(); }
-
-        @Override void apply(TwitterTaskInfo task, Integer value) throws TaskDescriptionException {
-          task.setMaxTaskFailures(value);
-        }
-      })
-      .build();
+                task.addToConstraints(rackLimitConstraint(1));
+              }
+            }
+          })
+          .build();
 
   private ConfigurationManager() {
     // Utility class.
@@ -382,7 +317,6 @@ public final class ConfigurationManager {
    * @return A reference to the modified {@code config} (for chaining).
    * @throws TaskDescriptionException If the task is invalid.
    */
-  @ThermosJank
   @VisibleForTesting
   public static TwitterTaskInfo populateFields(JobConfiguration job, TwitterTaskInfo config)
       throws TaskDescriptionException {
@@ -410,18 +344,10 @@ public final class ConfigurationManager {
     }
 
     if (!config.isSetThermosConfig()) {
-      if (config.getConfiguration() == null) {
-        throw new TaskDescriptionException("Task configuration may not be null");
-      }
-
-      assertUnset(config);
-      populateFields(config);
+      throw new TaskDescriptionException("Thermos configuration may not be null");
     }
 
     sanitize(config);
-
-    config.setConfigParsed(true);
-
     return config;
   }
 
@@ -437,89 +363,6 @@ public final class ConfigurationManager {
         return constraint.getName().equals(name);
       }
     };
-  }
-
-  /**
-   * A redundant class that should collapse into {@link TypedField}.
-   * TODO(wfarner): Collapse this into TypedField.
-   *
-   * @param <T> Field type.
-   */
-  private abstract static class Field<T> {
-    private final String key;
-    private final T defaultValue;
-    private final boolean required;
-
-    private Field(boolean required, String key, T defaultValue) {
-      this.required = required;
-      this.key = key;
-      this.defaultValue = defaultValue;
-    }
-
-    abstract boolean isSet(TwitterTaskInfo task);
-
-    private void applyDefault(TwitterTaskInfo task) {
-      try {
-        apply(task, defaultValue);
-      } catch (TaskDescriptionException e) {
-        // Switch to runtime, since defaults should be safe.
-        throw new IllegalStateException("Default value " + defaultValue + " rejected for " + key);
-      }
-    }
-
-    abstract T parse(String raw) throws ParseException;
-
-    abstract void apply(TwitterTaskInfo task, T value) throws TaskDescriptionException;
-
-    void parseAndApply(TwitterTaskInfo task, String raw) throws TaskDescriptionException {
-      try {
-        apply(task, parse(raw));
-      } catch (ParseException e) {
-          throw new TaskDescriptionException("Value [" + raw
-              + "] cannot be applied to field " + key + ", " + e.getMessage());
-      }
-    }
-
-    T getDefaultValue() {
-      return defaultValue;
-    }
-
-    boolean isRequired() {
-      return required;
-    }
-  }
-
-  /**
-   * A typed configuration field that knows how to extract and parse a value from the raw
-   * configuration, and apply the value to the appropriate task struct field.
-   *
-   * @param <T> Field type.
-   */
-  private abstract static class TypedField<T> extends Field<T> {
-    private final ValueParser<T> parser;
-
-    TypedField(Class<T> type, boolean required, String key, T defaultValue) {
-      super(required, key, defaultValue);
-      this.parser = ValueParser.Registry.getParser(type).get();
-    }
-
-    @Override public T parse(String raw) throws ParseException {
-      return isRequired() ? parser.parse(raw) : parser.parseWithDefault(raw, getDefaultValue());
-    }
-  }
-
-  /**
-   * Resets the {@code start_command} to the original value in the task's configuration.  This can
-   * be used to undo any command-line expansion in a previous iteration of a task.
-   *
-   * @param task Task whose {@code start_command} should be reset.
-   */
-  public static void resetStartCommand(TwitterTaskInfo task) {
-    Preconditions.checkNotNull(task);
-    // This condition realistically only fails in unit tests.
-    if (task.isSetConfiguration()) {
-      task.setStartCommand(task.getConfiguration().get(START_COMMAND_FIELD));
-    }
   }
 
   @VisibleForTesting
@@ -541,41 +384,10 @@ public final class ConfigurationManager {
     };
   }
 
-  private static void assertUnset(TwitterTaskInfo task) throws TaskDescriptionException {
-    for (Field<?> field : FIELDS) {
-      if (field.isSet(task)) {
-        throw new TaskDescriptionException("Task field set before parsing: " + field.key);
-      }
-    }
-  }
-
   private static void sanitize(TwitterTaskInfo task) throws TaskDescriptionException {
     for (FieldSanitizer sanitizer : SANITIZERS) {
       sanitizer.sanitize(task);
     }
-  }
-
-  private static TwitterTaskInfo populateFields(TwitterTaskInfo task)
-      throws TaskDescriptionException {
-
-    Map<String, String> config = task.getConfiguration();
-
-    fillDataFields(task);
-
-    for (Field<?> field : FIELDS) {
-      String rawValue = config.get(field.key);
-      if (rawValue == null) {
-        if (field.required) {
-          throw new TaskDescriptionException("Field " + field.key + " is required.");
-        } else {
-          field.applyDefault(task);
-        }
-      } else {
-        field.parseAndApply(task, rawValue);
-      }
-    }
-
-    return task;
   }
 
   /**
@@ -586,19 +398,6 @@ public final class ConfigurationManager {
    */
   @VisibleForTesting
   public static TwitterTaskInfo applyDefaultsIfUnset(TwitterTaskInfo task) {
-    fillDataFields(task);
-    for (Field<?> field : FIELDS) {
-      if (!field.isSet(task)) {
-        field.applyDefault(task);
-      }
-    }
-
-    // TODO(wfarner): Remove this when new client is fully deployed and all tasks are backfilled.
-    maybeFillRequestedPorts(task);
-
-    // TODO(William Farner): Remove this once all tasks are backfilled with links.
-    maybeFillLinks(task);
-
     try {
       sanitize(task);
     } catch (TaskDescriptionException e) {
@@ -617,23 +416,6 @@ public final class ConfigurationManager {
   public static void applyDefaultsIfUnset(JobConfiguration job) {
     for (TwitterTaskInfo task : job.getTaskConfigs()) {
       ConfigurationManager.applyDefaultsIfUnset(task);
-    }
-  }
-
-  private static void fillDataFields(TwitterTaskInfo task) {
-    if (!task.isSetThermosConfig()) {
-      // Workaround for thrift 0.5.0 NPE.  See MESOS-370.
-      task.setThermosConfig(new byte[] {});
-    }
-
-    if (!task.isSetConstraints()) {
-      task.setConstraints(Sets.<Constraint>newHashSet());
-    }
-  }
-
-  private static void maybeFillRequestedPorts(TwitterTaskInfo task) {
-    if (!task.isSetRequestedPorts()) {
-      task.setRequestedPorts(CommandLineExpander.getPortNames(task.getStartCommand()));
     }
   }
 

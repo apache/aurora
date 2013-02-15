@@ -30,7 +30,6 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
-import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.events.PubsubEvent;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
@@ -301,7 +300,7 @@ public class StateManagerImplTest extends EasyMockTest {
     expectLastCall().times(2);
 
     control.replay();
-    TwitterTaskInfo taskInfo = makeTaskWithPorts("jim", "myJob", 0, "%port:foo%", "foo");
+    TwitterTaskInfo taskInfo = makeTaskWithPorts("jim", "myJob", 0, "foo");
 
     String taskId = insertTask(taskInfo);
     stateManager.assignTask(taskId, HOST_A, SlaveID.newBuilder().setValue(HOST_A).build(),
@@ -309,7 +308,6 @@ public class StateManagerImplTest extends EasyMockTest {
     ScheduledTask task =
         Iterables.getOnlyElement(stateManager.fetchTasks(Query.byRole("jim")));
     assertEquals(ImmutableMap.of("foo", 50), task.getAssignedTask().getAssignedPorts());
-    assertEquals("50", task.getAssignedTask().getTask().getStartCommand());
     assignTask(taskId, HOST_A);
     changeState(taskId, STARTING);
     changeState(taskId, RUNNING);
@@ -325,7 +323,6 @@ public class StateManagerImplTest extends EasyMockTest {
         ImmutableSet.<Integer>of(51));
 
     assertEquals(ImmutableMap.of("foo", 51), updated.getAssignedPorts());
-    assertEquals("51", updated.getTask().getStartCommand());
     changeState(newTaskId, STARTING);
     changeState(newTaskId, ROLLBACK);
     changeState(newTaskId, FINISHED);
@@ -336,7 +333,6 @@ public class StateManagerImplTest extends EasyMockTest {
         SlaveID.newBuilder().setValue(HOST_A).build(),
         ImmutableSet.<Integer>of(52));
     assertEquals(ImmutableMap.of("foo", 52), rolledBack.getAssignedPorts());
-    assertEquals("52", rolledBack.getTask().getStartCommand());
   }
 
   @Test
@@ -501,16 +497,17 @@ public class StateManagerImplTest extends EasyMockTest {
         .setOwner(new Identity().setRole(owner).setUser(owner))
         .setJobName(job)
         .setShardId(shard)
-        .setStartCommand("echo")
         .setRequestedPorts(ImmutableSet.<String>of());
   }
 
-  private static TwitterTaskInfo makeTaskWithPorts(String owner, String job, int shard,
-      String startCommand, String... requestedPorts) {
+  private static TwitterTaskInfo makeTaskWithPorts(
+      String owner,
+      String job,
+      int shard,
+      String... requestedPorts) {
+
     TwitterTaskInfo task = makeTask(owner, job, shard);
-    task.setStartCommand(startCommand);
     task.setRequestedPorts(ImmutableSet.<String>builder().add(requestedPorts).build());
-    task.setConfiguration(ImmutableMap.of(ConfigurationManager.START_COMMAND_FIELD, startCommand));
     return task;
   }
 
