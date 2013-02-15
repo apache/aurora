@@ -18,13 +18,10 @@ from twitter.mesos.config.schema import (
     Resources,
     Task)
 from twitter.mesos.parsers.pystachio_config import PystachioConfig
-from gen.twitter.mesos.ttypes import (
-    Identity,
-    ResponseCode,
-    ScheduleStatus,
-    TaskQuery)
 
-from thrift.transport import TTransport
+from gen.twitter.mesos.ttypes import ResponseCode, ScheduleStatus
+
+from .job_monitor import JobMonitor
 
 
 class Quickrun(object):
@@ -41,8 +38,7 @@ class Quickrun(object):
       ScheduleStatus.KILLED])
 
   def __init__(self, cluster, command, options):
-    self._active_query = TaskQuery(owner=Identity(role=options.role),
-        jobName=options.name)
+    self._jobname, self._role = options.name, options.role
     self._stop = threading.Event()
     self._config = self.config(cluster, command, options)
     self._instances = options.instances
@@ -64,20 +60,8 @@ class Quickrun(object):
       job = job(announce=Announcer(), environment='test', daemon=True)
     return populate_namespaces(PystachioConfig(job))
 
-  def _iter_active_slaves(self, client):
-    try:
-      res = client.scheduler.getTasksStatus(self._active_query)
-    except TTransport.TTransportException as e:
-      print('Failed to query slaves from scheduler: %s' % e)
-      return
-    if res is None or res.tasks is None:
-      return
-    for task in res.tasks:
-      yield (task.assignedTask.task.shardId, task.status, task.assignedTask.slaveId)
-
   def _terminal(self, statuses):
-    terminals = sum([count for (status, count) in statuses.items()
-                     if status in self.FINISHED_STATES])
+    terminals = sum(status in self.FINISHED_STATES for status in statuses.values())
     return terminals == self._instances
 
   def _write_line(self, line):
@@ -87,17 +71,19 @@ class Quickrun(object):
     sys.stderr.flush()
 
   def run(self, client):
+    monitor = JobMonitor(client, self._role, self._jobname)
     response = client.create_job(self._config)
     if response.responseCode != ResponseCode.OK:
       print('Failed to create job: %s' % response.message)
       return False
     try:
       while True:
-        statuses = defaultdict(int)
-        for shard_id, status, slave_id in self._iter_active_slaves(client):
-          statuses[status] += 1
+        statuses = monitor.states()
+        statuses_count = defaultdict(int)
+        for shard_id, status in statuses.items():
+          statuses_count[status] += 1
         self._write_line(' :: '.join('%s %2d' % (ScheduleStatus._VALUES_TO_NAMES[status], count)
-            for (status, count) in statuses.items()))
+            for (status, count) in statuses_count.items()))
         if self._terminal(statuses):
           print('\nTask finished.')
           return True

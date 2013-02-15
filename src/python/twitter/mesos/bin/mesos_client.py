@@ -23,10 +23,10 @@ from twitter.common.log.options import LogOptions
 from twitter.common.quantity import Amount, Data
 from twitter.common.quantity.parse_simple import parse_data_into
 from twitter.mesos.client import client_util
-from twitter.mesos.client.client_wrapper import MesosClientAPI, create_client
+from twitter.mesos.client.client_wrapper import MesosClientAPI
 from twitter.mesos.client.client_util import requires, query_scheduler
+from twitter.mesos.client.job_monitor import JobMonitor
 from twitter.mesos.client.quickrun import Quickrun
-from twitter.mesos.client.spawn_local import spawn_local
 from twitter.mesos.clusters import Cluster
 from twitter.mesos.command_runner import DistributedCommandRunner
 from twitter.mesos.packer import sd_packer_client
@@ -39,6 +39,14 @@ from gen.twitter.mesos.ttypes import (
     Identity,
     ScheduleStatus,
     TaskQuery)
+
+
+try:
+  from twitter.mesos.client.spawn_local import spawn_local
+except ImportError:
+  def spawn_local(*args, **kw):
+    print('Local spawning not supported in this version of mesos client.')
+    sys.exit(1)
 
 
 DEFAULT_USAGE_BANNER = """
@@ -164,12 +172,30 @@ def make_spawn_options(options):
       'env'))
 
 
+CREATE_STATES = (
+  'PENDING',
+  'RUNNING',
+  'FINISHED'
+)
+
+WAIT_UNTIL_OPTION = optparse.Option(
+    '--wait_until',
+    default='PENDING',
+    type='choice',
+    choices=CREATE_STATES,
+    metavar='STATE',
+    dest='wait_until',
+    help='Block the client until all the tasks have transitioned into the '
+         'requested state.  Options: %s.  Default: %%default' % (', '.join(CREATE_STATES)))
+
+
 @app.command
 @app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
 @app.command_option(CLUSTER_CONFIG_OPTION)
 @app.command_option(ENV_OPTION)
 @app.command_option(JSON_OPTION)
+@app.command_option(WAIT_UNTIL_OPTION)
 @requires.exactly('job', 'config')
 def create(jobname, config_file):
   """usage: create job config
@@ -187,13 +213,18 @@ def create(jobname, config_file):
   if config.cluster() == 'local':
     options.shard = 0
     options.runner = 'build'
-    print('Detected cluster=local, spawning local run.')
     return spawn_local('build', jobname, config_file, **make_spawn_options(options))
 
-  api = create_client(config.cluster())
+  api = MesosClientAPI(config.cluster(), options.verbosity)
+  monitor = JobMonitor(api, config.role(), jobname)
   resp = api.create_job(config)
   client_util.check_and_log_response(resp)
   handle_open(api.scheduler.scheduler(), config.role(), config.name())
+
+  if options.wait_until == 'RUNNING':
+    monitor.wait_until(monitor.running_or_finished)
+  elif options.wait_until == 'FINISHED':
+    monitor.wait_until(monitor.terminal)
 
 
 @app.command
@@ -304,7 +335,7 @@ def runtask(args, options):
   if task_is_expensive(options):
     client_util.die('Task too expensive.')
   qr = Quickrun(cluster, cmdline, options)
-  api = MesosClientAPI(cluster=cluster)
+  api = MesosClientAPI(cluster, options.verbosity)
   qr.run(api)
 
 
@@ -329,7 +360,7 @@ def diff(job, config_file):
       options.bindings,
       select_cluster=options.cluster,
       select_env=options.env)
-  api = create_client(config.cluster())
+  api = MesosClientAPI(config.cluster(), options.verbosity)
   resp = query_scheduler(api, config.role(), job, statuses=ACTIVE_STATES)
   if not resp.responseCode:
     client_util.die('Request failed, server responded with "%s"' % resp.message)
@@ -380,7 +411,7 @@ def do_open(*args):
   if not options.cluster:
     client_util.die('--cluster is required')
 
-  api = create_client()
+  api = MesosClientAPI(options.cluster, options.verbosity)
 
   import webbrowser
   webbrowser.open_new_tab(synthesize_url(api.scheduler.scheduler(), role, job))
@@ -468,7 +499,8 @@ def start_cron(role, jobname):
   Invokes a cron job immediately, out of its normal cron cycle.
   This does not affect the cron cycle in any way.
   """
-  api = create_client()
+  options = app.get_options()
+  api = MesosClientAPI(options.cluster, options.verbosity)
   resp = api.start_cronjob(role, jobname)
   client_util.check_and_log_response(resp)
   handle_open(api.scheduler.scheduler(), role, jobname)
@@ -486,7 +518,8 @@ def kill(role, jobname):
   Kills all shards if no shard-ids are specified.
 
   """
-  api = create_client()
+  options = app.get_options()
+  api = MesosClientAPI(options.cluster, options.verbosity)
   resp = api.kill_job(role, jobname, _getshards(app.get_options().shards))
   client_util.check_and_log_response(resp)
   handle_open(api.scheduler.scheduler(), role, jobname)
@@ -500,6 +533,7 @@ def status(role, jobname):
 
   Fetches and prints information about the active tasks in a job.
   """
+  options = app.get_options()
 
   def is_active(task):
     return task.status in ACTIVE_STATES
@@ -533,7 +567,7 @@ def status(role, jobname):
               task.assignedTask.slaveHost,
               taskString))
 
-  resp = create_client().check_status(role, jobname)
+  resp = MesosClientAPI(options.cluster, options.verbosity).check_status(role, jobname)
   client_util.check_and_log_response(resp)
 
   if resp.tasks:
@@ -609,7 +643,7 @@ Based on your job size (%s) you should use max_total_failures >= %s.
 See http://confluence.local.twitter.com/display/Aurora/Aurora+Configuration+Referencefor details.
 ''' % (job_size, min_failure_threshold))
 
-  api = create_client(config.cluster())
+  api = MesosClientAPI(config.cluster(), options.verbosity)
   resp = api.update_job(config, _getshards(options.shards))
   client_util.check_and_log_response(resp)
 
@@ -625,7 +659,8 @@ def cancel_update(role, jobname):
   or if another user is actively updating the job.  This command should only
   be used when the user is confident that they are not conflicting with another user.
   """
-  resp = create_client().cancel_update(role, jobname)
+  options = app.get_options()
+  resp = MesosClientAPI(options.cluster, options.verbosity).cancel_update(role, jobname)
   client_util.check_and_log_response(resp)
 
 
@@ -637,7 +672,8 @@ def get_quota(role):
 
   Prints the production quota that has been allocated to a user.
   """
-  resp = create_client().get_quota(role)
+  options = app.get_options()
+  resp = MesosClientAPI(options.cluster, options.verbosity).get_quota(role)
   quota = resp.quota
 
   quota_fields = [
@@ -663,7 +699,9 @@ def ssh(role, job, shard, *args):
 
   Initiate an SSH session on the machine that a shard is running on.
   """
-  resp = query_scheduler(create_client(), role, job, set([int(shard)]))
+  options = app.get_options()
+  resp = query_scheduler(MesosClientAPI(options.cluster, options.verbosity),
+      role, job, set([int(shard)]))
   options = app.get_options()
 
   if not resp.responseCode:

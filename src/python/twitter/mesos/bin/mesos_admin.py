@@ -8,7 +8,7 @@ import sys
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 from twitter.mesos.client import client_util
-from twitter.mesos.client.client_wrapper import create_client
+from twitter.mesos.client.client_wrapper import MesosClientAPI
 from twitter.mesos.client.client_util import requires, query_scheduler
 
 from gen.twitter.mesos.constants import ACTIVE_STATES, TERMINAL_STATES
@@ -103,7 +103,7 @@ def query(args, options):
   if not (states <= ACTIVE_STATES) and not options.force:
     client_util.die('--force is required for expensive queries (states outside ACTIVE states')
 
-  api = create_client(options.cluster)
+  api = MesosClientAPI(options.cluster, options.verbosity)
   query_info = query_scheduler(api, role, job, shards=shards, statuses=states)
   if query_info.responseCode != ResponseCode.OK:
     client_util.die('Failed to query scheduler: %s' % query_info.message)
@@ -135,7 +135,7 @@ def set_quota(role, cpu_str, ram_mb_str, disk_mb_str):
   except ValueError:
     log.error('Invalid value')
 
-  resp = create_client().set_quota(role, cpu, ram_mb, disk_mb)
+  resp = MesosClientAPI(options.cluster, options.verbosity).set_quota(role, cpu, ram_mb, disk_mb)
   client_util.check_and_log_response(resp)
 
 
@@ -155,7 +155,7 @@ def force_task_state(task_id, state):
               % (state, ', '.join(ScheduleStatus._NAMES_TO_VALUES.keys())))
     sys.exit(1)
 
-  resp = create_client().force_task_state(task_id, status)
+  resp = MesosClientAPI(options.cluster, options.verbosity).force_task_state(task_id, status)
   client_util.check_and_log_response(resp)
 
 
@@ -167,7 +167,8 @@ def scheduler_backup_now():
 
   Immediately initiates a full storage backup.
   """
-  client_util.check_and_log_response(create_client().perform_backup())
+  client_util.check_and_log_response(
+      MesosClientAPI(options.cluster, options.verbosity).perform_backup())
 
 
 @app.command
@@ -178,7 +179,7 @@ def scheduler_list_backups():
 
   Lists backups available for recovery.
   """
-  resp = create_client().list_backups()
+  resp = MesosClientAPI(options.cluster, options.verbosity).list_backups()
   client_util.check_and_log_response(resp)
   log.info('%s available backups:' % len(resp.backups))
   for backup in resp.backups:
@@ -193,7 +194,8 @@ def scheduler_stage_recovery(backup_id):
 
   Stages a backup for recovery.
   """
-  client_util.check_and_log_response(create_client().stage_recovery(backup_id))
+  client_util.check_and_log_response(
+      MesosClientAPI(options.cluster, options.verbosity).stage_recovery(backup_id))
 
 
 @app.command
@@ -204,7 +206,8 @@ def scheduler_print_recovery_tasks():
 
   Prints all active tasks in a staged recovery.
   """
-  resp = create_client().query_recovery(TaskQuery(statuses=ACTIVE_STATES))
+  resp = MesosClientAPI(options.cluster, options.verbosity).query_recovery(
+      TaskQuery(statuses=ACTIVE_STATES))
   client_util.check_and_log_response(resp)
   log.info('Role\tJob\tShard\tStatus\tTask ID')
   for task in resp.tasks:
@@ -226,7 +229,8 @@ def scheduler_delete_recovery_tasks(task_ids):
   Deletes a comma-separated list of task IDs from a staged recovery.
   """
   ids = set(task_ids.split(','))
-  client_util.check_and_log_response(create_client().delete_recovery_tasks(TaskQuery(taskIds=ids)))
+  client_util.check_and_log_response(MesosClientAPI(options.cluster, options.verbosity)
+      .delete_recovery_tasks(TaskQuery(taskIds=ids)))
 
 
 @app.command
@@ -237,7 +241,8 @@ def scheduler_commit_recovery():
 
   Commits a staged recovery.
   """
-  client_util.check_and_log_response(create_client().commit_recovery())
+  client_util.check_and_log_response(MesosClientAPI(options.cluster, options.verbosity)
+      .commit_recovery())
 
 
 @app.command
@@ -248,7 +253,8 @@ def scheduler_unload_recovery():
 
   Unloads a staged recovery.
   """
-  client_util.check_and_log_response(create_client().unload_recovery())
+  client_util.check_and_log_response(MesosClientAPI(options.cluster, options.verbosity)
+      .unload_recovery())
 
 
 def make_commands_str(commands):

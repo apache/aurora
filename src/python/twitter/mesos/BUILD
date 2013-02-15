@@ -85,13 +85,13 @@ python_library(
 python_library(
   name = 'mesos-lib',
   dependencies = [
-    pants('src/python/twitter/mesos/packer'),
-    pants('src/python/twitter/mesos/client'),
     pants(':clusters'),
     pants(':command_runner'),
     pants(':location'),
     pants(':scheduler_client'),
     pants(':zookeeper_helper'),
+    pants('src/python/twitter/mesos/packer'),
+    pants('src/python/twitter/mesos/client'),
   ]
 )
 
@@ -108,6 +108,18 @@ python_binary(
     'linux-x86_64',
     'macosx-10.6-x86_64',
   )
+)
+
+python_binary(
+  name = 'mesos_client_full',
+  source = 'bin/mesos_client.py',
+  dependencies = [
+    pants(':mesos-lib'),
+    pants('src/python/twitter/common/app'),
+    pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/thermos/base:options'),
+    pants('src/python/twitter/mesos/client:spawn_local'),
+  ],
 )
 
 python_binary(
