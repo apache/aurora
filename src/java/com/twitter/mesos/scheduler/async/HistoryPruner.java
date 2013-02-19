@@ -13,6 +13,7 @@ import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
+import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.LinkedHashMultimap;
@@ -64,11 +65,12 @@ public class HistoryPruner implements EventSubscriber {
   final Multimap<String, String> tasksByJob = LinkedHashMultimap.create();
 
   private final ScheduledExecutorService executor;
-  private final StateManager stateManager;
   private final Clock clock;
   private final long pruneThresholdMillis;
   private final int perJobHistoryGoal;
   private final Map<String, Future<?>> taskIdToFuture = Maps.newHashMap();
+  private final TaskDeleter taskDeleter;
+  private final Supplier<Set<ScheduledTask>> inactiveTasksSupplier;
 
   @BindingAnnotation
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
@@ -83,10 +85,20 @@ public class HistoryPruner implements EventSubscriber {
       @PruneThreshold int perJobHistoryGoal) {
 
     this.executor = checkNotNull(executor);
-    this.stateManager = checkNotNull(stateManager);
     this.clock = checkNotNull(clock);
     this.pruneThresholdMillis = inactivePruneThreshold.as(Time.MILLISECONDS);
     this.perJobHistoryGoal = checkNotNull(perJobHistoryGoal);
+    this.taskDeleter = new TaskDeleter(checkNotNull(stateManager), executor);
+    this.inactiveTasksSupplier = new Supplier<Set<ScheduledTask>>() {
+      @Override public Set<ScheduledTask> get() {
+        return stateManager.fetchTasks(INACTIVE_QUERY);
+      }
+    };
+  }
+
+  @VisibleForTesting
+  long calculateTimeout(long taskEventTimestampMillis) {
+    return pruneThresholdMillis - Math.max(0, clock.nowMillis() - taskEventTimestampMillis);
   }
 
   /**
@@ -110,22 +122,11 @@ public class HistoryPruner implements EventSubscriber {
    */
   @Subscribe
   public synchronized void storageStarted(StorageStarted event) {
-    for (ScheduledTask task : LATEST_ACTIVITY.sortedCopy(stateManager.fetchTasks(INACTIVE_QUERY))) {
+    for (ScheduledTask task : LATEST_ACTIVITY.sortedCopy(inactiveTasksSupplier.get())) {
       registerInactiveTask(
           Tasks.jobKey(task),
           Tasks.id(task),
           calculateTimeout(Iterables.getLast(task.getTaskEvents()).getTimestamp()));
-    }
-  }
-
-  private synchronized void delete(Set<ScheduledTask> tasks) {
-    for (ScheduledTask task : tasks) {
-      String id = Tasks.id(task);
-      tasksByJob.remove(Tasks.jobKey(task), id);
-      Future<?> future = taskIdToFuture.remove(id);
-      if (future != null) {
-        future.cancel(false);
-      }
     }
   }
 
@@ -139,14 +140,20 @@ public class HistoryPruner implements EventSubscriber {
     // This is 'eventually consistent', which is deemed to be okay in this case.
     executor.submit(new Runnable() {
       @Override public void run() {
-        delete(event.getTasks());
+        deleteInternal(event.getTasks());
       }
     });
   }
 
-  @VisibleForTesting
-  long calculateTimeout(long taskEventTimestampMillis) {
-    return pruneThresholdMillis - Math.max(0, clock.nowMillis() - taskEventTimestampMillis);
+  private synchronized void deleteInternal(Set<ScheduledTask> tasks) {
+    for (ScheduledTask task : tasks) {
+      String id = Tasks.id(task);
+      tasksByJob.remove(Tasks.jobKey(task), id);
+      Future<?> future = taskIdToFuture.remove(id);
+      if (future != null) {
+        future.cancel(false);
+      }
+    }
   }
 
   private void registerInactiveTask(
@@ -181,21 +188,45 @@ public class HistoryPruner implements EventSubscriber {
     // Deferred to prevent triggering an event within an event handler.
     final Set<String> ids = pruneTaskIds.build();
     if (!ids.isEmpty()) {
-      executor.submit(new Runnable() {
-        @Override public void run() {
-          stateManager.deleteTasks(ids);
-        }
-      });
+      taskDeleter.deleteLater(ids);
     }
   }
 
-  private synchronized void pruneTask(String jobKey, String taskId) {
+  private void pruneTask(String jobKey, String taskId) {
     try {
       LOG.info("Pruning expired inactive task " + taskId);
-      stateManager.deleteTasks(ImmutableSet.of(taskId));
+      taskDeleter.deleteLater(ImmutableSet.of(taskId));
     } finally {
-      tasksByJob.remove(jobKey, taskId);
-      taskIdToFuture.remove(taskId);
+      // Synchronize only on internal structures to guarantee that no external locks are
+      // obtained while holding the intrinsic lock.
+      synchronized (this) {
+        tasksByJob.remove(jobKey, taskId);
+        taskIdToFuture.remove(taskId);
+      }
+    }
+  }
+
+  /**
+   * Wraps StateManager and schedules delayed task deletions. This helps prevent holding a lock
+   * when performing an operation that requires another lock. When neglected, this can cause
+   * a deadlock.
+   */
+  private static class TaskDeleter {
+    final ScheduledExecutorService executor;
+    final StateManager stateManager;
+
+    TaskDeleter(StateManager stateManager, ScheduledExecutorService executor) {
+      this.stateManager  = stateManager;
+      this.executor = executor;
+    }
+
+    void deleteLater(final Set<String> taskIds) {
+      executor.submit(new Runnable() {
+        @Override public void run() {
+          LOG.info("Pruning inactive tasks " + taskIds);
+          stateManager.deleteTasks(taskIds);
+        }
+      });
     }
   }
 }
