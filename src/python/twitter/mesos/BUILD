@@ -18,6 +18,16 @@ python_library(
 )
 
 python_library(
+  name = 'cluster_option',
+  sources = ['cluster_option.py'],
+  dependencies = [
+    pants('src/python/twitter/common/lang'),
+    pants('src/python/twitter/common/options'),
+    pants(':clusters'),
+  ]
+)
+
+python_library(
   name = 'location',
   sources = ['location.py'],
 )

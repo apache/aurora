@@ -2,6 +2,7 @@ python_test_suite(name = 'all',
   dependencies = [
     pants(':updater'),
     pants(':constraints'),
+    pants(':cluster_option'),
     pants('tests/python/twitter/mesos/parsers:all'),
     pants('tests/python/twitter/mesos/executor:all'),
     pants('tests/python/twitter/mesos/packer:all'),
@@ -24,5 +25,12 @@ python_tests(name = 'constraints',
   sources = ['test_constraint_parsing.py'],
   dependencies = [
     pants('src/python/twitter/mesos:parsers'),
+  ]
+)
+
+python_tests(name = 'cluster_option',
+  sources = ['test_cluster_option.py'],
+  dependencies = [
+    pants('src/python/twitter/mesos:cluster_option'),
   ]
 )
