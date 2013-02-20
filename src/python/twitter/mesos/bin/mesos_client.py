@@ -129,17 +129,18 @@ ENV_OPTION = optparse.Option(
 
 # This is for binding arbitrary points in the Thermos namespace to specific strings, e.g.
 # if a Thermos configuration has {{jvm.version}}, it can be bound explicitly from the
-# command-line with, for example, -E jvm.version:7
+# command-line with, for example, -E jvm.version=7
 ENVIRONMENT_BIND_OPTION = optparse.Option(
     '-E',
     type='string',
     nargs=1,
     action='callback',
     default=[],
-    metavar='NAME:VALUE',
+    metavar='NAME=VALUE',
     callback=add_binding_to('bindings'),
     dest='bindings',
-    help='Bind a thermos mustache variable name to a value.')
+    help='Bind a thermos mustache variable name to a value. '
+         'Multiple flags may be used to specify multiple values.')
 
 
 EXECUTOR_SANDBOX_OPTION = optparse.Option(
