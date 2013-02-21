@@ -196,10 +196,11 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     }
 
     try {
-      schedulerCore.createJob(ParsedConfiguration.fromUnparsed(job));
+      ParsedConfiguration parsed = ParsedConfiguration.fromUnparsed(job);
+      schedulerCore.createJob(parsed);
       response.setResponseCode(OK)
           .setMessage(String.format("%d new tasks pending for job %s",
-              job.getTaskConfigs().size(), Tasks.jobKey(job)));
+              parsed.get().getTaskConfigsSize(), Tasks.jobKey(job)));
     } catch (ConfigurationManager.TaskDescriptionException e) {
       response.setResponseCode(INVALID_REQUEST)
           .setMessage("Invalid task description: " + e.getMessage());

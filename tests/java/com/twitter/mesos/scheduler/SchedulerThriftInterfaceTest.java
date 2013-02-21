@@ -115,6 +115,36 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testCreateHomogeneousJobNoShards() throws Exception {
+    JobConfiguration job = makeJob();
+    job.unsetTaskConfigs();
+    job.setTaskConfig(nonProductionTask());
+    expectAuth(ROLE, true);
+
+    control.replay();
+
+    CreateJobResponse response = thrift.createJob(job, SESSION);
+    assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
+  }
+
+  @Test
+  public void testCreateHomogeneousJob() throws Exception {
+    JobConfiguration job = makeJob();
+    job.unsetTaskConfigs();
+    job.setTaskConfig(nonProductionTask());
+    job.setShardCount(2);
+    expectAuth(ROLE, true);
+    ParsedConfiguration parsed = ParsedConfiguration.fromUnparsed(job);
+    assertEquals(2, parsed.get().getTaskConfigsSize());
+    scheduler.createJob(parsed);
+
+    control.replay();
+
+    CreateJobResponse response = thrift.createJob(job, SESSION);
+    assertEquals(ResponseCode.OK, response.getResponseCode());
+  }
+
+  @Test
   public void testCreateJobBadRequest() throws Exception {
     JobConfiguration job = makeJob();
     expectAuth(ROLE, true);

@@ -214,8 +214,8 @@ public final class ConfigurationManager {
    */
   public static JobConfiguration validateAndPopulate(JobConfiguration job)
       throws TaskDescriptionException {
+
     Preconditions.checkNotNull(job);
-    String role = job.getOwner().getRole();
 
     if (job.getTaskConfigsSize() > MAX_TASKS_PER_JOB.get()) {
       throw new TaskDescriptionException("Job exceeds task limit of " + MAX_TASKS_PER_JOB.get());
@@ -229,7 +229,20 @@ public final class ConfigurationManager {
       throw new TaskDescriptionException("Job name contains illegal characters: " + copy.getName());
     }
 
-    if (copy.getTaskConfigsSize() == 0) {
+    // Temporarily support JobConfiguration objects that are 'heterogeneous'.  This allows the
+    // client to begin sending homogeneous jobs before the scheduler uses them internally.
+    if (copy.isSetTaskConfig()) {
+      if (copy.getShardCount() <= 0) {
+        throw new TaskDescriptionException("Shard count must be positive.");
+      }
+      if (copy.isSetTaskConfigs()) {
+        throw new TaskDescriptionException(
+            "'taskConfigs' and 'taskConfig' fields may not be used together.");
+      }
+      for (int i = 0; i < copy.getShardCount(); i++) {
+        copy.addToTaskConfigs(copy.getTaskConfig().deepCopy().setShardId(i));
+      }
+    } else if (copy.getTaskConfigsSize() == 0) {
       throw new TaskDescriptionException("No tasks specified.");
     }
 
@@ -265,7 +278,7 @@ public final class ConfigurationManager {
       }
 
       String dedicatedRole = getRole(valueConstraint);
-      if (!role.equals(dedicatedRole)) {
+      if (!job.getOwner().getRole().equals(dedicatedRole)) {
         throw new TaskDescriptionException(
             "Only " + dedicatedRole + " may use hosts dedicated for that role.");
       }
