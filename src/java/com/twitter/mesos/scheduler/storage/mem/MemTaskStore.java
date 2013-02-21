@@ -99,7 +99,8 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
     long durationNanos = System.nanoTime() - start;
     Level level = (durationNanos >= slowQueryThresholdNanos) ? Level.INFO : Level.FINE;
     if (LOG.isLoggable(level)) {
-      LOG.log(level, "Query took " + durationNanos + " ms: " + query);
+      LOG.log(level, "Query took "
+          + Amount.of(durationNanos, Time.NANOSECONDS).as(Time.MILLISECONDS) + " ms: " + query);
     }
 
     return result;

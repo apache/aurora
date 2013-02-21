@@ -1,18 +1,29 @@
 package com.twitter.mesos.scheduler.testing;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import com.google.common.base.Charsets;
+import com.google.common.base.Function;
+import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
+import com.google.common.io.CharStreams;
+import com.google.common.io.Files;
 
 import com.twitter.common.application.AbstractApplication;
 import com.twitter.common.application.AppLauncher;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.ArgFilters;
 import com.twitter.common.args.CmdLine;
+import com.twitter.common.io.FileUtils;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.mesos.gen.AssignedTask;
@@ -21,6 +32,7 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
@@ -30,6 +42,10 @@ import com.twitter.mesos.scheduler.storage.mem.MemStorage;
 
 /**
  * Benchmark to evaluate storage performance.
+ *
+ * This can be run with:
+ * $ ./pants goal run src/java/com/twitter/mesos/scheduler:storage_benchmark_app \
+ *     --jvm-run-jvmargs='-Xms4g -Xmx4g -XX:+UseConcMarkSweepGC -XX:+UseParNewGC'
  */
 public class StorageBenchmark extends AbstractApplication {
 
@@ -41,17 +57,21 @@ public class StorageBenchmark extends AbstractApplication {
   @CmdLine(name = "queried_job_active_stages",
       help = "Test stages for active task count of the job queried.")
   private static final Arg<List<Integer>> ACTIVE_STAGES =
-      Arg.create((List<Integer>) ImmutableList.<Integer>of(100, 1000, 10000));
+      Arg.create((List<Integer>) ImmutableList.<Integer>of(10, 100, 1000));
 
   @CmdLine(name = "queried_job_inactive_stages",
       help = "Test stages for inactive task count of the job queried.")
   private static final Arg<List<Integer>> INACTIVE_STAGES =
-      Arg.create((List<Integer>) ImmutableList.<Integer>of(100, 1000, 10000));
+      Arg.create((List<Integer>) ImmutableList.<Integer>of(100, 1000));
 
   @CmdLine(name = "dormant_task_stages",
       help = "Test stages dormant task count (tasks that are not queried).")
   private static final Arg<List<Integer>> DORMANT_STAGES =
-      Arg.create((List<Integer>) ImmutableList.<Integer>of(1000, 10000, 100000));
+      Arg.create((List<Integer>) ImmutableList.<Integer>of(
+          1000,
+          5000,
+          10000,
+          50000));
 
   @CmdLine(name = "fetches", help = "Number of fetch operations to perform in each test stage.")
   private static final Arg<Integer> FETCHES = Arg.create(10000);
@@ -59,30 +79,120 @@ public class StorageBenchmark extends AbstractApplication {
   enum QueryType {
     BY_ID,
     BY_JOB,
-    BY_ROLE,
-    ALL
+    BY_ROLE
   }
 
   @Override
   public void run() {
-    for (QueryType type : QueryType.values()) {
-      for (int dormantTasks : DORMANT_STAGES.get()) {
-        run(type, dormantTasks);
+    final File outputDir = FileUtils.createTempDir();
+    try {
+      System.out.println("Writing test output to " + outputDir);
+      String readme = "Test configuration"
+          + "\nqueried_job_active_stages: " + ACTIVE_STAGES.get()
+          + "\nqueried_job_inactive_stages: " + INACTIVE_STAGES.get()
+          + "\ndormant_task_stages: " + DORMANT_STAGES.get()
+          + "\nfetches: " + FETCHES.get()
+          + "\nquery types: " + ImmutableList.copyOf(QueryType.values()) + "\n";
+      Files.write(readme, new File(outputDir, "README"), Charsets.UTF_8);
+
+      for (QueryType type : QueryType.values()) {
+        // Each data file represents a scatter plot on a graph.
+        List<Plot> plots = Lists.newArrayList();
+        for (int activeTasks : ACTIVE_STAGES.get()) {
+          plots.addAll(run(type, activeTasks, outputDir));
+        }
+
+        Iterable<String> plotCommands = FluentIterable.from(plots).transform(
+            new Function<Plot, String>() {
+              @Override public String apply(Plot plot) {
+                return "'" + plot.file + "' title '" + plot.title + "' with linespoints";
+              }
+            });
+
+        List<String> commands = ImmutableList.of(
+            "set title '" + type.name().toLowerCase() + "'",
+            "set xlabel 'Task Store Size'",
+            "set ylabel 'QPS'",
+            "set term png",
+            "set output '" + type.name().toLowerCase() + ".png'",
+            "plot " + Joiner.on(", ").join(plotCommands)
+        );
+        String[] command = new String[] {
+            "gnuplot",
+            "-e",
+            Joiner.on("; ").join(commands) + ""
+        };
+        try {
+          Process process = Runtime.getRuntime().exec(command);
+          int result = process.waitFor();
+          if (result != 0) {
+            System.err.println("gnuplot exited with code " + result);
+            System.err.println("stdout: "
+                + CharStreams.toString(new InputStreamReader(process.getInputStream())));
+            System.err.println("stderr: "
+                + CharStreams.toString(new InputStreamReader(process.getErrorStream())));
+          }
+        } catch (InterruptedException e) {
+          System.err.println("Interrupted while waiting for gnuplot command:" + e);
+          Thread.currentThread().interrupt();
+        }
       }
+    } catch (IOException e) {
+      System.err.println("Failed to write test output: " + e.getMessage());
+    } finally {
+      try {
+        org.apache.commons.io.FileUtils.deleteDirectory(outputDir);
+      } catch (IOException e) {
+        System.err.println("Failed to delete temp dir:" + e);
+      }
+    }
+  }
+
+  private static class Plot {
+    final String file;
+    final String title;
+
+    Plot(String file, String title) {
+      this.file = file;
+      this.title = title;
     }
   }
 
   // Using a separate function here for now to satisfy checkstyle - current rules
   // don't allow nesting depth > 3.
-  private void run(QueryType type, int dormantTasks) {
-    for (int activeTasks : ACTIVE_STAGES.get()) {
-      for (int inactiveTasks : INACTIVE_STAGES.get()) {
-        run(new Stage(activeTasks, inactiveTasks, dormantTasks, type));
+  private List<Plot> run(QueryType type, int activeTasks, File outputDir) throws IOException {
+    List<Plot> plots = Lists.newArrayList();
+    for (int inactiveTasks : INACTIVE_STAGES.get()) {
+      List<String> points = Lists.newArrayList();
+      for (int dormantTasks : DORMANT_STAGES.get()) {
+        TestResult result = run(new Stage(activeTasks, inactiveTasks, dormantTasks, type));
+        points.add(result.totalTasks + " " + result.qps);
       }
+
+      File dataFile = new File(outputDir, type.name().toLowerCase()
+          + "_" + activeTasks + "_active" + "_" + inactiveTasks + "_inactive");
+      Files.write(
+          Joiner.on("\n").join(points) + "\n",
+          dataFile,
+          Charsets.UTF_8);
+      plots.add(new Plot(
+          dataFile.getAbsolutePath(),
+          activeTasks + "_active" + "_" + inactiveTasks + "_inactive"));
+    }
+    return plots;
+  }
+
+  private static class TestResult {
+    double qps;
+    int totalTasks;
+
+    TestResult(double qps, int totalTasks) {
+      this.qps = qps;
+      this.totalTasks = totalTasks;
     }
   }
 
-  private void run(final Stage stage) {
+  private TestResult run(final Stage stage) throws IOException {
     System.out.println("Executing stage " + stage);
     Storage storage = MemStorage.newEmptyStorage();
     storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
@@ -106,8 +216,7 @@ public class StorageBenchmark extends AbstractApplication {
     switch (stage.type) {
       case BY_ID:
         query.setTaskIds(storage.doInTransaction(new Work.Quiet<Set<String>>() {
-          @Override
-          public Set<String> apply(StoreProvider storeProvider) {
+          @Override public Set<String> apply(StoreProvider storeProvider) {
             return storeProvider.getTaskStore().fetchTaskIds(
                 new TaskQuery()
                     .setOwner(new Identity().setRole(QUERIED_ROLE_NAME))
@@ -126,9 +235,6 @@ public class StorageBenchmark extends AbstractApplication {
             .setJobName(QUERIED_JOB_NAME);
         break;
 
-      case ALL:
-        break;
-
       default:
         throw new IllegalStateException("Unrecognized type " + stage.type);
     }
@@ -143,10 +249,14 @@ public class StorageBenchmark extends AbstractApplication {
       });
     }
 
-    int queries = FETCHES.get();
     long timeMs = Amount.of(System.nanoTime() - start, Time.NANOSECONDS).as(Time.MILLISECONDS);
-    System.out.println("Completed " + queries + " queries in "
-        + timeMs + "ms (" + (((double) queries * 1000) / timeMs) + " qps)");
+    int totalTasks = storage.doInTransaction(new Work.Quiet<Integer>() {
+      @Override public Integer apply(StoreProvider storeProvider) {
+        return storeProvider.getTaskStore().fetchTasks(Query.GET_ALL).size();
+      }
+    });
+
+    return new TestResult(((double) FETCHES.get() * 1000) / timeMs, totalTasks);
   }
 
   private ScheduledTask makeTask(String owner, String jobName) {
