@@ -28,6 +28,7 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.StateManager;
 import com.twitter.mesos.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.mesos.scheduler.events.PubsubEvent.TaskStateChange;
+import com.twitter.mesos.scheduler.storage.testing.StorageTestUtil;
 
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
@@ -53,6 +54,7 @@ public class TaskTimeoutTest extends EasyMockTest {
   private static final String TASK_ID = "task_id";
   private static final long TIMEOUT_MS = Amount.of(1L, Time.MINUTES).as(Time.MILLISECONDS);
 
+  private StorageTestUtil storageUtil;
   private ScheduledExecutorService executor;
   private ScheduledFuture<?> future;
   private StateManager stateManager;
@@ -61,12 +63,18 @@ public class TaskTimeoutTest extends EasyMockTest {
 
   @Before
   public void setUp() {
-    future = createMock(new Clazz<ScheduledFuture<?>>() { });
+    storageUtil = new StorageTestUtil(this);
+    storageUtil.expectTransactions();
     executor = createMock(ScheduledExecutorService.class);
+    future = createMock(new Clazz<ScheduledFuture<?>>() { });
     stateManager = createMock(StateManager.class);
     clock = new FakeClock();
-    timeout =
-        new TaskTimeout(executor, stateManager, clock, Amount.of(TIMEOUT_MS, Time.MILLISECONDS));
+    timeout = new TaskTimeout(
+        storageUtil.storage,
+        executor,
+        stateManager,
+        clock,
+        Amount.of(TIMEOUT_MS, Time.MILLISECONDS));
   }
 
   @After
@@ -163,12 +171,12 @@ public class TaskTimeoutTest extends EasyMockTest {
   @Test
   public void testStorageStart() {
     clock.setNowMillis(TIMEOUT_MS * 2);
-    expect(stateManager.fetchTasks(TaskTimeout.TRANSIENT_QUERY))
-        .andReturn(ImmutableSet.of(
-            makeTask("a", ASSIGNED, 0),
-            makeTask("b", KILLING, TIMEOUT_MS),
-            makeTask("c", PREEMPTING, TIMEOUT_MS * 3) /* In the future */
-        ));
+    storageUtil.expectTaskFetch(
+        TaskTimeout.TRANSIENT_QUERY,
+        makeTask("a", ASSIGNED, 0),
+        makeTask("b", KILLING, TIMEOUT_MS),
+        makeTask("c", PREEMPTING, TIMEOUT_MS * 3) /* In the future */
+    );
     expectTaskWatch(0);
     expectTaskWatch(0);
     expectTaskWatch(TIMEOUT_MS);
@@ -185,9 +193,7 @@ public class TaskTimeoutTest extends EasyMockTest {
   @Test
   public void testStorageStartTwice() {
     // This should never happen, but testing that the class handles it gracefully.
-    expect(stateManager.fetchTasks(TaskTimeout.TRANSIENT_QUERY))
-        .andReturn(ImmutableSet.of(makeTask("a", ASSIGNED, 0)))
-        .times(2);
+    storageUtil.expectTaskFetch(TaskTimeout.TRANSIENT_QUERY, makeTask("a", ASSIGNED, 0)).times(2);
     expectTaskWatch();
     expectCancel();
     expectTaskWatch();

@@ -26,7 +26,7 @@ import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.comm.AdjustRetainedTasks;
 import com.twitter.mesos.scheduler.PulseMonitor;
-import com.twitter.mesos.scheduler.StateManager;
+import com.twitter.mesos.scheduler.storage.testing.StorageTestUtil;
 
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
@@ -50,15 +50,19 @@ public class GcExecutorLauncherTest extends EasyMockTest {
 
   private final AtomicInteger taskIdCounter = new AtomicInteger();
 
-  private StateManager stateManager;
+  private StorageTestUtil storageUtil;
   private PulseMonitor<String> hostMonitor;
   private GcExecutorLauncher gcExecutorLauncher;
 
   @Before
   public void setUp() {
-    stateManager = createMock(StateManager.class);
+    storageUtil = new StorageTestUtil(this);
+    storageUtil.expectTransactions();
     hostMonitor = createMock(new Clazz<PulseMonitor<String>>() { });
-    gcExecutorLauncher = new GcExecutorLauncher(hostMonitor, Optional.of("nonempty"), stateManager);
+    gcExecutorLauncher = new GcExecutorLauncher(
+        hostMonitor,
+        Optional.of("nonempty"),
+        storageUtil.storage);
   }
 
   @Test
@@ -118,7 +122,6 @@ public class GcExecutorLauncherTest extends EasyMockTest {
   }
 
   private void expectGetTasksByHost(String host, ScheduledTask... tasks) {
-    expect(stateManager.fetchTasks(new TaskQuery().setSlaveHost(host)))
-        .andReturn(ImmutableSet.<ScheduledTask>builder().add(tasks).build());
+    storageUtil.expectTaskFetch(new TaskQuery().setSlaveHost(host), tasks);
   }
 }

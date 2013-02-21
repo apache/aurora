@@ -32,8 +32,8 @@ import com.twitter.mesos.gen.comm.AdjustRetainedTasks;
 import com.twitter.mesos.scheduler.CommandUtil;
 import com.twitter.mesos.scheduler.PulseMonitor;
 import com.twitter.mesos.scheduler.Resources;
-import com.twitter.mesos.scheduler.StateManager;
 import com.twitter.mesos.scheduler.TaskLauncher;
+import com.twitter.mesos.scheduler.storage.Storage;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -65,17 +65,17 @@ public class GcExecutorLauncher implements TaskLauncher {
 
   private final PulseMonitor<String> pulseMonitor;
   private final Optional<String> gcExecutorPath;
-  private final StateManager stateManager;
+  private final Storage storage;
 
   @Inject
   GcExecutorLauncher(
       @GcExecutor PulseMonitor<String> pulseMonitor,
       @GcExecutor Optional<String> gcExecutorPath,
-      StateManager stateManager) {
+      Storage storage) {
 
-    this.gcExecutorPath = checkNotNull(gcExecutorPath);
     this.pulseMonitor = checkNotNull(pulseMonitor);
-    this.stateManager = checkNotNull(stateManager);
+    this.gcExecutorPath = checkNotNull(gcExecutorPath);
+    this.storage = checkNotNull(storage);
   }
 
   @Override
@@ -85,7 +85,7 @@ public class GcExecutorLauncher implements TaskLauncher {
     }
 
     Set<ScheduledTask> tasksOnHost =
-        stateManager.fetchTasks(new TaskQuery().setSlaveHost(offer.getHostname()));
+        Storage.Util.fetchTasks(storage, new TaskQuery().setSlaveHost(offer.getHostname()));
     AdjustRetainedTasks message = new AdjustRetainedTasks()
         .setRetainedTasks(Maps.transformValues(Tasks.mapById(tasksOnHost), Tasks.GET_STATUS));
     byte[] data;

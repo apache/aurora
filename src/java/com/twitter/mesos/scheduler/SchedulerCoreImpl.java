@@ -30,6 +30,9 @@ import com.twitter.mesos.scheduler.events.PubsubEvent.Interceptors.Event;
 import com.twitter.mesos.scheduler.events.PubsubEvent.Interceptors.Notify;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 import com.twitter.mesos.scheduler.quota.Quotas;
+import com.twitter.mesos.scheduler.storage.Storage;
+import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
+import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -58,6 +61,8 @@ public class SchedulerCoreImpl implements SchedulerCore {
     }
   };
 
+  private final Storage storage;
+
   private final CronJobManager cronScheduler;
 
   // Schedulers that are responsible for triggering execution of jobs.
@@ -84,16 +89,21 @@ public class SchedulerCoreImpl implements SchedulerCore {
   /**
    * Creates a new core scheduler.
    *
+   * @param storage Backing store implementation.
    * @param cronScheduler Cron scheduler.
    * @param immediateScheduler Immediate scheduler.
    * @param stateManager Persistent state manager.
    * @param quotaManager Quota tracker.
    */
   @Inject
-  public SchedulerCoreImpl(CronJobManager cronScheduler,
+  public SchedulerCoreImpl(
+      Storage storage,
+      CronJobManager cronScheduler,
       ImmediateJobManager immediateScheduler,
       StateManagerImpl stateManager,
       QuotaManager quotaManager) {
+
+    this.storage = checkNotNull(storage);
 
     // The immediate scheduler will accept any job, so it's important that other schedulers are
     // placed first.
@@ -306,35 +316,42 @@ public class SchedulerCoreImpl implements SchedulerCore {
       throws ScheduleException {
     checkStarted();
 
-    JobConfiguration job = parsedConfiguration.get();
+    final JobConfiguration job = parsedConfiguration.get();
     if (cronScheduler.hasJob(job.getOwner().getRole(), job.getName())) {
       cronScheduler.updateJob(job);
       return Optional.absent();
     }
 
-    Set<ScheduledTask> existingTasks =
-        stateManager.fetchTasks(Query.activeQuery(job.getOwner(), job.getName()));
+    return storage.doInWriteTransaction(new MutateWork<Optional<String>, ScheduleException>() {
+      @Override public Optional<String> apply(MutableStoreProvider storeProvider)
+          throws ScheduleException {
 
-    // Reject if any existing task for the job is in UPDATING/ROLLBACK
-    if (Iterables.any(existingTasks, IS_UPDATING)) {
-      throw new ScheduleException("Update/Rollback already in progress for " + Tasks.jobKey(job));
-    }
+        Set<ScheduledTask> existingTasks = storeProvider.getTaskStore().fetchTasks(
+            Query.activeQuery(job.getOwner(), job.getName()));
 
-    if (!existingTasks.isEmpty()) {
-      Quota currentJobQuota =
-          Quotas.fromTasks(Iterables.transform(existingTasks, Tasks.SCHEDULED_TO_INFO));
-      Quota newJobQuota = Quotas.fromJob(job);
-      Quota additionalQuota = Quotas.subtract(newJobQuota, currentJobQuota);
-      ensureHasAdditionalQuota(job.getOwner().getRole(), additionalQuota);
-    }
+        // Reject if any existing task for the job is in UPDATING/ROLLBACK
+        if (Iterables.any(existingTasks, IS_UPDATING)) {
+          throw new ScheduleException("Update/Rollback already in progress for "
+              + Tasks.jobKey(job));
+        }
 
-    try {
-      return Optional.of(stateManager.registerUpdate(job.getOwner().getRole(), job.getName(),
-          job.getTaskConfigs()));
-    } catch (StateManagerImpl.UpdateException e) {
-      LOG.log(Level.INFO, "Failed to start update.", e);
-      throw new ScheduleException(e.getMessage(), e);
-    }
+        if (!existingTasks.isEmpty()) {
+          Quota currentJobQuota =
+              Quotas.fromTasks(Iterables.transform(existingTasks, Tasks.SCHEDULED_TO_INFO));
+          Quota newJobQuota = Quotas.fromJob(job);
+          Quota additionalQuota = Quotas.subtract(newJobQuota, currentJobQuota);
+          ensureHasAdditionalQuota(job.getOwner().getRole(), additionalQuota);
+        }
+
+        try {
+          return Optional.of(stateManager.registerUpdate(job.getOwner().getRole(), job.getName(),
+              job.getTaskConfigs()));
+        } catch (StateManagerImpl.UpdateException e) {
+          LOG.log(Level.INFO, "Failed to start update.", e);
+          throw new ScheduleException(e.getMessage(), e);
+        }
+      }
+    });
   }
 
   @Override

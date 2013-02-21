@@ -1222,7 +1222,7 @@ public class StateManagerImpl implements StateManager {
         taskId,
         role,
         job,
-        Iterables.getOnlyElement(fetchTasks(Query.byId(taskId))),
+        task,
         taskUpdateChecker(role, job),
         workSink,
         clock,

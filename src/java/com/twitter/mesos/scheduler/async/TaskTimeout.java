@@ -33,6 +33,7 @@ import com.twitter.mesos.scheduler.StateManager;
 import com.twitter.mesos.scheduler.events.PubsubEvent.EventSubscriber;
 import com.twitter.mesos.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.mesos.scheduler.events.PubsubEvent.TaskStateChange;
+import com.twitter.mesos.scheduler.storage.Storage;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -59,6 +60,7 @@ class TaskTimeout implements EventSubscriber {
 
   private final Map<String, Context> futures = Maps.newConcurrentMap();
 
+  private final Storage storage;
   private final ScheduledExecutorService executor;
   private final StateManager stateManager;
   private final long timeoutMillis;
@@ -66,11 +68,13 @@ class TaskTimeout implements EventSubscriber {
 
   @Inject
   TaskTimeout(
+      Storage storage,
       ScheduledExecutorService executor,
       StateManager stateManager,
       final Clock clock,
       Amount<Long, Time> timeout) {
 
+    this.storage = checkNotNull(storage);
     this.executor = checkNotNull(executor);
     this.stateManager = checkNotNull(stateManager);
     this.timeoutMillis = timeout.as(Time.MILLISECONDS);
@@ -120,8 +124,7 @@ class TaskTimeout implements EventSubscriber {
 
   @Subscribe
   public void storageStarted(StorageStarted event) {
-    Set<ScheduledTask> transientTasks = stateManager.fetchTasks(TRANSIENT_QUERY);
-    for (ScheduledTask task : transientTasks) {
+    for (ScheduledTask task : Storage.Util.fetchTasks(storage, TRANSIENT_QUERY)) {
       registerTimeout(
           Tasks.id(task),
           task.getStatus(),

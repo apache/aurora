@@ -151,7 +151,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     cron = new CronJobManager(storage, cronScheduler);
     stateManager = new StateManagerImpl(storage, clock, new MutableState(), driver, eventSink);
     quotaManager = new QuotaManagerImpl(storage);
-    scheduler = new SchedulerCoreImpl(cron,
+    scheduler = new SchedulerCoreImpl(
+        storage,
+        cron,
         immediateManager,
         stateManager,
         quotaManager);

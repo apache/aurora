@@ -48,7 +48,9 @@ public interface StateManager {
    *
    * @param slaveHost Host to save attributes for.
    * @param attributes Attributes associated with the host.
+   * @deprecated Use storage directly instead.
    */
+  @Deprecated
   void saveAttributesFromOffer(String slaveHost, List<Attribute> attributes);
 
   /**
@@ -71,6 +73,8 @@ public interface StateManager {
    * Deletes tasks with the given task IDs.
    *
    * @param taskIds IDs of tasks to delete.
+   * @deprecated Use storage directly instead.
    */
+  @Deprecated
   void deleteTasks(Set<String> taskIds);
 }
