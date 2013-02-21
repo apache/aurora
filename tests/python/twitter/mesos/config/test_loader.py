@@ -2,10 +2,13 @@ import json
 
 from twitter.common.contextutil import temporary_file
 
+from twitter.mesos.config import AuroraConfig
 from twitter.mesos.config.loader import AuroraConfigLoader
 from twitter.thermos.config.loader import ThermosTaskWrapper
 
+from pystachio import Environment
 import pytest
+
 
 
 BAD_MESOS_CONFIG = """
@@ -62,3 +65,17 @@ def test_load_into():
     assert 'jobs' in env and len(env['jobs']) == 1
     hello_world = env['jobs'][0]
     assert hello_world.name().get() == 'hello_world'
+
+
+def test_pick():
+  with temporary_file() as fp:
+    fp.write(MESOS_CONFIG)
+    fp.flush()
+    env = AuroraConfigLoader.load(fp.name)
+
+  hello_world = env['jobs'][0]
+  assert AuroraConfig.pick(env, 'hello_world', None) == hello_world
+
+  env['jobs'][0] = env['jobs'][0](name = 'something_{{else}}')
+  assert str(AuroraConfig.pick(env, 'something_else', [{'else': 'else'}]).name()) == (
+      'something_else')

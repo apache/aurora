@@ -63,15 +63,22 @@ class PortResolver(object):
 
 
 class AuroraConfig(object):
+  class Error(Exception): pass
+  class InvalidConfig(Error): pass
+
   @classmethod
   def pick(cls, env, name, bindings, select_cluster=None, select_env=None):
     job_list = env.get('jobs', [])
     if not job_list:
       raise ValueError('No jobs specified!')
+
+    def maybe_bind(j):
+      return j.bind(*bindings) if bindings else j
+
     if name is None:
       if len(job_list) > 1:
         raise ValueError('Configuration has multiple jobs but no job name specified!')
-      return job_list[0].bind(*bindings) if bindings else job_list[0]
+      return maybe_bind(job_list[0])
 
     # TODO(wfarner): Rework this and calling code to make name optional as well.
     def match_name(job):
@@ -80,7 +87,10 @@ class AuroraConfig(object):
       return select_cluster is None or str(job.cluster()) == select_cluster
     def match_env(job):
       return select_env is None or str(job.environment()) == select_env
-    matches = [j for j in job_list if match_name(j) and match_cluster(j) and match_env(j)]
+
+    bound_jobs = map(maybe_bind, job_list)
+    matches = [j for j in bound_jobs if match_name(j) and match_cluster(j) and match_env(j)]
+
     if len(matches) == 0:
       msg = 'Could not find job with name %s' % name
       if select_cluster:
@@ -91,8 +101,7 @@ class AuroraConfig(object):
     elif len(matches) > 1:
       raise ValueError('Multiple jobs match, please disambiguate by specifying a cluster or env.')
     else:
-      job = matches[0]
-      return job.bind(*bindings) if bindings else job
+      return matches[0]
 
   @classmethod
   def load(cls, filename, name=None, bindings=None, select_cluster=None, select_env=None):

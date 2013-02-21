@@ -122,9 +122,23 @@ EMPTY_MESOS_CONFIG = """
 foo = Job(name = "hello_world")
 """
 
+UNDERSPECIFIED_MESOS_CONFIG = """
+jobs = [
+  Job(name = "hello_world")
+]
+"""
+
 BAD_MESOS_CONFIG = """
 jobs = 1234
 """
+
+
+def test_empty_config():
+  with pytest.raises(AuroraConfig.InvalidConfig):
+    with temporary_file() as fp:
+      fp.write(UNDERSPECIFIED_MESOS_CONFIG)
+      fp.flush()
+      AuroraConfig.load(fp.name)
 
 
 def test_simple_config():
