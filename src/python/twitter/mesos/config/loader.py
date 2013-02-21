@@ -1,3 +1,4 @@
+import json
 import os
 
 from twitter.common.lang import Compatibility

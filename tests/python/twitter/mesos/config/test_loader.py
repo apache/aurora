@@ -1,6 +1,9 @@
+import json
+
 from twitter.common.contextutil import temporary_file
 
 from twitter.mesos.config.loader import AuroraConfigLoader
+from twitter.thermos.config.loader import ThermosTaskWrapper
 
 import pytest
 
@@ -36,6 +39,19 @@ def test_empty_config():
   with temporary_file() as fp:
     fp.flush()
     AuroraConfigLoader.load(fp.name)
+
+
+def test_load_json():
+  with temporary_file() as fp:
+    fp.write(MESOS_CONFIG)
+    fp.flush()
+    env = AuroraConfigLoader.load(fp.name)
+    job = env['jobs'][0]
+  with temporary_file() as fp:
+    fp.write(json.dumps(job.get()))
+    fp.flush()
+    new_job = AuroraConfigLoader.load_json(fp.name)
+    assert new_job == job
 
 
 def test_load_into():
