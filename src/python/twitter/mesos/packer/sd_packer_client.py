@@ -35,4 +35,4 @@ def create_packer(cluster, verbose=False):
   if Location.is_corp():
     packer_host, packer_port = TunnelHelper.create_tunnel(packer_host, packer_port)
 
-  return Packer(packer_host, packer_port, **kw)
+  return Packer(packer_host, packer_port, verbose=verbose)
