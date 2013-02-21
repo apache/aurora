@@ -8,8 +8,8 @@ from gen.twitter.mesos.constants import (
 )
 from gen.twitter.mesos.ttypes import (
     Identity,
-    TaskQuery,
-    ScheduleStatus)
+    TaskQuery
+)
 
 from thrift.transport import TTransport
 

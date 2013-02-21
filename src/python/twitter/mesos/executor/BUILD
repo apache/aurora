@@ -160,8 +160,7 @@ python_library(
     pants('src/python/twitter/common/exceptions'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/quantity'),
-    pants('src/python/twitter/mesos/config:schema'),
-    pants('src/python/twitter/mesos:parsers'), # TODO(wickman) Fix this messy dependency
+    pants('src/python/twitter/mesos/config'),
   ]
 )
 

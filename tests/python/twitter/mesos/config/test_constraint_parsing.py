@@ -1,14 +1,14 @@
-import exceptions
 import pytest
 import unittest
 
-from twitter.mesos.parsers.base import ThriftCodec
+from twitter.mesos.config.thrift import constraints_to_thrift
+
 
 def test_parsing_constraints():
   constraints_dict = {
     'int': '2',
   }
-  c = ThriftCodec.constraints_to_thrift(constraints_dict).pop()
+  c = constraints_to_thrift(constraints_dict).pop()
   assert c.name == 'int'
   assert c.constraint.value.negated == False
   assert c.constraint.value.values == set(['2'])
@@ -17,7 +17,7 @@ def test_parsing_constraints():
   constraints_dict = {
     '!str': '!foo',
   }
-  c = ThriftCodec.constraints_to_thrift(constraints_dict).pop()
+  c = constraints_to_thrift(constraints_dict).pop()
   assert c.name == '!str'
   assert c.constraint.value.negated == True
   assert c.constraint.value.values == set(['foo'])
@@ -26,7 +26,7 @@ def test_parsing_constraints():
   constraints_dict = {
     'set': '1,2,3,a,b,c',
   }
-  c = ThriftCodec.constraints_to_thrift(constraints_dict).pop()
+  c = constraints_to_thrift(constraints_dict).pop()
   assert c.name == 'set'
   assert c.constraint.value.negated == False
   assert c.constraint.value.values == set(['1', '2', '3', 'a', 'b', 'c'])
@@ -34,7 +34,7 @@ def test_parsing_constraints():
   constraints_dict = {
     '!set': '!1,2,3,a,b,c',
   }
-  c = ThriftCodec.constraints_to_thrift(constraints_dict).pop()
+  c = constraints_to_thrift(constraints_dict).pop()
   assert c.name == '!set'
   assert c.constraint.value.negated == True
   assert c.constraint.value.values == set(['1', '2', '3', 'a', 'b', 'c'])
@@ -43,12 +43,12 @@ def test_parsing_constraints():
   constraints_dict = {
     'limit': 'limit:4',
   }
-  c = ThriftCodec.constraints_to_thrift(constraints_dict).pop()
+  c = constraints_to_thrift(constraints_dict).pop()
   assert c.name == 'limit'
   assert c.constraint.limit.limit == 4
 
   constraints_dict = {
     'limit': 'limit:a',
   }
-  with pytest.raises(exceptions.ValueError):
-    constraints = ThriftCodec.constraints_to_thrift(constraints_dict)
+  with pytest.raises(ValueError):
+    constraints = constraints_to_thrift(constraints_dict)

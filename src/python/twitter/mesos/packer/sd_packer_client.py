@@ -3,16 +3,19 @@ import sys
 
 from twitter.common import log
 from twitter.common.net.tunnel import TunnelHelper
-from twitter.mesos.location import Location
-from twitter.mesos.zookeeper_helper import ZookeeperHelper
+from twitter.common.zookeeper.serverset import ServerSet
+from twitter.common_internal.location import Location
+from twitter.common_internal.zookeeper.tunneler import TunneledZookeeper
 
-from twitter.mesos.packer.packer_client import Packer
+from twitter.mesos.clusters import Cluster
 
-_ZK_TIMEOUT_SECS = 5
+from .packer_client import Packer
 
 
-def create_packer(cluster, **kw):
-  zk, packer_ss = ZookeeperHelper.get_packer_serverset(cluster)
+def create_packer(cluster, verbose=False):
+  cluster = Cluster.get(cluster)
+  zk = TunneledZookeeper.get(cluster.packer_zk, verbose=verbose)
+  packer_ss = ServerSet(zk, cluster.packer_zk_path)
   packers = list(packer_ss)
   zk.close()
 

@@ -1,18 +1,18 @@
 import copy
 import getpass
 import json
-import sys
 
-from twitter.common import log
-from twitter.mesos.config.schema import (
-  MesosContext,
-  MesosTaskInstance
-)
+from twitter.common.lang import Compatibility
 from twitter.thermos.config.loader import (
   ThermosTaskValidator,
-  ThermosTaskWrapper)
+  ThermosTaskWrapper
+)
 
 from gen.twitter.mesos.ttypes import (
+  Constraint,
+  LimitConstraint,
+  TaskConstraint,
+  ValueConstraint,
   CronCollisionPolicy,
   Identity,
   JobConfiguration,
@@ -20,14 +20,45 @@ from gen.twitter.mesos.ttypes import (
   TwitterTaskInfo,
 )
 
-from pystachio import Empty, Environment
+from .schema import (
+  MesosContext,
+  MesosTaskInstance
+)
 
-from .base import ThriftCodec
+from pystachio import Empty
 
 __all__ = (
   'InvalidConfig',
   'convert'
 )
+
+
+def constraints_to_thrift(constraints):
+  """Convert a python dictionary to a set of Constraint thrift objects."""
+  result = set()
+  for attribute, constraint_value in constraints.items():
+    assert isinstance(attribute, Compatibility.string) and (
+           isinstance(constraint_value, Compatibility.string)), (
+      "Both attribute name and value in constraints must be string")
+    constraint = Constraint()
+    constraint.name = attribute
+    task_constraint = TaskConstraint()
+    if constraint_value.startswith('limit:'):
+      task_constraint.limit = LimitConstraint()
+      try:
+        task_constraint.limit.limit = int(constraint_value.replace('limit:', '', 1))
+      except ValueError:
+        print('%s is not a valid limit value, must be integer' % constraint_value)
+        raise
+    else:
+      # Strip off the leading negation if present.
+      negated = constraint_value.startswith('!')
+      if negated:
+        constraint_value = constraint_value[1:]
+      task_constraint.value = ValueConstraint(negated, set(constraint_value.split(',')))
+    constraint.constraint = task_constraint
+    result.add(constraint)
+  return result
 
 
 def task_instance_from_job(job, instance):
@@ -55,7 +86,6 @@ def select_cron_policy(cron_policy, cron_collision_policy):
   if cron_policy is Empty and cron_collision_policy is Empty:
     return CronCollisionPolicy.KILL_EXISTING
   elif cron_policy is not Empty and cron_collision_policy is Empty:
-    log.warning('cron_policy is deprecated.  use cron_collision_policy instead.')
     return translate_cron_policy(cron_policy)
   elif cron_policy is Empty and cron_collision_policy is not Empty:
     return translate_cron_policy(cron_collision_policy)
@@ -108,14 +138,14 @@ def convert(job, packages=[]):
   task.owner = owner
   task.requestedPorts = ThermosTaskWrapper(task_raw, strict=False).ports()
   task.taskLinks = not_empty_or(job.task_links(), {})
-  task.constraints = ThriftCodec.constraints_to_thrift(not_empty_or(job.constraints(), {}))
+  task.constraints = constraints_to_thrift(not_empty_or(job.constraints(), {}))
 
   # Replicate task objects to reflect number of instances.
   tasks = []
   for k in range(job.instances().get()):
     task_copy = copy.deepcopy(task)
     task_copy.shardId = k
-    underlying, refs = task_instance_from_job(job, k)
+    underlying, _ = task_instance_from_job(job, k)
     try:
       ThermosTaskValidator.assert_valid_task(underlying.task())
     except ThermosTaskValidator.InvalidTaskError as e:

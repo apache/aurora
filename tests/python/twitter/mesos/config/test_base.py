@@ -1,20 +1,60 @@
 import pytest
 
 from twitter.common.contextutil import temporary_file
+from twitter.mesos.config import AuroraConfig, PortResolver
 from twitter.mesos.config.schema import (
   Announcer,
   Empty,
   Integer,
-  MesosJob,
+  Job,
   Process,
   Resources,
   Task)
-from twitter.mesos.parsers.pystachio_config import MesosConfigLoader, PystachioConfig
 
 from gen.twitter.mesos.ttypes import Identity
 
+
+resolve = PortResolver.resolve
+unallocated = PortResolver.unallocated
+bound = PortResolver.bound
+
+
+def test_all_static():
+  portmap = {}
+  assert resolve(portmap) == {}
+  assert bound(portmap) == set()
+  assert unallocated(portmap) == set()
+
+  portmap = {'port': '80'}
+  assert resolve(portmap) == {'port': 80}
+  assert bound(resolve(portmap)) == set(['port'])
+  assert unallocated(resolve(portmap)) == set()
+
+
+def test_binding():
+  portmap = {'aurora': 'http', 'http': 80}
+  assert resolve(portmap) == {'aurora': 80, 'http': 80}
+  assert unallocated(resolve(portmap)) == set()
+  assert bound(resolve(portmap)) == set(['aurora', 'http'])
+
+  portmap = {'aurora': 'http', 'http': 'unbound'}
+  assert resolve(portmap) == {'aurora': 'unbound', 'http': 'unbound'}
+  assert unallocated(resolve(portmap)) == set(['unbound'])
+  assert bound(resolve(portmap)) == set(['aurora', 'http'])
+
+
+def test_cycle():
+  portmap = {'aurora': 'http', 'http': 'aurora'}
+  with pytest.raises(PortResolver.CycleException):
+    resolve(portmap)
+  portmap = {'aurora': 'http', 'http': 'https', 'https': 'aurora'}
+  with pytest.raises(PortResolver.CycleException):
+    resolve(portmap)
+
+
+
 MESOS_CONFIG = """
-HELLO_WORLD = MesosJob(
+HELLO_WORLD = Job(
   name = 'hello_world',
   role = 'john_doe',
   cluster = 'smf1-test',
@@ -28,7 +68,7 @@ jobs = [HELLO_WORLD]
 """
 
 LIMITED_MESOS_CONFIG = """
-HELLO_WORLD = MesosJob(
+HELLO_WORLD = Job(
   name = 'hello_world',
   role = 'john_doe',
   cluster = 'smf1-test',
@@ -49,7 +89,7 @@ jobs = [HELLO_WORLD]
 """
 
 
-REIFIED_CONFIG = MesosJob(
+REIFIED_CONFIG = Job(
   name = 'hello_world',
   role = 'john_doe',
   cluster = 'smf1-test',
@@ -60,7 +100,7 @@ REIFIED_CONFIG = MesosJob(
   )
 )
 
-REIFIED_LIMITED_CONFIG = MesosJob(
+REIFIED_LIMITED_CONFIG = Job(
   name = 'hello_world',
   role = 'john_doe',
   cluster = 'smf1-test',
@@ -79,7 +119,7 @@ REIFIED_LIMITED_CONFIG = MesosJob(
 )
 
 EMPTY_MESOS_CONFIG = """
-foo = MesosJob(name = "hello_world")
+foo = Job(name = "hello_world")
 """
 
 BAD_MESOS_CONFIG = """
@@ -87,27 +127,12 @@ jobs = 1234
 """
 
 
-def test_load_into():
-  with temporary_file() as fp:
-    fp.write(MESOS_CONFIG)
-    fp.flush()
-    env = MesosConfigLoader.load_into(fp.name)
-    assert 'jobs' in env and len(env['jobs']) == 1
-    hello_world = env['jobs'][0]
-    assert hello_world.name().get() == 'hello_world'
-
-
 def test_simple_config():
   with temporary_file() as fp:
     fp.write(MESOS_CONFIG)
     fp.flush()
-
-    job1 = MesosConfigLoader.load(fp.name)
-    job2 = MesosConfigLoader.load(fp.name, name="hello_world")
-    with pytest.raises(ValueError):
-      MesosConfigLoader.load(fp.name, name="herpderp")
-    proxy_config1 = PystachioConfig.load(fp.name)
-    proxy_config2 = PystachioConfig.load(fp.name, name="hello_world")
+    proxy_config1 = AuroraConfig.load(fp.name)
+    proxy_config2 = AuroraConfig.load(fp.name, name="hello_world")
     assert proxy_config1._job == proxy_config2._job
     assert proxy_config1._job == REIFIED_CONFIG
     assert proxy_config1.name() == 'hello_world'
@@ -115,16 +140,13 @@ def test_simple_config():
     assert proxy_config1.cluster() == 'smf1-test'
     assert proxy_config1.ports() == set()
 
-  assert job1 == REIFIED_CONFIG
-  assert job2 == REIFIED_CONFIG
-
 
 def test_limited_config():
   with temporary_file() as fp:
     fp.write(LIMITED_MESOS_CONFIG)
     fp.flush()
 
-    job = PystachioConfig.load(fp.name)
+    job = AuroraConfig.load(fp.name)
     assert job != REIFIED_LIMITED_CONFIG
 
     process_map = dict((str(process.name()), process) for process in job._job.task().processes())
@@ -138,27 +160,11 @@ def test_limited_config():
     assert process_map['hello_world_fails_200'].max_failures() == Integer(100)
 
 
-def test_bad_config():
-  with temporary_file() as fp:
-    fp.write(BAD_MESOS_CONFIG)
-    fp.flush()
-    with pytest.raises(MesosConfigLoader.BadConfig):
-      MesosConfigLoader.load(fp.name)
-
-
-def test_empty_config():
-  with temporary_file() as fp:
-    fp.write(EMPTY_MESOS_CONFIG)
-    fp.flush()
-    with pytest.raises(MesosConfigLoader.BadConfig):
-      MesosConfigLoader.load(fp.name)
-
-
 def test_ports():
   def make_config(announce, *ports):
     process = Process(name = 'hello',
                       cmdline = ' '.join('{{thermos.ports[%s]}}' % port for port in ports))
-    return PystachioConfig(MesosJob(
+    return AuroraConfig(Job(
         name = 'hello_world', role = 'john_doe', cluster = 'smf1-test',
         announce = announce,
         task = Task(name = 'main', processes = [process],

@@ -15,7 +15,7 @@ from poster.encode import multipart_encode
 from poster.streaminghttp import StreamingHTTPHandler
 
 from twitter.common import log
-from twitter.mesos.session_key_helper import SessionKeyHelper
+from twitter.common_internal.auth import SSHAgentAuthenticator
 
 
 class Progress(object):
@@ -72,12 +72,9 @@ class Packer(object):
   def compose_url(endpoint, query_params={}, auth=False):
     url = endpoint
     if auth:
-      session_key = SessionKeyHelper.acquire_session_key(getpass.getuser())
-      auth_params = {
-        'user': getpass.getuser(),
-        'nonce': session_key.nonce,
-        'token': session_key.nonceSig.encode('hex')
-      }
+      user = getpass.getuser()
+      nonce, nonce_sig = SSHAgentAuthenticator.create_session(user)
+      auth_params = { 'user': user, 'nonce': nonce, 'token': nonce_sig }
       query_params = dict(query_params.items() + auth_params.items())
     if query_params:
       url += '?%s' % urllib.urlencode(query_params)

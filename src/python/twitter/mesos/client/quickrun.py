@@ -1,23 +1,21 @@
 from __future__ import print_function
 
 from collections import defaultdict
-from functools import partial
-import socket
 import sys
 import threading
 import time
 
-from twitter.common import log
 from twitter.common.quantity import Amount, Time, Data
-from twitter.mesos.client.client_util import populate_namespaces
+from twitter.mesos.client.config import populate_namespaces
 from twitter.mesos.config.schema import (
+    Announcer,
     Constraint,
     Job,
     Packer,
     Process,
     Resources,
     Task)
-from twitter.mesos.parsers.pystachio_config import PystachioConfig
+from twitter.mesos.config import AuroraConfig
 
 from gen.twitter.mesos.ttypes import ResponseCode, ScheduleStatus
 
@@ -58,7 +56,7 @@ class Quickrun(object):
     job = Job(task=task, instances=options.instances, role=options.role, cluster=cluster)
     if options.announce:
       job = job(announce=Announcer(), environment='test', daemon=True)
-    return populate_namespaces(PystachioConfig(job))
+    return populate_namespaces(AuroraConfig(job))
 
   def _terminal(self, statuses):
     terminals = sum(status in self.FINISHED_STATES for status in statuses.values())
@@ -80,7 +78,7 @@ class Quickrun(object):
       while True:
         statuses = monitor.states()
         statuses_count = defaultdict(int)
-        for shard_id, status in statuses.items():
+        for status in statuses.values():
           statuses_count[status] += 1
         self._write_line(' :: '.join('%s %2d' % (ScheduleStatus._VALUES_TO_NAMES[status], count)
             for (status, count) in statuses_count.items()))

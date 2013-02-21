@@ -12,11 +12,10 @@ from gen.twitter.mesos.ttypes import (
   ValueConstraint,
 )
 from twitter.common.contextutil import temporary_file
-from twitter.mesos.clusters import Cluster
 from twitter.mesos.config.schema import (
   MesosJob,
 )
-from twitter.mesos.parsers.pystachio_thrift import convert as convert_pystachio_to_thrift
+from twitter.mesos.config.thrift import convert as convert_pystachio_to_thrift
 from twitter.thermos.config.schema import (
   Process,
   Resources,
@@ -24,6 +23,7 @@ from twitter.thermos.config.schema import (
 )
 
 from pystachio import Empty, Integer, Map, String
+
 
 HELLO_WORLD = MesosJob(
   name = 'hello_world',
@@ -82,16 +82,6 @@ def test_config_with_options():
   assert tti.isDaemon == True
   assert job.cronCollisionPolicy == CronCollisionPolicy.RUN_OVERLAP
   assert tti.healthCheckIntervalSecs == 30
-  # This is apparently not possible:
-  #
-  # assert tti.constraints == set([
-  #  Constraint(name = 'cpu',
-  #             constraint = TaskConstraint(
-  #                 value = ValueConstraint(negated = False, values = set(['x86_64'])))),
-  #  Constraint(name = 'dedicated',
-  #             constraint = TaskConstraint(
-  #                 value = ValueConstraint(negated = False, values = set(['your_mom']))))
-  #])
   assert len(tti.constraints) == 2
 
 

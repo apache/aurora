@@ -7,9 +7,8 @@ import sys
 
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
-from twitter.mesos.client import client_util
-from twitter.mesos.client.client_wrapper import MesosClientAPI
-from twitter.mesos.client.client_util import requires, query_scheduler
+from twitter.mesos.client.base import check_and_log_response, die, requires
+from twitter.mesos.client.api import MesosClientAPI
 
 from gen.twitter.mesos.constants import ACTIVE_STATES, TERMINAL_STATES
 from gen.twitter.mesos.ttypes import (
@@ -81,7 +80,7 @@ def query(args, options):
     if state not in ScheduleStatus._NAMES_TO_VALUES:
       msg = "Unknown state '%s' specified.  Valid states are:\n" % state
       msg += ','.join(ScheduleStatus._NAMES_TO_VALUES.keys())
-      client_util.die(msg)
+      die(msg)
 
   # Role, Job, Shards, States, and the listformat
   role = args[0] if len(args) > 0 else None
@@ -93,20 +92,20 @@ def query(args, options):
   #  Figure out "expensive" queries here and bone if they do not have --force
   #  - Does not specify role
   if role is None and not options.force:
-    client_util.die('--force is required for expensive queries (no role specified)')
+    die('--force is required for expensive queries (no role specified)')
 
   #  - Does not specify job
   if job is None and not options.force:
-    client_util.die('--force is required for expensive queries (no job specified)')
+    die('--force is required for expensive queries (no job specified)')
 
   #  - Specifies status outside of ACTIVE_STATES
   if not (states <= ACTIVE_STATES) and not options.force:
-    client_util.die('--force is required for expensive queries (states outside ACTIVE states')
+    die('--force is required for expensive queries (states outside ACTIVE states')
 
   api = MesosClientAPI(options.cluster, options.verbosity)
-  query_info = query_scheduler(api, role, job, shards=shards, statuses=states)
+  query_info = api.query(api.build_query(role, job, shards=shards, statuses=states))
   if query_info.responseCode != ResponseCode.OK:
-    client_util.die('Failed to query scheduler: %s' % query_info.message)
+    die('Failed to query scheduler: %s' % query_info.message)
   if query_info.tasks is None:
     return
 
@@ -117,7 +116,7 @@ def query(args, options):
   except KeyError:
     msg = "Unknown key in format string.  Valid keys are:\n"
     msg += ','.join(d.keys())
-    client_util.die(msg)
+    die(msg)
 
 
 @app.command
@@ -136,7 +135,7 @@ def set_quota(role, cpu_str, ram_mb_str, disk_mb_str):
     log.error('Invalid value')
 
   resp = MesosClientAPI(options.cluster, options.verbosity).set_quota(role, cpu, ram_mb, disk_mb)
-  client_util.check_and_log_response(resp)
+  check_and_log_response(resp)
 
 
 @app.command
@@ -156,7 +155,7 @@ def force_task_state(task_id, state):
     sys.exit(1)
 
   resp = MesosClientAPI(options.cluster, options.verbosity).force_task_state(task_id, status)
-  client_util.check_and_log_response(resp)
+  check_and_log_response(resp)
 
 
 @app.command
@@ -167,8 +166,7 @@ def scheduler_backup_now():
 
   Immediately initiates a full storage backup.
   """
-  client_util.check_and_log_response(
-      MesosClientAPI(options.cluster, options.verbosity).perform_backup())
+  check_and_log_response(MesosClientAPI(options.cluster, options.verbosity).perform_backup())
 
 
 @app.command
@@ -180,7 +178,7 @@ def scheduler_list_backups():
   Lists backups available for recovery.
   """
   resp = MesosClientAPI(options.cluster, options.verbosity).list_backups()
-  client_util.check_and_log_response(resp)
+  check_and_log_response(resp)
   log.info('%s available backups:' % len(resp.backups))
   for backup in resp.backups:
     log.info(backup)
@@ -194,7 +192,7 @@ def scheduler_stage_recovery(backup_id):
 
   Stages a backup for recovery.
   """
-  client_util.check_and_log_response(
+  check_and_log_response(
       MesosClientAPI(options.cluster, options.verbosity).stage_recovery(backup_id))
 
 
@@ -208,7 +206,7 @@ def scheduler_print_recovery_tasks():
   """
   resp = MesosClientAPI(options.cluster, options.verbosity).query_recovery(
       TaskQuery(statuses=ACTIVE_STATES))
-  client_util.check_and_log_response(resp)
+  check_and_log_response(resp)
   log.info('Role\tJob\tShard\tStatus\tTask ID')
   for task in resp.tasks:
     assigned = task.assignedTask
@@ -229,7 +227,7 @@ def scheduler_delete_recovery_tasks(task_ids):
   Deletes a comma-separated list of task IDs from a staged recovery.
   """
   ids = set(task_ids.split(','))
-  client_util.check_and_log_response(MesosClientAPI(options.cluster, options.verbosity)
+  check_and_log_response(MesosClientAPI(options.cluster, options.verbosity)
       .delete_recovery_tasks(TaskQuery(taskIds=ids)))
 
 
@@ -241,7 +239,7 @@ def scheduler_commit_recovery():
 
   Commits a staged recovery.
   """
-  client_util.check_and_log_response(MesosClientAPI(options.cluster, options.verbosity)
+  check_and_log_response(MesosClientAPI(options.cluster, options.verbosity)
       .commit_recovery())
 
 
@@ -253,7 +251,7 @@ def scheduler_unload_recovery():
 
   Unloads a staged recovery.
   """
-  client_util.check_and_log_response(MesosClientAPI(options.cluster, options.verbosity)
+  check_and_log_response(MesosClientAPI(options.cluster, options.verbosity)
       .unload_recovery())
 
 
@@ -306,7 +304,7 @@ def help(args):
     sys.exit(0)
 
   if len(args) > 1:
-    client_util.die('Please specify at most one subcommand.')
+    die('Please specify at most one subcommand.')
 
   subcmd = args[0]
   if subcmd in globals():

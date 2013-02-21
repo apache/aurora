@@ -3,17 +3,17 @@ import posixpath
 import subprocess
 
 from twitter.common import log
-from twitter.mesos.client.client_wrapper import MesosClientAPI
+from twitter.mesos.client.api import MesosClientAPI
 from twitter.mesos.clusters import Cluster
 from twitter.mesos.config.schema import MesosContext
 from twitter.thermos.config.schema import ThermosContext
-
-from pystachio import Ref, Environment, String
 
 from gen.twitter.mesos.constants import LIVE_STATES
 from gen.twitter.mesos.ttypes import (
   Identity,
   TaskQuery)
+
+from pystachio import Environment, String
 
 
 class DistributedCommandRunner(object):

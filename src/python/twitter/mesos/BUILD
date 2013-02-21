@@ -1,94 +1,9 @@
 python_library(
-  name = 'parsers',
-  sources = globs('parsers/*.py'),
-  dependencies = [
-    pants('3rdparty/python:pystachio'),
-    pants('src/python/twitter/common/lang'),
-    pants('src/python/twitter/common/log'),
-    pants('src/python/twitter/mesos/client'),
-    pants('src/python/twitter/mesos/config:schema'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
-    pants(':clusters')
-  ]
-)
-
-python_library(
   name = 'clusters',
   sources = ['clusters.py'],
-)
-
-python_library(
-  name = 'cluster_option',
-  sources = ['cluster_option.py'],
   dependencies = [
     pants('src/python/twitter/common/lang'),
     pants('src/python/twitter/common/options'),
-    pants(':clusters'),
-  ]
-)
-
-python_library(
-  name = 'location',
-  sources = ['location.py'],
-)
-
-python_library(
-  name = 'zookeeper_helper',
-  sources = ['zookeeper_helper.py'],
-  dependencies = [
-    pants('src/python/twitter/common/log'),
-    pants('src/python/twitter/common/net:ssh'),
-    pants('src/python/twitter/common/zookeeper'),
-    pants('src/python/twitter/common/zookeeper/serverset'),
-    pants(':clusters'),
-    pants(':location'),
-  ]
-)
-
-python_library(
-  name = 'updater',
-  sources = ['updater.py'],
-  dependencies = [
-    pants('src/python/twitter/common/app'),
-    pants('src/python/twitter/common/log'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
-  ]
-)
-
-python_library(
-  name = 'scheduler_client',
-  sources = ['scheduler_client.py'],
-  dependencies = [
-    pants('src/python/twitter/common/log'),
-    pants('src/python/twitter/common/net:ssh'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
-    pants(':clusters'),
-    pants(':location'),
-    pants(':zookeeper_helper'),
-  ]
-)
-
-python_library(
-  name = 'session_key_helper',
-  sources = ['session_key_helper.py'],
-  dependencies = [
-    pants('src/python/twitter/common/log'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
-    pants('src/python/twitter/common_internal/ods'),
-    pants('3rdparty/python:paramiko'),
-  ]
-)
-
-python_library(
-  name = 'command_runner',
-  sources = ['command_runner.py'],
-  dependencies = [
-    pants(':clusters'),
-    pants('3rdparty/python:pystachio'),
-    pants('src/python/twitter/mesos/client'),
-    pants('src/python/twitter/mesos/config:schema'),
-    pants('src/python/twitter/thermos/config:schema'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
   ]
 )
 
@@ -96,12 +11,8 @@ python_library(
   name = 'mesos-lib',
   dependencies = [
     pants(':clusters'),
-    pants(':command_runner'),
-    pants(':location'),
-    pants(':scheduler_client'),
-    pants(':zookeeper_helper'),
-    pants('src/python/twitter/mesos/packer'),
     pants('src/python/twitter/mesos/client'),
+    pants('src/python/twitter/mesos/packer'),
   ]
 )
 
@@ -109,6 +20,7 @@ python_binary(
   name = 'mesos_client',
   source = 'bin/mesos_client.py',
   dependencies = [
+    python_requirement('argparse'), # this is a legacy dependency required for macaw deploy_mesos
     pants(':mesos-lib'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/log'),

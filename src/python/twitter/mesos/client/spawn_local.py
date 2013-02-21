@@ -1,7 +1,6 @@
 import os
 import socket
 import subprocess
-import tempfile
 import threading
 import time
 import urllib2
@@ -11,11 +10,11 @@ from twitter.common import log
 from twitter.common.contextutil import temporary_dir
 from twitter.common.http import HttpServer
 from twitter.common.net.tunnel import TunnelHelper
-from twitter.mesos.client.client_util import die, get_config
+from twitter.mesos.client.base import die
+from twitter.mesos.client.config import get_config
 from twitter.mesos.executor.sandbox_manager import AppAppSandbox, DirectorySandbox
 from twitter.mesos.executor.task_runner_wrapper import TaskRunnerWrapper
 from twitter.mesos.executor.thermos_executor import ThermosExecutor
-from twitter.mesos.parsers.pystachio_config import PystachioConfig
 from twitter.thermos.observer.observer import TaskObserver
 from twitter.thermos.observer.http import BottleObserver
 
@@ -152,11 +151,8 @@ def spawn_local(runner, jobname, config_file, json=False, open_browser=False,
   """
     Spawn a local run of a task.
   """
-  try:
-    config = get_config(jobname, config_file, json, force_local=True,
-        bindings=bindings, translate=True, select_cluster=cluster, select_env=env)
-  except PystachioConfig.InvalidConfig as err:
-    die("Invalid configuration: %s" % err)
+  config = get_config(jobname, config_file, json, force_local=True,
+      bindings=bindings, translate=True, select_cluster=cluster, select_env=env)
 
   checkpoint_root = os.path.expanduser(os.path.join('~', '.thermos'))
   _, port = spawn_observer(checkpoint_root)

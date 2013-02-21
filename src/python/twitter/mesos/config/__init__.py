@@ -1,47 +1,71 @@
-import copy
-import getpass
-import json
-import os
-import posixpath
-import sys
-
-from pystachio import Empty, Environment, Integer, Ref
-from twitter.common import log
-from twitter.common.dirutil import safe_open
 from twitter.common.lang import Compatibility
-from twitter.thermos.config.loader import ThermosTaskValidator
-from twitter.mesos.clusters import Cluster
-from twitter.mesos.config.schema import (
-  MesosContext,
-  MesosJob,
-)
-
 from twitter.thermos.config.loader import ThermosTaskWrapper
 
-from .base import PortResolver, ThriftCodec
-from .mesos_config import MesosConfig
-from .proxy_config import ProxyConfig
-from .pystachio_thrift import convert as convert_pystachio_to_thrift
+from .loader import AuroraConfigLoader
+from .schema import MesosContext
+from .thrift import convert as convert_thrift
+
+from pystachio import Environment, Integer, Ref
 
 
-SCHEMA_PREAMBLE = """
-from pystachio import *
-from twitter.mesos.config.schema import *
-"""
+class PortResolver(object):
+  class CycleException(Exception): pass
 
-def deposit_schema(environment):
-  Compatibility.exec_function(
-    compile(SCHEMA_PREAMBLE, "<exec_function>", "exec"), environment)
+  @classmethod
+  def resolve(cls, portmap):
+    """
+        Given an announce-style portmap, return a fully dereferenced portmap.
+
+        For example, given the portmap:
+          {
+            'http': 80,
+            'aurora: 'http',
+            'https': 'aurora',
+            'thrift': 'service'
+          }
+
+        Returns {'http': 80, 'aurora': 80, 'https': 80, 'thrift': 'service'}
+    """
+    for (name, port) in portmap.items():
+      if not isinstance(name, Compatibility.string):
+        raise ValueError('All portmap keys must be strings!')
+      if not isinstance(port, (int, Compatibility.string)):
+        raise ValueError('All portmap values must be strings or integers!')
+
+    portmap = portmap.copy()
+    for port in list(portmap):
+      try:
+        portmap[port] = int(portmap[port])
+      except ValueError:
+        continue
+
+    def resolve_one(static_port):
+      visited = set()
+      root = portmap[static_port]
+      while root in portmap:
+        visited.add(root)
+        if portmap[root] in visited:
+          raise cls.CycleException('Found cycle in portmap!')
+        root = portmap[root]
+      return root
+
+    return dict((name, resolve_one(name)) for name in portmap)
+
+  @classmethod
+  def unallocated(cls, portmap):
+    """Given a resolved portmap, return the list of ports that need to be allocated."""
+    return set(port for port in portmap.values() if not isinstance(port, int))
+
+  @classmethod
+  def bound(cls, portmap):
+    """Given a resolved portmap, return the list of ports that have already been allocated."""
+    return set(portmap)
 
 
-class MesosConfigLoader(object):
-  SCHEMA = {}
-  deposit_schema(SCHEMA)
-
-  class BadConfig(Exception): pass
-
-  @staticmethod
-  def pick(job_list, name, bindings, select_cluster=None, select_env=None):
+class AuroraConfig(object):
+  @classmethod
+  def pick(cls, env, name, bindings, select_cluster=None, select_env=None):
+    job_list = env.get('jobs', [])
     if not job_list:
       raise ValueError('No jobs specified!')
     if name is None:
@@ -70,54 +94,15 @@ class MesosConfigLoader(object):
       job = matches[0]
       return job.bind(*bindings) if bindings else job
 
-  @staticmethod
-  def load_into(filename):
-    environment = {}
-    deposit_stack = [os.path.dirname(filename)]
-    def ast_executor(config_file, env):
-      actual_file = os.path.join(deposit_stack[-1], config_file)
-      deposit_stack.append(os.path.dirname(actual_file))
-      with open(actual_file) as fp:
-        Compatibility.exec_function(compile(fp.read(), actual_file, 'exec'), env)
-      deposit_stack.pop()
-    def export(*args, **kw):
-      pass
-    environment.update(MesosConfigLoader.SCHEMA)
-    environment.update(
-      mesos_include=lambda fn: ast_executor(fn, environment),
-      include=lambda fn: ast_executor(fn, environment),
-      export=export)
-    ast_executor(os.path.basename(filename), environment)
-    return environment
+  @classmethod
+  def load(cls, filename, name=None, bindings=None, select_cluster=None, select_env=None):
+    env = AuroraConfigLoader.load(filename)
+    return cls(cls.pick(env, name, bindings, select_cluster, select_env))
 
-  @staticmethod
-  def load(filename, name=None, bindings=None, select_cluster=None, select_env=None):
-    env = MesosConfigLoader.load_into(filename)
-    job_list = env.get('jobs', [])
-    if not isinstance(job_list, list) or len(job_list) == 0:
-      raise MesosConfigLoader.BadConfig('Could not extract any jobs from %s' % filename)
-    return MesosConfigLoader.pick(job_list, name, bindings, select_cluster, select_env)
-
-  @staticmethod
-  def load_json(filename, name=None, bindings=None):
-    with open(filename) as fp:
-      js = json.load(fp)
-    job = MesosJob(js)
-    return job.bind(*bindings) if bindings else job
-
-
-class PystachioConfig(ProxyConfig):
-  @staticmethod
-  def load(filename, name=None, bindings=None, select_cluster=None, select_env=None):
-    return PystachioConfig(MesosConfigLoader.load(filename,
-                                                  name,
-                                                  bindings,
-                                                  select_cluster,
-                                                  select_env))
-
-  @staticmethod
-  def load_json(filename, name=None, bindings=None, select_cluster=None, select_env=None):
-    return PystachioConfig(MesosConfigLoader.load_json(filename, name, bindings))
+  @classmethod
+  def load_json(cls, filename, name=None, bindings=None, select_cluster=None, select_env=None):
+    job = AuroraConfigLoader.load_json(filename)
+    return cls(job.bind(*bindings) if bindings else job)
 
   def __init__(self, job):
     def has(pystachio_type, thing):
@@ -139,11 +124,6 @@ class PystachioConfig(ProxyConfig):
     """
     def process_over_failure_limit(proc):
       return (proc.max_failures() == Integer(0) or proc.max_failures() >= Integer(100))
-    for proc in job.task().processes():
-      if process_over_failure_limit(proc):
-        log.warning('Processes running in Mesos must have failure limits between 1 and 100, '
-                    'changing Process(%s) failure limit from %s to 100.' % (proc.name(),
-                     proc.max_failures()))
     return job(task = job.task()(
       processes = [proc(max_failures = 100) if process_over_failure_limit(proc) else proc
                    for proc in job.task().processes()]))
@@ -164,13 +144,16 @@ class PystachioConfig(ProxyConfig):
     typecheck = interpolated_job.bind(Environment(mesos=Environment(instance=0))).check()
     if not typecheck.ok():
       raise self.InvalidConfig(typecheck.message())
-    return convert_pystachio_to_thrift(interpolated_job, self._packages)
+    return convert_thrift(interpolated_job, self._packages)
 
   def bind(self, binding):
     self._job = self._job.bind(binding)
 
   def raw(self):
     return self._job
+
+  def instances(self):
+    return self._job.instances().get()
 
   def task(self, instance):
     return (self._job % self.context(instance)).task()
@@ -209,7 +192,7 @@ class PystachioConfig(ProxyConfig):
     return self._job.task_links().get()
 
   def update_config(self):
-    return MesosConfig.get_update_config(self._job.get())
+    return self._job.update_config()
 
   def add_package(self, package):
     self._packages.append(package)
@@ -218,9 +201,6 @@ class PystachioConfig(ProxyConfig):
     if self._job.has_package() and self._job.package().check().ok():
       package = self._job.package() % self.context()
       return map(str, [package.role(), package.name(), package.version()])
-
-  def package_files(self):
-    return []
 
   def is_dedicated(self):
     return self._job.has_constraints() and 'dedicated' in self._job.constraints()

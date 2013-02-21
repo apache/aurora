@@ -14,8 +14,8 @@ from twitter.common.exceptions import ExceptionalThread
 from twitter.common.quantity import Amount, Time
 
 # thermos
+from twitter.mesos.config import PortResolver
 from twitter.mesos.config.schema import MesosTaskInstance
-from twitter.mesos.parsers.base import PortResolver
 from twitter.thermos.base.path import TaskPath
 from twitter.thermos.monitoring.monitor import TaskMonitor
 

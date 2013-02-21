@@ -2,8 +2,8 @@ import exceptions
 import pytest
 
 from twitter.common import options
-from twitter.mesos.clusters import Cluster
-from twitter.mesos.cluster_option import ClusterOption
+from twitter.mesos.clusters import Cluster, ClusterOption
+
 
 def test_constructors():
   ClusterOption('--cluster')
@@ -14,6 +14,7 @@ def test_constructors():
 
   with pytest.raises(Cluster.UnknownCluster):
     ClusterOption('--cluster', default='borg')
+
 
 def test_parsable(capsys):
   parser = options.parser().options((
@@ -31,12 +32,14 @@ def test_parsable(capsys):
   out, err = capsys.readouterr()
   assert 'error: borg is not a valid cluster for --source_cluster option.' in err
 
+
 def test_filter():
   option = ClusterOption('--cluster', cluster_filter=lambda cluster: cluster.name != 'smf1-test')
   parser = options.parser().options([option])
   parser.parse(['--cluster=smf1'])
   with pytest.raises(SystemExit):
     parser.parse(['--cluster=smf1-test'])
+
 
 def test_usage_output(capsys):
   option = ClusterOption('--cluster', cluster_filter=lambda cluster: cluster.name != 'smf1',

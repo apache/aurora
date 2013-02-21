@@ -5,7 +5,10 @@ python_library(
     pants('3rdparty/python:poster'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/net:ssh'),
-    pants('src/python/twitter/mesos:session_key_helper'),
-    pants('src/python/twitter/mesos:zookeeper_helper'),
+    pants('src/python/twitter/common/zookeeper/serverset'),
+    pants('src/python/twitter/common_internal/auth'),
+    pants('src/python/twitter/common_internal/location'),
+    pants('src/python/twitter/common_internal/zookeeper:tunneler'),
+    pants('src/python/twitter/mesos:clusters'),
   ]
 )

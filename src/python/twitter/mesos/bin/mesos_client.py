@@ -7,7 +7,6 @@ import collections
 from datetime import datetime
 import functools
 import getpass
-import math
 import optparse
 from optparse import OptionValueError
 import os
@@ -22,23 +21,19 @@ from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 from twitter.common.quantity import Amount, Data
 from twitter.common.quantity.parse_simple import parse_data_into
-from twitter.mesos.client import client_util
-from twitter.mesos.client.client_wrapper import MesosClientAPI
-from twitter.mesos.client.client_util import requires, query_scheduler
+from twitter.mesos.client.api import MesosClientAPI
+from twitter.mesos.client.base import check_and_log_response, die, requires
+from twitter.mesos.client.command_runner import DistributedCommandRunner
+from twitter.mesos.client.config import get_config
 from twitter.mesos.client.job_monitor import JobMonitor
 from twitter.mesos.client.quickrun import Quickrun
 from twitter.mesos.clusters import Cluster
-from twitter.mesos.command_runner import DistributedCommandRunner
 from twitter.mesos.packer import sd_packer_client
 from twitter.mesos.packer.packer_client import Packer
-from twitter.mesos.parsers import MesosConfig, PystachioConfig
 from twitter.thermos.base.options import add_binding_to
 
-from gen.twitter.mesos.constants import ACTIVE_STATES, LIVE_STATES
-from gen.twitter.mesos.ttypes import (
-    Identity,
-    ScheduleStatus,
-    TaskQuery)
+from gen.twitter.mesos.constants import ACTIVE_STATES
+from gen.twitter.mesos.ttypes import ScheduleStatus
 
 
 try:
@@ -62,7 +57,7 @@ def synthesize_url(scheduler_client, role=None, job=None):
     return None
 
   if job and not role:
-    client_util.die('If job specified, must specify role!')
+    die('If job specified, must specify role!')
 
   scheduler_url = urljoin(scheduler_url, 'scheduler')
   if role:
@@ -152,17 +147,6 @@ EXECUTOR_SANDBOX_OPTION = optparse.Option(
     help='Run the command in the executor sandbox instead of the task sandbox.')
 
 
-def maybe_retranslate(jobname, config_file, *args, **kw):
-  try:
-    config = client_util.get_config(jobname, config_file, *args, **kw)
-  except PystachioConfig.InvalidConfig as err:
-    client_util.die('Invalid configuration: %s' % err)
-  if config.cluster().startswith('localhost') or (
-      Cluster.get(config.cluster()).thermos_autotranslate and isinstance(config, MesosConfig)):
-    return client_util.get_config(jobname, config_file, *args, translate=True, **kw)
-  return config
-
-
 def make_spawn_options(options):
   return dict((name, getattr(options, name)) for name in (
       'json',
@@ -204,10 +188,12 @@ def create(jobname, config_file):
   Creates a job based on a configuration file.
   """
   options = app.get_options()
-  config = maybe_retranslate(
+  config = get_config(
       jobname,
       config_file,
       options.json,
+      False,
+      options.bindings,
       select_cluster=options.cluster,
       select_env=options.env)
 
@@ -216,10 +202,10 @@ def create(jobname, config_file):
     options.runner = 'build'
     return spawn_local('build', jobname, config_file, **make_spawn_options(options))
 
-  api = MesosClientAPI(config.cluster(), options.verbosity)
+  api = MesosClientAPI(config.cluster(), options.verbosity == 'verbose')
   monitor = JobMonitor(api, config.role(), jobname)
   resp = api.create_job(config)
-  client_util.check_and_log_response(resp)
+  check_and_log_response(resp)
   handle_open(api.scheduler.scheduler(), config.role(), config.name())
 
   if options.wait_until == 'RUNNING':
@@ -334,9 +320,9 @@ def runtask(args, options):
   Cluster.assert_exists(cluster)
   cmdline = ' '.join(args[1:])
   if task_is_expensive(options):
-    client_util.die('Task too expensive.')
+    die('Task too expensive.')
   qr = Quickrun(cluster, cmdline, options)
-  api = MesosClientAPI(cluster, options.verbosity)
+  api = MesosClientAPI(cluster, options.verbosity == 'verbose')
   qr.run(api)
 
 
@@ -353,7 +339,7 @@ def diff(job, config_file):
   By default the diff will be displayed using 'diff', though you may choose an alternate
   diff program by specifying the DIFF_VIEWER environment variable."""
   options = app.get_options()
-  config = maybe_retranslate(
+  config = get_config(
       job,
       config_file,
       options.json,
@@ -361,14 +347,14 @@ def diff(job, config_file):
       options.bindings,
       select_cluster=options.cluster,
       select_env=options.env)
-  api = MesosClientAPI(config.cluster(), options.verbosity)
-  resp = query_scheduler(api, config.role(), job, statuses=ACTIVE_STATES)
+  api = MesosClientAPI(config.cluster(), options.verbosity == 'verbose')
+  resp = api.query(api.build_query(config.role(), job, statuses=ACTIVE_STATES))
   if not resp.responseCode:
-    client_util.die('Request failed, server responded with "%s"' % resp.message)
+    die('Request failed, server responded with "%s"' % resp.message)
   remote_tasks = [t.assignedTask.task for t in resp.tasks]
   resp = api.populate_job_config(config)
   if not resp.responseCode:
-    client_util.die('Request failed, server responded with "%s"' % resp.message)
+    die('Request failed, server responded with "%s"' % resp.message)
   local_tasks = resp.populated
 
   pp = pprint.PrettyPrinter(indent=2)
@@ -410,9 +396,9 @@ def do_open(*args):
     job = args[1]
 
   if not options.cluster:
-    client_util.die('--cluster is required')
+    die('--cluster is required')
 
-  api = MesosClientAPI(options.cluster, options.verbosity)
+  api = MesosClientAPI(options.cluster, options.verbosity == 'verbose')
 
   import webbrowser
   webbrowser.open_new_tab(synthesize_url(api.scheduler.scheduler(), role, job))
@@ -435,7 +421,7 @@ def inspect(jobname, config_file):
   the parsed configuration.
   """
   options = app.get_options()
-  config = maybe_retranslate(
+  config = get_config(
       jobname,
       config_file,
       options.json,
@@ -501,9 +487,9 @@ def start_cron(role, jobname):
   This does not affect the cron cycle in any way.
   """
   options = app.get_options()
-  api = MesosClientAPI(options.cluster, options.verbosity)
+  api = MesosClientAPI(options.cluster, options.verbosity == 'verbose')
   resp = api.start_cronjob(role, jobname)
-  client_util.check_and_log_response(resp)
+  check_and_log_response(resp)
   handle_open(api.scheduler.scheduler(), role, jobname)
 
 
@@ -520,9 +506,9 @@ def kill(role, jobname):
 
   """
   options = app.get_options()
-  api = MesosClientAPI(options.cluster, options.verbosity)
+  api = MesosClientAPI(options.cluster, options.verbosity == 'verbose')
   resp = api.kill_job(role, jobname, _getshards(app.get_options().shards))
-  client_util.check_and_log_response(resp)
+  check_and_log_response(resp)
   handle_open(api.scheduler.scheduler(), role, jobname)
 
 
@@ -568,8 +554,9 @@ def status(role, jobname):
               task.assignedTask.slaveHost,
               taskString))
 
-  resp = MesosClientAPI(options.cluster, options.verbosity).check_status(role, jobname)
-  client_util.check_and_log_response(resp)
+  resp = MesosClientAPI(options.cluster, options.verbosity == 'verbose').check_status(
+      role, jobname)
+  check_and_log_response(resp)
 
   if resp.tasks:
     active_tasks = filter(is_active, resp.tasks)
@@ -589,7 +576,7 @@ def _getshards(shards):
   try:
     return map(int, shards.split(','))
   except ValueError:
-    client_util.die('Invalid shards list: %r' % shards)
+    die('Invalid shards list: %r' % shards)
 
 
 @app.command
@@ -617,7 +604,7 @@ def update(jobname, config_file):
   to preview what changes will take effect.
   """
   options = app.get_options()
-  config = maybe_retranslate(
+  config = get_config(
       jobname,
       config_file,
       options.json,
@@ -625,28 +612,9 @@ def update(jobname, config_file):
       bindings=options.bindings,
       select_cluster=options.cluster,
       select_env=options.env)
-
-  job_size = len(config.job().taskConfigs)
-  if config.update_config()['maxTotalFailures'] >= job_size:
-    client_util.die('''max_total_failures in update_config must be lesser than the job size.
-Based on your job size (%s) you should use max_total_failures <= %s.
-
-See http://confluence.local.twitter.com/display/Aurora/Aurora+Configuration+Reference for details.
-''' % (job_size, job_size-1))
-
-  if config.is_dedicated():
-    min_failure_threshold = int(math.floor(job_size * 0.02))
-    if config.update_config()['maxTotalFailures'] < min_failure_threshold:
-      client_util.die('''Since this is a dedicated job, you must set your max_total_failures in
-your update configuration to no less than 2%% of your job size.
-Based on your job size (%s) you should use max_total_failures >= %s.
-
-See http://confluence.local.twitter.com/display/Aurora/Aurora+Configuration+Referencefor details.
-''' % (job_size, min_failure_threshold))
-
-  api = MesosClientAPI(config.cluster(), options.verbosity)
+  api = MesosClientAPI(config.cluster(), options.verbosity == 'verbose')
   resp = api.update_job(config, _getshards(options.shards))
-  client_util.check_and_log_response(resp)
+  check_and_log_response(resp)
 
 
 @app.command
@@ -661,8 +629,9 @@ def cancel_update(role, jobname):
   be used when the user is confident that they are not conflicting with another user.
   """
   options = app.get_options()
-  resp = MesosClientAPI(options.cluster, options.verbosity).cancel_update(role, jobname)
-  client_util.check_and_log_response(resp)
+  resp = MesosClientAPI(options.cluster, options.verbosity == 'verbose').cancel_update(
+      role, jobname)
+  check_and_log_response(resp)
 
 
 @app.command
@@ -674,7 +643,7 @@ def get_quota(role):
   Prints the production quota that has been allocated to a user.
   """
   options = app.get_options()
-  resp = MesosClientAPI(options.cluster, options.verbosity).get_quota(role)
+  resp = MesosClientAPI(options.cluster, options.verbosity == 'verbose').get_quota(role)
   quota = resp.quota
 
   quota_fields = [
@@ -701,12 +670,12 @@ def ssh(role, job, shard, *args):
   Initiate an SSH session on the machine that a shard is running on.
   """
   options = app.get_options()
-  resp = query_scheduler(MesosClientAPI(options.cluster, options.verbosity),
-      role, job, set([int(shard)]))
-  options = app.get_options()
+
+  api = MesosClientAPI(options.cluster, options.verbosity == 'verbose')
+  resp = api.query(api.build_query(role, job, set([int(shard)])))
 
   if not resp.responseCode:
-    client_util.die('Request failed, server responded with "%s"' % resp.message)
+    die('Request failed, server responded with "%s"' % resp.message)
 
   remote_cmd = 'bash' if not args else ' '.join(args)
   command = DistributedCommandRunner.substitute(remote_cmd, resp.tasks[0],
@@ -722,9 +691,9 @@ def ssh(role, job, shard, *args):
       port, name = tunnel.split(':')
       port = int(port)
     except ValueError:
-      client_util.die('Could not parse tunnel: %s.  Must be of form PORT:NAME' % tunnel)
+      die('Could not parse tunnel: %s.  Must be of form PORT:NAME' % tunnel)
     if name not in resp.tasks[0].assignedTask.assignedPorts:
-      client_util.die('Task %s has no port named %s' % (resp.tasks[0].assignedTask.taskId, name))
+      die('Task %s has no port named %s' % (resp.tasks[0].assignedTask.taskId, name))
     ssh_command += [
         '-L', '%d:%s:%d' % (port, slave_host, resp.tasks[0].assignedTask.assignedPorts[name])]
 
@@ -757,7 +726,7 @@ def run(*line):
   command = ' '.join(line[2:])
 
   if not options.cluster:
-    client_util.die('--cluster is required')
+    die('--cluster is required')
 
   dcr = DistributedCommandRunner(options.cluster, role, jobs.split(','))
   dcr.run(command, parallelism=options.num_threads, executor_sandbox=options.executor_sandbox)
@@ -770,17 +739,14 @@ def _get_packer(cluster=None):
   packer_enabled_clusters = [c.name for c in Cluster.get_all() if c.packer_zk or c.packer_redirect]
 
   if not cluster:
-    client_util.die(
-      '--cluster must be specified. Valid clusters for this command are %s' %
-      packer_enabled_clusters)
+    die('--cluster must be specified. Valid clusters for this command are %s' %
+        packer_enabled_clusters)
   elif cluster not in Cluster.get_list():
-    client_util.die(
-      'Cluster "%s" does not exist. Valid, Packer-enabled clusters are %s' %
-      (cluster, packer_enabled_clusters))
+    die('Cluster "%s" does not exist. Valid, Packer-enabled clusters are %s' %
+        (cluster, packer_enabled_clusters))
   elif cluster not in packer_enabled_clusters:
-    client_util.die(
-      'Cluster "%s" is not Packer-enabled. Packer is currently available for %s' %
-      (cluster, packer_enabled_clusters))
+    die('Cluster "%s" is not Packer-enabled. Packer is currently available for %s' %
+        (cluster, packer_enabled_clusters))
   return sd_packer_client.create_packer(cluster, verbose=options.verbosity in ('normal', 'verbose'))
 
 
@@ -880,7 +846,7 @@ def package_get_version(role, package, version):
   pkg = _get_packer().get_version(role, package, version)
   if app.get_options().metadata_only:
     if not 'metadata' in pkg:
-      client_util.die('Package does not contain any user-specified metadata.')
+      die('Package does not contain any user-specified metadata.')
     else:
       print(pkg['metadata'])
   else:
@@ -977,7 +943,7 @@ def help(args):
     sys.exit(0)
 
   if len(args) > 1:
-    client_util.die('Please specify at most one subcommand.')
+    die('Please specify at most one subcommand.')
 
   subcmd = args[0]
   if subcmd in globals():
