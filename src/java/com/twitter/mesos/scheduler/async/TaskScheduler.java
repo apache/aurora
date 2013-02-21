@@ -32,6 +32,7 @@ import org.apache.mesos.Protos.TaskInfo;
 
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Command;
+import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
@@ -259,50 +260,59 @@ public interface TaskScheduler extends EventSubscriber {
     static final Optional<String> LAUNCH_FAILED_MSG =
         Optional.of("Unknown exception attempting to schedule task.");
 
+
+    /**
+     * A helper method that attempts to schedule a PENDING task. This method is package private
+     * to satisfy @Timed annotation's requirement.
+     *
+     * @param taskId The task to schedule.
+     * @param store Scheduler storage interface.
+     * @param retryLater A command to execute when a task is not scheduled.
+     */
+    @Timed("task_schedule_attempt")
+    void runInTransaction(String taskId, StoreProvider store, Command retryLater) {
+      removeTask(taskId, false);
+      LOG.fine("Attempting to schedule task " + taskId);
+      TaskQuery pendingTaskQuery = new TaskQuery()
+          .setStatuses(ImmutableSet.of(PENDING))
+          .setTaskIds(ImmutableSet.of(taskId));
+      final ScheduledTask task =
+          Iterables.getOnlyElement(store.getTaskStore().fetchTasks(pendingTaskQuery), null);
+      if (task == null) {
+        LOG.warning("Failed to look up task " + taskId);
+      } else {
+        Function<ExpiringOffer, Optional<TaskInfo>> assignment =
+            new Function<ExpiringOffer, Optional<TaskInfo>>() {
+              @Override public Optional<TaskInfo> apply(ExpiringOffer expiring) {
+                return assigner.maybeAssign(expiring.offer, task);
+              }
+            };
+        try {
+          if (!offers.launchFirst(assignment)) {
+            // Task could not be scheduled.
+            retryLater.execute();
+          }
+        } catch (Offers.LaunchException e) {
+          LOG.log(Level.WARNING, "Failed to launch task.", e);
+          scheduleAttemptsFailed.incrementAndGet();
+
+          // The attempt to schedule the task failed, so we need to backpedal on the
+          // assignment.
+          // It is in the LOST state and a new task will move to PENDING to replace it.
+          // Should the state change fail due to storage issues, that's okay.  The task will
+          // time out in the ASSIGNED state and be moved to LOST.
+          stateManager.changeState(pendingTaskQuery, LOST, LAUNCH_FAILED_MSG);
+        }
+      }
+    }
+
     private class PendingTask implements Runnable {
       final String taskId;
       final long penaltyMs;
-      final TaskQuery selfQuery;
 
       PendingTask(String taskId, long penaltyMs) {
         this.taskId = taskId;
         this.penaltyMs = penaltyMs;
-        this.selfQuery = new TaskQuery()
-            .setStatuses(ImmutableSet.of(PENDING))
-            .setTaskIds(ImmutableSet.of(taskId));
-      }
-
-      private void runInTransaction(StoreProvider store) {
-        removeTask(taskId, false);
-        LOG.fine("Attempting to schedule task " + taskId);
-        final ScheduledTask task =
-            Iterables.getOnlyElement(store.getTaskStore().fetchTasks(selfQuery), null);
-        if (task == null) {
-          LOG.warning("Failed to look up task " + taskId);
-        } else {
-          Function<ExpiringOffer, Optional<TaskInfo>> assignment =
-              new Function<ExpiringOffer, Optional<TaskInfo>>() {
-                @Override public Optional<TaskInfo> apply(ExpiringOffer expiring) {
-                  return assigner.maybeAssign(expiring.offer, task);
-                }
-              };
-          try {
-            if (!offers.launchFirst(assignment)) {
-              // Task could not be scheduled.
-              retryLater();
-            }
-          } catch (Offers.LaunchException e) {
-            LOG.log(Level.WARNING, "Failed to launch task.", e);
-            scheduleAttemptsFailed.incrementAndGet();
-
-            // The attempt to schedule the task failed, so we need to backpedal on the
-            // assignment.
-            // It is in the LOST state and a new task will move to PENDING to replace it.
-            // Should the state change fail due to storage issues, that's okay.  The task will
-            // time out in the ASSIGNED state and be moved to LOST.
-            stateManager.changeState(selfQuery, LOST, LAUNCH_FAILED_MSG);
-          }
-        }
       }
 
       @Override public void run() {
@@ -310,7 +320,11 @@ public interface TaskScheduler extends EventSubscriber {
         try {
           storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
             @Override public void execute(MutableStoreProvider store) {
-              runInTransaction(store);
+              runInTransaction(taskId, store, new Command() {
+                @Override public void execute() {
+                  retryLater();
+                }
+              });
             }
           });
         } catch (RuntimeException e) {

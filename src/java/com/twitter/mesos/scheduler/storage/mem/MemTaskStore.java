@@ -3,6 +3,7 @@ package com.twitter.mesos.scheduler.storage.mem;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -25,6 +26,7 @@ import com.twitter.common.base.Closure;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.common.stats.Stats;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
@@ -65,6 +67,10 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
       TransactionalMap.wrap(Maps.<String, ScheduledTask>newHashMap());
   private final TransactionalMap<String, Set<String>> tasksByJobKey =
       TransactionalMap.wrap(Maps.<String, Set<String>>newHashMap());
+
+  private final AtomicLong taskQueriesById = Stats.exportLong("task_queries_by_id");
+  private final AtomicLong taskQueriesByJob = Stats.exportLong("task_queries_by_job");
+  private final AtomicLong taskQueriesAll = Stats.exportLong("task_queries_all");
 
   @Override
   public void commit() {
@@ -274,8 +280,10 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
     // Apply the query against the working set.
     Iterable<ScheduledTask> from;
     if (query.isSetTaskIds()) {
+      taskQueriesById.incrementAndGet();
       from = fromIdIndex(query.getTaskIds());
     } else if (Query.isJobScoped(query)) {
+      taskQueriesByJob.incrementAndGet();
       Collection<String> taskIds =
           tasksByJobKey.get(Tasks.jobKey(query.getOwner().getRole(), query.getJobName()));
       if (taskIds == null) {
@@ -284,6 +292,7 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
         from = fromIdIndex(taskIds);
       }
     } else {
+      taskQueriesAll.incrementAndGet();
       from = tasks.values();
     }
 
