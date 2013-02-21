@@ -74,7 +74,7 @@ class Packer(object):
     if auth:
       user = getpass.getuser()
       nonce, nonce_sig = SSHAgentAuthenticator.create_session(user)
-      auth_params = { 'user': user, 'nonce': nonce, 'token': nonce_sig }
+      auth_params = { 'user': user, 'nonce': nonce, 'token': nonce_sig.encode('hex') }
       query_params = dict(query_params.items() + auth_params.items())
     if query_params:
       url += '?%s' % urllib.urlencode(query_params)
