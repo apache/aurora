@@ -52,10 +52,13 @@ public class LockManager {
 
   /**
    * Blocks until this thread has acquired a read lock.
+   *
+   * @return {@code true} if the lock was newly-acquired, or {@code false} if this thread previously
+   *         secured the write lock and has yet to release it.
    */
-  public void readLock() {
+  public boolean readLock() {
     lock.readLock().lock();
-    lockState.get().lockAcquired(LockMode.READ);
+    return lockState.get().lockAcquired(LockMode.READ);
   }
 
   /**

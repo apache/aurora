@@ -1,5 +1,6 @@
 package com.twitter.mesos.scheduler.storage.mem;
 
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -7,6 +8,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
 
 import com.twitter.common.inject.TimedInterceptor.Timed;
+import com.twitter.common.stats.Stats;
 import com.twitter.mesos.scheduler.storage.AttributeStore;
 import com.twitter.mesos.scheduler.storage.AttributeStore.AttributeStoreImpl;
 import com.twitter.mesos.scheduler.storage.JobStore;
@@ -26,6 +28,9 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 public class MemStorage implements Storage {
   private static final Logger LOG = Logger.getLogger(MemStorage.class.getName());
+
+  private final AtomicLong readLockWaitNanos = Stats.exportLong("read_lock_wait_nanos");
+  private final AtomicLong writeLockWaitNanos = Stats.exportLong("write_lock_wait_nanos");
 
   private final MutableStoreProvider storeProvider;
   private final LockManager lockManager = new LockManager();
@@ -105,7 +110,11 @@ public class MemStorage implements Storage {
   public <T, E extends Exception> T doInTransaction(Work<T, E> work) throws StorageException, E {
     checkNotNull(work);
 
-    lockManager.readLock();
+    long lockStartNanos = System.nanoTime();
+    boolean topLevelTransaction = lockManager.readLock();
+    if (topLevelTransaction) {
+      readLockWaitNanos.addAndGet(System.nanoTime() - lockStartNanos);
+    }
     try {
       return work.apply(storeProvider);
     } finally {
@@ -133,7 +142,11 @@ public class MemStorage implements Storage {
     checkNotNull(work);
 
     boolean committed = false;
+    long lockStartNanos = System.nanoTime();
     boolean topLevelTransaction = lockManager.writeLock();
+    if (topLevelTransaction) {
+      writeLockWaitNanos.addAndGet(System.nanoTime() - lockStartNanos);
+    }
     try {
       T result =  work.apply(storeProvider);
       if (topLevelTransaction) {

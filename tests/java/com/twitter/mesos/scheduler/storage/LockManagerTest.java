@@ -18,6 +18,8 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 public class LockManagerTest extends TearDownTestCase {
 
@@ -69,5 +71,24 @@ public class LockManagerTest extends TearDownTestCase {
     lockManager.readUnlock();
     fastReadFinished.countDown();
     assertEquals("slow", slowReadResult.get());
+  }
+
+  @Test
+  public void testReentrantReadLock() {
+    assertTrue(lockManager.readLock());
+    assertFalse(lockManager.readLock());
+    lockManager.readUnlock();
+    lockManager.readUnlock();
+    assertTrue(lockManager.readLock());
+  }
+
+  @Test
+  public void testReentrantWriteLock() {
+    assertTrue(lockManager.writeLock());
+    assertFalse(lockManager.writeLock());
+    lockManager.writeUnlock();
+    lockManager.writeUnlock();
+    assertTrue(lockManager.writeLock());
+    assertFalse(lockManager.readLock());
   }
 }
