@@ -39,7 +39,7 @@ class HttpSignaler(object):
           return (False, reason % (shorten(str(expected_response)), shorten(str(response))))
         else:
           return (True, None)
-    except (URLError, HTTPError, HTTPException) as e:
+    except (URLError, HTTPError, HTTPException, SocketTimeout) as e:
       # the type of an HTTPException is typically more useful than its contents (since for example
       # BadStatusLines are often empty). likewise with socket.timeout.
       err = e.__class__.__name__ if isinstance(e, (HTTPException, SocketTimeout)) else e
