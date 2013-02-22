@@ -6,6 +6,7 @@ import javax.inject.Singleton;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.net.MediaType;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
 import com.google.inject.Key;
@@ -88,13 +89,64 @@ public class ServletModule extends AbstractModule {
     });
 
     // Static assets.
-    Registration.registerHttpAsset(binder(), "/js/util.js", ServletModule.class,
-        "assets/util.js", "application/javascript", true);
-    Registration.registerHttpAsset(binder(), "/assets/thermos.png", ServletModule.class,
-        "assets/thermos.png", "image/png", true);
+    registerAsset("assets/util.js", "/js/util.js");
+    registerAsset("assets/thermos.png", "/assets/thermos.png");
+    registerAsset("assets/datatables/css/jquery.dataTables.css", "/css/jquery.dataTables.css");
+    registerAsset("assets/datatables/images/back_disabled.png", "/images/back_disabled.png");
+    registerAsset(
+        "assets/datatables/images/back_enabled_hover.png",
+        "/images/back_enabled_hover.png");
+    registerAsset("assets/datatables/images/back_enabled.png", "/images/back_enabled.png");
+    registerAsset(
+        "assets/datatables/images/forward_disabled.png",
+        "/images/forward_disabled.png");
+    registerAsset(
+        "assets/datatables/images/forward_enabled_hover.png",
+        "/images/forward_enabled_hover.png");
+    registerAsset(
+        "assets/datatables/images/forward_enabled.png",
+        "/images/forward_enabled.png");
+    registerAsset(
+        "assets/datatables/images/sort_asc_disabled.png",
+        "/images/sort_asc_disabled.png");
+    registerAsset("assets/datatables/images/sort_asc.png", "/images/sort_asc.png");
+    registerAsset("assets/datatables/images/sort_both.png", "/images/sort_both.png");
+    registerAsset(
+        "assets/datatables/images/sort_desc_disabled.png",
+        "/images/sort_desc_disabled.png");
+    registerAsset("assets/datatables/images/sort_desc.png", "/images/sort_desc.png");
+    registerAsset(
+        "assets/datatables/js/jquery.dataTables.min.js",
+        "/js/jquery.dataTables.min.js");
+    registerAsset(
+        "assets/datatables/js/dataTables.bootstrap.js",
+        "/js/dataTables.bootstrap.js");
 
     bind(LeaderRedirect.class).in(Singleton.class);
     LifecycleModule.bindStartupAction(binder(), RedirectMonitor.class);
+  }
+
+  private void registerAsset(String resourceLocation, String registerLocation) {
+    MediaType mediaType;
+
+    if (registerLocation.endsWith(".png")) {
+      mediaType = MediaType.PNG;
+    } else if (registerLocation.endsWith(".js")) {
+      mediaType = MediaType.JAVASCRIPT_UTF_8;
+    } else if (registerLocation.endsWith(".css")) {
+      mediaType = MediaType.CSS_UTF_8;
+    } else {
+      throw new IllegalArgumentException("Could not determine media type for "
+          + registerLocation);
+    }
+
+    Registration.registerHttpAsset(
+      binder(),
+      registerLocation,
+      ServletModule.class,
+      resourceLocation,
+      mediaType.toString(),
+      true);
   }
 
   static class RedirectMonitor implements ExceptionalCommand<MonitorException> {
