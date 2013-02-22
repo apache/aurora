@@ -184,6 +184,31 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   }
 
   @Test
+  public void testSharedDedicatedHost() throws Exception {
+    String dedicated1 = "ads/adserver";
+    String dedicated2 = "kestrel/kestrel";
+
+    expectGetHostAttributes(HOST_A, dedicated(dedicated1, dedicated2)).anyTimes();
+
+    control.replay();
+
+    assertNoVetoes(checkConstraint(
+        new Identity().setRole("ads"),
+        "adserver",
+        HOST_A,
+        DEDICATED_ATTRIBUTE,
+        true,
+        dedicated1));
+    assertNoVetoes(checkConstraint(
+        new Identity().setRole("kestrel"),
+        "kestrel",
+        HOST_A,
+        DEDICATED_ATTRIBUTE,
+        true,
+        dedicated2));
+  }
+
+  @Test
   public void testMultiValuedAttributes() throws Exception {
     expectGetHostAttributes(HOST_A, valueAttribute("jvm", "1.0", "2.0", "3.0")).anyTimes();
     expectGetHostAttributes(HOST_B, valueAttribute("jvm", "1.0")).anyTimes();
@@ -250,8 +275,8 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     return valueAttribute(RACK_ATTRIBUTE, rack);
   }
 
-  private Attribute dedicated(String role) {
-    return valueAttribute(DEDICATED_ATTRIBUTE, role);
+  private Attribute dedicated(String value, String... values) {
+    return valueAttribute(DEDICATED_ATTRIBUTE, value, values);
   }
 
   @Test
@@ -356,31 +381,51 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     assertEquals((int) (Veto.MAX_SCORE * 200.0 / DISK.range), DISK.veto(200).getScore());
   }
 
-  private void checkConstraint(String host, String constraintName,
-      boolean expected, String value, String... vs) {
-    checkConstraint(OWNER_A, JOB_A, host, constraintName, expected, value, vs);
+  private TwitterTaskInfo checkConstraint(
+      String host,
+      String constraintName,
+      boolean expected,
+      String value,
+      String... vs) {
+
+    return checkConstraint(OWNER_A, JOB_A, host, constraintName, expected, value, vs);
   }
 
-  private void checkConstraint(Identity owner, String jobName, String host, String constraintName,
-      boolean expected, String value, String... vs) {
-    checkConstraint(owner, jobName, host, constraintName, expected,
+  private TwitterTaskInfo checkConstraint(
+      Identity owner,
+      String jobName,
+      String host,
+      String constraintName,
+      boolean expected,
+      String value,
+      String... vs) {
+
+    return checkConstraint(owner, jobName, host, constraintName, expected,
         new ValueConstraint(false,
             ImmutableSet.<String>builder().add(value).addAll(Arrays.asList(vs)).build()));
   }
 
-  private void checkConstraint(Identity owner, String jobName, String host, String constraintName,
-      boolean expected, ValueConstraint value) {
+  private TwitterTaskInfo checkConstraint(
+      Identity owner,
+      String jobName,
+      String host,
+      String constraintName,
+      boolean expected,
+      ValueConstraint value) {
 
     Constraint constraint = new Constraint(constraintName, TaskConstraint.value(value));
-    assertEquals(expected,
-        defaultFilter.filter(DEFAULT_OFFER, host, makeTask(owner, jobName, constraint), TASK_ID)
-            .isEmpty());
+    TwitterTaskInfo task = makeTask(owner, jobName, constraint);
+    assertEquals(
+        expected,
+        defaultFilter.filter(DEFAULT_OFFER, host, task, TASK_ID).isEmpty());
 
     Constraint negated = constraint.deepCopy();
     negated.getConstraint().getValue().setNegated(!value.isNegated());
-    assertEquals(!expected,
-        defaultFilter.filter(DEFAULT_OFFER, host, makeTask(owner, jobName, negated), TASK_ID)
-            .isEmpty());
+    TwitterTaskInfo negatedTask = makeTask(owner, jobName, negated);
+    assertEquals(
+        !expected,
+        defaultFilter.filter(DEFAULT_OFFER, host, negatedTask, TASK_ID).isEmpty());
+    return task;
   }
 
   private void assertNoVetoes(TwitterTaskInfo task) {
