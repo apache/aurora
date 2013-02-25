@@ -51,7 +51,7 @@ public final class ConfigurationManager {
   @VisibleForTesting
   @Positive
   @CmdLine(name = "max_tasks_per_job", help = "Maximum number of allowed tasks in a single job.")
-  public static final Arg<Integer> MAX_TASKS_PER_JOB = Arg.create(500);
+  public static final Arg<Integer> MAX_TASKS_PER_JOB = Arg.create(1000);
 
   @CmdLine(name = "require_contact_email",
       help = "If true, reject jobs that do not specify a contact email address.")
