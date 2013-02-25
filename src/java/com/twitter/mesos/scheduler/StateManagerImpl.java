@@ -78,7 +78,9 @@ import static com.twitter.mesos.Tasks.SCHEDULED_TO_SHARD_ID;
 import static com.twitter.mesos.gen.ScheduleStatus.INIT;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
+import static com.twitter.mesos.gen.ScheduleStatus.ROLLBACK;
 import static com.twitter.mesos.gen.ScheduleStatus.UNKNOWN;
+import static com.twitter.mesos.gen.ScheduleStatus.UPDATING;
 import static com.twitter.mesos.scheduler.Shards.GET_NEW_CONFIG;
 import static com.twitter.mesos.scheduler.Shards.GET_ORIGINAL_CONFIG;
 
@@ -475,6 +477,8 @@ public class StateManagerImpl implements StateManager {
 
     return txStorage.doInWriteTransaction(txStorage.new SideEffectWork<String, UpdateException>() {
       @Override public String apply(MutableStoreProvider storeProvider) throws UpdateException {
+        assertNotUpdatingOrRollingBack(role, job, storeProvider.getTaskStore());
+
         String jobKey = Tasks.jobKey(role, job);
         Set<TwitterTaskInfo> existingTasks = ImmutableSet.copyOf(Iterables.transform(
             storeProvider.getTaskStore().fetchTasks(Query.activeQuery(role, job)),
@@ -508,6 +512,18 @@ public class StateManagerImpl implements StateManager {
     });
   }
 
+  private static final Set<ScheduleStatus> UPDATE_IN_PROGRESS = EnumSet.of(UPDATING, ROLLBACK);
+  private static void assertNotUpdatingOrRollingBack(
+      String role,
+      String jobName,
+      TaskStore taskStore) throws UpdateException {
+
+    TaskQuery query = Query.byJob(role, jobName).setStatuses(UPDATE_IN_PROGRESS);
+    if (!taskStore.fetchTaskIds(query).isEmpty()) {
+      throw new UpdateException("Unable to proceed until UPDATING and ROLLBACK tasks complete.");
+    }
+  }
+
   /**
    * Completes an in-progress update.
    *
@@ -534,6 +550,8 @@ public class StateManagerImpl implements StateManager {
 
     return txStorage.doInWriteTransaction(txStorage.new SideEffectWork<Boolean, UpdateException>() {
       @Override public Boolean apply(MutableStoreProvider storeProvider) throws UpdateException {
+        assertNotUpdatingOrRollingBack(role, job, storeProvider.getTaskStore());
+
         UpdateStore.Mutable updateStore = storeProvider.getUpdateStore();
 
         String jobKey = Tasks.jobKey(role, job);
@@ -708,9 +726,7 @@ public class StateManagerImpl implements StateManager {
     final Function<TaskUpdateConfiguration, TwitterTaskInfo> configSelector = updating
         ? GET_NEW_CONFIG
         : GET_ORIGINAL_CONFIG;
-    final ScheduleStatus modifyingState = updating
-        ? ScheduleStatus.UPDATING
-        : ScheduleStatus.ROLLBACK;
+    final ScheduleStatus modifyingState = updating ? UPDATING : ROLLBACK;
 
     managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
     return txStorage.doInWriteTransaction(

@@ -281,6 +281,7 @@ public class StateManagerImplTest extends EasyMockTest {
     try {
       stateManager.finishUpdate(
           "jim", "myJob", Optional.<String>absent(), UpdateResult.SUCCESS, true);
+      fail();
     } catch (UpdateException e) {
       // expected
     }
@@ -290,6 +291,55 @@ public class StateManagerImplTest extends EasyMockTest {
         "jim", "myJob", Optional.of(token), UpdateResult.SUCCESS, true));
     assertFalse(stateManager.finishUpdate(
         "jim", "myJob", Optional.of(token), UpdateResult.SUCCESS, false));
+  }
+
+  @Test
+  public void testUpdatingPreventCancel() throws Exception {
+    // Tests that any tasks in UPDATING or ROLLBACK prevents an update from being finalized.
+    // Otherwise, the schedule would lose the persisted update configuration, and fail
+    // to reschedule tasks.
+
+    expectPubSubEvent();
+    driver.killTask(EasyMock.<String>anyObject());
+    expectLastCall().times(2);
+
+    control.replay();
+    TwitterTaskInfo taskInfo = makeTask("jim", "myJob", 0);
+
+    String id = insertTask(taskInfo);
+    changeState(id, ASSIGNED);
+
+    TwitterTaskInfo updated = taskInfo.deepCopy().setNumCpus(1000);
+    String token = stateManager.registerUpdate("jim", "myJob", ImmutableSet.of(updated));
+    stateManager.modifyShards("jim", "myJob", ImmutableSet.of(0), token, true);
+
+    // Since the task is still in UPDATING, it should not be possible to cancel the update.
+    try {
+      stateManager.finishUpdate(
+          "jim", "myJob", Optional.<String>absent(), UpdateResult.SUCCESS, true);
+      fail("cancel_update should have been prevented");
+    } catch (UpdateException e) {
+      // expected
+    }
+
+    changeState(id, FINISHED);
+    String updatedId =
+        Tasks.id(Iterables.getOnlyElement(stateManager.fetchTasks(Query.byStatus(PENDING))));
+    changeState(updatedId, ASSIGNED);
+    stateManager.modifyShards("jim", "myJob", ImmutableSet.of(0), token, false);
+    // Since the task is still in ROLLBACK, it should not be possible to cancel the update.
+    try {
+      stateManager.finishUpdate(
+          "jim", "myJob", Optional.<String>absent(), UpdateResult.SUCCESS, true);
+      fail("cancel_update should have been prevented");
+    } catch (UpdateException e) {
+      // expected
+    }
+
+    changeState(updatedId, FINISHED);
+
+    stateManager.finishUpdate(
+        "jim", "myJob", Optional.<String>absent(), UpdateResult.SUCCESS, true);
   }
 
   @Test
