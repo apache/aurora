@@ -16,7 +16,9 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.BackoffStrategy;
+import com.twitter.common.util.Random;
 import com.twitter.common.util.TruncatedBinaryBackoff;
+import com.twitter.mesos.scheduler.async.TaskScheduler.OfferReturnDelay;
 import com.twitter.mesos.scheduler.async.TaskScheduler.TaskSchedulerImpl;
 import com.twitter.mesos.scheduler.events.TaskEventModule;
 
@@ -46,10 +48,10 @@ public class AsyncModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> MAX_SCHEDULE_DELAY =
       Arg.create(Amount.of(30L, Time.SECONDS));
 
-  @CmdLine(name = "max_offer_hold_time",
-      help = "Maximum amount of time to hold a resource offer before declining.")
-  private static final Arg<Amount<Long, Time>> MAX_OFFER_HOLD_TIME =
-      Arg.create(Amount.of(1L, Time.MINUTES));
+  @CmdLine(name = "min_offer_hold_time",
+      help = "Minimum amount of time to hold a resource offer before declining.")
+  private static final Arg<Amount<Integer, Time>> MIN_OFFER_HOLD_TIME =
+      Arg.create(Amount.of(5, Time.MINUTES));
 
   @CmdLine(name = "history_prune_threshold",
       help = "Time after which the scheduler will prune terminated task history.")
@@ -87,8 +89,7 @@ public class AsyncModule extends AbstractModule {
     });
     binder().install(new PrivateModule() {
       @Override protected void configure() {
-        bind(new TypeLiteral<Amount<Long, Time>>() { })
-            .toInstance(MAX_OFFER_HOLD_TIME.get());
+        bind(OfferReturnDelay.class).to(RandomJitterReturnDelay.class);
         bind(BackoffStrategy.class).toInstance(
             new TruncatedBinaryBackoff(INITIAL_SCHEDULE_DELAY.get(), MAX_SCHEDULE_DELAY.get()));
         bind(TaskScheduler.class).to(TaskSchedulerImpl.class);
@@ -112,5 +113,19 @@ public class AsyncModule extends AbstractModule {
     TaskEventModule.bindSubscriber(binder(), TaskScheduler.class);
     TaskEventModule.bindSubscriber(binder(), TaskTimeout.class);
     TaskEventModule.bindSubscriber(binder(), HistoryPruner.class);
+  }
+
+  /**
+   * Returns offers after a random duration within a fixed window.
+   */
+  private static class RandomJitterReturnDelay implements OfferReturnDelay {
+    private static final int JITTER_WINDOW_MS = Amount.of(1, Time.MINUTES).as(Time.MILLISECONDS);
+
+    private final int minHoldTimeMs = MIN_OFFER_HOLD_TIME.get().as(Time.MILLISECONDS);
+    private final Random random = new Random.SystemRandom(new java.util.Random());
+
+    @Override public Amount<Integer, Time> get() {
+      return Amount.of(minHoldTimeMs + random.nextInt(JITTER_WINDOW_MS), Time.MILLISECONDS);
+    }
   }
 }

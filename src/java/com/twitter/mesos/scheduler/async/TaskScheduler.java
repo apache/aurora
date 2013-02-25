@@ -17,7 +17,9 @@ import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
+import com.google.common.base.Supplier;
 import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
@@ -37,7 +39,6 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.BackoffStrategy;
-import com.twitter.common.util.Clock;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduledTask;
@@ -91,6 +92,14 @@ public interface TaskScheduler extends EventSubscriber {
   Iterable<Offer> getOffers();
 
   /**
+   * Calculates the amount of time before an offer should be 'returned' by declining it.
+   * The delay is calculated for each offer that is received, so the return delay may be
+   * fixed or variable.
+   */
+  public interface OfferReturnDelay extends Supplier<Amount<Integer, Time>> {
+  }
+
+  /**
    * A task scheduler that learns of pending tasks via internal pubsub notifications.
    * <p>
    * Additionally, it will automatically return resource offers after a configurable amount of time.
@@ -98,9 +107,6 @@ public interface TaskScheduler extends EventSubscriber {
   class TaskSchedulerImpl implements TaskScheduler {
 
     private static final Logger LOG = Logger.getLogger(TaskSchedulerImpl.class.getName());
-
-    @VisibleForTesting
-    static final long OFFER_CLEANUP_INTERVAL_SECS = 5;
 
     @VisibleForTesting
     final Map<String, Future<?>> futures =
@@ -123,27 +129,15 @@ public interface TaskScheduler extends EventSubscriber {
         TaskAssigner assigner,
         BackoffStrategy pendingRetryStrategy,
         Driver driver,
-        final ScheduledExecutorService executor,
-        Amount<Long, Time> offerExpiry,
-        Clock clock) {
+        ScheduledExecutorService executor,
+        OfferReturnDelay returnDelay) {
 
       this.storage = checkNotNull(storage);
       this.stateManager = checkNotNull(stateManager);
       this.assigner = checkNotNull(assigner);
       this.pendingRetryStrategy = checkNotNull(pendingRetryStrategy);
       this.executor = checkNotNull(executor);
-      this.offers = new Offers(driver, offerExpiry, clock);
-
-      LOG.info("Declining resource offers not accepted for " + offerExpiry);
-      executor.scheduleAtFixedRate(
-          new Runnable() {
-            @Override public void run() {
-              offers.declineExpired();
-            }
-          },
-          OFFER_CLEANUP_INTERVAL_SECS,
-          OFFER_CLEANUP_INTERVAL_SECS,
-          TimeUnit.SECONDS);
+      this.offers = new Offers(driver, returnDelay, executor);
     }
 
     @Inject
@@ -153,7 +147,7 @@ public interface TaskScheduler extends EventSubscriber {
         TaskAssigner assigner,
         BackoffStrategy pendingRetryStrategy,
         Driver driver,
-        Amount<Long, Time> offerExpiry,
+        OfferReturnDelay returnDelay,
         ShutdownRegistry shutdownRegistry) {
 
       this(
@@ -163,8 +157,7 @@ public interface TaskScheduler extends EventSubscriber {
           pendingRetryStrategy,
           driver,
           createThreadPool(shutdownRegistry),
-          offerExpiry,
-          Clock.SYSTEM_CLOCK);
+          returnDelay);
     }
 
     private static ScheduledExecutorService createThreadPool(ShutdownRegistry shutdownRegistry) {
@@ -195,13 +188,6 @@ public interface TaskScheduler extends EventSubscriber {
       // on an offer, the master will mark the task as LOST and it will be retried.
       offers.remove(offerId);
     }
-
-    private static final Function<ExpiringOffer, Offer> GET_OFFER =
-        new Function<ExpiringOffer, Offer>() {
-          @Override public Offer apply(ExpiringOffer offer) {
-            return offer.offer;
-          }
-        };
 
     @Override
     public Iterable<Offer> getOffers() {
@@ -281,10 +267,10 @@ public interface TaskScheduler extends EventSubscriber {
       if (task == null) {
         LOG.warning("Failed to look up task " + taskId);
       } else {
-        Function<ExpiringOffer, Optional<TaskInfo>> assignment =
-            new Function<ExpiringOffer, Optional<TaskInfo>>() {
-              @Override public Optional<TaskInfo> apply(ExpiringOffer expiring) {
-                return assigner.maybeAssign(expiring.offer, task);
+        Function<Offer, Optional<TaskInfo>> assignment =
+            new Function<Offer, Optional<TaskInfo>>() {
+              @Override public Optional<TaskInfo> apply(Offer offer) {
+                return assigner.maybeAssign(offer, task);
               }
             };
         try {
@@ -341,33 +327,16 @@ public interface TaskScheduler extends EventSubscriber {
       }
     }
 
-    private static class ExpiringOffer {
-      final Offer offer;
-      final long expirationMs;
-
-      ExpiringOffer(Offer offer, long expirationMs) {
-        this.offer = offer;
-        this.expirationMs = expirationMs;
-      }
-    }
-
     private static class Offers {
-      private final Map<OfferID, ExpiringOffer> offers = Maps.newHashMap();
+      private final Map<OfferID, Offer> offers = Maps.newHashMap();
       private final Driver driver;
-      private final long offerExpiryMs;
-      private final Clock clock;
-      private final Predicate<ExpiringOffer> isExpired;
+      private final OfferReturnDelay returnDelay;
+      private final ScheduledExecutorService executor;
 
-      Offers(Driver driver, Amount<Long, Time> offerExpiry, final Clock clock) {
+      Offers(Driver driver, OfferReturnDelay returnDelay, ScheduledExecutorService executor) {
         this.driver = driver;
-        this.offerExpiryMs = offerExpiry.as(Time.MILLISECONDS);
-        this.clock = clock;
-        isExpired = new Predicate<ExpiringOffer>() {
-          @Override public boolean apply(ExpiringOffer expiring) {
-            return clock.nowMillis() >= expiring.expirationMs;
-          }
-        };
-
+        this.returnDelay = returnDelay;
+        this.executor = executor;
         Stats.exportSize("outstanding_offers", offers);
       }
 
@@ -375,26 +344,35 @@ public interface TaskScheduler extends EventSubscriber {
         offers.remove(id);
       }
 
-      private static Predicate<ExpiringOffer> isSlave(final SlaveID slave) {
-        return new Predicate<ExpiringOffer>() {
-          @Override public boolean apply(ExpiringOffer expiring) {
-            return expiring.offer.getSlaveId().equals(slave);
+      private static Predicate<Offer> isSlave(final SlaveID slave) {
+        return new Predicate<Offer>() {
+          @Override public boolean apply(Offer offer) {
+            return offer.getSlaveId().equals(slave);
           }
         };
       }
 
       synchronized void receive(Offer offer) {
-        List<ExpiringOffer> sameSlave = FluentIterable.from(offers.values())
+        List<Offer> sameSlave = FluentIterable.from(offers.values())
             .filter(isSlave(offer.getSlaveId()))
             .toImmutableList();
         if (sameSlave.isEmpty()) {
-          offers.put(offer.getId(), new ExpiringOffer(offer, clock.nowMillis() + offerExpiryMs));
+          final OfferID id = offer.getId();
+          offers.put(id, offer);
+          executor.schedule(
+              new Runnable() {
+                @Override public void run() {
+                  decline(id);
+                }
+              },
+              returnDelay.get().as(Time.MILLISECONDS),
+              TimeUnit.MILLISECONDS);
         } else {
           LOG.info("Returning " + (sameSlave.size() + 1)
               + " offers for " + offer.getSlaveId().getValue() + " for compaction.");
           decline(offer.getId());
-          for (ExpiringOffer expiring : sameSlave) {
-            decline(expiring.offer.getId());
+          for (Offer sameSlaveOffer : sameSlave) {
+            decline(sameSlaveOffer.getId());
           }
         }
       }
@@ -405,13 +383,13 @@ public interface TaskScheduler extends EventSubscriber {
         driver.declineOffer(id);
       }
 
-      synchronized boolean launchFirst(Function<ExpiringOffer, Optional<TaskInfo>> acceptor)
+      synchronized boolean launchFirst(Function<Offer, Optional<TaskInfo>> acceptor)
           throws LaunchException {
 
-        for (ExpiringOffer expiring : offers.values()) {
-          Optional<TaskInfo> assignment = acceptor.apply(expiring);
+        for (Offer offer : offers.values()) {
+          Optional<TaskInfo> assignment = acceptor.apply(offer);
           if (assignment.isPresent()) {
-            OfferID id = expiring.offer.getId();
+            OfferID id = offer.getId();
             remove(id);
             try {
               driver.launchTask(id, assignment.get());
@@ -433,16 +411,8 @@ public interface TaskScheduler extends EventSubscriber {
         }
       }
 
-      synchronized void declineExpired() {
-        for (ExpiringOffer expired
-            : FluentIterable.from(offers.values()).filter(isExpired).toImmutableList()) {
-
-          decline(expired.offer.getId());
-        }
-      }
-
       synchronized List<Offer> getAll() {
-        return FluentIterable.from(offers.values()).transform(GET_OFFER).toImmutableList();
+        return ImmutableList.copyOf(offers.values());
       }
     }
   }

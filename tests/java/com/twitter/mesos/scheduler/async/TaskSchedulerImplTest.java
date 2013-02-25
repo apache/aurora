@@ -25,7 +25,6 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.common.util.BackoffStrategy;
-import com.twitter.common.util.testing.FakeClock;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
@@ -36,6 +35,7 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.Driver;
 import com.twitter.mesos.scheduler.StateManager;
 import com.twitter.mesos.scheduler.TaskAssigner;
+import com.twitter.mesos.scheduler.async.TaskScheduler.OfferReturnDelay;
 import com.twitter.mesos.scheduler.async.TaskScheduler.TaskSchedulerImpl;
 import com.twitter.mesos.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.mesos.scheduler.events.PubsubEvent.TaskStateChange;
@@ -61,8 +61,6 @@ import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 
 public class TaskSchedulerImplTest extends EasyMockTest {
 
-  private static final Amount<Long, Time> OFFER_EXPIRY = Amount.of(1L, Time.MINUTES);
-
   private Storage storage;
   private StateManager stateManager;
   private TaskAssigner assigner;
@@ -70,10 +68,9 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   private Driver driver;
   private ScheduledExecutorService executor;
   private ScheduledFuture<?> future;
-  private FakeClock clock;
+  private OfferReturnDelay returnDelay;
 
   private TaskSchedulerImpl scheduler;
-  private Capture<Runnable> expirationCapture;
 
   @Before
   public void setUp() {
@@ -84,17 +81,10 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     driver = createMock(Driver.class);
     executor = createMock(ScheduledExecutorService.class);
     future = createMock(ScheduledFuture.class);
-    clock = new FakeClock();
+    returnDelay = createMock(OfferReturnDelay.class);
   }
 
   private void replayAndCreateScheduler() {
-    expirationCapture = createCapture();
-    expect(executor.scheduleAtFixedRate(
-        capture(expirationCapture),
-        EasyMock.eq(TaskSchedulerImpl.OFFER_CLEANUP_INTERVAL_SECS),
-        EasyMock.eq(TaskSchedulerImpl.OFFER_CLEANUP_INTERVAL_SECS),
-        EasyMock.eq(TimeUnit.SECONDS)))
-        .andReturn(createMock(ScheduledFuture.class));
     control.replay();
     scheduler = new TaskSchedulerImpl(
         storage,
@@ -103,8 +93,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
         retryStrategy,
         driver,
         executor,
-        OFFER_EXPIRY,
-        clock);
+        returnDelay);
   }
 
   @After
@@ -119,6 +108,14 @@ public class TaskSchedulerImplTest extends EasyMockTest {
         .setSlaveId(SlaveID.newBuilder().setValue("slave_id-" + offerId))
         .setHostname("hostname")
         .build();
+  }
+
+  private Capture<Runnable> expectOfferDeclineIn(int delayMillis) {
+    expect(returnDelay.get()).andReturn(Amount.of(delayMillis, Time.MILLISECONDS));
+    Capture<Runnable> runnable = createCapture();
+    executor.schedule(capture(runnable), eq((long) delayMillis), eq(TimeUnit.MILLISECONDS));
+    expectLastCall().andReturn(createMock(ScheduledFuture.class));
+    return runnable;
   }
 
   private void sendOffer(Offer offer) {
@@ -151,6 +148,9 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
   @Test
   public void testNoTasks() {
+    expectOfferDeclineIn(10);
+    expectOfferDeclineIn(10);
+
     replayAndCreateScheduler();
 
     sendOffer(makeOffer("a"));
@@ -221,6 +221,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
   @Test
   public void testTaskAssigned() {
+    expectOfferDeclineIn(10);
     Offer offer = makeOffer("offerA");
     ScheduledTask task = makeTask("a", PENDING);
     TaskInfo mesosTask = TaskInfo.newBuilder()
@@ -266,6 +267,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
         .build();
 
     Capture<Runnable> timeoutCapture = expectTaskWatch(10);
+    expectOfferDeclineIn(10);
     expect(assigner.maybeAssign(offer, task)).andReturn(Optional.of(mesosTask));
     driver.launchTask(offer.getId(), mesosTask);
     expectLastCall().andThrow(new IllegalStateException("Driver not ready."));
@@ -296,6 +298,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
         .build();
 
     Capture<Runnable> timeoutCapture = expectTaskWatch(10);
+    expectOfferDeclineIn(10);
     expect(assigner.maybeAssign(offer, task)).andThrow(new StorageException("Injected failure."));
 
     Capture<Runnable> timeoutCapture2 = expectTaskWatch(10, 20);
@@ -316,6 +319,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     Offer offerA = makeOffer("offerA");
     ScheduledTask task = makeTask("a", PENDING);
     Capture<Runnable> timeoutCapture = expectTaskWatch(10);
+    Capture<Runnable> offerExpirationCapture = expectOfferDeclineIn(10);
     expect(assigner.maybeAssign(offerA, task)).andReturn(Optional.<TaskInfo>absent());
     Capture<Runnable> timeoutCapture2 = expectTaskWatch(10, 20);
     driver.declineOffer(offerA.getId());
@@ -328,22 +332,27 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     changeState("a", INIT, PENDING);
     sendOffer(offerA);
     timeoutCapture.getValue().run();
-    clock.advance(OFFER_EXPIRY);
-    expirationCapture.getValue().run();
+    offerExpirationCapture.getValue().run();
     timeoutCapture2.getValue().run();
     scheduler.tasksDeleted(new TasksDeleted(ImmutableSet.of(makeTask("a", KILLED))));
   }
 
   @Test
   public void testOneOfferPerSlave() {
+    Capture<Runnable> offerExpirationCapture = expectOfferDeclineIn(10);
+
     Offer offerA = makeOffer("offerA");
     Offer offerB = makeOffer("offerB").toBuilder().setSlaveId(offerA.getSlaveId()).build();
     driver.declineOffer(offerA.getId());
     driver.declineOffer(offerB.getId());
 
+    // No attempt is made to avoid declining offers multiple times, so offerA is declined twice.
+    driver.declineOffer(offerA.getId());
+
     replayAndCreateScheduler();
 
     sendOffer(offerA);
     sendOffer(offerB);
+    offerExpirationCapture.getValue().run();
   }
 }
