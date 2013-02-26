@@ -15,12 +15,14 @@ from twitter.common.quantity import Amount, Time
 
 # thermos
 from twitter.mesos.config import PortResolver
-from twitter.mesos.config.schema import MesosTaskInstance
+from twitter.mesos.config.schema import MesosJob, MesosTaskInstance
+from twitter.mesos.config.thrift import task_instance_from_job
 from twitter.thermos.base.path import TaskPath
 from twitter.thermos.monitoring.monitor import TaskMonitor
 
 # thrifts
 from gen.twitter.mesos.ttypes import AssignedTask
+from thrift.Thrift import TException
 from thrift.TSerialization import deserialize as thrift_deserialize
 
 from .discovery_manager import DiscoveryManager
@@ -86,7 +88,7 @@ class ThermosExecutor(ThermosExecutorBase):
     """
     try:
       assigned_task = thrift_deserialize(AssignedTask(), task.data)
-    except Exception as e:
+    except (EOFError, TException) as e:
       raise ValueError('Could not deserialize task! %s' % e)
     return assigned_task
 
@@ -104,7 +106,17 @@ class ThermosExecutor(ThermosExecutorBase):
       json_blob = json.loads(thermos_task)
     except Exception as e:
       raise ValueError('Could not deserialize thermosConfig JSON! %s' % e)
-    return MesosTaskInstance(json_blob)
+    # As part of the transition for MESOS-2133, we can send either a MesosTaskInstance
+    # or we can be sending a MesosJob.  So handle both possible cases.  Once everyone
+    # is using MesosJob, then we can begin to leverage additional information that
+    # becomes available such as cluster.
+    if 'instance' in json_blob:
+      return MesosTaskInstance(json_blob)
+    else:
+      job, refs = task_instance_from_job(MesosJob(json_blob), assigned_task.task.shardId)
+      if refs:
+        raise ValueError('Unexpected unbound refs: %s' % ' '.join(map(str, refs)))
+      return job
 
   @property
   def runner(self):
@@ -230,6 +242,7 @@ class ThermosExecutor(ThermosExecutorBase):
     self.log('launchTask got task: %s:%s' % (task.name, task.task_id.value))
 
     if self._runner:
+      # XXX(wickman) This looks like it's sending LOST for the wrong task?
       # TODO(wickman) Send LOST immediately for both tasks?
       log.error('Error!  Already running a task! %s' % self._runner)
       self.send_update(driver, self._task_id, 'LOST',
@@ -240,8 +253,8 @@ class ThermosExecutor(ThermosExecutorBase):
     self._task_id = task.task_id.value
 
     try:
-      assigned_task = ThermosExecutor.deserialize_assigned_task(task)
-      mesos_task = ThermosExecutor.deserialize_thermos_task(assigned_task)
+      assigned_task = self.deserialize_assigned_task(task)
+      mesos_task = self.deserialize_thermos_task(assigned_task)
     except Exception as e:
       log.fatal('Could not deserialize AssignedTask: %s' % e)
       self.send_update(driver, self._task_id, 'FAILED', "Could not deserialize task: %s" % e)
