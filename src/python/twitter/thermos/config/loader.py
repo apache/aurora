@@ -134,7 +134,8 @@ class ThermosTaskValidator(object):
     if os.path.exists(active_task):
       task_on_disk = ThermosTaskWrapper.from_file(active_task)
       if not task_on_disk or task_on_disk.task != task:
-        raise cls.InvalidTaskError('Task differs from on disk copy: %s' % active_task)
+        raise cls.InvalidTaskError('Task differs from on disk copy: %r vs %r' % (
+            task_on_disk.task if task_on_disk else None, task))
 
 
 class ThermosConfigLoader(object):

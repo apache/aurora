@@ -31,8 +31,9 @@ from twitter.mesos.executor.thermos_executor import ThermosExecutor, ThermosExec
 from twitter.mesos.executor.task_runner_wrapper import TaskRunnerWrapper
 from twitter.mesos.executor.sandbox_manager import DirectorySandbox
 from twitter.mesos.executor.status_manager import StatusManager
-from twitter.thermos.runner.runner import TaskRunner
 from twitter.thermos.base.path import TaskPath
+from twitter.thermos.runner.runner import TaskRunner
+from twitter.thermos.monitoring.monitor import TaskMonitor
 
 from test_http_signaler import SignalServer, UnhealthyHandler
 
@@ -117,19 +118,18 @@ def make_task(thermos_config, assigned_ports={}):
   return td
 
 
-def hello_world():
-  return MesosTaskInstance(
+HELLO_WORLD_TASK_ID = 'hello_world-001'
+HELLO_WORLD = MesosTaskInstance(
     task = Task(name = 'hello_world',
                 processes = [
-                  Process(name = 'hello_world', cmdline = 'echo hello world')
+                  Process(name = 'hello_world_{{thermos.task_id}}', cmdline = 'echo hello world')
                 ],
                 resources = Resources(cpu=1.0, ram=16*MB, disk=32*MB)),
     instance = 0,
-    role = getpass.getuser())
+    role = getpass.getuser()
+)
 
-
-def sleep60():
-  return MesosTaskInstance(
+SLEEP60 = MesosTaskInstance(
     task = Task(name = 'sleep60',
                 processes = [
                   Process(name = 'sleep60', cmdline = 'sleep 60')
@@ -137,7 +137,8 @@ def sleep60():
                 resources = Resources(cpu=1.0, ram=16*MB, disk=32*MB)),
     health_check_interval_secs = 0.1,
     instance = 0,
-    role = getpass.getuser())
+    role = getpass.getuser()
+)
 
 
 def make_runner(proxy_driver, checkpoint_root, task, ports={}, fast_status=False,
@@ -203,13 +204,17 @@ class TestThermosExecutor(object):
     with temporary_dir() as tempdir:
       runner_class = functools.partial(TestTaskRunner, checkpoint_root=tempdir)
       te = ThermosExecutor(runner_class=runner_class)
-      te.launchTask(proxy_driver, make_task(hello_world()))
+      te.launchTask(proxy_driver, make_task(HELLO_WORLD))
       while te._runner.is_alive():
         time.sleep(0.1)
       while te._manager is None:
         time.sleep(0.1)
       te._manager.join()
+      tm = TaskMonitor(TaskPath(root=tempdir), task_id=HELLO_WORLD_TASK_ID)
+      runner_state = tm.get_state()
 
+    assert 'hello_world_hello_world-001' in runner_state.processes, (
+      'Could not find processes, got: %s' % ' '.join(runner_state.processes))
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
     status_updates = [arg_tuple[0][0] for arg_tuple in updates]
@@ -221,7 +226,7 @@ class TestThermosExecutor(object):
     proxy_driver = ProxyDriver()
 
     with temporary_dir() as checkpoint_root:
-      _, executor = make_runner(proxy_driver, checkpoint_root, sleep60(), fast_status=True)
+      _, executor = make_runner(proxy_driver, checkpoint_root, SLEEP60, fast_status=True)
       while executor._runner is None or executor._runner._popen is None or (
           executor._runner._popen.pid is None):
         time.sleep(0.1)
@@ -236,7 +241,7 @@ class TestThermosExecutor(object):
     proxy_driver = ProxyDriver()
 
     with temporary_dir() as checkpoint_root:
-      runner, executor = make_runner(proxy_driver, checkpoint_root, sleep60())
+      runner, executor = make_runner(proxy_driver, checkpoint_root, SLEEP60)
       runner.kill(force=True, preemption_wait=Amount(1, Time.SECONDS))
       executor._manager.join()
 
@@ -248,7 +253,7 @@ class TestThermosExecutor(object):
     proxy_driver = ProxyDriver()
 
     with temporary_dir() as checkpoint_root:
-      _, executor = make_runner(proxy_driver, checkpoint_root, sleep60())
+      _, executor = make_runner(proxy_driver, checkpoint_root, SLEEP60)
       # send two, expect at most one delivered
       executor.killTask(proxy_driver, mesos_pb.TaskID(value='sleep60-001'))
       executor.killTask(proxy_driver, mesos_pb.TaskID(value='sleep60-001'))
@@ -262,7 +267,7 @@ class TestThermosExecutor(object):
     proxy_driver = ProxyDriver()
 
     with temporary_dir() as checkpoint_root:
-      _, executor = make_runner(proxy_driver, checkpoint_root, sleep60())
+      _, executor = make_runner(proxy_driver, checkpoint_root, SLEEP60)
       executor.shutdown(proxy_driver)
       executor._manager.join()
 
@@ -274,7 +279,7 @@ class TestThermosExecutor(object):
     proxy_driver = ProxyDriver()
 
     with temporary_dir() as checkpoint_root:
-      runner, executor = make_runner(proxy_driver, checkpoint_root, sleep60())
+      runner, executor = make_runner(proxy_driver, checkpoint_root, SLEEP60)
       runner.lose(force=True)
       executor._manager.join()
 
@@ -286,7 +291,7 @@ class TestThermosExecutor(object):
     proxy_driver = ProxyDriver()
     with SignalServer(UnhealthyHandler) as port:
       with temporary_dir() as checkpoint_root:
-        _, executor = make_runner(proxy_driver, checkpoint_root, sleep60(), ports={'health': port},
+        _, executor = make_runner(proxy_driver, checkpoint_root, SLEEP60, ports={'health': port},
                                  fast_status=True)
         executor._manager.join()
 
@@ -298,7 +303,7 @@ class TestThermosExecutor(object):
     proxy_driver = ProxyDriver()
 
     te = FastThermosExecutor(runner_class=FailingStartingTaskRunner)
-    te.launchTask(proxy_driver, make_task(hello_world()))
+    te.launchTask(proxy_driver, make_task(HELLO_WORLD))
 
     proxy_driver._stop_event.wait(timeout=1.0)
     assert proxy_driver._stop_event.is_set()
@@ -310,7 +315,7 @@ class TestThermosExecutor(object):
     proxy_driver = ProxyDriver()
 
     te = FastThermosExecutor(runner_class=FailingInitializingTaskRunner)
-    te.launchTask(proxy_driver, make_task(hello_world()))
+    te.launchTask(proxy_driver, make_task(HELLO_WORLD))
 
     proxy_driver._stop_event.wait(timeout=1.0)
     assert proxy_driver._stop_event.is_set()
@@ -321,7 +326,7 @@ class TestThermosExecutor(object):
   def test_killTask_during_runner_initialize(self):
     proxy_driver = ProxyDriver()
 
-    task = make_task(hello_world())
+    task = make_task(HELLO_WORLD)
     te = FastThermosExecutor(runner_class=SlowInitializingTaskRunner)
     te.launchTask(proxy_driver, task)
     te.killTask(proxy_driver, mesos_pb.TaskID(value=task.task_id.value))

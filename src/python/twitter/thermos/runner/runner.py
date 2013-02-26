@@ -401,26 +401,6 @@ class TaskRunner(object):
         launch_time_ms)
     else:
       self._task_id = task_id
-    self._launch_time = launch_time
-    self._log_dir = log_dir or os.path.join(sandbox, '.logs')
-    self._pathspec = TaskPath(root=checkpoint_root, task_id=self._task_id, log_dir=self._log_dir)
-    self._portmap = portmap or {}
-    try:
-      ThermosTaskValidator.assert_valid_task(task)
-      ThermosTaskValidator.assert_valid_ports(task, self._portmap)
-      ThermosTaskValidator.assert_same_task(self._pathspec, task)
-    except ThermosTaskValidator.InvalidTaskError as e:
-      raise self.InvalidTask('Invalid task: %s' % e)
-    self._plan = None
-    self._regular_plan = TaskPlanner(task, clock=clock,
-        process_filter=lambda proc: proc.final().get() == False)
-    self._finalizing_plan = TaskPlanner(task, clock=clock,
-        process_filter=lambda proc: proc.final().get() == True)
-    self._chroot = chroot
-    self._task = task
-    self._sandbox = sandbox
-    self._terminal_state = None
-
     current_user = TaskRunnerHelper.get_actual_user()
     self._user = user or current_user
     # TODO(wickman) This should be delegated to the ProcessPlatform / Helper
@@ -428,20 +408,46 @@ class TaskRunner(object):
       if os.geteuid() != 0:
         raise ValueError('task specifies user as %s, but %s does not have setuid permission!' % (
           self._user, current_user))
-
+    self._portmap = portmap or {}
+    self._launch_time = launch_time
+    self._log_dir = log_dir or os.path.join(sandbox, '.logs')
+    self._pathspec = TaskPath(root=checkpoint_root, task_id=self._task_id, log_dir=self._log_dir)
+    try:
+      ThermosTaskValidator.assert_valid_task(task)
+      ThermosTaskValidator.assert_valid_ports(task, self._portmap)
+    except ThermosTaskValidator.InvalidTaskError as e:
+      raise self.InvalidTask('Invalid task: %s' % e)
+    context = ThermosContext(task_id=self._task_id,
+                             user=self._user,
+                             ports=self._portmap)
+    self._task, uninterp = (task % Environment(thermos=context)).interpolate()
+    if len(uninterp) > 0:
+      raise self.InvalidTask('Failed to interpolate task, missing: %s' %
+          ', '.join(str(ref) for ref in uninterp))
+    try:
+      ThermosTaskValidator.assert_same_task(self._pathspec, self._task)
+    except ThermosTaskValidator.InvalidTaskError as e:
+      raise self.InvalidTask('Invalid task: %s' % e)
+    self._plan = None
+    self._regular_plan = TaskPlanner(self._task, clock=clock,
+        process_filter=lambda proc: proc.final().get() == False)
+    self._finalizing_plan = TaskPlanner(self._task, clock=clock,
+        process_filter=lambda proc: proc.final().get() == True)
+    self._chroot = chroot
+    self._sandbox = sandbox
+    self._terminal_state = None
     self._ckpt = None
-    self._process_map = dict((p.name().get(), p) for p in task.processes())
+    self._process_map = dict((p.name().get(), p) for p in self._task.processes())
     self._task_processes = {}
     self._stages = dict((state, stage(self)) for state, stage in self.STAGES.items())
     self._ps = ProcessProviderFactory.get()
     self._finalization_start = None
     self._preemption_deadline = None
-
     self._watcher = ProcessMuxer(self._pathspec)
+    self._state   = RunnerState(processes = {})
 
-    universal_handler = universal_handler or TaskRunnerUniversalHandler
     # create runner state
-    self._state      = RunnerState(processes = {})
+    universal_handler = universal_handler or TaskRunnerUniversalHandler
     self._dispatcher = CheckpointDispatcher()
     self._dispatcher.register_handler(universal_handler(self))
     self._dispatcher.register_handler(TaskRunnerProcessHandler(self))
@@ -613,14 +619,8 @@ class TaskRunner(object):
     run_number = len(self.state.processes[process_name])-1
     pathspec = self._pathspec.given(process=process_name, run=run_number)
     process = self._process_map.get(process_name)
-    context = ThermosContext(task_id=self._task_id,
-                             user=self._user,
-                             ports=self._portmap)
-    process, uninterp = (process % Environment(thermos=context)).interpolate()
-    assert len(uninterp) == 0, 'Failed to interpolate process, missing:\n%s' % (
-      '\n'.join(str(ref) for ref in uninterp))
-    # close the ckpt on the Process, also consider closing down logging or recreating the
-    # logging lock.
+    if process is None:
+      raise self.InternalError('FATAL: Could not find process: %s' % process_name)
     def close_ckpt_and_fork():
       pid = os.fork()
       if pid == 0 and self._ckpt is not None:
