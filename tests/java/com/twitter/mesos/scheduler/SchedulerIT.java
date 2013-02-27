@@ -146,8 +146,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
               }
             }
         );
-        bind(ExecutorConfig.class).toInstance(
-            new ExecutorConfig("/executor/old", "/executor/thermos"));
+        bind(ExecutorConfig.class).toInstance(new ExecutorConfig("/executor/thermos"));
         bind(Boolean.class).annotatedWith(ShutdownOnDriverExit.class).toInstance(false);
       }
     };

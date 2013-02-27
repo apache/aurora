@@ -28,6 +28,7 @@ import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.ValueConstraint;
+import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
 import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.storage.AttributeStore;
@@ -79,8 +80,8 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   private static final long DEFAULT_RAM = 1000;
   private static final long DEFAULT_DISK = 2000;
   private static final Resources DEFAULT_OFFER = new Resources(
-      DEFAULT_CPUS + ThermosResources.CPUS,
-      Amount.of(DEFAULT_RAM + ThermosResources.RAM.as(Data.MB), Data.MB),
+      MesosTaskFactoryImpl.getTotalTaskCpus(DEFAULT_CPUS),
+      MesosTaskFactoryImpl.getTotalTaskRam(DEFAULT_RAM),
       Amount.of(DEFAULT_DISK, Data.MB), 0);
 
   private final AtomicLong taskIdCounter = new AtomicLong();

@@ -5,7 +5,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -35,8 +34,6 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
  */
 public interface MesosTaskFactory {
 
-  ExecutorID DEFAULT_EXECUTOR_ID = ExecutorID.newBuilder().setValue("twitter").build();
-
   /**
    * Creates a mesos task object.
    *
@@ -50,57 +47,61 @@ public interface MesosTaskFactory {
   static class MesosTaskFactoryImpl implements MesosTaskFactory {
     private static final Logger LOG = Logger.getLogger(MesosTaskFactoryImpl.class.getName());
 
-    private static final String THERMOS_EXECUTOR_ID_PREFIX = "thermos-";
+    /**
+     * CPU allocated for each executor.  TODO(wickman) Consider lowing this number if sufficient.
+     */
+    public static final double CPUS = 0.25;
+
+    /**
+     * RAM required for the executor.  Executors in the wild have been observed using 48-54MB RSS,
+     * setting to 128MB to be extra vigilant initially.
+     */
+    public static final Amount<Long, Data> RAM = Amount.of(128L, Data.MB);
+
+    /**
+     * Return the total CPU consumption of this task including the executor.
+     *
+     * @param taskCpus Number of CPUs required for the user task.
+     */
+    public static double getTotalTaskCpus(double taskCpus) {
+      return taskCpus + CPUS;
+    }
+
+    /**
+     * Return the total RAM consumption of this task including the executor.
+     *
+     * @param taskRamMb Memory requirement for the user task, in megabytes.
+     */
+    public static Amount<Long, Data> getTotalTaskRam(long taskRamMb) {
+      return Amount.of(taskRamMb + RAM.as(Data.MB), Data.MB);
+    }
 
     static class ExecutorConfig {
-      private final String oldExecutorPath;
-      private final String thermosExecutorPath;
+      private final String executorPath;
 
-      ExecutorConfig(String oldExecutorPath, String thermosExecutorPath) {
-        this.oldExecutorPath = checkNotBlank(oldExecutorPath);
-        this.thermosExecutorPath = checkNotBlank(thermosExecutorPath);
+      ExecutorConfig(String executorPath) {
+        this.executorPath = checkNotBlank(executorPath);
       }
 
-      String getOldExecutorPath() {
-        return oldExecutorPath;
-      }
-
-      String getThermosExecutorPath() {
-        return thermosExecutorPath;
+      String getExecutorPath() {
+        return executorPath;
       }
     }
 
-    // These are hard-coded to avoid risk posed due to MESOS-911.
-    private static final double EXECUTOR_CPUS = 0.25;
-    private static final Amount<Double, Data> EXECUTOR_RAM = Amount.of(3d, Data.GB);
-
-    private final String oldExePath;
-    private final String thermosExePath;
-    private final double cpus;
-    private final Amount<Double, Data> ram;
+    private final String executorPath;
 
     @Inject
     MesosTaskFactoryImpl(ExecutorConfig executorConfig) {
-      this(executorConfig, EXECUTOR_CPUS, EXECUTOR_RAM);
+      this.executorPath = executorConfig.getExecutorPath();
     }
 
     @VisibleForTesting
-    MesosTaskFactoryImpl(ExecutorConfig executorConfig, double cpus, Amount<Double, Data> ram) {
-      Preconditions.checkNotNull(executorConfig);
-      Preconditions.checkArgument(cpus > 0);
-
-      Preconditions.checkNotNull(ram);
-      Preconditions.checkArgument(ram.getValue() > 0);
-
-      this.oldExePath = executorConfig.getOldExecutorPath();
-      this.thermosExePath = executorConfig.getThermosExecutorPath();
-      this.cpus = cpus;
-      this.ram = ram;
+    static ExecutorID getExecutorId(String taskId) {
+      return ExecutorID.newBuilder().setValue("thermos-" + taskId).build();
     }
 
-    @Override public TaskInfo createFrom(AssignedTask task, SlaveID slaveId)
-        throws SchedulerException {
-
+    @Override
+    public TaskInfo createFrom(AssignedTask task, SlaveID slaveId) throws SchedulerException {
       checkNotNull(task);
       byte[] taskInBytes;
       try {
@@ -129,24 +130,13 @@ public interface MesosTaskFactory {
               .addAllResources(resources)
               .setData(ByteString.copyFrom(taskInBytes));
 
-      ExecutorInfo executor;
-      if (Tasks.IS_THERMOS_TASK.apply(task.getTask())) {
-        executor = ExecutorInfo.newBuilder()
-            .setCommand(CommandUtil.create(thermosExePath))
-            .setExecutorId(
-                ExecutorID.newBuilder().setValue(THERMOS_EXECUTOR_ID_PREFIX + task.getTaskId()))
-            .addResources(Resources.makeMesosResource(Resources.CPUS, ThermosResources.CPUS))
-            .addResources(
-                Resources.makeMesosResource(Resources.RAM_MB, ThermosResources.RAM.as(Data.MB)))
-            .build();
-      } else {
-        executor = ExecutorInfo.newBuilder().setCommand(CommandUtil.create(oldExePath))
-            .setExecutorId(DEFAULT_EXECUTOR_ID)
-            .addResources(Resources.makeMesosResource(Resources.CPUS, cpus))
-            .addResources(Resources.makeMesosResource(Resources.RAM_MB, ram.as(Data.MB)))
-            .build();
-      }
-
+      ExecutorInfo executor = ExecutorInfo.newBuilder()
+          .setCommand(CommandUtil.create(executorPath))
+          .setExecutorId(getExecutorId(task.getTaskId()))
+          .addResources(Resources.makeMesosResource(Resources.CPUS, CPUS))
+          .addResources(
+              Resources.makeMesosResource(Resources.RAM_MB, RAM.as(Data.MB)))
+          .build();
       return taskBuilder
           .setExecutor(executor)
           .build();

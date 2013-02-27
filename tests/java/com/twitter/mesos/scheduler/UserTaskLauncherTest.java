@@ -7,7 +7,6 @@ import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.protobuf.ByteString;
 
 import org.apache.mesos.Protos.Attribute;
 import org.apache.mesos.Protos.FrameworkID;
@@ -86,7 +85,7 @@ public class UserTaskLauncherTest extends EasyMockTest {
     TaskStatus status = TaskStatus.newBuilder()
         .setState(TaskState.TASK_RUNNING)
         .setTaskId(TaskID.newBuilder().setValue(TASK_ID_A))
-        .setData(ByteString.copyFromUtf8("fake message"))
+        .setMessage("fake message")
         .build();
     assertTrue(launcher.statusUpdate(status));
   }
@@ -113,7 +112,7 @@ public class UserTaskLauncherTest extends EasyMockTest {
     TaskStatus status = TaskStatus.newBuilder()
         .setState(TaskState.TASK_RUNNING)
         .setTaskId(TaskID.newBuilder().setValue(TASK_ID_A))
-        .setData(ByteString.copyFromUtf8("fake message"))
+        .setMessage("fake message")
         .build();
     launcher.statusUpdate(status);
   }

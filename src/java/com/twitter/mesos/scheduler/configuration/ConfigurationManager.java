@@ -342,7 +342,7 @@ public final class ConfigurationManager {
     }
 
     if (!config.isSetThermosConfig()) {
-      throw new TaskDescriptionException("Thermos configuration may not be null");
+      throw new TaskDescriptionException("Configuration may not be null");
     }
 
     sanitize(config);

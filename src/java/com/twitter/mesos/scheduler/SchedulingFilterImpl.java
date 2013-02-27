@@ -24,6 +24,7 @@ import com.twitter.mesos.gen.Constraint;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.storage.AttributeStore;
 import com.twitter.mesos.scheduler.storage.Storage;
@@ -125,13 +126,16 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     return ImmutableList.<FilterRule>of(
         new SingleVetoRule() {
           @Override public Optional<Veto> doApply(TwitterTaskInfo task) {
-            return CPU.maybeVeto(available.getNumCpus(), ThermosResources.getTotalTaskCpus(task));
+            return CPU.maybeVeto(
+                available.getNumCpus(),
+                MesosTaskFactoryImpl.getTotalTaskCpus(task.getNumCpus()));
           }
         },
         new SingleVetoRule() {
           @Override public Optional<Veto> doApply(TwitterTaskInfo task) {
-            return RAM.maybeVeto(available.getRam().as(Data.MB),
-                ThermosResources.getTotalTaskRam(task).as(Data.MB));
+            return RAM.maybeVeto(
+                available.getRam().as(Data.MB),
+                MesosTaskFactoryImpl.getTotalTaskRam(task.getRamMb()).as(Data.MB));
           }
         },
         new SingleVetoRule() {

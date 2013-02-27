@@ -110,15 +110,6 @@ public final class Tasks {
           .onResultOf(Functions.compose(Functions.forPredicate(IS_PRODUCTION), ASSIGNED_TO_INFO))
           .compound(Ordering.natural().onResultOf(ASSIGNED_TO_ID));
 
-  public static final Predicate<TwitterTaskInfo> IS_THERMOS_TASK =
-      new Predicate<TwitterTaskInfo>() {
-        @Override public boolean apply(TwitterTaskInfo task) {
-          // Length check is an artifact of thrift 0.5.0 NPE workaround from ConfigurationManager.
-          // See MESOS-370.
-          return task.isSetThermosConfig() && (task.getThermosConfig().length > 0);
-        }
-      };
-
   private Tasks() {
     // Utility class.
   }

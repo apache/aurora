@@ -917,7 +917,6 @@ public class StateManagerImpl implements StateManager {
     AssignedTask getAssignedTask();
   }
 
-  @ThermosJank
   private TaskAssignMutation assignHost(
       final String slaveHost,
       final SlaveID slaveId,

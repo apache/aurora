@@ -2,7 +2,6 @@ package com.twitter.mesos.scheduler;
 
 import org.apache.mesos.Protos.CommandInfo;
 import org.apache.mesos.Protos.CommandInfo.URI;
-import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.ExecutorInfo;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.SlaveID;
@@ -12,6 +11,7 @@ import org.apache.mesos.Protos.Value.Type;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.twitter.common.quantity.Data;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.TwitterTaskInfo;
@@ -37,7 +37,7 @@ public class MesosTaskFactoryImplTest {
 
   @Before
   public void setUp() {
-    taskFactory = new MesosTaskFactoryImpl(new ExecutorConfig(EXECUTOR_PATH, "unused"));
+    taskFactory = new MesosTaskFactoryImpl(new ExecutorConfig(EXECUTOR_PATH));
   }
 
   @Test
@@ -46,15 +46,15 @@ public class MesosTaskFactoryImplTest {
     TaskInfo task = taskFactory.createFrom(TASK, SLAVE);
 
     ExecutorInfo expected = ExecutorInfo.newBuilder()
-        .setExecutorId(ExecutorID.newBuilder().setValue("twitter"))
+        .setExecutorId(MesosTaskFactoryImpl.getExecutorId(TASK.getTaskId()))
         .addResources(Resource.newBuilder()
             .setName("cpus")
             .setType(Type.SCALAR)
-            .setScalar(Scalar.newBuilder().setValue(0.25)))
+            .setScalar(Scalar.newBuilder().setValue(MesosTaskFactoryImpl.CPUS)))
         .addResources(Resource.newBuilder()
             .setName("mem")
             .setType(Type.SCALAR)
-            .setScalar(Scalar.newBuilder().setValue(3072.0)))
+            .setScalar(Scalar.newBuilder().setValue(MesosTaskFactoryImpl.RAM.as(Data.MB))))
         .setCommand(CommandInfo.newBuilder()
             .setValue("./executor.sh")
             .addUris(URI.newBuilder().setValue(EXECUTOR_PATH).setExecutable(true)))

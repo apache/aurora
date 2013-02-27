@@ -83,10 +83,6 @@ public class SchedulerMain extends AbstractApplication {
   private static final Arg<Integer> THRIFT_PORT = Arg.create(0);
 
   @NotNull
-  @CmdLine(name = "executor_path", help = "Path to the executor launch script.")
-  private static final Arg<String> EXECUTOR_PATH = Arg.create();
-
-  @NotNull
   @CmdLine(name = "thermos_executor_path", help = "Path to the thermos executor launch script.")
   private static final Arg<String> THERMOS_EXECUTOR_PATH = Arg.create();
 
@@ -192,8 +188,7 @@ public class SchedulerMain extends AbstractApplication {
             return THRIFT_PORT.get();
           }
         });
-        bind(ExecutorConfig.class)
-            .toInstance(new ExecutorConfig(EXECUTOR_PATH.get(), THERMOS_EXECUTOR_PATH.get()));
+        bind(ExecutorConfig.class).toInstance(new ExecutorConfig(THERMOS_EXECUTOR_PATH.get()));
         bind(Boolean.class).annotatedWith(ShutdownOnDriverExit.class).toInstance(true);
       }
     };

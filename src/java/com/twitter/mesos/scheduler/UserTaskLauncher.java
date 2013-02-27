@@ -52,9 +52,6 @@ class UserTaskLauncher implements TaskLauncher {
     @Nullable String message = null;
     if (status.hasMessage()) {
       message = status.getMessage();
-    } else if (status.hasData()) {
-      // TODO(William Farner): Once thermos executor has full deployment, this may be removed.
-      message = status.getData().toStringUtf8();
     }
 
     TaskQuery query = Query.byId(status.getTaskId().getValue());
