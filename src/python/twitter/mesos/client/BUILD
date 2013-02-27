@@ -34,6 +34,7 @@ python_library(
   name = 'config',
   sources = ['config.py'],
   dependencies = [
+    pants(':base'),
     pants('3rdparty/python:pystachio'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/log'),
