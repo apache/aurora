@@ -67,8 +67,9 @@ class DiscoveryManager(HealthInterface):
           additional=additional,
           failure_callback=self.on_failure,
           shard=shard,
-          ensemble=ensemble,
-          credentials=self.super_credentials())
+          ensemble=ensemble)
+          # TODO(wickman) This is disabled until MESOS-2376 is resolved.
+          # credentials=self.super_credentials())
 
   def on_failure(self):
     if self._service:
