@@ -24,6 +24,7 @@ import com.twitter.mesos.Protobufs;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.TwitterTaskInfo;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -48,15 +49,23 @@ public interface MesosTaskFactory {
     private static final Logger LOG = Logger.getLogger(MesosTaskFactoryImpl.class.getName());
 
     /**
+     * Name to associate with task executors.
+     */
+    @VisibleForTesting
+    static final String EXECUTOR_NAME = "aurora.task";
+
+    /**
      * CPU allocated for each executor.  TODO(wickman) Consider lowing this number if sufficient.
      */
-    public static final double CPUS = 0.25;
+    @VisibleForTesting
+    static final double CPUS = 0.25;
 
     /**
      * RAM required for the executor.  Executors in the wild have been observed using 48-54MB RSS,
      * setting to 128MB to be extra vigilant initially.
      */
-    public static final Amount<Long, Data> RAM = Amount.of(128L, Data.MB);
+    @VisibleForTesting
+    static final Amount<Long, Data> RAM = Amount.of(128L, Data.MB);
 
     /**
      * Return the total CPU consumption of this task including the executor.
@@ -100,6 +109,11 @@ public interface MesosTaskFactory {
       return ExecutorID.newBuilder().setValue("thermos-" + taskId).build();
     }
 
+    @VisibleForTesting
+    static String getSourceName(TwitterTaskInfo task) {
+      return task.getOwner().getRole() + "." + task.getJobName() + "." + task.getShardId();
+    }
+
     @Override
     public TaskInfo createFrom(AssignedTask task, SlaveID slaveId) throws SchedulerException {
       checkNotNull(task);
@@ -111,9 +125,10 @@ public interface MesosTaskFactory {
         throw new SchedulerException("Internal error.", e);
       }
 
+      TwitterTaskInfo config = task.getTask();
       List<Resource> resources;
       if (task.isSetAssignedPorts()) {
-        resources = Resources.from(task.getTask())
+        resources = Resources.from(config)
             .toResourceList(ImmutableSet.copyOf(task.getAssignedPorts().values()));
       } else {
         resources = ImmutableList.of();
@@ -130,9 +145,12 @@ public interface MesosTaskFactory {
               .addAllResources(resources)
               .setData(ByteString.copyFrom(taskInBytes));
 
+
       ExecutorInfo executor = ExecutorInfo.newBuilder()
           .setCommand(CommandUtil.create(executorPath))
           .setExecutorId(getExecutorId(task.getTaskId()))
+          .setName(EXECUTOR_NAME)
+          .setSource(getSourceName(config))
           .addResources(Resources.makeMesosResource(Resources.CPUS, CPUS))
           .addResources(
               Resources.makeMesosResource(Resources.RAM_MB, RAM.as(Data.MB)))

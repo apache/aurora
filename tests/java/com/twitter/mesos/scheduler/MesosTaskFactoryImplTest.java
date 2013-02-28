@@ -28,6 +28,7 @@ public class MesosTaskFactoryImplTest {
       .setTask(new TwitterTaskInfo()
           .setOwner(new Identity("role", "user"))
           .setJobName("job-name")
+          .setShardId(2)
           .setDiskMb(10)
           .setRamMb(100)
           .setNumCpus(5));
@@ -47,6 +48,8 @@ public class MesosTaskFactoryImplTest {
 
     ExecutorInfo expected = ExecutorInfo.newBuilder()
         .setExecutorId(MesosTaskFactoryImpl.getExecutorId(TASK.getTaskId()))
+        .setName(MesosTaskFactoryImpl.EXECUTOR_NAME)
+        .setSource(MesosTaskFactoryImpl.getSourceName(TASK.getTask()))
         .addResources(Resource.newBuilder()
             .setName("cpus")
             .setType(Type.SCALAR)

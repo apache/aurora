@@ -101,6 +101,7 @@ public class GcExecutorLauncher implements TaskLauncher {
     String uuid = UUID.randomUUID().toString();
     ExecutorInfo.Builder executor = ExecutorInfo.newBuilder()
         .setExecutorId(ExecutorID.newBuilder().setValue(EXECUTOR_PREFIX + uuid))
+        .setName("aurora.gc")
         .addAllResources(GC_EXECUTOR_RESOURCES.toResourceList())
         .setCommand(CommandUtil.create(gcExecutorPath.get()));
 
