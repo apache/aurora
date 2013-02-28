@@ -2,17 +2,21 @@ package com.twitter.mesos.auth;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+import java.nio.ByteBuffer;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.lang.StringUtils;
 
 import com.twitter.common.quantity.Amount;
@@ -58,7 +62,8 @@ public interface SessionValidator {
    */
   static class SessionValidatorImpl implements SessionValidator {
 
-    private static final Amount<Long, Time> MAXIMUM_NONCE_DRIFT = Amount.of(60L, Time.SECONDS);
+    @VisibleForTesting
+    static final Amount<Long, Time> MAXIMUM_NONCE_DRIFT = Amount.of(60L, Time.SECONDS);
 
     private final Clock clock;
     private final UserValidator userValidator;
@@ -86,6 +91,19 @@ public interface SessionValidator {
       }
 
       userValidator.assertRoleAccess(sessionKey, targetRole);
+    }
+
+    /**
+     * Creates a SessionKey from the supplied parameters
+     *
+     * @param user Owner of the SessionKey
+     * @param nonce Nonce of the SessionKey
+     * @param hexToken Hex-encoded signature of the nonce
+     * @throws DecoderException If the provided hexToken cannot be properly decoded
+     */
+    public static SessionKey createKey(String user, long nonce, String hexToken)
+        throws DecoderException {
+      return new SessionKey(user, nonce, ByteBuffer.wrap(Hex.decodeHex(hexToken.toCharArray())));
     }
   }
 
