@@ -227,7 +227,7 @@ def create(jobname, config_file):
 @app.command_option(JSON_OPTION)
 @requires.exactly('job', 'config')
 def spawn(jobname, config_file):
-  """usage: spawn [--shard=number] job config
+  """usage: spawn job config
 
   Spawns a local run of a task in the specified job.
   """

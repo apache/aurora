@@ -108,7 +108,7 @@ class LocalDriver(ExecutorDriver):
     self.stopped.set()
 
   def sendStatusUpdate(self, status):
-    log.info('LocalDriver.sendStatusUpdate(%s)' % status)
+    log.info('LocalDriver.sendStatusUpdate(%s)' % str(status).replace('\n', ' '))
     if status.state == mesos_pb.TASK_RUNNING:
       self.started.set()
 
@@ -152,7 +152,7 @@ def spawn_local(runner, jobname, config_file, json=False, open_browser=False,
     Spawn a local run of a task.
   """
   config = get_config(jobname, config_file, json, force_local=True,
-      bindings=bindings, translate=True, select_cluster=cluster, select_env=env)
+      bindings=bindings, select_cluster=cluster, select_env=env)
 
   checkpoint_root = os.path.expanduser(os.path.join('~', '.thermos'))
   _, port = spawn_observer(checkpoint_root)
