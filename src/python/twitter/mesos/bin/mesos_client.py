@@ -89,7 +89,7 @@ SHARDS_OPTION = optparse.Option(
     '--shards',
     dest='shards',
     default=None,
-    help='A comma separated list of shard ids to act on.')
+    help='A comma-separated list of shard ids to act on. If not set, all shards will be acted on.')
 
 
 JSON_OPTION = optparse.Option(
@@ -98,7 +98,7 @@ JSON_OPTION = optparse.Option(
     dest='json',
     default=False,
     action='store_true',
-    help='If specified, configuration is read in JSON format.  Only works with Thermos tasks.')
+    help='If specified, configuration is read in JSON format. Only works with Thermos tasks.')
 
 
 def make_cluster_option(explanation):
@@ -499,11 +499,12 @@ def start_cron(role, jobname):
 @app.command_option(SHARDS_OPTION)
 @requires.exactly('role', 'job')
 def kill(role, jobname):
-  """usage: kill --cluster=CLUSTER --shards=shards role job
+  """usage: kill --cluster=CLUSTER role job
 
   Kills a running job, blocking until all tasks have terminated.
-  Kills all shards if no shard-ids are specified.
 
+  Default behaviour is to kill all shards in the job, but the kill
+  can be limited to specific shards with the --shards option
   """
   options = app.get_options()
   api = MesosClientAPI(options.cluster, options.verbosity == 'verbose')
