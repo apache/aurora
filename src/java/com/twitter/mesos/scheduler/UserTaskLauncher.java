@@ -5,6 +5,7 @@ import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
@@ -27,6 +28,9 @@ import static com.google.common.base.Preconditions.checkNotNull;
 class UserTaskLauncher implements TaskLauncher {
 
   private static final Logger LOG = Logger.getLogger(UserTaskLauncher.class.getName());
+
+  @VisibleForTesting
+  static final String MEMORY_LIMIT_EXCEEDED = "Memory limit exceeded";
 
   private final TaskScheduler taskScheduler;
   private final StateManager stateManager;
@@ -61,6 +65,13 @@ class UserTaskLauncher implements TaskLauncher {
       if (translatedState == null) {
         LOG.severe("Failed to look up task state translation for: " + status.getState());
       } else {
+        // TODO(William Farner): Remove this hack once MESOS-1793 is satisfied.
+        if ((translatedState == ScheduleStatus.FAILED)
+            && (message != null)
+            && (message.contains(MEMORY_LIMIT_EXCEEDED))) {
+          message = MEMORY_LIMIT_EXCEEDED;
+        }
+
         stateManager.changeState(query, translatedState, Optional.fromNullable(message));
         return true;
       }
