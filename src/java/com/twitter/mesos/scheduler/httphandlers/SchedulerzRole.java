@@ -1,5 +1,6 @@
 package com.twitter.mesos.scheduler.httphandlers;
 
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -25,6 +26,8 @@ import com.google.inject.Inject;
 import org.antlr.stringtemplate.StringTemplate;
 
 import com.twitter.common.base.Closure;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.scheduler.ClusterName;
@@ -126,6 +129,13 @@ public class SchedulerzRole extends JerseyTemplateServlet {
             case FAILED:
             case UNKNOWN:
               job.failedTaskCount++;
+              Date now = new Date();
+              long elapsedMillis = now.getTime()
+                  - Iterables.getLast(task.getTaskEvents()).getTimestamp();
+
+              if (Amount.of(elapsedMillis, Time.MILLISECONDS).as(Time.HOURS) < 6) {
+                job.recentlyFailedTaskCount++;
+              }
               break;
 
             default:
@@ -179,6 +189,7 @@ public class SchedulerzRole extends JerseyTemplateServlet {
     int activeTaskCount = 0;
     int finishedTaskCount = 0;
     int failedTaskCount = 0;
+    int recentlyFailedTaskCount = 0;
 
     public String getName() {
       return name;
@@ -198,6 +209,10 @@ public class SchedulerzRole extends JerseyTemplateServlet {
 
     public int getFailedTaskCount() {
       return failedTaskCount;
+    }
+
+    public int getRecentlyFailedTaskCount() {
+      return recentlyFailedTaskCount;
     }
   }
 }
