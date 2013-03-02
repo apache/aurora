@@ -446,7 +446,7 @@ def inspect(jobname, config_file):
     print('     policy:   %s' % job.cron_collision_policy())
   if job.has_constraints():
     print('  constraints:')
-    for constraint, value in job.constraints().items():
+    for constraint, value in job.constraints().get().items():
       print('    %s: %s' % (constraint, value))
   print('  daemon:     %s' % bool(job.daemon().get()))
   print('  production: %s' % bool(job.production().get()))
