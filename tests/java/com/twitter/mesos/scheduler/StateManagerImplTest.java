@@ -63,6 +63,9 @@ import static com.twitter.mesos.scheduler.StateManagerImpl.UpdateException;
 public class StateManagerImplTest extends EasyMockTest {
 
   private static final String HOST_A = "host_a";
+  private static final Identity JIM = new Identity("jim", "jim-user");
+  private static final Identity JACK = new Identity("jack", "jack-user");
+  private static final String MY_JOB = "myJob";
 
   private Driver driver;
   private Closure<PubsubEvent> eventSink;
@@ -159,6 +162,10 @@ public class StateManagerImplTest extends EasyMockTest {
     expectLastCall().anyTimes();
   }
 
+  private void assertJimJobVarCount(ScheduleStatus status, int count) {
+    assertVarCount(JIM.getRole(), MY_JOB, status, count);
+  }
+
   @Test
   public void testAbandonRunningTask() {
     expectPubSubEvent();
@@ -166,32 +173,32 @@ public class StateManagerImplTest extends EasyMockTest {
     control.replay();
 
     Set<String> taskIds = insertTasks(
-        makeTask("jim", "myJob", 0),
-        makeTask("jack", "otherJob", 0));
-    assertVarCount("jim", "myJob", PENDING, 1);
-    assertVarCount("jack", "otherJob", PENDING, 1);
-    assertVarCount(PENDING, 2);
+        makeTask(JIM, MY_JOB, 0),
+        makeTask(JACK, "otherJob", 0));
+    assertJimJobVarCount(PENDING, 1);
+    assertVarCount(JACK.getRole(), "otherJob", PENDING, 1);
+    assertTotalTaskCount(PENDING, 2);
 
     String task1 = Iterables.get(taskIds, 0);
     assignTask(task1, HOST_A);
-    assertVarCount("jim", "myJob", PENDING, 0);
-    assertVarCount("jim", "myJob", ASSIGNED, 1);
-    assertVarCount(PENDING, 1);
-    assertVarCount(ASSIGNED, 1);
+    assertJimJobVarCount(PENDING, 0);
+    assertJimJobVarCount(ASSIGNED, 1);
+    assertTotalTaskCount(PENDING, 1);
+    assertTotalTaskCount(ASSIGNED, 1);
     changeState(task1, RUNNING);
-    assertVarCount("jim", "myJob", ASSIGNED, 0);
-    assertVarCount("jim", "myJob", RUNNING, 1);
-    assertVarCount(ASSIGNED, 0);
-    assertVarCount(RUNNING, 1);
+    assertJimJobVarCount(ASSIGNED, 0);
+    assertJimJobVarCount(RUNNING, 1);
+    assertTotalTaskCount(ASSIGNED, 0);
+    assertTotalTaskCount(RUNNING, 1);
     stateManager.abandonTasks(ImmutableSet.of(task1));
-    assertVarCount("jim", "myJob", RUNNING, 0);
-    assertVarCount("jim", "myJob", LOST, 0);
-    assertVarCount("jim", "myJob", PENDING, 1);
-    assertVarCount("jim", "myJob", UNKNOWN, 0);
-    assertVarCount(RUNNING, 0);
-    assertVarCount(LOST, 0);
-    assertVarCount(PENDING, 2);
-    assertVarCount(UNKNOWN, 0);
+    assertJimJobVarCount(RUNNING, 0);
+    assertJimJobVarCount(LOST, 0);
+    assertJimJobVarCount(PENDING, 1);
+    assertJimJobVarCount(UNKNOWN, 0);
+    assertTotalTaskCount(RUNNING, 0);
+    assertTotalTaskCount(LOST, 0);
+    assertTotalTaskCount(PENDING, 2);
+    assertTotalTaskCount(UNKNOWN, 0);
     assertTrue(stateManager.fetchTasks(Query.byId(task1)).isEmpty());
   }
 
@@ -202,17 +209,17 @@ public class StateManagerImplTest extends EasyMockTest {
     control.replay();
 
     Set<String> taskIds = insertTasks(
-        makeTask("jim", "myJob", 0),
-        makeTask("jack", "otherJob", 0));
+        makeTask(JIM, MY_JOB, 0),
+        makeTask(JACK, "otherJob", 0));
     String task1 = Iterables.get(taskIds, 0);
     assignTask(task1, HOST_A);
     changeState(task1, RUNNING);
     changeState(task1, FINISHED);
-    assertVarCount("jim", "myJob", FINISHED, 1);
-    assertVarCount(FINISHED, 1);
+    assertJimJobVarCount(FINISHED, 1);
+    assertTotalTaskCount(FINISHED, 1);
     stateManager.abandonTasks(ImmutableSet.of(task1));
-    assertVarCount("jim", "myJob", FINISHED, 0);
-    assertVarCount(FINISHED, 0);
+    assertJimJobVarCount(FINISHED, 0);
+    assertTotalTaskCount(FINISHED, 0);
     assertTrue(stateManager.fetchTasks(Query.byId(task1)).isEmpty());
   }
 
@@ -222,16 +229,16 @@ public class StateManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    String taskId = insertTask(makeTask("jim", "myJob", 0));
-    assertVarCount("jim", "myJob", PENDING, 1);
-    assertVarCount(PENDING, 1);
+    String taskId = insertTask(makeTask(JIM, MY_JOB, 0));
+    assertJimJobVarCount(PENDING, 1);
+    assertTotalTaskCount(PENDING, 1);
     assertEquals(1, changeState(taskId, KILLING));
-    assertVarCount("jim", "myJob", PENDING, 0);
-    assertVarCount("jim", "myJob", KILLING, 0);
-    assertVarCount("jim", "myJob", UNKNOWN, 0);
-    assertVarCount(PENDING, 0);
-    assertVarCount(KILLING, 0);
-    assertVarCount(UNKNOWN, 0);
+    assertJimJobVarCount(PENDING, 0);
+    assertJimJobVarCount(KILLING, 0);
+    assertJimJobVarCount(UNKNOWN, 0);
+    assertTotalTaskCount(PENDING, 0);
+    assertTotalTaskCount(KILLING, 0);
+    assertTotalTaskCount(UNKNOWN, 0);
     assertEquals(0, changeState(taskId, KILLING));
   }
 
@@ -243,18 +250,18 @@ public class StateManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    String taskId = insertTask(makeTask("jim", "myJob", 0));
+    String taskId = insertTask(makeTask(JIM, MY_JOB, 0));
 
     assignTask(taskId, HOST_A);
     changeState(taskId, RUNNING);
     changeState(taskId, KILLING);
-    assertVarCount("jim", "myJob", KILLING, 1);
-    assertVarCount(KILLING, 1);
+    assertJimJobVarCount(KILLING, 1);
+    assertTotalTaskCount(KILLING, 1);
     changeState(taskId, UNKNOWN);
-    assertVarCount("jim", "myJob", KILLING, 0);
-    assertVarCount("jim", "myJob", UNKNOWN, 0);
-    assertVarCount(KILLING, 0);
-    assertVarCount(UNKNOWN, 0);
+    assertJimJobVarCount(KILLING, 0);
+    assertJimJobVarCount(UNKNOWN, 0);
+    assertTotalTaskCount(KILLING, 0);
+    assertTotalTaskCount(UNKNOWN, 0);
   }
 
   @Test
@@ -263,10 +270,10 @@ public class StateManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    insertTask(makeTask("jim", "myJob", 0));
-    assertVarCount("jim", "myJob", PENDING, 1);
-    assertVarCount(INIT, 0);
-    assertVarCount(PENDING, 1);
+    insertTask(makeTask(JIM, MY_JOB, 0));
+    assertJimJobVarCount(PENDING, 1);
+    assertTotalTaskCount(INIT, 0);
+    assertTotalTaskCount(PENDING, 1);
   }
 
   @Test
@@ -274,23 +281,23 @@ public class StateManagerImplTest extends EasyMockTest {
     expectPubSubEvent();
 
     control.replay();
-    TwitterTaskInfo taskInfo = makeTask("jim", "myJob", 0);
+    TwitterTaskInfo taskInfo = makeTask(JIM, MY_JOB, 0);
 
     insertTask(taskInfo);
 
     try {
       stateManager.finishUpdate(
-          "jim", "myJob", Optional.<String>absent(), UpdateResult.SUCCESS, true);
+          JIM, MY_JOB, Optional.<String>absent(), UpdateResult.SUCCESS, true);
       fail();
     } catch (UpdateException e) {
       // expected
     }
 
-    String token = stateManager.registerUpdate("jim", "myJob", ImmutableSet.of(taskInfo));
+    String token = stateManager.registerUpdate(JIM.getRole(), MY_JOB, ImmutableSet.of(taskInfo));
     assertTrue(stateManager.finishUpdate(
-        "jim", "myJob", Optional.of(token), UpdateResult.SUCCESS, true));
+        JIM, MY_JOB, Optional.of(token), UpdateResult.SUCCESS, true));
     assertFalse(stateManager.finishUpdate(
-        "jim", "myJob", Optional.of(token), UpdateResult.SUCCESS, false));
+        JIM, MY_JOB, Optional.of(token), UpdateResult.SUCCESS, false));
   }
 
   @Test
@@ -304,19 +311,19 @@ public class StateManagerImplTest extends EasyMockTest {
     expectLastCall().times(2);
 
     control.replay();
-    TwitterTaskInfo taskInfo = makeTask("jim", "myJob", 0);
+    TwitterTaskInfo taskInfo = makeTask(JIM, MY_JOB, 0);
 
     String id = insertTask(taskInfo);
     changeState(id, ASSIGNED);
 
     TwitterTaskInfo updated = taskInfo.deepCopy().setNumCpus(1000);
-    String token = stateManager.registerUpdate("jim", "myJob", ImmutableSet.of(updated));
-    stateManager.modifyShards("jim", "myJob", ImmutableSet.of(0), token, true);
+    String token = stateManager.registerUpdate(JIM.getRole(), MY_JOB, ImmutableSet.of(updated));
+    stateManager.modifyShards(JIM, MY_JOB, ImmutableSet.of(0), token, true);
 
     // Since the task is still in UPDATING, it should not be possible to cancel the update.
     try {
       stateManager.finishUpdate(
-          "jim", "myJob", Optional.<String>absent(), UpdateResult.SUCCESS, true);
+          JIM, MY_JOB, Optional.<String>absent(), UpdateResult.SUCCESS, true);
       fail("cancel_update should have been prevented");
     } catch (UpdateException e) {
       // expected
@@ -326,11 +333,11 @@ public class StateManagerImplTest extends EasyMockTest {
     String updatedId =
         Tasks.id(Iterables.getOnlyElement(stateManager.fetchTasks(Query.byStatus(PENDING))));
     changeState(updatedId, ASSIGNED);
-    stateManager.modifyShards("jim", "myJob", ImmutableSet.of(0), token, false);
+    stateManager.modifyShards(JIM, MY_JOB, ImmutableSet.of(0), token, false);
     // Since the task is still in ROLLBACK, it should not be possible to cancel the update.
     try {
       stateManager.finishUpdate(
-          "jim", "myJob", Optional.<String>absent(), UpdateResult.SUCCESS, true);
+          JIM, MY_JOB, Optional.<String>absent(), UpdateResult.SUCCESS, true);
       fail("cancel_update should have been prevented");
     } catch (UpdateException e) {
       // expected
@@ -339,7 +346,7 @@ public class StateManagerImplTest extends EasyMockTest {
     changeState(updatedId, FINISHED);
 
     stateManager.finishUpdate(
-        "jim", "myJob", Optional.<String>absent(), UpdateResult.SUCCESS, true);
+        JIM, MY_JOB, Optional.<String>absent(), UpdateResult.SUCCESS, true);
   }
 
   @Test
@@ -350,19 +357,19 @@ public class StateManagerImplTest extends EasyMockTest {
     expectLastCall().times(2);
 
     control.replay();
-    TwitterTaskInfo taskInfo = makeTaskWithPorts("jim", "myJob", 0, "foo");
+    TwitterTaskInfo taskInfo = makeTaskWithPorts(JIM, MY_JOB, 0, "foo");
 
     String taskId = insertTask(taskInfo);
     stateManager.assignTask(taskId, HOST_A, SlaveID.newBuilder().setValue(HOST_A).build(),
         ImmutableSet.<Integer>of(50));
     ScheduledTask task =
-        Iterables.getOnlyElement(stateManager.fetchTasks(Query.byRole("jim")));
+        Iterables.getOnlyElement(stateManager.fetchTasks(Query.byRole(JIM.getRole())));
     assertEquals(ImmutableMap.of("foo", 50), task.getAssignedTask().getAssignedPorts());
     assignTask(taskId, HOST_A);
     changeState(taskId, STARTING);
     changeState(taskId, RUNNING);
 
-    stateManager.registerUpdate("jim", "myJob", ImmutableSet.of(taskInfo));
+    stateManager.registerUpdate(JIM.getRole(), MY_JOB, ImmutableSet.of(taskInfo));
     changeState(taskId, UPDATING);
     changeState(taskId, FINISHED);
 
@@ -389,7 +396,7 @@ public class StateManagerImplTest extends EasyMockTest {
   public void testTracksInit() throws Exception {
     expectPubSubEvent();
 
-    final TwitterTaskInfo task = makeTask("jim", "myJob", 0);
+    final TwitterTaskInfo task = makeTask(JIM, MY_JOB, 0);
 
     // Insert a task in the INIT state, and restart the state manager.
     storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
@@ -402,15 +409,15 @@ public class StateManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertVarCount("jim", "myJob", INIT, 1);
-    assertVarCount(INIT, 1);
+    assertJimJobVarCount(INIT, 1);
+    assertTotalTaskCount(INIT, 1);
   }
 
   @Test
   public void testTracksUnknown() throws Exception {
     expectPubSubEvent();
 
-    final TwitterTaskInfo task = makeTask("jim", "myJob", 0);
+    final TwitterTaskInfo task = makeTask(JIM, MY_JOB, 0);
 
     // Insert a task in the INIT state, and restart the state manager.
     storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
@@ -425,8 +432,8 @@ public class StateManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertVarCount("jim", "myJob", UNKNOWN, 1);
-    assertVarCount(UNKNOWN, 1);
+    assertJimJobVarCount(UNKNOWN, 1);
+    assertTotalTaskCount(UNKNOWN, 1);
   }
 
   @Ignore("TODO(William Farner): Remove this test completely once DbStorage is removed.")
@@ -439,7 +446,7 @@ public class StateManagerImplTest extends EasyMockTest {
     failNthTransaction(1);
 
     try {
-      insertTask(makeTask("jim", "myJob", 0));
+      insertTask(makeTask(JIM, MY_JOB, 0));
       fail("Insert should have failed.");
     } catch (StorageException e) {
       // Expected.
@@ -453,10 +460,10 @@ public class StateManagerImplTest extends EasyMockTest {
     assertTrue(tasks.isEmpty());
     assertTrue(stateManager.fetchTasks(Query.GET_ALL).isEmpty());
 
-    assertVarCount("jim", "myJob", INIT, 0);
-    assertVarCount("jim", "myJob", PENDING, 0);
-    assertVarCount(INIT, 0);
-    assertVarCount(PENDING, 0);
+    assertJimJobVarCount(INIT, 0);
+    assertJimJobVarCount(PENDING, 0);
+    assertTotalTaskCount(INIT, 0);
+    assertTotalTaskCount(PENDING, 0);
   }
 
   @Test
@@ -478,7 +485,7 @@ public class StateManagerImplTest extends EasyMockTest {
 
     // Now that we are initialized, all stats should be present.
     for (ScheduleStatus status : ScheduleStatus.values()) {
-      assertVarCount(status, 0);
+      assertTotalTaskCount(status, 0);
     }
   }
 
@@ -499,7 +506,7 @@ public class StateManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    insertTask(makeTask("jim", "myJob", 0));
+    insertTask(makeTask(JIM, MY_JOB, 0));
   }
 
   private String insertTask(TwitterTaskInfo task) {
@@ -517,7 +524,7 @@ public class StateManagerImplTest extends EasyMockTest {
     }
   }
 
-  private void assertVarCount(ScheduleStatus status, long expected) {
+  private void assertTotalTaskCount(ScheduleStatus status, long expected) {
     assertEquals(expected, getVar(mutableState.getVars().getVarName(status)).read());
   }
 
@@ -542,16 +549,16 @@ public class StateManagerImplTest extends EasyMockTest {
     return MemStorage.newEmptyStorage();
   }
 
-  private static TwitterTaskInfo makeTask(String owner, String job, int shard) {
+  private static TwitterTaskInfo makeTask(Identity owner, String job, int shard) {
     return new TwitterTaskInfo()
-        .setOwner(new Identity().setRole(owner).setUser(owner))
+        .setOwner(owner)
         .setJobName(job)
         .setShardId(shard)
         .setRequestedPorts(ImmutableSet.<String>of());
   }
 
   private static TwitterTaskInfo makeTaskWithPorts(
-      String owner,
+      Identity owner,
       String job,
       int shard,
       String... requestedPorts) {

@@ -527,7 +527,7 @@ public class StateManagerImpl implements StateManager {
   /**
    * Completes an in-progress update.
    *
-   * @param role Role owning the update to finish.
+   * @param identity The job owner and invoking user.
    * @param job Job to finish updating.
    * @param updateToken Token associated with the update.  If present, the token must match the
    *     the stored token for the update.
@@ -538,14 +538,17 @@ public class StateManagerImpl implements StateManager {
    *     does not match the stored token.
    */
   boolean finishUpdate(
-       final String role,
-       final String job,
-       final Optional<String> updateToken,
-       final UpdateResult result,
-       final boolean throwIfMissing)
-       throws UpdateException {
+      final Identity identity,
+      final String job,
+      final Optional<String> updateToken,
+      final UpdateResult result,
+      final boolean throwIfMissing) throws UpdateException {
 
+    checkNotNull(identity);
+    final String role = identity.getRole();
+    final String updatingUser = identity.getUser();
     checkNotBlank(role);
+    checkNotBlank(updatingUser);
     checkNotBlank(job);
 
     return txStorage.doInWriteTransaction(txStorage.new SideEffectWork<Boolean, UpdateException>() {
@@ -579,7 +582,7 @@ public class StateManagerImpl implements StateManager {
             changeState(
                 Query.liveShard(role, job, shard),
                 KILLING,
-                Optional.of("Removed during update."));
+                Optional.of("Removed during update by " + updatingUser));
           }
         }
 
@@ -717,7 +720,7 @@ public class StateManagerImpl implements StateManager {
   }
 
   Map<Integer, ShardUpdateResult> modifyShards(
-      final String role,
+      final Identity identity,
       final String jobName,
       final Set<Integer> shards,
       final String updateToken,
@@ -726,7 +729,16 @@ public class StateManagerImpl implements StateManager {
     final Function<TaskUpdateConfiguration, TwitterTaskInfo> configSelector = updating
         ? GET_NEW_CONFIG
         : GET_ORIGINAL_CONFIG;
-    final ScheduleStatus modifyingState = updating ? UPDATING : ROLLBACK;
+    final ScheduleStatus modifyingState;
+    final String role = identity.getRole();
+    final String auditMessage;
+    if (updating) {
+      modifyingState = UPDATING;
+      auditMessage = "Updated by " + identity.getUser();
+    } else {
+      modifyingState = ROLLBACK;
+      auditMessage = "Rolled back by " + identity.getUser();
+    }
 
     managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
     return txStorage.doInWriteTransaction(
@@ -782,7 +794,10 @@ public class StateManagerImpl implements StateManager {
                 // Initiate update on the existing shards.
                 // TODO(William Farner): The additional query could be avoided here.
                 //                       Consider allowing state changes on tasks by task ID.
-                changeState(Query.liveShards(role, jobName, changedShards), modifyingState);
+                changeState(
+                    Query.liveShards(role, jobName, changedShards),
+                    modifyingState,
+                    Optional.of(auditMessage));
                 putResults(result, ShardUpdateResult.RESTARTING, changedShards);
               }
               putResults(

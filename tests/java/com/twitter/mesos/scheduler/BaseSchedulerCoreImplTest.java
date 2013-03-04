@@ -1007,7 +1007,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     ParsedConfiguration job = makeJob(OWNER_A, JOB_A, 1);
     scheduler.createJob(job);
     Optional<String> updateToken = scheduler.initiateJobUpdate(job);
-    scheduler.finishUpdate(OWNER_A.getRole(), JOB_A, updateToken, SUCCESS);
+    scheduler.finishUpdate(OWNER_A, JOB_A, updateToken, SUCCESS);
 
     // If the finish update succeeded internally, we should be able to start a new update.
     assertTrue(scheduler.initiateJobUpdate(job).isPresent());
@@ -1058,14 +1058,14 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     buildScheduler();
 
     try {
-      scheduler.finishUpdate("foo", "foo", Optional.of("foo"), SUCCESS);
+      scheduler.finishUpdate(OWNER_A, "foo", Optional.of("foo"), SUCCESS);
       fail("Call should have failed.");
     } catch (ScheduleException e) {
       // Expected.
     }
 
     try {
-      scheduler.finishUpdate("foo", "foo", Optional.<String>absent(), SUCCESS);
+      scheduler.finishUpdate(OWNER_A, "foo", Optional.<String>absent(), SUCCESS);
       fail("Call should have failed.");
     } catch (ScheduleException e) {
       // Expected.
@@ -1082,13 +1082,13 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     Optional<String> token = scheduler.initiateJobUpdate(job);
 
     try {
-      scheduler.finishUpdate(OWNER_B.getRole(), JOB_A, Optional.of("foo"), SUCCESS);
+      scheduler.finishUpdate(OWNER_B, JOB_A, Optional.of("foo"), SUCCESS);
       fail("Finish update should have failed.");
     } catch (ScheduleException e) {
       // expected.
     }
 
-    scheduler.finishUpdate(OWNER_A.getRole(), JOB_A, token, SUCCESS);
+    scheduler.finishUpdate(OWNER_A, JOB_A, token, SUCCESS);
   }
 
   @Test
@@ -1107,7 +1107,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       // expected.
     }
 
-    scheduler.finishUpdate(OWNER_A.getRole(), JOB_A, token, SUCCESS);
+    scheduler.finishUpdate(OWNER_A, JOB_A, token, SUCCESS);
   }
 
   private void verifyUpdate(Set<ScheduledTask> tasks, JobConfiguration job,
@@ -1154,7 +1154,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
           numTasks,
           additionalTasks);
 
-      scheduler.finishUpdate(OWNER_A.role, JOB_A, updateToken, result);
+      scheduler.finishUpdate(OWNER_A, JOB_A, updateToken, result);
       postUpdate();
       Set<ScheduledTask> tasks = getTasks(Query.activeQuery(OWNER_A.getRole(), JOB_A));
       verify(tasks, job.get(), updatedJob.get());
@@ -1189,7 +1189,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         StateManagerImpl.putResults(expected, ShardUpdateResult.RESTARTING, jobShards);
         assertEquals(
             expected.build(),
-            scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken));
+            scheduler.updateShards(OWNER_A, JOB_A, jobShards, updateToken));
         assertEquals(numTasks, getTasksByStatus(UPDATING).size());
 
         changeStatus(queryByOwner(OWNER_A), FINISHED);
@@ -1236,14 +1236,13 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setRequestedPorts(differentPorts);
 
     Optional<String> updateToken = scheduler.initiateJobUpdate(updatedJob);
-    String role = OWNER_A.getRole();
 
     ImmutableMap.Builder<Integer, ShardUpdateResult> expected = ImmutableMap.builder();
     expected.put(1, ShardUpdateResult.RESTARTING);
     StateManagerImpl.putResults(expected, ShardUpdateResult.UNCHANGED, ImmutableSet.of(0, 2));
     assertEquals(
         expected.build(),
-        scheduler.updateShards(role, JOB_A, ImmutableSet.of(0, 1, 2), updateToken.get()));
+        scheduler.updateShards(OWNER_A, JOB_A, ImmutableSet.of(0, 1, 2), updateToken.get()));
     // Move a few tasks into RUNNING to ensure that the scheduler does not try to kill them
     // in subsequent update batches.
     changeStatus(Query.liveShard(OWNER_A.getRole(), JOB_A, 0), FINISHED);
@@ -1257,20 +1256,20 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     StateManagerImpl.putResults(expected, ShardUpdateResult.ADDED, ImmutableSet.of(3, 4, 5));
     assertEquals(
         expected.build(),
-        scheduler.updateShards(role, JOB_A, ImmutableSet.of(3, 4, 5), updateToken.get()));
+        scheduler.updateShards(OWNER_A, JOB_A, ImmutableSet.of(3, 4, 5), updateToken.get()));
 
     expected = ImmutableMap.builder();
     StateManagerImpl.putResults(expected, ShardUpdateResult.ADDED, ImmutableSet.of(6, 7, 8));
     assertEquals(
         expected.build(),
-        scheduler.updateShards(role, JOB_A, ImmutableSet.of(6, 7, 8), updateToken.get()));
+        scheduler.updateShards(OWNER_A, JOB_A, ImmutableSet.of(6, 7, 8), updateToken.get()));
 
     expected = ImmutableMap.builder();
     StateManagerImpl.putResults(expected, ShardUpdateResult.ADDED, ImmutableSet.of(9));
     assertEquals(
         expected.build(),
-        scheduler.updateShards(role, JOB_A, ImmutableSet.of(9), updateToken.get()));
-    scheduler.finishUpdate(role, JOB_A, updateToken, UpdateResult.SUCCESS);
+        scheduler.updateShards(OWNER_A, JOB_A, ImmutableSet.of(9), updateToken.get()));
+    scheduler.finishUpdate(OWNER_A, JOB_A, updateToken, UpdateResult.SUCCESS);
 
     assertEquals(differentPorts,
         Iterables.getOnlyElement(getTasks(Query.liveShard(OWNER_A.getRole(), JOB_A, 1)))
@@ -1296,7 +1295,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
             ImmutableSet.of(0, 1, 2, 3));
         assertEquals(
             expected.build(),
-            scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken));
+            scheduler.updateShards(OWNER_A, JOB_A, jobShards, updateToken));
         assertEquals(numTasks, getTasksByStatus(UPDATING).size());
 
         changeStatus(queryByOwner(OWNER_A), KILLED);
@@ -1308,7 +1307,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
             ImmutableSet.of(0, 1, 2, 3));
         assertEquals(
             expected.build(),
-            scheduler.rollbackShards(OWNER_A.role, JOB_A, jobShards, updateToken));
+            scheduler.rollbackShards(OWNER_A, JOB_A, jobShards, updateToken));
 
         changeStatus(Query.byStatus(PENDING), ASSIGNED);
         changeStatus(Query.byStatus(ASSIGNED), RUNNING);
@@ -1365,17 +1364,16 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     changeStatus(queryByOwner(OWNER_A), RUNNING);
 
     Optional<String> updateToken = scheduler.initiateJobUpdate(job);
-    String role = OWNER_A.getRole();
 
     assertEquals(
         shardResults(numTasks, ShardUpdateResult.UNCHANGED),
-        scheduler.updateShards(role, JOB_A, ImmutableSet.of(0, 1), updateToken.get()));
+        scheduler.updateShards(OWNER_A, JOB_A, ImmutableSet.of(0, 1), updateToken.get()));
 
     assertEquals(
         shardResults(numTasks, ShardUpdateResult.UNCHANGED),
-        scheduler.rollbackShards(role, JOB_A, ImmutableSet.of(0, 1), updateToken.get()));
+        scheduler.rollbackShards(OWNER_A, JOB_A, ImmutableSet.of(0, 1), updateToken.get()));
 
-    scheduler.finishUpdate(role, JOB_A, updateToken, UpdateResult.FAILED);
+    scheduler.finishUpdate(OWNER_A, JOB_A, updateToken, UpdateResult.FAILED);
   }
 
   private static Closure<ScheduledTask> verifyPorts(final Set<String> requestedPorts) {
@@ -1403,7 +1401,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
         assertEquals(
             shardResults(numTasks, ShardUpdateResult.RESTARTING),
-            scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken));
+            scheduler.updateShards(OWNER_A, JOB_A, jobShards, updateToken));
         assertEquals(numTasks, getTasksByStatus(UPDATING).size());
 
         changeStatus(queryByOwner(OWNER_A), RUNNING);
@@ -1430,7 +1428,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
         assertEquals(
             shardResults(numTasks, ShardUpdateResult.RESTARTING),
-            scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken));
+            scheduler.updateShards(OWNER_A, JOB_A, jobShards, updateToken));
         assertEquals(numTasks, getTasksByStatus(PENDING).size());
 
         return SUCCESS;
@@ -1462,7 +1460,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
                 .build();
         assertEquals(
             expected,
-            scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken));
+            scheduler.updateShards(OWNER_A, JOB_A, jobShards, updateToken));
         changeStatus(Query.byStatus(UPDATING), KILLED);
 
         assertEquals(numTasks + additionalTasks, getTasksByStatus(PENDING).size());
@@ -1490,7 +1488,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
         assertEquals(
             shardResults(2, ShardUpdateResult.RESTARTING),
-            scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken));
+            scheduler.updateShards(OWNER_A, JOB_A, jobShards, updateToken));
         changeStatus(Query.byStatus(UPDATING), FINISHED);
 
         assertEquals(numTasks + additionalTasks, getTasksByStatus(PENDING).size());
@@ -1527,14 +1525,14 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
                 .build();
         assertEquals(
             expected,
-            scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken));
+            scheduler.updateShards(OWNER_A, JOB_A, jobShards, updateToken));
         changeStatus(Query.byStatus(UPDATING), KILLED);
 
         assertEquals(numTasks + additionalTasks, getTasksByStatus(PENDING).size());
 
         assertEquals(
             shardResults(numTasks, ShardUpdateResult.RESTARTING),
-            scheduler.rollbackShards(OWNER_A.role, JOB_A, ImmutableSet.of(0, 1), updateToken));
+            scheduler.rollbackShards(OWNER_A, JOB_A, ImmutableSet.of(0, 1), updateToken));
 
         return UpdateResult.FAILED;
       }
@@ -1589,14 +1587,14 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
         assertEquals(
             shardResults(2, ShardUpdateResult.RESTARTING),
-            scheduler.updateShards(OWNER_A.role, JOB_A, jobShards, updateToken));
+            scheduler.updateShards(OWNER_A, JOB_A, jobShards, updateToken));
         changeStatus(Query.byStatus(UPDATING), KILLED);
 
         assertEquals(numTasks + additionalTasks, getTasksByStatus(PENDING).size());
 
         assertEquals(
             shardResults(2, ShardUpdateResult.RESTARTING),
-            scheduler.rollbackShards(OWNER_A.role, JOB_A, jobShards, updateToken));
+            scheduler.rollbackShards(OWNER_A, JOB_A, jobShards, updateToken));
 
         return UpdateResult.FAILED;
       }

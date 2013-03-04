@@ -34,6 +34,7 @@ import com.twitter.mesos.gen.FinishUpdateResponse;
 import com.twitter.mesos.gen.ForceTaskStateResponse;
 import com.twitter.mesos.gen.GetQuotaResponse;
 import com.twitter.mesos.gen.Hosts;
+import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.KillResponse;
 import com.twitter.mesos.gen.ListBackupsResponse;
@@ -381,9 +382,10 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     checkNotBlank(updateToken);
     checkNotNull(session);
 
+    Identity identity = new Identity(role, session.getUser());
     UpdateShardsResponse response = new UpdateShardsResponse();
     try {
-      response.setShards(schedulerCore.updateShards(role, jobName, shards, updateToken))
+      response.setShards(schedulerCore.updateShards(identity, jobName, shards, updateToken))
           .setResponseCode(UpdateResponseCode.OK)
           .setMessage("Successfully started update of shards: " + shards);
     } catch (ScheduleException e) {
@@ -407,9 +409,10 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     checkNotBlank(updateToken);
     checkNotNull(session);
 
+    Identity identity = new Identity(role, session.getUser());
     RollbackShardsResponse response = new RollbackShardsResponse();
     try {
-      response.setShards(schedulerCore.rollbackShards(role, jobName, shards, updateToken))
+      response.setShards(schedulerCore.rollbackShards(identity, jobName, shards, updateToken))
           .setResponseCode(UpdateResponseCode.OK)
           .setMessage("Successfully started rollback of shards: " + shards);
     } catch (ScheduleException e) {
@@ -432,11 +435,11 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     checkNotNull(session);
 
     FinishUpdateResponse response = new FinishUpdateResponse();
+    Identity identity = new Identity(role, session.getUser());
+    Optional<String> token = updateResult == UpdateResult.TERMINATE
+        ? Optional.<String>absent() : Optional.of(updateToken);
     try {
-      schedulerCore.finishUpdate(role, jobName,
-          updateResult == UpdateResult.TERMINATE
-              ? Optional.<String>absent() : Optional.of(updateToken),
-          updateResult);
+      schedulerCore.finishUpdate(identity, jobName, token, updateResult);
       response.setResponseCode(OK).setMessage("Update successfully finished.");
     } catch (ScheduleException e) {
       response.setResponseCode(ResponseCode.INVALID_REQUEST).setMessage(e.getMessage());

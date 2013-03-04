@@ -16,6 +16,7 @@ import com.google.inject.Inject;
 import com.twitter.common.util.StateMachine;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduleStatus;
@@ -286,7 +287,11 @@ public class SchedulerCoreImpl implements SchedulerCore {
       if (!matchingScheduler) {
         try {
           updateFinished = stateManager.finishUpdate(
-              role, job, Optional.<String>absent(), UpdateResult.TERMINATE, false);
+              new Identity(role, user),
+              job,
+              Optional.<String>absent(),
+              UpdateResult.TERMINATE,
+              false);
         } catch (UpdateException e) {
           LOG.severe(
               String.format("Could not terminate job update for %s\n%s", query, e.getMessage()));
@@ -356,43 +361,46 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
   @Override
   public synchronized Map<Integer, ShardUpdateResult> updateShards(
-      String role,
+      Identity identity,
       String jobName,
       Set<Integer> shards,
       String updateToken) throws ScheduleException {
 
     try {
-      return stateManager.modifyShards(role, jobName, shards, updateToken, true);
+      return stateManager.modifyShards(identity, jobName, shards, updateToken, true);
     } catch (UpdateException e) {
-      LOG.log(Level.INFO, "Failed to update shards for " + Tasks.jobKey(role, jobName), e);
+      LOG.log(Level.INFO, "Failed to update shards for " + Tasks.jobKey(identity, jobName), e);
       throw new ScheduleException(e.getMessage(), e);
     }
   }
 
   @Override
   public synchronized Map<Integer, ShardUpdateResult> rollbackShards(
-      String role,
+      Identity identity,
       String jobName,
       Set<Integer> shards,
       String updateToken) throws ScheduleException {
 
     try {
-      return stateManager.modifyShards(role, jobName, shards, updateToken, false);
+      return stateManager.modifyShards(identity, jobName, shards, updateToken, false);
     } catch (UpdateException e) {
-      LOG.log(Level.INFO, "Failed to roll back shards for " + Tasks.jobKey(role, jobName), e);
+      LOG.log(Level.INFO, "Failed to roll back shards for " + Tasks.jobKey(identity, jobName), e);
       throw new ScheduleException(e.getMessage(), e);
     }
   }
 
   @Override
-  public synchronized void finishUpdate(String role, String jobName, Optional<String> updateToken,
+  public synchronized void finishUpdate(
+      Identity identity,
+      String jobName,
+      Optional<String> updateToken,
       UpdateResult result) throws ScheduleException {
     checkStarted();
 
     try {
-      stateManager.finishUpdate(role, jobName, updateToken, result, true);
+      stateManager.finishUpdate(identity, jobName, updateToken, result, true);
     } catch (StateManagerImpl.UpdateException e) {
-      LOG.log(Level.INFO, "Failed to finish update for " + Tasks.jobKey(role, jobName), e);
+      LOG.log(Level.INFO, "Failed to finish update for " + Tasks.jobKey(identity, jobName), e);
       throw new ScheduleException(e.getMessage(), e);
     }
   }

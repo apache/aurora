@@ -8,6 +8,7 @@ import javax.annotation.Nullable;
 import com.google.common.base.Optional;
 
 import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ShardUpdateResult;
@@ -98,8 +99,8 @@ public interface SchedulerCore extends RegisteredListener {
    * @throws ScheduleException If there was an error in scheduling an update when no active tasks
    *                           are found for a job or an update for the job is already in progress.
    * @return A unique update token if an update must be coordinated through
-   *         {@link #updateShards(String, String, java.util.Set, String)} and
-   *         {@link #finishUpdate(String, String, Optional, UpdateResult)}, or an absent value if
+   *         {@link #updateShards(Identity, String, Set, String)}and
+   *         {@link #finishUpdate(Identity, String, Optional, UpdateResult)}, or an absent value if
    * the update was completed in-place and no further action is necessary.
    */
   Optional<String> initiateJobUpdate(ParsedConfiguration parsedConfiguration)
@@ -109,7 +110,7 @@ public interface SchedulerCore extends RegisteredListener {
    * Initiates an update on shards within a job.
    * Requires that startUpdate was called for the job first.
    *
-   * @param role The job owner.
+   * @param identity The job owner and invoking user.
    * @param jobName Job being updated.
    * @param shards Shards to be updated.
    * @param updateToken A unique string identifying the update, must be provided from
@@ -118,7 +119,7 @@ public interface SchedulerCore extends RegisteredListener {
    * @return The action taken on each of the shards.
    */
   Map<Integer, ShardUpdateResult> updateShards(
-      String role,
+      Identity identity,
       String jobName,
       Set<Integer> shards,
       String updateToken) throws ScheduleException;
@@ -127,7 +128,7 @@ public interface SchedulerCore extends RegisteredListener {
    * Initiates a rollback of the specified shards.
    * Requires that startUpdate was called for the job first.
    *
-   * @param role The job owner.
+   * @param identity The job owner and invoking user.
    * @param jobName Name of the job being updated.
    * @param shards Shards to be updated.
    * @param updateToken A unique string identifying the update, must be provided from
@@ -136,7 +137,7 @@ public interface SchedulerCore extends RegisteredListener {
    * @return The action taken on each of the shards.
    */
   Map<Integer, ShardUpdateResult> rollbackShards(
-      String role,
+      Identity identity,
       String jobName,
       Set<Integer> shards,
       String updateToken) throws ScheduleException;
@@ -144,7 +145,7 @@ public interface SchedulerCore extends RegisteredListener {
   /**
    * Completes an update.
    *
-   * @param role The job owner.
+   * @param identity The job owner and invoking user.
    * @param jobName Name of the job being updated.
    * @param updateToken The update token provided from
    *                    {@link #initiateJobUpdate(ParsedConfiguration)},
@@ -153,8 +154,11 @@ public interface SchedulerCore extends RegisteredListener {
    * @throws ScheduleException If an update for the job does not exist or if the update token is
    *                           invalid.
    */
-  void finishUpdate(String role, String jobName, Optional<String> updateToken, UpdateResult result)
-      throws ScheduleException;
+  void finishUpdate(
+      Identity identity,
+      String jobName,
+      Optional<String> updateToken,
+      UpdateResult result) throws ScheduleException;
 
   /**
    * Assigns a new state to tasks.
