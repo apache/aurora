@@ -123,6 +123,9 @@ public class ServletModule extends AbstractModule {
     registerAsset(
         "assets/datatables/js/dataTables.localstorage.js",
         "/js/dataTables.localstorage.js");
+    registerAsset(
+        "assets/datatables/js/dataTables.htmlNumberType.js",
+        "/js/dataTables.htmlNumberType.js");
 
     bind(LeaderRedirect.class).in(Singleton.class);
     LifecycleModule.bindStartupAction(binder(), RedirectMonitor.class);
