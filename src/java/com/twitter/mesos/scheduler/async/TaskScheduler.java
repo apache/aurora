@@ -1,10 +1,7 @@
 package com.twitter.mesos.scheduler.async;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -17,12 +14,13 @@ import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
+import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Maps;
+import com.google.common.collect.Lists;
 import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
@@ -50,7 +48,6 @@ import com.twitter.mesos.scheduler.TaskAssigner;
 import com.twitter.mesos.scheduler.events.PubsubEvent.EventSubscriber;
 import com.twitter.mesos.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.mesos.scheduler.events.PubsubEvent.TaskStateChange;
-import com.twitter.mesos.scheduler.events.PubsubEvent.TasksDeleted;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
@@ -107,10 +104,6 @@ public interface TaskScheduler extends EventSubscriber {
   class TaskSchedulerImpl implements TaskScheduler {
 
     private static final Logger LOG = Logger.getLogger(TaskSchedulerImpl.class.getName());
-
-    @VisibleForTesting
-    final Map<String, Future<?>> futures =
-        Collections.synchronizedMap(Maps.<String, Future<?>>newHashMap());
 
     private final Storage storage;
     private final StateManager stateManager;
@@ -194,20 +187,9 @@ public interface TaskScheduler extends EventSubscriber {
       return offers.getAll();
     }
 
-    private void removeTask(String taskId, boolean cancelIfPresent) {
-      Future<?> future = futures.remove(taskId);
-      if (cancelIfPresent && (future != null)) {
-        future.cancel(true);
-      }
-    }
-
-    private void addTask(String taskId, long delayMillis, boolean cancelIfPresent) {
-      removeTask(taskId, cancelIfPresent);
+    private void addTask(String taskId, long delayMillis) {
       LOG.fine("Evaluating task " + taskId + " in " + delayMillis + " ms");
-      PendingTask task = new PendingTask(taskId, delayMillis);
-      futures.put(
-          taskId,
-          executor.schedule(task, delayMillis, TimeUnit.MILLISECONDS));
+      executor.schedule(new PendingTask(taskId, delayMillis), delayMillis, TimeUnit.MILLISECONDS);
     }
 
     @Subscribe
@@ -216,14 +198,7 @@ public interface TaskScheduler extends EventSubscriber {
       // this to implement scheduling backoff (inducing a longer delay).
       String taskId = stateChange.getTaskId();
       if (stateChange.getNewState() == PENDING) {
-        addTask(taskId, pendingRetryStrategy.calculateBackoffMs(0), true);
-      }
-    }
-
-    @Subscribe
-    public void tasksDeleted(TasksDeleted deletion) {
-      for (ScheduledTask task : deletion.getTasks()) {
-        removeTask(Tasks.id(task), true);
+        addTask(taskId, pendingRetryStrategy.calculateBackoffMs(0));
       }
     }
 
@@ -235,7 +210,7 @@ public interface TaskScheduler extends EventSubscriber {
       storage.doInTransaction(new Work.Quiet<Void>() {
         @Override public Void apply(StoreProvider store) {
           for (ScheduledTask task : store.getTaskStore().fetchTasks(Query.byStatus(PENDING))) {
-            addTask(Tasks.id(task), pendingRetryStrategy.calculateBackoffMs(0), true);
+            addTask(Tasks.id(task), pendingRetryStrategy.calculateBackoffMs(0));
           }
           return null;
         }
@@ -246,7 +221,6 @@ public interface TaskScheduler extends EventSubscriber {
     static final Optional<String> LAUNCH_FAILED_MSG =
         Optional.of("Unknown exception attempting to schedule task.");
 
-
     /**
      * A helper method that attempts to schedule a PENDING task. This method is package private
      * to satisfy @Timed annotation's requirement.
@@ -256,16 +230,13 @@ public interface TaskScheduler extends EventSubscriber {
      * @param retryLater A command to execute when a task is not scheduled.
      */
     @Timed("task_schedule_attempt")
-    void runInTransaction(String taskId, StoreProvider store, Command retryLater) {
-      removeTask(taskId, false);
+    void tryScheduling(String taskId, StoreProvider store, Command retryLater) {
       LOG.fine("Attempting to schedule task " + taskId);
-      TaskQuery pendingTaskQuery = new TaskQuery()
-          .setStatuses(ImmutableSet.of(PENDING))
-          .setTaskIds(ImmutableSet.of(taskId));
+      TaskQuery pendingTaskQuery = Query.byId(taskId).setStatuses(ImmutableSet.of(PENDING));
       final ScheduledTask task =
           Iterables.getOnlyElement(store.getTaskStore().fetchTasks(pendingTaskQuery), null);
       if (task == null) {
-        LOG.warning("Failed to look up task " + taskId);
+        LOG.warning("Failed to look up task " + taskId + ", it may have been deleted.");
       } else {
         Function<Offer, Optional<TaskInfo>> assignment =
             new Function<Offer, Optional<TaskInfo>>() {
@@ -294,7 +265,7 @@ public interface TaskScheduler extends EventSubscriber {
 
     private class PendingTask implements Runnable {
       final String taskId;
-      final long penaltyMs;
+      volatile long penaltyMs;
 
       PendingTask(String taskId, long penaltyMs) {
         this.taskId = taskId;
@@ -306,7 +277,7 @@ public interface TaskScheduler extends EventSubscriber {
         try {
           storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
             @Override public void execute(MutableStoreProvider store) {
-              runInTransaction(taskId, store, new Command() {
+              tryScheduling(taskId, store, new Command() {
                 @Override public void execute() {
                   retryLater();
                 }
@@ -323,15 +294,17 @@ public interface TaskScheduler extends EventSubscriber {
       }
 
       private void retryLater() {
-        addTask(taskId, pendingRetryStrategy.calculateBackoffMs(penaltyMs), false);
+        penaltyMs = pendingRetryStrategy.calculateBackoffMs(penaltyMs);
+        LOG.fine("Re-evaluating " + taskId + " in " + penaltyMs + " ms.");
+        executor.schedule(this, penaltyMs, TimeUnit.MILLISECONDS);
       }
     }
 
     private static class Offers {
-      private final Map<OfferID, Offer> offers = Maps.newHashMap();
-      private final Driver driver;
-      private final OfferReturnDelay returnDelay;
-      private final ScheduledExecutorService executor;
+      final List<Offer> offers = Lists.newArrayList();
+      final Driver driver;
+      final OfferReturnDelay returnDelay;
+      final ScheduledExecutorService executor;
 
       Offers(Driver driver, OfferReturnDelay returnDelay, ScheduledExecutorService executor) {
         this.driver = driver;
@@ -340,11 +313,17 @@ public interface TaskScheduler extends EventSubscriber {
         Stats.exportSize("outstanding_offers", offers);
       }
 
+      private static final Function<Offer, OfferID> GET_ID = new Function<Offer, OfferID>() {
+        @Override public OfferID apply(Offer offer) {
+          return offer.getId();
+        }
+      };
+
       synchronized void remove(OfferID id) {
-        offers.remove(id);
+        Iterables.removeIf(offers, Predicates.compose(Predicates.equalTo(id), GET_ID));
       }
 
-      private static Predicate<Offer> isSlave(final SlaveID slave) {
+      static Predicate<Offer> isSlave(final SlaveID slave) {
         return new Predicate<Offer>() {
           @Override public boolean apply(Offer offer) {
             return offer.getSlaveId().equals(slave);
@@ -352,17 +331,16 @@ public interface TaskScheduler extends EventSubscriber {
         };
       }
 
-      synchronized void receive(Offer offer) {
-        List<Offer> sameSlave = FluentIterable.from(offers.values())
+      synchronized void receive(final Offer offer) {
+        List<Offer> sameSlave = FluentIterable.from(offers)
             .filter(isSlave(offer.getSlaveId()))
             .toImmutableList();
         if (sameSlave.isEmpty()) {
-          final OfferID id = offer.getId();
-          offers.put(id, offer);
+          offers.add(offer);
           executor.schedule(
               new Runnable() {
                 @Override public void run() {
-                  decline(id);
+                  decline(offer.getId());
                 }
               },
               returnDelay.get().as(Time.MILLISECONDS),
@@ -386,23 +364,29 @@ public interface TaskScheduler extends EventSubscriber {
       synchronized boolean launchFirst(Function<Offer, Optional<TaskInfo>> acceptor)
           throws LaunchException {
 
-        for (Offer offer : offers.values()) {
+        Optional<Offer> accepted = Optional.absent();
+        for (Offer offer : offers) {
           Optional<TaskInfo> assignment = acceptor.apply(offer);
           if (assignment.isPresent()) {
-            OfferID id = offer.getId();
-            remove(id);
             try {
-              driver.launchTask(id, assignment.get());
+              driver.launchTask(offer.getId(), assignment.get());
             } catch (RuntimeException e) {
               // TODO(William Farner): Catch only the checked exception produced by Driver
               // once it changes from throwing IllegalStateException when the driver is not yet
               // registered.
               throw new LaunchException("Failed to launch task.", e);
             }
-            return true;
+            accepted = Optional.of(offer);
+            break;
           }
         }
-        return false;
+
+        if (accepted.isPresent()) {
+          offers.remove(accepted.get());
+          return true;
+        } else {
+          return false;
+        }
       }
 
       static class LaunchException extends Exception {
@@ -412,7 +396,7 @@ public interface TaskScheduler extends EventSubscriber {
       }
 
       synchronized List<Offer> getAll() {
-        return ImmutableList.copyOf(offers.values());
+        return ImmutableList.copyOf(offers);
       }
     }
   }

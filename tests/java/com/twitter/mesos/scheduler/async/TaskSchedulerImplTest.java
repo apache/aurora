@@ -16,8 +16,7 @@ import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskInfo;
 import org.easymock.Capture;
 import org.easymock.EasyMock;
-import org.easymock.IExpectationSetters;
-import org.junit.After;
+
 import org.junit.Before;
 import org.junit.Test;
 
@@ -39,7 +38,6 @@ import com.twitter.mesos.scheduler.async.TaskScheduler.OfferReturnDelay;
 import com.twitter.mesos.scheduler.async.TaskScheduler.TaskSchedulerImpl;
 import com.twitter.mesos.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.mesos.scheduler.events.PubsubEvent.TaskStateChange;
-import com.twitter.mesos.scheduler.events.PubsubEvent.TasksDeleted;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
@@ -50,7 +48,6 @@ import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
-import static org.junit.Assert.assertTrue;
 
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
 import static com.twitter.mesos.gen.ScheduleStatus.INIT;
@@ -96,11 +93,6 @@ public class TaskSchedulerImplTest extends EasyMockTest {
         returnDelay);
   }
 
-  @After
-  public void validateNoLeak() {
-    assertTrue(scheduler.futures.isEmpty());
-  }
-
   private Offer makeOffer(String offerId) {
     return Offer.newBuilder()
         .setId(OfferID.newBuilder().setValue(offerId))
@@ -142,10 +134,6 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     return expectTaskWatch(0, nextPenaltyMs);
   }
 
-  private IExpectationSetters<?> expectCancel(boolean interrupt) {
-    return expect(future.cancel(interrupt)).andReturn(true);
-  }
-
   @Test
   public void testNoTasks() {
     expectOfferDeclineIn(10);
@@ -161,18 +149,12 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   public void testNoOffers() {
     Capture<Runnable> timeoutCapture = expectTaskWatch(10);
     expectTaskWatch(10, 20);
-    expectCancel(true);
 
     replayAndCreateScheduler();
 
     insertTasks(makeTask("a", PENDING));
     changeState("a", INIT, PENDING);
     timeoutCapture.getValue().run();
-    scheduler.tasksDeleted(new TasksDeleted(ImmutableSet.of(makeTask("a"), makeTask("b"))));
-  }
-
-  private ScheduledTask makeTask(String taskId) {
-    return makeTask(taskId, KILLED);
   }
 
   private ScheduledTask makeTask(String taskId, ScheduleStatus status) {
@@ -196,7 +178,6 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   @Test
   public void testLoadFromStorage() {
     expectTaskWatch(10);
-    expectCancel(true);
 
     replayAndCreateScheduler();
 
@@ -206,7 +187,6 @@ public class TaskSchedulerImplTest extends EasyMockTest {
         makeTask("c", RUNNING));
     scheduler.storageStarted(new StorageStarted());
     changeState("c", RUNNING, FINISHED);
-    scheduler.tasksDeleted(new TasksDeleted(ImmutableSet.of(makeTask("b", KILLED))));
   }
 
   @Test
@@ -239,7 +219,6 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     Capture<Runnable> timeoutCapture3 = expectTaskWatch(10);
     expectTaskWatch(10, 20);
-    expectCancel(true);
 
     replayAndCreateScheduler();
 
@@ -253,7 +232,6 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     insertTasks(makeTask("b", PENDING));
     changeState("b", INIT, PENDING);
     timeoutCapture3.getValue().run();
-    scheduler.tasksDeleted(new TasksDeleted(ImmutableSet.of(makeTask("b", KILLED))));
   }
 
   @Test
@@ -324,7 +302,6 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     Capture<Runnable> timeoutCapture2 = expectTaskWatch(10, 20);
     driver.declineOffer(offerA.getId());
     expectTaskWatch(20, 30);
-    expectCancel(true);
 
     replayAndCreateScheduler();
 
@@ -334,7 +311,6 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     timeoutCapture.getValue().run();
     offerExpirationCapture.getValue().run();
     timeoutCapture2.getValue().run();
-    scheduler.tasksDeleted(new TasksDeleted(ImmutableSet.of(makeTask("a", KILLED))));
   }
 
   @Test
