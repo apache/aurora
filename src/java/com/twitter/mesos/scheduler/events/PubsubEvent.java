@@ -6,6 +6,7 @@ import java.util.Set;
 
 import com.google.common.base.Objects;
 
+import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
@@ -60,18 +61,16 @@ public interface PubsubEvent {
    * Event sent when a task changed state.
    */
   public static class TaskStateChange implements PubsubEvent {
-    private final String taskId;
-    private final ScheduleStatus oldState;
     private final ScheduledTask task;
+    private final ScheduleStatus oldState;
 
-    public TaskStateChange(String taskId, ScheduleStatus oldState, ScheduledTask task) {
-      this.taskId = checkNotNull(taskId);
-      this.oldState = checkNotNull(oldState);
+    public TaskStateChange(ScheduledTask task, ScheduleStatus oldState) {
       this.task = checkNotNull(task);
+      this.oldState = checkNotNull(oldState);
     }
 
     public String getTaskId() {
-      return taskId;
+      return Tasks.id(task);
     }
 
     public ScheduleStatus getOldState() {
@@ -93,14 +92,13 @@ public interface PubsubEvent {
       }
 
       TaskStateChange other = (TaskStateChange) o;
-      return Objects.equal(taskId, other.taskId)
-          && Objects.equal(oldState, other.oldState)
-          && Objects.equal(task, other.task);
+      return Objects.equal(task, other.task)
+          && Objects.equal(oldState, other.oldState);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(taskId, oldState, task);
+      return Objects.hashCode(task, oldState);
     }
   }
 

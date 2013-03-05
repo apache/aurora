@@ -386,7 +386,7 @@ public class HistoryPrunerTest extends EasyMockTest {
 
   private ScheduledTask changeState(String taskId, ScheduleStatus from, ScheduleStatus to) {
     ScheduledTask task = makeTask(taskId, to);
-    pruner.recordStateChange(new PubsubEvent.TaskStateChange(taskId, from, task));
+    pruner.recordStateChange(new PubsubEvent.TaskStateChange(task, from));
     return task;
   }
 

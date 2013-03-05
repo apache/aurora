@@ -56,8 +56,6 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.storage.JobUpdateConfiguration;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
-import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
-import com.twitter.mesos.scheduler.TransactionalStorage.SideEffect;
 import com.twitter.mesos.scheduler.TransactionalStorage.SideEffectWork;
 import com.twitter.mesos.scheduler.TransactionalStorage.TransactionFinalizer;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
@@ -213,7 +211,6 @@ public class StateManagerImpl implements StateManager {
   StateManagerImpl(
       final Storage storage,
       final Clock clock,
-      MutableState mutableState,
       Driver driver,
       Closure<PubsubEvent> taskEventSink) {
 
@@ -226,7 +223,7 @@ public class StateManagerImpl implements StateManager {
       }
     };
 
-    txStorage = new TransactionalStorage(storage, mutableState, finalizer, taskEventSink);
+    txStorage = new TransactionalStorage(storage, finalizer, taskEventSink);
     readOnlyStorage = new ReadOnlyStorage() {
       @Override public <T, E extends Exception> T doInTransaction(Work<T, E> work)
           throws StorageException, E {
@@ -237,11 +234,6 @@ public class StateManagerImpl implements StateManager {
     this.driver = checkNotNull(driver);
 
     Stats.exportSize("work_queue_depth", workQueue);
-  }
-
-  @VisibleForTesting
-  Function<TwitterTaskInfo, ScheduledTask> getTaskCreator() {
-    return taskCreator;
   }
 
   /**
@@ -276,13 +268,8 @@ public class StateManagerImpl implements StateManager {
     txStorage.start(txStorage.new NoResultSideEffectWork() {
       @Override public void execute(final MutableStoreProvider storeProvider) {
         for (ScheduledTask task : storeProvider.getTaskStore().fetchTasks(Query.GET_ALL)) {
-          createStateMachine(this, task, task.getStatus());
+          createStateMachine(task, task.getStatus());
         }
-        addSideEffect(new SideEffect() {
-          @Override public void mutate(MutableState state) {
-            state.getVars().beginExporting();
-          }
-        });
       }
     });
 
@@ -381,16 +368,6 @@ public class StateManagerImpl implements StateManager {
                   // condition between the time the scheduler is actually available without hitting
                   // IllegalStateException (see DriverImpl).
                   // driver.killTask(Tasks.id(task));
-
-                  addSideEffect(new SideEffect() {
-                    @Override public void mutate(MutableState state) {
-                      state.getVars().adjustCount(
-                          Tasks.getRole(task),
-                          Tasks.getJob(task),
-                          task.getStatus(),
-                          ScheduleStatus.KILLED);
-                    }
-                  });
                 } else {
                   LOG.info("Retaining task " + Tasks.id(task));
                 }
@@ -436,7 +413,7 @@ public class StateManagerImpl implements StateManager {
         storeProvider.getTaskStore().saveTasks(scheduledTasks);
 
         for (ScheduledTask task : scheduledTasks) {
-          createStateMachine(this, task).updateState(PENDING);
+          createStateMachine(task).updateState(PENDING);
         }
       }
     });
@@ -1044,8 +1021,7 @@ public class StateManagerImpl implements StateManager {
 
             taskStore.saveTasks(ImmutableSet.of(task));
 
-            createStateMachine(sideEffectWork, task)
-                .updateState(PENDING, Optional.of("Rescheduled"));
+            createStateMachine(task).updateState(PENDING, Optional.of("Rescheduled"));
             TwitterTaskInfo taskInfo = task.getAssignedTask().getTask();
             sideEffectWork.addTaskEvent(
                 new PubsubEvent.TaskRescheduled(
@@ -1056,11 +1032,7 @@ public class StateManagerImpl implements StateManager {
 
           case UPDATE:
           case ROLLBACK:
-            maybeRescheduleForUpdate(
-                sideEffectWork,
-                storeProvider,
-                taskId,
-                work.command == WorkCommand.ROLLBACK);
+            maybeRescheduleForUpdate(storeProvider, taskId, work.command == WorkCommand.ROLLBACK);
             break;
 
           case UPDATE_STATE:
@@ -1070,21 +1042,10 @@ public class StateManagerImpl implements StateManager {
                 work.mutation.execute(task);
               }
             });
-            sideEffectWork.addSideEffect(new SideEffect() {
-              @Override
-              public void mutate(MutableState state) {
-                state.getVars().adjustCount(
-                    stateMachine.getRole(),
-                    stateMachine.getJobName(),
-                    stateMachine.getPreviousState(),
-                    stateMachine.getState());
-              }
-            });
             sideEffectWork.addTaskEvent(
                 new PubsubEvent.TaskStateChange(
-                    stateMachine.getTaskId(),
-                    stateMachine.getPreviousState(),
-                    Iterables.getOnlyElement(taskStore.fetchTasks(idQuery))));
+                    Iterables.getOnlyElement(taskStore.fetchTasks(idQuery)),
+                    stateMachine.getPreviousState()));
             break;
 
           case DELETE:
@@ -1117,31 +1078,19 @@ public class StateManagerImpl implements StateManager {
   public void deleteTasks(final Set<String> taskIds) {
     txStorage.doInWriteTransaction(txStorage.new NoResultSideEffectWork() {
       @Override protected void execute(final MutableStoreProvider storeProvider) {
-        final TaskStore.Mutable taskStore = storeProvider.getTaskStore();
-        final Iterable<ScheduledTask> tasks = taskStore.fetchTasks(Query.byId(taskIds));
-
-        addSideEffect(new SideEffect() {
-          @Override public void mutate(MutableState state) {
-            for (ScheduledTask task : tasks) {
-              state.getVars().decrementCount(
-                  Tasks.getRole(task),
-                  Tasks.getJob(task),
-                  task.getStatus());
-            }
-          }
-        });
+        TaskStore.Mutable taskStore = storeProvider.getTaskStore();
+        Iterable<ScheduledTask> tasks = taskStore.fetchTasks(Query.byId(taskIds));
         addTaskEvent(new PubsubEvent.TasksDeleted(ImmutableSet.copyOf(tasks)));
-
         taskStore.deleteTasks(taskIds);
       }
     });
   }
 
   private void maybeRescheduleForUpdate(
-      SideEffectWork<?, ?> sideEffectWork,
       MutableStoreProvider storeProvider,
       String taskId,
       boolean rollingBack) {
+
     TaskStore.Mutable taskStore = storeProvider.getTaskStore();
 
     TwitterTaskInfo oldConfig = Tasks.SCHEDULED_TO_INFO.apply(
@@ -1172,7 +1121,7 @@ public class StateManagerImpl implements StateManager {
 
     ScheduledTask newTask = taskCreator.apply(newConfig).setAncestorId(taskId);
     taskStore.saveTasks(ImmutableSet.of(newTask));
-    createStateMachine(sideEffectWork, newTask)
+    createStateMachine(newTask)
         .updateState(
             PENDING,
             Optional.of("Rescheduled after " + (rollingBack ? "rollback." : "update.")));
@@ -1204,7 +1153,6 @@ public class StateManagerImpl implements StateManager {
     if (task != null) {
       String role = Tasks.getRole(task);
       String job = Tasks.getJob(task);
-
       return new TaskStateMachine(
           Tasks.id(task),
           role,
@@ -1232,24 +1180,15 @@ public class StateManagerImpl implements StateManager {
     return stateMachine;
   }
 
-  private TaskStateMachine createStateMachine(
-      SideEffectWork<?, ?> sideEffectWork,
-      ScheduledTask task) {
-
-    return createStateMachine(sideEffectWork, task, INIT);
+  private TaskStateMachine createStateMachine(ScheduledTask task) {
+    return createStateMachine(task, INIT);
   }
 
-  private TaskStateMachine createStateMachine(
-      SideEffectWork<?, ?> sideEffectWork,
-      final ScheduledTask task,
-      final ScheduleStatus initialState) {
-
-    final String taskId = Tasks.id(task);
-    final String role = Tasks.getRole(task);
-    final String job = Tasks.getJob(task);
-
-    TaskStateMachine stateMachine = new TaskStateMachine(
-        taskId,
+  private TaskStateMachine createStateMachine(ScheduledTask task, ScheduleStatus initialState) {
+    String role = Tasks.getRole(task);
+    String job = Tasks.getJob(task);
+    return new TaskStateMachine(
+        Tasks.id(task),
         role,
         job,
         task,
@@ -1257,13 +1196,5 @@ public class StateManagerImpl implements StateManager {
         workSink,
         clock,
         initialState);
-
-    sideEffectWork.addSideEffect(new SideEffect() {
-      @Override public void mutate(MutableState state) {
-        state.getVars().incrementCount(role, job, initialState);
-      }
-    });
-
-    return stateMachine;
   }
 }

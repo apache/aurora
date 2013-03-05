@@ -1,147 +1,102 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.concurrent.atomic.AtomicLong;
+
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Function;
-import com.google.common.base.Functions;
-import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.eventbus.Subscribe;
+import com.google.inject.Inject;
 
-import com.twitter.common.collections.Pair;
-import com.twitter.common.stats.StatImpl;
-import com.twitter.common.stats.Stats;
+import com.twitter.common.stats.StatsProvider;
+import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduleStatus;
+import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.scheduler.events.PubsubEvent.EventSubscriber;
+import com.twitter.mesos.scheduler.events.PubsubEvent.StorageStarted;
+import com.twitter.mesos.scheduler.events.PubsubEvent.TaskStateChange;
+import com.twitter.mesos.scheduler.events.PubsubEvent.TasksDeleted;
+import com.twitter.mesos.scheduler.storage.Storage;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * StateManager variables.
+ * TODO(William Farner): Rename this class now that it's decoupled from StateManager.
  */
-class StateManagerVars {
+class StateManagerVars implements EventSubscriber {
 
-  /**
-   * Mutable state of the StateManager.
-   * TODO(William Farner): Rework this to work with task pubsub events.
-   */
-  static class MutableState {
-    private final Vars vars = new Vars();
+  private final LoadingCache<String, AtomicLong> vars;
 
-    /**
-     * Gets a reference to the vars.
-     *
-     * @return State manager variables.
-     */
-    public Vars getVars() {
-      return vars;
+  private final Storage storage;
+
+  @Inject
+  StateManagerVars(Storage storage, final StatsProvider statProvider) {
+    this.storage = checkNotNull(storage);
+    checkNotNull(statProvider);
+    vars = CacheBuilder.newBuilder().build(new CacheLoader<String, AtomicLong>() {
+      @Override public AtomicLong load(String statName) throws Exception {
+        return statProvider.makeCounter(statName);
+      }
+    });
+
+    // Initialize by-status counters.
+    for (ScheduleStatus status : ScheduleStatus.values()) {
+      vars.getUnchecked(getVarName(status));
     }
   }
 
-  /**
-   * Custom stat class so that we can delay stat export.  This allows us to prevent
-   * false values reported while the database is being loaded.
-   */
-  private static class Var extends StatImpl<Long> {
-    private volatile long value = 0;
+  @VisibleForTesting
+  static String getVarName(String role, String job, ScheduleStatus status) {
+    return "job_" + role + "_" + job + "_tasks_" + status.name();
+  }
 
-    public Var(String name) {
-      super(name);
+  @VisibleForTesting
+  static String getVarName(ScheduleStatus status) {
+    return "task_store_" + status;
+  }
+
+  private AtomicLong getCounter(ScheduleStatus status) {
+    return vars.getUnchecked(getVarName(status));
+  }
+
+  private AtomicLong getCounter(String role, String job, ScheduleStatus status) {
+    return vars.getUnchecked(getVarName(role, job, status));
+  }
+
+  private void incrementCount(String role, String job, ScheduleStatus status) {
+    getCounter(status).incrementAndGet();
+    getCounter(role, job, status).incrementAndGet();
+  }
+
+  private void decrementCount(String role, String job, ScheduleStatus status) {
+    getCounter(status).decrementAndGet();
+    getCounter(role, job, status).decrementAndGet();
+  }
+
+  @Subscribe
+  public void taskChangedState(TaskStateChange stateChange) {
+    ScheduledTask task = stateChange.getTask();
+    String role = Tasks.getRole(task);
+    String job = Tasks.getJob(task);
+    if (stateChange.getOldState() != ScheduleStatus.INIT) {
+      decrementCount(role, job, stateChange.getOldState());
     }
+    incrementCount(role, job, task.getStatus());
+  }
 
-    @Override public Long read() {
-      return value;
-    }
-
-    void increment() {
-      value++;
-    }
-
-    void decrement() {
-      value--;
+  @Subscribe
+  public void storageStarted(StorageStarted event) {
+    for (ScheduledTask task : Storage.Util.fetchTasks(storage, Query.GET_ALL)) {
+      incrementCount(Tasks.getRole(task), Tasks.getJob(task), task.getStatus());
     }
   }
 
-  /**
-   * Vars layer to handle delayed export.
-   */
-  static final class Vars {
-    private volatile boolean exporting = false;
-    private final Function<Var, Var> maybeExport = new Function<Var, Var>() {
-      @Override public Var apply(Var var) {
-        if (exporting) {
-          Stats.export(var);
-        }
-        return var;
-      }
-    };
-
-    private final LoadingCache<Pair<String, ScheduleStatus>, Var> varsByJobKeyAndStatus =
-        CacheBuilder.newBuilder().build(
-            CacheLoader.from(Functions.compose(maybeExport,
-                new Function<Pair<String, ScheduleStatus>, Var>() {
-                  @Override public Var apply(Pair<String, ScheduleStatus> jobAndStatus) {
-                    String jobKey = jobAndStatus.getFirst();
-                    ScheduleStatus status = jobAndStatus.getSecond();
-                    return new Var(getVarName(jobKey, status));
-                  }
-                })));
-
-    private final LoadingCache<ScheduleStatus, Var> varsByStatus = CacheBuilder.newBuilder().build(
-        CacheLoader.from(Functions.compose(maybeExport,
-            new Function<ScheduleStatus, Var>() {
-              @Override public Var apply(ScheduleStatus status) {
-                return new Var(getVarName(status));
-              }
-            })));
-
-    Vars() {
-      // Initialize by-status counters.
-      for (ScheduleStatus status : ScheduleStatus.values()) {
-        varsByStatus.getUnchecked(status);
-      }
-    }
-
-    @VisibleForTesting
-    String getVarName(String jobKey, ScheduleStatus status) {
-      return "job_" + jobKey + "_tasks_" + status.name();
-    }
-
-    @VisibleForTesting
-    String getVarName(ScheduleStatus status) {
-      return "task_store_" + status;
-    }
-
-    private static String statPrefix(String role, String job) {
-      return role + "_" + job;
-    }
-
-    public void incrementCount(String role, String job, ScheduleStatus status) {
-      varsByStatus.getUnchecked(status).increment();
-      varsByJobKeyAndStatus.getUnchecked(Pair.of(statPrefix(role, job), status)).increment();
-    }
-
-    public void decrementCount(String role, String job, ScheduleStatus status) {
-      varsByStatus.getUnchecked(status).decrement();
-      varsByJobKeyAndStatus.getUnchecked(Pair.of(statPrefix(role, job), status)).decrement();
-    }
-
-    public void adjustCount(
-        String role,
-        String job,
-        ScheduleStatus oldStatus,
-        ScheduleStatus newStatus) {
-
-      decrementCount(role, job, oldStatus);
-      incrementCount(role, job, newStatus);
-    }
-
-    public void beginExporting() {
-      Preconditions.checkState(!exporting, "Exporting has already started.");
-      exporting = true;
-      for (Var var : varsByStatus.asMap().values()) {
-        Stats.export(var);
-      }
-      for (Var var : varsByJobKeyAndStatus.asMap().values()) {
-        Stats.export(var);
-      }
+  @Subscribe
+  public void tasksDeleted(final TasksDeleted event) {
+    for (ScheduledTask task : event.getTasks()) {
+      decrementCount(Tasks.getRole(task), Tasks.getJob(task), task.getStatus());
     }
   }
 }

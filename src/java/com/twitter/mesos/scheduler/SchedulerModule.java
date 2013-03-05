@@ -32,6 +32,8 @@ import com.twitter.common.inject.TimedInterceptor;
 import com.twitter.common.net.pool.DynamicHostSet;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.common.stats.Stats;
+import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.thrift.ThriftServer;
 import com.twitter.common.util.Clock;
 import com.twitter.common.zookeeper.Candidate;
@@ -54,7 +56,6 @@ import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
 import com.twitter.mesos.scheduler.PulseMonitor.PulseMonitorImpl;
 import com.twitter.mesos.scheduler.RegisteredListener.FanoutRegisteredListener;
 import com.twitter.mesos.scheduler.SchedulerLifecycle.DriverReference;
-import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.TaskAssigner.TaskAssignerImpl;
 import com.twitter.mesos.scheduler.async.AsyncModule;
 import com.twitter.mesos.scheduler.events.TaskEventModule;
@@ -175,7 +176,6 @@ public class SchedulerModule extends AbstractModule {
 
     // Bindings for StateManager
     bind(StateManager.class).to(StateManagerImpl.class);
-    bind(MutableState.class).in(Singleton.class);
     bind(Clock.class).toInstance(Clock.SYSTEM_CLOCK);
     bind(StateManagerImpl.class).in(Singleton.class);
 
@@ -206,6 +206,9 @@ public class SchedulerModule extends AbstractModule {
 
     bind(MaintenanceController.class).to(MaintenanceControllerImpl.class);
     bind(MaintenanceControllerImpl.class).in(Singleton.class);
+
+    bind(StatsProvider.class).toInstance(Stats.STATS_PROVIDER);
+    TaskEventModule.bindSubscriber(binder(), StateManagerVars.class);
   }
 
   /**

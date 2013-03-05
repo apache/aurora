@@ -88,10 +88,10 @@ public class NearestFitTest {
   public void testStateChanged() {
     vetoed(ALMOST);
     assertNearest(ALMOST);
-    nearest.stateChanged(new TaskStateChange(
-        TASK,
-        ScheduleStatus.PENDING,
-        new ScheduledTask().setStatus(ScheduleStatus.ASSIGNED)));
+    ScheduledTask task = new ScheduledTask()
+        .setStatus(ScheduleStatus.ASSIGNED)
+        .setAssignedTask(new AssignedTask().setTaskId(TASK));
+    nearest.stateChanged(new TaskStateChange(task, ScheduleStatus.PENDING));
     assertNearest();
   }
 

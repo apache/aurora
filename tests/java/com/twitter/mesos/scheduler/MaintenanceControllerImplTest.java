@@ -83,7 +83,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
     assertStatus(HOST_A, SCHEDULED, maintenance.startMaintenance(A));
     assertStatus(HOST_A, DRAINING, maintenance.drain(A));
     task.setStatus(FINISHED);
-    maintenance.taskChangedState(new TaskStateChange("taskA", RUNNING, task));
+    maintenance.taskChangedState(new TaskStateChange(task, RUNNING));
     assertStatus(HOST_A, DRAINED, maintenance.getStatus(A));
     assertStatus(HOST_A, NONE, maintenance.endMaintenance(A));
   }
@@ -122,7 +122,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
     // Make sure a later transition on the host does not cause any ill effects that could surface
     // from stale internal state.
     task.setStatus(FINISHED);
-    maintenance.taskChangedState(new TaskStateChange("taskA", RUNNING, task));
+    maintenance.taskChangedState(new TaskStateChange(task, RUNNING));
     assertStatus(HOST_A, NONE, maintenance.getStatus(A));
   }
 
@@ -141,7 +141,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
     assertStatus(HOST_A, DRAINING, maintenance.getStatus(A));
     assertStatus("b", DRAINED, maintenance.getStatus(ImmutableSet.of("b")));
     task.setStatus(ScheduleStatus.FINISHED);
-    maintenance.taskChangedState(new TaskStateChange("taskA", RUNNING, task));
+    maintenance.taskChangedState(new TaskStateChange(task, RUNNING));
     assertStatus(HOST_A, DRAINED, maintenance.getStatus(A));
   }
 

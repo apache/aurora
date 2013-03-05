@@ -8,7 +8,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 import com.twitter.common.base.Closure;
-import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.events.PubsubEvent;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
@@ -21,14 +20,11 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 class TransactionalStorage {
   @VisibleForTesting
-  final Queue<SideEffect> sideEffects = Lists.newLinkedList();
-  @VisibleForTesting
   final Queue<PubsubEvent> events = Lists.newLinkedList();
 
   private AtomicBoolean inTransaction = new AtomicBoolean(false);
 
   private final Storage storage;
-  private final MutableState mutableState;
   private final TransactionFinalizer transactionFinalizer;
   private final Closure<PubsubEvent> taskEventSink;
 
@@ -50,12 +46,10 @@ class TransactionalStorage {
 
   TransactionalStorage(
       Storage storage,
-      MutableState mutableState,
       TransactionFinalizer transactionFinalizer,
       Closure<PubsubEvent> taskEventSink) {
 
     this.storage = checkNotNull(storage);
-    this.mutableState = checkNotNull(mutableState);
     this.transactionFinalizer = checkNotNull(transactionFinalizer);
     this.taskEventSink = checkNotNull(taskEventSink);
   }
@@ -82,11 +76,6 @@ class TransactionalStorage {
    * @param <E> Work exception type.
    */
   abstract class SideEffectWork<T, E extends Exception> implements MutateWork<T, E> {
-    protected final void addSideEffect(SideEffect sideEffect) {
-      Preconditions.checkState(inTransaction.get());
-      sideEffects.add(Preconditions.checkNotNull(sideEffect));
-    }
-
     protected final void addTaskEvent(PubsubEvent notice) {
       Preconditions.checkState(inTransaction.get());
       events.add(Preconditions.checkNotNull(notice));
@@ -160,16 +149,8 @@ class TransactionalStorage {
           // once this is assessed.
           transactionFinalizer.finalize(work, storeProvider);
           if (topLevelTransaction) {
-            // Since an event execution can spawn a side-effect, we loop until we process all events
-            // and side-effects.
-            while (!sideEffects.isEmpty() || !events.isEmpty()) {
-              if (!sideEffects.isEmpty()) {
-                sideEffects.remove().mutate(mutableState);
-              }
-
-              if (!events.isEmpty()) {
-                taskEventSink.execute(events.remove());
-              }
+            while (!events.isEmpty()) {
+              taskEventSink.execute(events.remove());
             }
           }
           return result;
@@ -180,12 +161,5 @@ class TransactionalStorage {
         }
       }
     };
-  }
-
-  /**
-   * Side effects are modifications of the internal state.
-   */
-  interface SideEffect {
-    void mutate(MutableState state);
   }
 }

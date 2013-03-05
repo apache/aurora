@@ -115,8 +115,10 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   }
 
   private void changeState(String taskId, ScheduleStatus oldState, ScheduleStatus newState) {
-    scheduler.taskChangedState(
-        new TaskStateChange(taskId, oldState, new ScheduledTask().setStatus(newState)));
+    ScheduledTask task = new ScheduledTask()
+        .setStatus(newState)
+        .setAssignedTask(new AssignedTask().setTaskId(taskId));
+    scheduler.taskChangedState(new TaskStateChange(task, oldState));
   }
 
   private Capture<Runnable> expectTaskWatch(long previousPenaltyMs, long nextPenaltyMs) {

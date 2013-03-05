@@ -64,12 +64,10 @@ public class LostTaskStatsTest extends EasyMockTest {
   }
 
   private void taskLost(String host) {
-    lostStats.stateChange(new TaskStateChange(
-        "task-" + host,
-        ScheduleStatus.RUNNING,
-        new ScheduledTask()
-            .setStatus(ScheduleStatus.LOST)
-            .setAssignedTask(new AssignedTask().setSlaveHost(host)))
+    ScheduledTask task = new ScheduledTask()
+        .setStatus(ScheduleStatus.LOST)
+        .setAssignedTask(new AssignedTask().setTaskId("task-" + host).setSlaveHost(host));
+    lostStats.stateChange(new TaskStateChange(task, ScheduleStatus.RUNNING)
     );
   }
 

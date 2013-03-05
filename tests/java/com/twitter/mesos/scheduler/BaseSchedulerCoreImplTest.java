@@ -52,7 +52,6 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.ValueConstraint;
 import com.twitter.mesos.scheduler.CronJobManager.CronScheduler;
-import com.twitter.mesos.scheduler.StateManagerVars.MutableState;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import com.twitter.mesos.scheduler.events.PubsubEvent;
@@ -149,7 +148,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     this.storage = newStorage;
     ImmediateJobManager immediateManager = new ImmediateJobManager(storage);
     cron = new CronJobManager(storage, cronScheduler);
-    stateManager = new StateManagerImpl(storage, clock, new MutableState(), driver, eventSink);
+    stateManager = new StateManagerImpl(storage, clock, driver, eventSink);
     quotaManager = new QuotaManagerImpl(storage);
     scheduler = new SchedulerCoreImpl(
         storage,
