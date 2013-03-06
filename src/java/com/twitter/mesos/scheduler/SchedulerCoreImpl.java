@@ -41,6 +41,7 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.mesos.Tasks.ACTIVE_STATES;
 import static com.twitter.mesos.Tasks.jobKey;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
+import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.ROLLBACK;
 import static com.twitter.mesos.gen.ScheduleStatus.UPDATING;
 import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.CONSTRUCTED;
@@ -308,6 +309,36 @@ public class SchedulerCoreImpl implements SchedulerCore {
     if (!matchingScheduler && !updateFinished && (tasksAffected == 0)) {
       throw new ScheduleException("No jobs to kill");
     }
+  }
+
+  @Override
+  public void restartShards(
+      String role,
+      String jobName,
+      final Set<Integer> shards,
+      final String requestingUser) throws ScheduleException {
+
+    if (shards.isEmpty()) {
+      throw new ScheduleException("At least one shard must be specified.");
+    }
+
+    checkStarted();
+    final TaskQuery query = Query.activeQuery(role, jobName).setShardIds(shards);
+    storage.doInWriteTransaction(new MutateWork.NoResult<ScheduleException>() {
+      @Override protected void execute(MutableStoreProvider storeProvider)
+          throws ScheduleException {
+
+        Set<ScheduledTask> matchingTasks = storeProvider.getTaskStore().fetchTasks(query);
+        if (matchingTasks.size() != shards.size()) {
+          throw new ScheduleException("Not all requested shards are active.");
+        }
+        LOG.info("Restarting shards matching " + query);
+        stateManager.changeState(
+            Query.byId(Tasks.ids(matchingTasks)),
+            RESTARTING,
+            Optional.of("Restarted by " + requestingUser));
+      }
+    });
   }
 
   private void ensureHasAdditionalQuota(String role, Quota quota) throws ScheduleException {

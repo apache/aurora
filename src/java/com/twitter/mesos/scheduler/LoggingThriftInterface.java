@@ -39,6 +39,7 @@ import com.twitter.mesos.gen.PerformBackupResponse;
 import com.twitter.mesos.gen.PopulateJobResponse;
 import com.twitter.mesos.gen.QueryRecoveryResponse;
 import com.twitter.mesos.gen.Quota;
+import com.twitter.mesos.gen.RestartShardsResponse;
 import com.twitter.mesos.gen.RollbackShardsResponse;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduleStatusResponse;
@@ -188,6 +189,17 @@ class LoggingThriftInterface implements MesosAdmin.Iface {
 
     logUserAction(session, "finish updating job " + jobName + " with result " + updateResult);
     return delegate.finishUpdate(ownerRole, jobName, updateResult, updateToken, session);
+  }
+
+  @Override
+  public RestartShardsResponse restartShards(
+      String role,
+      String jobName,
+      Set<Integer> shardIds,
+      SessionKey session) throws TException {
+
+    logUserAction(session, "restart shards " + role + "/" + jobName + " " + shardIds);
+    return delegate.restartShards(role, jobName, shardIds, session);
   }
 
   @Override

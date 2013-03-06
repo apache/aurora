@@ -18,6 +18,7 @@ import org.apache.commons.lang.StringUtils;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.NotEmpty;
+import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.base.Supplier;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -45,6 +46,7 @@ import com.twitter.mesos.gen.PopulateJobResponse;
 import com.twitter.mesos.gen.QueryRecoveryResponse;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ResponseCode;
+import com.twitter.mesos.gen.RestartShardsResponse;
 import com.twitter.mesos.gen.RollbackShardsResponse;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduleStatusResponse;
@@ -441,6 +443,36 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     try {
       schedulerCore.finishUpdate(identity, jobName, token, updateResult);
       response.setResponseCode(OK).setMessage("Update successfully finished.");
+    } catch (ScheduleException e) {
+      response.setResponseCode(ResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
+    }
+
+    return response;
+  }
+
+  @Override
+  public RestartShardsResponse restartShards(
+      String role,
+      String jobName,
+      Set<Integer> shardIds,
+      SessionKey session) {
+
+    checkNotBlank(role);
+    checkNotBlank(jobName);
+    MorePreconditions.checkNotBlank(shardIds);
+    checkNotNull(session);
+
+    RestartShardsResponse response = new RestartShardsResponse();
+    try {
+      sessionValidator.checkAuthenticated(session, role);
+    } catch (AuthFailedException e) {
+      response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
+      return response;
+    }
+
+    try {
+      schedulerCore.restartShards(role, jobName, shardIds, session.getUser());
+      response.setResponseCode(OK).setMessage("Shards are restarting.");
     } catch (ScheduleException e) {
       response.setResponseCode(ResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
     }

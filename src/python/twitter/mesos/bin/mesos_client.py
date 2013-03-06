@@ -620,6 +620,27 @@ def update(jobname, config_file):
 
 @app.command
 @app.command_option(CLUSTER_INVOKE_OPTION)
+@app.command_option(OPEN_BROWSER_OPTION)
+@app.command_option(SHARDS_OPTION)
+@requires.exactly('role', 'job')
+def restart(role, job):
+  """usage: restart --cluster=CLUSTER role job --shards=SHARDS
+
+  Restarts a batch of shards within a job.
+  WARNING: All specified shards will be restarted simultaneously.  Any batching and
+  delays must be done externally.
+  """
+  options = app.get_options()
+  api = MesosClientAPI(options.cluster, options.verbosity == 'verbose')
+  if not options.shards:
+    die('--shards is required')
+  resp = api.restart(role, job, _getshards(options.shards))
+  check_and_log_response(resp)
+  handle_open(api.scheduler.scheduler(), role, job)
+
+
+@app.command
+@app.command_option(CLUSTER_INVOKE_OPTION)
 @requires.exactly('role', 'job')
 def cancel_update(role, jobname):
   """usage: cancel_update --cluster=CLUSTER role job

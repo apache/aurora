@@ -179,6 +179,18 @@ public interface SchedulerCore extends RegisteredListener {
   void killTasks(TaskQuery query, String user) throws ScheduleException;
 
   /**
+   * Initiates a restart of shards within an active job.
+   *
+   * @param role Role owning the shards to restart.
+   * @param jobName Job containing the shards.
+   * @param shards Shards to be restarted.
+   * @param requestingUser User performing the restart action.
+   * @throws ScheduleException If there are no matching active shards.
+   */
+  void restartShards(String role, String jobName, Set<Integer> shards, String requestingUser)
+      throws ScheduleException;
+
+  /**
    * Preempts a task in favor of another.
    *
    * @param task Task being preempted.

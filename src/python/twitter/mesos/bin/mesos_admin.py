@@ -154,6 +154,7 @@ def force_task_state(task_id, state):
               % (state, ', '.join(ScheduleStatus._NAMES_TO_VALUES.keys())))
     sys.exit(1)
 
+  options = app.get_options()
   resp = MesosClientAPI(options.cluster, options.verbosity).force_task_state(task_id, status)
   check_and_log_response(resp)
 
@@ -166,6 +167,7 @@ def scheduler_backup_now():
 
   Immediately initiates a full storage backup.
   """
+  options = app.get_options()
   check_and_log_response(MesosClientAPI(options.cluster, options.verbosity).perform_backup())
 
 
@@ -177,6 +179,7 @@ def scheduler_list_backups():
 
   Lists backups available for recovery.
   """
+  options = app.get_options()
   resp = MesosClientAPI(options.cluster, options.verbosity).list_backups()
   check_and_log_response(resp)
   log.info('%s available backups:' % len(resp.backups))
@@ -192,6 +195,7 @@ def scheduler_stage_recovery(backup_id):
 
   Stages a backup for recovery.
   """
+  options = app.get_options()
   check_and_log_response(
       MesosClientAPI(options.cluster, options.verbosity).stage_recovery(backup_id))
 
@@ -204,6 +208,7 @@ def scheduler_print_recovery_tasks():
 
   Prints all active tasks in a staged recovery.
   """
+  options = app.get_options()
   resp = MesosClientAPI(options.cluster, options.verbosity).query_recovery(
       TaskQuery(statuses=ACTIVE_STATES))
   check_and_log_response(resp)
@@ -227,6 +232,7 @@ def scheduler_delete_recovery_tasks(task_ids):
   Deletes a comma-separated list of task IDs from a staged recovery.
   """
   ids = set(task_ids.split(','))
+  options = app.get_options()
   check_and_log_response(MesosClientAPI(options.cluster, options.verbosity)
       .delete_recovery_tasks(TaskQuery(taskIds=ids)))
 
@@ -239,6 +245,7 @@ def scheduler_commit_recovery():
 
   Commits a staged recovery.
   """
+  options = app.get_options()
   check_and_log_response(MesosClientAPI(options.cluster, options.verbosity)
       .commit_recovery())
 
@@ -251,6 +258,7 @@ def scheduler_unload_recovery():
 
   Unloads a staged recovery.
   """
+  options = app.get_options()
   check_and_log_response(MesosClientAPI(options.cluster, options.verbosity)
       .unload_recovery())
 

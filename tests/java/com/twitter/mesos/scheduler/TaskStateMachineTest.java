@@ -234,6 +234,16 @@ public class TaskStateMachineTest extends EasyMockTest {
   }
 
   @Test
+  public void testPendingRestartedTask() {
+    expectWork(UPDATE_STATE).times(1);
+
+    control.replay();
+
+    // PENDING -> RESTARTING should not be allowed.
+    transition(stateMachine, PENDING, RESTARTING);
+  }
+
+  @Test
   public void testAllowsSkipStartingAndRunning() {
     expectWork(UPDATE_STATE).times(3);
 
@@ -301,6 +311,32 @@ public class TaskStateMachineTest extends EasyMockTest {
     control.replay();
 
     transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, UPDATING, KILLED);
+  }
+
+  @Test
+  public void testUpdateRestartingTask() {
+    stateMachine = makeStateMachine("test", makeTask(true));
+    expectWork(UPDATE_STATE).times(7);
+    expect(isJobUpdating.get()).andReturn(true);
+    expectWork(UPDATE);
+    expectWork(KILL).times(2);
+
+    control.replay();
+
+    transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, RESTARTING, UPDATING, FINISHED);
+  }
+
+  @Test
+  public void testRollbackRestartingTask() {
+    stateMachine = makeStateMachine("test", makeTask(true));
+    expectWork(UPDATE_STATE).times(7);
+    expect(isJobUpdating.get()).andReturn(true);
+    expectWork(WorkCommand.ROLLBACK);
+    expectWork(KILL).times(2);
+
+    control.replay();
+
+    transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, RESTARTING, ROLLBACK, FINISHED);
   }
 
   @Test

@@ -92,7 +92,7 @@ invoking cancel_update.
 
     log.info("Updating job: %s" % config.name())
     updater = Updater(config, self._scheduler)
-  
+
     resp = updater.start()
     update_resp = FinishUpdateResponse()
     update_resp.responseCode = resp.responseCode
@@ -116,7 +116,7 @@ invoking cancel_update.
     resp = updater.finish(failed_shards)
     if resp.responseCode != ResponseCode.OK:
       log.error('There was an error finalizing the update: %s' % resp.message)
-    
+
     return resp
 
   def cancel_update(self, role, jobname):
@@ -127,6 +127,10 @@ invoking cancel_update.
     if resp.responseCode != ResponseCode.OK:
       log.error('Error cancelling the update: %s' % resp.message)
     return resp
+
+  def restart(self, role, jobname, shards):
+    log.info("Restarting job %s shards %s" % (jobname, shards))
+    return self._scheduler.restartShards(role, jobname, shards)
 
   def get_quota(self, role):
     log.info("Getting quota for: %s" % role)

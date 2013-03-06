@@ -32,6 +32,7 @@ import com.twitter.mesos.gen.LimitConstraint;
 import com.twitter.mesos.gen.MaintenanceStatusResponse;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ResponseCode;
+import com.twitter.mesos.gen.RestartShardsResponse;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.SessionKey;
@@ -182,6 +183,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     storageUtil.expectTaskFetch(query, task);
     scheduler.killTasks(query, USER);
     storageUtil.expectTaskFetch(query);
+
     control.replay();
 
     KillResponse response = thrift.killTasks(query, SESSION);
@@ -204,6 +206,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     scheduler.killTasks(query, USER);
     storageUtil.expectTaskFetch(query, task).times(2);
     storageUtil.expectTaskFetch(query);
+
     control.replay();
 
     KillResponse response = thrift.killTasks(query, SESSION);
@@ -239,6 +242,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAdminAuth(true);
     scheduler.killTasks(query, USER);
     storageUtil.expectTaskFetch(query);
+
     control.replay();
 
     KillResponse response = thrift.killTasks(query, SESSION);
@@ -250,7 +254,9 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     TaskQuery query = new TaskQuery()
         .setOwner(ROLE_IDENTITY)
         .setJobName("");
+
     control.replay();
+
     KillResponse response = thrift.killTasks(query, SESSION);
     assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
@@ -265,6 +271,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     scheduler.killTasks(query, USER);
     expectLastCall().andThrow(new ScheduleException("No jobs matching query"));
+
     control.replay();
 
     KillResponse response = thrift.killTasks(query, SESSION);
@@ -334,6 +341,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .andReturn(Optional.of(token));
 
     control.replay();
+
     StartUpdateResponse resp = thrift.startUpdate(job, SESSION);
     assertEquals(token, resp.getUpdateToken());
     assertEquals(ResponseCode.OK, resp.getResponseCode());
@@ -349,14 +357,45 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .andReturn(Optional.<String>absent());
 
     control.replay();
+
     StartUpdateResponse resp = thrift.startUpdate(job, SESSION);
     assertEquals(ResponseCode.OK, resp.getResponseCode());
     assertFalse(resp.isRollingUpdateRequired());
   }
 
   @Test
+  public void testRestartShards() throws Exception {
+    Set<Integer> shards = ImmutableSet.of(1, 6);
+
+    expectAuth(ROLE, true);
+    scheduler.restartShards(ROLE, JOB_NAME, shards, USER);
+
+    control.replay();
+
+    RestartShardsResponse resp = thrift.restartShards(ROLE, JOB_NAME, shards, SESSION);
+    assertEquals(ResponseCode.OK, resp.getResponseCode());
+  }
+
+  @Test
+  public void testRestartShardsFails() throws Exception {
+    Set<Integer> shards = ImmutableSet.of(1, 6);
+
+    String message = "Injected.";
+    expectAuth(ROLE, true);
+    scheduler.restartShards(ROLE, JOB_NAME, shards, USER);
+    expectLastCall().andThrow(new ScheduleException(message));
+
+    control.replay();
+
+    RestartShardsResponse resp = thrift.restartShards(ROLE, JOB_NAME, shards, SESSION);
+    assertEquals(ResponseCode.INVALID_REQUEST, resp.getResponseCode());
+    assertEquals(message, resp.getMessage());
+  }
+
+  @Test
   public void testCreateJobNoResources() throws Exception {
     expectAuth(ROLE, true);
+
     control.replay();
 
     TwitterTaskInfo task = productionTask();
@@ -369,6 +408,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testCreateJobBadCpu() throws Exception {
     expectAuth(ROLE, true);
+
     control.replay();
 
     TwitterTaskInfo task = productionTask().setNumCpus(0.0);
@@ -378,6 +418,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testCreateJobBadRam() throws Exception {
     expectAuth(ROLE, true);
+
     control.replay();
 
     TwitterTaskInfo task = productionTask().setRamMb(-123);
@@ -387,6 +428,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testCreateJobBadDisk() throws Exception {
     expectAuth(ROLE, true);
+
     control.replay();
 
     TwitterTaskInfo task = productionTask().setDiskMb(0);
@@ -448,6 +490,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testCreateJobExceedsTaskLimit() throws Exception {
     expectAuth(ROLE, true);
+
     control.replay();
 
     JobConfiguration job = makeJob(taskCopies(nonProductionTask(), MAX_TASKS_PER_JOB.get() + 1));
@@ -460,6 +503,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     JobConfiguration job = makeJob(taskCopies(nonProductionTask(), MAX_TASKS_PER_JOB.get()));
     scheduler.createJob(ParsedConfiguration.fromUnparsed(job));
     expectAuth(ROLE, true);
+
     control.replay();
 
     thrift.createJob(job, SESSION);
@@ -471,7 +515,9 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testCreateEmptyJob() throws Exception {
     expectAuth(ROLE, true);
+
     control.replay();
+
     JobConfiguration job = new JobConfiguration()
         .setOwner(ROLE_IDENTITY)
         .setName(JOB_NAME)
@@ -482,6 +528,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testLimitConstraintForDedicatedJob() throws Exception {
     expectAuth(ROLE, true);
+
     control.replay();
 
     TwitterTaskInfo task = nonProductionTask();
@@ -492,6 +539,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testMultipleValueConstraintForDedicatedJob() throws Exception {
     expectAuth(ROLE, true);
+
     control.replay();
 
     TwitterTaskInfo task = nonProductionTask();
@@ -502,6 +550,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testUnauthorizedDedicatedJob() throws Exception {
     expectAuth(ROLE, true);
+
     control.replay();
 
     TwitterTaskInfo task = nonProductionTask();
@@ -512,6 +561,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testRejectsMixedProductionMode() throws Exception {
     expectAuth(ROLE, true);
+
     control.replay();
 
     TwitterTaskInfo nonProduction = nonProductionTask();
@@ -523,6 +573,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testCreateJobMissingShardIds() throws Exception {
     expectAuth(ROLE, true);
+
     control.replay();
 
     JobConfiguration job = makeJob(productionTask());
@@ -533,6 +584,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testCreateJobDuplicateShardIds() throws Exception {
     expectAuth(ROLE, true);
+
     control.replay();
 
     // Tasks are internally placed in a Set, so a differentiating value is needed to prevent
@@ -548,6 +600,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testCreateJobShardIdHole() throws Exception {
     expectAuth(ROLE, true);
+
     control.replay();
 
     JobConfiguration job = makeJob(productionTask(), productionTask());

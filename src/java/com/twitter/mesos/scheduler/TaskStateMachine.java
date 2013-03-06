@@ -193,6 +193,14 @@ public class TaskStateMachine {
         /* Remove a terminated task that is remotely removed. */
         Closures.filter(Transition.to(UNKNOWN), addWorkClosure(WorkCommand.DELETE)));
 
+    final Command initiateUpdateSequence = new Command() {
+      @Override public void execute() throws IllegalStateException {
+        Preconditions.checkState(isJobUpdating.get(),
+            "No active update found for task " + taskId + ", which is trying to update/rollback.");
+        addWork(WorkCommand.KILL);
+      }
+    };
+
     final Closure<Transition<State>> manageRestartingTask = new Closure<Transition<State>>() {
       @Override public void execute(Transition<State> transition) {
         switch (transition.getTo().getState()) {
@@ -200,6 +208,11 @@ public class TaskStateMachine {
           case STARTING:
           case RUNNING:
             addWork(WorkCommand.KILL);
+            break;
+
+          case UPDATING:
+          case ROLLBACK:
+            initiateUpdateSequence.execute();
             break;
 
           case LOST:
@@ -246,14 +259,6 @@ public class TaskStateMachine {
         } else {
           LOG.info("Task " + getTaskId() + " reached failure limit, not rescheduling");
         }
-      }
-    };
-
-    final Command initiateUpdateSequence = new Command() {
-      @Override public void execute() throws IllegalStateException {
-        Preconditions.checkState(isJobUpdating.get(),
-            "No active update found for task " + taskId + ", which is trying to update/rollback.");
-        addWork(WorkCommand.KILL);
       }
     };
 
@@ -453,7 +458,7 @@ public class TaskStateMachine {
                 .withCallback(manageRestartingTask))
         .addState(
             Rule.from(RESTARTING)
-                .to(FINISHED, FAILED, KILLING, KILLED, LOST)
+                .to(FINISHED, FAILED, UPDATING, ROLLBACK, KILLING, KILLED, LOST)
                 .withCallback(manageRestartingTask))
         .addState(
             Rule.from(UPDATING)
@@ -507,6 +512,11 @@ public class TaskStateMachine {
               }
             }
         )
+        // TODO(wfarner): Consider alternatives to allow exceptions to surface.  This would allow
+        // the state machine to surface illegal state transitions and propagate better information
+        // to the caller.  As it stands, the caller must implement logic that really belongs in
+        // the state machine.  For example, preventing RESTARTING->UPDATING transitions
+        // (or for that matter, almost any user-initiated state transition) is awkward.
         .throwOnBadTransition(false)
         .build();
   }

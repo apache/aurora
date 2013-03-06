@@ -77,6 +77,7 @@ import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
 import static com.twitter.mesos.gen.ScheduleStatus.LOST;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
+import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.UPDATING;
@@ -1607,6 +1608,43 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         verifyUpdate(tasks, oldJob, VERIFY_OLD_TASK);
       }
     };
+  }
+
+  @Test
+  public void testRestartShards() throws Exception {
+    expectKillTask(2);
+
+    control.replay();
+    buildScheduler();
+
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, productionTask().setIsDaemon(true), 6));
+    changeStatus(Query.byJob(OWNER_A.role, JOB_A), ASSIGNED);
+    changeStatus(Query.byJob(OWNER_A.role, JOB_A), RUNNING);
+    scheduler.restartShards(OWNER_A.role, JOB_A, ImmutableSet.of(1, 5), OWNER_A.user);
+    assertEquals(4, getTasks(Query.byStatus(RUNNING)).size());
+    assertEquals(2, getTasks(Query.byStatus(RESTARTING)).size());
+    changeStatus(Query.byStatus(RESTARTING), FINISHED);
+    assertEquals(2, getTasks(Query.byStatus(PENDING)).size());
+  }
+
+  @Test(expected = ScheduleException.class)
+  public void testRestartNonexistentShard() throws Exception {
+    control.replay();
+    buildScheduler();
+
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, productionTask().setIsDaemon(true), 1));
+    changeStatus(Query.byJob(OWNER_A.role, JOB_A), ASSIGNED);
+    changeStatus(Query.byJob(OWNER_A.role, JOB_A), FINISHED);
+    scheduler.restartShards(OWNER_A.role, JOB_A, ImmutableSet.of(5), OWNER_A.user);
+  }
+
+  @Test
+  public void testRestartPendingShard() throws Exception {
+    control.replay();
+    buildScheduler();
+
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, productionTask().setIsDaemon(true), 1));
+    scheduler.restartShards(OWNER_A.role, JOB_A, ImmutableSet.of(0), OWNER_A.user);
   }
 
   @Test
