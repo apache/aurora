@@ -24,6 +24,7 @@ import com.twitter.common.base.Command;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveMapper;
 import com.twitter.mesos.scheduler.storage.Storage.StorageException;
+import com.twitter.mesos.scheduler.storage.testing.StorageTestUtil;
 
 import static org.apache.mesos.Protos.Status.DRIVER_RUNNING;
 import static org.easymock.EasyMock.expect;
@@ -72,6 +73,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
       .setTaskId(TASK_ID)
       .build();
 
+  private StorageTestUtil storageUtil;
   private TaskLauncher systemLauncher;
   private TaskLauncher userLauncher;
   private SlaveMapper slaveMapper;
@@ -82,6 +84,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
 
   @Before
   public void setUp() {
+    storageUtil = new StorageTestUtil(this);
     Lifecycle lifecycle =
         new Lifecycle(createMock(Command.class), createMock(UncaughtExceptionHandler.class));
     systemLauncher = createMock(TaskLauncher.class);
@@ -89,6 +92,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     slaveMapper = createMock(SlaveMapper.class);
     registeredListener = createMock(RegisteredListener.class);
     scheduler = new MesosSchedulerImpl(
+        storageUtil.storage,
         createMock(SchedulerCore.class),
         lifecycle,
         Arrays.asList(systemLauncher, userLauncher),
@@ -119,6 +123,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   public void testNoAccepts() throws Exception {
     new OfferFixture() {
       @Override void respondToOffer() throws Exception {
+        expectOfferAttributesSaved(OFFER);
         expect(systemLauncher.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
         expect(userLauncher.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
       }
@@ -129,6 +134,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   public void testOfferFirstAccepts() throws Exception {
     new OfferFixture() {
       @Override void respondToOffer() throws Exception {
+        expectOfferAttributesSaved(OFFER);
         expect(systemLauncher.createTask(OFFER)).andReturn(Optional.of(TASK));
         expectLaunch(TASK);
       }
@@ -139,6 +145,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   public void testOfferSchedulerAccepts() throws Exception {
     new OfferFixture() {
       @Override void respondToOffer() throws Exception {
+        expectOfferAttributesSaved(OFFER);
         expect(systemLauncher.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
         expect(userLauncher.createTask(OFFER)).andReturn(Optional.of(TASK));
         expectLaunch(TASK);
@@ -150,6 +157,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   public void testAcceptedExceedsOffer() throws Exception {
     new OfferFixture() {
       @Override void respondToOffer() throws Exception {
+        expectOfferAttributesSaved(OFFER);
         expect(systemLauncher.createTask(OFFER)).andReturn(Optional.of(BIGGER_TASK));
         expect(userLauncher.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
       }
@@ -199,6 +207,9 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   public void testMultipleOffers() throws Exception {
     new RegisteredFixture() {
       @Override void expectations() throws Exception {
+        storageUtil.expectTransactions();
+        expectOfferAttributesSaved(OFFER);
+        expectOfferAttributesSaved(OFFER_2);
         slaveMapper.addSlave(SLAVE_HOST, SLAVE_ID);
         slaveMapper.addSlave(SLAVE_HOST_2, SLAVE_ID_2);
         expect(systemLauncher.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
@@ -212,6 +223,10 @@ public class MesosSchedulerImplTest extends EasyMockTest {
         scheduler.resourceOffers(driver, ImmutableList.of(OFFER, OFFER_2));
       }
     };
+  }
+
+  private void expectOfferAttributesSaved(Offer offer) {
+    storageUtil.attributeStore.saveHostAttributes(Conversions.getAttributes(offer));
   }
 
   private abstract class RegisteredFixture {
@@ -242,6 +257,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     abstract void respondToOffer() throws Exception;
 
     @Override void expectations() throws Exception {
+      storageUtil.expectTransactions();
       slaveMapper.addSlave(SLAVE_HOST, SLAVE_ID);
       respondToOffer();
     }

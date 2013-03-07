@@ -1,11 +1,8 @@
 package com.twitter.mesos.scheduler;
 
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
@@ -28,13 +25,10 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.Atomics;
 import com.google.inject.Inject;
 
-import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.SlaveID;
 
 import com.twitter.common.base.Closure;
@@ -43,8 +37,6 @@ import com.twitter.common.util.Clock;
 import com.twitter.common.util.StateMachine;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
-import com.twitter.mesos.gen.Attribute;
-import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
@@ -92,49 +84,6 @@ import static com.twitter.mesos.scheduler.Shards.GET_ORIGINAL_CONFIG;
 public class StateManagerImpl implements StateManager {
   private static final Logger LOG = Logger.getLogger(StateManagerImpl.class.getName());
 
-  private static final Function<TaskUpdateConfiguration, Integer> GET_SHARD =
-      new Function<TaskUpdateConfiguration, Integer>() {
-        @Override public Integer apply(TaskUpdateConfiguration config) {
-          return config.isSetOldConfig()
-              ? config.getOldConfig().getShardId()
-              : config.getNewConfig().getShardId();
-        }
-      };
-
-  private static final Function<Protos.Attribute, String> ATTRIBUTE_NAME =
-      new Function<org.apache.mesos.Protos.Attribute, String>() {
-        @Override public String apply(Protos.Attribute attr) {
-          return attr.getName();
-        }
-      };
-
-  private static final Function<Protos.Attribute, String> VALUE_CONVERTER =
-      new Function<Protos.Attribute, String>() {
-        @Override public String apply(Protos.Attribute attribute) {
-          switch (attribute.getType()) {
-            case SCALAR:
-              return String.valueOf(attribute.getScalar().getValue());
-
-            case TEXT:
-              return attribute.getText().getValue();
-
-            default:
-              LOG.finest("Unrecognized attribute type:" + attribute.getType() + " , ignoring.");
-              return null;
-          }
-        }
-      };
-
-  private static final AttributeConverter ATTRIBUTE_CONVERTER = new AttributeConverter() {
-    @Override public Attribute apply(Entry<String, Collection<Protos.Attribute>> entry) {
-      // Convert values and filter any that were ignored.
-      Iterable<String> values = Iterables.filter(
-          Iterables.transform(entry.getValue(), VALUE_CONVERTER), Predicates.notNull());
-
-      return new Attribute(entry.getKey(), ImmutableSet.copyOf(values));
-    }
-  };
-
   private final AtomicLong shardSanityCheckFails = Stats.exportLong("shard_sanity_check_failures");
 
   @VisibleForTesting
@@ -146,6 +95,7 @@ public class StateManagerImpl implements StateManager {
   }
   private final ReadOnlyStorage readOnlyStorage;
 
+  // TODO(William Farner): Push lifecycle management into storage.
   // Enforces lifecycle of the manager, ensuring proper call order.
   private final StateMachine<State> managerState = StateMachine.<State>builder("state_manager")
       .initialState(State.CREATED)
@@ -196,11 +146,7 @@ public class StateManagerImpl implements StateManager {
     final TaskStateMachine stateMachine;
     final Closure<ScheduledTask> mutation;
 
-    WorkEntry(
-        WorkCommand command,
-        TaskStateMachine stateMachine,
-        Closure<ScheduledTask> mutation) {
-
+    WorkEntry(WorkCommand command, TaskStateMachine stateMachine, Closure<ScheduledTask> mutation) {
       this.command = command;
       this.stateMachine = stateMachine;
       this.mutation = mutation;
@@ -590,36 +536,6 @@ public class StateManagerImpl implements StateManager {
   }
 
   /**
-   * Typedef to make anonymous implementation more concise.
-   */
-  private abstract static class AttributeConverter
-      implements Function<Entry<String, Collection<Protos.Attribute>>, Attribute> { }
-
-  @Override
-  public void saveAttributesFromOffer(
-      final String slaveHost,
-      List<Protos.Attribute> attributes) {
-
-    checkNotBlank(slaveHost);
-    checkNotNull(attributes);
-
-    // Group by attribute name.
-    final Multimap<String, Protos.Attribute> valuesByName =
-        Multimaps.index(attributes, ATTRIBUTE_NAME);
-
-    // Convert groups into individual attributes.
-    final Set<Attribute> attrs = Sets.newHashSet(
-        Iterables.transform(valuesByName.asMap().entrySet(), ATTRIBUTE_CONVERTER));
-
-    txStorage.doInWriteTransaction(txStorage.new NoResultSideEffectWork() {
-      @Override protected void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getAttributeStore().saveHostAttributes(
-            new HostAttributes().setHost(slaveHost).setAttributes(attrs));
-      }
-    });
-  }
-
-  /**
    * Performs a simple state change, transitioning all tasks matching a query to the given
    * state.
    * No audit message will be applied with the transition.
@@ -636,10 +552,14 @@ public class StateManagerImpl implements StateManager {
   @Override
   public int changeState(
       TaskQuery query,
-      ScheduleStatus newState,
-      Optional<String> auditMessage) {
+      final ScheduleStatus newState,
+      final Optional<String> auditMessage) {
 
-    return changeState(query, stateUpdaterWithAuditMessage(newState, auditMessage));
+    return changeState(query, new Function<TaskStateMachine, Boolean>() {
+      @Override public Boolean apply(TaskStateMachine stateMachine) {
+        return stateMachine.updateState(newState, auditMessage);
+      }
+    });
   }
 
   @Override
@@ -804,6 +724,15 @@ public class StateManagerImpl implements StateManager {
     }
   }
 
+  private static final Function<TaskUpdateConfiguration, Integer> GET_SHARD =
+      new Function<TaskUpdateConfiguration, Integer>() {
+        @Override public Integer apply(TaskUpdateConfiguration config) {
+          return config.isSetOldConfig()
+              ? config.getOldConfig().getShardId()
+              : config.getNewConfig().getShardId();
+        }
+      };
+
   private Set<TaskUpdateConfiguration> fetchShardUpdateConfigs(
       JobUpdateConfiguration config,
       Set<Integer> shards) {
@@ -891,20 +820,6 @@ public class StateManagerImpl implements StateManager {
     };
   }
 
-  private static Function<TaskStateMachine, Boolean> stateUpdaterWithAuditMessage(
-      final ScheduleStatus state,
-      final Optional<String> auditMessage) {
-
-    checkNotNull(state);
-    checkNotNull(auditMessage);
-
-    return new Function<TaskStateMachine, Boolean>() {
-      @Override public Boolean apply(TaskStateMachine stateMachine) {
-        return stateMachine.updateState(state, auditMessage);
-      }
-    };
-  }
-
   private interface TaskAssignMutation extends Function<TaskStateMachine, Boolean> {
     AssignedTask getAssignedTask();
   }
@@ -926,7 +841,6 @@ public class StateManagerImpl implements StateManager {
 
     return new TaskAssignMutation() {
       AtomicReference<AssignedTask> assignedTask = Atomics.newReference();
-
       @Override public AssignedTask getAssignedTask() {
         return assignedTask.get();
       }
@@ -940,17 +854,7 @@ public class StateManagerImpl implements StateManager {
                 "More than one result was found for an identity query.");
           }
         };
-
-        return stateUpdaterWithMutation(ScheduleStatus.ASSIGNED, wrapper).apply(stateMachine);
-      }
-    };
-  }
-
-  private static Function<TaskStateMachine, Boolean> stateUpdaterWithMutation(
-      final ScheduleStatus state, final Closure<ScheduledTask> mutation) {
-    return new Function<TaskStateMachine, Boolean>() {
-      @Override public Boolean apply(TaskStateMachine stateMachine) {
-        return stateMachine.updateState(state, mutation);
+        return stateMachine.updateState(ScheduleStatus.ASSIGNED, wrapper);
       }
     };
   }
@@ -1149,19 +1053,9 @@ public class StateManagerImpl implements StateManager {
     });
   }
 
-  private TaskStateMachine getStateMachine(String taskId, ScheduledTask task) {
+  private TaskStateMachine getStateMachine(String taskId, @Nullable ScheduledTask task) {
     if (task != null) {
-      String role = Tasks.getRole(task);
-      String job = Tasks.getJob(task);
-      return new TaskStateMachine(
-          Tasks.id(task),
-          role,
-          job,
-          task,
-          taskUpdateChecker(role, job),
-          workSink,
-          clock,
-          task.getStatus());
+      return createStateMachine(task, task.getStatus());
     }
 
     // The task is unknown, not present in storage.

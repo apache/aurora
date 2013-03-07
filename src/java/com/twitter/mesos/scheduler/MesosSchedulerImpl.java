@@ -31,6 +31,9 @@ import com.twitter.mesos.GuiceUtils.AllowUnchecked;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.comm.SchedulerMessage;
 import com.twitter.mesos.scheduler.RegisteredListener.RegisterHandlingException;
+import com.twitter.mesos.scheduler.storage.Storage;
+import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
+import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -53,7 +56,7 @@ public class MesosSchedulerImpl implements Scheduler {
   private final SlaveMapper slaveMapper;
   private final RegisteredListener registeredListener;
 
-  // Stores scheduler state and handles actual scheduling decisions.
+  private final Storage storage;
   private final SchedulerCore schedulerCore;
   private final Lifecycle lifecycle;
   private volatile FrameworkID frameworkID = null;
@@ -68,11 +71,14 @@ public class MesosSchedulerImpl implements Scheduler {
    */
   @Inject
   public MesosSchedulerImpl(
+      Storage storage,
       SchedulerCore schedulerCore,
       final Lifecycle lifecycle,
       List<TaskLauncher> taskLaunchers,
       SlaveMapper slaveMapper,
       RegisteredListener registeredListener) {
+
+    this.storage = checkNotNull(storage);
     this.schedulerCore = checkNotNull(schedulerCore);
     this.lifecycle = checkNotNull(lifecycle);
     this.taskLaunchers = checkNotNull(taskLaunchers);
@@ -118,9 +124,15 @@ public class MesosSchedulerImpl implements Scheduler {
   @Override
   public void resourceOffers(SchedulerDriver driver, List<Offer> offers) {
     Preconditions.checkState(frameworkID != null, "Must be registered before receiving offers.");
-    for (Offer offer : offers) {
+
+    for (final Offer offer : offers) {
       log(Level.FINE, "Received offer: %s", offer);
       resourceOffers.incrementAndGet();
+      storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+        @Override protected void execute(MutableStoreProvider storeProvider) {
+          storeProvider.getAttributeStore().saveHostAttributes(Conversions.getAttributes(offer));
+        }
+      });
 
       slaveMapper.addSlave(offer.getHostname(), offer.getSlaveId());
 
@@ -242,16 +254,9 @@ public class MesosSchedulerImpl implements Scheduler {
 
   /**
    * Maintains a mapping between hosts and slave ids.
+   * TODO(William Farner): Kill this interface and use HostAttributes in Storage.
    */
   public interface SlaveHosts {
-
-    /**
-     * Gets the slave ID associated with a host name.
-     *
-     * @param host The host to look up.
-     * @return The host's slave ID, or {@code null} if the host was not found.
-     */
-    SlaveID getSlave(String host);
 
     /**
      * Gets all slave ID mappings.
@@ -282,11 +287,6 @@ public class MesosSchedulerImpl implements Scheduler {
    */
   static class SlaveHostsImpl implements SlaveHosts, SlaveMapper {
     private final Map<String, SlaveID> executorSlaves = Maps.newConcurrentMap();
-
-    @Override
-    public SlaveID getSlave(String host) {
-      return executorSlaves.get(host);
-    }
 
     @Override
     public void addSlave(String host, SlaveID slaveId) {

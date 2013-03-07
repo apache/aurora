@@ -32,7 +32,6 @@ import com.twitter.mesos.scheduler.async.TaskScheduler;
 import com.twitter.mesos.scheduler.storage.Storage.StorageException;
 
 import static org.easymock.EasyMock.expect;
-import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -62,8 +61,6 @@ public class UserTaskLauncherTest extends EasyMockTest {
     taskScheduler = createMock(TaskScheduler.class);
     stateManager = createMock(StateManager.class);
     launcher = new UserTaskLauncher(taskScheduler, stateManager);
-    stateManager.saveAttributesFromOffer(SLAVE_HOST_1, OFFER.getAttributesList());
-    expectLastCall().anyTimes();
   }
 
   @Test

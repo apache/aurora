@@ -1,11 +1,9 @@
 package com.twitter.mesos.scheduler;
 
-import java.util.List;
 import java.util.Set;
 
 import com.google.common.base.Optional;
 
-import org.apache.mesos.Protos.Attribute;
 import org.apache.mesos.Protos.SlaveID;
 
 import com.twitter.mesos.gen.AssignedTask;
@@ -42,16 +40,6 @@ public interface StateManager {
       TaskQuery query,
       ScheduleStatus newState,
       Optional<String> auditMessage);
-
-  /**
-   * Persists the attributes associated with a host.
-   *
-   * @param slaveHost Host to save attributes for.
-   * @param attributes Attributes associated with the host.
-   * @deprecated Use storage directly instead.
-   */
-  @Deprecated
-  void saveAttributesFromOffer(String slaveHost, List<Attribute> attributes);
 
   /**
    * Assigns a task to a specific slave.

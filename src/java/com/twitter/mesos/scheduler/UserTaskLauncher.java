@@ -15,9 +15,7 @@ import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.Protos.TaskStatus;
 
-import com.twitter.mesos.StateTranslator;
 import com.twitter.mesos.gen.ScheduleStatus;
-import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.async.TaskScheduler;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -45,7 +43,6 @@ class UserTaskLauncher implements TaskLauncher {
   public Optional<TaskInfo> createTask(Offer offer) {
     checkNotNull(offer);
 
-    stateManager.saveAttributesFromOffer(offer.getHostname(), offer.getAttributesList());
     taskScheduler.offer(ImmutableList.of(offer));
 
     return Optional.absent();
@@ -58,28 +55,24 @@ class UserTaskLauncher implements TaskLauncher {
       message = status.getMessage();
     }
 
-    TaskQuery query = Query.byId(status.getTaskId().getValue());
-
     try {
-      ScheduleStatus translatedState = StateTranslator.get(status.getState());
-      if (translatedState == null) {
-        LOG.severe("Failed to look up task state translation for: " + status.getState());
-      } else {
-        // TODO(William Farner): Remove this hack once MESOS-1793 is satisfied.
-        if ((translatedState == ScheduleStatus.FAILED)
-            && (message != null)
-            && (message.contains(MEMORY_LIMIT_EXCEEDED))) {
-          message = MEMORY_LIMIT_EXCEEDED;
-        }
-
-        stateManager.changeState(query, translatedState, Optional.fromNullable(message));
-        return true;
+      ScheduleStatus translatedState = Conversions.convertProtoState(status.getState());
+      // TODO(William Farner): Remove this hack once MESOS-1793 is satisfied.
+      if ((translatedState == ScheduleStatus.FAILED)
+          && (message != null)
+          && (message.contains(MEMORY_LIMIT_EXCEEDED))) {
+        message = MEMORY_LIMIT_EXCEEDED;
       }
+
+      stateManager.changeState(
+          Query.byId(status.getTaskId().getValue()),
+          translatedState,
+          Optional.fromNullable(message));
     } catch (SchedulerException e) {
       LOG.log(Level.WARNING, "Failed to update status for: " + status, e);
       throw e;
     }
-    return false;
+    return true;
   }
 
   @Override
