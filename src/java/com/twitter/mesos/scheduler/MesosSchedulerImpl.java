@@ -1,7 +1,6 @@
 package com.twitter.mesos.scheduler;
 
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -9,8 +8,6 @@ import java.util.logging.Logger;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Maps;
 import com.google.inject.Inject;
 
 import org.apache.mesos.Protos.ExecutorID;
@@ -53,7 +50,6 @@ public class MesosSchedulerImpl implements Scheduler {
   private final AtomicLong lostExecutors = Stats.exportLong("scheduler_lost_executors");
 
   private final List<TaskLauncher> taskLaunchers;
-  private final SlaveMapper slaveMapper;
   private final RegisteredListener registeredListener;
 
   private final Storage storage;
@@ -67,7 +63,6 @@ public class MesosSchedulerImpl implements Scheduler {
    * @param schedulerCore Core scheduler.
    * @param lifecycle Application lifecycle manager.
    * @param taskLaunchers Task launchers.
-   * @param slaveMapper Slave information accumulator.
    */
   @Inject
   public MesosSchedulerImpl(
@@ -75,14 +70,12 @@ public class MesosSchedulerImpl implements Scheduler {
       SchedulerCore schedulerCore,
       final Lifecycle lifecycle,
       List<TaskLauncher> taskLaunchers,
-      SlaveMapper slaveMapper,
       RegisteredListener registeredListener) {
 
     this.storage = checkNotNull(storage);
     this.schedulerCore = checkNotNull(schedulerCore);
     this.lifecycle = checkNotNull(lifecycle);
     this.taskLaunchers = checkNotNull(taskLaunchers);
-    this.slaveMapper = checkNotNull(slaveMapper);
     this.registeredListener = checkNotNull(registeredListener);
   }
 
@@ -133,8 +126,6 @@ public class MesosSchedulerImpl implements Scheduler {
           storeProvider.getAttributeStore().saveHostAttributes(Conversions.getAttributes(offer));
         }
       });
-
-      slaveMapper.addSlave(offer.getHostname(), offer.getSlaveId());
 
       // Ordering of task launchers is important here, since offers are consumed greedily.
       // TODO(William Farner): Refactor this area of code now that the primary task launcher
@@ -249,53 +240,6 @@ public class MesosSchedulerImpl implements Scheduler {
   private static void log(Level level, String message, Object... args) {
     if (LOG.isLoggable(level)) {
       LOG.log(level, String.format(message, args));
-    }
-  }
-
-  /**
-   * Maintains a mapping between hosts and slave ids.
-   * TODO(William Farner): Kill this interface and use HostAttributes in Storage.
-   */
-  public interface SlaveHosts {
-
-    /**
-     * Gets all slave ID mappings.
-     *
-     * @return all string to slave ID mappings.
-     */
-    Map<String, SlaveID> getSlaves();
-  }
-
-  /**
-   * Records slave host names and their associated slave IDs.
-   *
-   * We accept a trivial memory "leak" by not removing when a slave machine is decommissioned.
-   */
-  public interface SlaveMapper {
-
-    /**
-     * Records a host to slave ID mapping.
-     *
-     * @param host Host name.
-     * @param slaveId Slave ID.
-     */
-    void addSlave(String host, SlaveID slaveId);
-  }
-
-  /**
-   * In-memory slave host mapper.
-   */
-  static class SlaveHostsImpl implements SlaveHosts, SlaveMapper {
-    private final Map<String, SlaveID> executorSlaves = Maps.newConcurrentMap();
-
-    @Override
-    public void addSlave(String host, SlaveID slaveId) {
-      executorSlaves.put(host, slaveId);
-    }
-
-    @Override
-    public Map<String, SlaveID> getSlaves() {
-      return ImmutableMap.copyOf(executorSlaves);
     }
   }
 }

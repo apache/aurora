@@ -22,7 +22,6 @@ import org.junit.Test;
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.base.Command;
 import com.twitter.common.testing.EasyMockTest;
-import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveMapper;
 import com.twitter.mesos.scheduler.storage.Storage.StorageException;
 import com.twitter.mesos.scheduler.storage.testing.StorageTestUtil;
 
@@ -76,7 +75,6 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   private StorageTestUtil storageUtil;
   private TaskLauncher systemLauncher;
   private TaskLauncher userLauncher;
-  private SlaveMapper slaveMapper;
   private RegisteredListener registeredListener;
   private SchedulerDriver driver;
 
@@ -89,14 +87,12 @@ public class MesosSchedulerImplTest extends EasyMockTest {
         new Lifecycle(createMock(Command.class), createMock(UncaughtExceptionHandler.class));
     systemLauncher = createMock(TaskLauncher.class);
     userLauncher = createMock(TaskLauncher.class);
-    slaveMapper = createMock(SlaveMapper.class);
     registeredListener = createMock(RegisteredListener.class);
     scheduler = new MesosSchedulerImpl(
         storageUtil.storage,
         createMock(SchedulerCore.class),
         lifecycle,
         Arrays.asList(systemLauncher, userLauncher),
-        slaveMapper,
         registeredListener);
     driver = createMock(SchedulerDriver.class);
   }
@@ -210,8 +206,6 @@ public class MesosSchedulerImplTest extends EasyMockTest {
         storageUtil.expectTransactions();
         expectOfferAttributesSaved(OFFER);
         expectOfferAttributesSaved(OFFER_2);
-        slaveMapper.addSlave(SLAVE_HOST, SLAVE_ID);
-        slaveMapper.addSlave(SLAVE_HOST_2, SLAVE_ID_2);
         expect(systemLauncher.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
         expect(userLauncher.createTask(OFFER)).andReturn(Optional.of(TASK));
         expectLaunch(TASK);
@@ -258,7 +252,6 @@ public class MesosSchedulerImplTest extends EasyMockTest {
 
     @Override void expectations() throws Exception {
       storageUtil.expectTransactions();
-      slaveMapper.addSlave(SLAVE_HOST, SLAVE_ID);
       respondToOffer();
     }
 

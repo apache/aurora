@@ -114,6 +114,7 @@ public final class Conversions {
         offer.getHostname(),
         FluentIterable.from(valuesByName.asMap().entrySet())
             .transform(ATTRIBUTE_CONVERTER)
-            .toImmutableSet());
+            .toImmutableSet())
+        .setSlaveId(offer.getSlaveId().getValue());
   }
 }

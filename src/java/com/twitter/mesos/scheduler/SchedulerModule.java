@@ -49,9 +49,6 @@ import com.twitter.mesos.scheduler.CronJobManager.CronScheduler;
 import com.twitter.mesos.scheduler.CronJobManager.CronScheduler.Cron4jScheduler;
 import com.twitter.mesos.scheduler.Driver.DriverImpl;
 import com.twitter.mesos.scheduler.MaintenanceController.MaintenanceControllerImpl;
-import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHosts;
-import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveHostsImpl;
-import com.twitter.mesos.scheduler.MesosSchedulerImpl.SlaveMapper;
 import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
 import com.twitter.mesos.scheduler.PulseMonitor.PulseMonitorImpl;
 import com.twitter.mesos.scheduler.RegisteredListener.FanoutRegisteredListener;
@@ -168,9 +165,6 @@ public class SchedulerModule extends AbstractModule {
 
     // updaterTaskProvider handled in provider.
 
-    bind(SlaveHosts.class).to(SlaveHostsImpl.class);
-    bind(SlaveMapper.class).to(SlaveHostsImpl.class);
-    bind(SlaveHostsImpl.class).in(Singleton.class);
     bind(Scheduler.class).to(MesosSchedulerImpl.class);
     bind(MesosSchedulerImpl.class).in(Singleton.class);
 
