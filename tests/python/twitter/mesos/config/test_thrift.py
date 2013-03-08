@@ -39,14 +39,11 @@ HELLO_WORLD = MesosJob(
 
 def test_simple_config():
   job = convert_pystachio_to_thrift(HELLO_WORLD)
-  assert len(job.taskConfigs) == 1
-  tti = iter(job.taskConfigs).next()
-
-
+  assert job.shardCount == 1
+  tti = job.taskConfig
   assert job.name == 'hello_world'
   assert job.owner == Identity(role=HELLO_WORLD.role().get(), user=getpass.getuser())
   assert job.cronSchedule == ''
-
   assert tti.jobName == 'hello_world'
   assert tti.isDaemon == False
   assert tti.numCpus == 0.1
@@ -57,7 +54,6 @@ def test_simple_config():
   assert tti.priority == 0
   assert tti.healthCheckIntervalSecs == 30
   assert tti.maxTaskFailures == 1
-  assert tti.shardId == 0
   assert tti.constraints == set()
 
 
@@ -74,8 +70,8 @@ def test_config_with_options():
     }
   )
   job = convert_pystachio_to_thrift(hwc)
-  assert len(job.taskConfigs) == 1
-  tti = iter(job.taskConfigs).next()
+  assert job.shardCount == 1
+  tti = job.taskConfig
 
   assert tti.production == True
   assert tti.priority == 200
@@ -95,9 +91,7 @@ def test_config_with_ports():
     )
   )
   job = convert_pystachio_to_thrift(hwc)
-  assert len(job.taskConfigs) == 1
-  tti = iter(job.taskConfigs).next()
-  assert tti.requestedPorts == set(['http', 'admin'])
+  assert job.taskConfig.requestedPorts == set(['http', 'admin'])
 
 
 def test_config_with_bad_resources():
@@ -151,8 +145,8 @@ def test_cron_policy_alias():
 
 def test_packages_in_config():
   job = convert_pystachio_to_thrift(HELLO_WORLD, packages = [('alpha', 'beta', 1)])
-  assert len(job.taskConfigs) == 1
-  tti = iter(job.taskConfigs).next()
+  assert job.shardCount == 1
+  tti = job.taskConfig
 
   assert len(tti.packages) == 1
   pi = iter(tti.packages).next()

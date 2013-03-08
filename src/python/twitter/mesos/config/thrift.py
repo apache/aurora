@@ -140,27 +140,24 @@ def convert(job, packages=[]):
   task.taskLinks = not_empty_or(job.task_links(), {})
   task.constraints = constraints_to_thrift(not_empty_or(job.constraints(), {}))
 
-  # Replicate task objects to reflect number of instances.
-  tasks = []
-  for k in range(job.instances().get()):
-    task_copy = copy.deepcopy(task)
-    task_copy.shardId = k
-    underlying, _ = task_instance_from_job(job, k)
-    try:
-      ThermosTaskValidator.assert_valid_task(underlying.task())
-    except ThermosTaskValidator.InvalidTaskError as e:
-      raise ValueError('Task is invalid: %s' % e)
-    if not underlying.check().ok():
-      raise ValueError('Task not fully specified: %s' % underlying.check().message())
-    task_copy.thermosConfig = json.dumps(underlying.get())
-    tasks.append(task_copy)
+  underlying, _ = job.interpolate()
+  # need to fake an instance id for the sake of schema checking
+  underlying_checked = underlying.bind(mesos = {'instance': 31337})
+  try:
+    ThermosTaskValidator.assert_valid_task(underlying_checked.task())
+  except ThermosTaskValidator.InvalidTaskError as e:
+    raise ValueError('Task is invalid: %s' % e)
+  if not underlying_checked.check().ok():
+    raise ValueError('Job not fully specified: %s' % underlying.check().message())
+  task.thermosConfig = underlying.json_dumps()
 
   cron_schedule = job.cron_schedule().get() if job.has_cron_schedule() else ''
   cron_policy = select_cron_policy(job.cron_policy(), job.cron_collision_policy())
 
   return JobConfiguration(
-    str(job.name()),
-    owner,
-    tasks,
-    cron_schedule,
-    cron_policy)
+    name=str(job.name()),
+    owner=owner,
+    cronSchedule=cron_schedule,
+    cronCollisionPolicy=cron_policy,
+    taskConfig=task,
+    shardCount=job.instances().get())
