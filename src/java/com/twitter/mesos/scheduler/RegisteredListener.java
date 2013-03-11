@@ -8,6 +8,7 @@ import com.google.inject.Inject;
 
 /**
  * A listener that will be notified when the framework has been registered.
+ * TODO(William Farner): Use pubsub notifications in place of this.
  */
 interface RegisteredListener {
 

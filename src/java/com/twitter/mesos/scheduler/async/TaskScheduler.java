@@ -154,6 +154,10 @@ public interface TaskScheduler extends EventSubscriber {
     }
 
     private static ScheduledExecutorService createThreadPool(ShutdownRegistry shutdownRegistry) {
+      // TODO(William Farner): Extract a utility function that does this and overrides
+      // afterExecute, otherwise uncaught exceptions are swallowed.
+      // However, be careful doing this with periodic tasks (e.g. scheduleAtFixedRate), as
+      // Future.get() will block forever on them.
       final ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(
           1,
           new ThreadFactoryBuilder().setDaemon(true).setNameFormat("TaskScheduler-%d").build());

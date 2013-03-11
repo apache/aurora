@@ -34,11 +34,15 @@ class FakeDriverFactory implements DriverFactory {
 
   @Override
   public SchedulerDriver apply(@Nullable String frameworkId) {
-    return new FakeSchedulerDriver();
+    return new FakeSchedulerDriver() {
+      @Override public Status run() {
+        lifecycle.awaitShutdown();
+        return null;
+      }
+    };
   }
 
-  private class FakeSchedulerDriver implements SchedulerDriver {
-
+  static class FakeSchedulerDriver implements SchedulerDriver {
     @Override public Status start() {
       return null;
     }
@@ -60,7 +64,6 @@ class FakeDriverFactory implements DriverFactory {
     }
 
     @Override public Status run() {
-      lifecycle.awaitShutdown();
       return null;
     }
 
