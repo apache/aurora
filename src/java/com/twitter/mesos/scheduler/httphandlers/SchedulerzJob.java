@@ -1,6 +1,5 @@
 package com.twitter.mesos.scheduler.httphandlers;
 
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumSet;
@@ -29,7 +28,6 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Ordering;
-import com.google.common.collect.Range;
 import com.google.inject.Inject;
 
 import org.antlr.stringtemplate.StringTemplate;
@@ -40,7 +38,6 @@ import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Constants;
 import com.twitter.mesos.gen.Constraint;
 import com.twitter.mesos.gen.Identity;
-import com.twitter.mesos.gen.Package;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskConstraint;
@@ -49,7 +46,6 @@ import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.CommandLineExpander;
-import com.twitter.mesos.scheduler.Numbers;
 import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
 import com.twitter.mesos.scheduler.metadata.NearestFit;
 import com.twitter.mesos.scheduler.storage.Storage;
@@ -229,7 +225,8 @@ public class SchedulerzJob extends JerseyTemplateServlet {
           if (task.getPackagesSize() > 0) {
             details.put(
                 "packages",
-                Joiner.on(',').join(Iterables.transform(task.getPackages(), PACKAGE_TOSTRING)));
+                Joiner.on(',').join(Iterables.transform(task.getPackages(),
+                                                        TransformationUtils.PACKAGE_TOSTRING)));
           }
           return new SchedulingDetails(details.build());
         }
@@ -262,29 +259,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
     }
   }
 
-  private static final Function<Package, String> PACKAGE_TOSTRING =
-      new Function<Package, String>() {
-        @Override public String apply(Package pkg) {
-          return pkg.getRole() + "/" + pkg.getName() + " v" + pkg.getVersion();
-        }
-      };
 
-  private static final Function<Range<Integer>, String> RANGE_TOSTRING =
-      new Function<Range<Integer>, String>() {
-        @Override public String apply(Range<Integer> range) {
-          int lower = range.lowerEndpoint();
-          int upper = range.upperEndpoint();
-          return (lower == upper) ? String.valueOf(lower) : (lower + " - " + upper);
-        }
-      };
-
-  private static final Function<Collection<Integer>, String> SHARDS_TOSTRING =
-      new Function<Collection<Integer>, String>() {
-        @Override public String apply(Collection<Integer> shards) {
-          return Joiner.on(", ")
-              .join(Iterables.transform(Numbers.toRanges(shards), RANGE_TOSTRING));
-        }
-      };
 
   private static Map<String, SchedulingDetails> buildSchedulingTable(
       Iterable<TwitterTaskInfo> tasks) {
@@ -295,7 +270,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
     Multimap<SchedulingDetails, Integer> shardsByDetails = Multimaps.invertFrom(
         Multimaps.forMap(detailsByShard), HashMultimap.<SchedulingDetails, Integer>create());
     Map<SchedulingDetails, String> shardStringsByDetails =
-        Maps.transformValues(shardsByDetails.asMap(), SHARDS_TOSTRING);
+        Maps.transformValues(shardsByDetails.asMap(), TransformationUtils.SHARDS_TOSTRING);
     return HashBiMap.create(shardStringsByDetails).inverse();
   }
 

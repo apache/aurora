@@ -3,6 +3,7 @@ package com.twitter.mesos.scheduler.httphandlers;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -14,6 +15,7 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
 import com.google.common.base.Function;
+import com.google.common.base.Joiner;
 import com.google.common.base.Predicate;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -21,6 +23,7 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
 import org.antlr.stringtemplate.StringTemplate;
@@ -30,6 +33,7 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.CronJobManager;
 import com.twitter.mesos.scheduler.Query;
@@ -169,6 +173,7 @@ public class SchedulerzRole extends JerseyTemplateServlet {
                     .put("nextRun", CronJobManager.predictNextRun(job.cronSchedule).getTime())
                     .put("cronCollisionPolicy",
                         CronJobManager.orDefault(job.getCronCollisionPolicy()))
+                    .put("packages", getPackages(job))
                     .build();
               }
             });
@@ -178,6 +183,20 @@ public class SchedulerzRole extends JerseyTemplateServlet {
         template.setAttribute("resourceQuota", quotaManager.getQuota(role));
       }
     });
+  }
+
+  private String getPackages(JobConfiguration job) {
+    Set<String> packages = Sets.newHashSet();
+
+    // Insert all packages for all tasks in the set to eliminate duplicates
+    for (TwitterTaskInfo task : job.getTaskConfigs()) {
+      if (task.getPackagesSize() > 0) {
+        packages.addAll(
+            Lists.newArrayList(Iterables.transform(task.getPackages(),
+                                                   TransformationUtils.PACKAGE_TOSTRING)));
+      }
+    }
+    return Joiner.on(',').join(packages);
   }
 
   /**
