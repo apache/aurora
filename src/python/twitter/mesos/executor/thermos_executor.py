@@ -14,6 +14,7 @@ from twitter.common.exceptions import ExceptionalThread
 from twitter.common.quantity import Amount, Time
 
 # thermos
+from twitter.mesos.common.http_signaler import HttpSignaler
 from twitter.mesos.config import PortResolver
 from twitter.mesos.config.schema import MesosJob, MesosTaskInstance
 from twitter.mesos.config.thrift import task_instance_from_job
@@ -28,7 +29,6 @@ from thrift.TSerialization import deserialize as thrift_deserialize
 from .discovery_manager import DiscoveryManager
 from .executor_base import ThermosExecutorBase
 from .health_checker import HealthCheckerThread
-from .http_signaler import HttpSignaler
 from .kill_manager import KillManager
 from .resource_checkpoints import ResourceCheckpointer
 from .resource_manager import ResourceManager

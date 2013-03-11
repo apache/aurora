@@ -6,12 +6,12 @@ from twitter.common.lang import Compatibility
 
 if Compatibility.PY3:
   from http.client import HTTPException
-  from urllib.request import urlopen
+  import urllib.request as urllib_request
   from urllib.error import URLError, HTTPError
 else:
   from httplib import HTTPException
-  from urllib2 import urlopen, URLError, HTTPError
-
+  import urllib2 as urllib_request
+  from urllib2 import URLError, HTTPError
 
 class HttpSignaler(object):
   """Simple HTTP endpoint wrapper to check health or trigger quitquitquit/abortabortabort"""
@@ -28,7 +28,8 @@ class HttpSignaler(object):
     """Returns a (boolean, string|None) tuple of (call success, failure reason)"""
     try:
       data = '' if use_post_method else None
-      with contextlib.closing(urlopen(self.url(endpoint), data, timeout=self.TIMEOUT_SECS)) as fp:
+      with contextlib.closing(
+          urllib_request.urlopen(self.url(endpoint), data, timeout=self.TIMEOUT_SECS)) as fp:
         response = fp.read().strip().lower()
         if expected_response is not None and response != expected_response:
           def shorten(string):

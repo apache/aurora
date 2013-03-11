@@ -51,21 +51,13 @@ python_tests(name = 'discovery_manager',
   ]
 )
 
-python_tests(name = 'http_signaler',
-  sources = [ 'test_http_signaler.py' ],
-  dependencies = [
-    pants('src/python/twitter/common/exceptions'),
-    pants('src/python/twitter/mesos/executor:http_signaler'),
-  ]
-)
-
 python_tests(name = 'status_manager',
   sources = [ 'test_status_manager.py' ],
   dependencies = [
     python_requirement('tornado'),
     pants('src/python/twitter/common/testing'),
-    pants('src/python/twitter/mesos/executor:http_signaler'),
-    pants('src/python/twitter/mesos/executor:status_manager')
+    pants('src/python/twitter/mesos/executor:status_manager'),
+    pants('src/python/twitter/mesos/common:http_signaler'),
   ]
 )
 
@@ -75,6 +67,7 @@ python_tests(name = 'thermos_executor',
   dependencies = [
     pants('src/python/twitter/pants:pants-lib'),
     pants('src/python/twitter/common/app'),
+    pants('src/python/twitter/common/exceptions'),
     pants('src/python/twitter/common/quantity'),
     pants('src/python/twitter/thermos/runner'),
     pants('src/python/twitter/thermos/monitoring:monitor'),

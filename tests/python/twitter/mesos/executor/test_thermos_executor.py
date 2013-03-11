@@ -1,3 +1,4 @@
+from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 from collections import defaultdict
 import functools
 import getpass
@@ -17,6 +18,7 @@ from gen.twitter.mesos.ttypes import (
 from gen.twitter.thermos.ttypes import TaskState
 
 from twitter.common import log
+from twitter.common.exceptions import ExceptionalThread
 from twitter.common.log.options import LogOptions
 from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_rmtree
@@ -35,8 +37,6 @@ from twitter.mesos.executor.status_manager import StatusManager
 from twitter.thermos.base.path import TaskPath
 from twitter.thermos.monitoring.monitor import TaskMonitor
 from twitter.thermos.runner.runner import TaskRunner
-
-from test_http_signaler import SignalServer, UnhealthyHandler
 
 if 'THERMOS_DEBUG' in os.environ:
   LogOptions.set_stderr_log_level('DEBUG')
@@ -183,6 +183,29 @@ def make_runner(proxy_driver, checkpoint_root, task, ports={}, fast_status=False
 
   assert te.launched.is_set()
   return runner, te
+
+
+class UnhealthyHandler(BaseHTTPRequestHandler):
+  def do_GET(self):
+    self.send_response(200)
+    self.end_headers()
+    self.wfile.write('not ok')
+
+
+class SignalServer(ExceptionalThread):
+  def __init__(self, handler):
+    self._server = HTTPServer(('', 0), handler)
+    super(SignalServer, self).__init__()
+    self.daemon = True
+    self._stop = threading.Event()
+  def run(self):
+    while not self._stop.is_set():
+      self._server.handle_request()
+  def __enter__(self):
+    self.start()
+    return self._server.server_port
+  def __exit__(self, exc_type, exc_val, traceback):
+    self._stop.set()
 
 
 class TestThermosExecutor(object):

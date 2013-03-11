@@ -9,7 +9,7 @@ import mesos_pb2 as mesos_pb
 
 from twitter.common.quantity import Amount, Time
 from twitter.common.testing.clock import ThreadedClock
-from twitter.mesos.executor.http_signaler import HttpSignaler
+from twitter.mesos.common.http_signaler import HttpSignaler
 from twitter.mesos.executor.status_manager import StatusManager
 from twitter.mesos.executor.health_checker import HealthCheckerThread
 

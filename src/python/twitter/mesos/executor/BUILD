@@ -34,15 +34,6 @@ python_library(
 )
 
 python_library(
-  name = 'http_signaler',
-  sources = ['http_signaler.py'],
-  dependencies = [
-    pants('src/python/twitter/common/lang'),
-    pants('src/python/twitter/common/log'),
-  ]
-)
-
-python_library(
   name = 'health_interface',
   sources = ['health_interface.py'],
   dependencies = [python_requirement('mesos')]
@@ -150,7 +141,6 @@ python_library(
   name = 'thermos_executor_lib',
   sources = ['thermos_executor.py'],
   dependencies = [
-    pants(':http_signaler'),
     pants(':resource_manager'),
     pants(':status_manager'),
     pants(':task_runner_wrapper'),
@@ -160,6 +150,7 @@ python_library(
     pants('src/python/twitter/common/exceptions'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/quantity'),
+    pants('src/python/twitter/mesos/common:http_signaler'),
     pants('src/python/twitter/mesos/config'),
   ]
 )
