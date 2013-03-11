@@ -56,7 +56,7 @@ public class GcExecutorLauncher implements TaskLauncher {
   public @interface GcExecutor { }
 
   private static final Resources GC_EXECUTOR_RESOURCES =
-      new Resources(0.19, Amount.of(63L, Data.MB), Amount.of(15L, Data.MB), 0);
+      new Resources(0.19, Amount.of(127L, Data.MB), Amount.of(15L, Data.MB), 0);
   private static final Resources ALMOST_EMPTY_TASK_RESOURCES =
       new Resources(0.01, Amount.of(1L, Data.MB), Amount.of(1L, Data.MB), 0);
 
