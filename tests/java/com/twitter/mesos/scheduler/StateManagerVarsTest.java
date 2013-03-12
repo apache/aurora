@@ -3,14 +3,14 @@ package com.twitter.mesos.scheduler;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 
+import org.easymock.EasyMock;
+import org.easymock.IAnswer;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.twitter.common.stats.Stat;
 import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.gen.AssignedTask;
@@ -23,6 +23,7 @@ import com.twitter.mesos.scheduler.events.PubsubEvent.TaskStateChange;
 import com.twitter.mesos.scheduler.events.PubsubEvent.TasksDeleted;
 import com.twitter.mesos.scheduler.storage.testing.StorageTestUtil;
 
+import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
@@ -40,34 +41,43 @@ public class StateManagerVarsTest extends EasyMockTest {
   private static final String TASK_ID = "task_id";
 
   private StorageTestUtil storageUtil;
-  private Map<String, AtomicLong> counters;
+  private StatsProvider trackedStats;
+  private Map<String, AtomicLong> totalCounters;
+  private Map<String, AtomicLong> perJobCounters;
   private StateManagerVars vars;
 
   @Before
   public void setUp() {
     storageUtil = new StorageTestUtil(this);
-    counters = Maps.newHashMap();
-    StatsProvider stats = new StatsProvider() {
-      @Override public AtomicLong makeCounter(String name) {
-        AtomicLong counter = new AtomicLong();
-        counters.put(name, counter);
-        return counter;
-      }
 
-      @Override public <T extends Number> Stat<T> makeGauge(String name, Supplier<T> gauge) {
-        throw new UnsupportedOperationException();
-      }
+    totalCounters = Maps.newHashMap();
+    trackedStats = createMock(StatsProvider.class);
+    collectStatsInto(trackedStats, totalCounters);
 
-      @Override public RequestTimer makeRequestTimer(String name) {
-        throw new UnsupportedOperationException();
-      }
+    perJobCounters = Maps.newHashMap();
+    StatsProvider untrackedStats = createMock(StatsProvider.class);
+    expect(trackedStats.untracked()).andReturn(untrackedStats).anyTimes();
+    collectStatsInto(untrackedStats, perJobCounters);
+  }
 
-      @Override
-      public StatsProvider untracked() {
-        throw new UnsupportedOperationException();
-      }
-    };
-    vars = new StateManagerVars(storageUtil.storage, stats);
+  private void initialize() {
+    vars = new StateManagerVars(storageUtil.storage, trackedStats);
+  }
+
+  private static void collectStatsInto(
+      StatsProvider mockProvider,
+      final Map<String, AtomicLong> counters) {
+
+    expect(mockProvider.makeCounter(EasyMock.<String>anyObject())).andAnswer(
+        new IAnswer<AtomicLong>() {
+          @Override public AtomicLong answer() {
+            String name = (String) EasyMock.getCurrentArguments()[0];
+            AtomicLong counter = new AtomicLong();
+            counters.put(name, counter);
+            return counter;
+          }
+        }
+    ).anyTimes();
   }
 
   private void changeState(ScheduledTask task, ScheduleStatus status) {
@@ -99,12 +109,14 @@ public class StateManagerVarsTest extends EasyMockTest {
   @Test
   public void testStartsAtZero() {
     control.replay();
+    initialize();
     assertAllZero();
   }
 
   @Test
   public void testTaskLifeCycle() {
     control.replay();
+    initialize();
 
     ScheduledTask taskA = makeTask(JOB_A, INIT);
     changeState(taskA, PENDING);
@@ -134,6 +146,7 @@ public class StateManagerVarsTest extends EasyMockTest {
         makeTask(JOB_B, FAILED));
 
     control.replay();
+    initialize();
 
     vars.storageStarted(new StorageStarted());
     assertCount(2, PENDING);
@@ -148,13 +161,13 @@ public class StateManagerVarsTest extends EasyMockTest {
   }
 
   private void assertCount(long expected, ScheduleStatus status) {
-    assertEquals(expected, counters.get(StateManagerVars.getVarName(status)).get());
+    assertEquals(expected, totalCounters.get(StateManagerVars.getVarName(status)).get());
   }
 
   private void assertJobCount(long expected, String job, ScheduleStatus status) {
     assertEquals(
         expected,
-        counters.get(StateManagerVars.getVarName(ROLE_A, job, status)).get());
+        perJobCounters.get(StateManagerVars.getVarName(ROLE_A, job, status)).get());
   }
 
   private void assertCounts(long expected, String job, ScheduleStatus status) {

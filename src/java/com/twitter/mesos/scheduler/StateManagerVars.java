@@ -27,7 +27,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 class StateManagerVars implements EventSubscriber {
 
-  private final LoadingCache<String, AtomicLong> vars;
+  private final LoadingCache<String, AtomicLong> totalCounters;
+  private final LoadingCache<String, AtomicLong> perJobCounters;
 
   private final Storage storage;
 
@@ -35,15 +36,20 @@ class StateManagerVars implements EventSubscriber {
   StateManagerVars(Storage storage, final StatsProvider statProvider) {
     this.storage = checkNotNull(storage);
     checkNotNull(statProvider);
-    vars = CacheBuilder.newBuilder().build(new CacheLoader<String, AtomicLong>() {
-      @Override public AtomicLong load(String statName) throws Exception {
+    totalCounters = CacheBuilder.newBuilder().build(new CacheLoader<String, AtomicLong>() {
+      @Override public AtomicLong load(String statName) {
         return statProvider.makeCounter(statName);
+      }
+    });
+    perJobCounters = CacheBuilder.newBuilder().build(new CacheLoader<String, AtomicLong>() {
+      @Override public AtomicLong load(String statName) {
+        return statProvider.untracked().makeCounter(statName);
       }
     });
 
     // Initialize by-status counters.
     for (ScheduleStatus status : ScheduleStatus.values()) {
-      vars.getUnchecked(getVarName(status));
+      getCounter(status);
     }
   }
 
@@ -58,11 +64,11 @@ class StateManagerVars implements EventSubscriber {
   }
 
   private AtomicLong getCounter(ScheduleStatus status) {
-    return vars.getUnchecked(getVarName(status));
+    return totalCounters.getUnchecked(getVarName(status));
   }
 
   private AtomicLong getCounter(String role, String job, ScheduleStatus status) {
-    return vars.getUnchecked(getVarName(role, job, status));
+    return perJobCounters.getUnchecked(getVarName(role, job, status));
   }
 
   private void incrementCount(String role, String job, ScheduleStatus status) {
