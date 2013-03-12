@@ -61,6 +61,11 @@ public class StateManagerVarsTest extends EasyMockTest {
       @Override public RequestTimer makeRequestTimer(String name) {
         throw new UnsupportedOperationException();
       }
+
+      @Override
+      public StatsProvider untracked() {
+        throw new UnsupportedOperationException();
+      }
     };
     vars = new StateManagerVars(storageUtil.storage, stats);
   }
