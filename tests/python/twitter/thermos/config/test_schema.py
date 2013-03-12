@@ -7,6 +7,7 @@ from twitter.thermos.config.schema import (
   Process,
   Resources,
   SequentialTask,
+  SimpleTask,
   Task,
   Tasks,
   Units,

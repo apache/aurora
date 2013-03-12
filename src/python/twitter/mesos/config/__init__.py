@@ -1,5 +1,6 @@
 from twitter.common.lang import Compatibility
-from twitter.thermos.config.loader import ThermosTaskWrapper
+from twitter.thermos.config.loader import PortExtractor, ThermosTaskWrapper
+from twitter.thermos.config.schema import ThermosContext
 
 from .loader import AuroraConfigLoader
 from .schema import MesosContext
@@ -114,27 +115,33 @@ class AuroraConfig(object):
     return cls(job.bind(*bindings) if bindings else job)
 
   def __init__(self, job):
-    def has(pystachio_type, thing):
-      return getattr(pystachio_type, 'has_%s' % thing)()
-    for required in ("cluster", "task", "role"):
-      if not has(job, required):
-        raise self.InvalidConfig('%s required for job "%s"' % (required.capitalize(), job.name()))
-    if not has(job.task(), 'processes'):
-      raise self.InvalidConfig('Processes required for task on job "%s"' % job.name())
     self._job = self.sanitize_job(job)
     self._packages = []
 
   @staticmethod
   def sanitize_job(job):
     """
-      Do any necessarity sanitation of input job.  Currently we only make
-      sure that the maximum process failures is capped at a reasonable
-      maximum, 100.
+      Validate and sanitize the input job
+
+      Currently, the validation stage simply ensures that the job has all required fields.
+      self.InvalidConfig is raised if any required fields are not present.
+
+      The sanitization ensures that the maximum process failures is capped at a reasonable maximum
+      (currently, 100)
     """
+    def has(pystachio_type, thing):
+      return getattr(pystachio_type, 'has_%s' % thing)()
+    for required in ("cluster", "task", "role"):
+      if not has(job, required):
+        raise AuroraConfig.InvalidConfig(
+          '%s required for job "%s"' % (required.capitalize(), job.name()))
+    if not has(job.task(), 'processes'):
+      raise AuroraConfig.InvalidConfig('Processes required for task on job "%s"' % job.name())
+
     def process_over_failure_limit(proc):
       return (proc.max_failures() == Integer(0) or proc.max_failures() >= Integer(100))
-    return job(task = job.task()(
-      processes = [proc(max_failures = 100) if process_over_failure_limit(proc) else proc
+    return job(task=job.task()(
+      processes = [proc(max_failures=100) if process_over_failure_limit(proc) else proc
                    for proc in job.task().processes()]))
 
   def context(self, instance=None):
@@ -148,11 +155,19 @@ class AuroraConfig(object):
 
   def job(self):
     interpolated_job = self._job % self.context()
-    # Typecheck against the Job with a dummy {{mesos.instance}} populated.  It is the only free
-    # variable that gets unwrapped at the Task level.
-    typecheck = interpolated_job.bind(Environment(mesos=Environment(instance=0))).check()
+    # Typecheck against the Job, with the following free variables unwrapped at the Task level:
+    #  - a dummy {{mesos.instance}}
+    #  - dummy values for the {{thermos.ports}} context, to allow for their use in task_links
+    try:
+      dummy_ports = dict(
+        (port, 31337) for port in PortExtractor.extract(interpolated_job.task_links()))
+    except PortExtractor.InvalidPorts as err:
+      raise self.InvalidConfig('Invalid port references in task_links! %s' % err)
+    typecheck = interpolated_job.bind(Environment(
+        mesos=Environment(instance=0), thermos=ThermosContext(ports=dummy_ports))).check()
     if not typecheck.ok():
       raise self.InvalidConfig(typecheck.message())
+    interpolated_job = interpolated_job(task_links=self.task_links())
     return convert_thrift(interpolated_job, self._packages)
 
   def bind(self, binding):
@@ -196,9 +211,19 @@ class AuroraConfig(object):
     return PortResolver.unallocated(portmap) | (referenced_ports - PortResolver.bound(portmap))
 
   def task_links(self):
-    # TODO(wfarner): Need to convert thermos-style template parameters
-    # to those understood by the scheduler (e.g. %shard_id%).
-    return self._job.task_links().get()
+    # {{mesos.instance}} --> %shard_id%
+    # {{thermos.ports[foo]}} --> %port:foo%
+    task_links = self._job.task_links()
+    _, uninterp = task_links.interpolate()
+    substitutions = {
+      Ref.from_address('mesos.instance'): '%shard_id%'
+    }
+    port_scope = Ref.from_address('thermos.ports')
+    for ref in uninterp:
+      subscope = port_scope.scoped_to(ref)
+      if subscope:
+        substitutions[ref] = '%%port:%s%%' % subscope.action().value
+    return task_links.bind(substitutions)
 
   def update_config(self):
     return self._job.update_config()

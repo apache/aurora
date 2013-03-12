@@ -12,6 +12,7 @@ from gen.twitter.mesos.ttypes import (
   ValueConstraint,
 )
 from twitter.common.contextutil import temporary_file
+from twitter.mesos.config import AuroraConfig
 from twitter.mesos.config.schema import (
   MesosJob,
 )
@@ -23,6 +24,7 @@ from twitter.thermos.config.schema import (
 )
 
 from pystachio import Empty, Integer, Map, String
+from pystachio.naming import frozendict
 
 
 HELLO_WORLD = MesosJob(
@@ -119,6 +121,26 @@ def test_config_with_bad_resources():
     with pytest.raises(ValueError):
       convert_pystachio_to_thrift(HELLO_WORLD(task = hwtask(resources = resource)))
 
+def test_config_with_task_links():
+  tl = Map(String, String)
+  unresolved_tl = {
+    'foo': 'http://%host%:{{thermos.ports[foo]}}',
+    'bar': 'http://%host%:{{thermos.ports[bar]}}/{{mesos.instance}}',
+  }
+  resolved_tl = {
+    'foo': 'http://%host%:%port:foo%',
+    'bar': 'http://%host%:%port:bar%/%shard_id%'
+  }
+  aurora_config = AuroraConfig(HELLO_WORLD(task_links = tl(unresolved_tl)))
+  assert aurora_config.task_links() == tl(resolved_tl)
+  assert aurora_config.job().taskConfig.taskLinks == frozendict(resolved_tl)
+
+  bad_tl = {
+    'foo': '{{thermos.ports.bad}}'
+  }
+  with pytest.raises(AuroraConfig.InvalidConfig):
+    AuroraConfig(HELLO_WORLD(task_links=tl(bad_tl))).job()
+
 
 def test_cron_policy_alias():
   cron_schedule = '*/10 * * * *'
@@ -142,6 +164,7 @@ def test_cron_policy_alias():
 
   with pytest.raises(ValueError):
     tti = convert_pystachio_to_thrift(CRON_HELLO_WORLD(cron_collision_policy='GARBAGE'))
+
 
 def test_packages_in_config():
   job = convert_pystachio_to_thrift(HELLO_WORLD, packages = [('alpha', 'beta', 1)])

@@ -19,6 +19,23 @@ from twitter.thermos.config.schema import *
 def deposit_schema(environment):
   Compatibility.exec_function(compile(SCHEMA_PREAMBLE, "<exec_function>", "exec"), environment)
 
+class PortExtractor(object):
+  class InvalidPorts(Exception): pass
+
+  @staticmethod
+  def extract(obj):
+    port_scope = Ref.from_address('thermos.ports')
+    _, uninterp = obj.interpolate()
+    ports = []
+    for ref in uninterp:
+      subscope = port_scope.scoped_to(ref)
+      if subscope is not None:
+        if not subscope.is_index():
+          raise PortExtractor.InvalidPorts(
+            'Bad port specification "%s" (should be of form "thermos.ports[name]"' % ref.address())
+        ports.append(subscope.action().value)
+    return ports
+
 
 class ThermosProcessWrapper(object):
   # >=1 characters && anything but NULL and '/'
@@ -29,16 +46,10 @@ class ThermosProcessWrapper(object):
     self._process = process
 
   def ports(self):
-    port_scope = Ref.from_address('thermos.ports')
-    _, uninterp = self._process.interpolate()
-    ports = []
-    for ref in uninterp:
-      subscope = port_scope.scoped_to(ref)
-      if subscope is not None:
-        if not subscope.is_index():
-          raise self.InvalidProcess('Process has invalid ports scoping!')
-        ports.append(subscope.action().value)
-    return ports
+    try:
+      return PortExtractor.extract(self._process)
+    except PortExtractor.InvalidPorts:
+      raise self.InvalidProcess('Process has invalid ports scoping!')
 
   @staticmethod
   def assert_valid_process_name(name):
