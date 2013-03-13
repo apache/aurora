@@ -49,6 +49,7 @@ public abstract class JobManager {
    *
    * @return Jobs stored by this job manager.
    */
+  // TODO(ksweeney): Consider adding a Map<JobKey, JobConfiguration> to complement this.
   public Iterable<JobConfiguration> getJobs() {
     return Collections.emptyList();
   }
@@ -60,6 +61,7 @@ public abstract class JobManager {
    * @param job Job name.
    * @return {@code true} if the manager has a matching job, {@code false} otherwise.
    */
+  // TODO(ksweeney): Refactor to take a JobKey
   public abstract boolean hasJob(String role, String job);
 
   /**
@@ -69,6 +71,7 @@ public abstract class JobManager {
    * @param job Job name.
    * @return {@code true} if a matching job was deleted.
    */
+  // TODO(ksweeney): Refactor to take a JobKey
   public boolean deleteJob(String role, String job) {
     // Optionally overridden by implementing class.
     return false;
