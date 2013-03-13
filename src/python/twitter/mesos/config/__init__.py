@@ -6,7 +6,7 @@ from .loader import AuroraConfigLoader
 from .schema import MesosContext
 from .thrift import convert as convert_thrift
 
-from pystachio import Environment, Integer, Ref
+from pystachio import Empty, Environment, Integer, Ref
 
 
 class PortResolver(object):
@@ -158,13 +158,15 @@ class AuroraConfig(object):
     # Typecheck against the Job, with the following free variables unwrapped at the Task level:
     #  - a dummy {{mesos.instance}}
     #  - dummy values for the {{thermos.ports}} context, to allow for their use in task_links
-    try:
-      dummy_ports = dict(
-        (port, 31337) for port in PortExtractor.extract(interpolated_job.task_links()))
-    except PortExtractor.InvalidPorts as err:
-      raise self.InvalidConfig('Invalid port references in task_links! %s' % err)
-    typecheck = interpolated_job.bind(Environment(
-        mesos=Environment(instance=0), thermos=ThermosContext(ports=dummy_ports))).check()
+    env = dict(mesos=Environment(instance=0))
+    if interpolated_job.task_links() is not Empty:
+      try:
+        dummy_ports = dict(
+          (port, 31337) for port in PortExtractor.extract(interpolated_job.task_links()))
+      except PortExtractor.InvalidPorts as err:
+        raise self.InvalidConfig('Invalid port references in task_links! %s' % err)
+      env.update(thermos=ThermosContext(ports=dummy_ports))
+    typecheck = interpolated_job.bind(Environment(env)).check()
     if not typecheck.ok():
       raise self.InvalidConfig(typecheck.message())
     interpolated_job = interpolated_job(task_links=self.task_links())
@@ -214,6 +216,8 @@ class AuroraConfig(object):
     # {{mesos.instance}} --> %shard_id%
     # {{thermos.ports[foo]}} --> %port:foo%
     task_links = self._job.task_links()
+    if task_links is Empty:
+      return task_links
     _, uninterp = task_links.interpolate()
     substitutions = {
       Ref.from_address('mesos.instance'): '%shard_id%'

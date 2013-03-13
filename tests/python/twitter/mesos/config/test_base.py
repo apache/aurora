@@ -147,6 +147,7 @@ def test_simple_config():
     fp.flush()
     proxy_config1 = AuroraConfig.load(fp.name)
     proxy_config2 = AuroraConfig.load(fp.name, name="hello_world")
+    assert proxy_config1.job()
     assert proxy_config1._job == proxy_config2._job
     assert proxy_config1._job == REIFIED_CONFIG
     assert proxy_config1.name() == 'hello_world'
