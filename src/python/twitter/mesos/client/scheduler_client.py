@@ -1,5 +1,6 @@
 import functools
 import getpass
+import inspect
 import threading
 import time
 
@@ -149,11 +150,6 @@ class SchedulerProxy(object):
   CONNECT_MAXIMUM_WAIT = Amount(1, Time.MINUTES)
   RPC_RETRY_INTERVAL = Amount(5, Time.SECONDS)
   RPC_MAXIMUM_WAIT = Amount(10, Time.MINUTES)
-  UNAUTHENTICATED_RPCS = frozenset([
-    'populateJobConfig',
-    'getTasksStatus',
-    'getQuota'
-  ])
 
   class TimeoutError(Exception): pass
 
@@ -250,12 +246,19 @@ class SchedulerProxy(object):
     def method_wrapper(*args):
       start = time.time()
       while (time.time() - start) < self.RPC_MAXIMUM_WAIT.as_(Time.SECONDS):
-        auth_args = () if method_name in self.UNAUTHENTICATED_RPCS else (self.session_key(),)
         try:
           method = getattr(self.client(), method_name)
           if not callable(method):
             return method
-          return method(*(args + auth_args))
+
+          # Inject a session key for the 'session' argument if none was provided
+          # TODO(ksweeney): Do Thrift type introspection instead of relying on parameter name.
+          method_signature = inspect.getargspec(method).args
+          if 'session' in method_signature and len(args) < len(method_signature):
+            session_position = method_signature.index('session')
+            assert session_position >= 0
+            args = args[:session_position] + (self.session_key(),) + args[session_position:]
+          return method(*args)
         except (TTransport.TTransportException, self.TimeoutError) as e:
           log.warning('Connection error with scheduler: %s, reconnecting...' % e)
           self.invalidate()
