@@ -1,3 +1,10 @@
+"""Read checkpoint streams for the Thermos runner
+
+This module contains the CheckpointDispatcher, which reconstructs checkpoint streams containing the
+state of the Thermos runner and its constituent processes.
+
+"""
+
 import os
 
 from twitter.common import log
@@ -162,14 +169,11 @@ class CheckpointDispatcher(object):
       UniversalStateHandler: self._universal_handlers
     }
 
-    found = False
     for handler_type, handler_list in HANDLER_MAP.items():
       if isinstance(handler, handler_type):
         handler_list.append(handler)
-        found = True
         break
-
-    if not found:
+    else:
       raise CheckpointDispatcher.InvalidHandler("Unknown handler type %s" % type(handler))
 
   def _run_process_dispatch(self, state, process_update):
@@ -203,11 +207,7 @@ class CheckpointDispatcher(object):
   def update_process_state(process_state, process_state_update):
     """
       Apply process_state_update against process_state.
-
-      set recovery = True if you are in checkpoint recovery mode (i.e. you expect
-        to see replays of ckpts from forked children.)
-
-      returns True if a state update was applied to process_state
+      Raises ErrorRecoveringState on failure.
     """
     def assert_process_state_in(*expected_states):
       assert process_state.state in expected_states, (
@@ -256,6 +256,7 @@ class CheckpointDispatcher(object):
       assert_process_state_in(ProcessState.FORKED, ProcessState.RUNNING)
       required_fields = ['seq', 'state']
       copy_fields(process_state, process_state_update, required_fields)
+
     else:
       raise CheckpointDispatcher.ErrorRecoveringState(
         "Unknown state = %s" % process_state_update.state)
@@ -277,11 +278,10 @@ class CheckpointDispatcher(object):
 
   def dispatch(self, state, runner_ckpt, recovery=False, truncate=False):
     """
-      state          = RunnerState to apply process update
-      process_update = RunnerCkpt update
-      recovery       = Pass in as true if you are in recovery mode
-                       (accept out-of-order sequence updates)
-      truncate       = If true, store only the latest task/process states, instead of
+      state          = RunnerState to be updated
+      runner_ckpt    = RunnerCkpt update to apply
+      recovery       = if true, enable recovery mode (accept out-of-order sequence updates)
+      truncate       = if true, store only the latest task/process states, instead of
                        history for all runs.
     """
     # case 1: runner_header

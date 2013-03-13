@@ -105,6 +105,10 @@ def test_task_process_cannot_depend_upon_daemon():
   with pytest.raises(TaskPlanner.InvalidSchedule):
     TaskPlanner(empty_task(processes=[p1(daemon=True), p2], constraints=[{'order': ['p1', 'p2']}]))
 
+def test_task_non_ephemeral_process_cannot_depend_on_ephemeral_process():
+  with pytest.raises(TaskPlanner.InvalidSchedule):
+    TaskPlanner(empty_task(processes=[p1(ephemeral=True), p2],
+                           constraints=[{'order': ['p1', 'p2']}]))
 
 def test_task_failed_predecessor_does_not_make_process_runnable():
   p = TaskPlanner(empty_task(processes=[p1, p2], constraints=[{'order': ['p1', 'p2']}]))

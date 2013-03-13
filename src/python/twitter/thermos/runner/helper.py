@@ -51,7 +51,8 @@ class TaskRunnerHelper(object):
     state.  These operations do not require knowledge of the underlying
     task.
   """
-  class PermissionError(Exception): pass
+  class Error(Exception): pass
+  class PermissionError(Error): pass
   PS = ProcessProviderFactory.get()
 
   # Maximum drift between when the system says a task was forked and when we checkpointed
@@ -214,10 +215,11 @@ class TaskRunnerHelper(object):
   @classmethod
   def kill_runner(cls, state):
     log.debug('TaskRunnerHelper.kill_runner()')
-    assert state, 'Could not read state!'
-    assert state.statuses
+    if not state or not state.statuses:
+      raise cls.Error('Could not read state!')
     pid = state.statuses[-1].runner_pid
-    assert pid != os.getpid(), 'Unwilling to commit seppuku.'
+    if pid == os.getpid():
+      raise cls.Error('Unwilling to commit seppuku.')
     try:
       os.kill(pid, signal.SIGKILL)
       return True
@@ -264,7 +266,9 @@ class TaskRunnerHelper(object):
       hydrated TaskRunner object.  Terminal status must be either
       KILLED or LOST state.
     """
-    assert terminal_status in (TaskState.KILLED, TaskState.LOST)
+    if terminal_status not in (TaskState.KILLED, TaskState.LOST):
+      raise cls.Error('terminal_status must be KILLED or LOST (got %s)' %
+                      TaskState._VALUES_TO_NAMES.get(terminal_status) or terminal_status)
     pathspec = TaskPath(root=checkpoint_root, task_id=task_id)
     checkpoint = pathspec.getpath('runner_checkpoint')
     state = CheckpointDispatcher.from_file(checkpoint)

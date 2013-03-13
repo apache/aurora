@@ -1,4 +1,4 @@
-from abc import ABCMeta, abstractmethod
+from abc import abstractmethod
 import getpass
 import grp
 import os
@@ -13,6 +13,7 @@ from twitter.common.dirutil import (
   lock_file,
   safe_mkdir,
   safe_open)
+from twitter.common.lang import Interface
 from twitter.common.quantity import (
   Amount,
   Time)
@@ -29,8 +30,7 @@ __author__ = 'wickman@twitter.com (brian wickman)'
 __tested__ = False
 
 
-class Platform(object):
-  __metaclass__ = ABCMeta
+class Platform(Interface):
 
   @abstractmethod
   def clock(self):
@@ -130,7 +130,8 @@ class ProcessBase(object):
         raise ProcessBase.UnknownUserError('Unknown user %s!' % self._user)
     self._ckpt = None
     self._ckpt_head = -1
-    assert platform is not None
+    if platform is None:
+      raise ValueError("Platform must be specified")
     self._platform = platform
 
   def _log(self, msg):
@@ -149,9 +150,9 @@ class ProcessBase(object):
     self._seq += 1
 
   def _write_initial_update(self):
-    self._write_process_update(state = ProcessState.FORKED,
-                               fork_time = self._fork_time,
-                               coordinator_pid = self._pid)
+    self._write_process_update(state=ProcessState.FORKED,
+                               fork_time=self._fork_time,
+                               coordinator_pid=self._pid)
 
   def cmdline(self):
     return self._cmdline
@@ -232,11 +233,11 @@ class ProcessBase(object):
 
   def start(self):
     """
-      This is the main call point into the runner.
+      This is the main call point into the runner, and forks a co-ordinator process to run the
+      target process (i.e. self.cmdline())
 
-      Forks off the process specified by task/process.  The forked off child never returns,
-      but the parent returns immediately and populates information about the pid of the
-      process runner process.
+      The parent returns immediately and populates information about the pid of the co-ordinator.
+      The child (co-ordinator) will launch the target process in a subprocess.
     """
     self._prepare_fork()
     self._pid = self._platform.fork()
@@ -332,6 +333,7 @@ class Process(ProcessBase):
     os.setuid(uid)
 
   def execute(self):
+    """Perform final initialization and launch target process in a subprocess."""
     assert self._stderr
     assert self._stdout
 
@@ -384,7 +386,8 @@ class Process(ProcessBase):
     else:
       state = ProcessState.FAILED
 
-    self._write_process_update(state=state, return_code=rc,
+    self._write_process_update(state=state,
+                               return_code=rc,
                                stop_time=self._platform.clock().time())
 
   def finish(self):

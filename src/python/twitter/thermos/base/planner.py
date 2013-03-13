@@ -1,10 +1,8 @@
-"""
-
-Planners to schedule processes within Tasks.
+"""Planners to schedule processes within Tasks.
 
 TaskPlanner:
-  a daemon process can depend upon a regular process
-  a regular process can not depend upon a daemon process
+  - a daemon process can depend upon a regular process
+  - a regular process cannot depend upon a daemon process
 """
 
 from collections import defaultdict, namedtuple
@@ -165,13 +163,12 @@ class TaskPlanner(object):
           continue
         for k in range(1, len(process_names)):
           pnk, pnk1 = process_names[k], process_names[k-1]
-          if pnk1 not in processes:
-            raise TaskPlanner.InvalidSchedule("Unknown process in dependency: %s" % pnk1)
-          if pnk not in processes:
-            raise TaskPlanner.InvalidSchedule("Unknown process in dependency: %s" % pnk)
           if process_map[pnk1].daemon().get():
-            raise TaskPlanner.InvalidSchedule("Process %s may not depend upon daemon process %s"
-                % (pnk, pnk1))
+            raise TaskPlanner.InvalidSchedule(
+              'Process %s may not depend upon daemon process %s' % (pnk, pnk1))
+          if not process_map[pnk].ephemeral().get() and process_map[pnk1].ephemeral().get():
+            raise TaskPlanner.InvalidSchedule(
+              'Non-ephemeral process %s may not depend upon ephemeral process %s' % (pnk, pnk1))
           dependencies[pnk].add(pnk1)
     return (processes, dependencies)
 
@@ -213,7 +210,7 @@ class TaskPlanner(object):
 
   @property
   def waiting(self):
-    """A list of processes that are runnable w/o duration restrictions."""
+    """A list of processes that are waiting w/o duration restrictions."""
     return self.waiting_at(self._clock.time())
 
   def runnable_at(self, timestamp):
