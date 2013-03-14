@@ -22,7 +22,6 @@ from twitter.thermos.base.path import TaskPath
 from twitter.thermos.monitoring.monitor import TaskMonitor
 
 # thrifts
-from gen.twitter.mesos.constants import DEFAULT_ENVIRONMENT
 from gen.twitter.mesos.ttypes import AssignedTask
 from thrift.Thrift import TException
 from thrift.TSerialization import deserialize as thrift_deserialize
@@ -198,7 +197,7 @@ class ThermosExecutor(ThermosExecutorBase):
     if mesos_task.has_announce():
       discovery_manager = DiscoveryManager(
           mesos_task.role().get(),
-          mesos_task.environment().get() if mesos_task.has_environment() else DEFAULT_ENVIRONMENT,
+          mesos_task.environment().get() if mesos_task.has_environment() else 'devel',
           assigned_task.task.jobName,
           socket.gethostname(),
           mesos_task.announce().primary_port().get(),

@@ -83,7 +83,6 @@ public interface SchedulerCore extends RegisteredListener {
    * @param job Name of the job.
    * @throws ScheduleException If the specified job does not exist, or is not a cron job.
    */
-  // TODO(ksweeney): refactor to use JobKey
   void startCronJob(String role, String job) throws ScheduleException;
 
   /**
@@ -119,7 +118,6 @@ public interface SchedulerCore extends RegisteredListener {
    * @throws ScheduleException If there was an error in updating the state to UPDATING.
    * @return The action taken on each of the shards.
    */
-  // TODO(ksweeney): Refactor this to take a JobKey
   Map<Integer, ShardUpdateResult> updateShards(
       Identity identity,
       String jobName,
@@ -138,7 +136,6 @@ public interface SchedulerCore extends RegisteredListener {
    * @throws ScheduleException If there was an error in updating the state to ROLLBACK.
    * @return The action taken on each of the shards.
    */
-  // TODO(ksweeney): Refactor this to take a JobKey
   Map<Integer, ShardUpdateResult> rollbackShards(
       Identity identity,
       String jobName,
@@ -157,7 +154,6 @@ public interface SchedulerCore extends RegisteredListener {
    * @throws ScheduleException If an update for the job does not exist or if the update token is
    *                           invalid.
    */
-  // TODO(ksweeney): Refactor this to take a JobKey
   void finishUpdate(
       Identity identity,
       String jobName,

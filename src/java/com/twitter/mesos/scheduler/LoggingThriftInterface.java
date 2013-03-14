@@ -8,8 +8,6 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.annotation.Nullable;
-
 import com.google.common.collect.ImmutableList;
 import com.google.inject.Binder;
 import com.google.inject.BindingAnnotation;
@@ -21,6 +19,7 @@ import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.thrift.TException;
 
+import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.CommitRecoveryResponse;
 import com.twitter.mesos.gen.CreateJobResponse;
 import com.twitter.mesos.gen.DeleteRecoveryTasksResponse;
@@ -31,7 +30,6 @@ import com.twitter.mesos.gen.ForceTaskStateResponse;
 import com.twitter.mesos.gen.GetQuotaResponse;
 import com.twitter.mesos.gen.Hosts;
 import com.twitter.mesos.gen.JobConfiguration;
-import com.twitter.mesos.gen.JobKey;
 import com.twitter.mesos.gen.KillResponse;
 import com.twitter.mesos.gen.ListBackupsResponse;
 import com.twitter.mesos.gen.MaintenanceStatusResponse;
@@ -93,14 +91,8 @@ class LoggingThriftInterface implements MesosAdmin.Iface {
     this.delegate = checkNotNull(delegate);
   }
 
-  private void logUserAction(SessionKey session, String messageTemplate, Object... formatArgs) {
-    LOG.info(
-        "Request by user " + session.getUser() + " to "
-        + String.format(messageTemplate, formatArgs));
-  }
-
-  private void logUnauthenticatedAction(String messageTemplate, Object... formatArgs) {
-    LOG.info(String.format(messageTemplate, formatArgs));
+  private void logUserAction(SessionKey session, String message) {
+    LOG.info("Request by " + session.getUser() + " to " + message);
   }
 
   public static void bind(Binder binder, Class<? extends Iface> delegate) {
@@ -119,7 +111,7 @@ class LoggingThriftInterface implements MesosAdmin.Iface {
   public SetQuotaResponse setQuota(String ownerRole, Quota quota, SessionKey session)
       throws TException {
 
-    logUserAction(session, "setQuota|ownerRole: %s |quota: %s", ownerRole, quota);
+    logUserAction(session, "adjust " + ownerRole + " quota to " + quota);
     return delegate.setQuota(ownerRole, quota, session);
   }
 
@@ -129,7 +121,7 @@ class LoggingThriftInterface implements MesosAdmin.Iface {
       ScheduleStatus status,
       SessionKey session) throws TException {
 
-    logUserAction(session, "forceTaskState|taskId: %s |status: %s", taskId, status);
+    logUserAction(session, "force " + taskId + " state to " + status);
     return delegate.forceTaskState(taskId, status, session);
   }
 
@@ -137,124 +129,106 @@ class LoggingThriftInterface implements MesosAdmin.Iface {
   public CreateJobResponse createJob(JobConfiguration description, SessionKey session)
       throws TException {
 
-    logUserAction(session, "createJob|description: %s", description);
+    logUserAction(session, "create job " + Tasks.jobKey(description));
     return delegate.createJob(description, session);
   }
 
   @Override
   public PopulateJobResponse populateJobConfig(JobConfiguration description) throws TException {
-    logUnauthenticatedAction("populateJobConfig|description: %s", description);
+    LOG.info("Request to populate job config " + Tasks.jobKey(description));
     return delegate.populateJobConfig(description);
   }
 
   @Override
-  public StartCronResponse startCronJob(
-      @Nullable String ownerRole,
-      @Nullable String jobName,
-      SessionKey session,
-      @Nullable JobKey job) throws TException {
+  public StartCronResponse startCronJob(String role, String jobName, SessionKey session)
+      throws TException {
 
-    logUserAction(session,
-        "startCronJob|ownerRole: %s |jobName: %s |job: %s", ownerRole, jobName, job);
-
-    return delegate.startCronJob(ownerRole, jobName, session, job);
+    logUserAction(session, "start cron job " + Tasks.jobKey(role, jobName));
+    return delegate.startCronJob(role, jobName, session);
   }
 
   @Override
   public StartUpdateResponse startUpdate(JobConfiguration updatedConfig, SessionKey session)
       throws TException {
 
-    logUserAction(session, "startUpdate|updatedConfig: %s", updatedConfig);
+    logUserAction(session, "start updating job " + Tasks.jobKey(updatedConfig));
     return delegate.startUpdate(updatedConfig, session);
   }
 
   @Override
   public UpdateShardsResponse updateShards(
-      @Nullable String ownerRole,
-      @Nullable String jobName,
-      Set<Integer> shards,
+      String ownerRole,
+      String jobName,
+      Set<Integer> shardIds,
       String updateToken,
-      SessionKey session,
-      @Nullable JobKey job) throws TException {
+      SessionKey session) throws TException {
 
-    logUserAction(session,
-        "updateJob|ownerRole: %s |jobName: %s |shards: %s |job: %s",
-        ownerRole, jobName, shards, job);
-    return delegate.updateShards(ownerRole, jobName, shards, updateToken, session, job);
+    logUserAction(session, "update job " + jobName + " shards " + shardIds);
+    return delegate.updateShards(ownerRole, jobName, shardIds, updateToken, session);
   }
 
   @Override
   public RollbackShardsResponse rollbackShards(
-      @Nullable String ownerRole,
-      @Nullable String jobName,
-      Set<Integer> shards,
+      String ownerRole,
+      String jobName,
+      Set<Integer> shardIds,
       String updateToken,
-      SessionKey session,
-      @Nullable JobKey job) throws TException {
+      SessionKey session) throws TException {
 
-    logUserAction(session,
-        "rollbackShards|ownerRole: %s |jobName: %s |shards: %s |job: %s",
-        ownerRole, jobName, shards, job);
-    return delegate.rollbackShards(ownerRole, jobName, shards, updateToken, session, job);
+    logUserAction(session, "rollback job " + jobName + " shards " + shardIds);
+    return delegate.rollbackShards(ownerRole, jobName, shardIds, updateToken, session);
   }
 
   @Override
   public FinishUpdateResponse finishUpdate(
-      @Nullable String ownerRole,
-      @Nullable String jobName,
+      String ownerRole,
+      String jobName,
       UpdateResult updateResult,
       String updateToken,
-      SessionKey session,
-      @Nullable JobKey job) throws TException {
+      SessionKey session) throws TException {
 
-    logUserAction(session,
-        "finishUpdate|ownerRole: %s |jobName: %s |updateResult: %s |job: %s",
-        ownerRole, jobName, updateResult, job);
-    return delegate.finishUpdate(ownerRole, jobName, updateResult, updateToken, session, job);
+    logUserAction(session, "finish updating job " + jobName + " with result " + updateResult);
+    return delegate.finishUpdate(ownerRole, jobName, updateResult, updateToken, session);
   }
 
   @Override
   public RestartShardsResponse restartShards(
-      @Nullable String role,
-      @Nullable String jobName,
+      String role,
+      String jobName,
       Set<Integer> shardIds,
-      SessionKey session,
-      @Nullable JobKey job) throws TException {
+      SessionKey session) throws TException {
 
-    logUserAction(
-        session,
-        "restartShards|role: %s |jobName: %s |shardIds: %s |job: %s",
-        role, jobName, shardIds, job);
-    return delegate.restartShards(role, jobName, shardIds, session, job);
+    logUserAction(session, "restart shards " + role + "/" + jobName + " " + shardIds);
+    return delegate.restartShards(role, jobName, shardIds, session);
   }
 
   @Override
   public ScheduleStatusResponse getTasksStatus(TaskQuery query) throws TException {
-    logUnauthenticatedAction("getTasksStatus|query: %s", query);
+    LOG.info("Request to fetch status for tasks matching " + query);
     return delegate.getTasksStatus(query);
   }
 
   @Override
   public KillResponse killTasks(TaskQuery query, SessionKey session) throws TException {
-    logUserAction(session, "killTasks|query: %s", query);
+    logUserAction(session, "kill tasks matching " + query);
     return delegate.killTasks(query, session);
   }
 
   @Override
   public GetQuotaResponse getQuota(String ownerRole) throws TException {
-    logUnauthenticatedAction("getQuota|ownerRole: %s", ownerRole);
+    LOG.info("Request to fetch quota for " + ownerRole);
     return delegate.getQuota(ownerRole);
   }
 
   @Override
   public PerformBackupResponse performBackup(SessionKey session) throws TException {
-    logUserAction(session, "performBackup");
+    logUserAction(session, "perform backup immediately");
     return delegate.performBackup(session);
   }
 
   @Override
   public ListBackupsResponse listBackups(SessionKey session) throws TException {
-    logUserAction(session, "listBackups");
+    logUserAction(session, "list backups");
     return delegate.listBackups(session);
   }
 
@@ -262,7 +236,7 @@ class LoggingThriftInterface implements MesosAdmin.Iface {
   public StageRecoveryResponse stageRecovery(String backupId, SessionKey session)
       throws TException {
 
-    logUserAction(session, String.format("stageBackup|backupId: %s", backupId));
+    logUserAction(session, "stage backup " + backupId);
     return delegate.stageRecovery(backupId, session);
   }
 
@@ -270,7 +244,7 @@ class LoggingThriftInterface implements MesosAdmin.Iface {
   public QueryRecoveryResponse queryRecovery(TaskQuery query, SessionKey session)
       throws TException {
 
-    logUserAction(session, String.format("queryRecovery|query: %s", query));
+    logUserAction(session, "query recovery for " + query);
     return delegate.queryRecovery(query, session);
   }
 
@@ -278,19 +252,19 @@ class LoggingThriftInterface implements MesosAdmin.Iface {
   public DeleteRecoveryTasksResponse deleteRecoveryTasks(TaskQuery query, SessionKey session)
       throws TException {
 
-    logUserAction(session, String.format("deleteRecoveryTasks|query: %s", query));
+    logUserAction(session, "delete recovery tasks matching " + query);
     return delegate.deleteRecoveryTasks(query, session);
   }
 
   @Override
   public CommitRecoveryResponse commitRecovery(SessionKey session) throws TException {
-    logUserAction(session, "commitRecovery");
+    logUserAction(session, "commit staged recovery");
     return delegate.commitRecovery(session);
   }
 
   @Override
   public UnloadRecoveryResponse unloadRecovery(SessionKey session) throws TException {
-    logUserAction(session, "unloadRecovery");
+    logUserAction(session, "unload staged recovery");
     return delegate.unloadRecovery(session);
   }
 
@@ -298,13 +272,13 @@ class LoggingThriftInterface implements MesosAdmin.Iface {
   public StartMaintenanceResponse startMaintenance(
       Hosts hosts, SessionKey session) throws TException {
 
-    logUserAction(session, "startMaintenance|hosts: %s", hosts);
+    logUserAction(session, "Starting cluster maintenance on hosts " + hosts);
     return delegate.startMaintenance(hosts, session);
   }
 
   @Override
   public DrainHostsResponse drainHosts(Hosts hostNames, SessionKey session) throws TException {
-    logUserAction(session, "drainHosts|hostNames: %s", hostNames);
+    logUserAction(session, "Draining tasks off maintenance hosts " + hostNames);
     return delegate.drainHosts(hostNames, session);
   }
 
@@ -313,7 +287,7 @@ class LoggingThriftInterface implements MesosAdmin.Iface {
       Hosts hosts,
       SessionKey session) throws TException {
 
-    logUserAction(session, "maintenanceStatus|hosts: %s", hosts);
+    logUserAction(session, "Gathering maintenance status of hosts " + hosts);
     return delegate.maintenanceStatus(hosts, session);
   }
 
@@ -322,7 +296,7 @@ class LoggingThriftInterface implements MesosAdmin.Iface {
       Hosts hosts,
       SessionKey session) throws TException {
 
-    logUserAction(session, "endMaintenance|hosts: %s", hosts);
+    logUserAction(session, "Ending cluster maintenance for " + hosts);
     return delegate.endMaintenance(hosts, session);  }
 
 }
