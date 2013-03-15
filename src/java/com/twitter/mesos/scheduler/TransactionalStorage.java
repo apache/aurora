@@ -8,10 +8,12 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 import com.twitter.common.base.Closure;
+import com.twitter.common.util.Clock;
 import com.twitter.mesos.scheduler.events.PubsubEvent;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
+import com.twitter.mesos.scheduler.storage.StorageBackfill;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -27,6 +29,7 @@ class TransactionalStorage {
   private final Storage storage;
   private final TransactionFinalizer transactionFinalizer;
   private final Closure<PubsubEvent> taskEventSink;
+  private final Clock clock;
 
   interface TransactionFinalizer {
     /**
@@ -47,11 +50,24 @@ class TransactionalStorage {
   TransactionalStorage(
       Storage storage,
       TransactionFinalizer transactionFinalizer,
-      Closure<PubsubEvent> taskEventSink) {
+      Closure<PubsubEvent> taskEventSink,
+      Clock clock) {
 
     this.storage = checkNotNull(storage);
     this.transactionFinalizer = checkNotNull(transactionFinalizer);
     this.taskEventSink = checkNotNull(taskEventSink);
+    this.clock = checkNotNull(clock);
+  }
+
+  /**
+   * Backfills storage structs, ideally this is performed before other storage queries.
+   */
+  void backfill() {
+    storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider storeProvider) {
+        StorageBackfill.backfill(storeProvider, clock);
+      }
+    });
   }
 
   /**

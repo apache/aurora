@@ -7,7 +7,6 @@ import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Logger;
 
@@ -38,11 +37,9 @@ import com.twitter.common.util.StateMachine;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
-import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.ShardUpdateResult;
-import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
@@ -50,7 +47,6 @@ import com.twitter.mesos.gen.storage.JobUpdateConfiguration;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 import com.twitter.mesos.scheduler.TransactionalStorage.SideEffectWork;
 import com.twitter.mesos.scheduler.TransactionalStorage.TransactionFinalizer;
-import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.events.PubsubEvent;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
@@ -83,8 +79,6 @@ import static com.twitter.mesos.scheduler.Shards.GET_ORIGINAL_CONFIG;
  */
 public class StateManagerImpl implements StateManager {
   private static final Logger LOG = Logger.getLogger(StateManagerImpl.class.getName());
-
-  private final AtomicLong shardSanityCheckFails = Stats.exportLong("shard_sanity_check_failures");
 
   @VisibleForTesting
   final TransactionalStorage txStorage;
@@ -169,7 +163,7 @@ public class StateManagerImpl implements StateManager {
       }
     };
 
-    txStorage = new TransactionalStorage(storage, finalizer, taskEventSink);
+    txStorage = new TransactionalStorage(storage, finalizer, taskEventSink, clock);
     readOnlyStorage = new ReadOnlyStorage() {
       @Override public <T, E extends Exception> T doInTransaction(Work<T, E> work)
           throws StorageException, E {
@@ -249,80 +243,12 @@ public class StateManagerImpl implements StateManager {
     });
   }
 
-  private static Set<String> activeShards(
-      TaskStore taskStore,
-      String role,
-      String job,
-      int shardId) {
-
-    TaskQuery query = new TaskQuery()
-        .setStatuses(Tasks.ACTIVE_STATES)
-        .setOwner(new Identity().setRole(role))
-        .setJobName(job)
-        .setShardIds(ImmutableSet.of(shardId));
-    return taskStore.fetchTaskIds(query);
-  }
-
   /**
    * Instructs the state manager to start.
    */
   void start() {
     managerState.transition(State.STARTED);
-
-    txStorage.doInWriteTransaction(txStorage.new NoResultSideEffectWork() {
-      @Override protected void execute(final MutableStoreProvider storeProvider) {
-        for (String id : storeProvider.getJobStore().fetchManagerIds()) {
-          for (JobConfiguration job : storeProvider.getJobStore().fetchJobs(id)) {
-            ConfigurationManager.applyDefaultsIfUnset(job);
-            storeProvider.getJobStore().saveAcceptedJob(id, job);
-          }
-        }
-        LOG.info("Performing shard uniqueness sanity check.");
-        storeProvider.getTaskStore().mutateTasks(Query.GET_ALL, new Closure<ScheduledTask>() {
-          @Override public void execute(final ScheduledTask task) {
-            ConfigurationManager.applyDefaultsIfUnset(task.getAssignedTask().getTask());
-
-            TaskEvent latestEvent = task.isSetTaskEvents()
-                ? Iterables.getLast(task.getTaskEvents(), null) : null;
-            if ((latestEvent == null) || (latestEvent.getStatus() != task.getStatus())) {
-              LOG.severe("Task " + Tasks.id(task) + " has no event for current status.");
-              task.addToTaskEvents(new TaskEvent(clock.nowMillis(), task.getStatus())
-                  .setMessage("Synthesized missing event."));
-            }
-
-            if (Tasks.isActive(task.getStatus())) {
-              // Perform a sanity check on the number of active shards.
-              Set<String> activeTasksInShard = activeShards(
-                  storeProvider.getTaskStore(),
-                  Tasks.getRole(task),
-                  Tasks.getJob(task),
-                  Tasks.SCHEDULED_TO_SHARD_ID.apply(task));
-
-              if (activeTasksInShard.size() > 1) {
-                shardSanityCheckFails.incrementAndGet();
-                LOG.severe("Active shard sanity check failed when loading " + Tasks.id(task)
-                    + ", active tasks found: " + activeTasksInShard);
-
-                // We want to keep exactly one task from this shard, so sort the IDs and keep the
-                // highest (newest) in the hopes that it is legitimately running.
-                String newestTask = Iterables.getLast(Sets.newTreeSet(activeTasksInShard));
-                if (!Tasks.id(task).equals(newestTask)) {
-                  task.setStatus(ScheduleStatus.KILLED);
-                  task.addToTaskEvents(new TaskEvent(clock.nowMillis(), ScheduleStatus.KILLED)
-                      .setMessage("Killed duplicate shard."));
-                  // TODO(wfarner); Circle back if this is necessary.  Currently there's a race
-                  // condition between the time the scheduler is actually available without hitting
-                  // IllegalStateException (see DriverImpl).
-                  // driver.killTask(Tasks.id(task));
-                } else {
-                  LOG.info("Retaining task " + Tasks.id(task));
-                }
-              }
-            }
-          }
-        });
-      }
-    });
+    txStorage.backfill();
   }
 
   /**
