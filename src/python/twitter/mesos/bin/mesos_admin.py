@@ -134,6 +134,7 @@ def set_quota(role, cpu_str, ram_mb_str, disk_mb_str):
   except ValueError:
     log.error('Invalid value')
 
+  options = app.get_options()
   resp = MesosClientAPI(options.cluster, options.verbosity).set_quota(role, cpu, ram_mb, disk_mb)
   check_and_log_response(resp)
 
