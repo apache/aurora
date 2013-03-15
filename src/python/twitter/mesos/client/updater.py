@@ -3,8 +3,10 @@ import time
 
 from twitter.common import app, log
 
+from gen.twitter.mesos.constants import DEFAULT_ENVIRONMENT
 from gen.twitter.mesos.ttypes import (
   Identity,
+  JobKey,
   ResponseCode,
   ScheduleStatus,
   ShardUpdateResult,
@@ -79,6 +81,9 @@ class Updater(object):
       raise self.InvalidConfigError(str(e))
     self._update_token = None
 
+    # TODO(ksweeney): Get this from config and remove job_name and role fields.
+    self._job = JobKey(name=self._job_name, environment=DEFAULT_ENVIRONMENT, role=self._role)
+
   def update_failure_counts(self, failed_shards):
     """Update the failure counts metrics based upon a batch of failed shards."""
     for shard in failed_shards:
@@ -110,9 +115,11 @@ class Updater(object):
          True if update succeeded
          False if update failed
     """
+
+    # TODO(ksweeney): Change to use just job after JobKey refactor.
     resp = self._scheduler.finishUpdate(
-        self._role, self._job_name, UpdateResult.FAILED if rollback else UpdateResult.SUCCESS,
-        self._update_token)
+        self._role, self._job_name, self._job,
+        UpdateResult.FAILED if rollback else UpdateResult.SUCCESS, self._update_token)
     if resp.responseCode == ResponseCode.OK:
       resp._update_token = None
     return resp
@@ -122,7 +129,10 @@ class Updater(object):
 
   @classmethod
   def cancel_update(cls, scheduler, role, jobname, token=None):
-    return scheduler.finishUpdate(role, jobname, UpdateResult.TERMINATE, token)
+    job = JobKey(role=role, environment=DEFAULT_ENVIRONMENT, name=jobname)
+
+    # TODO(ksweeney): Change to use just job after JobKey refactor.
+    return scheduler.finishUpdate(role, jobname, job, UpdateResult.TERMINATE, token)
 
   def is_failed_update(self):
     total_failed_shards = self.exceeded_shard_fail_count()
@@ -201,7 +211,9 @@ class Updater(object):
     while shards_to_rollback:
       batch_shards = shards_to_rollback[0 : self._update_config.batch_size]
       shards_to_rollback = list(set(shards_to_rollback) - set(batch_shards))
-      resp = self._scheduler.rollbackShards(self._role, self._job_name, batch_shards, 
+
+      # TODO(ksweeney): Change to use just job after JobKey refactor.
+      resp = self._scheduler.rollbackShards(self._role, self._job_name, self._job, batch_shards,
           self._update_token)
       log.log(debug_if(resp.responseCode == UpdateResponseCode.OK),
         'Response from scheduler: %s (message: %s)'
@@ -220,7 +232,10 @@ class Updater(object):
     Returns a map of the current status of the restarted shards as returned by the scheduler.
     """
     log.info('Restarting shards: %s' % shard_ids)
-    return self._scheduler.updateShards(self._role, self._job_name, shard_ids, self._update_token)
+
+    # TODO(ksweeney): Change to use just job after JobKey refactor.
+    return self._scheduler.updateShards(self._role, self._job_name, self._job, shard_ids,
+        self._update_token)
 
   def watch_shards(self, shard_ids):
     """Monitors the restarted shards.

@@ -149,9 +149,13 @@ public class SchedulerModule extends AbstractModule {
     bind(CronJobManager.class).in(Singleton.class);
     bind(ImmediateJobManager.class).in(Singleton.class);
 
+    // Bindings for SchedulerController
+    bind(SchedulerController.class).to(SchedulerThriftInterface.class).in(Singleton.class);
+
     // Bindings for thrift interfaces.
-    LoggingThriftInterface.bind(binder(), SchedulerThriftInterface.class);
-    bind(SchedulerThriftInterface.class).in(Singleton.class);
+    // TODO(ksweeney): Refactor LoggingThriftInterface to LoggingSchedulerController
+    LoggingThriftInterface.bind(binder(), SchedulerThriftRouter.class);
+    bind(SchedulerThriftRouter.class).in(Singleton.class);
     bind(ThriftServer.class).to(SchedulerThriftServer.class).in(Singleton.class);
 
     bind(LostTaskStats.class).in(Singleton.class);

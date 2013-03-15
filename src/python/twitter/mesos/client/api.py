@@ -2,10 +2,11 @@ from twitter.common import log
 from twitter.common.lang import Compatibility
 from twitter.mesos.client.updater import Updater
 
-from gen.twitter.mesos.constants import LIVE_STATES
+from gen.twitter.mesos.constants import DEFAULT_ENVIRONMENT, LIVE_STATES
 from gen.twitter.mesos.ttypes import (
     FinishUpdateResponse,
     Identity,
+    JobKey,
     ResponseCode,
     Quota,
     TaskQuery)
@@ -46,7 +47,10 @@ invoking cancel_update.
   def start_cronjob(self, role, jobname):
     log.info("Starting cron job: %s" % jobname)
 
-    return self._scheduler.startCronJob(role, jobname)
+    # TODO(ksweeney): Change to use just job after JobKey refactor
+    job = JobKey(role=role, environment=DEFAULT_ENVIRONMENT, name=jobname)
+
+    return self._scheduler.startCronJob(role, jobname, job)
 
   def kill_job(self, role, jobname, shards=None):
     log.info("Killing tasks for job: %s" % jobname)
@@ -130,7 +134,11 @@ invoking cancel_update.
 
   def restart(self, role, jobname, shards):
     log.info("Restarting job %s shards %s" % (jobname, shards))
-    return self._scheduler.restartShards(role, jobname, shards)
+
+    # TODO(ksweeney): Change to use just job after JobKey refactor
+    job = JobKey(role=role, environment=DEFAULT_ENVIRONMENT, name=jobname)
+
+    return self._scheduler.restartShards(role, jobname, job, shards)
 
   def get_quota(self, role):
     log.info("Getting quota for: %s" % role)

@@ -37,10 +37,10 @@ import com.twitter.mesos.gen.GetQuotaResponse;
 import com.twitter.mesos.gen.Hosts;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.JobKey;
 import com.twitter.mesos.gen.KillResponse;
 import com.twitter.mesos.gen.ListBackupsResponse;
 import com.twitter.mesos.gen.MaintenanceStatusResponse;
-import com.twitter.mesos.gen.MesosAdmin;
 import com.twitter.mesos.gen.PerformBackupResponse;
 import com.twitter.mesos.gen.PopulateJobResponse;
 import com.twitter.mesos.gen.QueryRecoveryResponse;
@@ -74,6 +74,7 @@ import com.twitter.mesos.scheduler.storage.backup.StorageBackup;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
+
 import static com.twitter.mesos.gen.ResponseCode.AUTH_FAILED;
 import static com.twitter.mesos.gen.ResponseCode.ERROR;
 import static com.twitter.mesos.gen.ResponseCode.INVALID_REQUEST;
@@ -83,7 +84,7 @@ import static com.twitter.mesos.gen.ResponseCode.OK;
  * Mesos scheduler thrift server implementation.
  * Interfaces between mesos users and the scheduler core to perform cluster administration tasks.
  */
-public class SchedulerThriftInterface implements MesosAdmin.Iface {
+public class SchedulerThriftInterface implements SchedulerController {
   @VisibleForTesting
   @NotEmpty
   @CmdLine(name = "admin_role",
@@ -183,6 +184,8 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     checkNotNull(job);
     checkNotNull(session);
 
+    // TODO(ksweeney): check valid JobKey in job after deprecating non-environment version.
+
     LOG.info("Received createJob request: " + Tasks.jobKey(job));
     CreateJobResponse response = new CreateJobResponse();
 
@@ -219,6 +222,8 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
   public PopulateJobResponse populateJobConfig(JobConfiguration description) {
     checkNotNull(description);
 
+    // TODO(ksweeney): check valid JobKey in description after deprecating non-environment version.
+
     PopulateJobResponse response = new PopulateJobResponse();
     try {
       response.setPopulated(ConfigurationManager.validateAndPopulate(description).getTaskConfigs())
@@ -232,21 +237,20 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
   }
 
   @Override
-  public StartCronResponse startCronJob(String role, String jobName, SessionKey session) {
-    checkNotBlank(role);
-    checkNotBlank(jobName);
+  public StartCronResponse startCronJob(JobKey job, SessionKey session) {
     checkNotNull(session);
+    JobKeys.assertValid(job);
 
     StartCronResponse response = new StartCronResponse();
     try {
-      sessionValidator.checkAuthenticated(session, role);
+      sessionValidator.checkAuthenticated(session, job.getRole());
     } catch (AuthFailedException e) {
       response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
       return response;
     }
 
     try {
-      schedulerCore.startCronJob(role, jobName);
+      schedulerCore.startCronJob(job.getRole(), job.getName());
       response.setResponseCode(OK).setMessage("Cron run started.");
     } catch (ScheduleException e) {
       response.setResponseCode(INVALID_REQUEST)
@@ -341,6 +345,8 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
     checkNotNull(job);
     checkNotNull(session);
 
+    // TODO(ksweeney): check valid JobKey in job after deprecating non-environment version.
+
     LOG.info("Received update request for tasks: " + Tasks.jobKey(job));
     StartUpdateResponse response = new StartUpdateResponse();
     try {
@@ -372,22 +378,24 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
 
   @Override
   public UpdateShardsResponse updateShards(
-      String role,
-      String jobName,
+      JobKey job,
       Set<Integer> shards,
       String updateToken,
       SessionKey session) {
 
-    checkNotBlank(role);
-    checkNotBlank(jobName);
+    JobKeys.assertValid(job);
     checkNotBlank(shards);
     checkNotBlank(updateToken);
     checkNotNull(session);
 
-    Identity identity = new Identity(role, session.getUser());
+    Identity identity = new Identity(job.getRole(), session.getUser());
+
+    // TODO(ksweeney): Validate session key here
+
     UpdateShardsResponse response = new UpdateShardsResponse();
     try {
-      response.setShards(schedulerCore.updateShards(identity, jobName, shards, updateToken))
+      response
+          .setShards(schedulerCore.updateShards(identity, job.getName(), shards, updateToken))
           .setResponseCode(UpdateResponseCode.OK)
           .setMessage("Successfully started update of shards: " + shards);
     } catch (ScheduleException e) {
@@ -399,22 +407,23 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
 
   @Override
   public RollbackShardsResponse rollbackShards(
-      String role,
-      String jobName,
+      JobKey job,
       Set<Integer> shards,
       String updateToken,
       SessionKey session) {
 
-    checkNotBlank(role);
-    checkNotBlank(jobName);
+    JobKeys.assertValid(job);
     checkNotBlank(shards);
     checkNotBlank(updateToken);
     checkNotNull(session);
 
-    Identity identity = new Identity(role, session.getUser());
+    // TODO(ksweeney): Validate session key here
+
+    Identity identity = new Identity(job.getRole(), session.getUser());
     RollbackShardsResponse response = new RollbackShardsResponse();
     try {
-      response.setShards(schedulerCore.rollbackShards(identity, jobName, shards, updateToken))
+      response
+          .setShards(schedulerCore.rollbackShards(identity, job.getName(), shards, updateToken))
           .setResponseCode(UpdateResponseCode.OK)
           .setMessage("Successfully started rollback of shards: " + shards);
     } catch (ScheduleException e) {
@@ -426,22 +435,22 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
 
   @Override
   public FinishUpdateResponse finishUpdate(
-      String role,
-      String jobName,
+      JobKey job,
       UpdateResult updateResult,
       String updateToken,
       SessionKey session) {
 
-    checkNotBlank(role);
-    checkNotBlank(jobName);
+    JobKeys.assertValid(job);
     checkNotNull(session);
 
+    // TODO(ksweeney): Validate session key here
+
     FinishUpdateResponse response = new FinishUpdateResponse();
-    Identity identity = new Identity(role, session.getUser());
+    Identity identity = new Identity(job.getRole(), session.getUser());
     Optional<String> token = updateResult == UpdateResult.TERMINATE
         ? Optional.<String>absent() : Optional.of(updateToken);
     try {
-      schedulerCore.finishUpdate(identity, jobName, token, updateResult);
+      schedulerCore.finishUpdate(identity, job.getName(), token, updateResult);
       response.setResponseCode(OK).setMessage("Update successfully finished.");
     } catch (ScheduleException e) {
       response.setResponseCode(ResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
@@ -452,26 +461,24 @@ public class SchedulerThriftInterface implements MesosAdmin.Iface {
 
   @Override
   public RestartShardsResponse restartShards(
-      String role,
-      String jobName,
+      JobKey job,
       Set<Integer> shardIds,
       SessionKey session) {
 
-    checkNotBlank(role);
-    checkNotBlank(jobName);
+    JobKeys.assertValid(job);
     MorePreconditions.checkNotBlank(shardIds);
     checkNotNull(session);
 
     RestartShardsResponse response = new RestartShardsResponse();
     try {
-      sessionValidator.checkAuthenticated(session, role);
+      sessionValidator.checkAuthenticated(session, job.getRole());
     } catch (AuthFailedException e) {
       response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
       return response;
     }
 
     try {
-      schedulerCore.restartShards(role, jobName, shardIds, session.getUser());
+      schedulerCore.restartShards(job.getRole(), job.getName(), shardIds, session.getUser());
       response.setResponseCode(OK).setMessage("Shards are restarting.");
     } catch (ScheduleException e) {
       response.setResponseCode(ResponseCode.INVALID_REQUEST).setMessage(e.getMessage());

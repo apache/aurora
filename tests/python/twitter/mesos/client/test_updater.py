@@ -5,6 +5,7 @@ import unittest
 
 from twitter.mesos.client.updater import Updater
 
+from gen.twitter.mesos.constants import DEFAULT_ENVIRONMENT
 from gen.twitter.mesos.ttypes import *
 
 import pytest
@@ -101,7 +102,7 @@ class FakeScheduler(object):
     resp.shards = response[-1]
     return resp
 
-  def updateShards(self, role, job, shard_ids, update_token):
+  def updateShards(self, role, job_name, job, shard_ids, update_token):
     """Check input paramters with expected paramters queued by expect_restart_tasks.
 
     Arguments:
@@ -114,9 +115,9 @@ class FakeScheduler(object):
     """
     return self._handle_update('updateShards',
                                self._restart_calls,
-                               (role, job, shard_ids, update_token))
+                               (role, job_name, job, shard_ids, update_token))
 
-  def expect_updateShards(self, role, job, shard_ids, update_token, shard_results):
+  def expect_updateShards(self, role, job_name, job, shard_ids, update_token, shard_results):
     """Sets up an expectation for a restart_tasks call to be made.
 
     Arguments:
@@ -125,9 +126,9 @@ class FakeScheduler(object):
     shard_ids -- set of shards.
     update_token -- unique token identifying the current update.
     """
-    self._restart_calls.append((role, job, shard_ids, update_token, shard_results))
+    self._restart_calls.append((role, job_name, job, shard_ids, update_token, shard_results))
 
-  def rollbackShards(self, role, job, shard_ids, update_token):
+  def rollbackShards(self, role, job_name, job, shard_ids, update_token):
     """Check input paramters with expected paramters queued by expect_rollback_tasks.
 
     Arguments:
@@ -140,9 +141,9 @@ class FakeScheduler(object):
     """
     return self._handle_update('rollbackShards',
                                self._rollback_calls,
-                               (role, job, shard_ids, update_token))
+                               (role, job_name, job, shard_ids, update_token))
 
-  def expect_rollbackShards(self, role, job, shard_ids, update_token, shard_results):
+  def expect_rollbackShards(self, role, job_name, job, shard_ids, update_token, shard_results):
     """Sets up an expectation for a rollback_tasks call to be made.
 
     Arguments:
@@ -151,7 +152,7 @@ class FakeScheduler(object):
     shard_ids -- set of shards.
     update_token -- unique token identifying the current update.
     """
-    self._rollback_calls.append((role, job, shard_ids, update_token, shard_results))
+    self._rollback_calls.append((role, job_name, job, shard_ids, update_token, shard_results))
 
 
 class UpdaterTest(unittest.TestCase):
@@ -176,11 +177,15 @@ class UpdaterTest(unittest.TestCase):
     self._updater._update_token = 'test_update'
 
   def expect_restart(self, shard_ids, shard_results=None):
-    self._scheduler.expect_updateShards('mesos', 'jimbob', shard_ids, 'test_update', shard_results)
+    self._scheduler.expect_updateShards('mesos', 'jimbob',
+      JobKey(role='mesos', environment=DEFAULT_ENVIRONMENT, name='jimbob'),
+      shard_ids, 'test_update', shard_results)
 
   def expect_rollback(self, shard_ids, shard_results=None):
     self._scheduler.expect_rollbackShards(
-        'mesos', 'jimbob', shard_ids, 'test_update', shard_results)
+      'mesos', 'jimbob',
+      JobKey(role='mesos', environment=DEFAULT_ENVIRONMENT, name='jimbob'),
+      shard_ids, 'test_update', shard_results)
 
   def expect_get_statuses(self, statuses, num_calls=EXPECTED_GET_STATUS_CALLS):
     for x in range(int(num_calls)):
