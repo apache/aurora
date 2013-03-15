@@ -147,7 +147,7 @@ class Updater(object):
               (failure_count, shard, self._update_config.max_per_shard_failures))
     return is_failed
 
-  def _maybe_watch_shards(self, shard_states, batch_shards):
+  def _get_shards_to_watch(self, shard_states, batch_shards):
     if shard_states:
       no_watch_states = (ShardUpdateResult.UNCHANGED, )
       watch_states = (ShardUpdateResult.RESTARTING, ShardUpdateResult.ADDED)
@@ -158,10 +158,7 @@ class Updater(object):
     else:
       log.error('No shard actions returned by scheduler, assuming all shards restarted.')
       watch_shards = batch_shards
-    if watch_shards:
-      return self.watch_shards(watch_shards)
-    else:
-      return []
+    return watch_shards
 
   def update(self, initial_shards):
     """Performs the job update, blocking until it completes.
@@ -175,25 +172,35 @@ class Updater(object):
     Returns the set of shards that failed to update.
     """
     failed_shards = []
-    remaining_shards = initial_shards[:]
+    ShardState = collections.namedtuple('ShardState', ['shard_id', 'is_updated'])
+    remaining_shards = [ShardState(shard_id, is_updated=False) for shard_id in initial_shards]
 
     log.info('Starting job update.')
     while remaining_shards and not self.is_failed_update():
       batch_shards = remaining_shards[0 : self._update_config.batch_size]
       remaining_shards = list(set(remaining_shards) - set(batch_shards))
-      resp = self.restart_shards(batch_shards)
-      log.log(debug_if(resp.responseCode == UpdateResponseCode.OK),
-        'Response from scheduler: %s (message: %s)' % (
-          UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
-      failed_shards = self._maybe_watch_shards(resp.shards, batch_shards)
+      shards_to_restart = [s.shard_id for s in batch_shards if s.is_updated]
+      shards_to_update = [s.shard_id for s in batch_shards if not s.is_updated]
+
+      shards_to_watch = []
+      if shards_to_restart:
+        self.restart_shards(shards_to_restart)
+        shards_to_watch += shards_to_restart
+
+      if shards_to_update:
+        shard_states = self.update_shards(shards_to_update)
+        shards_to_watch += self._get_shards_to_watch(shard_states, shards_to_update)
+
+      failed_shards = self.watch_shards(shards_to_watch) if shards_to_watch else []
+
       log.log(debug_if(not failed_shards), 'Failed shards: %s' % failed_shards)
-      remaining_shards += failed_shards
-      remaining_shards.sort()
+      remaining_shards += [ShardState(shard_id, is_updated=True) for shard_id in failed_shards]
+      remaining_shards.sort(key=lambda tup: tup.shard_id)
       self.update_failure_counts(failed_shards)
 
     if failed_shards:
-      shards_to_rollback = [shard for shard in set(initial_shards).difference(remaining_shards)] + (
-          failed_shards)
+      untouched_shards = [s.shard_id for s in remaining_shards if not s.is_updated]
+      shards_to_rollback = list(set(initial_shards) - set(untouched_shards))
       self.rollback(shards_to_rollback)
 
     return failed_shards
@@ -218,24 +225,39 @@ class Updater(object):
       log.log(debug_if(resp.responseCode == UpdateResponseCode.OK),
         'Response from scheduler: %s (message: %s)'
           % (UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
-      failed_shards += self._maybe_watch_shards(resp.shards, batch_shards)
+      failed_shards += self.watch_shards(self._get_shards_to_watch(resp.shards, batch_shards))
 
     if failed_shards:
       log.error('Rollback failed for shards: %s' % failed_shards)
 
+  def update_shards(self, shard_ids):
+    """Instructs the scheduler to update shards.
+
+    Arguments:
+    shard_ids -- set of shards to be updated by the scheduler.
+
+    Returns a map of the current status of the updated shards as returned by the scheduler.
+    """
+    log.info('Updating shards: %s' % shard_ids)
+    # TODO(ksweeney): Change to use just job after JobKey refactor.
+    resp = self._scheduler.updateShards(
+        self._role, self._job_name, self._job, shard_ids, self._update_token)
+    log.log(debug_if(resp.responseCode == UpdateResponseCode.OK),
+        'Response from scheduler: %s (message: %s)' % (
+          UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
+    return resp.shards
+
   def restart_shards(self, shard_ids):
-    """Performs a scheduler call for restart.
+    """Instructs the scheduler to restart shards.
 
     Arguments:
     shard_ids -- set of shards to be restarted by the scheduler.
-
-    Returns a map of the current status of the restarted shards as returned by the scheduler.
     """
     log.info('Restarting shards: %s' % shard_ids)
-
-    # TODO(ksweeney): Change to use just job after JobKey refactor.
-    return self._scheduler.updateShards(self._role, self._job_name, self._job, shard_ids,
-        self._update_token)
+    resp = self._scheduler.restartShards(self._role, self._job_name, self._job, shard_ids)
+    log.log(debug_if(resp.responseCode == ResponseCode.OK),
+        'Response from scheduler: %s (message: %s)' % (
+          ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
 
   def watch_shards(self, shard_ids):
     """Monitors the restarted shards.

@@ -30,5 +30,6 @@ python_tests(name = 'updater',
     pants('src/python/twitter/common'),
     pants('src/python/twitter/mesos:mesos-lib'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    python_requirement('mox'),
   ]
 )
