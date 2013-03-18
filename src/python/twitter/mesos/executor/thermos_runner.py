@@ -5,6 +5,7 @@ import sys
 import traceback
 
 from twitter.common import app, options, log
+from twitter.common.log.options import LogOptions
 
 from twitter.thermos.base.options import add_port_to
 from twitter.thermos.config.loader import ThermosConfigLoader
@@ -84,4 +85,5 @@ def main(args, opts):
     runner_teardown(task_runner)
 
 
+LogOptions.set_simple(True)
 app.main()

@@ -17,11 +17,14 @@ app.configure(module='twitter.common_internal.app.modules.chickadee_handler',
 app.configure(debug=True)
 
 
+LogOptions.set_simple(True)
+
 if 'ANGRYBIRD_THERMOS' in os.environ:
   LogOptions.set_log_dir(os.path.join(os.environ['ANGRYBIRD_THERMOS'], 'thermos/log'))
 else:
   # locate logs locally in executor sandbox
   LogOptions.set_log_dir('executor_logs')
+
 
 def main():
   LogOptions.set_disk_log_level('DEBUG')
