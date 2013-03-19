@@ -158,9 +158,6 @@ public class SchedulerModule extends AbstractModule {
     bind(SchedulerThriftRouter.class).in(Singleton.class);
     bind(ThriftServer.class).to(SchedulerThriftServer.class).in(Singleton.class);
 
-    bind(LostTaskStats.class).in(Singleton.class);
-    TaskEventModule.bindSubscriber(binder(), LostTaskStats.class);
-
     // Filter layering: notifier filter -> base impl
     TaskEventModule.bind(binder(), SchedulingFilterImpl.class);
     bind(SchedulingFilterImpl.class).in(Singleton.class);
