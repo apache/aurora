@@ -48,7 +48,6 @@ public final class ConfigurationManager {
   @VisibleForTesting public static final String HOST_CONSTRAINT = "host";
   @VisibleForTesting public static final String RACK_CONSTRAINT = "rack";
 
-  @VisibleForTesting
   @Positive
   @CmdLine(name = "max_tasks_per_job", help = "Maximum number of allowed tasks in a single job.")
   public static final Arg<Integer> MAX_TASKS_PER_JOB = Arg.create(1000);

@@ -20,6 +20,7 @@ import com.twitter.common.util.Random;
 import com.twitter.common.util.TruncatedBinaryBackoff;
 import com.twitter.mesos.scheduler.async.TaskScheduler.OfferReturnDelay;
 import com.twitter.mesos.scheduler.async.TaskScheduler.TaskSchedulerImpl;
+import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.events.TaskEventModule;
 
 import static com.twitter.mesos.scheduler.async.HistoryPruner.PruneThreshold;
@@ -58,10 +59,6 @@ public class AsyncModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> HISTORY_PRUNE_THRESHOLD =
       Arg.create(Amount.of(2L, Time.DAYS));
 
-  @CmdLine(name = "per_job_task_history_goal",
-      help = "Per-job task history that the scheduler attempts to retain.")
-  private static final Arg<Integer> PER_JOB_TASK_HISTORY_GOAL = Arg.create(300);
-
   @Override
   protected void configure() {
     // Don't worry about clean shutdown, these can be daemon and cleanup-free.
@@ -99,8 +96,9 @@ public class AsyncModule extends AbstractModule {
     });
     binder().install(new PrivateModule() {
       @Override protected void configure() {
+        // TODO(ksweeney): Create a configuration validator module so this can be injected.
         bind(Integer.class).annotatedWith(PruneThreshold.class)
-            .toInstance(PER_JOB_TASK_HISTORY_GOAL.get());
+            .toInstance(ConfigurationManager.MAX_TASKS_PER_JOB.get() * 2);
         bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(PruneThreshold.class)
             .toInstance(HISTORY_PRUNE_THRESHOLD.get());
         bind(ScheduledExecutorService.class).toInstance(executor);
