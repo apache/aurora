@@ -73,12 +73,12 @@ Package = PackerPackage
 
 
 class UpdateConfig(Struct):
-  batch_size             = Default(Integer, 1)
-  restart_threshold      = Default(Integer, 60)
-  watch_secs             = Default(Integer, 30)
-  max_per_shard_failures = Default(Integer, 0)
-  max_total_failures     = Default(Integer, 0)
-
+  batch_size                  = Default(Integer, 1)
+  restart_threshold           = Default(Integer, 60)
+  healthy_threshold           = Default(Integer, 30)
+  watch_secs                  = Default(Integer, 30)
+  max_per_shard_failures      = Default(Integer, 0)
+  max_total_failures          = Default(Integer, 0)
 
 
 class Announcer(Struct):

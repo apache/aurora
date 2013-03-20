@@ -1,61 +1,59 @@
 import collections
-import time
 
 from twitter.common import app, log
 
 from gen.twitter.mesos.constants import DEFAULT_ENVIRONMENT
 from gen.twitter.mesos.ttypes import (
-  Identity,
   JobKey,
   ResponseCode,
-  ScheduleStatus,
   ShardUpdateResult,
-  TaskQuery,
   UpdateResponseCode,
   UpdateResult,
 )
 
+from .shard_watcher import ShardWatcher
 from .scheduler_client import SchedulerProxy
-
-
-app.add_option('--mesos_updater_status_check_interval',
-  dest='mesos_updater_status_check_interval',
-  default=3,
-  type='int',
-  help='How often Mesos runs update loop.')
 
 
 def debug_if(condition):
   return log.DEBUG if condition else log.ERROR
 
 
-class Shard(object):
-  def __init__(self, task_id=None, birthday=None, finished=False):
-    self.task_id = task_id
-    self.birthday = birthday
-    self.finished = finished
-    self.healthy = False
-
-  def set_healthy(self, healthy):
-    self.healthy = healthy
-    self.finished = True
-
-  def __str__(self):
-    return ('[id=%s, birthday=%s, healthy=%s, finished=%s'
-            % (self.task_id, self.birthday, self.healthy, self.finished))
-
-
 class UpdaterConfig(object):
-  def __init__(self, batch_size, restart_threshold, watch_secs, max_per_shard_failures,
-               max_total_failures):
+  """
+  For updates involving a health check,
+
+  UPDATE SHARD          RUNNING                    HEALTHY           RUNNING and HEALTHY
+  ------------------------|--------------------------|-----------------------|
+  \----------------------/ \------------------------/ \----------------------/
+     restart_thresold           healthy_threshold            watch_secs
+
+  For updates without a health check,
+
+  UPDATE SHARD          RUNNING               REMAINS RUNNING
+  ------------------------|--------------------------|
+  \----------------------/ \------------------------/
+     restart_thresold            watch_secs
+
+  When an update is initiated, a shard is expected to move into RUNNING before restart_threshold.
+  Once RUNNING, if health checks are enabled, the health checker requires the shard to be in a 
+  "healthy" state within healthy_threshold. The shard is then expected to remain RUNNING and report
+  "healthy", if health checks are enabled, for atleast watch_secs. If any of these conditions are 
+  not satisfied, the shard is deemed unhealthy.
+  """
+  def __init__(self, batch_size, restart_threshold, healthy_threshold, watch_secs,
+               max_per_shard_failures, max_total_failures):
     if batch_size <= 0:
       raise ValueError('Batch size should be greater than 0')
     if restart_threshold <= 0:
       raise ValueError('Restart Threshold should be greater than 0')
     if watch_secs <= 0:
       raise ValueError('Watch seconds should be greater than 0')
+    if healthy_threshold <= 0:
+      raise ValueError('Healthy threshold should be greater than 0')
     self.batch_size = batch_size
     self.restart_threshold = restart_threshold
+    self.healthy_threshold = healthy_threshold
     self.watch_secs = watch_secs
     self.max_total_failures = max_total_failures
     self.max_per_shard_failures = max_per_shard_failures
@@ -68,13 +66,13 @@ class Updater(object):
   class InvalidConfigError(Error): pass
   class UpdateInProgressError(Error): pass
 
-  def __init__(self, config, scheduler=None, clock=time):
+  def __init__(self, config, scheduler=None, shard_watcher=None):
+    self._config = config
     self._role = config.role()
     self._job_name = config.name()
-    self._scheduler = scheduler or SchedulerProxy(config.cluster())
-    self._clock = clock
+    self._cluster = config.cluster()
+    self._scheduler = scheduler or SchedulerProxy(self._cluster)
     self._failures_by_shard = collections.defaultdict(int)
-    self._config = config
     try:
       self._update_config = UpdaterConfig(**config.update_config().get())
     except ValueError as e:
@@ -83,13 +81,20 @@ class Updater(object):
 
     # TODO(ksweeney): Get this from config and remove job_name and role fields.
     self._job = JobKey(name=self._job_name, environment=DEFAULT_ENVIRONMENT, role=self._role)
+    if shard_watcher:
+      self._shard_watcher = shard_watcher
+    else:
+      self._shard_watcher = ShardWatcher(
+          scheduler, self._job, self._cluster, self._update_config.restart_threshold,
+          self._update_config.healthy_threshold, self._update_config.watch_secs,
+          config.has_health_port())
 
-  def update_failure_counts(self, failed_shards):
+  def _update_failure_counts(self, failed_shards):
     """Update the failure counts metrics based upon a batch of failed shards."""
     for shard in failed_shards:
       self._failures_by_shard[shard] += 1
 
-  def exceeded_shard_fail_count(self):
+  def _exceeded_shard_fail_count(self):
     """Checks if the per shard failure is greater than a threshold."""
     return sum(count > self._update_config.max_per_shard_failures
                for count in self._failures_by_shard.values())
@@ -134,8 +139,8 @@ class Updater(object):
     # TODO(ksweeney): Change to use just job after JobKey refactor.
     return scheduler.finishUpdate(role, jobname, job, UpdateResult.TERMINATE, token)
 
-  def is_failed_update(self):
-    total_failed_shards = self.exceeded_shard_fail_count()
+  def _is_failed_update(self):
+    total_failed_shards = self._exceeded_shard_fail_count()
     is_failed = total_failed_shards > self._update_config.max_total_failures
 
     if is_failed:
@@ -176,7 +181,7 @@ class Updater(object):
     remaining_shards = [ShardState(shard_id, is_updated=False) for shard_id in initial_shards]
 
     log.info('Starting job update.')
-    while remaining_shards and not self.is_failed_update():
+    while remaining_shards and not self._is_failed_update():
       batch_shards = remaining_shards[0 : self._update_config.batch_size]
       remaining_shards = list(set(remaining_shards) - set(batch_shards))
       shards_to_restart = [s.shard_id for s in batch_shards if s.is_updated]
@@ -184,28 +189,28 @@ class Updater(object):
 
       shards_to_watch = []
       if shards_to_restart:
-        self.restart_shards(shards_to_restart)
+        self._restart_shards(shards_to_restart)
         shards_to_watch += shards_to_restart
 
       if shards_to_update:
-        shard_states = self.update_shards(shards_to_update)
+        shard_states = self._update_shards(shards_to_update)
         shards_to_watch += self._get_shards_to_watch(shard_states, shards_to_update)
 
-      failed_shards = self.watch_shards(shards_to_watch) if shards_to_watch else []
+      failed_shards = self._shard_watcher.watch(shards_to_watch) if shards_to_watch else []
 
       log.log(debug_if(not failed_shards), 'Failed shards: %s' % failed_shards)
       remaining_shards += [ShardState(shard_id, is_updated=True) for shard_id in failed_shards]
       remaining_shards.sort(key=lambda tup: tup.shard_id)
-      self.update_failure_counts(failed_shards)
+      self._update_failure_counts(failed_shards)
 
     if failed_shards:
       untouched_shards = [s.shard_id for s in remaining_shards if not s.is_updated]
       shards_to_rollback = list(set(initial_shards) - set(untouched_shards))
-      self.rollback(shards_to_rollback)
+      self._rollback(shards_to_rollback)
 
     return failed_shards
 
-  def rollback(self, shards_to_rollback):
+  def _rollback(self, shards_to_rollback):
     """Performs the job rollback.
 
     Arguments:
@@ -225,12 +230,13 @@ class Updater(object):
       log.log(debug_if(resp.responseCode == UpdateResponseCode.OK),
         'Response from scheduler: %s (message: %s)'
           % (UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
-      failed_shards += self.watch_shards(self._get_shards_to_watch(resp.shards, batch_shards))
+      shards_to_watch = self._get_shards_to_watch(resp.shards, batch_shards)
+      failed_shards += self._shard_watcher.watch(shards_to_watch)
 
     if failed_shards:
       log.error('Rollback failed for shards: %s' % failed_shards)
 
-  def update_shards(self, shard_ids):
+  def _update_shards(self, shard_ids):
     """Instructs the scheduler to update shards.
 
     Arguments:
@@ -247,7 +253,7 @@ class Updater(object):
           UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
     return resp.shards
 
-  def restart_shards(self, shard_ids):
+  def _restart_shards(self, shard_ids):
     """Instructs the scheduler to restart shards.
 
     Arguments:
@@ -258,76 +264,3 @@ class Updater(object):
     log.log(debug_if(resp.responseCode == ResponseCode.OK),
         'Response from scheduler: %s (message: %s)' % (
           ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
-
-  def watch_shards(self, shard_ids):
-    """Monitors the restarted shards.
-
-    Arguments:
-    shard_ids -- set of shards to watch.
-
-    Returns a set of tasks that failed to meet the following criteria,
-    1. Failed to move to RUNNING state before restart_threshold from the time of restart.
-    2. Failed to stay in the RUNNING state before watch_secs expire.
-    """
-    log.info('Watching shards for %s seconds: %s' % (self._update_config.watch_secs, shard_ids))
-    shard_ids = set(shard_ids)
-    start_time = self._clock.time()
-    expected_running_by = start_time + self._update_config.restart_threshold
-
-    shards_health = {}
-    def shards(finished):
-      return dict([(s_id, s) for (s_id, s) in shards_health.items() if s.finished == finished])
-
-    while True:
-      log.debug('Querying shard statuses.')
-      query = TaskQuery()
-      query.owner = Identity(role=self._role)
-      query.jobName = self._job_name
-      query.statuses = set([ScheduleStatus.RUNNING])
-      query.shardIds = shard_ids
-      resp = self._scheduler.getTasksStatus(query)
-      resp.tasks = resp.tasks or []
-      log.debug('Response from scheduler: %s (message: %s)'
-          % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
-
-      now = self._clock.time()
-      for task in resp.tasks:
-        task_id = task.assignedTask.taskId
-        shard_id = task.assignedTask.task.shardId
-        status = task.status
-        if shard_id in shards_health:
-          shard = shards_health[shard_id]
-          if not shard.finished and status != ScheduleStatus.RUNNING or task_id != shard.task_id:
-            log.error('Detected failure in shard %s' % shard_id)
-            log.debug('  task id %s' % task_id)
-            shard.set_healthy(False)
-        elif status == ScheduleStatus.RUNNING:
-          log.debug('Detected RUNNING shard %s' % shard_id)
-          log.debug('  task id %s' % task_id)
-          shards_health[shard_id] = Shard(task_id, now)
-      shards_returned = [task.assignedTask.task.shardId for task in resp.tasks]
-      for shard_id in set(shards(finished=False)) - set(shards_returned):
-        log.error('Shard %s is no longer RUNNING' % shard_id)
-        shards_health[shard_id].set_healthy(False)
-
-      if now > expected_running_by:
-        for shard_id in shard_ids - set(shards_health):
-          shards_health[shard_id] = Shard(finished=True)
-          log.error('Shard %s did not transition to RUNNING' % shard_id)
-
-      for shard_id, shard in shards(finished=False).items():
-        if now > (shard.birthday + self._update_config.watch_secs):
-          shard.set_healthy(True)
-          log.info('Shard %s is up and healthy' % shard_id)
-
-      log.debug('Shards health: {%s}' % ['%s: %s' % val for val in shards_health.items()])
-
-      # Return if all tasks are finished.
-      if set(shards(finished=True)) == shard_ids:
-        return [s_id for (s_id, s) in shards_health.items() if not s.healthy]
-      # Return if time is up.
-      if now > (start_time + self._update_config.restart_threshold +
-          self._update_config.watch_secs):
-        return [s_id for s_id in shard_ids if s_id not in shards_health
-                                           or not shards_health[s_id].healthy]
-      self._clock.sleep(app.get_options().mesos_updater_status_check_interval)

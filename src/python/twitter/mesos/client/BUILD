@@ -115,11 +115,23 @@ python_library(
 )
 
 python_library(
+  name = 'shard_watcher',
+  sources = ['shard_watcher.py'],
+  dependencies = [
+    pants(':scheduler_client'),
+    pants('src/python/twitter/common/app'),
+    pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/mesos/common:http_signaler'),
+    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+  ]
+)
+
+python_library(
   name = 'updater',
   sources = ['updater.py'],
   dependencies = [
     pants(':scheduler_client'),
-    pants('src/python/twitter/common/app'),
+    pants(':shard_watcher'),
     pants('src/python/twitter/common/log'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
   ]

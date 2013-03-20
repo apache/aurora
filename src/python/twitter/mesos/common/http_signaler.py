@@ -1,8 +1,13 @@
 import contextlib
 from socket import timeout as SocketTimeout
+import socks
+import sys
 
 from twitter.common import log
 from twitter.common.lang import Compatibility
+from twitter.common.net.tunnel import TunnelHelper
+from twitter.common_internal.location import Location
+from twitter.mesos.clusters import Cluster
 
 if Compatibility.PY3:
   from http.client import HTTPException
@@ -17,6 +22,14 @@ class HttpSignaler(object):
   """Simple HTTP endpoint wrapper to check health or trigger quitquitquit/abortabortabort"""
   TIMEOUT_SECS = 1.0
   FAILURE_REASON_LENGTH = 10
+
+  @classmethod
+  def maybe_setup_proxy(cls, cluster):
+    if Location.is_corp() and not Cluster.get(cluster).force_notunnel:
+      proxy_host, proxy_port = TunnelHelper.create_proxy()
+      socks.setdefaultproxy(socks.PROXY_TYPE_SOCKS5, proxy_host, proxy_port)
+      module = sys.modules.get('urllib2', __import__('urllib2'))
+      socks.wrapmodule(module)
 
   def __init__(self, port, host='localhost'):
     self._url_base = 'http://%s:%d/' % (host, port)
@@ -40,7 +53,7 @@ class HttpSignaler(object):
           return (False, reason % (shorten(str(expected_response)), shorten(str(response))))
         else:
           return (True, None)
-    except (URLError, HTTPError, HTTPException, SocketTimeout) as e:
+    except (URLError, HTTPError, HTTPException, SocketTimeout, socks.GeneralProxyError) as e:
       # the type of an HTTPException is typically more useful than its contents (since for example
       # BadStatusLines are often empty). likewise with socket.timeout.
       err = e.__class__.__name__ if isinstance(e, (HTTPException, SocketTimeout)) else e

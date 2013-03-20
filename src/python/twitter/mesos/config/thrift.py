@@ -149,7 +149,8 @@ def convert(job, packages=[]):
     raise ValueError('Task is invalid: %s' % e)
   if not underlying_checked.check().ok():
     raise ValueError('Job not fully specified: %s' % underlying.check().message())
-  task.thermosConfig = underlying.json_dumps()
+  # TODO(Sathya): Re-evaluate this since the scheduler does not need to know about an update config.
+  task.thermosConfig = underlying(update_config=Empty).json_dumps()
 
   cron_schedule = job.cron_schedule().get() if job.has_cron_schedule() else ''
   cron_policy = select_cron_policy(job.cron_policy(), job.cron_collision_policy())

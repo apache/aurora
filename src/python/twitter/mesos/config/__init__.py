@@ -212,6 +212,9 @@ class AuroraConfig(object):
                                    if self._job.has_announce() else {})
     return PortResolver.unallocated(portmap) | (referenced_ports - PortResolver.bound(portmap))
 
+  def has_health_port(self):
+    return "health" in ThermosTaskWrapper(self._job.task(), strict=False).ports()
+
   def task_links(self):
     # {{mesos.instance}} --> %shard_id%
     # {{thermos.ports[foo]}} --> %port:foo%
