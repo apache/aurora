@@ -77,6 +77,10 @@ def main(args, opts):
 
   try:
     task_runner.run()
+  except TaskRunner.InternalError as err:
+    app.error('Internal error: %s' % err)
+  except TaskRunner.InvalidTask as err:
+    app.error(str(err))
   except TaskRunner.StateError:
     app.error('Task appears to already be in a terminal state.')
   except TaskRunner.PermissionError:
