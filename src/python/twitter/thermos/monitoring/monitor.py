@@ -22,8 +22,6 @@ from gen.twitter.thermos.ttypes import (
   RunnerState,
   TaskState)
 
-__author__ = 'wickman@twitter.com (brian wickman)'
-__tested__ = False
 
 class TaskMonitor(object):
   """
@@ -36,6 +34,9 @@ class TaskMonitor(object):
     self._dispatcher = CheckpointDispatcher()
     self._runnerstate = RunnerState(processes={})
     self._runner_ckpt = pathspec.given(task_id=task_id).getpath('runner_checkpoint')
+    self._active_file, self._finished_file = (
+        pathspec.given(task_id=task_id, state=state).getpath('task_path')
+        for state in ('active', 'finished'))
     self._ckpt_head = 0
     self._apply_states()
     self._lock = threading.Lock()
@@ -95,6 +96,14 @@ class TaskMonitor(object):
   def task_state(self):
     state = self.get_state()
     return state.statuses[-1].state if state.statuses else TaskState.ACTIVE
+
+  @property
+  def active(self):
+    return os.path.exists(self._active_file)
+
+  @property
+  def finished(self):
+    return os.path.exists(self._finished_file)
 
   def get_active_processes(self):
     """

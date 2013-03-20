@@ -133,7 +133,7 @@ class TaskRunnerWrapper(object):
     return self._sandbox.exists()
 
   def is_started(self):
-    return self.task_state() == TaskState.ACTIVE
+    return self._monitor and (self._monitor.active or self._monitor.finished)
 
   def is_alive(self):
     """

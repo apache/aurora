@@ -38,8 +38,10 @@ from twitter.thermos.base.path import TaskPath
 from twitter.thermos.monitoring.monitor import TaskMonitor
 from twitter.thermos.runner.runner import TaskRunner
 
+
 if 'THERMOS_DEBUG' in os.environ:
-  LogOptions.set_stderr_log_level('DEBUG')
+  LogOptions.set_stderr_log_level('google:DEBUG')
+  LogOptions.set_simple(True)
   log.init('executor_logger')
 
 
@@ -157,14 +159,11 @@ def make_runner(proxy_driver, checkpoint_root, task, ports={}, fast_status=False
   executor_timer_class(te, proxy_driver).start()
   task_description = make_task(task, assigned_ports=ports)
   te.launchTask(proxy_driver, task_description)
+
   while not te._runner.is_started():
     time.sleep(0.1)
-  while te._runner.task_state() != TaskState.ACTIVE:
-    time.sleep(0.1)
 
-  task_json = TaskPath(root=checkpoint_root, task_id=task_description.task_id.value,
-                       state='active').getpath('task_path')
-  while not os.path.exists(task_json):
+  while len(proxy_driver.method_calls['sendStatusUpdate']) < 2:
     time.sleep(0.1)
 
   # make sure startup was kosher
