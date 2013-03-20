@@ -110,11 +110,11 @@ class ProcessMuxer(object):
 
   def select(self):
     """
-      Read and multiplex checkpoint records from all the forked off process managers.
+      Read and multiplex checkpoint records from all the forked off process coordinators.
 
       Checkpoint records can come from one of two places:
         in-process: checkpoint records synthesized for FORKED and LOST events
-        out-of-process: checkpoint records from from file descriptors of forked managers
+        out-of-process: checkpoint records from from file descriptors of forked coordinators
 
       Returns a list of RunnerCkpt objects that were successfully read, or an empty
       list if none were read.

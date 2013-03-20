@@ -1,3 +1,11 @@
+""" Thermos runner.
+
+This module contains the TaskRunner, the core component of Thermos responsible for actually running
+tasks. It also contains several Handlers which define the behaviour on state transitions within the
+TaskRunner.
+
+"""
+
 from contextlib import contextmanager
 import errno
 from functools import partial
@@ -28,8 +36,6 @@ from twitter.thermos.config.loader import (
   ThermosTaskWrapper,
   ThermosTaskValidator)
 from twitter.thermos.config.schema import ThermosContext
-from twitter.thermos.runner.process import Process
-from twitter.thermos.runner.muxer import ProcessMuxer
 
 from gen.twitter.thermos.ttypes import (
   ProcessState,
@@ -42,6 +48,8 @@ from gen.twitter.thermos.ttypes import (
 )
 
 from .helper import TaskRunnerHelper
+from .muxer import ProcessMuxer
+from .process import Process
 
 
 # TODO(wickman) Currently this is messy because of all the private access into ._runner.
@@ -125,6 +133,7 @@ class TaskRunnerProcessHandler(ProcessStateHandler):
 class TaskRunnerTaskHandler(TaskStateHandler):
   """
     Accesses these parts of the runner:
+      _plan [set to regular_plan or finalizing_plan]
       _recovery [boolean, whether or not to side-effect]
       _pathspec [path creation]
       _task [ThermosTask]
@@ -159,22 +168,22 @@ class TaskRunnerTaskHandler(TaskStateHandler):
 
   def on_killed(self, task_update):
     log.debug('Task on_killed(%s)' % task_update)
-    self.cleanup()
+    self._cleanup()
 
   def on_success(self, task_update):
     log.debug('Task on_success(%s)' % task_update)
-    self.cleanup()
+    self._cleanup()
     log.info('Task succeeded.')
 
   def on_failed(self, task_update):
     log.debug('Task on_failed(%s)' % task_update)
-    self.cleanup()
+    self._cleanup()
 
   def on_lost(self, task_update):
     log.debug('Task on_lost(%s)' % task_update)
-    self.cleanup()
+    self._cleanup()
 
-  def cleanup(self):
+  def _cleanup(self):
     if not self._runner._recovery:
       self._runner._kill()
       TaskRunnerHelper.finalize_task(self._pathspec)
@@ -182,6 +191,8 @@ class TaskRunnerTaskHandler(TaskStateHandler):
 
 class TaskRunnerUniversalHandler(UniversalStateHandler):
   """
+    Universal handler to checkpoint every process and task transition of the runner.
+
     Accesses these parts of the runner:
       _ckpt_write
   """
@@ -189,22 +200,22 @@ class TaskRunnerUniversalHandler(UniversalStateHandler):
   def __init__(self, runner):
     self._runner = runner
 
-  def checkpoint(self, record):
+  def _checkpoint(self, record):
     self._runner._ckpt_write(record)
 
   def on_process_transition(self, state, process_update):
     log.debug('_on_process_transition: %s' % process_update)
-    self.checkpoint(RunnerCkpt(process_status=process_update))
+    self._checkpoint(RunnerCkpt(process_status=process_update))
 
   def on_task_transition(self, state, task_update):
     log.debug('_on_task_transition: %s' % task_update)
-    self.checkpoint(RunnerCkpt(task_status=task_update))
+    self._checkpoint(RunnerCkpt(task_status=task_update))
 
   def on_initialization(self, header):
     log.debug('_on_initialization: %s' % header)
     ThermosTaskValidator.assert_valid_task(self._runner.task)
     ThermosTaskValidator.assert_valid_ports(self._runner.task, header.ports)
-    self.checkpoint(RunnerCkpt(runner_header=header))
+    self._checkpoint(RunnerCkpt(runner_header=header))
 
 
 class TaskRunnerStage(object):
@@ -232,7 +243,7 @@ class TaskRunnerStage(object):
     """
       The stage to which we should transition.
     """
-    raise NotImplemented
+    raise NotImplementedError
 
 
 class TaskRunnerStage_ACTIVE(TaskRunnerStage):
@@ -318,6 +329,10 @@ class TaskRunnerStage_FINALIZING(TaskRunnerStage):
 class TaskRunner(object):
   """
     Run a ThermosTask.
+
+    This class encapsulates the core logic to run and control the state of a Thermos task.
+    Typically, it will be instantiated directly to control a new task, but a TaskRunner can also be
+    synthesised from an existing task's checkpoint root
   """
   class Error(Exception): pass
   class InvalidTask(Error): pass
@@ -396,9 +411,9 @@ class TaskRunner(object):
     launch_time = self._clock.time()
     launch_time_ms = '%06d' % int((launch_time - int(launch_time)) * 10**6)
     if not task_id:
-      self._task_id = task_id = '%s-%s.%s' % (task.name(),
-        time.strftime('%Y%m%d-%H%M%S', time.localtime(launch_time)),
-        launch_time_ms)
+      self._task_id = '%s-%s.%s' % (task.name(),
+                                    time.strftime('%Y%m%d-%H%M%S', time.localtime(launch_time)),
+                                    launch_time_ms)
     else:
       self._task_id = task_id
     current_user = TaskRunnerHelper.get_actual_user()
@@ -428,7 +443,7 @@ class TaskRunner(object):
       ThermosTaskValidator.assert_same_task(self._pathspec, self._task)
     except ThermosTaskValidator.InvalidTaskError as e:
       raise self.InvalidTask('Invalid task: %s' % e)
-    self._plan = None
+    self._plan = None # plan currently being executed (updated by Handlers)
     self._regular_plan = TaskPlanner(self._task, clock=clock,
         process_filter=lambda proc: proc.final().get() == False)
     self._finalizing_plan = TaskPlanner(self._task, clock=clock,
@@ -512,13 +527,14 @@ class TaskRunner(object):
   def _resume_task(self):
     assert self._ckpt is not None
     unapplied_updates = self._replay_process_ckpts()
-    assert not self.is_terminal(), 'Should not resume terminal task.'
+    if self.is_terminal():
+      raise self.StateError('Cannot resume terminal task.')
     self._initialize_ckpt_header()
     self._replay(unapplied_updates)
 
   def _ckpt_write(self, record):
     """
-      Write to the checkpoint if we're not in recovery mode.
+      Write to the checkpoint stream if we're not in recovery mode.
     """
     if not self._recovery:
       self._ckpt.write(record)
@@ -532,7 +548,7 @@ class TaskRunner(object):
 
   def _replay_runner_ckpt(self):
     """
-      Replay the checkpoint associated with this task.
+      Replay the checkpoint stream associated with this task.
     """
     ckpt_file = self._pathspec.getpath('runner_checkpoint')
     if os.path.exists(ckpt_file):
@@ -564,19 +580,19 @@ class TaskRunner(object):
     """
     if self._state.header is None:
       header = RunnerHeader(
-        task_id = self._task_id,
-        launch_time_ms = int(self._launch_time*1000),
-        sandbox = self._sandbox,
-        log_dir = self._log_dir,
-        hostname = socket.gethostname(),
-        user = self._user,
-        ports = self._portmap)
+        task_id=self._task_id,
+        launch_time_ms=int(self._launch_time*1000),
+        sandbox=self._sandbox,
+        log_dir=self._log_dir,
+        hostname=socket.gethostname(),
+        user=self._user,
+        ports=self._portmap)
       runner_ckpt = RunnerCkpt(runner_header=header)
       self._dispatcher.dispatch(self._state, runner_ckpt)
 
   def _set_task_status(self, state):
-    update = TaskStatus(state = state, timestamp_ms = int(self._clock.time() * 1000),
-                        runner_pid = os.getpid(), runner_uid = os.getuid())
+    update = TaskStatus(state=state, timestamp_ms=int(self._clock.time() * 1000),
+                        runner_pid=os.getpid(), runner_uid=os.getuid())
     runner_ckpt = RunnerCkpt(task_status=update)
     self._dispatcher.dispatch(self._state, runner_ckpt, self._recovery)
 
@@ -616,7 +632,7 @@ class TaskRunner(object):
       Construct a Process() object from a process_name, populated with its
       correct run number and fully interpolated commandline.
     """
-    run_number = len(self.state.processes[process_name])-1
+    run_number = len(self.state.processes[process_name]) - 1
     pathspec = self._pathspec.given(process=process_name, run=run_number)
     process = self._process_map.get(process_name)
     if process is None:
@@ -637,6 +653,8 @@ class TaskRunner(object):
       fork=close_ckpt_and_fork)
 
   def deadlocked(self, plan=None):
+    """Check whether a plan is deadlocked, i.e. there are no running/runnable processes, and the
+    plan is not complete."""
     plan = plan or self._regular_plan
     now = self._clock.time()
     running = list(plan.running)
@@ -647,6 +665,8 @@ class TaskRunner(object):
     return len(running + runnable + waiting) == 0 and not plan.is_complete()
 
   def is_healthy(self):
+    """Check whether the TaskRunner is healthy. A healthy TaskRunner is not deadlocked and has not
+    reached its max_failures count."""
     max_failures = self._task.max_failures().get()
     deadlocked = self.deadlocked()
     under_failure_limit = max_failures == 0 or len(self._regular_plan.failed) < max_failures
@@ -661,11 +681,10 @@ class TaskRunner(object):
     return self._state.processes[process_name][-1]
 
   def is_process_lost(self, process_name):
-    """
-       Determine whether or not we should mark a task as LOST and do so if necessary.
-    """
+    """Determine whether or not we should mark a task as LOST and do so if necessary."""
     current_run = self._current_process_run(process_name)
-    assert current_run
+    if not current_run:
+      raise self.InternalError('No current_run for process %s!' % process_name)
 
     def forked_but_never_came_up():
       return current_run.state == ProcessState.FORKED and (
@@ -772,7 +791,6 @@ class TaskRunner(object):
     return TaskRunnerHelper.is_task_terminal(self.task_state())
 
   def terminal_state(self):
-    # Forced terminal state
     if self._terminal_state:
       log.debug('Forced terminal state: %s' %
           TaskState._VALUES_TO_NAMES.get(self._terminal_state, 'UNKNOWN'))
@@ -781,6 +799,10 @@ class TaskRunner(object):
       return TaskState.SUCCESS if self.is_healthy() else TaskState.FAILED
 
   def run(self, force=False):
+    """
+      Entrypoint to runner. Assume control of checkpoint stream, and execute TaskRunnerStages
+      until runner is terminal.
+    """
     if self.is_terminal():
       return
     with self.control(force):
@@ -790,6 +812,7 @@ class TaskRunner(object):
     iteration_time = self.MAX_ITERATION_TIME.as_(Time.SECONDS)
     while not self.is_terminal():
       start = self._clock.time()
+      # step 1: execute stage corresponding to the state we're currently in
       runner = self._stages[self.task_state()]
       iteration_wait = runner.run()
       if iteration_wait is None:
@@ -798,6 +821,7 @@ class TaskRunner(object):
         self._set_task_status(runner.transition_to())
         continue
       log.debug('Run loop: Work to be done within %.1fs' % iteration_wait)
+      # step 2: check child process checkpoint streams for updates
       if not self.collect_updates(iteration_wait):
         # If we don't collect any updates, at least 'touch' the checkpoint stream
         # so as to prevent garbage collection.
@@ -808,12 +832,14 @@ class TaskRunner(object):
           self._clock.sleep(iteration_wait - elapsed)
         log.debug('Run loop: No updates collected, touching checkpoint.')
         os.utime(self._pathspec.getpath('runner_checkpoint'), None)
+      # step 3: reap any zombie child processes
       TaskRunnerHelper.reap_children()
 
   def kill(self, force=False, terminal_status=TaskState.KILLED,
            preemption_wait=Amount(1, Time.MINUTES)):
     """
-      Kill all processes associated with this task and set task/process states as KILLED.
+      Kill all processes associated with this task and set task/process states as terminal_status
+      (defaults to KILLED)
     """
     log.debug('Runner issued kill: force:%s, preemption_wait:%s' % (
       force, preemption_wait))

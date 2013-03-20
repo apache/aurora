@@ -40,6 +40,8 @@ def test_task_finish_with_ephemerals():
   assert p.is_complete()
   p.add_failure('p1')
   assert p.is_complete()
+  assert not p.failed
+  assert p.finished == _('p1')
 
   with_ephemeral = empty_task(processes=[p1, p2(ephemeral=True)])
   p = TaskPlanner(with_ephemeral)
@@ -51,6 +53,9 @@ def test_task_finish_with_ephemerals():
   assert p.is_complete()
   p.set_running('p2')
   assert p.is_complete()
+  p.add_failure('p2')
+  assert p.is_complete()
+  assert p.failed == _('p1')
 
 
 def test_task_finish_with_daemons():

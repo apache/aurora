@@ -1,3 +1,11 @@
+"""Run processes of a Thermos task.
+
+This module contains the Process class, used to manage the execution of the constituent processes of
+a Thermos task. Each process is represented by a "coordinator" process, which fires off the actual
+commandline in a subprocess of its own.
+
+"""
+
 from abc import abstractmethod
 import getpass
 import grp
@@ -26,12 +34,9 @@ from gen.twitter.thermos.ttypes import (
   ProcessStatus,
   RunnerCkpt)
 
-__author__ = 'wickman@twitter.com (brian wickman)'
-__tested__ = False
-
 
 class Platform(Interface):
-
+  """Abstract representation of a platform encapsulating system-level functions"""
   @abstractmethod
   def clock(self):
     pass
@@ -43,46 +48,6 @@ class Platform(Interface):
   @abstractmethod
   def getpid(self):
     pass
-
-
-class ProcessFactory(object):
-  """
-    Translates a (task, name) => Process object which has an .execute() command.
-  """
-
-  def __init__(self):
-    pass
-
-  def make(self, process_name, *args, **kw):
-    """
-      Get a reified Process object.
-
-      Mostly just marshalls to the underlying concrete ProcessBase implementation, which takes
-      a known (but complicated) set of parameters like:
-         name
-         cmdline
-         sequence number
-         pathspec
-         sandbox dir
-         user
-    """
-    pass
-
-  def start(self, process_name):
-    pass
-
-  def release(self, process_name):
-    """
-      Release a process object when it is no longer necessary.
-    """
-    pass
-
-  def reap(self):
-    pass
-
-  def platform(self):
-    pass
-
 
 
 class ProcessBase(object):
@@ -127,7 +92,7 @@ class ProcessBase(object):
       try:
         pwd.getpwnam(self._user)
       except KeyError:
-        raise ProcessBase.UnknownUserError('Unknown user %s!' % self._user)
+        raise self.UnknownUserError('Unknown user %s!' % self._user)
     self._ckpt = None
     self._ckpt_head = -1
     if platform is None:
@@ -143,6 +108,7 @@ class ProcessBase(object):
     self._ckpt.write(msg)
 
   def _write_process_update(self, **kw):
+    """Write a process update to the coordinator's checkpoint stream."""
     process_status = ProcessStatus(**kw)
     process_status.seq = self._seq
     process_status.process = self.name()
@@ -177,7 +143,7 @@ class ProcessBase(object):
     self._log('initializing checkpoint file: %s' % self.ckpt_file())
     ckpt_fp = lock_file(self.ckpt_file(), "a+")
     if ckpt_fp in (None, False):
-      raise ProcessBase.CheckpointError('Could not acquire checkpoint permission or lock for %s!' %
+      raise self.CheckpointError('Could not acquire checkpoint permission or lock for %s!' %
         self.ckpt_file())
     self._ckpt_head = os.path.getsize(self.ckpt_file())
     ckpt_fp.seek(self._ckpt_head)
@@ -195,15 +161,16 @@ class ProcessBase(object):
     with open(self.ckpt_file(), 'r') as fp:
       fp.seek(self._ckpt_head)
       rr = ThriftRecordReader(fp, RunnerCkpt)
-      while total_wait_time < ProcessBase.MAXIMUM_CONTROL_WAIT:
+      while total_wait_time < self.MAXIMUM_CONTROL_WAIT:
         ckpt_tail = os.path.getsize(self.ckpt_file())
         if ckpt_tail == self._ckpt_head:
-          self._platform.clock().sleep(ProcessBase.CONTROL_WAIT_CHECK_INTERVAL.as_(Time.SECONDS))
-          total_wait_time += ProcessBase.CONTROL_WAIT_CHECK_INTERVAL
+          self._platform.clock().sleep(self.CONTROL_WAIT_CHECK_INTERVAL.as_(Time.SECONDS))
+          total_wait_time += self.CONTROL_WAIT_CHECK_INTERVAL
           continue
         checkpoint = rr.try_read()
         if checkpoint:
-          assert checkpoint.process_status
+          if not checkpoint.process_status:
+            raise self.CheckpointError('No process status in checkpoint!')
           if (checkpoint.process_status.process != self.name() or
               checkpoint.process_status.state != ProcessState.FORKED or
               checkpoint.process_status.fork_time != self._fork_time or
@@ -213,12 +180,12 @@ class ProcessBase(object):
                 checkpoint.process_status.fork_time, self._fork_time))
             self._log('   coordinator_pid [%s] vs self._pid [%s]' % (
                 checkpoint.process_status.coordinator_pid, self._pid))
-            raise ProcessBase.CheckpointError('Lost control of the checkpoint stream!')
+            raise self.CheckpointError('Lost control of the checkpoint stream!')
           self._log('Taking control of the checkpoint stream at record: %s' %
             checkpoint.process_status)
           self._seq = checkpoint.process_status.seq + 1
           return True
-    raise ProcessBase.CheckpointError('Timed out waiting for checkpoint stream!')
+    raise self.CheckpointError('Timed out waiting for checkpoint stream!')
 
   def _prepare_fork(self):
     self._stdout = safe_open(self._pathspec.with_filename('stdout').getpath('process_logdir'), "w")
@@ -233,7 +200,7 @@ class ProcessBase(object):
 
   def start(self):
     """
-      This is the main call point into the runner, and forks a co-ordinator process to run the
+      This is the main call point from the runner, and forks a co-ordinator process to run the
       target process (i.e. self.cmdline())
 
       The parent returns immediately and populates information about the pid of the co-ordinator.
@@ -304,9 +271,7 @@ class Process(ProcessBase):
       raise self.UnspecifiedSandbox('If using chroot, must specify sandbox!')
 
   def _chroot(self):
-    """
-      Chroot to the sandbox directory.
-    """
+    """chdir and chroot to the sandbox directory."""
     os.chdir(self._sandbox)
     os.chroot(self._sandbox)
 
@@ -333,7 +298,7 @@ class Process(ProcessBase):
     os.setuid(uid)
 
   def execute(self):
-    """Perform final initialization and launch target process in a subprocess."""
+    """Perform final initialization and launch target process commandline in a subprocess."""
     assert self._stderr
     assert self._stdout
 

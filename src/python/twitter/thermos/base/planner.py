@@ -3,6 +3,7 @@
 TaskPlanner:
   - a daemon process can depend upon a regular process
   - a regular process cannot depend upon a daemon process
+  - a non-ephemeral process cannot depend upon an ephemeral process
 """
 
 from collections import defaultdict, namedtuple
@@ -108,14 +109,14 @@ class Planner(object):
     self._failed.add(process)
 
   def is_complete(self):
-    return self._finished == (self._processes - self._failed)
+    return self._finished.union(self._failed) == self._processes
 
 
 TaskAttributes = namedtuple('TaskAttributes', 'min_duration is_daemon max_failures is_ephemeral')
 
 class TaskPlanner(object):
   """
-    A planner for processes part of a Thermos task, taking into account ephemeral and daemon
+    A planner for the processes part of a Thermos task, taking into account ephemeral and daemon
     bits, in addition to duration restrictions [and failure limits?].
 
                                is_daemon
@@ -231,16 +232,22 @@ class TaskPlanner(object):
     self._planner.set_running(process)
 
   def add_failure(self, process, timestamp=None):
+    """Increment the failure count of a process, and reset it to runnable if maximum number of
+    failures has not been reached, or mark it as failed otherwise (ephemeral processes do not
+    count towards the success of a task, and are hence marked finished instead)"""
     timestamp = timestamp if timestamp is not None else self._clock.time()
     self._last_terminal[process] = timestamp
     self._failures[process] += 1
     if self._attributes[process].max_failures == 0 or (
         self._failures[process] < self._attributes[process].max_failures):
       self._planner.reset(process)
+    elif self._attributes[process].is_ephemeral:
+      self._planner.set_finished(process)
     else:
       self._planner.set_failed(process)
 
   def add_success(self, process, timestamp=None):
+    """Reset a process to runnable if it is a daemon, or mark it as finished otherwise."""
     timestamp = timestamp if timestamp is not None else self._clock.time()
     self._last_terminal[process] = timestamp
     if not self._attributes[process].is_daemon:
@@ -258,6 +265,8 @@ class TaskPlanner(object):
     self._planner.reset(process)
 
   def is_complete(self):
+    """A task is complete if all ordinary processes are finished or failed (there may still be
+       running ephemeral processes)"""
     terminals = self._planner.finished.union(self._planner.failed).union(self._ephemerals)
     return self._planner.processes == terminals
 

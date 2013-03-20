@@ -1,7 +1,10 @@
-"""Read checkpoint streams for the Thermos runner
+"""Read checkpoint streams for the Thermos runner, and dispatch events on state transitions
 
 This module contains the CheckpointDispatcher, which reconstructs checkpoint streams containing the
 state of the Thermos runner and its constituent processes.
+
+It also defines several Handler interfaces to define behaviour on transitions in the Process and
+Task state machines.
 
 """
 
@@ -19,6 +22,10 @@ from gen.twitter.thermos.ttypes import (
 
 
 class UniversalStateHandler(object):
+  """
+    Generic interface for a handler to be called on any process/state transition, and at task
+    initialization
+  """
   def on_process_transition(self, state, process_update):
     pass
 
@@ -31,7 +38,9 @@ class UniversalStateHandler(object):
 
 class ProcessStateHandler(object):
   """
-    Process run state machine () - starting state, [] - terminal state
+    Interface for handlers for the Process state machine, called on process transitions
+
+    () - starting state, [] - terminal state
 
                              [FAILED]
                                 ^
@@ -65,7 +74,9 @@ class ProcessStateHandler(object):
 
 class TaskStateHandler(object):
   """
-    Task state machine () - starting state, [] - terminal state
+    Interface for handlers for the Task state machine, called on task transitions
+
+    () - starting state, [] - terminal state
 
        .--------------------------------------------+----.
        |                                            |    |
@@ -121,11 +132,9 @@ def copy_fields(state, state_update, fields):
 
 class CheckpointDispatcher(object):
   """
-    The reconstruction / dispatching mechanism for logic triggered on
-    task/process state transitions.
+    The reconstruction/dispatching mechanism for logic triggered on task/process state transitions.
 
-    Most applications should build an event-loop around the
-    CheckpointDispatcher.
+    Most applications should build an event-loop around the CheckpointDispatcher.
   """
 
   class Error(Exception): pass
@@ -148,7 +157,7 @@ class CheckpointDispatcher(object):
 
   @classmethod
   def from_file(cls, filename, truncate=False):
-    state = RunnerState(processes = {})
+    state = RunnerState(processes={})
     builder = cls()
     try:
       for update in cls.iter_updates(filename):
@@ -174,7 +183,7 @@ class CheckpointDispatcher(object):
         handler_list.append(handler)
         break
     else:
-      raise CheckpointDispatcher.InvalidHandler("Unknown handler type %s" % type(handler))
+      raise self.InvalidHandler("Unknown handler type %s" % type(handler))
 
   def _run_process_dispatch(self, state, process_update):
     for handler in self._universal_handlers:
@@ -203,17 +212,18 @@ class CheckpointDispatcher(object):
       ProcessState.LOST]
     return process_state_update.state in TERMINAL_STATES
 
-  @staticmethod
-  def update_process_state(process_state, process_state_update):
+  @classmethod
+  def _update_process_state(cls, process_state, process_state_update):
     """
       Apply process_state_update against process_state.
       Raises ErrorRecoveringState on failure.
     """
     def assert_process_state_in(*expected_states):
-      assert process_state.state in expected_states, (
-       'Detected invalid state transition %s => %s' % (
-          ProcessState._VALUES_TO_NAMES.get(process_state.state),
-          ProcessState._VALUES_TO_NAMES.get(process_state_update.state)))
+      if process_state.state not in expected_states:
+        raise cls.ErrorRecoveringState(
+            'Detected invalid state transition %s => %s' % (
+              ProcessState._VALUES_TO_NAMES.get(process_state.state),
+              ProcessState._VALUES_TO_NAMES.get(process_state_update.state)))
 
     # CREATION => WAITING
     if process_state_update.state == ProcessState.WAITING:
@@ -258,7 +268,7 @@ class CheckpointDispatcher(object):
       copy_fields(process_state, process_state_update, required_fields)
 
     else:
-      raise CheckpointDispatcher.ErrorRecoveringState(
+      raise cls.ErrorRecoveringState(
         "Unknown state = %s" % process_state_update.state)
 
   def would_update(self, state, runner_ckpt):
@@ -278,17 +288,22 @@ class CheckpointDispatcher(object):
 
   def dispatch(self, state, runner_ckpt, recovery=False, truncate=False):
     """
+      Given a RunnerState and a RunnerCkpt to apply to it, determine the appropriate action and
+      dispatch to the appropriate handlers.
+
       state          = RunnerState to be updated
       runner_ckpt    = RunnerCkpt update to apply
       recovery       = if true, enable recovery mode (accept out-of-order sequence updates)
       truncate       = if true, store only the latest task/process states, instead of
                        history for all runs.
+
+      Raises ErrorRecoveringState on failure.
     """
     # case 1: runner_header
     #   -> Initialization of the task stream.
     if runner_ckpt.runner_header is not None:
       if state.header is not None:
-        raise CheckpointDispatcher.ErrorRecoveringState(
+        raise self.ErrorRecoveringState(
           "Attempting to rebind task with different parameters!")
       else:
         log.debug('Initializing TaskRunner header to %s' % runner_ckpt.runner_header)
@@ -327,12 +342,12 @@ class CheckpointDispatcher(object):
           log.debug('Skipping replayed out-of-order update: %s' % process_update)
           return
         else:
-          raise CheckpointDispatcher.InvalidSequenceNumber(
+          raise self.InvalidSequenceNumber(
             "Out of order sequence number! %s => %s" % (current_run, process_update))
 
       # One special case for WAITING: Initialize a new target ProcessState.
       if process_update.state == ProcessState.WAITING:
-        assert current_run is None or CheckpointDispatcher.is_terminal(current_run)
+        assert current_run is None or self.is_terminal(current_run)
         if name not in state.processes:
           state.processes[name] = [ProcessStatus(seq=-1)]
         else:
@@ -344,10 +359,10 @@ class CheckpointDispatcher(object):
       # Run the process state machine.
       log.debug('Running state machine for process=%s/seq=%s' % (name, process_update.seq))
       if not state.processes or name not in state.processes:
-        raise CheckpointDispatcher.ErrorRecoveringState("Encountered potentially out of order "
+        raise self.ErrorRecoveringState("Encountered potentially out of order "
           "process update.  Are you sure this is a full checkpoint stream?")
-      CheckpointDispatcher.update_process_state(state.processes[name][-1], process_update)
+      self._update_process_state(state.processes[name][-1], process_update)
       self._run_process_dispatch(process_update.state, process_update)
       return
 
-    raise CheckpointDispatcher.ErrorRecoveringState("Empty RunnerCkpt encountered!")
+    raise self.ErrorRecoveringState("Empty RunnerCkpt encountered!")
