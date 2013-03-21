@@ -148,14 +148,16 @@ class ShardWatcher(object):
       elif status == ScheduleStatus.RUNNING:
         log.debug('Detected RUNNING shard %s' % shard_id)
         log.debug('  task id %s' % task_id)
-        health_checker = self.maybe_create_health_checker(
-            assigned_task.slaveHost, assigned_task.assignedPorts['health'])
+        if self._health_checker_enabled:
+          health_port = assigned_task.assignedPorts['health']
+          health_checker = self.create_health_checker(assigned_task.slaveHost, health_port)
+        else:
+          health_checker = None
         shards_info[shard_id] = Shard(task_id, now, health_checker)
     return shards_info
 
-  def maybe_create_health_checker(self, host, port):
-    if self._health_checker_enabled:
-      return HealthChecker(port, host)
+  def create_health_checker(self, host, port):
+    return HealthChecker(port, host)
 
   def _update_health_info(self, shards_info, now):
     for shard_id, shard in shards_info.items():

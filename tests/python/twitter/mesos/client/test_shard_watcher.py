@@ -84,7 +84,7 @@ class TestShardWatcher(ShardWatcher):
   def maybe_setup_proxy(self, cluster):
     pass
 
-  def maybe_create_health_checker(self, host, port):
+  def create_health_checker(self, host, port):
     return HealthCheckHandler.handle_health_checker_creation(host, port)
 
 
@@ -122,9 +122,11 @@ class ShardWatcherTest(unittest.TestCase):
     response = ScheduleStatusResponse(responseCode=ResponseCode.OK, message='test', tasks=[])
     for shard in statuses:
       task = TwitterTaskInfo(shardId = shard)
+      ports = {}
+      if self._health_check_handler.ENABLED:
+        ports['health'] = 33333
       # Using shardId as the slaveHost for testing.
-      assigned_task = AssignedTask(
-          task = task, slaveHost = str(shard), assignedPorts = {'health': 1})
+      assigned_task = AssignedTask(task = task, slaveHost = str(shard), assignedPorts = ports)
       response.tasks += [ScheduledTask(assignedTask = assigned_task, status = statuses[shard])]
     query = self.get_tasks_status_query(set(statuses).union(missing_shards))
     for x in range(int(num_calls)):
