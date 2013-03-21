@@ -1,28 +1,20 @@
 package com.twitter.mesos.scheduler;
 
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.common.base.Optional;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
 
 import org.apache.mesos.Protos;
-import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.OfferID;
-import org.apache.mesos.Protos.SlaveID;
-import org.apache.mesos.Protos.Status;
 import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.SchedulerDriver;
 
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.StateMachine;
-import com.twitter.mesos.codec.ThriftBinaryCodec;
-import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
-import com.twitter.mesos.gen.comm.ExecutorMessage;
 
 import static org.apache.mesos.Protos.Status.DRIVER_RUNNING;
 
@@ -59,15 +51,6 @@ public interface Driver {
   void killTask(String taskId);
 
   /**
-   * Sends a message to an executor.
-   *
-   * @param message Message to send.
-   * @param slave Slave to route the message to.
-   * @param executor Executor to route to within the {@code slave}.
-   */
-  void sendMessage(ExecutorMessage message, SlaveID slave, ExecutorID executor);
-
-  /**
    * Stops the underlying driver if it is running, otherwise does nothing.
    */
   void stop();
@@ -97,8 +80,6 @@ public interface Driver {
     private final StateMachine<State> stateMachine;
     private final Supplier<Optional<SchedulerDriver>> driverSupplier;
     private final AtomicLong killFailures = Stats.exportLong("scheduler_driver_kill_failures");
-    private final AtomicLong messageFailures =
-        Stats.exportLong("scheduler_driver_message_failures");
 
     /**
      * Creates a driver manager that will only ask for the underlying mesos driver when actually
@@ -161,39 +142,6 @@ public interface Driver {
         LOG.severe(String.format("Attempt to kill task %s failed with code %s",
             taskId, status));
         killFailures.incrementAndGet();
-      }
-    }
-
-    @Override
-    public void sendMessage(ExecutorMessage message, SlaveID slave, ExecutorID executor) {
-      SchedulerDriver driver = get(State.RUNNING);
-
-      Preconditions.checkNotNull(message);
-      Preconditions.checkNotNull(slave);
-      Preconditions.checkNotNull(executor);
-
-      byte[] data;
-      try {
-        data = ThriftBinaryCodec.encode(message);
-      } catch (CodingException e) {
-        LOG.log(Level.SEVERE, "Failed to send restart request.", e);
-        return;
-      }
-
-      String logMessage = String.format("Attempting to send message to %s/%s",
-          slave.getValue(), executor.getValue());
-      Level level = Level.FINE;
-      if (LOG.isLoggable(Level.FINEST)) {
-        level = Level.FINE;
-        logMessage += " - " + message;
-      }
-      LOG.log(level, logMessage);
-
-      Status status = driver.sendFrameworkMessage(executor, slave, data);
-      if (status != DRIVER_RUNNING) {
-        LOG.severe(
-            String.format("Attempt to send message failed with code %s [%s]", status, message));
-        messageFailures.incrementAndGet();
       }
     }
   }

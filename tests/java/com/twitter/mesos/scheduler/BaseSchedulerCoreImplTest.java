@@ -92,8 +92,6 @@ import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.pop
  */
 public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
-  private static final String FRAMEWORK_ID = "FrameworkId";
-
   private static final Identity OWNER_A = new Identity("Test_Role_A", "Test_User_A");
   private static final String JOB_A = "Test_Job_A";
   private static final int ONE_GB = 1024;
@@ -611,8 +609,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    scheduler.registered(FRAMEWORK_ID);
-
     for (Set<ScheduleStatus> statuses : ImmutableSet.of(
         ImmutableSet.<ScheduleStatus>of(),
         EnumSet.of(ASSIGNED),
@@ -735,7 +731,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    scheduler.registered(FRAMEWORK_ID);
     scheduler.createJob(makeJob(OWNER_A, JOB_A, 1));
     changeStatus(queryByOwner(OWNER_A), ASSIGNED);
     changeStatus(queryByOwner(OWNER_A), STARTING);

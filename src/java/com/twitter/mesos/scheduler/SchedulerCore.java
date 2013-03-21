@@ -35,7 +35,7 @@ import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
  * <li>{@link #stop()}
  * </ol>
  */
-public interface SchedulerCore extends RegisteredListener {
+public interface SchedulerCore {
 
   /**
    * Prompts the scheduler to prepare for possible activation as the leading scheduler.  This
@@ -56,15 +56,6 @@ public interface SchedulerCore extends RegisteredListener {
    * Prepares the scheduler for serving traffic.
    */
   void start();
-
-  /**
-   * Assigns a framework ID to the scheduler, should be called when the scheduler implementation
-   * has received a successful registration signal.
-   *
-   * @param frameworkId Framework ID.
-   */
-  @Override
-  void registered(String frameworkId);
 
   /**
    * Creates a new job, whose tasks will become candidates for scheduling.

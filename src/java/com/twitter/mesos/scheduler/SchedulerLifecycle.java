@@ -11,6 +11,7 @@ import javax.annotation.Nullable;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
+import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
@@ -28,6 +29,8 @@ import com.twitter.common.zookeeper.Group;
 import com.twitter.common.zookeeper.ServerSet;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.SingletonService.LeaderControl;
+import com.twitter.mesos.scheduler.events.PubsubEvent.DriverRegistered;
+import com.twitter.mesos.scheduler.events.PubsubEvent.EventSubscriber;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -44,7 +47,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * <p>TODO(John Sirois): This class contains the old logic of SchedulerMain - now that its extracted
  * it should be tested.
  */
-class SchedulerLifecycle implements RegisteredListener {
+class SchedulerLifecycle implements EventSubscriber {
 
   /**
    * A {@link SingletonService} scheduler leader candidate that exposes a method for awaiting clean
@@ -117,8 +120,8 @@ class SchedulerLifecycle implements RegisteredListener {
     return new SchedulerCandidateImpl();
   }
 
-  @Override
-  public void registered(String frameworkId) throws RegisterHandlingException {
+  @Subscribe
+  public void registered(DriverRegistered event) {
     registeredLatch.countDown();
     registeredFlag.set(1);
   }

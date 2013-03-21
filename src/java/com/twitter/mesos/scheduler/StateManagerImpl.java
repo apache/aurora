@@ -228,22 +228,6 @@ public class StateManagerImpl implements StateManager {
   }
 
   /**
-   * Sets the framework ID that should be persisted.
-   *
-   * @param frameworkId Updated framework ID.
-   */
-  void setFrameworkId(final String frameworkId) {
-    checkNotNull(frameworkId);
-    managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
-
-    txStorage.doInWriteTransaction(txStorage.new NoResultSideEffectWork() {
-      @Override protected void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getSchedulerStore().saveFrameworkId(frameworkId);
-      }
-    });
-  }
-
-  /**
    * Instructs the state manager to start.
    */
   void start() {

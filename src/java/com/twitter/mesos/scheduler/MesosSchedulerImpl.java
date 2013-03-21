@@ -27,7 +27,8 @@ import com.twitter.common.stats.Stats;
 import com.twitter.mesos.GuiceUtils.AllowUnchecked;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.comm.SchedulerMessage;
-import com.twitter.mesos.scheduler.RegisteredListener.RegisterHandlingException;
+import com.twitter.mesos.scheduler.events.PubsubEvent.Interceptors.Event;
+import com.twitter.mesos.scheduler.events.PubsubEvent.Interceptors.Notify;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
@@ -50,12 +51,11 @@ public class MesosSchedulerImpl implements Scheduler {
   private final AtomicLong lostExecutors = Stats.exportLong("scheduler_lost_executors");
 
   private final List<TaskLauncher> taskLaunchers;
-  private final RegisteredListener registeredListener;
 
   private final Storage storage;
   private final SchedulerCore schedulerCore;
   private final Lifecycle lifecycle;
-  private volatile FrameworkID frameworkID = null;
+  private volatile boolean registered = false;
 
   /**
    * Creates a new mesos scheduler.
@@ -69,14 +69,12 @@ public class MesosSchedulerImpl implements Scheduler {
       Storage storage,
       SchedulerCore schedulerCore,
       final Lifecycle lifecycle,
-      List<TaskLauncher> taskLaunchers,
-      RegisteredListener registeredListener) {
+      List<TaskLauncher> taskLaunchers) {
 
     this.storage = checkNotNull(storage);
     this.schedulerCore = checkNotNull(schedulerCore);
     this.lifecycle = checkNotNull(lifecycle);
     this.taskLaunchers = checkNotNull(taskLaunchers);
-    this.registeredListener = checkNotNull(registeredListener);
   }
 
   @Override
@@ -84,17 +82,21 @@ public class MesosSchedulerImpl implements Scheduler {
     LOG.info("Received notification of lost slave: " + slaveId);
   }
 
+  @Notify(after = Event.DriverRegistered)
   @Override
-  public void registered(SchedulerDriver driver, FrameworkID frameworkId, MasterInfo masterInfo) {
+  public void registered(
+      SchedulerDriver driver,
+      final FrameworkID frameworkId,
+      MasterInfo masterInfo) {
+
     LOG.info("Registered with ID " + frameworkId + ", master: " + masterInfo);
 
-    this.frameworkID = frameworkId;
-    try {
-      registeredListener.registered(frameworkId.getValue());
-    } catch (RegisterHandlingException e) {
-      LOG.log(Level.SEVERE, "Problem registering", e);
-      driver.abort();
-    }
+    storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider storeProvider) {
+        storeProvider.getSchedulerStore().saveFrameworkId(frameworkId.getValue());
+      }
+    });
+    registered = true;
   }
 
   @Override
@@ -116,7 +118,7 @@ public class MesosSchedulerImpl implements Scheduler {
   @Timed("scheduler_resource_offers")
   @Override
   public void resourceOffers(SchedulerDriver driver, List<Offer> offers) {
-    Preconditions.checkState(frameworkID != null, "Must be registered before receiving offers.");
+    Preconditions.checkState(registered, "Must be registered before receiving offers.");
 
     for (final Offer offer : offers) {
       log(Level.FINE, "Received offer: %s", offer);

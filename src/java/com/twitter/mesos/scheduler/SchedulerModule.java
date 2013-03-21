@@ -17,7 +17,6 @@ import com.google.inject.Key;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
-import com.google.inject.multibindings.Multibinder;
 
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
@@ -51,7 +50,6 @@ import com.twitter.mesos.scheduler.Driver.DriverImpl;
 import com.twitter.mesos.scheduler.MaintenanceController.MaintenanceControllerImpl;
 import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
 import com.twitter.mesos.scheduler.PulseMonitor.PulseMonitorImpl;
-import com.twitter.mesos.scheduler.RegisteredListener.FanoutRegisteredListener;
 import com.twitter.mesos.scheduler.SchedulerLifecycle.DriverReference;
 import com.twitter.mesos.scheduler.TaskAssigner.TaskAssignerImpl;
 import com.twitter.mesos.scheduler.async.AsyncModule;
@@ -178,6 +176,7 @@ public class SchedulerModule extends AbstractModule {
     LifecycleModule.bindStartupAction(binder(), RegisterShutdownStackPrinter.class);
 
     bind(SchedulerLifecycle.class).in(Singleton.class);
+    TaskEventModule.bindSubscriber(binder(), SchedulerLifecycle.class);
     bind(AttributeStore.Mutable.class).to(AttributeStoreImpl.class);
     bind(AttributeStoreImpl.class).in(Singleton.class);
 
@@ -185,14 +184,6 @@ public class SchedulerModule extends AbstractModule {
     PeriodicTaskModule.bind(binder());
 
     install(new ServletModule());
-
-    Multibinder<RegisteredListener> registeredListeners =
-        Multibinder.newSetBinder(binder(), RegisteredListener.class);
-    registeredListeners.addBinding().to(SchedulerLifecycle.class);
-    registeredListeners.addBinding().to(SchedulerCore.class);
-
-    bind(RegisteredListener.class).to(FanoutRegisteredListener.class);
-    bind(FanoutRegisteredListener.class).in(Singleton.class);
 
     bind(GcExecutorLauncher.class).in(Singleton.class);
     bind(UserTaskLauncher.class).in(Singleton.class);

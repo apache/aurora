@@ -155,13 +155,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
     }
   }
 
-  @Notify(after = Event.DriverRegistered)
-  @Override
-  public synchronized void registered(String frameworkId) {
-    checkStarted();
-    stateManager.setFrameworkId(frameworkId);
-  }
-
   private boolean hasActiveJob(JobConfiguration job) {
     return Iterables.any(jobManagers, managerHasJob(job));
   }
