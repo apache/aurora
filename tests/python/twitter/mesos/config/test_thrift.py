@@ -47,7 +47,7 @@ def test_simple_config():
   assert job.owner == Identity(role=HELLO_WORLD.role().get(), user=getpass.getuser())
   assert job.cronSchedule == ''
   assert tti.jobName == 'hello_world'
-  assert tti.isDaemon == False
+  assert tti.isService == False
   assert tti.numCpus == 0.1
   assert tti.ramMb == 64
   assert tti.diskMb == 64
@@ -63,7 +63,7 @@ def test_config_with_options():
   hwc = HELLO_WORLD(
     production = True,
     priority = 200,
-    daemon = True,
+    service = True,
     health_check_interval_secs = 30,
     cron_policy = 'RUN_OVERLAP',
     constraints = {
@@ -77,7 +77,7 @@ def test_config_with_options():
 
   assert tti.production == True
   assert tti.priority == 200
-  assert tti.isDaemon == True
+  assert tti.isService == True
   assert job.cronCollisionPolicy == CronCollisionPolicy.RUN_OVERLAP
   assert tti.healthCheckIntervalSecs == 30
   assert len(tti.constraints) == 2

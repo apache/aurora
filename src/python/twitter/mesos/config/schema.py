@@ -119,11 +119,16 @@ class MesosJob(Struct):
   cron_schedule = String
   cron_policy   = String          # these two are aliases of each other.  default is KILL_EXISTING
   cron_collision_policy = String  # if unspecified.
+                                  # cron_policy is DEPRECATED (MESOS-2491) in favor of
+                                  # cron_collision_policy.
 
   update_config = Default(UpdateConfig, UpdateConfig())
 
   constraints                = Map(String, String)
-  daemon                     = Default(Integer, 0)  # boolean
+  daemon                     = Integer              # daemon and service are booleans that are
+  service                    = Integer              # aliased together.  daemon is DEPRECATED
+                                                    # (MESOS-2492) # in favor of service.  by
+                                                    # default, service is False.
   max_task_failures          = Default(Integer, 1)
   production                 = Default(Integer, 0)  # boolean
   priority                   = Default(Integer, 0)
@@ -135,6 +140,7 @@ class MesosJob(Struct):
 
 
 Job = MesosJob
+Service = Job(service = True)
 
 
 from .helpers import *

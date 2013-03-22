@@ -236,9 +236,9 @@ public class TaskStateMachine {
     };
 
     // To be called on a task transitioning into the FINISHED state.
-    final Command rescheduleIfDaemon = new Command() {
+    final Command rescheduleIfService = new Command() {
       @Override public void execute() {
-        if (task.getAssignedTask().getTask().isIsDaemon()) {
+        if (task.getAssignedTask().getTask().isIsService()) {
           addWork(WorkCommand.RESCHEDULE);
         }
       }
@@ -249,12 +249,12 @@ public class TaskStateMachine {
       @Override public void execute() {
         addWork(WorkCommand.INCREMENT_FAILURES);
 
-        // Max failures is ignored for daemon task.
-        boolean isDaemon = task.getAssignedTask().getTask().isIsDaemon();
+        // Max failures is ignored for service task.
+        boolean isService = task.getAssignedTask().getTask().isIsService();
 
         // Max failures is ignored when set to -1.
         int maxFailures = task.getAssignedTask().getTask().getMaxTaskFailures();
-        if (isDaemon || (maxFailures == -1) || (task.getFailureCount() < (maxFailures - 1))) {
+        if (isService || (maxFailures == -1) || (task.getFailureCount() < (maxFailures - 1))) {
           addWork(WorkCommand.RESCHEDULE);
         } else {
           LOG.info("Task " + getTaskId() + " reached failure limit, not rescheduling");
@@ -304,7 +304,7 @@ public class TaskStateMachine {
                       @Override public void execute(Transition<State> transition) {
                         switch (transition.getTo().getState()) {
                           case FINISHED:
-                            rescheduleIfDaemon.execute();
+                            rescheduleIfService.execute();
                             break;
 
                           case PREEMPTING:
@@ -353,7 +353,7 @@ public class TaskStateMachine {
                       @Override public void execute(Transition<State> transition) {
                         switch (transition.getTo().getState()) {
                           case FINISHED:
-                            rescheduleIfDaemon.execute();
+                            rescheduleIfService.execute();
                             break;
 
                           case RESTARTING:
@@ -406,7 +406,7 @@ public class TaskStateMachine {
                       @Override public void execute(Transition<State> transition) {
                         switch (transition.getTo().getState()) {
                           case FINISHED:
-                            rescheduleIfDaemon.execute();
+                            rescheduleIfService.execute();
                             break;
 
                           case PREEMPTING:
