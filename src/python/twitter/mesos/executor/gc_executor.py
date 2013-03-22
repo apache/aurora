@@ -302,12 +302,9 @@ class ThermosGCExecutor(ThermosExecutorBase):
     local_gc, remote_gc, _ = self.reconcile_states(driver, retain_tasks)
     self.clean_orphans(driver)
     delete_tasks = set(retain_tasks).intersection(self.garbage_collect(local_gc)) | remote_gc
-    # TODO(wickman) Stop sending deletedTasks messages temporarily until
-    # https://issues.apache.org/jira/browse/MESOS-317 is fixed.
-    #
-    # if delete_tasks:
-    #  driver.sendFrameworkMessage(thrift_serialize(
-    #      SchedulerMessage(deletedTasks=DeletedTasks(taskIds=delete_tasks))))
+    if delete_tasks:
+      driver.sendFrameworkMessage(thrift_serialize(
+          SchedulerMessage(deletedTasks=DeletedTasks(taskIds=delete_tasks))))
     self.send_update(driver, task.task_id.value, 'FINISHED', "Garbage collection finished.")
     defer(driver.stop, clock=self._clock, delay=self.PERSISTENCE_WAIT)
 

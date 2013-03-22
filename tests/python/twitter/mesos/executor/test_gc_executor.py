@@ -322,8 +322,6 @@ def test_gc_withheld():
   assert len(executor.gcs) == len(FINISHED_TASKS) - 1
   assert len(proxy_driver.messages) == 0
 
-"""
-TODO(wickman)  Uncomment when external MESOS-317 is fixed.
 
 def test_gc_withheld_and_executor_missing():
   executor, proxy_driver = run_gc_with(active_executors=set(ACTIVE_TASKS),
@@ -333,4 +331,3 @@ def test_gc_withheld_and_executor_missing():
   assert len(executor.gcs) == len(FINISHED_TASKS)
   assert len(proxy_driver.messages) == 1
   assert proxy_driver.messages[0].deletedTasks.taskIds == set(['failure'])
-"""
