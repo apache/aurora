@@ -99,7 +99,7 @@ public class TaskStateMachineTest extends EasyMockTest {
   }
 
   @Test
-  public void testServiceRescheduled() {
+  public void testDaemonRescheduled() {
     stateMachine = makeStateMachine("test", makeTask(true));
     expectWork(UPDATE_STATE).times(5);
     expectWork(RESCHEDULE);
@@ -391,7 +391,7 @@ public class TaskStateMachineTest extends EasyMockTest {
     return expectLastCall();
   }
 
-  private static ScheduledTask makeTask(boolean service) {
+  private static ScheduledTask makeTask(boolean daemon) {
     return new ScheduledTask()
         .setAssignedTask(
             new AssignedTask()
@@ -399,6 +399,6 @@ public class TaskStateMachineTest extends EasyMockTest {
                     new TwitterTaskInfo()
                         .setOwner(new Identity().setRole("roleA"))
                         .setJobName("jobA")
-                        .setIsService(service)));
+                        .setIsDaemon(daemon)));
   }
 }

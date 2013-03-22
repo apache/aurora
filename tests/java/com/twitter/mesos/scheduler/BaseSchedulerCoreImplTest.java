@@ -636,14 +636,14 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   }
 
   @Test
-  public void testServiceTasksRescheduled() throws Exception {
+  public void testDaemonTasksRescheduled() throws Exception {
     control.replay();
     buildScheduler();
 
-    // Schedule 5 service and 5 non-service tasks.
+    // Schedule 5 daemon and 5 non-daemon tasks.
     scheduler.createJob(makeJob(OWNER_A, JOB_A, 5));
-    TwitterTaskInfo task = productionTask().setIsService(true);
-    scheduler.createJob(makeJob(OWNER_A, JOB_A + "service", task, 5));
+    TwitterTaskInfo task = productionTask().setIsDaemon(true);
+    scheduler.createJob(makeJob(OWNER_A, JOB_A + "daemon", task, 5));
 
     assertEquals(10, getTasksByStatus(PENDING).size());
     changeStatus(queryByOwner(OWNER_A), ASSIGNED);
@@ -653,7 +653,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     changeStatus(queryByOwner(OWNER_A), RUNNING);
     assertEquals(10, getTasksByStatus(RUNNING).size());
 
-    // Service tasks will move back into PENDING state after finishing.
+    // Daemon tasks will move back into PENDING state after finishing.
     changeStatus(queryByOwner(OWNER_A), FINISHED);
     Set<ScheduledTask> newTasks = getTasksByStatus(PENDING);
     assertEquals(5, newTasks.size());
@@ -667,16 +667,16 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   }
 
   @Test
-  public void testServiceTaskIgnoresMaxFailures() throws Exception {
+  public void testDaemonTaskIgnoresMaxFailures() throws Exception {
     control.replay();
     buildScheduler();
 
     int maxFailures = 5;
     int totalFailures = 10;
 
-    // Schedule a service task.
+    // Schedule a daemon task.
     TwitterTaskInfo task = productionTask()
-        .setIsService(true)
+        .setIsDaemon(true)
         .setMaxTaskFailures(maxFailures);
     scheduler.createJob(makeJob(OWNER_A, JOB_A, task, 1));
     assertTaskCount(1);
@@ -705,10 +705,10 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    // Create 5 non-service and 5 service tasks.
+    // Create 5 non-daemon and 5 daemon tasks.
     scheduler.createJob(makeJob(OWNER_A, JOB_A, 5));
-    TwitterTaskInfo task = productionTask().setIsService(true);
-    scheduler.createJob(makeJob(OWNER_A, JOB_A + "service", task, 5));
+    TwitterTaskInfo task = productionTask().setIsDaemon(true);
+    scheduler.createJob(makeJob(OWNER_A, JOB_A + "daemon", task, 5));
 
     assertEquals(10, getTasksByStatus(PENDING).size());
     changeStatus(queryByOwner(OWNER_A), ASSIGNED);
@@ -1612,7 +1612,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, productionTask().setIsService(true), 6));
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, productionTask().setIsDaemon(true), 6));
     changeStatus(Query.byJob(OWNER_A.role, JOB_A), ASSIGNED);
     changeStatus(Query.byJob(OWNER_A.role, JOB_A), RUNNING);
     scheduler.restartShards(OWNER_A.role, JOB_A, ImmutableSet.of(1, 5), OWNER_A.user);
@@ -1627,7 +1627,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, productionTask().setIsService(true), 1));
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, productionTask().setIsDaemon(true), 1));
     changeStatus(Query.byJob(OWNER_A.role, JOB_A), ASSIGNED);
     changeStatus(Query.byJob(OWNER_A.role, JOB_A), FINISHED);
     scheduler.restartShards(OWNER_A.role, JOB_A, ImmutableSet.of(5), OWNER_A.user);
@@ -1638,7 +1638,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    scheduler.createJob(makeJob(OWNER_A, JOB_A, productionTask().setIsService(true), 1));
+    scheduler.createJob(makeJob(OWNER_A, JOB_A, productionTask().setIsDaemon(true), 1));
     scheduler.restartShards(OWNER_A.role, JOB_A, ImmutableSet.of(0), OWNER_A.user);
   }
 

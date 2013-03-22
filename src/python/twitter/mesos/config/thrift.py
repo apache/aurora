@@ -32,9 +32,6 @@ __all__ = (
   'convert'
 )
 
-class InvalidConfig(ValueError):
-  pass
-
 
 def constraints_to_thrift(constraints):
   """Convert a python dictionary to a set of Constraint thrift objects."""
@@ -81,7 +78,7 @@ def task_instance_from_job(job, instance):
 def translate_cron_policy(policy):
   cron_policy = CronCollisionPolicy._NAMES_TO_VALUES.get(policy.get())
   if cron_policy is None:
-    raise InvalidConfig('Invalid cron policy: %s' % policy.get())
+    raise ValueError('Invalid cron policy: %s' % policy.get())
   return cron_policy
 
 
@@ -93,23 +90,12 @@ def select_cron_policy(cron_policy, cron_collision_policy):
   elif cron_policy is Empty and cron_collision_policy is not Empty:
     return translate_cron_policy(cron_collision_policy)
   else:
-    raise InvalidConfig('Specified both cron_policy and cron_collision_policy!')
-
-
-def select_service_bit(daemon, service):
-  if daemon is Empty and service is Empty:
-    return False
-  elif daemon is not Empty and service is Empty:
-    return bool(daemon.get())
-  elif daemon is Empty and service is not Empty:
-    return bool(service.get())
-  else:
-    raise InvalidConfig('Specified both daemon and service bits!')
+    raise ValueError('Specified both cron_policy and cron_collision_policy!')
 
 
 def convert(job, packages=[]):
   if not job.role().check().ok():
-    raise InvalidConfig(job.role().check().message())
+    raise ValueError(job.role().check().message())
 
   owner = Identity(role=str(job.role()), user=getpass.getuser())
 
@@ -124,7 +110,7 @@ def convert(job, packages=[]):
   # job components
   task.jobName = job.name().get()
   task.production = bool(job.production().get())
-  task.isService = select_service_bit(job.daemon(), job.service())
+  task.isDaemon = bool(job.daemon().get())
   task.maxTaskFailures = job.max_task_failures().get()
   task.priority = job.priority().get()
   if job.has_health_check_interval_secs():
@@ -136,17 +122,17 @@ def convert(job, packages=[]):
 
   # task components
   if not task_raw.has_resources():
-    raise InvalidConfig('Task must specify resources!')
+    raise ValueError('Task must specify resources!')
 
   if task_raw.resources().ram().get() == 0 or task_raw.resources().disk().get() == 0:
-    raise InvalidConfig('Must specify ram and disk resources, got ram:%r disk:%r' % (
+    raise ValueError('Must specify ram and disk resources, got ram:%r disk:%r' % (
       task_raw.resources().ram().get(), task_raw.resources().disk().get()))
 
   task.numCpus = task_raw.resources().cpu().get()
   task.ramMb = task_raw.resources().ram().get() / MB
   task.diskMb = task_raw.resources().disk().get() / MB
   if task.numCpus <= 0 or task.ramMb <= 0 or task.diskMb <= 0:
-    raise InvalidConfig('Task has invalid resources.  cpu/ramMb/diskMb must all be positive: '
+    raise ValueError('Task has invalid resources.  cpu/ramMb/diskMb must all be positive: '
         'cpu:%r ramMb:%r diskMb:%r' % (task.numCpus, task.ramMb, task.diskMb))
 
   task.owner = owner
@@ -160,9 +146,9 @@ def convert(job, packages=[]):
   try:
     ThermosTaskValidator.assert_valid_task(underlying_checked.task())
   except ThermosTaskValidator.InvalidTaskError as e:
-    raise InvalidConfig('Task is invalid: %s' % e)
+    raise ValueError('Task is invalid: %s' % e)
   if not underlying_checked.check().ok():
-    raise InvalidConfig('Job not fully specified: %s' % underlying.check().message())
+    raise ValueError('Job not fully specified: %s' % underlying.check().message())
   # TODO(Sathya): Re-evaluate this since the scheduler does not need to know about an update config.
   task.thermosConfig = underlying(update_config=Empty).json_dumps()
 

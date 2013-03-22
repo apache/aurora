@@ -125,7 +125,7 @@ public final class ConfigurationManager {
       .add(new RequiredField<Number>(_Fields.NUM_CPUS, new GreaterThan(0.0, "num_cpus")))
           .add(new RequiredField<Number>(_Fields.RAM_MB, new GreaterThan(0.0, "ram_mb")))
           .add(new RequiredField<Number>(_Fields.DISK_MB, new GreaterThan(0.0, "disk_mb")))
-          .add(new DefaultField(_Fields.IS_SERVICE, false))
+          .add(new DefaultField(_Fields.IS_DAEMON, false))
           .add(new DefaultField(_Fields.PRIORITY, 0))
           .add(new DefaultField(_Fields.PRODUCTION, false))
           .add(new DefaultField(_Fields.HEALTH_CHECK_INTERVAL_SECS, 30))
@@ -145,7 +145,7 @@ public final class ConfigurationManager {
             @Override public void sanitize(TwitterTaskInfo task) {
               if (!isDedicated(task)
                   && task.isProduction()
-                  && task.isIsService()
+                  && task.isIsDaemon()
                   && !Iterables.any(task.getConstraints(), hasName(RACK_CONSTRAINT))) {
 
                 task.addToConstraints(rackLimitConstraint(1));
@@ -334,10 +334,10 @@ public final class ConfigurationManager {
     config.setOwner(job.getOwner());
     config.setJobName(job.getName());
 
-    // Only one of [service=true, cron_schedule] may be set.
-    if (!StringUtils.isEmpty(job.getCronSchedule()) && config.isIsService()) {
+    // Only one of [daemon=true, cron_schedule] may be set.
+    if (!StringUtils.isEmpty(job.getCronSchedule()) && config.isIsDaemon()) {
       throw new TaskDescriptionException(
-          "A service task may not be run on a cron schedule: " + config);
+          "A daemon task may not be run on a cron schedule: " + config);
     }
 
     if (!config.isSetThermosConfig()) {
