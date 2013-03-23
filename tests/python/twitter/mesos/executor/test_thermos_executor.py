@@ -46,7 +46,13 @@ if 'THERMOS_DEBUG' in os.environ:
 
 
 class TestStatusManager(StatusManager):
-  WAIT_LIMIT = Amount(1, Time.SECONDS)
+  # this should be greater than TaskRunner.COORDINATOR_INTERVAL_SLEEP (currently 1s) in order to
+  # wait until the task cleanly transitions past the CLEANING stage
+  WAIT_LIMIT = Amount(1100, Time.MILLISECONDS)
+  # time between escalations in the qqq/aaa path
+  ESCALATION_WAIT = Amount(1, Time.MILLISECONDS)
+  # only necessary with real Mesos driver
+  PERSISTENCE_WAIT = Amount(0, Time.SECONDS)
 
 
 class FastThermosExecutor(ThermosExecutor):
@@ -346,8 +352,9 @@ class TestThermosExecutor(object):
     proxy_driver = ProxyDriver()
     with SignalServer(UnhealthyHandler) as port:
       with temporary_dir() as checkpoint_root:
-        _, executor = make_runner(proxy_driver, checkpoint_root, SLEEP60_MTI, ports={'health': port},
-                                 fast_status=True)
+        _, executor = make_runner(proxy_driver, checkpoint_root,
+                                  SLEEP60_MTI(health_check_interval_secs=0.1),
+                                  ports={'health': port}, fast_status=True)
         executor._manager.join()
 
     updates = proxy_driver.method_calls['sendStatusUpdate']
