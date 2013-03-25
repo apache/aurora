@@ -33,6 +33,7 @@ python_library(
   dependencies = [
     pants('src/python/twitter/common/dirutil'),
     pants('src/python/twitter/common/exceptions'),
+    pants('src/python/twitter/common/lang'),
     pants('src/python/twitter/common/log'),
     python_requirement('watchdog'),
   ]
@@ -58,6 +59,7 @@ python_library(
   dependencies = [
     pants('src/python/twitter/common'),
     pants('src/python/twitter/common/collections'),
+    pants('src/python/twitter/common/concurrent'),
     pants('src/python/twitter/common/lang'),
     pants('src/python/twitter/common/quantity'),
     pants(':disk'),

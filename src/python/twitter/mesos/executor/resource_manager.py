@@ -184,7 +184,7 @@ class ResourceManager(HealthInterface, ExceptionalThread):
       # TODO(jon): pass enforcer ProcessSample et al instead; it doesn't need TaskResourceSample
       kill_reason = self._enforcer.enforce(self.sample)
       if kill_reason and not self._kill_reason:
-        log.info('ResourceManager triggering kill - reason: %s' % kill_reason)
+        log.warn('ResourceManager triggering kill - reason: %s' % kill_reason)
         self._kill_reason = kill_reason
       self._stop_event.wait(timeout=self._enforcement_interval)
 

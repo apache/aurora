@@ -23,6 +23,7 @@ from operator import attrgetter
 
 from twitter.common import log
 from twitter.common.collections import RingBuffer
+from twitter.common.concurrent import EventMuxer
 from twitter.common.lang import Interface
 from twitter.common.quantity import Amount, Time
 
@@ -208,10 +209,14 @@ class TaskResourceMonitor(ResourceMonitorBase, threading.Thread):
       except ValueError as err:
         log.warning("Error recording resource sample: %s" % err)
 
-      # Sleep until it's time for the next disk collection, the next process collection, or we've
-      # been killed
+      # Sleep until any of the following conditions are met:
+      # - it's time for the next disk collection
+      # - it's time for the next process collection
+      # - the result from the last disk collection is available via the DiskCollector
+      # - the TaskResourceMonitor has been killed via self._kill_signal
       now = time.time()
-      self._kill_signal.wait(
-        timeout=max(0, next_process_collection - now, next_disk_collection - now))
+      next_collection = min(next_process_collection - now, next_disk_collection - now)
+      EventMuxer(self._kill_signal, self._disk_collector.completed_event
+                ).wait(timeout=max(0, next_collection))
 
     log.debug('Stopping resource monitoring for task "%s"' % self._task_id)

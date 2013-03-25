@@ -19,6 +19,7 @@ from Queue import Empty, Queue
 from twitter.common import log
 from twitter.common.dirutil import du, safe_bsize
 from twitter.common.exceptions import ExceptionalThread
+from twitter.common.lang import Lockable
 from twitter.common.quantity import Amount, Time
 
 from watchdog.observers import Observer as WatchdogObserver
@@ -37,7 +38,7 @@ class DiskCollectorThread(ExceptionalThread):
     self.path = path
     self.value = None
     self.event = threading.Event()
-    threading.Thread.__init__(self)
+    super(DiskCollectorThread, self).__init__()
     self.daemon = True
 
   def run(self):
@@ -50,13 +51,15 @@ class DiskCollectorThread(ExceptionalThread):
     return self.event.is_set()
 
 
-class DiskCollector(object):
+class DiskCollector(Lockable):
   """ Spawn a background thread to sample disk usage """
   def __init__(self, root):
     self._root = root
     self._thread = None
     self._value = 0
+    super(DiskCollector, self).__init__()
 
+  @Lockable.sync
   def sample(self):
     """ Trigger collection of sample, if not already begun """
     if self._thread is None:
@@ -64,12 +67,23 @@ class DiskCollector(object):
       self._thread.start()
 
   @property
+  @Lockable.sync
   def value(self):
     """ Retrieve value of disk usage """
     if self._thread is not None and self._thread.finished():
       self._value = self._thread.value
       self._thread = None
     return self._value
+
+  @property
+  @Lockable.sync
+  def completed_event(self):
+    """ Return a threading.Event that will block until an in-progress disk collection is complete,
+    or block indefinitely otherwise. Use with caution! (i.e.: set a timeout) """
+    if self._thread is not None:
+      return self._thread.event
+    else:
+      return threading.Event()
 
 
 class InotifyDiskCollectorThread(ExceptionalThread, FileSystemEventHandler):
@@ -88,7 +102,7 @@ class InotifyDiskCollectorThread(ExceptionalThread, FileSystemEventHandler):
     self._files = {}   # file path => size (bytes)
     self._queue = Queue()
     self._observer = WatchdogObserver()
-    threading.Thread.__init__(self)
+    super(InotifyDiskCollectorThread, self).__init__()
     self.daemon = True
 
   def dispatch(self, event):
@@ -161,3 +175,7 @@ class InotifyDiskCollector(object):
   @property
   def value(self):
     return self._thread.value
+
+  @property
+  def completed_event(self):
+    return threading.Event()
