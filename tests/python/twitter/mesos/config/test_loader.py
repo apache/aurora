@@ -57,14 +57,17 @@ def test_load_json():
     assert new_job == job
 
 
-def test_load_into():
+def test_load_from():
   with temporary_file() as fp:
     fp.write(MESOS_CONFIG)
     fp.flush()
-    env = AuroraConfigLoader.load_into(fp.name)
-    assert 'jobs' in env and len(env['jobs']) == 1
-    hello_world = env['jobs'][0]
-    assert hello_world.name().get() == 'hello_world'
+    fp.seek(0)
+
+    for config in (fp.name, fp):
+      env = AuroraConfigLoader.load_from(config)
+      assert 'jobs' in env and len(env['jobs']) == 1
+      hello_world = env['jobs'][0]
+      assert hello_world.name().get() == 'hello_world'
 
 
 def test_pick():

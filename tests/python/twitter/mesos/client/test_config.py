@@ -5,7 +5,7 @@ import tempfile
 
 from twitter.common.contextutil import temporary_dir, temporary_file, open_zip
 from twitter.mesos.client import config
-from twitter.mesos.config import AuroraConfig
+from twitter.mesos.config import AuroraConfig, AuroraConfigLoader
 from twitter.mesos.config.schema import Announcer, Job, Resources, Task, MB
 from twitter.mesos.packer import sd_packer_client
 import twitter.mesos.packer.packer_client as packer_client
@@ -28,6 +28,11 @@ HELLO_WORLD = Job(
 jobs = [HELLO_WORLD]
 """
 
+MESOS_CONFIG_WITH_INCLUDE = """
+%s
+include(%s)
+"""
+
 MESOS_CONFIG_WITH_ANNOUNCE_1 = MESOS_CONFIG_BASE % 'announce = Announcer(primary_port="http"),'
 MESOS_CONFIG_WITH_ANNOUNCE_2 = MESOS_CONFIG_BASE % (
  '''announce = Announcer(
@@ -46,6 +51,28 @@ def test_get_config_announces():
       fp.write(good_config)
       fp.flush()
       config.get_config('hello_world', fp.name)
+
+      fp.seek(0)
+      config.get_config('hello_world', fp)
+
+def test_include():
+  with temporary_dir() as dir:
+    hello_mesos_fname = "hello_world.mesos"
+    hello_mesos_path = os.path.join(dir, hello_mesos_fname)
+    with open(os.path.join(dir, hello_mesos_path), "wb") as hello_world_mesos:
+      hello_world_mesos.write(MESOS_CONFIG_WITHOUT_ANNOUNCE)
+      hello_world_mesos.flush()
+
+      hello_include_fname_path = os.path.join(dir, "hello_include_fname.mesos")
+      with open(hello_include_fname_path, "wb+") as hello_include_fname_fp:
+        hello_include_fname_fp.write(MESOS_CONFIG_WITH_INCLUDE % ("", """'%s'""" % hello_mesos_fname))
+        hello_include_fname_fp.flush()
+
+        config.get_config('hello_world', hello_include_fname_path)
+
+        hello_include_fname_fp.seek(0)
+        with pytest.raises(AuroraConfigLoader.InvalidConfigError):
+          config.get_config('hello_world', hello_include_fname_fp)
 
 
 def test_environment_names():
