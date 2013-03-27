@@ -385,6 +385,22 @@ class TestThermosExecutor(object):
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert updates[-1][0][0].state == mesos_pb.TASK_FAILED
 
+  def test_slow_runner_initialize(self):
+    proxy_driver = ProxyDriver()
+
+    task = make_task(HELLO_WORLD_MTI)
+    te = FastThermosExecutor(runner_class=SlowInitializingTaskRunner)
+    te.RUNNER_INITIALIZATION_TIMEOUT = Amount(1, Time.MILLISECONDS)
+    te.launchTask(proxy_driver, task)
+
+    proxy_driver._stop_event.wait(timeout=1.0)
+    assert proxy_driver._stop_event.is_set()
+
+    updates = proxy_driver.method_calls['sendStatusUpdate']
+    assert len(updates) == 2
+    assert updates[-1][0][0].state == mesos_pb.TASK_FAILED
+    te._runner._init_start.set()
+
   def test_killTask_during_runner_initialize(self):
     proxy_driver = ProxyDriver()
 

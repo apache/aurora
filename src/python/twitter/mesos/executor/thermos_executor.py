@@ -68,6 +68,7 @@ class ThermosExecutorTimer(ExceptionalThread):
 class ThermosExecutor(ThermosExecutorBase):
   STOP_WAIT = Amount(5, Time.SECONDS)
   RESOURCE_CHECKPOINT = 'resource_usage.recordio'
+  RUNNER_INITIALIZATION_TIMEOUT = Amount(5, Time.MINUTES)
 
   def __init__(self, runner_class=RUNNER_CLASS, manager_class=StatusManager):
     ThermosExecutorBase.__init__(self)
@@ -126,14 +127,25 @@ class ThermosExecutor(ThermosExecutorBase):
 
   def _start_runner(self, driver, assigned_task, mesos_task, portmap):
     """
-      Commence running a task.
-        - Start the RunnerWrapper to fork TaskRunner (to control actual processes)
+      Commence running a Task.
+        - Initialize the TaskRunnerWrapper (create sandbox)
+        - Start the TaskRunnerWrapper (fork the Thermos TaskRunner)
         - Set up necessary HealthCheckers
+        - Set up DiscoveryManager, if applicable
         - Set up ResourceCheckpointer
         - Set up StatusManager, and attach HealthCheckers
+
     """
+
     try:
-      self._runner.initialize()
+      deadline(self._runner.initialize, timeout=self.RUNNER_INITIALIZATION_TIMEOUT,
+               daemon=True, propagate=True)
+    except Timeout:
+      msg = 'Timed out waiting for sandbox to initialize!'
+      log.fatal(msg)
+      self.send_update(driver, self._task_id, 'FAILED', msg)
+      defer(driver.stop, delay=self.STOP_WAIT)
+      return
     except self._runner.TaskError as e:
       msg = 'Initialization of task runner failed: %s' % e
       log.fatal(msg)
