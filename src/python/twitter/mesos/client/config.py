@@ -22,7 +22,7 @@ from gen.twitter.mesos.ttypes import (
     ResponseCode,
     TaskQuery)
 
-from pystachio import Ref
+from pystachio import Empty, Ref
 
 
 def _get_package_data(cluster, package, packer=None):
