@@ -458,7 +458,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setNumCpus(1.0)
         .setRamMb(1024)
         .setDiskMb(1024)
-        .setIsDaemon(true)
+        .setIsService(true)
         .setProduction(true)
         .setOwner(ROLE_IDENTITY)
         .setJobName(JOB_NAME);
@@ -474,7 +474,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
           .setPriority(0)
           .setRamMb(1024)
           .setDiskMb(1024)
-          .setIsDaemon(true)
+          .setIsService(true)
           .setProduction(true)
           .setRequestedPorts(ImmutableSet.<String>of())
           .setTaskLinks(ImmutableMap.<String, String>of())

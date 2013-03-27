@@ -94,8 +94,8 @@ class ThermosTaskWrapper(object):
   def from_file(filename, **kw):
     try:
       with safe_open(filename) as fp:
-        js = json.load(fp)
-      return ThermosTaskWrapper(Task(js), **kw)
+        task = Task.json_load(fp)
+      return ThermosTaskWrapper(task, **kw)
     except Exception as e:
       return None
 

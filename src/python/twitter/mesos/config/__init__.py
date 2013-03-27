@@ -4,7 +4,7 @@ from twitter.thermos.config.schema import ThermosContext
 
 from .loader import AuroraConfigLoader
 from .schema import MesosContext
-from .thrift import convert as convert_thrift
+from .thrift import convert as convert_thrift, InvalidConfig as InvalidThriftConfig
 
 from pystachio import Empty, Environment, Integer, Ref
 
@@ -65,7 +65,9 @@ class PortResolver(object):
 
 class AuroraConfig(object):
   class Error(Exception): pass
-  class InvalidConfig(Error): pass
+  class InvalidConfig(Error):
+    def __str__(self):
+      return 'The configuration was invalid: %s' % self.args[0]
 
   @classmethod
   def pick(cls, env, name, bindings, select_cluster=None, select_env=None):
@@ -170,7 +172,10 @@ class AuroraConfig(object):
     if not typecheck.ok():
       raise self.InvalidConfig(typecheck.message())
     interpolated_job = interpolated_job(task_links=self.task_links())
-    return convert_thrift(interpolated_job, self._packages)
+    try:
+      return convert_thrift(interpolated_job, self._packages)
+    except InvalidThriftConfig as e:
+      raise self.InvalidConfig(str(e))
 
   def bind(self, binding):
     self._job = self._job.bind(binding)

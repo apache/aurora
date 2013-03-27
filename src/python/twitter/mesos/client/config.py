@@ -22,7 +22,7 @@ from gen.twitter.mesos.ttypes import (
     ResponseCode,
     TaskQuery)
 
-from pystachio import Ref
+from pystachio import Empty, Ref
 
 
 def _get_package_data(cluster, package, packer=None):
@@ -74,7 +74,28 @@ def _warn_on_unspecified_package_bindings(config):
   p_uri, p = Ref.from_address('mesos.package_uri'), Ref.from_address('mesos.package')
   if p not in refs and p_uri not in refs:
     print(PACKAGE_UNDERSPECIFIED_WARNING % (
-        '{{packer[%s][%s][%s].copy_command}}' % tuple(config.package())))
+        '{{packer[%s][%s][%s].copy_command}}' % tuple(config.package())), file=sys.stderr)
+
+
+CRON_DEPRECATION_WARNING = """
+The "cron_policy" parameter to Jobs has been renamed to "cron_collision_policy".
+Please update your Jobs accordingly.
+"""
+
+def _warn_on_deprecated_cron_policy(config):
+  if config.raw().cron_policy() is not Empty:
+    print(CRON_DEPRECATION_WARNING, file=sys.stderr)
+
+
+DAEMON_DEPRECATION_WARNING = """
+The "daemon" parameter to Jobs is deprecated in favor of the "service" parameter.
+Please update your Job to set "service = True" instead of "daemon = True", or use
+the top-level Service() instead of Job().
+"""
+
+def _warn_on_deprecated_daemon_job(config):
+  if config.raw().daemon() is not Empty:
+    print(DAEMON_DEPRECATION_WARNING, file=sys.stderr)
 
 
 ANNOUNCE_WARNING = """
@@ -95,7 +116,6 @@ def _validate_announce_configuration(config):
       'dedicated' not in config.raw().constraints()):
     for port in config.raw().announce().portmap().get().values():
       try:
-        print('Trying port: %s' % port)
         port = int(port)
       except ValueError:
         continue
@@ -203,4 +223,6 @@ def populate_namespaces(config, force_local=False):
   """Populate additional bindings in the config, e.g. packer bindings."""
   _inject_packer_bindings(config, force_local)
   _warn_on_unspecified_package_bindings(config)
+  _warn_on_deprecated_cron_policy(config)
+  _warn_on_deprecated_daemon_job(config)
   return config

@@ -112,9 +112,10 @@ class ThermosExecutor(ThermosExecutorBase):
     # is using MesosJob, then we can begin to leverage additional information that
     # becomes available such as cluster.
     if 'instance' in json_blob:
-      return MesosTaskInstance(json_blob)
+      return MesosTaskInstance.json_loads(thermos_task)
     else:
-      job, refs = task_instance_from_job(MesosJob(json_blob), assigned_task.task.shardId)
+      job, refs = task_instance_from_job(MesosJob.json_loads(thermos_task),
+          assigned_task.task.shardId)
       if refs:
         raise ValueError('Unexpected unbound refs: %s' % ' '.join(map(str, refs)))
       return job

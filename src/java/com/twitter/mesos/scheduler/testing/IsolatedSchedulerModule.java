@@ -177,9 +177,9 @@ public class IsolatedSchedulerModule extends AbstractModule {
         @Override public void run() {
           Identity mesosUser = new Identity("mesos", "mesos");
           for (int i = 0; i < 20; i++) {
-            JobConfiguration daemon = createJob("daemonJob" + i, mesosUser);
-            daemon.getTaskConfig().setIsDaemon(true);
-            submitJob(daemon);
+            JobConfiguration service = createJob("serviceJob" + i, mesosUser);
+            service.getTaskConfig().setIsService(true);
+            submitJob(service);
           }
 
           for (int i = 0; i < 20; i++) {

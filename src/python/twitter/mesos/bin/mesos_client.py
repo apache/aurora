@@ -444,7 +444,7 @@ def inspect(jobname, config_file):
     print('  constraints:')
     for constraint, value in job.constraints().get().items():
       print('    %s: %s' % (constraint, value))
-  print('  daemon:     %s' % bool(job.daemon().get()))
+  print('  service:     %s' % bool(job.service().get()))
   print('  production: %s' % bool(job.production().get()))
   print()
 

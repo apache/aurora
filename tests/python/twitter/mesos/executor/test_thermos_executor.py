@@ -163,7 +163,7 @@ def make_runner(proxy_driver, checkpoint_root, task, ports={}, fast_status=False
   manager_class = TestStatusManager if fast_status else StatusManager
   te = FastThermosExecutor(runner_class=runner_class, manager_class=manager_class)
   executor_timer_class(te, proxy_driver).start()
-  task_description = make_task(task, assigned_ports=ports)
+  task_description = make_task(task, assigned_ports=ports, shardId=0)
   te.launchTask(proxy_driver, task_description)
 
   while not te._runner.is_started():
@@ -353,8 +353,8 @@ class TestThermosExecutor(object):
     with SignalServer(UnhealthyHandler) as port:
       with temporary_dir() as checkpoint_root:
         _, executor = make_runner(proxy_driver, checkpoint_root,
-                                  SLEEP60_MTI(health_check_interval_secs=0.1),
-                                  ports={'health': port}, fast_status=True)
+            MESOS_JOB(task=SLEEP60, health_check_interval_secs=0.1),
+            ports={'health': port}, fast_status=True)
         executor._manager.join()
 
     updates = proxy_driver.method_calls['sendStatusUpdate']
