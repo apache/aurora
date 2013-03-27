@@ -66,9 +66,11 @@ class TaskObserverFileBrowser(object):
     types = self._observer.logs(task_id, process, int(run))
     if logtype not in types:
       bottle.abort(404, "No such log type: %s" % logtype)
-    chroot, path = types[logtype]
+    base, path = types[logtype]
+    filename = os.path.join(base, path)
     return {
       'task_id': task_id,
+      'filename': filename,
       'process': process,
       'run': run,
       'logtype': logtype

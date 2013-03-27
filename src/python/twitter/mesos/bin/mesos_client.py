@@ -151,7 +151,6 @@ def make_spawn_options(options):
   return dict((name, getattr(options, name)) for name in (
       'json',
       'open_browser',
-      'shard',
       'bindings',
       'cluster',
       'env'))
@@ -198,7 +197,6 @@ def create(jobname, config_file):
       select_env=options.env)
 
   if config.cluster() == 'local':
-    options.shard = 0
     options.runner = 'build'
     return spawn_local('build', jobname, config_file, **make_spawn_options(options))
 
@@ -215,8 +213,6 @@ def create(jobname, config_file):
 
 
 @app.command
-@app.command_option('--shard', dest='shard', type=int, default=0,
-    help='The shard number to spawn.')
 @app.command_option('--runner', dest='runner', default='build',
     help='The thermos_runner.pex to run the task.  If "build", build one automatically. '
          'This requires that you be running the spawn from within the root of a science repo.')

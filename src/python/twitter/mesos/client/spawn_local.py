@@ -84,14 +84,6 @@ def create_executor(runner_pex, sandbox_root, checkpoint_root):
   return ThermosExecutor(runner_class=make_local_runner_wrapper(
       runner_pex, sandbox_root, checkpoint_root))
 
-
-def pick_task(job_configuration, shard_id=0):
-  for tti in job_configuration.taskConfigs:
-    if tti.shardId == shard_id:
-      return tti
-  raise ValueError('shard_id %s not part of job!' % shard_id)
-
-
 def create_assigned_ports(names):
   return dict((name, TunnelHelper.get_random_port()) for name in names)
 
@@ -116,7 +108,7 @@ class LocalDriver(ExecutorDriver):
     log.info('LocalDriver.sendFrameworkMessage(%s)' % data)
 
 
-def create_taskinfo(proxy_config, shard_id=0):
+def create_taskinfo(proxy_config):
   import socket
   from mesos_pb2 import (
       TaskInfo,
@@ -126,7 +118,8 @@ def create_taskinfo(proxy_config, shard_id=0):
   from thrift.TSerialization import serialize as thrift_serialize
 
   job_configuration = proxy_config.job()
-  tti = pick_task(job_configuration, shard_id)
+  tti = job_configuration.taskConfig
+  tti.shardId = 0
   local_time = time.strftime('%Y%m%d-%H%M%S')
   task_id = slave_id = job_configuration.name + local_time
 
@@ -156,7 +149,7 @@ def spawn_local(runner, jobname, config_file, json=False, open_browser=False,
 
   checkpoint_root = os.path.expanduser(os.path.join('~', '.thermos'))
   _, port = spawn_observer(checkpoint_root)
-  task_info = create_taskinfo(config, shard)
+  task_info = create_taskinfo(config)
 
   with temporary_dir() as sandbox:
     runner_pex = runner if runner != 'build' else build_local_runner()
