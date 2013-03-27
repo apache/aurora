@@ -22,7 +22,7 @@ from gen.twitter.mesos.ttypes import (
     ResponseCode,
     TaskQuery)
 
-from pystachio import Empty, Ref
+from pystachio import Ref
 
 
 def _get_package_data(cluster, package, packer=None):
@@ -43,6 +43,15 @@ def _extract_package_uri(metadata):
   if latest_audit['state'] == 'DELETED':
     die('The requested package version has been deleted.')
   return metadata['uri']
+
+
+APPAPP_DEPRECATION_WARNING = """
+The use of app-app is deprecated. Please reach out to mesos-team@twitter.com for advice on
+migrating your application away from app-app layouts to an alternative packaging solution.
+"""
+def _warn_on_appapp_layouts(config):
+  if config.raw().has_layout():
+    print(APPAPP_DEPRECATION_WARNING, file=sys.stderr)
 
 
 PACKAGE_DEPRECATION_WARNING = """
@@ -139,15 +148,15 @@ UPDATE_CONFIG_MAX_FAILURES_ERROR = '''
 max_total_failures in update_config must be lesser than the job size.
 Based on your job size (%s) you should use max_total_failures <= %s.
 
-See http://confluence.local.twitter.com/pages/viewpage.action?pageId=21865792 for details.
+See http://go/auroraconfig for details.
 '''
 
 UPDATE_CONFIG_DEDICATED_THRESHOLD_ERROR = '''
 Since this is a dedicated job, you must set your max_total_failures in
 your update configuration to no less than 2%% of your job size.
 Based on your job size (%s) you should use max_total_failures >= %s.
-                        
-See http://confluence.local.twitter.com/pages/viewpage.action?pageId=21865792 for details.
+
+See http://go/auroraconfig for details.
 '''
 
 def _validate_update_config(config):
@@ -225,4 +234,5 @@ def populate_namespaces(config, force_local=False):
   _warn_on_unspecified_package_bindings(config)
   _warn_on_deprecated_cron_policy(config)
   _warn_on_deprecated_daemon_job(config)
+  _warn_on_appapp_layouts(config)
   return config
