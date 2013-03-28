@@ -111,7 +111,8 @@ public interface MesosTaskFactory {
 
     @VisibleForTesting
     static String getSourceName(TwitterTaskInfo task) {
-      return task.getOwner().getRole() + "." + task.getJobName() + "." + task.getShardId();
+      return String.format("%s.%s.%s.%s",
+          task.getOwner().getRole(), task.getEnvironment(), task.getJobName(), task.getShardId());
     }
 
     @Override

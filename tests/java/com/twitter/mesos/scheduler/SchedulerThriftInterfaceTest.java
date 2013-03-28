@@ -481,7 +481,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
           .setConstraints(ImmutableSet.of(
               ConfigurationManager.hostLimitConstraint(1),
               ConfigurationManager.rackLimitConstraint(1)))
-          .setMaxTaskFailures(1);
+          .setMaxTaskFailures(1)
+          .setEnvironment(DEFAULT_ENVIRONMENT);
     }
     // Task configs are placed in a HashSet after deepCopy, equals() does not play nicely between
     // HashSet and ImmutableSet - dropping an ImmutableSet in place keeps equals() happy.
@@ -718,11 +719,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setRamMb(1024)
         .setDiskMb(1024)
         .setProduction(production)
-        .setKey(
-            new JobKey()
-                .setRole("testing")
-                .setEnvironment(DEFAULT_ENVIRONMENT)
-                .setName(JOB_NAME));
+        .setEnvironment(DEFAULT_ENVIRONMENT);
   }
 
   private static TwitterTaskInfo productionTask() {

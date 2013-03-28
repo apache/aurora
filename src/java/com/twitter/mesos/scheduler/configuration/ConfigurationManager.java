@@ -35,6 +35,8 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.TwitterTaskInfo._Fields;
 import com.twitter.mesos.gen.ValueConstraint;
 
+import static com.twitter.mesos.gen.Constants.DEFAULT_ENVIRONMENT;
+
 /**
  * Manages translation from a string-mapped configuration to a concrete configuration type, and
  * defaults for optional values.
@@ -133,6 +135,7 @@ public final class ConfigurationManager {
           .add(new DefaultField(_Fields.TASK_LINKS, Maps.<String, String>newHashMap()))
           .add(new DefaultField(_Fields.REQUESTED_PORTS, Sets.<String>newHashSet()))
           .add(new DefaultField(_Fields.CONSTRAINTS, Sets.<Constraint>newHashSet()))
+          .add(new DefaultField(_Fields.ENVIRONMENT, DEFAULT_ENVIRONMENT))
           .add(new FieldSanitizer() {
             @Override
             public void sanitize(TwitterTaskInfo task) {
@@ -333,6 +336,11 @@ public final class ConfigurationManager {
 
     config.setOwner(job.getOwner());
     config.setJobName(job.getName());
+
+    // TODO(ksweeney): Remove the check for job.isSetKey when it's no longer optional.
+    if (StringUtils.isBlank(config.getEnvironment()) && job.isSetKey()) {
+      config.setEnvironment(job.getKey().getEnvironment());
+    }
 
     // Only one of [service=true, cron_schedule] may be set.
     if (!StringUtils.isEmpty(job.getCronSchedule()) && config.isIsService()) {
