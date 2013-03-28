@@ -191,8 +191,7 @@ class ThermosGCExecutor(ThermosExecutorBase):
         if len(states) > 0:
           _, last_state = states[-1]
           updates[task_id] = self.THERMOS_TO_TWITTER_STATES.get(last_state, ScheduleStatus.UNKNOWN)
-          self.send_update(driver, task_id, last_state,
-              'Telling scheduler of finished task %s' % task_id)
+          self.send_update(driver, task_id, last_state, 'Task finish detected by GC executor.')
         else:
           self.log('Task state unavailable for finished task!  Possible checkpoint corruption.')
       if task_id in sched_finished and task_id not in local_task_ids:
@@ -201,7 +200,7 @@ class ThermosGCExecutor(ThermosExecutorBase):
       if task_id not in local_task_ids and task_id in sched_active:
         self.log('Know nothing about task %s, telling scheduler of LOSS.' % task_id)
         updates[task_id] = ScheduleStatus.LOST
-        self.send_update(driver, task_id, 'LOST', 'Executor found no trace of %s' % task_id)
+        self.send_update(driver, task_id, 'LOST', 'GC executor found no trace of task.')
       if task_id not in local_task_ids and task_id in sched_starting:
         self.log('Know nothing about task %s, but scheduler says STARTING - passing' % task_id)
 
@@ -246,8 +245,7 @@ class ThermosGCExecutor(ThermosExecutorBase):
           self._clock.time() - latest_update))
       if self.terminate_task(task_id, kill=False):
         updates[task_id] = ScheduleStatus.LOST
-        self.send_update(driver, task_id, 'LOST',
-          'Reporting task %s as LOST because its runner has been dead too long.' % task_id)
+        self.send_update(driver, task_id, 'LOST', 'GC executor detected failed task runner.')
 
     return updates
 
@@ -292,7 +290,9 @@ class ThermosGCExecutor(ThermosExecutorBase):
   def linked_executors(self):
     thermos_executor_prefix = 'thermos-'
     for executor in self._detector.find(root=self._mesos_root):
-      if executor.executor_id.startswith(thermos_executor_prefix):
+      # It's possible for just the 'latest' symlink to be present but no run directories.
+      # This indicates that the task has been fully garbage collected.
+      if executor.executor_id.startswith(thermos_executor_prefix) and executor.run != 'latest':
         yield executor.executor_id[len(thermos_executor_prefix):]
 
   def run(self, driver, task, retain_tasks):
@@ -305,7 +305,7 @@ class ThermosGCExecutor(ThermosExecutorBase):
     if delete_tasks:
       driver.sendFrameworkMessage(thrift_serialize(
           SchedulerMessage(deletedTasks=DeletedTasks(taskIds=delete_tasks))))
-    self.send_update(driver, task.task_id.value, 'FINISHED', "Garbage collection finished.")
+    self.send_update(driver, task.task_id.value, 'FINISHED', 'Garbage collection finished.')
     defer(driver.stop, clock=self._clock, delay=self.PERSISTENCE_WAIT)
 
   def launchTask(self, driver, task):
