@@ -5,11 +5,10 @@ from twitter.common.app.modules.http import RootServer
 
 from twitter.mesos.clusters import Cluster
 from twitter.mesos.executor.resource_checkpoints import CheckpointResourceMonitor
+from twitter.mesos.observer.mesos_vars import MesosObserverVars
 from twitter.thermos.base.path import TaskPath
 from twitter.thermos.observer.observer import TaskObserver
 from twitter.thermos.observer.http import BottleObserver
-
-from .mesos_vars import MesosObserverVars
 
 
 app.add_option("--root",
