@@ -23,6 +23,12 @@ def test_testCoverage():
       assert (hasattr(TestSchedulerProxyAdminInjection, 'test_%s' % rpc_name),
               'No test defined for RPC %s' % rpc_name)
 
+class TestSchedulerProxy(scheduler_client.SchedulerProxy):
+  """In testing we shouldn't use the real SSHAgentAuthenticator."""
+  @classmethod
+  def create_session(cls, user):
+    return SessionKey(user=user, nonce=42, nonceSig='UNAUTHENTICATED')
+
 class TestSchedulerProxyInjection(unittest.TestCase):
 
   def setUp(self):
@@ -43,7 +49,7 @@ class TestSchedulerProxyInjection(unittest.TestCase):
     self.mox.VerifyAll()
 
   def make_scheduler_proxy(self):
-    return scheduler_client.SchedulerProxy('local')
+    return TestSchedulerProxy('local')
 
   def test_startCronJob(self):
     self.mock_thrift_client.startCronJob(IgnoreArg(), IgnoreArg(), IsA(JobKey), IsA(SessionKey))
