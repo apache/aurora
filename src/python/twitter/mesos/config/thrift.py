@@ -1,6 +1,4 @@
-import copy
 import getpass
-import json
 
 from twitter.common.lang import Compatibility
 from twitter.thermos.config.loader import (
@@ -16,6 +14,7 @@ from gen.twitter.mesos.ttypes import (
   CronCollisionPolicy,
   Identity,
   JobConfiguration,
+  JobKey,
   Package,
   TwitterTaskInfo,
 )
@@ -84,6 +83,18 @@ def translate_cron_policy(policy):
     raise InvalidConfig('Invalid cron policy: %s' % policy.get())
   return cron_policy
 
+def fully_interpolated(pystachio_object, coerce_fn=lambda i: i):
+  # Extract a fully-interpolated unwrapped object from pystachio_object or raise InvalidConfig.
+  #
+  # TODO(ksweeney): Remove this once Pystachio 1.0 changes the behavior of interpolate() to return
+  # unwrapped objects and fail when there are any unbound refs.
+  if not pystachio_object.check().ok():
+    raise InvalidConfig(pystachio_object.check().message())
+    # If an object type-checks it's okay to use the raw value from the wrapped object returned by
+  # interpolate. Without the previous check value.get() could return a string with mustaches
+  # instead of an object of the expected type.
+  value, _ = pystachio_object.interpolate()
+  return coerce_fn(value.get())
 
 def select_cron_policy(cron_policy, cron_collision_policy):
   if cron_policy is Empty and cron_collision_policy is Empty:
@@ -95,14 +106,13 @@ def select_cron_policy(cron_policy, cron_collision_policy):
   else:
     raise InvalidConfig('Specified both cron_policy and cron_collision_policy!')
 
-
-def select_service_bit(daemon, service):
-  if daemon is Empty and service is Empty:
+def select_service_bit(job):
+  if not job.has_daemon() and not job.has_service():
     return False
-  elif daemon is not Empty and service is Empty:
-    return bool(daemon.get())
-  elif daemon is Empty and service is not Empty:
-    return bool(service.get())
+  elif job.has_daemon() and not job.has_service():
+    return fully_interpolated(job.daemon(), bool)
+  elif not job.has_daemon() and job.has_service():
+    return fully_interpolated(job.service(), bool)
   else:
     raise InvalidConfig('Specified both daemon and service bits!')
 
@@ -118,12 +128,14 @@ ALIASED_FIELDS = (
 def filter_aliased_fields(job):
   return job(**dict((key, Empty) for key in ALIASED_FIELDS))
 
+def convert(job, packages=frozenset()):
+  """Convert a Pystachio MesosJob to an Aurora Thrift JobConfiguration."""
 
-def convert(job, packages=[]):
-  if not job.role().check().ok():
-    raise InvalidConfig(job.role().check().message())
-
-  owner = Identity(role=str(job.role()), user=getpass.getuser())
+  owner = Identity(role=fully_interpolated(job.role()), user=getpass.getuser())
+  key = JobKey(
+    role=fully_interpolated(job.role()),
+    environment=fully_interpolated(job.environment()),
+    name=fully_interpolated(job.name()))
 
   task_raw = job.task()
 
@@ -131,32 +143,37 @@ def convert(job, packages=[]):
   task = TwitterTaskInfo()
 
   def not_empty_or(item, default):
-    return default if item is Empty else item.get()
+    return default if item is Empty else fully_interpolated(item)
 
   # job components
-  task.jobName = job.name().get()
-  task.production = bool(job.production().get())
-  task.isService = select_service_bit(job.daemon(), job.service())
-  task.maxTaskFailures = job.max_task_failures().get()
-  task.priority = job.priority().get()
+  task.jobName = fully_interpolated(job.name())
+  task.environment = fully_interpolated(job.environment())
+  task.production = fully_interpolated(job.production(), bool)
+  task.isService = select_service_bit(job)
+  task.maxTaskFailures = fully_interpolated(job.max_task_failures())
+  task.priority = fully_interpolated(job.priority())
   if job.has_health_check_interval_secs():
-    task.healthCheckIntervalSecs = job.health_check_interval_secs().get()
+    task.healthCheckIntervalSecs = fully_interpolated(job.health_check_interval_secs())
   task.contactEmail = not_empty_or(job.contact(), None)
 
-  # Add package tuples (role, package_name, version) to a task, to display in the scheduler UI.
-  task.packages = [Package(str(p[0]), str(p[1]), int(p[2])) for p in packages] if packages else None
+  # Add package tuples to a task, to display in the scheduler UI.
+  task.packages = frozenset(
+      Package(role=str(role), name=str(package_name), version=int(version))
+      for role, package_name, version in packages)
 
   # task components
   if not task_raw.has_resources():
     raise InvalidConfig('Task must specify resources!')
 
-  if task_raw.resources().ram().get() == 0 or task_raw.resources().disk().get() == 0:
+  if (fully_interpolated(task_raw.resources().ram()) == 0
+      or fully_interpolated(task_raw.resources().disk()) == 0):
     raise InvalidConfig('Must specify ram and disk resources, got ram:%r disk:%r' % (
-      task_raw.resources().ram().get(), task_raw.resources().disk().get()))
+      fully_interpolated(task_raw.resources().ram()),
+      fully_interpolated(task_raw.resources().disk())))
 
-  task.numCpus = task_raw.resources().cpu().get()
-  task.ramMb = task_raw.resources().ram().get() / MB
-  task.diskMb = task_raw.resources().disk().get() / MB
+  task.numCpus = fully_interpolated(task_raw.resources().cpu())
+  task.ramMb = fully_interpolated(task_raw.resources().ram()) / MB
+  task.diskMb = fully_interpolated(task_raw.resources().disk()) / MB
   if task.numCpus <= 0 or task.ramMb <= 0 or task.diskMb <= 0:
     raise InvalidConfig('Task has invalid resources.  cpu/ramMb/diskMb must all be positive: '
         'cpu:%r ramMb:%r diskMb:%r' % (task.numCpus, task.ramMb, task.diskMb))
@@ -176,16 +193,18 @@ def convert(job, packages=[]):
   if not underlying_checked.check().ok():
     raise InvalidConfig('Job not fully specified: %s' % underlying.check().message())
 
-  cron_schedule = job.cron_schedule().get() if job.has_cron_schedule() else ''
+  cron_schedule = not_empty_or(job.cron_schedule(), '')
   cron_policy = select_cron_policy(job.cron_policy(), job.cron_collision_policy())
 
   # TODO(Sathya): Re-evaluate this since the scheduler does not need to know about an update config.
   task.thermosConfig = filter_aliased_fields(underlying).json_dumps()
 
+  # TODO(ksweeney): Remove jobName once it has been deprecated.
   return JobConfiguration(
-    name=str(job.name()),
+    name=fully_interpolated(job.name()),
+    key=key,
     owner=owner,
     cronSchedule=cron_schedule,
     cronCollisionPolicy=cron_policy,
     taskConfig=task,
-    shardCount=job.instances().get())
+    shardCount=fully_interpolated(job.instances()))

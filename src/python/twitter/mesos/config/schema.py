@@ -1,5 +1,6 @@
 from pystachio import *
 from twitter.thermos.config.schema import *
+from gen.twitter.mesos.constants import DEFAULT_ENVIRONMENT
 
 
 class MesosContext(Struct):
@@ -102,7 +103,7 @@ class MesosTaskInstance(Struct):
   instance                   = Required(Integer)
   role                       = Required(String)
   announce                   = Announcer
-  environment                = String
+  environment                = Default(String, DEFAULT_ENVIRONMENT)
   health_check_interval_secs = Default(Integer, 30)
 
 
@@ -111,7 +112,7 @@ class MesosJob(Struct):
   role          = Required(String)
   contact       = String
   cluster       = Required(String)
-  environment   = String
+  environment   = Default(String, DEFAULT_ENVIRONMENT)
   instances     = Default(Integer, 1)
   task          = Required(Task)
   announce      = Announcer

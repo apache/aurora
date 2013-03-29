@@ -1,17 +1,13 @@
-import copy
 import getpass
-from contextlib import contextmanager
 
 import pytest
 
 from gen.twitter.mesos.ttypes import (
-  Constraint,
   CronCollisionPolicy,
+  JobKey,
   Identity,
-  TaskConstraint,
-  ValueConstraint,
 )
-from twitter.common.contextutil import temporary_file
+
 from twitter.mesos.config import AuroraConfig
 from twitter.mesos.config.schema import (
   MesosJob,
@@ -23,7 +19,7 @@ from twitter.thermos.config.schema import (
   Task
 )
 
-from pystachio import Empty, Integer, Map, String
+from pystachio import Map, String
 from pystachio.naming import frozendict
 
 
@@ -44,6 +40,10 @@ def test_simple_config():
   assert job.shardCount == 1
   tti = job.taskConfig
   assert job.name == 'hello_world'
+  assert job.key == JobKey(
+    role=HELLO_WORLD.role().get(),
+    environment=HELLO_WORLD.environment().get(),
+    name=HELLO_WORLD.name().get())
   assert job.owner == Identity(role=HELLO_WORLD.role().get(), user=getpass.getuser())
   assert job.cronSchedule == ''
   assert tti.jobName == 'hello_world'
@@ -57,6 +57,8 @@ def test_simple_config():
   assert tti.healthCheckIntervalSecs == 30
   assert tti.maxTaskFailures == 1
   assert tti.constraints == set()
+  assert tti.packages == set()
+  assert tti.environment == HELLO_WORLD.environment().get()
 
 
 def test_config_with_options():
@@ -69,7 +71,8 @@ def test_config_with_options():
     constraints = {
       'dedicated': 'your_mom',
       'cpu': 'x86_64'
-    }
+    },
+    environment = 'prod'
   )
   job = convert_pystachio_to_thrift(hwc)
   assert job.shardCount == 1
@@ -81,6 +84,8 @@ def test_config_with_options():
   assert job.cronCollisionPolicy == CronCollisionPolicy.RUN_OVERLAP
   assert tti.healthCheckIntervalSecs == 30
   assert len(tti.constraints) == 2
+  assert tti.environment == 'prod'
+  assert job.key.environment == 'prod'
 
 
 def test_config_with_ports():
