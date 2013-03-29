@@ -58,18 +58,18 @@ class MesosObserverVars(ExceptionalThread):
   @classmethod
   def executor_binaries(cls):
     """Generator yielding (cwd, executor binary) pairs of active executors."""
-    try:
-      for proc in psutil.process_iter():
+    for proc in psutil.process_iter():
+      try:
         if (len(proc.cmdline) >= 2
             and proc.cmdline[0].startswith('python')
             and proc.cmdline[1] in cls.EXECUTOR_BINARIES):
-          yield (proc.getcwd(), proc.cmdline[1])
-    except psutil.error.Error as e:
-      log.error("Failed to collect information on executors: %s" % e)
+          yield (proc, proc.getcwd(), proc.cmdline[1])
+      except psutil.error.Error as e:
+        log.error("Failed to collect information on executors: %s" % e)
 
   def executor_releases(self):
     """Generator yielding (executor_name, executor_release) for all active executors"""
-    active_binaries = dict(self.executor_binaries())
+    active_binaries = dict((path, binary) for _, path, binary in self.executor_binaries())
     for executor in self._detector.find(root=self._mesos_root):
       if executor.run == 'latest':
         continue
@@ -125,7 +125,8 @@ class MesosObserverVars(ExceptionalThread):
 
   def collect_unparented_executors(self):
     """Collect all orphaned executor processes"""
-    def is_orphan_executor(proc):
+    def is_orphan_executor(proc_tuple):
+      proc = proc_tuple[0]
       try:
         if proc.ppid == 1:
           log.debug('Orphaned executor: pid=%d status=%s cwd=%s age=%s' % (
@@ -136,7 +137,7 @@ class MesosObserverVars(ExceptionalThread):
           return True
       except psutil.error.Error as e:
         log.error('Failed to collect stats for %s: %s' % (proc, e))
-    self.orphaned_executors.write(len(filter(is_orphan_executor, self.executor_processes())))
+    self.orphaned_executors.write(len(filter(is_orphan_executor, self.executor_binaries())))
 
   def collect_orphans(self):
     orphaned_tasks, orphaned_runners = 0, 0
