@@ -57,15 +57,18 @@ class MesosObserverVars(ExceptionalThread):
 
   @classmethod
   def executor_binaries(cls):
-    """Generator yielding (cwd, executor binary) pairs of active executors."""
-    for proc in psutil.process_iter():
-      try:
-        if (len(proc.cmdline) >= 2
-            and proc.cmdline[0].startswith('python')
-            and proc.cmdline[1] in cls.EXECUTOR_BINARIES):
-          yield (proc, proc.getcwd(), proc.cmdline[1])
-      except psutil.error.Error as e:
-        log.error("Failed to collect information on executors: %s" % e)
+    """Generator yielding (process, cwd, executor binary) tuples of active executors."""
+    try:
+      for proc in psutil.process_iter():
+        try:
+          if (len(proc.cmdline) >= 2
+              and proc.cmdline[0].startswith('python')
+              and proc.cmdline[1] in cls.EXECUTOR_BINARIES):
+            yield (proc, proc.getcwd(), proc.cmdline[1])
+        except psutil.error.Error as e:
+          log.error("Failed to collect information on executors: %s" % e)
+    except psutil.error.Error as e:
+      log.error("Failed to iterate over processes: %s" % e)
 
   def executor_releases(self):
     """Generator yielding (executor_name, executor_release) for all active executors"""
