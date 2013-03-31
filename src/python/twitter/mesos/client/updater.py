@@ -1,6 +1,6 @@
 import collections
 
-from twitter.common import app, log
+from twitter.common import log
 
 from gen.twitter.mesos.constants import DEFAULT_ENVIRONMENT
 from gen.twitter.mesos.ttypes import (
@@ -23,37 +23,30 @@ class UpdaterConfig(object):
   """
   For updates involving a health check,
 
-  UPDATE SHARD          RUNNING                    HEALTHY           RUNNING and HEALTHY
-  ------------------------|--------------------------|-----------------------|
-  \----------------------/ \------------------------/ \----------------------/
-     restart_thresold           healthy_threshold            watch_secs
+  UPDATE SHARD                         HEALTHY              REMAIN HEALTHY
+  ----------------------------------------|-----------------------|
+  \--------------------------------------/ \----------------------/
+            restart_thresold                      watch_secs
 
-  For updates without a health check,
-
-  UPDATE SHARD          RUNNING               REMAINS RUNNING
-  ------------------------|--------------------------|
-  \----------------------/ \------------------------/
-     restart_thresold            watch_secs
-
-  When an update is initiated, a shard is expected to move into RUNNING before restart_threshold.
-  Once RUNNING, if health checks are enabled, the health checker requires the shard to be in a 
-  "healthy" state within healthy_threshold. The shard is then expected to remain RUNNING and report
-  "healthy", if health checks are enabled, for atleast watch_secs. If any of these conditions are 
-  not satisfied, the shard is deemed unhealthy.
+  When an update is initiated, a shard is expected to be "healthy" before restart_threshold. A shard
+  is also expected to remain healthy for at least watch_secs. If these conditions are not satisfied,
+  the shard is deemed unhealthy.
   """
-  def __init__(self, batch_size, restart_threshold, healthy_threshold, watch_secs,
-               max_per_shard_failures, max_total_failures):
+  def __init__(self,
+               batch_size,
+               restart_threshold,
+               watch_secs,
+               max_per_shard_failures,
+               max_total_failures):
+
     if batch_size <= 0:
       raise ValueError('Batch size should be greater than 0')
     if restart_threshold <= 0:
       raise ValueError('Restart Threshold should be greater than 0')
     if watch_secs <= 0:
       raise ValueError('Watch seconds should be greater than 0')
-    if healthy_threshold <= 0:
-      raise ValueError('Healthy threshold should be greater than 0')
     self.batch_size = batch_size
     self.restart_threshold = restart_threshold
-    self.healthy_threshold = healthy_threshold
     self.watch_secs = watch_secs
     self.max_total_failures = max_total_failures
     self.max_per_shard_failures = max_per_shard_failures
@@ -66,7 +59,7 @@ class Updater(object):
   class InvalidConfigError(Error): pass
   class UpdateInProgressError(Error): pass
 
-  def __init__(self, config, scheduler=None, shard_watcher=None):
+  def __init__(self, config, scheduler=None):
     self._config = config
     self._role = config.role()
     self._job_name = config.name()
@@ -81,13 +74,7 @@ class Updater(object):
 
     # TODO(ksweeney): Get this from config and remove job_name and role fields.
     self._job = JobKey(name=self._job_name, environment=DEFAULT_ENVIRONMENT, role=self._role)
-    if shard_watcher:
-      self._shard_watcher = shard_watcher
-    else:
-      self._shard_watcher = ShardWatcher(
-          scheduler, self._job, self._cluster, self._update_config.restart_threshold,
-          self._update_config.healthy_threshold, self._update_config.watch_secs,
-          config.has_health_port())
+    self._has_health_port = config.has_health_port()
 
   def _update_failure_counts(self, failed_shards):
     """Update the failure counts metrics based upon a batch of failed shards."""
@@ -165,18 +152,26 @@ class Updater(object):
       watch_shards = batch_shards
     return watch_shards
 
-  def update(self, initial_shards):
+  def update(self, initial_shards, health_check_interval_seconds, shard_watcher=None):
     """Performs the job update, blocking until it completes.
     A rollback will be performed if the update was considered a failure based on the
     update configuration.
 
     Arguments:
-    update_config -- job update configuration object.
     initial_shards -- a list of shards to update.
+    health_check_interval_seconds -- Time to wait between consecutive status checks.
 
     Returns the set of shards that failed to update.
     """
-    failed_shards = []
+    self._shard_watcher = shard_watcher or ShardWatcher(
+        self._scheduler,
+        self._job,
+        self._cluster,
+        self._update_config.restart_threshold,
+        self._update_config.watch_secs,
+        self._has_health_port,
+        health_check_interval_seconds)
+    failed_shards = set()
     ShardState = collections.namedtuple('ShardState', ['shard_id', 'is_updated'])
     remaining_shards = [ShardState(shard_id, is_updated=False) for shard_id in initial_shards]
 
@@ -196,7 +191,7 @@ class Updater(object):
         shard_states = self._update_shards(shards_to_update)
         shards_to_watch += self._get_shards_to_watch(shard_states, shards_to_update)
 
-      failed_shards = self._shard_watcher.watch(shards_to_watch) if shards_to_watch else []
+      failed_shards = self._shard_watcher.watch(shards_to_watch) if shards_to_watch else set()
 
       log.log(debug_if(not failed_shards), 'Failed shards: %s' % failed_shards)
       remaining_shards += [ShardState(shard_id, is_updated=True) for shard_id in failed_shards]
@@ -214,7 +209,6 @@ class Updater(object):
     """Performs the job rollback.
 
     Arguments:
-    update_config -- update configuration object that describes how the rollback is performed.
     shards_to_rollback -- shard ids.
     """
     log.info('Reverting update for %s' % shards_to_rollback)

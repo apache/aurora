@@ -577,6 +577,11 @@ def _getshards(shards):
 
 
 @app.command
+@app.command_option('--updater_health_check_interval_seconds',
+                    dest='health_check_interval_seconds',
+                    type=int,
+                    default=3,
+                    help='Time interval between subsequent shard status checks.')
 @app.command_option(SHARDS_OPTION)
 @app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(CLUSTER_CONFIG_OPTION)
@@ -610,7 +615,7 @@ def update(jobname, config_file):
       select_cluster=options.cluster,
       select_env=options.env)
   api = MesosClientAPI(config.cluster(), options.verbosity == 'verbose')
-  resp = api.update_job(config, _getshards(options.shards))
+  resp = api.update_job(config, options.health_check_interval_seconds, _getshards(options.shards))
   check_and_log_response(resp)
 
 

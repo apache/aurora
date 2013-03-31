@@ -1,7 +1,7 @@
 import time
 
-from twitter.common import app, log
-from twitter.mesos.common.http_signaler import HttpSignaler as HealthChecker
+from twitter.common import log
+from .health_check_factory import HealthCheckFactory
 
 from gen.twitter.mesos.ttypes import (
   Identity,
@@ -10,19 +10,9 @@ from gen.twitter.mesos.ttypes import (
   TaskQuery,
 )
 
-app.add_option('--aurora_updater_status_check_interval',
-  dest='aurora_updater_status_check_interval',
-  default=3,
-  type='int',
-  help='How often Mesos runs the update loop.')
-
-
 class Shard(object):
-  def __init__(self, task_id=None, birthday=None, health_checker=None, finished=False):
-    self.task_id = task_id
+  def __init__(self, birthday=None, finished=False):
     self.birthday = birthday
-    self.health_checker = health_checker
-    self.healthy_timestamp = None
     self.finished = finished
     self.healthy = False
 
@@ -31,92 +21,88 @@ class Shard(object):
     self.finished = True
 
   def __str__(self):
-    return ('[id=%s, birthday=%s, healthy=%s, healthy_timestamp=%s, finished=%s]'
-            % (self.task_id, self.birthday, self.healthy, self.healthy_timestamp, self.finished))
+    return ('[birthday=%s, healthy=%s, finished=%s]' % (self.birthday, self.healthy, self.finished))
 
 
 class ShardWatcher(object):
-  def __init__(self, scheduler, job, cluster, restart_threshold, healthy_threshold, watch_secs,
-               health_checker_enabled, clock=time):
+  def __init__(self,
+               scheduler,
+               job,
+               cluster,
+               restart_threshold,
+               watch_secs,
+               has_health_port,
+               health_check_interval_seconds,
+               health_check_factory=None,
+               clock=time):
+
     self._scheduler = scheduler
     self._job_name = job.name
     self._role = job.role
     self._job = job
     self._restart_threshold = restart_threshold
-    self._healthy_threshold = healthy_threshold
     self._watch_secs = watch_secs
-    self._health_checker_enabled = health_checker_enabled
+    self._health_check_interval_seconds = health_check_interval_seconds
+    self._health_check_factory = health_check_factory or HealthCheckFactory(
+        cluster, has_health_port)
     self._clock = clock
-    self._cluster = cluster
-    self._is_proxy_setup = False
-
-  def maybe_setup_proxy(self, cluster):
-    if self._health_checker_enabled and not self._is_proxy_setup:
-      self._is_proxy_setup = True
-      HealthChecker.maybe_setup_proxy(cluster)
 
   def watch(self, shard_ids):
-    """Monitors a set of shards.
+    """Watches a set of shards and detects failures based on a delegated health check.
 
     Arguments:
     shard_ids -- set of shards to watch.
 
-    Returns a set of shards that meet the following criteria,
-    1. Failed to move to RUNNING state before restart_threshold from the time of restart.
-    2. Failed to respond to a health check before healthy_threshold after moving into RUNNING.
-    3. Failed to respond to a health check or failed to stay in the RUNNING state before watch_secs.
+    Returns a set of shards that are considered failed.
     """
-    self.maybe_setup_proxy(self._cluster)
     log.info('Watching shards: %s' % shard_ids)
     shard_ids = set(shard_ids)
-    start_time = self._clock.time()
-    expected_running_by = start_time + self._restart_threshold
-    max_time = start_time + self._restart_threshold + self._watch_secs
-    if self._health_checker_enabled:
-      max_time += self._healthy_threshold
+    health_check = self._health_check_factory.get()
+    now = self._clock.time()
+    expected_healthy_by = now + self._restart_threshold
+    max_time = now + self._restart_threshold + self._watch_secs
 
-    shards_info = {}
-    def shards(finished):
-      return dict((s_id, s) for (s_id, s) in shards_info.items() if s.finished == finished)
+    shard_states = {}
+    def finished_shards():
+      return dict((s_id, s) for s_id, s in shard_states.items() if s.finished)
 
     while True:
-      tasks = self._get_tasks_by_shard_id(shard_ids)
+      running_tasks = self._get_tasks_by_shard_id(shard_ids)
       now = self._clock.time()
-      shards_info = self._update_shards_info(shards_info, tasks, now)
+      tasks_by_shard = dict((task.assignedTask.task.shardId, task) for task in running_tasks)
+      for shard_id in shard_ids:
+        running_task = tasks_by_shard.get(shard_id)
+        if shard_id not in finished_shards():
+          if running_task is not None and health_check.health(running_task):
+            if shard_id not in shard_states:
+              shard_states[shard_id] = Shard(now)
+            shard = shard_states.get(shard_id)
+            if now > (shard.birthday + self._watch_secs):
+              log.info('Shard %s has been up and healthy for at least %d seconds' % (
+                  shard_id, self._watch_secs))
+              shard.set_healthy(True)
+          else:
+            # A shard that was previously healthy and currently unhealthy has failed.
+            if shard_id in shard_states:
+              log.info('Shard %s is unhealthy' % shard_id)
+              shard_states[shard_id].set_healthy(False)
+            elif now > expected_healthy_by:
+              log.info('Shard %s was not reported healthy within %d seconds' % (
+                  shard_id, self._restart_threshold))
+              shard_states[shard_id] = Shard(finished=True)
 
-      # Shards not reported when queried for status are unhealthy.
-      shards_returned = [task.assignedTask.task.shardId for task in tasks]
-      for shard_id in set(shards(finished=False)) - set(shards_returned):
-        log.error('Shard %s is no longer RUNNING' % shard_id)
-        shards_info[shard_id].set_healthy(False)
-
-      # Shards that do not transition to RUNNING before a restart threshold are unhealthy.
-      if now > expected_running_by:
-        for shard_id in (shard_ids - set(shards_info)):
-          shards_info[shard_id] = Shard(finished=True)
-          log.error('Shard %s did not transition to RUNNING' % shard_id)
-
-      if self._health_checker_enabled:
-        unfinished_shards = self._update_health_info(shards(finished=False), now) 
-        shards_info.update(unfinished_shards)
-      else:
-        for shard_id, shard in shards(finished=False).items():
-          if now > (shard.birthday + self._watch_secs):
-            shard.set_healthy(True)
-            log.info('Shard %s is up and healthy' % shard_id)
-
-      log.debug('Shards health: {%s}' % ['%s: %s' % val for val in shards_info.items()])
+      log.debug('Shards health: %s' % ['%s: %s' % val for val in shard_states.items()])
 
       # Return if all tasks are finished.
-      if set(shards(finished=True)) == shard_ids:
-        return [s_id for (s_id, s) in shards_info.items() if not s.healthy]
+      if set(finished_shards().keys()) == shard_ids:
+        return set([s_id for s_id, s in shard_states.items() if not s.healthy])
 
       # Return if time is up.
       if now > max_time:
-        return [s_id for s_id in shard_ids if s_id not in shards_info 
-                                             or not shards_info[s_id].healthy]
+        return set([s_id for s_id in shard_ids if s_id not in shard_states
+                                             or not shard_states[s_id].healthy])
 
-      self._clock.sleep(app.get_options().aurora_updater_status_check_interval)
+      self._clock.sleep(self._health_check_interval_seconds)
 
   def _get_tasks_by_shard_id(self, shard_ids):
     log.debug('Querying shard statuses.')
@@ -131,50 +117,3 @@ class ShardWatcher(object):
     log.debug('Response from scheduler: %s (message: %s)'
         % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
     return resp.tasks
-
-  def _update_shards_info(self, shards_info, tasks, now):
-    for task in tasks:
-      assigned_task = task.assignedTask
-      task_id = assigned_task.taskId
-      shard_id = assigned_task.task.shardId
-      status = task.status
-
-      if shard_id in shards_info:
-        shard = shards_info[shard_id]
-        if not shard.finished and status != ScheduleStatus.RUNNING or task_id != shard.task_id:
-          log.error('Detected failure in shard %s' % shard_id)
-          log.error('  task id %s' % task_id)
-          shard.set_healthy(False)
-      elif status == ScheduleStatus.RUNNING:
-        log.debug('Detected RUNNING shard %s' % shard_id)
-        log.debug('  task id %s' % task_id)
-        if self._health_checker_enabled:
-          health_port = assigned_task.assignedPorts['health']
-          health_checker = self.create_health_checker(assigned_task.slaveHost, health_port)
-        else:
-          health_checker = None
-        shards_info[shard_id] = Shard(task_id, now, health_checker)
-    return shards_info
-
-  def create_health_checker(self, host, port):
-    return HealthChecker(port, host)
-
-  def _update_health_info(self, shards_info, now):
-    for shard_id, shard in shards_info.items():
-      # Shards that do not respond to health checks before the healthy threhsold are unhealthy.
-      if shard.healthy_timestamp is None and now > (shard.birthday + self._healthy_threshold):
-        shard.set_healthy(False)
-        log.info('Shard %s did not respond "OK" to health checks' % shard_id)
-
-      is_healthy, reason = shard.health_checker.health()
-      if is_healthy:
-        if shard.healthy_timestamp is None:
-          log.info('Shard %s responded ok to health check' % shard_id)
-          shard.healthy_timestamp = now
-        if now > (shard.healthy_timestamp + self._watch_secs):
-          shard.set_healthy(True)
-          log.info('Shard %s is up and healthy' % shard_id)
-      else:
-        log.debug('Shard %s did not respond ok to health check. Reason: %s' % (shard_id, reason))
-        shard.healthy_timestamp = None
-    return shards_info

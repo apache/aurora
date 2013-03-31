@@ -2,8 +2,8 @@ python_test_suite(name = 'all',
   dependencies = [
     pants(':config'),
     pants(':scheduler_client'),
-    pants(':updater'),
     pants(':shard_watcher'),
+    pants(':updater'),
   ],
 )
 
@@ -39,7 +39,16 @@ python_tests(name = 'shard_watcher',
   sources = ['test_shard_watcher.py'],
   dependencies = [
     pants('src/python/twitter/mesos:mesos-lib'),
-    pants('src/python/twitter/mesos/common:http_signaler'),
+    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    python_requirement('mox'),
+  ]
+)
+
+python_tests(name = 'health_check_factory',
+  sources = ['test_health_check_factory.py'],
+  dependencies = [
+    pants('src/python/twitter/mesos:mesos-lib'),
+    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
     python_requirement('mox'),
   ]
 )

@@ -116,10 +116,10 @@ python_library(
 
 python_library(
   name = 'shard_watcher',
-  sources = ['shard_watcher.py'],
+  sources = ['shard_watcher.py', 'health_check_factory.py'],
   dependencies = [
     pants(':scheduler_client'),
-    pants('src/python/twitter/common/app'),
+    pants('src/python/twitter/common/lang'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/mesos/common:http_signaler'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),

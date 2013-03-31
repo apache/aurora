@@ -89,7 +89,7 @@ invoking cancel_update.
   def query(self, query):
     return self._scheduler.getTasksStatus(query)
 
-  def update_job(self, config, shards=None):
+  def update_job(self, config, health_check_interval_seconds=3, shards=None):
     """Run a job update for a given config, for the specified shards.  If
        shards is left unspecified, update all shards.  Returns whether or not
        the update was successful."""
@@ -110,7 +110,8 @@ invoking cancel_update.
       log.info('Update successful: %s' % resp.message)
       return update_resp
 
-    failed_shards = updater.update(shards or list(range(config.instances())))
+    failed_shards = updater.update(
+        shards or list(range(config.instances())), health_check_interval_seconds)
 
     if failed_shards:
       log.info('Update reverted, failures detected on shards %s' % failed_shards)

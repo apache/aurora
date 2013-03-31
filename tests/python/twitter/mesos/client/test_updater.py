@@ -1,5 +1,4 @@
 import copy
-from math import ceil
 import unittest
 
 from twitter.mesos.client.scheduler_client import SchedulerProxy
@@ -60,7 +59,6 @@ class UpdaterTest(unittest.TestCase):
   UPDATE_CONFIG = {
     'batch_size':             3,
     'restart_threshold':     50,
-    'healthy_threshold':     50,
     'watch_secs':            50,
     'max_per_shard_failures': 0,
     'max_total_failures':     0,
@@ -80,7 +78,7 @@ class UpdaterTest(unittest.TestCase):
 
   def init_updater(self, update_config):
     config = FakeConfig(self._role, self._name, update_config)
-    self._updater = Updater(config, self._scheduler_proxy, self._shard_watcher)
+    self._updater = Updater(config, self._scheduler_proxy)
     self._updater._update_token = self._update_token
 
   def expect_update(self, shard_ids, shard_results=None):
@@ -103,12 +101,14 @@ class UpdaterTest(unittest.TestCase):
         self._update_token, self._session_key).AndReturn(response)
 
   def expect_watch_shards(self, shard_ids, failed_shards=[]):
-    self._shard_watcher.watch(shard_ids).AndReturn(failed_shards)
+    self._shard_watcher.watch(shard_ids).AndReturn(set(failed_shards))
 
   def assert_update_result(self, expected_failed_shards, update_shards=None):
     update_shards = update_shards or self._initial_shards
-    shards_returned = self._updater.update(update_shards)
-    assert expected_failed_shards == shards_returned, (
+    health_check_interval_seconds = 3
+    shards_returned = self._updater.update(
+        update_shards, health_check_interval_seconds, self._shard_watcher)
+    assert set(expected_failed_shards) == shards_returned, (
         'Expected shards (%s) : Returned shards (%s)' % (expected_failed_shards, shards_returned))
 
   def replay_mocks(self):
@@ -135,12 +135,12 @@ class UpdaterTest(unittest.TestCase):
 
   def test_noop_update(self):
     """No config changes made in any tasks."""
-    def expect_noop_restart(shards):
+    def expect_noop_update(shards):
       self.expect_update(shards, dict([(s, UNCHANGED) for s in shards]))
-    expect_noop_restart([0, 1, 2])
-    expect_noop_restart([3, 4, 5])
-    expect_noop_restart([6, 7, 8])
-    expect_noop_restart([9])
+    expect_noop_update([0, 1, 2])
+    expect_noop_update([3, 4, 5])
+    expect_noop_update([6, 7, 8])
+    expect_noop_update([9])
     self.replay_mocks()
     self.assert_update_result([])
     self.verify_mocks()
@@ -242,12 +242,5 @@ class UpdaterTest(unittest.TestCase):
     """Test for out of range error for watch secs"""
     update_config = self.UPDATE_CONFIG.copy()
     update_config.update(watch_secs=0)
-    with pytest.raises(Updater.InvalidConfigError):
-      self.init_updater(update_config)
-
-  def test_invalid_healthy_threshold(self):
-    """Test for out of range error for healthy threshold"""
-    update_config = self.UPDATE_CONFIG.copy()
-    update_config.update(healthy_threshold = 0)
     with pytest.raises(Updater.InvalidConfigError):
       self.init_updater(update_config)

@@ -26,10 +26,10 @@ class HttpSignaler(object):
   @classmethod
   def maybe_setup_proxy(cls, cluster):
     if Location.is_corp() and not Cluster.get(cluster).force_notunnel:
+      log.info('Setting up SOCKS proxy for http health checks.')
       proxy_host, proxy_port = TunnelHelper.create_proxy()
       socks.setdefaultproxy(socks.PROXY_TYPE_SOCKS5, proxy_host, proxy_port)
-      module = sys.modules.get('urllib2', __import__('urllib2'))
-      socks.wrapmodule(module)
+      socks.wrapmodule(urllib_request)
 
   def __init__(self, port, host='localhost'):
     self._url_base = 'http://%s:%d/' % (host, port)
