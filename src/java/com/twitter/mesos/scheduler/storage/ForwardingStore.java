@@ -143,8 +143,8 @@ public class ForwardingStore implements
   }
 
   @Override
-  public void deleteTasks() {
-    taskStore.deleteTasks();
+  public void deleteAllTasks() {
+    taskStore.deleteAllTasks();
   }
 
   @Override

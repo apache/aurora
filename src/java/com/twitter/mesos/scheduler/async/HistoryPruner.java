@@ -24,13 +24,16 @@ import com.google.common.eventbus.Subscribe;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
 
+import com.twitter.common.base.Closure;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Clock;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
-import com.twitter.mesos.scheduler.StateManager;
+import com.twitter.mesos.scheduler.storage.Storage;
+import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
+import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -69,7 +72,7 @@ public class HistoryPruner implements EventSubscriber {
   private final long pruneThresholdMillis;
   private final int perJobHistoryGoal;
   private final Map<String, Future<?>> taskIdToFuture = Maps.newHashMap();
-  private final TaskDeleter taskDeleter;
+  private final Closure<Set<String>> taskDeleter;
   private final Supplier<Set<ScheduledTask>> inactiveTasksSupplier;
 
   @BindingAnnotation
@@ -78,8 +81,8 @@ public class HistoryPruner implements EventSubscriber {
 
   @Inject
   HistoryPruner(
-      ScheduledExecutorService executor,
-      final StateManager stateManager,
+      final ScheduledExecutorService executor,
+      final Storage storage,
       final Clock clock,
       @PruneThreshold Amount<Long, Time> inactivePruneThreshold,
       @PruneThreshold int perJobHistoryGoal) {
@@ -88,10 +91,24 @@ public class HistoryPruner implements EventSubscriber {
     this.clock = checkNotNull(clock);
     this.pruneThresholdMillis = inactivePruneThreshold.as(Time.MILLISECONDS);
     this.perJobHistoryGoal = checkNotNull(perJobHistoryGoal);
-    this.taskDeleter = new TaskDeleter(checkNotNull(stateManager), executor);
+    this.taskDeleter = new Closure<Set<String>>() {
+      @Override public void execute(final Set<String> taskIds) {
+        executor.submit(new Runnable() {
+          @Override public void run() {
+            LOG.info("Pruning inactive tasks " + taskIds);
+            storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+              @Override protected void execute(MutableStoreProvider storeProvider) {
+                storeProvider.getTaskStore().deleteTasks(taskIds);
+              }
+            });
+          }
+        });
+      }
+    };
+
     this.inactiveTasksSupplier = new Supplier<Set<ScheduledTask>>() {
       @Override public Set<ScheduledTask> get() {
-        return stateManager.fetchTasks(INACTIVE_QUERY);
+        return Storage.Util.fetchTasks(storage, INACTIVE_QUERY);
       }
     };
   }
@@ -188,14 +205,14 @@ public class HistoryPruner implements EventSubscriber {
     // Deferred to prevent triggering an event within an event handler.
     final Set<String> ids = pruneTaskIds.build();
     if (!ids.isEmpty()) {
-      taskDeleter.deleteLater(ids);
+      taskDeleter.execute(ids);
     }
   }
 
   private void pruneTask(String jobKey, String taskId) {
     try {
       LOG.info("Pruning expired inactive task " + taskId);
-      taskDeleter.deleteLater(ImmutableSet.of(taskId));
+      taskDeleter.execute(ImmutableSet.of(taskId));
     } finally {
       // Synchronize only on internal structures to guarantee that no external locks are
       // obtained while holding the intrinsic lock.
@@ -203,30 +220,6 @@ public class HistoryPruner implements EventSubscriber {
         tasksByJob.remove(jobKey, taskId);
         taskIdToFuture.remove(taskId);
       }
-    }
-  }
-
-  /**
-   * Wraps StateManager and schedules delayed task deletions. This helps prevent holding a lock
-   * when performing an operation that requires another lock. When neglected, this can cause
-   * a deadlock.
-   */
-  private static class TaskDeleter {
-    final ScheduledExecutorService executor;
-    final StateManager stateManager;
-
-    TaskDeleter(StateManager stateManager, ScheduledExecutorService executor) {
-      this.stateManager  = stateManager;
-      this.executor = executor;
-    }
-
-    void deleteLater(final Set<String> taskIds) {
-      executor.submit(new Runnable() {
-        @Override public void run() {
-          LOG.info("Pruning inactive tasks " + taskIds);
-          stateManager.deleteTasks(taskIds);
-        }
-      });
     }
   }
 }

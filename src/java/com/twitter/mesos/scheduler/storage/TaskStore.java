@@ -43,7 +43,7 @@ public interface TaskStore {
     /**
      * Removes all tasks from the store.
      */
-    void deleteTasks();
+    void deleteAllTasks();
 
     /**
      * Deletes specific tasks from the store.

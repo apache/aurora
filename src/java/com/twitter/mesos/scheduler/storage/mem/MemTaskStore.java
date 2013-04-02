@@ -151,7 +151,7 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
 
   @Timed("mem_storage_delete_all_tasks")
   @Override
-  public void deleteTasks() {
+  public void deleteAllTasks() {
     tasks.clear();
     tasksByJobKey.clear();
   }

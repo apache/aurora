@@ -115,7 +115,7 @@ public class MemTaskStoreTest {
   @Test
   public void testDeleteAll() {
     store.saveTasks(ImmutableSet.of(TASK_A, TASK_B, TASK_C, TASK_D));
-    store.deleteTasks();
+    store.deleteAllTasks();
     assertStoreContents();
   }
 

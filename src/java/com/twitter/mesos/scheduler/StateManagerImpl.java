@@ -671,32 +671,6 @@ public class StateManagerImpl implements StateManager {
         .toImmutableSet();
   }
 
-  /**
-   * Instructs the state manager to abandon records of the provided tasks.  This is essentially
-   * simulating an executor notifying the state manager of missing tasks.
-   * Tasks will be deleted in this process.
-   *
-   * @param taskIds IDs of tasks to abandon.
-   * @throws IllegalStateException If the manager is not in a state to service abandon requests.
-   */
-  void abandonTasks(final Set<String> taskIds) throws IllegalStateException {
-    checkNotBlank(taskIds);
-    managerState.checkState(State.STARTED);
-
-    txStorage.doInWriteTransaction(txStorage.new NoResultSideEffectWork() {
-      @Override protected void execute(MutableStoreProvider storeProvider) {
-        for (TaskStateMachine stateMachine : getStateMachines(taskIds).values()) {
-          stateMachine.updateState(ScheduleStatus.UNKNOWN, Optional.of("Dead executor."));
-        }
-
-        // Need to process the work queue first to ensure the tasks can be state changed prior
-        // to deletion.
-        processWorkQueueInTransaction(this, storeProvider);
-        deleteTasks(taskIds);
-      }
-    });
-  }
-
   private int changeStateInTransaction(
       Set<String> taskIds,
       Function<TaskStateMachine, Boolean> stateChange) {
@@ -863,7 +837,7 @@ public class StateManagerImpl implements StateManager {
             break;
 
           case DELETE:
-            deleteTasks(ImmutableSet.of(taskId));
+            taskStore.deleteTasks(ImmutableSet.of(taskId));
             break;
 
           case INCREMENT_FAILURES:
@@ -879,25 +853,6 @@ public class StateManagerImpl implements StateManager {
         }
       }
     }
-  }
-
-  /**
-   * Deletes records of tasks from the task store.
-   * This will not perform any state checking or state transitions, but will immediately remove
-   * the tasks from the store.  It will also silently ignore attempts to delete task IDs that do
-   * not exist.
-   *
-   * @param taskIds IDs of tasks to delete.
-   */
-  public void deleteTasks(final Set<String> taskIds) {
-    txStorage.doInWriteTransaction(txStorage.new NoResultSideEffectWork() {
-      @Override protected void execute(final MutableStoreProvider storeProvider) {
-        TaskStore.Mutable taskStore = storeProvider.getTaskStore();
-        Iterable<ScheduledTask> tasks = taskStore.fetchTasks(Query.byId(taskIds));
-        addTaskEvent(new PubsubEvent.TasksDeleted(ImmutableSet.copyOf(tasks)));
-        taskStore.deleteTasks(taskIds);
-      }
-    });
   }
 
   private void maybeRescheduleForUpdate(

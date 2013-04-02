@@ -29,6 +29,7 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.scheduler.events.PubsubEvent;
+import com.twitter.mesos.scheduler.events.PubsubEvent.TaskStateChange;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.StorageException;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
@@ -57,7 +58,6 @@ public class StateManagerImplTest extends EasyMockTest {
 
   private static final String HOST_A = "host_a";
   private static final Identity JIM = new Identity("jim", "jim-user");
-  private static final Identity JACK = new Identity("jack", "jack-user");
   private static final String MY_JOB = "myJob";
 
   private Driver driver;
@@ -149,40 +149,6 @@ public class StateManagerImplTest extends EasyMockTest {
     // easy verification of pubsub events.
     eventSink.execute(EasyMock.isA(PubsubEvent.class));
     expectLastCall().anyTimes();
-  }
-
-  @Test
-  public void testAbandonRunningTask() {
-    expectPubSubEvent();
-
-    control.replay();
-
-    Set<String> taskIds = insertTasks(
-        makeTask(JIM, MY_JOB, 0),
-        makeTask(JACK, "otherJob", 0));
-
-    String task1 = Iterables.get(taskIds, 0);
-    assignTask(task1, HOST_A);
-    changeState(task1, RUNNING);
-    stateManager.abandonTasks(ImmutableSet.of(task1));
-    assertTrue(stateManager.fetchTasks(Query.byId(task1)).isEmpty());
-  }
-
-  @Test
-  public void testAbandonFinishedTask() {
-    expectPubSubEvent();
-
-    control.replay();
-
-    Set<String> taskIds = insertTasks(
-        makeTask(JIM, MY_JOB, 0),
-        makeTask(JACK, "otherJob", 0));
-    String task1 = Iterables.get(taskIds, 0);
-    assignTask(task1, HOST_A);
-    changeState(task1, RUNNING);
-    changeState(task1, FINISHED);
-    stateManager.abandonTasks(ImmutableSet.of(task1));
-    assertTrue(stateManager.fetchTasks(Query.byId(task1)).isEmpty());
   }
 
   @Test
@@ -355,18 +321,17 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @Test
   public void testNestedEvents() {
-    // Trigger an event that triggers a side-effect and a PubSub event twice.
-    eventSink.execute(EasyMock.<PubsubEvent>anyObject());
+    // Trigger an event that produces a side-effect and a PubSub event .
+    eventSink.execute(EasyMock.isA(TaskStateChange.class));
     expectLastCall().andAnswer(new IAnswer<Void>() {
       @Override public Void answer() throws Throwable {
-        stateManager.deleteTasks(ImmutableSet.of("taskA"));
+        stateManager.changeState(Query.GET_ALL, ScheduleStatus.ASSIGNED);
         return null;
       }
-    }).times(2);
+    });
 
     // Final event sink execution that adds no side effect or event.
-    eventSink.execute(EasyMock.isA(PubsubEvent.class));
-    expectLastCall();
+    eventSink.execute(EasyMock.isA(TaskStateChange.class));
 
     control.replay();
 

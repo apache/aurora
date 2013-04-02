@@ -518,7 +518,7 @@ public class LogStorage extends ForwardingStore implements DistributedSnapshotSt
   }
 
   @Override
-  public void deleteTasks() {
+  public void deleteAllTasks() {
     doInWriteTransaction(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
         deleteTasks(storeProvider.getTaskStore().fetchTaskIds(Query.GET_ALL));

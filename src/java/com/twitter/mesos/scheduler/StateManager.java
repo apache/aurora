@@ -56,13 +56,4 @@ public interface StateManager {
       String slaveHost,
       SlaveID slaveId,
       Set<Integer> assignedPorts);
-
-  /**
-   * Deletes tasks with the given task IDs.
-   *
-   * @param taskIds IDs of tasks to delete.
-   * @deprecated Use storage directly instead.
-   */
-  @Deprecated
-  void deleteTasks(Set<String> taskIds);
 }

@@ -451,7 +451,7 @@ public class LogStorageTest extends EasyMockTest {
       }
 
       @Override protected void performMutations() {
-        logStorage.deleteTasks();
+        logStorage.deleteAllTasks();
       }
     };
   }

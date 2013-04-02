@@ -139,7 +139,7 @@ public class MemStorageTest extends TearDownTestCase {
 
     expectWriteFail(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getTaskStore().deleteTasks();
+        storeProvider.getTaskStore().deleteAllTasks();
         throw new CustomException();
       }
     });
