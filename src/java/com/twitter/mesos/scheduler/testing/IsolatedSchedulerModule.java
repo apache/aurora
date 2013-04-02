@@ -1,5 +1,9 @@
 package com.twitter.mesos.scheduler.testing;
 
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -14,13 +18,16 @@ import java.util.logging.Logger;
 import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
+import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
+import com.google.inject.PrivateBinder;
 import com.google.inject.Provider;
 import com.google.inject.Singleton;
 
@@ -42,7 +49,9 @@ import org.apache.mesos.SchedulerDriver;
 
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.application.modules.LifecycleModule;
+import com.twitter.common.base.Closures;
 import com.twitter.common.base.Command;
+import com.twitter.common.inject.Bindings;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
@@ -62,7 +71,11 @@ import com.twitter.mesos.scheduler.events.PubsubEvent.DriverRegistered;
 import com.twitter.mesos.scheduler.events.PubsubEvent.EventSubscriber;
 import com.twitter.mesos.scheduler.events.PubsubEvent.TaskStateChange;
 import com.twitter.mesos.scheduler.events.TaskEventModule;
+import com.twitter.mesos.scheduler.storage.CallOrderEnforcingStorage;
 import com.twitter.mesos.scheduler.storage.DistributedSnapshotStore;
+import com.twitter.mesos.scheduler.storage.Storage;
+import com.twitter.mesos.scheduler.storage.Storage.MutateWork.NoResult.Quiet;
+import com.twitter.mesos.scheduler.storage.Storage.NonVolatileStorage;
 import com.twitter.mesos.scheduler.storage.mem.MemStorageModule;
 import com.twitter.mesos.scheduler.testing.FakeDriverFactory.FakeSchedulerDriver;
 
@@ -75,7 +88,11 @@ public class IsolatedSchedulerModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    MemStorageModule.bind(binder());
+    install(CallOrderEnforcingStorage.wrappingModule(FakeNonVolatileStorage.class));
+    MemStorageModule.bind(
+        binder(),
+        Bindings.annotatedKeyFactory(FakeNonVolatileStorage.RealStorage.class),
+        Closures.<PrivateBinder>noop());
 
     bind(DriverFactory.class).to(FakeDriverFactory.class);
     bind(FakeDriverFactory.class).in(Singleton.class);
@@ -301,6 +318,42 @@ public class IsolatedSchedulerModule extends AbstractModule {
           .addAttributes(attribute(ConfigurationManager.RACK_CONSTRAINT, rack))
           .addAttributes(attribute(ConfigurationManager.HOST_CONSTRAINT, host))
           .build();
+    }
+  }
+
+  static class FakeNonVolatileStorage implements NonVolatileStorage {
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target({ ElementType.PARAMETER, ElementType.METHOD })
+    @BindingAnnotation
+    @interface RealStorage { }
+
+    private final Storage storage;
+
+    @Inject FakeNonVolatileStorage(@RealStorage Storage storage) {
+      this.storage = Preconditions.checkNotNull(storage);
+    }
+
+    @Override public void prepare() {
+      // No-op.
+    }
+
+    @Override public void start(Quiet initializationLogic) {
+      // No-op.
+    }
+
+    @Override public void stop() {
+    }
+
+    @Override public <T, E extends Exception> T doInTransaction(Work<T, E> work)
+        throws StorageException, E {
+
+      return storage.doInTransaction(work);
+    }
+
+    @Override public <T, E extends Exception> T doInWriteTransaction(MutateWork<T, E> work)
+        throws StorageException, E {
+
+      return storage.doInWriteTransaction(work);
     }
   }
 }

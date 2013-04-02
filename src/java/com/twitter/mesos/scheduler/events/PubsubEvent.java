@@ -225,7 +225,7 @@ public interface PubsubEvent {
      * and/or after their invocation.
      */
     @Target(METHOD) @Retention(RUNTIME)
-    public @interface Notify {
+    public @interface SendNotification {
       /**
        * Event to fire prior to invocation.
        */

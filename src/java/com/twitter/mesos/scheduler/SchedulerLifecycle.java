@@ -25,12 +25,19 @@ import com.twitter.common.args.CmdLine;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
+import com.twitter.common.util.Clock;
 import com.twitter.common.zookeeper.Group;
 import com.twitter.common.zookeeper.ServerSet;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.SingletonService.LeaderControl;
 import com.twitter.mesos.scheduler.events.PubsubEvent.DriverRegistered;
 import com.twitter.mesos.scheduler.events.PubsubEvent.EventSubscriber;
+import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
+import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
+import com.twitter.mesos.scheduler.storage.Storage.NonVolatileStorage;
+import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
+import com.twitter.mesos.scheduler.storage.Storage.Work;
+import com.twitter.mesos.scheduler.storage.StorageBackfill;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -81,7 +88,7 @@ class SchedulerLifecycle implements EventSubscriber {
   private static final Logger LOG = Logger.getLogger(SchedulerLifecycle.class.getName());
 
   private final DriverFactory driverFactory;
-  private final SchedulerCore scheduler;
+  private final NonVolatileStorage storage;
   private final Lifecycle lifecycle;
   private final CountDownLatch registeredLatch = new CountDownLatch(1);
   private final AtomicInteger registeredFlag = Stats.exportInt("framework_registered");
@@ -89,22 +96,25 @@ class SchedulerLifecycle implements EventSubscriber {
   private final Driver driver;
   private final DriverReference driverRef;
   private final boolean shutdownAfterRunning;
+  private final Clock clock;
 
   @Inject
   SchedulerLifecycle(
       DriverFactory driverFactory,
-      SchedulerCore scheduler,
+      NonVolatileStorage storage,
       Lifecycle lifecycle,
       Driver driver,
       DriverReference driverRef,
-      @ShutdownOnDriverExit boolean shutdownAfterRunning) {
+      @ShutdownOnDriverExit boolean shutdownAfterRunning,
+      Clock clock) {
 
     this.driverFactory = checkNotNull(driverFactory);
-    this.scheduler = checkNotNull(scheduler);
+    this.storage = checkNotNull(storage);
     this.lifecycle = checkNotNull(lifecycle);
     this.driver  = checkNotNull(driver);
     this.driverRef = checkNotNull(driverRef);
     this.shutdownAfterRunning = shutdownAfterRunning;
+    this.clock = checkNotNull(clock);
   }
 
   /**
@@ -115,8 +125,8 @@ class SchedulerLifecycle implements EventSubscriber {
    * @return A candidate that can be offered for leadership of a distributed election.
    */
   public SchedulerCandidate prepare() {
-    LOG.info("Preparing scheduler candidate");
-    scheduler.prepare();
+    LOG.info("Preparing storage");
+    storage.prepare();
     return new SchedulerCandidateImpl();
   }
 
@@ -145,7 +155,6 @@ class SchedulerLifecycle implements EventSubscriber {
    * Implementation of the scheduler candidate lifecycle.
    */
   private class SchedulerCandidateImpl implements SchedulerCandidate {
-
     @Override public void onLeading(LeaderControl control) {
       LOG.info("Elected as leading scheduler!");
       try {
@@ -174,11 +183,18 @@ class SchedulerLifecycle implements EventSubscriber {
     }
 
     private void lead() {
-      @Nullable final String frameworkId = scheduler.initialize();
+      storage.start(new MutateWork.NoResult.Quiet() {
+        @Override protected void execute(MutableStoreProvider storeProvider) {
+          StorageBackfill.backfill(storeProvider, clock);
+        }
+      });
+      @Nullable final String frameworkId = storage.doInTransaction(new Work.Quiet<String>() {
+        @Override public String apply(StoreProvider storeProvider) {
+          return storeProvider.getSchedulerStore().fetchFrameworkId();
+        }
+      });
 
       driverRef.set(driverFactory.apply(frameworkId));
-
-      scheduler.start();
 
       startDaemonThread("Driver-Runner", new Runnable() {
         @Override public void run() {
@@ -234,7 +250,7 @@ class SchedulerLifecycle implements EventSubscriber {
         }
 
         driver.stop(); // shut down incoming offers
-        scheduler.stop(); // shut down offer and slave update processing
+        storage.stop();
       } catch (ServerSet.UpdateException e) {
         LOG.log(Level.WARNING, "Failed to leave server set.", e);
       } finally {

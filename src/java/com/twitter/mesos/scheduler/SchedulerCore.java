@@ -3,8 +3,6 @@ package com.twitter.mesos.scheduler;
 import java.util.Map;
 import java.util.Set;
 
-import javax.annotation.Nullable;
-
 import com.google.common.base.Optional;
 
 import com.twitter.mesos.gen.AssignedTask;
@@ -24,38 +22,8 @@ import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
  * the job to all configured scheduler modules, which are responsible for triggering execution of
  * the job.  Until a job is triggered by a scheduler module, it is retained in the scheduler core
  * in the PENDING state.
- *
- * This interface imposes the following lifecycle:
- * <ol>
- * <li>[construct]
- * <li>{@link #prepare()}
- * <li>{@link #initialize()}
- * <li>{@link #start()}
- * <li>serve clients via other methods (normal usage)
- * <li>{@link #stop()}
- * </ol>
  */
 public interface SchedulerCore {
-
-  /**
-   * Prompts the scheduler to prepare for possible activation as the leading scheduler.  This
-   * method should not block.
-   */
-  void prepare();
-
-  /**
-   * Initializes the scheduler's storage system and returns the last framework ID assigned to this
-   * scheduler.
-   *
-   * @return The last assigned framework ID or {@code null} if none has been assigned yet.
-   */
-  @Nullable
-  String initialize();
-
-  /**
-   * Prepares the scheduler for serving traffic.
-   */
-  void start();
 
   /**
    * Creates a new job, whose tasks will become candidates for scheduling.
@@ -200,9 +168,4 @@ public interface SchedulerCore {
    * @param taskIds IDs of tasks that were deleted.
    */
   void tasksDeleted(Set<String> taskIds);
-
-  /**
-   * Should be called to allow the scheduler to gracefully shut down.
-   */
-  void stop();
 }

@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Ordering;
+import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 
@@ -45,6 +46,7 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.events.PubsubEvent.EventSubscriber;
+import com.twitter.mesos.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
@@ -193,8 +195,14 @@ public class CronJobManager extends JobManager implements EventSubscriber {
     }
   }
 
-  @Override
-  public void start() {
+  /**
+   * Notifies the cron job manager that storage is started, and job configurations are ready to
+   * load.
+   *
+   * @param storageStarted Event.
+   */
+  @Subscribe
+  public void storageStarted(StorageStarted storageStarted) {
     Iterable<JobConfiguration> crons =
         storage.doInTransaction(new Work.Quiet<Iterable<JobConfiguration>>() {
           @Override public Iterable<JobConfiguration> apply(Storage.StoreProvider storeProvider) {

@@ -134,21 +134,6 @@ public interface Storage {
   }
 
   /**
-   * Requests the underlying storage prepare its data set; ie: initialize schemas, begin syncing out
-   * of date data, etc.  This method should not block.
-   */
-  void prepare();
-
-  /**
-   * Prepares the underlying storage for serving traffic.
-   *
-   * @param initializationLogic work to perform after this storage system is ready but before
-   *     allowing general use of
-   *     {@link #doInTransaction(com.twitter.mesos.scheduler.storage.Storage.Work)}.
-   */
-  void start(MutateWork.NoResult.Quiet initializationLogic);
-
-  /**
    * Executes the unit of {@code work} in a read-only transaction.
    *
    * <p>TODO(John Sirois): Audit usages and handle StorageException appropriately.
@@ -178,9 +163,32 @@ public interface Storage {
       throws StorageException, E;
 
   /**
-   * Prepares the underlying storage system for clean shutdown.
+   * A non-volatile storage that has additional methods to control its lifecycle.
    */
-  void stop();
+  interface NonVolatileStorage extends Storage {
+    /**
+     * Requests the underlying storage prepare its data set; ie: initialize schemas, begin syncing
+     * out of date data, etc.  This method should not block.
+     *
+     * @throws StorageException if there was a problem preparing storage.
+     */
+    void prepare() throws StorageException;
+
+    /**
+     * Prepares the underlying storage for serving traffic.
+     *
+     * @param initializationLogic work to perform after this storage system is ready but before
+     *     allowing general use of
+     *     {@link #doInTransaction(com.twitter.mesos.scheduler.storage.Storage.Work)}.
+     * @throws StorageException if there was a starting storage.
+     */
+    void start(MutateWork.NoResult.Quiet initializationLogic) throws StorageException;
+
+    /**
+     * Prepares the underlying storage system for clean shutdown.
+     */
+    void stop();
+  }
 
   /**
    * Utility functions for interacting with a Storage instance.

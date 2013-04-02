@@ -69,16 +69,6 @@ public class ForwardingStore implements
   }
 
   @Override
-  public void prepare() {
-    storage.prepare();
-  }
-
-  @Override
-  public void start(MutateWork.NoResult.Quiet initializationLogic) {
-    storage.start(initializationLogic);
-  }
-
-  @Override
   public <T, E extends Exception> T doInTransaction(Work<T, E> work) throws StorageException, E {
     return storage.doInTransaction(work);
   }
@@ -88,11 +78,6 @@ public class ForwardingStore implements
       throws StorageException, E {
 
     return storage.doInWriteTransaction(work);
-  }
-
-  @Override
-  public void stop() {
-    storage.stop();
   }
 
   @Override

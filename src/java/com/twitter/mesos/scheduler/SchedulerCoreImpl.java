@@ -6,14 +6,12 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.common.base.Optional;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
 
-import com.twitter.common.util.StateMachine;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
@@ -27,8 +25,6 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.scheduler.StateManagerImpl.UpdateException;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
-import com.twitter.mesos.scheduler.events.PubsubEvent.Interceptors.Event;
-import com.twitter.mesos.scheduler.events.PubsubEvent.Interceptors.Notify;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 import com.twitter.mesos.scheduler.quota.Quotas;
 import com.twitter.mesos.scheduler.storage.Storage;
@@ -44,11 +40,6 @@ import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
 import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.ROLLBACK;
 import static com.twitter.mesos.gen.ScheduleStatus.UPDATING;
-import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.CONSTRUCTED;
-import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.INITIALIZED;
-import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.STANDING_BY;
-import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.STARTED;
-import static com.twitter.mesos.scheduler.SchedulerCoreImpl.State.STOPPED;
 
 /**
  * Implementation of the scheduler core.
@@ -76,19 +67,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
   private final QuotaManager quotaManager;
 
   /**
-   * Scheduler states.
-   */
-  enum State {
-    CONSTRUCTED,
-    STANDING_BY,
-    INITIALIZED,
-    STARTED,
-    STOPPED
-  }
-
-  private final StateMachine<State> stateMachine;
-
-  /**
    * Creates a new core scheduler.
    *
    * @param storage Backing store implementation.
@@ -113,46 +91,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
     this.cronScheduler = cronScheduler;
     this.stateManager = checkNotNull(stateManager);
     this.quotaManager = checkNotNull(quotaManager);
-
-   // TODO(John Sirois): Add a method to StateMachine or write a wrapper that allows for a
-   // read-locked do-in-state assertion around a block of work.  Transition would then need to grab
-   // the write lock.  Another approach is to force these transitions with:
-   // SchedulerCoreFactory -> SchedulerCoreRunner -> SchedulerCore which remove all state sensitive
-   // methods out of schedulerCore save for stop.
-   stateMachine = StateMachine.<State>builder("scheduler-core")
-       .initialState(CONSTRUCTED)
-       .addState(CONSTRUCTED, STANDING_BY)
-       .addState(STANDING_BY, INITIALIZED)
-       .addState(INITIALIZED, STARTED)
-       .addState(STARTED, STOPPED)
-       .build();
-  }
-
-  @Override
-  public synchronized void prepare() {
-    checkLifecycleState(CONSTRUCTED);
-    stateManager.prepare();
-    stateMachine.transition(STANDING_BY);
-  }
-
-  @Override
-  public synchronized String initialize() {
-    checkLifecycleState(STANDING_BY);
-    String storedFrameworkId = stateManager.initialize();
-    stateMachine.transition(INITIALIZED);
-    return storedFrameworkId;
-  }
-
-  @Notify(after = Event.StorageStarted)
-  @Override
-  public synchronized void start() {
-    checkLifecycleState(INITIALIZED);
-    stateManager.start();
-    stateMachine.transition(STARTED);
-
-    for (JobManager jobManager : jobManagers) {
-      jobManager.start();
-    }
   }
 
   private boolean hasActiveJob(JobConfiguration job) {
@@ -167,7 +105,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
   @Override
   public synchronized void createJob(ParsedConfiguration parsedConfiguration)
       throws ScheduleException, ConfigurationManager.TaskDescriptionException {
-    checkStarted();
 
     JobConfiguration job = parsedConfiguration.get();
     if (hasActiveJob(job)) {
@@ -196,7 +133,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
   public synchronized void startCronJob(String role, String job) throws ScheduleException {
     checkNotBlank(role);
     checkNotBlank(job);
-    checkStarted();
 
     if (!cronScheduler.hasJob(role, job)) {
       throw new ScheduleException("Cron job does not exist for " + Tasks.jobKey(role, job));
@@ -209,8 +145,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
   public synchronized void runJob(JobConfiguration job) {
     checkNotNull(job);
     checkNotNull(job.getTaskConfigs());
-    checkStarted();
-
     launchTasks(job.getTaskConfigs());
   }
 
@@ -244,9 +178,11 @@ public class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public synchronized void setTaskStatus(TaskQuery query, final ScheduleStatus status,
+  public synchronized void setTaskStatus(
+      TaskQuery query,
+      final ScheduleStatus status,
       Optional<String> message) {
-    checkStarted();
+
     checkNotNull(query);
     checkNotNull(status);
 
@@ -261,7 +197,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
   @Override
   public synchronized void killTasks(TaskQuery query, String user) throws ScheduleException {
-    checkStarted();
     checkNotNull(query);
     LOG.info("Killing tasks matching " + query);
 
@@ -315,7 +250,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
       throw new ScheduleException("At least one shard must be specified.");
     }
 
-    checkStarted();
     final TaskQuery query = Query.activeQuery(role, jobName).setShardIds(shards);
     storage.doInWriteTransaction(new MutateWork.NoResult<ScheduleException>() {
       @Override protected void execute(MutableStoreProvider storeProvider)
@@ -343,7 +277,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
   @Override
   public synchronized Optional<String> initiateJobUpdate(ParsedConfiguration parsedConfiguration)
       throws ScheduleException {
-    checkStarted();
 
     final JobConfiguration job = parsedConfiguration.get();
     if (cronScheduler.hasJob(job.getOwner().getRole(), job.getName())) {
@@ -419,7 +352,6 @@ public class SchedulerCoreImpl implements SchedulerCore {
       String jobName,
       Optional<String> updateToken,
       UpdateResult result) throws ScheduleException {
-    checkStarted();
 
     try {
       stateManager.finishUpdate(identity, jobName, updateToken, result, true);
@@ -437,20 +369,5 @@ public class SchedulerCoreImpl implements SchedulerCore {
 
     stateManager.changeState(Query.byId(task.getTaskId()), ScheduleStatus.PREEMPTING,
         Optional.of("Preempting in favor of " + preemptingTask.getTaskId()));
-  }
-
-  @Override
-  public synchronized void stop() {
-    checkStarted();
-    stateManager.stop();
-    stateMachine.transition(STOPPED);
-  }
-
-  private void checkStarted() {
-    checkLifecycleState(STARTED);
-  }
-
-  private void checkLifecycleState(State state) {
-    Preconditions.checkState(stateMachine.getState() == state);
   }
 }

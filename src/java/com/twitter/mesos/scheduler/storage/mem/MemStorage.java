@@ -1,7 +1,6 @@
 package com.twitter.mesos.scheduler.storage.mem;
 
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
@@ -16,7 +15,6 @@ import com.twitter.mesos.scheduler.storage.LockManager;
 import com.twitter.mesos.scheduler.storage.QuotaStore;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
 import com.twitter.mesos.scheduler.storage.Storage;
-import com.twitter.mesos.scheduler.storage.Storage.MutateWork.NoResult.Quiet;
 import com.twitter.mesos.scheduler.storage.TaskStore;
 import com.twitter.mesos.scheduler.storage.Transactional;
 import com.twitter.mesos.scheduler.storage.UpdateStore;
@@ -27,8 +25,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * A storage implementation comprised of individual in-memory store implementations.
  */
 public class MemStorage implements Storage {
-  private static final Logger LOG = Logger.getLogger(MemStorage.class.getName());
-
   private final AtomicLong readLockWaitNanos = Stats.exportLong("read_lock_wait_nanos");
   private final AtomicLong writeLockWaitNanos = Stats.exportLong("write_lock_wait_nanos");
 
@@ -92,19 +88,6 @@ public class MemStorage implements Storage {
         new AttributeStoreImpl());
   }
 
-  @Override
-  public void prepare() {
-    // No-op.
-  }
-
-  @Override
-  public void start(final Quiet initializationLogic) {
-    checkNotNull(initializationLogic);
-
-    doInWriteTransaction(initializationLogic);
-    LOG.info("Applied initialization logic.");
-  }
-
   @Timed("mem_storage_read_transaction")
   @Override
   public <T, E extends Exception> T doInTransaction(Work<T, E> work) throws StorageException, E {
@@ -160,10 +143,5 @@ public class MemStorage implements Storage {
       }
       lockManager.writeUnlock();
     }
-  }
-
-  @Override
-  public void stop() {
-    // No-op.
   }
 }

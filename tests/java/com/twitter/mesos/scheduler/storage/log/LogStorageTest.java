@@ -133,7 +133,7 @@ public class LogStorageTest extends EasyMockTest {
     };
 
     final Capture<MutateWork.NoResult.Quiet> recoverAndInitializeWork = createCapture();
-    storageUtil.storage.start(capture(recoverAndInitializeWork));
+    storageUtil.storage.doInWriteTransaction(capture(recoverAndInitializeWork));
     expectLastCall().andAnswer(new IAnswer<Void>() {
       @Override public Void answer() throws Throwable {
         recoverAndInitializeWork.getValue().apply(storageUtil.mutableStoreProvider);
@@ -223,7 +223,7 @@ public class LogStorageTest extends EasyMockTest {
       MutateWork.NoResult.Quiet initializationLogic = MutateWork.NOOP;
 
       final Capture<MutateWork.NoResult.Quiet> recoverAndInitializeWork = createCapture();
-      storageUtil.storage.start(capture(recoverAndInitializeWork));
+      storageUtil.storage.doInWriteTransaction(capture(recoverAndInitializeWork));
       expectLastCall().andAnswer(new IAnswer<Void>() {
         @Override public Void answer() throws Throwable {
           recoverAndInitializeWork.getValue().apply(storageUtil.mutableStoreProvider);

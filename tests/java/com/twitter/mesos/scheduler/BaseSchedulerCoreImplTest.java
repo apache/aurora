@@ -61,6 +61,7 @@ import com.twitter.mesos.scheduler.quota.Quotas;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
+import com.twitter.mesos.scheduler.storage.StorageBackfill;
 
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
@@ -146,6 +147,12 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   private void buildScheduler(Storage newStorage) throws Exception {
     this.storage = newStorage;
+    storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider storeProvider) {
+        StorageBackfill.backfill(storeProvider, clock);
+      }
+    });
+
     ImmediateJobManager immediateManager = new ImmediateJobManager(storage);
     cron = new CronJobManager(storage, cronScheduler);
     stateManager = new StateManagerImpl(storage, clock, driver, eventSink);
@@ -159,9 +166,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     cron.schedulerCore = scheduler;
     immediateManager.schedulerCore = scheduler;
-    scheduler.prepare();
-    scheduler.initialize();
-    scheduler.start();
 
     // Apply a default quota for users so we don't have to give quota for every test.
     quotaManager.setQuota(OWNER_A.getRole(), scale(DEFAULT_TASK_QUOTA, DEFAULT_TASKS_IN_QUOTA));
@@ -253,7 +257,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
 
     storage = createStorage();
-    storage.start(MutateWork.NOOP);
 
     final TwitterTaskInfo storedTask = new TwitterTaskInfo()
         .setOwner(OWNER_A)
@@ -332,7 +335,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
 
     storage = createStorage();
-    storage.start(MutateWork.NOOP);
 
     final AtomicInteger taskId = new AtomicInteger();
 

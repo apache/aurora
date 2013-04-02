@@ -10,11 +10,12 @@ import org.aopalliance.intercept.MethodInvocation;
 
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.scheduler.events.PubsubEvent.Interceptors.Event;
-import com.twitter.mesos.scheduler.events.PubsubEvent.Interceptors.Notify;
+import com.twitter.mesos.scheduler.events.PubsubEvent.Interceptors.SendNotification;
 
 /**
  * A method interceptor that sends pubsub notifications before and/or after a method annotated
- * with {@link Notify} is invoked.
+ * with {@link SendNotification}
+ * is invoked.
  */
 class NotifyingMethodInterceptor implements MethodInterceptor {
   private static final Logger LOG = Logger.getLogger(NotifyingMethodInterceptor.class.getName());
@@ -34,15 +35,16 @@ class NotifyingMethodInterceptor implements MethodInterceptor {
   @Override
   public Object invoke(MethodInvocation invocation) throws Throwable {
     Method method = invocation.getMethod();
-    Notify notify = method.getAnnotation(Notify.class);
-    if (notify == null) {
-      LOG.warning("Interceptor should not match methods without @Notify");
+    SendNotification sendNotification = method.getAnnotation(SendNotification.class);
+    if (sendNotification == null) {
+      LOG.warning("Interceptor should not match methods without @"
+          + SendNotification.class.getSimpleName());
       return invocation.proceed();
     }
 
-    maybeFire(notify.before());
+    maybeFire(sendNotification.before());
     Object result = invocation.proceed();
-    maybeFire(notify.after());
+    maybeFire(sendNotification.after());
     return result;
   }
 }

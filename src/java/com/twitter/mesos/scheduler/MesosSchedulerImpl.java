@@ -28,7 +28,7 @@ import com.twitter.mesos.GuiceUtils.AllowUnchecked;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.comm.SchedulerMessage;
 import com.twitter.mesos.scheduler.events.PubsubEvent.Interceptors.Event;
-import com.twitter.mesos.scheduler.events.PubsubEvent.Interceptors.Notify;
+import com.twitter.mesos.scheduler.events.PubsubEvent.Interceptors.SendNotification;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
@@ -82,7 +82,7 @@ public class MesosSchedulerImpl implements Scheduler {
     LOG.info("Received notification of lost slave: " + slaveId);
   }
 
-  @Notify(after = Event.DriverRegistered)
+  @SendNotification(after = Event.DriverRegistered)
   @Override
   public void registered(
       SchedulerDriver driver,

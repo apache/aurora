@@ -20,11 +20,11 @@ import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Clock;
 import com.twitter.mesos.scheduler.log.Log;
+import com.twitter.mesos.scheduler.storage.CallOrderEnforcingStorage;
 import com.twitter.mesos.scheduler.storage.DistributedSnapshotStore;
 import com.twitter.mesos.scheduler.storage.JobStore;
 import com.twitter.mesos.scheduler.storage.QuotaStore;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
-import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.TaskStore;
 import com.twitter.mesos.scheduler.storage.UpdateStore;
 import com.twitter.mesos.scheduler.storage.log.LogManager.MaxEntrySize;
@@ -49,7 +49,7 @@ import com.twitter.mesos.scheduler.storage.mem.MemUpdateStore;
  * <p/>
  * Exposes bindings for storage components:
  * <ul>
- *   <li>{@link Storage}</li>
+ *   <li>{@link com.twitter.mesos.scheduler.storage.Storage}</li>
  *   <li>Keyed by {@link LogStorage.WriteBehind}
  *     <ul>
  *       <li>{@link SchedulerStore}</li>
@@ -138,8 +138,8 @@ public class LogStorageModule extends AbstractModule {
         .toInstance(MAX_LOG_ENTRY_SIZE.get());
     bind(LogManager.class).in(Singleton.class);
 
-    bind(Storage.class).to(LogStorage.class);
     bind(LogStorage.class).in(Singleton.class);
+    install(CallOrderEnforcingStorage.wrappingModule(LogStorage.class));
     bind(DistributedSnapshotStore.class).to(LogStorage.class);
   }
 

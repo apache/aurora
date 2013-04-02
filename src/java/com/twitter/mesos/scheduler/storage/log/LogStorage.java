@@ -61,6 +61,7 @@ import com.twitter.mesos.scheduler.storage.QuotaStore;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
 import com.twitter.mesos.scheduler.storage.SnapshotStore;
 import com.twitter.mesos.scheduler.storage.Storage;
+import com.twitter.mesos.scheduler.storage.Storage.NonVolatileStorage;
 import com.twitter.mesos.scheduler.storage.TaskStore;
 import com.twitter.mesos.scheduler.storage.UpdateStore;
 import com.twitter.mesos.scheduler.storage.log.LogManager.StreamManager;
@@ -104,7 +105,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * <p>If the op fails to apply to local storage we will never write the op to the log and if the op
  * fails to apply to the log, it'll throw and abort the local storage transaction as well.
  */
-public class LogStorage extends ForwardingStore implements DistributedSnapshotStore {
+public class LogStorage extends ForwardingStore
+    implements NonVolatileStorage, DistributedSnapshotStore {
 
   /**
    * A service that can schedule an action to be executed periodically.
@@ -268,7 +270,7 @@ public class LogStorage extends ForwardingStore implements DistributedSnapshotSt
 
   @Override
   public synchronized void start(final MutateWork.NoResult.Quiet initializationLogic) {
-    super.start(new MutateWork.NoResult.Quiet() {
+    doInWriteTransaction(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider unused) {
         // Must have the underlying storage started so we can query it for the last checkpoint.
         // We replay these entries in the forwarded storage system's transactions but not ours - we
@@ -283,6 +285,11 @@ public class LogStorage extends ForwardingStore implements DistributedSnapshotSt
     });
 
     scheduleSnapshots();
+  }
+
+  @Override
+  public void stop() {
+    // No-op.
   }
 
   @Timed("scheduler_log_recover")

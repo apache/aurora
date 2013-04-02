@@ -32,6 +32,7 @@ import com.twitter.mesos.scheduler.ScheduleException;
 import com.twitter.mesos.scheduler.SchedulerCore;
 import com.twitter.mesos.scheduler.SchedulingFilter;
 import com.twitter.mesos.scheduler.storage.Storage;
+import com.twitter.mesos.scheduler.storage.Storage.StorageException;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -131,7 +132,14 @@ class Preempter implements Runnable {
   @Override
   public void run() {
     // We are only interested in preempting in favor of pending tasks.
-    List<AssignedTask> pendingTasks = fetch(PENDING_QUERY, isIdleTask);
+    List<AssignedTask> pendingTasks;
+    try {
+      pendingTasks = fetch(PENDING_QUERY, isIdleTask);
+    } catch (StorageException e) {
+      LOG.fine("Failed to fetch PENDING tasks, storage is likely not yet ready.");
+      return;
+    }
+
     if (pendingTasks.isEmpty()) {
       return;
     }

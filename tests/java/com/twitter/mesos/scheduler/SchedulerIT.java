@@ -164,9 +164,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
   }
 
   private void startScheduler() throws Exception {
-    final ExceptionalCommand<?> startup =
-        injector.getInstance(Key.get(ExceptionalCommand.class, StartupStage.class));
-    startup.execute();
+    injector.getInstance(Key.get(ExceptionalCommand.class, StartupStage.class)).execute();
 
     // Mimic AppLauncher running main.
     final SchedulerMain main = injector.getInstance(SchedulerMain.class);

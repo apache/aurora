@@ -7,7 +7,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.testing.TearDown;
 
 import org.apache.mesos.Protos.SlaveID;
 import org.easymock.EasyMock;
@@ -93,14 +92,6 @@ public class StateManagerImplTest extends EasyMockTest {
   private StateManagerImpl createStateManager(final Storage wrappedStorage) {
     resetStats();
     this.storage = new Storage() {
-      @Override public void prepare() {
-        wrappedStorage.prepare();
-      }
-
-      @Override public void start(MutateWork.NoResult.Quiet initializationLogic) {
-        wrappedStorage.start(initializationLogic);
-      }
-
       @Override public <T, E extends Exception> T doInTransaction(final Work<T, E> work)
           throws StorageException, E {
 
@@ -127,21 +118,9 @@ public class StateManagerImplTest extends EasyMockTest {
           }
         });
       }
-
-      @Override public void stop() {
-        wrappedStorage.stop();
-      }
     };
 
-    final StateManagerImpl manager = new StateManagerImpl(storage, clock, driver, eventSink);
-    manager.initialize();
-    manager.start();
-    addTearDown(new TearDown() {
-      @Override public void tearDown() {
-        manager.stop();
-      }
-    });
-    return manager;
+    return new StateManagerImpl(storage, clock, driver, eventSink);
   }
 
   private void expectPubSubEvent() {

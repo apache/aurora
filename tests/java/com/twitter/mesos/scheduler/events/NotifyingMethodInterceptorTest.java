@@ -13,7 +13,7 @@ import com.twitter.common.base.Closure;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.scheduler.events.PubsubEvent.DriverRegistered;
 import com.twitter.mesos.scheduler.events.PubsubEvent.Interceptors.Event;
-import com.twitter.mesos.scheduler.events.PubsubEvent.Interceptors.Notify;
+import com.twitter.mesos.scheduler.events.PubsubEvent.Interceptors.SendNotification;
 import com.twitter.mesos.scheduler.events.PubsubEvent.StorageStarted;
 
 import static org.junit.Assert.assertEquals;
@@ -40,7 +40,10 @@ public class NotifyingMethodInterceptorTest extends EasyMockTest {
     Injector injector = Guice.createInjector(new AbstractModule() {
       @Override protected void configure() {
         bind(Math.class).in(Singleton.class);
-        bindInterceptor(Matchers.any(), Matchers.annotatedWith(Notify.class), interceptor);
+        bindInterceptor(
+            Matchers.any(),
+            Matchers.annotatedWith(SendNotification.class),
+            interceptor);
       }
     });
 
@@ -52,17 +55,17 @@ public class NotifyingMethodInterceptorTest extends EasyMockTest {
   }
 
   static class Math {
-    @Notify(before = Event.DriverRegistered, after = Event.StorageStarted)
+    @SendNotification(before = Event.DriverRegistered, after = Event.StorageStarted)
     int add(int a, int b) {
       return a + b;
     }
 
-    @Notify(after = Event.DriverRegistered)
+    @SendNotification(after = Event.DriverRegistered)
     int subtract(int a, int b) {
       return a - b;
     }
 
-    @Notify
+    @SendNotification
     int multiply(int a, int b) {
       return a * b;
     }

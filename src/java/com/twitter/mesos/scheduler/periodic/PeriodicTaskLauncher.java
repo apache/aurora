@@ -16,7 +16,6 @@ import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
-import com.twitter.mesos.scheduler.StateManagerImpl;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -42,7 +41,6 @@ public class PeriodicTaskLauncher implements Command, Runnable {
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
   public @interface PeriodicTaskInterval { }
 
-  private final StateManagerImpl stateManager;
   private final ShutdownRegistry shutdownRegistry;
   private final Preempter preeempter;
   private final ScheduledExecutorService executor;
@@ -50,12 +48,10 @@ public class PeriodicTaskLauncher implements Command, Runnable {
 
   @Inject
   PeriodicTaskLauncher(
-      StateManagerImpl stateManager,
       ShutdownRegistry shutdownRegistry,
       Preempter preeempter,
       @PeriodicTaskInterval Amount<Long, Time> taskInterval) {
 
-    this.stateManager = checkNotNull(stateManager);
     this.shutdownRegistry = checkNotNull(shutdownRegistry);
     this.preeempter = checkNotNull(preeempter);
     this.taskInterval = checkNotNull(taskInterval);
@@ -84,11 +80,7 @@ public class PeriodicTaskLauncher implements Command, Runnable {
   @Override
   public void run() {
     try {
-      if (stateManager.isStarted()) {
-        preeempter.run();
-      } else {
-        LOG.fine("Skipping periodic task run since state manager is not started.");
-      }
+      preeempter.run();
     } catch (RuntimeException e) {
       LOG.log(Level.WARNING, "Periodic task failed.", e);
     }

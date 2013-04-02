@@ -21,7 +21,7 @@ import com.twitter.common.base.Command;
 import com.twitter.mesos.scheduler.SchedulingFilter;
 import com.twitter.mesos.scheduler.events.NotifyingSchedulingFilter.NotifyDelegate;
 import com.twitter.mesos.scheduler.events.PubsubEvent.EventSubscriber;
-import com.twitter.mesos.scheduler.events.PubsubEvent.Interceptors.Notify;
+import com.twitter.mesos.scheduler.events.PubsubEvent.Interceptors.SendNotification;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -58,7 +58,7 @@ public final class TaskEventModule extends AbstractModule {
     // Ensure at least an empty binding is present.
     getSubscriberBinder(binder());
     LifecycleModule.bindStartupAction(binder(), RegisterSubscribers.class);
-    bindInterceptor(Matchers.any(), Matchers.annotatedWith(Notify.class),
+    bindInterceptor(Matchers.any(), Matchers.annotatedWith(SendNotification.class),
         new NotifyingMethodInterceptor(eventPoster));
   }
 

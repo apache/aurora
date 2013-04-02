@@ -8,12 +8,10 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 import com.twitter.common.base.Closure;
-import com.twitter.common.util.Clock;
 import com.twitter.mesos.scheduler.events.PubsubEvent;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
-import com.twitter.mesos.scheduler.storage.StorageBackfill;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -29,7 +27,6 @@ class TransactionalStorage {
   private final Storage storage;
   private final TransactionFinalizer transactionFinalizer;
   private final Closure<PubsubEvent> taskEventSink;
-  private final Clock clock;
 
   interface TransactionFinalizer {
     /**
@@ -50,24 +47,11 @@ class TransactionalStorage {
   TransactionalStorage(
       Storage storage,
       TransactionFinalizer transactionFinalizer,
-      Closure<PubsubEvent> taskEventSink,
-      Clock clock) {
+      Closure<PubsubEvent> taskEventSink) {
 
     this.storage = checkNotNull(storage);
     this.transactionFinalizer = checkNotNull(transactionFinalizer);
     this.taskEventSink = checkNotNull(taskEventSink);
-    this.clock = checkNotNull(clock);
-  }
-
-  /**
-   * Backfills storage structs, ideally this is performed before other storage queries.
-   */
-  void backfill() {
-    storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider storeProvider) {
-        StorageBackfill.backfill(storeProvider, clock);
-      }
-    });
   }
 
   /**
@@ -117,36 +101,6 @@ class TransactionalStorage {
     }
 
     abstract void execute(MutableStoreProvider storeProvider);
-  }
-
-  /**
-   * Starts the storage and executes a transaction.
-   *
-   * @param work Work to execute.
-   */
-  void start(final SideEffectWork<Void, RuntimeException> work) {
-    Preconditions.checkState(!inTransaction.get());
-    storage.start(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider storeProvider) {
-        executeSideEffectsAfter(work).apply(storeProvider);
-      }
-    });
-  }
-
-  /**
-   * Prepares the storage.
-   */
-  void prepare() {
-    Preconditions.checkState(!inTransaction.get());
-    storage.prepare();
-  }
-
-  /**
-   * Stops the storage.
-   */
-  void stop() {
-    Preconditions.checkState(!inTransaction.get());
-    storage.stop();
   }
 
   private <T, E extends Exception> MutateWork<T, E> executeSideEffectsAfter(

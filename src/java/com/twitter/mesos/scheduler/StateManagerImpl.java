@@ -33,7 +33,6 @@ import org.apache.mesos.Protos.SlaveID;
 import com.twitter.common.base.Closure;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.Clock;
-import com.twitter.common.util.StateMachine;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
@@ -88,15 +87,6 @@ public class StateManagerImpl implements StateManager {
     <T, E extends Exception> T doInTransaction(Work<T, E> work) throws StorageException, E;
   }
   private final ReadOnlyStorage readOnlyStorage;
-
-  // TODO(William Farner): Push lifecycle management into storage.
-  // Enforces lifecycle of the manager, ensuring proper call order.
-  private final StateMachine<State> managerState = StateMachine.<State>builder("state_manager")
-      .initialState(State.CREATED)
-      .addState(State.CREATED, State.INITIALIZED)
-      .addState(State.INITIALIZED, State.STARTED)
-      .addState(State.STARTED, State.STOPPED)
-      .build();
 
   // Work queue to receive state machine side effect work.
   // Items are sorted to place DELETE entries last.  This is to ensure that within a transaction,
@@ -163,7 +153,7 @@ public class StateManagerImpl implements StateManager {
       }
     };
 
-    txStorage = new TransactionalStorage(storage, finalizer, taskEventSink, clock);
+    txStorage = new TransactionalStorage(storage, finalizer, taskEventSink);
     readOnlyStorage = new ReadOnlyStorage() {
       @Override public <T, E extends Exception> T doInTransaction(Work<T, E> work)
           throws StorageException, E {
@@ -174,83 +164,6 @@ public class StateManagerImpl implements StateManager {
     this.driver = checkNotNull(driver);
 
     Stats.exportSize("work_queue_depth", workQueue);
-  }
-
-  /**
-   * State manager lifecycle state.
-   */
-  private enum State {
-    CREATED,
-    INITIALIZED,
-    STARTED,
-    STOPPED
-  }
-
-  /**
-   * Prompts the state manager to prepare for possible activation in the leading scheduler process.
-   */
-  void prepare() {
-    txStorage.prepare();
-  }
-
-  /**
-   * Initializes the state manager, by starting the storage and fetching the persisted framework ID.
-   *
-   * @return The persisted framework ID, or {@code null} if no framework ID exists in the store.
-   */
-  @Nullable
-  String initialize() {
-    managerState.transition(State.INITIALIZED);
-
-    // Note: Do not attempt to mutate tasks here.  Any task mutations made here will be
-    // overwritten if a snapshot is applied.
-
-    txStorage.start(txStorage.new NoResultSideEffectWork() {
-      @Override public void execute(final MutableStoreProvider storeProvider) {
-        for (ScheduledTask task : storeProvider.getTaskStore().fetchTasks(Query.GET_ALL)) {
-          createStateMachine(task, task.getStatus());
-        }
-      }
-    });
-
-    LOG.info("Storage initialization complete.");
-    return getFrameworkId();
-  }
-
-  private String getFrameworkId() {
-    managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
-
-    return readOnlyStorage.doInTransaction(new Work.Quiet<String>() {
-      @Override public String apply(StoreProvider storeProvider) {
-        return storeProvider.getSchedulerStore().fetchFrameworkId();
-      }
-    });
-  }
-
-  /**
-   * Instructs the state manager to start.
-   */
-  void start() {
-    managerState.transition(State.STARTED);
-    txStorage.backfill();
-  }
-
-  /**
-   * Checks whether the state manager is currently in the STARTED state.
-   *
-   * @return {@code true} if in the STARTED state, {@code false} otherwise.
-   */
-  public boolean isStarted() {
-    return managerState.getState() == State.STARTED;
-  }
-
-  /**
-   * Instructs the state manager to stop, and shut down the backing storage.
-   */
-  void stop() {
-    managerState.transition(State.STOPPED);
-
-    txStorage.stop();
   }
 
   /**
@@ -499,7 +412,6 @@ public class StateManagerImpl implements StateManager {
   @Override
   public Set<ScheduledTask> fetchTasks(final TaskQuery query) {
     checkNotNull(query);
-    managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
 
     return readOnlyStorage.doInTransaction(new Work.Quiet<Set<ScheduledTask>>() {
       @Override public Set<ScheduledTask> apply(StoreProvider storeProvider) {
@@ -547,7 +459,6 @@ public class StateManagerImpl implements StateManager {
       auditMessage = "Rolled back by " + identity.getUser();
     }
 
-    managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
     return txStorage.doInWriteTransaction(
         txStorage.new SideEffectWork<Map<Integer, ShardUpdateResult>, UpdateException>() {
           @Override public Map<Integer, ShardUpdateResult> apply(
@@ -782,7 +693,6 @@ public class StateManagerImpl implements StateManager {
       SideEffectWork<?, ?> sideEffectWork,
       MutableStoreProvider storeProvider) {
 
-    managerState.checkState(ImmutableSet.of(State.INITIALIZED, State.STARTED));
     for (final WorkEntry work : Iterables.consumingIterable(workQueue)) {
       final TaskStateMachine stateMachine = work.stateMachine;
 
