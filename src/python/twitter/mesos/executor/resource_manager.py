@@ -56,12 +56,12 @@ class ResourceEnforcer(object):
     if sample.ramRssBytes > self._max_ram:
       # TODO(wickman) Add human-readable resource ranging support to twitter.common.
       return FailureReason('RAM limit exceeded.  Reserved %s bytes vs resident %s bytes' % (
-          self._max_ram, sample.ramRssBytes), status=mesos_pb.TASK_KILLED)
+          self._max_ram, sample.ramRssBytes), status=mesos_pb.TASK_FAILED)
 
   def _enforce_disk(self, sample):
     if sample.diskBytes > self._max_disk:
       return FailureReason('Disk limit exceeded.  Reserved %s bytes vs used %s bytes.' % (
-          self._max_disk, sample.diskBytes), status=mesos_pb.TASK_KILLED)
+          self._max_disk, sample.diskBytes), status=mesos_pb.TASK_FAILED)
 
   @staticmethod
   def render_portmap(portmap):
@@ -82,7 +82,7 @@ class ResourceEnforcer(object):
       if self.ENFORCE_PORT_RANGE[0] <= port <= self.ENFORCE_PORT_RANGE[1]:
         if port not in self._portmap:
           return FailureReason('Listening on unallocated port %s.  Portmap is %s' % (
-              port, self.render_portmap(self._portmap)), status=mesos_pb.TASK_KILLED)
+              port, self.render_portmap(self._portmap)), status=mesos_pb.TASK_FAILED)
 
   def enforce(self, sample):
     """
