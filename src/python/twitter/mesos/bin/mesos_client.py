@@ -886,7 +886,7 @@ def package_set_live(role, package, version):
   Updates the 'live' label of a package to point to a specific version.
   """
   _get_packer().set_live(role, package, version)
-  print('Version %s is now the LIVE vesion' % version)
+  print('Version %s is now the LIVE version' % version)
 
 @app.command
 @trap_packer_error
