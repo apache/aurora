@@ -58,7 +58,7 @@ PACKAGE_DEPRECATION_WARNING = """
 Job.package is deprecated.  Instead use the {{packer}} namespace directly.
 
 See the packer section of the Configuration Reference page for more information:
-http://confluence.twitter.biz/display/Aurora/Aurora+Configuration+Reference#AuroraConfigurationReference-%7B%7Bpacker%7D%7Dnamespace
+http://go/auroraconfig/#Aurora%2BThermosConfigurationReference-%7B%7Bpacker%7D%7Dnamespace
 """
 
 
@@ -105,6 +105,20 @@ the top-level Service() instead of Job().
 def _warn_on_deprecated_daemon_job(config):
   if config.raw().daemon() is not Empty:
     print(DAEMON_DEPRECATION_WARNING, file=sys.stderr)
+
+
+HEALTH_CHECK_INTERVAL_SECS_DEPRECATION_WARNING = """
+The "health_check_interval_secs" parameter to Jobs is deprecated in favor of the
+"health_check_config" parameter. Please update your Job to set the parameter by creating a new
+HealthCheckConfig.
+
+See the HealthCheckConfig section of the Configuration Reference page for more information:
+http://go/auroraconfig/#Aurora%2BThermosConfigurationReference-HealthCheckConfig
+"""
+
+def _warn_on_deprecated_health_check_interval_secs(config):
+  if config.raw().health_check_interval_secs() is not Empty:
+    print(HEALTH_CHECK_INTERVAL_SECS_DEPRECATION_WARNING, file=sys.stderr)
 
 
 ANNOUNCE_WARNING = """
@@ -172,6 +186,19 @@ def _validate_update_config(config):
       die(UPDATE_CONFIG_DEDICATED_THRESHOLD_ERROR % (job_size, min_failure_threshold))
 
 
+HEALTH_CHECK_INTERVAL_SECS_ERROR = '''
+health_check_interval_secs paramater to Job has been deprecated. Please specify health_check_config
+only.
+
+See http://go/auroraconfig/#Aurora%2BThermosConfigurationReference-HealthCheckConfig
+'''
+
+def _validate_health_check_config(config):
+  # TODO(Sathya): Remove this check after health_check_interval_secs deprecation cycle is complete.
+  if config.raw().has_health_check_interval_secs() and config.raw().has_health_check_config():
+    die(HEALTH_CHECK_INTERVAL_SECS_ERROR)
+
+
 def _inject_packer_bindings(config, force_local=False):
   local = config.cluster() == 'local' or force_local
 
@@ -224,6 +251,7 @@ def get_config(jobname,
 
 def validate_config(config):
   _validate_update_config(config)
+  _validate_health_check_config(config)
   _validate_announce_configuration(config)
   _validate_environment_name(config)
 
@@ -234,5 +262,6 @@ def populate_namespaces(config, force_local=False):
   _warn_on_unspecified_package_bindings(config)
   _warn_on_deprecated_cron_policy(config)
   _warn_on_deprecated_daemon_job(config)
+  _warn_on_deprecated_health_check_interval_secs(config)
   _warn_on_appapp_layouts(config)
   return config

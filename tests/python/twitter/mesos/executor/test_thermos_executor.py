@@ -24,6 +24,7 @@ from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_rmtree
 from twitter.common.quantity import Amount, Time, Data
 from twitter.mesos.config.schema import (
+  HealthCheckConfig,
   MB,
   MesosJob,
   MesosTaskInstance,
@@ -352,9 +353,12 @@ class TestThermosExecutor(object):
     proxy_driver = ProxyDriver()
     with SignalServer(UnhealthyHandler) as port:
       with temporary_dir() as checkpoint_root:
-        _, executor = make_runner(proxy_driver, checkpoint_root,
-            MESOS_JOB(task=SLEEP60, health_check_interval_secs=0.1),
-            ports={'health': port}, fast_status=True)
+        health_check_config = HealthCheckConfig(initial_interval_secs=0.1, interval_secs=0.1)
+        _, executor = make_runner(proxy_driver,
+                                  checkpoint_root,
+                                  MESOS_JOB(task=SLEEP60, health_check_config=health_check_config),
+                                  ports={'health': port},
+                                  fast_status=True)
         executor._manager.join()
 
     updates = proxy_driver.method_calls['sendStatusUpdate']

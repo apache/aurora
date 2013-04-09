@@ -2,6 +2,7 @@ python_test_suite(name = 'all',
   dependencies = [
     pants(':discovery_manager'),
     pants(':gc_executor'),
+    pants(':health_checker'),
     pants(':resource_manager'),
     pants(':sandbox_manager'),
     pants(':status_manager'),
@@ -48,6 +49,15 @@ python_tests(name = 'discovery_manager',
     pants('src/python/twitter/common/zookeeper:testing'),
     pants('src/python/twitter/common/zookeeper/serverset'),
     pants('src/python/twitter/common_internal/zookeeper:twitter_service')
+  ]
+)
+
+python_tests(name = 'health_checker',
+  sources = [ 'test_health_checker.py' ],
+  dependencies = [
+    pants('src/python/twitter/common/testing'),
+    pants('src/python/twitter/mesos/executor:health_checker'),
+    python_requirement('mox'),
   ]
 )
 

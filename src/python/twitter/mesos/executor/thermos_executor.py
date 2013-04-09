@@ -192,9 +192,14 @@ class ThermosExecutor(ThermosExecutorBase):
 
     http_signaler = None
     if portmap.get('health'):
-      http_signaler = HttpSignaler(portmap.get('health'))
-      health_checkers.append(HealthCheckerThread(http_signaler.health,
-          interval_secs=mesos_task.health_check_interval_secs().get()))
+      health_check_config = mesos_task.health_check_config().get()
+      http_signaler = HttpSignaler(portmap.get('health'), health_check_config.get('timeout_secs'))
+      health_checker = HealthCheckerThread(
+          http_signaler.health,
+          interval_secs=health_check_config.get('interval_secs'),
+          initial_interval_secs=health_check_config.get('initial_interval_secs'),
+          max_consecutive_failures=health_check_config.get('max_consecutive_failures'))
+      health_checkers.append(health_checker)
 
     task_path = TaskPath(root=self._runner._checkpoint_root, task_id=self._task_id)
     resource_manager = ResourceManager(

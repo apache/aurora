@@ -31,8 +31,9 @@ class HttpSignaler(object):
       socks.setdefaultproxy(socks.PROXY_TYPE_SOCKS5, proxy_host, proxy_port)
       socks.wrapmodule(urllib_request)
 
-  def __init__(self, port, host='localhost'):
+  def __init__(self, port, host='localhost', timeout_secs=TIMEOUT_SECS):
     self._url_base = 'http://%s:%d/' % (host, port)
+    self._timeout_secs = timeout_secs
 
   def url(self, endpoint):
     return self._url_base + endpoint
@@ -42,7 +43,7 @@ class HttpSignaler(object):
     try:
       data = '' if use_post_method else None
       with contextlib.closing(
-          urllib_request.urlopen(self.url(endpoint), data, timeout=self.TIMEOUT_SECS)) as fp:
+          urllib_request.urlopen(self.url(endpoint), data, timeout=self._timeout_secs)) as fp:
         response = fp.read().strip().lower()
         if expected_response is not None and response != expected_response:
           def shorten(string):

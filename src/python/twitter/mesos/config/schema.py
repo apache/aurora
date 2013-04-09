@@ -81,6 +81,13 @@ class UpdateConfig(Struct):
   max_total_failures          = Default(Integer, 0)
 
 
+class HealthCheckConfig(Struct):
+  initial_interval_secs    = Default(Float, 60.0)
+  interval_secs            = Default(Float, 30.0)
+  timeout_secs             = Default(Float, 1.0)
+  max_consecutive_failures = Default(Integer, 0)
+
+
 class Announcer(Struct):
   primary_port = Default(String, 'http')
 
@@ -103,7 +110,8 @@ class MesosTaskInstance(Struct):
   role                       = Required(String)
   announce                   = Announcer
   environment                = Default(String, DEFAULT_ENVIRONMENT)
-  health_check_interval_secs = Default(Integer, 30)
+  health_check_interval_secs = Default(Integer, 30) # DEPRECATED (MESOS-2649)
+  health_check_config        = Default(HealthCheckConfig, HealthCheckConfig())
 
 
 class MesosJob(Struct):
@@ -132,7 +140,8 @@ class MesosJob(Struct):
   max_task_failures          = Default(Integer, 1)
   production                 = Default(Integer, 0)  # boolean
   priority                   = Default(Integer, 0)
-  health_check_interval_secs = Default(Integer, 30)
+  health_check_interval_secs = Integer # DEPRECATED in favor of health_check_config (MESOS-2649).
+  health_check_config        = HealthCheckConfig
   task_links                 = Map(String, String)
 
   layout        = AppLayout      # DEPRECATED in favor of directory sandboxes

@@ -54,7 +54,6 @@ def test_simple_config():
   assert tti.requestedPorts == set()
   assert tti.production == False
   assert tti.priority == 0
-  assert tti.healthCheckIntervalSecs == 30
   assert tti.maxTaskFailures == 1
   assert tti.constraints == set()
   assert tti.packages == set()
@@ -66,7 +65,6 @@ def test_config_with_options():
     production = True,
     priority = 200,
     service = True,
-    health_check_interval_secs = 30,
     cron_policy = 'RUN_OVERLAP',
     constraints = {
       'dedicated': 'your_mom',
@@ -82,7 +80,6 @@ def test_config_with_options():
   assert tti.priority == 200
   assert tti.isService == True
   assert job.cronCollisionPolicy == CronCollisionPolicy.RUN_OVERLAP
-  assert tti.healthCheckIntervalSecs == 30
   assert len(tti.constraints) == 2
   assert tti.environment == 'prod'
   assert job.key.environment == 'prod'
