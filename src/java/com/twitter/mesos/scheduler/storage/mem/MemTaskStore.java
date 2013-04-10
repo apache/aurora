@@ -95,7 +95,7 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
     checkNotNull(query);
 
     long start = System.nanoTime();
-    ImmutableSet<ScheduledTask> result = immutableMatches(query).toImmutableSet();
+    ImmutableSet<ScheduledTask> result = immutableMatches(query).toSet();
     long durationNanos = System.nanoTime() - start;
     Level level = (durationNanos >= slowQueryThresholdNanos) ? Level.INFO : Level.FINE;
     if (LOG.isLoggable(level)) {
@@ -111,7 +111,7 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
   public Set<String> fetchTaskIds(TaskQuery query) {
     checkNotNull(query);
 
-    return mutableMatches(query).transform(Tasks.SCHEDULED_TO_ID).toImmutableSet();
+    return mutableMatches(query).transform(Tasks.SCHEDULED_TO_ID).toSet();
   }
 
   private Map<String, Collection<String>> taskIdsByJobKey(Iterable<ScheduledTask> toIndex) {
@@ -129,7 +129,7 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
         "Proposed new tasks would create task ID collision.");
 
     Set<ScheduledTask> immutable =
-        FluentIterable.from(newTasks).transform(deepCopy).toImmutableSet();
+        FluentIterable.from(newTasks).transform(deepCopy).toSet();
     tasks.putAll(Maps.uniqueIndex(immutable, Tasks.SCHEDULED_TO_ID));
 
     // Update job key index.

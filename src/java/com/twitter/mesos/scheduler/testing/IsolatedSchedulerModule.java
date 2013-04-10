@@ -183,7 +183,7 @@ public class IsolatedSchedulerModule extends AbstractModule {
         @Override public void run() {
           scheduler.get().resourceOffers(
               driver,
-              FluentIterable.from(cluster).transform(slaveToOffer).toImmutableList());
+              FluentIterable.from(cluster).transform(slaveToOffer).toList());
         }
       });
     }

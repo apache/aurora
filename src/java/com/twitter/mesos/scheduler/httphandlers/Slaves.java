@@ -77,7 +77,7 @@ public class Slaves extends JerseyTemplateServlet {
         template.setAttribute("cluster_name", clusterName);
 
         template.setAttribute("slaves",
-            FluentIterable.from(getHostAttributes()).transform(TO_SLAVE).toImmutableList());
+            FluentIterable.from(getHostAttributes()).transform(TO_SLAVE).toList());
       }
     });
   }

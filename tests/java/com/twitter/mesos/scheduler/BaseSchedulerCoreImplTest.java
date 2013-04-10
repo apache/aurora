@@ -1165,7 +1165,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       Optional<String> updateToken = scheduler.initiateJobUpdate(updatedJob);
 
       Set<Integer> jobShards = FluentIterable.from(updatedJob.get().getTaskConfigs())
-          .transform(Tasks.INFO_TO_SHARD_ID).toImmutableSet();
+          .transform(Tasks.INFO_TO_SHARD_ID).toSet();
 
       UpdateResult result = performRegisteredUpdate(
           updatedJob.get(),

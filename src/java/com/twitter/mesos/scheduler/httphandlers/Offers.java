@@ -43,7 +43,7 @@ public class Offers {
   @Produces(MediaType.APPLICATION_JSON)
   public Response getOffers() {
     return Response.ok(
-        FluentIterable.from(scheduler.getOffers()).transform(TO_BEAN).toImmutableList()).build();
+        FluentIterable.from(scheduler.getOffers()).transform(TO_BEAN).toList()).build();
   }
 
   private static final Function<ExecutorID, String> EXECUTOR_ID_TOSTRING =
@@ -99,7 +99,7 @@ public class Offers {
       };
 
   private static <A, B> Iterable<B> immutable(Iterable<A> iterable, Function<A, B> transform) {
-    return FluentIterable.from(iterable).transform(transform).toImmutableList();
+    return FluentIterable.from(iterable).transform(transform).toList();
   }
 
   private static final Function<Offer, Map<String, ?>> TO_BEAN =

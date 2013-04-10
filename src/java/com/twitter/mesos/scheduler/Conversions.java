@@ -94,7 +94,7 @@ public final class Conversions {
           FluentIterable.from(entry.getValue())
               .transform(VALUE_CONVERTER)
               .filter(Predicates.notNull())
-              .toImmutableSet());
+              .toSet());
     }
   };
 
@@ -114,7 +114,7 @@ public final class Conversions {
         offer.getHostname(),
         FluentIterable.from(valuesByName.asMap().entrySet())
             .transform(ATTRIBUTE_CONVERTER)
-            .toImmutableSet())
+            .toSet())
         .setSlaveId(offer.getSlaveId().getValue());
   }
 }

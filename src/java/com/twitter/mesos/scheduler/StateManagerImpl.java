@@ -355,7 +355,7 @@ public class StateManagerImpl implements StateManager {
     return FluentIterable.from(jobConfig.getConfigs())
         .filter(Predicates.compose(Predicates.isNull(), configSelector))
         .transform(GET_SHARD_ID)
-        .toImmutableSet();
+        .toSet();
   }
 
   /**
@@ -579,7 +579,7 @@ public class StateManagerImpl implements StateManager {
         .from(fetchShardUpdateConfigs(config, shards))
         .transform(configSelector)
         .filter(Predicates.notNull())
-        .toImmutableSet();
+        .toSet();
   }
 
   private int changeStateInTransaction(

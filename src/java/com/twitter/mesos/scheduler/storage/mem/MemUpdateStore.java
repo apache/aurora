@@ -74,14 +74,14 @@ public class MemUpdateStore implements UpdateStore.Mutable.Transactioned {
     return FluentIterable.from(configs.values())
         .filter(hasRole(role))
         .transform(DEEP_COPY)
-        .toImmutableSet();
+        .toSet();
   }
 
   @Override
   public Set<String> fetchUpdatingRoles() {
     return FluentIterable.from(configs.values())
         .transform(GET_ROLE)
-        .toImmutableSet();
+        .toSet();
   }
 
   private static final Function<JobUpdateConfiguration, String> GET_ROLE =

@@ -338,7 +338,7 @@ public interface TaskScheduler extends EventSubscriber {
       synchronized void receive(final Offer offer) {
         List<Offer> sameSlave = FluentIterable.from(offers)
             .filter(isSlave(offer.getSlaveId()))
-            .toImmutableList();
+            .toList();
         if (sameSlave.isEmpty()) {
           offers.add(offer);
           executor.schedule(

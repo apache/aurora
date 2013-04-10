@@ -147,7 +147,7 @@ public interface MaintenanceController {
               FluentIterable.from(storeProvider.getAttributeStore().getHostAttributes())
                   .filter(IS_DRAINING)
                   .transform(HOST_NAME)
-                  .toImmutableSet();
+                  .toSet();
           watchDrainingTasks(storeProvider, drainingHosts);
         }
       });
@@ -217,7 +217,7 @@ public interface MaintenanceController {
         @Override public Set<HostStatus> apply(StoreProvider storeProvider) {
           return FluentIterable.from(storeProvider.getAttributeStore().getHostAttributes())
               .filter(Predicates.compose(Predicates.in(hosts), HOST_NAME))
-              .transform(ATTRS_TO_STATUS).toImmutableSet();
+              .transform(ATTRS_TO_STATUS).toSet();
         }
       });
     }

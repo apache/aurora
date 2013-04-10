@@ -79,7 +79,7 @@ public class MemJobStore implements JobStore.Mutable.Transactioned {
 
     return FluentIterable.from(manager.jobs.values())
         .transform(DEEP_COPY)
-        .toImmutableSet();
+        .toSet();
   }
 
   @Nullable
