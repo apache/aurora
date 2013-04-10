@@ -1,7 +1,14 @@
 python_test_suite(name = 'all',
   dependencies = [
+    pants(':small'),
     pants(':medium'),
     pants(':large'),
+  ]
+)
+
+python_test_suite(name = 'small',
+  dependencies = [
+    pants(':test_process'),
   ]
 )
 
@@ -57,6 +64,11 @@ python_tests(name = 'test_ephemerals',
 python_tests(name = 'test_failure_limit',
   sources = ['test_failure_limit.py'],
   dependencies = [pants(':runner_baselibs')]
+)
+
+python_tests(name = 'test_process',
+  sources = ['test_process.py'],
+  dependencies = [pants(':runner_baselibs')],
 )
 
 python_tests(name = 'test_staged_kill',

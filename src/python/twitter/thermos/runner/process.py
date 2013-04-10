@@ -6,6 +6,8 @@ commandline in a subprocess of its own.
 
 """
 
+from __future__ import print_function
+
 from abc import abstractmethod
 import getpass
 import grp
@@ -254,6 +256,7 @@ class Process(ProcessBase):
     Encapsulate a running process for a task.
   """
   RCFILE = '.thermos_profile'
+  FD_CLOEXEC = True
 
   def __init__(self, *args, **kw):
     """
@@ -265,6 +268,7 @@ class Process(ProcessBase):
     """
     fork = kw.pop('fork', os.fork)
     self._use_chroot = bool(kw.pop('chroot', False))
+    self._rc = None
     kw['platform'] = RealPlatform(fork=fork)
     ProcessBase.__init__(self, *args, **kw)
     if self._use_chroot and self._sandbox is None:
@@ -333,6 +337,7 @@ class Process(ProcessBase):
     self._popen = subprocess.Popen(["/bin/bash", "-c", self.cmdline()],
                                    stderr=self._stderr,
                                    stdout=self._stdout,
+                                   close_fds=self.FD_CLOEXEC,
                                    cwd=sandbox,
                                    env=env)
 
@@ -354,6 +359,7 @@ class Process(ProcessBase):
     self._write_process_update(state=state,
                                return_code=rc,
                                stop_time=self._platform.clock().time())
+    self._rc = rc
 
   def finish(self):
     self._log('Coordinator exiting.')
