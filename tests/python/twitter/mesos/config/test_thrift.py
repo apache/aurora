@@ -9,21 +9,20 @@ from gen.twitter.mesos.ttypes import (
 )
 
 from twitter.mesos.config import AuroraConfig
-from twitter.mesos.config.schema import (
-  MesosJob,
-)
+from twitter.mesos.config.schema import Job
 from twitter.mesos.config.thrift import convert as convert_pystachio_to_thrift
+from twitter.mesos.config.thrift import task_instance_from_job
 from twitter.thermos.config.schema import (
   Process,
   Resources,
-  Task
+  Task,
 )
 
 from pystachio import Map, String
 from pystachio.naming import frozendict
 
 
-HELLO_WORLD = MesosJob(
+HELLO_WORLD = Job(
   name = 'hello_world',
   role = 'john_doe',
   cluster = 'smf1-test',
@@ -178,3 +177,9 @@ def test_packages_in_config():
   assert pi.role == 'alpha'
   assert pi.name == 'beta'
   assert pi.version == 1
+
+
+def test_task_instance_from_job():
+  instance = task_instance_from_job(Job(health_check_interval_secs=30), 0)
+  assert instance is not None
+
