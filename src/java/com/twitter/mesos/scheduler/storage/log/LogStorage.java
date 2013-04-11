@@ -558,6 +558,7 @@ public class LogStorage extends ForwardingStore
               + Maps.transformValues(tasksById, Tasks.GET_STATUS));
         }
 
+        // TODO(William Farner): Avoid writing an op when mutated is empty.
         log(Op.saveTasks(new SaveTasks(mutated)));
         return mutated;
       }

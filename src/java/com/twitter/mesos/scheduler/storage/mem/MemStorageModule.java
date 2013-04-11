@@ -14,6 +14,7 @@ import com.twitter.mesos.scheduler.storage.JobStore;
 import com.twitter.mesos.scheduler.storage.QuotaStore;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
 import com.twitter.mesos.scheduler.storage.Storage;
+import com.twitter.mesos.scheduler.storage.Storage.Volatile;
 import com.twitter.mesos.scheduler.storage.TaskStore;
 import com.twitter.mesos.scheduler.storage.UpdateStore;
 
@@ -75,6 +76,9 @@ public final class MemStorageModule extends PrivateModule {
   @Override
   protected void configure() {
     bind(storageKey).to(MemStorage.class);
+    Key<Storage> exposedMemStorageKey = Key.get(Storage.class, Volatile.class);
+    bind(exposedMemStorageKey).to(MemStorage.class);
+    expose(exposedMemStorageKey);
     bind(MemStorage.class).in(Singleton.class);
 
     bindStore(SchedulerStore.Mutable.Transactioned.class, MemSchedulerStore.class);

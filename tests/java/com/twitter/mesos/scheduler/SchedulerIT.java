@@ -4,17 +4,21 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
+import java.util.Arrays;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.google.common.base.Function;
 import com.google.common.base.Optional;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -33,16 +37,17 @@ import org.apache.mesos.Protos.MasterInfo;
 import org.apache.mesos.Protos.Status;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
+import org.easymock.EasyMock;
 import org.easymock.IAnswer;
+import org.easymock.IArgumentMatcher;
 import org.easymock.IMocksControl;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.twitter.common.application.ShutdownStage;
+import com.twitter.common.application.Lifecycle;
 import com.twitter.common.application.StartupStage;
 import com.twitter.common.application.modules.AppLauncherModule;
 import com.twitter.common.application.modules.LifecycleModule;
-import com.twitter.common.base.Command;
 import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.io.FileUtils;
 import com.twitter.common.net.pool.DynamicHostSet.HostChangeMonitor;
@@ -53,11 +58,19 @@ import com.twitter.common.zookeeper.ServerSet;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.common.zookeeper.testing.BaseZooKeeperTest;
 import com.twitter.common_internal.zookeeper.TwitterServerSet;
+import com.twitter.mesos.codec.ThriftBinaryCodec;
+import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
+import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.Identity;
+import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TaskEvent;
+import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.storage.LogEntry;
 import com.twitter.mesos.gen.storage.Op;
 import com.twitter.mesos.gen.storage.SaveFrameworkId;
 import com.twitter.mesos.gen.storage.SaveTasks;
+import com.twitter.mesos.gen.storage.Snapshot;
 import com.twitter.mesos.gen.storage.Transaction;
 import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl.ExecutorConfig;
 import com.twitter.mesos.scheduler.SchedulerLifecycle.ShutdownOnDriverExit;
@@ -72,10 +85,10 @@ import com.twitter.mesos.scheduler.storage.log.LogStorageModule;
 import com.twitter.thrift.Endpoint;
 import com.twitter.thrift.ServiceInstance;
 
-import static org.easymock.EasyMock.aryEq;
 import static org.easymock.EasyMock.createControl;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 public class SchedulerIT extends BaseZooKeeperTest {
@@ -100,7 +113,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
   private EntrySerializer entrySerializer;
   private ZooKeeperClient zkClient;
   private File backupDir;
-  private Command shutdown;
+  private Lifecycle lifecycle;
 
   @Before
   public void mySetUp() throws Exception {
@@ -160,7 +173,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
             testModule,
             new LifecycleModule(),
             new AppLauncherModule()));
-    shutdown = injector.getInstance(Key.get(Command.class, ShutdownStage.class));
+    lifecycle = injector.getInstance(Lifecycle.class);
   }
 
   private void startScheduler() throws Exception {
@@ -180,8 +193,8 @@ public class SchedulerIT extends BaseZooKeeperTest {
     });
     addTearDown(new TearDown() {
       @Override public void tearDown() throws Exception {
-        shutdown.execute();
-        new ExecutorServiceShutdown(executor, Amount.of(1L, Time.SECONDS)).execute();
+        lifecycle.shutdown();
+        new ExecutorServiceShutdown(executor, Amount.of(10L, Time.SECONDS)).execute();
       }
     });
   }
@@ -191,7 +204,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
   }
 
   private HostAndPort awaitSchedulerReady() throws Exception {
-    Future<HostAndPort> monitor = executor.submit(new Callable<HostAndPort>() {
+    return executor.submit(new Callable<HostAndPort>() {
       @Override public HostAndPort call() throws Exception {
         final AtomicReference<HostAndPort> thriftEndpoint = Atomics.newReference();
         ServerSet schedulerService =
@@ -206,12 +219,12 @@ public class SchedulerIT extends BaseZooKeeperTest {
             }
           }
         });
-        schedulerReady.await();
+        // A timeout is used because certain types of assertion errors (mocks) will not surface
+        // until the main test thread exits this body of code.
+        assertTrue(schedulerReady.await(5L, TimeUnit.MINUTES));
         return thriftEndpoint.get();
       }
-    });
-
-    return monitor.get();
+    }).get();
   }
 
   private AtomicInteger curPosition = new AtomicInteger();
@@ -230,32 +243,68 @@ public class SchedulerIT extends BaseZooKeeperTest {
     return new IntPosition(curPosition.incrementAndGet());
   }
 
-  private void expectLogWrite(LogEntry entry) throws Exception {
-    for (byte[] chunk : entrySerializer.serialize(entry)) {
-      expect(logStream.append(aryEq(chunk))).andReturn(nextPosition());
-    }
+  private byte[] sameEntry(Op logOp) {
+    EasyMock.reportMatcher(new LogOpMatcher(logOp));
+    return null;
   }
 
   private void expectLogOp(Op op) throws Exception {
-    expectLogWrite(LogEntry.transaction(new Transaction().setOps(ImmutableList.of(op))));
+    expect(logStream.append(sameEntry(op))).andReturn(nextPosition());
   }
 
-  private void expectSaveTasks(SaveTasks saveTasks) throws Exception {
-    expectLogOp(Op.saveTasks(saveTasks));
+  private void expectSaveTasks(Set<ScheduledTask> tasks) throws Exception {
+    expectLogOp(Op.saveTasks(new SaveTasks(tasks)));
+  }
+
+  private Iterable<Entry> toEntries(LogEntry... entries) {
+    return Iterables.transform(Arrays.asList(entries),
+        new Function<LogEntry, Entry>() {
+          @Override public Entry apply(final LogEntry entry) {
+            return new Entry() {
+              @Override public byte[] contents() {
+                try {
+                  return entrySerializer.serialize(entry)[0];
+                } catch (CodingException e) {
+                  throw Throwables.propagate(e);
+                }
+              }
+            };
+          }
+        });
+  }
+
+  private static ScheduledTask makeTask(String id) {
+    return new ScheduledTask()
+        .setStatus(ScheduleStatus.RUNNING)
+        .setTaskEvents(ImmutableList.of(new TaskEvent(100, ScheduleStatus.RUNNING)))
+        .setAssignedTask(new AssignedTask()
+            .setTaskId(id)
+            .setTask(new TwitterTaskInfo()
+                .setJobName("job-" + id)
+                .setEnvironment("test")
+                .setOwner(new Identity("role-" + id, "user-" + id))));
   }
 
   @Test
   public void testLaunch() throws Exception {
     expect(driverFactory.apply(null)).andReturn(driver).anyTimes();
 
+    ScheduledTask snapshotTask = makeTask("snapshotTask");
+    ScheduledTask transactionTask = makeTask("transactionTask");
+    Iterable<Entry> recoveredEntries = toEntries(
+        LogEntry.snapshot(new Snapshot().setTasks(ImmutableSet.of(snapshotTask))),
+        LogEntry.transaction(new Transaction().setOps(ImmutableList.of(
+            Op.saveTasks(new SaveTasks(ImmutableSet.of(transactionTask)))))));
+
     expect(log.open()).andReturn(logStream);
+    expect(logStream.readAll()).andReturn(recoveredEntries.iterator()).anyTimes();
+    // An empty saveTasks is an artifact of the fact that mutateTasks always writes a log operation
+    // even if nothing is changed.
+    expectSaveTasks(ImmutableSet.<ScheduledTask>of());
+    expectLogOp(Op.saveFrameworkId(new SaveFrameworkId(FRAMEWORK_ID)));
+
     logStream.close();
     expectLastCall().anyTimes();
-
-    Iterable<Entry> recoveredEntries = ImmutableList.of();
-    expect(logStream.readAll()).andReturn(recoveredEntries.iterator()).anyTimes();
-    expectSaveTasks(new SaveTasks().setTasks(ImmutableSet.<ScheduledTask>of()));
-    expectLogOp(Op.saveFrameworkId(new SaveFrameworkId(FRAMEWORK_ID)));
 
     expect(driver.run()).andAnswer(new IAnswer<Status>() {
       @Override public Status answer() throws InterruptedException {
@@ -274,5 +323,27 @@ public class SchedulerIT extends BaseZooKeeperTest {
         MasterInfo.getDefaultInstance());
 
     // TODO(William Farner): Send a thrift RPC to the scheduler.
+  }
+
+  private class LogOpMatcher implements IArgumentMatcher {
+    private final LogEntry expected;
+
+    LogOpMatcher(Op expected) {
+      this.expected = LogEntry.transaction(new Transaction().setOps(ImmutableList.of(expected)));
+    }
+
+    @Override
+    public boolean matches(Object argument) {
+      try {
+        return expected.equals(ThriftBinaryCodec.decodeNonNull(LogEntry.class, (byte[]) argument));
+      } catch (CodingException e) {
+        return false;
+      }
+    }
+
+    @Override
+    public void appendTo(StringBuffer buffer) {
+      buffer.append(expected);
+    }
   }
 }

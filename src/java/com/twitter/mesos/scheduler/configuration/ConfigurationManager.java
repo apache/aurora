@@ -406,7 +406,7 @@ public final class ConfigurationManager {
     try {
       sanitize(task);
     } catch (TaskDescriptionException e) {
-      LOG.log(Level.WARNING, "Failed to sanitize task " + task, e);
+      LOG.log(Level.WARNING, "Failed to sanitize task due to " + e + ", task" + task);
     }
 
     return task;

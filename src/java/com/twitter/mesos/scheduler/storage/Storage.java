@@ -1,6 +1,12 @@
 package com.twitter.mesos.scheduler.storage;
 
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
 import com.google.common.collect.ImmutableSet;
+import com.google.inject.BindingAnnotation;
 
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
@@ -189,6 +195,16 @@ public interface Storage {
      */
     void stop();
   }
+
+  /**
+   * Identifies a storage layer that is in-memory only.
+   * This generally should only be used when the storage is first starting up, to perform queries
+   * related to initially load the storage.
+   */
+  @Retention(RetentionPolicy.RUNTIME)
+  @Target({ ElementType.PARAMETER, ElementType.METHOD })
+  @BindingAnnotation
+  public @interface Volatile { }
 
   /**
    * Utility functions for interacting with a Storage instance.

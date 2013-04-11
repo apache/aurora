@@ -1,11 +1,8 @@
 package com.twitter.mesos.scheduler.storage.log;
 
 import java.util.Arrays;
-import java.util.EnumSet;
-import java.util.Set;
 import java.util.logging.Logger;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
 
@@ -23,6 +20,7 @@ import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
+import com.twitter.mesos.scheduler.storage.Storage.Volatile;
 import com.twitter.mesos.scheduler.storage.Storage.Work;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -34,14 +32,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public final class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
 
   private static final Logger LOG = Logger.getLogger(SnapshotStoreImpl.class.getName());
-
-  private static final Set<Snapshot._Fields> NEW_FIELDS = EnumSet.of(
-      Snapshot._Fields.TASKS,
-      Snapshot._Fields.JOBS,
-      Snapshot._Fields.SCHEDULER_METADATA,
-      Snapshot._Fields.UPDATE_CONFIGURATIONS,
-      Snapshot._Fields.QUOTA_CONFIGURATIONS
-  );
 
   private static final SnapshotField ATTRIBUTE_FIELD = new SnapshotField() {
     @Override public void saveToSnapshot(StoreProvider storeProvider, Snapshot snapshot) {
@@ -159,8 +149,7 @@ public final class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
   private final Storage storage;
 
   @Inject
-  public SnapshotStoreImpl(Clock clock, Storage storage) {
-
+  public SnapshotStoreImpl(Clock clock, @Volatile Storage storage) {
     this.clock = checkNotNull(clock);
     this.storage = checkNotNull(storage);
   }
@@ -180,15 +169,6 @@ public final class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         return snapshot;
       }
     });
-  }
-
-  private static void checkNewFieldsBlank(Snapshot snapshot) {
-    for (Snapshot._Fields field : NEW_FIELDS) {
-      Preconditions.checkState(!snapshot.isSet(field),
-          "Unexpected field set in snapshot: " + field
-              + ", snapshot taken at " + snapshot.getTimestamp()
-              + ", field value: " + snapshot.getFieldValue(field));
-    }
   }
 
   @Override public void applySnapshot(final Snapshot snapshot) {
