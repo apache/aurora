@@ -7,7 +7,8 @@ import java.util.Set;
 import com.google.common.base.Function;
 import com.google.common.base.Objects;
 import com.google.common.base.Predicate;
-import com.google.common.collect.DiscreteDomains;
+import com.google.common.collect.ContiguousSet;
+import com.google.common.collect.DiscreteDomain;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -41,8 +42,9 @@ public class Resources {
   private static final Function<Range, Set<Integer>> RANGE_TO_MEMBERS =
       new Function<Range, Set<Integer>>() {
         @Override public Set<Integer> apply(Range range) {
-          return com.google.common.collect.Ranges.closed(
-              (int) range.getBegin(), (int) range.getEnd()).asSet(DiscreteDomains.integers());
+          return ContiguousSet.create(
+              com.google.common.collect.Range.closed((int) range.getBegin(), (int) range.getEnd()),
+              DiscreteDomain.integers());
         }
       };
 

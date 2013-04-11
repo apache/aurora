@@ -113,7 +113,7 @@ public class MemStorageTest extends TearDownTestCase {
     storage.doInTransaction(new Work.Quiet<Void>() {
       @Override public Void apply(StoreProvider storeProvider) {
         assertEquals(
-            ImmutableSet.builder().add(taskIds).build(),
+            ImmutableSet.<String>builder().add(taskIds).build(),
             storeProvider.getTaskStore().fetchTaskIds(Query.GET_ALL));
         return null;
       }

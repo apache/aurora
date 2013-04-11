@@ -6,7 +6,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.PeekingIterator;
 import com.google.common.collect.Range;
-import com.google.common.collect.Ranges;
 import com.google.common.collect.Sets;
 
 /**
@@ -44,7 +43,7 @@ public final class Numbers {
         iterator.next();
       }
 
-      builder.add(Ranges.closed(start, end));
+      builder.add(Range.closed(start, end));
     }
 
     return builder.build();
