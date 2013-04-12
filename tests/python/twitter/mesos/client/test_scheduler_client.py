@@ -11,26 +11,29 @@ import gen.twitter.mesos.MesosSchedulerManager as MesosSchedulerManager
 from gen.twitter.mesos.constants import DEFAULT_ENVIRONMENT
 from gen.twitter.mesos.ttypes import *
 
+
 ROLE = 'foorole'
 JOB_NAME = 'barjobname'
 JOB_KEY = JobKey(role=ROLE, environment=DEFAULT_ENVIRONMENT, name=JOB_NAME)
+
 
 def test_testCoverage():
   """Make sure a new thrift RPC doesn't get added without minimal test coverage."""
   for name, klass in inspect.getmembers(MesosAdmin) + inspect.getmembers(MesosSchedulerManager):
     if name.endswith('_args'):
-      rpc_name = name.strip('_args')
-      assert (hasattr(TestSchedulerProxyAdminInjection, 'test_%s' % rpc_name),
+      rpc_name = name[:-len('_args')]
+      assert hasattr(TestSchedulerProxyAdminInjection, 'test_%s' % rpc_name), (
               'No test defined for RPC %s' % rpc_name)
+
 
 class TestSchedulerProxy(scheduler_client.SchedulerProxy):
   """In testing we shouldn't use the real SSHAgentAuthenticator."""
   @classmethod
-  def create_session(cls, user):
+  def create_session(cls, user, agent_key):
     return SessionKey(user=user, nonce=42, nonceSig='UNAUTHENTICATED')
 
-class TestSchedulerProxyInjection(unittest.TestCase):
 
+class TestSchedulerProxyInjection(unittest.TestCase):
   def setUp(self):
     self.mox = Mox()
 

@@ -176,9 +176,9 @@ class SchedulerProxy(object):
       Cluster.assert_exists(cluster)
   
   @classmethod
-  def create_session(cls, user):
+  def create_session(cls, user, agent_key):
     try:
-      nonce, nonce_sig = SSHAgentAuthenticator.create_session(user)
+      nonce, nonce_sig = SSHAgentAuthenticator.create_session_from_key(agent_key)
       return SessionKey(user=user, nonce=nonce, nonceSig=nonce_sig)
     except SSHAgentAuthenticator.AuthorizationError as e:
       log.warning('Could not authenticate: %s' % e)
@@ -188,7 +188,7 @@ class SchedulerProxy(object):
 
   def __init__(self, cluster, verbose=False):
     self.cluster = cluster
-    self._session_key = self._client = self._scheduler = None
+    self._agent_key = self._client = self._scheduler = None
     self.verbose = verbose
     self.assert_valid_cluster(cluster)
 
@@ -201,12 +201,13 @@ class SchedulerProxy(object):
     return _wrapper
 
   def invalidate(self):
-    self._session_key = self._client = self._scheduler = None
+    self._agent_key = self._client = self._scheduler = None
 
   def requires_auth(method):
     def _wrapper(self, *args, **kwargs):
-      if not self._session_key:
-        self._session_key = self.create_session(getpass.getuser())
+      if not self._agent_key:
+        user = getpass.getuser()
+        self._agent_key = (user, SSHAgentAuthenticator.get_ods_key(user))
       return method(self, *args, **kwargs)
     return _wrapper
 
@@ -216,7 +217,7 @@ class SchedulerProxy(object):
 
   @requires_auth
   def session_key(self):
-    return self._session_key
+    return self.create_session(*self._agent_key)
 
   @with_scheduler
   def scheduler(self):
