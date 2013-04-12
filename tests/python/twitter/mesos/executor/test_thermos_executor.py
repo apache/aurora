@@ -138,6 +138,7 @@ HELLO_WORLD = BASE_TASK(
 HELLO_WORLD_MTI = BASE_MTI(task=HELLO_WORLD)
 
 SLEEP60 = BASE_TASK(processes = [Process(name = 'sleep60', cmdline = 'sleep 60')])
+SLEEP2 = BASE_TASK(processes = [Process(name = 'sleep2', cmdline = 'sleep 2')])
 SLEEP60_MTI = BASE_MTI(task=SLEEP60)
 
 MESOS_JOB = MesosJob(
@@ -196,6 +197,13 @@ class UnhealthyHandler(BaseHTTPRequestHandler):
     self.send_response(200)
     self.end_headers()
     self.wfile.write('not ok')
+
+
+class HealthyHandler(BaseHTTPRequestHandler):
+  def do_GET(self):
+    self.send_response(200)
+    self.end_headers()
+    self.wfile.write('ok')
 
 
 class SignalServer(ExceptionalThread):
@@ -364,6 +372,21 @@ class TestThermosExecutor(object):
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
     assert updates[-1][0][0].state == mesos_pb.TASK_FAILED
+
+  def test_task_health_ok(self):
+    proxy_driver = ProxyDriver()
+    with SignalServer(HealthyHandler) as port:
+      with temporary_dir() as checkpoint_root:
+        health_check_config = HealthCheckConfig(initial_interval_secs=0.1, interval_secs=0.1)
+        _, executor = make_runner(proxy_driver,
+                                  checkpoint_root,
+                                  MESOS_JOB(task=SLEEP2, health_check_config=health_check_config),
+                                  ports={'health': port},
+                                  fast_status=True)
+        executor._manager.join()
+    updates = proxy_driver.method_calls['sendStatusUpdate']
+    assert len(updates) == 3
+    assert updates[-1][0][0].state == mesos_pb.TASK_FINISHED
 
   def test_failing_runner_start(self):
     proxy_driver = ProxyDriver()

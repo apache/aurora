@@ -193,7 +193,8 @@ class ThermosExecutor(ThermosExecutorBase):
     http_signaler = None
     if portmap.get('health'):
       health_check_config = mesos_task.health_check_config().get()
-      http_signaler = HttpSignaler(portmap.get('health'), health_check_config.get('timeout_secs'))
+      http_signaler = HttpSignaler(portmap.get('health'),
+          timeout_secs=health_check_config.get('timeout_secs'))
       health_checker = HealthCheckerThread(
           http_signaler.health,
           interval_secs=health_check_config.get('interval_secs'),
