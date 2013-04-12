@@ -11,7 +11,7 @@ from twitter.common.net.tunnel import TunnelHelper
 from twitter.common.zookeeper.client import ZooKeeper
 from twitter.common.zookeeper.serverset import ServerSet, Endpoint
 from twitter.common.zookeeper.test_server import ZookeeperServer
-from twitter.common_internal.zookeeper.twitter_service import TwitterService
+from twitter.common_internal.zookeeper.twitter_serverset import TwitterServerSet
 from twitter.mesos.executor.discovery_manager import DiscoveryManager
 
 
@@ -54,7 +54,7 @@ class TestDiscoveryManager(object):
 
   @classmethod
   def make_ss(cls, role, environment, jobname, **kw):
-    return ServerSet(cls.ZK, TwitterService.zkpath(role, environment, jobname), **kw)
+    return ServerSet(cls.ZK, TwitterServerSet.zkpath(role, environment, jobname), **kw)
 
   def _make_manager(self, *args):
     role, environment, jobname = args[0:3]
