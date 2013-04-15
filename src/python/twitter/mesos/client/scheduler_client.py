@@ -176,15 +176,21 @@ class SchedulerProxy(object):
       Cluster.assert_exists(cluster)
   
   @classmethod
-  def create_session(cls, user, agent_key):
+  def create_anonymous_session(cls, user):
+    return SessionKey(user=user, nonce=SSHAgentAuthenticator.get_timestamp(),
+        nonceSig='UNAUTHENTICATED')
+
+  @classmethod
+  def create_session(cls, user, agent_key=None):
+    if agent_key is None:
+      return cls.create_anonymous_session(user)
     try:
       nonce, nonce_sig = SSHAgentAuthenticator.create_session_from_key(agent_key)
       return SessionKey(user=user, nonce=nonce, nonceSig=nonce_sig)
     except SSHAgentAuthenticator.AuthorizationError as e:
       log.warning('Could not authenticate: %s' % e)
       log.warning('Attempting unauthenticated communication.')
-      return SessionKey(user=user, nonce=SSHAgentAuthenticator.get_timestamp(),
-          nonceSig='UNAUTHENTICATED')
+      return cls.create_anonymous_session(user)
 
   def __init__(self, cluster, verbose=False):
     self.cluster = cluster
@@ -207,7 +213,11 @@ class SchedulerProxy(object):
     def _wrapper(self, *args, **kwargs):
       if not self._agent_key:
         user = getpass.getuser()
-        self._agent_key = (user, SSHAgentAuthenticator.get_ods_key(user))
+        try:
+          self._agent_key = (user, SSHAgentAuthenticator.get_ods_key(user))
+        except SSHAgentAuthenticator.AgentError as e:
+          log.warning('Could not acquire key: %s' % e)
+          self._agent_key = (user, None)
       return method(self, *args, **kwargs)
     return _wrapper
 
