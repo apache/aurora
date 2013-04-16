@@ -12,6 +12,8 @@ import com.google.inject.PrivateModule;
 import com.google.inject.Singleton;
 
 import com.twitter.common.util.StateMachine;
+import com.twitter.mesos.scheduler.events.PubsubEvent.Interceptors.Event;
+import com.twitter.mesos.scheduler.events.PubsubEvent.Interceptors.SendNotification;
 import com.twitter.mesos.scheduler.storage.Storage.MutateWork.NoResult.Quiet;
 import com.twitter.mesos.scheduler.storage.Storage.NonVolatileStorage;
 
@@ -63,6 +65,7 @@ public class CallOrderEnforcingStorage implements NonVolatileStorage {
     stateMachine.transition(State.PREPARED);
   }
 
+  @SendNotification(after = Event.StorageStarted)
   @Override
   public void start(Quiet initializationLogic) throws StorageException {
     checkInState(State.PREPARED);

@@ -53,6 +53,7 @@ import com.twitter.common.io.FileUtils;
 import com.twitter.common.net.pool.DynamicHostSet.HostChangeMonitor;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.common.stats.Stats;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 import com.twitter.common.zookeeper.ServerSet;
 import com.twitter.common.zookeeper.ZooKeeperClient;
@@ -88,6 +89,7 @@ import com.twitter.thrift.ServiceInstance;
 import static org.easymock.EasyMock.createControl;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -273,10 +275,10 @@ public class SchedulerIT extends BaseZooKeeperTest {
         });
   }
 
-  private static ScheduledTask makeTask(String id) {
+  private static ScheduledTask makeTask(String id, ScheduleStatus status) {
     return new ScheduledTask()
-        .setStatus(ScheduleStatus.RUNNING)
-        .setTaskEvents(ImmutableList.of(new TaskEvent(100, ScheduleStatus.RUNNING)))
+        .setStatus(status)
+        .setTaskEvents(ImmutableList.of(new TaskEvent(100, status)))
         .setAssignedTask(new AssignedTask()
             .setTaskId(id)
             .setTask(new TwitterTaskInfo()
@@ -289,8 +291,8 @@ public class SchedulerIT extends BaseZooKeeperTest {
   public void testLaunch() throws Exception {
     expect(driverFactory.apply(null)).andReturn(driver).anyTimes();
 
-    ScheduledTask snapshotTask = makeTask("snapshotTask");
-    ScheduledTask transactionTask = makeTask("transactionTask");
+    ScheduledTask snapshotTask = makeTask("snapshotTask", ScheduleStatus.ASSIGNED);
+    ScheduledTask transactionTask = makeTask("transactionTask", ScheduleStatus.RUNNING);
     Iterable<Entry> recoveredEntries = toEntries(
         LogEntry.snapshot(new Snapshot().setTasks(ImmutableSet.of(snapshotTask))),
         LogEntry.transaction(new Transaction().setOps(ImmutableList.of(
@@ -321,6 +323,11 @@ public class SchedulerIT extends BaseZooKeeperTest {
     scheduler.registered(driver,
         FrameworkID.newBuilder().setValue(FRAMEWORK_ID).build(),
         MasterInfo.getDefaultInstance());
+
+    assertEquals(0L, Stats.<Long>getVariable("task_store_PENDING").read().longValue());
+    assertEquals(1L, Stats.<Long>getVariable("task_store_ASSIGNED").read().longValue());
+    assertEquals(1L, Stats.<Long>getVariable("task_store_RUNNING").read().longValue());
+    assertEquals(0L, Stats.<Long>getVariable("task_store_UNKNOWN").read().longValue());
 
     // TODO(William Farner): Send a thrift RPC to the scheduler.
   }
