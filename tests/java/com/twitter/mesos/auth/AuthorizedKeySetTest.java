@@ -33,6 +33,7 @@ public class AuthorizedKeySetTest {
     // all bad
     assertEquals(0, load("invalid1").keys.size());
     assertEquals(0, load("invalid2").keys.size());
+    assertEquals(0, load("invalid3").keys.size());
 
     // mixed good and bad
     assertEquals(1, load("valid2").keys.size());

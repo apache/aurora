@@ -22,6 +22,8 @@ import net.lag.jaramiko.PKey;
 import net.lag.jaramiko.RSAKey;
 import net.lag.jaramiko.SSHException;
 
+import org.apache.commons.codec.binary.Base64;
+
 import com.twitter.common.base.Either;
 import com.twitter.common.base.Either.Transformer;
 import com.twitter.common.base.Function;
@@ -128,15 +130,18 @@ public class AuthorizedKeySet {
     String encodedKey = fields.get(1);
     try {
       if ("ssh-rsa".equals(algorithm)) {
-        return Either.right(RSAKey.createFromBase64(encodedKey));
+        return Either.right(RSAKey.createFromData(Base64.decodeBase64(encodedKey)));
       } else if ("ssh-dss".equals(algorithm)) {
-        return Either.right(DSSKey.createFromBase64(encodedKey));
+        return Either.right(DSSKey.createFromData(Base64.decodeBase64(encodedKey)));
       } else {
         return failure("Unknown key type: " + algorithm, null);
       }
     } catch (SSHException e) {
       return failure("Failed to create key for line: " + line, e);
     } catch (NumberFormatException e) {
+      // TODO(John Sirois): Patch jaramiko to handle and throw some form of SSHException
+      return failure("Failed to create key for line: " + line, e);
+    } catch (NegativeArraySizeException e) {
       // TODO(John Sirois): Patch jaramiko to handle and throw some form of SSHException
       return failure("Failed to create key for line: " + line, e);
     }
