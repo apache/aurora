@@ -113,13 +113,13 @@ public interface MaintenanceController {
       Set<String> emptyHosts = Sets.newHashSet();
       for (String host : hosts) {
         // If there are no tasks on the host, immediately transition to DRAINED.
-        TaskQuery query = new TaskQuery().setStatuses(Tasks.ACTIVE_STATES).setSlaveHost(host);
+        Query.Builder query = Query.slaveScoped(host).active();
         Set<String> activeTasks = store.getTaskStore().fetchTaskIds(query);
         if (activeTasks.isEmpty()) {
           emptyHosts.add(host);
         } else {
           drainingTasksByHost.putAll(host, activeTasks);
-          callback.execute(query);
+          callback.execute(query.get());
         }
       }
 

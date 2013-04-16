@@ -13,7 +13,6 @@ import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Ordering;
@@ -29,6 +28,7 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
+import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.StateManager;
 import com.twitter.mesos.scheduler.events.PubsubEvent.EventSubscriber;
 import com.twitter.mesos.scheduler.events.PubsubEvent.StorageStarted;
@@ -56,7 +56,7 @@ class TaskTimeout implements EventSubscriber {
       ScheduleStatus.ROLLBACK);
 
   @VisibleForTesting
-  static final TaskQuery TRANSIENT_QUERY = new TaskQuery().setStatuses(TRANSIENT_STATES);
+  static final TaskQuery TRANSIENT_QUERY = Query.byStatus(TRANSIENT_STATES);
 
   private final Map<String, Context> futures = Maps.newConcurrentMap();
 
@@ -152,11 +152,9 @@ class TaskTimeout implements EventSubscriber {
         // timeout is still valid.  Ideally, the future would have already been canceled, but in the
         // event of a state transition race, including transientState prevents an unintended
         // task timeout.
-        TaskQuery query = new TaskQuery()
-            .setTaskIds(ImmutableSet.of(taskId))
-            .setStatuses(ImmutableSet.of(context.transientState));
-          // Note: This requires LOST transitions trigger Driver.killTask.
-          stateManager.changeState(query, ScheduleStatus.LOST, TIMEOUT_MESSAGE);
+        TaskQuery query = Query.taskScoped(taskId).byStatus(context.transientState).get();
+        // Note: This requires LOST transitions trigger Driver.killTask.
+        stateManager.changeState(query, ScheduleStatus.LOST, TIMEOUT_MESSAGE);
       } finally {
         futures.remove(taskId);
       }

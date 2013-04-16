@@ -27,10 +27,10 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.ScheduledTask;
-import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.comm.AdjustRetainedTasks;
 import com.twitter.mesos.scheduler.CommandUtil;
 import com.twitter.mesos.scheduler.PulseMonitor;
+import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.Resources;
 import com.twitter.mesos.scheduler.TaskLauncher;
 import com.twitter.mesos.scheduler.storage.Storage;
@@ -85,7 +85,7 @@ public class GcExecutorLauncher implements TaskLauncher {
     }
 
     Set<ScheduledTask> tasksOnHost =
-        Storage.Util.fetchTasks(storage, new TaskQuery().setSlaveHost(offer.getHostname()));
+        Storage.Util.fetchTasks(storage, Query.bySlave(offer.getHostname()));
     AdjustRetainedTasks message = new AdjustRetainedTasks()
         .setRetainedTasks(Maps.transformValues(Tasks.mapById(tasksOnHost), Tasks.GET_STATUS));
     byte[] data;

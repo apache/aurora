@@ -8,6 +8,7 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
 import com.twitter.common.base.Closure;
+import com.twitter.common.base.Supplier;
 import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.MaintenanceMode;
@@ -142,13 +143,24 @@ public class ForwardingStore implements
     return taskStore.mutateTasks(query, mutator);
   }
 
+  @Override
   public ImmutableSet<ScheduledTask> fetchTasks(TaskQuery query) {
     return taskStore.fetchTasks(query);
   }
 
   @Override
+  public ImmutableSet<ScheduledTask> fetchTasks(Supplier<TaskQuery> querySupplier) {
+    return taskStore.fetchTasks(querySupplier);
+  }
+
+  @Override
   public Set<String> fetchTaskIds(TaskQuery query) {
     return taskStore.fetchTaskIds(query);
+  }
+
+  @Override
+  public Set<String> fetchTaskIds(Supplier<TaskQuery> querySupplier) {
+    return taskStore.fetchTaskIds(querySupplier);
   }
 
   @Override

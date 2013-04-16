@@ -4,7 +4,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 
@@ -12,12 +11,10 @@ import com.twitter.common.base.Closure;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.Clock;
 import com.twitter.mesos.Tasks;
-import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskEvent;
-import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
@@ -117,11 +114,6 @@ public final class StorageBackfill {
       String job,
       int shardId) {
 
-    TaskQuery query = new TaskQuery()
-        .setStatuses(Tasks.ACTIVE_STATES)
-        .setOwner(new Identity().setRole(role))
-        .setJobName(job)
-        .setShardIds(ImmutableSet.of(shardId));
-    return taskStore.fetchTaskIds(query);
+    return taskStore.fetchTaskIds(Query.shardScoped(role, job, shardId).active().get());
   }
 }

@@ -10,7 +10,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.common.testing.EasyMockTest;
-import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.Quota;
@@ -20,6 +19,7 @@ import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.storage.JobUpdateConfiguration;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
+import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.quota.QuotaManager.QuotaManagerImpl;
 import com.twitter.mesos.scheduler.storage.testing.StorageTestUtil;
 
@@ -34,9 +34,7 @@ import static org.junit.Assert.assertTrue;
 public class QuotaManagerImplTest extends EasyMockTest {
 
   private static final String ROLE = "foo";
-  private static final TaskQuery ACTIVE_QUERY = new TaskQuery()
-          .setOwner(new Identity().setRole(ROLE))
-          .setStatuses(Tasks.ACTIVE_STATES);
+  private static final TaskQuery ACTIVE_QUERY = Query.roleScoped(ROLE).active().get();
 
   private StorageTestUtil storageUtil;
   private QuotaManager quotaManager;

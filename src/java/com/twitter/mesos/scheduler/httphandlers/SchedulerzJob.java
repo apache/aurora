@@ -1,5 +1,6 @@
 package com.twitter.mesos.scheduler.httphandlers;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumSet;
@@ -37,7 +38,6 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Constants;
 import com.twitter.mesos.gen.Constraint;
-import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskConstraint;
@@ -46,6 +46,7 @@ import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.CommandLineExpander;
+import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
 import com.twitter.mesos.scheduler.metadata.NearestFit;
 import com.twitter.mesos.scheduler.storage.Storage;
@@ -308,24 +309,22 @@ public class SchedulerzJob extends JerseyTemplateServlet {
         template.setAttribute("role", role);
         template.setAttribute("job", job);
 
-        TaskQuery query = new TaskQuery()
-            .setOwner(new Identity().setRole(role))
-            .setJobName(job);
-
         boolean hasMore = false;
+
+        Query.Builder builder = Query.jobScoped(role, job);
 
         Optional<TaskQuery> activeQuery = Optional.absent();
         Optional<TaskQuery> completedQuery = Optional.absent();
         if (statusFilter != null) {
-          query.setStatuses(FILTER_MAP.get(statusFilter));
+          Collection<ScheduleStatus> queryStatuses = FILTER_MAP.get(statusFilter);
           if (Tasks.isActive(statusFilter)) {
-            activeQuery = Optional.of(query);
+            activeQuery = Optional.of(builder.byStatus(queryStatuses).get());
           } else {
-            completedQuery = Optional.of(query);
+            completedQuery = Optional.of(builder.byStatus(queryStatuses).get());
           }
         } else {
-          activeQuery = Optional.of(new TaskQuery(query).setStatuses(Tasks.ACTIVE_STATES));
-          completedQuery = Optional.of(new TaskQuery(query).setStatuses(Tasks.TERMINAL_STATES));
+          activeQuery = Optional.of(builder.active().get());
+          completedQuery = Optional.of(builder.terminal().get());
         }
 
         if (activeQuery.isPresent()) {

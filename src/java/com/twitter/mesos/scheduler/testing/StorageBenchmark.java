@@ -212,27 +212,23 @@ public class StorageBenchmark extends AbstractApplication {
       }
     });
 
-    final TaskQuery query = new TaskQuery();
+    final TaskQuery query;
     switch (stage.type) {
       case BY_ID:
-        query.setTaskIds(storage.doInTransaction(new Work.Quiet<Set<String>>() {
+        query = Query.byId(storage.doInTransaction(new Work.Quiet<Set<String>>() {
           @Override public Set<String> apply(StoreProvider storeProvider) {
             return storeProvider.getTaskStore().fetchTaskIds(
-                new TaskQuery()
-                    .setOwner(new Identity().setRole(QUERIED_ROLE_NAME))
-                    .setJobName(QUERIED_JOB_NAME)
-                    .setShardIds(ImmutableSet.of(0)));
+                Query.shardScoped(QUERIED_ROLE_NAME, QUERIED_JOB_NAME, 0).active().get());
           }
         }));
         break;
 
       case BY_ROLE:
-        query.setOwner(new Identity().setRole(QUERIED_ROLE_NAME));
+        query = Query.byRole(QUERIED_ROLE_NAME);
         break;
 
       case BY_JOB:
-        query.setOwner(new Identity().setRole(QUERIED_ROLE_NAME))
-            .setJobName(QUERIED_JOB_NAME);
+        query = Query.byJob(QUERIED_ROLE_NAME, QUERIED_JOB_NAME);
         break;
 
       default:

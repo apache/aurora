@@ -23,6 +23,7 @@ import org.apache.commons.lang.StringUtils;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.base.Closure;
+import com.twitter.common.base.Supplier;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -106,6 +107,11 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
     return result;
   }
 
+  @Override
+  public ImmutableSet<ScheduledTask> fetchTasks(Supplier<TaskQuery> querySupplier) {
+    return fetchTasks(querySupplier.get());
+  }
+
   @Timed("mem_storage_fetch_task_ids")
   @Override
   public Set<String> fetchTaskIds(TaskQuery query) {
@@ -119,6 +125,11 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
         Multimaps.index(toIndex, Tasks.SCHEDULED_TO_JOB_KEY),
         Tasks.SCHEDULED_TO_ID)
         .asMap();
+  }
+
+  @Override
+  public Set<String> fetchTaskIds(Supplier<TaskQuery> querySupplier) {
+    return fetchTaskIds(querySupplier.get());
   }
 
   @Timed("mem_storage_save_tasks")

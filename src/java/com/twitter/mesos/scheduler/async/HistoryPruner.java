@@ -31,6 +31,7 @@ import com.twitter.common.util.Clock;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
+import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
@@ -62,7 +63,7 @@ public class HistoryPruner implements EventSubscriber {
       });
 
   @VisibleForTesting
-  static final TaskQuery INACTIVE_QUERY = new TaskQuery().setStatuses(Tasks.TERMINAL_STATES);
+  static final TaskQuery INACTIVE_QUERY = Query.unscoped().terminal().get();
 
   @VisibleForTesting
   final Multimap<String, String> tasksByJob = LinkedHashMultimap.create();

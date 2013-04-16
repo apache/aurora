@@ -250,7 +250,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
       throw new ScheduleException("At least one shard must be specified.");
     }
 
-    final TaskQuery query = Query.activeQuery(role, jobName).setShardIds(shards);
+    final TaskQuery query = Query.shardScoped(role, jobName, shards).active().get();
     storage.doInWriteTransaction(new MutateWork.NoResult<ScheduleException>() {
       @Override protected void execute(MutableStoreProvider storeProvider)
           throws ScheduleException {
@@ -289,7 +289,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
           throws ScheduleException {
 
         Set<ScheduledTask> existingTasks = storeProvider.getTaskStore().fetchTasks(
-            Query.activeQuery(job.getOwner(), job.getName()));
+            Query.jobScoped(job.getOwner().getRole(), job.getName()).active().get());
 
         // Reject if any existing task for the job is in UPDATING/ROLLBACK
         if (Iterables.any(existingTasks, IS_UPDATING)) {

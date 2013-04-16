@@ -12,7 +12,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -65,8 +64,8 @@ class Preempter implements Runnable {
   static final TaskQuery PENDING_QUERY = Query.byStatus(PENDING);
 
   @VisibleForTesting
-  static final TaskQuery ACTIVE_NOT_PENDING_QUERY = new TaskQuery()
-      .setStatuses(ImmutableSet.copyOf(Sets.difference(Tasks.ACTIVE_STATES, EnumSet.of(PENDING))));
+  static final TaskQuery ACTIVE_NOT_PENDING_QUERY = Query.byStatus(
+      EnumSet.copyOf(Sets.difference(Tasks.ACTIVE_STATES, EnumSet.of(PENDING))));
 
   private static final Logger LOG = Logger.getLogger(Preempter.class.getName());
 

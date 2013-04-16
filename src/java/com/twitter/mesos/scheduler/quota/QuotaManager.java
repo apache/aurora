@@ -9,12 +9,12 @@ import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
 
 import com.twitter.mesos.Tasks;
-import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.storage.JobUpdateConfiguration;
 import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
+import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.Shards;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
@@ -101,9 +101,7 @@ public interface QuotaManager {
     public Quota getConsumption(final String role) {
       checkNotBlank(role);
 
-      final TaskQuery query = new TaskQuery()
-          .setOwner(new Identity().setRole(role))
-          .setStatuses(Tasks.ACTIVE_STATES);
+      final TaskQuery query = Query.roleScoped(role).active().get();
 
       return storage.doInTransaction(
           new Work.Quiet<Quota>() {

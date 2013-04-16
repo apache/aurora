@@ -5,7 +5,6 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 
 import org.easymock.Capture;
 import org.easymock.EasyMock;
@@ -25,6 +24,7 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.StateManager;
 import com.twitter.mesos.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.mesos.scheduler.events.PubsubEvent.TaskStateChange;
@@ -135,9 +135,7 @@ public class TaskTimeoutTest extends EasyMockTest {
     expectTaskWatch();
     expectCancel();
     Capture<Runnable> killingTimeout = expectTaskWatch();
-    TaskQuery query = new TaskQuery()
-        .setTaskIds(ImmutableSet.of(TASK_ID))
-        .setStatuses(ImmutableSet.of(KILLING));
+    TaskQuery query = Query.taskScoped(TASK_ID).byStatus(KILLING).get();
     expect(stateManager.changeState(query, LOST, TaskTimeout.TIMEOUT_MESSAGE)).andReturn(1);
 
     control.replay();
@@ -150,9 +148,7 @@ public class TaskTimeoutTest extends EasyMockTest {
   @Test
   public void testTimeout() throws Exception {
     Capture<Runnable> assignedTimeout = expectTaskWatch();
-    TaskQuery query = new TaskQuery()
-        .setTaskIds(ImmutableSet.of(TASK_ID))
-        .setStatuses(ImmutableSet.of(ASSIGNED));
+    TaskQuery query = Query.taskScoped(TASK_ID).byStatus(ASSIGNED).get();
     expect(stateManager.changeState(query, LOST, TaskTimeout.TIMEOUT_MESSAGE)).andReturn(0);
 
     control.replay();

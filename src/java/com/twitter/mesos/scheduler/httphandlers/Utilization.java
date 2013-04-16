@@ -31,10 +31,10 @@ import com.twitter.common.collections.Pair;
 import com.twitter.common.util.templating.StringTemplateHelper;
 import com.twitter.common.util.templating.StringTemplateHelper.TemplateException;
 import com.twitter.mesos.Tasks;
-import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.ClusterName;
+import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.storage.Storage;
 
@@ -44,7 +44,7 @@ import com.twitter.mesos.scheduler.storage.Storage;
 @Path("/utilization")
 public class Utilization {
 
-  private static final TaskQuery ALL_ACTIVE = new TaskQuery().setStatuses(Tasks.ACTIVE_STATES);
+  private static final TaskQuery ALL_ACTIVE = Query.byStatus(Tasks.ACTIVE_STATES);
 
   private final Storage storage;
   private final String clusterName;
@@ -146,8 +146,7 @@ public class Utilization {
 
     MetricType type = MetricType.getById(metric);
     LoadingCache<Pair<String, String>, Metric> byJob = newMetricCache();
-    TaskQuery query = new TaskQuery().setStatuses(Tasks.ACTIVE_STATES)
-        .setOwner(new Identity().setRole(role));
+    TaskQuery query = Query.roleScoped(role).active().get();
     for (TwitterTaskInfo task : Iterables.filter(getTasks(query), type.filter)) {
       byJob.getUnchecked(Pair.<String, String>of(task.getJobName(), null)).accumulate(task);
     }

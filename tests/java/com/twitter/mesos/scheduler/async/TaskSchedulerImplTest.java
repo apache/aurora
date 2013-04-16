@@ -29,9 +29,9 @@ import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
-import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.Driver;
+import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.StateManager;
 import com.twitter.mesos.scheduler.TaskAssigner;
 import com.twitter.mesos.scheduler.async.TaskScheduler.OfferReturnDelay;
@@ -252,9 +252,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     driver.launchTask(offer.getId(), mesosTask);
     expectLastCall().andThrow(new IllegalStateException("Driver not ready."));
     expect(stateManager.changeState(
-        new TaskQuery()
-            .setTaskIds(ImmutableSet.of("a"))
-            .setStatuses(ImmutableSet.of(PENDING)),
+        Query.taskScoped("a").byStatus(PENDING).get(),
         LOST,
         TaskSchedulerImpl.LAUNCH_FAILED_MSG))
         .andReturn(1);

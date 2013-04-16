@@ -227,7 +227,7 @@ public class StateManagerImpl implements StateManager {
 
         String jobKey = Tasks.jobKey(role, job);
         Set<TwitterTaskInfo> existingTasks = ImmutableSet.copyOf(Iterables.transform(
-            storeProvider.getTaskStore().fetchTasks(Query.activeQuery(role, job)),
+            storeProvider.getTaskStore().fetchTasks(Query.jobScoped(role, job).active()),
             Tasks.SCHEDULED_TO_INFO));
 
         if (existingTasks.isEmpty()) {
@@ -264,7 +264,7 @@ public class StateManagerImpl implements StateManager {
       String jobName,
       TaskStore taskStore) throws UpdateException {
 
-    TaskQuery query = Query.byJob(role, jobName).setStatuses(UPDATE_IN_PROGRESS);
+    Query.Builder query = Query.jobScoped(role, jobName).byStatus(UPDATE_IN_PROGRESS);
     if (!taskStore.fetchTaskIds(query).isEmpty()) {
       throw new UpdateException("Unable to proceed until UPDATING and ROLLBACK tasks complete.");
     }
@@ -326,7 +326,7 @@ public class StateManagerImpl implements StateManager {
               (result == UpdateResult.SUCCESS) ? GET_NEW_CONFIG : GET_ORIGINAL_CONFIG;
           for (Integer shard : fetchRemovedShards(jobConfig.get(), removedSelector)) {
             changeState(
-                Query.liveShard(role, job, shard),
+                Query.shardScoped(role, job, shard).active().get(),
                 KILLING,
                 Optional.of("Removed during update by " + updatingUser));
           }
@@ -478,7 +478,10 @@ public class StateManagerImpl implements StateManager {
             }
 
             Set<ScheduledTask> tasks =
-                store.getTaskStore().fetchTasks(Query.liveShards(role, jobName, shards));
+                store.getTaskStore().fetchTasks(Query
+                    .shardScoped(role, jobName, shards)
+                    .active()
+                    .get());
 
             // Extract any shard IDs that are being added as a part of this stage in the update.
             Set<Integer> newShardIds = Sets.difference(shards,
@@ -513,7 +516,7 @@ public class StateManagerImpl implements StateManager {
                 // TODO(William Farner): The additional query could be avoided here.
                 //                       Consider allowing state changes on tasks by task ID.
                 changeState(
-                    Query.liveShards(role, jobName, changedShards),
+                    Query.shardScoped(role, jobName, changedShards).active().get(),
                     modifyingState,
                     Optional.of(auditMessage));
                 putResults(result, ShardUpdateResult.RESTARTING, changedShards);

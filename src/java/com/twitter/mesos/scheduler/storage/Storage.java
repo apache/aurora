@@ -8,6 +8,8 @@ import java.lang.annotation.Target;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.BindingAnnotation;
 
+import com.twitter.common.base.Supplier;
+
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.SchedulerException;
@@ -230,6 +232,23 @@ public interface Storage {
           return storeProvider.getTaskStore().fetchTasks(query);
         }
       });
+    }
+
+    /**
+     * Fetch tasks matching the query returned by {@code querySupplier} from {@code storage} in a
+     * read transaction. Intended for use with {@link com.twitter.mesos.scheduler.Query.Builder}
+     * instances.
+     *
+     * @see #fetchTasks(Storage, com.twitter.mesos.gen.TaskQuery)
+     * @param storage Storage instance to query from.
+     * @param querySupplier Supplier of the query to perform.
+     * @return Tasks returned from the query.
+     */
+    public static ImmutableSet<ScheduledTask> fetchTasks(
+        Storage storage,
+        Supplier<TaskQuery> querySupplier) {
+
+      return fetchTasks(storage, querySupplier.get());
     }
   }
 }

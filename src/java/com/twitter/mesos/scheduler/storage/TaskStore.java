@@ -5,6 +5,7 @@ import java.util.Set;
 import com.google.common.collect.ImmutableSet;
 
 import com.twitter.common.base.Closure;
+import com.twitter.common.base.Supplier;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 
@@ -16,18 +17,39 @@ public interface TaskStore {
   /**
    * Fetches a read-only view of tasks matching a query and filters.
    *
+   * @deprecated Use {@link #fetchTaskIds(Supplier)}.
    * @param query Query to identify tasks with.
    * @return A read-only view of matching tasks.
    */
+  @Deprecated
   ImmutableSet<ScheduledTask> fetchTasks(TaskQuery query);
+
+  /**
+   * Fetches a read-only view of tasks matching a query and filters. Intended for use with a
+   * {@link com.twitter.mesos.scheduler.Query.Builder}.
+   *
+   * @param querySupplier Supplier of the query to identify tasks with.
+   * @return A read-only view of matching tasks.
+   */
+  ImmutableSet<ScheduledTask> fetchTasks(Supplier<TaskQuery> querySupplier);
 
   /**
    * Convenience method to execute a query and only retrieve the IDs of the matching tasks.
    *
+   * @deprecated Use {@link #fetchTaskIds(Supplier)}.
    * @param query Query to identify tasks with.
    * @return IDs of the matching tasks.
    */
+  @Deprecated
   Set<String> fetchTaskIds(TaskQuery query);
+
+  /**
+   * Convenience method to execute a query and only retrieve the IDs of the matching tasks.
+   *
+   * @param querySupplier Supplier of the query to identify tasks with.
+   * @return IDs of the matching tasks.
+   */
+  Set<String> fetchTaskIds(Supplier<TaskQuery> querySupplier);
 
   public interface Mutable extends TaskStore {
     /**

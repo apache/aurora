@@ -22,10 +22,10 @@ import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
-import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.comm.AdjustRetainedTasks;
 import com.twitter.mesos.scheduler.PulseMonitor;
+import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.storage.testing.StorageTestUtil;
 
 import static org.easymock.EasyMock.expect;
@@ -122,6 +122,6 @@ public class GcExecutorLauncherTest extends EasyMockTest {
   }
 
   private void expectGetTasksByHost(String host, ScheduledTask... tasks) {
-    storageUtil.expectTaskFetch(new TaskQuery().setSlaveHost(host), tasks);
+    storageUtil.expectTaskFetch(Query.bySlave(host), tasks);
   }
 }

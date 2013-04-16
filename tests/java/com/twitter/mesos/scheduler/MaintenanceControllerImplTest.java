@@ -8,7 +8,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.common.testing.EasyMockTest;
-import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.HostStatus;
@@ -16,7 +15,6 @@ import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.MaintenanceMode;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
-import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.MaintenanceController.MaintenanceControllerImpl;
 import com.twitter.mesos.scheduler.events.PubsubEvent.StorageStarted;
@@ -70,7 +68,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
   @Test
   public void testMaintenanceCycle() {
     expect(stateManager.changeState(
-        new TaskQuery().setSlaveHost(HOST_A).setStatuses(Tasks.ACTIVE_STATES),
+        Query.slaveScoped(HOST_A).active().get(),
         ScheduleStatus.RESTARTING,
         MaintenanceControllerImpl.DRAINING_MESSAGE))
         .andReturn(1);

@@ -593,7 +593,8 @@ public class SchedulerThriftInterface implements SchedulerController {
     ForceTaskStateResponse response = new ForceTaskStateResponse();
     try {
       assertAdmin(session);
-      schedulerCore.setTaskStatus(Query.byId(taskId), status, transitionMessage(session.getUser()));
+      schedulerCore.setTaskStatus(
+          Query.byId(taskId), status, transitionMessage(session.getUser()));
       response.setResponseCode(OK).setMessage("Transition attempted.");
     } catch (AuthFailedException e) {
       response.setResponseCode(AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);

@@ -301,7 +301,11 @@ public class CronJobManager extends JobManager implements EventSubscriber {
 
     Optional<JobConfiguration> runJob = Optional.absent();
 
-    final TaskQuery activeQuery = Query.activeQuery(job.getOwner(), job.getName());
+    final TaskQuery activeQuery = Query
+        .jobScoped(job.getOwner().getRole(), job.getName())
+        .active()
+        .get();
+
     Set<ScheduledTask> activeTasks = Storage.Util.fetchTasks(storage, activeQuery);
 
     if (activeTasks.isEmpty()) {

@@ -73,7 +73,9 @@ public class CronJobManagerTest extends EasyMockTest {
   }
 
   private IExpectationSetters<?> expectActiveTaskFetch(ScheduledTask... activeTasks) {
-    TaskQuery query = Query.activeQuery(job.getOwner().getRole(), job.getName());
+    TaskQuery query = Query.jobScoped(job.getOwner().getRole(), job.getName())
+        .active()
+        .get();
     return storageUtil.expectTaskFetch(query, activeTasks);
   }
 
