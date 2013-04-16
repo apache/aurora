@@ -14,6 +14,7 @@ from twitter.common.exceptions import ExceptionalThread
 from twitter.common.quantity import Amount, Time
 
 # thermos
+from twitter.mesos.clusters import Cluster
 from twitter.mesos.common.http_signaler import HttpSignaler
 from twitter.mesos.config import PortResolver
 from twitter.mesos.config.schema import MesosJob, MesosTaskInstance
@@ -115,11 +116,25 @@ class ThermosExecutor(ThermosExecutorBase):
     if 'instance' in json_blob:
       return MesosTaskInstance.json_loads(thermos_task)
     else:
-      job, refs = task_instance_from_job(MesosJob.json_loads(thermos_task),
+      mti, refs = task_instance_from_job(MesosJob.json_loads(thermos_task),
           assigned_task.task.shardId)
       if refs:
         raise ValueError('Unexpected unbound refs: %s' % ' '.join(map(str, refs)))
-      return job
+      return mti
+
+  @classmethod
+  def extract_ensemble(cls, assigned_task, default=Cluster.DEFAULT_ENSEMBLE):
+    thermos_task = assigned_task.task.thermosConfig
+    if 'instance' in json.loads(thermos_task):
+      # Received MesosTaskInstance
+      return default
+    else:
+      job = MesosJob.json_loads(thermos_task)
+      try:
+        cluster = Cluster.get(job.cluster().get())
+        return cluster.zk
+      except KeyError:
+        return default
 
   @property
   def runner(self):
@@ -222,7 +237,8 @@ class ThermosExecutor(ThermosExecutorBase):
           socket.gethostname(),
           mesos_task.announce().primary_port().get(),
           portmap,
-          assigned_task.task.shardId)
+          assigned_task.task.shardId,
+          ensemble=self.extract_ensemble(assigned_task))
       health_checkers.append(discovery_manager)
 
     health_checkers.append(self._kill_manager)

@@ -23,6 +23,7 @@ from twitter.common.log.options import LogOptions
 from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_rmtree
 from twitter.common.quantity import Amount, Time, Data
+from twitter.mesos.clusters import Cluster
 from twitter.mesos.config.schema import (
   HealthCheckConfig,
   MB,
@@ -147,6 +148,7 @@ MESOS_JOB = MesosJob(
   role = getpass.getuser(),
 )
 
+
 def test_deserialize_thermos_task():
   assigned_task = AssignedTask(task=TwitterTaskInfo(
       thermosConfig=MESOS_JOB(task=HELLO_WORLD).json_dumps(),
@@ -157,6 +159,22 @@ def test_deserialize_thermos_task():
       thermosConfig=HELLO_WORLD_MTI.json_dumps(),
       shardId=0))
   assert ThermosExecutor.deserialize_thermos_task(assigned_task) == BASE_MTI(task=HELLO_WORLD)
+
+
+def test_extract_ensemble():
+  def make_assigned_task(thermos_config):
+    return AssignedTask(task=TwitterTaskInfo(thermosConfig=thermos_config.json_dumps(),
+        shardId=0))
+
+  assigned_task = make_assigned_task(MESOS_JOB(task=HELLO_WORLD, cluster='unknown'))
+  assert ThermosExecutor.extract_ensemble(assigned_task) == Cluster.DEFAULT_ENSEMBLE
+
+  assigned_task = make_assigned_task(MESOS_JOB(task=HELLO_WORLD, cluster='smf1-test'))
+  assert ThermosExecutor.extract_ensemble(assigned_task) == (
+      Cluster.get('smf1-test').zk)
+
+  assigned_task = make_assigned_task(HELLO_WORLD_MTI)
+  assert ThermosExecutor.extract_ensemble(assigned_task) == Cluster.DEFAULT_ENSEMBLE
 
 
 def make_runner(proxy_driver, checkpoint_root, task, ports={}, fast_status=False,
@@ -452,6 +470,7 @@ class TestThermosExecutor(object):
     assert len(updates) == 2
     assert updates[-1][0][0].state == mesos_pb.TASK_KILLED
 
+
 def test_waiting_executor():
   proxy_driver = ProxyDriver()
   with temporary_dir() as checkpoint_root:
@@ -460,3 +479,4 @@ def test_waiting_executor():
     TestThermosExecutorTimer(te, proxy_driver).start()
     proxy_driver._stop_event.wait(timeout=1.0)
     assert proxy_driver._stop_event.is_set()
+
