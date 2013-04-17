@@ -237,8 +237,9 @@ class ThermosExecutor(ThermosExecutorBase):
           socket.gethostname(),
           mesos_task.announce().primary_port().get(),
           portmap,
-          assigned_task.task.shardId,
-          ensemble=self.extract_ensemble(assigned_task))
+          assigned_task.task.shardId)
+          # TODO(wickman) Possibly return this code once we've hashed out MESOS-2753
+          # ensemble=self.extract_ensemble(assigned_task))
       health_checkers.append(discovery_manager)
 
     health_checkers.append(self._kill_manager)
