@@ -9,9 +9,9 @@ import com.google.inject.Inject;
 
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.Resources;
-import com.twitter.mesos.scheduler.SchedulingFilter;
+import com.twitter.mesos.scheduler.configuration.Resources;
 import com.twitter.mesos.scheduler.events.PubsubEvent.Vetoed;
+import com.twitter.mesos.scheduler.filter.SchedulingFilter;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;

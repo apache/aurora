@@ -9,7 +9,7 @@ import com.google.common.base.Objects;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
-import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
+import com.twitter.mesos.scheduler.filter.SchedulingFilter.Veto;
 
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;

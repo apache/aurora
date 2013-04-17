@@ -20,16 +20,16 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.Resources;
 import com.twitter.mesos.scheduler.SchedulerCore;
-import com.twitter.mesos.scheduler.SchedulingFilter;
+import com.twitter.mesos.scheduler.configuration.Resources;
+import com.twitter.mesos.scheduler.filter.SchedulingFilter;
 import com.twitter.mesos.scheduler.storage.testing.StorageTestUtil;
 
 import static org.easymock.EasyMock.expect;
 
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
-import static com.twitter.mesos.scheduler.SchedulingFilter.Veto;
+import static com.twitter.mesos.scheduler.filter.SchedulingFilter.Veto;
 
 public class PreempterTest extends EasyMockTest {
 

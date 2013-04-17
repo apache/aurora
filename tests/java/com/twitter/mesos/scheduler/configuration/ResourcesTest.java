@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.configuration;
 
 import java.util.Set;
 
@@ -14,14 +14,11 @@ import org.apache.mesos.Protos.Value.Type;
 import org.junit.Test;
 
 import com.twitter.common.collections.Pair;
-import com.twitter.mesos.scheduler.Resources.InsufficientResourcesException;
+import com.twitter.mesos.scheduler.configuration.Resources.InsufficientResourcesException;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
-/**
- * @author William Farner
- */
 public class ResourcesTest {
 
   private static final String NAME = "resource_name";

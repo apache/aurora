@@ -29,6 +29,7 @@ import org.junit.Test;
 import com.twitter.common.collections.Pair;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.scheduler.async.TaskScheduler;
+import com.twitter.mesos.scheduler.configuration.Resources;
 import com.twitter.mesos.scheduler.storage.Storage.StorageException;
 
 import static org.easymock.EasyMock.expect;

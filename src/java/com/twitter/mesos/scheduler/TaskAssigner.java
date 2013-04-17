@@ -11,7 +11,9 @@ import org.apache.mesos.Protos.TaskInfo;
 
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduledTask;
-import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
+import com.twitter.mesos.scheduler.configuration.Resources;
+import com.twitter.mesos.scheduler.filter.SchedulingFilter;
+import com.twitter.mesos.scheduler.filter.SchedulingFilter.Veto;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 

@@ -10,10 +10,10 @@ import org.junit.Test;
 import com.twitter.common.base.Closure;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.Resources;
-import com.twitter.mesos.scheduler.SchedulingFilter;
-import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
+import com.twitter.mesos.scheduler.configuration.Resources;
 import com.twitter.mesos.scheduler.events.PubsubEvent.Vetoed;
+import com.twitter.mesos.scheduler.filter.SchedulingFilter;
+import com.twitter.mesos.scheduler.filter.SchedulingFilter.Veto;
 
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;

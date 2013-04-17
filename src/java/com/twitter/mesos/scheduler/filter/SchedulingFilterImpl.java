@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.filter;
 
 import java.util.Collection;
 import java.util.Comparator;
@@ -25,7 +25,9 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
+import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
+import com.twitter.mesos.scheduler.configuration.Resources;
 import com.twitter.mesos.scheduler.storage.AttributeStore;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
@@ -33,11 +35,11 @@ import com.twitter.mesos.scheduler.storage.Storage.Work.Quiet;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import static com.twitter.mesos.scheduler.SchedulingFilterImpl.ResourceVector.CPU;
-import static com.twitter.mesos.scheduler.SchedulingFilterImpl.ResourceVector.DISK;
-import static com.twitter.mesos.scheduler.SchedulingFilterImpl.ResourceVector.PORTS;
-import static com.twitter.mesos.scheduler.SchedulingFilterImpl.ResourceVector.RAM;
 import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
+import static com.twitter.mesos.scheduler.filter.SchedulingFilterImpl.ResourceVector.CPU;
+import static com.twitter.mesos.scheduler.filter.SchedulingFilterImpl.ResourceVector.DISK;
+import static com.twitter.mesos.scheduler.filter.SchedulingFilterImpl.ResourceVector.PORTS;
+import static com.twitter.mesos.scheduler.filter.SchedulingFilterImpl.ResourceVector.RAM;
 
 /**
  * Implementation of the scheduling filter that ensures resource requirements of tasks are

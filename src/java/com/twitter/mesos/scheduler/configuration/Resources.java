@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.configuration;
 
 import java.util.Collections;
 import java.util.List;
@@ -26,6 +26,7 @@ import org.apache.mesos.Protos.Value.Type;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.Numbers;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -226,7 +227,7 @@ public class Resources {
    * @param value Value for the resource.
    * @return A mesos resource.
    */
-  static Resource makeMesosResource(String name, double value) {
+  public static Resource makeMesosResource(String name, double value) {
     return Resource.newBuilder().setName(name).setType(Type.SCALAR)
         .setScalar(Scalar.newBuilder().setValue(value)).build();
   }
@@ -262,7 +263,7 @@ public class Resources {
    *
    * @return CPUs.
    */
-  double getNumCpus() {
+  public double getNumCpus() {
     return numCpus;
   }
 
@@ -271,7 +272,7 @@ public class Resources {
    *
    * @return Disk.
    */
-  Amount<Long, Data> getDisk() {
+  public Amount<Long, Data> getDisk() {
     return disk;
   }
 
@@ -280,7 +281,7 @@ public class Resources {
    *
    * @return RAM.
    */
-  Amount<Long, Data> getRam() {
+  public Amount<Long, Data> getRam() {
     return ram;
   }
 
@@ -289,7 +290,7 @@ public class Resources {
    *
    * @return Port count.
    */
-  int getNumPorts() {
+  public int getNumPorts() {
     return numPorts;
   }
 

@@ -25,6 +25,7 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.configuration.Resources;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 

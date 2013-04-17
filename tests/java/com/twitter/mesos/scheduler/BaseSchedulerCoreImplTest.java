@@ -54,6 +54,7 @@ import com.twitter.mesos.gen.ValueConstraint;
 import com.twitter.mesos.scheduler.CronJobManager.CronScheduler;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
+import com.twitter.mesos.scheduler.configuration.ParsedConfiguration;
 import com.twitter.mesos.scheduler.events.PubsubEvent;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 import com.twitter.mesos.scheduler.quota.QuotaManager.QuotaManagerImpl;

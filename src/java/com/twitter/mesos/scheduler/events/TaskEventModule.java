@@ -18,10 +18,10 @@ import com.google.inject.multibindings.Multibinder;
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Command;
-import com.twitter.mesos.scheduler.SchedulingFilter;
 import com.twitter.mesos.scheduler.events.NotifyingSchedulingFilter.NotifyDelegate;
 import com.twitter.mesos.scheduler.events.PubsubEvent.EventSubscriber;
 import com.twitter.mesos.scheduler.events.PubsubEvent.Interceptors.SendNotification;
+import com.twitter.mesos.scheduler.filter.SchedulingFilter;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 

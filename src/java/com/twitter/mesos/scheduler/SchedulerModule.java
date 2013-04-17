@@ -33,7 +33,6 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.stats.StatsProvider;
-import com.twitter.common.thrift.ThriftServer;
 import com.twitter.common.util.Clock;
 import com.twitter.common.zookeeper.Candidate;
 import com.twitter.common.zookeeper.ServerSet;
@@ -54,6 +53,7 @@ import com.twitter.mesos.scheduler.SchedulerLifecycle.DriverReference;
 import com.twitter.mesos.scheduler.TaskAssigner.TaskAssignerImpl;
 import com.twitter.mesos.scheduler.async.AsyncModule;
 import com.twitter.mesos.scheduler.events.TaskEventModule;
+import com.twitter.mesos.scheduler.filter.SchedulingFilterImpl;
 import com.twitter.mesos.scheduler.httphandlers.ServletModule;
 import com.twitter.mesos.scheduler.metadata.MetadataModule;
 import com.twitter.mesos.scheduler.periodic.GcExecutorLauncher;
@@ -146,15 +146,6 @@ public class SchedulerModule extends AbstractModule {
     // Bindings for SchedulerCoreImpl.
     bind(CronJobManager.class).in(Singleton.class);
     bind(ImmediateJobManager.class).in(Singleton.class);
-
-    // Bindings for SchedulerController
-    bind(SchedulerController.class).to(SchedulerThriftInterface.class).in(Singleton.class);
-
-    // Bindings for thrift interfaces.
-    // TODO(ksweeney): Refactor LoggingThriftInterface to LoggingSchedulerController
-    LoggingThriftInterface.bind(binder(), SchedulerThriftRouter.class);
-    bind(SchedulerThriftRouter.class).in(Singleton.class);
-    bind(ThriftServer.class).to(SchedulerThriftServer.class).in(Singleton.class);
 
     // Filter layering: notifier filter -> base impl
     TaskEventModule.bind(binder(), SchedulingFilterImpl.class);

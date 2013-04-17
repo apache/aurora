@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.thrift;
 
 import java.util.Set;
 import java.util.logging.Level;
@@ -63,8 +63,14 @@ import com.twitter.mesos.gen.UnloadRecoveryResponse;
 import com.twitter.mesos.gen.UpdateResponseCode;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.UpdateShardsResponse;
+import com.twitter.mesos.scheduler.JobKeys;
+import com.twitter.mesos.scheduler.MaintenanceController;
+import com.twitter.mesos.scheduler.Query;
+import com.twitter.mesos.scheduler.ScheduleException;
+import com.twitter.mesos.scheduler.SchedulerCore;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
+import com.twitter.mesos.scheduler.configuration.ParsedConfiguration;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.backup.Recovery;
@@ -84,7 +90,7 @@ import static com.twitter.mesos.gen.ResponseCode.OK;
  * Mesos scheduler thrift server implementation.
  * Interfaces between mesos users and the scheduler core to perform cluster administration tasks.
  */
-public class SchedulerThriftInterface implements SchedulerController {
+class SchedulerThriftInterface implements SchedulerController {
   @VisibleForTesting
   @NotEmpty
   @CmdLine(name = "admin_role",

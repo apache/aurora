@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.filter;
 
 import java.util.Set;
 
@@ -6,6 +6,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
 
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.configuration.Resources;
 
 /**
  * Determines whether a proposed scheduling assignment should be allowed.

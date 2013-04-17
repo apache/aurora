@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.filter;
 
 import java.util.Arrays;
 import java.util.Set;
@@ -29,8 +29,9 @@ import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.ValueConstraint;
 import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
-import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
+import com.twitter.mesos.scheduler.configuration.Resources;
+import com.twitter.mesos.scheduler.filter.SchedulingFilter.Veto;
 import com.twitter.mesos.scheduler.storage.AttributeStore;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
@@ -42,14 +43,14 @@ import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import static com.twitter.mesos.scheduler.ConstraintFilter.limitVeto;
-import static com.twitter.mesos.scheduler.ConstraintFilter.mismatchVeto;
-import static com.twitter.mesos.scheduler.SchedulingFilterImpl.DEDICATED_HOST_VETO;
-import static com.twitter.mesos.scheduler.SchedulingFilterImpl.ResourceVector.CPU;
-import static com.twitter.mesos.scheduler.SchedulingFilterImpl.ResourceVector.DISK;
-import static com.twitter.mesos.scheduler.SchedulingFilterImpl.ResourceVector.PORTS;
-import static com.twitter.mesos.scheduler.SchedulingFilterImpl.ResourceVector.RAM;
 import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
+import static com.twitter.mesos.scheduler.filter.ConstraintFilter.limitVeto;
+import static com.twitter.mesos.scheduler.filter.ConstraintFilter.mismatchVeto;
+import static com.twitter.mesos.scheduler.filter.SchedulingFilterImpl.DEDICATED_HOST_VETO;
+import static com.twitter.mesos.scheduler.filter.SchedulingFilterImpl.ResourceVector.CPU;
+import static com.twitter.mesos.scheduler.filter.SchedulingFilterImpl.ResourceVector.DISK;
+import static com.twitter.mesos.scheduler.filter.SchedulingFilterImpl.ResourceVector.PORTS;
+import static com.twitter.mesos.scheduler.filter.SchedulingFilterImpl.ResourceVector.RAM;
 
 public class SchedulingFilterImplTest extends EasyMockTest {
 

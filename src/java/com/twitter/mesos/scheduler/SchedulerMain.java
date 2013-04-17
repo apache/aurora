@@ -53,6 +53,7 @@ import com.twitter.mesos.scheduler.storage.backup.BackupModule;
 import com.twitter.mesos.scheduler.storage.log.LogStorageModule;
 import com.twitter.mesos.scheduler.storage.log.SnapshotStoreImpl;
 import com.twitter.mesos.scheduler.testing.IsolatedSchedulerModule;
+import com.twitter.mesos.scheduler.thrift.ThriftModule;
 
 /**
  * Launcher for the twitter mesos scheduler.
@@ -127,6 +128,7 @@ public class SchedulerMain extends AbstractApplication {
     ImmutableList.Builder<Module> modules = ImmutableList.<Module>builder()
         .addAll(getSystemModules())
         .add(new SchedulerModule(clusterName, authMode))
+        .add(new ThriftModule())
         .add(serviceBinder)
         .add(additionalModules);
 

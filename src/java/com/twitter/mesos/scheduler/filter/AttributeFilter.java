@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.filter;
 
 import java.util.Set;
 
@@ -12,7 +12,7 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Attribute;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.ValueConstraint;
-import com.twitter.mesos.scheduler.SchedulingFilterImpl.AttributeLoader;
+import com.twitter.mesos.scheduler.filter.SchedulingFilterImpl.AttributeLoader;
 
 /**
  * Utility class that matches attributes to constraints.

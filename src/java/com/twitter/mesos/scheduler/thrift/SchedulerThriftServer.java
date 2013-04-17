@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.thrift;
 
 import com.twitter.common.thrift.ThriftServer;
 

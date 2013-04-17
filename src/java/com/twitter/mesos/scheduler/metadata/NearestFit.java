@@ -18,11 +18,11 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduleStatus;
-import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
 import com.twitter.mesos.scheduler.events.PubsubEvent.EventSubscriber;
 import com.twitter.mesos.scheduler.events.PubsubEvent.TaskStateChange;
 import com.twitter.mesos.scheduler.events.PubsubEvent.TasksDeleted;
 import com.twitter.mesos.scheduler.events.PubsubEvent.Vetoed;
+import com.twitter.mesos.scheduler.filter.SchedulingFilter.Veto;
 
 /**
  * Tracks vetoes against scheduling decisions and maintains the closest fit among all the vetoes

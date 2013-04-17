@@ -51,7 +51,7 @@ public final class JobKeys {
    * @return A valid JobKey if one can be synthesized.
    * @throws IllegalArgumentException if no valid JobKey could be synthesized.
    */
-  static JobKey fromRequestParameters(
+  public static JobKey fromRequestParameters(
       @Nullable JobKey jobKey,
       @Nullable String role,
       @Nullable String name) {
@@ -81,5 +81,5 @@ public final class JobKeys {
     return assertValid(job);
   }
 
-  private JobKeys() { };
+  private JobKeys() { }
 }

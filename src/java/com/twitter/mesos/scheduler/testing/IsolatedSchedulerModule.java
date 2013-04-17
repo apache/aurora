@@ -19,6 +19,7 @@ import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -46,6 +47,7 @@ import org.apache.mesos.Protos.Value.Text;
 import org.apache.mesos.Protos.Value.Type;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
+import org.apache.thrift.TException;
 
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.application.modules.LifecycleModule;
@@ -59,14 +61,14 @@ import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 import com.twitter.mesos.gen.CreateJobResponse;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.MesosSchedulerManager;
 import com.twitter.mesos.gen.Package;
 import com.twitter.mesos.gen.SessionKey;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.storage.Snapshot;
 import com.twitter.mesos.scheduler.DriverFactory;
-import com.twitter.mesos.scheduler.Resources;
-import com.twitter.mesos.scheduler.SchedulerThriftInterface;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
+import com.twitter.mesos.scheduler.configuration.Resources;
 import com.twitter.mesos.scheduler.events.PubsubEvent.DriverRegistered;
 import com.twitter.mesos.scheduler.events.PubsubEvent.EventSubscriber;
 import com.twitter.mesos.scheduler.events.PubsubEvent.TaskStateChange;
@@ -121,14 +123,14 @@ public class IsolatedSchedulerModule extends AbstractModule {
     };
 
     private final Provider<Scheduler> scheduler;
-    private final SchedulerThriftInterface thrift;
+    private final MesosSchedulerManager.Iface thrift;
     private final ScheduledExecutorService executor;
     private final SchedulerDriver driver;
 
     @Inject
     FakeClusterRunner(
         Provider<Scheduler> scheduler,
-        SchedulerThriftInterface thrift,
+        MesosSchedulerManager.Iface thrift,
         ShutdownRegistry shutdownRegistry) {
 
       this.scheduler = scheduler;
@@ -272,9 +274,12 @@ public class IsolatedSchedulerModule extends AbstractModule {
           job.getOwner().getUser(),
           System.currentTimeMillis(),
           ByteBuffer.wrap("fake".getBytes()));
-      CreateJobResponse response = thrift.createJob(
-          job,
-          sessionKey);
+      CreateJobResponse response;
+      try {
+        response = thrift.createJob(job, sessionKey);
+      } catch (TException e) {
+        throw Throwables.propagate(e);
+      }
       LOG.info("Create job response: " + response);
     }
   }

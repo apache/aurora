@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.thrift;
 
 import java.util.Iterator;
 import java.util.Set;
@@ -44,7 +44,12 @@ import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.ValueConstraint;
+import com.twitter.mesos.scheduler.MaintenanceController;
+import com.twitter.mesos.scheduler.Query;
+import com.twitter.mesos.scheduler.ScheduleException;
+import com.twitter.mesos.scheduler.SchedulerCore;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
+import com.twitter.mesos.scheduler.configuration.ParsedConfiguration;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 import com.twitter.mesos.scheduler.storage.backup.Recovery;
 import com.twitter.mesos.scheduler.storage.backup.StorageBackup;
@@ -62,9 +67,9 @@ import static com.twitter.mesos.gen.MaintenanceMode.NONE;
 import static com.twitter.mesos.gen.MaintenanceMode.SCHEDULED;
 import static com.twitter.mesos.gen.ResponseCode.INVALID_REQUEST;
 import static com.twitter.mesos.gen.ResponseCode.OK;
-import static com.twitter.mesos.scheduler.SchedulerThriftInterface.transitionMessage;
 import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.MAX_TASKS_PER_JOB;
+import static com.twitter.mesos.scheduler.thrift.SchedulerThriftInterface.transitionMessage;
 
 public class SchedulerThriftInterfaceTest extends EasyMockTest {
 

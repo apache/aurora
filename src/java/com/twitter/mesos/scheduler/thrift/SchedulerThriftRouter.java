@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.thrift;
 
 import java.util.Set;
 
@@ -39,6 +39,7 @@ import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.UnloadRecoveryResponse;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.UpdateShardsResponse;
+import com.twitter.mesos.scheduler.JobKeys;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -47,7 +48,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * controllers. For now this is a thin shim to avoid huge refactors for simple Thrift API
  * changes and input validation is performed by the controllers.
  */
-public class SchedulerThriftRouter implements MesosAdmin.Iface {
+class SchedulerThriftRouter implements MesosAdmin.Iface {
 
   private SchedulerController schedulerController;
 

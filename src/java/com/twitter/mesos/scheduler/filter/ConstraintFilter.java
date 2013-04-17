@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.filter;
 
 import java.util.Collection;
 import java.util.Set;
@@ -16,8 +16,9 @@ import com.twitter.mesos.gen.Attribute;
 import com.twitter.mesos.gen.Constraint;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskConstraint;
-import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
-import com.twitter.mesos.scheduler.SchedulingFilterImpl.AttributeLoader;
+import com.twitter.mesos.scheduler.SchedulerException;
+import com.twitter.mesos.scheduler.filter.SchedulingFilter.Veto;
+import com.twitter.mesos.scheduler.filter.SchedulingFilterImpl.AttributeLoader;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 

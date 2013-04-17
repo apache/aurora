@@ -31,8 +31,8 @@ import com.twitter.mesos.gen.comm.AdjustRetainedTasks;
 import com.twitter.mesos.scheduler.CommandUtil;
 import com.twitter.mesos.scheduler.PulseMonitor;
 import com.twitter.mesos.scheduler.Query;
-import com.twitter.mesos.scheduler.Resources;
 import com.twitter.mesos.scheduler.TaskLauncher;
+import com.twitter.mesos.scheduler.configuration.Resources;
 import com.twitter.mesos.scheduler.storage.Storage;
 
 import static java.lang.annotation.ElementType.FIELD;

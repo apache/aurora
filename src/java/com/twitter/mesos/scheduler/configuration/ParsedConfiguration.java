@@ -1,11 +1,10 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.configuration;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
 import com.twitter.mesos.gen.JobConfiguration;
-import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 
 /**
@@ -17,7 +16,7 @@ public final class ParsedConfiguration {
   private final JobConfiguration parsed;
 
   @VisibleForTesting
-  ParsedConfiguration(JobConfiguration parsed) throws TaskDescriptionException {
+  public ParsedConfiguration(JobConfiguration parsed) throws TaskDescriptionException {
     this.parsed = parsed;
   }
 

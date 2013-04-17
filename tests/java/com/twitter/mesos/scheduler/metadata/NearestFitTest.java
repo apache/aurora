@@ -13,10 +13,10 @@ import com.twitter.common.util.testing.FakeTicker;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
-import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
 import com.twitter.mesos.scheduler.events.PubsubEvent.TaskStateChange;
 import com.twitter.mesos.scheduler.events.PubsubEvent.TasksDeleted;
 import com.twitter.mesos.scheduler.events.PubsubEvent.Vetoed;
+import com.twitter.mesos.scheduler.filter.SchedulingFilter.Veto;
 
 import static org.junit.Assert.assertEquals;
 

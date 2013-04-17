@@ -47,7 +47,7 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.CommandLineExpander;
 import com.twitter.mesos.scheduler.Query;
-import com.twitter.mesos.scheduler.SchedulingFilter.Veto;
+import com.twitter.mesos.scheduler.filter.SchedulingFilter.Veto;
 import com.twitter.mesos.scheduler.metadata.NearestFit;
 import com.twitter.mesos.scheduler.storage.Storage;
 

@@ -27,6 +27,7 @@ import com.twitter.common.stats.Stats;
 import com.twitter.mesos.GuiceUtils.AllowUnchecked;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.comm.SchedulerMessage;
+import com.twitter.mesos.scheduler.configuration.Resources;
 import com.twitter.mesos.scheduler.events.PubsubEvent.Interceptors.Event;
 import com.twitter.mesos.scheduler.events.PubsubEvent.Interceptors.SendNotification;
 import com.twitter.mesos.scheduler.storage.Storage;

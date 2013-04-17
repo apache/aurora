@@ -13,6 +13,7 @@ import com.twitter.mesos.gen.ShardUpdateResult;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
+import com.twitter.mesos.scheduler.configuration.ParsedConfiguration;
 
 /**
  * Scheduling core, stores scheduler state and makes decisions about which tasks to schedule when
