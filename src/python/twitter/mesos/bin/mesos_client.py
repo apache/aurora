@@ -85,11 +85,29 @@ OPEN_BROWSER_OPTION = optparse.Option(
     help='Open a browser window to the job page after a job mutation.')
 
 
+def shard_range_parser(shards):
+  result = set()
+  for part in shards.split(','):
+    x = part.split('-')
+    result.update(range(int(x[0]), int(x[-1])+1))
+  return sorted(result)
+
+def parse_shards_into(option, opt, value, parser):
+  try:
+    setattr(parser.values, option.dest, shard_range_parser(value))
+  except ValueError as e:
+    raise OptionValueError('Failed to parse: %s' % e)
+
 SHARDS_OPTION = optparse.Option(
     '--shards',
+    type='string',
     dest='shards',
     default=None,
-    help='A comma-separated list of shard ids to act on. If not set, all shards will be acted on.')
+    action='callback',
+    callback=parse_shards_into,
+    help='A list of shard ids to act on. Can either be a comma-separated list (e.g. 0,1,2) '
+    'or a range (e.g. 0-2) or any combination of the two (e.g. 0-2,5,7-9). If not set, '
+    'all shards will be acted on.')
 
 
 JSON_OPTION = optparse.Option(
@@ -504,7 +522,7 @@ def kill(role, jobname):
   """
   options = app.get_options()
   api = MesosClientAPI(options.cluster, options.verbosity == 'verbose')
-  resp = api.kill_job(role, jobname, _getshards(app.get_options().shards))
+  resp = api.kill_job(role, jobname, app.get_options().shards)
   check_and_log_response(resp)
   handle_open(api.scheduler.scheduler(), role, jobname)
 
@@ -566,16 +584,6 @@ def status(role, jobname):
     log.info('No tasks found.')
 
 
-def _getshards(shards):
-  if not shards:
-    return None
-
-  try:
-    return map(int, shards.split(','))
-  except ValueError:
-    die('Invalid shards list: %r' % shards)
-
-
 @app.command
 @app.command_option('--updater_health_check_interval_seconds',
                     dest='health_check_interval_seconds',
@@ -615,7 +623,7 @@ def update(jobname, config_file):
       select_cluster=options.cluster,
       select_env=options.env)
   api = MesosClientAPI(config.cluster(), options.verbosity == 'verbose')
-  resp = api.update_job(config, options.health_check_interval_seconds, _getshards(options.shards))
+  resp = api.update_job(config, options.health_check_interval_seconds, options.shards)
   check_and_log_response(resp)
 
 
@@ -635,7 +643,7 @@ def restart(role, job):
   api = MesosClientAPI(options.cluster, options.verbosity == 'verbose')
   if not options.shards:
     die('--shards is required')
-  resp = api.restart(role, job, _getshards(options.shards))
+  resp = api.restart(role, job, options.shards)
   check_and_log_response(resp)
   handle_open(api.scheduler.scheduler(), role, job)
 
