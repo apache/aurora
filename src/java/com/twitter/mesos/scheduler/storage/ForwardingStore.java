@@ -5,10 +5,10 @@ import java.util.Set;
 import javax.annotation.Nullable;
 
 import com.google.common.base.Optional;
+import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableSet;
 
 import com.twitter.common.base.Closure;
-import com.twitter.common.base.Supplier;
 import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.MaintenanceMode;

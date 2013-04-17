@@ -2,6 +2,8 @@ package com.twitter.mesos.scheduler.storage.mem;
 
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google.common.base.Supplier;
+import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.Atomics;
@@ -17,6 +19,7 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.JobKeys;
 import com.twitter.mesos.scheduler.Query;
 
 import static org.junit.Assert.assertEquals;
@@ -54,12 +57,21 @@ public class MemTaskStoreTest {
     assertStoreContents();
     store.saveTasks(ImmutableSet.of(TASK_A, TASK_B, TASK_C, TASK_D));
 
-    assertQueryResults(Query.byId("b"), TASK_B);
-    assertQueryResults(Query.byId(ImmutableSet.of("a", "d")), TASK_A, TASK_D);
-    assertQueryResults(Query.byRole("role-c"), TASK_C);
-    assertQueryResults(Query.byStatus(ScheduleStatus.PENDING), TASK_A, TASK_B, TASK_C, TASK_D);
-    assertQueryResults(Query.shardScoped("role-a", "job-a", 0).active().get(), TASK_A);
-    assertQueryResults(Query.jobScoped("role-b", "job-b").active().get(), TASK_B);
+    assertQueryResults(Query.taskScoped("b"), TASK_B);
+    assertQueryResults(Query.taskScoped("a", "d"), TASK_A, TASK_D);
+    assertQueryResults(Query.roleScoped("role-c"), TASK_C);
+    assertQueryResults(Query.envScoped("role-c", "test"), TASK_C);
+    assertQueryResults(Query.envScoped("role-c", "devel"));
+    assertQueryResults(
+        Query.unscoped().byStatus(ScheduleStatus.PENDING),
+        TASK_A, TASK_B, TASK_C, TASK_D);
+    assertQueryResults(Query.shardScoped("role-a", "job-a", 0).active(), TASK_A);
+    assertQueryResults(
+        Query.shardScoped(JobKeys.from("role-a", "test", "job-a"), 0).active(),
+        TASK_A);
+    assertQueryResults(Query.jobScoped("role-b", "job-b").active(), TASK_B);
+    assertQueryResults(Query.jobScoped(JobKeys.from("role-b", "test", "job-b")).active(), TASK_B);
+    assertQueryResults(Query.jobScoped(JobKeys.from("role-b", "devel", "job-b")).active());
 
     // Explicitly call out the current differing behaviors for types of empty query conditions.
     // Specifically - null task IDs and empty task IDs are different than other 'IN' conditions..
@@ -156,9 +168,9 @@ public class MemTaskStoreTest {
     final ScheduledTask b = makeTask("b", "jim", "job");
     final ScheduledTask c = makeTask("c", "jim", "job2");
     final ScheduledTask d = makeTask("d", "joe", "job");
-    final TaskQuery jimsJob = Query.byJob("jim", "job");
-    final TaskQuery jimsJob2 = Query.byJob("jim", "job2");
-    final TaskQuery joesJob = Query.byJob("joe", "job");
+    final Query.Builder jimsJob = Query.jobScoped("jim", "job");
+    final Query.Builder jimsJob2 = Query.jobScoped("jim", "job2");
+    final Query.Builder joesJob = Query.jobScoped("joe", "job");
 
     store.saveTasks(ImmutableSet.of(a, b, c, d));
     beforeAndAfterCommit(new Runnable() {
@@ -178,7 +190,7 @@ public class MemTaskStoreTest {
       }
     });
 
-    store.mutateTasks(jimsJob, new Closure<ScheduledTask>() {
+    store.mutateTasks(jimsJob.get(), new Closure<ScheduledTask>() {
       @Override public void execute(ScheduledTask task) {
         task.setStatus(ScheduleStatus.RUNNING);
       }
@@ -220,10 +232,14 @@ public class MemTaskStoreTest {
   }
 
   private void assertStoreContents(ScheduledTask... tasks) {
-    assertQueryResults(Query.GET_ALL, tasks);
+    assertQueryResults(Query.unscoped(), tasks);
   }
 
   private void assertQueryResults(TaskQuery query, ScheduledTask... tasks) {
+    assertQueryResults(Suppliers.ofInstance(query), tasks);
+  }
+
+  private void assertQueryResults(Supplier<TaskQuery> query, ScheduledTask... tasks) {
     assertEquals(
         ImmutableSet.<ScheduledTask>builder().add(tasks).build(),
         store.fetchTasks(query));
@@ -237,6 +253,7 @@ public class MemTaskStoreTest {
             .setTask(new TwitterTaskInfo()
                 .setShardId(0)
                 .setJobName(jobName)
+                .setEnvironment("test")
                 .setOwner(new Identity(role, role))));
   }
 

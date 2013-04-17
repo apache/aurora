@@ -3,10 +3,9 @@ package com.twitter.mesos.scheduler;
 import java.util.EnumSet;
 
 import com.google.common.base.Objects;
+import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Ints;
-
-import com.twitter.common.base.Supplier;
 
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Identity;
@@ -86,6 +85,10 @@ public final class Query {
 
   public static Builder roleScoped(String role) {
     return unscoped().byRole(role);
+  }
+
+  public static Builder envScoped(String role, String environment) {
+    return unscoped().byEnv(role, environment);
   }
 
   /**
@@ -256,6 +259,24 @@ public final class Query {
     }
 
     /**
+     * Create a builder scoped to an environment. An environment scope conflicts with role, job,
+     * and shard scopes.
+     *
+     * @param role The role to scope the query to.
+     * @param environment The environment to scope the query to.
+     * @return A new Builder scoped to the given environment.
+     */
+    public Builder byEnv(String role, String environment) {
+      checkNotNull(role);
+      checkNotNull(environment);
+
+      return new Builder(
+          query.deepCopy()
+              .setOwner(new Identity().setRole(role))
+              .setEnvironment(environment));
+    }
+
+    /**
      * Creates a builder scoped to the job identified by (role, name). A job scope
      * conflicts with role and shards scopes.
      *
@@ -286,6 +307,7 @@ public final class Query {
       return new Builder(
           query.deepCopy()
               .setOwner(new Identity().setRole(jobKey.getRole()))
+              .setEnvironment(jobKey.getEnvironment())
               .setJobName(jobKey.getName()));
     }
 
@@ -299,6 +321,7 @@ public final class Query {
      */
     public Builder bySlave(String slaveHost) {
       checkNotNull(slaveHost);
+
       return new Builder(query.deepCopy().setSlaveHost(slaveHost));
     }
 
@@ -373,6 +396,7 @@ public final class Query {
       return new Builder(
           query.deepCopy()
               .setOwner(new Identity().setRole(jobKey.getRole()))
+              .setEnvironment(jobKey.getEnvironment())
               .setJobName(jobKey.getName())
               .setShardIds(ImmutableSet.<Integer>builder()
                   .add(shardId)
@@ -420,6 +444,7 @@ public final class Query {
       return new Builder(
           query.deepCopy()
               .setOwner(new Identity().setRole(jobKey.getRole()))
+              .setEnvironment(jobKey.getEnvironment())
               .setJobName(jobKey.getName())
               .setShardIds(ImmutableSet.copyOf(shardIds)));
     }

@@ -10,6 +10,7 @@ import java.util.logging.Logger;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
+import com.google.common.base.Supplier;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -23,7 +24,6 @@ import org.apache.commons.lang.StringUtils;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.base.Closure;
-import com.twitter.common.base.Supplier;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -238,6 +238,11 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
             if (!query.getOwner().getUser().equals(config.getOwner().getUser())) {
               return false;
             }
+          }
+        }
+        if (query.getEnvironment() != null) {
+          if (!query.getEnvironment().equals(config.getEnvironment())) {
+            return false;
           }
         }
         if (query.getJobName() != null) {

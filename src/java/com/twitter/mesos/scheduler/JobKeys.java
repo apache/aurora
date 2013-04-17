@@ -59,7 +59,7 @@ public final class JobKeys {
     if (isValid(jobKey)) {
       return jobKey.deepCopy();
     } else {
-      return fromStrings(role, DEFAULT_ENVIRONMENT, name);
+      return from(role, DEFAULT_ENVIRONMENT, name);
     }
   }
 
@@ -72,8 +72,7 @@ public final class JobKeys {
    * @return A valid JobKey if it can be created.
    * @throws IllegalArgumentException if the key fails to validate.
    */
-  public static JobKey fromStrings(String role, String environment, String name) {
-
+  public static JobKey from(String role, String environment, String name) {
     JobKey job = new JobKey()
         .setRole(role)
         .setEnvironment(environment)
