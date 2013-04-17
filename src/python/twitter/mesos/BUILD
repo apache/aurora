@@ -8,6 +8,13 @@ python_library(
 )
 
 python_library(
+  name = 'mesos-core',
+  dependencies = [
+    python_requirement('mesos==181')
+  ]
+)
+
+python_library(
   name = 'mesos-lib',
   dependencies = [
     pants(':clusters'),

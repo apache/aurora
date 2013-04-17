@@ -105,12 +105,12 @@ python_library(
     pants('src/python/twitter/common/lang'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/net:tunnel'),
+    pants('src/python/twitter/mesos:mesos-core'),
     pants('src/python/twitter/mesos/executor:thermos_executor_lib'),
     pants('src/python/twitter/mesos/executor:task_runner_wrapper'),
     pants('src/python/twitter/mesos/executor:sandbox_manager'),
     pants('src/python/twitter/thermos/observer'),
     python_requirement('cherrypy'),
-    python_requirement('mesos'),
   ]
 )
 

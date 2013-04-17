@@ -36,7 +36,9 @@ python_library(
 python_library(
   name = 'health_interface',
   sources = ['health_interface.py'],
-  dependencies = [python_requirement('mesos')]
+  dependencies = [
+    pants('src/python/twitter/mesos:mesos-core')
+  ]
 )
 
 python_library(
@@ -116,10 +118,10 @@ python_library(
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/lang'),
     pants('src/python/twitter/common/quantity'),
+    pants('src/python/twitter/mesos:mesos-core'),
     pants('src/thrift/com/twitter/thermos:py-thrift'),
     pants(':thermos_executor_base'),
     pants(':health_interfaces'),
-    python_requirement('mesos'),
   ]
 )
 
@@ -131,9 +133,9 @@ python_library(
     pants('src/python/twitter/common/app/modules:exceptions'),
     pants('src/python/twitter/common_internal/app/modules:chickadee_handler'),
     pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/mesos:mesos-core'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
     pants('src/thrift/com/twitter/thermos:py-thrift'),
-    python_requirement('mesos'),
   ]
 )
 
