@@ -145,6 +145,8 @@ public class SchedulerModule extends AbstractModule {
 
     // Bindings for SchedulerCoreImpl.
     bind(CronJobManager.class).in(Singleton.class);
+    // TODO(William Farner): Add a test that fails if CronJobManager is not wired for events.
+    TaskEventModule.bindSubscriber(binder(), CronJobManager.class);
     bind(ImmediateJobManager.class).in(Singleton.class);
 
     // Filter layering: notifier filter -> base impl
