@@ -124,13 +124,23 @@ def select_service_bit(job):
   else:
     raise InvalidConfig('Specified both daemon and service bits!')
 
-
+# TODO(wickman) Due to MESOS-2718 we should revert to using the MesosTaskInstance.
+#
+# Using the MesosJob instead of the MesosTaskInstance was to allow for
+# planned future use of fields such as 'cluster' and to allow for conversion
+# from Job=>Task to be done entirely on the executor, but instead this had
+# made it impossible to run idempotent updates.
+#
+# In the meantime, we are erasing fields of the Job that are controversial.
+# This achieves roughly the same effect as using the MesosTaskInstance.
+# The future work is tracked at MESOS-2727.
 ALIASED_FIELDS = (
   'cron_policy',
   'cron_collision_policy',
   'update_config',
   'daemon',
   'service',
+  'instances'
 )
 
 def filter_aliased_fields(job):
