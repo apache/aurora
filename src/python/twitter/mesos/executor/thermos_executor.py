@@ -69,7 +69,7 @@ class ThermosExecutorTimer(ExceptionalThread):
 class ThermosExecutor(ThermosExecutorBase):
   STOP_WAIT = Amount(5, Time.SECONDS)
   RESOURCE_CHECKPOINT = 'resource_usage.recordio'
-  RUNNER_INITIALIZATION_TIMEOUT = Amount(5, Time.MINUTES)
+  RUNNER_INITIALIZATION_TIMEOUT = Amount(10, Time.MINUTES)
 
   def __init__(self, runner_class=RUNNER_CLASS, manager_class=StatusManager):
     ThermosExecutorBase.__init__(self)
