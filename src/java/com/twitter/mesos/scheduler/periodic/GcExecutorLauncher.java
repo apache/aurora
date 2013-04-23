@@ -61,6 +61,7 @@ public class GcExecutorLauncher implements TaskLauncher {
       new Resources(0.01, Amount.of(1L, Data.MB), Amount.of(1L, Data.MB), 0);
 
   private static final String SYSTEM_TASK_PREFIX = "system-gc-";
+  private static final String EXECUTOR_NAME = "aurora.gc";
   private static final String EXECUTOR_PREFIX = "gc-";
 
   private final PulseMonitor<String> pulseMonitor;
@@ -76,6 +77,10 @@ public class GcExecutorLauncher implements TaskLauncher {
     this.pulseMonitor = checkNotNull(pulseMonitor);
     this.gcExecutorPath = checkNotNull(gcExecutorPath);
     this.storage = checkNotNull(storage);
+  }
+
+  static String getSourceName(String hostname, String uuid) {
+    return String.format("%s.%s.%s", EXECUTOR_NAME, hostname, uuid);
   }
 
   @Override
@@ -101,7 +106,8 @@ public class GcExecutorLauncher implements TaskLauncher {
     String uuid = UUID.randomUUID().toString();
     ExecutorInfo.Builder executor = ExecutorInfo.newBuilder()
         .setExecutorId(ExecutorID.newBuilder().setValue(EXECUTOR_PREFIX + uuid))
-        .setName("aurora.gc")
+        .setName(EXECUTOR_NAME)
+        .setSource(getSourceName(offer.getHostname(), uuid))
         .addAllResources(GC_EXECUTOR_RESOURCES.toResourceList())
         .setCommand(CommandUtil.create(gcExecutorPath.get()));
 

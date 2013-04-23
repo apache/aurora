@@ -48,6 +48,7 @@ public interface MesosTaskFactory {
 
   static class MesosTaskFactoryImpl implements MesosTaskFactory {
     private static final Logger LOG = Logger.getLogger(MesosTaskFactoryImpl.class.getName());
+    private static final String EXECUTOR_PREFIX = "thermos-";
 
     /**
      * Name to associate with task executors.
@@ -107,7 +108,7 @@ public interface MesosTaskFactory {
 
     @VisibleForTesting
     static ExecutorID getExecutorId(String taskId) {
-      return ExecutorID.newBuilder().setValue("thermos-" + taskId).build();
+      return ExecutorID.newBuilder().setValue(EXECUTOR_PREFIX + taskId).build();
     }
 
     @VisibleForTesting
