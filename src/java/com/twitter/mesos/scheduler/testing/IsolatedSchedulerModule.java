@@ -81,6 +81,8 @@ import com.twitter.mesos.scheduler.storage.Storage.NonVolatileStorage;
 import com.twitter.mesos.scheduler.storage.mem.MemStorageModule;
 import com.twitter.mesos.scheduler.testing.FakeDriverFactory.FakeSchedulerDriver;
 
+import static com.twitter.mesos.gen.MesosAdmin.Iface;
+
 /**
  * A module that binds a fake mesos driver factory and a volatile storage system.
  */
@@ -130,7 +132,7 @@ public class IsolatedSchedulerModule extends AbstractModule {
     @Inject
     FakeClusterRunner(
         Provider<Scheduler> scheduler,
-        MesosSchedulerManager.Iface thrift,
+        Iface thrift,
         ShutdownRegistry shutdownRegistry) {
 
       this.scheduler = scheduler;
