@@ -38,13 +38,6 @@ def _get_package_data(cluster, package, packer=None):
     die('Failed to fetch package metadata: %s' % e)
 
 
-def _extract_package_uri(metadata):
-  latest_audit = sorted(metadata['auditLog'], key=lambda a: a['timestamp'])[-1]
-  if latest_audit['state'] == 'DELETED':
-    die('The requested package version has been deleted.')
-  return metadata['uri']
-
-
 APPAPP_DEPRECATION_WARNING = """
 The use of app-app is deprecated. Please reach out to mesos-team@twitter.com for advice on
 migrating your application away from app-app layouts to an alternative packaging solution.
@@ -213,21 +206,29 @@ def _inject_packer_bindings(config, force_local=False):
     role, package_name, version = (action.value for action in components[1:4])
     return (role, package_name, version)
 
-  def generate_packer_struct(uri):
+  def generate_packer_struct(metadata):
+    uri = metadata['uri']
+    filename = metadata.get('filename', None) or posixpath.basename(uri)
     packer = PackerObject(
       tunnel_host=app.get_options().tunnel_host,
-      package=posixpath.basename(uri),
+      package=filename,
       package_uri=uri)
     packer = packer(copy_command=packer.local_copy_command() if local
                     else packer.remote_copy_command())
     return packer
+
+  def validate_package(metadata):
+    latest_audit = sorted(metadata['auditLog'], key=lambda a: a['timestamp'])[-1]
+    if latest_audit['state'] == 'DELETED':
+      die('The requested package version has been deleted.')
+    return metadata
 
   _, refs = config.raw().interpolate()
   packages = filter(None, map(extract_ref, set(refs)))
   for package in set(packages):
     ref = Ref.from_address('packer[%s][%s][%s]' % package)
     package_data = _get_package_data(config.cluster(), package)
-    config.bind({ref: generate_packer_struct(_extract_package_uri(package_data))})
+    config.bind({ref: generate_packer_struct(validate_package(package_data))})
     config.add_package((package[0], package[1], package_data['id']))
 
 

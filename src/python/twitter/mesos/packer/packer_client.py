@@ -103,7 +103,8 @@ class Packer(object):
 
   @staticmethod
   def _ver_url(role, package, version):
-    return '%s/%s' % (Packer._pkg_url(role, package), version)
+    # Quoting the path to support arbitrary version identifiers such as metadata strings.
+    return '%s/%s' % (Packer._pkg_url(role, package), urllib.quote(version))
 
   def compute_checksum(self, local_file):
     # Calculate the checksum, reading 16 MiB chunks.
@@ -121,7 +122,9 @@ class Packer(object):
     return json.loads(self._api(Packer._role_url(role)))
 
   def get_version(self, role, package, version):
-    return json.loads(self._api(Packer._ver_url(role, package, version)))
+    data = json.loads(self._api(Packer._ver_url(role, package, version)))
+    log.debug('Metadata: %s' % data)
+    return data
 
   def list_versions(self, role, package):
     return json.loads(self._api(Packer._pkg_url(role, package)))
@@ -142,13 +145,9 @@ class Packer(object):
       upload_progress = QuietProgress()
     stream = CallbackFile(local_file, 'rb', upload_progress.update, 'Uploading')
     datagen, headers = multipart_encode({'file': stream})
-
-    query_params = {'md5sum': digest}
-    if metadata:
-      query_params['metadata'] = metadata
-    selector = Packer.compose_url(Packer._pkg_url(role, package), query_params, auth=True)
+    selector = Packer.compose_url('/data/%s' % digest, auth=True)
     url = 'http://%s:%s%s' % (self._host, self._port, selector)
-    log.debug('Sending packer request %s' % url)
+    log.debug('Uploading package data blob: %s' % url)
 
     file_size = os.path.getsize(local_file)
     upload_start = time.time()
@@ -156,11 +155,24 @@ class Packer(object):
       request = urllib2.Request(url, datagen, headers)
       opener = urllib2.build_opener(StreamingHTTPHandler)
       conn = opener.open(request, None, socket._GLOBAL_DEFAULT_TIMEOUT)
-      resp = conn.read()
-      upload_secs = time.time() - upload_start
-      if self._verbose:
-        print('Average upload rate: %s KB/s' % (int(file_size / 1024 / upload_secs)))
-      return json.loads(resp)
+      status = conn.getcode()
+
+      if status == 201:
+        upload_secs = time.time() - upload_start
+        log.debug('Average upload rate: %s KB/s' % (int(file_size / 1024 / upload_secs)))
+      elif status == 200:
+        log.debug('Packer already has this data blob, not uploading again.')
+      else:
+        raise Packer.Error('Package data not uploaded: %s' % conn.read())
+
+      # We can now safely assume the data blob is present, add the version.
+      query_params = {'filename': os.path.basename(local_file), 'md5sum': digest}
+      if metadata:
+        query_params['metadata'] = metadata
+      return json.loads(self._api(Packer._pkg_url(role, package),
+                                  auth=True,
+                                  params=query_params,
+                                  method='POST'))
     except urllib2.HTTPError as e:
       raise Packer.Error('HTTP %s: %s' % (e.code, e.msg))
     except urllib2.URLError as e:

@@ -1,6 +1,5 @@
 import json
 import os
-import pytest
 import tempfile
 
 from twitter.common.contextutil import temporary_dir, temporary_file, open_zip
@@ -10,7 +9,9 @@ from twitter.mesos.config.schema import Announcer, Job, Resources, Task, MB
 from twitter.mesos.packer import sd_packer_client
 import twitter.mesos.packer.packer_client as packer_client
 
+import mox
 from mox import Mox, IsA
+import pytest
 
 
 MESOS_CONFIG_BASE = """
@@ -43,6 +44,18 @@ MESOS_CONFIG_WITH_INVALID_STATS = MESOS_CONFIG_BASE % (
     'announce = Announcer(primary_port="http", stats_port="blah"),')
 MESOS_CONFIG_WITHOUT_ANNOUNCE = MESOS_CONFIG_BASE % ''
 
+PACKER_CONFIG = """
+jobs = [Job(
+  name = 'hello_world',
+  role = 'john_doe',
+  cluster = 'smf1-test',
+  task = Task(
+    name = 'main',
+    processes = [Process(name='command', cmdline="{{packer[john_doe][dummy][eleventy].package}}")],
+    resources = Resources(cpu = 0.1, ram = 64 * MB, disk = 64 * MB),
+  )
+)]
+"""
 
 def test_get_config_announces():
   for good_config in (MESOS_CONFIG_WITH_ANNOUNCE_1, MESOS_CONFIG_WITH_ANNOUNCE_2,
@@ -112,3 +125,33 @@ def test_dedicated_portmap():
     config._validate_announce_configuration(
         AuroraConfig(base_job(announce=Announcer(portmap={'http': 80}),
                                  constraints = {'foo': 'bar'})))
+
+def test_package_filename():
+  mocker = mox.Mox()
+  mocker.StubOutWithMock(config.sd_packer_client, 'create_packer')
+  mock_client = mocker.CreateMock(packer_client.Packer)
+  config.sd_packer_client.create_packer('smf1-test').AndReturn(mock_client)
+  config.sd_packer_client.create_packer('smf1-test').AndReturn(mock_client)
+
+  pkg = {
+    'id': 5,
+    'uri': 'hftp://foo/bar/file.zip',
+    'auditLog': [{'user': 'john_doe', 'timestamp': 100, 'state': 'PRESENT'}],
+  }
+  mock_client.get_version('john_doe', 'dummy', 'eleventy').AndReturn(pkg)
+  pkg2 = dict(pkg.items())
+  pkg2['filename'] = 'different_file.zip'
+  mock_client.get_version('john_doe', 'dummy', 'eleventy').AndReturn(pkg2)
+  mocker.ReplayAll()
+
+  with temporary_file() as fp:
+    fp.write(PACKER_CONFIG)
+    fp.flush()
+    cfg = config.get_config('hello_world', fp.name)
+    assert 'file.zip' == cfg.task(0).processes()[0].cmdline().get()
+
+  with temporary_file() as fp:
+    fp.write(PACKER_CONFIG)
+    fp.flush()
+    cfg = config.get_config('hello_world', fp.name)
+    assert 'different_file.zip' == cfg.task(0).processes()[0].cmdline().get()
