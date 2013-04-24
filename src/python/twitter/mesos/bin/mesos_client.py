@@ -448,6 +448,7 @@ def inspect(jobname, config_file):
     return
 
   job = config.raw()
+  job_thrift = config.job()
   print('Job level information')
   print('  name:       %s' % job.name())
   print('  role:       %s' % job.role())
@@ -462,7 +463,7 @@ def inspect(jobname, config_file):
     print('  constraints:')
     for constraint, value in job.constraints().get().items():
       print('    %s: %s' % (constraint, value))
-  print('  service:     %s' % bool(job.service().get()))
+  print('  service:    %s' % job_thrift.taskConfig.isService)
   print('  production: %s' % bool(job.production().get()))
   print()
 
