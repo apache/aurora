@@ -1,7 +1,6 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.thrift;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.util.logging.Logger;
@@ -32,12 +31,6 @@ class ThriftServerLauncher implements ServiceRunner {
   private static final Logger LOG = Logger.getLogger(ThriftServerLauncher.class.getName());
 
   private final ThriftConfiguration configuration;
-
-  interface ThriftConfiguration {
-    InputStream getSslKeyStream() throws IOException;
-
-    int getServingPort();
-  }
 
   // Security is enforced via file permissions, not via this password, for what it's worth.
   private static final String SSL_KEYFILE_PASSWORD = "MesosKeyStorePassword";

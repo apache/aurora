@@ -10,8 +10,6 @@ import java.util.Iterator;
  *
  * <p>Logs are accessed by {@link #open() opening} a {@link Stream}.  All stream
  * access occurs with references to log entry {@link Position positions} in the stream.
- *
- * @author John Sirois
  */
 public interface Log {
 

@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.http;
 
 import java.util.Arrays;
 import java.util.Set;
@@ -31,11 +31,8 @@ import com.twitter.thrift.ServiceInstance;
 import static org.easymock.EasyMock.capture;
 import static org.junit.Assert.assertEquals;
 
-import static com.twitter.mesos.scheduler.LeaderRedirect.HTTP_PORT_NAME;
+import static com.twitter.mesos.scheduler.http.LeaderRedirect.HTTP_PORT_NAME;
 
-/**
- * @author William Farner
- */
 public class LeaderRedirectTest extends EasyMockTest {
 
   private static final int HTTP_PORT = 500;

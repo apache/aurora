@@ -28,9 +28,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-/**
- * @author William Farner
- */
 public class QuotaManagerImplTest extends EasyMockTest {
 
   private static final String ROLE = "foo";

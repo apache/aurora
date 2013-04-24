@@ -47,12 +47,12 @@ import com.twitter.mesos.scheduler.DriverFactory.DriverFactoryImpl;
 import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl.ExecutorConfig;
 import com.twitter.mesos.scheduler.SchedulerLifecycle.ShutdownOnDriverExit;
 import com.twitter.mesos.scheduler.SchedulerModule.AuthMode;
-import com.twitter.mesos.scheduler.ThriftServerLauncher.ThriftConfiguration;
 import com.twitter.mesos.scheduler.log.mesos.MesosLogStreamModule;
 import com.twitter.mesos.scheduler.storage.backup.BackupModule;
 import com.twitter.mesos.scheduler.storage.log.LogStorageModule;
 import com.twitter.mesos.scheduler.storage.log.SnapshotStoreImpl;
 import com.twitter.mesos.scheduler.testing.IsolatedSchedulerModule;
+import com.twitter.mesos.scheduler.thrift.ThriftConfiguration;
 import com.twitter.mesos.scheduler.thrift.ThriftModule;
 
 /**

@@ -3,8 +3,6 @@ package com.twitter.mesos.scheduler.storage;
 /**
  * Storage mechanism that is able to create complete snapshots of the local storage system state
  * and apply these to restore local storage from a snapshotted baseline.
- *
- * @author John Sirois
  */
 public interface SnapshotStore<T> {
 

@@ -3,6 +3,7 @@ package com.twitter.mesos.scheduler.thrift;
 import com.google.inject.AbstractModule;
 import com.google.inject.Singleton;
 
+import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.thrift.ThriftServer;
 
 /**
@@ -17,5 +18,6 @@ public class ThriftModule extends AbstractModule {
     LoggingThriftInterface.bind(binder(), SchedulerThriftRouter.class);
     bind(SchedulerThriftRouter.class).in(Singleton.class);
     bind(ThriftServer.class).to(SchedulerThriftServer.class).in(Singleton.class);
+    LifecycleModule.bindServiceRunner(binder(), ThriftServerLauncher.class);
   }
 }

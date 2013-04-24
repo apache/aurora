@@ -12,8 +12,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Binding annotation for the cluster name.
- *
- * @author William Farner
  */
 @BindingAnnotation
 @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)

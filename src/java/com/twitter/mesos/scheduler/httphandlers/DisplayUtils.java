@@ -1,16 +1,14 @@
-package com.twitter.mesos.scheduler.httphandlers;
+package com.twitter.mesos.scheduler.http;
 
 import com.google.common.base.Function;
 import com.google.common.collect.Ordering;
 
 import com.twitter.mesos.gen.JobConfiguration;
-import com.twitter.mesos.scheduler.httphandlers.SchedulerzHome.Role;
-import com.twitter.mesos.scheduler.httphandlers.SchedulerzRole.Job;
+import com.twitter.mesos.scheduler.http.SchedulerzHome.Role;
+import com.twitter.mesos.scheduler.http.SchedulerzRole.Job;
 
 /**
  * Utility class to hold common display helper functions.
- *
- * @author William Farner
  */
 public final class DisplayUtils {
 

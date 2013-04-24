@@ -8,9 +8,6 @@ import com.twitter.mesos.gen.Identity;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
-/**
- * @author John Sirois
- */
 public class ThriftBinaryCodecTest {
 
   @Test

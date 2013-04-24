@@ -8,8 +8,6 @@ import com.twitter.mesos.scheduler.storage.Storage;
 
 /**
  * Guice module for the quota package.
- *
- * @author William Farner
  */
 public class QuotaModule extends AbstractModule {
 

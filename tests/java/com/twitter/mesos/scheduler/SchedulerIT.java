@@ -76,13 +76,13 @@ import com.twitter.mesos.gen.storage.Transaction;
 import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl.ExecutorConfig;
 import com.twitter.mesos.scheduler.SchedulerLifecycle.ShutdownOnDriverExit;
 import com.twitter.mesos.scheduler.SchedulerModule.AuthMode;
-import com.twitter.mesos.scheduler.ThriftServerLauncher.ThriftConfiguration;
 import com.twitter.mesos.scheduler.log.Log;
 import com.twitter.mesos.scheduler.log.Log.Entry;
 import com.twitter.mesos.scheduler.log.Log.Position;
 import com.twitter.mesos.scheduler.log.Log.Stream;
 import com.twitter.mesos.scheduler.storage.log.LogManager.StreamManager.EntrySerializer;
 import com.twitter.mesos.scheduler.storage.log.LogStorageModule;
+import com.twitter.mesos.scheduler.thrift.ThriftConfiguration;
 import com.twitter.thrift.Endpoint;
 import com.twitter.thrift.ServiceInstance;
 

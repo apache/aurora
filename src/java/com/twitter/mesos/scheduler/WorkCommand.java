@@ -3,8 +3,6 @@ package com.twitter.mesos.scheduler;
 /**
  * Descriptions of the different types of external work commands that task state machines may
  * trigger.
- *
- * @author William Farner
  */
 public enum WorkCommand {
   // Send an instruction for the runner of this task to kill the task.

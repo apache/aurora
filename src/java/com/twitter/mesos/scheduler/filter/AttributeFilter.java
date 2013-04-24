@@ -16,8 +16,6 @@ import com.twitter.mesos.scheduler.filter.SchedulingFilterImpl.AttributeLoader;
 
 /**
  * Utility class that matches attributes to constraints.
- *
- * @author William Farner
  */
 final class AttributeFilter {
 

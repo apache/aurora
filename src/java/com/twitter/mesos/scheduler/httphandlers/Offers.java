@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler.httphandlers;
+package com.twitter.mesos.scheduler.http;
 
 import java.util.Map;
 

@@ -30,8 +30,6 @@ import com.twitter.mesos.gen.SessionKey;
 
 /**
  * Validator for RPC sessions with the mesos scheduler.
- *
- * @author William Farner
  */
 public interface SessionValidator {
 

@@ -54,7 +54,7 @@ import com.twitter.mesos.scheduler.TaskAssigner.TaskAssignerImpl;
 import com.twitter.mesos.scheduler.async.AsyncModule;
 import com.twitter.mesos.scheduler.events.TaskEventModule;
 import com.twitter.mesos.scheduler.filter.SchedulingFilterImpl;
-import com.twitter.mesos.scheduler.httphandlers.ServletModule;
+import com.twitter.mesos.scheduler.http.ServletModule;
 import com.twitter.mesos.scheduler.metadata.MetadataModule;
 import com.twitter.mesos.scheduler.periodic.GcExecutorLauncher;
 import com.twitter.mesos.scheduler.periodic.GcExecutorLauncher.GcExecutor;
@@ -165,7 +165,6 @@ public class SchedulerModule extends AbstractModule {
     bind(Clock.class).toInstance(Clock.SYSTEM_CLOCK);
     bind(StateManagerImpl.class).in(Singleton.class);
 
-    LifecycleModule.bindServiceRunner(binder(), ThriftServerLauncher.class);
     LifecycleModule.bindStartupAction(binder(), RegisterShutdownStackPrinter.class);
 
     bind(SchedulerLifecycle.class).in(Singleton.class);

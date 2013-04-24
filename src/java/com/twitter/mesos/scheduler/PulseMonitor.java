@@ -17,8 +17,6 @@ import com.twitter.common.quantity.Time;
  * entries.
  *
  * @param <T> The type of values to track.
- *
- * @author William Farner
  */
 public interface PulseMonitor<T> extends Supplier<Set<T>> {
 

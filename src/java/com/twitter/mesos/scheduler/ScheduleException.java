@@ -2,8 +2,6 @@ package com.twitter.mesos.scheduler;
 
 /**
 * Exception class to signal a failure to schedule a task or job.
-*
-* @author William Farner
 */
 public class ScheduleException extends Exception {
   public ScheduleException(String msg) {

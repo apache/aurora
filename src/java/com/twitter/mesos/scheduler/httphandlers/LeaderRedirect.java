@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.http;
 
 import java.net.InetSocketAddress;
 import java.util.concurrent.atomic.AtomicReference;
@@ -25,8 +25,6 @@ import com.twitter.thrift.ServiceInstance;
 /**
  * Redirect logic for finding the leading scheduler in the event that this process is not the
  * leader.
- *
- * @author William Farner
  */
 public class LeaderRedirect {
 

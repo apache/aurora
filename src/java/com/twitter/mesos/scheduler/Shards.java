@@ -9,8 +9,6 @@ import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 
 /**
  * Utility class for dealing with individual shards of a job.
- *
- * @author William Farner
  */
 public final class Shards {
 

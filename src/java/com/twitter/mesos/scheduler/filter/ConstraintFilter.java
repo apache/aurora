@@ -26,8 +26,6 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**
  * Filter that determines whether a task's constraints are satisfied.
- *
- * @author William Farner
  */
 class ConstraintFilter implements Function<Constraint, Optional<Veto>> {
 

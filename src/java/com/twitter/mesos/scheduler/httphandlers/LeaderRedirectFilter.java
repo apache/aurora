@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler.httphandlers;
+package com.twitter.mesos.scheduler.http;
 
 import java.io.IOException;
 
@@ -12,7 +12,6 @@ import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
 
 import com.twitter.common.net.http.filters.AbstractHttpFilter;
-import com.twitter.mesos.scheduler.LeaderRedirect;
 
 /**
  * An HTTP filter that will redirect the request to the leading scheduler.

@@ -58,9 +58,6 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
-/**
- * @author John Sirois
- */
 public class LogManagerTest extends EasyMockTest {
 
   private static final Amount<Integer, Data> NO_FRAMES_EVER_SIZE =

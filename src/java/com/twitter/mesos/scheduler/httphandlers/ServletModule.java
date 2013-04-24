@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler.httphandlers;
+package com.twitter.mesos.scheduler.http;
 
 import java.util.Map;
 
@@ -26,7 +26,6 @@ import com.twitter.common.webassets.bootstrap.BootstrapModule;
 import com.twitter.common.webassets.jquery.JQueryModule;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.CronJobManager;
-import com.twitter.mesos.scheduler.LeaderRedirect;
 import com.twitter.mesos.scheduler.SchedulerCore;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 import com.twitter.thrift.ServiceInstance;
