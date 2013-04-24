@@ -794,13 +794,19 @@ def trap_packer_error(fn):
 @app.command
 @trap_packer_error
 @app.command_option(CLUSTER_INVOKE_OPTION)
+@app.command_option('--all', '-a', dest='list_all_packages', default=False, action='store_true',
+                    help='List hidden packages (packages prefixed with "__") as well.')
 @requires.exactly('role')
 def package_list(role):
   """usage: package_list --cluster=CLUSTER role
 
   Prints the names of packages owned by a user.
   """
-  print('\n'.join(_get_packer().list_packages(role)))
+  def filter_packages(packages):
+    if app.get_options().list_all_packages:
+      return packages
+    return [package for package in packages if not package.startswith('__')]
+  print('\n'.join(filter_packages(_get_packer().list_packages(role))))
 
 
 def _print_package(pkg):
