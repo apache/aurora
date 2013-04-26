@@ -75,8 +75,6 @@ class ChainedHealthCheck(HealthCheck):
 class HealthCheckFactory(object):
   def __init__(self, cluster, has_health_port):
     self._enable_http = has_health_port
-    if self._enable_http:
-      HttpSignaler.maybe_setup_proxy(cluster)
 
   def get(self):
     check = StatusHealthCheck()
