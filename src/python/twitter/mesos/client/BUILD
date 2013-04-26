@@ -21,6 +21,13 @@ python_library(
   ]
 )
 
+# Ideally these would be resources but the pkg_resources module loading mechanism needs
+# sentinel __init__.py files written and those do not get written for non-"source" files.
+python_library(
+  name = 'recipes',
+  sources = globs('recipes/*')
+)
+
 python_library(
   name = 'base',
   sources = ['base.py'],
@@ -35,6 +42,7 @@ python_library(
   sources = ['config.py'],
   dependencies = [
     pants(':base'),
+    pants(':recipes'),
     pants('3rdparty/python:pystachio'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/log'),

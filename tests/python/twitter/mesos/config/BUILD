@@ -18,7 +18,12 @@ python_tests(name = 'test_loader',
   sources = ['test_loader.py'],
   dependencies = [
     pants('src/python/twitter/common/contextutil'),
+    pants('src/python/twitter/mesos/client:recipes'),
     pants('src/python/twitter/mesos/config'),
+  ],
+  coverage = [
+    'twitter.mesos.config',
+    'twitter.thermos.config'
   ]
 )
 

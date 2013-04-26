@@ -2,8 +2,6 @@ from twitter.common.lang import Compatibility
 from twitter.thermos.config.loader import PortExtractor, ThermosTaskWrapper
 from twitter.thermos.config.schema import ThermosContext
 
-from .loader import AuroraConfigLoader
-from .schema import MesosContext
 from .thrift import convert as convert_thrift, InvalidConfig as InvalidThriftConfig
 
 from pystachio import Empty, Environment, Integer, Ref
@@ -65,9 +63,15 @@ class PortResolver(object):
 
 class AuroraConfig(object):
   class Error(Exception): pass
+
   class InvalidConfig(Error):
     def __str__(self):
       return 'The configuration was invalid: %s' % self.args[0]
+
+  @classmethod
+  def plugins(cls):
+    """A stack of callables to apply to the config on load."""
+    return []
 
   @classmethod
   def pick(cls, env, name, bindings, select_cluster=None, select_env=None):
@@ -107,14 +111,24 @@ class AuroraConfig(object):
       return matches[0]
 
   @classmethod
+  def apply_plugins(cls, config):
+    for plugin in cls.plugins():
+      if not callable(plugin):
+        raise cls.Error('Invalid configuration plugin %r, should be callable!' % plugin)
+      plugin(config)
+    return config
+
+  @classmethod
   def load(cls, filename, name=None, bindings=None, select_cluster=None, select_env=None):
+    from .loader import AuroraConfigLoader
     env = AuroraConfigLoader.load(filename)
-    return cls(cls.pick(env, name, bindings, select_cluster, select_env))
+    return cls.apply_plugins(cls(cls.pick(env, name, bindings, select_cluster, select_env)))
 
   @classmethod
   def load_json(cls, filename, name=None, bindings=None, select_cluster=None, select_env=None):
+    from .loader import AuroraConfigLoader
     job = AuroraConfigLoader.load_json(filename)
-    return cls(job.bind(*bindings) if bindings else job)
+    return cls.apply_plugins(cls(job.bind(*bindings) if bindings else job))
 
   def __init__(self, job):
     self._job = self.sanitize_job(job)
@@ -147,6 +161,7 @@ class AuroraConfig(object):
                    for proc in job.task().processes()]))
 
   def context(self, instance=None):
+    from .schema import MesosContext
     context = dict(
       role=self.role(),
       cluster=self.cluster(),
@@ -157,6 +172,7 @@ class AuroraConfig(object):
 
   def job(self):
     interpolated_job = self._job % self.context()
+
     # Typecheck against the Job, with the following free variables unwrapped at the Task level:
     #  - a dummy {{mesos.instance}}
     #  - dummy values for the {{thermos.ports}} context, to allow for their use in task_links
@@ -182,6 +198,10 @@ class AuroraConfig(object):
 
   def raw(self):
     return self._job
+
+  # This stinks to high heaven
+  def update_job(self, new_job):
+    self._job = new_job
 
   def instances(self):
     return self._job.instances().get()

@@ -2,6 +2,7 @@ import copy
 import json
 import os
 import re
+import textwrap
 
 from pystachio import Ref
 from twitter.common.dirutil import safe_open
@@ -9,15 +10,8 @@ from twitter.common.lang import Compatibility
 from twitter.thermos.base.planner import TaskPlanner
 from twitter.thermos.config.schema import Task
 
+import pkg_resources
 
-SCHEMA_PREAMBLE = """
-from pystachio import *
-from twitter.thermos.config.schema import *
-"""
-
-
-def deposit_schema(environment):
-  Compatibility.exec_function(compile(SCHEMA_PREAMBLE, "<exec_function>", "exec"), environment)
 
 class PortExtractor(object):
   class InvalidPorts(Exception): pass
@@ -100,6 +94,7 @@ class ThermosTaskWrapper(object):
       return None
 
 
+# TODO(wickman) These should be validators pushed onto ThermosConfigLoader.plugins
 class ThermosTaskValidator(object):
   class InvalidTaskError(Exception): pass
 
@@ -149,34 +144,120 @@ class ThermosTaskValidator(object):
             task_on_disk.task if task_on_disk else None, task))
 
 
-class ThermosConfigLoader(object):
-  SCHEMA = {}
-  deposit_schema(SCHEMA)
+# TODO(wickman) Push this down into pystachio as part of
+# https://github.com/wickman/pystachio/issues/6 and
+# https://github.com/wickman/pystachio/issues/7
+class ConfigLoader(object):
+  class Error(Exception): pass
+  class InvalidConfigError(Error): pass
+  class NotFound(Error): pass
 
-  @staticmethod
-  def load(filename, **kw):
-    tc = ThermosConfigLoader()
+  SCHEMA = ""
+  _SCHEMA_ENVIRONMENT = {}
+
+  @classmethod
+  def schema(cls):
+    if not cls._SCHEMA_ENVIRONMENT:
+      Compatibility.exec_function(
+          compile(cls.SCHEMA, "<exec_function>", "exec"), cls._SCHEMA_ENVIRONMENT)
+    return copy.copy(cls._SCHEMA_ENVIRONMENT)
+
+  @classmethod
+  def compile_into(cls, data, data_name, environment):
+    try:
+      Compatibility.exec_function(compile(data, data_name, 'exec'), environment)
+    except SyntaxError as e:
+      raise cls.InvalidConfigError(str(e))
+
+  @classmethod
+  def fp_executor(cls):
+    def ast_executor(fp, env):
+      if hasattr(fp, 'read') and callable(fp.read):
+        cls.compile_into(fp.read(), '<resource: %s>' % fp, env)
+      else:
+        raise cls.InvalidConfigError('Configurations loaded from file cannot include other files.')
+    return ast_executor
+
+  @classmethod
+  def file_executor(cls, filename):
     deposit_stack = [os.path.dirname(filename)]
     def ast_executor(config_file, env):
       actual_file = os.path.join(deposit_stack[-1], config_file)
       deposit_stack.append(os.path.dirname(actual_file))
       with open(actual_file) as fp:
-        Compatibility.exec_function(compile(fp.read(), actual_file, 'exec'), env)
+        cls.compile_into(fp.read(), actual_file, env)
       deposit_stack.pop()
+    return ast_executor
+
+  @classmethod
+  def resource_exists(cls, filename):
+    module_base, module_file = os.path.split(filename)
+    module_base = module_base.replace(os.sep, '.')
+    try:
+      return pkg_resources.resource_exists(module_base, module_file) and (
+          not pkg_resources.resource_isdir(module_base, module_file))
+    except (ValueError, ImportError):
+      return False
+
+  @classmethod
+  def module_executor(cls, filename):
+    deposit_stack = [os.path.dirname(filename)]
+    def ast_executor(config_file, env):
+      actual_file = os.path.join(deposit_stack[-1], config_file)
+      deposit_stack.append(os.path.dirname(actual_file))
+      module_base, module_file = os.path.split(actual_file)
+      module_base = module_base.replace(os.sep, '.')
+      cls.compile_into(pkg_resources.resource_string(module_base, module_file), actual_file, env)
+      deposit_stack.pop()
+    return ast_executor
+
+  @classmethod
+  def choose_executor_and_base(cls, obj):
+    if isinstance(obj, Compatibility.string):
+      if os.path.isfile(obj):
+        return cls.file_executor(obj), os.path.basename(obj)
+      elif cls.resource_exists(obj):
+        return cls.module_executor(obj), os.path.basename(obj)
+    elif hasattr(obj, 'read') and callable(obj.read):
+      return cls.fp_executor(), obj
+    raise cls.NotFound('Could not load resource %s' % obj)
+
+  @classmethod
+  def load(cls, loadable, environment=None):
+    """
+      Load a loadable object.  A loadable object may be one of:
+        - a file-like object
+        - a file path
+        - a zipimported file path
+    """
+    environment = environment or {}
+    ast_executor, loadable_base = cls.choose_executor_and_base(loadable)
+    environment.update(include=lambda fn: ast_executor(fn, environment))
+    ast_executor(loadable_base, environment)
+    return environment
+
+
+class ThermosConfigLoader(ConfigLoader):
+  SCHEMA = textwrap.dedent("""
+    from pystachio import *
+    from twitter.thermos.config.schema import *
+  """)
+
+  @classmethod
+  def load(cls, loadable, **kw):
+    tc = cls()
     def export(task):
       if isinstance(task, dict):
         task = Task(task)
       tc.add_task(ThermosTaskWrapper(task, **kw))
-    schema_copy = copy.copy(ThermosConfigLoader.SCHEMA)
-    schema_copy.update(
-      include = lambda fn: ast_executor(fn, schema_copy),
-      export = export)
-    ast_executor(os.path.basename(filename), schema_copy)
+    environment = cls.schema()
+    environment.update(export=export)
+    ConfigLoader.load(loadable, environment)
     return tc
 
-  @staticmethod
-  def load_json(filename, **kw):
-    tc = ThermosConfigLoader()
+  @classmethod
+  def load_json(cls, filename, **kw):
+    tc = cls()
     task = ThermosTaskWrapper.from_file(filename, **kw)
     if task:
       ThermosTaskValidator.assert_valid_task(task.task())

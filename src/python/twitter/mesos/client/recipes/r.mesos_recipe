@@ -1,0 +1,7 @@
+recipes = {
+  'r': Task(
+     name = 'r_installer',
+     resources = Resources(cpu = 0.2, ram = 128*MB, disk = 128*MB),
+     processes = [Packer.install('__recipe_r', role='mesos', version='live')]
+  )
+}

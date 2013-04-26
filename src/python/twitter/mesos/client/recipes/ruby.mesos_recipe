@@ -1,0 +1,9 @@
+python_installer = Task(
+  name = 'ruby_installer_{{ruby_version}}',
+  resources = Resources(cpu = 0.2, ram = 128*MB, disk = 128*MB),
+  processes = [Packer.install('__recipe_ruby{{ruby_version}}', role='mesos', version='live')]
+)
+
+recipes = {
+  'ruby19': python_installer.bind(py_version = '19'),
+}

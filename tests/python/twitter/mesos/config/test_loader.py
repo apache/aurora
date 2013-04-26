@@ -1,4 +1,5 @@
 import json
+import tempfile
 
 from twitter.common.contextutil import temporary_file
 
@@ -29,6 +30,20 @@ HELLO_WORLD = MesosJob(
 jobs = [HELLO_WORLD]
 """
 
+def test_enoent():
+  nonexistent_file = tempfile.mktemp()
+  with pytest.raises(AuroraConfigLoader.NotFound):
+    AuroraConfigLoader.load(nonexistent_file)
+
+
+def test_module_loading():
+  env = AuroraConfigLoader.load('twitter/mesos/client/recipes/python.mesos_recipe')
+  assert 'recipes' in env
+  with pytest.raises(AuroraConfigLoader.NotFound):
+    AuroraConfigLoader.load('twitter/mesos/client/recipes/does_not_exist.mesos_recipe')
+  with pytest.raises(AuroraConfigLoader.NotFound):
+    AuroraConfigLoader.load('twitter/mesos/client')
+
 
 def test_bad_config():
   with temporary_file() as fp:
@@ -57,14 +72,14 @@ def test_load_json():
     assert new_job == job
 
 
-def test_load_from():
+def test_load():
   with temporary_file() as fp:
     fp.write(MESOS_CONFIG)
     fp.flush()
     fp.seek(0)
 
     for config in (fp.name, fp):
-      env = AuroraConfigLoader.load_from(config)
+      env = AuroraConfigLoader.load(config)
       assert 'jobs' in env and len(env['jobs']) == 1
       hello_world = env['jobs'][0]
       assert hello_world.name().get() == 'hello_world'

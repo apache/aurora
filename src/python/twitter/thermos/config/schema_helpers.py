@@ -1,10 +1,9 @@
 """Helpers for composing Thermos workflows."""
-
 import itertools
 
 from twitter.common.lang import Compatibility
 
-from .schema import (
+from .schema_base import (
    Constraint,
    GB,
    Process,
@@ -122,7 +121,7 @@ class Tasks(object):
        task."""
     if len(tasks) == 0:
       return Task()
-    head_task = tasks[0]
+    head_task = tasks[-1]
     return head_task(processes=Units.processes_merge(tasks))
 
   @classmethod
@@ -146,6 +145,7 @@ class Tasks(object):
     base = cls._combine_processes(*tasks)
     base = base(resources=Units.resources_max(task.resources() for task in tasks))
     base_constraints = Units.constraints_merge(tasks)
+    # TODO(wickman) be smarter about this in light of existing constraints
     for (t1, t2) in zip(tasks[0:-1], tasks[1:]):
       for p1 in t1.processes():
         for p2 in t2.processes():
@@ -240,12 +240,8 @@ def SequentialTask(*args, **kw):
   """A Task whose processes are always sequential."""
   return Tasks.sequential(Task(*args, **kw))
 
-
 python_options = Options.python
 java_options = Options.java
-
-
 combine_tasks = Tasks.combine
 concat_tasks = Tasks.concat
-
 order = Processes.order

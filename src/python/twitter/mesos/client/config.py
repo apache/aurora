@@ -3,6 +3,7 @@
 
 from __future__ import print_function
 
+import functools
 import math
 import posixpath
 import re
@@ -12,9 +13,11 @@ from twitter.common import app, log
 from twitter.mesos.client.base import die
 from twitter.mesos.clusters import Cluster
 from twitter.mesos.config import AuroraConfig
-from twitter.mesos.config.schema import PackerObject
+from twitter.mesos.config.schema import Empty, PackerObject
+from twitter.mesos.config.recipes import Recipes
 from twitter.mesos.packer.packer_client import Packer
 from twitter.mesos.packer import sd_packer_client
+from twitter.thermos.config.schema_helpers import Tasks
 
 from gen.twitter.mesos.constants import LIVE_STATES
 from gen.twitter.mesos.ttypes import (
@@ -23,7 +26,6 @@ from gen.twitter.mesos.ttypes import (
     TaskQuery)
 
 from pystachio import Empty, Ref
-
 
 def _get_package_data(cluster, package, packer=None):
   cluster = Cluster.get(cluster).packer_redirect or cluster
@@ -232,24 +234,6 @@ def _inject_packer_bindings(config, force_local=False):
     config.add_package((package[0], package[1], package_data['id']))
 
 
-def get_config(jobname,
-               config_file,
-               json=False,
-               force_local=False,
-               bindings=(),
-               select_cluster=None,
-               select_env=None):
-  """Creates and returns a config object contained in the provided file."""
-  loader = AuroraConfig.load_json if json else AuroraConfig.load
-  config = loader(config_file,
-                  jobname,
-                  bindings,
-                  select_cluster=select_cluster,
-                  select_env=select_env)
-  validate_config(config)
-  return populate_namespaces(config, force_local=force_local)
-
-
 def validate_config(config):
   _validate_update_config(config)
   _validate_health_check_config(config)
@@ -266,3 +250,39 @@ def populate_namespaces(config, force_local=False):
   _warn_on_deprecated_health_check_interval_secs(config)
   _warn_on_appapp_layouts(config)
   return config
+
+
+def inject_recipes(config):
+  job = config.raw() % config.context()
+  recipes = job.recipes().get() if job.recipes() is not Empty else []
+  tasks = [Recipes.get(recipe) for recipe in recipes]
+  tasks.append(job.task())
+  config.update_job(job(task = Tasks.concat(*tasks)))
+
+
+def AnnotatedAuroraConfig(force_local):
+  class _AnnotatedAuroraConfig(AuroraConfig):
+    @classmethod
+    def plugins(cls):
+      return (validate_config,
+              inject_recipes,
+              functools.partial(populate_namespaces, force_local=force_local))
+  return _AnnotatedAuroraConfig
+
+
+def get_config(jobname,
+               config_file,
+               json=False,
+               force_local=False,
+               bindings=(),
+               select_cluster=None,
+               select_env=None):
+  """Creates and returns a config object contained in the provided file."""
+  Recipes.include_module('twitter.mesos.client.recipes')
+  AuroraConfig = AnnotatedAuroraConfig(force_local)
+  loader = AuroraConfig.load_json if json else AuroraConfig.load
+  return loader(config_file,
+                jobname,
+                bindings,
+                select_cluster=select_cluster,
+                select_env=select_env)

@@ -447,6 +447,7 @@ def inspect(jobname, config_file):
     print('Parsed job config: %s' % config.job())
     return
 
+  job_thrift = config.job()
   job = config.raw()
   job_thrift = config.job()
   print('Job level information')

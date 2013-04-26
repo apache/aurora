@@ -4,7 +4,8 @@ import tempfile
 
 from twitter.common.contextutil import temporary_dir, temporary_file, open_zip
 from twitter.mesos.client import config
-from twitter.mesos.config import AuroraConfig, AuroraConfigLoader
+from twitter.mesos.config import AuroraConfig
+from twitter.mesos.config.loader import AuroraConfigLoader
 from twitter.mesos.config.schema import Announcer, Job, Resources, Task, MB
 from twitter.mesos.packer import sd_packer_client
 import twitter.mesos.packer.packer_client as packer_client
@@ -67,6 +68,7 @@ def test_get_config_announces():
 
       fp.seek(0)
       config.get_config('hello_world', fp)
+
 
 def test_include():
   with temporary_dir() as dir:

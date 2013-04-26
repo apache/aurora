@@ -70,13 +70,13 @@ def test_combine_tasks():
   assert combine_tasks(t2) == t2
 
   t3 = combine_tasks(t1, t2)
-  assert t3.name() == t1.name()
+  assert t3.name() == t2.name()
   assert t3.resources() == r111
   assert set(t3.processes()) == set([p1, p2, p3, p4])
   assert set(t3.constraints()) == set(order(p1, p2) + order(p3, p4))
 
   t4 = concat_tasks(t1, t2)
-  assert t4.name() == t1.name()
+  assert t4.name() == t2.name()
   assert t4.resources() == r111
   assert set(t4.processes()) == set([p1, p2, p3, p4])
   assert set(t4.constraints()) == set(

@@ -1,6 +1,7 @@
 from textwrap import dedent
 
-from .schema import Process
+from .schema_base import Process
+
 
 __all__ = (
   'Packer',
