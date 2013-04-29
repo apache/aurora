@@ -46,6 +46,7 @@ import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.CommandLineExpander;
+import com.twitter.mesos.scheduler.JobKeys;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.filter.SchedulingFilter.Veto;
 import com.twitter.mesos.scheduler.metadata.NearestFit;
@@ -67,7 +68,7 @@ import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 /**
  * HTTP interface to view information about a job in the mesos scheduler.
  */
-@Path("/scheduler/{role}/{job}")
+@Path("/scheduler/{role}{environment:(/.*)?}/{job}")
 public class SchedulerzJob extends JerseyTemplateServlet {
   private static final String STATUS_FILTER_PARAM = "status";
   private static final String ADMIN_VIEW_PARAM = "admin";
@@ -284,10 +285,23 @@ public class SchedulerzJob extends JerseyTemplateServlet {
   @Produces(MediaType.TEXT_HTML)
   public Response get(
       @PathParam("role") final String role,
+      @PathParam("environment") final String environment,
       @PathParam("job") final String job,
       @QueryParam(OFFSET_PARAM) final int offset,
       @QueryParam(STATUS_FILTER_PARAM) final String filterArg,
       @QueryParam(ADMIN_VIEW_PARAM) final String adminView) {
+
+    if (environment.isEmpty()) {
+      StringBuilder output = new StringBuilder();
+      String url = "/scheduler/" + role + "/" + Constants.DEFAULT_ENVIRONMENT + "/" + job;
+
+      output.append("<html><head>");
+      output.append("<meta http-equiv='refresh' content='3;URL=" + url + "'>");
+      output.append("</head>");
+      output.append("<body>This URL is deprecated, redirecting to " + url + "</body>");
+      output.append("</html>");
+      return Response.ok(output.toString()).build();
+    }
 
     return fillTemplate(new Closure<StringTemplate>() {
       @Override public void execute(StringTemplate template) {
@@ -306,12 +320,13 @@ public class SchedulerzJob extends JerseyTemplateServlet {
           }
         }
 
+        String env = environment.substring(1, environment.length());
         template.setAttribute("role", role);
         template.setAttribute("job", job);
-
+        template.setAttribute("environment", env);
         boolean hasMore = false;
 
-        Query.Builder builder = Query.jobScoped(role, job);
+        Query.Builder builder = Query.jobScoped(JobKeys.from(role, env, job));
 
         Optional<TaskQuery> activeQuery = Optional.absent();
         Optional<TaskQuery> completedQuery = Optional.absent();

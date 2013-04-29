@@ -106,6 +106,7 @@ public class SchedulerzRole extends JerseyTemplateServlet {
 
         for (ScheduledTask task : Storage.Util.fetchTasks(storage, Query.byRole(role))) {
           Job job = jobs.getUnchecked(task.getAssignedTask().getTask().getJobName());
+          job.environment = task.getAssignedTask().getTask().getEnvironment();
 
           switch (task.getStatus()) {
             case INIT:
@@ -204,6 +205,7 @@ public class SchedulerzRole extends JerseyTemplateServlet {
    */
   static class Job {
     String name;
+    String environment;
     int pendingTaskCount = 0;
     int activeTaskCount = 0;
     int finishedTaskCount = 0;
@@ -212,6 +214,10 @@ public class SchedulerzRole extends JerseyTemplateServlet {
 
     public String getName() {
       return name;
+    }
+
+    public String getEnvironment() {
+      return environment;
     }
 
     public int getPendingTaskCount() {
