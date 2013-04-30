@@ -24,6 +24,12 @@ class ExecutorDetector(object):
     for extraction in self.find():
       yield extraction
 
+  def match(self, path):
+    try:
+      return self._extractor.parse(path)
+    except ScanfParser.ParseError:
+      return None
+
   def path(self, result):
     return os.path.join(*self.PATTERN) % result.groups()
 
@@ -31,8 +37,4 @@ class ExecutorDetector(object):
            slave_id='*', framework_id='*', executor_id='*', run='*'):
     mixins = dict(
         root=root, slave_id=slave_id, framework_id=framework_id, executor_id=executor_id, run=run)
-    for path in glob(os.path.join(*self.PATTERN) % mixins):
-      try:
-        yield self._extractor.parse(path)
-      except ScanfParser.ParseError:
-        continue
+    return filter(None, map(self.match, glob(os.path.join(*self.PATTERN) % mixins)))

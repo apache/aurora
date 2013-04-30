@@ -10,6 +10,7 @@ from twitter.common import log
 
 from .process import ProcessSample
 
+
 def process_to_sample(process):
   """ Given a psutil.Process, return a current ProcessSample """
   try:
@@ -25,6 +26,7 @@ def process_to_sample(process):
   except (AccessDenied, NoSuchProcess) as e:
     log.warning('Error during process sampling [pid=%s]: %s' % (process.pid, e))
     return ProcessSample.empty()
+
 
 class ProcessTreeCollector(object):
   """ Collect resource consumption statistics for a process and its children """

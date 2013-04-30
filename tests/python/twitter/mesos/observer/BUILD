@@ -9,5 +9,6 @@ python_tests(name = 'mesos_vars',
   dependencies = [
     pants('src/python/twitter/common/contextutil'),
     pants('src/python/twitter/mesos/observer:mesos_vars'),
+    python_requirement('mox'),
   ]
 )
