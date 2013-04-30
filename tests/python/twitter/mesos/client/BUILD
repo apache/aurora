@@ -11,7 +11,7 @@ python_tests(name = 'config',
   sources = ['test_config.py'],
   dependencies = [
     pants('src/python/twitter/mesos/client:config'),
-    python_requirement('mox'),
+    pants('3rdparty/python:mox'),
   ],
 )
 
@@ -21,7 +21,7 @@ python_tests(name = 'scheduler_client',
     pants('src/python/twitter/common'),
     pants('src/python/twitter/mesos:mesos-lib'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
-    python_requirement('mox'),
+    pants('3rdparty/python:mox'),
   ],
 )
 
@@ -31,7 +31,7 @@ python_tests(name = 'updater',
     pants('src/python/twitter/common'),
     pants('src/python/twitter/mesos:mesos-lib'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
-    python_requirement('mox'),
+    pants('3rdparty/python:mox'),
   ]
 )
 
@@ -40,7 +40,7 @@ python_tests(name = 'shard_watcher',
   dependencies = [
     pants('src/python/twitter/mesos:mesos-lib'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
-    python_requirement('mox'),
+    pants('3rdparty/python:mox'),
   ]
 )
 
@@ -49,6 +49,6 @@ python_tests(name = 'health_check_factory',
   dependencies = [
     pants('src/python/twitter/mesos:mesos-lib'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
-    python_requirement('mox'),
+    pants('3rdparty/python:mox'),
   ]
 )
