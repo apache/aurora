@@ -55,21 +55,29 @@ class ExecutorVars(object):
     except PythonDirectoryWrapper.Error:
       return 'UNKNOWN'
 
-  def __init__(self, scope, executor, process):
+  def __init__(self, scope, executor, process, quiet=False):
     self._scope = scope
-    self._metrics = dict((metric, MutatorGauge(self.metric_name(executor, metric), 0))
-        for metric in self.ALL_METRICS)
-    for metric in self._metrics.values():
-      scope.register(metric)
-    self._process = process
+    self._quiet = quiet
     self.version = self.get_release_from_binary(
         os.path.join(process.getcwd(), process.cmdline[1]))
-    self._metrics['version'].write(self.version)
+    self._process = process
     self.orphan = False
 
+    if not quiet:
+      self._metrics = dict((metric, MutatorGauge(self.metric_name(executor, metric), 0))
+          for metric in self.ALL_METRICS)
+      for metric in self._metrics.values():
+        scope.register(metric)
+    self.write_metric('version', self.version)
+
   def unregister(self):
-    for metric in self._metrics.values():
-      self._scope.unregister(metric.name())
+    if not self._quiet:
+      for metric in self._metrics.values():
+        self._scope.unregister(metric.name())
+
+  def write_metric(self, metric, value):
+    if not self._quiet:
+      self._metrics[metric].write(value)
 
   @classmethod
   def thermos_children(cls, parent):
@@ -100,16 +108,16 @@ class ExecutorVars(object):
   def sample(self):
     try:
       executor_cpu, executor_rss, _ = self.cpu_rss_pss(self._process)
-      self._metrics['executor_cpu'].write(executor_cpu)
-      self._metrics['executor_rss'].write(executor_rss)
+      self.write_metric('executor_cpu', executor_cpu)
+      self.write_metric('executor_rss', executor_rss)
       self.orphan = self._process.ppid == 1
     except psutil.error.Error:
       return False
 
     try:
       child_stats = map(self.cpu_rss_pss, self.thermos_children(self._process))
-      self._metrics['thermos_cpu'].write(sum(stat[0] for stat in child_stats))
-      self._metrics['thermos_pss'].write(sum(stat[2] for stat in child_stats))
+      self.write_metric('thermos_cpu', sum(stat[0] for stat in child_stats))
+      self.write_metric('thermos_pss', sum(stat[2] for stat in child_stats))
     except psutil.error.Error:
       pass
 
@@ -222,12 +230,10 @@ class MesosObserverVars(ExceptionalThread):
       if not executor:
         log.warning('Found an executor not running in expected sandbox: %s' % cwd)
         continue
-      if self.executor_filter(executor):
-        continue
       if executor.executor_id not in self._executors:
         try:
           self._executors[executor.executor_id] = ExecutorVars(self.metrics,
-              executor.executor_id, proc)
+              executor.executor_id, proc, quiet=self.executor_filter(executor))
         except psutil.error.Error:
           continue
     purge = set()
