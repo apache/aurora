@@ -202,6 +202,7 @@ public class TaskStateMachine {
     };
 
     final Closure<Transition<State>> manageRestartingTask = new Closure<Transition<State>>() {
+      @SuppressWarnings("fallthrough")
       @Override public void execute(Transition<State> transition) {
         switch (transition.getTo().getState()) {
           case ASSIGNED:
@@ -301,6 +302,7 @@ public class TaskStateMachine {
                     KILLING, LOST, PREEMPTING)
                 .withCallback(
                     new Closure<Transition<State>>() {
+                      @SuppressWarnings("fallthrough")
                       @Override public void execute(Transition<State> transition) {
                         switch (transition.getTo().getState()) {
                           case FINISHED:
@@ -350,6 +352,7 @@ public class TaskStateMachine {
                     ROLLBACK, LOST, PREEMPTING)
                 .withCallback(
                     new Closure<Transition<State>>() {
+                      @SuppressWarnings("fallthrough")
                       @Override public void execute(Transition<State> transition) {
                         switch (transition.getTo().getState()) {
                           case FINISHED:
@@ -403,6 +406,7 @@ public class TaskStateMachine {
                     LOST, PREEMPTING)
                 .withCallback(
                     new Closure<Transition<State>>() {
+                      @SuppressWarnings("fallthrough")
                       @Override public void execute(Transition<State> transition) {
                         switch (transition.getTo().getState()) {
                           case FINISHED:
@@ -523,6 +527,7 @@ public class TaskStateMachine {
 
   private Closure<Transition<State>> manageUpdatingTask(final boolean rollback) {
     return new Closure<Transition<State>>() {
+      @SuppressWarnings("fallthrough")
       @Override public void execute(Transition<State> transition) {
         switch (transition.getTo().getState()) {
           case ASSIGNED:
