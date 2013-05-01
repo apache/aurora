@@ -14,6 +14,9 @@ import static com.twitter.mesos.gen.Constants.DEFAULT_ENVIRONMENT;
  * Utility class providing convenience functions relating to JobKeys.
  */
 public final class JobKeys {
+  private JobKeys() {
+    // Utility class.
+  }
 
   /**
    * Check that a jobKey struct is valid.
@@ -80,6 +83,4 @@ public final class JobKeys {
 
     return assertValid(job);
   }
-
-  private JobKeys() { }
 }

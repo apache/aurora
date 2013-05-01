@@ -152,6 +152,7 @@ class SchedulerProxy(object):
   UNAUTHENTICATED_RPCS = frozenset([
     'populateJobConfig',
     'getTasksStatus',
+    'getJobs',
     'getQuota'
   ])
 

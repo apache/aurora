@@ -1,5 +1,7 @@
 package com.twitter.mesos.scheduler.thrift;
 
+import java.util.Collection;
+import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -11,6 +13,8 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
 import com.google.inject.Inject;
 
 import org.apache.commons.lang.StringUtils;
@@ -31,6 +35,7 @@ import com.twitter.mesos.gen.DrainHostsResponse;
 import com.twitter.mesos.gen.EndMaintenanceResponse;
 import com.twitter.mesos.gen.FinishUpdateResponse;
 import com.twitter.mesos.gen.ForceTaskStateResponse;
+import com.twitter.mesos.gen.GetJobsResponse;
 import com.twitter.mesos.gen.GetQuotaResponse;
 import com.twitter.mesos.gen.Hosts;
 import com.twitter.mesos.gen.Identity;
@@ -61,6 +66,7 @@ import com.twitter.mesos.gen.UnloadRecoveryResponse;
 import com.twitter.mesos.gen.UpdateResponseCode;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.UpdateShardsResponse;
+import com.twitter.mesos.scheduler.CronJobManager;
 import com.twitter.mesos.scheduler.JobKeys;
 import com.twitter.mesos.scheduler.MaintenanceController;
 import com.twitter.mesos.scheduler.Query;
@@ -122,6 +128,7 @@ class SchedulerThriftInterface implements SchedulerController {
   private final StorageBackup backup;
   private final Recovery recovery;
   private final MaintenanceController maintenance;
+  private final CronJobManager cronJobManager;
   private final Amount<Long, Time> killTaskInitialBackoff;
   private final Amount<Long, Time> killTaskMaxBackoff;
 
@@ -133,6 +140,7 @@ class SchedulerThriftInterface implements SchedulerController {
       QuotaManager quotaManager,
       StorageBackup backup,
       Recovery recovery,
+      CronJobManager cronJobManager,
       MaintenanceController maintenance) {
 
     this(storage,
@@ -142,6 +150,7 @@ class SchedulerThriftInterface implements SchedulerController {
         backup,
         recovery,
         maintenance,
+        cronJobManager,
         KILL_TASK_INITIAL_BACKOFF.get(),
         KILL_TASK_MAX_BACKOFF.get());
   }
@@ -155,6 +164,7 @@ class SchedulerThriftInterface implements SchedulerController {
       StorageBackup backup,
       Recovery recovery,
       MaintenanceController maintenance,
+      CronJobManager cronJobManager,
       Amount<Long, Time> initialBackoff,
       Amount<Long, Time> maxBackoff) {
 
@@ -165,6 +175,7 @@ class SchedulerThriftInterface implements SchedulerController {
     this.backup = checkNotNull(backup);
     this.recovery = checkNotNull(recovery);
     this.maintenance = checkNotNull(maintenance);
+    this.cronJobManager = checkNotNull(cronJobManager);
     this.killTaskInitialBackoff = checkNotNull(initialBackoff);
     this.killTaskMaxBackoff = checkNotNull(maxBackoff);
   }
@@ -284,6 +295,53 @@ class SchedulerThriftInterface implements SchedulerController {
     } catch (AuthFailedException e) {
       return false;
     }
+  }
+
+  @Override
+  public GetJobsResponse getJobs(final String ownerRole) {
+    checkNotNull(ownerRole);
+
+    ImmutableSet.Builder<JobConfiguration> configs = ImmutableSet.builder();
+
+    // Get cron jobs come directly from the manager.
+    for (JobConfiguration jobConfiguration: cronJobManager.getJobs()) {
+      if (ownerRole.equals(jobConfiguration.getOwner().getRole())) {
+        configs.add(jobConfiguration.deepCopy());
+      }
+    }
+
+    // Query the task store, find immediate jobs, and synthesize a JobConfiguration for them.
+    // This is necessary because the ImmediateJobManager doesn't store jobs directly and
+    // ImmediateJobManager#getJobs always returns an empty Collection.
+    Multimap<JobKey, ScheduledTask> jobToTasks =
+        Multimaps.index(
+            Storage.Util.fetchTasks(storage, Query.roleScoped(ownerRole).active()),
+            new Function<ScheduledTask, JobKey>() {
+              @Override public JobKey apply(ScheduledTask scheduledTask) {
+                TwitterTaskInfo task = scheduledTask.getAssignedTask().getTask();
+
+                return JobKeys.from(
+                    task.getOwner().getRole(),
+                    task.getEnvironment(),
+                    task.getJobName());
+              }
+            });
+
+    for (Map.Entry<JobKey, Collection<ScheduledTask>> entry : jobToTasks.asMap().entrySet()) {
+      // Pick an arbitrary task for each immediate job. The chosen task might not be the most
+      // recent if the job is in the middle of an update or some shards have been selectively
+      // created.
+      ScheduledTask firstTask = entry.getValue().iterator().next();
+      configs.add(new JobConfiguration()
+          .setKey(entry.getKey())
+          .setOwner(firstTask.getAssignedTask().getTask().getOwner())
+          .setTaskConfig(firstTask.getAssignedTask().getTask())
+          .setShardCount(entry.getValue().size()));
+    }
+
+    return new GetJobsResponse()
+        .setConfigs(configs.build())
+        .setResponseCode(OK);
   }
 
   @Override

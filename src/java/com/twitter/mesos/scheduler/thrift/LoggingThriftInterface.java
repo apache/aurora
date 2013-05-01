@@ -28,6 +28,7 @@ import com.twitter.mesos.gen.DrainHostsResponse;
 import com.twitter.mesos.gen.EndMaintenanceResponse;
 import com.twitter.mesos.gen.FinishUpdateResponse;
 import com.twitter.mesos.gen.ForceTaskStateResponse;
+import com.twitter.mesos.gen.GetJobsResponse;
 import com.twitter.mesos.gen.GetQuotaResponse;
 import com.twitter.mesos.gen.Hosts;
 import com.twitter.mesos.gen.JobConfiguration;
@@ -232,6 +233,12 @@ class LoggingThriftInterface implements MesosAdmin.Iface {
   public ScheduleStatusResponse getTasksStatus(TaskQuery query) throws TException {
     logUnauthenticatedAction("getTasksStatus|query: %s", query);
     return delegate.getTasksStatus(query);
+  }
+
+  @Override
+  public GetJobsResponse getJobs(String ownerRole) throws TException {
+    logUnauthenticatedAction("getJobs|ownerRole: %s", ownerRole);
+    return delegate.getJobs(ownerRole);
   }
 
   @Override

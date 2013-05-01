@@ -9,6 +9,7 @@ import com.twitter.mesos.gen.DrainHostsResponse;
 import com.twitter.mesos.gen.EndMaintenanceResponse;
 import com.twitter.mesos.gen.FinishUpdateResponse;
 import com.twitter.mesos.gen.ForceTaskStateResponse;
+import com.twitter.mesos.gen.GetJobsResponse;
 import com.twitter.mesos.gen.GetQuotaResponse;
 import com.twitter.mesos.gen.Hosts;
 import com.twitter.mesos.gen.JobConfiguration;
@@ -93,6 +94,8 @@ interface SchedulerController {
   RestartShardsResponse restartShards(JobKey job, Set<Integer> shardIds, SessionKey session);
 
   ScheduleStatusResponse getTasksStatus(TaskQuery query);
+
+  GetJobsResponse getJobs(String ownerRole);
 
   KillResponse killTasks(TaskQuery query, SessionKey session);
 

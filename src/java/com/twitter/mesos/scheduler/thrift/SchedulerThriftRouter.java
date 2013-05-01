@@ -13,6 +13,7 @@ import com.twitter.mesos.gen.DrainHostsResponse;
 import com.twitter.mesos.gen.EndMaintenanceResponse;
 import com.twitter.mesos.gen.FinishUpdateResponse;
 import com.twitter.mesos.gen.ForceTaskStateResponse;
+import com.twitter.mesos.gen.GetJobsResponse;
 import com.twitter.mesos.gen.GetQuotaResponse;
 import com.twitter.mesos.gen.Hosts;
 import com.twitter.mesos.gen.JobConfiguration;
@@ -84,6 +85,11 @@ class SchedulerThriftRouter implements MesosAdmin.Iface {
   @Override
   public ScheduleStatusResponse getTasksStatus(TaskQuery query) {
     return schedulerController.getTasksStatus(query);
+  }
+
+  @Override
+  public GetJobsResponse getJobs(String ownerRole) {
+    return schedulerController.getJobs(ownerRole);
   }
 
   @Override

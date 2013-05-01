@@ -1,5 +1,6 @@
 package com.twitter.mesos.scheduler.storage.testing;
 
+import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableSet;
 
 import org.easymock.Capture;
@@ -101,5 +102,11 @@ public class StorageTestUtil {
   public IExpectationSetters<?> expectTaskFetch(TaskQuery query, ScheduledTask... result) {
     return expect(taskStore.fetchTasks(query))
         .andReturn(ImmutableSet.<ScheduledTask>builder().add(result).build());
+  }
+
+  public IExpectationSetters<?> expectTaskFetch(
+      Supplier<TaskQuery> query, ScheduledTask... result) {
+
+    return expectTaskFetch(query.get(), result);
   }
 }

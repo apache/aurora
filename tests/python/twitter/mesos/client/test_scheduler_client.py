@@ -122,6 +122,13 @@ class TestSchedulerProxyInjection(unittest.TestCase):
 
     self.make_scheduler_proxy().getTasksStatus(TaskQuery())
 
+  def test_getJobs(self):
+    self.mock_thrift_client.getJobs(IgnoreArg())
+
+    self.mox.ReplayAll()
+
+    self.make_scheduler_proxy().getJobs(ROLE)
+
   def test_killTasks(self):
     self.mock_thrift_client.killTasks(IsA(TaskQuery), IsA(SessionKey))
 

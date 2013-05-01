@@ -46,6 +46,8 @@ import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.ValueConstraint;
+import com.twitter.mesos.scheduler.CronJobManager;
+import com.twitter.mesos.scheduler.JobKeys;
 import com.twitter.mesos.scheduler.MaintenanceController;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.ScheduleException;
@@ -78,6 +80,7 @@ import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.MAX
 import static com.twitter.mesos.scheduler.thrift.SchedulerThriftInterface.transitionMessage;
 import static com.twitter.mesos.scheduler.thrift.auth.CapabilityValidator.Capability.ROOT;
 
+// TODO(ksweeney): Get role from JobKey instead of Identity everywhere in here.
 public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   private static final String ROLE = "bar_role";
@@ -98,6 +101,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private Recovery recovery;
   private MaintenanceController maintenance;
   private MesosAdmin.Iface thrift;
+  private CronJobManager cronJobManager;
 
   @Before
   public void setUp() {
@@ -109,6 +113,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     backup = createMock(StorageBackup.class);
     recovery = createMock(Recovery.class);
     maintenance = createMock(MaintenanceController.class);
+    cronJobManager = createMock(CronJobManager.class);
 
     // Use guice and install AuthModule to apply AOP-style auth layer.
     Module testModule = new AbstractModule() {
@@ -120,6 +125,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         bind(StorageBackup.class).toInstance(backup);
         bind(Recovery.class).toInstance(recovery);
         bind(MaintenanceController.class).toInstance(maintenance);
+        bind(CronJobManager.class).toInstance(cronJobManager);
         bind(SchedulerController.class).to(SchedulerThriftInterface.class);
         bind(MesosAdmin.Iface.class).to(SchedulerThriftRouter.class);
       }
@@ -711,6 +717,58 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     assertEquals(
         new EndMaintenanceResponse().setResponseCode(OK).setStatuses(none),
         thrift.endMaintenance(hosts, SESSION));
+  }
+
+  @Test
+  public void testGetJobs() throws Exception {
+    JobConfiguration ownedCronJob = makeJob();
+    ownedCronJob.setCronSchedule("0 * * * *");
+    JobConfiguration unownedCronJob = makeJob();
+    unownedCronJob.setOwner(new Identity("other", "other")).setCronSchedule("0 * * * *");
+    TwitterTaskInfo ownedImmediateTaskInfo = defaultTask(false)
+        .setJobName("immediate")
+        .setOwner(ROLE_IDENTITY);
+    Set<JobConfiguration> ownedCronJobOnly = ImmutableSet.of(ownedCronJob);
+    Set<JobConfiguration> unownedCronJobOnly = ImmutableSet.of(unownedCronJob);
+    Set<JobConfiguration> bothCronJobs = ImmutableSet.of(ownedCronJob, unownedCronJob);
+    ScheduledTask ownedImmediateTask = new ScheduledTask()
+        .setAssignedTask(
+            new AssignedTask().setTask(ownedImmediateTaskInfo));
+    JobConfiguration ownedImmediateJob = new JobConfiguration()
+        .setKey(JobKeys.from(ROLE, DEFAULT_ENVIRONMENT, "immediate"))
+        .setOwner(ROLE_IDENTITY)
+        .setShardCount(1)
+        .setTaskConfig(ownedImmediateTaskInfo);
+    Query.Builder query = Query.roleScoped(ROLE).active();
+
+    expect(cronJobManager.getJobs()).andReturn(ownedCronJobOnly);
+    storageUtil.expectTaskFetch(query);
+
+    expect(cronJobManager.getJobs()).andReturn(bothCronJobs);
+    storageUtil.expectTaskFetch(query);
+
+    expect(cronJobManager.getJobs()).andReturn(unownedCronJobOnly);
+    storageUtil.expectTaskFetch(query, ownedImmediateTask);
+
+    expect(cronJobManager.getJobs()).andReturn(ImmutableSet.<JobConfiguration>of());
+    storageUtil.expectTaskFetch(query);
+
+    control.replay();
+
+    assertEquals(
+        ownedCronJob,
+        Iterables.getOnlyElement(thrift.getJobs(ROLE).getConfigs()));
+
+    assertEquals(
+        ownedCronJob,
+        Iterables.getOnlyElement(thrift.getJobs(ROLE).getConfigs()));
+
+    Set<JobConfiguration> queryResult3 = thrift.getJobs(ROLE).getConfigs();
+    assertEquals(ownedImmediateJob, Iterables.getOnlyElement(queryResult3));
+    assertEquals(ownedImmediateTaskInfo, Iterables.getOnlyElement(queryResult3).getTaskConfig());
+
+    assertTrue(thrift.getJobs(ROLE).getConfigs().isEmpty());
+
   }
 
   private JobConfiguration makeJob() {
