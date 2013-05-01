@@ -63,33 +63,46 @@ class ShardWatcher(object):
     max_time = now + self._restart_threshold + self._watch_secs
 
     shard_states = {}
+
     def finished_shards():
       return dict((s_id, s) for s_id, s in shard_states.items() if s.finished)
+
+    def set_shard_healthy(shard_id, now):
+      if shard_id not in shard_states:
+        shard_states[shard_id] = Shard(now)
+      shard = shard_states.get(shard_id)
+      if now > (shard.birthday + self._watch_secs):
+        log.info('Shard %s has been up and healthy for at least %d seconds' % (
+            shard_id, self._watch_secs))
+        shard.set_healthy(True)
+
+    def maybe_set_shard_unhealthy(shard_id, retriable):
+      # A shard that was previously healthy and currently unhealthy has failed.
+      if shard_id in shard_states:
+        log.info('Shard %s is unhealthy' % shard_id)
+        shard_states[shard_id].set_healthy(False)
+      # If the restart threshold has expired or if the shard cannot be retried it is unhealthy.
+      elif now > expected_healthy_by or not retriable:
+        log.info('Shard %s was not reported healthy within %d seconds' % (
+            shard_id, self._restart_threshold))
+        shard_states[shard_id] = Shard(finished=True)
 
     while True:
       running_tasks = self._get_tasks_by_shard_id(shard_ids)
       now = self._clock.time()
       tasks_by_shard = dict((task.assignedTask.task.shardId, task) for task in running_tasks)
       for shard_id in shard_ids:
-        running_task = tasks_by_shard.get(shard_id)
         if shard_id not in finished_shards():
-          if running_task is not None and health_check.health(running_task):
-            if shard_id not in shard_states:
-              shard_states[shard_id] = Shard(now)
-            shard = shard_states.get(shard_id)
-            if now > (shard.birthday + self._watch_secs):
-              log.info('Shard %s has been up and healthy for at least %d seconds' % (
-                  shard_id, self._watch_secs))
-              shard.set_healthy(True)
+          running_task = tasks_by_shard.get(shard_id)
+          if running_task is not None:
+            task_healthy, retriable = health_check.health(running_task)
+            if task_healthy:
+              set_shard_healthy(shard_id, now)
+            else:
+              maybe_set_shard_unhealthy(shard_id, retriable)
           else:
-            # A shard that was previously healthy and currently unhealthy has failed.
-            if shard_id in shard_states:
-              log.info('Shard %s is unhealthy' % shard_id)
-              shard_states[shard_id].set_healthy(False)
-            elif now > expected_healthy_by:
-              log.info('Shard %s was not reported healthy within %d seconds' % (
-                  shard_id, self._restart_threshold))
-              shard_states[shard_id] = Shard(finished=True)
+            # Set retriable=True since a shard should be retried if it has not been healthy.
+            maybe_set_shard_unhealthy(shard_id, retriable=True)
 
       log.debug('Shards health: %s' % ['%s: %s' % val for val in shard_states.items()])
 

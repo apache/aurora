@@ -10,7 +10,34 @@ from gen.twitter.mesos.ttypes import ScheduleStatus
 class HealthCheck(Interface):
   @abstractmethod
   def health(self, task):
-    """Checks health of the task"""
+    """Checks health of the task and returns a (healthy, retriable) pair."""
+
+
+class HealthStatus(object):
+  @classmethod
+  def alive(cls):
+    return cls(True).health()
+
+  @classmethod
+  def dead(cls):
+    return cls(False).health()
+
+  def __init__(self, retry, health):
+    self._retry = retry
+    self._health = health
+
+  def health(self):
+    return (self._health, self._retry)
+
+
+class NotRetriable(HealthStatus):
+  def __init__(self, health):
+    super(NotRetriable, self).__init__(False, health)
+
+
+class Retriable(HealthStatus):
+  def __init__(self, health):
+    super(Retriable, self).__init__(True, health)
 
 
 class StatusHealthCheck(HealthCheck):
@@ -28,13 +55,13 @@ class StatusHealthCheck(HealthCheck):
 
     if status == ScheduleStatus.RUNNING:
       if shard_id in self._task_ids:
-        return task_id == self._task_ids.get(shard_id)
+        return Retriable.alive() if task_id == self._task_ids.get(shard_id) else NotRetriable.dead()
       else:
         log.info('Detected RUNNING shard %s' % shard_id)
         self._task_ids[shard_id] = task_id
-        return True
+        return Retriable.alive()
     else:
-      return False
+      return Retriable.dead()
 
 
 class HttpHealthCheck(HealthCheck):
@@ -60,7 +87,7 @@ class HttpHealthCheck(HealthCheck):
     if not http_signaler:
       http_signaler = self._http_signaler_factory(host_port[1], host_port[0])
       self._http_signalers[shard_id] = (host_port, http_signaler)
-    return http_signaler.health()[0]
+    return Retriable.alive() if http_signaler.health()[0] else Retriable.dead()
 
 
 class ChainedHealthCheck(HealthCheck):
@@ -69,7 +96,11 @@ class ChainedHealthCheck(HealthCheck):
     self._health_checkers = health_checkers
 
   def health(self, task):
-    return all(checker.health(task) for checker in self._health_checkers)
+    for checker in self._health_checkers:
+      healthy, retriable = checker.health(task)
+      if not healthy:
+        return (healthy, retriable)
+    return Retriable.alive()
 
 
 class HealthCheckFactory(object):

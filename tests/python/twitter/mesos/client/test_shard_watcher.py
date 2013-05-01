@@ -31,8 +31,8 @@ class FakeHealthCheckFactory(object):
   def get(self):
     return self._health_check
 
-  def expect_health_check(self, task, status):
-    self._health_check.health(task).InAnyOrder().AndReturn(status)
+  def expect_health_check(self, task, status, retry):
+    self._health_check.health(task).InAnyOrder().AndReturn((status, retry))
 
   def replay(self):
     mox.Replay(self._health_check)
@@ -85,9 +85,9 @@ class ShardWatcherTest(unittest.TestCase):
     for x in range(int(num_calls)):
       self._scheduler.getTasksStatus(query).AndReturn(response)
 
-  def expect_health_check(self, shard, status, num_calls=EXPECTED_CYCLES):
+  def expect_health_check(self, shard, status, retry=True, num_calls=EXPECTED_CYCLES):
     for x in range(int(num_calls)):
-      self._health_check_handler.expect_health_check(self.create_task(shard), status)
+      self._health_check_handler.expect_health_check(self.create_task(shard), status, retry)
 
   def assert_watch_result(self, expected_failed_shards, shards_to_watch=WATCH_SHARDS):
     shards_returned = self._watcher.watch(shards_to_watch)
@@ -123,11 +123,21 @@ class ShardWatcherTest(unittest.TestCase):
     self.verify_mocks()
 
   def test_all_shard_failure(self):
-    """One failed shard in a batch of shards"""
+    """All failed shard in a batch of shards"""
     self.expect_get_statuses()
     self.expect_health_check(0, False)
     self.expect_health_check(1, False)
     self.expect_health_check(2, False)
+    self.replay_mocks()
+    self.assert_watch_result([0, 1, 2])
+    self.verify_mocks()
+
+  def test_restart_threshold_fail_fast(self):
+    """Shards are reported unhealthy with retry set to False"""
+    self.expect_get_statuses(num_calls=1)
+    self.expect_health_check(0, False, retry=False, num_calls=1)
+    self.expect_health_check(1, False, retry=False, num_calls=1)
+    self.expect_health_check(2, False, retry=False, num_calls=1)
     self.replay_mocks()
     self.assert_watch_result([0, 1, 2])
     self.verify_mocks()

@@ -1,6 +1,7 @@
 python_test_suite(name = 'all',
   dependencies = [
     pants(':config'),
+    pants(':health_check_factory'),
     pants(':scheduler_client'),
     pants(':shard_watcher'),
     pants(':updater'),
