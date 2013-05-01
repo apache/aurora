@@ -330,6 +330,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
     assertEquals(0L, Stats.<Long>getVariable("task_store_UNKNOWN").read().longValue());
 
     // TODO(William Farner): Send a thrift RPC to the scheduler.
+    // TODO(William Farner): Also send an admin thrift RPC to verify capability (e.g. ROOT) mapping.
   }
 
   private class LogOpMatcher implements IArgumentMatcher {

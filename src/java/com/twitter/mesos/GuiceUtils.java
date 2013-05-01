@@ -57,9 +57,23 @@ public final class GuiceUtils {
         }
       };
 
-  private static Matcher<Method> interfaceMatcher(Class<?> matchInterface) {
-    final Set<Pair<String, Class[]>> interfaceMethods = ImmutableSet.copyOf(
-        Iterables.transform(ImmutableList.copyOf(matchInterface.getMethods()), CANONICALIZE));
+  /**
+   * Creates a matcher that will match methods of an interface, optionally excluding inherited
+   * methods.
+   *
+   * @param matchInterface The interface to match.
+   * @param declaredMethodsOnly if {@code true} only methods directly declared in the interface
+   *                            will be matched, otherwise all methods on the interface are matched.
+   * @return A new matcher instance.
+   */
+  public static Matcher<Method> interfaceMatcher(
+      Class<?> matchInterface,
+      boolean declaredMethodsOnly) {
+
+    Method[] methods =
+        declaredMethodsOnly ? matchInterface.getDeclaredMethods() : matchInterface.getMethods();
+    final Set<Pair<String, Class[]>> interfaceMethods =
+        ImmutableSet.copyOf(Iterables.transform(ImmutableList.copyOf(methods), CANONICALIZE));
     final LoadingCache<Method, Pair<String, Class[]>> cache = CacheBuilder.newBuilder()
         .build(CacheLoader.from(CANONICALIZE));
 
@@ -80,7 +94,9 @@ public final class GuiceUtils {
    */
   public static void bindJNIContextClassLoader(Binder binder, Class<?> wrapInterface) {
     final ClassLoader mainClassLoader = GuiceUtils.class.getClassLoader();
-    binder.bindInterceptor(Matchers.subclassesOf(wrapInterface), interfaceMatcher(wrapInterface),
+    binder.bindInterceptor(
+        Matchers.subclassesOf(wrapInterface),
+        interfaceMatcher(wrapInterface, false),
         new MethodInterceptor() {
           @Override public Object invoke(MethodInvocation invocation) throws Throwable {
             Thread currentThread = Thread.currentThread();
@@ -132,7 +148,7 @@ public final class GuiceUtils {
         "Non-void methods must be explicitly whitelisted with @AllowUnchecked: " + disallowed);
 
     Matcher<Method> matcher =
-        Matchers.<Method>not(WHITELIST_MATCHER).and(interfaceMatcher(wrapInterface));
+        Matchers.<Method>not(WHITELIST_MATCHER).and(interfaceMatcher(wrapInterface, false));
     binder.bindInterceptor(Matchers.subclassesOf(wrapInterface), matcher,
         new MethodInterceptor() {
           @Override public Object invoke(MethodInvocation invocation) throws Throwable {

@@ -7,15 +7,16 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.inject.AbstractModule;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.google.inject.Module;
 
 import org.easymock.IExpectationSetters;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.EasyMockTest;
-import com.twitter.mesos.auth.SessionValidator;
 import com.twitter.mesos.auth.SessionValidator.AuthFailedException;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Constraint;
@@ -31,6 +32,7 @@ import com.twitter.mesos.gen.JobKey;
 import com.twitter.mesos.gen.KillResponse;
 import com.twitter.mesos.gen.LimitConstraint;
 import com.twitter.mesos.gen.MaintenanceStatusResponse;
+import com.twitter.mesos.gen.MesosAdmin;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ResponseCode;
 import com.twitter.mesos.gen.RestartShardsResponse;
@@ -51,9 +53,13 @@ import com.twitter.mesos.scheduler.SchedulerCore;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ParsedConfiguration;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
+import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.backup.Recovery;
 import com.twitter.mesos.scheduler.storage.backup.StorageBackup;
 import com.twitter.mesos.scheduler.storage.testing.StorageTestUtil;
+import com.twitter.mesos.scheduler.thrift.auth.AuthModule;
+import com.twitter.mesos.scheduler.thrift.auth.CapabilityValidator;
+import com.twitter.mesos.scheduler.thrift.auth.CapabilityValidator.Capability;
 
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
@@ -70,6 +76,7 @@ import static com.twitter.mesos.gen.ResponseCode.OK;
 import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.MAX_TASKS_PER_JOB;
 import static com.twitter.mesos.scheduler.thrift.SchedulerThriftInterface.transitionMessage;
+import static com.twitter.mesos.scheduler.thrift.auth.CapabilityValidator.Capability.ROOT;
 
 public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
@@ -85,33 +92,40 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   private StorageTestUtil storageUtil;
   private SchedulerCore scheduler;
-  private SessionValidator sessionValidator;
+  private CapabilityValidator userValidator;
   private QuotaManager quotaManager;
   private StorageBackup backup;
   private Recovery recovery;
   private MaintenanceController maintenance;
-  private SchedulerController schedulerController;
+  private MesosAdmin.Iface thrift;
 
   @Before
   public void setUp() {
     storageUtil = new StorageTestUtil(this);
     storageUtil.expectTransactions();
     scheduler = createMock(SchedulerCore.class);
-    sessionValidator = createMock(SessionValidator.class);
+    userValidator = createMock(CapabilityValidator.class);
     quotaManager = createMock(QuotaManager.class);
     backup = createMock(StorageBackup.class);
     recovery = createMock(Recovery.class);
     maintenance = createMock(MaintenanceController.class);
-    schedulerController = new SchedulerThriftInterface(
-        storageUtil.storage,
-        scheduler,
-        sessionValidator,
-        quotaManager,
-        backup,
-        recovery,
-        maintenance,
-        Amount.of(1L, Time.MILLISECONDS),
-        Amount.of(1L, Time.SECONDS));
+
+    // Use guice and install AuthModule to apply AOP-style auth layer.
+    Module testModule = new AbstractModule() {
+      @Override protected void configure() {
+        bind(Storage.class).toInstance(storageUtil.storage);
+        bind(SchedulerCore.class).toInstance(scheduler);
+        bind(CapabilityValidator.class).toInstance(userValidator);
+        bind(QuotaManager.class).toInstance(quotaManager);
+        bind(StorageBackup.class).toInstance(backup);
+        bind(Recovery.class).toInstance(recovery);
+        bind(MaintenanceController.class).toInstance(maintenance);
+        bind(SchedulerController.class).to(SchedulerThriftInterface.class);
+        bind(MesosAdmin.Iface.class).to(SchedulerThriftRouter.class);
+      }
+    };
+    Injector injector = Guice.createInjector(testModule, new AuthModule());
+    thrift = injector.getInstance(MesosAdmin.Iface.class);
   }
 
   @Test
@@ -122,7 +136,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    CreateJobResponse response = schedulerController.createJob(job, SESSION);
+    CreateJobResponse response = thrift.createJob(job, SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
   }
 
@@ -135,7 +149,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    CreateJobResponse response = schedulerController.createJob(job, SESSION);
+    CreateJobResponse response = thrift.createJob(job, SESSION);
     assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
 
@@ -152,7 +166,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    CreateJobResponse response = schedulerController.createJob(job, SESSION);
+    CreateJobResponse response = thrift.createJob(job, SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
   }
 
@@ -165,7 +179,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    CreateJobResponse response = schedulerController.createJob(job, SESSION);
+    CreateJobResponse response = thrift.createJob(job, SESSION);
     assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
 
@@ -175,7 +189,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    CreateJobResponse response = schedulerController.createJob(makeJob(), SESSION);
+    CreateJobResponse response = thrift.createJob(makeJob(), SESSION);
     assertEquals(ResponseCode.AUTH_FAILED, response.getResponseCode());
   }
 
@@ -189,7 +203,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
             .setTask(new TwitterTaskInfo()
                 .setOwner(ROLE_IDENTITY)));
 
-    expectAdminAuth(false);
+    expectAuth(ROOT, false);
     expectAuth(ROLE, true);
     storageUtil.expectTaskFetch(query, task);
     scheduler.killTasks(query, USER);
@@ -197,7 +211,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    KillResponse response = schedulerController.killTasks(query, SESSION);
+    KillResponse response = thrift.killTasks(query, SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
   }
 
@@ -211,7 +225,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
             .setTask(new TwitterTaskInfo()
                 .setOwner(ROLE_IDENTITY)));
 
-    expectAdminAuth(false);
+    expectAuth(ROOT, false);
     expectAuth(ROLE, true);
     storageUtil.expectTaskFetch(query, task);
     scheduler.killTasks(query, USER);
@@ -220,7 +234,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    KillResponse response = schedulerController.killTasks(query, SESSION);
+    KillResponse response = thrift.killTasks(query, SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
   }
 
@@ -234,13 +248,13 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
             .setTask(new TwitterTaskInfo()
                 .setOwner(ROLE_IDENTITY)));
 
-    expectAdminAuth(false);
+    expectAuth(ROOT, false);
     expectAuth(ROLE, false);
     storageUtil.expectTaskFetch(query, task);
 
     control.replay();
 
-    KillResponse response = schedulerController.killTasks(query, SESSION);
+    KillResponse response = thrift.killTasks(query, SESSION);
     assertEquals(ResponseCode.AUTH_FAILED, response.getResponseCode());
   }
 
@@ -250,13 +264,13 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setOwner(ROLE_IDENTITY)
         .setJobName("foo_job");
 
-    expectAdminAuth(true);
+    expectAuth(ROOT, true);
     scheduler.killTasks(query, USER);
     storageUtil.expectTaskFetch(query);
 
     control.replay();
 
-    KillResponse response = schedulerController.killTasks(query, SESSION);
+    KillResponse response = thrift.killTasks(query, SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
   }
 
@@ -268,7 +282,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    KillResponse response = schedulerController.killTasks(query, SESSION);
+    KillResponse response = thrift.killTasks(query, SESSION);
     assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
 
@@ -278,14 +292,14 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setOwner(ROLE_IDENTITY)
         .setJobName("foo_job");
 
-    expectAdminAuth(true);
+    expectAuth(ROOT, true);
 
     scheduler.killTasks(query, USER);
     expectLastCall().andThrow(new ScheduleException("No jobs matching query"));
 
     control.replay();
 
-    KillResponse response = schedulerController.killTasks(query, SESSION);
+    KillResponse response = thrift.killTasks(query, SESSION);
     assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
 
@@ -295,12 +309,28 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setNumCpus(10)
         .setDiskMb(100)
         .setRamMb(200);
-    expectAdminAuth(true);
+    expectAuth(ROOT, true);
     quotaManager.setQuota(ROLE, quota);
 
     control.replay();
 
-    SetQuotaResponse response = schedulerController.setQuota(ROLE, quota, SESSION);
+    SetQuotaResponse response = thrift.setQuota(ROLE, quota, SESSION);
+    assertEquals(ResponseCode.OK, response.getResponseCode());
+  }
+
+  @Test
+  public void testProvisionerSetQuota() throws Exception {
+    Quota quota = new Quota()
+        .setNumCpus(10)
+        .setDiskMb(100)
+        .setRamMb(200);
+    expectAuth(ROOT, false);
+    expectAuth(Capability.PROVISIONER, true);
+    quotaManager.setQuota(ROLE, quota);
+
+    control.replay();
+
+    SetQuotaResponse response = thrift.setQuota(ROLE, quota, SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
   }
 
@@ -310,11 +340,12 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setNumCpus(10)
         .setDiskMb(100)
         .setRamMb(200);
-    expectAdminAuth(false);
+    expectAuth(ROOT, false);
+    expectAuth(Capability.PROVISIONER, false);
 
     control.replay();
 
-    SetQuotaResponse response = schedulerController.setQuota(ROLE, quota, SESSION);
+    SetQuotaResponse response = thrift.setQuota(ROLE, quota, SESSION);
     assertEquals(ResponseCode.AUTH_FAILED, response.getResponseCode());
   }
 
@@ -324,21 +355,21 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     ScheduleStatus status = ScheduleStatus.FAILED;
 
     scheduler.setTaskStatus(Query.byId(taskId), status, transitionMessage(SESSION.getUser()));
-    expectAdminAuth(true);
+    expectAuth(ROOT, true);
 
     control.replay();
 
-    ForceTaskStateResponse response = schedulerController.forceTaskState(taskId, status, SESSION);
+    ForceTaskStateResponse response = thrift.forceTaskState(taskId, status, SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
   }
 
   @Test
   public void testForceTaskStateAuthFailure() throws Exception {
-    expectAdminAuth(false);
+    expectAuth(ROOT, false);
 
     control.replay();
 
-    ForceTaskStateResponse response = schedulerController.forceTaskState(
+    ForceTaskStateResponse response = thrift.forceTaskState(
         "task",
         ScheduleStatus.FAILED,
         SESSION);
@@ -355,7 +386,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .andReturn(Optional.of(token));
 
     control.replay();
-    StartUpdateResponse resp = schedulerController.startUpdate(job, SESSION);
+    StartUpdateResponse resp = thrift.startUpdate(job, SESSION);
     assertEquals(token, resp.getUpdateToken());
     assertEquals(ResponseCode.OK, resp.getResponseCode());
     assertTrue(resp.isRollingUpdateRequired());
@@ -370,7 +401,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .andReturn(Optional.<String>absent());
 
     control.replay();
-    StartUpdateResponse resp = schedulerController.startUpdate(job, SESSION);
+    StartUpdateResponse resp = thrift.startUpdate(job, SESSION);
     assertEquals(ResponseCode.OK, resp.getResponseCode());
     assertFalse(resp.isRollingUpdateRequired());
   }
@@ -384,7 +415,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    RestartShardsResponse resp = schedulerController.restartShards(JOB_KEY, shards, SESSION);
+    RestartShardsResponse resp = thrift.restartShards(null, null, JOB_KEY, shards, SESSION);
     assertEquals(ResponseCode.OK, resp.getResponseCode());
   }
 
@@ -399,7 +430,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    RestartShardsResponse resp = schedulerController.restartShards(JOB_KEY, shards, SESSION);
+    RestartShardsResponse resp = thrift.restartShards(null, null, JOB_KEY, shards, SESSION);
     assertEquals(ResponseCode.INVALID_REQUEST, resp.getResponseCode());
     assertEquals(message, resp.getMessage());
   }
@@ -416,7 +447,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     task.unsetDiskMb();
     assertEquals(
         INVALID_REQUEST,
-        schedulerController.createJob(makeJob(task), SESSION).getResponseCode());
+        thrift.createJob(makeJob(task), SESSION).getResponseCode());
   }
 
   @Test
@@ -428,7 +459,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     TwitterTaskInfo task = productionTask().setNumCpus(0.0);
     assertEquals(
         INVALID_REQUEST,
-        schedulerController.createJob(makeJob(task), SESSION).getResponseCode());
+        thrift.createJob(makeJob(task), SESSION).getResponseCode());
   }
 
   @Test
@@ -440,7 +471,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     TwitterTaskInfo task = productionTask().setRamMb(-123);
     assertEquals(
         INVALID_REQUEST,
-        schedulerController.createJob(makeJob(task), SESSION).getResponseCode());
+        thrift.createJob(makeJob(task), SESSION).getResponseCode());
   }
 
   @Test
@@ -452,7 +483,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     TwitterTaskInfo task = productionTask().setDiskMb(0);
     assertEquals(
         INVALID_REQUEST,
-        schedulerController.createJob(makeJob(task), SESSION).getResponseCode());
+        thrift.createJob(makeJob(task), SESSION).getResponseCode());
   }
 
   @Test
@@ -497,7 +528,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    assertEquals(ResponseCode.OK, schedulerController.createJob(job, SESSION).getResponseCode());
+    assertEquals(ResponseCode.OK, thrift.createJob(job, SESSION).getResponseCode());
   }
 
   private Set<TwitterTaskInfo> taskCopies(TwitterTaskInfo task, int copies) {
@@ -515,7 +546,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     JobConfiguration job = makeJob(taskCopies(nonProductionTask(), MAX_TASKS_PER_JOB.get() + 1));
-    assertEquals(INVALID_REQUEST, schedulerController.createJob(job, SESSION).getResponseCode());
+    assertEquals(INVALID_REQUEST, thrift.createJob(job, SESSION).getResponseCode());
   }
 
   @Test
@@ -527,12 +558,12 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    schedulerController.createJob(job, SESSION);
+    thrift.createJob(job, SESSION);
     JobConfiguration updated =
         makeJob(taskCopies(nonProductionTask(), MAX_TASKS_PER_JOB.get() + 1));
     assertEquals(
         INVALID_REQUEST,
-        schedulerController.startUpdate(updated, SESSION).getResponseCode());
+        thrift.startUpdate(updated, SESSION).getResponseCode());
   }
 
   @Test
@@ -547,7 +578,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setTaskConfigs(ImmutableSet.<TwitterTaskInfo>of());
     assertEquals(
         INVALID_REQUEST,
-        schedulerController.createJob(job, SESSION).getResponseCode());
+        thrift.createJob(job, SESSION).getResponseCode());
   }
 
   @Test
@@ -560,7 +591,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     task.addToConstraints(dedicatedConstraint(1));
     assertEquals(
         INVALID_REQUEST,
-        schedulerController.createJob(makeJob(task), SESSION).getResponseCode());
+        thrift.createJob(makeJob(task), SESSION).getResponseCode());
   }
 
   @Test
@@ -573,7 +604,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     task.addToConstraints(dedicatedConstraint(ImmutableSet.of("mesos", "test")));
     assertEquals(
         INVALID_REQUEST,
-        schedulerController.createJob(makeJob(task), SESSION).getResponseCode());
+        thrift.createJob(makeJob(task), SESSION).getResponseCode());
   }
 
   @Test
@@ -586,7 +617,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     task.addToConstraints(dedicatedConstraint(ImmutableSet.of("mesos")));
     assertEquals(
         INVALID_REQUEST,
-        schedulerController.createJob(makeJob(task), SESSION).getResponseCode());
+        thrift.createJob(makeJob(task), SESSION).getResponseCode());
   }
 
   @Test
@@ -599,7 +630,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     TwitterTaskInfo production = productionTask();
     assertEquals(
         INVALID_REQUEST,
-        schedulerController
+        thrift
             .createJob(makeJob(nonProduction, production), SESSION).getResponseCode());
   }
 
@@ -611,7 +642,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     JobConfiguration job = makeJob(productionTask());
     job.getTaskConfigs().iterator().next().unsetShardId();
-    assertEquals(INVALID_REQUEST, schedulerController.createJob(job, SESSION).getResponseCode());
+    assertEquals(INVALID_REQUEST, thrift.createJob(job, SESSION).getResponseCode());
   }
 
   @Test
@@ -627,7 +658,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     for (TwitterTaskInfo task : job.getTaskConfigs()) {
       task.setShardId(0);
     }
-    assertEquals(INVALID_REQUEST, schedulerController.createJob(job, SESSION).getResponseCode());
+    assertEquals(INVALID_REQUEST, thrift.createJob(job, SESSION).getResponseCode());
   }
 
   @Test
@@ -640,12 +671,12 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     job.setTaskConfigs(ImmutableSet.of(
         Iterables.get(job.getTaskConfigs(), 0).setShardId(0),
         Iterables.get(job.getTaskConfigs(), 0).setShardId(2)));
-    assertEquals(INVALID_REQUEST, schedulerController.createJob(job, SESSION).getResponseCode());
+    assertEquals(INVALID_REQUEST, thrift.createJob(job, SESSION).getResponseCode());
   }
 
   @Test
   public void testHostMaintenance() throws Exception {
-    expectAdminAuth(true).times(6);
+    expectAuth(ROOT, true).times(6);
     Set<String> hostnames = ImmutableSet.of("a");
     Set<HostStatus> none = ImmutableSet.of(new HostStatus("a", NONE));
     Set<HostStatus> scheduled = ImmutableSet.of(new HostStatus("a", SCHEDULED));
@@ -664,22 +695,22 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     assertEquals(
         new MaintenanceStatusResponse().setResponseCode(OK).setStatuses(none),
-        schedulerController.maintenanceStatus(hosts, SESSION));
+        thrift.maintenanceStatus(hosts, SESSION));
     assertEquals(
         new StartMaintenanceResponse().setResponseCode(OK).setStatuses(scheduled),
-        schedulerController.startMaintenance(hosts, SESSION));
+        thrift.startMaintenance(hosts, SESSION));
     assertEquals(
         new DrainHostsResponse().setResponseCode(OK).setStatuses(draining),
-        schedulerController.drainHosts(hosts, SESSION));
+        thrift.drainHosts(hosts, SESSION));
     assertEquals(
         new MaintenanceStatusResponse().setResponseCode(OK).setStatuses(draining),
-        schedulerController.maintenanceStatus(hosts, SESSION));
+        thrift.maintenanceStatus(hosts, SESSION));
     assertEquals(
         new MaintenanceStatusResponse().setResponseCode(OK).setStatuses(drained),
-        schedulerController.maintenanceStatus(hosts, SESSION));
+        thrift.maintenanceStatus(hosts, SESSION));
     assertEquals(
         new EndMaintenanceResponse().setResponseCode(OK).setStatuses(none),
-        schedulerController.endMaintenance(hosts, SESSION));
+        thrift.endMaintenance(hosts, SESSION));
   }
 
   private JobConfiguration makeJob() {
@@ -704,7 +735,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private IExpectationSetters<?> expectAuth(String role, boolean allowed)
       throws AuthFailedException {
 
-    sessionValidator.checkAuthenticated(SESSION, role);
+    userValidator.checkAuthenticated(SESSION, role);
     if (!allowed) {
       return expectLastCall().andThrow(new AuthFailedException("Denied!"));
     } else {
@@ -712,8 +743,15 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     }
   }
 
-  private IExpectationSetters<?> expectAdminAuth(boolean allowed) throws AuthFailedException {
-    return expectAuth(SchedulerThriftInterface.ADMIN_ROLE.get(), allowed);
+  private IExpectationSetters<?> expectAuth(Capability capability, boolean allowed)
+      throws AuthFailedException {
+
+    userValidator.checkAuthorized(SESSION, capability);
+    if (!allowed) {
+      return expectLastCall().andThrow(new AuthFailedException("Denied!"));
+    } else {
+      return expectLastCall();
+    }
   }
 
   private static TwitterTaskInfo defaultTask(boolean production) {

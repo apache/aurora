@@ -17,14 +17,12 @@ import org.apache.commons.lang.StringUtils;
 
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
-import com.twitter.common.args.constraints.NotEmpty;
 import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.base.Supplier;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.BackoffHelper;
 import com.twitter.mesos.Tasks;
-import com.twitter.mesos.auth.SessionValidator;
 import com.twitter.mesos.auth.SessionValidator.AuthFailedException;
 import com.twitter.mesos.gen.CommitRecoveryResponse;
 import com.twitter.mesos.gen.CreateJobResponse;
@@ -76,6 +74,8 @@ import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.backup.Recovery;
 import com.twitter.mesos.scheduler.storage.backup.Recovery.RecoveryException;
 import com.twitter.mesos.scheduler.storage.backup.StorageBackup;
+import com.twitter.mesos.scheduler.thrift.auth.CapabilityValidator;
+import com.twitter.mesos.scheduler.thrift.auth.CapabilityValidator.Capability;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -91,12 +91,6 @@ import static com.twitter.mesos.gen.ResponseCode.OK;
  * Interfaces between mesos users and the scheduler core to perform cluster administration tasks.
  */
 class SchedulerThriftInterface implements SchedulerController {
-  @VisibleForTesting
-  @NotEmpty
-  @CmdLine(name = "admin_role",
-      help = "Auth role that is premitted to run administrative functions.")
-  static final Arg<String> ADMIN_ROLE = Arg.create("mesos");
-
   private static final Logger LOG = Logger.getLogger(SchedulerThriftInterface.class.getName());
 
   @CmdLine(name = "kill_task_initial_backoff",
@@ -113,8 +107,6 @@ class SchedulerThriftInterface implements SchedulerController {
       help = "Allow new jobs to be created, if false all job creation requests will be denied.")
   private static final Arg<Boolean> ENABLE_JOB_CREATION = Arg.create(true);
 
-  private static final String NOT_ADMIN_MESSAGE = "Only admins may perform this operation.";
-
   private static final Function<ScheduledTask, String> GET_ROLE = Functions.compose(
       new Function<TwitterTaskInfo, String>() {
         @Override public String apply(TwitterTaskInfo task) {
@@ -125,7 +117,7 @@ class SchedulerThriftInterface implements SchedulerController {
 
   private final Storage storage;
   private final SchedulerCore schedulerCore;
-  private final SessionValidator sessionValidator;
+  private final CapabilityValidator sessionValidator;
   private final QuotaManager quotaManager;
   private final StorageBackup backup;
   private final Recovery recovery;
@@ -137,7 +129,7 @@ class SchedulerThriftInterface implements SchedulerController {
   SchedulerThriftInterface(
       Storage storage,
       SchedulerCore schedulerCore,
-      SessionValidator sessionValidator,
+      CapabilityValidator sessionValidator,
       QuotaManager quotaManager,
       StorageBackup backup,
       Recovery recovery,
@@ -158,7 +150,7 @@ class SchedulerThriftInterface implements SchedulerController {
   SchedulerThriftInterface(
       Storage storage,
       SchedulerCore schedulerCore,
-      SessionValidator sessionValidator,
+      CapabilityValidator sessionValidator,
       QuotaManager quotaManager,
       StorageBackup backup,
       Recovery recovery,
@@ -283,6 +275,15 @@ class SchedulerThriftInterface implements SchedulerController {
     }
 
     return response;
+  }
+
+  private boolean isAdmin(SessionKey session) {
+    try {
+      sessionValidator.checkAuthorized(session, Capability.ROOT);
+      return true;
+    } catch (AuthFailedException e) {
+      return false;
+    }
   }
 
   @Override
@@ -501,71 +502,30 @@ class SchedulerThriftInterface implements SchedulerController {
 
   @Override
   public StartMaintenanceResponse startMaintenance(Hosts hosts, SessionKey session) {
-    StartMaintenanceResponse response = new StartMaintenanceResponse();
-    try {
-      assertAdmin(session);
-      response.setStatuses(maintenance.startMaintenance(hosts.getHostNames()));
-      response.setResponseCode(OK);
-    } catch (AuthFailedException e) {
-      response.setResponseCode(AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
-    }
-
-    return response;
+    return new StartMaintenanceResponse()
+        .setStatuses(maintenance.startMaintenance(hosts.getHostNames()))
+        .setResponseCode(OK);
   }
 
   @Override
   public DrainHostsResponse drainHosts(Hosts hosts, SessionKey session) {
-    DrainHostsResponse response = new DrainHostsResponse();
-    try {
-      assertAdmin(session);
-      response.setStatuses(maintenance.drain(hosts.getHostNames()));
-      response.setResponseCode(OK);
-    } catch (AuthFailedException e) {
-      response.setResponseCode(AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
-    }
-
-    return response;
+    return new DrainHostsResponse()
+        .setStatuses(maintenance.drain(hosts.getHostNames()))
+        .setResponseCode(OK);
   }
 
   @Override
   public MaintenanceStatusResponse maintenanceStatus(Hosts hosts, SessionKey session) {
-    MaintenanceStatusResponse response = new MaintenanceStatusResponse();
-    try {
-      assertAdmin(session);
-      response.setStatuses(maintenance.getStatus(hosts.getHostNames()));
-      response.setResponseCode(OK);
-    } catch (AuthFailedException e) {
-      response.setResponseCode(AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
-    }
-
-    return response;
+    return new MaintenanceStatusResponse()
+        .setStatuses(maintenance.getStatus(hosts.getHostNames()))
+        .setResponseCode(OK);
   }
 
   @Override
   public EndMaintenanceResponse endMaintenance(Hosts hosts, SessionKey session) {
-    EndMaintenanceResponse response = new EndMaintenanceResponse();
-    try {
-      assertAdmin(session);
-      response.setStatuses(maintenance.endMaintenance(hosts.getHostNames()));
-      response.setResponseCode(OK);
-    } catch (AuthFailedException e) {
-      response.setResponseCode(AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
-    }
-
-    return response;
-  }
-
-  private void assertAdmin(SessionKey session) throws AuthFailedException {
-    sessionValidator.checkAuthenticated(session, ADMIN_ROLE.get());
-  }
-
-  private boolean isAdmin(SessionKey session) {
-    try {
-      assertAdmin(session);
-      return true;
-    } catch (AuthFailedException e) {
-      return false;
-    }
+    return new EndMaintenanceResponse()
+        .setStatuses(maintenance.endMaintenance(hosts.getHostNames()))
+        .setResponseCode(OK);
   }
 
   @Override
@@ -574,16 +534,8 @@ class SchedulerThriftInterface implements SchedulerController {
     checkNotNull(quota);
     checkNotNull(session);
 
-    SetQuotaResponse response = new SetQuotaResponse();
-    try {
-      assertAdmin(session);
-      quotaManager.setQuota(ownerRole, quota);
-      response.setResponseCode(OK).setMessage("Quota applied.");
-    } catch (AuthFailedException e) {
-      response.setResponseCode(AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
-    }
-
-    return response;
+    quotaManager.setQuota(ownerRole, quota);
+    return new SetQuotaResponse().setResponseCode(OK).setMessage("Quota applied.");
   }
 
   @Override
@@ -596,53 +548,29 @@ class SchedulerThriftInterface implements SchedulerController {
     checkNotNull(status);
     checkNotNull(session);
 
-    ForceTaskStateResponse response = new ForceTaskStateResponse();
-    try {
-      assertAdmin(session);
-      schedulerCore.setTaskStatus(
-          Query.byId(taskId), status, transitionMessage(session.getUser()));
-      response.setResponseCode(OK).setMessage("Transition attempted.");
-    } catch (AuthFailedException e) {
-      response.setResponseCode(AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
-    }
-
-    return response;
+    schedulerCore.setTaskStatus(
+        Query.byId(taskId), status, transitionMessage(session.getUser()));
+    return new ForceTaskStateResponse().setResponseCode(OK).setMessage("Transition attempted.");
   }
 
   @Override
   public PerformBackupResponse performBackup(SessionKey session) {
-    PerformBackupResponse response = new PerformBackupResponse().setResponseCode(OK);
-    try {
-      assertAdmin(session);
-      backup.backupNow();
-    } catch (AuthFailedException e) {
-      response.setResponseCode(AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
-    }
-
-    return response;
+    backup.backupNow();
+    return new PerformBackupResponse().setResponseCode(OK);
   }
 
   @Override
   public ListBackupsResponse listBackups(SessionKey session) {
-    ListBackupsResponse response = new ListBackupsResponse().setResponseCode(OK);
-    try {
-      assertAdmin(session);
-      response.setBackups(recovery.listBackups());
-    } catch (AuthFailedException e) {
-      response.setResponseCode(AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
-    }
-
-    return response;
+    return new ListBackupsResponse()
+        .setBackups(recovery.listBackups())
+        .setResponseCode(OK);
   }
 
   @Override
   public StageRecoveryResponse stageRecovery(String backupId, SessionKey session) {
     StageRecoveryResponse response = new StageRecoveryResponse().setResponseCode(OK);
     try {
-      assertAdmin(session);
       recovery.stage(backupId);
-    } catch (AuthFailedException e) {
-      response.setResponseCode(ResponseCode.AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
     } catch (RecoveryException e) {
       response.setResponseCode(ERROR).setMessage(e.getMessage());
       LOG.log(Level.WARNING, "Failed to stage recovery: " + e, e);
@@ -655,11 +583,7 @@ class SchedulerThriftInterface implements SchedulerController {
   public QueryRecoveryResponse queryRecovery(TaskQuery query, SessionKey session) {
     QueryRecoveryResponse response = new QueryRecoveryResponse().setResponseCode(OK);
     try {
-      assertAdmin(session);
       response.setTasks(recovery.query(query));
-    } catch (AuthFailedException e) {
-      response.setResponseCode(ResponseCode.AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
-      LOG.log(Level.WARNING, "Failed to query recovery: " + e, e);
     } catch (RecoveryException e) {
       response.setResponseCode(ERROR).setMessage(e.getMessage());
       LOG.log(Level.WARNING, "Failed to query recovery: " + e, e);
@@ -672,10 +596,7 @@ class SchedulerThriftInterface implements SchedulerController {
   public DeleteRecoveryTasksResponse deleteRecoveryTasks(TaskQuery query, SessionKey session) {
     DeleteRecoveryTasksResponse response = new DeleteRecoveryTasksResponse().setResponseCode(OK);
     try {
-      assertAdmin(session);
       recovery.deleteTasks(query);
-    } catch (AuthFailedException e) {
-      response.setResponseCode(ResponseCode.AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
     } catch (RecoveryException e) {
       response.setResponseCode(ERROR).setMessage(e.getMessage());
       LOG.log(Level.WARNING, "Failed to delete recovery tasks: " + e, e);
@@ -686,16 +607,9 @@ class SchedulerThriftInterface implements SchedulerController {
 
   @Override
   public CommitRecoveryResponse commitRecovery(SessionKey session) {
-    // TODO(William Farner): As it stands, this is not be enough to apply the backup in a way
-    //                       such that all state is internally-consistent.  For example, cron jobs
-    //                       will not reflect changes.  The safest route may be to
-    //                       commit, write a snapshot to the distributed log, then commit suicide.
     CommitRecoveryResponse response = new CommitRecoveryResponse().setResponseCode(OK);
     try {
-      assertAdmin(session);
       recovery.commit();
-    } catch (AuthFailedException e) {
-      response.setResponseCode(ResponseCode.AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
     } catch (RecoveryException e) {
       response.setResponseCode(ERROR).setMessage(e.getMessage());
     }
@@ -705,15 +619,8 @@ class SchedulerThriftInterface implements SchedulerController {
 
   @Override
   public UnloadRecoveryResponse unloadRecovery(SessionKey session) {
-    UnloadRecoveryResponse response = new UnloadRecoveryResponse().setResponseCode(OK);
-    try {
-      assertAdmin(session);
-      recovery.unload();
-    } catch (AuthFailedException e) {
-      response.setResponseCode(AUTH_FAILED).setMessage(NOT_ADMIN_MESSAGE);
-    }
-
-    return response;
+    recovery.unload();
+    return new UnloadRecoveryResponse().setResponseCode(OK);
   }
 
   @VisibleForTesting

@@ -40,6 +40,8 @@ import com.twitter.mesos.gen.UnloadRecoveryResponse;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.UpdateShardsResponse;
 import com.twitter.mesos.scheduler.JobKeys;
+import com.twitter.mesos.scheduler.thrift.auth.CapabilityValidator.Capability;
+import com.twitter.mesos.scheduler.thrift.auth.Requires;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -174,6 +176,7 @@ class SchedulerThriftRouter implements MesosAdmin.Iface {
     return schedulerController.endMaintenance(hosts, session);
   }
 
+  @Requires(whitelist = Capability.PROVISIONER)
   @Override
   public SetQuotaResponse setQuota(String ownerRole, Quota quota, SessionKey session) {
     return schedulerController.setQuota(ownerRole, quota, session);
