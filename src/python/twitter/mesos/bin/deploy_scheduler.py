@@ -92,14 +92,14 @@ class SchedulerManager(object):
       return self._scrape_vars(host).get('build_git_revision')
 
   def start_scheduler(self, host):
-    print 'Starting the scheduler on %s' % host
+    print 'Starting the scheduler on %s at %s' % (host, strftime('%Y-%m-%d %H:%M:%s', gmtime()))
     self._deployer.remote_check_call(host, ['sudo', 'monit', 'start', 'mesos-scheduler'])
     if self._really_deploy:
       print 'Waiting for the scheduler to start'
       time.sleep(5)
 
   def stop_scheduler(self, host):
-    print 'Stopping the scheduler on %s' % host
+    print 'Stopping the scheduler on %s at %s' % (host, strftime('%Y-%m-%d %H:%M:%s', gmtime()))
     print 'Temporarily disabling monit for the scheduler on %s' % host
     self._deployer.remote_check_call(host, ['sudo', 'monit', 'unmonitor', 'mesos-scheduler'])
     self.fetch_scheduler_http(host, 'quitquitquit')
@@ -200,7 +200,7 @@ class SchedulerManager(object):
         if not self._really_deploy:
           print 'Skipping further health checks, since we are not pushing.'
           return True
-        print '%s up and healthy for %s seconds' % (host, uptime)
+        print '%s up and healthy for %s seconds at %s' % (host, uptime, strftime('%Y-%m-%d %H:%M:%s', gmtime()))
 
         if started:
           if uptime < last_uptime:
@@ -220,7 +220,7 @@ class SchedulerManager(object):
         started = True
         last_uptime = uptime
       elif started:
-        print 'Scheduler %s stopped responding to health checks!' % host
+        print 'Scheduler %s stopped responding to health checks at %s!' % (host, strftime('%Y-%m-%d %H:%M:%s', gmtime()))
         return False
       time.sleep(2)
     return False
@@ -315,6 +315,7 @@ def main(_, options):
       print 'Scheduler on %s is not healthy' % scheduler
       hdfs.stage(builder, root=checkpoint_dir)
       manager.rollback(rollback_build=current_build)
+      print '!!!!!!!!!!!!!!!!!!!!'
       print 'Release rolled back.'
       break
   else:
