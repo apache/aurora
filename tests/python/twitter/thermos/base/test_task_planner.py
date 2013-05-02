@@ -110,10 +110,12 @@ def test_task_process_cannot_depend_upon_daemon():
   with pytest.raises(TaskPlanner.InvalidSchedule):
     TaskPlanner(empty_task(processes=[p1(daemon=True), p2], constraints=[{'order': ['p1', 'p2']}]))
 
+
 def test_task_non_ephemeral_process_cannot_depend_on_ephemeral_process():
   with pytest.raises(TaskPlanner.InvalidSchedule):
     TaskPlanner(empty_task(processes=[p1(ephemeral=True), p2],
                            constraints=[{'order': ['p1', 'p2']}]))
+
 
 def test_task_failed_predecessor_does_not_make_process_runnable():
   p = TaskPlanner(empty_task(processes=[p1, p2], constraints=[{'order': ['p1', 'p2']}]))
@@ -241,7 +243,6 @@ def test_task_fails():
   assert 'd1' in p.finished
 
 
-
 def test_task_lost():
   dt = p1(max_failures=2, min_duration=1)
 
@@ -292,3 +293,24 @@ def test_task_filters():
     TaskPlanner(task(constraints=[Constraint(order=['p1','f1'])]),
                 process_filter=lambda proc: proc.name().get().startswith('f'))
 
+
+def test_task_max_runs():
+  class CappedTaskPlanner(TaskPlanner):
+    TOTAL_RUN_LIMIT = 2
+  dt = p1(daemon=True, max_failures=0)
+
+  p = CappedTaskPlanner(empty_task(processes = [dt(name = 'd1', max_failures=100, daemon=False)]))
+  p.set_running('d1')
+  p.add_failure('d1', timestamp=1)
+  assert 'd1' in p.runnable
+  p.set_running('d1')
+  p.add_failure('d1', timestamp=2)
+  assert 'd1' not in p.runnable
+
+  p = CappedTaskPlanner(empty_task(processes = [dt(name = 'd1', max_failures=100)]))
+  p.set_running('d1')
+  p.add_failure('d1', timestamp=1)
+  assert 'd1' in p.runnable
+  p.set_running('d1')
+  p.add_success('d1', timestamp=2)
+  assert 'd1' not in p.runnable

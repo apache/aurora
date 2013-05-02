@@ -386,7 +386,7 @@ class TaskRunner(object):
 
   def __init__(self, task, checkpoint_root, sandbox, log_dir=None,
                task_id=None, portmap=None, user=None, chroot=False, clock=time,
-               universal_handler=None):
+               universal_handler=None, planner_class=TaskPlanner):
     """
       required:
         task (config.Task) = the task to run
@@ -396,17 +396,21 @@ class TaskRunner(object):
                           disabled for this task.]
 
       optional:
-        log_dir (string) = directory to house stdout/stderr logs. If not specified, logs will be
-                           written into the sandbox directory under .logs/
-        task_id (string) = bind to this task id.  if not specified, will synthesize an id based
-                           upon task.name()
-        portmap (dict)   = a map (string => integer) from name to port, e.g. { 'http': 80 }
-        user (string)    = the user to run the task as.  if not current user, requires setuid
-                           privileges.
-        chroot (boolean) = whether or not to chroot into the sandbox prior to exec.
+        log_dir (string)  = directory to house stdout/stderr logs. If not specified, logs will be
+                            written into the sandbox directory under .logs/
+        task_id (string)  = bind to this task id.  if not specified, will synthesize an id based
+                            upon task.name()
+        portmap (dict)    = a map (string => integer) from name to port, e.g. { 'http': 80 }
+        user (string)     = the user to run the task as.  if not current user, requires setuid
+                            privileges.
+        chroot (boolean)  = whether or not to chroot into the sandbox prior to exec.
         clock (time interface) = the clock to use throughout
         universal_handler = checkpoint record handler (only used for testing)
+        planner_class (TaskPlanner class) = TaskPlanner class to use for constructing the task
+                            planning policy.
     """
+    if not issubclass(planner_class, TaskPlanner):
+      raise TypeError('planner_class must be a TaskPlanner.')
     self._clock = clock
     launch_time = self._clock.time()
     launch_time_ms = '%06d' % int((launch_time - int(launch_time)) * 10**6)
@@ -444,9 +448,9 @@ class TaskRunner(object):
     except ThermosTaskValidator.InvalidTaskError as e:
       raise self.InvalidTask('Invalid task: %s' % e)
     self._plan = None # plan currently being executed (updated by Handlers)
-    self._regular_plan = TaskPlanner(self._task, clock=clock,
+    self._regular_plan = planner_class(self._task, clock=clock,
         process_filter=lambda proc: proc.final().get() == False)
-    self._finalizing_plan = TaskPlanner(self._task, clock=clock,
+    self._finalizing_plan = planner_class(self._task, clock=clock,
         process_filter=lambda proc: proc.final().get() == True)
     self._chroot = chroot
     self._sandbox = sandbox

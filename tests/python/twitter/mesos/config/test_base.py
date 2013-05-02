@@ -156,25 +156,6 @@ def test_simple_config():
     assert proxy_config1.ports() == set()
 
 
-def test_limited_config():
-  with temporary_file() as fp:
-    fp.write(LIMITED_MESOS_CONFIG)
-    fp.flush()
-
-    job = AuroraConfig.load(fp.name)
-    assert job != REIFIED_LIMITED_CONFIG
-
-    process_map = dict((str(process.name()), process) for process in job._job.task().processes())
-    assert len(process_map) == 4
-    for process in ('hello_world_fails_0', 'hello_world_fails_50', 'hello_world_fails_100',
-                    'hello_world_fails_200'):
-      assert process in process_map
-    assert process_map['hello_world_fails_0'].max_failures() == Integer(100)
-    assert process_map['hello_world_fails_50'].max_failures() == Integer(50)
-    assert process_map['hello_world_fails_100'].max_failures() == Integer(100)
-    assert process_map['hello_world_fails_200'].max_failures() == Integer(100)
-
-
 def test_ports():
   def make_config(announce, *ports):
     process = Process(name = 'hello',

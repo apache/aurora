@@ -142,6 +142,7 @@ class TaskPlanner(object):
   """
   InvalidSchedule = Planner.InvalidSchedule
   INFINITY = sys.float_info.max
+  TOTAL_RUN_LIMIT = sys.maxsize
 
   @staticmethod
   def extract_dependencies(task, process_filter=None):
@@ -181,6 +182,7 @@ class TaskPlanner(object):
     self._clock = clock
     self._last_terminal = {} # process => timestamp of last terminal state
     self._failures = defaultdict(int)
+    self._successes = defaultdict(int)
     self._attributes = {}
     self._ephemerals = set(process.name().get() for process in task.processes()
         if (self._filter is None or self._filter(process)) and process.ephemeral().get())
@@ -238,6 +240,16 @@ class TaskPlanner(object):
     timestamp = timestamp if timestamp is not None else self._clock.time()
     self._last_terminal[process] = timestamp
     self._failures[process] += 1
+    self.failure_transition(process)
+
+  def has_reached_run_limit(self, process):
+    return (self._successes[process] + self._failures[process]) >= self.TOTAL_RUN_LIMIT
+
+  def failure_transition(self, process):
+    if self.has_reached_run_limit(process):
+      self._planner.set_failed(process)
+      return
+
     if self._attributes[process].max_failures == 0 or (
         self._failures[process] < self._attributes[process].max_failures):
       self._planner.reset(process)
@@ -250,6 +262,14 @@ class TaskPlanner(object):
     """Reset a process to runnable if it is a daemon, or mark it as finished otherwise."""
     timestamp = timestamp if timestamp is not None else self._clock.time()
     self._last_terminal[process] = timestamp
+    self._successes[process] += 1
+    self.success_transition(process)
+
+  def success_transition(self, process):
+    if self.has_reached_run_limit(process):
+      self._planner.set_failed(process)
+      return
+
     if not self._attributes[process].is_daemon:
       self._planner.set_finished(process)
     else:

@@ -141,9 +141,6 @@ class AuroraConfig(object):
 
       Currently, the validation stage simply ensures that the job has all required fields.
       self.InvalidConfig is raised if any required fields are not present.
-
-      The sanitization ensures that the maximum process failures is capped at a reasonable maximum
-      (currently, 100)
     """
     def has(pystachio_type, thing):
       return getattr(pystachio_type, 'has_%s' % thing)()
@@ -153,12 +150,7 @@ class AuroraConfig(object):
           '%s required for job "%s"' % (required.capitalize(), job.name()))
     if not has(job.task(), 'processes'):
       raise AuroraConfig.InvalidConfig('Processes required for task on job "%s"' % job.name())
-
-    def process_over_failure_limit(proc):
-      return (proc.max_failures() == Integer(0) or proc.max_failures() >= Integer(100))
-    return job(task=job.task()(
-      processes = [proc(max_failures=100) if process_over_failure_limit(proc) else proc
-                   for proc in job.task().processes()]))
+    return job
 
   def context(self, instance=None):
     from .schema import MesosContext

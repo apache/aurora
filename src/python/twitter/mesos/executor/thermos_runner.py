@@ -8,6 +8,7 @@ from twitter.common import app, options, log
 from twitter.common.log.options import LogOptions
 
 from twitter.thermos.base.options import add_port_to
+from twitter.thermos.base.planner import TaskPlanner
 from twitter.thermos.config.loader import ThermosConfigLoader
 from twitter.thermos.runner import TaskRunner
 
@@ -58,6 +59,10 @@ def runner_teardown(runner, sig=signal.SIGUSR1, frame=None):
   sys.exit(0)
 
 
+class CappedTaskPlanner(TaskPlanner):
+  TOTAL_RUN_LIMIT = 100
+
+
 def main(args, opts):
   assert opts.thermos_json and os.path.exists(opts.thermos_json)
   assert opts.sandbox
@@ -70,7 +75,8 @@ def main(args, opts):
     app.error('ERROR!  Unbound ports: %s' % ' '.join(port for port in missing_ports))
 
   task_runner = TaskRunner(thermos_task.task, opts.checkpoint_root, opts.sandbox,
-    task_id=opts.task_id, user=opts.setuid, portmap=prebound_ports, chroot=opts.chroot)
+    task_id=opts.task_id, user=opts.setuid, portmap=prebound_ports, chroot=opts.chroot,
+    planner_class=CappedTaskPlanner)
 
   for sig in (signal.SIGUSR1, signal.SIGUSR2):
     signal.signal(sig, functools.partial(runner_teardown, task_runner))

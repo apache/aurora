@@ -172,8 +172,9 @@ python_binary(
   dependencies = [
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/app/modules:exceptions'),
-    pants('src/python/twitter/common_internal/app/modules:chickadee_handler'),
     pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/common_internal/app/modules:chickadee_handler'),
+    pants('src/python/twitter/thermos/base:planner'),
     pants('src/python/twitter/thermos/config:schema'),
     pants('src/python/twitter/thermos/runner'),
   ],
