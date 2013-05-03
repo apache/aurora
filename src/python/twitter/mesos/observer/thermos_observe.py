@@ -3,7 +3,7 @@ import time
 
 from twitter.common import app
 from twitter.common.app.modules.http import RootServer
-
+from twitter.common.metrics import RootMetrics
 from twitter.mesos.clusters import Cluster
 from twitter.mesos.executor.resource_checkpoints import CheckpointResourceMonitor
 from twitter.mesos.observer.mesos_vars import MesosObserverVars
@@ -52,6 +52,7 @@ def main(_, opts):
   observer_class = MesosObserverVars if opts.show_meta_slaves else MetaIgnoringMesosObserverVars
   observer_vars = observer_class(task_observer, mesos_root)
   observer_vars.start()
+  RootMetrics().register_observable('observer', observer_vars)
 
   bottle_wrapper = BottleObserver(task_observer)
   RootServer().mount_routes(bottle_wrapper)

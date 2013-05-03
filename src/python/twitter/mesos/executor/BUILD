@@ -1,4 +1,11 @@
 python_library(
+  name = 'psutil_base',
+  dependencies = [
+    python_requirement('psutil>=0.5.0'),
+  ]
+)
+
+python_library(
   name = 'sandbox_manager',
   sources = ['sandbox_manager.py'],
   dependencies = [
@@ -34,9 +41,22 @@ python_library(
 )
 
 python_library(
+  name = 'executor_vars',
+  sources = ['executor_vars.py'],
+  dependencies = [
+    pants('src/python/twitter/common/metrics'),
+    pants('src/python/twitter/common/python'),
+    pants('src/python/twitter/common/quantity'),
+    pants('src/python/twitter/common/string'),
+    pants(':psutil_base'),
+  ]
+)
+
+python_library(
   name = 'health_interface',
   sources = ['health_interface.py'],
   dependencies = [
+    pants('src/python/twitter/common/metrics'),
     pants('src/python/twitter/mesos:mesos-core')
   ]
 )
@@ -76,7 +96,7 @@ python_library(
   dependencies = [
     pants(':health_interface'),
     pants(':resource_checkpoints'),
-    python_requirement('psutil>=0.5.0'),
+    pants(':psutil_base'),
     pants('src/python/twitter/common/dirutil'),
     pants('src/python/twitter/common/exceptions'),
     pants('src/python/twitter/common/log'),
@@ -162,6 +182,7 @@ python_binary(
   source = 'thermos_executor_main.py',
   ignore_errors = True,
   dependencies = [
+    pants(':executor_vars'),
     pants(':thermos_executor_lib')
   ]
 )

@@ -6,6 +6,10 @@ from twitter.mesos.clusters import Cluster
 
 
 class ExecutorDetector(object):
+  LOG_PATH = 'executor_logs'
+  RESOURCE_PATH = 'resource_usage.recordio'
+  VARS_PATH = 'executor_vars.json'
+
   PATTERN = [
       '%(root)s',
       'slaves',

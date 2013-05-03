@@ -53,8 +53,6 @@ class CheckpointResourceMonitor(TaskResourceMonitor, ExceptionalThread):
     )
 
   MESOS_ROOT = None
-  RESOURCE_CHECKPOINT = 'resource_usage.recordio'
-
 
   def __init__(self, task_monitor, sandbox, wait_interval=Amount(15, Time.SECONDS)):
     """
@@ -75,7 +73,7 @@ class CheckpointResourceMonitor(TaskResourceMonitor, ExceptionalThread):
     if self._artifact_dir is None:
       raise self.Error("Could not locate artifact directory for %s" % self._task_id)
 
-    filename = os.path.join(self._artifact_dir, self.RESOURCE_CHECKPOINT)
+    filename = os.path.join(self._artifact_dir, ExecutorDetector.RESOURCE_PATH)
 
     try:
       fh = open(filename)

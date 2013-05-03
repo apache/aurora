@@ -9,9 +9,11 @@ import webbrowser
 from twitter.common import log
 from twitter.common.contextutil import temporary_dir
 from twitter.common.http import HttpServer
+from twitter.common.metrics.sampler import DiskMetricWriter
 from twitter.common.net.tunnel import TunnelHelper
 from twitter.mesos.client.base import die
 from twitter.mesos.client.config import get_config
+from twitter.mesos.executor.executor_detector import ExecutorDetector
 from twitter.mesos.executor.sandbox_manager import AppAppSandbox, DirectorySandbox
 from twitter.mesos.executor.task_runner_wrapper import TaskRunnerWrapper
 from twitter.mesos.executor.thermos_executor import ThermosExecutor
@@ -83,6 +85,7 @@ def build_local_runner():
 def create_executor(runner_pex, sandbox_root, checkpoint_root):
   return ThermosExecutor(runner_class=make_local_runner_wrapper(
       runner_pex, sandbox_root, checkpoint_root))
+
 
 def create_assigned_ports(names):
   return dict((name, TunnelHelper.get_random_port()) for name in names)
@@ -158,6 +161,10 @@ def spawn_local(runner, jobname, config_file, json=False, open_browser=False,
       return 1
 
     executor = create_executor(runner_pex, sandbox, checkpoint_root)
+    metric_writer = DiskMetricWriter(executor.metrics,
+        os.path.join(sandbox, ExecutorDetector.VARS_PATH))
+    metric_writer.start()
+
     driver = LocalDriver()
     executor.launchTask(driver, task_info)
 

@@ -11,6 +11,7 @@ import mesos_pb2 as mesos_pb
 from twitter.common import log
 from twitter.common.concurrent import deadline, defer, Timeout
 from twitter.common.exceptions import ExceptionalThread
+from twitter.common.metrics import Observable
 from twitter.common.quantity import Amount, Time
 
 # thermos
@@ -30,6 +31,7 @@ from thrift.TSerialization import deserialize as thrift_deserialize
 
 from .discovery_manager import DiscoveryManager
 from .executor_base import ThermosExecutorBase
+from .executor_detector import ExecutorDetector
 from .health_checker import HealthCheckerThread
 from .kill_manager import KillManager
 from .resource_checkpoints import ResourceCheckpointer
@@ -66,9 +68,8 @@ class ThermosExecutorTimer(ExceptionalThread):
       self._driver.stop()
 
 
-class ThermosExecutor(ThermosExecutorBase):
+class ThermosExecutor(Observable, ThermosExecutorBase):
   STOP_WAIT = Amount(5, Time.SECONDS)
-  RESOURCE_CHECKPOINT = 'resource_usage.recordio'
   RUNNER_INITIALIZATION_TIMEOUT = Amount(10, Time.MINUTES)
 
   def __init__(self, runner_class=RUNNER_CLASS, manager_class=StatusManager):
@@ -216,6 +217,7 @@ class ThermosExecutor(ThermosExecutorBase):
           initial_interval_secs=health_check_config.get('initial_interval_secs'),
           max_consecutive_failures=health_check_config.get('max_consecutive_failures'))
       health_checkers.append(health_checker)
+      self.metrics.register_observable('health_checker', health_checker)
 
     task_path = TaskPath(root=self._runner._checkpoint_root, task_id=self._task_id)
     resource_manager = ResourceManager(
@@ -224,9 +226,10 @@ class ThermosExecutor(ThermosExecutorBase):
         self._runner.sandbox.root
     )
     health_checkers.append(resource_manager)
+    self.metrics.register_observable('resource_manager', resource_manager)
 
     ResourceCheckpointer(lambda: resource_manager.sample,
-        os.path.join(self._runner.artifact_dir, self.RESOURCE_CHECKPOINT),
+        os.path.join(self._runner.artifact_dir, ExecutorDetector.RESOURCE_PATH),
         recordio=True).start()
 
     if mesos_task.has_announce():
@@ -241,8 +244,10 @@ class ThermosExecutor(ThermosExecutorBase):
           # TODO(wickman) Possibly return this code once we've hashed out MESOS-2753
           # ensemble=self.extract_ensemble(assigned_task))
       health_checkers.append(discovery_manager)
+      self.metrics.register_observable('discovery_manager', discovery_manager)
 
     health_checkers.append(self._kill_manager)
+    self.metrics.register_observable('kill_manager', self._kill_manager)
 
     self._manager = self._manager_class(
         self._runner,
@@ -250,6 +255,7 @@ class ThermosExecutor(ThermosExecutorBase):
         self._task_id,
         signaler=http_signaler,
         health_checkers=health_checkers)
+
     self._manager.start()
 
   """ Mesos Executor API methods follow """

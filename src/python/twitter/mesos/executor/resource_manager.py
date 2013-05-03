@@ -4,6 +4,7 @@ import time
 
 from twitter.common import log
 from twitter.common.exceptions import ExceptionalThread
+from twitter.common.metrics import LambdaGauge
 from twitter.common.quantity import Amount, Time
 from twitter.thermos.monitoring.disk import DiskCollector
 from twitter.thermos.monitoring.resource import TaskResourceMonitor
@@ -177,7 +178,6 @@ class ResourceManager(HealthInterface, ExceptionalThread):
   def run(self):
     """ Periodically conduct enforcement. Resources are aggregated in the background thread of the
     ResourceMonitor. """
-
     self._resource_monitor.start()
 
     while not self._stop_event.is_set():
@@ -188,7 +188,17 @@ class ResourceManager(HealthInterface, ExceptionalThread):
         self._kill_reason = kill_reason
       self._stop_event.wait(timeout=self._enforcement_interval)
 
+  def register_metrics(self):
+    self.metrics.register(LambdaGauge('disk_used', lambda: self._disk_sample))
+    self.metrics.register(LambdaGauge('disk_reserved', lambda: self._max_disk))
+    self.metrics.register(LambdaGauge('cpu_used', lambda: self._ps_sample.rate))
+    self.metrics.register(LambdaGauge('cpu_reserved', lambda: self._max_cpu))
+    self.metrics.register(LambdaGauge('ram_used', lambda: self._ps_sample.rss))
+    self.metrics.register(LambdaGauge('ram_reserved', lambda: self._max_ram))
+
   def start(self):
+    HealthInterface.start(self)
+    self.register_metrics()
     ExceptionalThread.start(self)
 
   def stop(self):

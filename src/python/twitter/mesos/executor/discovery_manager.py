@@ -3,6 +3,7 @@ import threading
 
 from twitter.common import log
 from twitter.common.quantity import Amount, Time
+from twitter.common.zookeeper.client import ZooKeeper
 from twitter.common.zookeeper.serverset import Endpoint
 from twitter.common_internal.zookeeper.twitter_service import TwitterService
 
@@ -52,24 +53,29 @@ class DiscoveryManager(HealthInterface):
                      shard,
                      ensemble=None):
     self._unhealthy = threading.Event()
-
     try:
       primary, additional = self.join_keywords(hostname, portmap, primary_port)
     except ValueError:
       self._service = None
       self._unhealthy.set()
     else:
-      self._service = TwitterService(
-          role,
-          environment,
-          jobname,
-          primary,
-          additional=additional,
-          failure_callback=self.on_failure,
-          shard=shard,
-          ensemble=ensemble)
-          # TODO(wickman) This is disabled until MESOS-2376 is resolved.
-          # credentials=self.super_credentials())
+      try:
+        self._service = TwitterService(
+            role,
+            environment,
+            jobname,
+            primary,
+            additional=additional,
+            failure_callback=self.on_failure,
+            shard=shard,
+            ensemble=ensemble)
+            # TODO(wickman) This is disabled until MESOS-2376 is resolved.
+            # credentials=self.super_credentials())
+        self.metrics.register_observable('ensemble', self._service.zookeeper)
+      except ZooKeeper.InvalidEnsemble as e:
+        log.error('Invalid ensemble: %s' % e)
+        self._service = None
+        self._unhealthy.set()
 
   def on_failure(self):
     if self._service:

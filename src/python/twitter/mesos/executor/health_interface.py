@@ -1,4 +1,7 @@
-from abc import ABCMeta, abstractproperty
+from abc import abstractproperty
+
+from twitter.common.lang import Interface
+from twitter.common.metrics import LambdaGauge, Observable
 
 import mesos_pb2 as mesos_pb
 
@@ -27,9 +30,7 @@ class FailureReason(object):
         mesos_pb._TASKSTATE.values_by_number[self._status].name)
 
 
-class HealthInterface(object):
-  __metaclass__ = ABCMeta
-
+class HealthInterface(Observable, Interface):
   @abstractproperty
   def healthy(self):
     pass
@@ -41,7 +42,7 @@ class HealthInterface(object):
     return FailureReason("Unhealthy")
 
   def start(self):
-    pass
+    self.metrics.register(LambdaGauge('health', lambda: int(self.healthy)))
 
   def stop(self):
     pass

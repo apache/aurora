@@ -61,6 +61,7 @@ class HealthCheckerThread(HealthInterface, ExceptionalThread):
       self._current_consecutive_failures = 0
 
   def start(self):
+    HealthInterface.start(self)
     ExceptionalThread.start(self)
 
   def stop(self):

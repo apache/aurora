@@ -5,7 +5,14 @@ import time
 
 from twitter.common import log
 from twitter.common.exceptions import ExceptionalThread
-from twitter.common.metrics import Label, MutatorGauge, RootMetrics
+from twitter.common.metrics import (
+    Label,
+    LambdaGauge,
+    CompoundMetrics,
+    MutatorGauge,
+    Observable)
+from twitter.common.metrics.metrics import Metrics
+from twitter.common.metrics.sampler import DiskMetricReader
 from twitter.common.python.dirwrapper import PythonDirectoryWrapper
 from twitter.common.python.pex import PexInfo
 from twitter.common.quantity import Amount, Time
@@ -17,19 +24,14 @@ from gen.twitter.thermos.ttypes import TaskState
 import psutil
 
 
-class ExecutorVars(object):
+class ExecutorVars(Observable):
   """
     Per-executor exported vars.
   """
-
-  ALL_METRICS = ('executor_rss', 'executor_cpu', 'thermos_pss', 'thermos_cpu', 'version')
+  ALL_METRICS = ('rss', 'cpu', 'thermos_pss', 'thermos_cpu', 'version')
   RELEASE_TAG_FORMAT = ScanfParser('%(project)s_R%(release)d')
   DEPLOY_TAG_FORMAT = ScanfParser('%(project)s_%(environment)s_%(release)d_R%(deploy)d')
   PROJECT_NAMES = ('thermos', 'thermos_executor')
-
-  @classmethod
-  def metric_name(cls, executor, metric):
-    return 'executor_%s_%s' % (executor, metric)
 
   @classmethod
   def get_release_from_tag(cls, tag):
@@ -55,29 +57,35 @@ class ExecutorVars(object):
     except PythonDirectoryWrapper.Error:
       return 'UNKNOWN'
 
-  def __init__(self, scope, executor, process, quiet=False):
-    self._scope = scope
-    self._quiet = quiet
-    self.version = self.get_release_from_binary(
-        os.path.join(process.getcwd(), process.cmdline[1]))
-    self._process = process
+  def __init__(self, process):
     self.orphan = False
+    self._process = process
 
-    if not quiet:
-      self._metrics = dict((metric, MutatorGauge(self.metric_name(executor, metric), 0))
-          for metric in self.ALL_METRICS)
-      for metric in self._metrics.values():
-        scope.register(metric)
-    self.write_metric('version', self.version)
+    # manage internal metrics
+    self._metrics = dict((metric, MutatorGauge(metric, 0)) for metric in self.ALL_METRICS)
+    self._internal_metrics = Metrics()
+    for metric in self._metrics.values():
+      self._internal_metrics.register(metric)
+    self._executor_cwd = process.getcwd()
+    self.version = self.get_release_from_binary(os.path.join(self._executor_cwd,
+         process.cmdline[1]))
+    self._internal_metrics.register(Label('version', self.version))
+    self._internal_metrics.register(LambdaGauge('orphan', lambda: int(self.orphan)))
 
-  def unregister(self):
-    if not self._quiet:
-      for metric in self._metrics.values():
-        self._scope.unregister(metric.name())
+    # manage external metrics
+    self._external_metrics = DiskMetricReader(
+        os.path.join(self._executor_cwd, ExecutorDetector.VARS_PATH))
+    self._external_metrics.start()
+
+    # combine the two
+    self._compound_metrics = CompoundMetrics(self._internal_metrics, self._external_metrics)
+
+  @property
+  def metrics(self):
+    return self._compound_metrics
 
   def write_metric(self, metric, value):
-    if not self._quiet:
-      self._metrics[metric].write(value)
+    self._metrics[metric].write(value)
 
   @classmethod
   def thermos_children(cls, parent):
@@ -108,8 +116,8 @@ class ExecutorVars(object):
   def sample(self):
     try:
       executor_cpu, executor_rss, _ = self.cpu_rss_pss(self._process)
-      self.write_metric('executor_cpu', executor_cpu)
-      self.write_metric('executor_rss', executor_rss)
+      self.write_metric('cpu', executor_cpu)
+      self.write_metric('rss', executor_rss)
       self.orphan = self._process.ppid == 1
     except psutil.error.Error:
       return False
@@ -123,14 +131,13 @@ class ExecutorVars(object):
 
     return True
 
+  def stop(self):
+    self._external_metrics.stop()
 
-class MesosObserverVars(ExceptionalThread):
+
+class MesosObserverVars(Observable, ExceptionalThread):
   COLLECTION_INTERVAL = Amount(30, Time.SECONDS)
-  METRIC_NAMESPACE = 'observer'
   EXECUTOR_BINARIES = ('./thermos_executor', './thermos_executor.pex')
-  STATUS_MAP = dict((getattr(psutil, status_name), status_name) for status_name in dir(psutil)
-                    if status_name.startswith('STATUS_'))
-
   OBSERVER_STATS = ('orphaned_runners',
                     'orphaned_tasks',
                     'orphaned_executors',
@@ -143,17 +150,14 @@ class MesosObserverVars(ExceptionalThread):
     self._mesos_root = mesos_root
     self._detector = ExecutorDetector()
     self._observer = observer
-    self._executors = {}  # executor_id -> ExecutorVars
+    self._executor_metrics = self.metrics.scope('executor')
+    self._executors = {}
     self._executor_releases = {}
     self._self = psutil.Process(os.getpid())
     for stat in self.OBSERVER_STATS:
       setattr(self, stat, self.metrics.register(MutatorGauge(stat, 0)))
     super(MesosObserverVars, self).__init__()
     self.daemon = True
-
-  @property
-  def metrics(self):
-    return RootMetrics().scope(self.METRIC_NAMESPACE)
 
   def collect(self):
     self.collect_orphans()
@@ -232,14 +236,17 @@ class MesosObserverVars(ExceptionalThread):
         continue
       if executor.executor_id not in self._executors:
         try:
-          self._executors[executor.executor_id] = ExecutorVars(self.metrics,
-              executor.executor_id, proc, quiet=self.executor_filter(executor))
+          executor_vars = ExecutorVars(proc)
         except psutil.error.Error:
           continue
+        self._executors[executor.executor_id] = executor_vars
+        if not self.executor_filter(executor):
+          self._executor_metrics.register_observable(executor.executor_id, executor_vars)
     purge = set()
     for eid, executor in self._executors.items():
       if not executor.sample():
-        executor.unregister()
+        executor.stop()
+        self._executor_metrics.unregister_observable(eid)
         purge.add(eid)
     for eid in purge:
       self._executors.pop(eid)
