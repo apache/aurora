@@ -5,7 +5,9 @@ import time
 from time import gmtime, strftime
 
 from twitter.common import app
+from twitter.common import log
 from twitter.common.dirutil import safe_rmtree
+from twitter.common.log import LogOptions
 from twitter.mesos.clusters import Cluster
 from twitter.mesos.deploy import Builder, Deployer, HDFSDeployer
 
@@ -57,7 +59,7 @@ class SchedulerManager(object):
 
         result, (output, _) = self._deployer.run_cmd(['ssh', app.get_options().tunnel_host, cmd])
         if result != 0:
-          print >> sys.stderr, ("Failed to determine scheduler hosts for dc: %(dc)s role: %(role)s"
+          log.error("Failed to determine scheduler hosts for dc: %(dc)s role: %(role)s"
               % params)
           sys.exit(1)
         self._machines = [host.strip() for host in output.splitlines()]
@@ -92,25 +94,25 @@ class SchedulerManager(object):
       return self._scrape_vars(host).get('build_git_revision')
 
   def start_scheduler(self, host):
-    print 'Starting the scheduler on %s at %s' % (host, strftime('%Y-%m-%d %H:%M:%s', gmtime()))
+    log.info('Starting the scheduler on %s at %s' % (host, strftime('%Y-%m-%d %H:%M:%S', gmtime())))
     self._deployer.remote_check_call(host, ['sudo', 'monit', 'start', 'mesos-scheduler'])
     if self._really_deploy:
-      print 'Waiting for the scheduler to start'
+      log.info('Waiting for the scheduler to start')
       time.sleep(5)
 
   def stop_scheduler(self, host):
-    print 'Stopping the scheduler on %s at %s' % (host, strftime('%Y-%m-%d %H:%M:%s', gmtime()))
-    print 'Temporarily disabling monit for the scheduler on %s' % host
+    log.info('Stopping the scheduler on %s at %s' % (host, strftime('%Y-%m-%d %H:%M:%S', gmtime())))
+    log.info('Temporarily disabling monit for the scheduler on %s' % host)
     self._deployer.remote_check_call(host, ['sudo', 'monit', 'unmonitor', 'mesos-scheduler'])
     self.fetch_scheduler_http(host, 'quitquitquit')
     if self._really_deploy:
-      print 'Waiting for scheduler to stop cleanly'
+      log.info('Waiting for scheduler to stop cleanly')
       time.sleep(5)
-    print 'Stopping scheduler via monit'
+    log.info('Stopping scheduler via monit')
     self._deployer.remote_check_call(host, ['sudo', 'monit', 'stop', 'mesos-scheduler'])
 
   def start_all_schedulers(self):
-    print 'Starting all schedulers: %s' % self.machines
+    log.info('Starting all schedulers: %s' % self.machines)
     # TODO(John Sirois): consider loony
     for host in self.machines:
       self.start_scheduler(host)
@@ -126,8 +128,7 @@ class SchedulerManager(object):
     for host in self.machines:
       # the linux machines do not have realpath installed - this is at least portable
       command = [
-        'ssh', self._deployer.ssh_target(host),
-        """"python -c 'import os; print os.path.realpath(\\"%s\\")'" """ % self.LIVE_BUILD_PATH
+        'ssh', self._deployer.ssh_target(host), 'readlink', '-f', self.LIVE_BUILD_PATH
       ]
       # TODO(John Sirois): get this to work via remote_call
       result = self._deployer.maybe_run_command(lambda cmd: os.popen(' '.join(cmd)).read(), command)
@@ -138,15 +139,14 @@ class SchedulerManager(object):
 
     current_builds = filter(bool, current_builds)
     if not self._ignore_conflicting_schedulers and self._really_deploy and len(current_builds) > 1:
-      print >> sys.stderr, ('Found conflicting current builds: %s please resolve manually' %
-          current_builds)
+      log.error('Found conflicting current builds: %s please resolve manually' % current_builds)
       raise self.ConflictingBuilds('Found conflicting builds: %s' % current_builds)
     current_build = current_builds.pop() if current_builds and self._really_deploy else None
-    print 'Found current build: %s' % current_build
+    log.info('Found current build: %s' % current_build)
     return current_build
 
   def set_live_build(self, build_path):
-    print 'Linking the new build on the scheduler'
+    log.info('Linking the new build on the scheduler')
     # TODO(John Sirois): consider loony
     for host in self.machines:
       self._deployer.remote_check_call(host, ['bash', '-c',
@@ -158,7 +158,7 @@ class SchedulerManager(object):
       ])
 
   def rollback(self, rollback_build=None):
-    print 'Initiating rollback'
+    log.info('Initiating rollback')
     self.stop_all_schedulers()
     if rollback_build:
       self.set_live_build(rollback_build)
@@ -167,9 +167,9 @@ class SchedulerManager(object):
   def stage_build(self, sha):
     release_scheduler_path = '%s/%s-%s' % (
         self.RELEASES_DIR, strftime("%Y%m%d%H%M%S", gmtime()), sha)
-    print 'Staging the build at: %s on:' % release_scheduler_path
+    log.info('Staging the build at: %s on:' % release_scheduler_path)
     for host in self.machines:
-      print '\t%s' % host
+      log.info('\t%s' % host)
 
     # Stage release dirs on all hosts
     for host in self.machines:
@@ -187,7 +187,7 @@ class SchedulerManager(object):
     return release_scheduler_path
 
   def is_up(self, host, sha, minimum_uptime_secs=15):
-    print 'Watching scheduler'
+    log.info('Watching scheduler')
     started = False
     watch_start = time.time()
     start_detected_at = 0
@@ -198,21 +198,21 @@ class SchedulerManager(object):
       if self.is_scheduler_healthy(host):
         uptime = self.scheduler_uptime_secs(host)
         if not self._really_deploy:
-          print 'Skipping further health checks, since we are not pushing.'
+          log.info('Skipping further health checks, since we are not pushing.')
           return True
-        print '%s up and healthy for %s seconds at %s' % (host, uptime, strftime('%Y-%m-%d %H:%M:%s', gmtime()))
+        log.info('%s up and healthy for %s seconds at %s' % (host, uptime, strftime('%Y-%m-%d %H:%M:%S', gmtime())))
 
         if started:
           if uptime < last_uptime:
-            print 'Detected scheduler process restart after update (uptime %s)!' % uptime
+            log.info('Detected scheduler process restart after update (uptime %s)!' % uptime)
             return False
           elif (time.time() - start_detected_at) > minimum_uptime_secs:
             if sha:
               deployed_sha = self.scheduler_sha(host)
               if deployed_sha != sha:
-                print 'Host %s is not on current build %s, has %s' % (host, sha, deployed_sha)
+                log.info('Host %s is not on current build %s, has %s' % (host, sha, deployed_sha))
                 return False
-            print 'Host %s has been up for at least %d seconds' % (host, minimum_uptime_secs)
+            log.info('Host %s has been up for at least %d seconds' % (host, minimum_uptime_secs))
             return True
         else:
           start_detected_at = time.time()
@@ -220,7 +220,7 @@ class SchedulerManager(object):
         started = True
         last_uptime = uptime
       elif started:
-        print 'Scheduler %s stopped responding to health checks at %s!' % (host, strftime('%Y-%m-%d %H:%M:%s', gmtime()))
+        log.info('Scheduler %s stopped responding to health checks at %s!' % (host, strftime('%Y-%m-%d %H:%M:%S', gmtime())))
         return False
       time.sleep(2)
     return False
@@ -277,17 +277,17 @@ app.add_option('--tunnel_host', dest='tunnel_host', default='nest1.corp.twitter.
 
 def main(_, options):
   if not options.really_push:
-    print '****************************************************************************************'
-    print 'You are running in pretend mode.  None of the commands are actually executed!'
-    print 'If you wish to push, add command line arg --really_push'
-    print '****************************************************************************************'
+    log.info('****************************************************************************************')
+    log.info('You are running in pretend mode.  None of the commands are actually executed!')
+    log.info('If you wish to push, add command line arg --really_push')
+    log.info('****************************************************************************************')
 
   dry_run = not options.really_push
 
   if not options.cluster:
     cluster_list = Cluster.get_list()
-    print ('Please specify the cluster you would like to deploy to with\n\t--cluster %s'
-           % cluster_list)
+    log.info('Please specify the cluster you would like to deploy to with\n\t--cluster %s' %
+        cluster_list)
     return
 
   hdfs = HDFSDeployer(options.cluster, verbose=options.verbose, dry_run=dry_run)
@@ -312,15 +312,17 @@ def main(_, options):
   for scheduler in manager.machines:
     # TODO(John Sirois): find the leader and health check it for 45 seconds instead of the default
     if not manager.is_up(scheduler, sha=builder.sha):
-      print 'Scheduler on %s is not healthy' % scheduler
+      log.info('Scheduler on %s is not healthy' % scheduler)
       hdfs.stage(builder, root=checkpoint_dir)
       manager.rollback(rollback_build=current_build)
-      print '!!!!!!!!!!!!!!!!!!!!'
-      print 'Release rolled back.'
+      log.info('!!!!!!!!!!!!!!!!!!!!')
+      log.info('Release rolled back.')
       break
   else:
-    print 'Push successful!'
+    log.info('Push successful!')
 
   safe_rmtree(checkpoint_dir)
 
+LogOptions.disable_disk_logging()
+LogOptions.set_stderr_log_level('INFO')
 app.main()
