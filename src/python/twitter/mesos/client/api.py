@@ -128,13 +128,13 @@ invoking cancel_update.
       log.error('Error cancelling the update: %s' % resp.message)
     return resp
 
-  def restart(self, role, jobname, shards):
+  def restart(self, role, env, jobname, shards):
     log.info("Restarting job %s shards %s" % (jobname, shards))
 
-    # TODO(ksweeney): Change to use just job after JobKey refactor
-    job = JobKey(role=role, environment=DEFAULT_ENVIRONMENT, name=jobname)
+    job = JobKey(role=role, environment=env, name=jobname)
 
-    return self._scheduler.restartShards(role, jobname, job, shards)
+    # TODO(ksweeney): Remove nulls after Thrift refactor.
+    return self._scheduler.restartShards(None, None, job, shards)
 
   def get_quota(self, role):
     log.info("Getting quota for: %s" % role)
