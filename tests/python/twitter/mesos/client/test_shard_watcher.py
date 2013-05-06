@@ -4,7 +4,6 @@ import unittest
 from twitter.mesos.client.health_check_factory import HealthCheck
 from twitter.mesos.client.shard_watcher import ShardWatcher
 
-from gen.twitter.mesos.constants import DEFAULT_ENVIRONMENT
 from gen.twitter.mesos.ttypes import *
 from gen.twitter.mesos.MesosSchedulerManager import Client as scheduler_client
 
@@ -52,13 +51,14 @@ class ShardWatcherTest(unittest.TestCase):
 
   def setUp(self):
     self._role = 'mesos'
+    self._env = 'test'
     self._name = 'jimbob'
     self._clock = FakeClock()
     self._scheduler = mox.MockObject(scheduler_client)
-    job = JobKey(name=self._name, environment=DEFAULT_ENVIRONMENT, role=self._role)
+    job_key = JobKey(name=self._name, environment=self._env, role=self._role)
     self._health_check_handler = FakeHealthCheckFactory()
     self._watcher = ShardWatcher(self._scheduler,
-                                 job,
+                                 job_key,
                                  'cluster',
                                  self.RESTART_THRESHOLD,
                                  self.WATCH_SECS,
@@ -70,6 +70,7 @@ class ShardWatcherTest(unittest.TestCase):
   def get_tasks_status_query(self, shard_ids):
     query = TaskQuery()
     query.owner = Identity(role=self._role)
+    query.environment = self._env
     query.jobName = self._name
     query.statuses = set([ScheduleStatus.RUNNING])
     query.shardIds = set(shard_ids)

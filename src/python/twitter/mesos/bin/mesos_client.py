@@ -32,7 +32,7 @@ from twitter.mesos.packer import sd_packer_client
 from twitter.mesos.packer.packer_client import Packer
 from twitter.thermos.base.options import add_binding_to
 
-from gen.twitter.mesos.constants import ACTIVE_STATES
+from gen.twitter.mesos.constants import ACTIVE_STATES, DEFAULT_ENVIRONMENT
 from gen.twitter.mesos.ttypes import ScheduleStatus
 
 
@@ -50,25 +50,29 @@ mesos client, used to interact with the aurora scheduler.
 For questions contact mesos-team@twitter.com.
 """
 
-def synthesize_url(scheduler_client, role=None, job=None):
+def synthesize_url(scheduler_client, role=None, env=None, job=None):
   scheduler_url = scheduler_client.url
   if not scheduler_url:
     log.warning("Unable to find scheduler web UI!")
     return None
 
-  if job and not role:
-    die('If job specified, must specify role!')
+  if env and not role:
+    die('If env specified, must specify role')
+  if job and not (role or env):
+    die('If job specified, must specify role and env')
 
   scheduler_url = urljoin(scheduler_url, 'scheduler')
   if role:
     scheduler_url += '/' + role
-    if job:
-      scheduler_url += '/' + job
+    if env:
+      scheduler_url += '/' + env
+      if job:
+        scheduler_url += '/' + job
   return scheduler_url
 
 
-def handle_open(scheduler_client, role, job):
-  url = synthesize_url(scheduler_client, role, job)
+def handle_open(scheduler_client, role, env, job):
+  url = synthesize_url(scheduler_client, role, env, job)
   if url:
     log.info('Job url: %s' % url)
     if app.get_options().open_browser:
@@ -136,7 +140,7 @@ CLUSTER_INVOKE_OPTION = make_cluster_option(
 ENV_OPTION = optparse.Option(
     '--env',
     dest='env',
-    default=None,
+    default=DEFAULT_ENVIRONMENT,
     help='Environment to match when selecting a job from a configuration.')
 
 
@@ -222,7 +226,7 @@ def create(jobname, config_file):
   monitor = JobMonitor(api, config.role(), jobname)
   resp = api.create_job(config)
   check_and_log_response(resp)
-  handle_open(api.scheduler.scheduler(), config.role(), config.name())
+  handle_open(api.scheduler.scheduler(), config.role(), config.environment(), config.name())
 
   if options.wait_until == 'RUNNING':
     monitor.wait_until(monitor.running_or_finished)
@@ -317,6 +321,8 @@ def task_is_expensive(options):
     help='Announce a serverset for this job.')
 @app.command_option('--role', type='string', default=getpass.getuser(), metavar='ROLE',
     help='Role in which to run the task.')
+@app.command_option('--env', type='string', default='test', metavar='ENV',
+    help='Environment in which to run the task.')
 @app.command_option('--yes_i_really_want_to_run_an_expensive_job', default=False,
     action='store_true', dest='yes_i_really_want_to_run_an_expensive_job',
     help='Yes, you really want to run a potentially resource intensive job.')
@@ -362,7 +368,7 @@ def diff(job, config_file):
       select_cluster=options.cluster,
       select_env=options.env)
   api = MesosClientAPI(config.cluster(), options.verbosity == 'verbose')
-  resp = api.query(api.build_query(config.role(), job, statuses=ACTIVE_STATES))
+  resp = api.query(api.build_query(config.role(), job, statuses=ACTIVE_STATES, env=options.env))
   if not resp.responseCode:
     die('Request failed, server responded with "%s"' % resp.message)
   remote_tasks = [t.assignedTask.task for t in resp.tasks]
@@ -398,16 +404,18 @@ def diff(job, config_file):
 @app.command_option(CLUSTER_INVOKE_OPTION)
 @requires.nothing
 def do_open(*args):
-  """usage: open --cluster=CLUSTER [role [job]]
+  """usage: open --cluster=CLUSTER [role [env [job]]]
 
-  Opens the scheduler page for a role or job in the default web browser.
+  Opens the scheduler page for a role, env or job in the default web browser.
   """
   options = app.get_options()
-  role = job = None
+  role = env = job = None
   if len(args) > 0:
     role = args[0]
-  if len(args) > 1:
-    job = args[1]
+    if len(args) > 1:
+      env = args[1]
+      if len(args) > 2:
+        job = args[2]
 
   if not options.cluster:
     die('--cluster is required')
@@ -415,7 +423,7 @@ def do_open(*args):
   api = MesosClientAPI(options.cluster, options.verbosity == 'verbose')
 
   import webbrowser
-  webbrowser.open_new_tab(synthesize_url(api.scheduler.scheduler(), role, job))
+  webbrowser.open_new_tab(synthesize_url(api.scheduler.scheduler(), role, env, job))
 
 
 @app.command
@@ -495,6 +503,7 @@ def inspect(jobname, config_file):
 @app.command
 @app.command_option(CLUSTER_INVOKE_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
+@app.command_option(ENV_OPTION)
 @requires.exactly('role', 'job')
 def start_cron(role, jobname):
   """usage: start_cron --cluster=CLUSTER role job
@@ -503,16 +512,18 @@ def start_cron(role, jobname):
   This does not affect the cron cycle in any way.
   """
   options = app.get_options()
+
   api = MesosClientAPI(options.cluster, options.verbosity == 'verbose')
-  resp = api.start_cronjob(role, jobname)
+  resp = api.start_cronjob(role, options.env, jobname)
   check_and_log_response(resp)
-  handle_open(api.scheduler.scheduler(), role, jobname)
+  handle_open(api.scheduler.scheduler(), role, options.env, jobname)
 
 
 @app.command
 @app.command_option(CLUSTER_INVOKE_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
 @app.command_option(SHARDS_OPTION)
+@app.command_option(ENV_OPTION)
 @requires.exactly('role', 'job')
 def kill(role, jobname):
   """usage: kill --cluster=CLUSTER role job
@@ -524,13 +535,14 @@ def kill(role, jobname):
   """
   options = app.get_options()
   api = MesosClientAPI(options.cluster, options.verbosity == 'verbose')
-  resp = api.kill_job(role, jobname, app.get_options().shards)
+  resp = api.kill_job(role, options.env, jobname, app.get_options().shards)
   check_and_log_response(resp)
-  handle_open(api.scheduler.scheduler(), role, jobname)
+  handle_open(api.scheduler.scheduler(), role, options.env, jobname)
 
 
 @app.command
 @app.command_option(CLUSTER_INVOKE_OPTION)
+@app.command_option(ENV_OPTION)
 @requires.exactly('role', 'job')
 def status(role, jobname):
   """usage: status --cluster=CLUSTER role job
@@ -572,7 +584,7 @@ def status(role, jobname):
               taskString))
 
   resp = MesosClientAPI(options.cluster, options.verbosity == 'verbose').check_status(
-      role, jobname)
+      role, jobname, options.env)
   check_and_log_response(resp)
 
   if resp.tasks:
@@ -633,6 +645,7 @@ def update(jobname, config_file):
 @app.command_option(CLUSTER_INVOKE_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
 @app.command_option(SHARDS_OPTION)
+@app.command_option(ENV_OPTION)
 @requires.exactly('role', 'job')
 def restart(role, job):
   """usage: restart --cluster=CLUSTER role job --shards=SHARDS
@@ -642,16 +655,18 @@ def restart(role, job):
   delays must be done externally.
   """
   options = app.get_options()
+
   api = MesosClientAPI(options.cluster, options.verbosity == 'verbose')
   if not options.shards:
     die('--shards is required')
-  resp = api.restart(role, job, options.shards)
+  resp = api.restart(role, options.env, job, options.shards)
   check_and_log_response(resp)
-  handle_open(api.scheduler.scheduler(), role, job)
+  handle_open(api.scheduler.scheduler(), role, options.env, job)
 
 
 @app.command
 @app.command_option(CLUSTER_INVOKE_OPTION)
+@app.command_option(ENV_OPTION)
 @requires.exactly('role', 'job')
 def cancel_update(role, jobname):
   """usage: cancel_update --cluster=CLUSTER role job
@@ -663,7 +678,7 @@ def cancel_update(role, jobname):
   """
   options = app.get_options()
   resp = MesosClientAPI(options.cluster, options.verbosity == 'verbose').cancel_update(
-      role, jobname)
+      role, options.env, jobname)
   check_and_log_response(resp)
 
 
@@ -691,6 +706,7 @@ def get_quota(role):
 @app.command
 @app.command_option(CLUSTER_INVOKE_OPTION)
 @app.command_option(EXECUTOR_SANDBOX_OPTION)
+@app.command_option(ENV_OPTION)
 @app.command_option('--user', dest='ssh_user', default=None,
                     help="ssh as this user instead of the role.")
 @app.command_option('-L', dest='tunnels', action='append', metavar='PORT:NAME',
@@ -705,7 +721,7 @@ def ssh(role, job, shard, *args):
   options = app.get_options()
 
   api = MesosClientAPI(options.cluster, options.verbosity == 'verbose')
-  resp = api.query(api.build_query(role, job, set([int(shard)])))
+  resp = api.query(api.build_query(role, job, set([int(shard)]), env=options.env))
 
   if not resp.responseCode:
     die('Request failed, server responded with "%s"' % resp.message)

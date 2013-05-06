@@ -27,7 +27,7 @@ class Shard(object):
 class ShardWatcher(object):
   def __init__(self,
                scheduler,
-               job,
+               job_key,
                cluster,
                restart_threshold,
                watch_secs,
@@ -37,9 +37,7 @@ class ShardWatcher(object):
                clock=time):
 
     self._scheduler = scheduler
-    self._job_name = job.name
-    self._role = job.role
-    self._job = job
+    self._job_key = job_key
     self._restart_threshold = restart_threshold
     self._watch_secs = watch_secs
     self._health_check_interval_seconds = health_check_interval_seconds
@@ -119,10 +117,10 @@ class ShardWatcher(object):
 
   def _get_tasks_by_shard_id(self, shard_ids):
     log.debug('Querying shard statuses.')
-    # TODO(ksweeney): Change to use just job after JobKey refactor.
     query = TaskQuery()
-    query.owner = Identity(role=self._role)
-    query.jobName = self._job_name
+    query.owner = Identity(role=self._job_key.role)
+    query.environment = self._job_key.environment
+    query.jobName = self._job_key.name
     query.statuses = set([ScheduleStatus.RUNNING])
     query.shardIds = shard_ids
     resp = self._scheduler.getTasksStatus(query)
