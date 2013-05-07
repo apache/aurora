@@ -7,6 +7,7 @@ python_test_suite(name = 'all',
     pants(':sandbox_manager'),
     pants(':status_manager'),
     pants(':thermos_executor'),
+    pants(':executor_vars'),
   ]
 )
 
@@ -84,6 +85,13 @@ python_tests(name = 'thermos_executor',
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
     pants('src/thrift/com/twitter/thermos:py-thrift'),
     pants('src/python/twitter/mesos/executor:thermos_executor_lib'),
+  ]
+)
+
+python_tests(name = 'executor_vars',
+  sources = ['test_executor_vars.py'],
+  dependencies = [
+    pants('src/python/twitter/mesos/executor:executor_vars'),
   ]
 )
 

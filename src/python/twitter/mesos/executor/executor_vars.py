@@ -1,6 +1,10 @@
 import os
 
-from twitter.common.metrics import LambdaGauge, MutatorGauge, Observable
+from twitter.common.metrics import (
+    LambdaGauge,
+    MutatorGauge,
+    NamedGauge,
+    Observable)
 from twitter.common.python.dirwrapper import PythonDirectoryWrapper
 from twitter.common.python.pex import PexInfo
 from twitter.common.quantity import Amount, Time
@@ -20,10 +24,6 @@ class ExecutorVars(Observable):
   RELEASE_TAG_FORMAT = ScanfParser('%(project)s_R%(release)d')
   DEPLOY_TAG_FORMAT = ScanfParser('%(project)s_%(environment)s_%(release)d_R%(deploy)d')
   PROJECT_NAMES = ('thermos', 'thermos_executor')
-
-  @classmethod
-  def metric_name(cls, executor, metric):
-    return 'executor_%s_%s' % (executor, metric)
 
   @classmethod
   def get_release_from_tag(cls, tag):
@@ -50,9 +50,13 @@ class ExecutorVars(Observable):
       return 'UNKNOWN'
 
   def __init__(self):
-    self.metrics.register(NamedGauge('version', self.get_release_from_binary(
-        os.path.join(process.getcwd(), process.cmdline[1]))))
     self._self = psutil.Process(os.getpid())
+    if hasattr(self._self, 'getcwd'):
+      self._version = self.get_release_from_binary(
+        os.path.join(self._self.getcwd(), self._self.cmdline[1]))
+    else:
+      self._version = 'UNKNOWN'
+    self.metrics.register(NamedGauge('version', self._version))
     self._orphan = False
     self.metrics.register(LambdaGauge('orphan', lambda: self._orphan))
     self._metrics = dict((metric, MutatorGauge(metric, 0)) for metric in self.MUTATOR_METRICS)
@@ -79,7 +83,8 @@ class ExecutorVars(Observable):
   def aggregate_memory(cls, process, attribute='pss'):
     try:
       return sum(getattr(mmap, attribute) for mmap in process.get_memory_maps())
-    except psutil.error.Error:
+    except (psutil.error.Error, AttributeError):
+      # psutil on OS X does not support get_memory_maps
       return 0
 
   @classmethod
