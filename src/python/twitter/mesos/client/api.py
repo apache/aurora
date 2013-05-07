@@ -44,42 +44,47 @@ invoking cancel_update.
   def populate_job_config(self, config):
     return self._scheduler.populateJobConfig(config.job())
 
-  def start_cronjob(self, role, env, jobname):
+  def start_cronjob(self, role, jobname):
     log.info("Starting cron job: %s" % jobname)
 
-    job = JobKey(role=role, environment=env, name=jobname)
+    # TODO(ksweeney): Change to use just job after JobKey refactor
+    job = JobKey(role=role, environment=DEFAULT_ENVIRONMENT, name=jobname)
 
-    # TODO(ksweeney): Remove nulls after Thrift refactor.
-    return self._scheduler.startCronJob(None, None, job)
+    return self._scheduler.startCronJob(role, jobname, job)
 
-  def kill_job(self, role, env, jobname, shards=None):
-    log.info("Killing tasks for job: %s/%s/%s" % (role, env, jobname))
-    if not isinstance(role, Compatibility.string) or not role:
-      raise ValueError('role must be a non-empty string')
+  def kill_job(self, role, jobname, shards=None):
+    log.info("Killing tasks for job: %s" % jobname)
     if not isinstance(jobname, Compatibility.string) or not jobname:
-      raise ValueError('jobname must be a non-empty string')
-    if not isinstance(env, Compatibility.string) or not env:
-      raise ValueError('env must be a non-empty string')
+      raise ValueError('jobname must be a non-empty string!')
 
-    # Leave query.owner.user unset so the query doesn't filter jobs only submitted by a particular
-    # user.
-    # TODO(wfarner): Refactor this when Identity is removed from TaskQuery.
-    query = TaskQuery(owner=Identity(role=role), environment=env, jobName=jobname)
+    query = TaskQuery()
+    # TODO(wickman)  Allow us to send user=getpass.getuser() without it resulting in filtering jobs
+    # only submitted by a particular user.
+    query.owner = Identity(role=role)
+    query.jobName = jobname
     if shards is not None:
       log.info("Shards to be killed: %s" % shards)
       query.shardIds = frozenset([int(s) for s in shards])
 
     return self._scheduler.killTasks(query)
 
-  def check_status(self, role, jobname=None, env=None):
-    log.info("Checking status of role: %s / env: %s / job: %s" % (role, env, jobname))
+  def check_status(self, role, jobname=None):
+    log.info("Checking status of role: %s / job: %s" % (role, jobname))
 
-    return self.query(TaskQuery(owner=Identity(role=role), environment=env, jobName=jobname))
+    query = TaskQuery()
+    query.owner = Identity(role=role)
+    if jobname:
+      query.jobName = jobname
+    return self.query(query)
 
   @classmethod
-  def build_query(cls, role, job, shards=None, statuses=LIVE_STATES, env=None):
-    return TaskQuery(
-      owner=Identity(role=role), jobName=job, statuses=statuses, shardIds=shards, environment=env)
+  def build_query(cls, role, job, shards=None, statuses=LIVE_STATES):
+    query = TaskQuery()
+    query.statuses = statuses
+    query.owner = Identity(role=role)
+    query.jobName = job
+    query.shardIds = shards
+    return query
 
   def query(self, query):
     return self._scheduler.getTasksStatus(query)
@@ -119,22 +124,22 @@ invoking cancel_update.
 
     return resp
 
-  def cancel_update(self, role, env, jobname):
-    """Cancel the update represented by role/env/jobname. Returns whether or not the cancellation
+  def cancel_update(self, role, jobname):
+    """Cancel the update represented by role/jobname.  Returns whether or not the cancellation
        was successful."""
-    log.info("Canceling update on job: %s/%s/%s" % (role, env, jobname))
-    resp = Updater.cancel_update(self._scheduler, role, env, jobname)
+    log.info("Canceling update on job: %s" % jobname)
+    resp = Updater.cancel_update(self._scheduler, role, jobname)
     if resp.responseCode != ResponseCode.OK:
       log.error('Error cancelling the update: %s' % resp.message)
     return resp
 
-  def restart(self, role, env, jobname, shards):
+  def restart(self, role, jobname, shards):
     log.info("Restarting job %s shards %s" % (jobname, shards))
 
-    job = JobKey(role=role, environment=env, name=jobname)
+    # TODO(ksweeney): Change to use just job after JobKey refactor
+    job = JobKey(role=role, environment=DEFAULT_ENVIRONMENT, name=jobname)
 
-    # TODO(ksweeney): Remove nulls after Thrift refactor.
-    return self._scheduler.restartShards(None, None, job, shards)
+    return self._scheduler.restartShards(role, jobname, job, shards)
 
   def get_quota(self, role):
     log.info("Getting quota for: %s" % role)

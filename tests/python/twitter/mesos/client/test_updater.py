@@ -5,6 +5,7 @@ from twitter.mesos.client.scheduler_client import SchedulerProxy
 from twitter.mesos.client.updater import Updater
 from twitter.mesos.client.shard_watcher import ShardWatcher
 
+from gen.twitter.mesos.constants import DEFAULT_ENVIRONMENT
 from gen.twitter.mesos.ttypes import *
 from gen.twitter.mesos.MesosSchedulerManager import Client as scheduler_client
 
@@ -17,9 +18,8 @@ UNCHANGED  = ShardUpdateResult.UNCHANGED
 
 
 class FakeConfig(object):
-  def __init__(self, role, name, env, update_config):
+  def __init__(self, role, name, update_config):
     self._role = role
-    self._env = env
     self._name = name
     self._update_config = update_config
 
@@ -37,12 +37,9 @@ class FakeConfig(object):
 
   def has_health_port(self):
     return False
-
+  
   def cluster(self):
     return 'test'
-
-  def environment(self):
-    return self._env
 
 
 class FakeSchedulerProxy(SchedulerProxy):
@@ -70,8 +67,7 @@ class UpdaterTest(unittest.TestCase):
   def setUp(self):
     self._role = 'mesos'
     self._name = 'jimbob'
-    self._env = 'test'
-    self._job_key = JobKey(name=self._name, environment=self._env, role=self._role)
+    self._job_key = JobKey(name=self._name, environment=DEFAULT_ENVIRONMENT, role=self._role)
     self._session_key = 'test_session'
     self._update_token = 'test_update'
     self._shard_watcher = mox.MockObject(ShardWatcher)
@@ -81,30 +77,27 @@ class UpdaterTest(unittest.TestCase):
     self.init_updater(copy.deepcopy(self.UPDATE_CONFIG))
 
   def init_updater(self, update_config):
-    config = FakeConfig(self._role, self._name, self._env, update_config)
+    config = FakeConfig(self._role, self._name, update_config)
     self._updater = Updater(config, self._scheduler_proxy)
     self._updater._update_token = self._update_token
 
   def expect_update(self, shard_ids, shard_results=None):
     response = UpdateShardsResponse(responseCode=UpdateResponseCode.OK, message='test')
     response.shards = shard_results
-    # TODO(ksweeney): Remove Nones after JobKey migration is complete
     self._scheduler.updateShards(
-        None, None, self._job_key, shard_ids,
+        self._role, self._name, self._job_key, shard_ids,
         self._update_token, self._session_key).AndReturn(response)
 
   def expect_restart(self, shard_ids):
     response = RestartShardsResponse(responseCode=ResponseCode.OK, message='test')
-    # TODO(ksweeney): Remove Nones after JobKey migration is complete
     self._scheduler.restartShards(
-        None, None, self._job_key, shard_ids, self._session_key).AndReturn(response)
+        self._role, self._name, self._job_key, shard_ids, self._session_key).AndReturn(response)
 
   def expect_rollback(self, shard_ids, shard_results=None):
     response = RollbackShardsResponse(responseCode=UpdateResponseCode.OK, message='test')
     response.shards = shard_results
-    # TODO(ksweeney): Remove Nones after JobKey migration is complete
     self._scheduler.rollbackShards(
-        None, None, self._job_key, shard_ids,
+        self._role, self._name, self._job_key, shard_ids,
         self._update_token, self._session_key).AndReturn(response)
 
   def expect_watch_shards(self, shard_ids, failed_shards=[]):

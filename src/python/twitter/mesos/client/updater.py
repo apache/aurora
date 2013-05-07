@@ -61,7 +61,8 @@ class Updater(object):
 
   def __init__(self, config, scheduler=None):
     self._config = config
-    self._job_key = JobKey(role=config.role(), environment=config.environment(), name=config.name())
+    self._role = config.role()
+    self._job_name = config.name()
     self._cluster = config.cluster()
     self._scheduler = scheduler or SchedulerProxy(self._cluster)
     self._failures_by_shard = collections.defaultdict(int)
@@ -71,6 +72,8 @@ class Updater(object):
       raise self.InvalidConfigError(str(e))
     self._update_token = None
 
+    # TODO(ksweeney): Get this from config and remove job_name and role fields.
+    self._job = JobKey(name=self._job_name, environment=DEFAULT_ENVIRONMENT, role=self._role)
     self._has_health_port = config.has_health_port()
 
   def _update_failure_counts(self, failed_shards):
@@ -85,11 +88,11 @@ class Updater(object):
 
   def start(self):
     """Start an update.
-
+    
        Returns:
          True if an update is necessary
          False if an update is not necessary
-
+         
        UpdateInProgressError exception is thrown if an update is already in progress.
     """
     resp = self._scheduler.startUpdate(self._config.job())
@@ -99,31 +102,29 @@ class Updater(object):
 
   def finish(self, rollback=False):
     """Finish an update.  If you seek a rollback on finish, set rollback=True.
-
+    
        Returns:
          True if update succeeded
          False if update failed
     """
 
-    # TODO(ksweeney): Remove nulls after Thrift refactor.
-    resp = self._scheduler.finishUpdate(None, None, self._job_key,
-        UpdateResult.FAILED if rollback else UpdateResult.SUCCESS,
-        self._update_token)
-
+    # TODO(ksweeney): Change to use just job after JobKey refactor.
+    resp = self._scheduler.finishUpdate(
+        self._role, self._job_name, self._job,
+        UpdateResult.FAILED if rollback else UpdateResult.SUCCESS, self._update_token)
     if resp.responseCode == ResponseCode.OK:
       resp._update_token = None
     return resp
-
+  
   def cancel(self):
-    return self.cancel_update(self._scheduler, self._job_key.role, self._job_key.environment,
-        self._job_key.jobname, self._update_token)
+    return self.cancel_update(self._scheduler, self._role, self._job_name, self._update_token)
 
   @classmethod
-  def cancel_update(cls, scheduler, role, env, jobname, token=None):
-    job_key = JobKey(role=role, environment=env, name=jobname)
+  def cancel_update(cls, scheduler, role, jobname, token=None):
+    job = JobKey(role=role, environment=DEFAULT_ENVIRONMENT, name=jobname)
 
-    # TODO(ksweeney): Remove nulls after Thrift refactor.
-    return scheduler.finishUpdate(None, None, job_key, UpdateResult.TERMINATE, token)
+    # TODO(ksweeney): Change to use just job after JobKey refactor.
+    return scheduler.finishUpdate(role, jobname, job, UpdateResult.TERMINATE, token)
 
   def _is_failed_update(self):
     total_failed_shards = self._exceeded_shard_fail_count()
@@ -164,7 +165,7 @@ class Updater(object):
     """
     self._shard_watcher = shard_watcher or ShardWatcher(
         self._scheduler,
-        self._job_key,
+        self._job,
         self._cluster,
         self._update_config.restart_threshold,
         self._update_config.watch_secs,
@@ -217,8 +218,8 @@ class Updater(object):
       batch_shards = shards_to_rollback[0 : self._update_config.batch_size]
       shards_to_rollback = list(set(shards_to_rollback) - set(batch_shards))
 
-      # TODO(ksweeney): Remove nulls after Thrift refactor.
-      resp = self._scheduler.rollbackShards(None, None, self._job_key, batch_shards,
+      # TODO(ksweeney): Change to use just job after JobKey refactor.
+      resp = self._scheduler.rollbackShards(self._role, self._job_name, self._job, batch_shards,
           self._update_token)
       log.log(debug_if(resp.responseCode == UpdateResponseCode.OK),
         'Response from scheduler: %s (message: %s)'
@@ -238,9 +239,9 @@ class Updater(object):
     Returns a map of the current status of the updated shards as returned by the scheduler.
     """
     log.info('Updating shards: %s' % shard_ids)
-    # TODO(ksweeney): Remove nulls after Thrift refactor.
+    # TODO(ksweeney): Change to use just job after JobKey refactor.
     resp = self._scheduler.updateShards(
-        None, None, self._job_key, shard_ids, self._update_token)
+        self._role, self._job_name, self._job, shard_ids, self._update_token)
     log.log(debug_if(resp.responseCode == UpdateResponseCode.OK),
         'Response from scheduler: %s (message: %s)' % (
           UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
@@ -253,8 +254,7 @@ class Updater(object):
     shard_ids -- set of shards to be restarted by the scheduler.
     """
     log.info('Restarting shards: %s' % shard_ids)
-    # TODO(ksweeney): Remove nulls after Thrift refactor.
-    resp = self._scheduler.restartShards(None, None, self._job_key, shard_ids)
+    resp = self._scheduler.restartShards(self._role, self._job_name, self._job, shard_ids)
     log.log(debug_if(resp.responseCode == ResponseCode.OK),
         'Response from scheduler: %s (message: %s)' % (
           ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))

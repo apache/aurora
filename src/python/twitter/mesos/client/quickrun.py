@@ -36,11 +36,12 @@ class Quickrun(object):
       ScheduleStatus.KILLED])
 
   def __init__(self, cluster, command, options):
+    self._jobname, self._role = options.name, options.role
     self._stop = threading.Event()
-    self._config = self._make_config(cluster, command, options)
+    self._config = self.config(cluster, command, options)
     self._instances = options.instances
 
-  def _make_config(self, cluster, command, options):
+  def config(self, cluster, command, options):
     processes = [Process(name=options.name, cmdline=command)]
     if options.package:
       role, name, version = options.package
@@ -52,14 +53,9 @@ class Quickrun(object):
         resources=Resources(cpu=options.cpus,
                             ram=options.ram.as_(Data.BYTES),
                             disk=options.disk.as_(Data.BYTES)))
-    job = Job(
-        task=task,
-        instances=options.instances,
-        role=options.role,
-        environment=options.env,
-        cluster=cluster)
+    job = Job(task=task, instances=options.instances, role=options.role, cluster=cluster)
     if options.announce:
-      job = job(announce=Announcer(), environment=options.env, daemon=True)
+      job = job(announce=Announcer(), environment='test', daemon=True)
     return populate_namespaces(AuroraConfig(job))
 
   def _terminal(self, statuses):
@@ -73,7 +69,7 @@ class Quickrun(object):
     sys.stderr.flush()
 
   def run(self, client):
-    monitor = JobMonitor(client, self._config.role(), self._config.environment(), self._config.name())
+    monitor = JobMonitor(client, self._role, self._jobname)
     response = client.create_job(self._config)
     if response.responseCode != ResponseCode.OK:
       print('Failed to create job: %s' % response.message)

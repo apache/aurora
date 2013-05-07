@@ -42,7 +42,6 @@ CLUSTER_OPTION = optparse.Option(
 @app.command_option('-l', '--listformat', dest='listformat',
     default="%role%/%jobName%/%shardId% %status%",
     help='Format string of job/task items to print out.')
-# TODO(ksweeney): Allow query by environment here.
 def query(args, options):
   """usage: query --cluster=CLUSTER [--shards=N[,N,...]]
                                     [--states=State[,State,...]]
