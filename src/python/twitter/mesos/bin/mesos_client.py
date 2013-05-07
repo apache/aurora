@@ -223,7 +223,7 @@ def create(jobname, config_file):
     return spawn_local('build', jobname, config_file, **make_spawn_options(options))
 
   api = MesosClientAPI(config.cluster(), options.verbosity == 'verbose')
-  monitor = JobMonitor(api, config.role(), jobname)
+  monitor = JobMonitor(api, config.role(), config.environment(), config.name())
   resp = api.create_job(config)
   check_and_log_response(resp)
   handle_open(api.scheduler.scheduler(), config.role(), config.environment(), config.name())
