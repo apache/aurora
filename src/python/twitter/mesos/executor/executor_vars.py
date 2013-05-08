@@ -1,5 +1,7 @@
 import os
+import time
 
+from twitter.common.exceptions import ExceptionalThread
 from twitter.common.metrics import (
     LambdaGauge,
     MutatorGauge,
@@ -13,7 +15,7 @@ from twitter.common.string.scanf import ScanfParser
 import psutil
 
 
-class ExecutorVars(Observable):
+class ExecutorVars(Observable, ExceptionalThread):
   """
     Executor exported /vars wrapper.
 
@@ -24,6 +26,7 @@ class ExecutorVars(Observable):
   RELEASE_TAG_FORMAT = ScanfParser('%(project)s_R%(release)d')
   DEPLOY_TAG_FORMAT = ScanfParser('%(project)s_%(environment)s_%(release)d_R%(deploy)d')
   PROJECT_NAMES = ('thermos', 'thermos_executor')
+  COLLECTION_INTERVAL = Amount(1, Time.MINUTES)
 
   @classmethod
   def get_release_from_tag(cls, tag):
@@ -49,7 +52,8 @@ class ExecutorVars(Observable):
     except PythonDirectoryWrapper.Error:
       return 'UNKNOWN'
 
-  def __init__(self):
+  def __init__(self, clock=time):
+    self._clock = clock
     self._self = psutil.Process(os.getpid())
     if hasattr(self._self, 'getcwd'):
       self._version = self.get_release_from_binary(
@@ -58,10 +62,12 @@ class ExecutorVars(Observable):
       self._version = 'UNKNOWN'
     self.metrics.register(NamedGauge('version', self._version))
     self._orphan = False
-    self.metrics.register(LambdaGauge('orphan', lambda: self._orphan))
+    self.metrics.register(LambdaGauge('orphan', lambda: int(self._orphan)))
     self._metrics = dict((metric, MutatorGauge(metric, 0)) for metric in self.MUTATOR_METRICS)
     for metric in self._metrics.values():
       self.metrics.register(metric)
+    ExceptionalThread.__init__(self)
+    self.daemon = True
 
   def write_metric(self, metric, value):
     self._metrics[metric].write(value)
@@ -92,6 +98,11 @@ class ExecutorVars(Observable):
     return (process.get_cpu_percent(0),
             process.get_memory_info().rss,
             cls.aggregate_memory(process, attribute='pss'))
+
+  def run(self):
+    while True:
+      self._clock.sleep(self.COLLECTION_INTERVAL.as_(Time.SECONDS))
+      self.sample()
 
   def sample(self):
     try:

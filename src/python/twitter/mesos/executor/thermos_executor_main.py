@@ -36,6 +36,7 @@ def main():
   # Create executor stub
   thermos_executor = ThermosExecutor()
   executor_vars = ExecutorVars()
+  executor_vars.start()
 
   compound_collector = CompoundMetrics(thermos_executor.metrics, executor_vars.metrics)
 

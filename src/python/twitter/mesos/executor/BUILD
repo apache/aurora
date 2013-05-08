@@ -44,6 +44,7 @@ python_library(
   name = 'executor_vars',
   sources = ['executor_vars.py'],
   dependencies = [
+    pants('src/python/twitter/common/exceptions'),
     pants('src/python/twitter/common/metrics'),
     pants('src/python/twitter/common/python'),
     pants('src/python/twitter/common/quantity'),
