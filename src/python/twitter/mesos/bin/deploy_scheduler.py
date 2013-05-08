@@ -9,9 +9,7 @@ from twitter.common import log
 from twitter.common.dirutil import safe_rmtree
 from twitter.common.log import LogOptions
 from twitter.mesos.clusters import Cluster
-from twitter.mesos.deploy import Builder, Deployer, HDFSDeployer
-
-__author__ = 'William Farner'
+from twitter.mesos.deploy import Builder, Deployer
 
 
 class SchedulerManager(object):
@@ -290,9 +288,7 @@ def main(_, options):
         cluster_list)
     return
 
-  hdfs = HDFSDeployer(options.cluster, verbose=options.verbose, dry_run=dry_run)
   builder = AuroraBuilder(options.cluster, options.release, options.hotfix, options.verbose)
-  checkpoint_dir = hdfs.checkpoint(builder)
 
   if not options.skip_build:
     builder.build()
@@ -305,7 +301,6 @@ def main(_, options):
   if current_build:
     manager.stop_all_schedulers()
 
-  hdfs.stage(builder)
   manager.set_live_build(new_build)
   manager.start_all_schedulers()
 
@@ -313,7 +308,6 @@ def main(_, options):
     # TODO(John Sirois): find the leader and health check it for 45 seconds instead of the default
     if not manager.is_up(scheduler, sha=builder.sha):
       log.info('Scheduler on %s is not healthy' % scheduler)
-      hdfs.stage(builder, root=checkpoint_dir)
       manager.rollback(rollback_build=current_build)
       log.info('!!!!!!!!!!!!!!!!!!!!')
       log.info('Release rolled back.')
@@ -321,7 +315,6 @@ def main(_, options):
   else:
     log.info('Push successful!')
 
-  safe_rmtree(checkpoint_dir)
 
 LogOptions.disable_disk_logging()
 LogOptions.set_stderr_log_level('INFO')
