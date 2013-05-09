@@ -191,10 +191,13 @@ class ResourceManager(HealthInterface, ExceptionalThread):
   def register_metrics(self):
     self.metrics.register(LambdaGauge('disk_used', lambda: self._disk_sample))
     self.metrics.register(LambdaGauge('disk_reserved', lambda: self._max_disk))
+    self.metrics.register(LambdaGauge('disk_percent', lambda: 1.0 * self._disk_sample / self._max_disk))
     self.metrics.register(LambdaGauge('cpu_used', lambda: self._ps_sample.rate))
     self.metrics.register(LambdaGauge('cpu_reserved', lambda: self._max_cpu))
+    self.metrics.register(LambdaGauge('cpu_percent', lambda: 1.0 * self._ps_sample.rate / self._max_cpu))
     self.metrics.register(LambdaGauge('ram_used', lambda: self._ps_sample.rss))
     self.metrics.register(LambdaGauge('ram_reserved', lambda: self._max_ram))
+    self.metrics.register(LambdaGauge('ram_percent', lambda: 1.0 * self._ps_sample.rss / self._max_ram))
 
   def start(self):
     HealthInterface.start(self)
