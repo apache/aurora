@@ -117,7 +117,9 @@ class TestDiscoveryManager(object):
 
       join_event.wait(timeout=10.0)
       assert join_event.is_set()
-      assert list(ss)[0] == old_instance
+      instances = list(ss)
+      assert len(instances) > 0
+      assert instances[0] == old_instance
 
       assert dm.healthy
 

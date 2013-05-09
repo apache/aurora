@@ -2,6 +2,7 @@ import socket
 import threading
 
 from twitter.common import log
+from twitter.common.metrics import LambdaGauge
 from twitter.common.quantity import Amount, Time
 from twitter.common.zookeeper.client import ZooKeeper
 from twitter.common.zookeeper.serverset import Endpoint
@@ -66,20 +67,17 @@ class DiscoveryManager(HealthInterface):
             jobname,
             primary,
             additional=additional,
-            failure_callback=self.on_failure,
             shard=shard,
+            strict=False,
             ensemble=ensemble)
             # TODO(wickman) This is disabled until MESOS-2376 is resolved.
             # credentials=self.super_credentials())
         self.metrics.register_observable('ensemble', self._service.zookeeper)
+        self.metrics.register(LambdaGauge('disconnected_time', self._service.disconnected_time))
       except ZooKeeper.InvalidEnsemble as e:
         log.error('Invalid ensemble: %s' % e)
         self._service = None
         self._unhealthy.set()
-
-  def on_failure(self):
-    if self._service:
-      self._service.rejoin()
 
   @property
   def healthy(self):
