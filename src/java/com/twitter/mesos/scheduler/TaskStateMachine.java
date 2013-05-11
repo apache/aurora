@@ -470,7 +470,7 @@ public class TaskStateMachine {
                 .withCallback(manageUpdatingTask(false)))
         .addState(
             Rule.from(ROLLBACK)
-                .to(FINISHED, FAILED, KILLING, KILLED, LOST)
+                .to(UPDATING, FINISHED, FAILED, KILLING, KILLED, LOST)
                 .withCallback(manageUpdatingTask(true)))
         .addState(
             Rule.from(FAILED)
@@ -533,6 +533,7 @@ public class TaskStateMachine {
           case ASSIGNED:
           case STARTING:
           case KILLING:
+          case UPDATING:
           case ROLLBACK:
           case RUNNING:
             addWork(WorkCommand.KILL);

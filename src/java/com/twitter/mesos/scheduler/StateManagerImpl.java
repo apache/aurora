@@ -16,6 +16,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
@@ -431,11 +432,20 @@ public class StateManagerImpl implements StateManager {
     }
   }
 
+  private static final Predicate<ScheduledTask> NOT_UPDATING = new Predicate<ScheduledTask>() {
+    @Override public boolean apply(ScheduledTask task) {
+      return task.getStatus() != UPDATING && task.getStatus() != ROLLBACK;
+    }
+  };
+
   private Set<Integer> getChangedShards(Set<ScheduledTask> tasks, Set<TwitterTaskInfo> compareTo) {
-    Set<TwitterTaskInfo> oldTasks =
-        ImmutableSet.copyOf(Iterables.transform(tasks, Tasks.SCHEDULED_TO_INFO));
-    Set<TwitterTaskInfo> changedTasks = Sets.difference(compareTo, oldTasks);
-    return ImmutableSet.copyOf(Iterables.transform(changedTasks, Tasks.INFO_TO_SHARD_ID));
+    Set<TwitterTaskInfo> existingTasks = FluentIterable.from(tasks)
+        .transform(Tasks.SCHEDULED_TO_INFO)
+        .toSet();
+    Set<TwitterTaskInfo> changedTasks = Sets.difference(compareTo, existingTasks);
+    return FluentIterable.from(changedTasks)
+        .transform(Tasks.INFO_TO_SHARD_ID)
+        .toSet();
   }
 
   Map<Integer, ShardUpdateResult> modifyShards(
@@ -510,7 +520,14 @@ public class StateManagerImpl implements StateManager {
                   updateConfig.get(),
                   updateShardIds,
                   configSelector);
-              Set<Integer> changedShards = getChangedShards(tasks, targetConfigs);
+              // Filter tasks in UPDATING/ROLLBACK to obtain the changed shards. This is done so
+              // that these tasks are either rolled back or updated. If not, when a task in UPDATING
+              // is later KILLED and a new shard is created with the updated configuration it
+              // appears as if the rollback completed successfully.
+              Set<ScheduledTask> notUpdating = FluentIterable.from(tasks)
+                  .filter(NOT_UPDATING)
+                  .toSet();
+              Set<Integer> changedShards = getChangedShards(notUpdating, targetConfigs);
               if (!changedShards.isEmpty()) {
                 // Initiate update on the existing shards.
                 // TODO(William Farner): The additional query could be avoided here.
@@ -578,8 +595,7 @@ public class StateManagerImpl implements StateManager {
 
     checkNotNull(config);
     checkNotBlank(shards);
-    return FluentIterable
-        .from(fetchShardUpdateConfigs(config, shards))
+    return FluentIterable.from(fetchShardUpdateConfigs(config, shards))
         .transform(configSelector)
         .filter(Predicates.notNull())
         .toSet();

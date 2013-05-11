@@ -1,5 +1,6 @@
 package com.twitter.mesos.scheduler;
 
+import java.util.Map;
 import java.util.Set;
 
 import com.google.common.base.Optional;
@@ -25,6 +26,7 @@ import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.ShardUpdateResult;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.scheduler.events.PubsubEvent;
@@ -44,6 +46,7 @@ import static org.junit.Assert.fail;
 
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
+import static com.twitter.mesos.gen.ScheduleStatus.KILLED;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.ROLLBACK;
@@ -228,6 +231,60 @@ public class StateManagerImplTest extends EasyMockTest {
 
     stateManager.finishUpdate(
         JIM, MY_JOB, Optional.<String>absent(), UpdateResult.SUCCESS, true);
+  }
+
+  @Test
+  public void testUpdatingToRollback() throws Exception {
+    expectPubSubEvent();
+    driver.killTask(EasyMock.<String>anyObject());
+    expectLastCall().times(2);
+
+    control.replay();
+    TwitterTaskInfo taskInfo = makeTask(JIM, MY_JOB, 0);
+
+    String id = insertTask(taskInfo);
+    changeState(id, ASSIGNED);
+    changeState(id, STARTING);
+    changeState(id, RUNNING);
+
+    TwitterTaskInfo updated = taskInfo.deepCopy().setNumCpus(1000);
+    String token = stateManager.registerUpdate(JIM.getRole(), MY_JOB, ImmutableSet.of(updated));
+    Map<Integer, ShardUpdateResult> result =
+        stateManager.modifyShards(JIM, MY_JOB, ImmutableSet.of(0), token, true);
+    assertEquals(result, ImmutableMap.of(0, ShardUpdateResult.RESTARTING));
+
+    result = stateManager.modifyShards(JIM, MY_JOB, ImmutableSet.of(0), token, false);
+    assertEquals(result, ImmutableMap.of(0, ShardUpdateResult.RESTARTING));
+  }
+
+  @Test
+  public void testRollbackToUpdating() throws Exception {
+    expectPubSubEvent();
+    driver.killTask(EasyMock.<String>anyObject());
+    expectLastCall().times(3);
+
+    control.replay();
+    TwitterTaskInfo taskInfo = makeTask(JIM, MY_JOB, 0);
+
+    String id = insertTask(taskInfo);
+    changeState(id, ASSIGNED);
+    changeState(id, STARTING);
+    changeState(id, RUNNING);
+    TwitterTaskInfo newConfig = taskInfo.deepCopy().setNumCpus(1000);
+    String token = stateManager.registerUpdate(JIM.getRole(), MY_JOB, ImmutableSet.of(newConfig));
+    changeState(id, UPDATING);
+    changeState(id, KILLED);
+
+    String newTaskId =
+        Tasks.id(Iterables.getOnlyElement(stateManager.fetchTasks(Query.byStatus(PENDING))));
+    assignTask(newTaskId, HOST_A);
+    changeState(newTaskId, STARTING);
+    changeState(newTaskId, RUNNING);
+    changeState(newTaskId, ROLLBACK);
+
+    Map<Integer, ShardUpdateResult> result =
+        stateManager.modifyShards(JIM, MY_JOB, ImmutableSet.of(0), token, true);
+    assertEquals(result, ImmutableMap.of(0, ShardUpdateResult.RESTARTING));
   }
 
   @Test
