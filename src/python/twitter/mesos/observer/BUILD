@@ -2,6 +2,7 @@ python_library(
   name = 'mesos_vars',
   sources = ['mesos_vars.py'],
   dependencies = [
+    pants('3rdparty/python:psutil'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/exceptions'),
     pants('src/python/twitter/common/metrics'),
@@ -10,7 +11,6 @@ python_library(
     pants('src/python/twitter/common/string'),
     pants('src/python/twitter/mesos/executor:executor_detector'),
     pants('src/thrift/com/twitter/thermos:py-thrift'),
-    python_requirement('psutil'),
   ],
 )
 

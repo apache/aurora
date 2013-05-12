@@ -49,7 +49,7 @@ python_library(
   sources = ['process_collector_psutil.py'],
   dependencies = [
     pants(':process'),
-    python_requirement('psutil>=0.5.0'),
+    pants('3rdparty/python:psutil'),
   ]
 )
 
