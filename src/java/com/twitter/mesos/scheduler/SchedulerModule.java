@@ -186,7 +186,7 @@ public class SchedulerModule extends AbstractModule {
     bind(MaintenanceControllerImpl.class).in(Singleton.class);
 
     bind(StatsProvider.class).toInstance(Stats.STATS_PROVIDER);
-    TaskEventModule.bindSubscriber(binder(), StateManagerVars.class);
+    TaskEventModule.bindSubscriber(binder(), TaskVars.class);
   }
 
   /**

@@ -16,7 +16,6 @@ import com.google.common.eventbus.Subscribe;
 import com.google.inject.Inject;
 
 import com.twitter.common.stats.StatsProvider;
-import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Attribute;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
@@ -32,30 +31,23 @@ import com.twitter.mesos.scheduler.storage.Storage.Work;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
- * StateManager variables.
- * TODO(William Farner): Rename this class now that it's decoupled from StateManager.
+ * A container that tracks and exports stat counters for tasks.
  */
-class StateManagerVars implements EventSubscriber {
-  private static final Logger LOG = Logger.getLogger(StateManagerVars.class.getName());
+class TaskVars implements EventSubscriber {
+  private static final Logger LOG = Logger.getLogger(TaskVars.class.getName());
 
-  private final LoadingCache<String, AtomicLong> totalCounters;
-  private final LoadingCache<String, AtomicLong> perJobCounters;
+  private final LoadingCache<String, AtomicLong> countersByStatus;
   private final LoadingCache<String, AtomicLong> countersByRack;
 
   private final Storage storage;
 
   @Inject
-  StateManagerVars(Storage storage, final StatsProvider statProvider) {
+  TaskVars(Storage storage, final StatsProvider statProvider) {
     this.storage = checkNotNull(storage);
     checkNotNull(statProvider);
-    totalCounters = CacheBuilder.newBuilder().build(new CacheLoader<String, AtomicLong>() {
+    countersByStatus = CacheBuilder.newBuilder().build(new CacheLoader<String, AtomicLong>() {
       @Override public AtomicLong load(String statName) {
         return statProvider.makeCounter(statName);
-      }
-    });
-    perJobCounters = CacheBuilder.newBuilder().build(new CacheLoader<String, AtomicLong>() {
-      @Override public AtomicLong load(String statName) {
-        return statProvider.untracked().makeCounter(statName);
       }
     });
     countersByRack = CacheBuilder.newBuilder().build(new CacheLoader<String, AtomicLong>() {
@@ -63,11 +55,6 @@ class StateManagerVars implements EventSubscriber {
         return statProvider.makeCounter(rackStatName(rack));
       }
     });
-  }
-
-  @VisibleForTesting
-  static String getVarName(String role, String job, ScheduleStatus status) {
-    return "job_" + role + "_" + job + "_tasks_" + status.name();
   }
 
   @VisibleForTesting
@@ -93,32 +80,24 @@ class StateManagerVars implements EventSubscriber {
   };
 
   private AtomicLong getCounter(ScheduleStatus status) {
-    return totalCounters.getUnchecked(getVarName(status));
+    return countersByStatus.getUnchecked(getVarName(status));
   }
 
-  private AtomicLong getCounter(String role, String job, ScheduleStatus status) {
-    return perJobCounters.getUnchecked(getVarName(role, job, status));
-  }
-
-  private void incrementCount(String role, String job, ScheduleStatus status) {
+  private void incrementCount(ScheduleStatus status) {
     getCounter(status).incrementAndGet();
-    getCounter(role, job, status).incrementAndGet();
   }
 
-  private void decrementCount(String role, String job, ScheduleStatus status) {
+  private void decrementCount(ScheduleStatus status) {
     getCounter(status).decrementAndGet();
-    getCounter(role, job, status).decrementAndGet();
   }
 
   @Subscribe
   public void taskChangedState(TaskStateChange stateChange) {
     ScheduledTask task = stateChange.getTask();
-    String role = Tasks.getRole(task);
-    String job = Tasks.getJob(task);
     if (stateChange.getOldState() != ScheduleStatus.INIT) {
-      decrementCount(role, job, stateChange.getOldState());
+      decrementCount(stateChange.getOldState());
     }
-    incrementCount(role, job, task.getStatus());
+    incrementCount(task.getStatus());
 
     if (stateChange.getNewState() == ScheduleStatus.LOST) {
       final String host = stateChange.getTask().getAssignedTask().getSlaveHost();
@@ -142,7 +121,7 @@ class StateManagerVars implements EventSubscriber {
   @Subscribe
   public void storageStarted(StorageStarted event) {
     for (ScheduledTask task : Storage.Util.fetchTasks(storage, Query.GET_ALL)) {
-      incrementCount(Tasks.getRole(task), Tasks.getJob(task), task.getStatus());
+      incrementCount(task.getStatus());
     }
 
     // Dummy read the counter for each status counter. This is important to guarantee a stat with
@@ -156,7 +135,7 @@ class StateManagerVars implements EventSubscriber {
   @Subscribe
   public void tasksDeleted(final TasksDeleted event) {
     for (ScheduledTask task : event.getTasks()) {
-      decrementCount(Tasks.getRole(task), Tasks.getJob(task), task.getStatus());
+      decrementCount(task.getStatus());
     }
   }
 }
