@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -37,9 +36,7 @@ import org.apache.mesos.Protos.MasterInfo;
 import org.apache.mesos.Protos.Status;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
-import org.easymock.EasyMock;
 import org.easymock.IAnswer;
-import org.easymock.IArgumentMatcher;
 import org.easymock.IMocksControl;
 import org.junit.Before;
 import org.junit.Test;
@@ -59,7 +56,6 @@ import com.twitter.common.zookeeper.ServerSet;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.common.zookeeper.testing.BaseZooKeeperTest;
 import com.twitter.common_internal.zookeeper.TwitterServerSet;
-import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
@@ -82,6 +78,8 @@ import com.twitter.mesos.scheduler.log.Log.Position;
 import com.twitter.mesos.scheduler.log.Log.Stream;
 import com.twitter.mesos.scheduler.storage.log.LogManager.StreamManager.EntrySerializer;
 import com.twitter.mesos.scheduler.storage.log.LogStorageModule;
+import com.twitter.mesos.scheduler.storage.log.testing.LogOpMatcher;
+import com.twitter.mesos.scheduler.storage.log.testing.LogOpMatcher.StreamMatcher;
 import com.twitter.mesos.scheduler.thrift.ThriftConfiguration;
 import com.twitter.thrift.Endpoint;
 import com.twitter.thrift.ServiceInstance;
@@ -112,6 +110,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
   private DriverFactory driverFactory;
   private Log log;
   private Stream logStream;
+  private StreamMatcher streamMatcher;
   private EntrySerializer entrySerializer;
   private ZooKeeperClient zkClient;
   private File backupDir;
@@ -141,6 +140,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
     driverFactory = control.createMock(DriverFactory.class);
     log = control.createMock(Log.class);
     logStream = control.createMock(Stream.class);
+    streamMatcher = LogOpMatcher.matcherFor(logStream);
     entrySerializer = new EntrySerializer(LogStorageModule.MAX_LOG_ENTRY_SIZE.get());
 
     zkClient = createZkClient();
@@ -245,19 +245,6 @@ public class SchedulerIT extends BaseZooKeeperTest {
     return new IntPosition(curPosition.incrementAndGet());
   }
 
-  private byte[] sameEntry(Op logOp) {
-    EasyMock.reportMatcher(new LogOpMatcher(logOp));
-    return null;
-  }
-
-  private void expectLogOp(Op op) throws Exception {
-    expect(logStream.append(sameEntry(op))).andReturn(nextPosition());
-  }
-
-  private void expectSaveTasks(Set<ScheduledTask> tasks) throws Exception {
-    expectLogOp(Op.saveTasks(new SaveTasks(tasks)));
-  }
-
   private Iterable<Entry> toEntries(LogEntry... entries) {
     return Iterables.transform(Arrays.asList(entries),
         new Function<LogEntry, Entry>() {
@@ -295,15 +282,17 @@ public class SchedulerIT extends BaseZooKeeperTest {
     ScheduledTask transactionTask = makeTask("transactionTask", ScheduleStatus.RUNNING);
     Iterable<Entry> recoveredEntries = toEntries(
         LogEntry.snapshot(new Snapshot().setTasks(ImmutableSet.of(snapshotTask))),
-        LogEntry.transaction(new Transaction().setOps(ImmutableList.of(
-            Op.saveTasks(new SaveTasks(ImmutableSet.of(transactionTask)))))));
+        LogEntry.transaction(new Transaction().setOps(
+            ImmutableList.of(Op.saveTasks(new SaveTasks(ImmutableSet.of(transactionTask)))))));
 
     expect(log.open()).andReturn(logStream);
     expect(logStream.readAll()).andReturn(recoveredEntries.iterator()).anyTimes();
     // An empty saveTasks is an artifact of the fact that mutateTasks always writes a log operation
     // even if nothing is changed.
-    expectSaveTasks(ImmutableSet.<ScheduledTask>of());
-    expectLogOp(Op.saveFrameworkId(new SaveFrameworkId(FRAMEWORK_ID)));
+    streamMatcher.expectTransaction(Op.saveTasks(new SaveTasks(ImmutableSet.<ScheduledTask>of())))
+        .andReturn(nextPosition());
+    streamMatcher.expectTransaction(Op.saveFrameworkId(new SaveFrameworkId(FRAMEWORK_ID)))
+        .andReturn(nextPosition());
 
     logStream.close();
     expectLastCall().anyTimes();
@@ -331,27 +320,5 @@ public class SchedulerIT extends BaseZooKeeperTest {
 
     // TODO(William Farner): Send a thrift RPC to the scheduler.
     // TODO(William Farner): Also send an admin thrift RPC to verify capability (e.g. ROOT) mapping.
-  }
-
-  private class LogOpMatcher implements IArgumentMatcher {
-    private final LogEntry expected;
-
-    LogOpMatcher(Op expected) {
-      this.expected = LogEntry.transaction(new Transaction().setOps(ImmutableList.of(expected)));
-    }
-
-    @Override
-    public boolean matches(Object argument) {
-      try {
-        return expected.equals(ThriftBinaryCodec.decodeNonNull(LogEntry.class, (byte[]) argument));
-      } catch (CodingException e) {
-        return false;
-      }
-    }
-
-    @Override
-    public void appendTo(StringBuffer buffer) {
-      buffer.append(expected);
-    }
   }
 }
