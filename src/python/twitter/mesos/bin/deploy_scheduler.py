@@ -11,6 +11,8 @@ from twitter.common.log import LogOptions
 from twitter.mesos.clusters import Cluster
 from twitter.mesos.deploy import Builder, Deployer
 
+from audubondata import Server
+
 
 class SchedulerManager(object):
   class ConflictingBuilds(Exception): pass
@@ -45,22 +47,18 @@ class SchedulerManager(object):
       if not self._really_deploy:
         self._machines = ['[dummy-host1]', '[dummy-host2]', '[dummy-host3]']
       else:
-        params = dict(
-          dc = self._cluster.dc,
-          role = self._cluster.scheduler_role
-        )
-        if self._cluster.is_colonized:
-          cmd = "colony --server=colony.%(dc)s.twitter.com 'membersOf audubon.role.%(role)s'" % (
-              params)
-        else:
-          cmd = 'loony --dc=%(dc)s --group=role:%(role)s --one-column' % params
-
-        result, (output, _) = self._deployer.run_cmd(['ssh', app.get_options().tunnel_host, cmd])
-        if result != 0:
-          log.error("Failed to determine scheduler hosts for dc: %(dc)s role: %(role)s"
-              % params)
+        try:
+          machines = Server.match_group('role', value=self._cluster.scheduler_role, datacenter=self._cluster.dc)
+        except Server.NotFound:
+          log.error("Failed to determine scheduler hosts in dc: %s under role: %s" %
+              (self._cluster.dc, self._cluster.scheduler_role))
           sys.exit(1)
-        self._machines = [host.strip() for host in output.splitlines()]
+        self._machines = []
+        for machine in machines:
+          if not machine.attribute('unmonitored'):
+            self._machines.append(machine.hostname)
+          else:
+            log.info("Ignoring unmonitored host: %s" % machine.hostname)
     return self._machines
 
   def fetch_scheduler_http(self, host, endpoint):

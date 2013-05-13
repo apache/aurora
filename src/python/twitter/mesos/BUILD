@@ -72,7 +72,9 @@ python_binary(
     pants(':clusters'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/dirutil'),
+    pants('src/python/twitter/common/log'),
     pants('src/python/twitter/mesos/deploy'),
+    python_requirement('audubondata'),
   ]
 )
 
