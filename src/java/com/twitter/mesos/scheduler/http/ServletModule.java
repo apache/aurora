@@ -72,7 +72,11 @@ public class ServletModule extends AbstractModule {
         bind(HttpStatsFilter.class).in(Singleton.class);
         filter("/scheduler*").through(HttpStatsFilter.class);
         bind(LeaderRedirectFilter.class).in(Singleton.class);
+        registerJerseyEndpoint("/cron", Cron.class);
+        registerJerseyEndpoint("/maintenance", Maintenance.class);
         registerJerseyEndpoint("/mname", Mname.class);
+        registerJerseyEndpoint("/offers", Offers.class);
+        registerJerseyEndpoint("/quotas", Quotas.class);
         registerJerseyEndpoint(
             "/scheduler",
             SchedulerzHome.class,
@@ -81,9 +85,6 @@ public class ServletModule extends AbstractModule {
         registerJerseyEndpoint("/slaves", Slaves.class);
         registerJerseyEndpoint("/structdump", StructDump.class);
         registerJerseyEndpoint("/utilization", Utilization.class);
-        registerJerseyEndpoint("/cron", Cron.class);
-        registerJerseyEndpoint("/offers", Offers.class);
-        registerJerseyEndpoint("/maintenance", Maintenance.class);
       }
     });
 

@@ -1,5 +1,6 @@
 package com.twitter.mesos.scheduler.storage;
 
+import java.util.Map;
 import java.util.Set;
 
 import javax.annotation.Nullable;
@@ -194,8 +195,8 @@ public class ForwardingStore implements
   }
 
   @Override
-  public Set<String> fetchQuotaRoles() {
-    return quotaStore.fetchQuotaRoles();
+  public Map<String, Quota> fetchQuotas() {
+    return quotaStore.fetchQuotas();
   }
 
   @Override

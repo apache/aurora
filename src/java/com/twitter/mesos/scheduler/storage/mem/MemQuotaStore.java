@@ -1,12 +1,12 @@
 package com.twitter.mesos.scheduler.storage.mem;
 
-import java.util.Set;
+import java.util.Map;
 
 import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 
 import com.twitter.mesos.gen.Quota;
@@ -63,7 +63,7 @@ public class MemQuotaStore implements QuotaStore.Mutable.Transactioned {
   }
 
   @Override
-  public Set<String> fetchQuotaRoles() {
-    return ImmutableSet.copyOf(quotas.keySet());
+  public Map<String, Quota> fetchQuotas() {
+    return ImmutableMap.copyOf(Maps.transformValues(quotas, DEEP_COPY));
   }
 }

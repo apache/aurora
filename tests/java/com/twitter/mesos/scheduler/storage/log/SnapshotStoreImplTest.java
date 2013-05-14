@@ -2,7 +2,7 @@ package com.twitter.mesos.scheduler.storage.log;
 
 import java.util.Set;
 
-import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
 import org.junit.Before;
@@ -59,8 +59,8 @@ public class SnapshotStoreImplTest extends EasyMockTest {
 
     storageUtil.expectTransactions();
     expect(storageUtil.taskStore.fetchTasks(Query.GET_ALL)).andReturn(tasks);
-    expect(storageUtil.quotaStore.fetchQuotaRoles()).andReturn(ImmutableSet.of("steve"));
-    expect(storageUtil.quotaStore.fetchQuota("steve")).andReturn(Optional.of(Quotas.NO_QUOTA));
+    expect(storageUtil.quotaStore.fetchQuotas())
+        .andReturn(ImmutableMap.of("steve", Quotas.NO_QUOTA));
     expect(storageUtil.attributeStore.getHostAttributes()).andReturn(ImmutableSet.of(attribute));
     expect(storageUtil.jobStore.fetchManagerIds()).andReturn(ImmutableSet.of("jobManager"));
     expect(storageUtil.jobStore.fetchJobs("jobManager"))

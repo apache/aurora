@@ -1,6 +1,6 @@
 package com.twitter.mesos.scheduler.storage;
 
-import java.util.Set;
+import java.util.Map;
 
 import com.google.common.base.Optional;
 
@@ -19,11 +19,11 @@ public interface QuotaStore {
   Optional<Quota> fetchQuota(String role);
 
   /**
-   * Fetches all roles that have been assigned quotas.
+   * Fetches all allocated quotas.
    *
-   * @return All roles with quota.
+   * @return All allocated quotas.
    */
-  Set<String> fetchQuotaRoles();
+  Map<String, Quota> fetchQuotas();
 
   public interface Mutable extends QuotaStore {
 

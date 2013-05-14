@@ -1,6 +1,7 @@
 package com.twitter.mesos.scheduler.storage.log;
 
 import java.util.Arrays;
+import java.util.Map;
 import java.util.logging.Logger;
 
 import com.google.common.collect.ImmutableSet;
@@ -9,6 +10,7 @@ import com.google.inject.Inject;
 import com.twitter.common.util.Clock;
 import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.storage.JobUpdateConfiguration;
 import com.twitter.mesos.gen.storage.QuotaConfiguration;
 import com.twitter.mesos.gen.storage.SchedulerMetadata;
@@ -125,9 +127,8 @@ public final class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
       new SnapshotField() {
         @Override public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
           ImmutableSet.Builder<QuotaConfiguration> quotas = ImmutableSet.builder();
-          for (String role : store.getQuotaStore().fetchQuotaRoles()) {
-            quotas.add(
-                new QuotaConfiguration(role, store.getQuotaStore().fetchQuota(role).get()));
+          for (Map.Entry<String, Quota> entry : store.getQuotaStore().fetchQuotas().entrySet()) {
+            quotas.add(new QuotaConfiguration(entry.getKey(), entry.getValue()));
           }
 
           snapshot.setQuotaConfigurations(quotas.build());

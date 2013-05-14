@@ -61,8 +61,9 @@ import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 import com.twitter.mesos.gen.CreateJobResponse;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
-import com.twitter.mesos.gen.MesosSchedulerManager;
+import com.twitter.mesos.gen.MesosAdmin;
 import com.twitter.mesos.gen.Package;
+import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.SessionKey;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.storage.Snapshot;
@@ -80,8 +81,6 @@ import com.twitter.mesos.scheduler.storage.Storage.MutateWork.NoResult.Quiet;
 import com.twitter.mesos.scheduler.storage.Storage.NonVolatileStorage;
 import com.twitter.mesos.scheduler.storage.mem.MemStorageModule;
 import com.twitter.mesos.scheduler.testing.FakeDriverFactory.FakeSchedulerDriver;
-
-import static com.twitter.mesos.gen.MesosAdmin.Iface;
 
 /**
  * A module that binds a fake mesos driver factory and a volatile storage system.
@@ -125,14 +124,14 @@ public class IsolatedSchedulerModule extends AbstractModule {
     };
 
     private final Provider<Scheduler> scheduler;
-    private final MesosSchedulerManager.Iface thrift;
+    private final MesosAdmin.Iface thrift;
     private final ScheduledExecutorService executor;
     private final SchedulerDriver driver;
 
     @Inject
     FakeClusterRunner(
         Provider<Scheduler> scheduler,
-        Iface thrift,
+        MesosAdmin.Iface thrift,
         ShutdownRegistry shutdownRegistry) {
 
       this.scheduler = scheduler;
@@ -192,6 +191,18 @@ public class IsolatedSchedulerModule extends AbstractModule {
       });
     }
 
+    private void setQuotas() {
+      executor.submit(new Runnable() {
+        @Override public void run() {
+          try {
+            thrift.setQuota("mesos", new Quota(2.0, 1024, 2048), sessionKey("mesos"));
+          } catch (TException e) {
+            throw Throwables.propagate(e);
+          }
+        }
+      });
+    }
+
     @Subscribe
     public void registered(DriverRegistered event) {
       executor.submit(new Runnable() {
@@ -211,6 +222,7 @@ public class IsolatedSchedulerModule extends AbstractModule {
         }
       });
 
+      setQuotas();
       offerClusterResources();
       // Send the offers again, since the first batch of offers will be consumed by GC executors.
       offerClusterResources();
@@ -271,14 +283,14 @@ public class IsolatedSchedulerModule extends AbstractModule {
               .setThermosConfig("opaque".getBytes()));
     }
 
+    private SessionKey sessionKey(String user) {
+      return new SessionKey(user, System.currentTimeMillis(), ByteBuffer.wrap("fake".getBytes()));
+    }
+
     private void submitJob(JobConfiguration job) {
-      SessionKey sessionKey = new SessionKey(
-          job.getOwner().getUser(),
-          System.currentTimeMillis(),
-          ByteBuffer.wrap("fake".getBytes()));
       CreateJobResponse response;
       try {
-        response = thrift.createJob(job, sessionKey);
+        response = thrift.createJob(job, sessionKey(job.getOwner().getUser()));
       } catch (TException e) {
         throw Throwables.propagate(e);
       }
