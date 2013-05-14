@@ -225,10 +225,11 @@ public class SchedulerzJob extends JerseyTemplateServlet {
             details.put(constraint.getName(), humanReadableConstraint(constraint.getConstraint()));
           }
           if (task.getPackagesSize() > 0) {
+            List<String> packages = Ordering.natural().sortedCopy(
+                Iterables.transform(task.getPackages(), TransformationUtils.PACKAGE_TOSTRING));
             details.put(
                 "packages",
-                Joiner.on(',').join(Iterables.transform(task.getPackages(),
-                                                        TransformationUtils.PACKAGE_TOSTRING)));
+                Joiner.on(',').join(packages));
           }
           return new SchedulingDetails(details.build());
         }
