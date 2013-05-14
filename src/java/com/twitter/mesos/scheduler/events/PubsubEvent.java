@@ -55,6 +55,13 @@ public interface PubsubEvent {
     public int hashCode() {
       return Objects.hashCode(tasks);
     }
+
+    @Override
+    public String toString() {
+      return Objects.toStringHelper(this)
+          .add("tasks", Tasks.ids(tasks))
+          .toString();
+    }
   }
 
   /**
@@ -99,6 +106,15 @@ public interface PubsubEvent {
     @Override
     public int hashCode() {
       return Objects.hashCode(task, oldState);
+    }
+
+    @Override
+    public String toString() {
+      return Objects.toStringHelper(this)
+          .add("task", Tasks.id(task))
+          .add("oldState", getOldState())
+          .add("newState", getNewState())
+          .toString();
     }
   }
 

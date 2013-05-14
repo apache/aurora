@@ -31,6 +31,7 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.StateManager;
 import com.twitter.mesos.scheduler.events.PubsubEvent;
 import com.twitter.mesos.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.mesos.scheduler.storage.testing.StorageTestUtil;
@@ -62,6 +63,7 @@ public class HistoryPrunerTest extends EasyMockTest {
   private ScheduledExecutorService executor;
   private FakeClock clock;
   private StorageTestUtil storageUtil;
+  private StateManager stateManager;
   private HistoryPruner pruner;
 
   @Before
@@ -71,7 +73,14 @@ public class HistoryPrunerTest extends EasyMockTest {
     clock = new FakeClock();
     storageUtil = new StorageTestUtil(this);
     storageUtil.expectTransactions();
-    pruner = new HistoryPruner(executor, storageUtil.storage, clock, ONE_DAY, PER_JOB_HISTORY);
+    stateManager = createMock(StateManager.class);
+    pruner = new HistoryPruner(
+        executor,
+        storageUtil.storage,
+        stateManager,
+        clock,
+        ONE_DAY,
+        PER_JOB_HISTORY);
   }
 
   @After
@@ -149,12 +158,12 @@ public class HistoryPrunerTest extends EasyMockTest {
     // Cancel future and delete pruned task "a" asynchronously.
     expectAsyncTaskDelete();
     expectCancelFuture();
-    storageUtil.taskStore.deleteTasks(Tasks.ids(a));
+    stateManager.deleteTasks(Tasks.ids(a));
 
     // Cancel future and delete pruned task "b" asynchronously.
     expectAsyncTaskDelete();
     expectCancelFuture();
-    storageUtil.taskStore.deleteTasks(Tasks.ids(b));
+    stateManager.deleteTasks(Tasks.ids(b));
 
     expectAsyncTaskDelete();
     expectCancelFuture().times(3);
@@ -192,7 +201,7 @@ public class HistoryPrunerTest extends EasyMockTest {
     Capture<Runnable> delayedDelete = expectDelayedTaskDeletion();
 
     // Expect task "a" to be pruned when future is activated.
-    storageUtil.taskStore.deleteTasks(ImmutableSet.of("a"));
+    stateManager.deleteTasks(ImmutableSet.of("a"));
 
     control.replay();
 
@@ -212,7 +221,7 @@ public class HistoryPrunerTest extends EasyMockTest {
     // Cancel future and delete task "a" asynchronously when history goal is exceeded.
     expectAsyncTaskDelete();
     expectCancelFuture();
-    storageUtil.taskStore.deleteTasks(ImmutableSet.of("a"));
+    stateManager.deleteTasks(ImmutableSet.of("a"));
 
     expectAsyncTaskDelete();
     expectCancelFuture().times(2);
@@ -305,6 +314,7 @@ public class HistoryPrunerTest extends EasyMockTest {
     return new HistoryPruner(
         realExecutor,
         storageUtil.storage,
+        stateManager,
         clock,
         Amount.of(1L, Time.MILLISECONDS),
         PER_JOB_HISTORY);
@@ -331,7 +341,7 @@ public class HistoryPrunerTest extends EasyMockTest {
     eventDispatch.setName(getClass().getName() + "-EventDispatch");
     eventDispatch.start();
 
-    storageUtil.taskStore.deleteTasks(ImmutableSet.of(taskId));
+    stateManager.deleteTasks(ImmutableSet.of(taskId));
     expectLastCall().andAnswer(new IAnswer<Void>() {
       @Override public Void answer() {
         deleteCalled.countDown();

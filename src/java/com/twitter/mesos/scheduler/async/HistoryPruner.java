@@ -32,9 +32,8 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.Query;
+import com.twitter.mesos.scheduler.StateManager;
 import com.twitter.mesos.scheduler.storage.Storage;
-import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
-import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -84,6 +83,7 @@ public class HistoryPruner implements EventSubscriber {
   HistoryPruner(
       final ScheduledExecutorService executor,
       final Storage storage,
+      final StateManager stateManager,
       final Clock clock,
       @PruneThreshold Amount<Long, Time> inactivePruneThreshold,
       @PruneThreshold int perJobHistoryGoal) {
@@ -97,11 +97,7 @@ public class HistoryPruner implements EventSubscriber {
         executor.submit(new Runnable() {
           @Override public void run() {
             LOG.info("Pruning inactive tasks " + taskIds);
-            storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
-              @Override protected void execute(MutableStoreProvider storeProvider) {
-                storeProvider.getUnsafeTaskStore().deleteTasks(taskIds);
-              }
-            });
+            stateManager.deleteTasks(taskIds);
           }
         });
       }

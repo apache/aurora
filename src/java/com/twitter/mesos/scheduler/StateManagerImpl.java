@@ -731,8 +731,7 @@ public class StateManagerImpl implements StateManager {
             break;
 
           case DELETE:
-            // TODO(wfarner): Bug: this should generate a pubsub event.  Test/fix.
-            taskStore.deleteTasks(ImmutableSet.of(taskId));
+            deleteTasks(ImmutableSet.of(taskId));
             break;
 
           case INCREMENT_FAILURES:
