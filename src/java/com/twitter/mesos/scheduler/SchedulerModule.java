@@ -43,6 +43,7 @@ import com.twitter.common_internal.zookeeper.TwitterServerSet.Service;
 import com.twitter.common_internal.zookeeper.legacy.ServerSetMigrationModule.ServiceDiscovery;
 import com.twitter.mesos.GuiceUtils;
 import com.twitter.mesos.auth.AuthBindings;
+import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.CronJobManager.CronScheduler;
 import com.twitter.mesos.scheduler.CronJobManager.CronScheduler.Cron4jScheduler;
 import com.twitter.mesos.scheduler.Driver.DriverImpl;
@@ -159,6 +160,8 @@ public class SchedulerModule extends AbstractModule {
 
     bind(Scheduler.class).to(MesosSchedulerImpl.class);
     bind(MesosSchedulerImpl.class).in(Singleton.class);
+
+    bind(new TypeLiteral<Function<TwitterTaskInfo, String>>() { }).to(TaskIdGenerator.class);
 
     // Bindings for StateManager
     bind(StateManager.class).to(StateManagerImpl.class);

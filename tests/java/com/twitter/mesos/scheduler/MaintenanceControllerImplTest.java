@@ -176,7 +176,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
   private void saveTask(final ScheduledTask task) {
     storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getTaskStore().saveTasks(ImmutableSet.of(task));
+        storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(task));
       }
     });
   }

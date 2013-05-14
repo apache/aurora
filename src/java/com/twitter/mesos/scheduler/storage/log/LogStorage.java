@@ -165,7 +165,11 @@ public class LogStorage extends ForwardingStore
       return LogStorage.this;
     }
 
-    @Override public TaskStore.Mutable getTaskStore() {
+    @Override public TaskStore getTaskStore() {
+      return LogStorage.this;
+    }
+
+    @Override public TaskStore.Mutable getUnsafeTaskStore() {
       return LogStorage.this;
     }
 

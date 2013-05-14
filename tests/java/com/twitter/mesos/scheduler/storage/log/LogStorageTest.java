@@ -387,10 +387,10 @@ public class LogStorageTest extends EasyMockTest {
       @Override protected void performMutations() {
         logStorage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
           @Override protected void execute(MutableStoreProvider provider) {
-            assertEquals(mutated, provider.getTaskStore().mutateTasks(query, mutation));
+            assertEquals(mutated, provider.getUnsafeTaskStore().mutateTasks(query, mutation));
             logStorage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
               @Override protected void execute(MutableStoreProvider innerProvider) {
-                innerProvider.getTaskStore().deleteTasks(tasksToRemove);
+                innerProvider.getUnsafeTaskStore().deleteTasks(tasksToRemove);
               }
             });
           }

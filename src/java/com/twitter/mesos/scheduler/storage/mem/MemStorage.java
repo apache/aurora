@@ -50,7 +50,11 @@ public class MemStorage implements Storage {
         return jobStore;
       }
 
-      @Override public TaskStore.Mutable getTaskStore() {
+      @Override public TaskStore getTaskStore() {
+        return taskStore;
+      }
+
+      @Override public TaskStore.Mutable getUnsafeTaskStore() {
         return taskStore;
       }
 

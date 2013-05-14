@@ -171,7 +171,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   private void insertTasks(final ScheduledTask task, final ScheduledTask... tasks) {
     storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider store) {
-        store.getTaskStore().saveTasks(
+        store.getUnsafeTaskStore().saveTasks(
             ImmutableSet.<ScheduledTask>builder().add(task).add(tasks).build());
       }
     });

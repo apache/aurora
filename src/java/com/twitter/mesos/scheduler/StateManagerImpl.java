@@ -82,6 +82,7 @@ public class StateManagerImpl implements StateManager {
 
   @VisibleForTesting
   final TransactionalStorage txStorage;
+  private final Function<TwitterTaskInfo, String> taskIdGenerator;
 
   // TODO(William Farner): Eliminate this and update all callers to use Storage directly.
   interface ReadOnlyStorage {
@@ -114,9 +115,11 @@ public class StateManagerImpl implements StateManager {
   private final Function<TwitterTaskInfo, ScheduledTask> taskCreator =
       new Function<TwitterTaskInfo, ScheduledTask>() {
         @Override public ScheduledTask apply(TwitterTaskInfo task) {
+          AssignedTask assigned =
+              new AssignedTask().setTaskId(taskIdGenerator.apply(task)).setTask(task);
           return new ScheduledTask()
               .setStatus(INIT)
-              .setAssignedTask(new AssignedTask().setTaskId(generateTaskId(task)).setTask(task));
+              .setAssignedTask(assigned);
         }
       };
 
@@ -143,6 +146,7 @@ public class StateManagerImpl implements StateManager {
       final Storage storage,
       final Clock clock,
       Driver driver,
+      Function<TwitterTaskInfo, String> taskIdGenerator,
       Closure<PubsubEvent> taskEventSink) {
 
     checkNotNull(storage);
@@ -163,6 +167,7 @@ public class StateManagerImpl implements StateManager {
     };
 
     this.driver = checkNotNull(driver);
+    this.taskIdGenerator = checkNotNull(taskIdGenerator);
 
     Stats.exportSize("work_queue_depth", workQueue);
   }
@@ -180,7 +185,7 @@ public class StateManagerImpl implements StateManager {
 
     txStorage.doInWriteTransaction(txStorage.new NoResultSideEffectWork() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getTaskStore().saveTasks(scheduledTasks);
+        storeProvider.getUnsafeTaskStore().saveTasks(scheduledTasks);
 
         for (ScheduledTask task : scheduledTasks) {
           createStateMachine(task).updateState(PENDING);
@@ -401,24 +406,6 @@ public class StateManagerImpl implements StateManager {
     changeState(Query.byId(taskId), mutation);
 
     return mutation.getAssignedTask();
-  }
-
-  /**
-   * Fetches all tasks that match a query.
-   * TODO(William Farner): Remove this method and update callers to invoke storage directly.
-   *
-   * @param query Query to perform.
-   * @return A read-only view of the tasks matching the query.
-   */
-  @Override
-  public Set<ScheduledTask> fetchTasks(final TaskQuery query) {
-    checkNotNull(query);
-
-    return readOnlyStorage.doInTransaction(new Work.Quiet<Set<ScheduledTask>>() {
-      @Override public Set<ScheduledTask> apply(StoreProvider storeProvider) {
-        return storeProvider.getTaskStore().fetchTasks(query);
-      }
-    });
   }
 
   @VisibleForTesting
@@ -686,28 +673,6 @@ public class StateManagerImpl implements StateManager {
     };
   }
 
-  /**
-   * Creates a new task ID that is permanently unique (not guaranteed, but highly confident),
-   * and by default sorts in chronological order.
-   *
-   * @param task Task that an ID is being generated for.
-   * @return New task ID.
-   */
-  private String generateTaskId(TwitterTaskInfo task) {
-    String sep = "-";
-    return new StringBuilder()
-        .append(clock.nowMillis())               // Allows chronological sorting.
-        .append(sep)
-        .append(task.getOwner().getRole())       // Identification and collision prevention.
-        .append(sep)
-        .append(task.getJobName())
-        .append(sep)
-        .append(task.getShardId())               // Collision prevention within job.
-        .append(sep)
-        .append(UUID.randomUUID())               // Just-in-case collision prevention.
-        .toString().replaceAll("[^\\w-]", sep);  // Constrain character set.
-  }
-
   private void processWorkQueueInTransaction(
       SideEffectWork<?, ?> sideEffectWork,
       MutableStoreProvider storeProvider) {
@@ -718,7 +683,7 @@ public class StateManagerImpl implements StateManager {
       if (work.command == WorkCommand.KILL) {
         driver.killTask(stateMachine.getTaskId());
       } else {
-        TaskStore.Mutable taskStore = storeProvider.getTaskStore();
+        TaskStore.Mutable taskStore = storeProvider.getUnsafeTaskStore();
         String taskId = stateMachine.getTaskId();
         TaskQuery idQuery = Query.byId(taskId);
 
@@ -731,7 +696,7 @@ public class StateManagerImpl implements StateManager {
             task.getAssignedTask().unsetAssignedPorts();
             task.unsetTaskEvents();
             task.setAncestorId(taskId);
-            String newTaskId = generateTaskId(task.getAssignedTask().getTask());
+            String newTaskId = taskIdGenerator.apply(task.getAssignedTask().getTask());
             task.getAssignedTask().setTaskId(newTaskId);
 
             LOG.info("Task being rescheduled: " + taskId);
@@ -766,6 +731,7 @@ public class StateManagerImpl implements StateManager {
             break;
 
           case DELETE:
+            // TODO(wfarner): Bug: this should generate a pubsub event.  Test/fix.
             taskStore.deleteTasks(ImmutableSet.of(taskId));
             break;
 
@@ -784,12 +750,24 @@ public class StateManagerImpl implements StateManager {
     }
   }
 
+  @Override
+  public void deleteTasks(final Set<String> taskIds) {
+    txStorage.doInWriteTransaction(txStorage.new NoResultSideEffectWork() {
+      @Override protected void execute(final MutableStoreProvider storeProvider) {
+        TaskStore.Mutable taskStore = storeProvider.getUnsafeTaskStore();
+        Iterable<ScheduledTask> tasks = taskStore.fetchTasks(Query.byId(taskIds));
+        addTaskEvent(new PubsubEvent.TasksDeleted(ImmutableSet.copyOf(tasks)));
+        taskStore.deleteTasks(taskIds);
+      }
+    });
+  }
+
   private void maybeRescheduleForUpdate(
       MutableStoreProvider storeProvider,
       String taskId,
       boolean rollingBack) {
 
-    TaskStore.Mutable taskStore = storeProvider.getTaskStore();
+    TaskStore.Mutable taskStore = storeProvider.getUnsafeTaskStore();
 
     TwitterTaskInfo oldConfig = Tasks.SCHEDULED_TO_INFO.apply(
         Iterables.getOnlyElement(taskStore.fetchTasks(Query.byId(taskId))));

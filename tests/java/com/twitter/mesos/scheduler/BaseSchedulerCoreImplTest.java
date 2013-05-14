@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import javax.annotation.Nullable;
 
@@ -28,6 +29,7 @@ import com.google.common.collect.Sets;
 
 import org.apache.mesos.Protos.SlaveID;
 import org.easymock.EasyMock;
+import org.easymock.IAnswer;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -109,6 +111,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private static final String SLAVE_HOST_1 = "SlaveHost1";
 
   private Driver driver;
+  private Function<TwitterTaskInfo, String> taskIdGenerator;
   private StateManagerImpl stateManager;
   private Storage storage;
   private SchedulerCoreImpl scheduler;
@@ -121,6 +124,17 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   @Before
   public void setUp() throws Exception {
     driver = createMock(Driver.class);
+
+    // TODO(William Farner): Set up explicit expectations for calls to generate task IDs.
+    taskIdGenerator = createMock(new Clazz<Function<TwitterTaskInfo, String>>() { });
+    final AtomicLong idCounter = new AtomicLong();
+    expect(taskIdGenerator.apply(EasyMock.<TwitterTaskInfo>anyObject())).andAnswer(
+        new IAnswer<String>() {
+          @Override public String answer() throws Throwable {
+            return "task-" + idCounter.incrementAndGet();
+          }
+        }).anyTimes();
+
     clock = new FakeClock();
     eventSink = createMock(new Clazz<Closure<PubsubEvent>>() { });
     eventSink.execute(EasyMock.<PubsubEvent>anyObject());
@@ -158,7 +172,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     ImmediateJobManager immediateManager = new ImmediateJobManager(storage);
     cron = new CronJobManager(storage, cronScheduler);
-    stateManager = new StateManagerImpl(storage, clock, driver, eventSink);
+    stateManager = new StateManagerImpl(storage, clock, driver, taskIdGenerator, eventSink);
     quotaManager = new QuotaManagerImpl(storage);
     scheduler = new SchedulerCoreImpl(
         storage,
@@ -279,7 +293,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getTaskStore().saveTasks(ImmutableSet.of(
+        storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(
             new ScheduledTask()
                 .setStatus(PENDING)
                 .setAssignedTask(
@@ -357,7 +371,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getTaskStore().saveTasks(badTasks);
+        storeProvider.getUnsafeTaskStore().saveTasks(badTasks);
       }
     });
 

@@ -57,10 +57,10 @@ public final class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         }
 
         @Override public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
-          store.getTaskStore().deleteAllTasks();
+          store.getUnsafeTaskStore().deleteAllTasks();
 
           if (snapshot.isSetTasks()) {
-            store.getTaskStore().saveTasks(snapshot.getTasks());
+            store.getUnsafeTaskStore().saveTasks(snapshot.getTasks());
           }
         }
       },

@@ -99,11 +99,11 @@ public final class StorageBackfill {
     backfillJobDefaults(storeProvider.getJobStore());
 
     LOG.info("Performing shard uniqueness sanity check.");
-    storeProvider.getTaskStore().mutateTasks(Query.GET_ALL, new Closure<ScheduledTask>() {
+    storeProvider.getUnsafeTaskStore().mutateTasks(Query.GET_ALL, new Closure<ScheduledTask>() {
       @Override public void execute(final ScheduledTask task) {
         ConfigurationManager.applyDefaultsIfUnset(task.getAssignedTask().getTask());
         guaranteeTaskHasEvents(task, clock);
-        guaranteeShardUniqueness(task, storeProvider.getTaskStore(), clock);
+        guaranteeShardUniqueness(task, storeProvider.getUnsafeTaskStore(), clock);
       }
     });
   }

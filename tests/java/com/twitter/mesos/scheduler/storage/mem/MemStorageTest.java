@@ -124,7 +124,7 @@ public class MemStorageTest extends TearDownTestCase {
   public void testTransactions() {
     expectWriteFail(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getTaskStore().saveTasks(ImmutableSet.of(makeTask("a"), makeTask("b")));
+        storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("a"), makeTask("b")));
         throw new CustomException();
       }
     });
@@ -132,14 +132,14 @@ public class MemStorageTest extends TearDownTestCase {
 
     storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getTaskStore().saveTasks(ImmutableSet.of(makeTask("a"), makeTask("b")));
+        storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("a"), makeTask("b")));
       }
     });
     expectTasks("a", "b");
 
     expectWriteFail(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getTaskStore().deleteAllTasks();
+        storeProvider.getUnsafeTaskStore().deleteAllTasks();
         throw new CustomException();
       }
     });
@@ -147,8 +147,8 @@ public class MemStorageTest extends TearDownTestCase {
 
     expectWriteFail(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
-        ScheduledTask a =
-            Iterables.getOnlyElement(storeProvider.getTaskStore().fetchTasks(Query.byId("a")));
+        ScheduledTask a = Iterables.getOnlyElement(
+            storeProvider.getUnsafeTaskStore().fetchTasks(Query.byId("a")));
         a.setStatus(ScheduleStatus.RUNNING)
             .setAncestorId("z");
         throw new CustomException();
@@ -168,10 +168,10 @@ public class MemStorageTest extends TearDownTestCase {
     // Nested transaction where inner transaction fails.
     expectWriteFail(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getTaskStore().saveTasks(ImmutableSet.of(makeTask("c")));
+        storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("c")));
         storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
           @Override protected void execute(MutableStoreProvider storeProvider) {
-            storeProvider.getTaskStore().saveTasks(ImmutableSet.of(makeTask("d")));
+            storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("d")));
             throw new CustomException();
           }
         });
@@ -182,10 +182,10 @@ public class MemStorageTest extends TearDownTestCase {
     // Nested transaction where outer transaction fails.
     expectWriteFail(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getTaskStore().saveTasks(ImmutableSet.of(makeTask("c")));
+        storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("c")));
         storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
           @Override protected void execute(MutableStoreProvider storeProvider) {
-            storeProvider.getTaskStore().saveTasks(ImmutableSet.of(makeTask("d")));
+            storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("d")));
           }
         });
         throw new CustomException();

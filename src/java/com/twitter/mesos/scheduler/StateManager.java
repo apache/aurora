@@ -8,23 +8,12 @@ import org.apache.mesos.Protos.SlaveID;
 
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduleStatus;
-import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 
 /**
  * Thin interface for the state manager.
  */
 public interface StateManager {
-
-  /**
-   * Fetches tasks matching a query.
-   *
-   * @param query Query to perform.
-   * @return Tasks found matching the query.
-   * @deprecated Please perform queries directly on a Storage instance.
-   */
-  @Deprecated
-  Set<ScheduledTask> fetchTasks(TaskQuery query);
 
   /**
    * Performs a simple state change, transitioning all tasks matching a query to the given
@@ -56,4 +45,14 @@ public interface StateManager {
       String slaveHost,
       SlaveID slaveId,
       Set<Integer> assignedPorts);
+
+  /**
+   * Deletes records of tasks from the task store.
+   * This will not perform any state checking or state transitions, but will immediately remove
+   * the tasks from the store.  It will also silently ignore attempts to delete task IDs that do
+   * not exist.
+   *
+   * @param taskIds IDs of tasks to delete.
+   */
+  void deleteTasks(final Set<String> taskIds);
 }

@@ -197,15 +197,15 @@ public class StorageBenchmark extends AbstractApplication {
     Storage storage = MemStorage.newEmptyStorage();
     storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getTaskStore().saveTasks(
+        storeProvider.getUnsafeTaskStore().saveTasks(
             replicate(
                 makeTask(QUERIED_ROLE_NAME, QUERIED_JOB_NAME).setStatus(ScheduleStatus.RUNNING),
                 stage.active));
-        storeProvider.getTaskStore().saveTasks(
+        storeProvider.getUnsafeTaskStore().saveTasks(
             replicate(
                 makeTask(QUERIED_ROLE_NAME, QUERIED_JOB_NAME).setStatus(ScheduleStatus.FINISHED),
                 stage.inactive));
-        storeProvider.getTaskStore().saveTasks(
+        storeProvider.getUnsafeTaskStore().saveTasks(
             replicate(
                 makeTask(DORMANT_ROLE_NAME, DORMANT_JOB_NAME).setStatus(ScheduleStatus.RUNNING),
                 stage.dormant));

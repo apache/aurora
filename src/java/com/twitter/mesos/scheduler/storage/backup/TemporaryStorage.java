@@ -60,7 +60,7 @@ interface TemporaryStorage {
         @Override public void deleteTasks(final TaskQuery query) {
           storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
             @Override protected void execute(MutableStoreProvider storeProvider) {
-              storeProvider.getTaskStore()
+              storeProvider.getUnsafeTaskStore()
                   .deleteTasks(storeProvider.getTaskStore().fetchTaskIds(query));
             }
           });

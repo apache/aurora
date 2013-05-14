@@ -77,6 +77,7 @@ public class StorageTestUtil {
 
   private <T> IExpectationSetters<T> expectWriteTransaction() {
     expect(mutableStoreProvider.getTaskStore()).andReturn(taskStore).anyTimes();
+    expect(mutableStoreProvider.getUnsafeTaskStore()).andReturn(taskStore).anyTimes();
     expect(mutableStoreProvider.getQuotaStore()).andReturn(quotaStore).anyTimes();
     expect(mutableStoreProvider.getAttributeStore()).andReturn(attributeStore).anyTimes();
     expect(mutableStoreProvider.getJobStore()).andReturn(jobStore).anyTimes();

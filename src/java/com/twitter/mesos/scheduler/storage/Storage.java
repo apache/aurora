@@ -30,7 +30,22 @@ public interface Storage {
   interface MutableStoreProvider extends StoreProvider {
     SchedulerStore.Mutable getSchedulerStore();
     JobStore.Mutable getJobStore();
-    TaskStore.Mutable getTaskStore();
+
+    /**
+     * Gets access to the mutable task store.
+     * <p>
+     * This is labeled as unsafe, since it's rare that a caller should be using this.  In most
+     * cases, mutations to the task store should be done through
+     * {@link com.twitter.mesos.scheduler.StateManager}.
+     * <p>
+     * TODO(William Farner): Come up with a way to restrict access to this interface.  As it stands,
+     * it's trivial for an unsuspecting caller to modify the task store directly and subvert the
+     * state machine and side effect systems.
+     *
+     * @return The mutable task store.
+     */
+    TaskStore.Mutable getUnsafeTaskStore();
+
     UpdateStore.Mutable getUpdateStore();
     QuotaStore.Mutable getQuotaStore();
     AttributeStore.Mutable getAttributeStore();

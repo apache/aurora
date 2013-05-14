@@ -99,7 +99,7 @@ public class HistoryPruner implements EventSubscriber {
             LOG.info("Pruning inactive tasks " + taskIds);
             storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
               @Override protected void execute(MutableStoreProvider storeProvider) {
-                storeProvider.getTaskStore().deleteTasks(taskIds);
+                storeProvider.getUnsafeTaskStore().deleteTasks(taskIds);
               }
             });
           }
