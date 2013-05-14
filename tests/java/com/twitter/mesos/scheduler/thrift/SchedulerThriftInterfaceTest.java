@@ -17,6 +17,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.common.testing.EasyMockTest;
+import com.twitter.common.util.Clock;
+import com.twitter.common.util.testing.FakeClock;
 import com.twitter.mesos.auth.SessionValidator.AuthFailedException;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Constraint;
@@ -118,6 +120,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     // Use guice and install AuthModule to apply AOP-style auth layer.
     Module testModule = new AbstractModule() {
       @Override protected void configure() {
+        bind(Clock.class).toInstance(new FakeClock());
         bind(Storage.class).toInstance(storageUtil.storage);
         bind(SchedulerCore.class).toInstance(scheduler);
         bind(CapabilityValidator.class).toInstance(userValidator);

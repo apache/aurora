@@ -11,6 +11,7 @@ import com.twitter.mesos.scheduler.thrift.auth.AuthModule;
  * Binding module to configure a thrift server.
  */
 public class ThriftModule extends AbstractModule {
+
   @Override
   protected void configure() {
     bind(SchedulerController.class).to(SchedulerThriftInterface.class).in(Singleton.class);

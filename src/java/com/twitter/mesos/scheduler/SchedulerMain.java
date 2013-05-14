@@ -46,7 +46,6 @@ import com.twitter.common_internal.zookeeper.legacy.ServerSetMigrationModule.Ser
 import com.twitter.mesos.scheduler.DriverFactory.DriverFactoryImpl;
 import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl.ExecutorConfig;
 import com.twitter.mesos.scheduler.SchedulerLifecycle.ShutdownOnDriverExit;
-import com.twitter.mesos.scheduler.SchedulerModule.AuthMode;
 import com.twitter.mesos.scheduler.log.mesos.MesosLogStreamModule;
 import com.twitter.mesos.scheduler.storage.backup.BackupModule;
 import com.twitter.mesos.scheduler.storage.log.LogStorageModule;
@@ -69,9 +68,6 @@ public class SchedulerMain extends AbstractApplication {
   @NotNull
   @CmdLine(name = "cluster_name", help = "Name to identify the cluster being served.")
   private static final Arg<String> CLUSTER_NAME = Arg.create();
-
-  @CmdLine(name = "auth_mode", help = "Enforces RPC authentication with mesos client.")
-  private static final Arg<AuthMode> AUTH_MODE = Arg.create(AuthMode.SECURE);
 
   @CanRead
   @NotNull
@@ -113,7 +109,6 @@ public class SchedulerMain extends AbstractApplication {
 
   static Iterable<? extends Module> getModules(
       final String clusterName,
-      AuthMode authMode,
       final Optional<InetSocketAddress> zkHost,
       File backupDir,
       Module... additionalModules) {
@@ -127,7 +122,7 @@ public class SchedulerMain extends AbstractApplication {
 
     ImmutableList.Builder<Module> modules = ImmutableList.<Module>builder()
         .addAll(getSystemModules())
-        .add(new SchedulerModule(clusterName, authMode))
+        .add(new SchedulerModule(clusterName))
         .add(new ThriftModule())
         .add(serviceBinder)
         .add(additionalModules);
@@ -197,7 +192,6 @@ public class SchedulerMain extends AbstractApplication {
 
     return getModules(
         CLUSTER_NAME.get(),
-        AUTH_MODE.get(),
         Optional.<InetSocketAddress>absent(),
         BACKUP_DIR.get(),
         configModule,

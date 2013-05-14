@@ -4,7 +4,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.logging.Logger;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
@@ -42,7 +41,6 @@ import com.twitter.common_internal.zookeeper.TwitterServerSet;
 import com.twitter.common_internal.zookeeper.TwitterServerSet.Service;
 import com.twitter.common_internal.zookeeper.legacy.ServerSetMigrationModule.ServiceDiscovery;
 import com.twitter.mesos.GuiceUtils;
-import com.twitter.mesos.auth.AuthBindings;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.CronJobManager.CronScheduler;
 import com.twitter.mesos.scheduler.CronJobManager.CronScheduler.Cron4jScheduler;
@@ -79,19 +77,10 @@ public class SchedulerModule extends AbstractModule {
   @CmdLine(name = "gc_executor_path", help = "Path to the gc executor launch script.")
   private static final Arg<String> GC_EXECUTOR_PATH = Arg.create(null);
 
-  @VisibleForTesting
-  enum AuthMode {
-    UNSECURE,
-    ANGRYBIRD_UNSECURE,
-    SECURE
-  }
-
   private final String clusterName;
-  private final AuthMode authMode;
 
-  SchedulerModule(String clusterName, AuthMode authMode) {
+  SchedulerModule(String clusterName) {
     this.clusterName = clusterName;
-    this.authMode = authMode;
   }
 
   @Override
@@ -112,27 +101,6 @@ public class SchedulerModule extends AbstractModule {
     bind(TaskAssigner.class).to(TaskAssignerImpl.class);
     bind(TaskAssignerImpl.class).in(Singleton.class);
     bind(MesosTaskFactory.class).to(MesosTaskFactoryImpl.class);
-
-    // Bindings for MesosSchedulerImpl.
-    switch(authMode) {
-      case SECURE:
-        LOG.info("Using secure authentication mode");
-        AuthBindings.bindLdapAuth(binder());
-        break;
-
-      case UNSECURE:
-        LOG.warning("Using unsecure authentication mode");
-        AuthBindings.bindTestAuth(binder());
-        break;
-
-      case ANGRYBIRD_UNSECURE:
-        LOG.warning("Using angrybird authentication mode");
-        AuthBindings.bindAngryBirdAuth(binder());
-        break;
-
-       default:
-         throw new IllegalArgumentException("Invalid authentication mode: " + authMode);
-    }
 
     bind(SchedulerCore.class).to(SchedulerCoreImpl.class).in(Singleton.class);
 

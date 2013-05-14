@@ -71,7 +71,6 @@ import com.twitter.mesos.gen.storage.Snapshot;
 import com.twitter.mesos.gen.storage.Transaction;
 import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl.ExecutorConfig;
 import com.twitter.mesos.scheduler.SchedulerLifecycle.ShutdownOnDriverExit;
-import com.twitter.mesos.scheduler.SchedulerModule.AuthMode;
 import com.twitter.mesos.scheduler.log.Log;
 import com.twitter.mesos.scheduler.log.Log.Entry;
 import com.twitter.mesos.scheduler.log.Log.Position;
@@ -169,7 +168,6 @@ public class SchedulerIT extends BaseZooKeeperTest {
     injector = Guice.createInjector(
         SchedulerMain.getModules(
             CLUSTER_NAME,
-            AuthMode.UNSECURE,
             Optional.of(InetSocketAddress.createUnresolved("localhost", getPort())),
             backupDir,
             testModule,
