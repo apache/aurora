@@ -36,6 +36,7 @@ import com.twitter.mesos.gen.TwitterTaskInfo._Fields;
 import com.twitter.mesos.gen.ValueConstraint;
 
 import static com.twitter.mesos.gen.Constants.DEFAULT_ENVIRONMENT;
+import static com.twitter.mesos.gen.Constants.GOOD_IDENTIFIER_PATTERN_JVM;
 
 /**
  * Manages translation from a string-mapped configuration to a concrete configuration type, and
@@ -60,7 +61,7 @@ public final class ConfigurationManager {
 
   private static final Logger LOG = Logger.getLogger(ConfigurationManager.class.getName());
 
-  private static final Pattern GOOD_IDENTIFIER_PATTERN = Pattern.compile("[\\w\\-\\.]+");
+  private static final Pattern GOOD_IDENTIFIER = Pattern.compile(GOOD_IDENTIFIER_PATTERN_JVM);
 
   private static final int MAX_IDENTIFIER_LENGTH = 255;
 
@@ -161,9 +162,10 @@ public final class ConfigurationManager {
     // Utility class.
   }
 
-  private static boolean isGoodIdentifier(String identifier) {
-    return GOOD_IDENTIFIER_PATTERN.matcher(identifier).matches()
-           && (identifier.length() <= MAX_IDENTIFIER_LENGTH);
+  @VisibleForTesting
+  static boolean isGoodIdentifier(String identifier) {
+    return GOOD_IDENTIFIER.matcher(identifier).matches()
+        && (identifier.length() <= MAX_IDENTIFIER_LENGTH);
   }
 
   private static void checkNotNull(Object value, String error) throws TaskDescriptionException {

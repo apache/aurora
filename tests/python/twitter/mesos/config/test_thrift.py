@@ -1,7 +1,13 @@
 import getpass
+import re
 
 import pytest
 
+from gen.twitter.mesos.constants import GOOD_IDENTIFIER_PATTERN_PYTHON
+from gen.twitter.mesos.test.constants import (
+  INVALID_IDENTIFIERS,
+  VALID_IDENTIFIERS,
+)
 from gen.twitter.mesos.ttypes import (
   CronCollisionPolicy,
   JobKey,
@@ -183,3 +189,10 @@ def test_task_instance_from_job():
   instance = task_instance_from_job(Job(health_check_interval_secs=30), 0)
   assert instance is not None
 
+
+def test_identifier_validation():
+  matcher = re.compile(GOOD_IDENTIFIER_PATTERN_PYTHON)
+  for identifier in VALID_IDENTIFIERS:
+    assert matcher.match(identifier)
+  for identifier in INVALID_IDENTIFIERS:
+    assert not matcher.match(identifier)
