@@ -141,8 +141,6 @@ class StatusManager(ExceptionalThread):
     update.task_id.value = self._task_id
     update.state = failure_reason.status if failure_reason is not None else finish_state
     if failure_reason and failure_reason.reason:
-      # TODO(wickman) Once MESOS-1506 is fixed, drop setting .data
-      update.data = failure_reason.reason
       update.message = failure_reason.reason
     task_state = mesos_pb._TASKSTATE.values_by_number.get(update.state)
     log.info('Sending terminal state update: %s' % (task_state.name if task_state else 'UNKNOWN'))
