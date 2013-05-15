@@ -159,7 +159,7 @@ public class TaskStateMachine {
    *
    * @param taskId ID of the task managed by this state machine.
    * @param role Role that owns this task.
-   * @param jobName JOb that this task is a part of.
+   * @param jobName Job that this task is a part of.
    * @param task Read-only task that this state machine manages.
    * @param isJobUpdating Supplier to test whether the task's job is currently in a rolling update.
    * @param workSink Work sink to receive transition response actions
@@ -634,8 +634,8 @@ public class TaskStateMachine {
 
     /**
      * Don't bother applying noop state changes.  If we end up modifying task state without a
-     * state transition (e.g. storing resource consumption of a running task, for example), we need
-     * to find a different way to suppress noop transitions.
+     * state transition (e.g. storing resource consumption of a running task), we need to find
+     * a different way to suppress noop transitions.
      */
     if (stateMachine.getState().getState() != status) {
       @SuppressWarnings("unchecked")

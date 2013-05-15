@@ -23,11 +23,13 @@ import com.twitter.mesos.gen.Constraint;
 import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.LimitConstraint;
+import com.twitter.mesos.gen.MaintenanceMode;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.ValueConstraint;
+import com.twitter.mesos.scheduler.MaintenanceController;
 import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.Resources;
@@ -88,6 +90,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   private final AtomicLong taskIdCounter = new AtomicLong();
 
   private SchedulingFilter defaultFilter;
+  private MaintenanceController maintenance;
   private Storage storage;
   private StoreProvider storeProvider;
   private TaskStore.Mutable taskStore;
@@ -96,7 +99,8 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   @Before
   public void setUp() throws Exception {
     storage = createMock(Storage.class);
-    defaultFilter = new SchedulingFilterImpl(storage);
+    maintenance = createMock(MaintenanceController.class);
+    defaultFilter = new SchedulingFilterImpl(storage, maintenance);
     storeProvider = createMock(StoreProvider.class);
     taskStore = createMock(TaskStore.Mutable.class);
     attributeStore = createMock(AttributeStore.Mutable.class);
@@ -122,6 +126,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   @Test
   public void testMeetsOffer() throws Exception {
     expectGetHostAttributes(HOST_A, host(HOST_A), rack(RACK_A)).atLeastOnce();
+    expectGetHostMaintenanceStatus(HOST_A).times(2);
     expectGetTasks().times(2);
 
     control.replay();
@@ -133,6 +138,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   @Test
   public void testSufficientPorts() throws Exception {
     expectGetHostAttributes(HOST_A, host(HOST_A), rack(RACK_A)).atLeastOnce();
+    expectGetHostMaintenanceStatus(HOST_A).times(4);
     expectGetTasks().times(4);
 
     control.replay();
@@ -163,6 +169,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   @Test
   public void testInsufficientResources() throws Exception {
     expectGetHostAttributes(HOST_A, host(HOST_A), rack(RACK_A)).atLeastOnce();
+    expectGetHostMaintenanceStatus(HOST_A).times(4);
     expectGetTasks().times(4);
 
     control.replay();
@@ -178,6 +185,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   @Test
   public void testDedicatedRole() throws Exception {
     expectGetHostAttributes(HOST_A, dedicated(ROLE_A)).anyTimes();
+    expectGetHostMaintenanceStatus(HOST_A).times(2);
 
     control.replay();
 
@@ -191,6 +199,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     String dedicated2 = "kestrel/kestrel";
 
     expectGetHostAttributes(HOST_A, dedicated(dedicated1, dedicated2)).anyTimes();
+    expectGetHostMaintenanceStatus(HOST_A).atLeastOnce();
 
     control.replay();
 
@@ -214,6 +223,8 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   public void testMultiValuedAttributes() throws Exception {
     expectGetHostAttributes(HOST_A, valueAttribute("jvm", "1.0", "2.0", "3.0")).anyTimes();
     expectGetHostAttributes(HOST_B, valueAttribute("jvm", "1.0")).anyTimes();
+    expectGetHostMaintenanceStatus(HOST_A).atLeastOnce();
+    expectGetHostMaintenanceStatus(HOST_B).atLeastOnce();
 
     control.replay();
 
@@ -225,9 +236,45 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   }
 
   @Test
+  public void testHostScheduledForMaintenance() throws Exception {
+    expectGetHostAttributes(HOST_A, host(HOST_A), rack(RACK_A)).atLeastOnce();
+    expectGetTasks();
+    expectGetHostMaintenanceStatus(HOST_A, MaintenanceMode.SCHEDULED);
+
+    control.replay();
+
+    assertNoVetoes(makeTask(), HOST_A);
+  }
+
+  @Test
+  public void testHostDrainingForMaintenance() throws Exception {
+    expectGetHostAttributes(HOST_A, host(HOST_A), rack(RACK_A)).atLeastOnce();
+    expectGetTasks();
+    expectGetHostMaintenanceStatus(HOST_A, MaintenanceMode.DRAINING);
+
+    control.replay();
+
+    assertVetoes(makeTask(), ConstraintFilter.maintenanceVeto("draining"));
+  }
+
+  @Test
+  public void testHostDrainedForMaintenance() throws Exception {
+    expectGetHostAttributes(HOST_A, host(HOST_A), rack(RACK_A)).atLeastOnce();
+    expectGetTasks();
+    expectGetHostMaintenanceStatus(HOST_A, MaintenanceMode.DRAINED);
+
+    control.replay();
+
+    assertVetoes(makeTask(), ConstraintFilter.maintenanceVeto("drained"));
+  }
+
+  @Test
   public void testMultipleTaskConstraints() throws Exception {
     expectGetHostAttributes(HOST_A, dedicated(HOST_A), host(HOST_A));
     expectGetHostAttributes(HOST_B, dedicated("xxx"), host(HOST_A));
+    expectGetHostMaintenanceStatus(HOST_A);
+    expectGetHostMaintenanceStatus(HOST_B);
+
     control.replay();
 
     Constraint constraint1 = makeConstraint("host", HOST_A);
@@ -245,6 +292,9 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
     expectGetHostAttributes(HOST_A, host(HOST_A));
     expectGetHostAttributes(HOST_B, dedicated(OWNER_B.getRole() + "/" + JOB_B), host(HOST_B));
+    expectGetHostMaintenanceStatus(HOST_A);
+    expectGetHostMaintenanceStatus(HOST_B);
+
     control.replay();
 
     Constraint hostLimit = limitConstraint("host", 1);
@@ -263,6 +313,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     expectGetHostAttributes(HOST_A);
     expectGetHostAttributes(HOST_A, host(HOST_A));
     expectGetTasks();
+    expectGetHostMaintenanceStatus(HOST_A);
 
     control.replay();
 
@@ -286,6 +337,9 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     expectGetHostAttributes(HOST_A, host(HOST_A), rack(RACK_A)).atLeastOnce();
     expectGetHostAttributes(HOST_B, host(HOST_B), rack(RACK_A)).atLeastOnce();
     expectGetHostAttributes(HOST_C, host(HOST_C), rack(RACK_B)).atLeastOnce();
+    expectGetHostMaintenanceStatus(HOST_A).atLeastOnce();
+    expectGetHostMaintenanceStatus(HOST_B).atLeastOnce();
+    expectGetHostMaintenanceStatus(HOST_C).atLeastOnce();
 
     expectGetTasks(
         makeScheduledTask(OWNER_A, JOB_A, HOST_A),
@@ -317,6 +371,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   @Test
   public void testAttribute() throws Exception {
     expectGetHostAttributes(HOST_A, valueAttribute("jvm", "1.0")).atLeastOnce();
+    expectGetHostMaintenanceStatus(HOST_A).atLeastOnce();
 
     control.replay();
 
@@ -341,6 +396,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     expectGetHostAttributes(HOST_A,
         valueAttribute("jvm", "1.4", "1.6", "1.7"),
         valueAttribute("zone", "a", "b", "c")).atLeastOnce();
+    expectGetHostMaintenanceStatus(HOST_A).atLeastOnce();
 
     control.replay();
 
@@ -377,6 +433,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   @Test
   public void testVetoScaling() {
     control.replay();
+
     assertEquals((int) (Veto.MAX_SCORE * 1.0 / CPU.range), CPU.veto(1).getScore());
     assertEquals(Veto.MAX_SCORE, CPU.veto(CPU.range * 10).getScore());
     assertEquals((int) (Veto.MAX_SCORE * 2.0 / RAM.range), RAM.veto(2).getScore());
@@ -462,6 +519,15 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         .andReturn(ImmutableSet.copyOf(tasks));
   }
 
+  private IExpectationSetters<MaintenanceMode> expectGetHostMaintenanceStatus(String host) {
+    return expectGetHostMaintenanceStatus(host, MaintenanceMode.NONE);
+  }
+
+  private IExpectationSetters<MaintenanceMode> expectGetHostMaintenanceStatus(
+      String host, MaintenanceMode mode) {
+    return expect(maintenance.getMode(host)).andReturn(mode);
+  }
+
   private IExpectationSetters<Optional<HostAttributes>> expectGetHostAttributes(
       String host,
       Attribute... attributes) {
@@ -516,5 +582,9 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
   private TwitterTaskInfo makeTask(int cpus, long ramMb, long diskMb) throws Exception {
     return makeTask(OWNER_A, JOB_A, cpus, ramMb, diskMb);
+  }
+
+  private TwitterTaskInfo makeTask() throws Exception {
+    return makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK);
   }
 }

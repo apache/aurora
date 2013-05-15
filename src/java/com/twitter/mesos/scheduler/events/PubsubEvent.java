@@ -7,6 +7,7 @@ import java.util.Set;
 import com.google.common.base.Objects;
 
 import com.twitter.mesos.Tasks;
+import com.twitter.mesos.gen.HostStatus;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.scheduler.filter.SchedulingFilter.Veto;
@@ -115,6 +116,36 @@ public interface PubsubEvent {
           .add("oldState", getOldState())
           .add("newState", getNewState())
           .toString();
+    }
+  }
+
+  /**
+   * Event sent when a host changed maintenance state.
+   */
+  public static class HostMaintenanceStateChange implements PubsubEvent {
+    private final HostStatus status;
+
+    public HostMaintenanceStateChange(HostStatus status) {
+      this.status = checkNotNull(status);
+    }
+
+    public HostStatus getStatus() {
+      return status;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof HostMaintenanceStateChange)) {
+        return false;
+      }
+
+      HostMaintenanceStateChange other = (HostMaintenanceStateChange) o;
+      return Objects.equal(status, other.status);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hashCode(status);
     }
   }
 

@@ -7,6 +7,7 @@ import com.google.common.collect.ImmutableSet;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.twitter.common.base.Closure;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.HostAttributes;
@@ -17,6 +18,7 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.MaintenanceController.MaintenanceControllerImpl;
+import com.twitter.mesos.scheduler.events.PubsubEvent;
 import com.twitter.mesos.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.mesos.scheduler.events.PubsubEvent.TaskStateChange;
 import com.twitter.mesos.scheduler.storage.Storage;
@@ -39,17 +41,20 @@ import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 public class MaintenanceControllerImplTest extends EasyMockTest {
 
   private static final String HOST_A = "a";
+  private static final String HOST_B = "b";
   private static final Set<String> A = ImmutableSet.of(HOST_A);
 
   private Storage storage;
   private StateManager stateManager;
   private MaintenanceControllerImpl maintenance;
+  private Closure<PubsubEvent> eventSink;
 
   @Before
   public void setUp() throws Exception {
     storage = MemStorage.newEmptyStorage();
     stateManager = createMock(StateManager.class);
-    maintenance = new MaintenanceControllerImpl(storage, stateManager);
+    eventSink = createMock(new Clazz<Closure<PubsubEvent>>() { });
+    maintenance = new MaintenanceControllerImpl(storage, stateManager, eventSink);
   }
 
   private static ScheduledTask makeTask(String host, String taskId) {
@@ -67,6 +72,10 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
 
   @Test
   public void testMaintenanceCycle() {
+    expectMaintenanceStateChangePubsubEvent(HOST_A, SCHEDULED);
+    expectMaintenanceStateChangePubsubEvent(HOST_A, DRAINING);
+    expectMaintenanceStateChangePubsubEvent(HOST_A, DRAINED);
+    expectMaintenanceStateChangePubsubEvent(HOST_A, NONE);
     expect(stateManager.changeState(
         Query.slaveScoped(HOST_A).active().get(),
         ScheduleStatus.RESTARTING,
@@ -97,6 +106,8 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
 
   @Test
   public void testDrainEmptyHost() {
+    expectMaintenanceStateChangePubsubEvent(HOST_A, SCHEDULED);
+    expectMaintenanceStateChangePubsubEvent(HOST_A, DRAINED);
     control.replay();
 
     setMode(HOST_A, NONE);
@@ -106,6 +117,8 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
 
   @Test
   public void testEndEarly() {
+    expectMaintenanceStateChangePubsubEvent(HOST_A, SCHEDULED);
+    expectMaintenanceStateChangePubsubEvent(HOST_A, NONE);
     control.replay();
 
     setMode(HOST_A, NONE);
@@ -126,21 +139,31 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
 
   @Test
   public void testStorageStart() {
+    expectMaintenanceStateChangePubsubEvent(HOST_A, DRAINING);
+    expectMaintenanceStateChangePubsubEvent(HOST_B, DRAINED);
+    expectMaintenanceStateChangePubsubEvent(HOST_A, DRAINED);
+
     control.replay();
 
     ScheduledTask task = makeTask(HOST_A, "taskA").setStatus(ScheduleStatus.RESTARTING);
     saveAttribute(new HostAttributes().setHost(HOST_A).setMode(DRAINING));
     saveTask(task);
-    saveAttribute(new HostAttributes().setHost("b").setMode(DRAINING));
-    saveTask(makeTask("b", "taskB").setStatus(ScheduleStatus.FINISHED));
+    saveAttribute(new HostAttributes().setHost(HOST_B).setMode(DRAINING));
+    saveTask(makeTask(HOST_B, "taskB").setStatus(ScheduleStatus.FINISHED));
 
     maintenance.storageStarted(new StorageStarted());
 
     assertStatus(HOST_A, DRAINING, maintenance.getStatus(A));
-    assertStatus("b", DRAINED, maintenance.getStatus(ImmutableSet.of("b")));
+    assertStatus(HOST_B, DRAINED, maintenance.getStatus(ImmutableSet.of("b")));
     task.setStatus(ScheduleStatus.FINISHED);
     maintenance.taskChangedState(new TaskStateChange(task, RUNNING));
     assertStatus(HOST_A, DRAINED, maintenance.getStatus(A));
+  }
+
+  private void expectMaintenanceStateChangePubsubEvent(String hostName, MaintenanceMode mode) {
+    eventSink.execute(
+        new PubsubEvent.HostMaintenanceStateChange(
+            new HostStatus().setHost(hostName).setMode(mode)));
   }
 
   private void assertStatus(String host, MaintenanceMode mode, Set<HostStatus> statuses) {

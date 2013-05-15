@@ -24,6 +24,7 @@ import com.twitter.mesos.gen.HostStatus;
 import com.twitter.mesos.gen.MaintenanceMode;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.TaskQuery;
+import com.twitter.mesos.scheduler.events.PubsubEvent;
 import com.twitter.mesos.scheduler.events.PubsubEvent.EventSubscriber;
 import com.twitter.mesos.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.mesos.scheduler.events.PubsubEvent.TaskStateChange;
@@ -44,8 +45,6 @@ import static com.twitter.mesos.gen.MaintenanceMode.DRAINING;
  * All state-changing functions return their results.  Additionally, all state-changing functions
  * will ignore requests to change state of unknown hosts and subsequently omit these hosts from
  * return values.
- *
- * TODO(William Farner): Augment the scheduler to use adjust scheduling based on a host's mode.
  */
 public interface MaintenanceController {
 
@@ -68,6 +67,14 @@ public interface MaintenanceController {
    *         moved to DRAINED.
    */
   Set<HostStatus> drain(Set<String> hosts);
+
+  /**
+   * Fetches the current maintenance mode of {$code host}.
+   *
+   * @param host Host to fetch state for.
+   * @return Maintenance mode of host, {@link MaintenanceMode#NONE} if the host is not known.
+   */
+  MaintenanceMode getMode(String host);
 
   /**
    * Fetches the current state of {@code hosts}.
@@ -94,15 +101,20 @@ public interface MaintenanceController {
    */
   Multimap<String, String> getDrainingTasks();
 
-  class MaintenanceControllerImpl implements MaintenanceController, EventSubscriber {
+   class MaintenanceControllerImpl implements MaintenanceController, EventSubscriber {
     private final Storage storage;
     private final StateManager stateManager;
+    private final Closure<PubsubEvent> eventSink;
     private final Multimap<String, String> drainingTasksByHost = HashMultimap.create();
 
     @Inject
-    MaintenanceControllerImpl(Storage storage, StateManager stateManager) {
+    public MaintenanceControllerImpl(
+        Storage storage,
+        StateManager stateManager,
+        Closure<PubsubEvent> eventSink) {
       this.storage = checkNotNull(storage);
       this.stateManager = checkNotNull(stateManager);
+      this.eventSink = checkNotNull(eventSink);
     }
 
     private Set<HostStatus> watchDrainingTasks(
@@ -139,6 +151,12 @@ public interface MaintenanceController {
       }
     };
 
+    /**
+     * Notifies the MaintenanceController that storage has started, and maintenance statuses are
+     * ready to be loaded.
+     *
+     * @param started Event.
+     */
     @Subscribe
     public synchronized void storageStarted(StorageStarted started) {
       storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
@@ -153,6 +171,11 @@ public interface MaintenanceController {
       });
     }
 
+    /**
+     * Notifies the MaintenanceController that a task has changed state
+     *
+     * @param change Event
+     */
     @Subscribe
     public synchronized void taskChangedState(TaskStateChange change) {
       if (Tasks.isTerminated(change.getNewState())) {
@@ -211,6 +234,21 @@ public interface MaintenanceController {
           }
         };
 
+    private static final Function<HostStatus, MaintenanceMode> GET_MODE =
+      new Function<HostStatus, MaintenanceMode>() {
+        @Override public MaintenanceMode apply(HostStatus status) {
+          return status.getMode();
+        }
+      };
+
+    @Override
+    public MaintenanceMode getMode(final String host) {
+      return FluentIterable.from(getStatus(ImmutableSet.of(host)))
+          .transform(GET_MODE)
+          .first()
+          .or(MaintenanceMode.NONE);
+    }
+
     @Override
     public Set<HostStatus> getStatus(final Set<String> hosts) {
       return storage.doInTransaction(new Work.Quiet<Set<HostStatus>>() {
@@ -246,7 +284,9 @@ public interface MaintenanceController {
       ImmutableSet.Builder<HostStatus> statuses = ImmutableSet.builder();
       for (String host : hosts) {
         if (store.setMaintenanceMode(host, mode)) {
-          statuses.add(new HostStatus().setHost(host).setMode(mode));
+          HostStatus status = new HostStatus().setHost(host).setMode(mode);
+          eventSink.execute(new PubsubEvent.HostMaintenanceStateChange(status.deepCopy()));
+          statuses.add(status);
         }
       }
       return statuses.build();

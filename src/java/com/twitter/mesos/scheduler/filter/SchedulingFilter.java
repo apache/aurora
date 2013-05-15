@@ -39,7 +39,7 @@ public interface SchedulingFilter {
 
     /**
      * Creates a special veto that represents a mismatch between the server and task's configuration
-     * for an attribute..
+     * for an attribute.
      *
      * @param reason Information about the value mismatch.
      * @return A constraint mismatch veto.

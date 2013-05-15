@@ -146,7 +146,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
    * Subclasses should create the {@code Storage} implementation to be used by the
    * {@link SchedulerCoreImpl} under test.
    *
-   * @return the {@code Storage} to for the SchedulerCoreImpl to use under tests
+   * @return the {@code Storage} for the SchedulerCoreImpl to use under tests
    * @throws Exception if there is a problem creating the storage implementation
    */
   protected abstract Storage createStorage() throws Exception;

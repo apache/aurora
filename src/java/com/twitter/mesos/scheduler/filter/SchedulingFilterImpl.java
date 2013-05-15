@@ -2,6 +2,7 @@ package com.twitter.mesos.scheduler.filter;
 
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.Set;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -13,7 +14,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
-import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
 import com.twitter.common.quantity.Amount;
@@ -21,9 +21,11 @@ import com.twitter.common.quantity.Data;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Attribute;
 import com.twitter.mesos.gen.Constraint;
+import com.twitter.mesos.gen.MaintenanceMode;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.MaintenanceController;
 import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
@@ -35,6 +37,8 @@ import com.twitter.mesos.scheduler.storage.Storage.Work.Quiet;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import static com.twitter.mesos.gen.MaintenanceMode.DRAINED;
+import static com.twitter.mesos.gen.MaintenanceMode.DRAINING;
 import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static com.twitter.mesos.scheduler.filter.SchedulingFilterImpl.ResourceVector.CPU;
 import static com.twitter.mesos.scheduler.filter.SchedulingFilterImpl.ResourceVector.DISK;
@@ -53,16 +57,21 @@ public class SchedulingFilterImpl implements SchedulingFilter {
 
   private static final Optional<Veto> NO_VETO = Optional.absent();
 
+  private static final Set<MaintenanceMode> VETO_MODES = EnumSet.of(DRAINING, DRAINED);
+
   private final Storage storage;
+  private final MaintenanceController maintenance;
 
   /**
    * Creates a new scheduling filter.
    *
    * @param storage Interface to accessing the task store.
+   * @param maintenance Interface to accessing the maintenance controller
    */
   @Inject
-  public SchedulingFilterImpl(Storage storage) {
+  public SchedulingFilterImpl(Storage storage, MaintenanceController maintenance) {
     this.storage = checkNotNull(storage);
+    this.maintenance = checkNotNull(maintenance);
   }
 
   /**
@@ -218,6 +227,13 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     };
   }
 
+  private Optional<Veto> getMaintenanceVeto(String slaveHost) {
+    MaintenanceMode mode = maintenance.getMode(slaveHost);
+    return VETO_MODES.contains(mode)
+        ? Optional.of(ConstraintFilter.maintenanceVeto(mode.toString().toLowerCase()))
+        : NO_VETO;
+  }
+
   private Set<Veto> getResourceVetoes(Resources offer, TwitterTaskInfo task) {
     ImmutableSet.Builder<Veto> builder = ImmutableSet.builder();
     for (FilterRule rule : rulesFromOffer(offer)) {
@@ -241,8 +257,10 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     if (!ConfigurationManager.isDedicated(task) && isDedicated(slaveHost)) {
       return ImmutableSet.of(DEDICATED_HOST_VETO);
     }
-
-    Set<Veto> constraintVetoes = ImmutableSet.copyOf(getConstraintFilter(slaveHost).apply(task));
-    return ImmutableSet.copyOf(Sets.union(getResourceVetoes(offer, task), constraintVetoes));
+    return ImmutableSet.<Veto>builder()
+        .addAll(getConstraintFilter(slaveHost).apply(task))
+        .addAll(getResourceVetoes(offer, task))
+        .addAll(getMaintenanceVeto(slaveHost).asSet())
+        .build();
   }
 }

@@ -86,7 +86,6 @@ import com.twitter.mesos.scheduler.thrift.auth.CapabilityValidator.Capability;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
-
 import static com.twitter.mesos.gen.ResponseCode.AUTH_FAILED;
 import static com.twitter.mesos.gen.ResponseCode.ERROR;
 import static com.twitter.mesos.gen.ResponseCode.INVALID_REQUEST;

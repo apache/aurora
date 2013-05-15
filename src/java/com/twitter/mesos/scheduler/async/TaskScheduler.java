@@ -1,7 +1,10 @@
 package com.twitter.mesos.scheduler.async;
 
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -11,23 +14,22 @@ import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
+import com.google.common.base.Objects;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
 import com.google.common.collect.FluentIterable;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
+import com.google.common.collect.Ordering;
+import com.google.common.collect.Sets;
 import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
-import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskInfo;
 
 import com.twitter.common.application.ShutdownRegistry;
@@ -39,13 +41,17 @@ import com.twitter.common.stats.Stats;
 import com.twitter.common.util.BackoffStrategy;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 import com.twitter.mesos.Tasks;
+import com.twitter.mesos.gen.HostStatus;
+import com.twitter.mesos.gen.MaintenanceMode;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.scheduler.Driver;
+import com.twitter.mesos.scheduler.MaintenanceController;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.StateManager;
 import com.twitter.mesos.scheduler.TaskAssigner;
 import com.twitter.mesos.scheduler.events.PubsubEvent.EventSubscriber;
+import com.twitter.mesos.scheduler.events.PubsubEvent.HostMaintenanceStateChange;
 import com.twitter.mesos.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.mesos.scheduler.events.PubsubEvent.TaskStateChange;
 import com.twitter.mesos.scheduler.storage.Storage;
@@ -56,6 +62,10 @@ import com.twitter.mesos.scheduler.storage.Storage.Work;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import static com.twitter.mesos.gen.MaintenanceMode.DRAINED;
+import static com.twitter.mesos.gen.MaintenanceMode.DRAINING;
+import static com.twitter.mesos.gen.MaintenanceMode.NONE;
+import static com.twitter.mesos.gen.MaintenanceMode.SCHEDULED;
 import static com.twitter.mesos.gen.ScheduleStatus.LOST;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 
@@ -66,7 +76,7 @@ import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 public interface TaskScheduler extends EventSubscriber {
 
   /**
-   * Notifies the scheduler of new resource ofers.
+   * Notifies the scheduler of new resource offers.
    *
    * @param offers Newly-available resource offers.
    */
@@ -118,6 +128,7 @@ public interface TaskScheduler extends EventSubscriber {
     @VisibleForTesting
     TaskSchedulerImpl(
         Storage storage,
+        MaintenanceController maintenance,
         StateManager stateManager,
         TaskAssigner assigner,
         BackoffStrategy pendingRetryStrategy,
@@ -130,12 +141,13 @@ public interface TaskScheduler extends EventSubscriber {
       this.assigner = checkNotNull(assigner);
       this.pendingRetryStrategy = checkNotNull(pendingRetryStrategy);
       this.executor = checkNotNull(executor);
-      this.offers = new Offers(driver, returnDelay, executor);
+      this.offers = new Offers(driver, returnDelay, executor, maintenance);
     }
 
     @Inject
     TaskSchedulerImpl(
         Storage storage,
+        MaintenanceController maintenance,
         StateManager stateManager,
         TaskAssigner assigner,
         BackoffStrategy pendingRetryStrategy,
@@ -145,6 +157,7 @@ public interface TaskScheduler extends EventSubscriber {
 
       this(
           storage,
+          maintenance,
           stateManager,
           assigner,
           pendingRetryStrategy,
@@ -257,8 +270,7 @@ public interface TaskScheduler extends EventSubscriber {
           LOG.log(Level.WARNING, "Failed to launch task.", e);
           scheduleAttemptsFailed.incrementAndGet();
 
-          // The attempt to schedule the task failed, so we need to backpedal on the
-          // assignment.
+          // The attempt to schedule the task failed, so we need to backpedal on the assignment.
           // It is in the LOST state and a new task will move to PENDING to replace it.
           // Should the state change fail due to storage issues, that's okay.  The task will
           // time out in the ASSIGNED state and be moved to LOST.
@@ -304,43 +316,113 @@ public interface TaskScheduler extends EventSubscriber {
       }
     }
 
+    @Subscribe
+    public void hostChangedMaintenanceState(HostMaintenanceStateChange change) {
+      offers.updateHostPreference(change.getStatus());
+    }
+
+    /*
+     * Tracks the Offers currently known by the scheduler
+     */
     private static class Offers {
-      final List<Offer> offers = Lists.newArrayList();
+      static final Comparator<HostOffer> PREFERENCE_COMPARATOR =
+          // Currently, the only preference is based on host maintenance status.
+          Ordering.explicit(NONE, SCHEDULED, DRAINING, DRAINED)
+              .onResultOf(new Function<HostOffer, MaintenanceMode>() {
+                @Override public MaintenanceMode apply(HostOffer offer) {
+                  return offer.mode;
+                }
+              });
+      final Set<HostOffer> hostOffers = Collections.synchronizedSet(
+          Sets.newTreeSet(PREFERENCE_COMPARATOR));
       final Driver driver;
       final OfferReturnDelay returnDelay;
       final ScheduledExecutorService executor;
+      final MaintenanceController maintenance;
 
-      Offers(Driver driver, OfferReturnDelay returnDelay, ScheduledExecutorService executor) {
+      Offers(Driver driver,
+             OfferReturnDelay returnDelay,
+             ScheduledExecutorService executor,
+             MaintenanceController maintenance) {
         this.driver = driver;
         this.returnDelay = returnDelay;
         this.executor = executor;
-        Stats.exportSize("outstanding_offers", offers);
+        this.maintenance = maintenance;
+        Stats.exportSize("outstanding_offers", hostOffers);
       }
 
-      private static final Function<Offer, OfferID> GET_ID = new Function<Offer, OfferID>() {
-        @Override public OfferID apply(Offer offer) {
-          return offer.getId();
+      /*
+       * Encapsulate an offer from a host, and the host's maintenance mode.
+       */
+      private static class HostOffer {
+        final Offer offer;
+        final MaintenanceMode mode;
+
+        HostOffer(Offer offer, MaintenanceMode mode) {
+          this.offer = offer;
+          this.mode = mode;
         }
-      };
 
-      synchronized void remove(OfferID id) {
-        Iterables.removeIf(offers, Predicates.compose(Predicates.equalTo(id), GET_ID));
+        @Override
+        public boolean equals(Object o) {
+          if (!(o instanceof HostOffer)) {
+            return false;
+          }
+          HostOffer other = (HostOffer) o;
+          return Objects.equal(offer, other.offer) && (mode == other.mode);
+        }
+
+        @Override
+        public int hashCode() {
+          return Objects.hashCode(offer, mode);
+        }
       }
 
-      static Predicate<Offer> isSlave(final SlaveID slave) {
-        return new Predicate<Offer>() {
-          @Override public boolean apply(Offer offer) {
-            return offer.getSlaveId().equals(slave);
-          }
-        };
+      /*
+       * Update the preference of a host's offers.
+       *
+       * @param hostName Host whose offers should be updated
+       */
+      synchronized void updateHostPreference(final HostStatus hostStatus) {
+        // Remove and re-add a host's offers to re-sort based on its new hostStatus
+        Set<HostOffer> changedOffers = FluentIterable.from(hostOffers)
+            .filter(new Predicate<HostOffer>() {
+              @Override public boolean apply(HostOffer hostOffer) {
+                return hostOffer.offer.getHostname().equals(hostStatus.getHost());
+              }
+            })
+            .toSet();
+        hostOffers.removeAll(changedOffers);
+        hostOffers.addAll(
+            FluentIterable.from(changedOffers)
+            .transform(new Function<HostOffer, HostOffer>() {
+              @Override
+              public HostOffer apply(HostOffer hostOffer) {
+                return new HostOffer(hostOffer.offer, hostStatus.getMode());
+              }
+            })
+            .toSet());
+      }
+
+      synchronized void remove(final OfferID id) {
+        Iterables.removeIf(hostOffers,
+            new Predicate<HostOffer>() {
+              @Override public boolean apply(HostOffer input) {
+                return input.offer.getId().equals(id);
+              }
+            });
       }
 
       synchronized void receive(final Offer offer) {
-        List<Offer> sameSlave = FluentIterable.from(offers)
-            .filter(isSlave(offer.getSlaveId()))
+        List<HostOffer> sameSlave = FluentIterable.from(hostOffers)
+            .filter(new Predicate<HostOffer>() {
+              @Override public boolean apply(HostOffer hostOffer) {
+                return hostOffer.offer.getSlaveId().equals(offer.getSlaveId());
+              }
+            })
             .toList();
         if (sameSlave.isEmpty()) {
-          offers.add(offer);
+          hostOffers.add(new HostOffer(offer, maintenance.getMode(offer.getHostname())));
           executor.schedule(
               new Runnable() {
                 @Override public void run() {
@@ -353,8 +435,8 @@ public interface TaskScheduler extends EventSubscriber {
           LOG.info("Returning " + (sameSlave.size() + 1)
               + " offers for " + offer.getSlaveId().getValue() + " for compaction.");
           decline(offer.getId());
-          for (Offer sameSlaveOffer : sameSlave) {
-            decline(sameSlaveOffer.getId());
+          for (HostOffer sameSlaveOffer : sameSlave) {
+            decline(sameSlaveOffer.offer.getId());
           }
         }
       }
@@ -368,25 +450,25 @@ public interface TaskScheduler extends EventSubscriber {
       synchronized boolean launchFirst(Function<Offer, Optional<TaskInfo>> acceptor)
           throws LaunchException {
 
-        Optional<Offer> accepted = Optional.absent();
-        for (Offer offer : offers) {
-          Optional<TaskInfo> assignment = acceptor.apply(offer);
+        Optional<HostOffer> accepted = Optional.absent();
+        for (HostOffer hostOffer : hostOffers) {
+          Optional<TaskInfo> assignment = acceptor.apply(hostOffer.offer);
           if (assignment.isPresent()) {
             try {
-              driver.launchTask(offer.getId(), assignment.get());
+              driver.launchTask(hostOffer.offer.getId(), assignment.get());
             } catch (RuntimeException e) {
               // TODO(William Farner): Catch only the checked exception produced by Driver
               // once it changes from throwing IllegalStateException when the driver is not yet
               // registered.
               throw new LaunchException("Failed to launch task.", e);
             }
-            accepted = Optional.of(offer);
+            accepted = Optional.of(hostOffer);
             break;
           }
         }
 
         if (accepted.isPresent()) {
-          offers.remove(accepted.get());
+          hostOffers.remove(accepted.get());
           return true;
         } else {
           return false;
@@ -400,7 +482,13 @@ public interface TaskScheduler extends EventSubscriber {
       }
 
       synchronized List<Offer> getAll() {
-        return ImmutableList.copyOf(offers);
+        return FluentIterable.from(hostOffers)
+            .transform(new Function<HostOffer, Offer>() {
+              @Override
+              public Offer apply(HostOffer offer) {
+                return offer.offer;
+              }
+            }).toList();
       }
     }
   }
