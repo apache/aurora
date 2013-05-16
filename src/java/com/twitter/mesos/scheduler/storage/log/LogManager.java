@@ -287,7 +287,7 @@ public final class LogManager {
      * @throws InvalidPositionException if there was a problem truncating before the snapshot.
      * @throws StreamAccessException if there was a problem appending the snapshot to the log.
      */
-    @Timed("scheduler_log_snapshot")
+    @Timed("log_manager_snapshot")
     void snapshot(Snapshot snapshot)
         throws CodingException, InvalidPositionException, StreamAccessException {
 
@@ -297,7 +297,7 @@ public final class LogManager {
       stream.truncateBefore(position);
     }
 
-    @Timed("scheduler_log_append")
+    @Timed("log_manager_append")
     private Position appendAndGetPosition(LogEntry logEntry) throws CodingException {
       Position firstPosition = null;
       byte[][] entries = entrySerializer.serialize(logEntry);

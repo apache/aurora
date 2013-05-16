@@ -26,6 +26,7 @@ import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.common.stats.SlidingStats;
 import com.twitter.common.stats.Stats;
 
 import static java.lang.annotation.ElementType.METHOD;
@@ -112,13 +113,13 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
   private static class LogStream implements com.twitter.mesos.scheduler.log.Log.Stream {
     private static final class OpStats {
       final String opName;
-      final AtomicLong total;
+      final SlidingStats timing;
       final AtomicLong timeouts;
       final AtomicLong failures;
 
       private OpStats(String opName) {
         this.opName = MorePreconditions.checkNotBlank(opName);
-        total = exportLongStat("scheduler_log_native_%s_total", opName);
+        timing = new SlidingStats("scheduler_log_native_" + opName, "nanos");
         timeouts = exportLongStat("scheduler_log_native_%s_timeouts", opName);
         failures = exportLongStat("scheduler_log_native_%s_failures", opName);
       }
@@ -172,10 +173,8 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
       this.noopEntry = noopEntry;
     }
 
-    @Timed("scheduler_log_native_read_from")
     @Override
     public Iterator<Entry> readAll() throws StreamAccessException {
-
       // TODO(John Sirois): Currently we must be the coordinator to ensure we get the 'full read'
       // of log entries expected by the users of the com.twitter.mesos.scheduler.log.Log interface.
       // Switch to another method of ensuring this when it becomes available in mesos' log
@@ -205,6 +204,7 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
           }
 
           while (position <= endPosition) {
+            long start = System.nanoTime();
             try {
               Log.Position p = log.position(Longs.toByteArray(position));
               LOG.info("Reading position " + position + " from the log");
@@ -221,7 +221,6 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
               // We skip these.
               if (entries.isEmpty()) {
                 entriesSkipped.getAndIncrement();
-                continue;
               } else {
                 entry = MESOS_ENTRY_TO_ENTRY.apply(Iterables.getOnlyElement(entries));
                 return true;
@@ -233,7 +232,7 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
               read.failures.getAndIncrement();
               throw new StreamAccessException("Problem reading from log", e);
             } finally {
-              read.total.getAndIncrement();
+              read.timing.accumulate(System.nanoTime() - start);
             }
           }
           return false;
@@ -252,7 +251,6 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
       };
     }
 
-    @Timed("scheduler_log_native_append")
     @Override
     public LogPosition append(final byte[] contents) throws StreamAccessException {
       Preconditions.checkNotNull(contents);
@@ -288,6 +286,7 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
     }
 
     private synchronized <T> T mutate(OpStats stats, Mutation<T> mutation) {
+      long start = System.nanoTime();
       if (writer == null) {
         writer = writerFactory.get();
       }
@@ -305,7 +304,7 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
 
         throw new StreamAccessException("Problem performing log" + stats.opName, e);
       } finally {
-        stats.total.getAndIncrement();
+        stats.timing.accumulate(System.nanoTime() - start);
       }
     }
 

@@ -7,6 +7,7 @@ import java.util.logging.Logger;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
 
+import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.util.Clock;
 import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.JobConfiguration;
@@ -31,7 +32,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * Snapshot store implementation that delegates to underlying snapshot stores by
  * extracting/applying fields in a snapshot thrift struct.
  */
-public final class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
+public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
 
   private static final Logger LOG = Logger.getLogger(SnapshotStoreImpl.class.getName());
 
@@ -155,6 +156,7 @@ public final class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
     this.storage = checkNotNull(storage);
   }
 
+  @Timed("snapshot_create")
   @Override public Snapshot createSnapshot() {
     return storage.doInTransaction(new Work.Quiet<Snapshot>() {
       @Override public Snapshot apply(StoreProvider storeProvider) {
@@ -172,6 +174,7 @@ public final class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
     });
   }
 
+  @Timed("snapshot_apply")
   @Override public void applySnapshot(final Snapshot snapshot) {
     checkNotNull(snapshot);
 
