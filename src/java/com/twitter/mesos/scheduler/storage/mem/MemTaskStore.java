@@ -66,8 +66,8 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
 
   private final TransactionalMap<String, ScheduledTask> tasks =
       TransactionalMap.wrap(Maps.<String, ScheduledTask>newHashMap());
-  private final TransactionalMap<String, Set<String>> tasksByJobKey =
-      TransactionalMap.wrap(Maps.<String, Set<String>>newHashMap());
+  private final TransactionalMap<String, ImmutableSet<String>> tasksByJobKey =
+      TransactionalMap.wrap(Maps.<String, ImmutableSet<String>>newHashMap());
 
   private final AtomicLong taskQueriesById = Stats.exportLong("task_queries_by_id");
   private final AtomicLong taskQueriesByJob = Stats.exportLong("task_queries_by_job");
@@ -187,7 +187,7 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
             "Index inconsistency - job for tasks not present in index: " + entry.getValue());
       }
 
-      Set<String> newIds = ImmutableSet.copyOf(
+      ImmutableSet<String> newIds = ImmutableSet.copyOf(
           Sets.<String>difference(existingIds, ImmutableSet.copyOf(entry.getValue())));
       if (newIds.isEmpty()) {
         tasksByJobKey.remove(entry.getKey());
