@@ -99,7 +99,8 @@ def test_config_with_ports():
       ]
     )
   )
-  job = convert_pystachio_to_thrift(hwc)
+  config = AuroraConfig(hwc)
+  job = config.job()
   assert job.taskConfig.requestedPorts == set(['http', 'admin'])
 
 
@@ -127,6 +128,7 @@ def test_config_with_bad_resources():
   for resource in bad_resources:
     with pytest.raises(ValueError):
       convert_pystachio_to_thrift(HELLO_WORLD(task = hwtask(resources = resource)))
+
 
 def test_config_with_task_links():
   tl = Map(String, String)

@@ -1,10 +1,7 @@
 import getpass
 
 from twitter.common.lang import Compatibility
-from twitter.thermos.config.loader import (
-  ThermosTaskValidator,
-  ThermosTaskWrapper
-)
+from twitter.thermos.config.loader import ThermosTaskValidator
 
 from gen.twitter.mesos.ttypes import (
   Constraint,
@@ -124,6 +121,7 @@ def select_service_bit(job):
   else:
     raise InvalidConfig('Specified both daemon and service bits!')
 
+
 # TODO(wickman) Due to MESOS-2718 we should revert to using the MesosTaskInstance.
 #
 # Using the MesosJob instead of the MesosTaskInstance was to allow for
@@ -143,10 +141,13 @@ ALIASED_FIELDS = (
   'instances'
 )
 
+
 def filter_aliased_fields(job):
   return job(**dict((key, Empty) for key in ALIASED_FIELDS))
 
-def convert(job, packages=frozenset()):
+# TODO(wickman) Make this a method directly on an AuroraConfig so that we don't
+# need the packages/ports shenanigans.
+def convert(job, packages=frozenset(), ports=frozenset()):
   """Convert a Pystachio MesosJob to an Aurora Thrift JobConfiguration."""
 
   owner = Identity(role=fully_interpolated(job.role()), user=getpass.getuser())
@@ -197,7 +198,7 @@ def convert(job, packages=frozenset()):
         'cpu:%r ramMb:%r diskMb:%r' % (task.numCpus, task.ramMb, task.diskMb))
 
   task.owner = owner
-  task.requestedPorts = ThermosTaskWrapper(task_raw, strict=False).ports()
+  task.requestedPorts = ports
   task.taskLinks = not_empty_or(job.task_links(), {})
   task.constraints = constraints_to_thrift(not_empty_or(job.constraints(), {}))
 

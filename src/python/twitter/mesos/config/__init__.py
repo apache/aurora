@@ -181,7 +181,7 @@ class AuroraConfig(object):
       raise self.InvalidConfig(typecheck.message())
     interpolated_job = interpolated_job(task_links=self.task_links())
     try:
-      return convert_thrift(interpolated_job, self._packages)
+      return convert_thrift(interpolated_job, self._packages, self.ports())
     except InvalidThriftConfig as e:
       raise self.InvalidConfig(str(e))
 

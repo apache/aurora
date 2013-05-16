@@ -156,16 +156,17 @@ def test_simple_config():
     assert proxy_config1.ports() == set()
 
 
-def test_ports():
-  def make_config(announce, *ports):
-    process = Process(name = 'hello',
-                      cmdline = ' '.join('{{thermos.ports[%s]}}' % port for port in ports))
-    return AuroraConfig(Job(
-        name = 'hello_world', role = 'john_doe', cluster = 'smf1-test',
-        announce = announce,
-        task = Task(name = 'main', processes = [process],
-                    resources =  Resources(cpu = 0.1, ram = 64 * 1048576, disk = 64 * 1048576))))
+def make_config(announce, *ports):
+  process = Process(name = 'hello',
+                    cmdline = ' '.join('{{thermos.ports[%s]}}' % port for port in ports))
+  return AuroraConfig(Job(
+      name = 'hello_world', role = 'john_doe', cluster = 'smf1-test',
+      announce = announce,
+      task = Task(name = 'main', processes = [process],
+                  resources =  Resources(cpu = 0.1, ram = 64 * 1048576, disk = 64 * 1048576))))
 
+
+def test_ports():
   announce = Announcer(portmap = {'http': 80})
   assert make_config(announce).ports() == set()
   assert make_config(announce, 'http').ports() == set()
@@ -184,3 +185,16 @@ def test_ports():
   assert make_config(Empty).ports() == set()
   assert make_config(Empty, 'http').ports() == set(['http'])
   assert make_config(Empty, 'http', 'thrift').ports() == set(['http', 'thrift'])
+
+
+def test_static_port_aliasing():
+  announce = Announcer(primary_port = 'thrift',
+                       portmap = {'thrift': 8081, 'health': 8300, 'aurora': 'health'})
+  assert make_config(announce).ports() == set()
+  assert make_config(announce).job().taskConfig.requestedPorts == set()
+  assert make_config(announce, 'thrift').ports() == set()
+  assert make_config(announce, 'thrift').job().taskConfig.requestedPorts == set()
+  assert make_config(announce, 'thrift', 'health').ports() == set()
+  assert make_config(announce, 'thrift', 'health').job().taskConfig.requestedPorts == set()
+  assert make_config(announce, 'derp').ports() == set(['derp'])
+  assert make_config(announce, 'derp').job().taskConfig.requestedPorts == set(['derp'])
