@@ -187,7 +187,8 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
             "Index inconsistency - job for tasks not present in index: " + entry.getValue());
       }
 
-      Set<String> newIds = Sets.difference(existingIds, ImmutableSet.copyOf(entry.getValue()));
+      Set<String> newIds = ImmutableSet.copyOf(
+          Sets.<String>difference(existingIds, ImmutableSet.copyOf(entry.getValue())));
       if (newIds.isEmpty()) {
         tasksByJobKey.remove(entry.getKey());
       } else {
