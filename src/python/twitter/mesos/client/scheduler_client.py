@@ -81,8 +81,10 @@ class ZookeeperSchedulerClient(SchedulerClient):
   SCHEDULER_ZK_PATH = '/twitter/service/mesos-scheduler'
   SERVERSET_TIMEOUT = Amount(10, Time.SECONDS)
 
-  @classmethod 
+  @classmethod
   def get_scheduler_serverset(cls, cluster, port=2181, verbose=False, **kw):
+    if cluster.zk is None:
+      raise ValueError('Cluster has no associated zookeeper ensemble!')
     zk = TunneledZookeeper.get(cluster.zk, port=port, verbose=verbose)
     return zk, ServerSet(zk, cluster.scheduler_zk_path)
 
@@ -175,7 +177,7 @@ class SchedulerProxy(object):
           assert False, 'Invalid cluster argument: %s' % cluster
     else:
       Cluster.assert_exists(cluster)
-  
+
   @classmethod
   def create_anonymous_session(cls, user):
     return SessionKey(user=user, nonce=SSHAgentAuthenticator.get_timestamp(),

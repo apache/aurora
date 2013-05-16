@@ -28,8 +28,12 @@ def test_testCoverage():
 
 class TestSchedulerProxy(scheduler_client.SchedulerProxy):
   """In testing we shouldn't use the real SSHAgentAuthenticator."""
+  # The real session_key() is decorated with requires_auth, which interacts with
+  # SSHAgentAuthenticator, so we need to undecorate it
+  def session_key(self):
+    return self.create_session('SOME_USER')
   @classmethod
-  def create_session(cls, user, agent_key):
+  def create_session(cls, user):
     return SessionKey(user=user, nonce=42, nonceSig='UNAUTHENTICATED')
 
 
