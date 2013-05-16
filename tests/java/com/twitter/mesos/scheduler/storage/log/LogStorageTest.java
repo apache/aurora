@@ -1,7 +1,6 @@
 package com.twitter.mesos.scheduler.storage.log;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -184,7 +183,10 @@ public class LogStorageTest extends EasyMockTest {
     schedulingService.doEvery(eq(SNAPSHOT_INTERVAL), capture(snapshotAction));
     Snapshot snapshotContents = new Snapshot()
         .setTimestamp(NOW)
-        .setDataDEPRECATED(ByteBuffer.wrap("snapshot".getBytes()));
+        .setTasks(ImmutableSet.of(
+            new ScheduledTask()
+                .setStatus(ScheduleStatus.RUNNING)
+                .setAssignedTask(new AssignedTask().setTaskId("task_id"))));
     expect(snapshotStore.createSnapshot()).andReturn(snapshotContents);
     streamMatcher.expectSnapshot(snapshotContents).andReturn(position);
     stream.truncateBefore(position);

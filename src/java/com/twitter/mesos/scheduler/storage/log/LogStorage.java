@@ -337,6 +337,12 @@ public class LogStorage extends ForwardingStore
         // Nothing to do here
         break;
 
+      case DEFLATED_ENTRY:
+        throw new IllegalArgumentException("Deflated entries are not handled at this layer.");
+
+      case FRAME:
+        throw new IllegalArgumentException("Framed entries are not handled at this layer.");
+
       default:
         throw new IllegalStateException("Unknown log entry type: " + logEntry);
     }

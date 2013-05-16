@@ -1,5 +1,6 @@
 package com.twitter.mesos.scheduler.storage.log;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
@@ -8,6 +9,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.zip.DeflaterOutputStream;
 
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
@@ -29,7 +31,11 @@ import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.AssignedTask;
+import com.twitter.mesos.gen.Attribute;
+import com.twitter.mesos.gen.HostAttributes;
+import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.storage.Frame;
 import com.twitter.mesos.gen.storage.FrameChunk;
 import com.twitter.mesos.gen.storage.FrameHeader;
@@ -232,7 +238,7 @@ public class LogManagerTest extends EasyMockTest {
 
   @Test
   public void testTransactionSnapshot() throws CodingException {
-    Snapshot snapshot = createSnapshot("snapshot-data");
+    Snapshot snapshot = createSnapshot();
     expectAppend(position1, LogEntry.snapshot(snapshot));
     stream.truncateBefore(position1);
 
@@ -453,17 +459,48 @@ public class LogManagerTest extends EasyMockTest {
     createStreamManager(message.chunkSize).readFromBeginning(reader);
   }
 
-  private Snapshot createSnapshot(String snapshotData) {
+  @Test
+  public void testReadDeflatedEntry() throws Exception {
+    Snapshot snapshot = createSnapshot();
+    LogEntry snapshotLogEntry = LogEntry.snapshot(snapshot);
+
+    ByteArrayOutputStream deflated = new ByteArrayOutputStream();
+    DeflaterOutputStream deflater = new DeflaterOutputStream(deflated);
+    deflater.write(encode(snapshotLogEntry));
+    deflater.flush();
+    deflater.close();
+
+    LogEntry deflatedSnapshotEntry =
+        LogEntry.deflatedEntry(ByteBuffer.wrap(deflated.toByteArray()));
+
+    Entry snapshotEntry = createMock(Entry.class);
+    expect(snapshotEntry.contents()).andReturn(encode(deflatedSnapshotEntry));
+
+    expect(stream.readAll()).andReturn(ImmutableList.of(snapshotEntry).iterator());
+
+    Closure<LogEntry> reader = createMock(new Clazz<Closure<LogEntry>>() { });
+    reader.execute(snapshotLogEntry);
+
+    control.replay();
+
+    createNoMessagesStreamManager().readFromBeginning(reader);
+  }
+
+  private Snapshot createSnapshot() {
     return new Snapshot()
         .setTimestamp(1L)
-        .setDataDEPRECATED(ByteBuffer.wrap(snapshotData.getBytes()));
+        .setHostAttributes(ImmutableSet.of(new HostAttributes("host",
+            ImmutableSet.of(new Attribute("hostname", ImmutableSet.of("abc"))))))
+        .setTasks(ImmutableSet.of(
+            new ScheduledTask().setStatus(ScheduleStatus.RUNNING)
+                .setAssignedTask(new AssignedTask().setTaskId("task_id")
+                    .setTask(new TwitterTaskInfo().setJobName("job_name")))));
   }
 
   private SaveTasks createSaveTasks(String... taskIds) {
     return new SaveTasks(ImmutableSet.copyOf(Iterables.transform(ImmutableList.copyOf(taskIds),
         new Function<String, ScheduledTask>() {
-          @Override
-          public ScheduledTask apply(String taskId) {
+          @Override public ScheduledTask apply(String taskId) {
             return new ScheduledTask().setAssignedTask(new AssignedTask().setTaskId(taskId));
           }
         })));

@@ -1,5 +1,7 @@
 package com.twitter.mesos.scheduler.storage.log;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -15,6 +17,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
+import java.util.zip.InflaterInputStream;
 
 import javax.annotation.Nullable;
 
@@ -23,6 +26,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
+import com.google.common.io.ByteStreams;
 import com.google.common.primitives.Bytes;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
@@ -42,6 +46,7 @@ import com.twitter.mesos.gen.storage.Frame;
 import com.twitter.mesos.gen.storage.FrameChunk;
 import com.twitter.mesos.gen.storage.FrameHeader;
 import com.twitter.mesos.gen.storage.LogEntry;
+import com.twitter.mesos.gen.storage.LogEntry._Fields;
 import com.twitter.mesos.gen.storage.Op;
 import com.twitter.mesos.gen.storage.RemoveTasks;
 import com.twitter.mesos.gen.storage.SaveHostAttributes;
@@ -128,6 +133,8 @@ public final class LogManager {
       final AtomicLong badFramesRead = Stats.exportLong("scheduler_log_bad_frames_read");
       final AtomicLong bytesRead = Stats.exportLong("scheduler_log_bytes_read");
       final AtomicLong entriesRead = Stats.exportLong("scheduler_log_entries_read");
+      final AtomicLong deflatedEntriesRead =
+          Stats.exportLong("scheduler_log_deflated_entries_read");
       final AtomicLong snapshots = Stats.exportLong("scheduler_log_snapshots");
     }
     private final Vars vars = new Vars();
@@ -163,6 +170,22 @@ public final class LogManager {
           logEntry = tryDecodeFrame(logEntry.getFrame(), entries);
         }
         if (logEntry != null) {
+          if (logEntry.isSet(_Fields.DEFLATED_ENTRY)) {
+            // Decompress the entry before replaying.
+            ByteArrayOutputStream inflated = new ByteArrayOutputStream();
+            ByteBuffer data = logEntry.getDeflatedEntry();
+            LOG.info("Inflating deflated log entry of size " + data.remaining());
+            InflaterInputStream inflater = new InflaterInputStream(
+                new ByteArrayInputStream(data.array(), data.position(), data.remaining()));
+            try {
+              ByteStreams.copy(inflater, inflated);
+              logEntry = decodeLogEntry(inflated.toByteArray());
+              vars.deflatedEntriesRead.incrementAndGet();
+            } catch (IOException e) {
+              throw new CodingException("Failed to inflate compressed log entry.", e);
+            }
+          }
+
           reader.execute(logEntry);
           vars.entriesRead.incrementAndGet();
         }
