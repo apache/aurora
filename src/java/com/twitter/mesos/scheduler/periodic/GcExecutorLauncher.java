@@ -80,7 +80,7 @@ public class GcExecutorLauncher implements TaskLauncher {
   }
 
   static String getSourceName(String hostname, String uuid) {
-    return String.format("%s.%s.%s", EXECUTOR_NAME, hostname, uuid);
+    return String.format("%s.%s", EXECUTOR_NAME, hostname);
   }
 
   @Override
