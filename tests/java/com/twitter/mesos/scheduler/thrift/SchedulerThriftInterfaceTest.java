@@ -90,10 +90,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private static final String JOB_NAME = "job_foo";
   private static final Identity ROLE_IDENTITY = new Identity(ROLE, USER);
   private static final SessionKey SESSION = new SessionKey().setUser(USER);
-  private static final JobKey JOB_KEY = new JobKey()
-      .setRole(ROLE)
-      .setName(JOB_NAME)
-      .setEnvironment(DEFAULT_ENVIRONMENT);
+  private static final JobKey JOB_KEY = JobKeys.from(ROLE, DEFAULT_ENVIRONMENT, JOB_NAME);
 
   private StorageTestUtil storageUtil;
   private SchedulerCore scheduler;
@@ -790,7 +787,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     return new JobConfiguration()
         .setName(JOB_NAME)
         .setOwner(ROLE_IDENTITY)
-        .setTaskConfigs(tasks);
+        .setTaskConfigs(tasks)
+        .setKey(JOB_KEY);
   }
 
   private IExpectationSetters<?> expectAuth(String role, boolean allowed)
