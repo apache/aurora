@@ -49,7 +49,7 @@ def pretty_time(seconds=time.time()):
      <table class="table table-bordered table-condensed table-striped" style="empty-cells:show;">
      <thead>
        <tr>
-         <th colspan=4> ${type} tasks ${offset}...${min(task_count, offset+num_tasks-1)} of ${task_count} </th>
+         <th colspan=4> ${type} tasks ${offset}...${min(task_count, offset+num_tasks) - 1} of ${task_count} </th>
          <th colspan=3> resources </th>
          <th colspan=3> links </th>
        </tr>
