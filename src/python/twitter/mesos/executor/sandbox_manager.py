@@ -3,15 +3,13 @@ import os
 
 from twitter.common import app, log
 from twitter.common.dirutil import safe_mkdir, safe_rmtree
-from twitter.common.lang import AbstractClass
+from twitter.common.lang import Interface
 from twitter.common_internal.appapp import AppFactory
 
-class SandboxBase(AbstractClass):
-  class CreationError(Exception):
-    pass
-
-  class DeletionError(Exception):
-    pass
+class SandboxBase(Interface):
+  class Error(Exception): pass
+  class CreationError(Error): pass
+  class DeletionError(Error): pass
 
   @abstractproperty
   def root(self):
@@ -64,7 +62,10 @@ class AppAppSandbox(SandboxBase):
   """ Sandbox implementation using an app-app layout as a sandbox """
   def __init__(self, task_id):
     self._task_id = task_id
-    self._app = AppFactory.get()
+    try:
+      self._app = AppFactory.get()
+    except AppFactory.UnsupportedPlatform as err:
+      raise self.Error("Cannot initialize AppAppSandbox: %s" % err)
     self._layout = None
     self._layouts = self._app.layout_list(name=task_id)
 
@@ -93,28 +94,28 @@ class AppAppSandbox(SandboxBase):
   @property
   def root(self):
     if self._layout is None:
-      raise Exception("There is no layout associated with this sandbox!")
+      raise self.Error("There is no layout associated with this sandbox!")
     return self._layout.root
 
   def create(self, mesos_task):
     from app.commands.layout_create import LayoutCreateError, NeedSuperuser
     if self._layout:
-      raise SandboxBase.CreationError('Layout %s already exists!' % self._layout)
+      raise self.CreationError('Layout %s already exists!' % self._layout)
     kw = AppAppSandbox.layout_create_args_from_task(self._app, self._task_id, mesos_task)
     try:
       self._layout = self._app.layout_create(**kw)
     except (LayoutCreateError, NeedSuperuser) as e:
       log.fatal('Could not create app-app layout!')
-      raise SandboxBase.CreationError('Could not create app-app layout!  %s' % e)
+      raise self.CreationError('Could not create app-app layout!  %s' % e)
     self._layouts = [self._layout]
 
   def destroy(self):
     if not self._layouts:
-      raise SandboxBase.DeletionError('No layout associated with %s!' % self._task_id)
+      raise self.DeletionError('No layout associated with %s!' % self._task_id)
     errors = []
     for layout in self._layouts:
       if not self._app.layout_destroy(layout_name=layout.name,
                                       layout_revision=layout.revision, force=True):
         errors.append('Could not destroy %s' % layout)
     if errors:
-      raise SandboxBase.DeletionError('Failed:\n%s' % '\n'.join(errors))
+      raise self.DeletionError('Failed:\n%s' % '\n'.join(errors))

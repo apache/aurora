@@ -11,7 +11,7 @@ Task state machines.
 import os
 
 from twitter.common import log
-from twitter.common.recordio import ThriftRecordReader
+from twitter.common.recordio import RecordIO, ThriftRecordReader
 from gen.twitter.thermos.ttypes import (
   ProcessState,
   ProcessStatus,
@@ -144,10 +144,13 @@ class CheckpointDispatcher(object):
 
   @classmethod
   def iter_updates(cls, filename):
-    with open(filename) as fp:
-      rr = ThriftRecordReader(fp, RunnerCkpt)
-      for update in rr:
-        yield update
+    try:
+      with open(filename) as fp:
+        rr = ThriftRecordReader(fp, RunnerCkpt)
+        for update in rr:
+          yield update
+    except (IOError, OSError, RecordIO.Error) as err:
+      raise cls.ErrorRecoveringState(err)
 
   @classmethod
   def iter_statuses(cls, filename):
@@ -157,6 +160,10 @@ class CheckpointDispatcher(object):
 
   @classmethod
   def from_file(cls, filename, truncate=False):
+    """Reconstruct a RunnerState from a checkpoint stream contained in a file
+
+      Returns a hydrated RunnerState, or None on any failures.
+    """
     state = RunnerState(processes={})
     builder = cls()
     try:

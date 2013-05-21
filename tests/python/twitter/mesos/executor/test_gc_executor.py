@@ -3,6 +3,7 @@ from itertools import product
 import os
 import threading
 import time
+import unittest
 
 from thrift.TSerialization import serialize as thrift_serialize
 from thrift.TSerialization import deserialize as thrift_deserialize
@@ -11,15 +12,21 @@ import mesos_pb2 as mesos
 from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_rmtree
 from twitter.common.quantity import Amount, Time, Data
+
+from twitter.mesos.executor.executor_detector import ExecutorDetector
 from twitter.mesos.executor.gc_executor import ThermosGCExecutor
+from twitter.mesos.executor.sandbox_manager import AppAppSandbox
+
+from twitter.thermos.config.schema import SimpleTask
+from twitter.thermos.runner import TaskRunner
 
 from gen.twitter.mesos.comm.ttypes import AdjustRetainedTasks, SchedulerMessage
-from gen.twitter.mesos.constants import (
-    ACTIVE_STATES,
-    LIVE_STATES,
-    TERMINAL_STATES)
+from gen.twitter.mesos.constants import ACTIVE_STATES, LIVE_STATES, TERMINAL_STATES
 from gen.twitter.mesos.ttypes import ScheduleStatus
 from gen.twitter.thermos.ttypes import ProcessState, TaskState
+
+import mock
+import mox
 
 
 ACTIVE_TASKS = ('sleep60-lost',)
@@ -101,6 +108,7 @@ class FakeClock(object):
     self.slept += amount
 
 
+
 class ThinTestThermosGCExecutor(ThermosGCExecutor):
   def __init__(self, checkpoint_root, active_executors=[]):
     self._active_executors = active_executors
@@ -130,9 +138,10 @@ class ThinTestThermosGCExecutor(ThermosGCExecutor):
 
 
 class ThickTestThermosGCExecutor(ThinTestThermosGCExecutor):
-  def __init__(self, active_tasks, finished_tasks, active_executors=[]):
+  def __init__(self, active_tasks, finished_tasks, active_executors=[], corrupt_tasks=[]):
     self._active_tasks = active_tasks
     self._finished_tasks = finished_tasks
+    self._corrupt_tasks = corrupt_tasks
     self._maybe_terminate = set()
     ThinTestThermosGCExecutor.__init__(self, None, active_executors)
 
@@ -151,11 +160,17 @@ class ThickTestThermosGCExecutor(ThinTestThermosGCExecutor):
     self._maybe_terminate.add(task_id)
 
   def get_states(self, task_id):
-    if task_id in self._active_tasks:
-      return [(self._clock.time(), self._active_tasks[task_id])]
-    elif task_id in self._finished_tasks:
-      return [(self._clock.time(), self._finished_tasks[task_id])]
+    if task_id not in self._corrupt_tasks:
+      if task_id in self._active_tasks:
+        return [(self._clock.time(), self._active_tasks[task_id])]
+      elif task_id in self._finished_tasks:
+        return [(self._clock.time(), self._finished_tasks[task_id])]
     return []
+
+  def should_gc_task(self, task_id):
+    if task_id in self._corrupt_tasks:
+      return set([task_id])
+    return set()
 
 
 def make_pair(*args, **kw):
@@ -219,14 +234,12 @@ def test_state_reconciliation_terminal_active():
     assert tgc.len_results == (0, 0, 0, 0)
     assert llen(lgc, rgc, updates) == (0, 0, 1)
 
-
-def test_state_reconciliation_terminal_starting():
+def test_state_reconciliation_corrupt_tasks():
   for st0, st1 in product(THERMOS_TERMINALS, LIVE_STATES):
-    tgc, driver = make_pair({}, {'foo': st0})
+    tgc, driver = make_pair({}, {'foo': st0}, corrupt_tasks=['foo'])
     lgc, rgc, updates = tgc.reconcile_states(driver, {'foo': st1})
     assert tgc.len_results == (0, 0, 0, 0)
-    assert llen(lgc, rgc, updates) == (0, 0, 1)
-
+    assert llen(lgc, rgc, updates) == (1, 0, 0)
 
 def test_state_reconciliation_terminal_nexist():
   for st0, st1 in product(THERMOS_TERMINALS, LIVE_STATES):
@@ -263,8 +276,9 @@ def test_real_get_states():
       assert isinstance(states, list) and len(states) > 0
       assert executor.get_sandbox(task) is not None
 
-
-def run_gc_with(active_executors, retained_tasks, lose=False):
+def run_gc_with(active_executors, 
+                retained_tasks, 
+                lose=False):
   proxy_driver = ProxyDriver()
   with temporary_dir() as td:
     setup_tree(td, lose=lose)
@@ -331,3 +345,145 @@ def test_gc_withheld_and_executor_missing():
   assert len(executor.gcs) == len(FINISHED_TASKS)
   assert len(proxy_driver.messages) == 1
   assert proxy_driver.messages[0].deletedTasks.taskIds == set(['failure'])
+
+def test_gc_killtask_noop():
+  proxy_driver = ProxyDriver()
+  with temporary_dir() as td:
+    setup_tree(td)
+    executor = ThinTestThermosGCExecutor(td)
+  executor.killTask(proxy_driver, "some_task")
+  assert not proxy_driver.stopped.is_set()
+  assert len(proxy_driver.updates) == 0
+
+def test_gc_shutdown_noop():
+  proxy_driver = ProxyDriver()
+  with temporary_dir() as td:
+    setup_tree(td)
+    executor = ThinTestThermosGCExecutor(td)
+  executor.shutdown(proxy_driver)
+  assert not proxy_driver.stopped.is_set()
+  assert len(proxy_driver.updates) == 0
+
+
+APPAPP_SANDBOX = 'twitter.mesos.executor.gc_executor.AppAppSandbox'
+DIRECTORY_SANDBOX = 'twitter.mesos.executor.gc_executor.DirectorySandbox'
+
+class TestRealGC(unittest.TestCase):
+  """
+    Test functions against the actual garbage_collect() functionality of the GC executor
+  """
+  def setUp(self):
+    self.clock = FakeClock()
+    self.HELLO_WORLD= SimpleTask(name="foo", command="echo hello world")
+
+  def setup_task(self, task, root, finished=False, corrupt=False):
+    """Set up the checkpoint stream for the given task in the given checkpoint root, optionally
+    finished and/or with a corrupt stream"""
+    tr = TaskRunner(
+        task=task, 
+        checkpoint_root=root, 
+        sandbox=os.path.join(root, 'sandbox', task.name().get()),
+        clock=self.clock)
+    with tr.control():
+      # initialize checkpoint stream
+      pass
+    if finished:
+      tr.kill()
+    if corrupt:
+      cpkt_file = TaskPath(root=root, tr=tr.task_id).getpath('runner_checkpoint')
+      with open(ckpt_file, 'w') as f:
+        f.write("definitely not a valid checkpoint stream")
+    return tr.task_id
+
+  def run_gc(self, root, task_id, retain=False):
+    """Run the garbage collection process against the given task_id in the given checkpoint root"""
+    class FakeTaskKiller(object):
+      def __init__(self, task_id, checkpoint_root): pass
+      def kill(self): pass
+      def lose(self): pass
+    class FakeTaskGarbageCollector(object):
+      def __init__(self, root): pass
+      def erase_logs(self, task_id): pass
+      def erase_metadata(self, task_id): pass
+    class FakeExecutorDetector(object):
+      class ExecutorScanf(object):
+        executor_id = 'thermos-' + task_id
+        run = 'some_run_number'
+      def find(self, root):
+        return [self.ExecutorScanf()]
+    executor = ThermosGCExecutor(
+        checkpoint_root=root, 
+        task_killer=FakeTaskKiller,
+        executor_detector=FakeExecutorDetector if retain else ExecutorDetector,
+        task_garbage_collector=FakeTaskGarbageCollector,
+        clock=self.clock)
+    return executor.garbage_collect()
+
+  def test_active_task_no_runners(self):
+    # TODO(jon): implement
+    pass
+
+  def test_active_task_running(self):
+    # TODO(jon): implement
+    pass
+
+  def test_finished_task_corrupt(self):
+    # TODO(jon): implement
+    pass
+
+  def test_gc_task_no_sandbox(self):
+    with mock.patch(APPAPP_SANDBOX) as appapp_mock:
+      with mock.patch(DIRECTORY_SANDBOX) as directory_mock:
+        appapp_sandbox = appapp_mock.return_value
+        directory_sandbox = directory_mock.return_value
+        appapp_sandbox.exists.return_value = directory_sandbox.exists.return_value = False
+        with temporary_dir() as root:
+          task_id = self.setup_task(self.HELLO_WORLD, root, finished=True)
+          gcs = self.run_gc(root, task_id)
+          appapp_sandbox.exists.assert_called_with()
+          directory_sandbox.exists.assert_called_with()
+          assert len(gcs) == 1
+
+  def test_gc_task_appapp_sandbox(self):
+    with mock.patch(APPAPP_SANDBOX) as appapp_mock:
+      appapp_sandbox = appapp_mock.return_value
+      appapp_sandbox.exists.return_value = True
+      with temporary_dir() as root:
+        task_id = self.setup_task(self.HELLO_WORLD, root, finished=True)
+        gcs = self.run_gc(root, task_id)
+        appapp_sandbox.exists.assert_called_with()
+        appapp_sandbox.destroy.assert_called_with()
+        assert len(gcs) == 1
+
+  def test_gc_task_appapp_sandbox_quiet_failure(self):
+    with mock.patch(APPAPP_SANDBOX) as appapp_mock:
+      appapp_sandbox = appapp_mock.return_value
+      appapp_sandbox.exists.return_value = True
+      appapp_sandbox.destroy.side_effect = AppAppSandbox.DeletionError()
+      with temporary_dir() as root:
+        task_id = self.setup_task(self.HELLO_WORLD, root, finished=True)
+        gcs = self.run_gc(root, task_id)
+        appapp_sandbox.exists.assert_called_with()
+        appapp_sandbox.destroy.assert_called_with()
+        assert len(gcs) == 1
+
+  def test_gc_task_directory_sandbox(self):
+    with mock.patch(APPAPP_SANDBOX) as appapp_mock:
+      with mock.patch(DIRECTORY_SANDBOX) as directory_mock:
+        appapp_sandbox = appapp_mock.return_value
+        appapp_sandbox.exists.return_value = False
+        directory_sandbox = directory_mock.return_value
+        directory_sandbox.exists.return_value = True
+        with temporary_dir() as root:
+          task_id = self.setup_task(self.HELLO_WORLD, root, finished=True)
+          gcs = self.run_gc(root, task_id)
+          directory_sandbox.exists.assert_called_with()
+          directory_sandbox.destroy.assert_called_with()
+          assert len(gcs) == 1
+
+  def test_gc_ignore_retained_task(self):
+    with temporary_dir() as root:
+      task_id = self.setup_task(self.HELLO_WORLD, root, finished=True)
+      gcs = self.run_gc(root, task_id, retain=True)
+      assert len(gcs) == 0
+

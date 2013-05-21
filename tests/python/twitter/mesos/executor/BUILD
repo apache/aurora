@@ -18,7 +18,9 @@ python_tests(name = 'gc_executor',
     pants('src/python/twitter/common/quantity'),
     pants('src/python/twitter/mesos/executor:gc_executor_lib'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
-    pants('src/thrift/com/twitter/thermos:py-thrift')
+    pants('src/thrift/com/twitter/thermos:py-thrift'),
+    python_requirement('mock'),
+    python_requirement('mox')
   ],
   coverage = 'twitter.mesos.executor.gc_executor'
 )

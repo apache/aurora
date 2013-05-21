@@ -4,6 +4,25 @@ This module contains the TaskRunner, the core component of Thermos responsible f
 tasks. It also contains several Handlers which define the behaviour on state transitions within the
 TaskRunner.
 
+There are three "active" states in a running Thermos task:
+  ACTIVE
+  CLEANING
+  FINALIZING
+
+A task in ACTIVE state is running regular processes.  The moment this task succeeds or goes over its
+failure limit, it then goes into CLEANING state, where it begins the staged termination of leftover
+processes (with SIGTERMs).  Once all processes have terminated, the task goes into FINALIZING state,
+where the processes marked with the 'final' bit run.  Once the task has gone into CLEANING state, it
+has a deadline for going into terminal state.  If it doesn't make it in time (at any point, whether
+in CLEANING or FINALIZING state), it is forced into terminal state through SIGKILLs of all live
+processes (coordinators, shells and the full process trees rooted at the shells.)
+
+TaskRunner.kill is implemented by forcing the task into CLEANING state and setting its finalization
+deadline manually.  So in practice, we implement Task preemption by calling kill with the
+finalization deadline = now + preemption wait, which gives the Task an opportunity to do graceful
+shutdown.  If preemption_wait=0, it will result in immediate SIGKILLs and then transition to the
+terminal state.
+
 """
 
 from contextlib import contextmanager
@@ -220,7 +239,7 @@ class TaskRunnerUniversalHandler(UniversalStateHandler):
 
 class TaskRunnerStage(object):
   """
-  A stage of the task runner pipeline.
+    A stage of the task runner pipeline.
   """
   MAX_ITERATION_WAIT = Amount(1, Time.SECONDS)
 

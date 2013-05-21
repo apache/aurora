@@ -6,7 +6,7 @@ import time
 from gen.twitter.thermos.ttypes import RunnerState, RunnerCkpt, TaskState
 
 from twitter.common import app
-from twitter.common.recordio import ThriftRecordReader
+from twitter.common.recordio import RecordIO, ThriftRecordReader
 from twitter.thermos.base.ckpt import CheckpointDispatcher
 
 app.add_option("--checkpoint", dest = "ckpt", metavar = "CKPT",
@@ -31,10 +31,14 @@ def main(args):
   rr = ThriftRecordReader(fp, RunnerCkpt)
   wrs = RunnerState(processes = {})
   dispatcher = CheckpointDispatcher()
-  for wts in rr:
-    print 'Recovering: ', wts
-    if values.assemble is True:
-       dispatcher.dispatch(wrs, wts)
+  try:
+    for wts in rr:
+      print 'Recovering: ', wts
+      if values.assemble is True:
+         dispatcher.dispatch(wrs, wts)
+  except RecordIO.Error as err:
+    print 'Error recovering checkpoint stream: %s' % err
+    return
   print '\n\n\n'
   if values.assemble:
     print 'Recovered Task Header'

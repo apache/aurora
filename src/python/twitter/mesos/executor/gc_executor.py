@@ -13,7 +13,6 @@ import time
 
 from twitter.common import log
 from twitter.common.concurrent import defer
-from twitter.common.process import ProcessProviderFactory
 from twitter.common.quantity import Amount, Time, Data
 from twitter.mesos.clusters import Cluster
 from twitter.thermos.base.ckpt import CheckpointDispatcher
@@ -29,12 +28,14 @@ from gen.twitter.mesos.comm.ttypes import (
     SchedulerMessage)
 from gen.twitter.mesos.ttypes import ScheduleStatus
 
-from .sandbox_manager import AppAppSandbox, DirectorySandbox
+from .sandbox_manager import AppAppSandbox, DirectorySandbox, SandboxBase
 from .executor_base import ThermosExecutorBase
 from .executor_detector import ExecutorDetector
 
 from thrift.TSerialization import deserialize as thrift_deserialize
 from thrift.TSerialization import serialize as thrift_serialize
+
+import psutil
 
 
 class ThermosGCExecutor(ThermosExecutorBase):
@@ -59,12 +60,14 @@ class ThermosGCExecutor(ThermosExecutorBase):
                mesos_root=None,
                verbose=True,
                task_killer=TaskKiller,
+               executor_detector=ExecutorDetector,
+               task_garbage_collector=TaskGarbageCollector,
                clock=time):
     ThermosExecutorBase.__init__(self)
     self._slave_id = None
     self._mesos_root = mesos_root or Cluster.DEFAULT_MESOS_ROOT
-    self._detector = ExecutorDetector()
-    self._collector = TaskGarbageCollector(root=checkpoint_root)
+    self._detector = executor_detector()
+    self._collector = task_garbage_collector(root=checkpoint_root)
     self._clock = clock
     self._start_time = clock.time()
     self._task_killer = task_killer
@@ -72,8 +75,12 @@ class ThermosGCExecutor(ThermosExecutorBase):
     if 'ANGRYBIRD_THERMOS' in os.environ:
       self._checkpoint_root = os.path.join(os.environ['ANGRYBIRD_THERMOS'], 'thermos', 'run')
 
+  def _runner_ckpt(self, task_id):
+    """Return the runner checkpoint file for a given task_id"""
+    return TaskPath(root=self._checkpoint_root, task_id=task_id).getpath('runner_checkpoint')
+
   def terminate_task(self, task_id, kill=True):
-    """Terminate a task given its task_id."""
+    """Terminate a task using the associated task killer. Returns a boolean indicating success."""
     killer = self._task_killer(task_id, self._checkpoint_root)
     self.log('Terminating %s...' % task_id)
     runner_terminate = killer.kill if kill else killer.lose
@@ -93,18 +100,20 @@ class ThermosGCExecutor(ThermosExecutorBase):
 
   def get_states(self, task_id):
     """Returns the (timestamp, status) tuples of the task or [] if could not replay."""
-    pathspec = TaskPath(root=self._checkpoint_root, task_id=task_id)
-    runner_ckpt = pathspec.getpath('runner_checkpoint')
-    statuses = CheckpointDispatcher.iter_statuses(runner_ckpt)
-    return [(state.timestamp_ms / 1000.0, state.state) for state in statuses]
+    statuses = CheckpointDispatcher.iter_statuses(self._runner_ckpt(task_id))
+    try:
+      return [(state.timestamp_ms / 1000.0, state.state) for state in statuses]
+    except CheckpointDispatcher.ErrorRecoveringState:
+      return []
 
   def get_sandbox(self, task_id):
     """Returns the sandbox of the task, or None if it has not yet been initialized."""
-    pathspec = TaskPath(root=self._checkpoint_root, task_id=task_id)
-    runner_ckpt = pathspec.getpath('runner_checkpoint')
-    for update in CheckpointDispatcher.iter_updates(runner_ckpt):
-      if update.runner_header and update.runner_header.sandbox:
-        return update.runner_header.sandbox
+    try:
+      for update in CheckpointDispatcher.iter_updates(self._runner_ckpt(task_id)):
+        if update.runner_header and update.runner_header.sandbox:
+          return update.runner_header.sandbox
+    except CheckpointDispatcher.ErrorRecoveringState:
+      return None
 
   def maybe_terminate_unknown_task(self, task_id):
     """Terminate a task if we believe the scheduler doesn't know about it.
@@ -112,13 +121,36 @@ class ThermosGCExecutor(ThermosExecutorBase):
        It's possible for the scheduler to queue a GC and launch a task afterwards, in which
        case we may see actively running tasks that the scheduler did not report in the
        AdjustRetainedTasks message.
+
+       Returns:
+         boolean indicating whether the task was terminated
     """
     states = self.get_states(task_id)
-    if len(states) > 0:
+    if states:
       task_start_time, _ = states[0]
       if self._start_time - task_start_time > self.MINIMUM_KILL_AGE.as_(Time.SECONDS):
-        self.log('Terminating task %s' % task_id)
-        self.terminate_task(task_id)
+        return self.terminate_task(task_id)
+    return False
+
+  def should_gc_task(self, task_id):
+    """Check if a possibly-corrupt task should be locally GCed
+
+      A task should be GCed if its checkpoint stream appears to be corrupted and the kill age
+      threshold is exceeded.
+
+       Returns:
+         set, containing the task_id if it should be marked for local GC, or empty otherwise
+    """
+    runner_ckpt = self._runner_ckpt(task_id)
+    if not os.path.exists(runner_ckpt):
+      return set()
+    latest_update = os.path.getmtime(runner_ckpt)
+    if self._start_time - latest_update > self.MINIMUM_KILL_AGE.as_(Time.SECONDS):
+      self.log('Got corrupt checkpoint file for %s - marking for local GC' % task_id)
+      return set([task_id])
+    else:
+      self.log('Checkpoint file unreadable, but not yet beyond MINIMUM_KILL_AGE threshold')
+      return set()
 
   def reconcile_states(self, driver, retained_tasks):
     """Reconcile states that the scheduler thinks tasks are in vs what they really are in.
@@ -144,6 +176,11 @@ class ThermosGCExecutor(ThermosExecutorBase):
          ACTIVE   | (TERMINAL / !EXISTS) => maybe kill
          TERMINAL | !EXISTS              => delete
          !EXISTS  | TERMINAL             => delete
+
+      Returns tuple of (local_gc, remote_gc, updates), where:
+        local_gc - set of task_ids to be GCed locally
+        remote_gc - set of task_ids to be deleted on the scheduler
+        updates - dictionary of updates sent to the scheduler (task_id: ScheduleStatus)
     """
     def partition(rt):
       active, starting, finished = set(), set(), set()
@@ -179,23 +216,24 @@ class ThermosGCExecutor(ThermosExecutorBase):
     updates = {}
 
     for task_id in all_task_ids:
-      if task_id in local_active and task_id not in sched_active and task_id not in sched_starting:
-        self.log('Inspecting %s for termination.' % task_id)
-        self.maybe_terminate_unknown_task(task_id)
+      if task_id in local_active and task_id not in (sched_active | sched_starting):
+        self.log('Inspecting task %s for termination.' % task_id)
+        if not self.maybe_terminate_unknown_task(task_id):
+          local_gc.update(self.should_gc_task(task_id))
       if task_id in local_finished and task_id not in sched_task_ids:
-        self.log('Queueing task_id %s for local deletion.' % task_id)
+        self.log('Queueing task %s for local deletion.' % task_id)
         local_gc.add(task_id)
-      if task_id in local_finished and (task_id in sched_active or task_id in sched_starting):
+      if task_id in local_finished and task_id in (sched_active | sched_starting):
         self.log('Task %s finished but scheduler thinks active/starting.' % task_id)
         states = self.get_states(task_id)
-        if len(states) > 0:
+        if states:
           _, last_state = states[-1]
           updates[task_id] = self.THERMOS_TO_TWITTER_STATES.get(last_state, ScheduleStatus.UNKNOWN)
           self.send_update(driver, task_id, last_state, 'Task finish detected by GC executor.')
         else:
-          self.log('Task state unavailable for finished task!  Possible checkpoint corruption.')
+          local_gc.update(self.should_gc_task(task_id))
       if task_id in sched_finished and task_id not in local_task_ids:
-        self.log('Queueing task_id %s for remote deletion.' % task_id)
+        self.log('Queueing task %s for remote deletion.' % task_id)
         remote_gc.add(task_id)
       if task_id not in local_task_ids and task_id in sched_active:
         self.log('Know nothing about task %s, telling scheduler of LOSS.' % task_id)
@@ -212,14 +250,11 @@ class ThermosGCExecutor(ThermosExecutorBase):
     updates = {}
 
     inspector = CheckpointInspector(self._checkpoint_root)
-    ps = ProcessProviderFactory.get()
-    ps.collect_all()
 
-    # TODO(wickman) This is almost a replica of code in runner/runner.py, factor out.
-    def is_our_pid(pid, uid, timestamp):
-      handle = ps.get_handle(pid)
-      if handle.user() != pwd.getpwuid(uid)[0]: return False
-      estimated_start_time = self._clock.time() - handle.wall_time()
+    def is_our_process(process, uid, timestamp):
+      if process.uids.real != uid:
+        return False
+      estimated_start_time = self._clock.time() - process.create_time
       return abs(timestamp - estimated_start_time) < self.MAX_PID_TIME_DRIFT.as_(Time.SECONDS)
 
     for task_id in active_tasks:
@@ -231,13 +266,18 @@ class ThermosGCExecutor(ThermosExecutorBase):
         log.warning('  - Task has no registered runners.')
         continue
       runner_pid, runner_uid, timestamp_ms = latest_runner
-      if runner_pid in ps.pids() and is_our_pid(runner_pid, runner_uid, timestamp_ms / 1000.0):
-        log.info('  - Runner appears healthy.')
+      try:
+        runner_process = psutil.Process(runner_pid)
+        if is_our_process(runner_process, runner_uid, timestamp_ms / 1000.0):
+          log.info('  - Runner appears healthy.')
+          continue
+      except psutil.NoSuchProcess:
+        # Runner is dead
+        pass
+      except psutil.Error as err:
+        log.error("  - Error sampling runner process: %s" % (runner_pid, err))
         continue
-      # Runner is dead
-      runner_ckpt = TaskPath(root=self._checkpoint_root, task_id=task_id).getpath(
-          'runner_checkpoint')
-      latest_update = os.path.getmtime(runner_ckpt)
+      latest_update = os.path.getmtime(self._runner_ckpt(task_id))
       if self._clock.time() - latest_update < self.MAX_CHECKPOINT_TIME_DRIFT.as_(Time.SECONDS):
         log.info('  - Runner is dead but under LOST threshold.')
         continue
@@ -253,7 +293,10 @@ class ThermosGCExecutor(ThermosExecutorBase):
     appapp_sandbox = AppAppSandbox(task_id)
     if appapp_sandbox.exists():
       self.log('Destroying AppAppSandbox for %s' % task_id)
-      appapp_sandbox.destroy()
+      try:
+        appapp_sandbox.destroy()
+      except SandboxBase.DeletionError as err:
+        self.log('Error destroying AppAppSandbox: %s!' % err)
     else:
       header_sandbox = self.get_sandbox(task_id)
       directory_sandbox = DirectorySandbox(header_sandbox) if header_sandbox else None
@@ -282,7 +325,7 @@ class ThermosGCExecutor(ThermosExecutorBase):
     for task_id in active_tasks - retained_executors:
       self.log('ERROR: Active task %s had its executor sandbox pulled.' % task_id)
     gc_tasks = finished_tasks - retained_executors
-    for gc_task in gc_tasks | force_delete:
+    for gc_task in (gc_tasks | force_delete):
       self._gc(gc_task)
     return gc_tasks
 

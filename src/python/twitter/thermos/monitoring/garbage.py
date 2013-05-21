@@ -1,16 +1,16 @@
-from __future__ import print_function
-
-from abc import abstractmethod, ABCMeta
+from abc import abstractmethod
 from collections import namedtuple
 import os
 import sys
 import time
 
 from twitter.common.dirutil import safe_delete, safe_rmtree, safe_bsize
+from twitter.common.lang import Interface
 from twitter.common.quantity import Amount, Data, Time
 from twitter.thermos.base.ckpt import CheckpointDispatcher
 from twitter.thermos.base.path import TaskPath
-from twitter.thermos.monitoring.detector import TaskDetector
+
+from .detector import TaskDetector
 
 
 class TaskGarbageCollector(object):
@@ -18,10 +18,6 @@ class TaskGarbageCollector(object):
     self._root = root
     self._detector = TaskDetector(root=self._root)
     self._states = {}
-
-  @classmethod
-  def _log(cls, msg):
-    print(msg, file=sys.stderr)
 
   def state(self, task_id):
     if task_id not in self._states:
@@ -93,11 +89,11 @@ class TaskGarbageCollector(object):
       safe_rmtree(state.header.sandbox)
 
 
-class TaskGarbageCollectionPolicy(object):
-  __metaclass__ = ABCMeta
-
+class TaskGarbageCollectionPolicy(Interface):
   def __init__(self, collector):
-    assert isinstance(collector, TaskGarbageCollector)
+    if not isinstance(collector, TaskGarbageCollector):
+      raise ValueError(
+          "Expected collector to be a TaskGarbageCollector, got %s" % collector.__class__.__name__)
     self._collector = collector
 
   @property
@@ -106,10 +102,7 @@ class TaskGarbageCollectionPolicy(object):
 
   @abstractmethod
   def run(self):
-    """
-      Returns a list of task_ids that should be garbage collected given the specified policy.
-    """
-    pass
+    """Returns a list of task_ids that should be garbage collected given the specified policy."""
 
 
 class DefaultCollector(TaskGarbageCollectionPolicy):

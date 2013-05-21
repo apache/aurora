@@ -17,7 +17,7 @@ from twitter.common.dirutil import du, tail_f
 from twitter.common.dirutil.tail import tail as tail_closed
 from twitter.common.quantity import Amount, Time, Data
 from twitter.common.quantity.parse_simple import parse_time, parse_data
-from twitter.common.recordio import ThriftRecordReader
+from twitter.common.recordio import RecordIO, ThriftRecordReader
 from twitter.thermos.base.path import TaskPath
 from twitter.thermos.base.ckpt import CheckpointDispatcher
 from twitter.thermos.base.options import add_port_to, add_binding_to
@@ -306,13 +306,20 @@ def read(args, options):
   dispatcher = CheckpointDispatcher()
   state = RunnerState(processes={})
   with open(args[0], 'r') as fp:
-    for record in ThriftRecordReader(fp, RunnerCkpt):
-      if not options.simple:
-        dispatcher.dispatch(state, record)
-      else:
-        print('CKPT: %s' % record)
+    try:
+      for record in ThriftRecordReader(fp, RunnerCkpt):
+        if not options.simple:
+          dispatcher.dispatch(state, record)
+        else:
+          print('CKPT: %s' % record)
+    except RecordIO.Error as err:
+      print("Failed to recover from %s: %s" % (fp.name, err))
+      return
 
   if not options.simple:
+    if state is None or state.header is None:
+      print('Checkpoint stream CORRUPT or outdated format')
+      return
     print('Recovered Task Header:')
     print('  id:      %s' % state.header.task_id)
     print('  user:    %s' % state.header.user)
@@ -498,8 +505,8 @@ def status(args, options):
       print()
     if options.verbose > 0:
       state = CheckpointDispatcher.from_file(checkpoint_filename)
-      if state is None:
-        print(' - CORRUPT or outdated format')
+      if state is None or state.header is None:
+        print(' - checkpoint stream CORRUPT or outdated format')
         return
       print('  state: %8s' % TaskState._VALUES_TO_NAMES.get(state.statuses[-1].state, 'Unknown'),
         end='')
