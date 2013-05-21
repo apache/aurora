@@ -52,10 +52,13 @@ class HttpSignaler(object):
     return self._PROXY.open if self._PROXY else urllib_request.urlopen
 
   def query(self, endpoint, data=None):
+    """Request an HTTP endpoint with a GET request (or POST if data is not None)"""
     self.maybe_setup_proxy(self._host)
+    url = self.url(endpoint)
+    log.debug("%s: %s %s" % (self.__class__.__name__, 'GET' if data is None else 'POST', url))
     try:
       with contextlib.closing(
-          self.opener(self.url(endpoint), data, timeout=self._timeout_secs)) as fp:
+          self.opener(url, data, timeout=self._timeout_secs)) as fp:
         return fp.read()
     except (URLError, HTTPError, HTTPException, SocketTimeout, socks.GeneralProxyError) as e:
       # the type of an HTTPException is typically more useful than its contents (since for example
