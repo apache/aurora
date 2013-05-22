@@ -334,7 +334,7 @@ public interface TaskScheduler extends EventSubscriber {
                 }
               });
       final Set<HostOffer> hostOffers = Collections.synchronizedSet(
-          Sets.newTreeSet(PREFERENCE_COMPARATOR));
+          Sets.<HostOffer>newTreeSet(PREFERENCE_COMPARATOR));
       final Driver driver;
       final OfferReturnDelay returnDelay;
       final ScheduledExecutorService executor;
