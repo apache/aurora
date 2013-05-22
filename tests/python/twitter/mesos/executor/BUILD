@@ -14,13 +14,13 @@ python_test_suite(name = 'all',
 python_tests(name = 'gc_executor',
   sources = ['test_gc_executor.py'],
   dependencies = [
+    pants('3rdparty/python:mox'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/quantity'),
     pants('src/python/twitter/mesos/executor:gc_executor_lib'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
     pants('src/thrift/com/twitter/thermos:py-thrift'),
     python_requirement('mock'),
-    python_requirement('mox')
   ],
   coverage = 'twitter.mesos.executor.gc_executor'
 )
@@ -58,9 +58,9 @@ python_tests(name = 'discovery_manager',
 python_tests(name = 'health_checker',
   sources = [ 'test_health_checker.py' ],
   dependencies = [
+    pants('3rdparty/python:mox'),
     pants('src/python/twitter/common/testing'),
     pants('src/python/twitter/mesos/executor:health_checker'),
-    python_requirement('mox'),
   ]
 )
 
