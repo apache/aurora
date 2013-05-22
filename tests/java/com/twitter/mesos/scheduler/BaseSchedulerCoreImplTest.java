@@ -234,7 +234,10 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       assertFalse(state.getAssignedTask().isSetSlaveId());
       // Need to clear shard ID since that was assigned in our makeJob function.
       assertEquals(
-          populateFields(job.get(), productionTask().setShardId(0)),
+          populateFields(
+              job.get(),
+              productionTask().setShardId(0),
+              ConfigurationManager.ShardIdState.PRESENT),
           state.getAssignedTask().getTask().setShardId(0));
     }
   }

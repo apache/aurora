@@ -304,18 +304,16 @@ class SchedulerThriftInterface implements SchedulerController {
 
     // Get cron jobs come directly from the manager.
     for (JobConfiguration jobConfiguration: cronJobManager.getJobs()) {
-      if (ownerRole.equals(jobConfiguration.getOwner().getRole())) {
-        JobConfiguration sanitizedJobConfiguration = jobConfiguration.deepCopy();
-        // TODO(ksweeney): Short-term workaround for MESOS-3025. Long term enforce that jobs cannot
-        // be returned from JobManager#getJobs with a null JobKey.
-        if (!sanitizedJobConfiguration.isSetKey()) {
-          sanitizedJobConfiguration.setKey(
-              JobKeys.from(
-                  sanitizedJobConfiguration.getOwner().getRole(),
-                  sanitizedJobConfiguration.getTaskConfig().getEnvironment(),
-                  sanitizedJobConfiguration.getName()));
-        }
-        configs.add(sanitizedJobConfiguration);
+      // TODO(ksweeney): Remove this when getJobs can't return null JobKeys.
+      JobConfiguration sanitized = jobConfiguration.deepCopy();
+      try {
+        ConfigurationManager.maybeFillJobKey(sanitized);
+      } catch (TaskDescriptionException e) {
+        LOG.severe("Unable to form job key for job " + sanitized);
+        continue;
+      }
+      if (ownerRole.equals(jobConfiguration.getKey().getRole())) {
+        configs.add(sanitized);
       }
     }
 

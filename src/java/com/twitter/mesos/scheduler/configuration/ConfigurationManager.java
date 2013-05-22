@@ -9,6 +9,7 @@ import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
@@ -34,6 +35,7 @@ import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.TwitterTaskInfo._Fields;
 import com.twitter.mesos.gen.ValueConstraint;
+import com.twitter.mesos.scheduler.JobKeys;
 
 import static com.twitter.mesos.gen.Constants.DEFAULT_ENVIRONMENT;
 import static com.twitter.mesos.gen.Constants.GOOD_IDENTIFIER_PATTERN_JVM;
@@ -158,6 +160,9 @@ public final class ConfigurationManager {
           })
           .build();
 
+  @VisibleForTesting
+  public static enum ShardIdState { PRESENT, ABSENT };
+
   private ConfigurationManager() {
     // Utility class.
   }
@@ -252,9 +257,14 @@ public final class ConfigurationManager {
 
     Set<Integer> shardIds = Sets.newHashSet();
 
+    // We need to fill in defaults on the template if one is present.
+    if (copy.isSetTaskConfig()) {
+      populateFields(copy, copy.getTaskConfig(), ShardIdState.ABSENT);
+    }
+
     List<TwitterTaskInfo> configsCopy = Lists.newArrayList(copy.getTaskConfigs());
     for (TwitterTaskInfo config : configsCopy) {
-      populateFields(copy, config);
+      populateFields(copy, config, ShardIdState.PRESENT);
       if (!shardIds.add(config.getShardId())) {
         throw new TaskDescriptionException("Duplicate shard ID " + config.getShardId());
       }
@@ -301,6 +311,9 @@ public final class ConfigurationManager {
     // The configs were mutated, so we need to refresh the Set.
     copy.setTaskConfigs(modifiedConfigs);
 
+    // We might need to add a JobKey populated from the task shards.
+    // TODO(ksweeney): Call maybe fill job key here.
+
     // Check for contiguous shard IDs.
     for (int i = 0; i < copy.getTaskConfigsSize(); i++) {
       if (!shardIds.contains(i)) {
@@ -316,18 +329,28 @@ public final class ConfigurationManager {
    *
    * @param job The job that the task is a member of.
    * @param config Task to populate.
+   * @param shardIdState Whether the task should have a shard ID or not.
    * @return A reference to the modified {@code config} (for chaining).
    * @throws TaskDescriptionException If the task is invalid.
    */
   @VisibleForTesting
-  public static TwitterTaskInfo populateFields(JobConfiguration job, TwitterTaskInfo config)
+  public static TwitterTaskInfo populateFields(
+      JobConfiguration job,
+      TwitterTaskInfo config,
+      ShardIdState shardIdState)
       throws TaskDescriptionException {
     if (config == null) {
       throw new TaskDescriptionException("Task may not be null.");
     }
 
-    if (!config.isSetShardId()) {
-      throw new TaskDescriptionException("Tasks must have a shard ID.");
+    if (shardIdState == ShardIdState.PRESENT) {
+      if (!config.isSetShardId()) {
+        throw new TaskDescriptionException("Tasks must have a shard ID.");
+      }
+    } else if (shardIdState == ShardIdState.ABSENT) {
+      if (config.isSetShardId()) {
+        throw new TaskDescriptionException("Template tasks must not have a shard ID.");
+      }
     }
 
     if (!config.isSetRequestedPorts()) {
@@ -424,6 +447,16 @@ public final class ConfigurationManager {
     for (TwitterTaskInfo task : job.getTaskConfigs()) {
       ConfigurationManager.applyDefaultsIfUnset(task);
     }
+    // While we support heterogeneous tasks we need to backfill both the template and the replicas.
+    if (job.isSetTaskConfig()) {
+      ConfigurationManager.applyDefaultsIfUnset(job.getTaskConfig());
+    }
+
+    try {
+      maybeFillJobKey(job);
+    } catch (TaskDescriptionException e) {
+      LOG.log(Level.WARNING, "Failed to fill job key in " + job + " due to " + e);
+    }
   }
 
   private static void maybeFillLinks(TwitterTaskInfo task) {
@@ -437,6 +470,33 @@ public final class ConfigurationManager {
       }
       task.setTaskLinks(links.build());
     }
+  }
+
+  private static Optional<TwitterTaskInfo> getTemplateTaskInfo(JobConfiguration job) {
+    // If no taskConfig (template) is set use an arbitrary shard to fill in missing job fields.
+    return Optional.fromNullable(job.getTaskConfig())
+        .or(Optional.fromNullable(Iterables.getFirst(job.getTaskConfigs(), null)));
+  }
+
+  /**
+   * Fill in a missing job key using from task fields.
+   *
+   * TODO(ksweeney): Make this private and call it in populateFields.
+   *
+   * @param job The job to mutate.
+   * @throws TaskDescriptionException If job has no tasks.
+   */
+  public static void maybeFillJobKey(JobConfiguration job) throws TaskDescriptionException {
+    if (job.isSetKey()) {
+      return;
+    }
+    Optional<TwitterTaskInfo> template = getTemplateTaskInfo(job);
+    if (!template.isPresent()) {
+      throw new TaskDescriptionException("Job must have at least one task");
+    }
+
+    job.setKey(
+        JobKeys.from(job.getOwner().getRole(), template.get().getEnvironment(), job.getName()));
   }
 
   /**

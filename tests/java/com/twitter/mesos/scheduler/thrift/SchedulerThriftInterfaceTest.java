@@ -721,10 +721,12 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testGetJobs() throws Exception {
-    JobConfiguration ownedCronJob = makeJob();
-    ownedCronJob.setCronSchedule("0 * * * *");
-    JobConfiguration unownedCronJob = makeJob();
-    unownedCronJob.setOwner(new Identity("other", "other")).setCronSchedule("0 * * * *");
+    JobConfiguration ownedCronJob = makeJob()
+        .setCronSchedule("0 * * * *");
+    JobConfiguration unownedCronJob = makeJob()
+        .setOwner(new Identity("other", "other"))
+        .setCronSchedule("0 * * * *")
+        .setKey(JOB_KEY.deepCopy().setRole("other"));
     TwitterTaskInfo ownedImmediateTaskInfo = defaultTask(false)
         .setJobName("immediate")
         .setOwner(ROLE_IDENTITY);
@@ -735,7 +737,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setAssignedTask(
             new AssignedTask().setTask(ownedImmediateTaskInfo));
     JobConfiguration ownedImmediateJob = new JobConfiguration()
-        .setKey(JobKeys.from(ROLE, DEFAULT_ENVIRONMENT, "immediate"))
+        .setKey(JOB_KEY.deepCopy().setName("immediate"))
         .setOwner(ROLE_IDENTITY)
         .setShardCount(1)
         .setTaskConfig(ownedImmediateTaskInfo);
