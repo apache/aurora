@@ -8,6 +8,7 @@ import java.util.NoSuchElementException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.inject.Provider;
@@ -207,7 +208,9 @@ public class MesosLog implements com.twitter.mesos.scheduler.log.Log {
             long start = System.nanoTime();
             try {
               Log.Position p = log.position(Longs.toByteArray(position));
-              LOG.info("Reading position " + position + " from the log");
+              if (LOG.isLoggable(Level.FINE)) {
+                LOG.fine("Reading position " + position + " from the log");
+              }
               List<Log.Entry> entries = reader.read(p, p, readTimeout, readTimeUnit);
 
               // N.B. HACK! There is currently no way to "increment" a position. Until the Mesos
