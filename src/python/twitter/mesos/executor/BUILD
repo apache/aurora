@@ -203,6 +203,7 @@ python_library(
     pants(':executor_detector'),
     pants(':sandbox_manager'),
     pants(':thermos_executor_base'),
+    pants('3rdparty/python:psutil'),
     pants('src/python/twitter/common/concurrent'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/process'),
