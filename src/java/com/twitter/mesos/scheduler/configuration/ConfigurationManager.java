@@ -2,7 +2,6 @@ package com.twitter.mesos.scheduler.configuration;
 
 import java.util.List;
 import java.util.Set;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
@@ -25,11 +24,13 @@ import org.apache.commons.lang.StringUtils;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.Positive;
+import com.twitter.common.base.Closure;
 import com.twitter.common.base.MorePreconditions;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Constraint;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.JobKey;
 import com.twitter.mesos.gen.LimitConstraint;
 import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.gen.TwitterTaskInfo;
@@ -67,11 +68,7 @@ public final class ConfigurationManager {
 
   private static final int MAX_IDENTIFIER_LENGTH = 255;
 
-  private interface FieldSanitizer {
-    void sanitize(TwitterTaskInfo task) throws TaskDescriptionException;
-  }
-
-  private static class DefaultField implements FieldSanitizer {
+  private static class DefaultField implements Closure<TwitterTaskInfo> {
     private final _Fields field;
     private final Object defaultValue;
 
@@ -80,7 +77,7 @@ public final class ConfigurationManager {
       this.defaultValue = defaultValue;
     }
 
-    @Override public void sanitize(TwitterTaskInfo task) {
+    @Override public void execute(TwitterTaskInfo task) {
       if (!task.isSet(field)) {
         task.setFieldValue(field, defaultValue);
       }
@@ -107,16 +104,16 @@ public final class ConfigurationManager {
     }
   }
 
-  private static class RequiredField<T> implements FieldSanitizer {
+  private static class RequiredFieldValidator<T> implements Validator<TwitterTaskInfo> {
     final _Fields field;
     final Validator<T> validator;
 
-    RequiredField(_Fields field, Validator<T> validator) {
+    RequiredFieldValidator(_Fields field, Validator<T> validator) {
       this.field = field;
       this.validator = validator;
     }
 
-    @Override public void sanitize(TwitterTaskInfo task) throws TaskDescriptionException {
+    public void validate(TwitterTaskInfo task) throws TaskDescriptionException {
       if (!task.isSet(field)) {
         throw new TaskDescriptionException("Field " + field.getFieldName() + " is required.");
       }
@@ -126,29 +123,26 @@ public final class ConfigurationManager {
     }
   }
 
-  private static final Iterable<FieldSanitizer> SANITIZERS = ImmutableList.<FieldSanitizer>builder()
-      .add(new RequiredField<Number>(_Fields.NUM_CPUS, new GreaterThan(0.0, "num_cpus")))
-          .add(new RequiredField<Number>(_Fields.RAM_MB, new GreaterThan(0.0, "ram_mb")))
-          .add(new RequiredField<Number>(_Fields.DISK_MB, new GreaterThan(0.0, "disk_mb")))
-          .add(new DefaultField(_Fields.IS_SERVICE, false))
-          .add(new DefaultField(_Fields.PRIORITY, 0))
-          .add(new DefaultField(_Fields.PRODUCTION, false))
-          .add(new DefaultField(_Fields.HEALTH_CHECK_INTERVAL_SECS, 30))
-          .add(new DefaultField(_Fields.MAX_TASK_FAILURES, 1))
-          .add(new DefaultField(_Fields.TASK_LINKS, Maps.<String, String>newHashMap()))
-          .add(new DefaultField(_Fields.REQUESTED_PORTS, Sets.<String>newHashSet()))
-          .add(new DefaultField(_Fields.CONSTRAINTS, Sets.<Constraint>newHashSet()))
-          .add(new DefaultField(_Fields.ENVIRONMENT, DEFAULT_ENVIRONMENT))
-          .add(new FieldSanitizer() {
-            @Override
-            public void sanitize(TwitterTaskInfo task) {
+  private static final Iterable<Closure<TwitterTaskInfo>> DEFAULT_FIELD_POPULATORS =
+      ImmutableList.of(
+          new DefaultField(_Fields.IS_SERVICE, false),
+          new DefaultField(_Fields.PRIORITY, 0),
+          new DefaultField(_Fields.PRODUCTION, false),
+          new DefaultField(_Fields.HEALTH_CHECK_INTERVAL_SECS, 30),
+          new DefaultField(_Fields.MAX_TASK_FAILURES, 1),
+          new DefaultField(_Fields.TASK_LINKS, Maps.<String, String>newHashMap()),
+          new DefaultField(_Fields.REQUESTED_PORTS, Sets.<String>newHashSet()),
+          new DefaultField(_Fields.CONSTRAINTS, Sets.<Constraint>newHashSet()),
+          new DefaultField(_Fields.ENVIRONMENT, DEFAULT_ENVIRONMENT),
+          new Closure<TwitterTaskInfo>() {
+            @Override public void execute(TwitterTaskInfo task) {
               if (!Iterables.any(task.getConstraints(), hasName(HOST_CONSTRAINT))) {
                 task.addToConstraints(hostLimitConstraint(1));
               }
             }
-          })
-          .add(new FieldSanitizer() {
-            @Override public void sanitize(TwitterTaskInfo task) {
+          },
+          new Closure<TwitterTaskInfo>() {
+            @Override public void execute(TwitterTaskInfo task) {
               if (!isDedicated(task)
                   && task.isProduction()
                   && task.isIsService()
@@ -157,8 +151,13 @@ public final class ConfigurationManager {
                 task.addToConstraints(rackLimitConstraint(1));
               }
             }
-          })
-          .build();
+          });
+
+  private static final Iterable<RequiredFieldValidator<?>> REQUIRED_FIELDS_VALIDATORS =
+      ImmutableList.<RequiredFieldValidator<?>>of(
+          new RequiredFieldValidator<Number>(_Fields.NUM_CPUS, new GreaterThan(0.0, "num_cpus")),
+          new RequiredFieldValidator<Number>(_Fields.RAM_MB, new GreaterThan(0.0, "ram_mb")),
+          new RequiredFieldValidator<Number>(_Fields.DISK_MB, new GreaterThan(0.0, "disk_mb")));
 
   @VisibleForTesting
   public static enum ShardIdState { PRESENT, ABSENT };
@@ -377,8 +376,12 @@ public final class ConfigurationManager {
       throw new TaskDescriptionException("Configuration may not be null");
     }
 
-    sanitize(config);
-    return config;
+    // Maximize the usefulness of any thrown error message by checking required fields first.
+    for (RequiredFieldValidator<?> validator : REQUIRED_FIELDS_VALIDATORS) {
+      validator.validate(config);
+    }
+
+    return applyDefaultsIfUnset(config);
   }
 
   /**
@@ -414,12 +417,6 @@ public final class ConfigurationManager {
     };
   }
 
-  private static void sanitize(TwitterTaskInfo task) throws TaskDescriptionException {
-    for (FieldSanitizer sanitizer : SANITIZERS) {
-      sanitizer.sanitize(task);
-    }
-  }
-
   /**
    * Applies defaults to unset values in a task.
    *
@@ -428,10 +425,8 @@ public final class ConfigurationManager {
    */
   @VisibleForTesting
   public static TwitterTaskInfo applyDefaultsIfUnset(TwitterTaskInfo task) {
-    try {
-      sanitize(task);
-    } catch (TaskDescriptionException e) {
-      LOG.log(Level.WARNING, "Failed to sanitize task due to " + e + ", task" + task);
+    for (Closure<TwitterTaskInfo> populator: DEFAULT_FIELD_POPULATORS) {
+      populator.execute(task);
     }
 
     return task;
@@ -455,7 +450,7 @@ public final class ConfigurationManager {
     try {
       maybeFillJobKey(job);
     } catch (TaskDescriptionException e) {
-      LOG.log(Level.WARNING, "Failed to fill job key in " + job + " due to " + e);
+      LOG.warning("Failed to fill job key in " + job + " due to " + e);
     }
   }
 
@@ -479,24 +474,36 @@ public final class ConfigurationManager {
   }
 
   /**
-   * Fill in a missing job key using from task fields.
-   *
-   * TODO(ksweeney): Make this private and call it in populateFields.
-   *
-   * @param job The job to mutate.
-   * @throws TaskDescriptionException If job has no tasks.
-   */
+    * Fill in a missing job key from task fields.
+    *
+    * TODO(ksweeney): Make this private and call it in populateFields.
+    *
+    * @param job The job to mutate.
+    * @throws TaskDescriptionException If job has no tasks.
+    */
   public static void maybeFillJobKey(JobConfiguration job) throws TaskDescriptionException {
-    if (job.isSetKey()) {
+    if (JobKeys.isValid(job.getKey())) {
       return;
     }
+
     Optional<TwitterTaskInfo> template = getTemplateTaskInfo(job);
     if (!template.isPresent()) {
       throw new TaskDescriptionException("Job must have at least one task");
     }
 
-    job.setKey(
-        JobKeys.from(job.getOwner().getRole(), template.get().getEnvironment(), job.getName()));
+    LOG.info("Attempting to synthesize key for job " + job + " using template task " + template);
+    JobKey synthesizedJobKey = new JobKey()
+        .setRole(job.getOwner().getRole())
+        .setEnvironment(template.get().getEnvironment())
+        .setName(job.getName());
+
+    if (!JobKeys.isValid(synthesizedJobKey)) {
+      throw new TaskDescriptionException(String.format(
+          "Could not make valid key from template %s: synthesized key %s is invalid",
+          template, synthesizedJobKey));
+    }
+
+    job.setKey(synthesizedJobKey);
   }
 
   /**

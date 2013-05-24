@@ -71,6 +71,7 @@ import com.twitter.mesos.gen.storage.Snapshot;
 import com.twitter.mesos.gen.storage.Transaction;
 import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl.ExecutorConfig;
 import com.twitter.mesos.scheduler.SchedulerLifecycle.ShutdownOnDriverExit;
+import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.log.Log;
 import com.twitter.mesos.scheduler.log.Log.Entry;
 import com.twitter.mesos.scheduler.log.Log.Position;
@@ -261,7 +262,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
   }
 
   private static ScheduledTask makeTask(String id, ScheduleStatus status) {
-    return new ScheduledTask()
+    ScheduledTask scheduledTask = new ScheduledTask()
         .setStatus(status)
         .setTaskEvents(ImmutableList.of(new TaskEvent(100, status)))
         .setAssignedTask(new AssignedTask()
@@ -270,6 +271,9 @@ public class SchedulerIT extends BaseZooKeeperTest {
                 .setJobName("job-" + id)
                 .setEnvironment("test")
                 .setOwner(new Identity("role-" + id, "user-" + id))));
+    // Apply defaults here so that we can expect the same task that will be written to the stream.
+    ConfigurationManager.applyDefaultsIfUnset(scheduledTask.getAssignedTask().getTask());
+    return scheduledTask;
   }
 
   @Test

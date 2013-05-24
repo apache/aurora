@@ -104,6 +104,8 @@ public final class StorageBackfill {
         ConfigurationManager.applyDefaultsIfUnset(task.getAssignedTask().getTask());
         guaranteeTaskHasEvents(task, clock);
         guaranteeShardUniqueness(task, storeProvider.getUnsafeTaskStore(), clock);
+        // TODO(ksweeney): Guarantee tasks pass current validation code here and quarantine if they
+        // don't.
       }
     });
   }
