@@ -7,6 +7,8 @@ import sys
 
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
+from twitter.common.quantity import Amount, Data
+from twitter.common.quantity.parse_simple import parse_data
 from twitter.mesos.client.base import check_and_log_response, die, requires
 from twitter.mesos.client.api import MesosClientAPI
 
@@ -137,6 +139,36 @@ def set_quota(role, cpu_str, ram_mb_str, disk_mb_str):
 
   options = app.get_options()
   resp = MesosClientAPI(options.cluster, options.verbosity).set_quota(role, cpu, ram_mb, disk_mb)
+  check_and_log_response(resp)
+
+
+@app.command
+@app.command_option(CLUSTER_OPTION)
+@requires.exactly('role', 'cpu', 'ram', 'disk')
+def increase_quota(role, cpu_str, ram_str, disk_str):
+  """usage: increase_quota --cluster=CLUSTER role cpu ram[unit] disk[unit]
+
+  Increases the amount of production quota allocated to a user.
+  """
+  cpu = float(cpu_str)
+  ram = parse_data(ram_str)
+  disk = parse_data(disk_str)
+
+  options = app.get_options()
+  client = MesosClientAPI(options.cluster, options.verbosity == 'verbose')
+  resp = client.get_quota(role)
+  quota = resp.quota
+  log.info('Current quota for %s:\n\tCPU\t%s\n\tRAM\t%s MB\n\tDisk\t%s MB' %
+           (role, quota.numCpus, quota.ramMb, quota.diskMb))
+
+  new_cpu = cpu + quota.numCpus
+  new_ram = ram + Amount(quota.ramMb, Data.MB)
+  new_disk = disk + Amount(quota.diskMb, Data.MB)
+
+  log.info('Attempting to update quota for %s to\n\tCPU\t%s\n\tRAM\t%s MB\n\tDisk\t%s MB' %
+           (role, new_cpu, new_ram.as_(Data.MB), new_disk.as_(Data.MB)))
+
+  resp = client.set_quota(role, new_cpu, new_ram.as_(Data.MB), new_disk.as_(Data.MB))
   check_and_log_response(resp)
 
 
