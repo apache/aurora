@@ -7,7 +7,6 @@ import javax.annotation.Nullable;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
 
 import org.apache.mesos.Protos.Offer;
@@ -16,7 +15,7 @@ import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.Protos.TaskStatus;
 
 import com.twitter.mesos.gen.ScheduleStatus;
-import com.twitter.mesos.scheduler.async.TaskScheduler;
+import com.twitter.mesos.scheduler.async.OfferQueue;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -30,12 +29,12 @@ class UserTaskLauncher implements TaskLauncher {
   @VisibleForTesting
   static final String MEMORY_LIMIT_EXCEEDED = "Memory limit exceeded";
 
-  private final TaskScheduler taskScheduler;
+  private final OfferQueue offerQueue;
   private final StateManager stateManager;
 
   @Inject
-  UserTaskLauncher(TaskScheduler taskScheduler, StateManager stateManager) {
-    this.taskScheduler = checkNotNull(taskScheduler);
+  UserTaskLauncher(OfferQueue offerQueue, StateManager stateManager) {
+    this.offerQueue = checkNotNull(offerQueue);
     this.stateManager = checkNotNull(stateManager);
   }
 
@@ -43,8 +42,7 @@ class UserTaskLauncher implements TaskLauncher {
   public Optional<TaskInfo> createTask(Offer offer) {
     checkNotNull(offer);
 
-    taskScheduler.offer(ImmutableList.of(offer));
-
+    offerQueue.addOffer(offer);
     return Optional.absent();
   }
 
@@ -77,6 +75,6 @@ class UserTaskLauncher implements TaskLauncher {
 
   @Override
   public void cancelOffer(OfferID offer) {
-    taskScheduler.cancelOffer(offer);
+    offerQueue.cancelOffer(offer);
   }
 }

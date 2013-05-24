@@ -5,7 +5,6 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.mesos.Protos.FrameworkID;
@@ -36,9 +35,10 @@ import com.twitter.mesos.scheduler.MaintenanceController;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.StateManager;
 import com.twitter.mesos.scheduler.TaskAssigner;
-import com.twitter.mesos.scheduler.async.TaskScheduler.OfferReturnDelay;
+import com.twitter.mesos.scheduler.async.OfferQueue.OfferQueueImpl;
+import com.twitter.mesos.scheduler.async.OfferQueue.OfferReturnDelay;
 import com.twitter.mesos.scheduler.async.TaskScheduler.TaskSchedulerImpl;
-import com.twitter.mesos.scheduler.events.PubsubEvent;
+import com.twitter.mesos.scheduler.events.PubsubEvent.HostMaintenanceStateChange;
 import com.twitter.mesos.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.mesos.scheduler.events.PubsubEvent.TaskStateChange;
 import com.twitter.mesos.scheduler.storage.Storage;
@@ -60,6 +60,9 @@ import static com.twitter.mesos.gen.ScheduleStatus.LOST;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 
+/**
+ * TODO(wfarner): Break this test up to independently test TaskSchedulerImpl and OfferQueueImpl.
+ */
 public class TaskSchedulerImplTest extends EasyMockTest {
 
   private static final String DEFAULT_HOST = "hostname";
@@ -78,6 +81,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   private ScheduledFuture<?> future;
   private OfferReturnDelay returnDelay;
   private TaskSchedulerImpl scheduler;
+  private OfferQueue offerQueue;
 
   @Before
   public void setUp() {
@@ -94,15 +98,14 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
   private void replayAndCreateScheduler() {
     control.replay();
+    offerQueue = new OfferQueueImpl(driver, returnDelay, executor, maintenance);
     scheduler = new TaskSchedulerImpl(
         storage,
-        maintenance,
         stateManager,
         assigner,
         retryStrategy,
-        driver,
         executor,
-        returnDelay);
+        offerQueue);
   }
 
   private Offer makeOffer(String offerId) {
@@ -128,10 +131,6 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     executor.schedule(capture(runnable), eq((long) delayMillis), eq(TimeUnit.MILLISECONDS));
     expectLastCall().andReturn(createMock(ScheduledFuture.class));
     return runnable;
-  }
-
-  private void sendOffer(Offer offer) {
-    scheduler.offer(ImmutableList.of(offer));
   }
 
   private void changeState(String taskId, ScheduleStatus oldState, ScheduleStatus newState) {
@@ -164,8 +163,8 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     replayAndCreateScheduler();
 
-    sendOffer(OFFER_A);
-    sendOffer(OFFER_B);
+    offerQueue.addOffer(OFFER_A);
+    offerQueue.addOffer(OFFER_B);
   }
 
   @Test
@@ -242,7 +241,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     replayAndCreateScheduler();
 
-    sendOffer(OFFER_A);
+    offerQueue.addOffer(OFFER_A);
     insertTasks(task);
     changeState("a", INIT, PENDING);
     timeoutCapture.getValue().run();
@@ -279,7 +278,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     insertTasks(task);
     changeState("a", INIT, PENDING);
-    sendOffer(OFFER_A);
+    offerQueue.addOffer(OFFER_A);
     timeoutCapture.getValue().run();
   }
 
@@ -306,7 +305,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     insertTasks(task);
     changeState("a", INIT, PENDING);
-    sendOffer(OFFER_A);
+    offerQueue.addOffer(OFFER_A);
     timeoutCapture.getValue().run();
     timeoutCapture2.getValue().run();
   }
@@ -327,7 +326,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     insertTasks(task);
     changeState("a", INIT, PENDING);
-    sendOffer(OFFER_A);
+    offerQueue.addOffer(OFFER_A);
     timeoutCapture.getValue().run();
     offerExpirationCapture.getValue().run();
     timeoutCapture2.getValue().run();
@@ -348,8 +347,8 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     replayAndCreateScheduler();
 
-    sendOffer(OFFER_A);
-    sendOffer(offerAB);
+    offerQueue.addOffer(OFFER_A);
+    offerQueue.addOffer(offerAB);
     offerExpirationCapture.getValue().run();
   }
 
@@ -378,10 +377,10 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     replayAndCreateScheduler();
 
-    sendOffer(OFFER_D);
-    sendOffer(OFFER_C);
-    sendOffer(OFFER_B);
-    sendOffer(OFFER_A);
+    offerQueue.addOffer(OFFER_D);
+    offerQueue.addOffer(OFFER_C);
+    offerQueue.addOffer(OFFER_B);
+    offerQueue.addOffer(OFFER_A);
 
     insertTasks(taskA);
     changeState("A", INIT, PENDING);
@@ -415,9 +414,9 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     replayAndCreateScheduler();
 
-    sendOffer(OFFER_A);
-    sendOffer(OFFER_B);
-    sendOffer(OFFER_C);
+    offerQueue.addOffer(OFFER_A);
+    offerQueue.addOffer(OFFER_B);
+    offerQueue.addOffer(OFFER_C);
 
     // Initially, we'd expect the offers to be consumed in order (A, B), with (C) unschedulable
 
@@ -447,7 +446,6 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   }
 
   private void changeHostMaintenanceState(String hostName, MaintenanceMode mode) {
-    scheduler.hostChangedMaintenanceState(
-        new PubsubEvent.HostMaintenanceStateChange(new HostStatus(hostName, mode)));
+    offerQueue.hostChangedState(new HostMaintenanceStateChange(new HostStatus(hostName, mode)));
   }
 }

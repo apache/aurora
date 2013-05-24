@@ -18,7 +18,8 @@ import com.twitter.common.stats.Stats;
 import com.twitter.common.util.BackoffStrategy;
 import com.twitter.common.util.Random;
 import com.twitter.common.util.TruncatedBinaryBackoff;
-import com.twitter.mesos.scheduler.async.TaskScheduler.OfferReturnDelay;
+import com.twitter.mesos.scheduler.async.OfferQueue.OfferQueueImpl;
+import com.twitter.mesos.scheduler.async.OfferQueue.OfferReturnDelay;
 import com.twitter.mesos.scheduler.async.TaskScheduler.TaskSchedulerImpl;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.events.TaskEventModule;
@@ -84,9 +85,10 @@ public class AsyncModule extends AbstractModule {
         expose(TaskTimeout.class);
       }
     });
+    TaskEventModule.bindSubscriber(binder(), TaskTimeout.class);
+
     binder().install(new PrivateModule() {
       @Override protected void configure() {
-        bind(OfferReturnDelay.class).to(RandomJitterReturnDelay.class);
         bind(BackoffStrategy.class).toInstance(
             new TruncatedBinaryBackoff(INITIAL_SCHEDULE_DELAY.get(), MAX_SCHEDULE_DELAY.get()));
         bind(TaskScheduler.class).to(TaskSchedulerImpl.class);
@@ -94,6 +96,19 @@ public class AsyncModule extends AbstractModule {
         expose(TaskScheduler.class);
       }
     });
+    TaskEventModule.bindSubscriber(binder(), TaskScheduler.class);
+
+    binder().install(new PrivateModule() {
+      @Override protected void configure() {
+        bind(OfferReturnDelay.class).to(RandomJitterReturnDelay.class);
+        bind(ScheduledExecutorService.class).toInstance(executor);
+        bind(OfferQueue.class).to(OfferQueueImpl.class);
+        bind(OfferQueueImpl.class).in(Singleton.class);
+        expose(OfferQueue.class);
+      }
+    });
+    TaskEventModule.bindSubscriber(binder(), OfferQueue.class);
+
     binder().install(new PrivateModule() {
       @Override protected void configure() {
         // TODO(ksweeney): Create a configuration validator module so this can be injected.
@@ -107,9 +122,6 @@ public class AsyncModule extends AbstractModule {
         expose(HistoryPruner.class);
       }
     });
-
-    TaskEventModule.bindSubscriber(binder(), TaskScheduler.class);
-    TaskEventModule.bindSubscriber(binder(), TaskTimeout.class);
     TaskEventModule.bindSubscriber(binder(), HistoryPruner.class);
   }
 

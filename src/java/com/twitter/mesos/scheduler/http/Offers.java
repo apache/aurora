@@ -9,6 +9,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 import com.google.inject.Inject;
@@ -19,7 +20,7 @@ import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.Value.Range;
 
-import com.twitter.mesos.scheduler.async.TaskScheduler;
+import com.twitter.mesos.scheduler.async.OfferQueue;
 
 /**
  * Servlet that exposes resource offers that the scheduler is currently retaining.
@@ -27,11 +28,11 @@ import com.twitter.mesos.scheduler.async.TaskScheduler;
 @Path("/offers")
 public class Offers {
 
-  private final TaskScheduler scheduler;
+  private final OfferQueue offerQueue;
 
   @Inject
-  Offers(TaskScheduler scheduler) {
-    this.scheduler = scheduler;
+  Offers(OfferQueue offerQueue) {
+    this.offerQueue = Preconditions.checkNotNull(offerQueue);
   }
 
   /**
@@ -43,7 +44,7 @@ public class Offers {
   @Produces(MediaType.APPLICATION_JSON)
   public Response getOffers() {
     return Response.ok(
-        FluentIterable.from(scheduler.getOffers()).transform(TO_BEAN).toList()).build();
+        FluentIterable.from(offerQueue.getOffers()).transform(TO_BEAN).toList()).build();
   }
 
   private static final Function<ExecutorID, String> EXECUTOR_ID_TOSTRING =

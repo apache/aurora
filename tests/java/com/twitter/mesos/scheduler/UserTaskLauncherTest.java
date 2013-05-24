@@ -1,6 +1,5 @@
 package com.twitter.mesos.scheduler;
 
-import java.util.Collection;
 import java.util.Set;
 
 import com.google.common.base.Function;
@@ -22,13 +21,12 @@ import org.apache.mesos.Protos.Value.Ranges;
 import org.apache.mesos.Protos.Value.Scalar;
 import org.apache.mesos.Protos.Value.Text;
 import org.apache.mesos.Protos.Value.Type;
-import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.common.collections.Pair;
 import com.twitter.common.testing.EasyMockTest;
-import com.twitter.mesos.scheduler.async.TaskScheduler;
+import com.twitter.mesos.scheduler.async.OfferQueue;
 import com.twitter.mesos.scheduler.configuration.Resources;
 import com.twitter.mesos.scheduler.storage.Storage.StorageException;
 
@@ -52,21 +50,21 @@ public class UserTaskLauncherTest extends EasyMockTest {
   private static final OfferID OFFER_ID = OfferID.newBuilder().setValue("OfferId").build();
   private static final Offer OFFER = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, 1024, 1024);
 
-  private TaskScheduler taskScheduler;
+  private OfferQueue offerQueue;
   private StateManager stateManager;
 
   private TaskLauncher launcher;
 
   @Before
   public void setUp() {
-    taskScheduler = createMock(TaskScheduler.class);
+    offerQueue = createMock(OfferQueue.class);
     stateManager = createMock(StateManager.class);
-    launcher = new UserTaskLauncher(taskScheduler, stateManager);
+    launcher = new UserTaskLauncher(offerQueue, stateManager);
   }
 
   @Test
   public void testForwardsOffers() throws Exception {
-    taskScheduler.offer(EasyMock.<Collection<Offer>>anyObject());
+    offerQueue.addOffer(OFFER);
 
     control.replay();
 
