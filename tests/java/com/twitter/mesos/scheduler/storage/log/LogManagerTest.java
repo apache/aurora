@@ -1,6 +1,5 @@
 package com.twitter.mesos.scheduler.storage.log;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
@@ -9,7 +8,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingDeque;
-import java.util.zip.DeflaterOutputStream;
 
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
@@ -19,6 +17,7 @@ import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
 
 import org.easymock.Capture;
+import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -95,7 +94,7 @@ public class LogManagerTest extends EasyMockTest {
   }
 
   private StreamManager createStreamManager(Amount<Integer, Data> maxEntrySize) {
-    return new StreamManager(stream, maxEntrySize);
+    return new StreamManager(stream, false, maxEntrySize);
   }
 
   @Test
@@ -113,7 +112,7 @@ public class LogManagerTest extends EasyMockTest {
 
     control.replay();
 
-    new LogManager(log, NO_FRAMES_EVER_SIZE, shutdownRegistry).open();
+    new LogManager(log, NO_FRAMES_EVER_SIZE, false, shutdownRegistry).open();
 
     assertTrue(shutdownAction.hasCaptured());
     shutdownAction.getValue().execute();
@@ -376,7 +375,7 @@ public class LogManagerTest extends EasyMockTest {
       }
     };
 
-    final StreamManager streamManager = new StreamManager(mockStream, message1.chunkSize);
+    final StreamManager streamManager = new StreamManager(mockStream, false, message1.chunkSize);
     StreamTransaction tr1 = streamManager.startTransaction();
     tr1.add(op1);
 
@@ -460,20 +459,15 @@ public class LogManagerTest extends EasyMockTest {
   }
 
   @Test
-  public void testReadDeflatedEntry() throws Exception {
+  public void testWriteAndReadDeflatedEntry() throws Exception {
     Snapshot snapshot = createSnapshot();
     LogEntry snapshotLogEntry = LogEntry.snapshot(snapshot);
-
-    ByteArrayOutputStream deflated = new ByteArrayOutputStream();
-    DeflaterOutputStream deflater = new DeflaterOutputStream(deflated);
-    deflater.write(encode(snapshotLogEntry));
-    deflater.flush();
-    deflater.close();
-
-    LogEntry deflatedSnapshotEntry =
-        LogEntry.deflatedEntry(ByteBuffer.wrap(deflated.toByteArray()));
+    LogEntry deflatedSnapshotEntry = Entries.deflate(snapshotLogEntry);
 
     Entry snapshotEntry = createMock(Entry.class);
+    expect(stream.append(EasyMock.aryEq(encode(deflatedSnapshotEntry)))).andReturn(position1);
+    stream.truncateBefore(position1);
+
     expect(snapshotEntry.contents()).andReturn(encode(deflatedSnapshotEntry));
 
     expect(stream.readAll()).andReturn(ImmutableList.of(snapshotEntry).iterator());
@@ -483,7 +477,9 @@ public class LogManagerTest extends EasyMockTest {
 
     control.replay();
 
-    createNoMessagesStreamManager().readFromBeginning(reader);
+    StreamManager streamManager = new StreamManager(stream, true, NO_FRAMES_EVER_SIZE);
+    streamManager.snapshot(snapshot);
+    streamManager.readFromBeginning(reader);
   }
 
   private Snapshot createSnapshot() {

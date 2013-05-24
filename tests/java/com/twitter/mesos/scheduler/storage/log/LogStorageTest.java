@@ -93,7 +93,7 @@ public class LogStorageTest extends EasyMockTest {
     log = createMock(Log.class);
 
     shutdownRegistry = createMock(ShutdownRegistry.class);
-    LogManager logManager = new LogManager(log, Amount.of(1, Data.GB), shutdownRegistry);
+    LogManager logManager = new LogManager(log, Amount.of(1, Data.GB), false, shutdownRegistry);
 
     schedulingService = createMock(SchedulingService.class);
     snapshotStore = createMock(new Clazz<SnapshotStore<Snapshot>>() { });

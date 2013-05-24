@@ -1,7 +1,5 @@
 package com.twitter.mesos.scheduler.storage.log;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -17,7 +15,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
-import java.util.zip.InflaterInputStream;
 
 import javax.annotation.Nullable;
 
@@ -26,7 +23,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
-import com.google.common.io.ByteStreams;
 import com.google.common.primitives.Bytes;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
@@ -39,7 +35,6 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.stats.Stats;
 import com.twitter.mesos.Tasks;
-import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.storage.Frame;
@@ -75,20 +70,31 @@ public final class LogManager {
   @BindingAnnotation
   public @interface MaxEntrySize { }
 
+  /**
+   * Binding annotation for settings regarding the way snapshots are written.
+   */
+  @Retention(RetentionPolicy.RUNTIME)
+  @Target({ ElementType.PARAMETER, ElementType.METHOD })
+  @BindingAnnotation
+  public @interface SnapshotSetting { }
+
   private static final Logger LOG = Logger.getLogger(LogManager.class.getName());
 
   private final Log log;
   private final Amount<Integer, Data> maxEntrySize;
+  private final boolean deflateSnapshots;
   private final ShutdownRegistry shutdownRegistry;
 
   @Inject
   LogManager(
       Log log,
       @MaxEntrySize Amount<Integer, Data> maxEntrySize,
+      @SnapshotSetting boolean deflateSnapshots,
       ShutdownRegistry shutdownRegistry) {
 
     this.log = checkNotNull(log);
     this.maxEntrySize = checkNotNull(maxEntrySize);
+    this.deflateSnapshots = deflateSnapshots;
     this.shutdownRegistry = checkNotNull(shutdownRegistry);
   }
 
@@ -105,7 +111,7 @@ public final class LogManager {
         stream.close();
       }
     });
-    return new StreamManager(stream, maxEntrySize);
+    return new StreamManager(stream, deflateSnapshots, maxEntrySize);
   }
 
   /**
@@ -141,11 +147,13 @@ public final class LogManager {
 
     private final Object writeMutex = new Object();
     private final Stream stream;
+    private final boolean deflateSnapshots;
     private final MessageDigest digest;
     private final EntrySerializer entrySerializer;
 
-    StreamManager(Stream stream, Amount<Integer, Data> maxEntrySize) {
+    StreamManager(Stream stream, boolean deflateSnapshots, Amount<Integer, Data> maxEntrySize) {
       this.stream = checkNotNull(stream);
+      this.deflateSnapshots = deflateSnapshots;
       digest = createDigest();
       entrySerializer = new EntrySerializer(digest, maxEntrySize);
     }
@@ -171,19 +179,8 @@ public final class LogManager {
         }
         if (logEntry != null) {
           if (logEntry.isSet(_Fields.DEFLATED_ENTRY)) {
-            // Decompress the entry before replaying.
-            ByteArrayOutputStream inflated = new ByteArrayOutputStream();
-            ByteBuffer data = logEntry.getDeflatedEntry();
-            LOG.info("Inflating deflated log entry of size " + data.remaining());
-            InflaterInputStream inflater = new InflaterInputStream(
-                new ByteArrayInputStream(data.array(), data.position(), data.remaining()));
-            try {
-              ByteStreams.copy(inflater, inflated);
-              logEntry = decodeLogEntry(inflated.toByteArray());
-              vars.deflatedEntriesRead.incrementAndGet();
-            } catch (IOException e) {
-              throw new CodingException("Failed to inflate compressed log entry.", e);
-            }
+            logEntry = Entries.inflate(logEntry);
+            vars.deflatedEntriesRead.incrementAndGet();
           }
 
           reader.execute(logEntry);
@@ -224,7 +221,7 @@ public final class LogManager {
       if (!Arrays.equals(header.getChecksum(), digest.digest())) {
         throw new CodingException("Read back a framed log entry that failed its checksum");
       }
-      return decodeLogEntry(Bytes.concat(chunks));
+      return Entries.thriftBinaryDecode(Bytes.concat(chunks));
     }
 
     private static boolean isFrame(LogEntry logEntry) {
@@ -248,11 +245,7 @@ public final class LogManager {
     private LogEntry decodeLogEntry(Entry entry) throws CodingException {
       byte[] contents = entry.contents();
       vars.bytesRead.addAndGet(contents.length);
-      return decodeLogEntry(contents);
-    }
-
-    private LogEntry decodeLogEntry(byte[] contents) throws CodingException {
-      return ThriftBinaryCodec.decodeNonNull(LogEntry.class, contents);
+      return Entries.thriftBinaryDecode(contents);
     }
 
     /**
@@ -291,7 +284,12 @@ public final class LogManager {
     void snapshot(Snapshot snapshot)
         throws CodingException, InvalidPositionException, StreamAccessException {
 
-      Position position = appendAndGetPosition(LogEntry.snapshot(snapshot));
+      LogEntry entry = LogEntry.snapshot(snapshot);
+      if (deflateSnapshots) {
+        entry = Entries.deflate(entry);
+      }
+
+      Position position = appendAndGetPosition(entry);
       vars.snapshots.incrementAndGet();
       vars.unSnapshottedTransactions.set(0);
       stream.truncateBefore(position);
@@ -337,7 +335,7 @@ public final class LogManager {
        */
       @VisibleForTesting
       public byte[][] serialize(LogEntry logEntry) throws CodingException {
-        byte[] entry = encode(logEntry);
+        byte[] entry = Entries.thriftBinaryEncode(logEntry);
         if (entry.length <= maxEntrySizeBytes) {
           return new byte[][] {entry};
         }
@@ -361,11 +359,7 @@ public final class LogManager {
       }
 
       private static byte[] encode(Frame frame) throws CodingException {
-        return encode(LogEntry.frame(frame));
-      }
-
-      private static byte[] encode(LogEntry entry) throws CodingException {
-        return ThriftBinaryCodec.encodeNonNull(entry);
+        return Entries.thriftBinaryEncode(LogEntry.frame(frame));
       }
     }
 

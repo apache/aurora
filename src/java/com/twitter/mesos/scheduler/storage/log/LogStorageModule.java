@@ -28,6 +28,7 @@ import com.twitter.mesos.scheduler.storage.SchedulerStore;
 import com.twitter.mesos.scheduler.storage.TaskStore;
 import com.twitter.mesos.scheduler.storage.UpdateStore;
 import com.twitter.mesos.scheduler.storage.log.LogManager.MaxEntrySize;
+import com.twitter.mesos.scheduler.storage.log.LogManager.SnapshotSetting;
 import com.twitter.mesos.scheduler.storage.log.LogStorage.ShutdownGracePeriod;
 import com.twitter.mesos.scheduler.storage.log.LogStorage.SnapshotInterval;
 import com.twitter.mesos.scheduler.storage.mem.MemJobStore;
@@ -81,6 +82,9 @@ public class LogStorageModule extends AbstractModule {
   @VisibleForTesting
   public static final Arg<Amount<Integer, Data>> MAX_LOG_ENTRY_SIZE =
       Arg.create(Amount.of(512, Data.KB));
+
+  @CmdLine(name = "deflate_snapshots", help = "Whether snapshots should be deflate-compressed.")
+  private static final Arg<Boolean> DEFLATE_SNAPSHOTS = Arg.create(true);
 
   private static <T> Key<T> createKey(Class<T> clazz) {
     return Key.get(clazz, LogStorage.WriteBehind.class);
@@ -137,6 +141,7 @@ public class LogStorageModule extends AbstractModule {
     bind(new TypeLiteral<Amount<Integer, Data>>() { }).annotatedWith(MaxEntrySize.class)
         .toInstance(MAX_LOG_ENTRY_SIZE.get());
     bind(LogManager.class).in(Singleton.class);
+    bind(Boolean.class).annotatedWith(SnapshotSetting.class).toInstance(DEFLATE_SNAPSHOTS.get());
 
     bind(LogStorage.class).in(Singleton.class);
     install(CallOrderEnforcingStorage.wrappingModule(LogStorage.class));
