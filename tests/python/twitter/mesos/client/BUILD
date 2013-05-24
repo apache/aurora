@@ -1,6 +1,7 @@
 python_test_suite(name = 'all',
   dependencies = [
     pants(':config'),
+    pants(':disambiguator'),
     pants(':health_check_factory'),
     pants(':scheduler_client'),
     pants(':shard_watcher'),
@@ -12,6 +13,14 @@ python_tests(name = 'config',
   sources = ['test_config.py'],
   dependencies = [
     pants('src/python/twitter/mesos/client:config'),
+    pants('3rdparty/python:mox'),
+  ],
+)
+
+python_tests(name = 'disambiguator',
+  sources = ['test_disambiguator.py'],
+  dependencies = [
+    pants('src/python/twitter/mesos/client:disambiguator'),
     pants('3rdparty/python:mox'),
   ],
 )

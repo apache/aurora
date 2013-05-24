@@ -25,14 +25,16 @@ from twitter.mesos.client.api import MesosClientAPI
 from twitter.mesos.client.base import check_and_log_response, die, requires
 from twitter.mesos.client.command_runner import DistributedCommandRunner
 from twitter.mesos.client.config import get_config
+from twitter.mesos.client.disambiguator import LiveJobDisambiguator
 from twitter.mesos.client.job_monitor import JobMonitor
 from twitter.mesos.client.quickrun import Quickrun
 from twitter.mesos.clusters import Cluster
+from twitter.mesos.common import AuroraJobKey
 from twitter.mesos.packer import sd_packer_client
 from twitter.mesos.packer.packer_client import Packer
 from twitter.thermos.base.options import add_binding_to
 
-from gen.twitter.mesos.constants import ACTIVE_STATES
+from gen.twitter.mesos.constants import ACTIVE_STATES, DEFAULT_ENVIRONMENT
 from gen.twitter.mesos.ttypes import ScheduleStatus
 
 
@@ -40,8 +42,7 @@ try:
   from twitter.mesos.client.spawn_local import spawn_local
 except ImportError:
   def spawn_local(*args, **kw):
-    print('Local spawning not supported in this version of mesos client.')
-    sys.exit(1)
+    die('Local spawning not supported in this version of mesos client.')
 
 
 DEFAULT_USAGE_BANNER = """
@@ -50,25 +51,59 @@ mesos client, used to interact with the aurora scheduler.
 For questions contact mesos-team@twitter.com.
 """
 
-def synthesize_url(scheduler_client, role=None, job=None):
+
+def set_quiet(option, _1, _2, parser):
+  setattr(parser.values, option.dest, 'quiet')
+  LogOptions.set_stderr_log_level('NONE')
+
+
+def set_verbose(option, _1, _2, parser):
+  setattr(parser.values, option.dest, 'verbose')
+  LogOptions.set_stderr_log_level('DEBUG')
+
+
+app.add_option('-v',
+               dest='verbosity',
+               default='normal',
+               action='callback',
+               callback=set_verbose,
+               help='Verbose logging. (default: %default)')
+app.add_option('-q',
+               dest='verbosity',
+               default='normal',
+               action='callback',
+               callback=set_quiet,
+               help='Quiet logging. (default: %default)')
+
+def make_client_factory():
+  options = app.get_options()
+  return functools.partial(MesosClientAPI, verbose=options.verbosity == 'verbose')
+
+make_client = lambda cluster: make_client_factory()(cluster)
+
+def synthesize_url(scheduler_client, role=None, env=None, job=None):
   scheduler_url = scheduler_client.url
   if not scheduler_url:
     log.warning("Unable to find scheduler web UI!")
     return None
 
-  if job and not role:
-    die('If job specified, must specify role!')
+  if env and not role:
+    die('If env specified, must specify role')
+  if job and not (role and env):
+    die('If job specified, must specify role and env')
 
   scheduler_url = urljoin(scheduler_url, 'scheduler')
   if role:
     scheduler_url += '/' + role
-    if job:
-      scheduler_url += '/' + job
+    if env:
+      scheduler_url += '/' + env
+      if job:
+        scheduler_url += '/' + job
   return scheduler_url
 
 
-def handle_open(scheduler_client, role, job):
-  url = synthesize_url(scheduler_client, role, job)
+def handle_open(scheduler_client, role, env, job):
+  url = synthesize_url(scheduler_client, role, env, job)
   if url:
     log.info('Job url: %s' % url)
     if app.get_options().open_browser:
@@ -130,14 +165,19 @@ CLUSTER_CONFIG_OPTION = make_cluster_option(
   'Cluster to match when selecting a job from a configuration. Optional if only one job matching '
   'the given job name exists in the config.')
 CLUSTER_INVOKE_OPTION = make_cluster_option(
-  'Cluster to invoke this command against (choose from %s)' % Cluster.get_list())
+  'Cluster to invoke this command against (choose from %s). Deprecated in favor of the '
+  'CLUSTER/ROLE/ENV/NAME syntax.' % Cluster.get_list())
 
 
-ENV_OPTION = optparse.Option(
+def make_env_option(explanation):
+  return optparse.Option(
     '--env',
     dest='env',
     default=None,
-    help='Environment to match when selecting a job from a configuration.')
+    help=explanation)
+
+ENV_CONFIG_OPTION = make_env_option(
+  'Environment to match when selecting a job from a configuration.')
 
 
 # This is for binding arbitrary points in the Thermos namespace to specific strings, e.g.
@@ -195,7 +235,7 @@ WAIT_UNTIL_OPTION = optparse.Option(
 @app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
 @app.command_option(CLUSTER_CONFIG_OPTION)
-@app.command_option(ENV_OPTION)
+@app.command_option(ENV_CONFIG_OPTION)
 @app.command_option(JSON_OPTION)
 @app.command_option(WAIT_UNTIL_OPTION)
 @requires.exactly('job', 'config')
@@ -218,11 +258,11 @@ def create(jobname, config_file):
     options.runner = 'build'
     return spawn_local('build', jobname, config_file, **make_spawn_options(options))
 
-  api = MesosClientAPI(config.cluster(), options.verbosity == 'verbose')
-  monitor = JobMonitor(api, config.role(), jobname)
+  api = make_client(config.cluster())
+  monitor = JobMonitor(api, config.role(), config.environment(), config.name())
   resp = api.create_job(config)
   check_and_log_response(resp)
-  handle_open(api.scheduler.scheduler(), config.role(), config.name())
+  handle_open(api.scheduler.scheduler(), config.role(), config.environment(), config.name())
 
   if options.wait_until == 'RUNNING':
     monitor.wait_until(monitor.running_or_finished)
@@ -237,7 +277,7 @@ def create(jobname, config_file):
 @app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
 @app.command_option(CLUSTER_CONFIG_OPTION)
-@app.command_option(ENV_OPTION)
+@app.command_option(ENV_CONFIG_OPTION)
 @app.command_option(JSON_OPTION)
 @requires.exactly('job', 'config')
 def spawn(jobname, config_file):
@@ -317,6 +357,8 @@ def task_is_expensive(options):
     help='Announce a serverset for this job.')
 @app.command_option('--role', type='string', default=getpass.getuser(), metavar='ROLE',
     help='Role in which to run the task.')
+@app.command_option('--env', type='string', default=DEFAULT_ENVIRONMENT, metavar='ENV',
+    help='Environment in which to run the task.')
 @app.command_option('--yes_i_really_want_to_run_an_expensive_job', default=False,
     action='store_true', dest='yes_i_really_want_to_run_an_expensive_job',
     help='Yes, you really want to run a potentially resource intensive job.')
@@ -336,14 +378,14 @@ def runtask(args, options):
   if task_is_expensive(options):
     die('Task too expensive.')
   qr = Quickrun(cluster, cmdline, options)
-  api = MesosClientAPI(cluster, options.verbosity == 'verbose')
+  api = make_client(cluster)
   qr.run(api)
 
 
 @app.command
 @app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(CLUSTER_CONFIG_OPTION)
-@app.command_option(ENV_OPTION)
+@app.command_option(ENV_CONFIG_OPTION)
 @app.command_option(JSON_OPTION)
 @requires.exactly('job', 'config')
 def diff(job, config_file):
@@ -361,8 +403,8 @@ def diff(job, config_file):
       options.bindings,
       select_cluster=options.cluster,
       select_env=options.env)
-  api = MesosClientAPI(config.cluster(), options.verbosity == 'verbose')
-  resp = api.query(api.build_query(config.role(), job, statuses=ACTIVE_STATES))
+  api = make_client(config.cluster())
+  resp = api.query(api.build_query(config.role(), job, statuses=ACTIVE_STATES, env=options.env))
   if not resp.responseCode:
     die('Request failed, server responded with "%s"' % resp.message)
   remote_tasks = [t.assignedTask.task for t in resp.tasks]
@@ -395,27 +437,32 @@ def diff(job, config_file):
 
 
 @app.command(name='open')
-@app.command_option(CLUSTER_INVOKE_OPTION)
-@requires.nothing
-def do_open(*args):
-  """usage: open --cluster=CLUSTER [role [job]]
+def do_open(args, _):
+  """usage: open cluster[/role[/env/job]]
 
-  Opens the scheduler page for a role or job in the default web browser.
+  Opens the scheduler page for a cluster, role or job in the default web browser.
   """
-  options = app.get_options()
-  role = job = None
+  cluster = role = env = job = None
+  args = args[0].split("/")
   if len(args) > 0:
-    role = args[0]
-  if len(args) > 1:
-    job = args[1]
+    cluster = args[0]
+    if len(args) > 1:
+      role = args[1]
+      if len(args) > 2:
+        env = args[2]
+        if len(args) > 3:
+          job = args[3]
+        else:
+          # TODO(ksweeney): Remove this after MESOS-2945 is completed.
+          die('env scheduler pages are not yet implemented, please specify job')
 
-  if not options.cluster:
-    die('--cluster is required')
+  if not cluster:
+    die('cluster is required')
 
-  api = MesosClientAPI(options.cluster, options.verbosity == 'verbose')
+  api = make_client(cluster)
 
   import webbrowser
-  webbrowser.open_new_tab(synthesize_url(api.scheduler.scheduler(), role, job))
+  webbrowser.open_new_tab(synthesize_url(api.scheduler.scheduler(), role, env, job))
 
 
 @app.command
@@ -425,7 +472,7 @@ def do_open(*args):
     help='Show the raw configuration.')
 @app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(CLUSTER_CONFIG_OPTION)
-@app.command_option(ENV_OPTION)
+@app.command_option(ENV_CONFIG_OPTION)
 @app.command_option(JSON_OPTION)
 @requires.exactly('job', 'config')
 def inspect(jobname, config_file):
@@ -495,49 +542,44 @@ def inspect(jobname, config_file):
 @app.command
 @app.command_option(CLUSTER_INVOKE_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
-@requires.exactly('role', 'job')
-def start_cron(role, jobname):
-  """usage: start_cron --cluster=CLUSTER role job
+def start_cron(args, options):
+  """usage: start_cron cluster/role/env/job
 
   Invokes a cron job immediately, out of its normal cron cycle.
   This does not affect the cron cycle in any way.
   """
-  options = app.get_options()
-  api = MesosClientAPI(options.cluster, options.verbosity == 'verbose')
-  resp = api.start_cronjob(role, jobname)
+
+  api, job_key = LiveJobDisambiguator.disambiguate_args_or_die(args, options, make_client_factory())
+  resp = api.start_cronjob(job_key)
   check_and_log_response(resp)
-  handle_open(api.scheduler.scheduler(), role, jobname)
+  handle_open(api.scheduler.scheduler(), job_key.role, job_key.env, job_key.name)
 
 
 @app.command
 @app.command_option(CLUSTER_INVOKE_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
 @app.command_option(SHARDS_OPTION)
-@requires.exactly('role', 'job')
-def kill(role, jobname):
-  """usage: kill --cluster=CLUSTER role job
+def kill(args, options):
+  """usage: kill cluster/role/env/job
 
   Kills a running job, blocking until all tasks have terminated.
 
   Default behaviour is to kill all shards in the job, but the kill
   can be limited to specific shards with the --shards option
   """
-  options = app.get_options()
-  api = MesosClientAPI(options.cluster, options.verbosity == 'verbose')
-  resp = api.kill_job(role, jobname, app.get_options().shards)
+  api, job_key = LiveJobDisambiguator.disambiguate_args_or_die(args, options, make_client_factory())
+  resp = api.kill_job(job_key, options.shards)
   check_and_log_response(resp)
-  handle_open(api.scheduler.scheduler(), role, jobname)
+  handle_open(api.scheduler.scheduler(), job_key.role, job_key.env, job_key.name)
 
 
 @app.command
 @app.command_option(CLUSTER_INVOKE_OPTION)
-@requires.exactly('role', 'job')
-def status(role, jobname):
-  """usage: status --cluster=CLUSTER role job
+def status(args, options):
+  """usage: status cluster/role/env/job
 
   Fetches and prints information about the active tasks in a job.
   """
-  options = app.get_options()
 
   def is_active(task):
     return task.status in ACTIVE_STATES
@@ -565,14 +607,17 @@ def status(role, jobname):
     for task in tasks:
       taskString = print_task(task)
 
-      log.info('shard: %s, status: %s on %s\n%s' %
-             (task.assignedTask.task.shardId,
+      log.info('role: %s, env: %s, name: %s, shard: %s, status: %s on %s\n%s' %
+             (task.assignedTask.task.owner.role,
+              task.assignedTask.task.environment,
+              task.assignedTask.task.jobName,
+              task.assignedTask.task.shardId,
               ScheduleStatus._VALUES_TO_NAMES[task.status],
               task.assignedTask.slaveHost,
               taskString))
 
-  resp = MesosClientAPI(options.cluster, options.verbosity == 'verbose').check_status(
-      role, jobname)
+  api, job_key = LiveJobDisambiguator.disambiguate_args_or_die(args, options, make_client_factory())
+  resp = api.check_status(job_key)
   check_and_log_response(resp)
 
   if resp.tasks:
@@ -595,7 +640,7 @@ def status(role, jobname):
 @app.command_option(SHARDS_OPTION)
 @app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(CLUSTER_CONFIG_OPTION)
-@app.command_option(ENV_OPTION)
+@app.command_option(ENV_CONFIG_OPTION)
 @app.command_option(JSON_OPTION)
 @requires.exactly('job', 'config')
 def update(jobname, config_file):
@@ -624,7 +669,7 @@ def update(jobname, config_file):
       bindings=options.bindings,
       select_cluster=options.cluster,
       select_env=options.env)
-  api = MesosClientAPI(config.cluster(), options.verbosity == 'verbose')
+  api = make_client(config.cluster())
   resp = api.update_job(config, options.health_check_interval_seconds, options.shards)
   check_and_log_response(resp)
 
@@ -633,37 +678,33 @@ def update(jobname, config_file):
 @app.command_option(CLUSTER_INVOKE_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
 @app.command_option(SHARDS_OPTION)
-@requires.exactly('role', 'job')
-def restart(role, job):
-  """usage: restart --cluster=CLUSTER role job --shards=SHARDS
+def restart(args, options):
+  """usage: restart cluster/role/env/job --shards=SHARDS
 
   Restarts a batch of shards within a job.
   WARNING: All specified shards will be restarted simultaneously.  Any batching and
   delays must be done externally.
   """
-  options = app.get_options()
-  api = MesosClientAPI(options.cluster, options.verbosity == 'verbose')
   if not options.shards:
     die('--shards is required')
-  resp = api.restart(role, job, options.shards)
+  api, job_key = LiveJobDisambiguator.disambiguate_args_or_die(args, options, make_client_factory())
+  resp = api.restart(job_key, options.shards)
   check_and_log_response(resp)
-  handle_open(api.scheduler.scheduler(), role, job)
+  handle_open(api.scheduler.scheduler(), job_key.role, job_key.env, job_key.name)
 
 
 @app.command
 @app.command_option(CLUSTER_INVOKE_OPTION)
-@requires.exactly('role', 'job')
-def cancel_update(role, jobname):
-  """usage: cancel_update --cluster=CLUSTER role job
+def cancel_update(args, options):
+  """usage: cancel_update cluster/role/env/job
 
-  Unlocks an job for updates.
+  Unlocks a job for updates.
   A job may be locked if a client's update session terminated abnormally,
   or if another user is actively updating the job.  This command should only
   be used when the user is confident that they are not conflicting with another user.
   """
-  options = app.get_options()
-  resp = MesosClientAPI(options.cluster, options.verbosity == 'verbose').cancel_update(
-      role, jobname)
+  api, job_key = LiveJobDisambiguator.disambiguate_args_or_die(args, options, make_client_factory())
+  resp = api.cancel_update(job_key)
   check_and_log_response(resp)
 
 
@@ -676,7 +717,7 @@ def get_quota(role):
   Prints the production quota that has been allocated to a user.
   """
   options = app.get_options()
-  resp = MesosClientAPI(options.cluster, options.verbosity == 'verbose').get_quota(role)
+  resp = make_client(options.cluster).get_quota(role)
   quota = resp.quota
 
   quota_fields = [
@@ -689,30 +730,37 @@ def get_quota(role):
 
 
 @app.command
-@app.command_option(CLUSTER_INVOKE_OPTION)
 @app.command_option(EXECUTOR_SANDBOX_OPTION)
 @app.command_option('--user', dest='ssh_user', default=None,
                     help="ssh as this user instead of the role.")
 @app.command_option('-L', dest='tunnels', action='append', metavar='PORT:NAME',
                     default=[],
                     help="Add tunnel from local port PORT to remote named port NAME.")
-@requires.at_least('role', 'job', 'shard')
-def ssh(role, job, shard, *args):
-  """usage: ssh --cluster=CLUSTER role job shard
+def ssh(args, options):
+  """usage: ssh cluster/role/env/job shard [args...]
 
   Initiate an SSH session on the machine that a shard is running on.
   """
-  options = app.get_options()
-
-  api = MesosClientAPI(options.cluster, options.verbosity == 'verbose')
-  resp = api.query(api.build_query(role, job, set([int(shard)])))
-
-  if not resp.responseCode:
-    die('Request failed, server responded with "%s"' % resp.message)
+  if not args:
+    die('Job path is required')
+  job_path = args.pop(0)
+  try:
+    cluster, role, env, name = AuroraJobKey.from_path(job_path)
+  except AuroraJobKey.Error as e:
+    die('Invalid job path "%s": %s' % (job_path, e))
+  if not args:
+    die('Shard is required')
+  try:
+    shard = int(args.pop(0))
+  except ValueError:
+    die('Shard must be an integer')
+  api = make_client(cluster)
+  resp = api.query(api.build_query(role, name, set([int(shard)]), env=env))
+  check_and_log_response(resp)
 
   remote_cmd = 'bash' if not args else ' '.join(args)
   command = DistributedCommandRunner.substitute(remote_cmd, resp.tasks[0],
-      options.cluster, executor_sandbox=options.executor_sandbox)
+      cluster, executor_sandbox=options.executor_sandbox)
 
   ssh_command = ['ssh', '-t']
 
@@ -738,30 +786,29 @@ def ssh(role, job, shard, *args):
 @app.command_option('-t', '--threads', type=int, default=1, dest='num_threads',
     help='The number of threads to use.')
 @app.command_option(EXECUTOR_SANDBOX_OPTION)
-@app.command_option(CLUSTER_INVOKE_OPTION)
-@requires.at_least('role', 'job', 'cmd')
-def run(*line):
-  """usage: run --cluster=CLUSTER role job(s) cmd
+def run(args, options):
+  """usage: run cluster/role/env/job cmd
 
-  Runs a shell command on all machines currently hosting shards of a
-  comma-separated list of jobs.
+  Runs a shell command on all machines currently hosting shards of a single job.
 
   This feature supports the same command line wildcards that are used to
   populate a job's commands.
 
-  For Aurora jobs this means %port:PORT_NAME%, %shard_id%, %task_id%.
-  For Thermos jobs this means anything in the {{mesos.*}} and {{thermos.*}} namespaces.
+  This means anything in the {{mesos.*}} and {{thermos.*}} namespaces.
   """
   # TODO(William Farner): Add support for invoking on individual shards.
-  options = app.get_options()
+  # TODO(Kevin Sweeney): Restore the ability to run across jobs with globs (See MESOS-3010).
+  if not args:
+    die('job path is required')
+  job_path = args.pop(0)
+  try:
+    cluster, role, env, name = AuroraJobKey.from_path(job_path)
+  except AuroraJobKey.Error as e:
+    die('Invalid job path "%s": %s' % (job_path, e))
 
-  (role, jobs) = line[:2]
-  command = ' '.join(line[2:])
+  command = ' '.join(args)
 
-  if not options.cluster:
-    die('--cluster is required')
-
-  dcr = DistributedCommandRunner(options.cluster, role, jobs.split(','))
+  dcr = DistributedCommandRunner(cluster, role, [name])
   dcr.run(command, parallelism=options.num_threads, executor_sandbox=options.executor_sandbox)
 
 
@@ -992,34 +1039,12 @@ def help(args):
     sys.exit(1)
 
 
-def set_quiet(option, _1, _2, parser):
-  setattr(parser.values, option.dest, 'quiet')
-  LogOptions.set_stderr_log_level('NONE')
-
-
-def set_verbose(option, _1, _2, parser):
-  setattr(parser.values, option.dest, 'verbose')
-  LogOptions.set_stderr_log_level('DEBUG')
-
-
 def main():
   app.help()
 
 
 if __name__ == '__main__':
   app.interspersed_args(True)
-  app.add_option('-v',
-                 dest='verbosity',
-                 default='normal',
-                 action='callback',
-                 callback=set_verbose,
-                 help='Verbose logging. (default: %default)')
-  app.add_option('-q',
-                 dest='verbosity',
-                 default='normal',
-                 action='callback',
-                 callback=set_quiet,
-                 help='Quiet logging. (default: %default)')
   LogOptions.set_stderr_log_level('INFO')
   LogOptions.disable_disk_logging()
   app.set_name('mesos-client')

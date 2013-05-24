@@ -1,6 +1,7 @@
 from twitter.common import log
 from twitter.common.lang import Compatibility
-from twitter.mesos.client.updater import Updater
+
+from twitter.mesos.common import AuroraJobKey
 
 from gen.twitter.mesos.constants import DEFAULT_ENVIRONMENT, LIVE_STATES
 from gen.twitter.mesos.ttypes import (
@@ -12,6 +13,7 @@ from gen.twitter.mesos.ttypes import (
     TaskQuery)
 
 from .scheduler_client import SchedulerProxy
+from .updater import Updater
 
 
 class MesosClientAPI(object):
@@ -27,10 +29,17 @@ job, and that the job is in a state suitable for an update.
 After checking on the above, you may release the update lock on the job by
 invoking cancel_update.
 """
+  class Error(Exception): pass
+  class TypeError(Error, TypeError): pass
+  class ClusterMismatch(Error, ValueError): pass
 
   def __init__(self, cluster, verbose=False):
     self._scheduler = SchedulerProxy(cluster, verbose=verbose)
     self._cluster = self._scheduler.cluster
+
+  @property
+  def cluster(self):
+    return self._cluster
 
   @property
   def scheduler(self):
@@ -44,47 +53,43 @@ invoking cancel_update.
   def populate_job_config(self, config):
     return self._scheduler.populateJobConfig(config.job())
 
-  def start_cronjob(self, role, jobname):
-    log.info("Starting cron job: %s" % jobname)
+  def start_cronjob(self, job_key):
+    self._assert_valid_job_key(job_key)
 
-    # TODO(ksweeney): Change to use just job after JobKey refactor
-    job = JobKey(role=role, environment=DEFAULT_ENVIRONMENT, name=jobname)
+    log.info("Starting cron job: %s" % job_key)
+    # TODO(ksweeney): Remove Nones before resolving MESOS-2403.
+    return self._scheduler.startCronJob(None, None, job_key.to_thrift())
 
-    return self._scheduler.startCronJob(role, jobname, job)
+  def get_jobs(self, role):
+    log.info("Retrieving jobs for role %s" % role)
+    return self._scheduler.getJobs(role)
 
-  def kill_job(self, role, jobname, shards=None):
-    log.info("Killing tasks for job: %s" % jobname)
-    if not isinstance(jobname, Compatibility.string) or not jobname:
-      raise ValueError('jobname must be a non-empty string!')
+  def kill_job(self, job_key, shards=None):
+    log.info("Killing tasks for job: %s" % job_key)
+    if not isinstance(job_key, AuroraJobKey):
+      raise TypeError('Expected type of job_key %r to be %s but got %s instead'
+          % (job_key, AuroraJobKey.__name__, job_key.__class__.__name__))
 
-    query = TaskQuery()
-    # TODO(wickman)  Allow us to send user=getpass.getuser() without it resulting in filtering jobs
-    # only submitted by a particular user.
-    query.owner = Identity(role=role)
-    query.jobName = jobname
+    # Leave query.owner.user unset so the query doesn't filter jobs only submitted by a particular
+    # user.
+    # TODO(wfarner): Refactor this when Identity is removed from TaskQuery.
+    query = job_key.to_thrift_query()
     if shards is not None:
       log.info("Shards to be killed: %s" % shards)
       query.shardIds = frozenset([int(s) for s in shards])
 
     return self._scheduler.killTasks(query)
 
-  def check_status(self, role, jobname=None):
-    log.info("Checking status of role: %s / job: %s" % (role, jobname))
+  def check_status(self, job_key):
+    self._assert_valid_job_key(job_key)
 
-    query = TaskQuery()
-    query.owner = Identity(role=role)
-    if jobname:
-      query.jobName = jobname
-    return self.query(query)
+    log.info("Checking status of %s" % job_key)
+    return self.query(job_key.to_thrift_query())
 
   @classmethod
-  def build_query(cls, role, job, shards=None, statuses=LIVE_STATES):
-    query = TaskQuery()
-    query.statuses = statuses
-    query.owner = Identity(role=role)
-    query.jobName = job
-    query.shardIds = shards
-    return query
+  def build_query(cls, role, job, shards=None, statuses=LIVE_STATES, env=None):
+    return TaskQuery(
+      owner=Identity(role=role), jobName=job, statuses=statuses, shardIds=shards, environment=env)
 
   def query(self, query):
     return self._scheduler.getTasksStatus(query)
@@ -124,22 +129,24 @@ invoking cancel_update.
 
     return resp
 
-  def cancel_update(self, role, jobname):
-    """Cancel the update represented by role/jobname.  Returns whether or not the cancellation
-       was successful."""
-    log.info("Canceling update on job: %s" % jobname)
-    resp = Updater.cancel_update(self._scheduler, role, jobname)
+  def cancel_update(self, job_key):
+    """Cancel the update represented by job_key. Returns whether or not the cancellation was
+    successful."""
+    self._assert_valid_job_key(job_key)
+
+    log.info("Canceling update on job %s" % job_key)
+    resp = Updater.cancel_update(self._scheduler, job_key.role, job_key.env, job_key.name)
     if resp.responseCode != ResponseCode.OK:
       log.error('Error cancelling the update: %s' % resp.message)
     return resp
 
-  def restart(self, role, jobname, shards):
-    log.info("Restarting job %s shards %s" % (jobname, shards))
+  def restart(self, job_key, shards):
+    self._assert_valid_job_key(job_key)
 
-    # TODO(ksweeney): Change to use just job after JobKey refactor
-    job = JobKey(role=role, environment=DEFAULT_ENVIRONMENT, name=jobname)
+    log.info("Restarting job %s shards %s" % (job_key, shards))
 
-    return self._scheduler.restartShards(role, jobname, job, shards)
+    # TODO(ksweeney): Remove Nones before resolving MESOS-2403.
+    return self._scheduler.restartShards(None, None, job_key.to_thrift(), shards)
 
   def get_quota(self, role):
     log.info("Getting quota for: %s" % role)
@@ -174,3 +181,10 @@ invoking cancel_update.
 
   def unload_recovery(self):
     return self._scheduler.unloadRecovery()
+
+  def _assert_valid_job_key(self, job_key):
+    if not isinstance(job_key, AuroraJobKey):
+      raise self.TypeError('Invalid job_key %r: expected %s but got %s'
+          % (job_key, AuroraJobKey.__name__, job_key.__class__.__name__))
+    if not job_key.cluster == self.cluster:
+      raise self.ClusterMismatch('job %s does not belong to cluster %s' % (job_key, self.cluster))

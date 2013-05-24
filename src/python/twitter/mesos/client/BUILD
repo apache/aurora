@@ -6,6 +6,7 @@ python_library(
     pants(':updater'),
     pants('src/python/twitter/common/lang'),
     pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/mesos/common'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
   ]
 )
@@ -17,6 +18,7 @@ python_library(
     pants(':base'),
     pants(':command_runner'),
     pants(':config'),
+    pants(':disambiguator'),
     pants(':quickrun'),
   ]
 )
@@ -63,6 +65,17 @@ python_library(
     pants('src/python/twitter/mesos/config:schema'),
     pants('src/python/twitter/thermos/config:schema'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+  ]
+)
+
+python_library(
+  name = 'disambiguator',
+  sources = ['disambiguator.py'],
+  dependencies = [
+    pants(':api'),
+    pants(':base'),
+    pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/mesos/common')
   ]
 )
 
