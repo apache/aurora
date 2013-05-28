@@ -7,9 +7,7 @@ import java.util.concurrent.TimeUnit;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
-import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.Offer;
-import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskInfo;
@@ -65,11 +63,10 @@ import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
  */
 public class TaskSchedulerImplTest extends EasyMockTest {
 
-  private static final String DEFAULT_HOST = "hostname";
-  private static final Offer OFFER_A = makeOffer("OFFER_A", "HOST_A");
-  private static final Offer OFFER_B = makeOffer("OFFER_B", "HOST_B");
-  private static final Offer OFFER_C = makeOffer("OFFER_C", "HOST_C");
-  private static final Offer OFFER_D = makeOffer("OFFER_D", "HOST_D");
+  private static final Offer OFFER_A = Offers.makeOffer("OFFER_A", "HOST_A");
+  private static final Offer OFFER_B = Offers.makeOffer("OFFER_B", "HOST_B");
+  private static final Offer OFFER_C = Offers.makeOffer("OFFER_C", "HOST_C");
+  private static final Offer OFFER_D = Offers.makeOffer("OFFER_D", "HOST_D");
 
   private Storage storage;
   private MaintenanceController maintenance;
@@ -106,19 +103,6 @@ public class TaskSchedulerImplTest extends EasyMockTest {
         retryStrategy,
         executor,
         offerQueue);
-  }
-
-  private Offer makeOffer(String offerId) {
-    return makeOffer(offerId, DEFAULT_HOST);
-  }
-
-  private static Offer makeOffer(String offerId, String hostName) {
-    return Offer.newBuilder()
-        .setId(OfferID.newBuilder().setValue(offerId))
-        .setFrameworkId(FrameworkID.newBuilder().setValue("framework_id"))
-        .setSlaveId(SlaveID.newBuilder().setValue("slave_id-" + offerId))
-        .setHostname(hostName)
-        .build();
   }
 
   private Capture<Runnable> expectOffer() {
@@ -337,7 +321,8 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectAnyMaintenanceCalls();
     Capture<Runnable> offerExpirationCapture = expectOfferDeclineIn(10);
 
-    Offer offerAB = makeOffer("OFFER_B").toBuilder().setSlaveId(OFFER_A.getSlaveId()).build();
+    Offer offerAB =
+        Offers.makeOffer("OFFER_B").toBuilder().setSlaveId(OFFER_A.getSlaveId()).build();
 
     driver.declineOffer(OFFER_A.getId());
     driver.declineOffer(offerAB.getId());

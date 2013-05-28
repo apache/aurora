@@ -15,6 +15,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Supplier;
 import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
@@ -113,8 +114,11 @@ public interface OfferQueue extends EventSubscriber {
                 return offer.mode;
               }
             });
-    final Set<HostOffer> hostOffers = Collections.synchronizedSet(
-        Sets.newTreeSet(PREFERENCE_COMPARATOR));
+
+    // This is a synchronized set only to support the stats export, which will be accessed from
+    // other threads.  All internal access to hostOffers is gated with the intrinsic lock.
+    final Set<HostOffer> hostOffers =
+        Collections.synchronizedSet(Sets.<HostOffer>newTreeSet(PREFERENCE_COMPARATOR));
     final Driver driver;
     final OfferReturnDelay returnDelay;
     final ScheduledExecutorService executor;
@@ -132,8 +136,7 @@ public interface OfferQueue extends EventSubscriber {
       Stats.exportSize("outstanding_offers", hostOffers);
     }
 
-    @Override
-    public synchronized void addOffer(final Offer offer) {
+    private synchronized void addOffer(final Offer offer, MaintenanceMode hostMode) {
       List<HostOffer> sameSlave = FluentIterable.from(hostOffers)
           .filter(new Predicate<HostOffer>() {
             @Override public boolean apply(HostOffer hostOffer) {
@@ -142,7 +145,7 @@ public interface OfferQueue extends EventSubscriber {
           })
           .toList();
       if (sameSlave.isEmpty()) {
-        hostOffers.add(new HostOffer(offer, maintenance.getMode(offer.getHostname())));
+        hostOffers.add(new HostOffer(offer, hostMode));
         executor.schedule(
             new Runnable() {
               @Override public void run() {
@@ -159,6 +162,13 @@ public interface OfferQueue extends EventSubscriber {
           decline(sameSlaveOffer.offer.getId());
         }
       }
+    }
+
+    @Override
+    public void addOffer(final Offer offer) {
+      // Don't secure the intrinsic lock until any external locks related to getting the host
+      // mode are released.  This avoids potential deadlock situations.
+      addOffer(offer, maintenance.getMode(offer.getHostname()));
     }
 
     synchronized void decline(OfferID id) {
@@ -246,12 +256,28 @@ public interface OfferQueue extends EventSubscriber {
       }
     }
 
+    private synchronized ImmutableList<HostOffer> offersCopy() {
+      return ImmutableList.copyOf(hostOffers);
+    }
+
+    private synchronized void removeOffer(HostOffer offer) {
+      // Synchronizing is not strictly necessary, but for uniformity in the lock used elsewhere.
+      hostOffers.remove(offer);
+    }
+
     @Override
-    public synchronized boolean launchFirst(Function<Offer, Optional<TaskInfo>> acceptor)
+    public boolean launchFirst(Function<Offer, Optional<TaskInfo>> acceptor)
         throws LaunchException {
 
+      // Copy the offers set into a same-order list to ensure we do not attempt to acquire an
+      // external lock while holding the intrinsic lock.  This done at the expense of additional
+      // heap churn and a risk of a data race on the host offers.  The ramification of a data
+      // race is an accepted invalid offer, though this race already exists since the offer
+      // flow occurs over the network and is unsynchronized.
+      List<HostOffer> offersCopy = offersCopy();
+
       Optional<HostOffer> accepted = Optional.absent();
-      for (HostOffer hostOffer : hostOffers) {
+      for (HostOffer hostOffer : offersCopy) {
         Optional<TaskInfo> assignment = acceptor.apply(hostOffer.offer);
         if (assignment.isPresent()) {
           try {
@@ -268,7 +294,7 @@ public interface OfferQueue extends EventSubscriber {
       }
 
       if (accepted.isPresent()) {
-        hostOffers.remove(accepted.get());
+        removeOffer(accepted.get());
         return true;
       } else {
         return false;
