@@ -113,7 +113,8 @@ public interface OfferQueue extends EventSubscriber {
               @Override public MaintenanceMode apply(HostOffer offer) {
                 return offer.mode;
               }
-            });
+            })
+            .compound(Ordering.arbitrary());
 
     // This is a synchronized set only to support the stats export, which will be accessed from
     // other threads.  All internal access to hostOffers is gated with the intrinsic lock.

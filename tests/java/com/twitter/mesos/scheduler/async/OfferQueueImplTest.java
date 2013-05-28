@@ -30,12 +30,17 @@ import com.twitter.mesos.scheduler.async.OfferQueue.OfferQueueImpl;
 import com.twitter.mesos.scheduler.async.OfferQueue.OfferReturnDelay;
 
 import static org.easymock.EasyMock.expect;
+import static org.junit.Assert.assertFalse;
 
 public class OfferQueueImplTest extends EasyMockTest {
 
   private static final Amount<Integer, Time> RETURN_DELAY = Amount.of(1, Time.DAYS);
   private static final String HOST_A = "HOST_A";
   private static final Offer OFFER_A = Offers.makeOffer("OFFER_A", HOST_A);
+  private static final String HOST_B = "HOST_B";
+  private static final Offer OFFER_B = Offers.makeOffer("OFFER_B", HOST_B);
+  private static final String HOST_C = "HOST_C";
+  private static final Offer OFFER_C = Offers.makeOffer("OFFER_C", HOST_C);
 
   private Driver driver;
   private ScheduledExecutorService executor;
@@ -100,5 +105,22 @@ public class OfferQueueImplTest extends EasyMockTest {
 
     launchAttempted.await();
     offerAdded.await();
+  }
+
+  @Test
+  public void testOffersSorted() throws Exception {
+    expect(maintenanceController.getMode(HOST_A)).andReturn(MaintenanceMode.NONE);
+    expect(maintenanceController.getMode(HOST_B)).andReturn(MaintenanceMode.DRAINING);
+    expect(maintenanceController.getMode(HOST_C)).andReturn(MaintenanceMode.NONE);
+    expect(offerAcceptor.apply(OFFER_A)).andReturn(Optional.<TaskInfo>absent());
+    expect(offerAcceptor.apply(OFFER_C)).andReturn(Optional.<TaskInfo>absent());
+    expect(offerAcceptor.apply(OFFER_B)).andReturn(Optional.<TaskInfo>absent());
+
+    control.replay();
+
+    offerQueue.addOffer(OFFER_A);
+    offerQueue.addOffer(OFFER_B);
+    offerQueue.addOffer(OFFER_C);
+    assertFalse(offerQueue.launchFirst(offerAcceptor));
   }
 }
