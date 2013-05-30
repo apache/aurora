@@ -71,8 +71,6 @@ class Updater(object):
       raise self.InvalidConfigError(str(e))
     self._update_token = None
 
-    self._has_health_port = config.has_health_port()
-
   def _update_failure_counts(self, failed_shards):
     """Update the failure counts metrics based upon a batch of failed shards."""
     for shard in failed_shards:
@@ -168,7 +166,6 @@ class Updater(object):
         self._cluster,
         self._update_config.restart_threshold,
         self._update_config.watch_secs,
-        self._has_health_port,
         health_check_interval_seconds)
     failed_shards = set()
     ShardState = collections.namedtuple('ShardState', ['shard_id', 'is_updated'])

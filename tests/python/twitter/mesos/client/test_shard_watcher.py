@@ -1,7 +1,7 @@
 from math import ceil
 import unittest
 
-from twitter.mesos.client.health_check_factory import HealthCheck
+from twitter.mesos.client.health_check import HealthCheck
 from twitter.mesos.client.shard_watcher import ShardWatcher
 
 from gen.twitter.mesos.ttypes import *
@@ -22,24 +22,6 @@ class FakeClock(object):
     self._now_seconds += seconds
 
 
-class FakeHealthCheckFactory(object):
-  """Performs the functions of a health checker for testing"""
-  def __init__(self):
-    self._health_check = mox.MockObject(HealthCheck)
-
-  def get(self):
-    return self._health_check
-
-  def expect_health_check(self, task, status, retry):
-    self._health_check.health(task).InAnyOrder().AndReturn((status, retry))
-
-  def replay(self):
-    mox.Replay(self._health_check)
-
-  def verify(self):
-    mox.Verify(self._health_check)
-
-
 def find_expected_cycles(period, sleep_secs):
   return ceil(period / sleep_secs) + 1
 
@@ -56,15 +38,13 @@ class ShardWatcherTest(unittest.TestCase):
     self._clock = FakeClock()
     self._scheduler = mox.MockObject(scheduler_client)
     job_key = JobKey(name=self._name, environment=self._env, role=self._role)
-    self._health_check_handler = FakeHealthCheckFactory()
+    self._health_check = mox.MockObject(HealthCheck)
     self._watcher = ShardWatcher(self._scheduler,
                                  job_key,
                                  'cluster',
                                  self.RESTART_THRESHOLD,
                                  self.WATCH_SECS,
-                                 has_health_port=True,
                                  health_check_interval_seconds=3,
-                                 health_check_factory=self._health_check_handler,
                                  clock=self._clock)
 
   def get_tasks_status_query(self, shard_ids):
@@ -86,22 +66,25 @@ class ShardWatcherTest(unittest.TestCase):
     for x in range(int(num_calls)):
       self._scheduler.getTasksStatus(query).AndReturn(response)
 
+  def mock_health_check(self, task, status, retry):
+    self._health_check.health(task).InAnyOrder().AndReturn((status, retry))
+
   def expect_health_check(self, shard, status, retry=True, num_calls=EXPECTED_CYCLES):
     for x in range(int(num_calls)):
-      self._health_check_handler.expect_health_check(self.create_task(shard), status, retry)
+      self.mock_health_check(self.create_task(shard), status, retry)
 
   def assert_watch_result(self, expected_failed_shards, shards_to_watch=WATCH_SHARDS):
-    shards_returned = self._watcher.watch(shards_to_watch)
+    shards_returned = self._watcher.watch(shards_to_watch, self._health_check)
     assert set(expected_failed_shards) == shards_returned, (
         'Expected shards (%s) : Returned shards (%s)' % (expected_failed_shards, shards_returned))
 
   def replay_mocks(self):
     mox.Replay(self._scheduler)
-    self._health_check_handler.replay()
+    mox.Replay(self._health_check)
 
   def verify_mocks(self):
     mox.Verify(self._scheduler)
-    self._health_check_handler.verify()
+    mox.Verify(self._health_check)
 
   def test_successful_watch(self):
     """All shards are healthy immediately"""

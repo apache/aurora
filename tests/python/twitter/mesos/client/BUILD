@@ -2,7 +2,7 @@ python_test_suite(name = 'all',
   dependencies = [
     pants(':config'),
     pants(':disambiguator'),
-    pants(':health_check_factory'),
+    pants(':health_check'),
     pants(':scheduler_client'),
     pants(':shard_watcher'),
     pants(':updater'),
@@ -25,18 +25,17 @@ python_tests(name = 'disambiguator',
   ],
 )
 
-python_tests(name = 'scheduler_client',
-  sources = ['test_scheduler_client.py'],
+python_tests(name = 'health_check',
+  sources = ['test_health_check.py'],
   dependencies = [
-    pants('src/python/twitter/common'),
     pants('src/python/twitter/mesos:mesos-lib'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
     pants('3rdparty/python:mox'),
   ],
 )
 
-python_tests(name = 'updater',
-  sources = ['test_updater.py'],
+python_tests(name = 'scheduler_client',
+  sources = ['test_scheduler_client.py'],
   dependencies = [
     pants('src/python/twitter/common'),
     pants('src/python/twitter/mesos:mesos-lib'),
@@ -54,9 +53,10 @@ python_tests(name = 'shard_watcher',
   ]
 )
 
-python_tests(name = 'health_check_factory',
-  sources = ['test_health_check_factory.py'],
+python_tests(name = 'updater',
+  sources = ['test_updater.py'],
   dependencies = [
+    pants('src/python/twitter/common'),
     pants('src/python/twitter/mesos:mesos-lib'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
     pants('3rdparty/python:mox'),

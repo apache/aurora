@@ -1050,4 +1050,3 @@ if __name__ == '__main__':
   app.set_name('mesos-client')
   app.set_usage(DEFAULT_USAGE_BANNER + generate_terse_usage())
   app.main()
-

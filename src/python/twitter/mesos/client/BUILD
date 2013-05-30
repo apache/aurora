@@ -137,7 +137,7 @@ python_library(
 
 python_library(
   name = 'shard_watcher',
-  sources = ['shard_watcher.py', 'health_check_factory.py'],
+  sources = ['shard_watcher.py', 'health_check.py'],
   dependencies = [
     pants(':scheduler_client'),
     pants('src/python/twitter/common/lang'),

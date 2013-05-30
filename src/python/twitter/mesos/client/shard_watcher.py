@@ -1,7 +1,7 @@
 import time
 
 from twitter.common import log
-from .health_check_factory import HealthCheckFactory
+from .health_check import ShardWatcherHealthCheck
 
 from gen.twitter.mesos.ttypes import (
   Identity,
@@ -31,9 +31,7 @@ class ShardWatcher(object):
                cluster,
                restart_threshold,
                watch_secs,
-               has_health_port,
                health_check_interval_seconds,
-               health_check_factory=None,
                clock=time):
 
     self._scheduler = scheduler
@@ -41,11 +39,9 @@ class ShardWatcher(object):
     self._restart_threshold = restart_threshold
     self._watch_secs = watch_secs
     self._health_check_interval_seconds = health_check_interval_seconds
-    self._health_check_factory = health_check_factory or HealthCheckFactory(
-        cluster, has_health_port)
     self._clock = clock
 
-  def watch(self, shard_ids):
+  def watch(self, shard_ids, health_check=None):
     """Watches a set of shards and detects failures based on a delegated health check.
 
     Arguments:
@@ -55,7 +51,7 @@ class ShardWatcher(object):
     """
     log.info('Watching shards: %s' % shard_ids)
     shard_ids = set(shard_ids)
-    health_check = self._health_check_factory.get()
+    health_check = health_check or ShardWatcherHealthCheck()
     now = self._clock.time()
     expected_healthy_by = now + self._restart_threshold
     max_time = now + self._restart_threshold + self._watch_secs

@@ -1,14 +1,14 @@
 import unittest
 
 from twitter.mesos.common.http_signaler import HttpSignaler
-from twitter.mesos.client.health_check_factory import (
+from twitter.mesos.client.health_check import (
   ChainedHealthCheck,
   HealthCheck,
-  HealthCheckFactory,
   HealthStatus,
   HttpHealthCheck,
   NotRetriable,
   Retriable,
+  ShardWatcherHealthCheck,
   StatusHealthCheck
 )
 
@@ -21,7 +21,7 @@ PENDING = ScheduleStatus.PENDING
 RUNNING = ScheduleStatus.RUNNING
 FAILED = ScheduleStatus.FAILED
 
-class HealthCheckFactoryTest(unittest.TestCase):
+class HealthCheckTest(unittest.TestCase):
   HOST = 'host-a'
   HEALTH_PORT = 33333
 
@@ -29,12 +29,15 @@ class HealthCheckFactoryTest(unittest.TestCase):
     self._http_signaler = mox.MockObject(HttpSignaler)
     self._status_health_check = StatusHealthCheck()
     self._http_health_check = HttpHealthCheck(self._http_signaler)
+    self._smart_health_check = ShardWatcherHealthCheck(self._http_signaler)
     self._health_check_a = mox.MockObject(HealthCheck)
     self._health_check_b = mox.MockObject(HealthCheck)
 
   def create_task(self, shard_id, task_id, status=RUNNING, host=HOST, port=HEALTH_PORT):
     task = TwitterTaskInfo(shardId=shard_id)
-    ports = {'health': port}
+    ports = {}
+    if port:
+      ports['health'] = port
     assigned_task = AssignedTask(taskId=task_id, task=task, slaveHost=host, assignedPorts=ports)
     return ScheduledTask(assignedTask=assigned_task, status=status)
 
@@ -100,7 +103,7 @@ class HealthCheckFactoryTest(unittest.TestCase):
     assert self._http_health_check.health(task_b) == Retriable.alive()
     self.verify()
 
-  def test_simple_chanined_health_check(self):
+  def test_simple_chained_health_check(self):
     """Verify successful health check"""
     task = self.create_task(0, 'a')
     self._health_check_a.health(task).AndReturn(Retriable.alive())
@@ -137,3 +140,30 @@ class HealthCheckFactoryTest(unittest.TestCase):
     assert Retriable.dead() == (False, True)
     assert NotRetriable.alive() == (True, False)
     assert NotRetriable.dead() == (False, False)
+
+  def test_smart_health_check(self):
+    """Verifies that if the task has no health port, only status check is performed"""
+    task = self.create_task(0, 'a', port=None)
+    self.replay()
+    assert self._smart_health_check.health(task) == Retriable.alive()
+    self.verify()
+
+  def test_smart_http_health_check(self):
+    """Verifies that http health check is performed if the task has a health port"""
+    task = self.create_task(0, 'a')
+    self.expect_http_signaler_creation()
+    self.expect_health_check(status=False)
+    self.replay()
+    assert self._smart_health_check.health(task) == Retriable.dead()
+    self.verify()
+
+  def test_smart_http_health_check_one_http_signaler(self):
+    """Verifies that upon multiple http health checks only one HttpHealthChecker is created"""
+    task = self.create_task(0, 'a')
+    self.expect_http_signaler_creation()
+    self.expect_health_check()
+    self.expect_health_check()
+    self.replay()
+    assert self._smart_health_check.health(task) == Retriable.alive()
+    assert self._smart_health_check.health(task) == Retriable.alive()
+    self.verify()

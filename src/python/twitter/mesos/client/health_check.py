@@ -103,12 +103,20 @@ class ChainedHealthCheck(HealthCheck):
     return Retriable.alive()
 
 
-class HealthCheckFactory(object):
-  def __init__(self, cluster, has_health_port):
-    self._enable_http = has_health_port
+class ShardWatcherHealthCheck(HealthCheck):
+  """Makes the decision: if a task has health port, then use Status+HTTP, else use only status.
+     Caveat: Only works if either ALL tasks have a health port or none of them have a health port.
+  """
+  # TODO(atollenaere) Refactor the code to use the executor HealthInterface/HealthChecker instead
 
-  def get(self):
-    check = StatusHealthCheck()
-    if self._enable_http:
-      check = ChainedHealthCheck(check, HttpHealthCheck())
-    return check
+  def __init__(self, http_signaler_factory=HttpSignaler):
+    self._has_health_port = False
+    self._health_checker = StatusHealthCheck()
+    self._http_signaler_factory = http_signaler_factory
+
+  def health(self, task):
+    if not self._has_health_port and 'health' in task.assignedTask.assignedPorts:
+      log.debug('Health port detected, enabling HTTP checks')
+      self._health_checker = ChainedHealthCheck(self._health_checker, HttpHealthCheck(self._http_signaler_factory))
+      self._has_health_port = True
+    return self._health_checker.health(task)
