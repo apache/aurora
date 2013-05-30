@@ -12,11 +12,11 @@ import com.google.common.collect.ImmutableSet;
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.JobUpdateConfiguration;
 import com.twitter.mesos.gen.MaintenanceMode;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
-import com.twitter.mesos.gen.storage.JobUpdateConfiguration;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 

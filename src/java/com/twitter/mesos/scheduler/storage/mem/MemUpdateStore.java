@@ -10,7 +10,7 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Maps;
 
 import com.twitter.mesos.Tasks;
-import com.twitter.mesos.gen.storage.JobUpdateConfiguration;
+import com.twitter.mesos.gen.JobUpdateConfiguration;
 import com.twitter.mesos.scheduler.storage.UpdateStore;
 
 import static com.google.common.base.Preconditions.checkNotNull;

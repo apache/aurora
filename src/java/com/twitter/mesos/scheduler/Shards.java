@@ -4,8 +4,8 @@ import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
 
+import com.twitter.mesos.gen.TaskUpdateConfiguration;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 
 /**
  * Utility class for dealing with individual shards of a job.

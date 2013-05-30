@@ -15,6 +15,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
+import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
 import org.apache.commons.lang.StringUtils;
@@ -35,12 +36,14 @@ import com.twitter.mesos.gen.DrainHostsResponse;
 import com.twitter.mesos.gen.EndMaintenanceResponse;
 import com.twitter.mesos.gen.FinishUpdateResponse;
 import com.twitter.mesos.gen.ForceTaskStateResponse;
+import com.twitter.mesos.gen.GetJobUpdatesResponse;
 import com.twitter.mesos.gen.GetJobsResponse;
 import com.twitter.mesos.gen.GetQuotaResponse;
 import com.twitter.mesos.gen.Hosts;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.JobKey;
+import com.twitter.mesos.gen.JobUpdateConfiguration;
 import com.twitter.mesos.gen.KillResponse;
 import com.twitter.mesos.gen.ListBackupsResponse;
 import com.twitter.mesos.gen.MaintenanceStatusResponse;
@@ -77,6 +80,9 @@ import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescri
 import com.twitter.mesos.scheduler.configuration.ParsedConfiguration;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 import com.twitter.mesos.scheduler.storage.Storage;
+import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
+import com.twitter.mesos.scheduler.storage.Storage.Work;
+import com.twitter.mesos.scheduler.storage.UpdateStore;
 import com.twitter.mesos.scheduler.storage.backup.Recovery;
 import com.twitter.mesos.scheduler.storage.backup.Recovery.RecoveryException;
 import com.twitter.mesos.scheduler.storage.backup.StorageBackup;
@@ -680,6 +686,23 @@ class SchedulerThriftInterface implements SchedulerController {
     }
 
     return response;
+  }
+
+  @Override
+  public GetJobUpdatesResponse getJobUpdates(SessionKey session) {
+    return storage.doInTransaction(new Work.Quiet<GetJobUpdatesResponse>() {
+      @Override public GetJobUpdatesResponse apply(StoreProvider storeProvider) {
+        GetJobUpdatesResponse response = new GetJobUpdatesResponse().setResponseCode(OK);
+        response.setJobUpdates(Sets.<JobUpdateConfiguration>newHashSet());
+        UpdateStore store = storeProvider.getUpdateStore();
+        for (String role : store.fetchUpdatingRoles()) {
+          for (JobUpdateConfiguration config : store.fetchUpdateConfigs(role)) {
+            response.addToJobUpdates(config);
+          }
+        }
+        return response;
+      }
+    });
   }
 
   @Override

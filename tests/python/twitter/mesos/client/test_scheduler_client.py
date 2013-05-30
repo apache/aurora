@@ -238,3 +238,10 @@ class TestSchedulerProxyAdminInjection(TestSchedulerProxyInjection):
     self.mox.ReplayAll()
 
     self.make_scheduler_proxy().unloadRecovery()
+
+  def test_getJobUpdates(self):
+    self.mock_thrift_client.getJobUpdates(IsA(SessionKey))
+
+    self.mox.ReplayAll()
+
+    self.make_scheduler_proxy().getJobUpdates()

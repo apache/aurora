@@ -297,6 +297,23 @@ def scheduler_unload_recovery():
       .unload_recovery())
 
 
+@app.command
+@app.command_option(CLUSTER_OPTION)
+@requires.nothing
+def scheduler_list_job_updates():
+  """usage: scheduler_list_job_updates --cluster=CLUSTER
+
+  Lists in-flight job updates.
+  """
+  options = app.get_options()
+  resp = MesosClientAPI(options.cluster, options.verbosity).get_job_updates()
+  check_and_log_response(resp)
+  # TODO(wfarner): Print env as well once it's available.
+  log.info('Role\tJob')
+  for update in resp.jobUpdates:
+    log.info('\t'.join((update.role, update.job)))
+
+
 def make_commands_str(commands):
   commands.sort()
   if len(commands) == 1:

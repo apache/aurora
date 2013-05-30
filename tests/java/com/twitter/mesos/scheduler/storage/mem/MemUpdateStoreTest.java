@@ -6,9 +6,9 @@ import com.google.common.collect.ImmutableSet;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.twitter.mesos.gen.JobUpdateConfiguration;
+import com.twitter.mesos.gen.TaskUpdateConfiguration;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.gen.storage.JobUpdateConfiguration;
-import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 import com.twitter.mesos.scheduler.storage.UpdateStore;
 
 import static org.junit.Assert.assertEquals;

@@ -28,6 +28,7 @@ import com.twitter.mesos.gen.DrainHostsResponse;
 import com.twitter.mesos.gen.EndMaintenanceResponse;
 import com.twitter.mesos.gen.FinishUpdateResponse;
 import com.twitter.mesos.gen.ForceTaskStateResponse;
+import com.twitter.mesos.gen.GetJobUpdatesResponse;
 import com.twitter.mesos.gen.GetJobsResponse;
 import com.twitter.mesos.gen.GetQuotaResponse;
 import com.twitter.mesos.gen.Hosts;
@@ -330,6 +331,12 @@ class LoggingThriftInterface implements MesosAdmin.Iface {
       SessionKey session) throws TException {
 
     logUserAction(session, "endMaintenance|hosts: %s", hosts);
-    return delegate.endMaintenance(hosts, session);  }
+    return delegate.endMaintenance(hosts, session);
+  }
 
+  @Override
+  public GetJobUpdatesResponse getJobUpdates(SessionKey session) throws TException {
+    logUserAction(session, "getJobUpdates");
+    return delegate.getJobUpdates(session);
+  }
 }

@@ -9,11 +9,11 @@ import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
 
 import com.twitter.mesos.Tasks;
+import com.twitter.mesos.gen.JobUpdateConfiguration;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.TaskQuery;
+import com.twitter.mesos.gen.TaskUpdateConfiguration;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.gen.storage.JobUpdateConfiguration;
-import com.twitter.mesos.gen.storage.TaskUpdateConfiguration;
 import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.Shards;
 import com.twitter.mesos.scheduler.storage.Storage;

@@ -4,7 +4,7 @@ import java.util.Set;
 
 import com.google.common.base.Optional;
 
-import com.twitter.mesos.gen.storage.JobUpdateConfiguration;
+import com.twitter.mesos.gen.JobUpdateConfiguration;
 
 /**
  * Stores all update configurations for on-going updates.
