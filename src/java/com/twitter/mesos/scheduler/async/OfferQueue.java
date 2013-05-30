@@ -1,11 +1,12 @@
 package com.twitter.mesos.scheduler.async;
 
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
 import com.google.common.base.Function;
@@ -15,10 +16,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Supplier;
 import com.google.common.collect.FluentIterable;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
-import com.google.common.collect.Sets;
 import com.google.common.eventbus.Subscribe;
 import com.google.inject.Inject;
 
@@ -98,6 +97,10 @@ public interface OfferQueue extends EventSubscriber {
    * Thrown when there was an unexpected failure trying to launch a task.
    */
   static class LaunchException extends Exception {
+    LaunchException(String msg) {
+      super(msg);
+    }
+
     LaunchException(String msg, Throwable cause) {
       super(msg, cause);
     }
@@ -116,10 +119,9 @@ public interface OfferQueue extends EventSubscriber {
             })
             .compound(Ordering.arbitrary());
 
-    // This is a synchronized set only to support the stats export, which will be accessed from
-    // other threads.  All internal access to hostOffers is gated with the intrinsic lock.
-    final Set<HostOffer> hostOffers =
-        Collections.synchronizedSet(Sets.<HostOffer>newTreeSet(PREFERENCE_COMPARATOR));
+    final Set<HostOffer> hostOffers = new ConcurrentSkipListSet<HostOffer>(PREFERENCE_COMPARATOR);
+    final AtomicLong offerRaces = Stats.exportLong("offer_accept_races");
+
     final Driver driver;
     final OfferReturnDelay returnDelay;
     final ScheduledExecutorService executor;
@@ -130,14 +132,23 @@ public interface OfferQueue extends EventSubscriber {
         OfferReturnDelay returnDelay,
         ScheduledExecutorService executor,
         MaintenanceController maintenance) {
+
       this.driver = driver;
       this.returnDelay = returnDelay;
       this.executor = executor;
       this.maintenance = maintenance;
+      // Potential gotcha - since this is now a ConcurrentSkipListSet, size() is more expensive.
+      // Could track this separately if it turns out to pose problems.
       Stats.exportSize("outstanding_offers", hostOffers);
     }
 
-    private synchronized void addOffer(final Offer offer, MaintenanceMode hostMode) {
+    @Override
+    public void addOffer(final Offer offer) {
+      // We run a slight risk of a race here, which is acceptable.  The worst case is that we
+      // temporarily hold two offers for the same host, which should be corrected when we return
+      // them after the return delay.
+      // There's also a chance that we return an offer for compaction ~simultaneously with the
+      // same-host offer being canceled/returned.  This is also fine.
       List<HostOffer> sameSlave = FluentIterable.from(hostOffers)
           .filter(new Predicate<HostOffer>() {
             @Override public boolean apply(HostOffer hostOffer) {
@@ -146,7 +157,7 @@ public interface OfferQueue extends EventSubscriber {
           })
           .toList();
       if (sameSlave.isEmpty()) {
-        hostOffers.add(new HostOffer(offer, hostMode));
+        hostOffers.add(new HostOffer(offer, maintenance.getMode(offer.getHostname())));
         executor.schedule(
             new Runnable() {
               @Override public void run() {
@@ -165,21 +176,14 @@ public interface OfferQueue extends EventSubscriber {
       }
     }
 
-    @Override
-    public void addOffer(final Offer offer) {
-      // Don't secure the intrinsic lock until any external locks related to getting the host
-      // mode are released.  This avoids potential deadlock situations.
-      addOffer(offer, maintenance.getMode(offer.getHostname()));
-    }
-
-    synchronized void decline(OfferID id) {
+    void decline(OfferID id) {
       LOG.fine("Declining offer " + id);
       cancelOffer(id);
       driver.declineOffer(id);
     }
 
     @Override
-    public synchronized void cancelOffer(final OfferID offerId) {
+    public void cancelOffer(final OfferID offerId) {
       Preconditions.checkNotNull(offerId);
 
       // The small risk of inconsistency is acceptable here - if we have an accept/remove race
@@ -193,13 +197,14 @@ public interface OfferQueue extends EventSubscriber {
     }
 
     @Override
-    public synchronized Iterable<Offer> getOffers() {
-      return FluentIterable.from(hostOffers)
-          .transform(new Function<HostOffer, Offer>() {
-            @Override public Offer apply(HostOffer offer) {
-              return offer.offer;
-            }
-          }).toList();
+    public Iterable<Offer> getOffers() {
+      return Iterables.unmodifiableIterable(
+          FluentIterable.from(hostOffers)
+              .transform(new Function<HostOffer, Offer>() {
+                @Override public Offer apply(HostOffer offer) {
+                  return offer.offer;
+                }
+              }));
     }
 
     /**
@@ -208,7 +213,7 @@ public interface OfferQueue extends EventSubscriber {
      * @param change Host change notification.
      */
     @Subscribe
-    public synchronized void hostChangedState(HostMaintenanceStateChange change) {
+    public void hostChangedState(HostMaintenanceStateChange change) {
       final HostStatus hostStatus = change.getStatus();
 
       // Remove and re-add a host's offers to re-sort based on its new hostStatus
@@ -257,49 +262,38 @@ public interface OfferQueue extends EventSubscriber {
       }
     }
 
-    private synchronized ImmutableList<HostOffer> offersCopy() {
-      return ImmutableList.copyOf(hostOffers);
-    }
-
-    private synchronized void removeOffer(HostOffer offer) {
-      // Synchronizing is not strictly necessary, but for uniformity in the lock used elsewhere.
-      hostOffers.remove(offer);
-    }
-
     @Override
     public boolean launchFirst(Function<Offer, Optional<TaskInfo>> acceptor)
         throws LaunchException {
 
-      // Copy the offers set into a same-order list to ensure we do not attempt to acquire an
-      // external lock while holding the intrinsic lock.  This done at the expense of additional
-      // heap churn and a risk of a data race on the host offers.  The ramification of a data
-      // race is an accepted invalid offer, though this race already exists since the offer
-      // flow occurs over the network and is unsynchronized.
-      List<HostOffer> offersCopy = offersCopy();
+      // It's important that this method is not called concurrently - doing so would open up the
+      // possibility of a race between the same offers being accepted by different threads.
 
-      Optional<HostOffer> accepted = Optional.absent();
-      for (HostOffer hostOffer : offersCopy) {
+      for (HostOffer hostOffer : hostOffers) {
         Optional<TaskInfo> assignment = acceptor.apply(hostOffer.offer);
         if (assignment.isPresent()) {
-          try {
-            driver.launchTask(hostOffer.offer.getId(), assignment.get());
-          } catch (RuntimeException e) {
-            // TODO(William Farner): Catch only the checked exception produced by Driver
-            // once it changes from throwing IllegalStateException when the driver is not yet
-            // registered.
-            throw new LaunchException("Failed to launch task.", e);
+          // Guard against an offer being removed after we grabbed it from the iterator.
+          // If that happens, the offer will not exist in hostOffers, and we can immediately
+          // send it back to LOST for quick reschedule.
+          if (hostOffers.remove(hostOffer)) {
+            try {
+              driver.launchTask(hostOffer.offer.getId(), assignment.get());
+              return true;
+            } catch (IllegalStateException e) {
+              // TODO(William Farner): Catch only the checked exception produced by Driver
+              // once it changes from throwing IllegalStateException when the driver is not yet
+              // registered.
+              throw new LaunchException("Failed to launch task.", e);
+            }
+          } else {
+            offerRaces.incrementAndGet();
+            throw new LaunchException(
+                "Accepted offer no longer exists in offer queue, likely data race.");
           }
-          accepted = Optional.of(hostOffer);
-          break;
         }
       }
 
-      if (accepted.isPresent()) {
-        removeOffer(accepted.get());
-        return true;
-      } else {
-        return false;
-      }
+      return false;
     }
   }
 }
