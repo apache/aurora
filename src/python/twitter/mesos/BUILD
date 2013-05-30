@@ -70,11 +70,11 @@ python_binary(
   source = 'bin/deploy_scheduler.py',
   dependencies = [
     pants(':clusters'),
+    pants('3rdparty/python.twitter:audubondata'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/dirutil'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/mesos/deploy'),
-    python_requirement('audubondata'),
   ]
 )
 
