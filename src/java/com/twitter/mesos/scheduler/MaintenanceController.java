@@ -112,6 +112,7 @@ public interface MaintenanceController {
         Storage storage,
         StateManager stateManager,
         Closure<PubsubEvent> eventSink) {
+
       this.storage = checkNotNull(storage);
       this.stateManager = checkNotNull(stateManager);
       this.eventSink = checkNotNull(eventSink);
@@ -243,16 +244,22 @@ public interface MaintenanceController {
 
     @Override
     public MaintenanceMode getMode(final String host) {
-      return FluentIterable.from(getStatus(ImmutableSet.of(host)))
-          .transform(GET_MODE)
-          .first()
-          .or(MaintenanceMode.NONE);
+      return storage.doInTransaction(new Work.Quiet<MaintenanceMode>() {
+        @Override public MaintenanceMode apply(StoreProvider storeProvider) {
+          return storeProvider.getAttributeStore().getHostAttributes(host)
+              .transform(ATTRS_TO_STATUS)
+              .transform(GET_MODE)
+              .or(MaintenanceMode.NONE);
+        }
+      });
     }
 
     @Override
     public Set<HostStatus> getStatus(final Set<String> hosts) {
       return storage.doInTransaction(new Work.Quiet<Set<HostStatus>>() {
         @Override public Set<HostStatus> apply(StoreProvider storeProvider) {
+          // Warning - this is filtering _all_ host attributes.  If using this to frequently query
+          // for a small set of hosts, a getHostAttributes variant should be added.
           return FluentIterable.from(storeProvider.getAttributeStore().getHostAttributes())
               .filter(Predicates.compose(Predicates.in(hosts), HOST_NAME))
               .transform(ATTRS_TO_STATUS).toSet();

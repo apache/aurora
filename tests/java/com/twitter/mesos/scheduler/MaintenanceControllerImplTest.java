@@ -2,6 +2,7 @@ package com.twitter.mesos.scheduler;
 
 import java.util.Set;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
 import org.junit.Before;
@@ -9,6 +10,7 @@ import org.junit.Test;
 
 import com.twitter.common.base.Closure;
 import com.twitter.common.testing.EasyMockTest;
+import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.HostStatus;
@@ -21,12 +23,7 @@ import com.twitter.mesos.scheduler.MaintenanceController.MaintenanceControllerIm
 import com.twitter.mesos.scheduler.events.PubsubEvent;
 import com.twitter.mesos.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.mesos.scheduler.events.PubsubEvent.TaskStateChange;
-import com.twitter.mesos.scheduler.storage.Storage;
-import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
-import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
-import com.twitter.mesos.scheduler.storage.Storage.StoreProvider;
-import com.twitter.mesos.scheduler.storage.Storage.Work;
-import com.twitter.mesos.scheduler.storage.mem.MemStorage;
+import com.twitter.mesos.scheduler.storage.testing.StorageTestUtil;
 
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
@@ -44,17 +41,18 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
   private static final String HOST_B = "b";
   private static final Set<String> A = ImmutableSet.of(HOST_A);
 
-  private Storage storage;
+  private StorageTestUtil storageUtil;
   private StateManager stateManager;
   private MaintenanceControllerImpl maintenance;
   private Closure<PubsubEvent> eventSink;
 
   @Before
   public void setUp() throws Exception {
-    storage = MemStorage.newEmptyStorage();
+    storageUtil = new StorageTestUtil(this);
+    storageUtil.expectTransactions();
     stateManager = createMock(StateManager.class);
     eventSink = createMock(new Clazz<Closure<PubsubEvent>>() { });
-    maintenance = new MaintenanceControllerImpl(storage, stateManager, eventSink);
+    maintenance = new MaintenanceControllerImpl(storageUtil.storage, stateManager, eventSink);
   }
 
   private static ScheduledTask makeTask(String host, String taskId) {
@@ -72,10 +70,13 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
 
   @Test
   public void testMaintenanceCycle() {
-    expectMaintenanceStateChangePubsubEvent(HOST_A, SCHEDULED);
-    expectMaintenanceStateChangePubsubEvent(HOST_A, DRAINING);
-    expectMaintenanceStateChangePubsubEvent(HOST_A, DRAINED);
-    expectMaintenanceStateChangePubsubEvent(HOST_A, NONE);
+    ScheduledTask task = makeTask(HOST_A, "taskA");
+
+    expectMaintenanceModeChange(HOST_A, SCHEDULED);
+    expectMaintenanceModeChange(HOST_A, DRAINING);
+    expectFetchTasksByHost(HOST_A, Tasks.ids(task));
+    expectMaintenanceModeChange(HOST_A, DRAINED);
+    expectMaintenanceModeChange(HOST_A, NONE);
     expect(stateManager.changeState(
         Query.slaveScoped(HOST_A).active().get(),
         ScheduleStatus.RESTARTING,
@@ -84,83 +85,93 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
 
     control.replay();
 
-    setMode(HOST_A, NONE);
-    ScheduledTask task = makeTask(HOST_A, "taskA");
-    saveTask(task);
     assertStatus(HOST_A, SCHEDULED, maintenance.startMaintenance(A));
     assertStatus(HOST_A, DRAINING, maintenance.drain(A));
-    task.setStatus(FINISHED);
-    maintenance.taskChangedState(new TaskStateChange(task, RUNNING));
-    assertStatus(HOST_A, DRAINED, maintenance.getStatus(A));
+    maintenance.taskChangedState(new TaskStateChange(task.setStatus(FINISHED), RUNNING));
     assertStatus(HOST_A, NONE, maintenance.endMaintenance(A));
   }
 
   @Test
-  public void testUnknownHosts() {
+  public void testUnknownHost() {
+    expect(storageUtil.attributeStore.setMaintenanceMode("b", MaintenanceMode.SCHEDULED))
+        .andReturn(false);
+
     control.replay();
 
     assertEquals(ImmutableSet.<HostStatus>of(),
-        maintenance.startMaintenance(ImmutableSet.of(HOST_A, "b")));
-    checkAttributes();
+        maintenance.startMaintenance(ImmutableSet.of("b")));
   }
 
   @Test
   public void testDrainEmptyHost() {
-    expectMaintenanceStateChangePubsubEvent(HOST_A, SCHEDULED);
-    expectMaintenanceStateChangePubsubEvent(HOST_A, DRAINED);
+    expectMaintenanceModeChange(HOST_A, SCHEDULED);
+    expectFetchTasksByHost(HOST_A, ImmutableSet.<String>of());
+    expectMaintenanceModeChange(HOST_A, DRAINED);
+
     control.replay();
 
-    setMode(HOST_A, NONE);
     assertStatus(HOST_A, SCHEDULED, maintenance.startMaintenance(A));
     assertStatus(HOST_A, DRAINED, maintenance.drain(A));
   }
 
   @Test
   public void testEndEarly() {
-    expectMaintenanceStateChangePubsubEvent(HOST_A, SCHEDULED);
-    expectMaintenanceStateChangePubsubEvent(HOST_A, NONE);
+    expectMaintenanceModeChange(HOST_A, SCHEDULED);
+    expectMaintenanceModeChange(HOST_A, NONE);
+
     control.replay();
 
-    setMode(HOST_A, NONE);
-    ScheduledTask task = makeTask(HOST_A, "taskA");
-    saveTask(task);
     assertStatus(HOST_A, SCHEDULED, maintenance.startMaintenance(A));
 
     // End maintenance without DRAINING.
     assertStatus(HOST_A, NONE, maintenance.endMaintenance(A));
-    assertStatus(HOST_A, NONE, maintenance.getStatus(A));
 
     // Make sure a later transition on the host does not cause any ill effects that could surface
     // from stale internal state.
-    task.setStatus(FINISHED);
-    maintenance.taskChangedState(new TaskStateChange(task, RUNNING));
-    assertStatus(HOST_A, NONE, maintenance.getStatus(A));
+    maintenance.taskChangedState(
+        new TaskStateChange(makeTask(HOST_A, "taskA").setStatus(FINISHED), RUNNING));
   }
 
   @Test
   public void testStorageStart() {
-    expectMaintenanceStateChangePubsubEvent(HOST_A, DRAINING);
-    expectMaintenanceStateChangePubsubEvent(HOST_B, DRAINED);
-    expectMaintenanceStateChangePubsubEvent(HOST_A, DRAINED);
+    ScheduledTask taskA = makeTask(HOST_A, "taskA").setStatus(ScheduleStatus.RESTARTING);
+
+    expect(storageUtil.attributeStore.getHostAttributes())
+        .andReturn(ImmutableSet.of(
+            new HostAttributes().setHost(HOST_A).setMode(DRAINING),
+            new HostAttributes().setHost(HOST_B).setMode(DRAINING)));
+    expectFetchTasksByHost(HOST_B, Tasks.ids());
+    expectMaintenanceModeChange(HOST_B, DRAINED);
+    expectMaintenanceModeChange(HOST_A, DRAINING);
+    expectFetchTasksByHost(HOST_A, Tasks.ids(taskA));
+    expectMaintenanceModeChange(HOST_A, DRAINED);
 
     control.replay();
 
-    ScheduledTask task = makeTask(HOST_A, "taskA").setStatus(ScheduleStatus.RESTARTING);
-    saveAttribute(new HostAttributes().setHost(HOST_A).setMode(DRAINING));
-    saveTask(task);
-    saveAttribute(new HostAttributes().setHost(HOST_B).setMode(DRAINING));
-    saveTask(makeTask(HOST_B, "taskB").setStatus(ScheduleStatus.FINISHED));
-
     maintenance.storageStarted(new StorageStarted());
-
-    assertStatus(HOST_A, DRAINING, maintenance.getStatus(A));
-    assertStatus(HOST_B, DRAINED, maintenance.getStatus(ImmutableSet.of("b")));
-    task.setStatus(ScheduleStatus.FINISHED);
-    maintenance.taskChangedState(new TaskStateChange(task, RUNNING));
-    assertStatus(HOST_A, DRAINED, maintenance.getStatus(A));
+    maintenance.taskChangedState(new TaskStateChange(taskA.setStatus(FINISHED), RUNNING));
   }
 
-  private void expectMaintenanceStateChangePubsubEvent(String hostName, MaintenanceMode mode) {
+  @Test
+  public void testGetMode() {
+    expect(storageUtil.attributeStore.getHostAttributes(HOST_A))
+        .andReturn(Optional.of(new HostAttributes().setHost(HOST_A).setMode(DRAINING)));
+    expect(storageUtil.attributeStore.getHostAttributes("unknown"))
+        .andReturn(Optional.<HostAttributes>absent());
+
+    control.replay();
+
+    assertEquals(DRAINING, maintenance.getMode(HOST_A));
+    assertEquals(NONE, maintenance.getMode("unknown"));
+  }
+
+  private void expectFetchTasksByHost(String hostName, Set<String> taskIds) {
+    expect(storageUtil.taskStore.fetchTaskIds(Query.slaveScoped(hostName).active()))
+        .andReturn(taskIds);
+  }
+
+  private void expectMaintenanceModeChange(String hostName, MaintenanceMode mode) {
+    expect(storageUtil.attributeStore.setMaintenanceMode(hostName, mode)).andReturn(true);
     eventSink.execute(
         new PubsubEvent.HostMaintenanceStateChange(
             new HostStatus().setHost(hostName).setMode(mode)));
@@ -168,39 +179,5 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
 
   private void assertStatus(String host, MaintenanceMode mode, Set<HostStatus> statuses) {
     assertEquals(ImmutableSet.of(new HostStatus(host, mode)), statuses);
-  }
-
-  private void checkAttributes(HostAttributes... attributes) {
-    assertEquals(
-        ImmutableSet.<HostAttributes>builder().add(attributes).build(),
-        getHostAttributes());
-  }
-
-  private Set<HostAttributes> getHostAttributes() {
-    return storage.doInTransaction(new Work.Quiet<Set<HostAttributes>>() {
-      @Override public Set<HostAttributes> apply(StoreProvider storeProvider) {
-        return storeProvider.getAttributeStore().getHostAttributes();
-      }
-    });
-  }
-
-  private void setMode(String host, MaintenanceMode mode) {
-    saveAttribute(new HostAttributes().setHost(host).setMode(mode));
-  }
-
-  private void saveAttribute(final HostAttributes attributes) {
-    storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getAttributeStore().saveHostAttributes(attributes);
-      }
-    });
-  }
-
-  private void saveTask(final ScheduledTask task) {
-    storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(task));
-      }
-    });
   }
 }
