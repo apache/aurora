@@ -38,8 +38,9 @@ from .resource_checkpoints import ResourceCheckpointer
 from .resource_manager import ResourceManager
 from .status_manager import StatusManager
 from .task_runner_wrapper import (
-  ProductionTaskRunner,
-  AngrybirdTaskRunner)
+  AngrybirdTaskRunner,
+  ProductionTaskRunner)
+
 
 
 if 'ANGRYBIRD_THERMOS' in os.environ:
