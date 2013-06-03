@@ -80,8 +80,8 @@ python_library(
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/metrics'),
     pants('src/python/twitter/common/quantity'),
-    pants('src/python/twitter/common/zookeeper/serverset'),
-    pants('src/python/twitter/common_internal/zookeeper:twitter_service'),
+    pants('src/python/twitter/common/zookeeper/serverset:kazoo_serverset'),
+    pants('src/python/twitter/common_internal/zookeeper:twitter_service_kazoo'),
   ]
 )
 

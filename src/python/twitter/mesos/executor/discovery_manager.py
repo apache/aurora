@@ -2,11 +2,10 @@ import socket
 import threading
 
 from twitter.common import log
-from twitter.common.metrics import LambdaGauge
+from twitter.common.metrics import LambdaGauge, Observable
 from twitter.common.quantity import Amount, Time
-from twitter.common.zookeeper.client import ZooKeeper
 from twitter.common.zookeeper.serverset import Endpoint
-from twitter.common_internal.zookeeper.twitter_service import TwitterService
+from twitter.common_internal.zookeeper.twitter_service_kazoo import KazooTwitterService
 
 from .health_interface import HealthInterface
 
@@ -60,24 +59,20 @@ class DiscoveryManager(HealthInterface):
       self._service = None
       self._unhealthy.set()
     else:
-      try:
-        self._service = TwitterService(
-            role,
-            environment,
-            jobname,
-            primary,
-            additional=additional,
-            shard=shard,
-            strict=False,
-            ensemble=ensemble)
-            # TODO(wickman) This is disabled until MESOS-2376 is resolved.
-            # credentials=self.super_credentials())
+      self._service = KazooTwitterService(
+          role,
+          environment,
+          jobname,
+          primary,
+          additional=additional,
+          shard=shard,
+          strict=False,
+          ensemble=ensemble)
+          # TODO(wickman) This is disabled until MESOS-2376 is resolved.
+          # credentials=self.super_credentials())
+      if isinstance(self._service.zookeeper, Observable):
         self.metrics.register_observable('ensemble', self._service.zookeeper)
-        self.metrics.register(LambdaGauge('disconnected_time', self._service.disconnected_time))
-      except ZooKeeper.InvalidEnsemble as e:
-        log.error('Invalid ensemble: %s' % e)
-        self._service = None
-        self._unhealthy.set()
+      self.metrics.register(LambdaGauge('disconnected_time', self._service.disconnected_time))
 
   @property
   def healthy(self):

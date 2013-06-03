@@ -9,9 +9,10 @@ from twitter.common.log.options import LogOptions
 from twitter.common.contextutil import temporary_dir
 from twitter.common.net.tunnel import TunnelHelper
 from twitter.common.zookeeper.client import ZooKeeper
+from twitter.common.zookeeper.kazoo_client import TwitterKazooClient
 from twitter.common.zookeeper.serverset import ServerSet, Endpoint
 from twitter.common.zookeeper.test_server import ZookeeperServer
-from twitter.common_internal.zookeeper.twitter_serverset import TwitterServerSet
+from twitter.common_internal.zookeeper.twitter_serverset_base import TwitterServerSetBase
 from twitter.mesos.executor.discovery_manager import DiscoveryManager
 
 
@@ -22,13 +23,14 @@ class TestDiscoveryManager(object):
   @classmethod
   def setup_class(cls):
     cls.ZKSERVER = ZookeeperServer()
-    cls.ZK = ZooKeeper(cls.ZKSERVER.ensemble,
-         authentication=('digest', '%(user)s:%(user)s' % {'user': getpass.getuser()}))
+    cls.ZK = TwitterKazooClient.make(
+        cls.ZKSERVER.ensemble,
+        auth_data=[('digest', '%(user)s:%(user)s' % {'user': getpass.getuser()})])
 
   @classmethod
   def teardown_class(cls):
     cls.ZKSERVER.stop()
-    cls.ZK.close()
+    cls.ZK.stop()
 
   def test_join_keywords(self):
     me = 'my.host.name'
@@ -54,7 +56,7 @@ class TestDiscoveryManager(object):
 
   @classmethod
   def make_ss(cls, role, environment, jobname, **kw):
-    return ServerSet(cls.ZK, TwitterServerSet.zkpath(role, environment, jobname), **kw)
+    return ServerSet(cls.ZK, TwitterServerSetBase.zkpath(role, environment, jobname), **kw)
 
   def _make_manager(self, *args):
     role, environment, jobname = args[0:3]

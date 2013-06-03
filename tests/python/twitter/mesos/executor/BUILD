@@ -51,7 +51,7 @@ python_tests(name = 'discovery_manager',
     pants('src/python/twitter/mesos/executor:discovery_manager'),
     pants('src/python/twitter/common/zookeeper:testing'),
     pants('src/python/twitter/common/zookeeper/serverset'),
-    pants('src/python/twitter/common_internal/zookeeper:twitter_serverset')
+    pants('src/python/twitter/common_internal/zookeeper:twitter_serverset_base')
   ]
 )
 
