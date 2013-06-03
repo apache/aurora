@@ -11,7 +11,7 @@ from twitter.common.metrics import (
     CompoundMetrics,
     MutatorGauge,
     Observable)
-from twitter.common.metrics.metrics import Metrics
+from twitter.common.metrics.metrics import MemoizedMetrics, Metrics
 from twitter.common.metrics.sampler import DiskMetricReader
 from twitter.common.python.dirwrapper import PythonDirectoryWrapper
 from twitter.common.python.pex import PexInfo
@@ -78,14 +78,28 @@ class ExecutorVars(Observable):
     self._external_metrics.start()
 
     # combine the two
-    self._compound_metrics = CompoundMetrics(self._internal_metrics, self._external_metrics)
+    self._compound_metrics = MemoizedMetrics(
+        CompoundMetrics(self._internal_metrics, self._external_metrics))
 
   @property
   def metrics(self):
     return self._compound_metrics
 
+  @property
+  def metrics_age(self):
+    return self._external_metrics.age
+
   def write_metric(self, metric, value):
     self._metrics[metric].write(value)
+
+  @property
+  def has_announcer(self):
+    return 'discovery_manager' in self._compound_metrics.memoized_sample
+
+  @property
+  def disconnected_time(self):
+    discovery_manager_stats = self._compound_metrics.memoized_sample.get('discovery_manager', {})
+    return discovery_manager_stats.get('disconnected_time', 0)
 
   @classmethod
   def thermos_children(cls, parent):
@@ -138,13 +152,16 @@ class ExecutorVars(Observable):
 class MesosObserverVars(Observable, ExceptionalThread):
   COLLECTION_INTERVAL = Amount(30, Time.SECONDS)
   EXECUTOR_BINARIES = ('./thermos_executor', './thermos_executor.pex')
-  OBSERVER_STATS = ('orphaned_runners',
-                    'orphaned_tasks',
-                    'orphaned_executors',
-                    'active_tasks',
+  OBSERVER_STATS = ('active_tasks',
+                    'disconnected_announcers',
                     'finished_tasks',
+                    'max_disconnected_time',
+                    'max_metrics_age',
+                    'observer_cpu',
                     'observer_rss',
-                    'observer_cpu')
+                    'orphaned_executors',
+                    'orphaned_tasks',
+                    'orphaned_runners')
 
   def __init__(self, observer, mesos_root):
     self._mesos_root = mesos_root
@@ -252,8 +269,20 @@ class MesosObserverVars(Observable, ExceptionalThread):
       self._executors.pop(eid)
 
   def index_executors(self):
+    """Roll-up executor-level statistics.
+
+       Rolling up executor-level metrics is necessary in order to not DDOS
+       observability which can't effectively handle per-executor metric
+       collection.
+
+       Indexed metrics:
+         - executor version
+         - disconnected announcers
+         - maximum disconnection time
+         - maximum metrics age (in case of locked VMs)
+    """
     self.orphaned_executors.write(
-      sum(executor.orphan for executor in self._executors.values()))
+        sum(executor.orphan for executor in self._executors.values()))
 
     releases_count = defaultdict(int)
     for executor in self._executors.values():
@@ -269,6 +298,13 @@ class MesosObserverVars(Observable, ExceptionalThread):
     for old_release in set(self._executor_releases) - set(releases_count):
       gauge = self._executor_releases.pop(old_release)
       self.metrics.unregister(gauge.name())
+
+    self.disconnected_announcers.write(
+        sum(executor.has_announcer for executor in self._executors.values()))
+    self.max_disconnected_time.write(
+        max([executor.disconnected_time for executor in self._executors.values()] or [0]))
+    self.max_metrics_age.write(
+        max([executor.metrics_age for executor in self._executors.values()] or [0]))
 
   def collect_observer_resource_usage(self):
     self.observer_cpu.write(self._self.get_cpu_percent(interval=0))
