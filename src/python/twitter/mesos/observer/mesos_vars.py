@@ -314,7 +314,7 @@ class MesosObserverVars(Observable, ExceptionalThread):
     self.announcers.write(
         sum(executor.has_announcer for executor in self._executors.values()))
     self.disconnected_announcers.write(
-        sum(executor.disconnected_time for executor in self._executors.values()))
+        sum(executor.disconnected_time > 0 for executor in self._executors.values()))
     self.max_disconnected_time.write(
         max([executor.disconnected_time for executor in self._executors.values()] or [0]))
     self.max_metrics_age.write(
