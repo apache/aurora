@@ -40,6 +40,9 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * A backup routine that layers over a snapshot store and periodically writes snapshots to
  * local disk.
+ *
+ * TODO(William Farner): Perform backups asynchronously.  As written, they are performed in a
+ * blocking write operation, which is asking for trouble.
  */
 public interface StorageBackup {
 
@@ -76,7 +79,7 @@ public interface StorageBackup {
     private final SnapshotStore<Snapshot> delegate;
     private final Clock clock;
     private final long backupIntervalMs;
-    private volatile long nextSnapshotMs;
+    private volatile long lastBackupMs;
     private final DateFormat backupDateFormat;
 
     @VisibleForTesting
@@ -95,22 +98,19 @@ public interface StorageBackup {
       this.config = checkNotNull(config);
       backupDateFormat = new SimpleDateFormat("yyyy-MM-dd-HH-mm");
       backupIntervalMs = config.interval.as(Time.MILLISECONDS);
-      nextSnapshotMs = clock.nowMillis() + backupIntervalMs;
+      lastBackupMs = clock.nowMillis();
     }
 
     @Override public Snapshot createSnapshot() {
       Snapshot snapshot = delegate.createSnapshot();
-      if (clock.nowMillis() >= nextSnapshotMs) {
-        nextSnapshotMs += backupIntervalMs;
+      if (clock.nowMillis() >= (lastBackupMs + backupIntervalMs)) {
         save(snapshot);
       }
-
       return snapshot;
     }
 
     @Override public void backupNow() {
-      nextSnapshotMs = clock.nowMillis();
-      createSnapshot();
+      save(delegate.createSnapshot());
     }
 
     @VisibleForTesting
@@ -119,6 +119,8 @@ public interface StorageBackup {
     }
 
     private void save(Snapshot snapshot) {
+      lastBackupMs = clock.nowMillis();
+
       String backupName = createBackupName();
       String tempBackupName = "temp_" + backupName;
       File tempFile = new File(config.dir, tempBackupName);

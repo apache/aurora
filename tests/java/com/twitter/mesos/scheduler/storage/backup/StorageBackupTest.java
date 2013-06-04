@@ -124,6 +124,25 @@ public class StorageBackupTest extends EasyMockTest {
             .toSet());
   }
 
+  @Test
+  public void testInterval() {
+    // Ensures that a long initial interval does not result in shortened subsequent intervals.
+    Snapshot snapshot = makeSnapshot();
+    expect(delegate.createSnapshot()).andReturn(snapshot).times(3);
+
+    control.replay();
+
+    assertEquals(snapshot, storageBackup.createSnapshot());
+    assertBackupCount(0);
+    clock.advance(Amount.of(INTERVAL.as(Time.MILLISECONDS) * 3, Time.MILLISECONDS));
+    assertEquals(snapshot, storageBackup.createSnapshot());
+    assertBackupCount(1);
+    assertEquals(1, storageBackup.successes.get());
+    assertEquals(snapshot, storageBackup.createSnapshot());
+    assertBackupCount(1);
+    assertEquals(1, storageBackup.successes.get());
+  }
+
   private void assertBackupCount(int count) {
     assertEquals(count, config.dir.list().length);
   }
