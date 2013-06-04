@@ -94,12 +94,21 @@ class ExecutorVars(Observable):
 
   @property
   def has_announcer(self):
-    return 'discovery_manager' in self._compound_metrics.memoized_sample
+    return 'discovery_manager.health' in self._compound_metrics.memoized_sample
 
   @property
   def disconnected_time(self):
-    discovery_manager_stats = self._compound_metrics.memoized_sample.get('discovery_manager', {})
-    return discovery_manager_stats.get('disconnected_time', 0)
+    return self._compound_metrics.memoized_sample.get('discovery_manager.disconnected_time', 0)
+
+  @property
+  def connection_losses(self):
+    return self._compound_metrics.memoized_sample.get(
+        'discovery_manager.ensemble.connection_losses', 0)
+
+  @property
+  def session_expirations(self):
+    return self._compound_metrics.memoized_sample.get(
+        'discovery_manager.ensemble.session_expirations', 0)
 
   @classmethod
   def thermos_children(cls, parent):
@@ -153,15 +162,18 @@ class MesosObserverVars(Observable, ExceptionalThread):
   COLLECTION_INTERVAL = Amount(30, Time.SECONDS)
   EXECUTOR_BINARIES = ('./thermos_executor', './thermos_executor.pex')
   OBSERVER_STATS = ('active_tasks',
-                    'disconnected_announcers',
+                    'announcers',               # TODO(wickman) Remove once resolved:
+                    'connection_losses',        # https://issues.apache.org/jira/browse/MESOS-433
+                    'disconnected_announcers',  # Remove
                     'finished_tasks',
-                    'max_disconnected_time',
+                    'max_disconnected_time',    # Remove
                     'max_metrics_age',
                     'observer_cpu',
                     'observer_rss',
                     'orphaned_executors',
                     'orphaned_tasks',
-                    'orphaned_runners')
+                    'orphaned_runners',
+                    'session_expirations',)
 
   def __init__(self, observer, mesos_root):
     self._mesos_root = mesos_root
@@ -299,12 +311,18 @@ class MesosObserverVars(Observable, ExceptionalThread):
       gauge = self._executor_releases.pop(old_release)
       self.metrics.unregister(gauge.name())
 
-    self.disconnected_announcers.write(
+    self.announcers.write(
         sum(executor.has_announcer for executor in self._executors.values()))
+    self.disconnected_announcers.write(
+        sum(executor.disconnected_time for executor in self._executors.values()))
     self.max_disconnected_time.write(
         max([executor.disconnected_time for executor in self._executors.values()] or [0]))
     self.max_metrics_age.write(
         max([executor.metrics_age for executor in self._executors.values()] or [0]))
+    self.connection_losses.write(
+        sum(executor.connection_losses for executor in self._executors.values()))
+    self.session_expirations.write(
+        sum(executor.session_expirations for executor in self._executors.values()))
 
   def collect_observer_resource_usage(self):
     self.observer_cpu.write(self._self.get_cpu_percent(interval=0))
