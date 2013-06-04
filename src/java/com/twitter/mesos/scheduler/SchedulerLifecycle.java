@@ -188,7 +188,7 @@ class SchedulerLifecycle implements EventSubscriber {
           StorageBackfill.backfill(storeProvider, clock);
         }
       });
-      @Nullable final String frameworkId = storage.doInTransaction(new Work.Quiet<String>() {
+      @Nullable final String frameworkId = storage.readOp(new Work.Quiet<String>() {
         @Override public String apply(StoreProvider storeProvider) {
           return storeProvider.getSchedulerStore().fetchFrameworkId();
         }

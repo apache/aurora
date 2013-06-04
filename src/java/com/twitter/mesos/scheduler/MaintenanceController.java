@@ -160,7 +160,7 @@ public interface MaintenanceController {
      */
     @Subscribe
     public synchronized void storageStarted(StorageStarted started) {
-      storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+      storage.writeOp(new MutateWork.NoResult.Quiet() {
         @Override protected void execute(MutableStoreProvider storeProvider) {
           Set<String> drainingHosts =
               FluentIterable.from(storeProvider.getAttributeStore().getHostAttributes())
@@ -186,7 +186,7 @@ public interface MaintenanceController {
         if (drainingTasksByHost.remove(host, change.getTaskId())
             && !drainingTasksByHost.containsKey(host)) {
 
-          storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+          storage.writeOp(new MutateWork.NoResult.Quiet() {
             @Override public void execute(MutableStoreProvider store) {
               setMaintenanceMode(store, ImmutableSet.of(host), DRAINED);
             }
@@ -197,7 +197,7 @@ public interface MaintenanceController {
 
     @Override
     public Set<HostStatus> startMaintenance(final Set<String> hosts) {
-      return storage.doInWriteTransaction(new MutateWork.Quiet<Set<HostStatus>>() {
+      return storage.writeOp(new MutateWork.Quiet<Set<HostStatus>>() {
         @Override public Set<HostStatus> apply(MutableStoreProvider storeProvider) {
           return setMaintenanceMode(storeProvider, hosts, MaintenanceMode.SCHEDULED);
         }
@@ -210,7 +210,7 @@ public interface MaintenanceController {
 
     @Override
     public synchronized Set<HostStatus> drain(final Set<String> hosts) {
-      return storage.doInWriteTransaction(new MutateWork.Quiet<Set<HostStatus>>() {
+      return storage.writeOp(new MutateWork.Quiet<Set<HostStatus>>() {
         @Override public Set<HostStatus> apply(MutableStoreProvider store) {
           return watchDrainingTasks(store, hosts, new Closure<TaskQuery>() {
             @Override public void execute(TaskQuery query) {
@@ -244,7 +244,7 @@ public interface MaintenanceController {
 
     @Override
     public MaintenanceMode getMode(final String host) {
-      return storage.doInTransaction(new Work.Quiet<MaintenanceMode>() {
+      return storage.readOp(new Work.Quiet<MaintenanceMode>() {
         @Override public MaintenanceMode apply(StoreProvider storeProvider) {
           return storeProvider.getAttributeStore().getHostAttributes(host)
               .transform(ATTRS_TO_STATUS)
@@ -256,7 +256,7 @@ public interface MaintenanceController {
 
     @Override
     public Set<HostStatus> getStatus(final Set<String> hosts) {
-      return storage.doInTransaction(new Work.Quiet<Set<HostStatus>>() {
+      return storage.readOp(new Work.Quiet<Set<HostStatus>>() {
         @Override public Set<HostStatus> apply(StoreProvider storeProvider) {
           // Warning - this is filtering _all_ host attributes.  If using this to frequently query
           // for a small set of hosts, a getHostAttributes variant should be added.
@@ -269,7 +269,7 @@ public interface MaintenanceController {
 
     @Override
     public synchronized Set<HostStatus> endMaintenance(final Set<String> hosts) {
-      return storage.doInWriteTransaction(new MutateWork.Quiet<Set<HostStatus>>() {
+      return storage.writeOp(new MutateWork.Quiet<Set<HostStatus>>() {
         @Override public Set<HostStatus> apply(MutableStoreProvider storeProvider) {
           drainingTasksByHost.keys().removeAll(hosts);
           return setMaintenanceMode(storeProvider, hosts, MaintenanceMode.NONE);

@@ -16,26 +16,26 @@ import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
- * Transactional wrapper around the persistent storage and mutable state.
+ * Wrapper around the persistent storage and mutable state.
  */
-class TransactionalStorage {
+class SideEffectStorage {
   @VisibleForTesting
   final Queue<PubsubEvent> events = Lists.newLinkedList();
 
-  private AtomicBoolean inTransaction = new AtomicBoolean(false);
+  private AtomicBoolean inOperation = new AtomicBoolean(false);
 
   private final Storage storage;
-  private final TransactionFinalizer transactionFinalizer;
+  private final OperationFinalizer operationFinalizer;
   private final Closure<PubsubEvent> taskEventSink;
 
-  interface TransactionFinalizer {
+  interface OperationFinalizer {
     /**
-     * Performs any work necessary to complete the transaction.
-     * This is executed in the context of a write transaction, immediately after the work
+     * Performs any work necessary to complete the operation.
+     * This is executed in the context of a write operation, immediately after the work
      * executes normally.
-     * NOTE: At present, this is executed for every nesting level of transactions, rather than
-     * at the completion of the top-level transaction.
-     * See comment in {@link #TransactionalStorage#executeSideEffectsAfter(SideEffectWork)}
+     * NOTE: At present, this is executed for every nesting level of operations, rather than
+     * at the completion of the top-level operation.
+     * See comment in {@link #SideEffectStorage#executeSideEffectsAfter(SideEffectWork)}
      * for more detail.
      *
      * @param work Work to finalize.
@@ -44,18 +44,18 @@ class TransactionalStorage {
     void finalize(SideEffectWork<?, ?> work, MutableStoreProvider storeProvider);
   }
 
-  TransactionalStorage(
+  SideEffectStorage(
       Storage storage,
-      TransactionFinalizer transactionFinalizer,
+      OperationFinalizer operationFinalizer,
       Closure<PubsubEvent> taskEventSink) {
 
     this.storage = checkNotNull(storage);
-    this.transactionFinalizer = checkNotNull(transactionFinalizer);
+    this.operationFinalizer = checkNotNull(operationFinalizer);
     this.taskEventSink = checkNotNull(taskEventSink);
   }
 
   /**
-   * Perform a unit of work in a transaction.  This supports nesting/reentrancy.
+   * Perform a unit of work in a mutating operation.  This supports nesting/reentrancy.
    *
    * @param work Work to perform.
    * @param <T> Work return type
@@ -63,27 +63,27 @@ class TransactionalStorage {
    * @return The work return value.
    * @throws E The work exception.
    */
-  <T, E extends Exception> T doInWriteTransaction(SideEffectWork<T, E> work) throws E {
-    return storage.doInWriteTransaction(executeSideEffectsAfter(work));
+  <T, E extends Exception> T writeOperation(SideEffectWork<T, E> work) throws E {
+    return storage.writeOp(executeSideEffectsAfter(work));
   }
 
   /**
-   * Transactional work that has side effects external to the storage system.
+   * Work that has side effects external to the storage system.
    * Work may add side effect and pubsub events, which will be executed/sent upon normal
-   * completion of the transaction.
+   * completion of the operation.
    *
    * @param <T> Work return type.
    * @param <E> Work exception type.
    */
   abstract class SideEffectWork<T, E extends Exception> implements MutateWork<T, E> {
     protected final void addTaskEvent(PubsubEvent notice) {
-      Preconditions.checkState(inTransaction.get());
+      Preconditions.checkState(inOperation.get());
       events.add(Preconditions.checkNotNull(notice));
     }
   }
 
   /**
-   * Transactional work with side effects which does not throw checked exceptions.
+   * Work with side effects which does not throw checked exceptions.
    *
    * @param <T>   Work return type.
    */
@@ -91,7 +91,7 @@ class TransactionalStorage {
   }
 
   /**
-   * Transactional work with side effects which does not throw checked exceptions or have a return
+   * Work with side effects which does not throw checked exceptions or have a return
    * value.
    */
   abstract class NoResultSideEffectWork extends SideEffectWork<Void, RuntimeException> {
@@ -108,25 +108,25 @@ class TransactionalStorage {
 
     return new MutateWork<T, E>() {
       @Override public T apply(MutableStoreProvider storeProvider) throws E {
-        boolean topLevelTransaction = inTransaction.compareAndSet(false, true);
+        boolean topLevelOperation = inOperation.compareAndSet(false, true);
 
         try {
           T result = work.apply(storeProvider);
 
           // TODO(William Farner): Maintaining this since it matches prior behavior, but this
           // seems wrong.  Double-check whether this is necessary, or if only the top-level
-          // transaction should be executing the finalizer.  Update doc on TransactionFinalizer
+          // operation should be executing the finalizer.  Update doc on OperationFinalizer
           // once this is assessed.
-          transactionFinalizer.finalize(work, storeProvider);
-          if (topLevelTransaction) {
+          operationFinalizer.finalize(work, storeProvider);
+          if (topLevelOperation) {
             while (!events.isEmpty()) {
               taskEventSink.execute(events.remove());
             }
           }
           return result;
         } finally {
-          if (topLevelTransaction) {
-            inTransaction.set(false);
+          if (topLevelOperation) {
+            inOperation.set(false);
           }
         }
       }

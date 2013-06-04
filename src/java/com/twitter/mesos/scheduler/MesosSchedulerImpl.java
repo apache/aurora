@@ -92,7 +92,7 @@ public class MesosSchedulerImpl implements Scheduler {
 
     LOG.info("Registered with ID " + frameworkId + ", master: " + masterInfo);
 
-    storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+    storage.writeOp(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getSchedulerStore().saveFrameworkId(frameworkId.getValue());
       }
@@ -124,7 +124,7 @@ public class MesosSchedulerImpl implements Scheduler {
     for (final Offer offer : offers) {
       log(Level.FINE, "Received offer: %s", offer);
       resourceOffers.incrementAndGet();
-      storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+      storage.writeOp(new MutateWork.NoResult.Quiet() {
         @Override protected void execute(MutableStoreProvider storeProvider) {
           storeProvider.getAttributeStore().saveHostAttributes(Conversions.getAttributes(offer));
         }

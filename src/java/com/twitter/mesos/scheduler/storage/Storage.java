@@ -52,7 +52,7 @@ public interface Storage {
   }
 
   /**
-   * Encapsulates a storage transaction unit of read-only work.
+   * Encapsulates a read-only storage operation.
    *
    * @param <T> The type of result this unit of work produces.
    * @param <E> The type of exception this unit of work can throw.
@@ -79,7 +79,7 @@ public interface Storage {
   }
 
   /**
-   * Encapsulates a storage transaction unit of work, which has mutable storage access.
+   * Encapsulates a storage operation, which has mutable storage access.
    *
    * @param <T> The type of result this unit of work produces.
    * @param <E> The type of exception this unit of work can throw.
@@ -156,33 +156,30 @@ public interface Storage {
   }
 
   /**
-   * Executes the unit of {@code work} in a read-only transaction.
+   * Executes the unit of read-only {@code work}.
    *
    * <p>TODO(John Sirois): Audit usages and handle StorageException appropriately.
    *
-   * @param work The unit of work to execute in a transaction.
+   * @param work The unit of work to execute.
    * @param <T> The type of result this unit of work produces.
    * @param <E> The type of exception this unit of work can throw.
    * @return the result when the unit of work completes successfully
    * @throws StorageException if there was a problem reading from stable storage.
    * @throws E bubbled transparently when the unit of work throws
    */
-  <T, E extends Exception> T doInTransaction(Work<T, E> work) throws StorageException, E;
+  <T, E extends Exception> T readOp(Work<T, E> work) throws StorageException, E;
 
   /**
-   * Executes the unit of {@code work} in a transaction such that any storage write operations
-   * requested are either all committed if the unit of work does not throw or else none of the
-   * requested storage operations commit when it does throw.
+   * Executes the unit of mutating {@code work}.
    *
-   * @param work The unit of work to execute in a transaction.
+   * @param work The unit of work to execute.
    * @param <T> The type of result this unit of work produces.
    * @param <E> The type of exception this unit of work can throw.
    * @return the result when the unit of work completes successfully
    * @throws StorageException if there was a problem reading from or writing to stable storage.
    * @throws E bubbled transparently when the unit of work throws
    */
-  <T, E extends Exception> T doInWriteTransaction(MutateWork<T, E> work)
-      throws StorageException, E;
+  <T, E extends Exception> T writeOp(MutateWork<T, E> work) throws StorageException, E;
 
   /**
    * A non-volatile storage that has additional methods to control its lifecycle.
@@ -201,7 +198,7 @@ public interface Storage {
      *
      * @param initializationLogic work to perform after this storage system is ready but before
      *     allowing general use of
-     *     {@link #doInTransaction(com.twitter.mesos.scheduler.storage.Storage.Work)}.
+     *     {@link #readOp}.
      * @throws StorageException if there was a starting storage.
      */
     void start(MutateWork.NoResult.Quiet initializationLogic) throws StorageException;
@@ -232,16 +229,16 @@ public interface Storage {
     }
 
     /**
-     * Fetches tasks from the {@link TaskStore} for {@code storage} in a read transaction.
-     * This is intended for convenience, and should only be used in instances where no other
-     * transactional work is performed with the result.
+     * Fetches tasks from the {@link TaskStore} for {@code storage} in a read operation.
+     * This is intended for convenience, and should only be used in instances where no write work
+     * is performed with the result.
      *
      * @param storage Storage instance to query from.
      * @param query Query to perform.
      * @return Tasks returned from the query.
      */
     public static ImmutableSet<ScheduledTask> fetchTasks(Storage storage, final TaskQuery query) {
-      return storage.doInTransaction(new Work.Quiet<ImmutableSet<ScheduledTask>>() {
+      return storage.readOp(new Work.Quiet<ImmutableSet<ScheduledTask>>() {
         @Override public ImmutableSet<ScheduledTask> apply(StoreProvider storeProvider) {
           return storeProvider.getTaskStore().fetchTasks(query);
         }
@@ -250,7 +247,7 @@ public interface Storage {
 
     /**
      * Fetch tasks matching the query returned by {@code querySupplier} from {@code storage} in a
-     * read transaction. Intended for use with {@link com.twitter.mesos.scheduler.Query.Builder}
+     * read operation. Intended for use with {@link com.twitter.mesos.scheduler.Query.Builder}
      * instances.
      *
      * @see #fetchTasks(Storage, com.twitter.mesos.gen.TaskQuery)

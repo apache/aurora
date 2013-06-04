@@ -19,13 +19,12 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * An in-memory job store.
  */
-public class MemJobStore implements JobStore.Mutable.Transactioned {
+public class MemJobStore implements JobStore.Mutable {
 
   private static final Function<JobConfiguration, JobConfiguration> DEEP_COPY =
       Util.deepCopier();
 
-  private final TransactionalMap<String, Manager> managers =
-      TransactionalMap.wrap(Maps.<String, Manager>newHashMap());
+  private final Map<String, Manager> managers = Maps.newHashMap();
 
   private Manager getOrCreate(String managerId) {
     Manager manager = managers.get(managerId);
@@ -34,16 +33,6 @@ public class MemJobStore implements JobStore.Mutable.Transactioned {
       managers.put(managerId, manager);
     }
     return manager;
-  }
-
-  @Override
-  public void commit() {
-    managers.commit();
-  }
-
-  @Override
-  public void rollback() {
-    managers.rollback();
   }
 
   @Override

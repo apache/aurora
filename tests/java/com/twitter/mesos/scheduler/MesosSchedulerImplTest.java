@@ -105,7 +105,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
 
   @Test
   public void testNoOffers() throws Exception {
-    storageUtil.expectTransactions();
+    storageUtil.expectOperations();
     storageUtil.schedulerStore.saveFrameworkId(FRAMEWORK_ID);
 
     control.replay();
@@ -223,7 +223,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
 
   private abstract class RegisteredFixture {
     RegisteredFixture() throws Exception {
-      storageUtil.expectTransactions();
+      storageUtil.expectOperations();
       storageUtil.schedulerStore.saveFrameworkId(FRAMEWORK_ID);
       expectations();
 

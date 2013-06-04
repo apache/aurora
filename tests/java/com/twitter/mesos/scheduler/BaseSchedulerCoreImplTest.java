@@ -164,7 +164,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   private void buildScheduler(Storage newStorage) throws Exception {
     this.storage = newStorage;
-    storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+    storage.writeOp(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
         StorageBackfill.backfill(storeProvider, clock);
       }
@@ -294,7 +294,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setEnvironment("test")
         .setOwner(OWNER_B);
 
-    storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+    storage.writeOp(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(
             new ScheduledTask()
@@ -372,7 +372,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
               }
             }));
 
-    storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+    storage.writeOp(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(badTasks);
       }

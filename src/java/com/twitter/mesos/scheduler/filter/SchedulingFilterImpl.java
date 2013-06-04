@@ -183,7 +183,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
           return ImmutableList.of();
         }
 
-        return storage.doInTransaction(new Quiet<Iterable<Veto>>() {
+        return storage.readOp(new Quiet<Iterable<Veto>>() {
           @Override public Iterable<Veto> apply(final StoreProvider storeProvider) {
             AttributeLoader attributeLoader = new AttributeLoader() {
               @Override public Iterable<Attribute> apply(String host) {
@@ -243,7 +243,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   }
 
   private boolean isDedicated(final String slaveHost) {
-    Iterable<Attribute> slaveAttributes = storage.doInTransaction(new Quiet<Iterable<Attribute>>() {
+    Iterable<Attribute> slaveAttributes = storage.readOp(new Quiet<Iterable<Attribute>>() {
       @Override public Iterable<Attribute> apply(final StoreProvider storeProvider) {
         return AttributeStore.Util.attributesOrNone(storeProvider, slaveHost);
       }

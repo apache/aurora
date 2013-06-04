@@ -21,8 +21,5 @@ public interface SchedulerStore {
      * @param frameworkId The framework id to store.
      */
     void saveFrameworkId(String frameworkId);
-
-    public interface Transactioned extends Mutable, Transactional {
-    }
   }
 }

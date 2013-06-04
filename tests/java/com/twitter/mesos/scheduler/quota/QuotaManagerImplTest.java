@@ -44,7 +44,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   @Test
   public void testGetEmptyQuota() {
-    storageUtil.expectTransactions();
+    storageUtil.expectOperations();
     noActiveUpdates();
     expect(storageUtil.quotaStore.fetchQuota(ROLE)).andReturn(Optional.<Quota>absent());
     returnNoTasks().atLeastOnce();
@@ -57,7 +57,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   @Test
   public void testConsumeNoQuota() {
-    storageUtil.expectTransactions();
+    storageUtil.expectOperations();
     noActiveUpdates();
     applyQuota(new Quota(1, 1, 1));
     returnNoTasks();
@@ -69,7 +69,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   @Test
   public void testNoQuotaExhausted() {
-    storageUtil.expectTransactions();
+    storageUtil.expectOperations();
     returnNoTasks();
     noActiveUpdates();
     expect(storageUtil.quotaStore.fetchQuota(ROLE)).andReturn(Optional.<Quota>absent());
@@ -83,7 +83,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
   public void testSetQuota() {
     Quota quota = new Quota(1, 2, 3);
 
-    storageUtil.expectTransactions();
+    storageUtil.expectOperations();
     storageUtil.quotaStore.saveQuota(ROLE, quota);
 
     control.replay();
@@ -96,7 +96,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
     ScheduledTask task1 = createTask("foo", "id1", 1, 1, 1);
     ScheduledTask task2 = createTask("foo", "id2", 1, 1, 1);
 
-    storageUtil.expectTransactions();
+    storageUtil.expectOperations();
     applyQuota(new Quota(2, 2, 2)).anyTimes();
     noActiveUpdates();
     returnTasks(task1);
@@ -111,7 +111,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   @Test
   public void testExhaustCpu() {
-    storageUtil.expectTransactions();
+    storageUtil.expectOperations();
     applyQuota(new Quota(2, 2, 2));
     noActiveUpdates();
     returnTasks(createTask("foo", "id1", 1, 1, 1));
@@ -123,7 +123,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   @Test
   public void testExhaustRam() {
-    storageUtil.expectTransactions();
+    storageUtil.expectOperations();
     applyQuota(new Quota(2, 2, 2));
     noActiveUpdates();
     returnTasks(createTask("foo", "id1", 1, 1, 1));
@@ -135,7 +135,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   @Test
   public void testExhaustDisk() {
-    storageUtil.expectTransactions();
+    storageUtil.expectOperations();
     applyQuota(new Quota(2, 2, 2));
     noActiveUpdates();
     returnTasks(createTask("foo", "id1", 1, 1, 1));
@@ -150,7 +150,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
     ScheduledTask task = createTask("foo", "id1", 3, 3, 3);
     task.getAssignedTask().getTask().setProduction(false);
 
-    storageUtil.expectTransactions();
+    storageUtil.expectOperations();
     applyQuota(new Quota(2, 2, 2));
     noActiveUpdates();
     returnTasks(task);
@@ -165,7 +165,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
     ScheduledTask task = createTask("bar", "id1", 1, 1, 1);
     ScheduledTask updatingTask = createTask("foo", "id1", 1, 1, 1);
 
-    storageUtil.expectTransactions();
+    storageUtil.expectOperations();
     applyQuota(new Quota(4, 4, 4)).anyTimes();
     returnTasks(task, updatingTask).anyTimes();
 

@@ -81,7 +81,7 @@ public interface QuotaManager {
     public Quota getQuota(final String role) {
       checkNotBlank(role);
 
-      Optional<Quota> quota = storage.doInTransaction(new Work.Quiet<Optional<Quota>>() {
+      Optional<Quota> quota = storage.readOp(new Work.Quiet<Optional<Quota>>() {
         @Override public Optional<Quota> apply(StoreProvider storeProvider) {
           return storeProvider.getQuotaStore().fetchQuota(role);
         }
@@ -103,7 +103,7 @@ public interface QuotaManager {
 
       final TaskQuery query = Query.roleScoped(role).active().get();
 
-      return storage.doInTransaction(
+      return storage.readOp(
           new Work.Quiet<Quota>() {
             @Override public Quota apply(StoreProvider storeProvider) {
               Quota quota = Quotas.fromTasks(Iterables.transform(
@@ -132,7 +132,7 @@ public interface QuotaManager {
       checkNotBlank(role);
       checkNotNull(quota);
 
-      storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+      storage.writeOp(new MutateWork.NoResult.Quiet() {
         @Override public void execute(MutableStoreProvider storeProvider) {
           storeProvider.getQuotaStore().saveQuota(role, quota);
         }

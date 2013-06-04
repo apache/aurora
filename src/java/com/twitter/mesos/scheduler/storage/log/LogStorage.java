@@ -274,7 +274,7 @@ public class LogStorage extends ForwardingStore
 
   @Override
   public synchronized void start(final MutateWork.NoResult.Quiet initializationLogic) {
-    doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+    writeOp(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider unused) {
         // Must have the underlying storage started so we can query it for the last checkpoint.
         // We replay these entries in the forwarded storage system's transactions but not ours - we
@@ -284,7 +284,7 @@ public class LogStorage extends ForwardingStore
 
         // Now that we're recovered we should let any mutations done in initializationLogic append
         // to the log, so run it in one of our transactions.
-        doInWriteTransaction(initializationLogic);
+        writeOp(initializationLogic);
       }
     });
 
@@ -431,7 +431,7 @@ public class LogStorage extends ForwardingStore
    */
   @Timed("scheduler_log_snapshot")
   public void snapshot() throws CodingException, InvalidPositionException, StreamAccessException {
-    super.doInWriteTransaction(new MutateWork.NoResult<CodingException>() {
+    super.writeOp(new MutateWork.NoResult<CodingException>() {
       @Override protected void execute(MutableStoreProvider unused)
           throws CodingException, InvalidPositionException, StreamAccessException {
 
@@ -449,19 +449,19 @@ public class LogStorage extends ForwardingStore
   }
 
   @Override
-  public synchronized <T, E extends Exception> T doInWriteTransaction(final MutateWork<T, E> work)
+  public synchronized <T, E extends Exception> T writeOp(final MutateWork<T, E> work)
       throws StorageException, E {
 
     // We don't want to use the log when recovering from it, we just want to update the underlying
     // store - so pass mutations straight through to the underlying storage.
     if (!recovered) {
-      return super.doInWriteTransaction(work);
+      return super.writeOp(work);
     }
 
     // The log stream transaction has already been set up so we just need to delegate with our
     // store provider so any mutations performed by work get logged.
     if (transaction != null) {
-      return super.doInWriteTransaction(new MutateWork<T, E>() {
+      return super.writeOp(new MutateWork<T, E>() {
         @Override public T apply(MutableStoreProvider unused) throws E {
           return work.apply(logStoreProvider);
         }
@@ -470,7 +470,7 @@ public class LogStorage extends ForwardingStore
 
     transaction = streamManager.startTransaction();
     try {
-      return super.doInWriteTransaction(new MutateWork<T, E>() {
+      return super.writeOp(new MutateWork<T, E>() {
         @Override public T apply(MutableStoreProvider unused) throws E {
           T result = work.apply(logStoreProvider);
           try {
@@ -493,7 +493,7 @@ public class LogStorage extends ForwardingStore
   @Timed("scheduler_log_save_framework_id")
   @Override
   public void saveFrameworkId(final String frameworkId) {
-    doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+    writeOp(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider unused) {
         log(Op.saveFrameworkId(new SaveFrameworkId(frameworkId)));
         LogStorage.super.saveFrameworkId(frameworkId);
@@ -504,7 +504,7 @@ public class LogStorage extends ForwardingStore
   @Timed("scheduler_log_job_save")
   @Override
   public void saveAcceptedJob(final String managerId, final JobConfiguration jobConfig) {
-    doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+    writeOp(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider unused) {
         log(Op.saveAcceptedJob(new SaveAcceptedJob(managerId, jobConfig)));
         LogStorage.super.saveAcceptedJob(managerId, jobConfig);
@@ -515,7 +515,7 @@ public class LogStorage extends ForwardingStore
   @Timed("scheduler_log_job_remove")
   @Override
   public void removeJob(final String jobKey) {
-    doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+    writeOp(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider unused) {
         log(Op.removeJob(new RemoveJob(jobKey)));
         LogStorage.super.removeJob(jobKey);
@@ -526,7 +526,7 @@ public class LogStorage extends ForwardingStore
   @Timed("scheduler_log_tasks_save")
   @Override
   public void saveTasks(final Set<ScheduledTask> newTasks) throws IllegalStateException {
-    doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+    writeOp(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider unused) {
         log(Op.saveTasks(new SaveTasks(newTasks)));
         LogStorage.super.saveTasks(newTasks);
@@ -536,7 +536,7 @@ public class LogStorage extends ForwardingStore
 
   @Override
   public void deleteAllTasks() {
-    doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+    writeOp(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
         deleteTasks(storeProvider.getTaskStore().fetchTaskIds(Query.GET_ALL));
       }
@@ -546,7 +546,7 @@ public class LogStorage extends ForwardingStore
   @Timed("scheduler_log_tasks_remove")
   @Override
   public void deleteTasks(final Set<String> taskIds) {
-    doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+    writeOp(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider unused) {
         log(Op.removeTasks(new RemoveTasks(taskIds)));
         LogStorage.super.deleteTasks(taskIds);
@@ -558,7 +558,7 @@ public class LogStorage extends ForwardingStore
   @Override
   public ImmutableSet<ScheduledTask> mutateTasks(final TaskQuery query,
       final Closure<ScheduledTask> mutator) {
-    return doInWriteTransaction(new MutateWork.Quiet<ImmutableSet<ScheduledTask>>() {
+    return writeOp(new MutateWork.Quiet<ImmutableSet<ScheduledTask>>() {
       @Override public ImmutableSet<ScheduledTask> apply(MutableStoreProvider unused) {
         ImmutableSet<ScheduledTask> mutated = LogStorage.super.mutateTasks(query, mutator);
 
@@ -578,7 +578,7 @@ public class LogStorage extends ForwardingStore
   @Timed("scheduler_log_jobupdate_save")
   @Override
   public void saveJobUpdateConfig(final JobUpdateConfiguration configs) {
-    doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+    writeOp(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider unused) {
         log(Op.saveJobUpdate(new SaveJobUpdate(
             configs.getRole(),
@@ -593,7 +593,7 @@ public class LogStorage extends ForwardingStore
   @Timed("scheduler_log_jobupdate_remove")
   @Override
   public void removeShardUpdateConfigs(final String role, final String job) {
-    doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+    writeOp(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider unused) {
         log(Op.removeJobUpdate(new RemoveJobUpdate(role, job)));
         LogStorage.super.removeShardUpdateConfigs(role, job);
@@ -604,7 +604,7 @@ public class LogStorage extends ForwardingStore
   @Timed("scheduler_log_quota_remove")
   @Override
   public void removeQuota(final String role) {
-    doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+    writeOp(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider unused) {
         log(Op.removeQuota(new RemoveQuota(role)));
         LogStorage.super.removeQuota(role);
@@ -615,7 +615,7 @@ public class LogStorage extends ForwardingStore
   @Timed("scheduler_log_quota_save")
   @Override
   public void saveQuota(final String role, final Quota quota) {
-    doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+    writeOp(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider unused) {
         log(Op.saveQuota(new SaveQuota(role, quota)));
         LogStorage.super.saveQuota(role, quota);
@@ -626,7 +626,7 @@ public class LogStorage extends ForwardingStore
   @Timed("scheduler_save_host_attribute")
   @Override
   public void saveHostAttributes(final HostAttributes attrs) {
-    doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+    writeOp(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider unused) {
         // Pass the updated attributes upstream, and then check if the stored value changes.
         // We do this since different parts of the system write partial HostAttributes objects
@@ -645,7 +645,7 @@ public class LogStorage extends ForwardingStore
 
   @Override
   public boolean setMaintenanceMode(final String host, final MaintenanceMode mode) {
-    doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+    writeOp(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider unused) {
         Optional<HostAttributes> saved = LogStorage.super.getHostAttributes(host);
         if (saved.isPresent()) {

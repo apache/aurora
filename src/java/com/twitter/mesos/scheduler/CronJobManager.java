@@ -204,7 +204,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
   @Subscribe
   public void storageStarted(StorageStarted storageStarted) {
     Iterable<JobConfiguration> crons =
-        storage.doInTransaction(new Work.Quiet<Iterable<JobConfiguration>>() {
+        storage.readOp(new Work.Quiet<Iterable<JobConfiguration>>() {
           @Override public Iterable<JobConfiguration> apply(Storage.StoreProvider storeProvider) {
             return storeProvider.getJobStore().fetchJobs(MANAGER_KEY);
           }
@@ -394,7 +394,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
     }
 
     String scheduledJobKey = scheduleJob(job);
-    storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+    storage.writeOp(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(Storage.MutableStoreProvider storeProvider) {
         storeProvider.getJobStore().saveAcceptedJob(MANAGER_KEY, job);
       }
@@ -434,9 +434,8 @@ public class CronJobManager extends JobManager implements EventSubscriber {
 
   @Override
   public Iterable<JobConfiguration> getJobs() {
-    return storage.doInTransaction(new Work.Quiet<Iterable<JobConfiguration>>() {
+    return storage.readOp(new Work.Quiet<Iterable<JobConfiguration>>() {
       @Override public Iterable<JobConfiguration> apply(Storage.StoreProvider storeProvider) {
-
         return storeProvider.getJobStore().fetchJobs(MANAGER_KEY);
       }
     });
@@ -449,7 +448,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
 
   private JobConfiguration fetchJob(final String jobKey) {
     checkNotNull(jobKey);
-    return storage.doInTransaction(new Work.Quiet<JobConfiguration>() {
+    return storage.readOp(new Work.Quiet<JobConfiguration>() {
       @Override public JobConfiguration apply(Storage.StoreProvider storeProvider) {
         return storeProvider.getJobStore().fetchJob(MANAGER_KEY, jobKey);
       }
@@ -466,7 +465,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
     String scheduledJobKey = scheduledJobs.remove(jobKey);
     if (scheduledJobKey != null) {
       cron.deschedule(scheduledJobKey);
-      storage.doInWriteTransaction(new MutateWork.NoResult.Quiet() {
+      storage.writeOp(new MutateWork.NoResult.Quiet() {
         @Override protected void execute(Storage.MutableStoreProvider storeProvider) {
           storeProvider.getJobStore().removeJob(jobKey);
         }

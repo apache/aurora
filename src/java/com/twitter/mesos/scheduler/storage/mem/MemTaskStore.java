@@ -12,12 +12,12 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Supplier;
 import com.google.common.collect.FluentIterable;
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
-import com.google.common.collect.Sets;
 
 import org.apache.commons.lang.StringUtils;
 
@@ -40,7 +40,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * An in-memory task store.
  */
-public class MemTaskStore implements TaskStore.Mutable.Transactioned {
+public class MemTaskStore implements TaskStore.Mutable {
 
   private static final Logger LOG = Logger.getLogger(MemTaskStore.class.getName());
 
@@ -64,26 +64,12 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
 
   private final long slowQueryThresholdNanos = SLOW_QUERY_LOG_THRESHOLD.get().as(Time.NANOSECONDS);
 
-  private final TransactionalMap<String, ScheduledTask> tasks =
-      TransactionalMap.wrap(Maps.<String, ScheduledTask>newHashMap());
-  private final TransactionalMap<String, ImmutableSet<String>> tasksByJobKey =
-      TransactionalMap.wrap(Maps.<String, ImmutableSet<String>>newHashMap());
+  private final Map<String, ScheduledTask> tasks = Maps.newHashMap();
+  private final Multimap<String, String> tasksByJobKey = HashMultimap.create();
 
   private final AtomicLong taskQueriesById = Stats.exportLong("task_queries_by_id");
   private final AtomicLong taskQueriesByJob = Stats.exportLong("task_queries_by_job");
   private final AtomicLong taskQueriesAll = Stats.exportLong("task_queries_all");
-
-  @Override
-  public void commit() {
-    tasks.commit();
-    tasksByJobKey.commit();
-  }
-
-  @Override
-  public void rollback() {
-    tasks.rollback();
-    tasksByJobKey.rollback();
-  }
 
   @Timed("mem_storage_deep_copies")
   protected ScheduledTask deepCopy(ScheduledTask input) {
@@ -120,11 +106,10 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
     return mutableMatches(query).transform(Tasks.SCHEDULED_TO_ID).toSet();
   }
 
-  private Map<String, Collection<String>> taskIdsByJobKey(Iterable<ScheduledTask> toIndex) {
+  private Multimap<String, String> taskIdsByJobKey(Iterable<ScheduledTask> toIndex) {
     return Multimaps.transformValues(
         Multimaps.index(toIndex, Tasks.SCHEDULED_TO_JOB_KEY),
-        Tasks.SCHEDULED_TO_ID)
-        .asMap();
+        Tasks.SCHEDULED_TO_ID);
   }
 
   @Override
@@ -142,22 +127,7 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
     Set<ScheduledTask> immutable =
         FluentIterable.from(newTasks).transform(deepCopy).toSet();
     tasks.putAll(Maps.uniqueIndex(immutable, Tasks.SCHEDULED_TO_ID));
-
-    // Update job key index.
-    for (Map.Entry<String, Collection<String>> entry : taskIdsByJobKey(immutable).entrySet()) {
-      ImmutableSet.Builder<String> newIds = ImmutableSet.builder();
-      newIds.addAll(entry.getValue());
-      Set<String> existingIds = tasksByJobKey.get(entry.getKey());
-      if (existingIds != null) {
-        newIds.addAll(existingIds);
-      }
-
-      // This is subtle but important: when modifying the items associated with a key, we must
-      // re-insert rather than updating the contents of the set.  The transactional map has no
-      // awareness of the contents of a value, so modifying the value set would break the
-      // transactional guarantee.
-      tasksByJobKey.put(entry.getKey(), newIds.build());
-    }
+    tasksByJobKey.putAll(taskIdsByJobKey(immutable));
   }
 
   @Timed("mem_storage_delete_all_tasks")
@@ -172,27 +142,10 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
   public void deleteTasks(Set<String> taskIds) {
     checkNotNull(taskIds);
 
-    // TransactionalMap does not presently support keySet modification, requiring iteration here.
-    ImmutableList.Builder<ScheduledTask> gone = ImmutableList.builder();
     for (String id : taskIds) {
-      ScheduledTask task = tasks.remove(id);
-      if (task != null) {
-        gone.add(task);
-      }
-    }
-    for (Map.Entry<String, Collection<String>> entry : taskIdsByJobKey(gone.build()).entrySet()) {
-      Set<String> existingIds = tasksByJobKey.get(entry.getKey());
-      if (existingIds == null) {
-        throw new IllegalStateException(
-            "Index inconsistency - job for tasks not present in index: " + entry.getValue());
-      }
-
-      ImmutableSet<String> newIds = ImmutableSet.copyOf(
-          Sets.<String>difference(existingIds, ImmutableSet.copyOf(entry.getValue())));
-      if (newIds.isEmpty()) {
-        tasksByJobKey.remove(entry.getKey());
-      } else {
-        tasksByJobKey.put(entry.getKey(), newIds);
+      ScheduledTask removed = tasks.remove(id);
+      if (removed != null) {
+        tasksByJobKey.remove(Tasks.jobKey(removed), Tasks.id(removed));
       }
     }
   }
@@ -203,7 +156,7 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
     checkNotNull(query);
     checkNotNull(mutator);
 
-    ImmutableMap.Builder<String, ScheduledTask> mutated = ImmutableMap.builder();
+    ImmutableSet.Builder<ScheduledTask> mutated = ImmutableSet.builder();
     for (ScheduledTask original : immutableMatches(query)) {
       // Copy the object before invoking user code.  This is to support diff checking.
       ScheduledTask mutable = deepCopy.apply(original);
@@ -215,14 +168,12 @@ public class MemTaskStore implements TaskStore.Mutable.Transactioned {
         // A diff is present - detach the mutable object from the closure's code to render
         // further mutation impossible.
         ScheduledTask updated = deepCopy.apply(mutable);
-        mutated.put(Tasks.id(mutable), updated);
+        tasks.put(Tasks.id(mutable), updated);
+        mutated.add(deepCopy.apply(updated));
       }
     }
 
-    Map<String, ScheduledTask> toUpdate = mutated.build();
-    tasks.putAll(toUpdate);
-
-    return ImmutableSet.copyOf(toUpdate.values());
+    return mutated.build();
   }
 
   private static Predicate<ScheduledTask> queryFilter(final TaskQuery query) {

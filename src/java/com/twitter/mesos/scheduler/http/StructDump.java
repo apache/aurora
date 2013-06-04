@@ -93,7 +93,7 @@ public class StructDump extends JerseyTemplateServlet {
     return fillTemplate(new Closure<StringTemplate>() {
       @Override public void execute(StringTemplate template) {
         template.setAttribute("id", id);
-        TBase<?, ?> struct = storage.doInTransaction(work);
+        TBase<?, ?> struct = storage.readOp(work);
         if (struct == null) {
           template.setAttribute("exception", "Entity not found");
         } else {

@@ -72,7 +72,7 @@ public class HistoryPrunerTest extends EasyMockTest {
     executor = createMock(ScheduledExecutorService.class);
     clock = new FakeClock();
     storageUtil = new StorageTestUtil(this);
-    storageUtil.expectTransactions();
+    storageUtil.expectOperations();
     stateManager = createMock(StateManager.class);
     pruner = new HistoryPruner(
         executor,

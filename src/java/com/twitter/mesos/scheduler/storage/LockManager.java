@@ -77,7 +77,7 @@ public class LockManager {
    */
   public boolean writeLock() {
     Preconditions.checkState(lockState.get().initialLockMode != LockMode.READ,
-        "A read transaction may not be upgraded to a write transaction.");
+        "A read operation may not be upgraded to a write operation.");
 
     lock.writeLock().lock();
     return lockState.get().lockAcquired(LockMode.WRITE);

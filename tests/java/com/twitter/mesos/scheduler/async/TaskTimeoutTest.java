@@ -64,7 +64,7 @@ public class TaskTimeoutTest extends EasyMockTest {
   @Before
   public void setUp() {
     storageUtil = new StorageTestUtil(this);
-    storageUtil.expectTransactions();
+    storageUtil.expectOperations();
     executor = createMock(ScheduledExecutorService.class);
     future = createMock(new Clazz<ScheduledFuture<?>>() { });
     stateManager = createMock(StateManager.class);

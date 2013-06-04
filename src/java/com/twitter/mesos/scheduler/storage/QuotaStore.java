@@ -46,8 +46,5 @@ public interface QuotaStore {
      * @param quota Quota to save.
      */
     void saveQuota(String role, Quota quota);
-
-    public interface Transactioned extends Mutable, Transactional {
-    }
   }
 }

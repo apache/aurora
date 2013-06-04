@@ -49,7 +49,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
   @Before
   public void setUp() throws Exception {
     storageUtil = new StorageTestUtil(this);
-    storageUtil.expectTransactions();
+    storageUtil.expectOperations();
     stateManager = createMock(StateManager.class);
     eventSink = createMock(new Clazz<Closure<PubsubEvent>>() { });
     maintenance = new MaintenanceControllerImpl(storageUtil.storage, stateManager, eventSink);

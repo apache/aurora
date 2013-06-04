@@ -45,8 +45,8 @@ import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TaskUpdateConfiguration;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
-import com.twitter.mesos.scheduler.TransactionalStorage.SideEffectWork;
-import com.twitter.mesos.scheduler.TransactionalStorage.TransactionFinalizer;
+import com.twitter.mesos.scheduler.SideEffectStorage.OperationFinalizer;
+import com.twitter.mesos.scheduler.SideEffectStorage.SideEffectWork;
 import com.twitter.mesos.scheduler.events.PubsubEvent;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
@@ -81,17 +81,17 @@ public class StateManagerImpl implements StateManager {
   private static final Logger LOG = Logger.getLogger(StateManagerImpl.class.getName());
 
   @VisibleForTesting
-  final TransactionalStorage txStorage;
+  final SideEffectStorage storage;
   private final Function<TwitterTaskInfo, String> taskIdGenerator;
 
   // TODO(William Farner): Eliminate this and update all callers to use Storage directly.
   interface ReadOnlyStorage {
-    <T, E extends Exception> T doInTransaction(Work<T, E> work) throws StorageException, E;
+    <T, E extends Exception> T readOperation(Work<T, E> work) throws StorageException, E;
   }
   private final ReadOnlyStorage readOnlyStorage;
 
   // Work queue to receive state machine side effect work.
-  // Items are sorted to place DELETE entries last.  This is to ensure that within a transaction,
+  // Items are sorted to place DELETE entries last.  This is to ensure that within an operation,
   // a delete is always processed after a state transition.
   private final Queue<WorkEntry> workQueue = new PriorityQueue<WorkEntry>(10,
       new Comparator<WorkEntry>() {
@@ -152,17 +152,17 @@ public class StateManagerImpl implements StateManager {
     checkNotNull(storage);
     this.clock = checkNotNull(clock);
 
-    TransactionFinalizer finalizer = new TransactionFinalizer() {
+    OperationFinalizer finalizer = new OperationFinalizer() {
       @Override public void finalize(SideEffectWork<?, ?> work, MutableStoreProvider store) {
-        processWorkQueueInTransaction(work, store);
+        processWorkQueueInWriteOperation(work, store);
       }
     };
 
-    txStorage = new TransactionalStorage(storage, finalizer, taskEventSink);
+    this.storage = new SideEffectStorage(storage, finalizer, taskEventSink);
     readOnlyStorage = new ReadOnlyStorage() {
-      @Override public <T, E extends Exception> T doInTransaction(Work<T, E> work)
+      @Override public <T, E extends Exception> T readOperation(Work<T, E> work)
           throws StorageException, E {
-        return storage.doInTransaction(work);
+        return storage.readOp(work);
       }
     };
 
@@ -183,7 +183,7 @@ public class StateManagerImpl implements StateManager {
 
     final Set<ScheduledTask> scheduledTasks = ImmutableSet.copyOf(transform(tasks, taskCreator));
 
-    txStorage.doInWriteTransaction(txStorage.new NoResultSideEffectWork() {
+    storage.writeOperation(storage.new NoResultSideEffectWork() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(scheduledTasks);
 
@@ -227,7 +227,7 @@ public class StateManagerImpl implements StateManager {
     checkNotBlank(job);
     checkNotBlank(updatedTasks);
 
-    return txStorage.doInWriteTransaction(txStorage.new SideEffectWork<String, UpdateException>() {
+    return storage.writeOperation(storage.new SideEffectWork<String, UpdateException>() {
       @Override public String apply(MutableStoreProvider storeProvider) throws UpdateException {
         assertNotUpdatingOrRollingBack(role, job, storeProvider.getTaskStore());
 
@@ -303,7 +303,7 @@ public class StateManagerImpl implements StateManager {
     checkNotBlank(updatingUser);
     checkNotBlank(job);
 
-    return txStorage.doInWriteTransaction(txStorage.new SideEffectWork<Boolean, UpdateException>() {
+    return storage.writeOperation(storage.new SideEffectWork<Boolean, UpdateException>() {
       @Override public Boolean apply(MutableStoreProvider storeProvider) throws UpdateException {
         assertNotUpdatingOrRollingBack(role, job, storeProvider.getTaskStore());
 
@@ -456,10 +456,10 @@ public class StateManagerImpl implements StateManager {
       auditMessage = "Rolled back by " + identity.getUser();
     }
 
-    return txStorage.doInWriteTransaction(
-        txStorage.new SideEffectWork<Map<Integer, ShardUpdateResult>, UpdateException>() {
-          @Override public Map<Integer, ShardUpdateResult> apply(
-              MutableStoreProvider store) throws UpdateException {
+    return storage.writeOperation(
+        storage.new SideEffectWork<Map<Integer, ShardUpdateResult>, UpdateException>() {
+          @Override public Map<Integer, ShardUpdateResult> apply(MutableStoreProvider store)
+              throws UpdateException {
 
             ImmutableMap.Builder<Integer, ShardUpdateResult> result = ImmutableMap.builder();
 
@@ -588,7 +588,7 @@ public class StateManagerImpl implements StateManager {
         .toSet();
   }
 
-  private int changeStateInTransaction(
+  private int changeStateInWriteOperation(
       Set<String> taskIds,
       Function<TaskStateMachine, Boolean> stateChange) {
 
@@ -605,9 +605,9 @@ public class StateManagerImpl implements StateManager {
       final TaskQuery query,
       final Function<TaskStateMachine, Boolean> stateChange) {
 
-    return txStorage.doInWriteTransaction(txStorage.new QuietSideEffectWork<Integer>() {
+    return storage.writeOperation(storage.new QuietSideEffectWork<Integer>() {
       @Override public Integer apply(MutableStoreProvider storeProvider) {
-        return changeStateInTransaction(
+        return changeStateInWriteOperation(
             storeProvider.getTaskStore().fetchTaskIds(query), stateChange);
       }
     });
@@ -664,8 +664,9 @@ public class StateManagerImpl implements StateManager {
   private Supplier<Boolean> taskUpdateChecker(final String role, final String job) {
     return new Supplier<Boolean>() {
       @Override public Boolean get() {
-        return readOnlyStorage.doInTransaction(new Work.Quiet<Boolean>() {
-          @Override public Boolean apply(StoreProvider storeProvider) {
+        return readOnlyStorage.readOperation(new Work.Quiet<Boolean>() {
+          @Override
+          public Boolean apply(StoreProvider storeProvider) {
             return storeProvider.getUpdateStore().fetchJobUpdateConfig(role, job).isPresent();
           }
         });
@@ -673,7 +674,7 @@ public class StateManagerImpl implements StateManager {
     };
   }
 
-  private void processWorkQueueInTransaction(
+  private void processWorkQueueInWriteOperation(
       SideEffectWork<?, ?> sideEffectWork,
       MutableStoreProvider storeProvider) {
 
@@ -751,7 +752,7 @@ public class StateManagerImpl implements StateManager {
 
   @Override
   public void deleteTasks(final Set<String> taskIds) {
-    txStorage.doInWriteTransaction(txStorage.new NoResultSideEffectWork() {
+    storage.writeOperation(storage.new NoResultSideEffectWork() {
       @Override protected void execute(final MutableStoreProvider storeProvider) {
         TaskStore.Mutable taskStore = storeProvider.getUnsafeTaskStore();
         Iterable<ScheduledTask> tasks = taskStore.fetchTasks(Query.byId(taskIds));
@@ -803,13 +804,15 @@ public class StateManagerImpl implements StateManager {
   }
 
   private Map<String, TaskStateMachine> getStateMachines(final Set<String> taskIds) {
-    return readOnlyStorage.doInTransaction(new Work.Quiet<Map<String, TaskStateMachine>>() {
-      @Override public Map<String, TaskStateMachine> apply(StoreProvider storeProvider) {
+    return readOnlyStorage.readOperation(new Work.Quiet<Map<String, TaskStateMachine>>() {
+      @Override
+      public Map<String, TaskStateMachine> apply(StoreProvider storeProvider) {
         Set<ScheduledTask> tasks = storeProvider.getTaskStore().fetchTasks(Query.byId(taskIds));
         Map<String, ScheduledTask> existingTasks = Maps.uniqueIndex(
             tasks,
             new Function<ScheduledTask, String>() {
-              @Override public String apply(ScheduledTask input) {
+              @Override
+              public String apply(ScheduledTask input) {
                 return input.getAssignedTask().getTaskId();
               }
             });

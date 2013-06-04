@@ -81,11 +81,11 @@ public final class MemStorageModule extends PrivateModule {
     expose(exposedMemStorageKey);
     bind(MemStorage.class).in(Singleton.class);
 
-    bindStore(SchedulerStore.Mutable.Transactioned.class, MemSchedulerStore.class);
-    bindStore(JobStore.Mutable.Transactioned.class, MemJobStore.class);
-    bindStore(TaskStore.Mutable.Transactioned.class, MemTaskStore.class);
-    bindStore(UpdateStore.Mutable.Transactioned.class, MemUpdateStore.class);
-    bindStore(QuotaStore.Mutable.Transactioned.class, MemQuotaStore.class);
+    bindStore(SchedulerStore.Mutable.class, MemSchedulerStore.class);
+    bindStore(JobStore.Mutable.class, MemJobStore.class);
+    bindStore(TaskStore.Mutable.class, MemTaskStore.class);
+    bindStore(UpdateStore.Mutable.class, MemUpdateStore.class);
+    bindStore(QuotaStore.Mutable.class, MemQuotaStore.class);
 
     expose(storageKey);
     bindAdditional.execute(binder());

@@ -35,7 +35,7 @@ public interface AttributeStore {
 
   /**
    * Attributes are considered mostly ephemeral and extremely low risk when inconsistency
-   * is present.  As a result, this is the only store lacking a {@link Transactional} sub-interface.
+   * is present.
    */
   public interface Mutable extends AttributeStore {
 

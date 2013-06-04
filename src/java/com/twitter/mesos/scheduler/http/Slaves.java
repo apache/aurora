@@ -50,7 +50,7 @@ public class Slaves extends JerseyTemplateServlet {
   }
 
   private Iterable<HostAttributes> getHostAttributes() {
-    return storage.doInTransaction(new Work.Quiet<Iterable<HostAttributes>>() {
+    return storage.readOp(new Work.Quiet<Iterable<HostAttributes>>() {
       @Override public Iterable<HostAttributes> apply(StoreProvider storeProvider) {
         return storeProvider.getAttributeStore().getHostAttributes();
       }

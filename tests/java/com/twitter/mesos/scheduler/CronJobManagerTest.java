@@ -50,7 +50,7 @@ public class CronJobManagerTest extends EasyMockTest {
     delayExecutor = createMock(Executor.class);
     delayLaunchCapture = createCapture();
     storageUtil = new StorageTestUtil(this);
-    storageUtil.expectTransactions();
+    storageUtil.expectOperations();
     cronScheduler = createMock(CronScheduler.class);
     cron = new CronJobManager(storageUtil.storage, cronScheduler, delayExecutor);
     cron.schedulerCore = scheduler;

@@ -17,22 +17,11 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * An in-memory quota store.
  */
-public class MemQuotaStore implements QuotaStore.Mutable.Transactioned {
+public class MemQuotaStore implements QuotaStore.Mutable {
 
   private static final Function<Quota, Quota> DEEP_COPY = Util.deepCopier();
 
-  private final TransactionalMap<String, Quota> quotas =
-      TransactionalMap.wrap(Maps.<String, Quota>newHashMap());
-
-  @Override
-  public void commit() {
-    quotas.commit();
-  }
-
-  @Override
-  public void rollback() {
-    quotas.rollback();
-  }
+  private final Map<String, Quota> quotas = Maps.newHashMap();
 
   @Override
   public void deleteQuotas() {

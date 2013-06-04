@@ -55,7 +55,7 @@ public class PreempterTest extends EasyMockTest {
   @Before
   public void setUp() {
     storageUtil = new StorageTestUtil(this);
-    storageUtil.expectTransactions();
+    storageUtil.expectOperations();
     scheduler = createMock(SchedulerCore.class);
     schedulingFilter = createMock(SchedulingFilter.class);
     clock = new FakeClock();

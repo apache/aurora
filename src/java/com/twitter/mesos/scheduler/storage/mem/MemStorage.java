@@ -3,7 +3,6 @@ package com.twitter.mesos.scheduler.storage.mem;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
 
 import com.twitter.common.inject.TimedInterceptor.Timed;
@@ -16,7 +15,6 @@ import com.twitter.mesos.scheduler.storage.QuotaStore;
 import com.twitter.mesos.scheduler.storage.SchedulerStore;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.TaskStore;
-import com.twitter.mesos.scheduler.storage.Transactional;
 import com.twitter.mesos.scheduler.storage.UpdateStore;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -30,15 +28,14 @@ public class MemStorage implements Storage {
 
   private final MutableStoreProvider storeProvider;
   private final LockManager lockManager = new LockManager();
-  private final Iterable<Transactional> transactionals;
 
   @Inject
   MemStorage(
-      final SchedulerStore.Mutable.Transactioned schedulerStore,
-      final JobStore.Mutable.Transactioned jobStore,
-      final TaskStore.Mutable.Transactioned taskStore,
-      final UpdateStore.Mutable.Transactioned updateStore,
-      final QuotaStore.Mutable.Transactioned quotaStore,
+      final SchedulerStore.Mutable schedulerStore,
+      final JobStore.Mutable jobStore,
+      final TaskStore.Mutable taskStore,
+      final UpdateStore.Mutable updateStore,
+      final QuotaStore.Mutable quotaStore,
       final AttributeStore.Mutable attributeStore) {
 
     storeProvider = new MutableStoreProvider() {
@@ -70,12 +67,6 @@ public class MemStorage implements Storage {
         return attributeStore;
       }
     };
-    transactionals = ImmutableList.of(
-        schedulerStore,
-        jobStore,
-        taskStore,
-        updateStore,
-        quotaStore);
   }
 
   /**
@@ -92,14 +83,14 @@ public class MemStorage implements Storage {
         new AttributeStoreImpl());
   }
 
-  @Timed("mem_storage_read_transaction")
+  @Timed("mem_storage_read_operation")
   @Override
-  public <T, E extends Exception> T doInTransaction(Work<T, E> work) throws StorageException, E {
+  public <T, E extends Exception> T readOp(Work<T, E> work) throws StorageException, E {
     checkNotNull(work);
 
     long lockStartNanos = System.nanoTime();
-    boolean topLevelTransaction = lockManager.readLock();
-    if (topLevelTransaction) {
+    boolean topLevelOperation = lockManager.readLock();
+    if (topLevelOperation) {
       readLockWaitNanos.addAndGet(System.nanoTime() - lockStartNanos);
     }
     try {
@@ -109,42 +100,21 @@ public class MemStorage implements Storage {
     }
   }
 
-  private void commit() {
-    for (Transactional transactional : transactionals) {
-      transactional.commit();
-    }
-  }
-
-  private void rollback() {
-    for (Transactional transactional : transactionals) {
-      transactional.rollback();
-    }
-  }
-
-  @Timed("mem_storage_write_transaction")
+  @Timed("mem_storage_write_operation")
   @Override
-  public <T, E extends Exception> T doInWriteTransaction(MutateWork<T, E> work)
+  public <T, E extends Exception> T writeOp(MutateWork<T, E> work)
       throws StorageException, E {
 
     checkNotNull(work);
 
-    boolean committed = false;
     long lockStartNanos = System.nanoTime();
-    boolean topLevelTransaction = lockManager.writeLock();
-    if (topLevelTransaction) {
+    boolean topLevelOperation = lockManager.writeLock();
+    if (topLevelOperation) {
       writeLockWaitNanos.addAndGet(System.nanoTime() - lockStartNanos);
     }
     try {
-      T result =  work.apply(storeProvider);
-      if (topLevelTransaction) {
-        commit();
-        committed = true;
-      }
-      return result;
+      return work.apply(storeProvider);
     } finally {
-      if (topLevelTransaction && !committed) {
-        rollback();
-      }
       lockManager.writeUnlock();
     }
   }

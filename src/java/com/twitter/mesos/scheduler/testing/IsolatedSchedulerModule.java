@@ -363,16 +363,16 @@ public class IsolatedSchedulerModule extends AbstractModule {
     @Override public void stop() {
     }
 
-    @Override public <T, E extends Exception> T doInTransaction(Work<T, E> work)
+    @Override public <T, E extends Exception> T readOp(Work<T, E> work)
         throws StorageException, E {
 
-      return storage.doInTransaction(work);
+      return storage.readOp(work);
     }
 
-    @Override public <T, E extends Exception> T doInWriteTransaction(MutateWork<T, E> work)
+    @Override public <T, E extends Exception> T writeOp(MutateWork<T, E> work)
         throws StorageException, E {
 
-      return storage.doInWriteTransaction(work);
+      return storage.writeOp(work);
     }
   }
 }

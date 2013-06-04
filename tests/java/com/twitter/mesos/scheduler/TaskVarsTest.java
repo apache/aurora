@@ -66,7 +66,7 @@ public class TaskVarsTest extends EasyMockTest {
   }
 
   private void expectLoadStorage(ScheduledTask... result) {
-    storageUtil.expectTransactions();
+    storageUtil.expectOperations();
     storageUtil.expectTaskFetch(Query.GET_ALL, result);
     globalCounters = Maps.newHashMap();
     for (ScheduleStatus status : ScheduleStatus.values()) {

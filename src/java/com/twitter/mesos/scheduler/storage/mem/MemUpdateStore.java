@@ -1,5 +1,6 @@
 package com.twitter.mesos.scheduler.storage.mem;
 
+import java.util.Map;
 import java.util.Set;
 
 import com.google.common.base.Function;
@@ -18,13 +19,12 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * An in-memory update store.
  */
-public class MemUpdateStore implements UpdateStore.Mutable.Transactioned {
+public class MemUpdateStore implements UpdateStore.Mutable {
 
   private static final Function<JobUpdateConfiguration, JobUpdateConfiguration> DEEP_COPY =
       Util.deepCopier();
 
-  private final TransactionalMap<String, JobUpdateConfiguration> configs =
-      TransactionalMap.wrap(Maps.<String, JobUpdateConfiguration>newHashMap());
+  private final Map<String, JobUpdateConfiguration> configs = Maps.newHashMap();
 
   private String key(String role, String job) {
     checkNotNull(role);
@@ -37,16 +37,6 @@ public class MemUpdateStore implements UpdateStore.Mutable.Transactioned {
     checkNotNull(config);
 
     return key(config.getRole(),  config.getJob());
-  }
-
-  @Override
-  public void commit() {
-    configs.commit();
-  }
-
-  @Override
-  public void rollback() {
-    configs.rollback();
   }
 
   @Override

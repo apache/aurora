@@ -156,12 +156,6 @@ public class MemTaskStoreTest {
     assertStoreContents(TASK_A.deepCopy().setStatus(ScheduleStatus.ASSIGNED));
   }
 
-  private void beforeAndAfterCommit(Runnable work) {
-    work.run();
-    store.commit();
-    work.run();
-  }
-
   @Test
   public void testConsistentJobIndex() {
     final ScheduledTask a = makeTask("a", "jim", "job");
@@ -173,22 +167,14 @@ public class MemTaskStoreTest {
     final Query.Builder joesJob = Query.jobScoped("joe", "job");
 
     store.saveTasks(ImmutableSet.of(a, b, c, d));
-    beforeAndAfterCommit(new Runnable() {
-      @Override public void run() {
-        assertQueryResults(jimsJob, a, b);
-        assertQueryResults(jimsJob2, c);
-        assertQueryResults(joesJob, d);
-      }
-    });
+    assertQueryResults(jimsJob, a, b);
+    assertQueryResults(jimsJob2, c);
+    assertQueryResults(joesJob, d);
 
     store.deleteTasks(ImmutableSet.of(Tasks.id(b)));
-    beforeAndAfterCommit(new Runnable() {
-      @Override public void run() {
-        assertQueryResults(jimsJob, a);
-        assertQueryResults(jimsJob2, c);
-        assertQueryResults(joesJob, d);
-      }
-    });
+    assertQueryResults(jimsJob, a);
+    assertQueryResults(jimsJob2, c);
+    assertQueryResults(joesJob, d);
 
     store.mutateTasks(jimsJob.get(), new Closure<ScheduledTask>() {
       @Override public void execute(ScheduledTask task) {
@@ -197,38 +183,22 @@ public class MemTaskStoreTest {
     });
     // Change 'a' locally to make subsequent equality checks pass.
     a.setStatus(ScheduleStatus.RUNNING);
-    beforeAndAfterCommit(new Runnable() {
-      @Override public void run() {
-        assertQueryResults(jimsJob, a);
-        assertQueryResults(jimsJob2, c);
-        assertQueryResults(joesJob, d);
-      }
-    });
-
-    store.deleteTasks(ImmutableSet.of(Tasks.id(d)));
-    assertQueryResults(joesJob);
-    store.rollback();
     assertQueryResults(jimsJob, a);
     assertQueryResults(jimsJob2, c);
     assertQueryResults(joesJob, d);
 
     store.deleteTasks(ImmutableSet.of(Tasks.id(d)));
-    beforeAndAfterCommit(new Runnable() {
-      @Override public void run() {
-        assertQueryResults(jimsJob, a);
-        assertQueryResults(jimsJob2, c);
-        assertQueryResults(joesJob);
-      }
-    });
+    assertQueryResults(joesJob);
+
+    store.deleteTasks(ImmutableSet.of(Tasks.id(d)));
+    assertQueryResults(jimsJob, a);
+    assertQueryResults(jimsJob2, c);
+    assertQueryResults(joesJob);
 
     store.saveTasks(ImmutableSet.of(b));
-    beforeAndAfterCommit(new Runnable() {
-      @Override public void run() {
-        assertQueryResults(jimsJob, a, b);
-        assertQueryResults(jimsJob2, c);
-        assertQueryResults(joesJob);
-      }
-    });
+    assertQueryResults(jimsJob, a, b);
+    assertQueryResults(jimsJob2, c);
+    assertQueryResults(joesJob);
   }
 
   private void assertStoreContents(ScheduledTask... tasks) {

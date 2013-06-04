@@ -101,7 +101,7 @@ class TaskVars implements EventSubscriber {
 
     if (stateChange.getNewState() == ScheduleStatus.LOST) {
       final String host = stateChange.getTask().getAssignedTask().getSlaveHost();
-      Optional<String> rack = storage.doInTransaction(new Work.Quiet<Optional<String>>() {
+      Optional<String> rack = storage.readOp(new Work.Quiet<Optional<String>>() {
         @Override public Optional<String> apply(StoreProvider storeProvider) {
           Optional<Attribute> rack = FluentIterable
               .from(AttributeStore.Util.attributesOrNone(storeProvider, host))

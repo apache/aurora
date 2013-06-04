@@ -105,7 +105,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Before
   public void setUp() {
     storageUtil = new StorageTestUtil(this);
-    storageUtil.expectTransactions();
+    storageUtil.expectOperations();
     scheduler = createMock(SchedulerCore.class);
     userValidator = createMock(CapabilityValidator.class);
     quotaManager = createMock(QuotaManager.class);

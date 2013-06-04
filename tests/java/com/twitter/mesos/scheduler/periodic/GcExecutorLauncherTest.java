@@ -57,7 +57,7 @@ public class GcExecutorLauncherTest extends EasyMockTest {
   @Before
   public void setUp() {
     storageUtil = new StorageTestUtil(this);
-    storageUtil.expectTransactions();
+    storageUtil.expectOperations();
     hostMonitor = createMock(new Clazz<PulseMonitor<String>>() { });
     gcExecutorLauncher = new GcExecutorLauncher(
         hostMonitor,

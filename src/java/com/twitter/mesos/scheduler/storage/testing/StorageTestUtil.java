@@ -28,7 +28,7 @@ import static org.easymock.EasyMock.expect;
 /**
  * Auxiliary class to simplify testing against a mocked storage.  This allows callers to directly
  * set up call expectations on individual stores rather than writing plumbing code to deal with
- * transactions and {@link StoreProvider}.
+ * operations and {@link StoreProvider}.
  */
 public class StorageTestUtil {
 
@@ -59,7 +59,7 @@ public class StorageTestUtil {
     this.storage = easyMock.createMock(Storage.class);
   }
 
-  private <T> IExpectationSetters<T> expectTransaction() {
+  private <T> IExpectationSetters<T> expectReadOperation() {
     expect(storeProvider.getTaskStore()).andReturn(taskStore).anyTimes();
     expect(storeProvider.getQuotaStore()).andReturn(quotaStore).anyTimes();
     expect(storeProvider.getAttributeStore()).andReturn(attributeStore).anyTimes();
@@ -68,14 +68,14 @@ public class StorageTestUtil {
     expect(storeProvider.getSchedulerStore()).andReturn(schedulerStore).anyTimes();
 
     final Capture<Work<T, RuntimeException>> work = EasyMockTest.createCapture();
-    return expect(storage.doInTransaction(capture(work))).andAnswer(new IAnswer<T>() {
+    return expect(storage.readOp(capture(work))).andAnswer(new IAnswer<T>() {
       @Override public T answer() {
         return work.getValue().apply(storeProvider);
       }
     });
   }
 
-  private <T> IExpectationSetters<T> expectWriteTransaction() {
+  private <T> IExpectationSetters<T> expectWriteOperation() {
     expect(mutableStoreProvider.getTaskStore()).andReturn(taskStore).anyTimes();
     expect(mutableStoreProvider.getUnsafeTaskStore()).andReturn(taskStore).anyTimes();
     expect(mutableStoreProvider.getQuotaStore()).andReturn(quotaStore).anyTimes();
@@ -85,7 +85,7 @@ public class StorageTestUtil {
     expect(mutableStoreProvider.getSchedulerStore()).andReturn(schedulerStore).anyTimes();
 
     final Capture<MutateWork<T, RuntimeException>> work = EasyMockTest.createCapture();
-    return expect(storage.doInWriteTransaction(capture(work))).andAnswer(new IAnswer<T>() {
+    return expect(storage.writeOp(capture(work))).andAnswer(new IAnswer<T>() {
       @Override public T answer() {
         return work.getValue().apply(mutableStoreProvider);
       }
@@ -93,11 +93,11 @@ public class StorageTestUtil {
   }
 
   /**
-   * Expects any number of transactions.
+   * Expects any number of read or write operations.
    */
-  public void expectTransactions() {
-    expectTransaction().anyTimes();
-    expectWriteTransaction().anyTimes();
+  public void expectOperations() {
+    expectReadOperation().anyTimes();
+    expectWriteOperation().anyTimes();
   }
 
   public IExpectationSetters<?> expectTaskFetch(TaskQuery query, ScheduledTask... result) {

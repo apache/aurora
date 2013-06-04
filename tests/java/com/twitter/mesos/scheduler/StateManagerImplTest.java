@@ -84,7 +84,7 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @After
   public void validateCompletion() {
-    assertTrue(stateManager.txStorage.events.isEmpty());
+    assertTrue(stateManager.storage.events.isEmpty());
   }
 
   private static class StateChangeMatcher implements IArgumentMatcher {

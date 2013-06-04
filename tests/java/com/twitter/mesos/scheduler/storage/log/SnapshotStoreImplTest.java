@@ -57,7 +57,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
         ImmutableSet.<TaskUpdateConfiguration>of());
     String frameworkId = "framework_id";
 
-    storageUtil.expectTransactions();
+    storageUtil.expectOperations();
     expect(storageUtil.taskStore.fetchTasks(Query.GET_ALL)).andReturn(tasks);
     expect(storageUtil.quotaStore.fetchQuotas())
         .andReturn(ImmutableMap.of("steve", Quotas.NO_QUOTA));
