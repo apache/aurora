@@ -8,9 +8,10 @@ import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.thrift.ThriftServer;
+import com.twitter.mesos.auth.AuthModule;
 import com.twitter.mesos.scheduler.thrift.FeatureToggleSchedulerController.Delegate;
 import com.twitter.mesos.scheduler.thrift.FeatureToggleSchedulerController.EnableUpdates;
-import com.twitter.mesos.scheduler.thrift.auth.AuthModule;
+import com.twitter.mesos.scheduler.thrift.auth.ThriftAuthModule;
 
 /**
  * Binding module to configure a thrift server.
@@ -39,7 +40,8 @@ public class ThriftModule extends AbstractModule {
     bind(SchedulerThriftRouter.class).in(Singleton.class);
     bind(ThriftServer.class).to(SchedulerThriftServer.class).in(Singleton.class);
     LifecycleModule.bindServiceRunner(binder(), ThriftServerLauncher.class);
-    install(AuthModule.userCapabilityModule());
+    install(ThriftAuthModule.userCapabilityModule());
     install(new AuthModule());
+    install(new ThriftAuthModule());
   }
 }

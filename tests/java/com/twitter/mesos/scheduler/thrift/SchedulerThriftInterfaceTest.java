@@ -61,9 +61,9 @@ import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.backup.Recovery;
 import com.twitter.mesos.scheduler.storage.backup.StorageBackup;
 import com.twitter.mesos.scheduler.storage.testing.StorageTestUtil;
-import com.twitter.mesos.scheduler.thrift.auth.AuthModule;
 import com.twitter.mesos.scheduler.thrift.auth.CapabilityValidator;
 import com.twitter.mesos.scheduler.thrift.auth.CapabilityValidator.Capability;
+import com.twitter.mesos.scheduler.thrift.auth.ThriftAuthModule;
 
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
@@ -130,7 +130,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         bind(MesosAdmin.Iface.class).to(SchedulerThriftRouter.class);
       }
     };
-    Injector injector = Guice.createInjector(testModule, new AuthModule());
+    Injector injector = Guice.createInjector(testModule, new ThriftAuthModule());
     thrift = injector.getInstance(MesosAdmin.Iface.class);
   }
 
