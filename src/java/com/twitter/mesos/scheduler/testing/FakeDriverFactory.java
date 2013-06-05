@@ -4,17 +4,22 @@ import java.util.Collection;
 
 import javax.annotation.Nullable;
 
+import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
+import com.google.inject.Provider;
 
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.Filters;
+import org.apache.mesos.Protos.FrameworkID;
+import org.apache.mesos.Protos.MasterInfo;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.Request;
 import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.Status;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskInfo;
+import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
 
 import com.twitter.common.application.Lifecycle;
@@ -25,17 +30,24 @@ import com.twitter.mesos.scheduler.DriverFactory;
  */
 class FakeDriverFactory implements DriverFactory {
 
+  private final Provider<Scheduler> scheduler;
   private final Lifecycle lifecycle;
 
   @Inject
-  FakeDriverFactory(Lifecycle lifecycle) {
+  FakeDriverFactory(Provider<Scheduler> scheduler, Lifecycle lifecycle) {
+    this.scheduler = Preconditions.checkNotNull(scheduler);
     this.lifecycle = Preconditions.checkNotNull(lifecycle);
   }
 
   @Override
-  public SchedulerDriver apply(@Nullable String frameworkId) {
+  public SchedulerDriver apply(@Nullable final String frameworkId) {
     return new FakeSchedulerDriver() {
       @Override public Status run() {
+        scheduler.get().registered(
+            this,
+            FrameworkID.newBuilder().setValue(
+                Optional.fromNullable(frameworkId).or("new-framework-id")).build(),
+            MasterInfo.newBuilder().setId("master-id").setIp(100).setPort(200).build());
         lifecycle.awaitShutdown();
         return null;
       }

@@ -1,9 +1,5 @@
 package com.twitter.mesos.scheduler.testing;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -18,7 +14,6 @@ import java.util.logging.Logger;
 import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
@@ -26,15 +21,12 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
-import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
-import com.google.inject.PrivateBinder;
 import com.google.inject.Provider;
 import com.google.inject.Singleton;
 
 import org.apache.mesos.Protos.Attribute;
 import org.apache.mesos.Protos.FrameworkID;
-import org.apache.mesos.Protos.MasterInfo;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.Resource;
@@ -50,10 +42,7 @@ import org.apache.mesos.SchedulerDriver;
 import org.apache.thrift.TException;
 
 import com.twitter.common.application.ShutdownRegistry;
-import com.twitter.common.application.modules.LifecycleModule;
-import com.twitter.common.base.Closures;
 import com.twitter.common.base.Command;
-import com.twitter.common.inject.Bindings;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
@@ -66,7 +55,6 @@ import com.twitter.mesos.gen.Package;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.SessionKey;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.gen.storage.Snapshot;
 import com.twitter.mesos.scheduler.DriverFactory;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.Resources;
@@ -74,16 +62,16 @@ import com.twitter.mesos.scheduler.events.PubsubEvent.DriverRegistered;
 import com.twitter.mesos.scheduler.events.PubsubEvent.EventSubscriber;
 import com.twitter.mesos.scheduler.events.PubsubEvent.TaskStateChange;
 import com.twitter.mesos.scheduler.events.TaskEventModule;
-import com.twitter.mesos.scheduler.storage.CallOrderEnforcingStorage;
-import com.twitter.mesos.scheduler.storage.DistributedSnapshotStore;
-import com.twitter.mesos.scheduler.storage.Storage;
-import com.twitter.mesos.scheduler.storage.Storage.MutateWork.NoResult.Quiet;
-import com.twitter.mesos.scheduler.storage.Storage.NonVolatileStorage;
-import com.twitter.mesos.scheduler.storage.mem.MemStorageModule;
+import com.twitter.mesos.scheduler.log.testing.FileLogStreamModule;
 import com.twitter.mesos.scheduler.testing.FakeDriverFactory.FakeSchedulerDriver;
 
 /**
- * A module that binds a fake mesos driver factory and a volatile storage system.
+ * A module that binds a fake mesos driver factory and a local (non-replicated) storage system.
+ * <p>
+ * The easiest way to run the scheduler in local/isolated mode is by executing:
+ * <pre>
+ * $ ./pants goal bundle aurora:scheduler-local && ./aurora/scripts/scheduler.sh -c local
+ * </pre>
  */
 public class IsolatedSchedulerModule extends AbstractModule {
 
@@ -91,24 +79,13 @@ public class IsolatedSchedulerModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    install(CallOrderEnforcingStorage.wrappingModule(FakeNonVolatileStorage.class));
-    MemStorageModule.bind(
-        binder(),
-        Bindings.annotatedKeyFactory(FakeNonVolatileStorage.RealStorage.class),
-        Closures.<PrivateBinder>noop());
-
     bind(DriverFactory.class).to(FakeDriverFactory.class);
     bind(FakeDriverFactory.class).in(Singleton.class);
-    bind(DistributedSnapshotStore.class).toInstance(new DistributedSnapshotStore() {
-      @Override public void persist(Snapshot snapshot) {
-        LOG.warning("Pretending to write snapshot.");
-      }
-    });
-    LifecycleModule.bindStartupAction(binder(), FakeClusterRunner.class);
     TaskEventModule.bindSubscriber(binder(), FakeClusterRunner.class);
+    install(new FileLogStreamModule());
   }
 
-  static class FakeClusterRunner implements Command, EventSubscriber {
+  static class FakeClusterRunner implements EventSubscriber {
     private final FrameworkID frameworkId =
         FrameworkID.newBuilder().setValue("framework-id").build();
     private final List<FakeSlave> cluster = ImmutableList.of(
@@ -167,18 +144,6 @@ public class IsolatedSchedulerModule extends AbstractModule {
         }
       });
       return executor;
-    }
-
-    @Override
-    public void execute() {
-      executor.submit(new Runnable() {
-        @Override public void run() {
-          scheduler.get().registered(
-              driver,
-              frameworkId,
-              MasterInfo.newBuilder().setId("master-id").setIp(100).setPort(200).build());
-        }
-      });
     }
 
     private void offerClusterResources() {
@@ -337,42 +302,6 @@ public class IsolatedSchedulerModule extends AbstractModule {
           .addAttributes(attribute(ConfigurationManager.RACK_CONSTRAINT, rack))
           .addAttributes(attribute(ConfigurationManager.HOST_CONSTRAINT, host))
           .build();
-    }
-  }
-
-  static class FakeNonVolatileStorage implements NonVolatileStorage {
-    @Retention(RetentionPolicy.RUNTIME)
-    @Target({ ElementType.PARAMETER, ElementType.METHOD })
-    @BindingAnnotation
-    @interface RealStorage { }
-
-    private final Storage storage;
-
-    @Inject FakeNonVolatileStorage(@RealStorage Storage storage) {
-      this.storage = Preconditions.checkNotNull(storage);
-    }
-
-    @Override public void prepare() {
-      // No-op.
-    }
-
-    @Override public void start(Quiet initializationLogic) {
-      // No-op.
-    }
-
-    @Override public void stop() {
-    }
-
-    @Override public <T, E extends Exception> T readOp(Work<T, E> work)
-        throws StorageException, E {
-
-      return storage.readOp(work);
-    }
-
-    @Override public <T, E extends Exception> T writeOp(MutateWork<T, E> work)
-        throws StorageException, E {
-
-      return storage.writeOp(work);
     }
   }
 }

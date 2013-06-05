@@ -57,7 +57,12 @@ final class Entries {
       deflater.close();
       byte[] deflatedData = deflated.toByteArray();
       int bytesSaved = deflatedData.length - initialLength;
-      LOG.info("Deflated log entry size: " + deflatedData.length + " (saved " + bytesSaved + ")");
+      if (bytesSaved < 0) {
+        LOG.warning("Deflated entry is larger than original by " + (bytesSaved * -1) + " bytes");
+      } else {
+        LOG.info("Deflated log entry size: " + deflatedData.length + " (saved " + bytesSaved + ")");
+      }
+
       COMPRESSION_BYTES_SAVED.addAndGet(bytesSaved);
       return LogEntry.deflatedEntry(ByteBuffer.wrap(deflatedData));
     } catch (IOException e) {

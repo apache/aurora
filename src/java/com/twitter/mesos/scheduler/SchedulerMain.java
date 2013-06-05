@@ -144,15 +144,11 @@ public class SchedulerMain extends AbstractApplication {
         zkClientKeyFactory,
         schedulerService));
     modules.add(new BackupModule(backupDir, SnapshotStoreImpl.class));
-
-    if (!ISOLATED_SCHEDULER.get()) {
-      modules.add(new AbstractModule() {
-        @Override protected void configure() {
-          LogStorageModule.bind(binder());
-        }
-      });
-    }
-
+    modules.add(new AbstractModule() {
+      @Override protected void configure() {
+        LogStorageModule.bind(binder());
+      }
+    });
     return modules.build();
   }
 
@@ -162,6 +158,7 @@ public class SchedulerMain extends AbstractApplication {
     if (ISOLATED_SCHEDULER.get()) {
       additional = new IsolatedSchedulerModule();
     } else {
+      // TODO(William Farner): Push these bindings down into a "production" module.
       additional = new AbstractModule() {
         @Override protected void configure() {
           bind(DriverFactory.class).to(DriverFactoryImpl.class);
