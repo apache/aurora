@@ -74,6 +74,8 @@ python_binary(
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/dirutil'),
     pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/common/zookeeper/serverset'),
+    pants('src/python/twitter/common_internal/zookeeper:tunneler'),
     pants('src/python/twitter/mesos/deploy'),
   ]
 )

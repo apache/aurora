@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+import threading
 import time
 from time import gmtime, strftime
 
@@ -8,6 +9,8 @@ from twitter.common import app
 from twitter.common import log
 from twitter.common.dirutil import safe_rmtree
 from twitter.common.log import LogOptions
+from twitter.common_internal.zookeeper.tunneler import TunneledZookeeper
+from twitter.common.zookeeper.serverset import ServerSet
 from twitter.mesos.clusters import Cluster
 from twitter.mesos.deploy import Builder, Deployer
 
@@ -31,6 +34,7 @@ class SchedulerManager(object):
   STAGED_PACKAGE_PATH = '%s/%s' % (STAGE_DIR, SCHEDULER_PACKAGE)
 
   UPTIME_WAIT_SECS = 180
+  LEADER_ELECTION_WAIT_SECS = 300
 
   def __init__(self, cluster, dry_run=False, verbose=False, ignore_conflicting_schedulers=False):
     self._really_deploy = not dry_run
@@ -39,6 +43,7 @@ class SchedulerManager(object):
     self._cluster_name = cluster
     self._cluster = Cluster.get(cluster)
     self._machines = None
+    self._leader = None
     self._ignore_conflicting_schedulers = ignore_conflicting_schedulers
 
   @property
@@ -60,6 +65,20 @@ class SchedulerManager(object):
           else:
             log.info("Ignoring unmonitored host: %s" % machine.hostname)
     return self._machines
+
+  def find_leader(self):
+    leader_lock = threading.Event()
+    zk = TunneledZookeeper.get(self._cluster.zk, verbose=self._verbose)
+    leader = ServerSet(zk, self._cluster.scheduler_zk_path, on_join=lambda _: leader_lock.set())
+    log.info("Waiting up to %s seconds for a leader to become elected." % LEADER_ELECTION_WAIT_SECS)
+    leader_lock.wait(timeout=LEADER_ELECTION_WAIT_SECS)
+    endpoints = list(leader)
+    if len(endpoints) == 0:
+      log.error("No leading scheduler found!")
+      self._leader = None
+    else:
+      self._leader = endpoints[0].service_endpoint.host
+    return self._leader
 
   def fetch_scheduler_http(self, host, endpoint):
     result = self._deployer.remote_call(host, [
@@ -267,10 +286,6 @@ app.add_option('--release', dest='release', default=None, type=int,
                     'release assigned to the cluster environment.  If specified, it must have '
                     'been assigned as a release for this environment.')
 
-app.add_option('--tunnel_host', dest='tunnel_host', default='nest1.corp.twitter.com',
-               help='Host to tunnel ssh requests through.')
-
-
 def main(_, options):
   if not options.really_push:
     log.info('****************************************************************************************')
@@ -302,14 +317,12 @@ def main(_, options):
   manager.set_live_build(new_build)
   manager.start_all_schedulers()
 
-  for scheduler in manager.machines:
-    # TODO(John Sirois): find the leader and health check it for 45 seconds instead of the default
-    if not manager.is_up(scheduler, sha=builder.sha):
-      log.info('Scheduler on %s is not healthy' % scheduler)
-      manager.rollback(rollback_build=current_build)
-      log.info('!!!!!!!!!!!!!!!!!!!!')
-      log.info('Release rolled back.')
-      break
+  leading_scheduler = manager.find_leader()
+  if not manager.is_up(leading_scheduler, sha=builder.sha):
+    log.info('Leading scheduler %s is not healthy' % scheduler)
+    manager.rollback(rollback_build=current_build)
+    log.info('!!!!!!!!!!!!!!!!!!!!')
+    log.info('Release rolled back.')
   else:
     log.info('Push successful!')
 
