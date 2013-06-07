@@ -2,6 +2,7 @@ python_library(
   name = 'api',
   sources = ['api.py'],
   dependencies = [
+    pants(':restarter'),
     pants(':scheduler_client'),
     pants(':updater'),
     pants('src/python/twitter/common/lang'),
@@ -101,6 +102,17 @@ python_library(
 )
 
 python_library(
+  name = 'restarter',
+  sources = ['restarter.py'],
+  dependencies = [
+    pants(':shard_watcher'),
+    pants(':updater_util'),
+    pants('src/python/twitter/common/log'),
+    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+  ]
+)
+
+python_library(
   name = 'scheduler_client',
   sources = ['scheduler_client.py'],
   dependencies = [
@@ -153,7 +165,16 @@ python_library(
   dependencies = [
     pants(':scheduler_client'),
     pants(':shard_watcher'),
+    pants(':updater_util'),
     pants('src/python/twitter/common/log'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+  ]
+)
+
+python_library(
+  name = 'updater_util',
+  sources = ['updater_util.py'],
+  dependencies = [
+    pants('src/python/twitter/common/log'),
   ]
 )

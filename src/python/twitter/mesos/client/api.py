@@ -10,8 +10,10 @@ from gen.twitter.mesos.ttypes import (
     JobKey,
     ResponseCode,
     Quota,
+    ScheduleStatus,
     TaskQuery)
 
+from .restarter import Restarter
 from .scheduler_client import SchedulerProxy
 from .updater import Updater
 
@@ -140,13 +142,15 @@ invoking cancel_update.
       log.error('Error cancelling the update: %s' % resp.message)
     return resp
 
-  def restart(self, job_key, shards):
+  def restart(self, job_key, shards, updater_config, health_check_interval_seconds):
+    """Perform a rolling restart of the job. If shards is None or [], restart all shards. Returns the
+       scheduler response for the last restarted batch of shards (which allows the client to show
+       the job URL), or the status check response if no tasks were active.
+    """
     self._assert_valid_job_key(job_key)
 
-    log.info("Restarting job %s shards %s" % (job_key, shards))
-
-    # TODO(ksweeney): Remove Nones before resolving MESOS-2403.
-    return self._scheduler.restartShards(None, None, job_key.to_thrift(), shards)
+    return Restarter(job_key, updater_config, health_check_interval_seconds, self._scheduler
+    ).restart(shards)
 
   def get_quota(self, role):
     log.info("Getting quota for: %s" % role)

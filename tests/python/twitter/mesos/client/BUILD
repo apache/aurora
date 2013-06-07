@@ -5,6 +5,7 @@ python_test_suite(name = 'all',
     pants(':health_check'),
     pants(':scheduler_client'),
     pants(':shard_watcher'),
+    pants(':restarter'),
     pants(':updater'),
   ],
 )
@@ -27,6 +28,15 @@ python_tests(name = 'disambiguator',
 
 python_tests(name = 'health_check',
   sources = ['test_health_check.py'],
+  dependencies = [
+    pants('src/python/twitter/mesos:mesos-lib'),
+    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants('3rdparty/python:mox'),
+  ],
+)
+
+python_tests(name = 'restarter',
+  sources = ['test_restarter.py'],
   dependencies = [
     pants('src/python/twitter/mesos:mesos-lib'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
@@ -62,3 +72,4 @@ python_tests(name = 'updater',
     pants('3rdparty/python:mox'),
   ]
 )
+

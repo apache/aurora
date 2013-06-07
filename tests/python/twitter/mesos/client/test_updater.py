@@ -8,6 +8,8 @@ from twitter.mesos.client.shard_watcher import ShardWatcher
 from gen.twitter.mesos.ttypes import *
 from gen.twitter.mesos.MesosSchedulerManager import Client as scheduler_client
 
+from .helper import FakeSchedulerProxy
+
 import mox
 import pytest
 
@@ -43,19 +45,6 @@ class FakeConfig(object):
 
   def environment(self):
     return self._env
-
-
-class FakeSchedulerProxy(SchedulerProxy):
-  def __init__(self, cluster, scheduler, session_key):
-    self._cluster = cluster
-    self._scheduler = scheduler
-    self._session_key = session_key
-
-  def client(self):
-    return self._scheduler
-
-  def session_key(self):
-    return self._session_key
 
 
 class UpdaterTest(unittest.TestCase):

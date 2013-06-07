@@ -28,6 +28,7 @@ from twitter.mesos.client.config import get_config
 from twitter.mesos.client.disambiguator import LiveJobDisambiguator
 from twitter.mesos.client.job_monitor import JobMonitor
 from twitter.mesos.client.quickrun import Quickrun
+from twitter.mesos.client.updater_util import UpdaterConfig
 from twitter.mesos.clusters import Cluster
 from twitter.mesos.common import AuroraJobKey
 from twitter.mesos.packer import sd_packer_client
@@ -678,17 +679,61 @@ def update(jobname, config_file):
 @app.command_option(CLUSTER_INVOKE_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
 @app.command_option(SHARDS_OPTION)
+@app.command_option(
+    '--batch_size',
+    dest='batch_size',
+    type=int,
+    default=1,
+    help='Number of shards to be restarted in one iteration.')
+@app.command_option(
+    '--health_check_interval_seconds',
+    dest='health_check_interval_seconds',
+    type=int,
+    default=3,
+    help='Time interval between subsequent shard status checks.')
+@app.command_option(
+    '--max_per_shard_failures',
+    dest='max_per_shard_failures',
+    type=int,
+    default=0,
+    help='Maximum number of restarts per shard during restart. Increments total failure count when this limit is exceeded.')
+@app.command_option(
+    '--max_total_failures',
+    dest='max_total_failures',
+    type=int,
+    default=0,
+    help='Maximum number of shard failures to be tolerated in total during restart.')
+@app.command_option(
+    '--restart_threshold',
+    dest='restart_threshold',
+    type=int,
+    default=60,
+    help='Maximum number of seconds before a shard must move into the RUNNING state before considered a failure.')
+@app.command_option(
+    '--watch_secs',
+    dest='watch_secs',
+    type=int,
+    default=30,
+    help='Minimum number of seconds a shard must remain in RUNNING state before considered a success.')
 def restart(args, options):
-  """usage: restart cluster/role/env/job --shards=SHARDS
+  """usage: restart cluster/role/env/job [--shards=SHARDS] [--batch_size=BATCH_SIZE]
+               [--health_check_interval_seconds=HEALTH_CHECK_INTERVAL_SECONDS]
+               [--max_per_shard_failures=MAX_PER_SHARD_FAILURES]
+               [--max_total_failures=MAX_TOTAL_FAILURES]
+               [--restart_threshold=RESTART_THRESHOLD] [--watch_secs=WATCH_SECS]
 
-  Restarts a batch of shards within a job.
-  WARNING: All specified shards will be restarted simultaneously.  Any batching and
-  delays must be done externally.
+  Performs a rolling restart of shards within a job.
+
+  Restarts are fully controlled client-side, so aborting halts the restart.
   """
-  if not options.shards:
-    die('--shards is required')
   api, job_key = LiveJobDisambiguator.disambiguate_args_or_die(args, options, make_client_factory())
-  resp = api.restart(job_key, options.shards)
+  updater_config = UpdaterConfig(
+      options.batch_size,
+      options.restart_threshold,
+      options.watch_secs,
+      options.max_per_shard_failures,
+      options.max_total_failures)
+  resp = api.restart(job_key, options.shards, updater_config, options.health_check_interval_seconds)
   check_and_log_response(resp)
   handle_open(api.scheduler.scheduler(), job_key.role, job_key.env, job_key.name)
 

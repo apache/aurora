@@ -141,14 +141,14 @@ class HealthCheckTest(unittest.TestCase):
     assert NotRetriable.alive() == (True, False)
     assert NotRetriable.dead() == (False, False)
 
-  def test_smart_health_check(self):
+  def test_shardwatcher_health_check(self):
     """Verifies that if the task has no health port, only status check is performed"""
     task = self.create_task(0, 'a', port=None)
     self.replay()
     assert self._smart_health_check.health(task) == Retriable.alive()
     self.verify()
 
-  def test_smart_http_health_check(self):
+  def test_shardwatcher_http_health_check(self):
     """Verifies that http health check is performed if the task has a health port"""
     task = self.create_task(0, 'a')
     self.expect_http_signaler_creation()
@@ -157,7 +157,7 @@ class HealthCheckTest(unittest.TestCase):
     assert self._smart_health_check.health(task) == Retriable.dead()
     self.verify()
 
-  def test_smart_http_health_check_one_http_signaler(self):
+  def test_shardwatcher_http_health_check_one_http_signaler(self):
     """Verifies that upon multiple http health checks only one HttpHealthChecker is created"""
     task = self.create_task(0, 'a')
     self.expect_http_signaler_creation()

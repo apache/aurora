@@ -41,7 +41,6 @@ class ShardWatcherTest(unittest.TestCase):
     self._health_check = mox.MockObject(HealthCheck)
     self._watcher = ShardWatcher(self._scheduler,
                                  job_key,
-                                 'cluster',
                                  self.RESTART_THRESHOLD,
                                  self.WATCH_SECS,
                                  health_check_interval_seconds=3,

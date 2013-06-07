@@ -28,7 +28,6 @@ class ShardWatcher(object):
   def __init__(self,
                scheduler,
                job_key,
-               cluster,
                restart_threshold,
                watch_secs,
                health_check_interval_seconds,
