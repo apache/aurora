@@ -7,7 +7,7 @@ from twitter.common import log
 from twitter.common.net.tunnel import TunnelHelper
 from twitter.common.quantity import Amount, Time
 from twitter.common.zookeeper.serverset import ServerSet
-from twitter.common_internal.auth import SSHAgentAuthenticator
+from twitter.common_internal.auth.ssh import SSHAgentAuthenticator
 from twitter.common_internal.location import Location
 from twitter.common_internal.zookeeper.tunneler import TunneledZookeeper
 from twitter.mesos.clusters import Cluster

@@ -15,7 +15,7 @@ from poster.encode import multipart_encode
 from poster.streaminghttp import StreamingHTTPHandler
 
 from twitter.common import log
-from twitter.common_internal.auth import SSHAgentAuthenticator
+from twitter.common_internal.auth.ssh import SSHAgentAuthenticator
 
 
 class Progress(object):
