@@ -267,7 +267,7 @@ app.set_usage('%prog [options]')
 app.add_option('-v', dest='verbose', default=False, action='store_true',
                help='Verbose logging. (default: %default)')
 
-app.add_option(ClusterOption(clusters=TWITTER_CLUSTERS))
+app.add_option(ClusterOption('--cluster', clusters=TWITTER_CLUSTERS))
 
 app.add_option('--skip_build', dest='skip_build', default=False, action='store_true',
                help='Skip build and test, use the existing build.')
