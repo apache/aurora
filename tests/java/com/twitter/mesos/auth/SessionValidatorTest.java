@@ -66,6 +66,12 @@ public class SessionValidatorTest extends EasyMockTest {
     sessionValidator.checkAuthenticated(testKey, USER);
   }
 
+  @Test(expected = SessionValidator.AuthFailedException.class)
+  public void testSessionValidatorEmptyRole() throws Exception {
+    control.replay();
+    sessionValidator.checkAuthenticated(testKey, "");
+  }
+
   @Test
   public void testSessionValidatorSuccess() throws Exception {
     expect(mockClock.nowMillis()).andReturn(NONCE);

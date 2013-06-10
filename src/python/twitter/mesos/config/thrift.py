@@ -1,8 +1,10 @@
 import getpass
+import re
 
 from twitter.common.lang import Compatibility
 from twitter.thermos.config.loader import ThermosTaskValidator
 
+from gen.twitter.mesos.constants import GOOD_IDENTIFIER_PATTERN_PYTHON
 from gen.twitter.mesos.ttypes import (
   Constraint,
   CronCollisionPolicy,
@@ -88,6 +90,7 @@ def translate_cron_policy(policy):
     raise InvalidConfig('Invalid cron policy: %s' % policy.get())
   return cron_policy
 
+
 def fully_interpolated(pystachio_object, coerce_fn=lambda i: i):
   # Extract a fully-interpolated unwrapped object from pystachio_object or raise InvalidConfig.
   #
@@ -101,6 +104,7 @@ def fully_interpolated(pystachio_object, coerce_fn=lambda i: i):
   value, _ = pystachio_object.interpolate()
   return coerce_fn(value.get())
 
+
 def select_cron_policy(cron_policy, cron_collision_policy):
   if cron_policy is Empty and cron_collision_policy is Empty:
     return CronCollisionPolicy.KILL_EXISTING
@@ -110,6 +114,7 @@ def select_cron_policy(cron_policy, cron_collision_policy):
     return translate_cron_policy(cron_collision_policy)
   else:
     raise InvalidConfig('Specified both cron_policy and cron_collision_policy!')
+
 
 def select_service_bit(job):
   if not job.has_daemon() and not job.has_service():
@@ -145,6 +150,16 @@ ALIASED_FIELDS = (
 def filter_aliased_fields(job):
   return job(**dict((key, Empty) for key in ALIASED_FIELDS))
 
+
+def assert_valid_field(field, identifier):
+  VALID_IDENTIFIER = re.compile(GOOD_IDENTIFIER_PATTERN_PYTHON)
+  if not isinstance(identifier, Compatibility.string):
+    raise InvalidConfig("%s must be a string" % field)
+  if not VALID_IDENTIFIER.match(identifier):
+    raise InvalidConfig("Invalid %s '%s'" % (field, identifier))
+  return identifier
+
+
 # TODO(wickman) Make this a method directly on an AuroraConfig so that we don't
 # need the packages/ports shenanigans.
 def convert(job, packages=frozenset(), ports=frozenset()):
@@ -152,9 +167,9 @@ def convert(job, packages=frozenset(), ports=frozenset()):
 
   owner = Identity(role=fully_interpolated(job.role()), user=getpass.getuser())
   key = JobKey(
-    role=fully_interpolated(job.role()),
-    environment=fully_interpolated(job.environment()),
-    name=fully_interpolated(job.name()))
+    role=assert_valid_field('role', fully_interpolated(job.role())),
+    environment=assert_valid_field('environment', fully_interpolated(job.environment())),
+    name=assert_valid_field('name', fully_interpolated(job.name())))
 
   task_raw = job.task()
 

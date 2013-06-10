@@ -3,6 +3,7 @@ package com.twitter.mesos.auth;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.nio.ByteBuffer;
+import java.util.regex.Pattern;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -27,6 +28,8 @@ import com.twitter.common_internal.ldap.Ods.LdapException;
 import com.twitter.common_internal.ldap.User;
 import com.twitter.mesos.auth.AuthorizedKeySet.KeyParseException;
 import com.twitter.mesos.gen.SessionKey;
+
+import static com.twitter.mesos.gen.Constants.GOOD_IDENTIFIER_PATTERN_JVM;
 
 /**
  * Validator for RPC sessions with the mesos scheduler.
@@ -80,6 +83,10 @@ public interface SessionValidator {
           || !sessionKey.isSetNonce()
           || !sessionKey.isSetNonceSig()) {
         throw new AuthFailedException("Incorrectly specified session key.");
+      }
+
+      if (!Pattern.matches(GOOD_IDENTIFIER_PATTERN_JVM, targetRole)) {
+        throw new AuthFailedException("Target role " + targetRole + " is not well formed.");
       }
 
       long now = this.clock.nowMillis();
