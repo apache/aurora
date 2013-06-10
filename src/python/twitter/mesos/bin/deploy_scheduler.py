@@ -301,7 +301,7 @@ def main(_, options):
         ' '.join(TWITTER_CLUSTERS))
     return
 
-  builder = AuroraBuilder(options.cluster, options.release, options.hotfix, options.verbose)
+  builder = AuroraBuilder(options.cluster.name, options.release, options.hotfix, options.verbose)
 
   if not options.skip_build:
     builder.build()
