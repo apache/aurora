@@ -66,6 +66,7 @@ python_binary(
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/zookeeper/serverset'),
     pants('src/python/twitter/common_internal/zookeeper:tunneler'),
+    pants('src/python/twitter/mesos/common:cluster_option'),
     pants('src/python/twitter/mesos/common_internal:clusters'),
     pants('src/python/twitter/mesos/deploy'),
   ]
