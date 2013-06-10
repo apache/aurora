@@ -73,8 +73,9 @@ class SchedulerManager(object):
     leader_lock = threading.Event()
     zk = TunneledZookeeper.get(self._cluster.zk, verbose=self._verbose)
     leader = ServerSet(zk, self._cluster.scheduler_zk_path, on_join=lambda _: leader_lock.set())
-    log.info("Waiting up to %s seconds for a leader to become elected." % LEADER_ELECTION_WAIT_SECS)
-    leader_lock.wait(timeout=LEADER_ELECTION_WAIT_SECS)
+    log.info("Waiting up to %s seconds for a leader to become elected."
+      % SchedulerManager.LEADER_ELECTION_WAIT_SECS)
+    leader_lock.wait(timeout=SchedulerManager.LEADER_ELECTION_WAIT_SECS)
     endpoints = list(leader)
     if len(endpoints) == 0:
       log.error("No leading scheduler found!")
@@ -318,7 +319,7 @@ def main(_, options):
   manager.start_all_schedulers()
 
   leading_scheduler = manager.find_leader()
-  if not manager.is_up(leading_scheduler, sha=builder.sha):
+  if not leading_scheduler or not manager.is_up(leading_scheduler, sha=builder.sha):
     log.info('Leading scheduler %s is not healthy' % scheduler)
     manager.rollback(rollback_build=current_build)
     log.info('!!!!!!!!!!!!!!!!!!!!')
