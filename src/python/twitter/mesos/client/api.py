@@ -1,7 +1,7 @@
 from twitter.common import log
 from twitter.common.lang import Compatibility
-
 from twitter.mesos.common import AuroraJobKey
+from twitter.mesos.common.cluster import Cluster
 
 from gen.twitter.mesos.constants import DEFAULT_ENVIRONMENT, LIVE_STATES
 from gen.twitter.mesos.ttypes import (
@@ -36,8 +36,11 @@ invoking cancel_update.
   class ClusterMismatch(Error, ValueError): pass
 
   def __init__(self, cluster, verbose=False):
+    if not isinstance(cluster, Cluster):
+      raise TypeError('MesosClientAPI expects instance of Cluster for "cluster", got %s' %
+          type(cluster))
     self._scheduler = SchedulerProxy(cluster, verbose=verbose)
-    self._cluster = self._scheduler.cluster
+    self._cluster = cluster
 
   @property
   def cluster(self):
@@ -193,5 +196,6 @@ invoking cancel_update.
     if not isinstance(job_key, AuroraJobKey):
       raise self.TypeError('Invalid job_key %r: expected %s but got %s'
           % (job_key, AuroraJobKey.__name__, job_key.__class__.__name__))
-    if not job_key.cluster == self.cluster:
-      raise self.ClusterMismatch('job %s does not belong to cluster %s' % (job_key, self.cluster))
+    if job_key.cluster != self.cluster.name:
+      raise self.ClusterMismatch('job %s does not belong to cluster %s' % (job_key,
+          self.cluster.name))

@@ -26,7 +26,7 @@ class JobMonitor(object):
   def terminal(cls, status):
     return status in TERMINAL_STATES
 
-  # TODO(ksweeney): Make this use AuroraJobKey
+  # TODO(ksweeney): Make this use the AuroraJobKey
   def __init__(self, client, role, env, jobname):
     self._client = client
     self._query = TaskQuery(owner=Identity(role=role), environment=env, jobName=jobname)

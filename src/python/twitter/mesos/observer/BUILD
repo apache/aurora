@@ -24,7 +24,7 @@ python_binary(
     pants('src/python/twitter/common/app/modules:vars'),
     pants('src/python/twitter/common_internal/app/modules:chickadee_handler'),
     pants('src/python/twitter/mesos/executor:resource_checkpoints'),
-    pants('src/python/twitter/mesos:clusters'),
+    pants('src/python/twitter/mesos/common_internal:clusters'),
     pants('src/python/twitter/thermos/base:path'),
     pants('src/python/twitter/thermos/observer'),
     pants(':mesos_vars'),

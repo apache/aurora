@@ -7,13 +7,34 @@ from twitter.common.zookeeper.serverset import ServerSet
 from twitter.common_internal.location import Location
 from twitter.common_internal.zookeeper.tunneler import TunneledZookeeper
 
-from twitter.mesos.clusters import Cluster
+from twitter.mesos.common.cluster import Cluster
+# TODO(wickman) Push this into mesos_client w/ MESOS-3006
+from twitter.mesos.common_internal.clusters import TWITTER_CLUSTERS
 
 from .packer_client import Packer
 
+from pystachio import Required, String
 
-def create_packer(cluster, verbose=False):
-  cluster = Cluster.get(cluster)
+
+class PackerTrait(Cluster.Trait):
+  packer_zk = String
+  packer_zk_path = String
+  packer_redirect = String
+
+
+def create_packer(cluster_name, verbose=False):
+  while True:
+    cluster = TWITTER_CLUSTERS[cluster_name].with_trait(PackerTrait)
+    if not cluster.packer_redirect:
+      break
+    log.info('Redirecting %s to packer cluster in %s' % (cluster.name, cluster.packer_redirect))
+    cluster_name = cluster.packer_redirect
+
+  if not cluster.packer_zk or not cluster.packer_zk_path:
+    log.fatal('%s does not have a packer defined!' % cluster.name)
+    # TODO(wickman) This should raise, not sys exit.
+    sys.exit(1)
+
   zk = TunneledZookeeper.get(cluster.packer_zk, verbose=verbose)
   packer_ss = ServerSet(zk, cluster.packer_zk_path)
   packers = list(packer_ss)
@@ -21,6 +42,7 @@ def create_packer(cluster, verbose=False):
 
   if len(packers) == 0:
     log.fatal('Could not find any packers!')
+    # TODO(wickman) This should raise, not sys exit.
     sys.exit(1)
 
   log.debug('Found nodes:')

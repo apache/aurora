@@ -23,15 +23,15 @@ from twitter.common.log.options import LogOptions
 from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_rmtree
 from twitter.common.quantity import Amount, Time, Data
-from twitter.mesos.clusters import Cluster
+from twitter.mesos.common_internal.clusters import TwitterCluster, TWITTER_CLUSTERS
 from twitter.mesos.config.schema import (
-  HealthCheckConfig,
-  MB,
-  MesosJob,
-  MesosTaskInstance,
-  Task,
-  Process,
-  Resources)
+    HealthCheckConfig,
+    MB,
+    MesosJob,
+    MesosTaskInstance,
+    Task,
+    Process,
+    Resources)
 from twitter.mesos.executor.thermos_executor import ThermosExecutor, ThermosExecutorTimer
 from twitter.mesos.executor.task_runner_wrapper import TaskRunnerWrapper
 from twitter.mesos.executor.sandbox_manager import DirectorySandbox
@@ -167,14 +167,14 @@ def test_extract_ensemble():
         shardId=0))
 
   assigned_task = make_assigned_task(MESOS_JOB(task=HELLO_WORLD, cluster='unknown'))
-  assert ThermosExecutor.extract_ensemble(assigned_task) == Cluster.DEFAULT_ENSEMBLE
+  assert ThermosExecutor.extract_ensemble(assigned_task) == TwitterCluster.DEFAULT_ENSEMBLE
 
   assigned_task = make_assigned_task(MESOS_JOB(task=HELLO_WORLD, cluster='smf1-test'))
   assert ThermosExecutor.extract_ensemble(assigned_task) == (
-      Cluster.get('smf1-test').zk)
+      TWITTER_CLUSTERS['smf1-test'].zk)
 
   assigned_task = make_assigned_task(HELLO_WORLD_MTI)
-  assert ThermosExecutor.extract_ensemble(assigned_task) == Cluster.DEFAULT_ENSEMBLE
+  assert ThermosExecutor.extract_ensemble(assigned_task) == TwitterCluster.DEFAULT_ENSEMBLE
 
 
 def make_runner(proxy_driver, checkpoint_root, task, ports={}, fast_status=False,

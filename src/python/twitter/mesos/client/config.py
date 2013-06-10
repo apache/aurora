@@ -11,7 +11,6 @@ import sys
 
 from twitter.common import app, log
 from twitter.mesos.client.base import die
-from twitter.mesos.clusters import Cluster
 from twitter.mesos.config import AuroraConfig
 from twitter.mesos.config.schema import Empty, PackerObject
 from twitter.mesos.config.recipes import Recipes
@@ -27,17 +26,6 @@ from gen.twitter.mesos.ttypes import (
 
 from pystachio import Empty, Ref
 
-def _get_package_data(cluster, package, packer=None):
-  cluster = Cluster.get(cluster).packer_redirect or cluster
-  role, name, version = package
-  log.info('Fetching metadata for package %s/%s version %s in %s.' % (
-    role, name, version, cluster))
-  try:
-    if packer is None:
-      packer = sd_packer_client.create_packer(cluster)
-    return packer.get_version(role, name, version)
-  except Packer.Error as e:
-    die('Failed to fetch package metadata: %s' % e)
 
 
 APPAPP_DEPRECATION_WARNING = """
@@ -192,6 +180,18 @@ def _validate_health_check_config(config):
   # TODO(Sathya): Remove this check after health_check_interval_secs deprecation cycle is complete.
   if config.raw().has_health_check_interval_secs() and config.raw().has_health_check_config():
     die(HEALTH_CHECK_INTERVAL_SECS_ERROR)
+
+
+def _get_package_data(cluster, package):
+  role, name, version = package
+  log.info('Fetching metadata for package %s/%s version %s in %s.' % (
+    role, name, version, cluster))
+  try:
+    # TODO(wickman) MESOS-3006
+    packer = sd_packer_client.create_packer(cluster)
+    return packer.get_version(role, name, version)
+  except Packer.Error as e:
+    die('Failed to fetch package metadata: %s' % e)
 
 
 def _inject_packer_bindings(config, force_local=False):

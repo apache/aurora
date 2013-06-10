@@ -1,13 +1,4 @@
 python_library(
-  name = 'clusters',
-  sources = ['clusters.py'],
-  dependencies = [
-    pants('src/python/twitter/common/lang'),
-    pants('src/python/twitter/common/options'),
-  ]
-)
-
-python_library(
   name = 'mesos-core',
   dependencies = [
     python_requirement('mesos==191')
@@ -17,7 +8,7 @@ python_library(
 python_library(
   name = 'mesos-lib',
   dependencies = [
-    pants(':clusters'),
+    pants('src/python/twitter/mesos/common_internal:clusters'),
     pants('src/python/twitter/mesos/client'),
     pants('src/python/twitter/mesos/packer'),
   ]
@@ -69,23 +60,13 @@ python_binary(
   name = 'deploy_scheduler',
   source = 'bin/deploy_scheduler.py',
   dependencies = [
-    pants(':clusters'),
     pants('3rdparty/python.twitter:audubondata'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/dirutil'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/zookeeper/serverset'),
     pants('src/python/twitter/common_internal/zookeeper:tunneler'),
+    pants('src/python/twitter/mesos/common_internal:clusters'),
     pants('src/python/twitter/mesos/deploy'),
-  ]
-)
-
-python_binary(
-  name = 'deploy_thermos',
-  source = 'bin/deploy_thermos.py',
-  dependencies = [
-    pants(':clusters'),
-    pants('src/python/twitter/common/app'),
-    pants('src/python/twitter/mesos/deploy')
   ]
 )

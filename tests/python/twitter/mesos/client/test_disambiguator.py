@@ -2,7 +2,7 @@ import functools
 
 from twitter.mesos.client.api import MesosClientAPI
 from twitter.mesos.client.disambiguator import LiveJobDisambiguator
-from twitter.mesos.common import AuroraJobKey
+from twitter.mesos.common import AuroraJobKey, Cluster
 
 from gen.twitter.mesos.constants import ResponseCode
 from gen.twitter.mesos.ttypes import (
@@ -15,8 +15,11 @@ import mox
 import pytest
 
 
+TEST_CLUSTER = Cluster(name = 'smf1')
+
+
 class LiveJobDisambiguatorTest(mox.MoxTestBase):
-  CLUSTER = 'smf1'
+  CLUSTER = TEST_CLUSTER
   ROLE = 'mesos'
   ENV = 'test'
   NAME = 'labrat'
@@ -65,14 +68,14 @@ class LiveJobDisambiguatorTest(mox.MoxTestBase):
 
   def test_disambiguate_job_path_or_die_unambiguous(self):
     key = LiveJobDisambiguator._disambiguate_or_die(self._api, self.ROLE, self.ENV, self.NAME)
-    cluster, role, env, name = key
-    assert cluster == self.CLUSTER
+    cluster_name, role, env, name = key
+    assert cluster_name == self.CLUSTER.name
     assert role == self.ROLE
     assert env == self.ENV
     assert name == self.NAME
 
   def test_disambiguate_args_or_die_unambiguous(self):
-    expected = (self._api, AuroraJobKey(self.CLUSTER, self.ROLE, self.ENV, self.NAME))
+    expected = (self._api, AuroraJobKey(self.CLUSTER.name, self.ROLE, self.ENV, self.NAME))
     result = LiveJobDisambiguator.disambiguate_args_or_die([self.JOB_PATH], None,
         client_factory=lambda *_: self._api)
     assert result == expected

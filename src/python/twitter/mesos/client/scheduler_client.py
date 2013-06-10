@@ -10,13 +10,24 @@ from twitter.common.zookeeper.serverset import ServerSet
 from twitter.common_internal.auth.ssh import SSHAgentAuthenticator
 from twitter.common_internal.location import Location
 from twitter.common_internal.zookeeper.tunneler import TunneledZookeeper
-from twitter.mesos.clusters import Cluster
+from twitter.mesos.common.cluster import Cluster
 
 from thrift.protocol import TBinaryProtocol
 from thrift.transport import TSocket, TSSLSocket, TTransport
 
 from gen.twitter.mesos import MesosAdmin
 from gen.twitter.mesos.ttypes import SessionKey
+
+from pystachio import Default, Integer, String
+
+
+class SchedulerClientTrait(Cluster.Trait):
+  zk             = String
+  zk_port        = Default(Integer, 2181)
+  scheduler_path = String
+  scheduler_uri  = String
+  force_notunnel = Default(Integer, 0)
+  proxy_url      = String
 
 
 class SchedulerClient(object):
@@ -25,23 +36,21 @@ class SchedulerClient(object):
 
   class CouldNotConnect(Exception): pass
 
-  @staticmethod
-  def get(cluster, **kwargs):
+  # TODO(wickman) Refactor per MESOS-3005
+  @classmethod
+  def get(cls, cluster, **kwargs):
+    if not isinstance(cluster, Cluster):
+      raise TypeError('"cluster" must be an instance of Cluster, got %s' % type(cluster))
+    cluster = cluster.with_trait(SchedulerClientTrait)
     log.debug('Client location: %s' % ('prod' if Location.is_prod() else 'corp'))
-
-    # TODO(vinod) : Clear up the convention of what --cluster <arg> means
-    # Currently arg can be any one of
-    # 'localhost:<scheduler port>'
-    # '<cluster name>'
-    # '<cluster name>: <zk port>'
-    # Instead of encoding zk port inside the <arg> string make it explicit.
-    if cluster.startswith('localhost:'):
+    if cluster.zk:
+      return ZookeeperSchedulerClient(cluster, port=cluster.zk_port, ssl=True, **kwargs)
+    elif cluster.scheduler_uri.startswith('localhost:'):
       log.info('Attempting to talk to local scheduler.')
-      port = int(cluster.split(':')[1])
+      port = int(cluster.scheduler_uri.split(':')[1])
       return LocalSchedulerClient(port, ssl=True)
     else:
-      zk_port = 2181 if ':' not in cluster else int(cluster.split(':')[1])
-      return ZookeeperSchedulerClient(cluster, zk_port, ssl=True, **kwargs)
+      raise ValueError('"cluster" does not specify zk or scheduler_uri')
 
   def __init__(self, verbose=False, ssl=False):
     self._client = None
@@ -78,7 +87,6 @@ class SchedulerClient(object):
 
 
 class ZookeeperSchedulerClient(SchedulerClient):
-  SCHEDULER_ZK_PATH = '/twitter/service/mesos-scheduler'
   SERVERSET_TIMEOUT = Amount(10, Time.SECONDS)
 
   @classmethod
@@ -98,13 +106,13 @@ class ZookeeperSchedulerClient(SchedulerClient):
     joined = threading.Event()
     def on_join(elements):
       joined.set()
-    zk, serverset = self.get_scheduler_serverset(Cluster.get(self._cluster),
+    zk, serverset = self.get_scheduler_serverset(self._cluster,
         port=self._zkport, verbose=self._verbose, on_join=on_join)
     joined.wait(timeout=self.SERVERSET_TIMEOUT.as_(Time.SECONDS))
     serverset_endpoints = list(serverset)
     if len(serverset_endpoints) == 0:
       zk.close()
-      raise self.CouldNotConnect('No schedulers detected in %s!' % self._cluster)
+      raise self.CouldNotConnect('No schedulers detected in %s!' % self._cluster.name)
     instance = serverset_endpoints[0]
     self._endpoint = instance.service_endpoint
     self._http = instance.additional_endpoints.get('http')
@@ -114,14 +122,14 @@ class ZookeeperSchedulerClient(SchedulerClient):
   @classmethod
   def _maybe_tunnel(cls, cluster, host, port):
     # Open a tunnel to the scheduler if necessary
-    if Location.is_corp() and not Cluster.get(cluster).force_notunnel:
-      log.info('Creating ssh tunnel for %s' % cluster)
+    if Location.is_corp() and not cluster.force_notunnel:
+      log.info('Creating ssh tunnel for %s' % cluster.name)
       return TunnelHelper.create_tunnel(host, port)
     return host, port
 
   @property
   def url(self):
-    proxy_url = Cluster.get(self._cluster).proxy_url
+    proxy_url = self._cluster.proxy_url
     if proxy_url:
       return proxy_url
     if self._http:
@@ -160,24 +168,6 @@ class SchedulerProxy(object):
 
   class TimeoutError(Exception): pass
 
-  @staticmethod
-  def assert_valid_cluster(cluster):
-    assert cluster, "Cluster not specified!"
-    if cluster.find(':') > -1:
-      scluster = cluster.split(':')
-
-      if scluster[0] != 'localhost':
-        Cluster.assert_exists(scluster[0])
-
-      if len(scluster) == 2:
-        try:
-          int(scluster[1])
-        except ValueError as e:
-          log.fatal('The cluster argument is invalid: %s (error: %s)' % (cluster, e))
-          assert False, 'Invalid cluster argument: %s' % cluster
-    else:
-      Cluster.assert_exists(cluster)
-
   @classmethod
   def create_anonymous_session(cls, user):
     return SessionKey(user=user, nonce=SSHAgentAuthenticator.get_timestamp(),
@@ -199,7 +189,6 @@ class SchedulerProxy(object):
     self.cluster = cluster
     self._agent_key = self._client = self._scheduler = None
     self.verbose = verbose
-    self.assert_valid_cluster(cluster)
 
   def with_scheduler(method):
     """Decorator magic to make sure a connection is made to the scheduler"""
@@ -243,7 +232,7 @@ class SchedulerProxy(object):
         self._client
     """
     self._scheduler = SchedulerClient.get(self.cluster, verbose=self.verbose)
-    assert self._scheduler, "Could not find scheduler (cluster = %s)" % self.cluster
+    assert self._scheduler, "Could not find scheduler (cluster = %s)" % self.cluster.name
     start = time.time()
     while (time.time() - start) < self.CONNECT_MAXIMUM_WAIT.as_(Time.SECONDS):
       try:
@@ -252,7 +241,7 @@ class SchedulerProxy(object):
       except SchedulerClient.CouldNotConnect as e:
         log.warning('Could not connect to scheduler: %s' % e)
     if not self._client:
-      raise self.TimeoutError('Timed out trying to connect to scheduler at %s' % self.cluster)
+      raise self.TimeoutError('Timed out trying to connect to scheduler at %s' % self.cluster.name)
 
   def __getattr__(self, method_name):
     # If the method does not exist, getattr will return AttributeError for us.
@@ -275,6 +264,6 @@ class SchedulerProxy(object):
           self.invalidate()
           time.sleep(self.RPC_RETRY_INTERVAL.as_(Time.SECONDS))
       raise self.TimeoutError('Timed out attempting to issue %s to %s' % (
-          method_name, self.cluster))
+          method_name, self.cluster.name))
 
     return method_wrapper

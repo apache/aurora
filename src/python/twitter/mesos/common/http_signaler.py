@@ -7,7 +7,6 @@ from twitter.common.lang import Compatibility
 from twitter.common.net.socks import urllib_opener as socks_opener
 from twitter.common.net.tunnel import TunnelHelper
 from twitter.common_internal.location import Location
-from twitter.mesos.clusters import Cluster
 
 if Compatibility.PY3:
   from http.client import HTTPException

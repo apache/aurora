@@ -4,6 +4,7 @@
 from __future__ import print_function
 
 import collections
+import copy
 from datetime import datetime
 import functools
 import getpass
@@ -29,8 +30,13 @@ from twitter.mesos.client.disambiguator import LiveJobDisambiguator
 from twitter.mesos.client.job_monitor import JobMonitor
 from twitter.mesos.client.quickrun import Quickrun
 from twitter.mesos.client.updater_util import UpdaterConfig
-from twitter.mesos.clusters import Cluster
-from twitter.mesos.common import AuroraJobKey
+from twitter.mesos.common import (
+    AuroraJobKey,
+    Cluster,
+    ClusterOption,
+    Clusters)
+# TODO(wickman) Split mesos_client / mesos_client_internal targets
+from twitter.mesos.common_internal.clusters import TWITTER_CLUSTERS
 from twitter.mesos.packer import sd_packer_client
 from twitter.mesos.packer.packer_client import Packer
 from twitter.thermos.base.options import add_binding_to
@@ -76,11 +82,46 @@ app.add_option('-q',
                callback=set_quiet,
                help='Quiet logging. (default: %default)')
 
+
+# TODO(wickman) Add ClusterSetOption to twitter.mesos.common -- these should
+# likely come in pairs for most tools.
+MESOS_CLIENT_CLUSTER_SET = Clusters(TWITTER_CLUSTERS.values())
+def set_cluster_config(option, _1, value, parser):
+  if value.endswith('.json'):
+    replacement = Clusters.from_json(value)
+  elif value.endswith('.yml'):
+    replacement = Clusters.from_yml(value)
+  else:
+    _, ext = os.path.splitext(value)
+    raise TypeError('Unknown cluster configuration format: %s' % ext)
+  MESOS_CLIENT_CLUSTER_SET.replace(replacement.values())
+
+
+def mesos_client_cluster_provider(name):
+  return MESOS_CLIENT_CLUSTER_SET[name]
+
+
+app.add_option('--cluster_config',
+               default=None,
+               type='string',
+               action='callback',
+               callback=set_cluster_config,
+               metavar='FILENAME',
+               help='Use a different default cluster configuration.  WARNING: Only for testing.')
+
+
 def make_client_factory():
   options = app.get_options()
-  return functools.partial(MesosClientAPI, verbose=options.verbosity == 'verbose')
+  class TwitterMesosClientAPI(MesosClientAPI):
+    def __init__(self, cluster, *args, **kw):
+      super(TwitterMesosClientAPI, self).__init__(MESOS_CLIENT_CLUSTER_SET[cluster], *args, **kw)
+  return functools.partial(TwitterMesosClientAPI, verbose=options.verbosity == 'verbose')
 
-make_client = lambda cluster: make_client_factory()(cluster)
+
+def make_client(cluster):
+  factory = make_client_factory()
+  return factory(cluster.name if isinstance(cluster, Cluster) else cluster)
+
 
 def synthesize_url(scheduler_client, role=None, env=None, job=None):
   scheduler_url = scheduler_client.url
@@ -152,22 +193,20 @@ JSON_OPTION = optparse.Option(
     dest='json',
     default=False,
     action='store_true',
-    help='If specified, configuration is read in JSON format. Only works with Thermos tasks.')
+    help='If specified, configuration is read in JSON format.')
 
 
-def make_cluster_option(explanation):
-  return optparse.Option(
-    '--cluster',
-    dest='cluster',
-    default=None,
-    help=explanation)
+CLUSTER_CONFIG_OPTION = ClusterOption(
+  '--cluster',
+  cluster_provider=mesos_client_cluster_provider,
+  help='Cluster to match when selecting a job from a configuration. Optional if only one job '
+       'matching the given job name exists in the config.')
 
-CLUSTER_CONFIG_OPTION = make_cluster_option(
-  'Cluster to match when selecting a job from a configuration. Optional if only one job matching '
-  'the given job name exists in the config.')
-CLUSTER_INVOKE_OPTION = make_cluster_option(
-  'Cluster to invoke this command against (choose from %s). Deprecated in favor of the '
-  'CLUSTER/ROLE/ENV/NAME syntax.' % Cluster.get_list())
+CLUSTER_INVOKE_OPTION = ClusterOption(
+  '--cluster',
+  cluster_provider=mesos_client_cluster_provider,
+  help='Cluster to invoke this command against. Deprecated in favor of the CLUSTER/ROLE/ENV/NAME '
+       'syntax.')
 
 
 def make_env_option(explanation):
@@ -206,6 +245,9 @@ EXECUTOR_SANDBOX_OPTION = optparse.Option(
     help='Run the command in the executor sandbox instead of the task sandbox.')
 
 
+# TODO(wickman) This is flawed -- we should ideally pass a config object
+# directly to spawn_local and construct a Cluster object on the fly from e.g.
+# command line parameters.
 def make_spawn_options(options):
   return dict((name, getattr(options, name)) for name in (
       'json',
@@ -252,10 +294,11 @@ def create(jobname, config_file):
       options.json,
       False,
       options.bindings,
-      select_cluster=options.cluster,
+      select_cluster=options.cluster.name if options.cluster else None,
       select_env=options.env)
 
   if config.cluster() == 'local':
+    # TODO(wickman) Fix this terrible API.
     options.runner = 'build'
     return spawn_local('build', jobname, config_file, **make_spawn_options(options))
 
@@ -373,13 +416,12 @@ def runtask(args, options):
   """
   if len(args) < 2:
     app.error('Must specify cluster and command-line for runtask command!')
-  cluster = args[0]
-  Cluster.assert_exists(cluster)
+  cluster_name = args[0]
   cmdline = ' '.join(args[1:])
   if task_is_expensive(options):
     die('Task too expensive.')
-  qr = Quickrun(cluster, cmdline, options)
-  api = make_client(cluster)
+  qr = Quickrun(cluster_name, cmdline, options)
+  api = make_client(cluster_name)
   qr.run(api)
 
 
@@ -402,7 +444,7 @@ def diff(job, config_file):
       options.json,
       False,
       options.bindings,
-      select_cluster=options.cluster,
+      select_cluster=options.cluster.name if options.cluster else None,
       select_env=options.env)
   api = make_client(config.cluster())
   resp = api.query(api.build_query(config.role(), job, statuses=ACTIVE_STATES, env=options.env))
@@ -443,10 +485,10 @@ def do_open(args, _):
 
   Opens the scheduler page for a cluster, role or job in the default web browser.
   """
-  cluster = role = env = job = None
+  cluster_name = role = env = job = None
   args = args[0].split("/")
   if len(args) > 0:
-    cluster = args[0]
+    cluster_name = args[0]
     if len(args) > 1:
       role = args[1]
       if len(args) > 2:
@@ -457,10 +499,10 @@ def do_open(args, _):
           # TODO(ksweeney): Remove this after MESOS-2945 is completed.
           die('env scheduler pages are not yet implemented, please specify job')
 
-  if not cluster:
+  if not cluster_name:
     die('cluster is required')
 
-  api = make_client(cluster)
+  api = make_client(cluster_name)
 
   import webbrowser
   webbrowser.open_new_tab(synthesize_url(api.scheduler.scheduler(), role, env, job))
@@ -489,7 +531,7 @@ def inspect(jobname, config_file):
       options.json,
       False,
       options.bindings,
-      select_cluster=options.cluster,
+      select_cluster=options.cluster.name if options.cluster else None,
       select_env=options.env)
   if options.raw:
     print('Parsed job config: %s' % config.job())
@@ -581,7 +623,6 @@ def status(args, options):
 
   Fetches and prints information about the active tasks in a job.
   """
-
   def is_active(task):
     return task.status in ACTIVE_STATES
 
@@ -668,7 +709,7 @@ def update(jobname, config_file):
       options.json,
       force_local=False,
       bindings=options.bindings,
-      select_cluster=options.cluster,
+      select_cluster=options.cluster.name if options.cluster else None,
       select_env=options.env)
   api = make_client(config.cluster())
   resp = api.update_job(config, options.health_check_interval_seconds, options.shards)
@@ -790,7 +831,7 @@ def ssh(args, options):
     die('Job path is required')
   job_path = args.pop(0)
   try:
-    cluster, role, env, name = AuroraJobKey.from_path(job_path)
+    cluster_name, role, env, name = AuroraJobKey.from_path(job_path)
   except AuroraJobKey.Error as e:
     die('Invalid job path "%s": %s' % (job_path, e))
   if not args:
@@ -799,13 +840,13 @@ def ssh(args, options):
     shard = int(args.pop(0))
   except ValueError:
     die('Shard must be an integer')
-  api = make_client(cluster)
+  api = make_client(cluster_name)
   resp = api.query(api.build_query(role, name, set([int(shard)]), env=env))
   check_and_log_response(resp)
 
   remote_cmd = 'bash' if not args else ' '.join(args)
   command = DistributedCommandRunner.substitute(remote_cmd, resp.tasks[0],
-      cluster, executor_sandbox=options.executor_sandbox)
+      api.cluster, executor_sandbox=options.executor_sandbox)
 
   ssh_command = ['ssh', '-t']
 
@@ -847,32 +888,23 @@ def run(args, options):
     die('job path is required')
   job_path = args.pop(0)
   try:
-    cluster, role, env, name = AuroraJobKey.from_path(job_path)
+    cluster_name, role, env, name = AuroraJobKey.from_path(job_path)
   except AuroraJobKey.Error as e:
     die('Invalid job path "%s": %s' % (job_path, e))
 
   command = ' '.join(args)
+  try:
+    cluster = MESOS_CLIENT_CLUSTER_SET[cluster_name]
+  except KeyError:
+    die('Unknown cluster %s' % cluster_name)
 
   dcr = DistributedCommandRunner(cluster, role, [name])
   dcr.run(command, parallelism=options.num_threads, executor_sandbox=options.executor_sandbox)
 
 
-def _get_packer(cluster=None):
-  options = app.get_options()
-  cluster = cluster or options.cluster
-
-  packer_enabled_clusters = [c.name for c in Cluster.get_all() if c.packer_zk or c.packer_redirect]
-
-  if not cluster:
-    die('--cluster must be specified. Valid clusters for this command are %s' %
-        packer_enabled_clusters)
-  elif cluster not in Cluster.get_list():
-    die('Cluster "%s" does not exist. Valid, Packer-enabled clusters are %s' %
-        (cluster, packer_enabled_clusters))
-  elif cluster not in packer_enabled_clusters:
-    die('Cluster "%s" is not Packer-enabled. Packer is currently available for %s' %
-        (cluster, packer_enabled_clusters))
-  return sd_packer_client.create_packer(cluster, verbose=options.verbosity in ('normal', 'verbose'))
+def _get_packer(cluster, verbosity='normal'):
+  # TODO(wickman) sd_packer_client(cluster.name) => TwitterPacker(cluster)
+  return sd_packer_client.create_packer(cluster.name, verbose=verbosity in ('normal', 'verbose'))
 
 
 def trap_packer_error(fn):
@@ -896,11 +928,13 @@ def package_list(role):
 
   Prints the names of packages owned by a user.
   """
+  options = app.get_options()
+  cluster, verbosity = options.cluster, options.verbosity
   def filter_packages(packages):
-    if app.get_options().list_all_packages:
+    if options.list_all_packages:
       return packages
     return [package for package in packages if not package.startswith('__')]
-  print('\n'.join(filter_packages(_get_packer().list_packages(role))))
+  print('\n'.join(filter_packages(_get_packer(cluster, verbosity).list_packages(role))))
 
 
 def _print_package(pkg):
@@ -921,7 +955,8 @@ def package_versions(role, package):
 
   Prints metadata about all of the versions of a package.
   """
-  for version in _get_packer().list_versions(role, package):
+  options = app.get_options()
+  for version in _get_packer(options.cluster, options.verbosity).list_versions(role, package):
     _print_package(version)
 
 
@@ -934,7 +969,8 @@ def package_delete_version(role, package, version):
 
   Deletes a version of a package.
   """
-  _get_packer().delete(role, package, version)
+  options = app.get_options()
+  _get_packer(options.cluster, options.verbosity).delete(role, package, version)
   print('Version deleted')
 
 
@@ -954,7 +990,9 @@ def package_add_version(role, package, file_path):
   Likewise, when the package is fetched prior to running a task, it will
   be stored as the original basename.
   """
-  pkg = _get_packer().add(role, package, file_path, app.get_options().metadata)
+  options = app.get_options()
+  cluster, verbosity = options.cluster, options.verbosity
+  pkg = _get_packer(cluster, verbosity).add(role, package, file_path, options.metadata)
   print('Package added:')
   _print_package(pkg)
 
@@ -974,8 +1012,9 @@ def package_get_version(role, package, version):
   Prints the metadata associated with a specific version of a package.
   This supports version labels 'latest' and 'live'.
   """
-  pkg = _get_packer().get_version(role, package, version)
-  if app.get_options().metadata_only:
+  options = app.get_options()
+  pkg = _get_packer(options.cluster, options.verbosity).get_version(role, package, version)
+  if options.metadata_only:
     if not 'metadata' in pkg:
       die('Package does not contain any user-specified metadata.')
     else:
@@ -993,7 +1032,8 @@ def package_set_live(role, package, version):
 
   Updates the 'live' label of a package to point to a specific version.
   """
-  _get_packer().set_live(role, package, version)
+  options = app.get_options()
+  _get_packer(options.cluster, options.verbosity).set_live(role, package, version)
   print('Version %s is now the LIVE version' % version)
 
 @app.command
@@ -1005,7 +1045,8 @@ def package_unset_live(role, package):
 
   Removes the 'live' label of a package if it exists.
   """
-  _get_packer().unset_live(role, package)
+  options = app.get_options()
+  _get_packer(options.cluster, options.verbosity).unset_live(role, package)
   print('LIVE label unset')
 
 
@@ -1021,7 +1062,8 @@ def package_unlock(role, package):
   in the event of a packer server crash it is possible.  If you find
   a need to use this, please inform mesos-team so they can investigate.
   """
-  _get_packer().unlock(role, package)
+  options = app.get_options()
+  _get_packer(options.cluster, options.verbosity).unlock(role, package)
   print('Package unlocked')
 
 

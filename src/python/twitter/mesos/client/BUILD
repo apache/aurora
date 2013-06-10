@@ -49,7 +49,6 @@ python_library(
     pants('3rdparty/python:pystachio'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/log'),
-    pants('src/python/twitter/mesos:clusters'),
     pants('src/python/twitter/mesos/config'),
     pants('src/python/twitter/mesos/packer'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
@@ -62,7 +61,7 @@ python_library(
   dependencies = [
     pants(':api'),
     pants('3rdparty/python:pystachio'),
-    pants('src/python/twitter/mesos:clusters'),
+    pants('src/python/twitter/mesos/common:cluster'),
     pants('src/python/twitter/mesos/config:schema'),
     pants('src/python/twitter/thermos/config:schema'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
@@ -122,7 +121,7 @@ python_library(
     pants('src/python/twitter/common_internal/auth:ssh'),
     pants('src/python/twitter/common_internal/location'),
     pants('src/python/twitter/common_internal/zookeeper:tunneler'),
-    pants('src/python/twitter/mesos:clusters'),
+    pants('src/python/twitter/mesos/common:cluster'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
   ]
 )

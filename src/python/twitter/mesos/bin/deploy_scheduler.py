@@ -9,9 +9,11 @@ from twitter.common import app
 from twitter.common import log
 from twitter.common.dirutil import safe_rmtree
 from twitter.common.log import LogOptions
-from twitter.common_internal.zookeeper.tunneler import TunneledZookeeper
 from twitter.common.zookeeper.serverset import ServerSet
-from twitter.mesos.clusters import Cluster
+from twitter.common_internal.zookeeper.tunneler import TunneledZookeeper
+from twitter.mesos.common.cluster_option import ClusterOption
+from twitter.mesos.common_internal.cluster_traits import AudubonTrait
+from twitter.mesos.common_internal.clusters import TWITTER_CLUSTERS
 from twitter.mesos.deploy import Builder, Deployer
 
 from audubondata import Server
@@ -40,8 +42,8 @@ class SchedulerManager(object):
     self._really_deploy = not dry_run
     self._verbose = verbose
     self._deployer = Deployer(self.REMOTE_USER, dry_run, verbose)
-    self._cluster_name = cluster
-    self._cluster = Cluster.get(cluster)
+    self._cluster_name = cluster.name
+    self._cluster = cluster.with_trait(AudubonTrait)
     self._machines = None
     self._leader = None
     self._ignore_conflicting_schedulers = ignore_conflicting_schedulers
@@ -53,7 +55,8 @@ class SchedulerManager(object):
         self._machines = ['[dummy-host1]', '[dummy-host2]', '[dummy-host3]']
       else:
         try:
-          machines = Server.match_group('role', value=self._cluster.scheduler_role, datacenter=self._cluster.dc)
+          machines = Server.match_group('role', value=self._cluster.scheduler_role,
+              datacenter=self._cluster.dc)
         except Server.NotFound:
           log.error("Failed to determine scheduler hosts in dc: %s under role: %s" %
               (self._cluster.dc, self._cluster.scheduler_role))
@@ -264,9 +267,7 @@ app.set_usage('%prog [options]')
 app.add_option('-v', dest='verbose', default=False, action='store_true',
                help='Verbose logging. (default: %default)')
 
-cluster_list = Cluster.get_list()
-app.add_option('--cluster', type='choice', choices=cluster_list, dest='cluster',
-               help='Cluster to deploy the scheduler in (one of: %s)' % ', '.join(cluster_list))
+app.add_option(ClusterOption(clusters=TWITTER_CLUSTERS))
 
 app.add_option('--skip_build', dest='skip_build', default=False, action='store_true',
                help='Skip build and test, use the existing build.')
@@ -296,9 +297,8 @@ def main(_, options):
   dry_run = not options.really_push
 
   if not options.cluster:
-    cluster_list = Cluster.get_list()
-    log.info('Please specify the cluster you would like to deploy to with\n\t--cluster %s' %
-        cluster_list)
+    log.info('Please specify the cluster you would like to deploy to with\n\t--cluster one of %s' %
+        ' '.join(TWITTER_CLUSTERS))
     return
 
   builder = AuroraBuilder(options.cluster, options.release, options.hotfix, options.verbose)

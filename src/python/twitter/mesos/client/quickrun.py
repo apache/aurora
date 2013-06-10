@@ -35,12 +35,12 @@ class Quickrun(object):
       ScheduleStatus.FINISHED,
       ScheduleStatus.KILLED])
 
-  def __init__(self, cluster, command, options):
+  def __init__(self, cluster_name, command, options):
     self._stop = threading.Event()
-    self._config = self._make_config(cluster, command, options)
+    self._config = self._make_config(cluster_name, command, options)
     self._instances = options.instances
 
-  def _make_config(self, cluster, command, options):
+  def _make_config(self, cluster_name, command, options):
     processes = [Process(name=options.name, cmdline=command)]
     if options.package:
       role, name, version = options.package
@@ -57,7 +57,7 @@ class Quickrun(object):
         instances=options.instances,
         role=options.role,
         environment=options.env,
-        cluster=cluster)
+        cluster=cluster_name)
     if options.announce:
       job = job(announce=Announcer(), environment=options.env, daemon=True)
     return populate_namespaces(AuroraConfig(job))

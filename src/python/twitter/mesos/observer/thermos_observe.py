@@ -4,7 +4,7 @@ import time
 from twitter.common import app
 from twitter.common.app.modules.http import RootServer
 from twitter.common.metrics import RootMetrics
-from twitter.mesos.clusters import Cluster
+from twitter.mesos.common_internal.clusters import TwitterCluster
 from twitter.mesos.executor.resource_checkpoints import CheckpointResourceMonitor
 from twitter.mesos.observer.mesos_vars import MesosObserverVars
 from twitter.thermos.base.path import TaskPath
@@ -40,7 +40,7 @@ class MetaIgnoringMesosObserverVars(MesosObserverVars):
 
 
 def main(_, opts):
-  mesos_root = os.environ.get('META_THERMOS_ROOT', Cluster.DEFAULT_MESOS_ROOT)
+  mesos_root = os.environ.get('META_THERMOS_ROOT', TwitterCluster.DEFAULT_MESOS_ROOT)
 
   # TODO(jon): either fully implement or remove the MesosCheckpointResourceMonitor
   class MesosCheckpointResourceMonitor(CheckpointResourceMonitor):

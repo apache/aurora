@@ -14,7 +14,7 @@ import time
 from twitter.common import log
 from twitter.common.concurrent import defer
 from twitter.common.quantity import Amount, Time, Data
-from twitter.mesos.clusters import Cluster
+from twitter.mesos.common_internal.clusters import TwitterCluster
 from twitter.thermos.base.ckpt import CheckpointDispatcher
 from twitter.thermos.base.path import TaskPath
 from twitter.thermos.runner.inspector import CheckpointInspector
@@ -65,7 +65,7 @@ class ThermosGCExecutor(ThermosExecutorBase):
                clock=time):
     ThermosExecutorBase.__init__(self)
     self._slave_id = None
-    self._mesos_root = mesos_root or Cluster.DEFAULT_MESOS_ROOT
+    self._mesos_root = mesos_root or TwitterCluster.DEFAULT_MESOS_ROOT
     self._detector = executor_detector()
     self._collector = task_garbage_collector(root=checkpoint_root)
     self._clock = clock

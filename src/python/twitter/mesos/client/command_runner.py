@@ -4,8 +4,8 @@ import subprocess
 
 from twitter.common import log
 from twitter.mesos.client.api import MesosClientAPI
-from twitter.mesos.clusters import Cluster
 from twitter.mesos.config.schema import MesosContext
+from twitter.mesos.common.cluster import Cluster
 from twitter.thermos.config.schema import ThermosContext
 
 from gen.twitter.mesos.constants import LIVE_STATES
@@ -13,7 +13,12 @@ from gen.twitter.mesos.ttypes import (
   Identity,
   TaskQuery)
 
-from pystachio import Environment, String
+from pystachio import Environment, Required, String
+
+
+class CommandRunnerTrait(Cluster.Trait):
+  slave_root          = Required(String)
+  slave_run_directory = Required(String)
 
 
 class DistributedCommandRunner(object):
@@ -42,7 +47,7 @@ class DistributedCommandRunner(object):
 
   @classmethod
   def sandbox_args(cls, cluster):
-    cluster = Cluster.get(cluster)
+    cluster = cluster.with_trait(CommandRunnerTrait)
     return {'slave_root': cluster.slave_root, 'slave_run_directory': cluster.slave_run_directory}
 
   @classmethod

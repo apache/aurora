@@ -7,6 +7,7 @@ from twitter.mesos.common import AuroraJobKey
 from .api import MesosClientAPI
 from .base import check_and_log_response, die
 
+
 class LiveJobDisambiguator(object):
   """
   Disambiguates a job-specification into concrete AuroraJobKeys by querying the scheduler API.
@@ -31,7 +32,7 @@ class LiveJobDisambiguator(object):
   def query_matches(self):
     resp = self._client.get_jobs(self._role)
     check_and_log_response(resp)
-    return [AuroraJobKey(self._client.cluster, j.key.role, j.key.environment, j.key.name)
+    return [AuroraJobKey(self._client.cluster.name, j.key.role, j.key.environment, j.key.name)
         for j in resp.configs if j.key.name == self._name]
 
   @classmethod
@@ -44,7 +45,7 @@ class LiveJobDisambiguator(object):
       die(e)
 
     if not disambiguator.ambiguous:
-      return AuroraJobKey(client.cluster, role, env, name)
+      return AuroraJobKey(client.cluster.name, role, env, name)
 
     log.warning("Job ambiguously specified - querying the scheduler to disambiguate")
     matches = disambiguator.query_matches()
@@ -57,7 +58,6 @@ class LiveJobDisambiguator(object):
       die("Multiple jobs match (%s) - disambiguate by using the CLUSTER/ROLE/ENV/NAME form"
           % ",".join(str(m) for m in matches))
 
-
   @classmethod
   def disambiguate_args_or_die(cls, args, options, client_factory=MesosClientAPI):
     """
@@ -68,7 +68,7 @@ class LiveJobDisambiguator(object):
     Arguments:
       args: args from app command invocation.
       options: options from app command invocation. must have env and cluster attributes.
-      client_factory: a callable (cluster_name) -> MesosClientAPI.
+      client_factory: a callable (cluster) -> MesosClientAPI.
     """
     if not len(args) > 0:
       die('job path is required')
@@ -84,5 +84,5 @@ class LiveJobDisambiguator(object):
       cluster = options.cluster
       if not cluster:
         die('cluster is required')
-      client = client_factory(cluster)
+      client = client_factory(cluster.name)
       return client, cls._disambiguate_or_die(client, role, env, name)

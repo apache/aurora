@@ -15,7 +15,7 @@ from twitter.common.metrics import Observable
 from twitter.common.quantity import Amount, Time
 
 # thermos
-from twitter.mesos.clusters import Cluster
+from twitter.mesos.common_internal.clusters import TwitterCluster, TWITTER_CLUSTERS
 from twitter.mesos.common.http_signaler import HttpSignaler
 from twitter.mesos.config import PortResolver
 from twitter.mesos.config.schema import MesosJob, MesosTaskInstance
@@ -125,7 +125,7 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
       return mti
 
   @classmethod
-  def extract_ensemble(cls, assigned_task, default=Cluster.DEFAULT_ENSEMBLE):
+  def extract_ensemble(cls, assigned_task, default=TwitterCluster.DEFAULT_ENSEMBLE):
     thermos_task = assigned_task.task.thermosConfig
     if 'instance' in json.loads(thermos_task):
       # Received MesosTaskInstance
@@ -133,9 +133,9 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
     else:
       job = MesosJob.json_loads(thermos_task)
       try:
-        cluster = Cluster.get(job.cluster().get())
+        cluster = TWITTER_CLUSTERS[job.cluster().get()]
         return cluster.zk
-      except KeyError:
+      except (AttributeError, KeyError):
         return default
 
   @property

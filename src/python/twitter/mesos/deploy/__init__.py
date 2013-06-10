@@ -7,7 +7,6 @@ import sys
 from twitter.common.git import branch
 from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_mkdir
-from twitter.mesos.clusters import Cluster
 from twitter.vert.backends.tag import TagBackend
 
 import git
@@ -72,7 +71,6 @@ class Builder(object):
   def __init__(self, cluster, release=None, hotfix=None, verbose=False):
     assert not (release is not None and hotfix), 'Cannot specify both release and hotfix.'
     self._deploy = self._get_deploy(cluster, release) if not hotfix else None
-    self._cluster = Cluster.get(cluster)
     self._hotfix = bool(hotfix)
     self._verbose = verbose
     self._sha = self._check_tag()
@@ -133,11 +131,6 @@ class Builder(object):
   def commands(self):
     """Returns a list of commands in order to build the artifacts associated with this release."""
     return []
-
-  @property
-  def artifacts(self):
-    """Returns a map of local artifact to remote artifact using $dc and $cluster substitutions."""
-    return {}
 
   def preprocess(self):
     pass

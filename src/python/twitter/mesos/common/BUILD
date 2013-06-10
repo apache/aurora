@@ -3,6 +3,9 @@ python_library(
   sources = ['__init__.py'],
   dependencies = [
     pants(':aurora_job_key'),
+    pants(':cluster'),
+    pants(':cluster_option'),
+    pants(':clusters'),
     pants(':http_signaler'),
   ]
 )
@@ -17,6 +20,31 @@ python_library(
 )
 
 python_library(
+  name = 'cluster',
+  sources = ['cluster.py'],
+  dependencies = [
+    pants('3rdparty/python:pystachio'),
+  ]
+)
+
+python_library(
+  name = 'clusters',
+  sources = ['clusters.py'],
+  dependencies = [
+    pants(':cluster'),
+    pants('3rdparty/python:pystachio'),
+  ]
+)
+
+python_library(
+  name = 'cluster_option',
+  sources = ['cluster_option.py'],
+  dependencies = [
+    pants('src/python/twitter/common/lang'),
+  ]
+)
+
+python_library(
   name = 'http_signaler',
   sources = ['http_signaler.py'],
   dependencies = [
@@ -25,6 +53,5 @@ python_library(
     pants('src/python/twitter/common/net'),
     pants('src/python/twitter/common/net:socks'),
     pants('src/python/twitter/common_internal/location'),
-    pants('src/python/twitter/mesos:clusters'),
   ]
 )

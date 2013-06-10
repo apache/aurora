@@ -2,7 +2,7 @@ import os
 from glob import glob
 
 from twitter.common.string import ScanfParser
-from twitter.mesos.clusters import Cluster
+from twitter.mesos.common_internal.clusters import TwitterCluster
 
 
 class ExecutorDetector(object):
@@ -37,7 +37,7 @@ class ExecutorDetector(object):
   def path(self, result):
     return os.path.join(*self.PATTERN) % result.groups()
 
-  def find(self, root=Cluster.DEFAULT_MESOS_ROOT,
+  def find(self, root=TwitterCluster.DEFAULT_MESOS_ROOT,
            slave_id='*', framework_id='*', executor_id='*', run='*'):
     mixins = dict(
         root=root, slave_id=slave_id, framework_id=framework_id, executor_id=executor_id, run=run)
