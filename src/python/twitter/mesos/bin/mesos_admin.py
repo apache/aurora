@@ -11,6 +11,8 @@ from twitter.common.quantity import Amount, Data
 from twitter.common.quantity.parse_simple import parse_data
 from twitter.mesos.client.base import check_and_log_response, die, requires
 from twitter.mesos.client.api import MesosClientAPI
+from twitter.mesos.common.cluster_option import ClusterOption
+from twitter.mesos.common_internal.clusters import TWITTER_CLUSTERS
 
 from gen.twitter.mesos.constants import ACTIVE_STATES, TERMINAL_STATES
 from gen.twitter.mesos.ttypes import (
@@ -26,11 +28,7 @@ For questions contact mesos-team@twitter.com.
 """
 
 
-CLUSTER_OPTION = optparse.Option(
-    '--cluster',
-    dest='cluster',
-    default=None,
-    help='Cluster to invoke the command against.')
+CLUSTER_OPTION = ClusterOption('--cluster', clusters=TWITTER_CLUSTERS)
 
 
 @app.command
