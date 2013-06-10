@@ -96,6 +96,8 @@ python_library(
     pants(':job_monitor'),
     pants('src/python/twitter/common/quantity'),
     pants('src/python/twitter/mesos/config'),
+    pants('src/python/twitter/mesos/common:aurora_job_key'),
+    pants('src/python/twitter/mesos/packer'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
   ]
 )

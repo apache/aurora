@@ -3,9 +3,10 @@ python_test_suite(name = 'all',
     pants(':config'),
     pants(':disambiguator'),
     pants(':health_check'),
+    pants(':quickrun'),
+    pants(':restarter'),
     pants(':scheduler_client'),
     pants(':shard_watcher'),
-    pants(':restarter'),
     pants(':updater'),
   ],
 )
@@ -33,6 +34,14 @@ python_tests(name = 'health_check',
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
     pants('3rdparty/python:mox'),
   ],
+)
+
+python_tests(name = 'quickrun',
+  sources = ['test_quickrun.py'],
+  dependencies = [
+    pants('src/python/twitter/mesos/client:quickrun'),
+    pants('3rdparty/python:mox'),
+  ]
 )
 
 python_tests(name = 'restarter',

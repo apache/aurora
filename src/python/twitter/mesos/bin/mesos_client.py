@@ -19,6 +19,7 @@ from time import gmtime, strftime
 from urlparse import urljoin
 
 from twitter.common import app, log
+from twitter.common.dirutil import Fileset
 from twitter.common.log.options import LogOptions
 from twitter.common.quantity import Amount, Data
 from twitter.common.quantity.parse_simple import parse_data_into
@@ -339,7 +340,23 @@ def parse_package(option, _, value, parser):
   splits = value.split(':')
   if len(splits) != 3:
     raise OptionValueError('Expected package to be of the form role:name:version')
-  setattr(parser.values, option.dest, tuple(splits))
+  if not getattr(parser.values, option.dest, None):
+    setattr(parser.values, option.dest, [])
+  getattr(parser.values, option.dest).append(tuple(splits))
+
+
+def parse_filemap(option, _, value, parser):
+  if value is None:
+    return
+  splits = value.split(':', 2)
+  if len(splits) == 1:
+    rel, glob = '.', splits[0]
+  else:
+    rel, glob = splits
+  filemap = dict((os.path.relpath(filename, rel), filename) for filename in Fileset.zglobs(glob))
+  if not getattr(parser.values, option.dest, None):
+    setattr(parser.values, option.dest, {})
+  getattr(parser.values, option.dest).update(filemap)
 
 
 RUNTASK_INSTANCE_LIMIT = 25
@@ -390,7 +407,7 @@ def task_is_expensive(options):
     default=Amount(1, Data.GB), metavar='AMOUNT', type='string',
     callback=parse_data_into('disk'),
     help='Amount of disk per instance, e.g. "1512mb" or "5G"')
-@app.command_option('-p', '--package', type='string', default=None,
+@app.command_option('-p', '--package', type='string', default=None, dest='packages',
     metavar='ROLE:NAME:VERSION', action='callback', callback=parse_package,
     help='Package to stage into sandbox prior to task invocation.  Package takes packer '
          'role, name, version strings.')
@@ -401,8 +418,13 @@ def task_is_expensive(options):
     help='Announce a serverset for this job.')
 @app.command_option('--role', type='string', default=getpass.getuser(), metavar='ROLE',
     help='Role in which to run the task.')
-@app.command_option('--env', type='string', default=DEFAULT_ENVIRONMENT, metavar='ENV',
-    help='Environment in which to run the task.')
+@app.command_option('-f', '--files', type='string', default=None, dest='filemap',
+    metavar='[BASE:]GLOB', action='callback', callback=parse_filemap,
+    help='Glob up files to be copied to the sandbox.  May be specified multiple times. '
+         'The format is [BASE:]GLOB, e.g. --files=src/python/**/*.py to add all files '
+         'beneath src/python ending in .py.  If you would like the paths to be relative '
+         'to a base directory, use BASE, e.g. --files=src/python:src/python/**/*.py to '
+         'strip away the leading src/python.')
 @app.command_option('--yes_i_really_want_to_run_an_expensive_job', default=False,
     action='store_true', dest='yes_i_really_want_to_run_an_expensive_job',
     help='Yes, you really want to run a potentially resource intensive job.')
@@ -420,7 +442,18 @@ def runtask(args, options):
   cmdline = ' '.join(args[1:])
   if task_is_expensive(options):
     die('Task too expensive.')
-  qr = Quickrun(cluster_name, cmdline, options)
+  qr = Quickrun(
+      cluster_name,
+      cmdline,
+      name=options.name,
+      role=options.role,
+      instances=options.instances,
+      cpu=options.cpus,
+      ram=options.ram,
+      disk=options.disk,
+      announce=options.announce,
+      packages=options.packages,
+      additional_files=options.filemap)
   api = make_client(cluster_name)
   qr.run(api)
 
