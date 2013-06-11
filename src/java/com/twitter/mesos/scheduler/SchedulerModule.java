@@ -59,6 +59,7 @@ import com.twitter.mesos.scheduler.periodic.GcExecutorLauncher;
 import com.twitter.mesos.scheduler.periodic.GcExecutorLauncher.GcExecutor;
 import com.twitter.mesos.scheduler.periodic.PeriodicTaskModule;
 import com.twitter.mesos.scheduler.quota.QuotaModule;
+import com.twitter.mesos.scheduler.stats.AsyncStatsModule;
 import com.twitter.mesos.scheduler.storage.AttributeStore;
 import com.twitter.mesos.scheduler.storage.AttributeStore.AttributeStoreImpl;
 import com.twitter.thrift.ServiceInstance;
@@ -152,6 +153,7 @@ public class SchedulerModule extends AbstractModule {
     bind(UserTaskLauncher.class).in(Singleton.class);
 
     install(new AsyncModule());
+    install(new AsyncStatsModule());
 
     bind(MaintenanceController.class).to(MaintenanceControllerImpl.class);
     bind(MaintenanceControllerImpl.class).in(Singleton.class);
