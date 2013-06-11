@@ -246,6 +246,13 @@ EXECUTOR_SANDBOX_OPTION = optparse.Option(
     help='Run the command in the executor sandbox instead of the task sandbox.')
 
 
+SSH_USER_OPTION = optparse.Option(
+    '--user',
+    dest='ssh_user',
+    default=None,
+    help="ssh as this user instead of the role.")
+
+
 # TODO(wickman) This is flawed -- we should ideally pass a config object
 # directly to spawn_local and construct a Cluster object on the fly from e.g.
 # command line parameters.
@@ -850,8 +857,7 @@ def get_quota(role):
 
 @app.command
 @app.command_option(EXECUTOR_SANDBOX_OPTION)
-@app.command_option('--user', dest='ssh_user', default=None,
-                    help="ssh as this user instead of the role.")
+@app.command_option(SSH_USER_OPTION)
 @app.command_option('-L', dest='tunnels', action='append', metavar='PORT:NAME',
                     default=[],
                     help="Add tunnel from local port PORT to remote named port NAME.")
@@ -904,6 +910,7 @@ def ssh(args, options):
 @app.command
 @app.command_option('-t', '--threads', type=int, default=1, dest='num_threads',
     help='The number of threads to use.')
+@app.command_option(SSH_USER_OPTION)
 @app.command_option(EXECUTOR_SANDBOX_OPTION)
 def run(args, options):
   """usage: run cluster/role/env/job cmd
@@ -931,7 +938,7 @@ def run(args, options):
   except KeyError:
     die('Unknown cluster %s' % cluster_name)
 
-  dcr = DistributedCommandRunner(cluster, role, [name])
+  dcr = DistributedCommandRunner(cluster, role, [name], options.ssh_user)
   dcr.run(command, parallelism=options.num_threads, executor_sandbox=options.executor_sandbox)
 
 

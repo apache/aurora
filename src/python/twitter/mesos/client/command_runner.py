@@ -92,11 +92,12 @@ class DistributedCommandRunner(object):
   def query_from(cls, role, job):
     return TaskQuery(statuses=LIVE_STATES, owner=Identity(role), jobName=job)
 
-  def __init__(self, cluster, role, jobs):
+  def __init__(self, cluster, role, jobs, ssh_user=None):
     self._cluster = cluster
     self._api = MesosClientAPI(cluster=cluster)
     self._role = role
     self._jobs = jobs
+    self._ssh_user = ssh_user if ssh_user else self._role
 
   def resolve(self):
     for job in self._jobs:
@@ -111,7 +112,7 @@ class DistributedCommandRunner(object):
     for task in self.resolve():
       host = task.assignedTask.slaveHost
       role = task.assignedTask.task.owner.role
-      yield (host, role, self.substitute(command, task, self._cluster, **kw))
+      yield (host, self._ssh_user, self.substitute(command, task, self._cluster, **kw))
 
   def run(self, command, parallelism=1, **kw):
     threadpool = ThreadPool(processes=parallelism)
