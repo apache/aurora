@@ -14,13 +14,13 @@ python_test_suite(name = 'all',
 python_tests(name = 'gc_executor',
   sources = ['test_gc_executor.py'],
   dependencies = [
+    pants('3rdparty/python:mock'),
     pants('3rdparty/python:mox'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/quantity'),
     pants('src/python/twitter/mesos/executor:gc_executor_lib'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
     pants('src/thrift/com/twitter/thermos:py-thrift'),
-    python_requirement('mock'),
   ],
   coverage = 'twitter.mesos.executor.gc_executor'
 )

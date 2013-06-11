@@ -6,8 +6,6 @@ commandline in a subprocess of its own.
 
 """
 
-from __future__ import print_function
-
 from abc import abstractmethod
 import getpass
 import grp
@@ -60,6 +58,7 @@ class ProcessBase(object):
   class UnknownUserError(Error): pass
   class CheckpointError(Error): pass
   class UnspecifiedSandbox(Error): pass
+  class PermissionError(Error): pass
 
   CONTROL_WAIT_CHECK_INTERVAL = Amount(100, Time.MILLISECONDS)
   MAXIMUM_CONTROL_WAIT = Amount(1, Time.MINUTES)
@@ -91,10 +90,9 @@ class ProcessBase(object):
     self._stderr = None
     self._user = user
     if self._user:
-      try:
-        pwd.getpwnam(self._user)
-      except KeyError:
-        raise self.UnknownUserError('Unknown user %s!' % self._user)
+      user, current_user = self._getpwuid() # may raise self.UnknownUserError
+      if user != current_user and os.geteuid() != 0:
+        raise self.PermissionError('Must be root to run processes as other users!')
     self._ckpt = None
     self._ckpt_head = -1
     if platform is None:
@@ -190,15 +188,31 @@ class ProcessBase(object):
     raise self.CheckpointError('Timed out waiting for checkpoint stream!')
 
   def _prepare_fork(self):
-    self._stdout = safe_open(self._pathspec.with_filename('stdout').getpath('process_logdir'), "w")
-    self._stderr = safe_open(self._pathspec.with_filename('stderr').getpath('process_logdir'), "w")
+    user, current_user = self._getpwuid()
+    uid, gid = user.pw_uid, user.pw_gid
     self._fork_time = self._platform.clock().time()
     self._setup_ckpt()
+    self._stdout = safe_open(self._pathspec.with_filename('stdout').getpath('process_logdir'), "w")
+    self._stderr = safe_open(self._pathspec.with_filename('stderr').getpath('process_logdir'), "w")
+    os.chown(self._stdout.name, user.pw_uid, user.pw_gid)
+    os.chown(self._stderr.name, user.pw_uid, user.pw_gid)
 
   def _finalize_fork(self):
     self._write_initial_update()
     self._ckpt.close()
     self._ckpt = None
+
+  def _getpwuid(self):
+    """Returns a tuple of the user (i.e. --user) and current user."""
+    try:
+      current_user = pwd.getpwuid(os.getuid())
+    except KeyError:
+      raise self.UnknownUserError('Unknown user %s!' % self._user)
+    try:
+      user = pwd.getpwnam(self._user) if self._user else current_user
+    except KeyError:
+      raise self.UnknownUserError('Unable to get pwent information!')
+    return user, current_user
 
   def start(self):
     """
@@ -279,15 +293,6 @@ class Process(ProcessBase):
     os.chdir(self._sandbox)
     os.chroot(self._sandbox)
 
-  def _getpwuid(self):
-    """Returns a tuple of the user (i.e. --user) and current user."""
-    try:
-      current_user = pwd.getpwuid(os.getuid())
-      user = pwd.getpwnam(self._user) if self._user else current_user
-    except KeyError:
-      raise self.UnknownUserError('Unable to get pwent information!')
-    return user, current_user
-
   def _setuid(self):
     """Drop privileges to the user supplied in Process creation (if necessary.)"""
     user, current_user = self._getpwuid()
@@ -303,8 +308,10 @@ class Process(ProcessBase):
 
   def execute(self):
     """Perform final initialization and launch target process commandline in a subprocess."""
-    assert self._stderr
-    assert self._stdout
+    if not self._stderr:
+      raise RuntimeError('self._stderr not set up!')
+    if not self._stdout:
+      raise RuntimeError('self._stdout not set up!')
 
     user, _ = self._getpwuid()
     username, homedir = user.pw_name, user.pw_dir

@@ -68,7 +68,10 @@ python_tests(name = 'test_failure_limit',
 
 python_tests(name = 'test_process',
   sources = ['test_process.py'],
-  dependencies = [pants(':runner_baselibs')],
+  dependencies = [
+    pants(':runner_baselibs'),
+    pants('3rdparty/python:mock')
+  ],
 )
 
 python_tests(name = 'test_staged_kill',
