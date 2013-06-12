@@ -19,7 +19,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * An in-memory update store.
  */
-public class MemUpdateStore implements UpdateStore.Mutable {
+class MemUpdateStore implements UpdateStore.Mutable {
 
   private static final Function<JobUpdateConfiguration, JobUpdateConfiguration> DEEP_COPY =
       Util.deepCopier();

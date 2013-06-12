@@ -470,7 +470,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
-        expect(storageUtil.taskStore.fetchTaskIds(Query.GET_ALL)).andReturn(taskIds);
+        expect(storageUtil.taskStore.fetchTaskIds(Query.unscoped())).andReturn(taskIds);
         storageUtil.taskStore.deleteTasks(taskIds);
         streamMatcher.expectTransaction(Op.removeTasks(new RemoveTasks(taskIds)))
             .andReturn(position);

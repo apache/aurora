@@ -17,7 +17,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * An in-memory quota store.
  */
-public class MemQuotaStore implements QuotaStore.Mutable {
+class MemQuotaStore implements QuotaStore.Mutable {
 
   private static final Function<Quota, Quota> DEEP_COPY = Util.deepCopier();
 

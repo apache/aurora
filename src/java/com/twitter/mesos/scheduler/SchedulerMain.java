@@ -48,8 +48,10 @@ import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl.Executo
 import com.twitter.mesos.scheduler.SchedulerLifecycle.ShutdownOnDriverExit;
 import com.twitter.mesos.scheduler.log.mesos.MesosLogStreamModule;
 import com.twitter.mesos.scheduler.storage.backup.BackupModule;
+import com.twitter.mesos.scheduler.storage.log.LogStorage;
 import com.twitter.mesos.scheduler.storage.log.LogStorageModule;
 import com.twitter.mesos.scheduler.storage.log.SnapshotStoreImpl;
+import com.twitter.mesos.scheduler.storage.mem.MemStorageModule;
 import com.twitter.mesos.scheduler.testing.IsolatedSchedulerModule;
 import com.twitter.mesos.scheduler.thrift.ThriftConfiguration;
 import com.twitter.mesos.scheduler.thrift.ThriftModule;
@@ -144,11 +146,9 @@ public class SchedulerMain extends AbstractApplication {
         zkClientKeyFactory,
         schedulerService));
     modules.add(new BackupModule(backupDir, SnapshotStoreImpl.class));
-    modules.add(new AbstractModule() {
-      @Override protected void configure() {
-        LogStorageModule.bind(binder());
-      }
-    });
+    // TODO(William Farner): Make all mem store implementation classes package private.
+    modules.add(new MemStorageModule(Bindings.annotatedKeyFactory(LogStorage.WriteBehind.class)));
+    modules.add(new LogStorageModule());
     return modules.build();
   }
 

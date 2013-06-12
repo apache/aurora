@@ -224,7 +224,7 @@ public class LogStorage extends ForwardingStore
              @WriteBehind TaskStore.Mutable taskStore,
              @WriteBehind UpdateStore.Mutable updateStore,
              @WriteBehind QuotaStore.Mutable quotaStore,
-             AttributeStore.Mutable attributeStore) {
+             @WriteBehind AttributeStore.Mutable attributeStore) {
 
     this(logManager,
         new ScheduledExecutorSchedulingService(shutdownRegistry, shutdownGracePeriod),
@@ -538,7 +538,7 @@ public class LogStorage extends ForwardingStore
   public void deleteAllTasks() {
     write(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
-        deleteTasks(storeProvider.getTaskStore().fetchTaskIds(Query.GET_ALL));
+        deleteTasks(storeProvider.getTaskStore().fetchTaskIds(Query.unscoped()));
       }
     });
   }

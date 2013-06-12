@@ -8,7 +8,6 @@ import com.google.inject.Inject;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.stats.Stats;
 import com.twitter.mesos.scheduler.storage.AttributeStore;
-import com.twitter.mesos.scheduler.storage.AttributeStore.AttributeStoreImpl;
 import com.twitter.mesos.scheduler.storage.JobStore;
 import com.twitter.mesos.scheduler.storage.LockManager;
 import com.twitter.mesos.scheduler.storage.QuotaStore;
@@ -80,7 +79,7 @@ public class MemStorage implements Storage {
         new MemTaskStore(),
         new MemUpdateStore(),
         new MemQuotaStore(),
-        new AttributeStoreImpl());
+        new MemAttributeStore());
   }
 
   @Timed("mem_storage_read_operation")

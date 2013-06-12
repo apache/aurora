@@ -40,7 +40,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * An in-memory task store.
  */
-public class MemTaskStore implements TaskStore.Mutable {
+class MemTaskStore implements TaskStore.Mutable {
 
   private static final Logger LOG = Logger.getLogger(MemTaskStore.class.getName());
 

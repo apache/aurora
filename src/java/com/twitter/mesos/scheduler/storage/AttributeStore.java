@@ -1,13 +1,9 @@
 package com.twitter.mesos.scheduler.storage;
 
-import java.util.Map;
 import java.util.Set;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Maps;
-import com.google.inject.Inject;
 
 import com.twitter.mesos.gen.Attribute;
 import com.twitter.mesos.gen.HostAttributes;
@@ -82,52 +78,4 @@ public interface AttributeStore {
     }
   }
 
-  class AttributeStoreImpl implements Mutable {
-    private final Map<String, HostAttributes> hostAttributes;
-
-    @Inject
-    public AttributeStoreImpl() {
-      this.hostAttributes = Maps.newHashMap();
-    }
-
-    @Override
-    public synchronized void deleteHostAttributes() {
-      hostAttributes.clear();
-    }
-
-    @Override
-    public synchronized void saveHostAttributes(HostAttributes attributes) {
-      HostAttributes stored = hostAttributes.get(attributes.getHost());
-      if (stored == null) {
-        stored = attributes;
-        hostAttributes.put(attributes.getHost(), attributes);
-      }
-      if (!stored.isSetMode()) {
-        stored.setMode(attributes.isSetMode() ? attributes.getMode() : MaintenanceMode.NONE);
-      }
-      stored.setAttributes(attributes.isSetAttributes()
-          ? attributes.getAttributes() : ImmutableSet.<Attribute>of());
-    }
-
-    @Override
-    public boolean setMaintenanceMode(String host, MaintenanceMode mode) {
-      HostAttributes stored = hostAttributes.get(host);
-      if (stored != null) {
-        stored.setMode(mode);
-        return true;
-      } else {
-        return false;
-      }
-    }
-
-    @Override
-    public synchronized Optional<HostAttributes> getHostAttributes(String host) {
-      return Optional.fromNullable(hostAttributes.get(host));
-    }
-
-    @Override
-    public Set<HostAttributes> getHostAttributes() {
-      return ImmutableSet.copyOf(hostAttributes.values());
-    }
-  }
 }

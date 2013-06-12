@@ -1,7 +1,6 @@
 package com.twitter.mesos.scheduler.periodic;
 
 import com.google.inject.AbstractModule;
-import com.google.inject.Binder;
 import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 
@@ -39,14 +38,5 @@ public class PeriodicTaskModule extends AbstractModule {
     bind(Preempter.class).in(Singleton.class);
 
     LifecycleModule.bindStartupAction(binder(), PeriodicTaskLauncher.class);
-  }
-
-  /**
-   * Binds the periodic task module.
-   *
-   * @param binder a guice binder to bind with.
-   */
-  public static void bind(Binder binder) {
-    binder.install(new PeriodicTaskModule());
   }
 }

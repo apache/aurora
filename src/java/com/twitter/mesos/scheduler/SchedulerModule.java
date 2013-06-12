@@ -60,8 +60,6 @@ import com.twitter.mesos.scheduler.periodic.GcExecutorLauncher.GcExecutor;
 import com.twitter.mesos.scheduler.periodic.PeriodicTaskModule;
 import com.twitter.mesos.scheduler.quota.QuotaModule;
 import com.twitter.mesos.scheduler.stats.AsyncStatsModule;
-import com.twitter.mesos.scheduler.storage.AttributeStore;
-import com.twitter.mesos.scheduler.storage.AttributeStore.AttributeStoreImpl;
 import com.twitter.thrift.ServiceInstance;
 
 /**
@@ -141,12 +139,9 @@ public class SchedulerModule extends AbstractModule {
 
     bind(SchedulerLifecycle.class).in(Singleton.class);
     TaskEventModule.bindSubscriber(binder(), SchedulerLifecycle.class);
-    bind(AttributeStore.Mutable.class).to(AttributeStoreImpl.class);
-    bind(AttributeStoreImpl.class).in(Singleton.class);
 
-    QuotaModule.bind(binder());
-    PeriodicTaskModule.bind(binder());
-
+    install(new QuotaModule());
+    install(new PeriodicTaskModule());
     install(new ServletModule());
 
     bind(GcExecutorLauncher.class).in(Singleton.class);

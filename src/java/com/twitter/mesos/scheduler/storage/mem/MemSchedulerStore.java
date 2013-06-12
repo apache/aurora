@@ -11,7 +11,7 @@ import com.twitter.mesos.scheduler.storage.SchedulerStore;
 /**
  * An in-memory scheduler store.
  */
-public class MemSchedulerStore implements SchedulerStore.Mutable {
+class MemSchedulerStore implements SchedulerStore.Mutable {
   private final AtomicReference<String> frameworkId = Atomics.newReference();
 
   @Override

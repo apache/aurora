@@ -4,17 +4,13 @@ import java.lang.annotation.Annotation;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.AbstractModule;
-import com.google.inject.Binder;
 import com.google.inject.Key;
-import com.google.inject.PrivateBinder;
 import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
-import com.twitter.common.base.Closure;
-import com.twitter.common.inject.Bindings;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
@@ -22,21 +18,10 @@ import com.twitter.common.util.Clock;
 import com.twitter.mesos.scheduler.log.Log;
 import com.twitter.mesos.scheduler.storage.CallOrderEnforcingStorage;
 import com.twitter.mesos.scheduler.storage.DistributedSnapshotStore;
-import com.twitter.mesos.scheduler.storage.JobStore;
-import com.twitter.mesos.scheduler.storage.QuotaStore;
-import com.twitter.mesos.scheduler.storage.SchedulerStore;
-import com.twitter.mesos.scheduler.storage.TaskStore;
-import com.twitter.mesos.scheduler.storage.UpdateStore;
 import com.twitter.mesos.scheduler.storage.log.LogManager.MaxEntrySize;
 import com.twitter.mesos.scheduler.storage.log.LogManager.SnapshotSetting;
 import com.twitter.mesos.scheduler.storage.log.LogStorage.ShutdownGracePeriod;
 import com.twitter.mesos.scheduler.storage.log.LogStorage.SnapshotInterval;
-import com.twitter.mesos.scheduler.storage.mem.MemJobStore;
-import com.twitter.mesos.scheduler.storage.mem.MemQuotaStore;
-import com.twitter.mesos.scheduler.storage.mem.MemSchedulerStore;
-import com.twitter.mesos.scheduler.storage.mem.MemStorageModule;
-import com.twitter.mesos.scheduler.storage.mem.MemTaskStore;
-import com.twitter.mesos.scheduler.storage.mem.MemUpdateStore;
 
 /**
  * Bindings for scheduler distributed log based storage.
@@ -48,19 +33,6 @@ import com.twitter.mesos.scheduler.storage.mem.MemUpdateStore;
  *   <li>The concrete {@link Log} implementation.</li>
  * </ul>
  * <p/>
- * Exposes bindings for storage components:
- * <ul>
- *   <li>{@link com.twitter.mesos.scheduler.storage.Storage}</li>
- *   <li>Keyed by {@link LogStorage.WriteBehind}
- *     <ul>
- *       <li>{@link SchedulerStore}</li>
- *       <li>{@link JobStore}</li>
- *       <li>{@link TaskStore}</li>
- *       <li>{@link UpdateStore}</li>
- *       <li>{@link QuotaStore}</li>
- *     </ul>
- *   </li>
- * </ul>
  */
 public class LogStorageModule extends AbstractModule {
 
@@ -85,49 +57,6 @@ public class LogStorageModule extends AbstractModule {
 
   @CmdLine(name = "deflate_snapshots", help = "Whether snapshots should be deflate-compressed.")
   private static final Arg<Boolean> DEFLATE_SNAPSHOTS = Arg.create(true);
-
-  private static <T> Key<T> createKey(Class<T> clazz) {
-    return Key.get(clazz, LogStorage.WriteBehind.class);
-  }
-
-  /**
-   * Binds a distributed log based storage system.
-   *
-   * @param binder a guice binder to bind the storage with
-   */
-  public static void bind(Binder binder) {
-    final Class<? extends SchedulerStore.Mutable> schedulerStore = MemSchedulerStore.class;
-    final Class<? extends JobStore.Mutable> jobStore = MemJobStore.class;
-    final Class<? extends TaskStore.Mutable> taskStore = MemTaskStore.class;
-    final Class<? extends UpdateStore.Mutable> updateStore = MemUpdateStore.class;
-    final Class<? extends QuotaStore.Mutable> quotaStore = MemQuotaStore.class;
-
-    Closure<PrivateBinder>  bindAdditional = new Closure<PrivateBinder>() {
-      private <T> void exposeBinding(
-          PrivateBinder binder,
-          Class<T> binding,
-          Class<? extends T> impl) {
-
-        Key<T> key = createKey(binding);
-        binder.bind(key).to(impl);
-        binder.expose(key);
-      }
-
-      @Override public void execute(PrivateBinder binder) {
-        exposeBinding(binder, SchedulerStore.Mutable.class, schedulerStore);
-        exposeBinding(binder, JobStore.Mutable.class, jobStore);
-        exposeBinding(binder, TaskStore.Mutable.class, taskStore);
-        exposeBinding(binder, UpdateStore.Mutable.class, updateStore);
-        exposeBinding(binder, QuotaStore.Mutable.class, quotaStore);
-      }
-    };
-
-    MemStorageModule.bind(
-        binder,
-        Bindings.annotatedKeyFactory(LogStorage.WriteBehind.class),
-        bindAdditional);
-    binder.install(new LogStorageModule());
-  }
 
   @Override
   protected void configure() {
