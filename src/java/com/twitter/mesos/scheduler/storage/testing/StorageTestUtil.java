@@ -68,7 +68,7 @@ public class StorageTestUtil {
     expect(storeProvider.getSchedulerStore()).andReturn(schedulerStore).anyTimes();
 
     final Capture<Work<T, RuntimeException>> work = EasyMockTest.createCapture();
-    return expect(storage.readOp(capture(work))).andAnswer(new IAnswer<T>() {
+    return expect(storage.consistentRead(capture(work))).andAnswer(new IAnswer<T>() {
       @Override public T answer() {
         return work.getValue().apply(storeProvider);
       }
@@ -85,7 +85,7 @@ public class StorageTestUtil {
     expect(mutableStoreProvider.getSchedulerStore()).andReturn(schedulerStore).anyTimes();
 
     final Capture<MutateWork<T, RuntimeException>> work = EasyMockTest.createCapture();
-    return expect(storage.writeOp(capture(work))).andAnswer(new IAnswer<T>() {
+    return expect(storage.write(capture(work))).andAnswer(new IAnswer<T>() {
       @Override public T answer() {
         return work.getValue().apply(mutableStoreProvider);
       }

@@ -158,7 +158,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
 
   @Timed("snapshot_create")
   @Override public Snapshot createSnapshot() {
-    return storage.readOp(new Work.Quiet<Snapshot>() {
+    return storage.consistentRead(new Work.Quiet<Snapshot>() {
       @Override public Snapshot apply(StoreProvider storeProvider) {
         Snapshot snapshot = new Snapshot();
 
@@ -178,7 +178,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
   @Override public void applySnapshot(final Snapshot snapshot) {
     checkNotNull(snapshot);
 
-    storage.writeOp(new MutateWork.NoResult.Quiet() {
+    storage.write(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
         LOG.info("Restoring snapshot.");
 

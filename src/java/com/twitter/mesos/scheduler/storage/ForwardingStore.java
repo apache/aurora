@@ -71,15 +71,15 @@ public class ForwardingStore implements
   }
 
   @Override
-  public <T, E extends Exception> T readOp(Work<T, E> work) throws StorageException, E {
-    return storage.readOp(work);
+  public <T, E extends Exception> T consistentRead(Work<T, E> work) throws StorageException, E {
+    return storage.consistentRead(work);
   }
 
   @Override
-  public <T, E extends Exception> T writeOp(MutateWork<T, E> work)
+  public <T, E extends Exception> T write(MutateWork<T, E> work)
       throws StorageException, E {
 
-    return storage.writeOp(work);
+    return storage.write(work);
   }
 
   @Override

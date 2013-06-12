@@ -85,7 +85,7 @@ public class MemStorage implements Storage {
 
   @Timed("mem_storage_read_operation")
   @Override
-  public <T, E extends Exception> T readOp(Work<T, E> work) throws StorageException, E {
+  public <T, E extends Exception> T consistentRead(Work<T, E> work) throws StorageException, E {
     checkNotNull(work);
 
     long lockStartNanos = System.nanoTime();
@@ -102,7 +102,7 @@ public class MemStorage implements Storage {
 
   @Timed("mem_storage_write_operation")
   @Override
-  public <T, E extends Exception> T writeOp(MutateWork<T, E> work)
+  public <T, E extends Exception> T write(MutateWork<T, E> work)
       throws StorageException, E {
 
     checkNotNull(work);

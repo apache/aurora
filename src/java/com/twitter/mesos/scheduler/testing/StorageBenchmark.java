@@ -195,7 +195,7 @@ public class StorageBenchmark extends AbstractApplication {
   private TestResult run(final Stage stage) throws IOException {
     System.out.println("Executing stage " + stage);
     Storage storage = MemStorage.newEmptyStorage();
-    storage.writeOp(new MutateWork.NoResult.Quiet() {
+    storage.write(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(
             replicate(
@@ -215,7 +215,7 @@ public class StorageBenchmark extends AbstractApplication {
     final TaskQuery query;
     switch (stage.type) {
       case BY_ID:
-        query = Query.byId(storage.readOp(new Work.Quiet<Set<String>>() {
+        query = Query.byId(storage.consistentRead(new Work.Quiet<Set<String>>() {
           @Override public Set<String> apply(StoreProvider storeProvider) {
             return storeProvider.getTaskStore().fetchTaskIds(
                 Query.shardScoped(QUERIED_ROLE_NAME, QUERIED_JOB_NAME, 0).active().get());
@@ -237,7 +237,7 @@ public class StorageBenchmark extends AbstractApplication {
 
     long start = System.nanoTime();
     for (int i = 0; i < FETCHES.get(); i++) {
-      storage.readOp(new Work.Quiet<Void>() {
+      storage.consistentRead(new Work.Quiet<Void>() {
         @Override public Void apply(StoreProvider storeProvider) {
           storeProvider.getTaskStore().fetchTasks(query);
           return null;
@@ -246,7 +246,7 @@ public class StorageBenchmark extends AbstractApplication {
     }
 
     long timeMs = Amount.of(System.nanoTime() - start, Time.NANOSECONDS).as(Time.MILLISECONDS);
-    int totalTasks = storage.readOp(new Work.Quiet<Integer>() {
+    int totalTasks = storage.consistentRead(new Work.Quiet<Integer>() {
       @Override public Integer apply(StoreProvider storeProvider) {
         return storeProvider.getTaskStore().fetchTasks(Query.GET_ALL).size();
       }

@@ -58,7 +58,7 @@ interface TemporaryStorage {
 
       return new TemporaryStorage() {
         @Override public void deleteTasks(final TaskQuery query) {
-          storage.writeOp(new MutateWork.NoResult.Quiet() {
+          storage.write(new MutateWork.NoResult.Quiet() {
             @Override protected void execute(MutableStoreProvider storeProvider) {
               storeProvider.getUnsafeTaskStore()
                   .deleteTasks(storeProvider.getTaskStore().fetchTaskIds(query));
@@ -67,7 +67,7 @@ interface TemporaryStorage {
         }
 
         @Override public Set<ScheduledTask> fetchTasks(final TaskQuery query) {
-          return storage.readOp(new Work.Quiet<Set<ScheduledTask>>() {
+          return storage.consistentRead(new Work.Quiet<Set<ScheduledTask>>() {
             @Override public Set<ScheduledTask> apply(StoreProvider storeProvider) {
               return storeProvider.getTaskStore().fetchTasks(query);
             }

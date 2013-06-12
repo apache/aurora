@@ -252,7 +252,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     }
 
     final TaskQuery query = Query.shardScoped(role, jobName, shards).active().get();
-    storage.writeOp(new MutateWork.NoResult<ScheduleException>() {
+    storage.write(new MutateWork.NoResult<ScheduleException>() {
       @Override protected void execute(MutableStoreProvider storeProvider)
           throws ScheduleException {
 
@@ -285,7 +285,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
       return Optional.absent();
     }
 
-    return storage.writeOp(new MutateWork<Optional<String>, ScheduleException>() {
+    return storage.write(new MutateWork<Optional<String>, ScheduleException>() {
       @Override public Optional<String> apply(MutableStoreProvider storeProvider)
           throws ScheduleException {
 

@@ -171,7 +171,7 @@ public interface Recovery {
       }
 
       void commit() {
-        primaryStorage.writeOp(new MutateWork.NoResult.Quiet() {
+        primaryStorage.write(new MutateWork.NoResult.Quiet() {
           @Override protected void execute(MutableStoreProvider storeProvider) {
             try {
               distributedStore.persist(tempStorage.toSnapshot());

@@ -86,7 +86,7 @@ public class StateManagerImpl implements StateManager {
 
   // TODO(William Farner): Eliminate this and update all callers to use Storage directly.
   interface ReadOnlyStorage {
-    <T, E extends Exception> T readOperation(Work<T, E> work) throws StorageException, E;
+    <T, E extends Exception> T consistentRead(Work<T, E> work) throws StorageException, E;
   }
   private final ReadOnlyStorage readOnlyStorage;
 
@@ -160,9 +160,9 @@ public class StateManagerImpl implements StateManager {
 
     this.storage = new SideEffectStorage(storage, finalizer, taskEventSink);
     readOnlyStorage = new ReadOnlyStorage() {
-      @Override public <T, E extends Exception> T readOperation(Work<T, E> work)
+      @Override public <T, E extends Exception> T consistentRead(Work<T, E> work)
           throws StorageException, E {
-        return storage.readOp(work);
+        return storage.consistentRead(work);
       }
     };
 
@@ -183,7 +183,7 @@ public class StateManagerImpl implements StateManager {
 
     final Set<ScheduledTask> scheduledTasks = ImmutableSet.copyOf(transform(tasks, taskCreator));
 
-    storage.writeOperation(storage.new NoResultSideEffectWork() {
+    storage.write(storage.new NoResultSideEffectWork() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(scheduledTasks);
 
@@ -227,7 +227,7 @@ public class StateManagerImpl implements StateManager {
     checkNotBlank(job);
     checkNotBlank(updatedTasks);
 
-    return storage.writeOperation(storage.new SideEffectWork<String, UpdateException>() {
+    return storage.write(storage.new SideEffectWork<String, UpdateException>() {
       @Override public String apply(MutableStoreProvider storeProvider) throws UpdateException {
         assertNotUpdatingOrRollingBack(role, job, storeProvider.getTaskStore());
 
@@ -303,7 +303,7 @@ public class StateManagerImpl implements StateManager {
     checkNotBlank(updatingUser);
     checkNotBlank(job);
 
-    return storage.writeOperation(storage.new SideEffectWork<Boolean, UpdateException>() {
+    return storage.write(storage.new SideEffectWork<Boolean, UpdateException>() {
       @Override public Boolean apply(MutableStoreProvider storeProvider) throws UpdateException {
         assertNotUpdatingOrRollingBack(role, job, storeProvider.getTaskStore());
 
@@ -456,7 +456,7 @@ public class StateManagerImpl implements StateManager {
       auditMessage = "Rolled back by " + identity.getUser();
     }
 
-    return storage.writeOperation(
+    return storage.write(
         storage.new SideEffectWork<Map<Integer, ShardUpdateResult>, UpdateException>() {
           @Override public Map<Integer, ShardUpdateResult> apply(MutableStoreProvider store)
               throws UpdateException {
@@ -605,7 +605,7 @@ public class StateManagerImpl implements StateManager {
       final TaskQuery query,
       final Function<TaskStateMachine, Boolean> stateChange) {
 
-    return storage.writeOperation(storage.new QuietSideEffectWork<Integer>() {
+    return storage.write(storage.new QuietSideEffectWork<Integer>() {
       @Override public Integer apply(MutableStoreProvider storeProvider) {
         return changeStateInWriteOperation(
             storeProvider.getTaskStore().fetchTaskIds(query), stateChange);
@@ -664,7 +664,7 @@ public class StateManagerImpl implements StateManager {
   private Supplier<Boolean> taskUpdateChecker(final String role, final String job) {
     return new Supplier<Boolean>() {
       @Override public Boolean get() {
-        return readOnlyStorage.readOperation(new Work.Quiet<Boolean>() {
+        return readOnlyStorage.consistentRead(new Work.Quiet<Boolean>() {
           @Override
           public Boolean apply(StoreProvider storeProvider) {
             return storeProvider.getUpdateStore().fetchJobUpdateConfig(role, job).isPresent();
@@ -752,7 +752,7 @@ public class StateManagerImpl implements StateManager {
 
   @Override
   public void deleteTasks(final Set<String> taskIds) {
-    storage.writeOperation(storage.new NoResultSideEffectWork() {
+    storage.write(storage.new NoResultSideEffectWork() {
       @Override protected void execute(final MutableStoreProvider storeProvider) {
         TaskStore.Mutable taskStore = storeProvider.getUnsafeTaskStore();
         Iterable<ScheduledTask> tasks = taskStore.fetchTasks(Query.byId(taskIds));
@@ -804,7 +804,7 @@ public class StateManagerImpl implements StateManager {
   }
 
   private Map<String, TaskStateMachine> getStateMachines(final Set<String> taskIds) {
-    return readOnlyStorage.readOperation(new Work.Quiet<Map<String, TaskStateMachine>>() {
+    return readOnlyStorage.consistentRead(new Work.Quiet<Map<String, TaskStateMachine>>() {
       @Override
       public Map<String, TaskStateMachine> apply(StoreProvider storeProvider) {
         Set<ScheduledTask> tasks = storeProvider.getTaskStore().fetchTasks(Query.byId(taskIds));

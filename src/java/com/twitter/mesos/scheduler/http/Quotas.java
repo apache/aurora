@@ -44,7 +44,7 @@ public class Quotas {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   public Response getOffers(@QueryParam("role") final String role) {
-    return storage.readOp(new Work.Quiet<Response>() {
+    return storage.consistentRead(new Work.Quiet<Response>() {
       @Override public Response apply(StoreProvider storeProvider) {
         Map<String, Quota> quotas;
         if (role == null) {

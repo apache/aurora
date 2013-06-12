@@ -69,7 +69,7 @@ public class ResourceCounter {
    * @throws StorageException if there was a problem fetching quotas from storage.
    */
   public Metric computeQuotaAllocationTotals() throws StorageException {
-    return storage.readOp(new Work.Quiet<Metric>() {
+    return storage.consistentRead(new Work.Quiet<Metric>() {
       @Override public Metric apply(StoreProvider storeProvider) {
         Metric allocation = new Metric();
         for (Quota quota : storeProvider.getQuotaStore().fetchQuotas().values()) {

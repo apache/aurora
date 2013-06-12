@@ -63,8 +63,8 @@ class SideEffectStorage {
    * @return The work return value.
    * @throws E The work exception.
    */
-  <T, E extends Exception> T writeOperation(SideEffectWork<T, E> work) throws E {
-    return storage.writeOp(executeSideEffectsAfter(work));
+  <T, E extends Exception> T write(SideEffectWork<T, E> work) throws E {
+    return storage.write(executeSideEffectsAfter(work));
   }
 
   /**

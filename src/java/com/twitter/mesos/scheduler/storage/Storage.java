@@ -167,7 +167,7 @@ public interface Storage {
    * @throws StorageException if there was a problem reading from stable storage.
    * @throws E bubbled transparently when the unit of work throws
    */
-  <T, E extends Exception> T readOp(Work<T, E> work) throws StorageException, E;
+  <T, E extends Exception> T consistentRead(Work<T, E> work) throws StorageException, E;
 
   /**
    * Executes the unit of mutating {@code work}.
@@ -179,7 +179,7 @@ public interface Storage {
    * @throws StorageException if there was a problem reading from or writing to stable storage.
    * @throws E bubbled transparently when the unit of work throws
    */
-  <T, E extends Exception> T writeOp(MutateWork<T, E> work) throws StorageException, E;
+  <T, E extends Exception> T write(MutateWork<T, E> work) throws StorageException, E;
 
   /**
    * A non-volatile storage that has additional methods to control its lifecycle.
@@ -198,7 +198,7 @@ public interface Storage {
      *
      * @param initializationLogic work to perform after this storage system is ready but before
      *     allowing general use of
-     *     {@link #readOp}.
+     *     {@link #consistentRead}.
      * @throws StorageException if there was a starting storage.
      */
     void start(MutateWork.NoResult.Quiet initializationLogic) throws StorageException;
@@ -238,7 +238,7 @@ public interface Storage {
      * @return Tasks returned from the query.
      */
     public static ImmutableSet<ScheduledTask> fetchTasks(Storage storage, final TaskQuery query) {
-      return storage.readOp(new Work.Quiet<ImmutableSet<ScheduledTask>>() {
+      return storage.consistentRead(new Work.Quiet<ImmutableSet<ScheduledTask>>() {
         @Override public ImmutableSet<ScheduledTask> apply(StoreProvider storeProvider) {
           return storeProvider.getTaskStore().fetchTasks(query);
         }

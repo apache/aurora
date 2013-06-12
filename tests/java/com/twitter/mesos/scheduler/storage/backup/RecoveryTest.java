@@ -85,7 +85,7 @@ public class RecoveryTest extends EasyMockTest {
   public void testRecover() throws Exception {
     expect(snapshotStore.createSnapshot()).andReturn(SNAPSHOT1);
     Capture<MutateWork<?, ?>> transaction = createCapture();
-    expect(primaryStorage.writeOp(capture(transaction))).andReturn(null);
+    expect(primaryStorage.write(capture(transaction))).andReturn(null);
     distributedStore.persist(SNAPSHOT1);
     shutDownNow.execute();
 
@@ -109,7 +109,7 @@ public class RecoveryTest extends EasyMockTest {
     expect(snapshotStore.createSnapshot()).andReturn(SNAPSHOT1);
     Snapshot modified = SNAPSHOT1.deepCopy().setTasks(ImmutableSet.of(TASK1));
     Capture<MutateWork<?, ?>> transaction = createCapture();
-    expect(primaryStorage.writeOp(capture(transaction))).andReturn(null);
+    expect(primaryStorage.write(capture(transaction))).andReturn(null);
     distributedStore.persist(modified);
     shutDownNow.execute();
 

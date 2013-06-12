@@ -690,7 +690,7 @@ class SchedulerThriftInterface implements SchedulerController {
 
   @Override
   public GetJobUpdatesResponse getJobUpdates(SessionKey session) {
-    return storage.readOp(new Work.Quiet<GetJobUpdatesResponse>() {
+    return storage.consistentRead(new Work.Quiet<GetJobUpdatesResponse>() {
       @Override public GetJobUpdatesResponse apply(StoreProvider storeProvider) {
         GetJobUpdatesResponse response = new GetJobUpdatesResponse().setResponseCode(OK);
         response.setJobUpdates(Sets.<JobUpdateConfiguration>newHashSet());

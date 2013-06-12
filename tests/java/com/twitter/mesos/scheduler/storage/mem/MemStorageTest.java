@@ -62,7 +62,7 @@ public class MemStorageTest extends TearDownTestCase {
 
     Future<String> future = executor.submit(new Callable<String>() {
       @Override public String call() throws Exception {
-        return storage.readOp(new Work.Quiet<String>() {
+        return storage.consistentRead(new Work.Quiet<String>() {
           @Override public String apply(StoreProvider storeProvider) {
             slowReadStarted.countDown();
             try {
@@ -78,7 +78,7 @@ public class MemStorageTest extends TearDownTestCase {
 
     slowReadStarted.await();
 
-    String fastResult = storage.readOp(new Work.Quiet<String>() {
+    String fastResult = storage.consistentRead(new Work.Quiet<String>() {
       @Override public String apply(StoreProvider storeProvider) {
         return "fastResult";
       }
@@ -102,7 +102,7 @@ public class MemStorageTest extends TearDownTestCase {
 
   private <T, E extends RuntimeException> void expectWriteFail(MutateWork<T, E> work) {
     try {
-      storage.writeOp(work);
+      storage.write(work);
       fail("Expected a CustomException.");
     } catch (CustomException e) {
       // Expected.
@@ -110,7 +110,7 @@ public class MemStorageTest extends TearDownTestCase {
   }
 
   private void expectTasks(final String... taskIds) {
-    storage.readOp(new Work.Quiet<Void>() {
+    storage.consistentRead(new Work.Quiet<Void>() {
       @Override public Void apply(StoreProvider storeProvider) {
         assertEquals(
             ImmutableSet.<String>builder().add(taskIds).build(),
@@ -130,7 +130,7 @@ public class MemStorageTest extends TearDownTestCase {
     });
     expectTasks("a", "b");
 
-    storage.writeOp(new MutateWork.NoResult.Quiet() {
+    storage.write(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("a"), makeTask("b")));
       }
@@ -156,7 +156,7 @@ public class MemStorageTest extends TearDownTestCase {
       }
     });
     expectTasks("a");
-    storage.readOp(new Work.Quiet<Void>() {
+    storage.consistentRead(new Work.Quiet<Void>() {
       @Override public Void apply(StoreProvider storeProvider) {
         assertEquals(
             makeTask("a"),
@@ -169,7 +169,7 @@ public class MemStorageTest extends TearDownTestCase {
     expectWriteFail(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("c")));
-        storage.writeOp(new MutateWork.NoResult.Quiet() {
+        storage.write(new MutateWork.NoResult.Quiet() {
           @Override protected void execute(MutableStoreProvider storeProvider) {
             storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("d")));
             throw new CustomException();
@@ -183,7 +183,7 @@ public class MemStorageTest extends TearDownTestCase {
     expectWriteFail(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("c")));
-        storage.writeOp(new MutateWork.NoResult.Quiet() {
+        storage.write(new MutateWork.NoResult.Quiet() {
           @Override protected void execute(MutableStoreProvider storeProvider) {
             storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("d")));
           }

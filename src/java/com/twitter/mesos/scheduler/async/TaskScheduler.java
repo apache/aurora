@@ -144,7 +144,7 @@ public interface TaskScheduler extends EventSubscriber {
       // TODO(William Farner): This being separate from TaskStateChange events is asking for a bug
       // where a subscriber forgets to handle storage start.
       // Wrap this concept into TaskStateChange.
-      storage.readOp(new Work.Quiet<Void>() {
+      storage.consistentRead(new Work.Quiet<Void>() {
         @Override public Void apply(StoreProvider store) {
           for (ScheduledTask task : store.getTaskStore().fetchTasks(Query.byStatus(PENDING))) {
             addTask(Tasks.id(task), pendingRetryStrategy.calculateBackoffMs(0));
@@ -211,7 +211,7 @@ public interface TaskScheduler extends EventSubscriber {
       @Override public void run() {
         scheduleAttemptsFired.incrementAndGet();
         try {
-          storage.writeOp(new MutateWork.NoResult.Quiet() {
+          storage.write(new MutateWork.NoResult.Quiet() {
             @Override public void execute(MutableStoreProvider store) {
               tryScheduling(taskId, store, new Command() {
                 @Override public void execute() {
