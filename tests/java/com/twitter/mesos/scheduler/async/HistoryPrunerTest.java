@@ -2,12 +2,12 @@ package com.twitter.mesos.scheduler.async;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
@@ -39,7 +39,7 @@ import com.twitter.mesos.scheduler.storage.testing.StorageTestUtil;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
@@ -85,7 +85,11 @@ public class HistoryPrunerTest extends EasyMockTest {
 
   @After
   public void validateNoLeak() {
-    assertTrue(pruner.tasksByJob.isEmpty());
+    synchronized (pruner.tasksByJob) {
+      assertEquals(
+          ImmutableMultimap.<String, String>of(),
+          ImmutableMultimap.copyOf(pruner.tasksByJob));
+    }
   }
 
   @Test
@@ -95,16 +99,6 @@ public class HistoryPrunerTest extends EasyMockTest {
     control.replay();
 
     pruner.storageStarted(new StorageStarted());
-  }
-
-  private IExpectationSetters<?> expectAsyncTaskDelete() {
-    expect(executor.submit(EasyMock.<Runnable>anyObject()));
-    return expectLastCall().andAnswer(new IAnswer<Future<?>>() {
-      @Override public Future<?> answer() {
-        ((Runnable) EasyMock.getCurrentArguments()[0]).run();
-        return null;
-      }
-    });
   }
 
   @Test
@@ -120,7 +114,6 @@ public class HistoryPrunerTest extends EasyMockTest {
     expectOneTaskWatch(taskATimestamp);
     expectOneTaskWatch(taskBTimestamp);
 
-    expectAsyncTaskDelete();
     expectCancelFuture().times(2);
 
     control.replay();
@@ -156,16 +149,13 @@ public class HistoryPrunerTest extends EasyMockTest {
     expectDefaultTaskWatch();
 
     // Cancel future and delete pruned task "a" asynchronously.
-    expectAsyncTaskDelete();
     expectCancelFuture();
     stateManager.deleteTasks(Tasks.ids(a));
 
     // Cancel future and delete pruned task "b" asynchronously.
-    expectAsyncTaskDelete();
     expectCancelFuture();
     stateManager.deleteTasks(Tasks.ids(b));
 
-    expectAsyncTaskDelete();
     expectCancelFuture().times(3);
 
     control.replay();
@@ -180,7 +170,6 @@ public class HistoryPrunerTest extends EasyMockTest {
   public void testStateChange() {
     expectDefaultTaskWatch();
 
-    expectAsyncTaskDelete();
     expectCancelFuture();
 
     control.replay();
@@ -197,8 +186,7 @@ public class HistoryPrunerTest extends EasyMockTest {
 
   @Test
   public void testActivateFutureAndExceedHistoryGoal() {
-    Capture<Runnable> capture = expectDefaultTaskWatch();
-    Capture<Runnable> delayedDelete = expectDelayedTaskDeletion();
+    Capture<Runnable> delayedDelete = expectDefaultTaskWatch();
 
     // Expect task "a" to be pruned when future is activated.
     stateManager.deleteTasks(ImmutableSet.of("a"));
@@ -209,7 +197,6 @@ public class HistoryPrunerTest extends EasyMockTest {
     changeState("a", RUNNING, KILLED);
     clock.advance(ONE_HOUR);
     // Execute future to prune task "a" from the system.
-    capture.getValue().run();
     delayedDelete.getValue().run();
   }
 
@@ -219,11 +206,9 @@ public class HistoryPrunerTest extends EasyMockTest {
     expectDefaultTaskWatchTimes(3);
 
     // Cancel future and delete task "a" asynchronously when history goal is exceeded.
-    expectAsyncTaskDelete();
     expectCancelFuture();
     stateManager.deleteTasks(ImmutableSet.of("a"));
 
-    expectAsyncTaskDelete();
     expectCancelFuture().times(2);
 
     control.replay();
@@ -244,7 +229,6 @@ public class HistoryPrunerTest extends EasyMockTest {
     ScheduledTask b = makeTask("b", FINISHED);
     expectGetInactiveTasks(a);
     expectDefaultTaskWatch();
-    expectAsyncTaskDelete().times(2);
     expectCancelFuture();
 
     control.replay();
@@ -258,6 +242,8 @@ public class HistoryPrunerTest extends EasyMockTest {
     pruner.tasksDeleted(new TasksDeleted(ImmutableSet.of(b)));
   }
 
+  // TODO(William Farner): Consider removing the thread safety tests.  Now that intrinsic locks
+  // are not used, it is rather awkward to test this.
   @Test
   public void testThreadSafeStateChangeEvent() throws Exception {
     // This tests against regression where an executor pruning a task holds an intrinsic lock and
@@ -377,13 +363,6 @@ public class HistoryPrunerTest extends EasyMockTest {
         eq(pruner.calculateTimeout(timestampMillis)),
         eq(TimeUnit.MILLISECONDS));
     expectLastCall().andReturn(future).times(count);
-    return capture;
-  }
-
-  private Capture<Runnable> expectDelayedTaskDeletion() {
-    Capture<Runnable> capture = createCapture();
-    executor.submit(EasyMock.capture(capture));
-    expectLastCall().andReturn(future);
     return capture;
   }
 

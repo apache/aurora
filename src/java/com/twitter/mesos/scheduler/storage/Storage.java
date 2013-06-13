@@ -236,7 +236,9 @@ public interface Storage {
      * @param storage Storage instance to query from.
      * @param query Query to perform.
      * @return Tasks returned from the query.
+     * @deprecated Use {@link #fetchTasks(Storage, Supplier)} instead.
      */
+    @Deprecated
     public static ImmutableSet<ScheduledTask> fetchTasks(Storage storage, final TaskQuery query) {
       return storage.consistentRead(new Work.Quiet<ImmutableSet<ScheduledTask>>() {
         @Override public ImmutableSet<ScheduledTask> apply(StoreProvider storeProvider) {
@@ -257,9 +259,13 @@ public interface Storage {
      */
     public static ImmutableSet<ScheduledTask> fetchTasks(
         Storage storage,
-        Supplier<TaskQuery> querySupplier) {
+        final Supplier<TaskQuery> querySupplier) {
 
-      return fetchTasks(storage, querySupplier.get());
+      return storage.consistentRead(new Work.Quiet<ImmutableSet<ScheduledTask>>() {
+        @Override public ImmutableSet<ScheduledTask> apply(StoreProvider storeProvider) {
+          return storeProvider.getTaskStore().fetchTasks(querySupplier);
+        }
+      });
     }
   }
 }

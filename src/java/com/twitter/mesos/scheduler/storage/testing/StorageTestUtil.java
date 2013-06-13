@@ -108,6 +108,7 @@ public class StorageTestUtil {
   public IExpectationSetters<?> expectTaskFetch(
       Supplier<TaskQuery> query, ScheduledTask... result) {
 
-    return expectTaskFetch(query.get(), result);
+    return expect(taskStore.fetchTasks(query))
+        .andReturn(ImmutableSet.<ScheduledTask>builder().add(result).build());
   }
 }
