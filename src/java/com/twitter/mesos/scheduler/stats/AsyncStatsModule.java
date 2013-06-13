@@ -86,9 +86,9 @@ public class AsyncStatsModule extends AbstractModule {
         @Override public void run() {
           try {
             for (GlobalMetric metric : counter.computeConsumptionTotals()) {
-              update("resources" + metric.type.name().toLowerCase(), metric);
+              update("resources_" + metric.type.name().toLowerCase(), metric);
             }
-            update("allocated_quota", counter.computeQuotaAllocationTotals());
+            update("resources_allocated_quota", counter.computeQuotaAllocationTotals());
           } catch (StorageException e) {
             LOG.fine("Unable to fetch metrics, storage is likely not ready.");
           }
