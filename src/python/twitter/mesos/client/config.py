@@ -12,26 +12,22 @@ import sys
 from twitter.common import app, log
 from twitter.mesos.client.base import die
 from twitter.mesos.config import AuroraConfig
-from twitter.mesos.config.schema import Empty, PackerObject
+from twitter.mesos.config.schema import PackerObject
 from twitter.mesos.config.recipes import Recipes
 from twitter.mesos.packer.packer_client import Packer
+from twitter.mesos.client.jenkins import JenkinsArtifactResolver
 from twitter.mesos.packer import sd_packer_client
 from twitter.thermos.config.schema_helpers import Tasks
 
-from gen.twitter.mesos.constants import LIVE_STATES
-from gen.twitter.mesos.ttypes import (
-    Identity,
-    ResponseCode,
-    TaskQuery)
-
 from pystachio import Empty, Ref
-
 
 
 APPAPP_DEPRECATION_WARNING = """
 The use of app-app is deprecated. Please reach out to mesos-team@twitter.com for advice on
 migrating your application away from app-app layouts to an alternative packaging solution.
 """
+
+
 def _warn_on_appapp_layouts(config):
   if config.raw().has_layout():
     print(APPAPP_DEPRECATION_WARNING, file=sys.stderr)
@@ -74,6 +70,7 @@ The "cron_policy" parameter to Jobs has been renamed to "cron_collision_policy".
 Please update your Jobs accordingly.
 """
 
+
 def _warn_on_deprecated_cron_policy(config):
   if config.raw().cron_policy() is not Empty:
     print(CRON_DEPRECATION_WARNING, file=sys.stderr)
@@ -84,6 +81,7 @@ The "daemon" parameter to Jobs is deprecated in favor of the "service" parameter
 Please update your Job to set "service = True" instead of "daemon = True", or use
 the top-level Service() instead of Job().
 """
+
 
 def _warn_on_deprecated_daemon_job(config):
   if config.raw().daemon() is not Empty:
@@ -99,6 +97,7 @@ See the HealthCheckConfig section of the Configuration Reference page for more i
 http://go/auroraconfig/#Aurora%2BThermosConfigurationReference-HealthCheckConfig
 """
 
+
 def _warn_on_deprecated_health_check_interval_secs(config):
   if config.raw().health_check_interval_secs() is not Empty:
     print(HEALTH_CHECK_INTERVAL_SECS_DEPRECATION_WARNING, file=sys.stderr)
@@ -109,6 +108,7 @@ Announcer specified primary port as '%(primary_port)s' but no processes have bou
 If you would like to utilize this port, you should listen on {{thermos.ports[%(primary_port)s]}}
 from some Process bound to your task.
 """
+
 
 def _validate_announce_configuration(config):
   if not config.raw().has_announce():
@@ -130,6 +130,7 @@ def _validate_announce_configuration(config):
 
 STAGING_RE = re.compile(r'^staging\d*$')
 
+
 def _validate_environment_name(config):
   if not config.raw().has_environment():
     return
@@ -148,6 +149,7 @@ Based on your job size (%s) you should use max_total_failures <= %s.
 See http://go/auroraconfig for details.
 '''
 
+
 UPDATE_CONFIG_DEDICATED_THRESHOLD_ERROR = '''
 Since this is a dedicated job, you must set your max_total_failures in
 your update configuration to no less than 2%% of your job size.
@@ -155,6 +157,7 @@ Based on your job size (%s) you should use max_total_failures >= %s.
 
 See http://go/auroraconfig for details.
 '''
+
 
 def _validate_update_config(config):
   job_size = config.instances()
@@ -176,10 +179,30 @@ only.
 See http://go/auroraconfig/#Aurora%2BThermosConfigurationReference-HealthCheckConfig
 '''
 
+
 def _validate_health_check_config(config):
   # TODO(Sathya): Remove this check after health_check_interval_secs deprecation cycle is complete.
   if config.raw().has_health_check_interval_secs() and config.raw().has_health_check_config():
     die(HEALTH_CHECK_INTERVAL_SECS_ERROR)
+
+
+def _generate_packer_struct(metadata, local):
+  uri = metadata['uri']
+  filename = metadata.get('filename', None) or posixpath.basename(uri)
+  packer = PackerObject(
+    tunnel_host=app.get_options().tunnel_host,
+    package=filename,
+    package_uri=uri)
+  packer = packer(copy_command=packer.local_copy_command() if local
+                  else packer.remote_copy_command())
+  return packer
+
+
+def _validate_package(metadata):
+  latest_audit = sorted(metadata['auditLog'], key=lambda a: a['timestamp'])[-1]
+  if latest_audit['state'] == 'DELETED':
+    die('The requested package version has been deleted.')
+  return metadata
 
 
 def _get_package_data(cluster, package):
@@ -198,6 +221,8 @@ def _inject_packer_bindings(config, force_local=False):
   local = config.cluster() == 'local' or force_local
 
   def extract_ref(ref):
+    # Ref format: packer[role][pkg][version]
+    # version can be a number, or one of strings 'latest', 'live'
     components = ref.components()
     if len(components) < 4:
       return None
@@ -208,30 +233,49 @@ def _inject_packer_bindings(config, force_local=False):
     role, package_name, version = (action.value for action in components[1:4])
     return (role, package_name, version)
 
-  def generate_packer_struct(metadata):
-    uri = metadata['uri']
-    filename = metadata.get('filename', None) or posixpath.basename(uri)
-    packer = PackerObject(
-      tunnel_host=app.get_options().tunnel_host,
-      package=filename,
-      package_uri=uri)
-    packer = packer(copy_command=packer.local_copy_command() if local
-                    else packer.remote_copy_command())
-    return packer
-
-  def validate_package(metadata):
-    latest_audit = sorted(metadata['auditLog'], key=lambda a: a['timestamp'])[-1]
-    if latest_audit['state'] == 'DELETED':
-      die('The requested package version has been deleted.')
-    return metadata
-
   _, refs = config.raw().interpolate()
   packages = filter(None, map(extract_ref, set(refs)))
   for package in set(packages):
     ref = Ref.from_address('packer[%s][%s][%s]' % package)
     package_data = _get_package_data(config.cluster(), package)
-    config.bind({ref: generate_packer_struct(validate_package(package_data))})
+    config.bind({ref: _generate_packer_struct(_validate_package(package_data), local)})
     config.add_package((package[0], package[1], package_data['id']))
+
+
+def _inject_jenkins_bindings(config, force_local=False):
+  local = config.cluster() == 'local' or force_local
+
+  cached_packages = {}  # memoize for cases when same ref occurs multiple times
+
+  def get_package_via_jenkins(cluster, role, package):
+    cache_key = (cluster, role, package)
+    if cache_key in cached_packages:
+      return cached_packages[cache_key]
+    packer = sd_packer_client.create_packer(cluster)
+    cached_packages[cache_key] = JenkinsArtifactResolver(packer, role).resolve(*package)
+    return cached_packages[cache_key]
+
+  def extract_ref(ref):
+    # Ref format: jenkins[jenkins_project][jenkins_build_number]
+    # jenkins_build_number can be a numeric string, or the string 'latest'
+    components = ref.components()
+    if len(components) < 3:
+      return None
+    if components[0] != Ref.Dereference('jenkins'):
+      return None
+    if not all(isinstance(action, Ref.Index) for action in components[1:3]):
+      return None
+    jenkins_project, jenkins_build_number = (action.value for action in components[1:3])
+    return (jenkins_project, jenkins_build_number)
+
+  _, refs = config.raw().interpolate()
+  jenkins_packages = filter(None, map(extract_ref, set(refs)))
+  for package in set(jenkins_packages):
+    jenkins_project, jenkins_build_number = package
+    ref = Ref.from_address('jenkins[%s][%s]' % (jenkins_project, jenkins_build_number))
+    package_name, package_data = get_package_via_jenkins(config.cluster(), config.role(), package)
+    config.bind({ref: _generate_packer_struct(_validate_package(package_data), local)})
+    config.add_package((config.role(), package_name, package_data['id']))
 
 
 def validate_config(config):
@@ -244,6 +288,7 @@ def validate_config(config):
 def populate_namespaces(config, force_local=False):
   """Populate additional bindings in the config, e.g. packer bindings."""
   _inject_packer_bindings(config, force_local)
+  _inject_jenkins_bindings(config, force_local)
   _warn_on_unspecified_package_bindings(config)
   _warn_on_deprecated_cron_policy(config)
   _warn_on_deprecated_daemon_job(config)
@@ -257,7 +302,7 @@ def inject_recipes(config):
   recipes = job.recipes().get() if job.recipes() is not Empty else []
   tasks = [Recipes.get(recipe) for recipe in recipes]
   tasks.append(job.task())
-  config.update_job(job(task = Tasks.concat(*tasks)))
+  config.update_job(job(task=Tasks.concat(*tasks)))
 
 
 def AnnotatedAuroraConfig(force_local):

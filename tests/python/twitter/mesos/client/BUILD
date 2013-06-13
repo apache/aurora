@@ -3,6 +3,7 @@ python_test_suite(name = 'all',
     pants(':config'),
     pants(':disambiguator'),
     pants(':health_check'),
+    pants(':jenkins'),
     pants(':quickrun'),
     pants(':restarter'),
     pants(':scheduler_client'),
@@ -82,3 +83,12 @@ python_tests(name = 'updater',
   ]
 )
 
+python_tests(name = 'jenkins',
+  sources = ['test_jenkins.py'],
+  soft_dependencies = True,
+  dependencies = [
+    pants('src/python/twitter/common/contextutil'),
+    pants('src/python/twitter/mesos/client:jenkins'),
+    pants('3rdparty/python:dingus'),
+  ],
+)

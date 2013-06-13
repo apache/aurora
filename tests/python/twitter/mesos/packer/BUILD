@@ -1,6 +1,6 @@
 python_test_suite(name = 'all',
   dependencies = [
-    pants(':packer_client')
+    pants(':packer_client'),
   ],
 )
 
@@ -9,7 +9,6 @@ python_tests(name = 'packer_client',
   soft_dependencies = True,
   dependencies = [
     pants('src/python/twitter/mesos/packer:packer'),
-    python_requirement('mox'),
+    pants('3rdparty/python:mox')
   ],
 )
-

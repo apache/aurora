@@ -45,6 +45,7 @@ python_library(
   sources = ['config.py'],
   dependencies = [
     pants(':base'),
+    pants(':jenkins'),
     pants(':recipes'),
     pants('3rdparty/python:pystachio'),
     pants('src/python/twitter/common/app'),
@@ -169,6 +170,17 @@ python_library(
     pants(':updater_util'),
     pants('src/python/twitter/common/log'),
     pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+  ]
+)
+
+python_library(
+  name = 'jenkins',
+  sources = ['jenkins.py'],
+  dependencies = [
+    pants('src/python/twitter/common/app'),
+    pants('src/python/twitter/common/dirutil'),
+    pants('src/python/twitter/common/log'),
+    pants('3rdparty/python:jenkinsapi'),
   ]
 )
 
