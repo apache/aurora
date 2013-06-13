@@ -11,11 +11,12 @@ import sys
 
 from twitter.common import app, log
 from twitter.mesos.client.base import die
+from twitter.mesos.client.build import BuildArtifactResolver
+from twitter.mesos.client.jenkins import JenkinsArtifactResolver
 from twitter.mesos.config import AuroraConfig
 from twitter.mesos.config.schema import PackerObject
 from twitter.mesos.config.recipes import Recipes
 from twitter.mesos.packer.packer_client import Packer
-from twitter.mesos.client.jenkins import JenkinsArtifactResolver
 from twitter.mesos.packer import sd_packer_client
 from twitter.thermos.config.schema_helpers import Tasks
 
@@ -217,7 +218,7 @@ def _get_package_data(cluster, package):
     die('Failed to fetch package metadata: %s' % e)
 
 
-def _inject_packer_bindings(config, force_local=False):
+def _inject_packer_bindings(config, env=None, force_local=False):
   local = config.cluster() == 'local' or force_local
 
   def extract_ref(ref):
@@ -242,7 +243,7 @@ def _inject_packer_bindings(config, force_local=False):
     config.add_package((package[0], package[1], package_data['id']))
 
 
-def _inject_jenkins_bindings(config, force_local=False):
+def _inject_jenkins_bindings(config, env=None, force_local=False):
   local = config.cluster() == 'local' or force_local
 
   cached_packages = {}  # memoize for cases when same ref occurs multiple times
@@ -278,17 +279,68 @@ def _inject_jenkins_bindings(config, force_local=False):
     config.add_package((config.role(), package_name, package_data['id']))
 
 
-def validate_config(config):
+def _inject_prebuilt_package_bindings(config, env=None, force_local=False):
+  local = config.cluster() == 'local' or force_local
+
+  cached_packages = {}  # memoize for cases when same ref occurs multiple times
+
+  def extract_ref(ref):
+    # Ref format: build[build_profile] where build profile is registered to the job
+    # Example: build[projectA]
+    #   where build = { 'projectA': BuildInfo(...) } is available in the thermos file env
+    components = ref.components()
+    if len(components) < 2:
+      return None
+    if components[0] != Ref.Dereference('build'):
+      return None
+    if not isinstance(components[1], Ref.Index):
+      return None
+    build_spec_name = components[1].value
+    return build_spec_name
+
+  def get_prebuilt_package_data(cluster, role, build_spec_name, build_spec, packer=None):
+    cache_key = (cluster, role, build_spec_name)
+    if cache_key in cached_packages:
+      return cached_packages[cache_key]
+    packer = sd_packer_client.create_packer(cluster)
+    build_artifact_resolver = BuildArtifactResolver(packer, role)
+    cached_packages[cache_key] = build_artifact_resolver.resolve(build_spec_name, build_spec)
+    return cached_packages[cache_key]
+
+  _, refs = config.raw().interpolate()
+  build_spec_names = filter(None, map(extract_ref, set(refs)))
+
+  env = env or {}
+  build_specs = env.get('build', {})
+
+  for build_spec_name in set(build_spec_names):
+    ref = Ref.from_address('build[%s]' % build_spec_name)
+    try:
+      build_spec = dict(build_specs[build_spec_name].get())
+    except KeyError:
+      raise KeyError("build spec '%s' not supplied in the environment" % build_spec_name)
+    package_name, package_data = get_prebuilt_package_data(
+        config.cluster(),
+        config.role(),
+        build_spec_name,
+        build_spec
+    )
+    config.bind({ref: _generate_packer_struct(_validate_package(package_data), local)})
+    config.add_package((config.role(), package_name, package_data['id']))
+
+
+def validate_config(config, env=None):
   _validate_update_config(config)
   _validate_health_check_config(config)
   _validate_announce_configuration(config)
   _validate_environment_name(config)
 
 
-def populate_namespaces(config, force_local=False):
+def populate_namespaces(config, env=None, force_local=False):
   """Populate additional bindings in the config, e.g. packer bindings."""
-  _inject_packer_bindings(config, force_local)
-  _inject_jenkins_bindings(config, force_local)
+  _inject_packer_bindings(config, env, force_local)
+  _inject_prebuilt_package_bindings(config, env, force_local)
+  _inject_jenkins_bindings(config, env, force_local)
   _warn_on_unspecified_package_bindings(config)
   _warn_on_deprecated_cron_policy(config)
   _warn_on_deprecated_daemon_job(config)
@@ -297,7 +349,7 @@ def populate_namespaces(config, force_local=False):
   return config
 
 
-def inject_recipes(config):
+def inject_recipes(config, env=None):
   job = config.raw() % config.context()
   recipes = job.recipes().get() if job.recipes() is not Empty else []
   tasks = [Recipes.get(recipe) for recipe in recipes]

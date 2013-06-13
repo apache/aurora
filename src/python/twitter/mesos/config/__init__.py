@@ -111,18 +111,18 @@ class AuroraConfig(object):
       return matches[0]
 
   @classmethod
-  def apply_plugins(cls, config):
+  def apply_plugins(cls, config, env=None):
     for plugin in cls.plugins():
       if not callable(plugin):
         raise cls.Error('Invalid configuration plugin %r, should be callable!' % plugin)
-      plugin(config)
+      plugin(config, env)
     return config
 
   @classmethod
   def load(cls, filename, name=None, bindings=None, select_cluster=None, select_env=None):
     from .loader import AuroraConfigLoader
     env = AuroraConfigLoader.load(filename)
-    return cls.apply_plugins(cls(cls.pick(env, name, bindings, select_cluster, select_env)))
+    return cls.apply_plugins(cls(cls.pick(env, name, bindings, select_cluster, select_env)), env)
 
   @classmethod
   def load_json(cls, filename, name=None, bindings=None, select_cluster=None, select_env=None):

@@ -45,6 +45,7 @@ python_library(
   sources = ['config.py'],
   dependencies = [
     pants(':base'),
+    pants(':build'),
     pants(':jenkins'),
     pants(':recipes'),
     pants('3rdparty/python:pystachio'),
@@ -173,6 +174,7 @@ python_library(
   ]
 )
 
+# Jenkins Artifact Resolver
 python_library(
   name = 'jenkins',
   sources = ['jenkins.py'],
@@ -188,6 +190,19 @@ python_library(
   name = 'updater_util',
   sources = ['updater_util.py'],
   dependencies = [
+    pants('src/python/twitter/common/log'),
+  ]
+)
+
+# Build Artifact Resolver
+python_library(
+  name = 'build',
+  sources = ['build.py'],
+  dependencies = [
+    pants('src/python/twitter/common/contextutil'),
+    pants('src/python/twitter/common/dirutil'),
+    pants('src/python/twitter/common/git'),
+    pants('src/python/twitter/common/lang'),
     pants('src/python/twitter/common/log'),
   ]
 )
