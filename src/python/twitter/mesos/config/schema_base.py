@@ -133,12 +133,11 @@ class MesosJob(Struct):
   update_config = Default(UpdateConfig, UpdateConfig())
 
   constraints                = Map(String, String)
-  daemon                     = Integer              # daemon and service are booleans that are
-  service                    = Integer              # aliased together.  daemon is DEPRECATED
-                                                    # (MESOS-2492) # in favor of service.  by
-                                                    # default, service is False.
+  daemon                     = Boolean  # daemon and service are aliased together.
+  service                    = Boolean  # daemon is DEPRECATED (MESOS-2492) in favor of
+                                        # service.  by default, service is False.
   max_task_failures          = Default(Integer, 1)
-  production                 = Default(Integer, 0)  # boolean
+  production                 = Default(Boolean, False)
   priority                   = Default(Integer, 0)
   health_check_interval_secs = Integer # DEPRECATED in favor of health_check_config (MESOS-2649).
   health_check_config        = HealthCheckConfig

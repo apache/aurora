@@ -1,4 +1,5 @@
 from pystachio import (
+  Boolean,
   Default,
   Empty,
   Float,
@@ -44,13 +45,13 @@ class Process(Struct):
   resources     = Resources
 
   # optionals
-  max_failures  = Default(Integer, 1) # maximum number of failed process runs
-                                      # before process is failed.
-  daemon        = Default(Integer, 0) # boolean
-  ephemeral     = Default(Integer, 0) # boolean
-  min_duration  = Default(Integer, 5) # integer seconds
-  final         = Default(Integer, 0) # if this process should be a finalizing process
-                                      # that should always be run after regular processes
+  max_failures  = Default(Integer, 1)      # maximum number of failed process runs
+                                           # before process is failed.
+  daemon        = Default(Boolean, False)
+  ephemeral     = Default(Boolean, False)
+  min_duration  = Default(Integer, 5)      # integer seconds
+  final         = Default(Boolean, False)  # if this process should be a finalizing process
+                                           # that should always be run after regular processes
 
 
 @Provided(thermos = ThermosContext)
@@ -61,8 +62,9 @@ class Task(Struct):
   # optionals
   constraints = Default(List(Constraint), [])
   resources = Resources
-  max_failures = Default(Integer, 1) # maximum number of failed processes before task is failed.
-  max_concurrency = Default(Integer, 0) # 0 = infinite concurrency, > 0 => max concurrent processes.
-  finalization_wait = Default(Integer, 30) # the amount of time in seconds we allocate to run the
-                                           # finalization schedule.
+  max_failures = Default(Integer, 1)        # maximum number of failed processes before task is failed.
+  max_concurrency = Default(Integer, 0)     # 0 is infinite concurrency.
+                                            # > 0 is max concurrent processes.
+  finalization_wait = Default(Integer, 30)  # the amount of time in seconds we allocate to run the
+                                            # finalization schedule.
   user = Default(String, '{{thermos.user}}')
