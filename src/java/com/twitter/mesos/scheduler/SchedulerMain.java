@@ -43,6 +43,7 @@ import com.twitter.common_internal.zookeeper.TwitterServerSet.Service;
 import com.twitter.common_internal.zookeeper.TwitterServerSetModule;
 import com.twitter.common_internal.zookeeper.ZooKeeperModule;
 import com.twitter.common_internal.zookeeper.legacy.ServerSetMigrationModule.ServiceDiscovery;
+import com.twitter.mesos.auth.AuthModule;
 import com.twitter.mesos.scheduler.DriverFactory.DriverFactoryImpl;
 import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl.ExecutorConfig;
 import com.twitter.mesos.scheduler.SchedulerLifecycle.ShutdownOnDriverExit;
@@ -125,6 +126,7 @@ public class SchedulerMain extends AbstractApplication {
     ImmutableList.Builder<Module> modules = ImmutableList.<Module>builder()
         .addAll(getSystemModules())
         .add(new SchedulerModule(clusterName))
+        .add(new AuthModule())
         .add(new ThriftModule())
         .add(serviceBinder)
         .add(additionalModules);

@@ -52,7 +52,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * controllers. For now this is a thin shim to avoid huge refactors for simple Thrift API
  * changes and input validation is performed by the controllers.
  */
-class SchedulerThriftRouter implements MesosAdmin.Iface {
+public class SchedulerThriftRouter implements MesosAdmin.Iface {
 
   private SchedulerController schedulerController;
 
