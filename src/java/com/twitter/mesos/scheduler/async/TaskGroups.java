@@ -182,7 +182,7 @@ public class TaskGroups implements EventSubscriber {
   @Subscribe
   public void storageStarted(StorageStarted event) {
     for (ScheduledTask task
-        : Storage.Util.fetchTasks(storage, Query.unscoped().byStatus(PENDING))) {
+        : Storage.Util.consistentFetchTasks(storage, Query.unscoped().byStatus(PENDING))) {
 
       add(task.getAssignedTask());
     }

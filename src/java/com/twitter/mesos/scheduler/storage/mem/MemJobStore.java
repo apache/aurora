@@ -6,6 +6,9 @@ import java.util.Set;
 import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
@@ -24,44 +27,40 @@ class MemJobStore implements JobStore.Mutable {
   private static final Function<JobConfiguration, JobConfiguration> DEEP_COPY =
       Util.deepCopier();
 
-  private final Map<String, Manager> managers = Maps.newHashMap();
-
-  private Manager getOrCreate(String managerId) {
-    Manager manager = managers.get(managerId);
-    if (manager == null) {
-      manager = new Manager();
-      managers.put(managerId, manager);
-    }
-    return manager;
-  }
+  private final LoadingCache<String, Manager> managers = CacheBuilder.newBuilder()
+      .build(new CacheLoader<String, Manager>() {
+        @Override public Manager load(String key) {
+          return new Manager();
+        }
+      });
 
   @Override
   public void saveAcceptedJob(String managerId, JobConfiguration jobConfig) {
     checkNotNull(managerId);
     checkNotNull(jobConfig);
 
-    getOrCreate(managerId).jobs.put(Tasks.jobKey(jobConfig), DEEP_COPY.apply(jobConfig));
+    managers.getUnchecked(managerId).jobs.put(Tasks.jobKey(jobConfig), DEEP_COPY.apply(jobConfig));
   }
 
   @Override
   public void removeJob(String jobKey) {
     checkNotNull(jobKey);
 
-    for (Manager manager : managers.values()) {
+    for (Manager manager : managers.asMap().values()) {
       manager.jobs.remove(jobKey);
     }
   }
 
   @Override
   public void deleteJobs() {
-    managers.clear();
+    managers.invalidateAll();
   }
 
   @Override
   public Iterable<JobConfiguration> fetchJobs(String managerId) {
     checkNotNull(managerId);
 
-    @Nullable Manager manager = managers.get(managerId);
+    @Nullable Manager manager = managers.getIfPresent(managerId);
     if (manager == null) {
       return ImmutableSet.of();
     }
@@ -77,7 +76,7 @@ class MemJobStore implements JobStore.Mutable {
     checkNotNull(managerId);
     checkNotNull(jobKey);
 
-    @Nullable Manager manager = managers.get(managerId);
+    @Nullable Manager manager = managers.getIfPresent(managerId);
     if (manager == null) {
       return null;
     }
@@ -87,10 +86,10 @@ class MemJobStore implements JobStore.Mutable {
 
   @Override
   public Set<String> fetchManagerIds() {
-    return ImmutableSet.copyOf(managers.keySet());
+    return ImmutableSet.copyOf(managers.asMap().keySet());
   }
 
   private static class Manager {
-    private final Map<String, JobConfiguration> jobs = Maps.newHashMap();
+    private final Map<String, JobConfiguration> jobs = Maps.newConcurrentMap();
   }
 }

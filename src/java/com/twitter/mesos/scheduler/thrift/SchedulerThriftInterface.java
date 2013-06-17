@@ -185,14 +185,6 @@ class SchedulerThriftInterface implements SchedulerController {
     this.killTaskMaxBackoff = checkNotNull(maxBackoff);
   }
 
-  private void validateSessionKeyForTasks(SessionKey session, TaskQuery taskQuery)
-      throws AuthFailedException {
-    Set<ScheduledTask> tasks = Storage.Util.fetchTasks(storage, taskQuery);
-    for (String role : ImmutableSet.copyOf(Iterables.transform(tasks, GET_ROLE))) {
-      sessionValidator.checkAuthenticated(session, role);
-    }
-  }
-
   @Override
   public CreateJobResponse createJob(JobConfiguration job, SessionKey session) {
     checkNotNull(job);
@@ -279,7 +271,7 @@ class SchedulerThriftInterface implements SchedulerController {
   public ScheduleStatusResponse getTasksStatus(TaskQuery query) {
     checkNotNull(query);
 
-    Set<ScheduledTask> tasks = Storage.Util.fetchTasks(storage, query);
+    Set<ScheduledTask> tasks = Storage.Util.weaklyConsistentFetchTasks(storage, query);
 
     ScheduleStatusResponse response = new ScheduleStatusResponse();
     if (tasks.isEmpty()) {
@@ -328,7 +320,7 @@ class SchedulerThriftInterface implements SchedulerController {
     // ImmediateJobManager#getJobs always returns an empty Collection.
     Multimap<JobKey, ScheduledTask> jobToTasks =
         Multimaps.index(
-            Storage.Util.fetchTasks(storage, Query.roleScoped(ownerRole).active()),
+            Storage.Util.weaklyConsistentFetchTasks(storage, Query.roleScoped(ownerRole).active()),
             new Function<ScheduledTask, JobKey>() {
               @Override public JobKey apply(ScheduledTask scheduledTask) {
                 TwitterTaskInfo task = scheduledTask.getAssignedTask().getTask();
@@ -355,6 +347,15 @@ class SchedulerThriftInterface implements SchedulerController {
     return new GetJobsResponse()
         .setConfigs(configs.build())
         .setResponseCode(OK);
+  }
+
+  private void validateSessionKeyForTasks(SessionKey session, TaskQuery taskQuery)
+      throws AuthFailedException {
+
+    Set<ScheduledTask> tasks = Storage.Util.consistentFetchTasks(storage, taskQuery);
+    for (String role : ImmutableSet.copyOf(Iterables.transform(tasks, GET_ROLE))) {
+      sessionValidator.checkAuthenticated(session, role);
+    }
   }
 
   @Override
@@ -398,7 +399,8 @@ class SchedulerThriftInterface implements SchedulerController {
     try {
       backoff.doUntilSuccess(new Supplier<Boolean>() {
         @Override public Boolean get() {
-          if (Storage.Util.fetchTasks(storage, activeQuery).isEmpty()) {
+          Set<ScheduledTask> tasks = Storage.Util.consistentFetchTasks(storage, activeQuery);
+          if (tasks.isEmpty()) {
             LOG.info("Tasks all killed, done waiting.");
             return true;
           } else {
@@ -690,7 +692,7 @@ class SchedulerThriftInterface implements SchedulerController {
 
   @Override
   public GetJobUpdatesResponse getJobUpdates(SessionKey session) {
-    return storage.consistentRead(new Work.Quiet<GetJobUpdatesResponse>() {
+    return storage.weaklyConsistentRead(new Work.Quiet<GetJobUpdatesResponse>() {
       @Override public GetJobUpdatesResponse apply(StoreProvider storeProvider) {
         GetJobUpdatesResponse response = new GetJobUpdatesResponse().setResponseCode(OK);
         response.setJobUpdates(Sets.<JobUpdateConfiguration>newHashSet());

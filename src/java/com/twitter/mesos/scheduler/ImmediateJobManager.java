@@ -31,6 +31,7 @@ public class ImmediateJobManager extends JobManager {
 
   @Override
   public boolean hasJob(final String role, final String job) {
-    return !Storage.Util.fetchTasks(storage, Query.jobScoped(role, job).active()).isEmpty();
+    return !Storage.Util.consistentFetchTasks(storage, Query.jobScoped(role, job).active())
+        .isEmpty();
   }
 }

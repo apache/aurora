@@ -156,7 +156,8 @@ public interface Storage {
   }
 
   /**
-   * Executes the unit of read-only {@code work}.
+   * Executes the unit of read-only {@code work}.  All data in the stores may be expected to be
+   * consistent, as the invocation is mutually exclusive of any writes.
    *
    * <p>TODO(John Sirois): Audit usages and handle StorageException appropriately.
    *
@@ -168,6 +169,20 @@ public interface Storage {
    * @throws E bubbled transparently when the unit of work throws
    */
   <T, E extends Exception> T consistentRead(Work<T, E> work) throws StorageException, E;
+
+  /**
+   * Executes a unit of read-only {@code work}.  This is functionally identical to
+   * {@link #consistentRead(Work)} with the exception that data in the stores may not be fully
+   * consistent.
+   *
+   * @param work The unit of work to execute.
+   * @param <T> The type of result this unit of work produces.
+   * @param <E> The type of exception this unit of work can throw.
+   * @return the result when the unit of work completes successfully
+   * @throws StorageException if there was a problem reading from stable storage.
+   * @throws E bubbled transparently when the unit of work throws
+   */
+  <T, E extends Exception> T weaklyConsistentRead(Work<T, E> work) throws StorageException, E;
 
   /**
    * Executes the unit of mutating {@code work}.
@@ -236,10 +251,13 @@ public interface Storage {
      * @param storage Storage instance to query from.
      * @param query Query to perform.
      * @return Tasks returned from the query.
-     * @deprecated Use {@link #fetchTasks(Storage, Supplier)} instead.
+     * @deprecated Use {@link #consistentFetchTasks(Storage, Supplier)} instead.
      */
     @Deprecated
-    public static ImmutableSet<ScheduledTask> fetchTasks(Storage storage, final TaskQuery query) {
+    public static ImmutableSet<ScheduledTask> consistentFetchTasks(
+        Storage storage,
+        final TaskQuery query) {
+
       return storage.consistentRead(new Work.Quiet<ImmutableSet<ScheduledTask>>() {
         @Override public ImmutableSet<ScheduledTask> apply(StoreProvider storeProvider) {
           return storeProvider.getTaskStore().fetchTasks(query);
@@ -252,16 +270,57 @@ public interface Storage {
      * read operation. Intended for use with {@link com.twitter.mesos.scheduler.Query.Builder}
      * instances.
      *
-     * @see #fetchTasks(Storage, com.twitter.mesos.gen.TaskQuery)
+     * @see #consistentFetchTasks
      * @param storage Storage instance to query from.
      * @param querySupplier Supplier of the query to perform.
      * @return Tasks returned from the query.
      */
-    public static ImmutableSet<ScheduledTask> fetchTasks(
+    public static ImmutableSet<ScheduledTask> consistentFetchTasks(
         Storage storage,
         final Supplier<TaskQuery> querySupplier) {
 
       return storage.consistentRead(new Work.Quiet<ImmutableSet<ScheduledTask>>() {
+        @Override public ImmutableSet<ScheduledTask> apply(StoreProvider storeProvider) {
+          return storeProvider.getTaskStore().fetchTasks(querySupplier);
+        }
+      });
+    }
+
+    /**
+     * Identical to {@link #weaklyConsistentFetchTasks(Storage, Supplier)}, but using the deprecated
+     * fask fetch API.
+     *
+     * @param storage Storage instance to query from.
+     * @param query Query to perform.
+     * @return Tasks returned from the query.
+     * @deprecated Use {@link #weaklyConsistentFetchTasks(Storage, Supplier)} instead.
+     */
+    @Deprecated
+    public static ImmutableSet<ScheduledTask> weaklyConsistentFetchTasks(
+        Storage storage,
+        final TaskQuery query) {
+
+      return storage.weaklyConsistentRead(new Work.Quiet<ImmutableSet<ScheduledTask>>() {
+        @Override public ImmutableSet<ScheduledTask> apply(StoreProvider storeProvider) {
+          return storeProvider.getTaskStore().fetchTasks(query);
+        }
+      });
+    }
+
+    /**
+     * Identical to {@link #consistentFetchTasks(Storage, Supplier)}, but fetches tasks using a
+     * weakly-consistent read operation.
+     *
+     * @see #consistentFetchTasks
+     * @param storage Storage instance to query from.
+     * @param querySupplier Supplier of the query to perform.
+     * @return Tasks returned from the query.
+     */
+    public static ImmutableSet<ScheduledTask> weaklyConsistentFetchTasks(
+        Storage storage,
+        final Supplier<TaskQuery> querySupplier) {
+
+      return storage.weaklyConsistentRead(new Work.Quiet<ImmutableSet<ScheduledTask>>() {
         @Override public ImmutableSet<ScheduledTask> apply(StoreProvider storeProvider) {
           return storeProvider.getTaskStore().fetchTasks(querySupplier);
         }

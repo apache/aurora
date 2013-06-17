@@ -21,7 +21,7 @@ class MemQuotaStore implements QuotaStore.Mutable {
 
   private static final Function<Quota, Quota> DEEP_COPY = Util.deepCopier();
 
-  private final Map<String, Quota> quotas = Maps.newHashMap();
+  private final Map<String, Quota> quotas = Maps.newConcurrentMap();
 
   @Override
   public void deleteQuotas() {

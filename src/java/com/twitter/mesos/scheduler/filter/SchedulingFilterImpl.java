@@ -14,6 +14,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
+import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
 import com.twitter.common.quantity.Amount;
@@ -22,6 +23,7 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Attribute;
 import com.twitter.mesos.gen.Constraint;
 import com.twitter.mesos.gen.MaintenanceMode;
+import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.gen.TwitterTaskInfo;
@@ -176,6 +178,9 @@ public class SchedulingFilterImpl implements SchedulingFilter {
         }
       });
 
+  private static final Iterable<ScheduleStatus> ACTIVE_NOT_PENDING_STATES =
+      EnumSet.copyOf(Sets.difference(Tasks.ACTIVE_STATES, EnumSet.of(ScheduleStatus.PENDING)));
+
   private FilterRule getConstraintFilter(final String slaveHost) {
     return new FilterRule() {
       @Override public Iterable<Veto> apply(final TwitterTaskInfo task) {
@@ -183,7 +188,11 @@ public class SchedulingFilterImpl implements SchedulingFilter {
           return ImmutableList.of();
         }
 
-        return storage.consistentRead(new Quiet<Iterable<Veto>>() {
+        // In the interest of performance, we perform a weakly consistent read here.  The biggest
+        // risk of this is that we might schedule against stale host attributes, or we might fail
+        // to correctly satisfy a diversity constraint.  Given that the likelihood is relatively low
+        // for both of these, and the impact is also low, the weak consistency is acceptable.
+        return storage.weaklyConsistentRead(new Quiet<Iterable<Veto>>() {
           @Override public Iterable<Veto> apply(final StoreProvider storeProvider) {
             AttributeLoader attributeLoader = new AttributeLoader() {
               @Override public Iterable<Attribute> apply(String host) {
@@ -195,10 +204,8 @@ public class SchedulingFilterImpl implements SchedulingFilter {
                 Suppliers.memoize(new Supplier<Collection<ScheduledTask>>() {
                   @Override public Collection<ScheduledTask> get() {
                     return storeProvider.getTaskStore().fetchTasks(
-                        Query
-                            .jobScoped(task.getOwner().getRole(), task.getJobName())
-                            .active()
-                            .get());
+                        Query.jobScoped(task.getOwner().getRole(), task.getJobName())
+                            .byStatus(ACTIVE_NOT_PENDING_STATES));
                   }
                 });
 
@@ -244,7 +251,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
 
   private boolean isDedicated(final String slaveHost) {
     Iterable<Attribute> slaveAttributes =
-        storage.consistentRead(new Quiet<Iterable<Attribute>>() {
+        storage.weaklyConsistentRead(new Quiet<Iterable<Attribute>>() {
           @Override public Iterable<Attribute> apply(final StoreProvider storeProvider) {
             return AttributeStore.Util.attributesOrNone(storeProvider, slaveHost);
           }

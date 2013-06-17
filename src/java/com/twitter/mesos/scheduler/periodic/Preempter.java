@@ -120,8 +120,9 @@ class Preempter implements Runnable {
   }
 
   private List<AssignedTask> fetch(TaskQuery query, Predicate<ScheduledTask> filter) {
-    return Lists.newArrayList(Iterables.transform(
-        Iterables.filter(Storage.Util.fetchTasks(storage, query), filter), SCHEDULED_TO_ASSIGNED));
+    return Lists.newArrayList(Iterables.transform(Iterables.filter(
+        Storage.Util.consistentFetchTasks(storage, query), filter),
+        SCHEDULED_TO_ASSIGNED));
   }
 
   private List<AssignedTask> fetch(TaskQuery query) {

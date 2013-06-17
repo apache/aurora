@@ -59,14 +59,7 @@ public class StorageTestUtil {
     this.storage = easyMock.createMock(Storage.class);
   }
 
-  private <T> IExpectationSetters<T> expectReadOperation() {
-    expect(storeProvider.getTaskStore()).andReturn(taskStore).anyTimes();
-    expect(storeProvider.getQuotaStore()).andReturn(quotaStore).anyTimes();
-    expect(storeProvider.getAttributeStore()).andReturn(attributeStore).anyTimes();
-    expect(storeProvider.getJobStore()).andReturn(jobStore).anyTimes();
-    expect(storeProvider.getUpdateStore()).andReturn(updateStore).anyTimes();
-    expect(storeProvider.getSchedulerStore()).andReturn(schedulerStore).anyTimes();
-
+  private <T> IExpectationSetters<T> expectConsistentRead() {
     final Capture<Work<T, RuntimeException>> work = EasyMockTest.createCapture();
     return expect(storage.consistentRead(capture(work))).andAnswer(new IAnswer<T>() {
       @Override public T answer() {
@@ -75,15 +68,16 @@ public class StorageTestUtil {
     });
   }
 
-  private <T> IExpectationSetters<T> expectWriteOperation() {
-    expect(mutableStoreProvider.getTaskStore()).andReturn(taskStore).anyTimes();
-    expect(mutableStoreProvider.getUnsafeTaskStore()).andReturn(taskStore).anyTimes();
-    expect(mutableStoreProvider.getQuotaStore()).andReturn(quotaStore).anyTimes();
-    expect(mutableStoreProvider.getAttributeStore()).andReturn(attributeStore).anyTimes();
-    expect(mutableStoreProvider.getJobStore()).andReturn(jobStore).anyTimes();
-    expect(mutableStoreProvider.getUpdateStore()).andReturn(updateStore).anyTimes();
-    expect(mutableStoreProvider.getSchedulerStore()).andReturn(schedulerStore).anyTimes();
+  private <T> IExpectationSetters<T> expectWeaklyConsistentRead() {
+    final Capture<Work<T, RuntimeException>> work = EasyMockTest.createCapture();
+    return expect(storage.weaklyConsistentRead(capture(work))).andAnswer(new IAnswer<T>() {
+      @Override public T answer() {
+        return work.getValue().apply(storeProvider);
+      }
+    });
+  }
 
+  private <T> IExpectationSetters<T> expectWriteOperation() {
     final Capture<MutateWork<T, RuntimeException>> work = EasyMockTest.createCapture();
     return expect(storage.write(capture(work))).andAnswer(new IAnswer<T>() {
       @Override public T answer() {
@@ -96,7 +90,21 @@ public class StorageTestUtil {
    * Expects any number of read or write operations.
    */
   public void expectOperations() {
-    expectReadOperation().anyTimes();
+    expect(storeProvider.getTaskStore()).andReturn(taskStore).anyTimes();
+    expect(storeProvider.getQuotaStore()).andReturn(quotaStore).anyTimes();
+    expect(storeProvider.getAttributeStore()).andReturn(attributeStore).anyTimes();
+    expect(storeProvider.getJobStore()).andReturn(jobStore).anyTimes();
+    expect(storeProvider.getUpdateStore()).andReturn(updateStore).anyTimes();
+    expect(storeProvider.getSchedulerStore()).andReturn(schedulerStore).anyTimes();
+    expect(mutableStoreProvider.getTaskStore()).andReturn(taskStore).anyTimes();
+    expect(mutableStoreProvider.getUnsafeTaskStore()).andReturn(taskStore).anyTimes();
+    expect(mutableStoreProvider.getQuotaStore()).andReturn(quotaStore).anyTimes();
+    expect(mutableStoreProvider.getAttributeStore()).andReturn(attributeStore).anyTimes();
+    expect(mutableStoreProvider.getJobStore()).andReturn(jobStore).anyTimes();
+    expect(mutableStoreProvider.getUpdateStore()).andReturn(updateStore).anyTimes();
+    expect(mutableStoreProvider.getSchedulerStore()).andReturn(schedulerStore).anyTimes();
+    expectConsistentRead().anyTimes();
+    expectWeaklyConsistentRead().anyTimes();
     expectWriteOperation().anyTimes();
   }
 

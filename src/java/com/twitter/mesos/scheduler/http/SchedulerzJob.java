@@ -42,7 +42,6 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.gen.TaskEvent;
-import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.CommandLineExpander;
@@ -332,22 +331,23 @@ public class SchedulerzJob extends JerseyTemplateServlet {
 
         Query.Builder builder = Query.jobScoped(JobKeys.from(role, env, job));
 
-        Optional<TaskQuery> activeQuery = Optional.absent();
-        Optional<TaskQuery> completedQuery = Optional.absent();
+        Optional<Query.Builder> activeQuery = Optional.absent();
+        Optional<Query.Builder> completedQuery = Optional.absent();
         if (statusFilter != null) {
           Collection<ScheduleStatus> queryStatuses = FILTER_MAP.get(statusFilter);
           if (Tasks.isActive(statusFilter)) {
-            activeQuery = Optional.of(builder.byStatus(queryStatuses).get());
+            activeQuery = Optional.of(builder.byStatus(queryStatuses));
           } else {
-            completedQuery = Optional.of(builder.byStatus(queryStatuses).get());
+            completedQuery = Optional.of(builder.byStatus(queryStatuses));
           }
         } else {
-          activeQuery = Optional.of(builder.active().get());
-          completedQuery = Optional.of(builder.terminal().get());
+          activeQuery = Optional.of(builder.active());
+          completedQuery = Optional.of(builder.terminal());
         }
 
         if (activeQuery.isPresent()) {
-          Set<ScheduledTask> activeTasks = Storage.Util.fetchTasks(storage, activeQuery.get());
+          Set<ScheduledTask> activeTasks =
+              Storage.Util.weaklyConsistentFetchTasks(storage, activeQuery.get());
           List<ScheduledTask> liveTasks = SHARD_ID_COMPARATOR.sortedCopy(activeTasks);
           template.setAttribute("activeTasks",
               ImmutableList.copyOf(
@@ -357,8 +357,8 @@ public class SchedulerzJob extends JerseyTemplateServlet {
               buildSchedulingTable(Iterables.transform(liveTasks, Tasks.SCHEDULED_TO_INFO)));
         }
         if (completedQuery.isPresent()) {
-          List<ScheduledTask> completedTasks =
-              Lists.newArrayList(Storage.Util.fetchTasks(storage, completedQuery.get()));
+          List<ScheduledTask> completedTasks = Lists.newArrayList(
+              Storage.Util.weaklyConsistentFetchTasks(storage, completedQuery.get()));
           Collections.sort(completedTasks, REVERSE_CHRON_COMPARATOR);
           template.setAttribute("completedTasks",
               ImmutableList.copyOf(

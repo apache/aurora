@@ -26,11 +26,11 @@ import com.twitter.mesos.gen.LimitConstraint;
 import com.twitter.mesos.gen.MaintenanceMode;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskConstraint;
-import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.ValueConstraint;
 import com.twitter.mesos.scheduler.MaintenanceController;
 import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
+import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.Resources;
 import com.twitter.mesos.scheduler.filter.SchedulingFilter.Veto;
@@ -106,15 +106,14 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     attributeStore = createMock(AttributeStore.Mutable.class);
 
     // Link the store provider to the store mocks.
-    expectPossibleDoInTransaction();
+    expectReads();
 
     expect(storeProvider.getTaskStore()).andReturn(taskStore).anyTimes();
     expect(storeProvider.getAttributeStore()).andReturn(attributeStore).anyTimes();
   }
 
-  @SuppressWarnings("unchecked")
-  private void expectPossibleDoInTransaction() throws Exception {
-    expect(storage.consistentRead(EasyMock.<Quiet<?>>anyObject()))
+  private void expectReads() throws Exception {
+    expect(storage.weaklyConsistentRead(EasyMock.<Quiet<?>>anyObject()))
         .andAnswer(new IAnswer<Object>() {
           @Override public Object answer() throws Exception {
             Quiet<?> arg = (Quiet<?>) EasyMock.getCurrentArguments()[0];
@@ -515,7 +514,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   }
 
   private IExpectationSetters<ImmutableSet<ScheduledTask>> expectGetTasks(ScheduledTask... tasks) {
-    return expect(taskStore.fetchTasks((TaskQuery) anyObject()))
+    return expect(taskStore.fetchTasks((Query.Builder) anyObject()))
         .andReturn(ImmutableSet.copyOf(tasks));
   }
 

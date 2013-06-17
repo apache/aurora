@@ -64,8 +64,9 @@ class MemTaskStore implements TaskStore.Mutable {
 
   private final long slowQueryThresholdNanos = SLOW_QUERY_LOG_THRESHOLD.get().as(Time.NANOSECONDS);
 
-  private final Map<String, ScheduledTask> tasks = Maps.newHashMap();
-  private final Multimap<String, String> tasksByJobKey = HashMultimap.create();
+  private final Map<String, ScheduledTask> tasks = Maps.newConcurrentMap();
+  private final Multimap<String, String> tasksByJobKey =
+      Multimaps.synchronizedSetMultimap(HashMultimap.<String, String>create());
 
   private final AtomicLong taskQueriesById = Stats.exportLong("task_queries_by_id");
   private final AtomicLong taskQueriesByJob = Stats.exportLong("task_queries_by_job");

@@ -352,7 +352,8 @@ public class StateManagerImplTest extends EasyMockTest {
     stateManager.assignTask(taskId, HOST_A, SlaveID.newBuilder().setValue(HOST_A).build(),
         ImmutableSet.<Integer>of(50));
     ScheduledTask task =
-        Iterables.getOnlyElement(Storage.Util.fetchTasks(storage, Query.byRole(JIM.getRole())));
+        Iterables.getOnlyElement(Storage.Util.consistentFetchTasks(storage, Query
+            .byRole(JIM.getRole())));
     assertEquals(ImmutableMap.of("foo", 50), task.getAssignedTask().getAssignedPorts());
     assignTask(taskId, HOST_A);
     changeState(taskId, STARTING);

@@ -85,7 +85,8 @@ public class SchedulerzHome extends JerseyTemplateServlet {
             CacheBuilder.newBuilder().build(CacheLoader.from(CREATE_ROLE));
 
         // TODO(William Farner): Render this page without an expensive query.
-        Set<ScheduledTask> tasks = Storage.Util.fetchTasks(storage, Query.GET_ALL);
+        Set<ScheduledTask> tasks =
+            Storage.Util.weaklyConsistentFetchTasks(storage, Query.unscoped());
         for (TwitterTaskInfo task : Iterables.transform(tasks, Tasks.SCHEDULED_TO_INFO)) {
           owners.getUnchecked(task.getOwner().getRole()).accumulate(task);
         }

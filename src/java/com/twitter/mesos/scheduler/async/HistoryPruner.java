@@ -122,7 +122,7 @@ public class HistoryPruner implements EventSubscriber {
   @Subscribe
   public void storageStarted(StorageStarted event) {
     for (ScheduledTask task
-        : LATEST_ACTIVITY.sortedCopy(Storage.Util.fetchTasks(storage, INACTIVE_QUERY))) {
+        : LATEST_ACTIVITY.sortedCopy(Storage.Util.consistentFetchTasks(storage, INACTIVE_QUERY))) {
 
       registerInactiveTask(
           Tasks.jobKey(task),

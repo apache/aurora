@@ -226,7 +226,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(job);
     assertTaskCount(numTasks);
 
-    Set<ScheduledTask> tasks = Storage.Util.fetchTasks(storage, queryJob(OWNER_A, JOB_A));
+    Set<ScheduledTask> tasks = Storage.Util.consistentFetchTasks(storage, queryJob(OWNER_A, JOB_A));
     assertEquals(numTasks, tasks.size());
     for (ScheduledTask state : tasks) {
       assertEquals(PENDING, state.getStatus());
@@ -906,7 +906,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(makeJob(OWNER_A, JOB_A, 1));
     assertTaskCount(1);
 
-    Set<ScheduledTask> tasks = Storage.Util.fetchTasks(storage, queryJob(OWNER_A, JOB_A));
+    Set<ScheduledTask> tasks = Storage.Util.consistentFetchTasks(storage, queryJob(OWNER_A, JOB_A));
     assertEquals(1, tasks.size());
 
     String taskId = Tasks.id(Iterables.get(tasks, 0));
@@ -962,7 +962,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(makeJob(OWNER_A, JOB_A, task, 1));
     assertTaskCount(1);
 
-    Set<ScheduledTask> tasks = Storage.Util.fetchTasks(storage, queryJob(OWNER_A, JOB_A));
+    Set<ScheduledTask> tasks = Storage.Util.consistentFetchTasks(storage, queryJob(OWNER_A, JOB_A));
     assertEquals(1, tasks.size());
 
     changeStatus(Query.unscoped().byStatus(PENDING), ASSIGNED);
@@ -1004,7 +1004,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.killTasks(queryJob(OWNER_A, JOB_A + "2"), OWNER_A.getUser());
     assertTaskCount(5);
 
-    for (ScheduledTask state : Storage.Util.fetchTasks(storage, Query.GET_ALL)) {
+    for (ScheduledTask state : Storage.Util.consistentFetchTasks(storage, Query.GET_ALL)) {
       assertEquals(JOB_A, Tasks.getJob(state));
     }
   }
@@ -1786,7 +1786,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   }
 
   private void assertTaskCount(int numTasks) {
-    assertEquals(numTasks, Storage.Util.fetchTasks(storage, Query.GET_ALL).size());
+    assertEquals(numTasks, Storage.Util.consistentFetchTasks(storage, Query.GET_ALL).size());
   }
 
   private static ParsedConfiguration makeCronJob(
@@ -1859,19 +1859,19 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   }
 
   private ScheduledTask getOnlyTask(Supplier<TaskQuery> query) {
-    return Iterables.getOnlyElement(Storage.Util.fetchTasks(storage, query));
+    return Iterables.getOnlyElement(Storage.Util.consistentFetchTasks(storage, query));
   }
 
   private Set<ScheduledTask> getTasks(Supplier<TaskQuery> query) {
-    return Storage.Util.fetchTasks(storage, query);
+    return Storage.Util.consistentFetchTasks(storage, query);
   }
 
   private Set<ScheduledTask> getTasksByStatus(ScheduleStatus status) {
-    return Storage.Util.fetchTasks(storage, Query.unscoped().byStatus(status).get());
+    return Storage.Util.consistentFetchTasks(storage, Query.unscoped().byStatus(status).get());
   }
 
   private Set<ScheduledTask> getTasksOwnedBy(Identity owner) {
-    return Storage.Util.fetchTasks(storage, query(owner, null, null));
+    return Storage.Util.consistentFetchTasks(storage, query(owner, null, null));
   }
 
   private TaskQuery query(Iterable<String> taskIds) {

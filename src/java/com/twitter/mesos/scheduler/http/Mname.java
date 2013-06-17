@@ -174,7 +174,8 @@ public class Mname {
       Optional<String> forwardRequest) {
 
     ScheduledTask task = Iterables.getOnlyElement(
-        Storage.Util.fetchTasks(storage, Query.shardScoped(role, job, shardId).active().get()),
+        Storage.Util.consistentFetchTasks(storage, Query.shardScoped(role, job, shardId).active()
+            .get()),
         null);
     if (task == null) {
       return respond(NOT_FOUND, "No such live shard found.");

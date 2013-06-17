@@ -50,7 +50,7 @@ public class Slaves extends JerseyTemplateServlet {
   }
 
   private Iterable<HostAttributes> getHostAttributes() {
-    return storage.consistentRead(new Work.Quiet<Iterable<HostAttributes>>() {
+    return storage.weaklyConsistentRead(new Work.Quiet<Iterable<HostAttributes>>() {
       @Override public Iterable<HostAttributes> apply(StoreProvider storeProvider) {
         return storeProvider.getAttributeStore().getHostAttributes();
       }

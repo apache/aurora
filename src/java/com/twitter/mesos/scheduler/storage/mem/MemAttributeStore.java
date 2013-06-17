@@ -1,7 +1,7 @@
 package com.twitter.mesos.scheduler.storage.mem;
 
-import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentMap;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
@@ -16,20 +16,18 @@ import com.twitter.mesos.scheduler.storage.AttributeStore.Mutable;
  * An in-memory attribute store.
  */
 class MemAttributeStore implements Mutable {
-  private final Map<String, HostAttributes> hostAttributes = Maps.newHashMap();
+  private final ConcurrentMap<String, HostAttributes> hostAttributes = Maps.newConcurrentMap();
 
   @Override
-  public synchronized void deleteHostAttributes() {
+  public void deleteHostAttributes() {
     hostAttributes.clear();
   }
 
   @Override
-  public synchronized void saveHostAttributes(HostAttributes attributes) {
+  public void saveHostAttributes(HostAttributes attributes) {
+    hostAttributes.putIfAbsent(attributes.getHost(), attributes);
+
     HostAttributes stored = hostAttributes.get(attributes.getHost());
-    if (stored == null) {
-      stored = attributes;
-      hostAttributes.put(attributes.getHost(), attributes);
-    }
     if (!stored.isSetMode()) {
       stored.setMode(attributes.isSetMode() ? attributes.getMode() : MaintenanceMode.NONE);
     }
@@ -49,7 +47,7 @@ class MemAttributeStore implements Mutable {
   }
 
   @Override
-  public synchronized Optional<HostAttributes> getHostAttributes(String host) {
+  public Optional<HostAttributes> getHostAttributes(String host) {
     return Optional.fromNullable(hostAttributes.get(host));
   }
 

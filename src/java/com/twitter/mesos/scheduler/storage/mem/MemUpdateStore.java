@@ -24,7 +24,7 @@ class MemUpdateStore implements UpdateStore.Mutable {
   private static final Function<JobUpdateConfiguration, JobUpdateConfiguration> DEEP_COPY =
       Util.deepCopier();
 
-  private final Map<String, JobUpdateConfiguration> configs = Maps.newHashMap();
+  private final Map<String, JobUpdateConfiguration> configs = Maps.newConcurrentMap();
 
   private String key(String role, String job) {
     checkNotNull(role);

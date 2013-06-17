@@ -281,7 +281,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
   }
 
   private boolean hasTasks(TaskQuery query) {
-    return !Storage.Util.fetchTasks(storage, query).isEmpty();
+    return !Storage.Util.consistentFetchTasks(storage, query).isEmpty();
   }
 
   public static CronCollisionPolicy orDefault(@Nullable CronCollisionPolicy policy) {
@@ -306,7 +306,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
         .active()
         .get();
 
-    Set<ScheduledTask> activeTasks = Storage.Util.fetchTasks(storage, activeQuery);
+    Set<ScheduledTask> activeTasks = Storage.Util.consistentFetchTasks(storage, activeQuery);
 
     if (activeTasks.isEmpty()) {
       runJob = Optional.of(job);

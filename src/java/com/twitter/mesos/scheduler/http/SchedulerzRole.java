@@ -104,7 +104,9 @@ public class SchedulerzRole extends JerseyTemplateServlet {
               }
             });
 
-        for (ScheduledTask task : Storage.Util.fetchTasks(storage, Query.byRole(role))) {
+        for (ScheduledTask task
+            : Storage.Util.weaklyConsistentFetchTasks(storage, Query.roleScoped(role))) {
+
           Job job = jobs.getUnchecked(task.getAssignedTask().getTask().getJobName());
           job.environment = task.getAssignedTask().getTask().getEnvironment();
 

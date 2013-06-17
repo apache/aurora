@@ -76,6 +76,12 @@ public class ForwardingStore implements
   }
 
   @Override
+  public <T, E extends Exception> T weaklyConsistentRead(Work<T, E> work)
+      throws StorageException, E {
+    return storage.weaklyConsistentRead(work);
+  }
+
+  @Override
   public <T, E extends Exception> T write(MutateWork<T, E> work)
       throws StorageException, E {
 

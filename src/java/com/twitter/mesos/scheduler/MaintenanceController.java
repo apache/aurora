@@ -244,7 +244,7 @@ public interface MaintenanceController {
 
     @Override
     public MaintenanceMode getMode(final String host) {
-      return storage.consistentRead(new Work.Quiet<MaintenanceMode>() {
+      return storage.weaklyConsistentRead(new Work.Quiet<MaintenanceMode>() {
         @Override public MaintenanceMode apply(StoreProvider storeProvider) {
           return storeProvider.getAttributeStore().getHostAttributes(host)
               .transform(ATTRS_TO_STATUS)
@@ -256,7 +256,7 @@ public interface MaintenanceController {
 
     @Override
     public Set<HostStatus> getStatus(final Set<String> hosts) {
-      return storage.consistentRead(new Work.Quiet<Set<HostStatus>>() {
+      return storage.weaklyConsistentRead(new Work.Quiet<Set<HostStatus>>() {
         @Override public Set<HostStatus> apply(StoreProvider storeProvider) {
           // Warning - this is filtering _all_ host attributes.  If using this to frequently query
           // for a small set of hosts, a getHostAttributes variant should be added.

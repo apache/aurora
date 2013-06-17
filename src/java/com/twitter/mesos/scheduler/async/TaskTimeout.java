@@ -124,7 +124,7 @@ class TaskTimeout implements EventSubscriber {
 
   @Subscribe
   public void storageStarted(StorageStarted event) {
-    for (ScheduledTask task : Storage.Util.fetchTasks(storage, TRANSIENT_QUERY)) {
+    for (ScheduledTask task : Storage.Util.consistentFetchTasks(storage, TRANSIENT_QUERY)) {
       registerTimeout(
           Tasks.id(task),
           task.getStatus(),

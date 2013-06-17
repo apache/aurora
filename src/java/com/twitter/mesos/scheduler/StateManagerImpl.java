@@ -665,8 +665,7 @@ public class StateManagerImpl implements StateManager {
     return new Supplier<Boolean>() {
       @Override public Boolean get() {
         return readOnlyStorage.consistentRead(new Work.Quiet<Boolean>() {
-          @Override
-          public Boolean apply(StoreProvider storeProvider) {
+          @Override public Boolean apply(StoreProvider storeProvider) {
             return storeProvider.getUpdateStore().fetchJobUpdateConfig(role, job).isPresent();
           }
         });
@@ -805,8 +804,7 @@ public class StateManagerImpl implements StateManager {
 
   private Map<String, TaskStateMachine> getStateMachines(final Set<String> taskIds) {
     return readOnlyStorage.consistentRead(new Work.Quiet<Map<String, TaskStateMachine>>() {
-      @Override
-      public Map<String, TaskStateMachine> apply(StoreProvider storeProvider) {
+      @Override public Map<String, TaskStateMachine> apply(StoreProvider storeProvider) {
         Set<ScheduledTask> tasks = storeProvider.getTaskStore().fetchTasks(Query.byId(taskIds));
         Map<String, ScheduledTask> existingTasks = Maps.uniqueIndex(
             tasks,

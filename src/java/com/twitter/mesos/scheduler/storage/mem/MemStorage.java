@@ -20,6 +20,13 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * A storage implementation comprised of individual in-memory store implementations.
+ * <p>
+ * This storage has a global read-write lock, which is used when invoking
+ * {@link #consistentRead(Work)} and {@link #write(MutateWork)}.  However, no locks are used at this
+ * level for {@link #weaklyConsistentRead(Work)}. It is the responsibility of the
+ * individual stores to ensure that read operations are thread-safe (optimally supporting
+ * concurrency).  Store implementations may assume that all methods invoked on {@code Mutable}
+ * store interfaces are protected by the global write lock, and thus invoked serially.
  */
 public class MemStorage implements Storage {
   private final AtomicLong readLockWaitNanos = Stats.exportLong("read_lock_wait_nanos");
@@ -82,7 +89,7 @@ public class MemStorage implements Storage {
         new MemAttributeStore());
   }
 
-  @Timed("mem_storage_read_operation")
+  @Timed("mem_storage_consistent_read_operation")
   @Override
   public <T, E extends Exception> T consistentRead(Work<T, E> work) throws StorageException, E {
     checkNotNull(work);
@@ -97,6 +104,14 @@ public class MemStorage implements Storage {
     } finally {
       lockManager.readUnlock();
     }
+  }
+
+  @Timed("mem_storage_weakly_consistent_read_operation")
+  @Override
+  public <T, E extends Exception> T weaklyConsistentRead(Work<T, E> work)
+      throws StorageException, E {
+
+    return work.apply(storeProvider);
   }
 
   @Timed("mem_storage_write_operation")
