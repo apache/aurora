@@ -215,6 +215,9 @@ public class SchedulerzJob extends JerseyTemplateServlet {
               .put("CPU", task.getNumCpus())
               .put("RAM" , scaleMb(task.getRamMb()))
               .put("disk", scaleMb(task.getDiskMb()));
+          if (task.isIsService()) {
+            details.put("service", "true");
+          }
           if (task.isProduction()) {
             details.put("production", "true");
           }
