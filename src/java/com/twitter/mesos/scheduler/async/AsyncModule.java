@@ -3,6 +3,7 @@ package com.twitter.mesos.scheduler.async;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 
+import com.google.common.util.concurrent.RateLimiter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
 import com.google.inject.PrivateModule;
@@ -20,7 +21,7 @@ import com.twitter.common.util.Random;
 import com.twitter.common.util.TruncatedBinaryBackoff;
 import com.twitter.mesos.scheduler.async.OfferQueue.OfferQueueImpl;
 import com.twitter.mesos.scheduler.async.OfferQueue.OfferReturnDelay;
-import com.twitter.mesos.scheduler.async.TaskScheduler.TaskSchedulerImpl;
+import com.twitter.mesos.scheduler.async.TaskGroups.SchedulingAction;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.events.TaskEventModule;
 
@@ -60,6 +61,10 @@ public class AsyncModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> HISTORY_PRUNE_THRESHOLD =
       Arg.create(Amount.of(2L, Time.DAYS));
 
+  @CmdLine(name = "max_schedule_attempts_per_sec",
+      help = "Maximum number of scheduling attempts to make per second.")
+  private static final Arg<Double> MAX_SCHEDULE_ATTEMPTS_PER_SEC = Arg.create(10D);
+
   @Override
   protected void configure() {
     // Don't worry about clean shutdown, these can be daemon and cleanup-free.
@@ -91,12 +96,14 @@ public class AsyncModule extends AbstractModule {
       @Override protected void configure() {
         bind(BackoffStrategy.class).toInstance(
             new TruncatedBinaryBackoff(INITIAL_SCHEDULE_DELAY.get(), MAX_SCHEDULE_DELAY.get()));
-        bind(TaskScheduler.class).to(TaskSchedulerImpl.class);
-        bind(TaskSchedulerImpl.class).in(Singleton.class);
-        expose(TaskScheduler.class);
+        bind(RateLimiter.class).toInstance(RateLimiter.create(MAX_SCHEDULE_ATTEMPTS_PER_SEC.get()));
+        bind(SchedulingAction.class).to(TaskScheduler.class);
+        bind(TaskScheduler.class).in(Singleton.class);
+        bind(TaskGroups.class).in(Singleton.class);
+        expose(TaskGroups.class);
       }
     });
-    TaskEventModule.bindSubscriber(binder(), TaskScheduler.class);
+    TaskEventModule.bindSubscriber(binder(), TaskGroups.class);
 
     binder().install(new PrivateModule() {
       @Override protected void configure() {

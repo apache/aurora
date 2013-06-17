@@ -212,6 +212,22 @@ public final class ConfigurationManager {
   }
 
   /**
+   * Resets fields within a task configuration that would make it unique from originally-equal
+   * configurations.
+   *
+   * @param task Task to scrub.
+   * @return Scrubbed task.
+   */
+  public static TwitterTaskInfo scrubNonUniqueTaskFields(TwitterTaskInfo task) {
+    TwitterTaskInfo copy = task.deepCopy();
+    // Unsetting only changes the isset bit vector.  For equals() comparison, the value must also be
+    // canonical.
+    copy.setShardId(0);
+    copy.unsetShardId();
+    return copy;
+  }
+
+  /**
    * Check validity of and populates defaults in a job configuration.  This will return a deep copy
    * of the provided job configuration with default configuration values applied, and configuration
    * map values parsed and applied to their respective struct fields.
@@ -247,6 +263,9 @@ public final class ConfigurationManager {
         throw new TaskDescriptionException(
             "'taskConfigs' and 'taskConfig' fields may not be used together.");
       }
+      // TODO(William Farner): Eliminate this once JobConfigurations are used all the way into
+      // the storage layer.  When eliminating this, also remove scrubNonUniqueTaskFields() and check
+      // its call path.
       for (int i = 0; i < copy.getShardCount(); i++) {
         copy.addToTaskConfigs(copy.getTaskConfig().deepCopy().setShardId(i));
       }

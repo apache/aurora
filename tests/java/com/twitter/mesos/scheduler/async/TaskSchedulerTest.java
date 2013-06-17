@@ -6,8 +6,10 @@ import java.util.concurrent.TimeUnit;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.util.concurrent.RateLimiter;
 
 import org.apache.mesos.Protos.Offer;
+import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskInfo;
@@ -35,14 +37,16 @@ import com.twitter.mesos.scheduler.StateManager;
 import com.twitter.mesos.scheduler.TaskAssigner;
 import com.twitter.mesos.scheduler.async.OfferQueue.OfferQueueImpl;
 import com.twitter.mesos.scheduler.async.OfferQueue.OfferReturnDelay;
-import com.twitter.mesos.scheduler.async.TaskScheduler.TaskSchedulerImpl;
+import com.twitter.mesos.scheduler.async.TaskGroups.SchedulingAction;
 import com.twitter.mesos.scheduler.events.PubsubEvent.HostMaintenanceStateChange;
 import com.twitter.mesos.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.mesos.scheduler.events.PubsubEvent.TaskStateChange;
+import com.twitter.mesos.scheduler.events.PubsubEvent.TasksDeleted;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
 import com.twitter.mesos.scheduler.storage.Storage.StorageException;
+import com.twitter.mesos.scheduler.storage.TaskStore;
 import com.twitter.mesos.scheduler.storage.mem.MemStorage;
 
 import static org.easymock.EasyMock.capture;
@@ -50,6 +54,8 @@ import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.easymock.EasyMock.isA;
+
+import static org.junit.Assert.assertEquals;
 
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
 import static com.twitter.mesos.gen.ScheduleStatus.INIT;
@@ -59,9 +65,9 @@ import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 
 /**
- * TODO(wfarner): Break this test up to independently test TaskSchedulerImpl and OfferQueueImpl.
+ * TODO(wfarner): Break this test up to independently test TaskScheduler and OfferQueueImpl.
  */
-public class TaskSchedulerImplTest extends EasyMockTest {
+public class TaskSchedulerTest extends EasyMockTest {
 
   private static final Offer OFFER_A = Offers.makeOffer("OFFER_A", "HOST_A");
   private static final Offer OFFER_B = Offers.makeOffer("OFFER_B", "HOST_B");
@@ -77,8 +83,8 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   private ScheduledExecutorService executor;
   private ScheduledFuture<?> future;
   private OfferReturnDelay returnDelay;
-  private TaskSchedulerImpl scheduler;
   private OfferQueue offerQueue;
+  private TaskGroups taskGroups;
 
   @Before
   public void setUp() {
@@ -96,13 +102,10 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   private void replayAndCreateScheduler() {
     control.replay();
     offerQueue = new OfferQueueImpl(driver, returnDelay, executor, maintenance);
-    scheduler = new TaskSchedulerImpl(
-        storage,
-        stateManager,
-        assigner,
-        retryStrategy,
-        executor,
-        offerQueue);
+    RateLimiter rateLimiter = RateLimiter.create(1);
+    SchedulingAction scheduler =
+        new TaskScheduler(storage, stateManager, assigner, offerQueue);
+    taskGroups = new TaskGroups(executor, storage, retryStrategy, rateLimiter, scheduler);
   }
 
   private Capture<Runnable> expectOffer() {
@@ -117,26 +120,41 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     return runnable;
   }
 
-  private void changeState(String taskId, ScheduleStatus oldState, ScheduleStatus newState) {
-    ScheduledTask task = new ScheduledTask()
-        .setStatus(newState)
-        .setAssignedTask(new AssignedTask().setTaskId(taskId));
-    scheduler.taskChangedState(new TaskStateChange(task, oldState));
+  private void changeState(
+      ScheduledTask task,
+      ScheduleStatus oldState,
+      ScheduleStatus newState) {
+
+    final ScheduledTask copy = task.deepCopy().setStatus(newState);
+    // Insert the task if it doesn't already exist.
+    storage.write(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider storeProvider) {
+        TaskStore.Mutable taskStore = storeProvider.getUnsafeTaskStore();
+        if (taskStore.fetchTaskIds(Query.taskScoped(Tasks.id(copy))).isEmpty()) {
+          taskStore.saveTasks(ImmutableSet.of(copy));
+        }
+      }
+    });
+    taskGroups.taskChangedState(new TaskStateChange(copy, oldState));
   }
 
-  private Capture<Runnable> expectTaskWatch(long previousPenaltyMs, long nextPenaltyMs) {
-    expect(retryStrategy.calculateBackoffMs(previousPenaltyMs)).andReturn(nextPenaltyMs);
+  private Capture<Runnable> expectTaskRetryIn(long penaltyMs) {
     Capture<Runnable> capture = createCapture();
     executor.schedule(
         EasyMock.capture(capture),
-        eq(nextPenaltyMs),
+        eq(penaltyMs),
         eq(TimeUnit.MILLISECONDS));
     expectLastCall().andReturn(future);
     return capture;
   }
 
-  private Capture<Runnable> expectTaskWatch(long nextPenaltyMs) {
-    return expectTaskWatch(0, nextPenaltyMs);
+  private Capture<Runnable> expectTaskBackoff(long previousPenaltyMs, long nextPenaltyMs) {
+    expect(retryStrategy.calculateBackoffMs(previousPenaltyMs)).andReturn(nextPenaltyMs);
+    return expectTaskRetryIn(nextPenaltyMs);
+  }
+
+  private Capture<Runnable> expectTaskBackoff(long nextPenaltyMs) {
+    return expectTaskBackoff(0, nextPenaltyMs);
   }
 
   @Test
@@ -153,55 +171,56 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
   @Test
   public void testNoOffers() {
-    Capture<Runnable> timeoutCapture = expectTaskWatch(10);
-    expectTaskWatch(10, 20);
+    Capture<Runnable> timeoutCapture = expectTaskBackoff(10);
+    expectTaskBackoff(10, 20);
 
     replayAndCreateScheduler();
 
-    insertTasks(makeTask("a", PENDING));
-    changeState("a", INIT, PENDING);
+    changeState(makeTask("a"), INIT, PENDING);
     timeoutCapture.getValue().run();
   }
 
-  private ScheduledTask makeTask(String taskId, ScheduleStatus status) {
+  private ScheduledTask makeTask(String taskId) {
     return new ScheduledTask()
-        .setStatus(status)
         .setAssignedTask(new AssignedTask()
             .setTaskId(taskId)
             .setTask(new TwitterTaskInfo()
+                .setJobName("job-" + taskId)
+                .setShardId(0)
                 .setOwner(new Identity().setRole("role-" + taskId).setUser("user-" + taskId))));
   }
 
-  private void insertTasks(final ScheduledTask task, final ScheduledTask... tasks) {
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider store) {
-        store.getUnsafeTaskStore().saveTasks(
-            ImmutableSet.<ScheduledTask>builder().add(task).add(tasks).build());
-      }
-    });
+
+  private ScheduledTask makeTask(String taskId, ScheduleStatus status) {
+    return makeTask(taskId).setStatus(status);
   }
 
   @Test
   public void testLoadFromStorage() {
-    expectTaskWatch(10);
+    expectTaskBackoff(10);
 
     replayAndCreateScheduler();
 
-    insertTasks(
-        makeTask("a", KILLED),
-        makeTask("b", PENDING),
-        makeTask("c", RUNNING));
-    scheduler.storageStarted(new StorageStarted());
-    changeState("c", RUNNING, FINISHED);
+    final ScheduledTask c = makeTask("c", RUNNING);
+    storage.write(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider store) {
+        store.getUnsafeTaskStore().saveTasks(ImmutableSet.of(
+            makeTask("a", KILLED),
+            makeTask("b", PENDING),
+            c));
+      }
+    });
+    taskGroups.storageStarted(new StorageStarted());
+    changeState(c, RUNNING, FINISHED);
   }
 
   @Test
   public void testTaskMissing() {
-    Capture<Runnable> timeoutCapture = expectTaskWatch(10);
+    Capture<Runnable> timeoutCapture = expectTaskBackoff(10);
 
     replayAndCreateScheduler();
 
-    changeState("a", INIT, PENDING);
+    taskGroups.taskChangedState(new TaskStateChange(makeTask("a", PENDING), INIT));
     timeoutCapture.getValue().run();
   }
 
@@ -213,27 +232,25 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     ScheduledTask task = makeTask("a", PENDING);
     TaskInfo mesosTask = makeTaskInfo(task);
 
-    Capture<Runnable> timeoutCapture = expectTaskWatch(10);
+    Capture<Runnable> timeoutCapture = expectTaskBackoff(10);
     expect(assigner.maybeAssign(OFFER_A, task)).andReturn(Optional.<TaskInfo>absent());
 
-    Capture<Runnable> timeoutCapture2 = expectTaskWatch(10, 20);
+    Capture<Runnable> timeoutCapture2 = expectTaskBackoff(10, 20);
     expect(assigner.maybeAssign(OFFER_A, task)).andReturn(Optional.of(mesosTask));
     driver.launchTask(OFFER_A.getId(), mesosTask);
 
-    Capture<Runnable> timeoutCapture3 = expectTaskWatch(10);
-    expectTaskWatch(10, 20);
+    Capture<Runnable> timeoutCapture3 = expectTaskBackoff(10);
+    expectTaskBackoff(10, 20);
 
     replayAndCreateScheduler();
 
     offerQueue.addOffer(OFFER_A);
-    insertTasks(task);
-    changeState("a", INIT, PENDING);
+    changeState(task, INIT, PENDING);
     timeoutCapture.getValue().run();
     timeoutCapture2.getValue().run();
 
-    // Ensure the offer was consumed
-    insertTasks(makeTask("b", PENDING));
-    changeState("b", INIT, PENDING);
+    // Ensure the offer was consumed.
+    changeState(makeTask("b"), INIT, PENDING);
     timeoutCapture3.getValue().run();
   }
 
@@ -246,7 +263,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
         .setSlaveId(SlaveID.newBuilder().setValue("slaveId"))
         .build();
 
-    Capture<Runnable> timeoutCapture = expectTaskWatch(10);
+    Capture<Runnable> timeoutCapture = expectTaskBackoff(10);
     expectAnyMaintenanceCalls();
     expectOfferDeclineIn(10);
     expect(assigner.maybeAssign(OFFER_A, task)).andReturn(Optional.of(mesosTask));
@@ -255,13 +272,12 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expect(stateManager.changeState(
         Query.taskScoped("a").byStatus(PENDING).get(),
         LOST,
-        TaskSchedulerImpl.LAUNCH_FAILED_MSG))
+        TaskScheduler.LAUNCH_FAILED_MSG))
         .andReturn(1);
 
     replayAndCreateScheduler();
 
-    insertTasks(task);
-    changeState("a", INIT, PENDING);
+    changeState(task, INIT, PENDING);
     offerQueue.addOffer(OFFER_A);
     timeoutCapture.getValue().run();
   }
@@ -275,20 +291,19 @@ public class TaskSchedulerImplTest extends EasyMockTest {
         .setSlaveId(SlaveID.newBuilder().setValue("slaveId"))
         .build();
 
-    Capture<Runnable> timeoutCapture = expectTaskWatch(10);
+    Capture<Runnable> timeoutCapture = expectTaskBackoff(10);
     expectAnyMaintenanceCalls();
     expectOfferDeclineIn(10);
     expect(assigner.maybeAssign(OFFER_A, task)).andThrow(new StorageException("Injected failure."));
 
-    Capture<Runnable> timeoutCapture2 = expectTaskWatch(10, 20);
+    Capture<Runnable> timeoutCapture2 = expectTaskBackoff(10, 20);
     expect(assigner.maybeAssign(OFFER_A, task)).andReturn(Optional.of(mesosTask));
     driver.launchTask(OFFER_A.getId(), mesosTask);
     expectLastCall();
 
     replayAndCreateScheduler();
 
-    insertTasks(task);
-    changeState("a", INIT, PENDING);
+    changeState(task, INIT, PENDING);
     offerQueue.addOffer(OFFER_A);
     timeoutCapture.getValue().run();
     timeoutCapture2.getValue().run();
@@ -298,18 +313,17 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   public void testExpiration() {
     ScheduledTask task = makeTask("a", PENDING);
 
-    Capture<Runnable> timeoutCapture = expectTaskWatch(10);
+    Capture<Runnable> timeoutCapture = expectTaskBackoff(10);
     Capture<Runnable> offerExpirationCapture = expectOfferDeclineIn(10);
     expectAnyMaintenanceCalls();
     expect(assigner.maybeAssign(OFFER_A, task)).andReturn(Optional.<TaskInfo>absent());
-    Capture<Runnable> timeoutCapture2 = expectTaskWatch(10, 20);
+    Capture<Runnable> timeoutCapture2 = expectTaskBackoff(10, 20);
     driver.declineOffer(OFFER_A.getId());
-    expectTaskWatch(20, 30);
+    expectTaskBackoff(20, 30);
 
     replayAndCreateScheduler();
 
-    insertTasks(task);
-    changeState("a", INIT, PENDING);
+    changeState(task, INIT, PENDING);
     offerQueue.addOffer(OFFER_A);
     timeoutCapture.getValue().run();
     offerExpirationCapture.getValue().run();
@@ -352,13 +366,13 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     TaskInfo mesosTaskA = makeTaskInfo(taskA);
     expect(assigner.maybeAssign(OFFER_A, taskA)).andReturn(Optional.of(mesosTaskA));
     driver.launchTask(OFFER_A.getId(), mesosTaskA);
-    Capture<Runnable> captureA = expectTaskWatch(10);
+    Capture<Runnable> captureA = expectTaskBackoff(10);
 
     ScheduledTask taskB = makeTask("B", PENDING);
     TaskInfo mesosTaskB = makeTaskInfo(taskB);
     expect(assigner.maybeAssign(OFFER_B, taskB)).andReturn(Optional.of(mesosTaskB));
     driver.launchTask(OFFER_B.getId(), mesosTaskB);
-    Capture<Runnable> captureB = expectTaskWatch(10);
+    Capture<Runnable> captureB = expectTaskBackoff(10);
 
     replayAndCreateScheduler();
 
@@ -367,12 +381,10 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     offerQueue.addOffer(OFFER_B);
     offerQueue.addOffer(OFFER_A);
 
-    insertTasks(taskA);
-    changeState("A", INIT, PENDING);
+    changeState(taskA, INIT, PENDING);
     captureA.getValue().run();
 
-    insertTasks(taskB);
-    changeState("B", INIT, PENDING);
+    changeState(taskB, INIT, PENDING);
     captureB.getValue().run();
   }
 
@@ -389,13 +401,13 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     TaskInfo mesosTaskA = makeTaskInfo(taskA);
     expect(assigner.maybeAssign(OFFER_B, taskA)).andReturn(Optional.of(mesosTaskA));
     driver.launchTask(OFFER_B.getId(), mesosTaskA);
-    Capture<Runnable> captureA = expectTaskWatch(10);
+    Capture<Runnable> captureA = expectTaskBackoff(10);
 
     ScheduledTask taskB = makeTask("B", PENDING);
     TaskInfo mesosTaskB = makeTaskInfo(taskB);
     expect(assigner.maybeAssign(OFFER_C, taskB)).andReturn(Optional.of(mesosTaskB));
     driver.launchTask(OFFER_C.getId(), mesosTaskB);
-    Capture<Runnable> captureB = expectTaskWatch(10);
+    Capture<Runnable> captureB = expectTaskBackoff(10);
 
     replayAndCreateScheduler();
 
@@ -407,15 +419,100 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     // Expected order now (B), with (C, A) unschedulable
     changeHostMaintenanceState("HOST_A", MaintenanceMode.DRAINING);
-    insertTasks(taskA);
-    changeState("A", INIT, PENDING);
+    changeState(taskA, INIT, PENDING);
     captureA.getValue().run();
 
     // Expected order now (C), with (A) unschedulable and (B) already consumed
     changeHostMaintenanceState("HOST_C", MaintenanceMode.NONE);
-    insertTasks(taskB);
-    changeState("B", INIT, PENDING);
+    changeState(taskB, INIT, PENDING);
     captureB.getValue().run();
+  }
+
+  private Capture<ScheduledTask> expectTaskScheduled(ScheduledTask task) {
+    TaskInfo mesosTask = makeTaskInfo(task);
+    Capture<ScheduledTask> taskScheduled = createCapture();
+    expect(assigner.maybeAssign(EasyMock.<Offer>anyObject(), capture(taskScheduled)))
+        .andReturn(Optional.of(mesosTask));
+    driver.launchTask(EasyMock.<OfferID>anyObject(), EasyMock.eq(mesosTask));
+    return taskScheduled;
+  }
+
+  @Test
+  public void testResistsStarvation() {
+    // TODO(wfarner): This test requires intimate knowledge of the way futures are used inside
+    // TaskScheduler.  It's time to test using a real ScheduledExecutorService.
+
+    expectAnyMaintenanceCalls();
+
+    ScheduledTask jobA0 = makeTask("a0", PENDING);
+
+    ScheduledTask jobA1 = jobA0.deepCopy();
+    jobA1.getAssignedTask().setTaskId("a1");
+    jobA1.getAssignedTask().getTask().setShardId(1);
+
+    ScheduledTask jobA2 = jobA0.deepCopy();
+    jobA2.getAssignedTask().setTaskId("a2");
+    jobA2.getAssignedTask().getTask().setShardId(2);
+
+    ScheduledTask jobB0 = makeTask("b0", PENDING);
+
+    expectOfferDeclineIn(10);
+    expectOfferDeclineIn(10);
+    expectOfferDeclineIn(10);
+    expectOfferDeclineIn(10);
+
+    Capture<Runnable> timeoutA = expectTaskBackoff(10);
+    Capture<Runnable> timeoutB = expectTaskBackoff(10);
+
+    Capture<ScheduledTask> firstScheduled = expectTaskScheduled(jobA0);
+    Capture<ScheduledTask> secondScheduled = expectTaskScheduled(jobB0);
+
+    // Expect another watch of the task group for job A.
+    expectTaskBackoff(10);
+
+    replayAndCreateScheduler();
+
+    offerQueue.addOffer(OFFER_A);
+    offerQueue.addOffer(OFFER_B);
+    offerQueue.addOffer(OFFER_C);
+    offerQueue.addOffer(OFFER_D);
+    changeState(jobA0, INIT, PENDING);
+    changeState(jobA1, INIT, PENDING);
+    changeState(jobA2, INIT, PENDING);
+    changeState(jobB0, INIT, PENDING);
+    timeoutA.getValue().run();
+    timeoutB.getValue().run();
+    assertEquals(
+        ImmutableSet.of(jobA0, jobB0),
+        ImmutableSet.of(firstScheduled.getValue(), secondScheduled.getValue()));
+  }
+
+  @Test
+  public void testTaskDeleted() {
+    expectAnyMaintenanceCalls();
+    expectOfferDeclineIn(10);
+
+    final ScheduledTask task = makeTask("a", PENDING);
+
+    Capture<Runnable> timeoutCapture = expectTaskBackoff(10);
+    expect(assigner.maybeAssign(OFFER_A, task)).andReturn(Optional.<TaskInfo>absent());
+    expectTaskBackoff(10, 20);
+
+    replayAndCreateScheduler();
+
+    offerQueue.addOffer(OFFER_A);
+    changeState(task, INIT, PENDING);
+    timeoutCapture.getValue().run();
+
+    // Ensure the offer was consumed.
+    changeState(task, INIT, PENDING);
+    storage.write(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider storeProvider) {
+        storeProvider.getUnsafeTaskStore().deleteTasks(Tasks.ids(task));
+      }
+    });
+    taskGroups.tasksDeleted(new TasksDeleted(ImmutableSet.of(task)));
+    timeoutCapture.getValue().run();
   }
 
   private TaskInfo makeTaskInfo(ScheduledTask task) {

@@ -76,6 +76,7 @@ public class ServletModule extends AbstractModule {
         registerJerseyEndpoint("/maintenance", Maintenance.class);
         registerJerseyEndpoint("/mname", Mname.class);
         registerJerseyEndpoint("/offers", Offers.class);
+        registerJerseyEndpoint("/pendingtasks", PendingTasks.class);
         registerJerseyEndpoint("/quotas", Quotas.class);
         registerJerseyEndpoint(
             "/scheduler",
