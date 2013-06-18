@@ -252,7 +252,7 @@ class AuroraBuilder(Builder):
 
   @property
   def test_commands(self):
-    return ['./pants goal clean-all test tests/java/com/twitter/mesos:all']
+    return ['./pants goal clean-all test tests/java/com/twitter/mesos::']
 
   @property
   def commands(self):
