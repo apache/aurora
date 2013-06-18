@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler.testing;
+package com.twitter.mesos.scheduler.local;
 
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -62,8 +62,8 @@ import com.twitter.mesos.scheduler.events.PubsubEvent.DriverRegistered;
 import com.twitter.mesos.scheduler.events.PubsubEvent.EventSubscriber;
 import com.twitter.mesos.scheduler.events.PubsubEvent.TaskStateChange;
 import com.twitter.mesos.scheduler.events.TaskEventModule;
+import com.twitter.mesos.scheduler.local.FakeDriverFactory.FakeSchedulerDriver;
 import com.twitter.mesos.scheduler.log.testing.FileLogStreamModule;
-import com.twitter.mesos.scheduler.testing.FakeDriverFactory.FakeSchedulerDriver;
 
 /**
  * A module that binds a fake mesos driver factory and a local (non-replicated) storage system.

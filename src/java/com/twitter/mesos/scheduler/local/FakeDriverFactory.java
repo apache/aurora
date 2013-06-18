@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler.testing;
+package com.twitter.mesos.scheduler.local;
 
 import java.util.Collection;
 
