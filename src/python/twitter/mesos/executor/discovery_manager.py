@@ -79,5 +79,6 @@ class DiscoveryManager(HealthInterface):
     return not self._unhealthy.is_set()
 
   def stop(self):
+    self.metrics.unregister_observable('ensemble')
     if self._service:
       self._service.cancel()

@@ -188,8 +188,8 @@ class TestStatusManager(unittest.TestCase):
 
     self.http.health.value = 'bad'
     assert len(self.driver.updates) == 0
-    monitor.unhealthy_event.wait(timeout=2.0)
-    assert monitor.unhealthy_event.is_set()
+    monitor._unhealthy_event.wait(timeout=2.0)
+    assert monitor._unhealthy_event.is_set()
 
     self.http.requests.qqq.wait(timeout=1.0)
     self.http.requests.aaa.wait(timeout=1.0)

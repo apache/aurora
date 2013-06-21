@@ -38,26 +38,25 @@ class StatusManager(ExceptionalThread):
     super(StatusManager, self).__init__()
     self.daemon = True
 
-  @property
-  def unhealthy_event(self):
-    return self._unhealthy_event
+  def _stop_health_checkers(self):
+    if self._unhealthy_event.is_set():
+      return
+    self._unhealthy_event.set()
+    for checker in self._health_checkers:
+      log.debug('Terminating %s' % checker)
+      checker.stop()
 
   def run(self):
     for checker in self._health_checkers:
       log.debug("Starting checker: %s" % checker)
       checker.start()
 
-    def notify_unhealthy():
-      self._unhealthy_event.set()
-      for checker in self._health_checkers:
-        checker.stop()
-
     failure_reason = None
 
     while self._runner.is_alive() and failure_reason is None:
       for checker in self._health_checkers:
         if not checker.healthy:
-          notify_unhealthy()
+          self._stop_health_checkers()
           failure_reason = checker.failure_reason
           log.info('Got %s from %s' % (failure_reason, checker.__class__.__name__))
           break
@@ -146,9 +145,7 @@ class StatusManager(ExceptionalThread):
     log.info('Sending terminal state update: %s' % (task_state.name if task_state else 'UNKNOWN'))
     self._driver.sendStatusUpdate(update)
 
-    for checker in self._health_checkers:
-      log.debug('Terminating %s' % checker)
-      checker.stop()
+    self._stop_health_checkers()
 
     # the executor is ephemeral and we just submitted a terminal task state, so shutdown
     log.info('Stopping executor.')
