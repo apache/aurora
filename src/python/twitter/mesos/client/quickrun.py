@@ -29,7 +29,7 @@ from .job_monitor import JobMonitor
 
 
 class Quickrun(object):
-  QUERY_INTERVAL = Amount(5, Time.SECONDS)
+  QUERY_INTERVAL = Amount(30, Time.SECONDS)
   WAIT_STATES = frozenset([
       ScheduleStatus.PENDING,
       ScheduleStatus.ASSIGNED,
