@@ -32,8 +32,8 @@ class LiveJobDisambiguator(object):
   def query_matches(self):
     resp = self._client.get_jobs(self._role)
     check_and_log_response(resp)
-    return [AuroraJobKey(self._client.cluster.name, j.key.role, j.key.environment, j.key.name)
-        for j in resp.configs if j.key.name == self._name]
+    return set(AuroraJobKey(self._client.cluster.name, j.key.role, j.key.environment, j.key.name)
+        for j in resp.configs if j.key.name == self._name)
 
   @classmethod
   def _disambiguate_or_die(cls, client, role, env, name):
@@ -50,8 +50,9 @@ class LiveJobDisambiguator(object):
     log.warning("Job ambiguously specified - querying the scheduler to disambiguate")
     matches = disambiguator.query_matches()
     if len(matches) == 1:
-      log.info("Found job %s" % matches[0])
-      return matches[0]
+      (match,) = matches
+      log.info("Found job %s" % match)
+      return match
     elif len(matches) == 0:
       die("No jobs found")
     else:
