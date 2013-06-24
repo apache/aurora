@@ -12,6 +12,7 @@ import com.google.common.collect.ImmutableSet;
 import com.twitter.common.base.Closure;
 import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.JobKey;
 import com.twitter.mesos.gen.JobUpdateConfiguration;
 import com.twitter.mesos.gen.MaintenanceMode;
 import com.twitter.mesos.gen.Quota;
@@ -111,12 +112,22 @@ public class ForwardingStore implements
   }
 
   @Override
+  public Optional<JobConfiguration> fetchJob(String managerId, JobKey jobKey) {
+    return jobStore.fetchJob(managerId, jobKey);
+  }
+
+  @Override
   public void saveAcceptedJob(String managerId, JobConfiguration jobConfig) {
     jobStore.saveAcceptedJob(managerId, jobConfig);
   }
 
   @Override
   public void removeJob(String jobKey) {
+    jobStore.removeJob(jobKey);
+  }
+
+  @Override
+  public void removeJob(JobKey jobKey) {
     jobStore.removeJob(jobKey);
   }
 

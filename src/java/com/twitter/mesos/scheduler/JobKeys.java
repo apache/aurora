@@ -83,4 +83,15 @@ public final class JobKeys {
 
     return assertValid(job);
   }
+
+  /**
+   * Create a "/"-delimited String representation of {@code jobKey}, suitable for logging but not
+   * necessarily suitable for use as a unique identifier.
+   *
+   * @param jobKey Key to represent.
+   * @return "/"-delimited representation of the key.
+   */
+  public static String toPath(JobKey jobKey) {
+    return jobKey.getRole() + "/" + jobKey.getEnvironment() + "/" + jobKey.getName();
+  }
 }

@@ -17,6 +17,7 @@ import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Constants;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.JobKey;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
@@ -75,6 +76,13 @@ public final class Tasks {
 
   public static final Function<ScheduledTask, String> SCHEDULED_TO_JOB_KEY =
       Functions.compose(ASSIGNED_TO_JOB_KEY, SCHEDULED_TO_ASSIGNED);
+
+  public static final Function<ScheduledTask, ScheduledTask> DEEP_COPY_SCHEDULED =
+      new Function<ScheduledTask, ScheduledTask>() {
+        @Override public ScheduledTask apply(ScheduledTask task) {
+          return task.deepCopy();
+        }
+      };
 
   /**
    * Different states that an active task may be in.
@@ -144,6 +152,11 @@ public final class Tasks {
 
   public static String jobKey(ScheduledTask task) {
     return jobKey(task.getAssignedTask());
+  }
+
+  public static String jobKey(JobKey jobKey) {
+    // TODO(ksweeney): Stop ignoring environment here as part of MESOS-2403.
+    return jobKey(jobKey.getRole(), jobKey.getName());
   }
 
   public static String id(ScheduledTask task) {

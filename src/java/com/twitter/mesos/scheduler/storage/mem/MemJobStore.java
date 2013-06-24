@@ -6,6 +6,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
+import com.google.common.base.Optional;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -15,6 +16,7 @@ import com.google.common.collect.Maps;
 
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.JobKey;
 import com.twitter.mesos.scheduler.storage.JobStore;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -52,6 +54,14 @@ class MemJobStore implements JobStore.Mutable {
   }
 
   @Override
+  public void removeJob(JobKey jobKey) {
+    checkNotNull(jobKey);
+
+    // TODO(ksweeney): Remove this delegation as part of MESOS-2403.
+    removeJob(Tasks.jobKey(jobKey));
+  }
+
+  @Override
   public void deleteJobs() {
     managers.invalidateAll();
   }
@@ -82,6 +92,14 @@ class MemJobStore implements JobStore.Mutable {
     }
 
     return DEEP_COPY.apply(manager.jobs.get(jobKey));
+  }
+
+  @Override
+  public Optional<JobConfiguration> fetchJob(String managerId, JobKey jobKey) {
+    checkNotNull(jobKey);
+
+    // TODO(ksweeney): Remove this delegation as part of MESOS-2403.
+    return Optional.fromNullable(fetchJob(managerId, Tasks.jobKey(jobKey)));
   }
 
   @Override

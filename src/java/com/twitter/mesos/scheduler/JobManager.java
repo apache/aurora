@@ -5,6 +5,7 @@ import java.util.Collections;
 import com.google.inject.Inject;
 
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.JobKey;
 
 /**
  * Interface for a job manager.  A job manager is responsible for deciding whether and when to
@@ -47,12 +48,21 @@ public abstract class JobManager {
   /**
    * Checks whether this manager is storing a job with the given key.
    *
+   * @deprecated Use {@link #hasJob(JobKey)}.
    * @param role Job owner.
    * @param job Job name.
    * @return {@code true} if the manager has a matching job, {@code false} otherwise.
    */
-  // TODO(ksweeney): Refactor to take a JobKey
+  @Deprecated
   public abstract boolean hasJob(String role, String job);
+
+  /**
+   * Checks whether this manager is storing a job with the given key.
+   *
+   * @param jobKey Job key.
+   * @return {@code true} if the manager has a matching job, {@code false} otherwise.
+   */
+  public abstract boolean hasJob(JobKey jobKey);
 
   /**
    * Instructs the manager to delete any jobs with the given key.

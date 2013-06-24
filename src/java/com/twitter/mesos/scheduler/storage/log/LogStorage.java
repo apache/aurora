@@ -31,6 +31,7 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.JobKey;
 import com.twitter.mesos.gen.JobUpdateConfiguration;
 import com.twitter.mesos.gen.MaintenanceMode;
 import com.twitter.mesos.gen.Quota;
@@ -521,6 +522,12 @@ public class LogStorage extends ForwardingStore
         LogStorage.super.removeJob(jobKey);
       }
     });
+  }
+
+  @Override
+  public void removeJob(JobKey jobKey) {
+    // TODO(ksweeney): Remove this delegation as part of MESOS-2403.
+    removeJob(Tasks.jobKey(jobKey));
   }
 
   @Timed("scheduler_log_tasks_save")

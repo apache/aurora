@@ -4,7 +4,10 @@ import java.util.Set;
 
 import javax.annotation.Nullable;
 
+import com.google.common.base.Optional;
+
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.JobKey;
 
 /**
  * Stores job configuration data.
@@ -26,13 +29,25 @@ public interface JobStore {
    * Fetches the {@code JobConfiguration} for the specified {@code jobKey}; if there is none then
    * {@code null} is returned.
    *
+   * @deprecated Use {@link JobStore#fetchJob(String, JobKey)} instead.
    * @param managerId The unique identifier of the {@link com.twitter.mesos.scheduler.JobManager}
    *     that accepted the job
    * @param jobKey The jobKey identifying the job to be fetched.
    * @return the job configuration for the given {@code jobKey} or else {@code null} if none is
    *     found
    */
+  @Deprecated
   @Nullable JobConfiguration fetchJob(String managerId, String jobKey);
+
+  /**
+   * Fetches the {@code JobConfiguration} for the specified {@code jobKey} if it exists.
+   *
+   * @param managerId The unique identifier of the {@link com.twitter.mesos.scheduler.JobManager}
+   *     that accepted the job
+   * @param jobKey The jobKey identifying the job to be fetched.
+   * @return the job configuration for the given {@code jobKey} or absent if none is found.
+   */
+  Optional<JobConfiguration> fetchJob(String managerId, JobKey jobKey);
 
   /**
    * Fetches all the unique manager ids that are present in the job store.
@@ -56,9 +71,19 @@ public interface JobStore {
      * Removes the job configuration for the job identified by {@code jobKey}.
      * If there is no stored configuration for the identified job, this method returns silently.
      *
+     * @deprecated Use {@link JobStore#removeJob(JobKey)}.
      * @param jobKey the key identifying the job to delete.
      */
+    @Deprecated
     void removeJob(String jobKey);
+
+    /**
+     * Removes the job configuration for the job identified by {@code jobKey}.
+     * If there is no stored configuration for the identified job, this method returns silently.
+     *
+     * @param jobKey the key identifying the job to delete.
+     */
+    void removeJob(JobKey jobKey);
 
     /**
      * Deletes all jobs.

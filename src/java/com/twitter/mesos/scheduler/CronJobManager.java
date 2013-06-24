@@ -41,6 +41,7 @@ import com.twitter.common.util.BackoffHelper;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.CronCollisionPolicy;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.JobKey;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
@@ -444,6 +445,12 @@ public class CronJobManager extends JobManager implements EventSubscriber {
   @Override
   public boolean hasJob(String role, String job) {
     return fetchJob(Tasks.jobKey(role, job)) != null;
+  }
+
+  @Override
+  public boolean hasJob(JobKey jobKey) {
+    // TODO(ksweeney): Remove delegation as part of MESOS-2403.
+    return hasJob(jobKey.getRole(), jobKey.getName());
   }
 
   private JobConfiguration fetchJob(final String jobKey) {
