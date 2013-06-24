@@ -1,7 +1,7 @@
 python_library(
   name = 'mesos-core',
   dependencies = [
-    python_requirement('mesos==191')
+    python_requirement('mesos==181')
   ]
 )
 
