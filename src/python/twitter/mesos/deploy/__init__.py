@@ -46,7 +46,7 @@ class Deployer(object):
   def run_cmd(self, cmd):
     """Runs a command and returns its return code along with stderr/stdout tuple"""
     def fork_join(args):
-      proc = subprocess.Popen(args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+      proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
       output = proc.communicate()
       return proc.returncode, output
     return self.maybe_run_command(fork_join, cmd)
@@ -55,7 +55,7 @@ class Deployer(object):
     if self._verbose or self._dry_run:
       print('%s command: %s' % ('Would run' if self._dry_run else 'Executing', ' '.join(cmd)))
     if self._dry_run:
-      return 0, ''
+      return 0, ('', '')
     else:
       return runner(cmd)
 

@@ -146,13 +146,11 @@ class SchedulerManager(object):
     current_builds = set()
     for host in self.machines:
       # the linux machines do not have realpath installed - this is at least portable
-      command = [
-        'ssh', self._deployer.ssh_target(host), 'readlink', '-f', self.LIVE_BUILD_PATH
-      ]
-      # TODO(John Sirois): get this to work via remote_call
-      result = self._deployer.maybe_run_command(lambda cmd: os.popen(' '.join(cmd)).read(), command)
+      command = ['readlink', '-f', self.LIVE_BUILD_PATH]
+      result = self._deployer.remote_call(host, command)
       if result:
-        current_build = result.strip()
+        rc, (stdout, stderr) = result
+        current_build = stdout.strip()
         if current_build != self.LIVE_BUILD_PATH:
           current_builds.add(current_build)
 
