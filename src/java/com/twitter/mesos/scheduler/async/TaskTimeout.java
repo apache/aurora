@@ -56,7 +56,7 @@ class TaskTimeout implements EventSubscriber {
       ScheduleStatus.ROLLBACK);
 
   @VisibleForTesting
-  static final TaskQuery TRANSIENT_QUERY = Query.byStatus(TRANSIENT_STATES);
+  static final Query.Builder TRANSIENT_QUERY = Query.unscoped().byStatus(TRANSIENT_STATES);
 
   private final Map<String, Context> futures = Maps.newConcurrentMap();
 

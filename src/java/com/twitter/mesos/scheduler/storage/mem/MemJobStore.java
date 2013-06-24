@@ -26,8 +26,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 class MemJobStore implements JobStore.Mutable {
 
-  private static final Function<JobConfiguration, JobConfiguration> DEEP_COPY =
-      Util.deepCopier();
+  private static final Function<JobConfiguration, JobConfiguration> DEEP_COPY = Util.deepCopier();
 
   private final LoadingCache<String, Manager> managers = CacheBuilder.newBuilder()
       .build(new CacheLoader<String, Manager>() {

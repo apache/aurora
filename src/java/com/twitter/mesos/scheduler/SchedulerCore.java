@@ -8,6 +8,7 @@ import com.google.common.base.Optional;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.JobKey;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ShardUpdateResult;
 import com.twitter.mesos.gen.TaskQuery;
@@ -39,12 +40,10 @@ public interface SchedulerCore {
   /**
    * Starts a cron job immediately.
    *
-   * @param role Owner of the job.
-   * @param job Name of the job.
+   * @param jobKey Job key.
    * @throws ScheduleException If the specified job does not exist, or is not a cron job.
    */
-  // TODO(ksweeney): refactor to use JobKey
-  void startCronJob(String role, String job) throws ScheduleException;
+  void startCronJob(JobKey jobKey) throws ScheduleException;
 
   /**
    * Triggers execution of a job.  This should only be called by job managers.

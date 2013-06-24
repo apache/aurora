@@ -31,14 +31,8 @@ public class ImmediateJobManager extends JobManager {
   }
 
   @Override
-  public boolean hasJob(final String role, final String job) {
-    return !Storage.Util.consistentFetchTasks(storage, Query.jobScoped(role, job).active())
+  public boolean hasJob(final JobKey jobKey) {
+    return !Storage.Util.consistentFetchTasks(storage, Query.jobScoped(jobKey).active())
         .isEmpty();
-  }
-
-  @Override
-  public boolean hasJob(JobKey jobKey) {
-    // TODO(ksweeney): Remove this delegation as part of MESOS-2403.
-    return hasJob(jobKey.getRole(), jobKey.getName());
   }
 }

@@ -2,6 +2,7 @@ package com.twitter.mesos.scheduler;
 
 import java.util.concurrent.Executor;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
 import org.easymock.Capture;
@@ -11,10 +12,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.common.testing.EasyMockTest;
-import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.CronCollisionPolicy;
-import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
@@ -33,6 +32,7 @@ import static org.junit.Assert.fail;
 public class CronJobManagerTest extends EasyMockTest {
 
   private static final String OWNER = "owner";
+  private static final String ENVIRONMENT = "staging11";
   private static final String JOB_NAME = "jobName";
 
   private SchedulerCore scheduler;
@@ -68,15 +68,12 @@ public class CronJobManagerTest extends EasyMockTest {
   }
 
   private IExpectationSetters<?> expectJobFetch() {
-    return expect(storageUtil.jobStore.fetchJob(CronJobManager.MANAGER_KEY, Tasks.jobKey(job)))
-        .andReturn(job);
+    return expect(storageUtil.jobStore.fetchJob(CronJobManager.MANAGER_KEY, job.getKey()))
+        .andReturn(Optional.of(job));
   }
 
   private IExpectationSetters<?> expectActiveTaskFetch(ScheduledTask... activeTasks) {
-    TaskQuery query = Query.jobScoped(job.getOwner().getRole(), job.getName())
-        .active()
-        .get();
-    return storageUtil.expectTaskFetch(query, activeTasks);
+    return storageUtil.expectTaskFetch(Query.jobScoped(job.getKey()).active(), activeTasks);
   }
 
   @Test
@@ -91,7 +88,7 @@ public class CronJobManagerTest extends EasyMockTest {
     control.replay();
 
     cron.receiveJob(job);
-    cron.startJobNow(job.getOwner().getRole(), job.getName());
+    cron.startJobNow(job.getKey());
   }
 
   @Test
@@ -119,7 +116,7 @@ public class CronJobManagerTest extends EasyMockTest {
     control.replay();
 
     cron.receiveJob(job);
-    cron.startJobNow(job.getOwner().getRole(), job.getName());
+    cron.startJobNow(job.getKey());
     delayLaunchCapture.getValue().run();
   }
 
@@ -157,12 +154,12 @@ public class CronJobManagerTest extends EasyMockTest {
     control.replay();
 
     cron.receiveJob(job);
-    cron.startJobNow(job.getOwner().getRole(), job.getName());
+    cron.startJobNow(job.getKey());
     delayLaunchCapture.getValue().run();
 
     // Start the job again.  Since the previous delayed start completed, this should repeat the
     // entire process.
-    cron.startJobNow(job.getOwner().getRole(), job.getName());
+    cron.startJobNow(job.getKey());
     delayLaunchCapture.getValue().run();
   }
 
@@ -196,9 +193,9 @@ public class CronJobManagerTest extends EasyMockTest {
 
     // Attempt to trick the cron manager into launching multiple times, or launching multiple
     // pollers.
-    cron.startJobNow(job.getOwner().getRole(), job.getName());
-    cron.startJobNow(job.getOwner().getRole(), job.getName());
-    cron.startJobNow(job.getOwner().getRole(), job.getName());
+    cron.startJobNow(job.getKey());
+    cron.startJobNow(job.getKey());
+    cron.startJobNow(job.getKey());
     delayLaunchCapture.getValue().run();
   }
 
@@ -237,7 +234,7 @@ public class CronJobManagerTest extends EasyMockTest {
     control.replay();
 
     cron.receiveJob(job);
-    cron.startJobNow(job.getOwner().getRole(), job.getName());
+    cron.startJobNow(job.getKey());
   }
 
   @Test
@@ -266,8 +263,7 @@ public class CronJobManagerTest extends EasyMockTest {
 
   private JobConfiguration makeJob() {
     return new JobConfiguration()
-        .setOwner(new Identity().setRole(OWNER))
-        .setName(JOB_NAME)
+        .setKey(JobKeys.from(OWNER, ENVIRONMENT, JOB_NAME))
         .setCronSchedule("1 1 1 1 1");
   }
 }

@@ -2,9 +2,13 @@ package com.twitter.mesos.scheduler;
 
 import javax.annotation.Nullable;
 
+import com.google.common.base.Function;
+import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 
+import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.JobKey;
+import com.twitter.mesos.gen.TaskQuery;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -17,6 +21,12 @@ public final class JobKeys {
   private JobKeys() {
     // Utility class.
   }
+
+  public static final Function<JobKey, JobKey> DEEP_COPY = new Function<JobKey, JobKey>() {
+    @Override public JobKey apply(JobKey jobKey) {
+      return jobKey.deepCopy();
+    }
+  };
 
   /**
    * Check that a jobKey struct is valid.
@@ -93,5 +103,37 @@ public final class JobKeys {
    */
   public static String toPath(JobKey jobKey) {
     return jobKey.getRole() + "/" + jobKey.getEnvironment() + "/" + jobKey.getName();
+  }
+
+  /**
+   * Create a "/"-delimited String representation of {@code jobKey}, suitable for logging but not
+   * necessarily suitable for use as a unique identifier.
+   *
+   * @param job Job to represent.
+   * @return "/"-delimited representation of the job's key.
+   */
+  public static String toPath(JobConfiguration job) {
+    return toPath(job.getKey());
+  }
+
+  /**
+   * Attempt to extract a {@link JobKey} from the given query if it is scoped to a single job.
+   *
+   * @param query Query to extract the key from.
+   * @return A present if one can be extracted, absent otherwise.
+   */
+  public static Optional<JobKey> from(TaskQuery query) {
+    if (Query.isJobScoped(query)
+        && query.isSetOwner()
+        && query.getOwner().isSetRole()
+        && query.isSetEnvironment()
+        && query.isSetJobName()) {
+
+      return Optional.of(
+          from(query.getOwner().getRole(), query.getEnvironment(), query.getJobName()));
+
+    } else {
+      return Optional.absent();
+    }
   }
 }

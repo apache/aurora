@@ -48,17 +48,6 @@ public abstract class JobManager {
   /**
    * Checks whether this manager is storing a job with the given key.
    *
-   * @deprecated Use {@link #hasJob(JobKey)}.
-   * @param role Job owner.
-   * @param job Job name.
-   * @return {@code true} if the manager has a matching job, {@code false} otherwise.
-   */
-  @Deprecated
-  public abstract boolean hasJob(String role, String job);
-
-  /**
-   * Checks whether this manager is storing a job with the given key.
-   *
    * @param jobKey Job key.
    * @return {@code true} if the manager has a matching job, {@code false} otherwise.
    */
@@ -67,12 +56,10 @@ public abstract class JobManager {
   /**
    * Instructs the manager to delete any jobs with the given key.
    *
-   * @param role Job owner.
-   * @param job Job name.
+   * @param jobKey Job key.
    * @return {@code true} if a matching job was deleted.
    */
-  // TODO(ksweeney): Refactor to take a JobKey
-  public boolean deleteJob(String role, String job) {
+  public boolean deleteJob(JobKey jobKey) {
     // Optionally overridden by implementing class.
     return false;
   }

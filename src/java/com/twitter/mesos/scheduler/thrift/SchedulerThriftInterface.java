@@ -243,20 +243,20 @@ class SchedulerThriftInterface implements SchedulerController {
   }
 
   @Override
-  public StartCronResponse startCronJob(JobKey job, SessionKey session) {
+  public StartCronResponse startCronJob(JobKey jobKey, SessionKey session) {
     checkNotNull(session);
-    JobKeys.assertValid(job);
+    JobKeys.assertValid(jobKey);
 
     StartCronResponse response = new StartCronResponse();
     try {
-      sessionValidator.checkAuthenticated(session, job.getRole());
+      sessionValidator.checkAuthenticated(session, jobKey.getRole());
     } catch (AuthFailedException e) {
       response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
       return response;
     }
 
     try {
-      schedulerCore.startCronJob(job.getRole(), job.getName());
+      schedulerCore.startCronJob(jobKey);
       response.setResponseCode(OK).setMessage("Cron run started.");
     } catch (ScheduleException e) {
       response.setResponseCode(INVALID_REQUEST)

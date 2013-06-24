@@ -16,6 +16,7 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.JobKey;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
@@ -34,7 +35,6 @@ import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.mesos.Tasks.ACTIVE_STATES;
 import static com.twitter.mesos.Tasks.jobKey;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
@@ -131,15 +131,14 @@ public class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public synchronized void startCronJob(String role, String job) throws ScheduleException {
-    checkNotBlank(role);
-    checkNotBlank(job);
+  public synchronized void startCronJob(JobKey jobKey) throws ScheduleException {
+    checkNotNull(jobKey);
 
-    if (!cronScheduler.hasJob(role, job)) {
-      throw new ScheduleException("Cron job does not exist for " + Tasks.jobKey(role, job));
+    if (!cronScheduler.hasJob(jobKey)) {
+      throw new ScheduleException("Cron job does not exist for " + JobKeys.toPath(jobKey));
     }
 
-    cronScheduler.startJobNow(role, job);
+    cronScheduler.startJobNow(jobKey);
   }
 
   @Override
@@ -173,7 +172,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
   private static Predicate<JobManager> managerHasJob(final JobConfiguration job) {
     return new Predicate<JobManager>() {
       @Override public boolean apply(JobManager manager) {
-        return manager.hasJob(job.getOwner().getRole(), job.getName());
+        return manager.hasJob(job.getKey());
       }
     };
   }
@@ -201,20 +200,22 @@ public class SchedulerCoreImpl implements SchedulerCore {
     checkNotNull(query);
     LOG.info("Killing tasks matching " + query);
 
-    boolean matchingScheduler = false;
+    boolean jobDeleted = false;
     boolean updateFinished = false;
 
-    if (specifiesJobOnly(query)) {
+    Optional<JobKey> jobKey = JobKeys.from(query);
+    if (jobKey.isPresent()) {
       // If this looks like a query for all tasks in a job, instruct the scheduler modules to
       // delete the job.
       for (JobManager manager : jobManagers) {
-        matchingScheduler =
-            manager.deleteJob(query.getOwner().getRole(), query.getJobName()) || matchingScheduler;
+        if (manager.deleteJob(jobKey.get())) {
+          jobDeleted = true;
+        }
       }
 
       String role = query.getOwner().getRole();
       String job = query.getJobName();
-      if (!matchingScheduler) {
+      if (!jobDeleted) {
         try {
           updateFinished = stateManager.finishUpdate(
               new Identity(role, user),
@@ -235,7 +236,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     }
 
     int tasksAffected = stateManager.changeState(query, KILLING, Optional.of("Killed by " + user));
-    if (!matchingScheduler && !updateFinished && (tasksAffected == 0)) {
+    if (!jobDeleted && !updateFinished && (tasksAffected == 0)) {
       throw new ScheduleException("No jobs to kill");
     }
   }
@@ -280,7 +281,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
       throws ScheduleException {
 
     final JobConfiguration job = parsedConfiguration.get();
-    if (cronScheduler.hasJob(job.getOwner().getRole(), job.getName())) {
+    if (cronScheduler.hasJob(job.getKey())) {
       cronScheduler.updateJob(job);
       return Optional.absent();
     }
