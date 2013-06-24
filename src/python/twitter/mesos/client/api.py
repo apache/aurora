@@ -192,6 +192,9 @@ invoking cancel_update.
   def get_job_updates(self):
     return self._scheduler.getJobUpdates()
 
+  def snapshot(self):
+    return self._scheduler.snapshot()
+
   def _assert_valid_job_key(self, job_key):
     if not isinstance(job_key, AuroraJobKey):
       raise self.TypeError('Invalid job_key %r: expected %s but got %s'

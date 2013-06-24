@@ -59,6 +59,7 @@ import com.twitter.mesos.gen.ScheduleStatusResponse;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.SessionKey;
 import com.twitter.mesos.gen.SetQuotaResponse;
+import com.twitter.mesos.gen.SnapshotResponse;
 import com.twitter.mesos.gen.StageRecoveryResponse;
 import com.twitter.mesos.gen.StartCronResponse;
 import com.twitter.mesos.gen.StartMaintenanceResponse;
@@ -711,6 +712,18 @@ class SchedulerThriftInterface implements SchedulerController {
   public UnloadRecoveryResponse unloadRecovery(SessionKey session) {
     recovery.unload();
     return new UnloadRecoveryResponse().setResponseCode(OK);
+  }
+
+  @Override
+  public SnapshotResponse snapshot(SessionKey session) {
+    SnapshotResponse response = new SnapshotResponse();
+    try {
+      storage.snapshot();
+      return response.setResponseCode(OK).setMessage("Compaction successful.");
+    } catch (Storage.StorageException e) {
+      LOG.log(Level.WARNING, "Requested snapshot failed.", e);
+      return response.setResponseCode(ERROR).setMessage(e.getMessage());
+    }
   }
 
   @VisibleForTesting

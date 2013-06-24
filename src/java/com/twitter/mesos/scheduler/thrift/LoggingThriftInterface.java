@@ -49,6 +49,7 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduleStatusResponse;
 import com.twitter.mesos.gen.SessionKey;
 import com.twitter.mesos.gen.SetQuotaResponse;
+import com.twitter.mesos.gen.SnapshotResponse;
 import com.twitter.mesos.gen.StageRecoveryResponse;
 import com.twitter.mesos.gen.StartCronResponse;
 import com.twitter.mesos.gen.StartMaintenanceResponse;
@@ -95,13 +96,17 @@ class LoggingThriftInterface implements MesosAdmin.Iface {
     this.delegate = checkNotNull(delegate);
   }
 
-  private void logUserAction(SessionKey session, String messageTemplate, Object... formatArgs) {
+  private static void logUserAction(
+      SessionKey session,
+      String messageTemplate,
+      Object... formatArgs) {
+
     LOG.info(
         "Request by user " + session.getUser() + " to "
         + String.format(messageTemplate, formatArgs));
   }
 
-  private void logUnauthenticatedAction(String messageTemplate, Object... formatArgs) {
+  private static void logUnauthenticatedAction(String messageTemplate, Object... formatArgs) {
     LOG.info(String.format(messageTemplate, formatArgs));
   }
 
@@ -338,5 +343,11 @@ class LoggingThriftInterface implements MesosAdmin.Iface {
   public GetJobUpdatesResponse getJobUpdates(SessionKey session) throws TException {
     logUserAction(session, "getJobUpdates");
     return delegate.getJobUpdates(session);
+  }
+
+  @Override
+  public SnapshotResponse snapshot(SessionKey session) throws TException {
+    logUserAction(session, "snapshot");
+    return delegate.snapshot(session);
   }
 }

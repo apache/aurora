@@ -132,4 +132,9 @@ public class MemStorage implements Storage {
       lockManager.writeUnlock();
     }
   }
+
+  @Override
+  public void snapshot() {
+    // No-op.
+  }
 }

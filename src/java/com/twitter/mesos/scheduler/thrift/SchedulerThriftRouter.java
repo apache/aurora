@@ -33,6 +33,7 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduleStatusResponse;
 import com.twitter.mesos.gen.SessionKey;
 import com.twitter.mesos.gen.SetQuotaResponse;
+import com.twitter.mesos.gen.SnapshotResponse;
 import com.twitter.mesos.gen.StageRecoveryResponse;
 import com.twitter.mesos.gen.StartCronResponse;
 import com.twitter.mesos.gen.StartMaintenanceResponse;
@@ -236,5 +237,10 @@ public class SchedulerThriftRouter implements MesosAdmin.Iface {
   @Override
   public GetJobUpdatesResponse getJobUpdates(SessionKey session) {
     return schedulerController.getJobUpdates(session);
+  }
+
+  @Override
+  public SnapshotResponse snapshot(SessionKey session) {
+    return schedulerController.snapshot(session);
   }
 }

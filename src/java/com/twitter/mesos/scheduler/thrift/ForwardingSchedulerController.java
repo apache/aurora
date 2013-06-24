@@ -2,8 +2,6 @@ package com.twitter.mesos.scheduler.thrift;
 
 import java.util.Set;
 
-import com.google.common.base.Preconditions;
-
 import com.twitter.mesos.gen.CommitRecoveryResponse;
 import com.twitter.mesos.gen.CreateJobResponse;
 import com.twitter.mesos.gen.DeleteRecoveryTasksResponse;
@@ -30,6 +28,7 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduleStatusResponse;
 import com.twitter.mesos.gen.SessionKey;
 import com.twitter.mesos.gen.SetQuotaResponse;
+import com.twitter.mesos.gen.SnapshotResponse;
 import com.twitter.mesos.gen.StageRecoveryResponse;
 import com.twitter.mesos.gen.StartCronResponse;
 import com.twitter.mesos.gen.StartMaintenanceResponse;
@@ -38,6 +37,8 @@ import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.UnloadRecoveryResponse;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.UpdateShardsResponse;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * A forwarding scheduler controller to make it easy to override specific behavior in an
@@ -48,7 +49,7 @@ abstract class ForwardingSchedulerController implements SchedulerController {
   private final SchedulerController delegate;
 
   ForwardingSchedulerController(SchedulerController delegate) {
-    this.delegate = Preconditions.checkNotNull(delegate);
+    this.delegate = checkNotNull(delegate);
   }
 
   @Override
@@ -202,5 +203,10 @@ abstract class ForwardingSchedulerController implements SchedulerController {
   @Override
   public GetJobUpdatesResponse getJobUpdates(SessionKey session) {
     return delegate.getJobUpdates(session);
+  }
+
+  @Override
+  public SnapshotResponse snapshot(SessionKey session) {
+    return delegate.snapshot(session);
   }
 }

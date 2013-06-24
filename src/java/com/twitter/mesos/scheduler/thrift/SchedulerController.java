@@ -28,6 +28,7 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduleStatusResponse;
 import com.twitter.mesos.gen.SessionKey;
 import com.twitter.mesos.gen.SetQuotaResponse;
+import com.twitter.mesos.gen.SnapshotResponse;
 import com.twitter.mesos.gen.StageRecoveryResponse;
 import com.twitter.mesos.gen.StartCronResponse;
 import com.twitter.mesos.gen.StartMaintenanceResponse;
@@ -111,4 +112,6 @@ interface SchedulerController {
   EndMaintenanceResponse endMaintenance(Hosts hosts, SessionKey session);
 
   GetJobUpdatesResponse getJobUpdates(SessionKey session);
+
+  SnapshotResponse snapshot(SessionKey session);
 }

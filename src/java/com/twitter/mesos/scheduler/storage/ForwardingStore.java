@@ -90,6 +90,11 @@ public class ForwardingStore implements
   }
 
   @Override
+  public void snapshot() throws StorageException {
+    storage.snapshot();
+  }
+
+  @Override
   public void saveFrameworkId(String frameworkId) {
     schedulerStore.saveFrameworkId(frameworkId);
   }

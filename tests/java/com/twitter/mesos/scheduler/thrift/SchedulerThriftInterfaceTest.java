@@ -773,6 +773,25 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   }
 
+  @Test
+  public void testSnapshot() throws Exception {
+    expectAuth(ROOT, false);
+
+    expectAuth(ROOT, true);
+    storageUtil.storage.snapshot();
+    expectLastCall();
+
+    expectAuth(ROOT, true);
+    storageUtil.storage.snapshot();
+    expectLastCall().andThrow(new Storage.StorageException("mock error!"));
+
+    control.replay();
+
+    assertEquals(ResponseCode.AUTH_FAILED, thrift.snapshot(SESSION).getResponseCode());
+    assertEquals(ResponseCode.OK, thrift.snapshot(SESSION).getResponseCode());
+    assertEquals(ResponseCode.ERROR, thrift.snapshot(SESSION).getResponseCode());
+  }
+
   private JobConfiguration makeJob() {
     return makeJob(nonProductionTask());
   }

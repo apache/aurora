@@ -312,6 +312,18 @@ def scheduler_list_job_updates():
     log.info('\t'.join((update.role, update.job)))
 
 
+@app.command
+@app.command_option(CLUSTER_OPTION)
+def scheduler_snapshot(_, options):
+  """usage: scheduler_snapshot --cluster=CLUSTER
+
+  Request that the scheduler perform a storage snapshot and block until complete.
+  """
+  resp = MesosClientAPI(options.cluster, options.verbosity == 'verbose').snapshot()
+  check_and_log_response(resp)
+  sys.exit(0 if resp.responseCode == ResponseCode.OK else 1)
+
+
 def make_commands_str(commands):
   commands.sort()
   if len(commands) == 1:

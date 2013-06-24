@@ -197,6 +197,12 @@ public interface Storage {
   <T, E extends Exception> T write(MutateWork<T, E> work) throws StorageException, E;
 
   /**
+   * Clean up the underlying storage by optimizing internal data structures. Does not change
+   * externally-visible state but might not run concurrently with write operations.
+   */
+  void snapshot() throws StorageException;
+
+  /**
    * A non-volatile storage that has additional methods to control its lifecycle.
    */
   interface NonVolatileStorage extends Storage {

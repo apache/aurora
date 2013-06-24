@@ -411,12 +411,12 @@ public class LogStorage extends ForwardingStore
         @Override public void run() {
           try {
             snapshot();
-          } catch (CodingException e) {
-            LOG.log(Level.WARNING, "Failed to encode a snapshot", e);
-          } catch (InvalidPositionException e) {
-            LOG.log(Level.WARNING, "Saved snapshot but failed to truncate entries preceding it", e);
-          } catch (StreamAccessException e) {
-            LOG.log(Level.WARNING, "Failed to create a snapshot", e);
+          } catch (StorageException e) {
+            if (e.getCause() != null) {
+              LOG.log(Level.WARNING, e.getMessage(), e.getCause());
+            } else {
+              LOG.log(Level.WARNING, "StorageException when attempting to snapshot.", e);
+            }
           }
         }
       });
@@ -431,7 +431,7 @@ public class LogStorage extends ForwardingStore
    * @throws StreamAccessException If there is a problem writing the snapshot to the log stream.
    */
   @Timed("scheduler_log_snapshot")
-  public void snapshot() throws CodingException, InvalidPositionException, StreamAccessException {
+  void doSnapshot() throws CodingException, InvalidPositionException, StreamAccessException {
     super.write(new MutateWork.NoResult<CodingException>() {
       @Override protected void execute(MutableStoreProvider unused)
           throws CodingException, InvalidPositionException, StreamAccessException {
@@ -663,6 +663,20 @@ public class LogStorage extends ForwardingStore
       }
     });
     return false;
+  }
+
+  @Override
+  public void snapshot() throws StorageException {
+    try {
+      doSnapshot();
+    } catch (CodingException e) {
+      throw new StorageException("Failed to encode a snapshot", e);
+    } catch (InvalidPositionException e) {
+      throw new StorageException("Saved snapshot but failed to truncate entries preceding it", e);
+    } catch (StreamAccessException e) {
+      throw new StorageException("Failed to create a snapshot", e);
+    }
+    super.snapshot();
   }
 
   private void log(Op op) {
