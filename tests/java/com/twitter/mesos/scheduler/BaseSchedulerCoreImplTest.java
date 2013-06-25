@@ -99,7 +99,8 @@ import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.pop
 public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   private static final String ROLE_A = "Test_Role_A";
-  private static final Identity OWNER_A = new Identity(ROLE_A, "Test_User_A");
+  private static final String USER_A = "Test_User_A";
+  private static final Identity OWNER_A = new Identity(ROLE_A, USER_A);
   private static final String ENV_A = "Test_Env_A";
   private static final String JOB_A = "Test_Job_A";
   private static final JobKey KEY_A = JobKeys.from(ROLE_A, ENV_A, JOB_A);
@@ -648,7 +649,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(job);
     assertTrue(cron.hasJob(KEY_A));
 
-    scheduler.killTasks(queryJob(OWNER_A, JOB_A), OWNER_A.getUser());
+    scheduler.killTasks(Query.jobScoped(KEY_A).get(), OWNER_A.getUser());
     scheduler.createJob(updated);
 
     JobConfiguration stored = Iterables.getOnlyElement(cron.getJobs());
@@ -1800,11 +1801,11 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   }
 
   private static Identity makeIdentity(String role) {
-    return new Identity().setRole(role).setUser(role);
+    return new Identity().setRole(role).setUser(USER_A);
   }
 
   private static Identity makeIdentity(JobKey jobKey) {
-    return makeIdentity(jobKey);
+    return makeIdentity(jobKey.getRole());
   }
 
   private static ParsedConfiguration makeCronJob(
@@ -1843,6 +1844,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       Iterable<TwitterTaskInfo> tasks) throws TaskDescriptionException {
 
     JobConfiguration job = new JobConfiguration()
+        .setName(jobKey.getName())
         .setOwner(makeIdentity(jobKey))
         .setKey(jobKey);
     int i = 0;

@@ -189,10 +189,12 @@ public class SchedulerCoreImpl implements SchedulerCore {
     stateManager.changeState(query, status, message);
   }
 
-  private static boolean specifiesJobOnly(TaskQuery query) {
-    return Query.isJobScoped(query)
-        && (query.getStatusesSize() == 0)
-        && (query.getTaskIdsSize() == 0);
+  private static Optional<JobKey> keyIfStrictlyJobScoped(TaskQuery query) {
+    if (query.getStatusesSize() == 0 && query.getTaskIdsSize() == 0) {
+      return JobKeys.from(query);
+    } else {
+      return Optional.absent();
+    }
   }
 
   @Override
@@ -203,7 +205,7 @@ public class SchedulerCoreImpl implements SchedulerCore {
     boolean jobDeleted = false;
     boolean updateFinished = false;
 
-    Optional<JobKey> jobKey = JobKeys.from(query);
+    Optional<JobKey> jobKey = keyIfStrictlyJobScoped(query);
     if (jobKey.isPresent()) {
       // If this looks like a query for all tasks in a job, instruct the scheduler modules to
       // delete the job.

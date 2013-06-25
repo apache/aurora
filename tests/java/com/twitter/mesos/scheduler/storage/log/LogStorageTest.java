@@ -198,6 +198,7 @@ public class LogStorageTest extends EasyMockTest {
             return null;
           }
         }).times(2);
+    storageUtil.storage.snapshot();
 
     control.replay();
 
