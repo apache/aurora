@@ -19,10 +19,12 @@ import javax.ws.rs.core.Response;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.HashBiMap;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -185,35 +187,46 @@ public class SchedulerzJob extends JerseyTemplateServlet {
     return (mb >= 1024) ? ((mb / 1024) + " GiB") : (mb + " MiB");
   }
 
-  private static String humanReadableConstraint(TaskConstraint constraint) {
-    StringBuilder sb = new StringBuilder();
-    switch (constraint.getSetField()) {
-      case VALUE:
-        if (constraint.getValue().isNegated()) {
-          sb.append("not ");
+  private static final Function<Constraint, String> DISPLAY_CONSTRAINT =
+      new Function<Constraint, String>() {
+        @Override public String apply(Constraint constraint) {
+          StringBuilder sb = new StringBuilder().append(constraint.getName()).append(": ");
+          TaskConstraint taskConstraint = constraint.getConstraint();
+          switch (taskConstraint.getSetField()) {
+            case VALUE:
+              if (taskConstraint.getValue().isNegated()) {
+                sb.append("not ");
+              }
+              sb.append(Joiner.on(", ").join(taskConstraint.getValue().getValues()));
+              break;
+
+            case LIMIT:
+              sb.append("limit ").append(taskConstraint.getLimit().getLimit());
+              break;
+
+            default:
+              sb.append("Unhandled constraint type " + taskConstraint.getSetField());
+          }
+
+          return sb.toString();
         }
-        sb.append(Joiner.on(", ").join(constraint.getValue().getValues()));
-        break;
-
-      case LIMIT:
-        sb.append("limit ").append(constraint.getLimit().getLimit());
-        break;
-
-      default:
-        sb.append("Unhandled constraint type " + constraint.getSetField());
-    }
-
-    return sb.toString();
-  }
+      };
 
   private static final Function<TwitterTaskInfo, SchedulingDetails> CONFIG_TO_DETAILS =
       new Function<TwitterTaskInfo, SchedulingDetails>() {
         @Override public SchedulingDetails apply(TwitterTaskInfo task) {
+          String resources = Joiner.on(", ").join(
+              "cpu: " + task.getNumCpus(),
+              "ram: " + scaleMb(task.getRamMb()),
+              "disk: " + scaleMb(task.getDiskMb()));
           ImmutableMap.Builder<String, Object> details = ImmutableMap.<String, Object>builder()
-              .put("contact", task.isSetContactEmail() ? task.getContactEmail() : "none")
-              .put("CPU", task.getNumCpus())
-              .put("RAM" , scaleMb(task.getRamMb()))
-              .put("disk", scaleMb(task.getDiskMb()));
+              .put("resources", resources);
+          if (task.getConstraintsSize() > 0) {
+            Iterable<String> displayConstraints = FluentIterable.from(task.getConstraints())
+                .transform(DISPLAY_CONSTRAINT)
+                .toSortedList(Ordering.<String>natural());
+            details.put("constraints", Joiner.on(", ").join(displayConstraints));
+          }
           if (task.isIsService()) {
             details.put("service", "true");
           }
@@ -221,10 +234,8 @@ public class SchedulerzJob extends JerseyTemplateServlet {
             details.put("production", "true");
           }
           if (task.getRequestedPortsSize() > 0) {
-            details.put("ports", Joiner.on(",").join(task.getRequestedPorts()));
-          }
-          for (Constraint constraint : task.getConstraints()) {
-            details.put(constraint.getName(), humanReadableConstraint(constraint.getConstraint()));
+            details.put("ports",
+                Joiner.on(", ").join(ImmutableSortedSet.copyOf(task.getRequestedPorts())));
           }
           if (task.getPackagesSize() > 0) {
             List<String> packages = Ordering.natural().sortedCopy(
@@ -233,6 +244,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
                 "packages",
                 Joiner.on(',').join(packages));
           }
+          details.put("contact", task.isSetContactEmail() ? task.getContactEmail() : "none");
           return new SchedulingDetails(details.build());
         }
       };
