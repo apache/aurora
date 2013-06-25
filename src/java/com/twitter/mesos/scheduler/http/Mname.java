@@ -29,7 +29,7 @@ import com.google.inject.Inject;
 
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduledTask;
-import com.twitter.mesos.scheduler.Query;
+import com.twitter.mesos.scheduler.base.Query;
 import com.twitter.mesos.scheduler.storage.Storage;
 
 import static javax.ws.rs.core.Response.Status.NOT_FOUND;

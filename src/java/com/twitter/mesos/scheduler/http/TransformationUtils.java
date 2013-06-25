@@ -8,7 +8,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Range;
 
 import com.twitter.mesos.gen.Package;
-import com.twitter.mesos.scheduler.Numbers;
+import com.twitter.mesos.scheduler.base.Numbers;
 
 /**
  * Utility class to hold common object to string transformation helper functions.

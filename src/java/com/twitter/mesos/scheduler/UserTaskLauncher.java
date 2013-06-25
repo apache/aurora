@@ -16,6 +16,8 @@ import org.apache.mesos.Protos.TaskStatus;
 
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.scheduler.async.OfferQueue;
+import com.twitter.mesos.scheduler.base.Conversions;
+import com.twitter.mesos.scheduler.base.Query;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 

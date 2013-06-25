@@ -26,7 +26,7 @@ public interface TaskStore {
 
   /**
    * Fetches a read-only view of tasks matching a query and filters. Intended for use with a
-   * {@link com.twitter.mesos.scheduler.Query.Builder}.
+   * {@link com.twitter.mesos.scheduler.base.Query.Builder}.
    *
    * @param querySupplier Supplier of the query to identify tasks with.
    * @return A read-only view of matching tasks.

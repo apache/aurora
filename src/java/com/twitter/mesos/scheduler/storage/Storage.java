@@ -273,7 +273,7 @@ public interface Storage {
 
     /**
      * Fetch tasks matching the query returned by {@code querySupplier} from {@code storage} in a
-     * read operation. Intended for use with {@link com.twitter.mesos.scheduler.Query.Builder}
+     * read operation. Intended for use with {@link com.twitter.mesos.scheduler.base.Query.Builder}
      * instances.
      *
      * @see #consistentFetchTasks

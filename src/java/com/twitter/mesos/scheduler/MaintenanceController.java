@@ -24,6 +24,7 @@ import com.twitter.mesos.gen.HostStatus;
 import com.twitter.mesos.gen.MaintenanceMode;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.TaskQuery;
+import com.twitter.mesos.scheduler.base.Query;
 import com.twitter.mesos.scheduler.events.PubsubEvent;
 import com.twitter.mesos.scheduler.events.PubsubEvent.EventSubscriber;
 import com.twitter.mesos.scheduler.events.PubsubEvent.StorageStarted;

@@ -52,7 +52,7 @@ import com.twitter.mesos.gen.storage.SaveQuota;
 import com.twitter.mesos.gen.storage.SaveTasks;
 import com.twitter.mesos.gen.storage.Snapshot;
 import com.twitter.mesos.gen.storage.Transaction;
-import com.twitter.mesos.scheduler.Query;
+import com.twitter.mesos.scheduler.base.Query;
 import com.twitter.mesos.scheduler.log.Log;
 import com.twitter.mesos.scheduler.log.Log.Entry;
 import com.twitter.mesos.scheduler.log.Log.Position;

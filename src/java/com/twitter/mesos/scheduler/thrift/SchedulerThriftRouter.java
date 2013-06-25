@@ -42,7 +42,7 @@ import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.UnloadRecoveryResponse;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.UpdateShardsResponse;
-import com.twitter.mesos.scheduler.JobKeys;
+import com.twitter.mesos.scheduler.base.JobKeys;
 import com.twitter.mesos.scheduler.thrift.auth.CapabilityValidator.Capability;
 import com.twitter.mesos.scheduler.thrift.auth.Requires;
 

@@ -25,7 +25,7 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.comm.AdjustRetainedTasks;
 import com.twitter.mesos.scheduler.PulseMonitor;
-import com.twitter.mesos.scheduler.Query;
+import com.twitter.mesos.scheduler.base.Query;
 import com.twitter.mesos.scheduler.storage.testing.StorageTestUtil;
 
 import static org.easymock.EasyMock.expect;

@@ -55,6 +55,8 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.ValueConstraint;
 import com.twitter.mesos.scheduler.CronJobManager.CronScheduler;
+import com.twitter.mesos.scheduler.base.JobKeys;
+import com.twitter.mesos.scheduler.base.Query;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import com.twitter.mesos.scheduler.configuration.ParsedConfiguration;

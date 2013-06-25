@@ -28,10 +28,10 @@ import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.comm.AdjustRetainedTasks;
-import com.twitter.mesos.scheduler.CommandUtil;
 import com.twitter.mesos.scheduler.PulseMonitor;
-import com.twitter.mesos.scheduler.Query;
 import com.twitter.mesos.scheduler.TaskLauncher;
+import com.twitter.mesos.scheduler.base.CommandUtil;
+import com.twitter.mesos.scheduler.base.Query;
 import com.twitter.mesos.scheduler.configuration.Resources;
 import com.twitter.mesos.scheduler.storage.Storage;
 

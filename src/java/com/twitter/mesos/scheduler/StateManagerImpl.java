@@ -2,6 +2,7 @@ package com.twitter.mesos.scheduler;
 
 import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Queue;
@@ -47,6 +48,7 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.scheduler.SideEffectStorage.OperationFinalizer;
 import com.twitter.mesos.scheduler.SideEffectStorage.SideEffectWork;
+import com.twitter.mesos.scheduler.base.Query;
 import com.twitter.mesos.scheduler.events.PubsubEvent;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
@@ -67,8 +69,8 @@ import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
 import static com.twitter.mesos.gen.ScheduleStatus.ROLLBACK;
 import static com.twitter.mesos.gen.ScheduleStatus.UNKNOWN;
 import static com.twitter.mesos.gen.ScheduleStatus.UPDATING;
-import static com.twitter.mesos.scheduler.Shards.GET_NEW_CONFIG;
-import static com.twitter.mesos.scheduler.Shards.GET_ORIGINAL_CONFIG;
+import static com.twitter.mesos.scheduler.base.Shards.GET_NEW_CONFIG;
+import static com.twitter.mesos.scheduler.base.Shards.GET_ORIGINAL_CONFIG;
 
 /**
  * Manager of all persistence-related operations for the scheduler.  Acts as a controller for
@@ -625,6 +627,31 @@ public class StateManagerImpl implements StateManager {
     AssignedTask getAssignedTask();
   }
 
+  private static Map<String, Integer> getNameMappedPorts(
+      Set<String> portNames,
+      Set<Integer> allocatedPorts) {
+
+    Preconditions.checkNotNull(portNames);
+
+    // Expand ports.
+    Map<String, Integer> ports = Maps.newHashMap();
+    Set<Integer> portsRemaining = Sets.newHashSet(allocatedPorts);
+    Iterator<Integer> portConsumer = Iterables.consumingIterable(portsRemaining).iterator();
+
+    for (String portName : portNames) {
+      Preconditions.checkArgument(portConsumer.hasNext(),
+          "Allocated ports %s were not sufficient to expand task.", allocatedPorts);
+      int portNumber = portConsumer.next();
+      ports.put(portName, portNumber);
+    }
+
+    if (!portsRemaining.isEmpty()) {
+      LOG.warning("Not all allocated ports were used to map ports!");
+    }
+
+    return ports;
+  }
+
   private TaskAssignMutation assignHost(
       final String slaveHost,
       final SlaveID slaveId,
@@ -633,8 +660,8 @@ public class StateManagerImpl implements StateManager {
     final Closure<ScheduledTask> mutation = new Closure<ScheduledTask>() {
       @Override public void execute(ScheduledTask task) {
         AssignedTask assigned = task.getAssignedTask();
-        assigned.setAssignedPorts(CommandLineExpander.getNameMappedPorts(
-            assigned.getTask().getRequestedPorts(), assignedPorts));
+        assigned.setAssignedPorts(
+            getNameMappedPorts(assigned.getTask().getRequestedPorts(), assignedPorts));
         assigned.setSlaveHost(slaveHost)
             .setSlaveId(slaveId.getValue());
       }

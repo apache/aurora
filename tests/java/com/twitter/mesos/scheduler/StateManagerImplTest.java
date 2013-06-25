@@ -33,6 +33,7 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.ShardUpdateResult;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
+import com.twitter.mesos.scheduler.base.Query;
 import com.twitter.mesos.scheduler.events.PubsubEvent;
 import com.twitter.mesos.scheduler.events.PubsubEvent.TaskStateChange;
 import com.twitter.mesos.scheduler.events.PubsubEvent.TasksDeleted;

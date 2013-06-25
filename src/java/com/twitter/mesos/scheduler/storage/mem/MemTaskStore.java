@@ -32,7 +32,7 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.Query;
+import com.twitter.mesos.scheduler.base.Query;
 import com.twitter.mesos.scheduler.storage.TaskStore;
 
 import static com.google.common.base.Preconditions.checkNotNull;

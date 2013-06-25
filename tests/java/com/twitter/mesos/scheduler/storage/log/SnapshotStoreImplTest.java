@@ -21,7 +21,7 @@ import com.twitter.mesos.gen.storage.QuotaConfiguration;
 import com.twitter.mesos.gen.storage.SchedulerMetadata;
 import com.twitter.mesos.gen.storage.Snapshot;
 import com.twitter.mesos.gen.storage.StoredJob;
-import com.twitter.mesos.scheduler.Query;
+import com.twitter.mesos.scheduler.base.Query;
 import com.twitter.mesos.scheduler.quota.Quotas;
 import com.twitter.mesos.scheduler.storage.SnapshotStore;
 import com.twitter.mesos.scheduler.storage.testing.StorageTestUtil;

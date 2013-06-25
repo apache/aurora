@@ -27,6 +27,7 @@ import com.twitter.common.stats.Stats;
 import com.twitter.mesos.GuiceUtils.AllowUnchecked;
 import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.comm.SchedulerMessage;
+import com.twitter.mesos.scheduler.base.Conversions;
 import com.twitter.mesos.scheduler.configuration.Resources;
 import com.twitter.mesos.scheduler.events.PubsubEvent.Interceptors.Event;
 import com.twitter.mesos.scheduler.events.PubsubEvent.Interceptors.SendNotification;
@@ -39,7 +40,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * Location for communication with the mesos core.
  */
-public class MesosSchedulerImpl implements Scheduler {
+class MesosSchedulerImpl implements Scheduler {
   private static final Logger LOG = Logger.getLogger(MesosSchedulerImpl.class.getName());
 
   private final AtomicLong resourceOffers = Stats.exportLong("scheduler_resource_offers");

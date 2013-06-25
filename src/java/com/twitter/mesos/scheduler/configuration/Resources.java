@@ -26,7 +26,7 @@ import org.apache.mesos.Protos.Value.Type;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.Numbers;
+import com.twitter.mesos.scheduler.base.Numbers;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 

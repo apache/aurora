@@ -53,6 +53,7 @@ import com.twitter.mesos.scheduler.TaskAssigner.TaskAssignerImpl;
 import com.twitter.mesos.scheduler.async.AsyncModule;
 import com.twitter.mesos.scheduler.events.TaskEventModule;
 import com.twitter.mesos.scheduler.filter.SchedulingFilterImpl;
+import com.twitter.mesos.scheduler.http.ClusterName;
 import com.twitter.mesos.scheduler.http.ServletModule;
 import com.twitter.mesos.scheduler.metadata.MetadataModule;
 import com.twitter.mesos.scheduler.periodic.GcExecutorLauncher;
@@ -65,7 +66,7 @@ import com.twitter.thrift.ServiceInstance;
 /**
  * Binding module for the twitter mesos scheduler.
  */
-public class SchedulerModule extends AbstractModule {
+class SchedulerModule extends AbstractModule {
   private static final Logger LOG = Logger.getLogger(SchedulerModule.class.getName());
 
   @CmdLine(name = "executor_gc_interval",

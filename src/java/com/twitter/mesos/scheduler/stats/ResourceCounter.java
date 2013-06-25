@@ -19,7 +19,7 @@ import com.google.inject.Inject;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.Query;
+import com.twitter.mesos.scheduler.base.Query;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.StorageException;

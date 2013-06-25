@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.base;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;

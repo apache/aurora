@@ -25,6 +25,8 @@ import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.scheduler.StateManagerImpl.UpdateException;
+import com.twitter.mesos.scheduler.base.JobKeys;
+import com.twitter.mesos.scheduler.base.Query;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ParsedConfiguration;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
@@ -45,7 +47,7 @@ import static com.twitter.mesos.gen.ScheduleStatus.UPDATING;
 /**
  * Implementation of the scheduler core.
  */
-public class SchedulerCoreImpl implements SchedulerCore {
+class SchedulerCoreImpl implements SchedulerCore {
 
   private static final Logger LOG = Logger.getLogger(SchedulerCoreImpl.class.getName());
 

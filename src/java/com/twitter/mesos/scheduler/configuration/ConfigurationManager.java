@@ -36,7 +36,7 @@ import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.TwitterTaskInfo._Fields;
 import com.twitter.mesos.gen.ValueConstraint;
-import com.twitter.mesos.scheduler.JobKeys;
+import com.twitter.mesos.scheduler.base.JobKeys;
 
 import static com.twitter.mesos.gen.Constants.DEFAULT_ENVIRONMENT;
 import static com.twitter.mesos.gen.Constants.GOOD_IDENTIFIER_PATTERN_JVM;

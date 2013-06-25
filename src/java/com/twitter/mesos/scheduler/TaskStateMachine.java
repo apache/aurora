@@ -40,7 +40,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * TODO(William Farner): Introduce an interface to allow state machines to be dealt with
  *     abstractly from the consumption side.
  */
-public class TaskStateMachine {
+class TaskStateMachine {
   private static final Logger LOG = Logger.getLogger(TaskStateMachine.class.getName());
 
   private static final AtomicLong ILLEGAL_TRANSITIONS =

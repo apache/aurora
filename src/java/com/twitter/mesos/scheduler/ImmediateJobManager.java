@@ -5,12 +5,13 @@ import com.google.inject.Inject;
 
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.JobKey;
+import com.twitter.mesos.scheduler.base.Query;
 import com.twitter.mesos.scheduler.storage.Storage;
 
 /**
  * Job scheduler that accepts any job and executes it immediately.
  */
-public class ImmediateJobManager extends JobManager {
+class ImmediateJobManager extends JobManager {
 
   private final Storage storage;
 

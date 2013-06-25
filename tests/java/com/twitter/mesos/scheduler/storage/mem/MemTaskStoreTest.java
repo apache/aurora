@@ -19,8 +19,8 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.JobKeys;
-import com.twitter.mesos.scheduler.Query;
+import com.twitter.mesos.scheduler.base.JobKeys;
+import com.twitter.mesos.scheduler.base.Query;
 
 import static org.junit.Assert.assertEquals;
 

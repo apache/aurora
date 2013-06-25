@@ -45,10 +45,8 @@ import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.ClusterName;
-import com.twitter.mesos.scheduler.CommandLineExpander;
-import com.twitter.mesos.scheduler.JobKeys;
-import com.twitter.mesos.scheduler.Query;
+import com.twitter.mesos.scheduler.base.JobKeys;
+import com.twitter.mesos.scheduler.base.Query;
 import com.twitter.mesos.scheduler.filter.SchedulingFilter.Veto;
 import com.twitter.mesos.scheduler.metadata.NearestFit;
 import com.twitter.mesos.scheduler.storage.Storage;
@@ -113,6 +111,35 @@ public class SchedulerzJob extends JerseyTemplateServlet {
     }
   };
 
+  // Double percents to escape formatting sequence.
+  private static final String PORT_FORMAT = "%%port:%s%%";
+  private static final String SHARD_ID_REGEXP = "%shard_id%";
+  private static final String TASK_ID_REGEXP = "%task_id%";
+  private static final String HOST_REGEXP = "%host%";
+
+  private static String expandText(String value, AssignedTask task) {
+    String expanded = value;
+    TwitterTaskInfo config = task.getTask();
+
+    expanded = expanded.replaceAll(SHARD_ID_REGEXP, String.valueOf(config.getShardId()));
+    expanded = expanded.replaceAll(TASK_ID_REGEXP, task.getTaskId());
+
+    if (task.isSetSlaveHost()) {
+      expanded = expanded.replaceAll(HOST_REGEXP, task.getSlaveHost());
+    }
+
+    // Expand ports.
+    if (task.isSetAssignedPorts()) {
+      for (Map.Entry<String, Integer> portEntry : task.getAssignedPorts().entrySet()) {
+        expanded = expanded.replaceAll(
+            String.format(PORT_FORMAT, portEntry.getKey()),
+            String.valueOf(portEntry.getValue()));
+      }
+    }
+
+    return expanded;
+  }
+
   private final Function<ScheduledTask, Map<String, Object>> taskToStringMap =
       new Function<ScheduledTask, Map<String, Object>>() {
         @Override public Map<String, Object> apply(ScheduledTask scheduledTask) {
@@ -138,7 +165,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
 
           Function<String, String> expander = new Function<String, String>() {
             @Override public String apply(String input) {
-              return CommandLineExpander.expand(input, task);
+              return expandText(input, task);
             }
           };
 

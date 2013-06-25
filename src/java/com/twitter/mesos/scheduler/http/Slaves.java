@@ -19,7 +19,6 @@ import com.twitter.common.base.Closure;
 import com.twitter.mesos.gen.Attribute;
 import com.twitter.mesos.gen.HostAttributes;
 import com.twitter.mesos.gen.MaintenanceMode;
-import com.twitter.mesos.scheduler.ClusterName;
 import com.twitter.mesos.scheduler.storage.Storage;
 
 import static com.google.common.base.Preconditions.checkNotNull;

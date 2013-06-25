@@ -30,7 +30,7 @@ import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.ValueConstraint;
 import com.twitter.mesos.scheduler.MaintenanceController;
 import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
-import com.twitter.mesos.scheduler.Query;
+import com.twitter.mesos.scheduler.base.Query;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.Resources;
 import com.twitter.mesos.scheduler.filter.SchedulingFilter.Veto;
