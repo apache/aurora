@@ -14,6 +14,7 @@ import com.twitter.mesos.gen.LimitConstraint;
 import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.ValueConstraint;
+import com.twitter.mesos.scheduler.base.JobKeys;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -45,16 +46,17 @@ public class ConfigurationManagerTest {
                   .setHealthCheckIntervalSecs(0)
                   .setTaskLinks(ImmutableMap.<String, String>of())
                   .setThermosConfig(new byte[] {})
-                  .setEnvironment(null)
+                  .setEnvironment(DEFAULT_ENVIRONMENT)
                   .setRequestedPorts(ImmutableSet.<String>of())
                   .setJobName(null)
                   .setPriority(0)
                   .setOwner(null)
-                  .setContactEmail(null)
+                  .setContactEmail("foo@twitter.com")
                   .setProduction(false)
-                  .setDiskMb(0L)
+                  .setDiskMb(1)
                   .setPackages(null)
-                  .setRamMb(0L)
+                  .setNumCpus(1.0)
+                  .setRamMb(1)
                   .setMaxTaskFailures(0)
                   .setShardId(0)
                   .setConstraints(
@@ -72,8 +74,8 @@ public class ConfigurationManagerTest {
       .setKey(null)
       .setTaskConfig(null)
       .setOwner(new Identity()
-          .setRole("nikhil")
-          .setUser("nikhil"));
+          .setRole("owner-role")
+          .setUser("owner-user"));
 
 
   @Test
@@ -118,5 +120,29 @@ public class ConfigurationManagerTest {
     ConfigurationManager.applyDefaultsIfUnset(copy);
     assertTrue(copy.isSetKey());
     assertEquals(DEFAULT_ENVIRONMENT, copy.getKey().getEnvironment());
+  }
+
+  @Test
+  public void testFillsJobKeyFromConfig() throws Exception {
+    JobConfiguration copy = UNSANITIZED_JOB_CONFIGURATION.deepCopy();
+    copy.unsetKey();
+    copy.setTaskConfig(Iterables.getFirst(copy.getTaskConfigs(), null));
+    copy.getTaskConfig().unsetShardId();
+    copy.setShardCount(1);
+    copy.unsetTaskConfigs();
+    ConfigurationManager.validateAndPopulate(copy);
+    assertEquals(
+        JobKeys.from(copy.getOwner().getRole(), DEFAULT_ENVIRONMENT, copy.getName()),
+        copy.getKey());
+  }
+
+  @Test
+  public void testFillsJobKeyFromConfigs() throws Exception {
+    JobConfiguration copy = UNSANITIZED_JOB_CONFIGURATION.deepCopy();
+    copy.unsetKey();
+    ConfigurationManager.validateAndPopulate(copy);
+    assertEquals(
+        JobKeys.from(copy.getOwner().getRole(), DEFAULT_ENVIRONMENT, copy.getName()),
+        copy.getKey());
   }
 }

@@ -329,8 +329,7 @@ public final class ConfigurationManager {
     // The configs were mutated, so we need to refresh the Set.
     copy.setTaskConfigs(modifiedConfigs);
 
-    // We might need to add a JobKey populated from the task shards.
-    // TODO(ksweeney): Call maybe fill job key here.
+    maybeFillJobKey(job);
 
     // Check for contiguous shard IDs.
     for (int i = 0; i < copy.getTaskConfigsSize(); i++) {
@@ -488,8 +487,11 @@ public final class ConfigurationManager {
 
   private static Optional<TwitterTaskInfo> getTemplateTaskInfo(JobConfiguration job) {
     // If no taskConfig (template) is set use an arbitrary shard to fill in missing job fields.
-    return Optional.fromNullable(job.getTaskConfig())
-        .or(Optional.fromNullable(Iterables.getFirst(job.getTaskConfigs(), null)));
+    if (job.isSetTaskConfig()) {
+      return Optional.of(job.getTaskConfig());
+    } else {
+      return Optional.fromNullable(Iterables.getFirst(job.getTaskConfigs(), null));
+    }
   }
 
   /**
