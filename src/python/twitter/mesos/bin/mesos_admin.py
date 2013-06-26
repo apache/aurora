@@ -3,12 +3,15 @@
 
 import collections
 import optparse
+import os
+import subprocess
 import sys
 
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 from twitter.common.quantity import Amount, Data
 from twitter.common.quantity.parse_simple import parse_data
+from twitter.mesos.admin.mesos_maintenance import MesosMaintenance
 from twitter.mesos.client.base import check_and_log_response, die, requires
 from twitter.mesos.client.api import MesosClientAPI
 from twitter.mesos.common.cluster_option import ClusterOption
@@ -138,6 +141,61 @@ def set_quota(role, cpu_str, ram_mb_str, disk_mb_str):
   options = app.get_options()
   resp = MesosClientAPI(options.cluster, options.verbosity).set_quota(role, cpu, ram_mb, disk_mb)
   check_and_log_response(resp)
+
+
+@app.command
+@app.command_option(CLUSTER_OPTION)
+@app.command_option('--filename', dest='filename', default=None,
+    help='Name of the file with hostnames')
+@app.command_option('--hosts', dest='hosts', default=None,
+    help='Comma separated list of hosts')
+@app.command_option('--batch_size', dest='batch_size', default=0,
+    help='Number of machines to operate on.')
+@app.command_option('--post_drain_script', dest='post_drain_script', default=None,
+    help='Path to a script to run for each host.')
+def perform_maintenance_hosts():
+  """usage: perform_maintenance --cluster=CLUSTER [--filename=filename]
+                                                [--hosts=hosts]
+                                                [--batch_size=num]
+                                                [--post_drain_script=path]
+
+  Asks the scheduler to remove any running tasks from the machine and remove it
+  from service temporarily, perform some action on them, then return the machines
+  to service.
+  """
+  options = app.get_options()
+  drainable_hosts = parse_hosts(options)
+
+  if options.post_drain_script:
+    if not os.path.exists(options.post_drain_script):
+      die("No such file: %s" % options.post_drain_script)
+    cmd = os.path.abspath(options.post_drain_script)
+    drained_callback = lambda host: subprocess.Popen([cmd, host])
+  else:
+    drained_callback = None
+
+  MesosMaintenance(options.cluster, options.verbosity).perform_maintenance(
+      drainable_hosts,
+      batch_size=int(options.batch_size),
+      callback=drained_callback)
+
+
+@app.command
+@app.command_option(CLUSTER_OPTION)
+@app.command_option('--filename', dest='filename', default=None,
+    help='Name of the file with hostnames')
+@app.command_option('--hosts', dest='hosts', default=None,
+    help='Comma separated list of hosts')
+def host_maintenance_status():
+  """usage: host_maintenance_status --cluster=CLUSTER [--filename=filename] [--hosts=hosts]
+
+  Check on the schedulers maintenance status for a list of hosts in the cluster.
+  """
+  options = app.get_options()
+  checkable_hosts = parse_hosts(options)
+  statuses = MesosMaintenance(options.cluster, options.verbosity).check_status(checkable_hosts)
+  for pair in statuses:
+    log.info("%s is in state: %s" % pair)
 
 
 @app.command
@@ -381,6 +439,19 @@ def help(args):
   else:
     print 'Subcommand %s not found.' % subcmd
     sys.exit(1)
+
+
+def parse_hosts(options):
+  if not (options.filename or options.hosts):
+    die('Please specify either --filename or --hosts')
+  if options.filename:
+    with open(options.filename, 'r') as hosts:
+      hosts = [hostname.strip() for hostname in hosts]
+  elif options.hosts:
+    hosts = [hostname.strip() for hostname in options.hosts.split(",")]
+  if not hosts:
+    die('No valid hosts found.')
+  return hosts
 
 
 def set_quiet(option, _1, _2, parser):

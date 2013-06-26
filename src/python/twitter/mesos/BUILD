@@ -49,6 +49,7 @@ python_binary(
     pants(':mesos-lib'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/mesos/admin:mesos_maintenance'),
     pants('src/python/twitter/mesos/common:cluster_option'),
     pants('src/python/twitter/mesos/common_internal:clusters'),
   ],

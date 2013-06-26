@@ -155,6 +155,22 @@ invoking cancel_update.
     return Restarter(job_key, updater_config, health_check_interval_seconds, self._scheduler
     ).restart(shards)
 
+  def start_maintenance(self, hosts):
+    log.info("Starting maintenance for: %s" % hosts.hostNames)
+    return self._scheduler.startMaintenance(hosts)
+
+  def drain_hosts(self, hosts):
+    log.info("Draining tasks on: %s" % hosts.hostNames)
+    return self._scheduler.drainHosts(hosts)
+
+  def maintenance_status(self, hosts):
+    log.info("Maintenance status for: %s" % hosts.hostNames)
+    return self._scheduler.maintenanceStatus(hosts)
+
+  def end_maintenance(self, hosts):
+    log.info("Ending maintenance for: %s" % hosts.hostNames)
+    return self._scheduler.endMaintenance(hosts)
+
   def get_quota(self, role):
     log.info("Getting quota for: %s" % role)
     return self._scheduler.getQuota(role)
