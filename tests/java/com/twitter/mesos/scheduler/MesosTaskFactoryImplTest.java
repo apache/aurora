@@ -49,7 +49,7 @@ public class MesosTaskFactoryImplTest {
     ExecutorInfo expected = ExecutorInfo.newBuilder()
         .setExecutorId(MesosTaskFactoryImpl.getExecutorId(TASK.getTaskId()))
         .setName(MesosTaskFactoryImpl.EXECUTOR_NAME)
-        .setSource(MesosTaskFactoryImpl.getSourceName(TASK.getTask()))
+        .setSource(MesosTaskFactoryImpl.getInstanceSourceName(TASK.getTask()))
         .addResources(Resource.newBuilder()
             .setName("cpus")
             .setType(Type.SCALAR)

@@ -112,10 +112,17 @@ public interface MesosTaskFactory {
       return ExecutorID.newBuilder().setValue(EXECUTOR_PREFIX + taskId).build();
     }
 
-    @VisibleForTesting
-    static String getSourceName(TwitterTaskInfo task) {
-      return String.format("%s.%s.%s.%s",
-          task.getOwner().getRole(), task.getEnvironment(), task.getJobName(), task.getShardId());
+    // TODO(wfarner): Use JobKey here.
+    public static String getJobSourceName(String role, String environment, String jobName) {
+      return String.format("%s.%s.%s", role, environment, jobName);
+    }
+
+    public static String getJobSourceName(TwitterTaskInfo task) {
+      return getJobSourceName(task.getOwner().getRole(), task.getEnvironment(), task.getJobName());
+    }
+
+    public static String getInstanceSourceName(TwitterTaskInfo task) {
+      return String.format("%s.%s", getJobSourceName(task), task.getShardId());
     }
 
     @Override
@@ -149,12 +156,11 @@ public interface MesosTaskFactory {
               .addAllResources(resources)
               .setData(ByteString.copyFrom(taskInBytes));
 
-
       ExecutorInfo executor = ExecutorInfo.newBuilder()
           .setCommand(CommandUtil.create(executorPath))
           .setExecutorId(getExecutorId(task.getTaskId()))
           .setName(EXECUTOR_NAME)
-          .setSource(getSourceName(config))
+          .setSource(getInstanceSourceName(config))
           .addResources(Resources.makeMesosResource(Resources.CPUS, CPUS))
           .addResources(
               Resources.makeMesosResource(Resources.RAM_MB, RAM.as(Data.MB)))

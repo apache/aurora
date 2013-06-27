@@ -364,8 +364,9 @@ public class SchedulerzJob extends JerseyTemplateServlet {
 
         String env = environment.substring(1, environment.length());
         template.setAttribute("role", role);
-        template.setAttribute("job", job);
         template.setAttribute("environment", env);
+        template.setAttribute("job", job);
+        template.setAttribute("statsUrl", DisplayUtils.getJobDashboardUrl(role, env, job));
         boolean hasMore = false;
 
         Query.Builder builder = Query.jobScoped(JobKeys.from(role, env, job));
