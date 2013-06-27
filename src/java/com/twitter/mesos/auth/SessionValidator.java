@@ -92,7 +92,8 @@ public interface SessionValidator {
       long now = this.clock.nowMillis();
       long diff = Math.abs(now - sessionKey.getNonce());
       if (Amount.of(diff, Time.MILLISECONDS).compareTo(MAXIMUM_NONCE_DRIFT) > 0) {
-        throw new AuthFailedException("Session key nonce expired.");
+        throw new AuthFailedException("Session key nonce expired. "
+            + "Ensure system clock is synced with the server.");
       }
 
       userValidator.assertRoleAccess(sessionKey, targetRole);
