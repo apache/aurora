@@ -47,6 +47,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import static com.twitter.mesos.gen.Constants.DEFAULT_ENVIRONMENT;
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
 import static com.twitter.mesos.gen.ScheduleStatus.INIT;
@@ -449,6 +450,7 @@ public class StateManagerImplTest extends EasyMockTest {
   private static TwitterTaskInfo makeTask(Identity owner, String job, int shard) {
     return new TwitterTaskInfo()
         .setOwner(owner)
+        .setEnvironment(DEFAULT_ENVIRONMENT)
         .setJobName(job)
         .setShardId(shard)
         .setRequestedPorts(ImmutableSet.<String>of());

@@ -187,7 +187,8 @@ public class TaskSchedulerTest extends EasyMockTest {
             .setTask(new TwitterTaskInfo()
                 .setJobName("job-" + taskId)
                 .setShardId(0)
-                .setOwner(new Identity().setRole("role-" + taskId).setUser("user-" + taskId))));
+                .setOwner(new Identity().setRole("role-" + taskId).setUser("user-" + taskId))
+                .setEnvironment("env-" + taskId)));
   }
 
 

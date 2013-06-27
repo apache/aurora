@@ -51,16 +51,6 @@ public final class Query {
     return slaveScoped(slaveHost).get();
   }
 
-  /**
-   * TODO(ksweeney): Deprecate and use JobKey.
-   *
-   * @deprecated Use {@link #byJob(com.twitter.mesos.gen.JobKey)} instead.
-   */
-  @Deprecated
-  public static TaskQuery byJob(String role, String job) {
-    return jobScoped(role, job).get();
-  }
-
   public static TaskQuery byJob(JobKey jobKey) {
     return jobScoped(jobKey).get();
   }

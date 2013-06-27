@@ -8,6 +8,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.common.base.Function;
+import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Supplier;
@@ -29,10 +30,11 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
 import com.twitter.mesos.Tasks;
+import com.twitter.mesos.gen.JobKey;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.base.Query;
+import com.twitter.mesos.scheduler.base.JobKeys;
 import com.twitter.mesos.scheduler.storage.TaskStore;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -65,8 +67,8 @@ class MemTaskStore implements TaskStore.Mutable {
   private final long slowQueryThresholdNanos = SLOW_QUERY_LOG_THRESHOLD.get().as(Time.NANOSECONDS);
 
   private final Map<String, ScheduledTask> tasks = Maps.newConcurrentMap();
-  private final Multimap<String, String> tasksByJobKey =
-      Multimaps.synchronizedSetMultimap(HashMultimap.<String, String>create());
+  private final Multimap<JobKey, String> tasksByJobKey =
+      Multimaps.synchronizedSetMultimap(HashMultimap.<JobKey, String>create());
 
   private final AtomicLong taskQueriesById = Stats.exportLong("task_queries_by_id");
   private final AtomicLong taskQueriesByJob = Stats.exportLong("task_queries_by_job");
@@ -107,9 +109,9 @@ class MemTaskStore implements TaskStore.Mutable {
     return mutableMatches(query).transform(Tasks.SCHEDULED_TO_ID).toSet();
   }
 
-  private Multimap<String, String> taskIdsByJobKey(Iterable<ScheduledTask> toIndex) {
+  private Multimap<JobKey, String> taskIdsByJobKey(Iterable<ScheduledTask> toIndex) {
     return Multimaps.transformValues(
-        Multimaps.index(toIndex, Tasks.SCHEDULED_TO_STRING_JOB_KEY),
+        Multimaps.index(toIndex, Tasks.SCHEDULED_TO_JOB_KEY),
         Tasks.SCHEDULED_TO_ID);
   }
 
@@ -249,13 +251,13 @@ class MemTaskStore implements TaskStore.Mutable {
   private FluentIterable<ScheduledTask> mutableMatches(TaskQuery query) {
     // Apply the query against the working set.
     Iterable<ScheduledTask> from;
+    Optional<JobKey> jobKey = JobKeys.from(query);
     if (query.isSetTaskIds()) {
       taskQueriesById.incrementAndGet();
       from = fromIdIndex(query.getTaskIds());
-    } else if (Query.isJobScoped(query)) {
+    } else if (jobKey.isPresent()) {
       taskQueriesByJob.incrementAndGet();
-      Collection<String> taskIds =
-          tasksByJobKey.get(Tasks.jobKey(query.getOwner().getRole(), query.getJobName()));
+      Collection<String> taskIds = tasksByJobKey.get(jobKey.get());
       if (taskIds == null) {
         from = ImmutableList.of();
       } else {

@@ -162,9 +162,9 @@ public class MemTaskStoreTest {
     final ScheduledTask b = makeTask("b", "jim", "job");
     final ScheduledTask c = makeTask("c", "jim", "job2");
     final ScheduledTask d = makeTask("d", "joe", "job");
-    final Query.Builder jimsJob = Query.jobScoped("jim", "job");
-    final Query.Builder jimsJob2 = Query.jobScoped("jim", "job2");
-    final Query.Builder joesJob = Query.jobScoped("joe", "job");
+    final Query.Builder jimsJob = Query.jobScoped(JobKeys.from("jim", "test", "job"));
+    final Query.Builder jimsJob2 = Query.jobScoped(JobKeys.from("jim", "test", "job2"));
+    final Query.Builder joesJob = Query.jobScoped(JobKeys.from("joe", "test", "job"));
 
     store.saveTasks(ImmutableSet.of(a, b, c, d));
     assertQueryResults(jimsJob, a, b);

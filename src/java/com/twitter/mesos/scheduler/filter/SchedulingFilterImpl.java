@@ -204,7 +204,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
                 Suppliers.memoize(new Supplier<Collection<ScheduledTask>>() {
                   @Override public Collection<ScheduledTask> get() {
                     return storeProvider.getTaskStore().fetchTasks(
-                        Query.jobScoped(task.getOwner().getRole(), task.getJobName())
+                        Query.jobScoped(Tasks.INFO_TO_JOB_KEY.apply(task))
                             .byStatus(ACTIVE_NOT_PENDING_STATES));
                   }
                 });

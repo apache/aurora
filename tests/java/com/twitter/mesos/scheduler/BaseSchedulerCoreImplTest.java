@@ -77,7 +77,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import static com.twitter.mesos.gen.Constants.DEFAULT_ENVIRONMENT;
 import static com.twitter.mesos.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.mesos.gen.ScheduleStatus.FAILED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
@@ -279,7 +278,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   @Test
   public void testLoadTasksFromStorage() throws Exception {
     final String storedTaskId = "task_on_disk";
-    final String storedTaskWithEnvId = "task_with_env";
 
     control.replay();
 
@@ -288,6 +286,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     final TwitterTaskInfo storedTask = new TwitterTaskInfo()
         .setOwner(OWNER_A)
         .setJobName(JOB_A)
+        .setEnvironment(ENV_A)
         .setNumCpus(1.0)
         .setRamMb(ONE_GB)
         .setDiskMb(500)
@@ -297,10 +296,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setConstraints(ImmutableSet.<Constraint>of())
         .setTaskLinks(ImmutableMap.<String, String>of());
 
-    final TwitterTaskInfo storedTaskEnvSet = storedTask.deepCopy()
-        .setEnvironment("test")
-        .setOwner(OWNER_B);
-
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(
@@ -309,13 +304,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
                 .setAssignedTask(
                     new AssignedTask()
                         .setTaskId(storedTaskId)
-                        .setTask(storedTask)),
-            new ScheduledTask()
-                .setStatus(PENDING)
-                .setAssignedTask(
-                    new AssignedTask()
-                        .setTaskId(storedTaskWithEnvId)
-                        .setTask(storedTaskEnvSet))));
+                        .setTask(storedTask))));
       }
     });
 
@@ -332,20 +321,10 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setHealthCheckIntervalSecs(30)
         .setMaxTaskFailures(1)
         .setThermosConfig(new byte[] {})
-        .setConstraints(ImmutableSet.of(ConfigurationManager.hostLimitConstraint(1)))
-        .setEnvironment(DEFAULT_ENVIRONMENT);
+        .setConstraints(ImmutableSet.of(ConfigurationManager.hostLimitConstraint(1)));
 
-    TwitterTaskInfo expectedEnvUnchanged = expected.deepCopy()
-        .setEnvironment("test")
-        .setOwner(OWNER_B);
+    assertEquals(expected, getTask(storedTaskId).getAssignedTask().getTask());
 
-    assertEquals(
-        expected,
-        getTask(storedTaskId).getAssignedTask().getTask());
-
-    assertEquals(
-        expectedEnvUnchanged,
-        getTask(storedTaskWithEnvId).getAssignedTask().getTask());
     assertEquals(ASSIGNED, getTask(storedTaskId).getStatus());
   }
 

@@ -298,7 +298,7 @@ class SchedulerCoreImpl implements SchedulerCore {
           throws ScheduleException {
 
         Set<ScheduledTask> existingTasks = storeProvider.getTaskStore().fetchTasks(
-            Query.jobScoped(job.getOwner().getRole(), job.getName()).active().get());
+            Query.jobScoped(job.getKey()).active().get());
 
         // Reject if any existing task for the job is in UPDATING/ROLLBACK
         if (Iterables.any(existingTasks, IS_UPDATING)) {

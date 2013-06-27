@@ -94,7 +94,8 @@ public class MemStorageTest extends TearDownTestCase {
             .setTaskId(taskId)
             .setTask(new TwitterTaskInfo()
                 .setOwner(new Identity().setRole("owner-" + taskId))
-                .setJobName("job-" + taskId)));
+                .setJobName("job-" + taskId)
+                .setEnvironment("env-" + taskId)));
   }
 
   private class CustomException extends RuntimeException {
