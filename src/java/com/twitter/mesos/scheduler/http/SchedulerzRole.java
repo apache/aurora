@@ -32,9 +32,11 @@ import com.twitter.common.base.Closure;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.JobKey;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.CronJobManager;
+import com.twitter.mesos.scheduler.base.JobKeys;
 import com.twitter.mesos.scheduler.base.Query;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 import com.twitter.mesos.scheduler.storage.Storage;
@@ -94,11 +96,12 @@ public class SchedulerzRole extends JerseyTemplateServlet {
         }
         template.setAttribute("role", role);
 
-        LoadingCache<String, Job> jobs = CacheBuilder.newBuilder().build(
-            new CacheLoader<String, Job>() {
-              @Override public Job load(String jobName) {
+        LoadingCache<JobKey, Job> jobs = CacheBuilder.newBuilder().build(
+            new CacheLoader<JobKey, Job>() {
+              @Override public Job load(JobKey key) {
                 Job job = new Job();
-                job.name = jobName;
+                job.environment = key.getEnvironment();
+                job.name = key.getName();
                 return job;
               }
             });
@@ -106,8 +109,9 @@ public class SchedulerzRole extends JerseyTemplateServlet {
         for (ScheduledTask task
             : Storage.Util.weaklyConsistentFetchTasks(storage, Query.roleScoped(role))) {
 
-          Job job = jobs.getUnchecked(task.getAssignedTask().getTask().getJobName());
-          job.environment = task.getAssignedTask().getTask().getEnvironment();
+          TwitterTaskInfo config = task.getAssignedTask().getTask();
+          Job job =
+              jobs.getUnchecked(JobKeys.from(role, config.getEnvironment(), config.getJobName()));
 
           switch (task.getStatus()) {
             case INIT:

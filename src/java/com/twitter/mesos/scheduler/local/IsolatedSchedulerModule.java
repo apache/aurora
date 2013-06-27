@@ -56,6 +56,7 @@ import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.SessionKey;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.DriverFactory;
+import com.twitter.mesos.scheduler.base.JobKeys;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.Resources;
 import com.twitter.mesos.scheduler.events.PubsubEvent.DriverRegistered;
@@ -236,11 +237,13 @@ public class IsolatedSchedulerModule extends AbstractModule {
     private JobConfiguration createJob(String jobName, Identity owner) {
       return new JobConfiguration()
           .setName(jobName)
+          .setKey(JobKeys.from(owner.getRole(), "test", jobName))
           .setOwner(owner)
           .setShardCount(5)
           .setTaskConfig(new TwitterTaskInfo()
               .setOwner(owner)
               .setJobName(jobName)
+              .setEnvironment("test")
               .setNumCpus(1.0)
               .setDiskMb(1024)
               .setRamMb(1024)

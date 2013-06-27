@@ -48,7 +48,7 @@ public final class JobKeys {
    * @return The validated jobKey argument.
    * @throws IllegalArgumentException if the key struct fails to validate.
    */
-  public static JobKey assertValid(JobKey jobKey) {
+  public static JobKey assertValid(JobKey jobKey) throws IllegalArgumentException {
     checkArgument(isValid(jobKey));
 
     return jobKey;
@@ -85,7 +85,9 @@ public final class JobKeys {
    * @return A valid JobKey if it can be created.
    * @throws IllegalArgumentException if the key fails to validate.
    */
-  public static JobKey from(String role, String environment, String name) {
+  public static JobKey from(String role, String environment, String name)
+      throws IllegalArgumentException {
+
     JobKey job = new JobKey()
         .setRole(role)
         .setEnvironment(environment)
