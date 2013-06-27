@@ -222,17 +222,12 @@ class LoggingThriftInterface implements MesosAdmin.Iface {
 
   @Override
   public RestartShardsResponse restartShards(
-      @Nullable String role,
-      @Nullable String jobName,
-      @Nullable JobKey job,
+      JobKey jobKey,
       Set<Integer> shardIds,
       SessionKey session) throws TException {
 
-    logUserAction(
-        session,
-        "restartShards|role: %s |jobName: %s |job: %s |shardIds: %s",
-        role, jobName, job, shardIds);
-    return delegate.restartShards(role, jobName, job, shardIds, session);
+    logUserAction(session, "restartShards|jobKey: %s |shardIds: %s", jobKey, shardIds);
+    return delegate.restartShards(jobKey, shardIds, session);
   }
 
   @Override

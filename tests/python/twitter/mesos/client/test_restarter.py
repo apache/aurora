@@ -39,9 +39,7 @@ class TestRestarter(MoxTestBase):
   def mock_restart_shards(self, shards):
     response = RestartShardsResponse(responseCode=ResponseCode.OK, message='test')
 
-    # TODO(ksweeney): Remove Nones before resolving MESOS-2403.
-    self.mock_scheduler.restartShards(None, None, JOB.to_thrift(), shards, SESSION_KEY
-    ).AndReturn(response)
+    self.mock_scheduler.restartShards(JOB.to_thrift(), shards, SESSION_KEY).AndReturn(response)
     self.mock_shard_watcher.watch(shards).AndReturn([])
 
   def test_restart_one_iteration(self):
@@ -96,9 +94,7 @@ class TestRestarter(MoxTestBase):
   def mock_restart_fails(self):
     response = RestartShardsResponse(responseCode=ResponseCode.ERROR, message='test error')
 
-    # TODO(ksweeney): Remove Nones before resolving MESOS-2403.
-    self.mock_scheduler.restartShards(None, None, JOB.to_thrift(), IgnoreArg(), SESSION_KEY
-    ).AndReturn(response)
+    self.mock_scheduler.restartShards(JOB.to_thrift(), IgnoreArg(), SESSION_KEY).AndReturn(response)
 
   def test_restart_shard_fails(self):
     self.mock_status_active_tasks([0, 1])
@@ -111,9 +107,7 @@ class TestRestarter(MoxTestBase):
   def mock_restart_watch_fails(self, shards):
     response = RestartShardsResponse(responseCode=ResponseCode.OK, message='test')
 
-    # TODO(ksweeney): Remove Nones before resolving MESOS-2403.
-    self.mock_scheduler.restartShards(None, None, JOB.to_thrift(), shards, SESSION_KEY
-    ).AndReturn(response)
+    self.mock_scheduler.restartShards(JOB.to_thrift(), shards, SESSION_KEY).AndReturn(response)
     self.mock_shard_watcher.watch(shards).AndReturn(shards)
 
   def test_restart_shards_watch_fails(self):

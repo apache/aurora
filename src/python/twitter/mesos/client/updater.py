@@ -197,8 +197,7 @@ class Updater(object):
     shard_ids -- set of shards to be restarted by the scheduler.
     """
     log.info('Restarting shards: %s' % shard_ids)
-    # TODO(ksweeney): Remove Nones before resolving MESOS-2403.
-    resp = self._scheduler.restartShards(None, None, self._job_key, shard_ids)
+    resp = self._scheduler.restartShards(self._job_key, shard_ids)
     log.log(debug_if(resp.responseCode == ResponseCode.OK),
         'Response from scheduler: %s (message: %s)' % (
           ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))

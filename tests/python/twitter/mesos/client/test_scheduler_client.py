@@ -112,12 +112,11 @@ class TestSchedulerProxyInjection(unittest.TestCase):
     self.make_scheduler_proxy().finishUpdate(ROLE, JOB_NAME, JOB_KEY, UpdateResult(), 'tok')
 
   def test_restartShards(self):
-    self.mock_thrift_client.restartShards(
-        IgnoreArg(), IgnoreArg(), IsA(JobKey), IgnoreArg(), IsA(SessionKey))
+    self.mock_thrift_client.restartShards(IsA(JobKey), IgnoreArg(), IsA(SessionKey))
 
     self.mox.ReplayAll()
 
-    self.make_scheduler_proxy().restartShards('foo', 'bar', JOB_KEY, set([0]))
+    self.make_scheduler_proxy().restartShards(JOB_KEY, set([0]))
 
   def test_getTasksStatus(self):
     self.mock_thrift_client.getTasksStatus(IsA(TaskQuery))

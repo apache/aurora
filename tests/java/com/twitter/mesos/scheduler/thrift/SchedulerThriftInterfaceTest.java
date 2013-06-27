@@ -418,11 +418,11 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     Set<Integer> shards = ImmutableSet.of(1, 6);
 
     expectAuth(ROLE, true);
-    scheduler.restartShards(ROLE, JOB_NAME, shards, USER);
+    scheduler.restartShards(JOB_KEY, shards, USER);
 
     control.replay();
 
-    RestartShardsResponse resp = thrift.restartShards(null, null, JOB_KEY, shards, SESSION);
+    RestartShardsResponse resp = thrift.restartShards(JOB_KEY, shards, SESSION);
     assertEquals(ResponseCode.OK, resp.getResponseCode());
   }
 
@@ -432,12 +432,12 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     String message = "Injected.";
     expectAuth(ROLE, true);
-    scheduler.restartShards(ROLE, JOB_NAME, shards, USER);
+    scheduler.restartShards(JOB_KEY, shards, USER);
     expectLastCall().andThrow(new ScheduleException(message));
 
     control.replay();
 
-    RestartShardsResponse resp = thrift.restartShards(null, null, JOB_KEY, shards, SESSION);
+    RestartShardsResponse resp = thrift.restartShards(JOB_KEY, shards, SESSION);
     assertEquals(ResponseCode.INVALID_REQUEST, resp.getResponseCode());
     assertEquals(message, resp.getMessage());
   }

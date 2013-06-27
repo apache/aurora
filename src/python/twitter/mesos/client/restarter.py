@@ -51,8 +51,7 @@ class Restarter(object):
 
       log.info("Restarting shards: %s", batch)
 
-      # TODO(ksweeney): Remove Nones before resolving MESOS-2403.
-      resp = self._scheduler.restartShards(None, None, self._job_key.to_thrift(), batch)
+      resp = self._scheduler.restartShards(self._job_key.to_thrift(), batch)
       if resp.responseCode != ResponseCode.OK:
         log.error('Error restarting shards: %s', resp.message)
         return resp

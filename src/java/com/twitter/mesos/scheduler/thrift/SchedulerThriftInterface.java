@@ -535,24 +535,24 @@ class SchedulerThriftInterface implements SchedulerController {
 
   @Override
   public RestartShardsResponse restartShards(
-      JobKey job,
+      JobKey jobKey,
       Set<Integer> shardIds,
       SessionKey session) {
 
-    JobKeys.assertValid(job);
+    JobKeys.assertValid(jobKey);
     MorePreconditions.checkNotBlank(shardIds);
     checkNotNull(session);
 
     RestartShardsResponse response = new RestartShardsResponse();
     try {
-      sessionValidator.checkAuthenticated(session, job.getRole());
+      sessionValidator.checkAuthenticated(session, jobKey.getRole());
     } catch (AuthFailedException e) {
       response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
       return response;
     }
 
     try {
-      schedulerCore.restartShards(job.getRole(), job.getName(), shardIds, session.getUser());
+      schedulerCore.restartShards(jobKey, shardIds, session.getUser());
       response.setResponseCode(OK).setMessage("Shards are restarting.");
     } catch (ScheduleException e) {
       response.setResponseCode(ResponseCode.INVALID_REQUEST).setMessage(e.getMessage());

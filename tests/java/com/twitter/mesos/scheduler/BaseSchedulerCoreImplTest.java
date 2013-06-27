@@ -1678,7 +1678,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(makeJob(KEY_A, productionTask().setIsService(true), 6));
     changeStatus(Query.jobScoped(KEY_A), ASSIGNED);
     changeStatus(Query.jobScoped(KEY_A), RUNNING);
-    scheduler.restartShards(OWNER_A.role, JOB_A, ImmutableSet.of(1, 5), OWNER_A.user);
+    scheduler.restartShards(KEY_A, ImmutableSet.of(1, 5), OWNER_A.user);
     assertEquals(4, getTasks(Query.unscoped().byStatus(RUNNING)).size());
     assertEquals(2, getTasks(Query.unscoped().byStatus(RESTARTING)).size());
     changeStatus(Query.unscoped().byStatus(RESTARTING), FINISHED);
@@ -1693,7 +1693,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(makeJob(KEY_A, productionTask().setIsService(true), 1));
     changeStatus(Query.jobScoped(KEY_A), ASSIGNED);
     changeStatus(Query.jobScoped(KEY_A), FINISHED);
-    scheduler.restartShards(ROLE_A, JOB_A, ImmutableSet.of(5), OWNER_A.user);
+    scheduler.restartShards(KEY_A, ImmutableSet.of(5), OWNER_A.user);
   }
 
   @Test
@@ -1702,7 +1702,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     buildScheduler();
 
     scheduler.createJob(makeJob(KEY_A, productionTask().setIsService(true), 1));
-    scheduler.restartShards(ROLE_A, JOB_A, ImmutableSet.of(0), OWNER_A.user);
+    scheduler.restartShards(KEY_A, ImmutableSet.of(0), OWNER_A.user);
   }
 
   @Test

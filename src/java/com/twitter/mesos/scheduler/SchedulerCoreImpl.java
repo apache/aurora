@@ -247,16 +247,19 @@ class SchedulerCoreImpl implements SchedulerCore {
 
   @Override
   public void restartShards(
-      String role,
-      String jobName,
+      JobKey jobKey,
       final Set<Integer> shards,
       final String requestingUser) throws ScheduleException {
+
+    if (!JobKeys.isValid(jobKey)) {
+      throw new ScheduleException("Invalid job key: " + jobKey);
+    }
 
     if (shards.isEmpty()) {
       throw new ScheduleException("At least one shard must be specified.");
     }
 
-    final TaskQuery query = Query.shardScoped(role, jobName, shards).active().get();
+    final Query.Builder query = Query.shardScoped(jobKey, shards).active();
     storage.write(new MutateWork.NoResult<ScheduleException>() {
       @Override protected void execute(MutableStoreProvider storeProvider)
           throws ScheduleException {

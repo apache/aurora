@@ -148,15 +148,11 @@ public class SchedulerThriftRouter implements MesosAdmin.Iface {
 
   @Override
   public RestartShardsResponse restartShards(
-      @Nullable String role,
-      @Nullable String jobName,
-      @Nullable JobKey job,
+      JobKey jobKey,
       Set<Integer> shardIds,
       SessionKey session) {
 
-    JobKey sanitizedJob = JobKeys.fromRequestParameters(job, role, jobName);
-
-    return schedulerController.restartShards(sanitizedJob, shardIds, session);
+    return schedulerController.restartShards(jobKey, shardIds, session);
   }
 
   @Override

@@ -144,13 +144,12 @@ public interface SchedulerCore {
   /**
    * Initiates a restart of shards within an active job.
    *
-   * @param role Role owning the shards to restart.
-   * @param jobName Job containing the shards.
+   * @param jobKey Key of job to be restarted.
    * @param shards Shards to be restarted.
    * @param requestingUser User performing the restart action.
    * @throws ScheduleException If there are no matching active shards.
    */
-  void restartShards(String role, String jobName, Set<Integer> shards, String requestingUser)
+  void restartShards(JobKey jobKey, Set<Integer> shards, String requestingUser)
       throws ScheduleException;
 
   /**

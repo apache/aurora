@@ -84,9 +84,7 @@ class UpdaterTest(unittest.TestCase):
 
   def expect_restart(self, shard_ids):
     response = RestartShardsResponse(responseCode=ResponseCode.OK, message='test')
-    # TODO(ksweeney): Remove Nones after JobKey migration is complete
-    self._scheduler.restartShards(
-        None, None, self._job_key, shard_ids, self._session_key).AndReturn(response)
+    self._scheduler.restartShards(self._job_key, shard_ids, self._session_key).AndReturn(response)
 
   def expect_rollback(self, shard_ids, shard_results=None):
     response = RollbackShardsResponse(responseCode=UpdateResponseCode.OK, message='test')
