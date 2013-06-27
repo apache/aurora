@@ -4,6 +4,7 @@ import java.util.Iterator;
 import java.util.Set;
 
 import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -721,12 +722,21 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testGetJobs() throws Exception {
+    TwitterTaskInfo ownedCronJobTask = nonProductionTask()
+        .setJobName(JobKeys.TO_JOB_NAME.apply(JOB_KEY))
+        .setOwner(ROLE_IDENTITY)
+        .setEnvironment(JobKeys.TO_ENVIRONMENT.apply(JOB_KEY));
     JobConfiguration ownedCronJob = makeJob()
-        .setCronSchedule("0 * * * *");
-    JobConfiguration unownedCronJob = makeJob()
-        .setOwner(new Identity("other", "other"))
         .setCronSchedule("0 * * * *")
-        .setKey(JOB_KEY.deepCopy().setRole("other"));
+        .setTaskConfigs(ImmutableSet.of(ownedCronJobTask));
+    ScheduledTask ownedCronJobScheduledTask = new ScheduledTask()
+        .setAssignedTask(new AssignedTask().setTask(ownedCronJobTask));
+    Identity otherOwner = new Identity("other", "other");
+    JobConfiguration unownedCronJob = makeJob()
+        .setOwner(otherOwner)
+        .setCronSchedule("0 * * * *")
+        .setKey(JOB_KEY.deepCopy().setRole("other"))
+        .setTaskConfigs(ImmutableSet.of(ownedCronJobTask.deepCopy().setOwner(otherOwner)));
     TwitterTaskInfo ownedImmediateTaskInfo = defaultTask(false)
         .setJobName("immediate")
         .setOwner(ROLE_IDENTITY);
@@ -755,15 +765,15 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expect(cronJobManager.getJobs()).andReturn(ImmutableSet.<JobConfiguration>of());
     storageUtil.expectTaskFetch(query);
 
+    // Handle the case where a cron job has a running task (same JobKey present in both stores).
+    expect(cronJobManager.getJobs()).andReturn(ImmutableList.of(ownedCronJob));
+    storageUtil.expectTaskFetch(query, ownedCronJobScheduledTask);
+
     control.replay();
 
-    assertEquals(
-        ownedCronJob,
-        Iterables.getOnlyElement(thrift.getJobs(ROLE).getConfigs()));
+    assertEquals(ownedCronJob, Iterables.getOnlyElement(thrift.getJobs(ROLE).getConfigs()));
 
-    assertEquals(
-        ownedCronJob,
-        Iterables.getOnlyElement(thrift.getJobs(ROLE).getConfigs()));
+    assertEquals(ownedCronJob, Iterables.getOnlyElement(thrift.getJobs(ROLE).getConfigs()));
 
     Set<JobConfiguration> queryResult3 = thrift.getJobs(ROLE).getConfigs();
     assertEquals(ownedImmediateJob, Iterables.getOnlyElement(queryResult3));
@@ -771,6 +781,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     assertTrue(thrift.getJobs(ROLE).getConfigs().isEmpty());
 
+    assertEquals(ownedCronJob, Iterables.getOnlyElement(thrift.getJobs(ROLE).getConfigs()));
   }
 
   @Test

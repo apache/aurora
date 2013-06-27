@@ -109,7 +109,7 @@ class MemTaskStore implements TaskStore.Mutable {
 
   private Multimap<String, String> taskIdsByJobKey(Iterable<ScheduledTask> toIndex) {
     return Multimaps.transformValues(
-        Multimaps.index(toIndex, Tasks.SCHEDULED_TO_JOB_KEY),
+        Multimaps.index(toIndex, Tasks.SCHEDULED_TO_STRING_JOB_KEY),
         Tasks.SCHEDULED_TO_ID);
   }
 

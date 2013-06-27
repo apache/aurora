@@ -3,6 +3,7 @@ package com.twitter.mesos.scheduler.base;
 import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
+import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 
@@ -27,6 +28,47 @@ public final class JobKeys {
       return jobKey.deepCopy();
     }
   };
+
+  // No copy needed for Functions that extract an immutable object (e.g. String).
+  private static final Function<JobConfiguration, JobKey> FROM_CONFIG_NO_COPY =
+      new Function<JobConfiguration, JobKey>() {
+        @Override public JobKey apply(JobConfiguration job) {
+          return job.getKey();
+        }
+      };
+
+  public static final Function<JobConfiguration, JobKey> FROM_CONFIG =
+      Functions.compose(DEEP_COPY, FROM_CONFIG_NO_COPY);
+
+  public static final Function<JobKey, String> TO_ROLE =
+      new Function<JobKey, String>() {
+        @Override public String apply(JobKey jobKey) {
+          return jobKey.getRole();
+        }
+      };
+
+  public static final Function<JobKey, String> TO_ENVIRONMENT =
+      new Function<JobKey, String>() {
+        @Override public String apply(JobKey jobKey) {
+          return jobKey.getEnvironment();
+        }
+      };
+
+  public static final Function<JobKey, String> TO_JOB_NAME =
+      new Function<JobKey, String>() {
+        @Override public String apply(JobKey jobKey) {
+          return jobKey.getName();
+        }
+      };
+
+  public static final Function<JobConfiguration, String> CONFIG_TO_ROLE =
+      Functions.compose(TO_ROLE, FROM_CONFIG_NO_COPY);
+
+  public static final Function<JobConfiguration, String> CONFIG_TO_ENVIRONMENT =
+      Functions.compose(TO_ENVIRONMENT, FROM_CONFIG_NO_COPY);
+
+  public static final Function<JobConfiguration, String> CONFIG_TO_JOB_NAME =
+      Functions.compose(TO_JOB_NAME, FROM_CONFIG_NO_COPY);
 
   /**
    * Check that a jobKey struct is valid.

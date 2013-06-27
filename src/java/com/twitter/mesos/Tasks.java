@@ -21,6 +21,7 @@ import com.twitter.mesos.gen.JobKey;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.base.JobKeys;
 
 /**
  * Utility class providing convenience functions relating to tasks.
@@ -64,17 +65,30 @@ public final class Tasks {
   public static final Function<ScheduledTask, Integer> SCHEDULED_TO_SHARD_ID =
       Functions.compose(INFO_TO_SHARD_ID, SCHEDULED_TO_INFO);
 
-  public static final Function<TwitterTaskInfo, String> INFO_TO_JOB_KEY =
+  public static final Function<TwitterTaskInfo, String> INFO_TO_STRING_JOB_KEY =
       new Function<TwitterTaskInfo, String>() {
         @Override public String apply(TwitterTaskInfo info) {
           return jobKey(info);
         }
       };
 
-  public static final Function<AssignedTask, String> ASSIGNED_TO_JOB_KEY =
+  public static final Function<AssignedTask, String> ASSIGNED_TO_STRING_JOB_KEY =
+      Functions.compose(INFO_TO_STRING_JOB_KEY, ASSIGNED_TO_INFO);
+
+  public static final Function<ScheduledTask, String> SCHEDULED_TO_STRING_JOB_KEY =
+      Functions.compose(ASSIGNED_TO_STRING_JOB_KEY, SCHEDULED_TO_ASSIGNED);
+
+  public static final Function<TwitterTaskInfo, JobKey> INFO_TO_JOB_KEY =
+      new Function<TwitterTaskInfo, JobKey>() {
+        @Override public JobKey apply(TwitterTaskInfo task) {
+          return JobKeys.from(task.getOwner().getRole(), task.getEnvironment(), task.getJobName());
+        }
+      };
+
+  public static final Function<AssignedTask, JobKey> ASSIGNED_TO_JOB_KEY =
       Functions.compose(INFO_TO_JOB_KEY, ASSIGNED_TO_INFO);
 
-  public static final Function<ScheduledTask, String> SCHEDULED_TO_JOB_KEY =
+  public static final Function<ScheduledTask, JobKey> SCHEDULED_TO_JOB_KEY =
       Functions.compose(ASSIGNED_TO_JOB_KEY, SCHEDULED_TO_ASSIGNED);
 
   public static final Function<ScheduledTask, ScheduledTask> DEEP_COPY_SCHEDULED =

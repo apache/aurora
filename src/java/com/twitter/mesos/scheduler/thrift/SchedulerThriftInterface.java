@@ -10,9 +10,12 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Optional;
+import com.google.common.base.Predicates;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
@@ -296,57 +299,47 @@ class SchedulerThriftInterface implements SchedulerController {
   }
 
   @Override
-  public GetJobsResponse getJobs(final String ownerRole) {
+  public GetJobsResponse getJobs(String ownerRole) {
     checkNotNull(ownerRole);
 
-    ImmutableSet.Builder<JobConfiguration> configs = ImmutableSet.builder();
-
-    // Get cron jobs come directly from the manager.
-    for (JobConfiguration jobConfiguration: cronJobManager.getJobs()) {
-      // TODO(ksweeney): Remove this when getJobs can't return null JobKeys.
-      JobConfiguration sanitized = jobConfiguration.deepCopy();
-      try {
-        ConfigurationManager.maybeFillJobKey(sanitized);
-      } catch (TaskDescriptionException e) {
-        LOG.severe("Unable to form job key for job " + sanitized);
-        continue;
-      }
-      if (ownerRole.equals(jobConfiguration.getKey().getRole())) {
-        configs.add(sanitized);
-      }
-    }
+    // Ensure we only return one JobConfiguration for each JobKey.
+    Map<JobKey, JobConfiguration> jobs = Maps.newHashMap();
 
     // Query the task store, find immediate jobs, and synthesize a JobConfiguration for them.
     // This is necessary because the ImmediateJobManager doesn't store jobs directly and
     // ImmediateJobManager#getJobs always returns an empty Collection.
-    Multimap<JobKey, ScheduledTask> jobToTasks =
-        Multimaps.index(
-            Storage.Util.weaklyConsistentFetchTasks(storage, Query.roleScoped(ownerRole).active()),
-            new Function<ScheduledTask, JobKey>() {
-              @Override public JobKey apply(ScheduledTask scheduledTask) {
-                TwitterTaskInfo task = scheduledTask.getAssignedTask().getTask();
+    Multimap<JobKey, ScheduledTask> tasks =  Multimaps.index(
+        Storage.Util.weaklyConsistentFetchTasks(storage, Query.roleScoped(ownerRole).active()),
+        Tasks.SCHEDULED_TO_JOB_KEY);
 
-                return JobKeys.from(
-                    task.getOwner().getRole(),
-                    task.getEnvironment(),
-                    task.getJobName());
-              }
-            });
+    jobs.putAll(Maps.transformEntries(tasks.asMap(),
+        new Maps.EntryTransformer<JobKey, Collection<ScheduledTask>, JobConfiguration>() {
+          @Override
+          public JobConfiguration transformEntry(JobKey jobKey, Collection<ScheduledTask> tasks) {
 
-    for (Map.Entry<JobKey, Collection<ScheduledTask>> entry : jobToTasks.asMap().entrySet()) {
-      // Pick an arbitrary task for each immediate job. The chosen task might not be the most
-      // recent if the job is in the middle of an update or some shards have been selectively
-      // created.
-      ScheduledTask firstTask = entry.getValue().iterator().next();
-      configs.add(new JobConfiguration()
-          .setKey(entry.getKey())
-          .setOwner(firstTask.getAssignedTask().getTask().getOwner())
-          .setTaskConfig(firstTask.getAssignedTask().getTask())
-          .setShardCount(entry.getValue().size()));
-    }
+            // Pick an arbitrary task for each immediate job. The chosen task might not be the most
+            // recent if the job is in the middle of an update or some shards have been selectively
+            // created.
+            ScheduledTask firstTask = tasks.iterator().next();
+            firstTask.getAssignedTask().getTask().unsetShardId();
+            return new JobConfiguration()
+                .setKey(jobKey)
+                .setOwner(firstTask.getAssignedTask().getTask().getOwner())
+                .setTaskConfig(firstTask.getAssignedTask().getTask())
+                .setShardCount(tasks.size());
+          }
+        }));
+
+    // Get cron jobs directly from the manager. Do this after querying the task store so the real
+    // template JobConfiguration for a cron job will overwrite the synthesized one that could have
+    // been created above.
+    jobs.putAll(Maps.uniqueIndex(
+        FluentIterable.from(cronJobManager.getJobs())
+            .filter(Predicates.compose(Predicates.equalTo(ownerRole), JobKeys.CONFIG_TO_ROLE)),
+        JobKeys.FROM_CONFIG));
 
     return new GetJobsResponse()
-        .setConfigs(configs.build())
+        .setConfigs(ImmutableSet.copyOf(jobs.values()))
         .setResponseCode(OK);
   }
 

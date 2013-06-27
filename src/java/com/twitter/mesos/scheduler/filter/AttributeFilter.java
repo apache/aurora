@@ -61,7 +61,7 @@ final class AttributeFilter {
       final AttributeLoader attributeFetcher) {
 
     Predicate<ScheduledTask> sameJob =
-        Predicates.compose(Predicates.equalTo(jobKey), Tasks.SCHEDULED_TO_JOB_KEY);
+        Predicates.compose(Predicates.equalTo(jobKey), Tasks.SCHEDULED_TO_STRING_JOB_KEY);
 
     Predicate<ScheduledTask> hasAttribute = new Predicate<ScheduledTask>() {
       @Override public boolean apply(ScheduledTask task) {
