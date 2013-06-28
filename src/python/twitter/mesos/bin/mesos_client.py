@@ -8,6 +8,7 @@ import copy
 from datetime import datetime
 import functools
 import getpass
+import json
 import optparse
 from optparse import OptionValueError
 import os
@@ -500,6 +501,7 @@ def diff(job, config_file):
   def pretty_print_task(task):
     # The raw configuration is not interesting - we only care about what gets parsed.
     task.configuration = None
+    task.thermosConfig = json.loads(task.thermosConfig)
     return pp.pformat(vars(task))
 
   def pretty_print_tasks(tasks):
