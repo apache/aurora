@@ -25,11 +25,11 @@ import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
-import com.twitter.mesos.scheduler.ScheduleException;
-import com.twitter.mesos.scheduler.SchedulerCore;
 import com.twitter.mesos.scheduler.base.Query;
+import com.twitter.mesos.scheduler.base.ScheduleException;
 import com.twitter.mesos.scheduler.configuration.Resources;
 import com.twitter.mesos.scheduler.filter.SchedulingFilter;
+import com.twitter.mesos.scheduler.state.SchedulerCore;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.StorageException;
 

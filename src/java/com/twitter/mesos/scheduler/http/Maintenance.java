@@ -9,7 +9,7 @@ import javax.ws.rs.core.Response;
 import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
 
-import com.twitter.mesos.scheduler.MaintenanceController;
+import com.twitter.mesos.scheduler.state.MaintenanceController;
 
 /**
  * Servlet that exposes state of {@link MaintenanceController}.

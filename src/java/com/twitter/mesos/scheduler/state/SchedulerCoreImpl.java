@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.state;
 
 import java.util.Map;
 import java.util.Set;
@@ -24,13 +24,14 @@ import com.twitter.mesos.gen.ShardUpdateResult;
 import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
-import com.twitter.mesos.scheduler.StateManagerImpl.UpdateException;
 import com.twitter.mesos.scheduler.base.JobKeys;
 import com.twitter.mesos.scheduler.base.Query;
+import com.twitter.mesos.scheduler.base.ScheduleException;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.configuration.ParsedConfiguration;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
 import com.twitter.mesos.scheduler.quota.Quotas;
+import com.twitter.mesos.scheduler.state.StateManagerImpl.UpdateException;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.MutateWork;

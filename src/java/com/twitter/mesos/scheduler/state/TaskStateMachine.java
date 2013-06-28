@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.state;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;

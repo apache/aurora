@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.state;
 
 import java.util.Set;
 
@@ -19,7 +19,6 @@ import com.twitter.mesos.gen.MaintenanceMode;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.MaintenanceController.MaintenanceControllerImpl;
 import com.twitter.mesos.scheduler.base.Query;
 import com.twitter.mesos.scheduler.events.PubsubEvent;
 import com.twitter.mesos.scheduler.events.PubsubEvent.StorageStarted;
@@ -35,6 +34,7 @@ import static com.twitter.mesos.gen.MaintenanceMode.NONE;
 import static com.twitter.mesos.gen.MaintenanceMode.SCHEDULED;
 import static com.twitter.mesos.gen.ScheduleStatus.FINISHED;
 import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
+import static com.twitter.mesos.scheduler.state.MaintenanceController.MaintenanceControllerImpl;
 
 public class MaintenanceControllerImplTest extends EasyMockTest {
 

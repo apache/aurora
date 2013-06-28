@@ -24,9 +24,9 @@ import com.twitter.common.net.pool.DynamicHostSet;
 import com.twitter.common.net.pool.DynamicHostSet.MonitorException;
 import com.twitter.common.webassets.bootstrap.BootstrapModule;
 import com.twitter.common.webassets.jquery.JQueryModule;
-import com.twitter.mesos.scheduler.CronJobManager;
-import com.twitter.mesos.scheduler.SchedulerCore;
 import com.twitter.mesos.scheduler.quota.QuotaManager;
+import com.twitter.mesos.scheduler.state.CronJobManager;
+import com.twitter.mesos.scheduler.state.SchedulerCore;
 import com.twitter.thrift.ServiceInstance;
 
 import static com.sun.jersey.api.core.ResourceConfig.PROPERTY_CONTAINER_REQUEST_FILTERS;

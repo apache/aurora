@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.state;
 
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicBoolean;

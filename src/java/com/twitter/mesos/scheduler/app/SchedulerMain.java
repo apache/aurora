@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.app;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -44,8 +44,10 @@ import com.twitter.common_internal.zookeeper.TwitterServerSetModule;
 import com.twitter.common_internal.zookeeper.ZooKeeperModule;
 import com.twitter.common_internal.zookeeper.legacy.ServerSetMigrationModule.ServiceDiscovery;
 import com.twitter.mesos.auth.AuthModule;
+import com.twitter.mesos.scheduler.DriverFactory;
 import com.twitter.mesos.scheduler.DriverFactory.DriverFactoryImpl;
-import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl.ExecutorConfig;
+import com.twitter.mesos.scheduler.MesosTaskFactory.ExecutorConfig;
+import com.twitter.mesos.scheduler.SchedulerLifecycle;
 import com.twitter.mesos.scheduler.SchedulerLifecycle.ShutdownOnDriverExit;
 import com.twitter.mesos.scheduler.local.IsolatedSchedulerModule;
 import com.twitter.mesos.scheduler.log.mesos.MesosLogStreamModule;
@@ -125,7 +127,7 @@ public class SchedulerMain extends AbstractApplication {
 
     ImmutableList.Builder<Module> modules = ImmutableList.<Module>builder()
         .addAll(getSystemModules())
-        .add(new SchedulerModule(clusterName))
+        .add(new AppModule(clusterName))
         .add(new AuthModule())
         .add(new ThriftModule())
         .add(serviceBinder)

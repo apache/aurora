@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.state;
 
 import java.util.Comparator;
 import java.util.EnumSet;
@@ -46,10 +46,10 @@ import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.TaskUpdateConfiguration;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
-import com.twitter.mesos.scheduler.SideEffectStorage.OperationFinalizer;
-import com.twitter.mesos.scheduler.SideEffectStorage.SideEffectWork;
+import com.twitter.mesos.scheduler.Driver;
 import com.twitter.mesos.scheduler.base.Query;
 import com.twitter.mesos.scheduler.events.PubsubEvent;
+import com.twitter.mesos.scheduler.state.SideEffectStorage.SideEffectWork;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.mesos.scheduler.storage.Storage.StorageException;
@@ -71,6 +71,7 @@ import static com.twitter.mesos.gen.ScheduleStatus.UNKNOWN;
 import static com.twitter.mesos.gen.ScheduleStatus.UPDATING;
 import static com.twitter.mesos.scheduler.base.Shards.GET_NEW_CONFIG;
 import static com.twitter.mesos.scheduler.base.Shards.GET_ORIGINAL_CONFIG;
+import static com.twitter.mesos.scheduler.state.SideEffectStorage.OperationFinalizer;
 
 /**
  * Manager of all persistence-related operations for the scheduler.  Acts as a controller for

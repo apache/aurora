@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.state;
 
 import java.util.Set;
 
@@ -19,7 +19,7 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskEvent;
 import com.twitter.mesos.gen.TwitterTaskInfo;
-import com.twitter.mesos.scheduler.TaskStateMachine.WorkSink;
+import com.twitter.mesos.scheduler.state.TaskStateMachine.WorkSink;
 
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
@@ -43,12 +43,12 @@ import static com.twitter.mesos.gen.ScheduleStatus.RUNNING;
 import static com.twitter.mesos.gen.ScheduleStatus.STARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.UNKNOWN;
 import static com.twitter.mesos.gen.ScheduleStatus.UPDATING;
-import static com.twitter.mesos.scheduler.WorkCommand.DELETE;
-import static com.twitter.mesos.scheduler.WorkCommand.INCREMENT_FAILURES;
-import static com.twitter.mesos.scheduler.WorkCommand.KILL;
-import static com.twitter.mesos.scheduler.WorkCommand.RESCHEDULE;
-import static com.twitter.mesos.scheduler.WorkCommand.UPDATE;
-import static com.twitter.mesos.scheduler.WorkCommand.UPDATE_STATE;
+import static com.twitter.mesos.scheduler.state.WorkCommand.DELETE;
+import static com.twitter.mesos.scheduler.state.WorkCommand.INCREMENT_FAILURES;
+import static com.twitter.mesos.scheduler.state.WorkCommand.KILL;
+import static com.twitter.mesos.scheduler.state.WorkCommand.RESCHEDULE;
+import static com.twitter.mesos.scheduler.state.WorkCommand.UPDATE;
+import static com.twitter.mesos.scheduler.state.WorkCommand.UPDATE_STATE;
 
 public class TaskStateMachineTest extends EasyMockTest {
 

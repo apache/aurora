@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.base;
 
 /**
 * Exception class to signal a failure to schedule a task or job.

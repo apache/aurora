@@ -11,7 +11,7 @@ import com.google.inject.BindingAnnotation;
 
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskQuery;
-import com.twitter.mesos.scheduler.SchedulerException;
+import com.twitter.mesos.scheduler.base.SchedulerException;
 
 /**
  * Manages scheduler storage operations providing an interface to perform atomic changes.
@@ -36,7 +36,7 @@ public interface Storage {
      * <p>
      * This is labeled as unsafe, since it's rare that a caller should be using this.  In most
      * cases, mutations to the task store should be done through
-     * {@link com.twitter.mesos.scheduler.StateManager}.
+     * {@link com.twitter.mesos.scheduler.state.StateManager}.
      * <p>
      * TODO(William Farner): Come up with a way to restrict access to this interface.  As it stands,
      * it's trivial for an unsuspecting caller to modify the task store directly and subvert the

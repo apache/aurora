@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.state;
 
 import java.util.Set;
 
@@ -102,7 +102,7 @@ public interface MaintenanceController {
    */
   Multimap<String, String> getDrainingTasks();
 
-   class MaintenanceControllerImpl implements MaintenanceController, EventSubscriber {
+  class MaintenanceControllerImpl implements MaintenanceController, EventSubscriber {
     private final Storage storage;
     private final StateManager stateManager;
     private final Closure<PubsubEvent> eventSink;

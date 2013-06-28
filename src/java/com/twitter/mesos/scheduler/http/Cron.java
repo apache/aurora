@@ -11,7 +11,7 @@ import javax.ws.rs.core.Response;
 import com.google.common.collect.ImmutableMap;
 import com.google.inject.Inject;
 
-import com.twitter.mesos.scheduler.CronJobManager;
+import com.twitter.mesos.scheduler.state.CronJobManager;
 
 /**
  * HTTP interface to dump state of the internal cron scheduler.

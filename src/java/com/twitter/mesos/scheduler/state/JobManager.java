@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.state;
 
 import java.util.Collections;
 
@@ -6,6 +6,7 @@ import com.google.inject.Inject;
 
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.JobKey;
+import com.twitter.mesos.scheduler.base.ScheduleException;
 
 /**
  * Interface for a job manager.  A job manager is responsible for deciding whether and when to

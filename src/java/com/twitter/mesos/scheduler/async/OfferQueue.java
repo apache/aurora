@@ -31,9 +31,9 @@ import com.twitter.common.stats.Stats;
 import com.twitter.mesos.gen.HostStatus;
 import com.twitter.mesos.gen.MaintenanceMode;
 import com.twitter.mesos.scheduler.Driver;
-import com.twitter.mesos.scheduler.MaintenanceController;
 import com.twitter.mesos.scheduler.events.PubsubEvent.EventSubscriber;
 import com.twitter.mesos.scheduler.events.PubsubEvent.HostMaintenanceStateChange;
+import com.twitter.mesos.scheduler.state.MaintenanceController;
 
 import static com.twitter.mesos.gen.MaintenanceMode.DRAINED;
 import static com.twitter.mesos.gen.MaintenanceMode.DRAINING;

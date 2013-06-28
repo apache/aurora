@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.app;
 
 import java.io.File;
 import java.io.IOException;
@@ -69,7 +69,8 @@ import com.twitter.mesos.gen.storage.SaveFrameworkId;
 import com.twitter.mesos.gen.storage.SaveTasks;
 import com.twitter.mesos.gen.storage.Snapshot;
 import com.twitter.mesos.gen.storage.Transaction;
-import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl.ExecutorConfig;
+import com.twitter.mesos.scheduler.DriverFactory;
+import com.twitter.mesos.scheduler.MesosTaskFactory.ExecutorConfig;
 import com.twitter.mesos.scheduler.SchedulerLifecycle.ShutdownOnDriverExit;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager;
 import com.twitter.mesos.scheduler.log.Log;

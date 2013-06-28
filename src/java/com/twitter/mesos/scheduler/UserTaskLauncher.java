@@ -18,6 +18,8 @@ import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.scheduler.async.OfferQueue;
 import com.twitter.mesos.scheduler.base.Conversions;
 import com.twitter.mesos.scheduler.base.Query;
+import com.twitter.mesos.scheduler.base.SchedulerException;
+import com.twitter.mesos.scheduler.state.StateManager;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 

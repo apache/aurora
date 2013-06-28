@@ -54,13 +54,13 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * <p>TODO(John Sirois): This class contains the old logic of SchedulerMain - now that its extracted
  * it should be tested.
  */
-class SchedulerLifecycle implements EventSubscriber {
+public class SchedulerLifecycle implements EventSubscriber {
 
   /**
    * A {@link SingletonService} scheduler leader candidate that exposes a method for awaiting clean
    * shutdown.
    */
-  interface SchedulerCandidate extends SingletonService.LeadershipListener {
+  public interface SchedulerCandidate extends SingletonService.LeadershipListener {
     /**
      * Waits for this candidate to abdicate or otherwise decide to quit.
      */

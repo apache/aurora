@@ -16,7 +16,7 @@ import com.twitter.mesos.gen.Attribute;
 import com.twitter.mesos.gen.Constraint;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskConstraint;
-import com.twitter.mesos.scheduler.SchedulerException;
+import com.twitter.mesos.scheduler.base.SchedulerException;
 import com.twitter.mesos.scheduler.filter.SchedulingFilter.Veto;
 import com.twitter.mesos.scheduler.filter.SchedulingFilterImpl.AttributeLoader;
 

@@ -26,6 +26,7 @@ import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.base.CommandUtil;
+import com.twitter.mesos.scheduler.base.SchedulerException;
 import com.twitter.mesos.scheduler.configuration.Resources;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -43,9 +44,22 @@ public interface MesosTaskFactory {
    * @param task Assigned task to translate into a task object.
    * @param slaveId Id of the slave the task is being assigned to.
    * @return A new task.
-   * @throws com.twitter.mesos.scheduler.SchedulerException If the task could not be encoded.
+   * @throws SchedulerException If the task could not be encoded.
    */
   TaskInfo createFrom(AssignedTask task, SlaveID slaveId) throws SchedulerException;
+
+  // TODO(wfarner): Reduce visibility of this class and instantiate it in a module only.
+  public static class ExecutorConfig {
+    private final String executorPath;
+
+    public ExecutorConfig(String executorPath) {
+      this.executorPath = checkNotBlank(executorPath);
+    }
+
+    String getExecutorPath() {
+      return executorPath;
+    }
+  }
 
   static class MesosTaskFactoryImpl implements MesosTaskFactory {
     private static final Logger LOG = Logger.getLogger(MesosTaskFactoryImpl.class.getName());
@@ -86,18 +100,6 @@ public interface MesosTaskFactory {
      */
     public static Amount<Long, Data> getTotalTaskRam(long taskRamMb) {
       return Amount.of(taskRamMb + RAM.as(Data.MB), Data.MB);
-    }
-
-    static class ExecutorConfig {
-      private final String executorPath;
-
-      ExecutorConfig(String executorPath) {
-        this.executorPath = checkNotBlank(executorPath);
-      }
-
-      String getExecutorPath() {
-        return executorPath;
-      }
     }
 
     private final String executorPath;

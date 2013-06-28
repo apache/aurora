@@ -24,10 +24,10 @@ import com.twitter.common.testing.EasyMockTest;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 import com.twitter.mesos.gen.MaintenanceMode;
 import com.twitter.mesos.scheduler.Driver;
-import com.twitter.mesos.scheduler.MaintenanceController;
 import com.twitter.mesos.scheduler.async.OfferQueue.LaunchException;
 import com.twitter.mesos.scheduler.async.OfferQueue.OfferQueueImpl;
 import com.twitter.mesos.scheduler.async.OfferQueue.OfferReturnDelay;
+import com.twitter.mesos.scheduler.state.MaintenanceController;
 
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertFalse;

@@ -29,8 +29,8 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Clock;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduledTask;
-import com.twitter.mesos.scheduler.StateManager;
 import com.twitter.mesos.scheduler.base.Query;
+import com.twitter.mesos.scheduler.state.StateManager;
 import com.twitter.mesos.scheduler.storage.Storage;
 
 import static java.lang.annotation.ElementType.FIELD;

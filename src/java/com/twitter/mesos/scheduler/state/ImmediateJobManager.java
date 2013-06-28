@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.state;
 
 import com.google.common.base.Preconditions;
 import com.google.inject.Inject;

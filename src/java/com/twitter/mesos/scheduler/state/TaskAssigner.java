@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler;
+package com.twitter.mesos.scheduler.state;
 
 import java.util.Set;
 import java.util.logging.Logger;
@@ -11,6 +11,7 @@ import org.apache.mesos.Protos.TaskInfo;
 
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduledTask;
+import com.twitter.mesos.scheduler.MesosTaskFactory;
 import com.twitter.mesos.scheduler.configuration.Resources;
 import com.twitter.mesos.scheduler.filter.SchedulingFilter;
 import com.twitter.mesos.scheduler.filter.SchedulingFilter.Veto;

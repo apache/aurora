@@ -15,8 +15,8 @@ import com.twitter.common.quantity.Data;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.TwitterTaskInfo;
+import com.twitter.mesos.scheduler.MesosTaskFactory.ExecutorConfig;
 import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
-import com.twitter.mesos.scheduler.MesosTaskFactory.MesosTaskFactoryImpl.ExecutorConfig;
 
 import static org.junit.Assert.assertEquals;
 
