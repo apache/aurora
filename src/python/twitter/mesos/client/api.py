@@ -62,8 +62,7 @@ invoking cancel_update.
     self._assert_valid_job_key(job_key)
 
     log.info("Starting cron job: %s" % job_key)
-    # TODO(ksweeney): Remove Nones before resolving MESOS-2403.
-    return self._scheduler.startCronJob(None, None, job_key.to_thrift())
+    return self._scheduler.startCronJob(job_key.to_thrift())
 
   def get_jobs(self, role):
     log.info("Retrieving jobs for role %s" % role)

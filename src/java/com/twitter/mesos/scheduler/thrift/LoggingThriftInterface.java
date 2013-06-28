@@ -155,16 +155,9 @@ class LoggingThriftInterface implements MesosAdmin.Iface {
   }
 
   @Override
-  public StartCronResponse startCronJob(
-      @Nullable String ownerRole,
-      @Nullable String jobName,
-      @Nullable JobKey job,
-      SessionKey session) throws TException {
-
-    logUserAction(session,
-        "startCronJob|ownerRole: %s |jobName: %s |job: %s", ownerRole, jobName, job);
-
-    return delegate.startCronJob(ownerRole, jobName, job, session);
+  public StartCronResponse startCronJob(JobKey jobKey, SessionKey session) throws TException {
+    logUserAction(session, "startCronJob|jobKey: %s", jobKey);
+    return delegate.startCronJob(jobKey, session);
   }
 
   @Override

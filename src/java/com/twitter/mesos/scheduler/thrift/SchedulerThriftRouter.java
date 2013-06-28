@@ -73,15 +73,8 @@ public class SchedulerThriftRouter implements MesosAdmin.Iface {
   }
 
   @Override
-  public StartCronResponse startCronJob(
-      @Nullable String role,
-      @Nullable String jobName,
-      @Nullable JobKey job,
-      SessionKey session) {
-
-    JobKey sanitizedJob = JobKeys.fromRequestParameters(job, role, jobName);
-
-    return schedulerController.startCronJob(sanitizedJob, session);
+  public StartCronResponse startCronJob(JobKey jobKey, SessionKey session) {
+    return schedulerController.startCronJob(jobKey, session);
   }
 
   @Override

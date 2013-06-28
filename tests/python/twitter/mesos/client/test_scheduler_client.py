@@ -59,12 +59,11 @@ class TestSchedulerProxyInjection(unittest.TestCase):
     return TestSchedulerProxy('local')
 
   def test_startCronJob(self):
-    self.mock_thrift_client.startCronJob(IgnoreArg(), IgnoreArg(), IsA(JobKey), IsA(SessionKey))
+    self.mock_thrift_client.startCronJob(IsA(JobKey), IsA(SessionKey))
 
     self.mox.ReplayAll()
 
-    self.make_scheduler_proxy().startCronJob(
-        'foo', 'bar', JobKey(role='foo', environment=DEFAULT_ENVIRONMENT, name='bar'))
+    self.make_scheduler_proxy().startCronJob(JOB_KEY)
 
   def test_createJob(self):
     self.mock_thrift_client.createJob(IsA(JobConfiguration), IsA(SessionKey))
