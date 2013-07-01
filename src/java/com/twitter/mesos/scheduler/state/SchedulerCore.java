@@ -6,7 +6,6 @@ import java.util.Set;
 import com.google.common.base.Optional;
 
 import com.twitter.mesos.gen.AssignedTask;
-import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.JobKey;
 import com.twitter.mesos.gen.ScheduleStatus;
@@ -60,8 +59,8 @@ public interface SchedulerCore {
    * @throws ScheduleException If there was an error in scheduling an update when no active tasks
    *                           are found for a job or an update for the job is already in progress.
    * @return A unique update token if an update must be coordinated through
-   *         {@link #updateShards(Identity, String, Set, String)}and
-   *         {@link #finishUpdate(Identity, String, Optional, UpdateResult)}, or an absent value if
+   *         {@link #updateShards(JobKey, String, Set, String)}and
+   *         {@link #finishUpdate(JobKey, String, Optional, UpdateResult)}, or an absent value if
    * the update was completed in-place and no further action is necessary.
    */
   Optional<String> initiateJobUpdate(ParsedConfiguration parsedConfiguration)
@@ -71,8 +70,8 @@ public interface SchedulerCore {
    * Initiates an update on shards within a job.
    * Requires that startUpdate was called for the job first.
    *
-   * @param identity The job owner and invoking user.
-   * @param jobName Job being updated.
+   * @param jobKey Job being updated.
+   * @param invokingUser Name of the invoking user for auditing purposes.
    * @param shards Shards to be updated.
    * @param updateToken A unique string identifying the update, must be provided from
    *                    {@link #initiateJobUpdate(ParsedConfiguration)}.
@@ -81,8 +80,8 @@ public interface SchedulerCore {
    */
   // TODO(ksweeney): Refactor this to take a JobKey
   Map<Integer, ShardUpdateResult> updateShards(
-      Identity identity,
-      String jobName,
+      JobKey jobKey,
+      String invokingUser,
       Set<Integer> shards,
       String updateToken) throws ScheduleException;
 
@@ -90,26 +89,25 @@ public interface SchedulerCore {
    * Initiates a rollback of the specified shards.
    * Requires that startUpdate was called for the job first.
    *
-   * @param identity The job owner and invoking user.
-   * @param jobName Name of the job being updated.
+   * @param jobKey Job being updated.
+   * @param invokingUser Name of the invoking user for auditing purposes.
    * @param shards Shards to be updated.
    * @param updateToken A unique string identifying the update, must be provided from
    *                    {@link #initiateJobUpdate(ParsedConfiguration)}
    * @throws ScheduleException If there was an error in updating the state to ROLLBACK.
    * @return The action taken on each of the shards.
    */
-  // TODO(ksweeney): Refactor this to take a JobKey
   Map<Integer, ShardUpdateResult> rollbackShards(
-      Identity identity,
-      String jobName,
+      JobKey jobKey,
+      String invokingUser,
       Set<Integer> shards,
       String updateToken) throws ScheduleException;
 
   /**
    * Completes an update.
    *
-   * @param identity The job owner and invoking user.
-   * @param jobName Name of the job being updated.
+   * @param jobKey The job being updated.
+   * @param invokingUser Name of the invoking user for auditing purposes.
    * @param updateToken The update token provided from
    *                    {@link #initiateJobUpdate(ParsedConfiguration)},
    *                    or not present if the update is being forcibly terminated.
@@ -119,8 +117,8 @@ public interface SchedulerCore {
    */
   // TODO(ksweeney): Refactor this to take a JobKey
   void finishUpdate(
-      Identity identity,
-      String jobName,
+      JobKey jobKey,
+      String invokingUser,
       Optional<String> updateToken,
       UpdateResult result) throws ScheduleException;
 

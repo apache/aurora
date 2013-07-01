@@ -4,6 +4,7 @@ import java.util.Set;
 
 import com.google.common.base.Optional;
 
+import com.twitter.mesos.gen.JobKey;
 import com.twitter.mesos.gen.JobUpdateConfiguration;
 
 /**
@@ -13,13 +14,12 @@ import com.twitter.mesos.gen.JobUpdateConfiguration;
 public interface UpdateStore {
 
   /**
-   * Fetches the update configuration (if present) for the given role/job.
+   * Fetches the update configuration (if present) for the given job key.
    *
-   * @param role Role the job is under.
-   * @param job Job to fetch update configuration for.
+   * @param jobKey Job to fetch update configuration for.
    * @return Optional job update configuration.
    */
-  Optional<JobUpdateConfiguration> fetchJobUpdateConfig(String role, String job);
+  Optional<JobUpdateConfiguration> fetchJobUpdateConfig(JobKey jobKey);
 
   /**
    * Fetches all active shard update configurations for a role.
@@ -50,8 +50,17 @@ public interface UpdateStore {
      *
      * @param role Owner role of the job.
      * @param job Name of the job.
+     * @deprecated Use {@link #removeShardUpdateConfigs(com.twitter.mesos.gen.JobKey)}.
      */
+    @Deprecated
     void removeShardUpdateConfigs(String role, String job);
+
+    /**
+     * Removes the update configuration for the job.
+     *
+     * @param jobKey Key of the job.
+     */
+    void removeShardUpdateConfigs(JobKey jobKey);
 
     /**
      * Deletes all update configurations.

@@ -37,7 +37,7 @@ import com.twitter.common.stats.Stats;
 import com.twitter.common.util.Clock;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
-import com.twitter.mesos.gen.Identity;
+import com.twitter.mesos.gen.JobKey;
 import com.twitter.mesos.gen.JobUpdateConfiguration;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
@@ -47,6 +47,7 @@ import com.twitter.mesos.gen.TaskUpdateConfiguration;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.scheduler.Driver;
+import com.twitter.mesos.scheduler.base.JobKeys;
 import com.twitter.mesos.scheduler.base.Query;
 import com.twitter.mesos.scheduler.events.PubsubEvent;
 import com.twitter.mesos.scheduler.state.SideEffectStorage.SideEffectWork;
@@ -63,6 +64,7 @@ import static com.google.common.collect.Iterables.transform;
 
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.mesos.Tasks.SCHEDULED_TO_SHARD_ID;
+import static com.twitter.mesos.Tasks.jobKey;
 import static com.twitter.mesos.gen.ScheduleStatus.INIT;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
@@ -214,37 +216,32 @@ public class StateManagerImpl implements StateManager {
   /**
    * Registers a new update.
    *
-   * @param role Role to register an update for.
-   * @param job Job to register an update for.
+   * @param jobKey Job to register an update for.
    * @param updatedTasks Updated Task information to be registered.
    * @throws UpdateException If no active tasks are found for the job, or if an update for the job
    *     is already in progress.
    * @return A unique string identifying the update.
    */
-  String registerUpdate(
-      final String role,
-      final String job,
-      final Set<TwitterTaskInfo> updatedTasks) throws UpdateException {
+  String registerUpdate(final JobKey jobKey, final Set<TwitterTaskInfo> updatedTasks)
+      throws UpdateException {
 
-    checkNotBlank(role);
-    checkNotBlank(job);
+    checkNotNull(jobKey);
     checkNotBlank(updatedTasks);
 
     return storage.write(storage.new SideEffectWork<String, UpdateException>() {
       @Override public String apply(MutableStoreProvider storeProvider) throws UpdateException {
-        assertNotUpdatingOrRollingBack(role, job, storeProvider.getTaskStore());
+        assertNotUpdatingOrRollingBack(jobKey, storeProvider.getTaskStore());
 
-        String jobKey = Tasks.jobKey(role, job);
         Set<TwitterTaskInfo> existingTasks = ImmutableSet.copyOf(Iterables.transform(
-            storeProvider.getTaskStore().fetchTasks(Query.jobScoped(role, job).active()),
+            storeProvider.getTaskStore().fetchTasks(Query.jobScoped(jobKey).active()),
             Tasks.SCHEDULED_TO_INFO));
 
         if (existingTasks.isEmpty()) {
-          throw new UpdateException("No active tasks found for job " + jobKey);
+          throw new UpdateException("No active tasks found for job " + JobKeys.toPath(jobKey));
         }
 
         UpdateStore.Mutable updateStore = storeProvider.getUpdateStore();
-        if (updateStore.fetchJobUpdateConfig(role, job).isPresent()) {
+        if (updateStore.fetchJobUpdateConfig(jobKey).isPresent()) {
           throw new UpdateException("Update already in progress for " + jobKey);
         }
 
@@ -260,20 +257,20 @@ public class StateManagerImpl implements StateManager {
         }
 
         String updateToken = UUID.randomUUID().toString();
+        // TODO(ksweeney): Change this to use JobKey as part of MESOS-2403.
         updateStore.saveJobUpdateConfig(
-            new JobUpdateConfiguration(role, job, updateToken, shardConfigBuilder.build()));
+            new JobUpdateConfiguration(
+                jobKey.getRole(), jobKey.getName(), updateToken, shardConfigBuilder.build()));
         return updateToken;
       }
     });
   }
 
   private static final Set<ScheduleStatus> UPDATE_IN_PROGRESS = EnumSet.of(UPDATING, ROLLBACK);
-  private static void assertNotUpdatingOrRollingBack(
-      String role,
-      String jobName,
-      TaskStore taskStore) throws UpdateException {
+  private static void assertNotUpdatingOrRollingBack(JobKey jobKey, TaskStore taskStore)
+      throws UpdateException {
 
-    Query.Builder query = Query.jobScoped(role, jobName).byStatus(UPDATE_IN_PROGRESS);
+    Query.Builder query = Query.jobScoped(jobKey).byStatus(UPDATE_IN_PROGRESS);
     if (!taskStore.fetchTaskIds(query).isEmpty()) {
       throw new UpdateException("Unable to proceed until UPDATING and ROLLBACK tasks complete.");
     }
@@ -282,8 +279,8 @@ public class StateManagerImpl implements StateManager {
   /**
    * Completes an in-progress update.
    *
-   * @param identity The job owner and invoking user.
-   * @param job Job to finish updating.
+   * @param jobKey The job key.
+   * @param invokingUser User invoking the command for auditing purposes.
    * @param updateToken Token associated with the update.  If present, the token must match the
    *     the stored token for the update.
    * @param result The result of the update.
@@ -293,40 +290,34 @@ public class StateManagerImpl implements StateManager {
    *     does not match the stored token.
    */
   boolean finishUpdate(
-      final Identity identity,
-      final String job,
+      final JobKey jobKey,
+      final String invokingUser,
       final Optional<String> updateToken,
       final UpdateResult result,
       final boolean throwIfMissing) throws UpdateException {
 
-    checkNotNull(identity);
-    final String role = identity.getRole();
-    final String updatingUser = identity.getUser();
-    checkNotBlank(role);
-    checkNotBlank(updatingUser);
-    checkNotBlank(job);
+    checkNotNull(jobKey);
+    checkNotBlank(invokingUser);
 
     return storage.write(storage.new SideEffectWork<Boolean, UpdateException>() {
       @Override public Boolean apply(MutableStoreProvider storeProvider) throws UpdateException {
-        assertNotUpdatingOrRollingBack(role, job, storeProvider.getTaskStore());
+        assertNotUpdatingOrRollingBack(jobKey, storeProvider.getTaskStore());
 
         UpdateStore.Mutable updateStore = storeProvider.getUpdateStore();
 
-        String jobKey = Tasks.jobKey(role, job);
-
         // Since we store all shards in a job with the same token, we can just check shard 0,
         // which is always guaranteed to exist for a job.
-        Optional<JobUpdateConfiguration> jobConfig = updateStore.fetchJobUpdateConfig(role, job);
+        Optional<JobUpdateConfiguration> jobConfig = updateStore.fetchJobUpdateConfig(jobKey);
         if (!jobConfig.isPresent()) {
           if (throwIfMissing) {
-            throw new UpdateException("Update does not exist for " + jobKey);
+            throw new UpdateException("Update does not exist for " + JobKeys.toPath(jobKey));
           }
           return false;
         }
 
         if (updateToken.isPresent()
             && !updateToken.get().equals(jobConfig.get().getUpdateToken())) {
-          throw new UpdateException("Invalid update token for " + jobKey);
+          throw new UpdateException("Invalid update token for " + JobKeys.toPath(jobKey));
         }
 
         if (EnumSet.of(UpdateResult.SUCCESS, UpdateResult.FAILED).contains(result)) {
@@ -335,13 +326,13 @@ public class StateManagerImpl implements StateManager {
               (result == UpdateResult.SUCCESS) ? GET_NEW_CONFIG : GET_ORIGINAL_CONFIG;
           for (Integer shard : fetchRemovedShards(jobConfig.get(), removedSelector)) {
             changeState(
-                Query.shardScoped(role, job, shard).active().get(),
+                Query.shardScoped(jobKey, shard).active().get(),
                 KILLING,
-                Optional.of("Removed during update by " + updatingUser));
+                Optional.of("Removed during update by " + invokingUser));
           }
         }
 
-        updateStore.removeShardUpdateConfigs(role, job);
+        updateStore.removeShardUpdateConfigs(jobKey);
         return true;
       }
     });
@@ -439,8 +430,8 @@ public class StateManagerImpl implements StateManager {
   }
 
   Map<Integer, ShardUpdateResult> modifyShards(
-      final Identity identity,
-      final String jobName,
+      final JobKey jobKey,
+      final String invokingUser,
       final Set<Integer> shards,
       final String updateToken,
       boolean updating) throws UpdateException {
@@ -449,14 +440,13 @@ public class StateManagerImpl implements StateManager {
         ? GET_NEW_CONFIG
         : GET_ORIGINAL_CONFIG;
     final ScheduleStatus modifyingState;
-    final String role = identity.getRole();
     final String auditMessage;
     if (updating) {
       modifyingState = UPDATING;
-      auditMessage = "Updated by " + identity.getUser();
+      auditMessage = "Updated by " + invokingUser;
     } else {
       modifyingState = ROLLBACK;
-      auditMessage = "Rolled back by " + identity.getUser();
+      auditMessage = "Rolled back by " + invokingUser;
     }
 
     return storage.write(
@@ -466,11 +456,10 @@ public class StateManagerImpl implements StateManager {
 
             ImmutableMap.Builder<Integer, ShardUpdateResult> result = ImmutableMap.builder();
 
-            String jobKey = Tasks.jobKey(role, jobName);
             Optional<JobUpdateConfiguration> updateConfig =
-                store.getUpdateStore().fetchJobUpdateConfig(role, jobName);
+                store.getUpdateStore().fetchJobUpdateConfig(jobKey);
             if (!updateConfig.isPresent()) {
-              throw new UpdateException("No active update found for " + jobKey);
+              throw new UpdateException("No active update found for " + JobKeys.toPath(jobKey));
             }
 
             if (!updateConfig.get().getUpdateToken().equals(updateToken)) {
@@ -479,7 +468,7 @@ public class StateManagerImpl implements StateManager {
 
             Set<ScheduledTask> tasks =
                 store.getTaskStore().fetchTasks(Query
-                    .shardScoped(role, jobName, shards)
+                    .shardScoped(jobKey, shards)
                     .active()
                     .get());
 
@@ -523,7 +512,7 @@ public class StateManagerImpl implements StateManager {
                 // TODO(William Farner): The additional query could be avoided here.
                 //                       Consider allowing state changes on tasks by task ID.
                 changeState(
-                    Query.shardScoped(role, jobName, changedShards).active().get(),
+                    Query.shardScoped(jobKey, changedShards).active().get(),
                     modifyingState,
                     Optional.of(auditMessage));
                 putResults(result, ShardUpdateResult.RESTARTING, changedShards);
@@ -540,12 +529,9 @@ public class StateManagerImpl implements StateManager {
   }
 
   private Optional<TaskUpdateConfiguration> fetchShardUpdateConfig(
-      UpdateStore updateStore,
-      String role,
-      String job,
-      int shard) {
+      UpdateStore updateStore, JobKey jobKey, int shard) {
 
-    Optional<JobUpdateConfiguration> optional = updateStore.fetchJobUpdateConfig(role, job);
+    Optional<JobUpdateConfiguration> optional = updateStore.fetchJobUpdateConfig(jobKey);
     if (optional.isPresent()) {
       Set<TaskUpdateConfiguration> matches =
           fetchShardUpdateConfigs(optional.get(), ImmutableSet.of(shard));
@@ -689,12 +675,12 @@ public class StateManagerImpl implements StateManager {
   }
 
   // Supplier that checks if there is an active update for a job.
-  private Supplier<Boolean> taskUpdateChecker(final String role, final String job) {
+  private Supplier<Boolean> taskUpdateChecker(final JobKey jobKey) {
     return new Supplier<Boolean>() {
       @Override public Boolean get() {
         return readOnlyStorage.consistentRead(new Work.Quiet<Boolean>() {
           @Override public Boolean apply(StoreProvider storeProvider) {
-            return storeProvider.getUpdateStore().fetchJobUpdateConfig(role, job).isPresent();
+            return storeProvider.getUpdateStore().fetchJobUpdateConfig(jobKey).isPresent();
           }
         });
       }
@@ -801,8 +787,7 @@ public class StateManagerImpl implements StateManager {
 
     Optional<TaskUpdateConfiguration> optional = fetchShardUpdateConfig(
         storeProvider.getUpdateStore(),
-        oldConfig.getOwner().getRole(),
-        oldConfig.getJobName(),
+        Tasks.INFO_TO_JOB_KEY.apply(oldConfig),
         oldConfig.getShardId());
 
     // TODO(Sathya): Figure out a way to handle race condition when finish update is called
@@ -862,9 +847,6 @@ public class StateManagerImpl implements StateManager {
     TaskStateMachine stateMachine = new TaskStateMachine(
         taskId,
         null,
-        // The task is unknown, so there is no matching task to fetch.
-        null,
-        null,
         // Since the task doesn't exist, its job cannot be updating.
         Suppliers.ofInstance(false),
         workSink,
@@ -879,14 +861,10 @@ public class StateManagerImpl implements StateManager {
   }
 
   private TaskStateMachine createStateMachine(ScheduledTask task, ScheduleStatus initialState) {
-    String role = Tasks.getRole(task);
-    String job = Tasks.getJob(task);
     return new TaskStateMachine(
         Tasks.id(task),
-        role,
-        job,
         task,
-        taskUpdateChecker(role, job),
+        taskUpdateChecker(Tasks.SCHEDULED_TO_JOB_KEY.apply(task)),
         workSink,
         clock,
         initialState);

@@ -76,8 +76,6 @@ class TaskStateMachine {
       });
 
   private final String taskId;
-  private final String role;
-  private final String jobName;
   private final WorkSink workSink;
   private final StateMachine<State> stateMachine;
   private ScheduleStatus previousState = null;
@@ -158,8 +156,6 @@ class TaskStateMachine {
    * Creates a new task state machine.
    *
    * @param taskId ID of the task managed by this state machine.
-   * @param role Role that owns this task.
-   * @param jobName Job that this task is a part of.
    * @param task Read-only task that this state machine manages.
    * @param isJobUpdating Supplier to test whether the task's job is currently in a rolling update.
    * @param workSink Work sink to receive transition response actions
@@ -170,8 +166,6 @@ class TaskStateMachine {
    */
   public TaskStateMachine(
       final String taskId,
-      @Nullable String role,
-      @Nullable String jobName,
       final ScheduledTask task,
       final Supplier<Boolean> isJobUpdating,
       final WorkSink workSink,
@@ -179,8 +173,6 @@ class TaskStateMachine {
       final ScheduleStatus initialState) {
 
     this.taskId = MorePreconditions.checkNotBlank(taskId);
-    this.role = role;
-    this.jobName = jobName;
     this.workSink = checkNotNull(workSink);
     this.clock = checkNotNull(clock);
     checkNotNull(initialState);
@@ -671,16 +663,6 @@ class TaskStateMachine {
    */
   public String getTaskId() {
     return taskId;
-  }
-
-  @Nullable
-  public String getRole() {
-    return role;
-  }
-
-  @Nullable
-  public String getJobName() {
-    return jobName;
   }
 
   /**

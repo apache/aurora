@@ -68,8 +68,6 @@ public class TaskStateMachineTest extends EasyMockTest {
   private TaskStateMachine makeStateMachine(String taskId, ScheduledTask task) {
     return new TaskStateMachine(
         taskId,
-        Tasks.getRole(task),
-        Tasks.getJob(task),
         task,
         isJobUpdating,
         workSink,

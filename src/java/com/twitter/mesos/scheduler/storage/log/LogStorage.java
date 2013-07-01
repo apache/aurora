@@ -608,6 +608,12 @@ public class LogStorage extends ForwardingStore
     });
   }
 
+  @Override
+  public void removeShardUpdateConfigs(JobKey jobKey) {
+    // TODO(ksweeney): Remove this delegation as part of MESOS-2403.
+    removeShardUpdateConfigs(jobKey.getRole(), jobKey.getName());
+  }
+
   @Timed("scheduler_log_quota_remove")
   @Override
   public void removeQuota(final String role) {

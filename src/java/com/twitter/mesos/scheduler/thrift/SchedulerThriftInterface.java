@@ -43,7 +43,6 @@ import com.twitter.mesos.gen.GetJobUpdatesResponse;
 import com.twitter.mesos.gen.GetJobsResponse;
 import com.twitter.mesos.gen.GetQuotaResponse;
 import com.twitter.mesos.gen.Hosts;
-import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.JobKey;
 import com.twitter.mesos.gen.JobUpdateConfiguration;
@@ -452,24 +451,22 @@ class SchedulerThriftInterface implements SchedulerController {
 
   @Override
   public UpdateShardsResponse updateShards(
-      JobKey job,
+      JobKey jobKey,
       Set<Integer> shards,
       String updateToken,
       SessionKey session) {
 
-    JobKeys.assertValid(job);
+    JobKeys.assertValid(jobKey);
     checkNotBlank(shards);
     checkNotBlank(updateToken);
     checkNotNull(session);
-
-    Identity identity = new Identity(job.getRole(), session.getUser());
 
     // TODO(ksweeney): Validate session key here
 
     UpdateShardsResponse response = new UpdateShardsResponse();
     try {
       response
-          .setShards(schedulerCore.updateShards(identity, job.getName(), shards, updateToken))
+          .setShards(schedulerCore.updateShards(jobKey, session.getUser(), shards, updateToken))
           .setResponseCode(UpdateResponseCode.OK)
           .setMessage("Successfully started update of shards: " + shards);
     } catch (ScheduleException e) {
@@ -481,23 +478,22 @@ class SchedulerThriftInterface implements SchedulerController {
 
   @Override
   public RollbackShardsResponse rollbackShards(
-      JobKey job,
+      JobKey jobKey,
       Set<Integer> shards,
       String updateToken,
       SessionKey session) {
 
-    JobKeys.assertValid(job);
+    JobKeys.assertValid(jobKey);
     checkNotBlank(shards);
     checkNotBlank(updateToken);
     checkNotNull(session);
 
     // TODO(ksweeney): Validate session key here
 
-    Identity identity = new Identity(job.getRole(), session.getUser());
     RollbackShardsResponse response = new RollbackShardsResponse();
     try {
       response
-          .setShards(schedulerCore.rollbackShards(identity, job.getName(), shards, updateToken))
+          .setShards(schedulerCore.rollbackShards(jobKey, session.getUser(), shards, updateToken))
           .setResponseCode(UpdateResponseCode.OK)
           .setMessage("Successfully started rollback of shards: " + shards);
     } catch (ScheduleException e) {
@@ -509,22 +505,21 @@ class SchedulerThriftInterface implements SchedulerController {
 
   @Override
   public FinishUpdateResponse finishUpdate(
-      JobKey job,
+      JobKey jobKey,
       UpdateResult updateResult,
       String updateToken,
       SessionKey session) {
 
-    JobKeys.assertValid(job);
+    JobKeys.assertValid(jobKey);
     checkNotNull(session);
 
     // TODO(ksweeney): Validate session key here
 
     FinishUpdateResponse response = new FinishUpdateResponse();
-    Identity identity = new Identity(job.getRole(), session.getUser());
     Optional<String> token = updateResult == UpdateResult.TERMINATE
         ? Optional.<String>absent() : Optional.of(updateToken);
     try {
-      schedulerCore.finishUpdate(identity, job.getName(), token, updateResult);
+      schedulerCore.finishUpdate(jobKey, session.getUser(), token, updateResult);
       response.setResponseCode(OK).setMessage("Update successfully finished.");
     } catch (ScheduleException e) {
       response.setResponseCode(ResponseCode.INVALID_REQUEST).setMessage(e.getMessage());

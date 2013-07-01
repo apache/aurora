@@ -28,12 +28,14 @@ import com.twitter.common.util.testing.FakeClock;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
+import com.twitter.mesos.gen.JobKey;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.ShardUpdateResult;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.scheduler.Driver;
+import com.twitter.mesos.scheduler.base.JobKeys;
 import com.twitter.mesos.scheduler.base.Query;
 import com.twitter.mesos.scheduler.events.PubsubEvent;
 import com.twitter.mesos.scheduler.events.PubsubEvent.TaskStateChange;
@@ -67,6 +69,7 @@ public class StateManagerImplTest extends EasyMockTest {
   private static final String HOST_A = "host_a";
   private static final Identity JIM = new Identity("jim", "jim-user");
   private static final String MY_JOB = "myJob";
+  private static final JobKey JOB_KEY = JobKeys.from(JIM.getRole(), DEFAULT_ENVIRONMENT, MY_JOB);
 
   private Driver driver;
   private Function<TwitterTaskInfo, String> taskIdGenerator;
@@ -200,17 +203,17 @@ public class StateManagerImplTest extends EasyMockTest {
 
     try {
       stateManager.finishUpdate(
-          JIM, MY_JOB, Optional.<String>absent(), UpdateResult.SUCCESS, true);
+          JOB_KEY, JIM.getUser(), Optional.<String>absent(), UpdateResult.SUCCESS, true);
       fail();
     } catch (UpdateException e) {
       // expected
     }
 
-    String token = stateManager.registerUpdate(JIM.getRole(), MY_JOB, ImmutableSet.of(taskInfo));
+    String token = stateManager.registerUpdate(JOB_KEY, ImmutableSet.of(taskInfo));
     assertTrue(stateManager.finishUpdate(
-        JIM, MY_JOB, Optional.of(token), UpdateResult.SUCCESS, true));
+        JOB_KEY, JIM.getUser(), Optional.of(token), UpdateResult.SUCCESS, true));
     assertFalse(stateManager.finishUpdate(
-        JIM, MY_JOB, Optional.of(token), UpdateResult.SUCCESS, false));
+        JOB_KEY, JIM.getUser(), Optional.of(token), UpdateResult.SUCCESS, false));
   }
 
   @Test
@@ -241,13 +244,13 @@ public class StateManagerImplTest extends EasyMockTest {
     insertTasks(taskInfo);
     changeState(id, ASSIGNED);
 
-    String token = stateManager.registerUpdate(JIM.getRole(), MY_JOB, ImmutableSet.of(updated));
-    stateManager.modifyShards(JIM, MY_JOB, ImmutableSet.of(0), token, true);
+    String token = stateManager.registerUpdate(JOB_KEY, ImmutableSet.of(updated));
+    stateManager.modifyShards(JOB_KEY, JIM.getUser(), ImmutableSet.of(0), token, true);
 
     // Since the task is still in UPDATING, it should not be possible to cancel the update.
     try {
       stateManager.finishUpdate(
-          JIM, MY_JOB, Optional.<String>absent(), UpdateResult.SUCCESS, true);
+          JOB_KEY, JIM.getUser(), Optional.<String>absent(), UpdateResult.SUCCESS, true);
       fail("cancel_update should have been prevented");
     } catch (UpdateException e) {
       // expected
@@ -255,11 +258,11 @@ public class StateManagerImplTest extends EasyMockTest {
 
     changeState(id, FINISHED);
     changeState(updatedId, ASSIGNED);
-    stateManager.modifyShards(JIM, MY_JOB, ImmutableSet.of(0), token, false);
+    stateManager.modifyShards(JOB_KEY, JIM.getUser(), ImmutableSet.of(0), token, false);
     // Since the task is still in ROLLBACK, it should not be possible to cancel the update.
     try {
       stateManager.finishUpdate(
-          JIM, MY_JOB, Optional.<String>absent(), UpdateResult.SUCCESS, true);
+          JOB_KEY, JIM.getUser(), Optional.<String>absent(), UpdateResult.SUCCESS, true);
       fail("cancel_update should have been prevented");
     } catch (UpdateException e) {
       // expected
@@ -268,7 +271,7 @@ public class StateManagerImplTest extends EasyMockTest {
     changeState(updatedId, FINISHED);
 
     stateManager.finishUpdate(
-        JIM, MY_JOB, Optional.<String>absent(), UpdateResult.SUCCESS, true);
+        JOB_KEY, JIM.getUser(), Optional.<String>absent(), UpdateResult.SUCCESS, true);
   }
 
   @Test
@@ -287,12 +290,12 @@ public class StateManagerImplTest extends EasyMockTest {
     changeState(id, STARTING);
     changeState(id, RUNNING);
 
-    String token = stateManager.registerUpdate(JIM.getRole(), MY_JOB, ImmutableSet.of(updated));
+    String token = stateManager.registerUpdate(JOB_KEY, ImmutableSet.of(updated));
     Map<Integer, ShardUpdateResult> result =
-        stateManager.modifyShards(JIM, MY_JOB, ImmutableSet.of(0), token, true);
+        stateManager.modifyShards(JOB_KEY, JIM.getUser(), ImmutableSet.of(0), token, true);
     assertEquals(result, ImmutableMap.of(0, ShardUpdateResult.RESTARTING));
 
-    result = stateManager.modifyShards(JIM, MY_JOB, ImmutableSet.of(0), token, false);
+    result = stateManager.modifyShards(JOB_KEY, JIM.getUser(), ImmutableSet.of(0), token, false);
     assertEquals(result, ImmutableMap.of(0, ShardUpdateResult.RESTARTING));
   }
 
@@ -317,7 +320,7 @@ public class StateManagerImplTest extends EasyMockTest {
     changeState(id, ASSIGNED);
     changeState(id, STARTING);
     changeState(id, RUNNING);
-    String token = stateManager.registerUpdate(JIM.getRole(), MY_JOB, ImmutableSet.of(newConfig));
+    String token = stateManager.registerUpdate(JOB_KEY, ImmutableSet.of(newConfig));
     changeState(id, UPDATING);
     changeState(id, KILLED);
 
@@ -327,7 +330,7 @@ public class StateManagerImplTest extends EasyMockTest {
     changeState(newTaskId, ROLLBACK);
 
     Map<Integer, ShardUpdateResult> result =
-        stateManager.modifyShards(JIM, MY_JOB, ImmutableSet.of(0), token, true);
+        stateManager.modifyShards(JOB_KEY, JIM.getUser(), ImmutableSet.of(0), token, true);
     assertEquals(result, ImmutableMap.of(0, ShardUpdateResult.RESTARTING));
   }
 
@@ -362,7 +365,7 @@ public class StateManagerImplTest extends EasyMockTest {
     changeState(taskId, STARTING);
     changeState(taskId, RUNNING);
 
-    stateManager.registerUpdate(JIM.getRole(), MY_JOB, ImmutableSet.of(taskInfo));
+    stateManager.registerUpdate(JOB_KEY, ImmutableSet.of(taskInfo));
     changeState(taskId, UPDATING);
     changeState(taskId, FINISHED);
 

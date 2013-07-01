@@ -11,6 +11,7 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Maps;
 
 import com.twitter.mesos.Tasks;
+import com.twitter.mesos.gen.JobKey;
 import com.twitter.mesos.gen.JobUpdateConfiguration;
 import com.twitter.mesos.scheduler.storage.UpdateStore;
 
@@ -50,13 +51,21 @@ class MemUpdateStore implements UpdateStore.Mutable {
   }
 
   @Override
+  public void removeShardUpdateConfigs(JobKey jobKey) {
+    // TODO(ksweeney): Remove this delegation as part of MESOS-2403.
+    removeShardUpdateConfigs(jobKey.getRole(), jobKey.getName());
+  }
+
+  @Override
   public void deleteShardUpdateConfigs() {
     configs.clear();
   }
 
   @Override
-  public Optional<JobUpdateConfiguration> fetchJobUpdateConfig(String role, String job) {
-    return Optional.fromNullable(configs.get(key(role, job))).transform(DEEP_COPY);
+  public Optional<JobUpdateConfiguration> fetchJobUpdateConfig(JobKey jobKey) {
+    // TODO(ksweeney): Stop ignoring environment here as part of MESOS-2403.
+    return Optional.fromNullable(
+        configs.get(key(jobKey.getRole(), jobKey.getName()))).transform(DEEP_COPY);
   }
 
   @Override

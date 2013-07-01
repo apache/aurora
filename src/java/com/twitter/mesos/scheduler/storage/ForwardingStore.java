@@ -192,8 +192,8 @@ public class ForwardingStore implements
   }
 
   @Override
-  public Optional<JobUpdateConfiguration> fetchJobUpdateConfig(String role, String job) {
-    return updateStore.fetchJobUpdateConfig(role, job);
+  public Optional<JobUpdateConfiguration> fetchJobUpdateConfig(JobKey jobKey) {
+    return updateStore.fetchJobUpdateConfig(jobKey);
   }
 
   @Override
@@ -214,6 +214,11 @@ public class ForwardingStore implements
   @Override
   public void removeShardUpdateConfigs(String role, String job) {
     updateStore.removeShardUpdateConfigs(role, job);
+  }
+
+  @Override
+  public void removeShardUpdateConfigs(JobKey jobKey) {
+    updateStore.removeShardUpdateConfigs(jobKey);
   }
 
   @Override

@@ -14,7 +14,6 @@ import com.google.inject.Inject;
 
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
-import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.JobKey;
 import com.twitter.mesos.gen.Quota;
@@ -218,13 +217,11 @@ class SchedulerCoreImpl implements SchedulerCore {
         }
       }
 
-      String role = query.getOwner().getRole();
-      String job = query.getJobName();
       if (!jobDeleted) {
         try {
           updateFinished = stateManager.finishUpdate(
-              new Identity(role, user),
-              job,
+              jobKey.get(),
+              user,
               Optional.<String>absent(),
               UpdateResult.TERMINATE,
               false);
@@ -289,7 +286,8 @@ class SchedulerCoreImpl implements SchedulerCore {
       throws ScheduleException {
 
     final JobConfiguration job = parsedConfiguration.get();
-    if (cronScheduler.hasJob(job.getKey())) {
+    final JobKey jobKey = job.getKey();
+    if (cronScheduler.hasJob(jobKey)) {
       cronScheduler.updateJob(job);
       return Optional.absent();
     }
@@ -299,7 +297,7 @@ class SchedulerCoreImpl implements SchedulerCore {
           throws ScheduleException {
 
         Set<ScheduledTask> existingTasks = storeProvider.getTaskStore().fetchTasks(
-            Query.jobScoped(job.getKey()).active().get());
+            Query.jobScoped(jobKey).active().get());
 
         // Reject if any existing task for the job is in UPDATING/ROLLBACK
         if (Iterables.any(existingTasks, IS_UPDATING)) {
@@ -316,8 +314,7 @@ class SchedulerCoreImpl implements SchedulerCore {
         }
 
         try {
-          return Optional.of(stateManager.registerUpdate(job.getOwner().getRole(), job.getName(),
-              job.getTaskConfigs()));
+          return Optional.of(stateManager.registerUpdate(jobKey, job.getTaskConfigs()));
         } catch (StateManagerImpl.UpdateException e) {
           LOG.log(Level.INFO, "Failed to start update.", e);
           throw new ScheduleException(e.getMessage(), e);
@@ -328,45 +325,45 @@ class SchedulerCoreImpl implements SchedulerCore {
 
   @Override
   public synchronized Map<Integer, ShardUpdateResult> updateShards(
-      Identity identity,
-      String jobName,
+      JobKey jobKey,
+      String invokingUser,
       Set<Integer> shards,
       String updateToken) throws ScheduleException {
 
     try {
-      return stateManager.modifyShards(identity, jobName, shards, updateToken, true);
+      return stateManager.modifyShards(jobKey, invokingUser, shards, updateToken, true);
     } catch (UpdateException e) {
-      LOG.log(Level.INFO, "Failed to update shards for " + Tasks.jobKey(identity, jobName), e);
+      LOG.log(Level.INFO, "Failed to update shards for " + JobKeys.toPath(jobKey), e);
       throw new ScheduleException(e.getMessage(), e);
     }
   }
 
   @Override
   public synchronized Map<Integer, ShardUpdateResult> rollbackShards(
-      Identity identity,
-      String jobName,
+      JobKey jobKey,
+      String invokingUser,
       Set<Integer> shards,
       String updateToken) throws ScheduleException {
 
     try {
-      return stateManager.modifyShards(identity, jobName, shards, updateToken, false);
+      return stateManager.modifyShards(jobKey, invokingUser, shards, updateToken, false);
     } catch (UpdateException e) {
-      LOG.log(Level.INFO, "Failed to roll back shards for " + Tasks.jobKey(identity, jobName), e);
+      LOG.log(Level.INFO, "Failed to roll back shards for " + JobKeys.toPath(jobKey), e);
       throw new ScheduleException(e.getMessage(), e);
     }
   }
 
   @Override
   public synchronized void finishUpdate(
-      Identity identity,
-      String jobName,
+      JobKey jobKey,
+      String invokingUser,
       Optional<String> updateToken,
       UpdateResult result) throws ScheduleException {
 
     try {
-      stateManager.finishUpdate(identity, jobName, updateToken, result, true);
+      stateManager.finishUpdate(jobKey, invokingUser, updateToken, result, true);
     } catch (StateManagerImpl.UpdateException e) {
-      LOG.log(Level.INFO, "Failed to finish update for " + Tasks.jobKey(identity, jobName), e);
+      LOG.log(Level.INFO, "Failed to finish update for " + JobKeys.toPath(jobKey), e);
       throw new ScheduleException(e.getMessage(), e);
     }
   }
