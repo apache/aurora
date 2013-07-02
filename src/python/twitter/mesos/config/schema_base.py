@@ -118,7 +118,7 @@ class MesosJob(Struct):
   role          = Required(String)
   contact       = String
   cluster       = Required(String)
-  environment   = Default(String, DEFAULT_ENVIRONMENT)
+  environment   = Required(String)
   instances     = Default(Integer, 1)
   task          = Required(Task)
   recipes       = List(String)

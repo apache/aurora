@@ -20,6 +20,8 @@ from twitter.mesos.packer.packer_client import Packer
 from twitter.mesos.packer import sd_packer_client
 from twitter.thermos.config.schema_helpers import Tasks
 
+from gen.twitter.mesos.constants import DEFAULT_ENVIRONMENT
+
 from pystachio import Empty, Ref
 
 
@@ -133,8 +135,6 @@ STAGING_RE = re.compile(r'^staging\d*$')
 
 
 def _validate_environment_name(config):
-  if not config.raw().has_environment():
-    return
   env_name = str(config.raw().environment())
   if STAGING_RE.match(env_name):
     return
@@ -329,6 +329,17 @@ def _inject_prebuilt_package_bindings(config, env=None, force_local=False):
     config.add_package((config.role(), package_name, package_data['id']))
 
 
+DEFAULT_ENVIRONMENT_WARNING = '''
+Job did not specify environment, auto-populating to "%s".
+'''
+
+
+def _inject_default_environment(config):
+  if not config.raw().has_environment():
+    print(DEFAULT_ENVIRONMENT_WARNING % DEFAULT_ENVIRONMENT, file=sys.stderr)
+    config.update_job(config.raw()(environment=DEFAULT_ENVIRONMENT))
+
+
 def validate_config(config, env=None):
   _validate_update_config(config)
   _validate_health_check_config(config)
@@ -338,6 +349,7 @@ def validate_config(config, env=None):
 
 def populate_namespaces(config, env=None, force_local=False):
   """Populate additional bindings in the config, e.g. packer bindings."""
+  _inject_default_environment(config)
   _inject_packer_bindings(config, env, force_local)
   _inject_prebuilt_package_bindings(config, env, force_local)
   _inject_jenkins_bindings(config, env, force_local)

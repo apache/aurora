@@ -134,6 +134,9 @@ class AuroraConfig(object):
     self._job = self.sanitize_job(job)
     self._packages = []
 
+  def __repr__(self):
+    return '%s(%r)' % (self.__class__.__name__, self._job)
+
   @staticmethod
   def sanitize_job(job):
     """

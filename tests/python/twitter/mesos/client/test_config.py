@@ -10,6 +10,8 @@ from twitter.mesos.config.schema import Announcer, Job, Resources, Task, MB
 from twitter.mesos.packer import sd_packer_client
 import twitter.mesos.packer.packer_client as packer_client
 
+from gen.twitter.mesos.constants import DEFAULT_ENVIRONMENT
+
 import mox
 from mox import Mox, IsA
 import pytest
@@ -20,6 +22,7 @@ HELLO_WORLD = Job(
   name = 'hello_world',
   role = 'john_doe',
   cluster = 'smf1-test',
+  environment = 'test',
   %s
   task = Task(
     name = 'main',
@@ -49,6 +52,7 @@ PACKER_CONFIG = """
 jobs = [Job(
   name = 'hello_world',
   role = 'john_doe',
+  environment = 'staging42',
   cluster = 'smf1-test',
   task = Task(
     name = 'main',
@@ -98,12 +102,28 @@ def test_environment_names():
       task = Task(name='main', processes = [],
                   resources = Resources(cpu = 0.1, ram = 64 * MB, disk = 64 * MB)))
 
-  config._validate_environment_name(AuroraConfig(base_job))
+  with pytest.raises(ValueError):
+    config._validate_environment_name(AuroraConfig(base_job))
   for env_name in GOOD:
     config._validate_environment_name(AuroraConfig(base_job(environment=env_name)))
   for env_name in BAD:
     with pytest.raises(ValueError):
       config._validate_environment_name(AuroraConfig(base_job(environment=env_name)))
+
+
+def test_inject_default_environment():
+  base_job = Job(
+      name='hello_world', role='john_doe', cluster='smf1-test',
+      task = Task(name='main', processes = [],
+                  resources = Resources(cpu = 0.1, ram = 64 * MB, disk = 64 * MB)))
+
+  no_env_config = AuroraConfig(base_job)
+  config._inject_default_environment(no_env_config)
+  assert no_env_config.environment() == DEFAULT_ENVIRONMENT
+
+  test_env_config = AuroraConfig(base_job(environment='test'))
+  config._inject_default_environment(test_env_config)
+  assert test_env_config.environment() == 'test'
 
 
 def test_dedicated_portmap():

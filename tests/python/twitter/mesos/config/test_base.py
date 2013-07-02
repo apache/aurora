@@ -57,6 +57,7 @@ MESOS_CONFIG = """
 HELLO_WORLD = Job(
   name = 'hello_world',
   role = 'john_doe',
+  environment = 'staging42',
   cluster = 'smf1-test',
   task = Task(
     name = 'main',
@@ -71,6 +72,7 @@ LIMITED_MESOS_CONFIG = """
 HELLO_WORLD = Job(
   name = 'hello_world',
   role = 'john_doe',
+  environment = 'staging42',
   cluster = 'smf1-test',
   task = Task(
     name = 'main',
@@ -92,6 +94,7 @@ jobs = [HELLO_WORLD]
 REIFIED_CONFIG = Job(
   name = 'hello_world',
   role = 'john_doe',
+  environment = 'staging42',
   cluster = 'smf1-test',
   task = Task(
     name = 'main',
@@ -103,6 +106,7 @@ REIFIED_CONFIG = Job(
 REIFIED_LIMITED_CONFIG = Job(
   name = 'hello_world',
   role = 'john_doe',
+  environment = 'staging42',
   cluster = 'smf1-test',
   task = Task(
     name = 'main',
@@ -160,7 +164,7 @@ def make_config(announce, *ports):
   process = Process(name = 'hello',
                     cmdline = ' '.join('{{thermos.ports[%s]}}' % port for port in ports))
   return AuroraConfig(Job(
-      name = 'hello_world', role = 'john_doe', cluster = 'smf1-test',
+      name = 'hello_world', environment = 'staging42', role = 'john_doe', cluster = 'smf1-test',
       announce = announce,
       task = Task(name = 'main', processes = [process],
                   resources =  Resources(cpu = 0.1, ram = 64 * 1048576, disk = 64 * 1048576))))

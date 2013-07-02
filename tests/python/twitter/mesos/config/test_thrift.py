@@ -31,6 +31,7 @@ from pystachio.naming import frozendict
 HELLO_WORLD = Job(
   name = 'hello_world',
   role = 'john_doe',
+  environment = 'staging66',
   cluster = 'smf1-test',
   task = Task(
     name = 'main',
