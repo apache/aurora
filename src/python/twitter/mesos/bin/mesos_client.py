@@ -4,7 +4,6 @@
 from __future__ import print_function
 
 import collections
-import copy
 from datetime import datetime
 import functools
 import getpass
@@ -43,7 +42,7 @@ from twitter.mesos.packer import sd_packer_client
 from twitter.mesos.packer.packer_client import Packer
 from twitter.thermos.base.options import add_binding_to
 
-from gen.twitter.mesos.constants import ACTIVE_STATES, DEFAULT_ENVIRONMENT
+from gen.twitter.mesos.constants import ACTIVE_STATES
 from gen.twitter.mesos.ttypes import ScheduleStatus
 
 
@@ -168,14 +167,16 @@ def shard_range_parser(shards):
   result = set()
   for part in shards.split(','):
     x = part.split('-')
-    result.update(range(int(x[0]), int(x[-1])+1))
+    result.update(range(int(x[0]), int(x[-1]) + 1))
   return sorted(result)
+
 
 def parse_shards_into(option, opt, value, parser):
   try:
     setattr(parser.values, option.dest, shard_range_parser(value))
   except ValueError as e:
     raise OptionValueError('Failed to parse: %s' % e)
+
 
 SHARDS_OPTION = optparse.Option(
     '--shards',
@@ -779,7 +780,8 @@ def update(jobname, config_file):
     dest='max_per_shard_failures',
     type=int,
     default=0,
-    help='Maximum number of restarts per shard during restart. Increments total failure count when this limit is exceeded.')
+    help='Maximum number of restarts per shard during restart. Increments total failure count when '
+         'this limit is exceeded.')
 @app.command_option(
     '--max_total_failures',
     dest='max_total_failures',
@@ -791,13 +793,15 @@ def update(jobname, config_file):
     dest='restart_threshold',
     type=int,
     default=60,
-    help='Maximum number of seconds before a shard must move into the RUNNING state before considered a failure.')
+    help='Maximum number of seconds before a shard must move into the RUNNING state before '
+         'considered a failure.')
 @app.command_option(
     '--watch_secs',
     dest='watch_secs',
     type=int,
     default=30,
-    help='Minimum number of seconds a shard must remain in RUNNING state before considered a success.')
+    help='Minimum number of seconds a shard must remain in RUNNING state before considered a '
+         'success.')
 def restart(args, options):
   """usage: restart cluster/role/env/job [--shards=SHARDS] [--batch_size=BATCH_SIZE]
                [--health_check_interval_seconds=HEALTH_CHECK_INTERVAL_SECONDS]
@@ -1077,6 +1081,7 @@ def package_set_live(role, package, version):
   options = app.get_options()
   _get_packer(options.cluster, options.verbosity).set_live(role, package, version)
   print('Version %s is now the LIVE version' % version)
+
 
 @app.command
 @trap_packer_error

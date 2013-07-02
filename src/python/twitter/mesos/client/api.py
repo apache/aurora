@@ -1,16 +1,13 @@
 from twitter.common import log
-from twitter.common.lang import Compatibility
 from twitter.mesos.common import AuroraJobKey
 from twitter.mesos.common.cluster import Cluster
 
-from gen.twitter.mesos.constants import DEFAULT_ENVIRONMENT, LIVE_STATES
+from gen.twitter.mesos.constants import LIVE_STATES
 from gen.twitter.mesos.ttypes import (
     FinishUpdateResponse,
     Identity,
-    JobKey,
-    ResponseCode,
     Quota,
-    ScheduleStatus,
+    ResponseCode,
     TaskQuery)
 
 from .restarter import Restarter
@@ -135,7 +132,7 @@ invoking cancel_update.
 
   def cancel_update(self, job_key):
     """Cancel the update represented by job_key. Returns whether or not the cancellation was
-    successful."""
+       successful."""
     self._assert_valid_job_key(job_key)
 
     log.info("Canceling update on job %s" % job_key)
@@ -145,9 +142,9 @@ invoking cancel_update.
     return resp
 
   def restart(self, job_key, shards, updater_config, health_check_interval_seconds):
-    """Perform a rolling restart of the job. If shards is None or [], restart all shards. Returns the
-       scheduler response for the last restarted batch of shards (which allows the client to show
-       the job URL), or the status check response if no tasks were active.
+    """Perform a rolling restart of the job. If shards is None or [], restart all shards. Returns
+       the scheduler response for the last restarted batch of shards (which allows the client to
+       show the job URL), or the status check response if no tasks were active.
     """
     self._assert_valid_job_key(job_key)
 

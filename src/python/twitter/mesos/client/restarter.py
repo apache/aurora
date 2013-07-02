@@ -1,10 +1,10 @@
 from twitter.common import log
 
+from gen.twitter.mesos.constants import ACTIVE_STATES
+from gen.twitter.mesos.ttypes import ResponseCode
+
 from .shard_watcher import ShardWatcher
 from .updater_util import FailureThreshold
-
-from gen.twitter.mesos.constants import ACTIVE_STATES
-from gen.twitter.mesos.ttypes import ScheduleStatus, ResponseCode
 
 
 class Restarter(object):
@@ -40,7 +40,8 @@ class Restarter(object):
 
       shards = sorted(task.assignedTask.task.shardId for task in status.tasks)
       if not shards:
-        log.info("No shards specified, and no active shards found in job %s. Nothing to do." % self._job_key)
+        log.info("No shards specified, and no active shards found in job %s" % self._job_key)
+        log.info("Nothing to do.")
         return status
 
     log.info("Performing rolling restart of job %s (shards: %s)" % (self._job_key, shards))

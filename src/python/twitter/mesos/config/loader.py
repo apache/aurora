@@ -1,7 +1,5 @@
 import textwrap
 
-from twitter.common.lang import Compatibility
-
 from .schema import Job
 
 from pystachio.config import Config

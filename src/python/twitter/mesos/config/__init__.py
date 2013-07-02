@@ -4,7 +4,7 @@ from twitter.thermos.config.schema import ThermosContext
 
 from .thrift import convert as convert_thrift, InvalidConfig as InvalidThriftConfig
 
-from pystachio import Empty, Environment, Integer, Ref
+from pystachio import Empty, Environment, Ref
 
 
 class PortResolver(object):
@@ -137,8 +137,8 @@ class AuroraConfig(object):
   def __repr__(self):
     return '%s(%r)' % (self.__class__.__name__, self._job)
 
-  @staticmethod
-  def sanitize_job(job):
+  @classmethod
+  def sanitize_job(cls, job):
     """
       Validate and sanitize the input job
 
@@ -149,10 +149,10 @@ class AuroraConfig(object):
       return getattr(pystachio_type, 'has_%s' % thing)()
     for required in ("cluster", "task", "role"):
       if not has(job, required):
-        raise AuroraConfig.InvalidConfig(
+        raise cls.InvalidConfig(
           '%s required for job "%s"' % (required.capitalize(), job.name()))
     if not has(job.task(), 'processes'):
-      raise AuroraConfig.InvalidConfig('Processes required for task on job "%s"' % job.name())
+      raise cls.InvalidConfig('Processes required for task on job "%s"' % job.name())
     return job
 
   def context(self, instance=None):
@@ -163,7 +163,7 @@ class AuroraConfig(object):
       instance=instance
     )
     # Filter unspecified values
-    return Environment(mesos = MesosContext(dict((k,v) for k,v in context.items() if v)))
+    return Environment(mesos=MesosContext(dict((k, v) for k, v in context.items() if v)))
 
   def job(self):
     interpolated_job = self._job % self.context()
