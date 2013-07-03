@@ -373,9 +373,9 @@ def AnnotatedAuroraConfig(force_local):
   class _AnnotatedAuroraConfig(AuroraConfig):
     @classmethod
     def plugins(cls):
-      return (validate_config,
-              inject_recipes,
-              functools.partial(populate_namespaces, force_local=force_local))
+      return (inject_recipes,
+              functools.partial(populate_namespaces, force_local=force_local),
+              validate_config)
   return _AnnotatedAuroraConfig
 
 
