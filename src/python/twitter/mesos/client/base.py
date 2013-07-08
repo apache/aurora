@@ -17,6 +17,16 @@ def check_and_log_response(resp):
     sys.exit(1)
 
 
+def deprecation_warning(text):
+  log.warning('')
+  log.warning('*' * 80)
+  log.warning('* The command you ran is deprecated and will soon break!')
+  for line in text.split('\n'):
+    log.warning('* %s' % line)
+  log.warning('*' * 80)
+  log.warning('')
+
+
 class requires(object):
   @staticmethod
   def wrap_function(fn, fnargs, comparator):

@@ -5,7 +5,7 @@ from twitter.common import log
 from twitter.mesos.common import AuroraJobKey
 
 from .api import MesosClientAPI
-from .base import check_and_log_response, die
+from .base import check_and_log_response, deprecation_warning, die
 
 
 class LiveJobDisambiguator(object):
@@ -47,7 +47,7 @@ class LiveJobDisambiguator(object):
     if not disambiguator.ambiguous:
       return AuroraJobKey(client.cluster.name, role, env, name)
 
-    log.warning("Job ambiguously specified - querying the scheduler to disambiguate")
+    deprecation_warning("Job ambiguously specified - querying the scheduler to disambiguate")
     matches = disambiguator.query_matches()
     if len(matches) == 1:
       (match,) = matches

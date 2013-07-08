@@ -24,7 +24,7 @@ from twitter.common.log.options import LogOptions
 from twitter.common.quantity import Amount, Data
 from twitter.common.quantity.parse_simple import parse_data_into
 from twitter.mesos.client.api import MesosClientAPI
-from twitter.mesos.client.base import check_and_log_response, die, requires
+from twitter.mesos.client.base import check_and_log_response, deprecation_warning, die, requires
 from twitter.mesos.client.command_runner import DistributedCommandRunner
 from twitter.mesos.client.config import get_config
 from twitter.mesos.client.disambiguator import LiveJobDisambiguator
@@ -284,6 +284,27 @@ WAIT_UNTIL_OPTION = optparse.Option(
          'requested state.  Options: %s.  Default: %%default' % (', '.join(CREATE_STATES)))
 
 
+def get_job_config(job_spec, config_file, options):
+  try:
+    job_key = AuroraJobKey.from_path(job_spec)
+    select_cluster = job_key.cluster
+    select_env = job_key.env
+    jobname = job_key.name
+  except AuroraJobKey.Error:
+    deprecation_warning('Please refer to your job in CLUSTER/ROLE/ENV/NAME format.')
+    select_cluster = options.cluster.name if options.cluster else None
+    select_env = options.env
+    jobname = job_spec
+  return get_config(
+      jobname,
+      config_file,
+      options.json,
+      False,
+      options.bindings,
+      select_cluster=select_cluster,
+      select_env=select_env)
+
+
 @app.command
 @app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
@@ -291,26 +312,18 @@ WAIT_UNTIL_OPTION = optparse.Option(
 @app.command_option(ENV_CONFIG_OPTION)
 @app.command_option(JSON_OPTION)
 @app.command_option(WAIT_UNTIL_OPTION)
-@requires.exactly('job', 'config')
-def create(jobname, config_file):
-  """usage: create job config
+@requires.exactly('cluster/role/env/job', 'config')
+def create(job_spec, config_file):
+  """usage: create cluster/role/env/job config
 
   Creates a job based on a configuration file.
   """
   options = app.get_options()
-  config = get_config(
-      jobname,
-      config_file,
-      options.json,
-      False,
-      options.bindings,
-      select_cluster=options.cluster.name if options.cluster else None,
-      select_env=options.env)
-
+  config = get_job_config(job_spec, config_file, options)
   if config.cluster() == 'local':
     # TODO(wickman) Fix this terrible API.
     options.runner = 'build'
-    return spawn_local('build', jobname, config_file, **make_spawn_options(options))
+    return spawn_local('build', config.name(), config_file, **make_spawn_options(options))
 
   api = make_client(config.cluster())
   monitor = JobMonitor(api, config.role(), config.environment(), config.name())
@@ -472,24 +485,17 @@ def runtask(args, options):
 @app.command_option(CLUSTER_CONFIG_OPTION)
 @app.command_option(ENV_CONFIG_OPTION)
 @app.command_option(JSON_OPTION)
-@requires.exactly('job', 'config')
-def diff(job, config_file):
-  """usage: diff job config
+@requires.exactly('cluster/role/env/job', 'config')
+def diff(job_spec, config_file):
+  """usage: diff cluster/role/env/job config
 
   Compares a job configuration against a running job.
   By default the diff will be displayed using 'diff', though you may choose an alternate
   diff program by specifying the DIFF_VIEWER environment variable."""
   options = app.get_options()
-  config = get_config(
-      job,
-      config_file,
-      options.json,
-      False,
-      options.bindings,
-      select_cluster=options.cluster.name if options.cluster else None,
-      select_env=options.env)
+  config = get_job_config(job_spec, config_file, options)
   api = make_client(config.cluster())
-  resp = api.query(api.build_query(config.role(), job, statuses=ACTIVE_STATES, env=options.env))
+  resp = api.query(api.build_query(config.role(), config.name(), statuses=ACTIVE_STATES, env=options.env))
   if not resp.responseCode:
     die('Request failed, server responded with "%s"' % resp.message)
   remote_tasks = [t.assignedTask.task for t in resp.tasks]
@@ -560,22 +566,15 @@ def do_open(args, _):
 @app.command_option(CLUSTER_CONFIG_OPTION)
 @app.command_option(ENV_CONFIG_OPTION)
 @app.command_option(JSON_OPTION)
-@requires.exactly('job', 'config')
-def inspect(jobname, config_file):
-  """usage: inspect job config
+@requires.exactly('cluster/role/env/job', 'config')
+def inspect(job_spec, config_file):
+  """usage: inspect cluster/role/env/job config
 
   Verifies that a job can be parsed from a configuration file, and displays
   the parsed configuration.
   """
   options = app.get_options()
-  config = get_config(
-      jobname,
-      config_file,
-      options.json,
-      False,
-      options.bindings,
-      select_cluster=options.cluster.name if options.cluster else None,
-      select_env=options.env)
+  config = get_job_config(job_spec, config_file, options)
   if options.raw:
     print('Parsed job config: %s' % config.job())
     return
@@ -727,9 +726,9 @@ def status(args, options):
 @app.command_option(CLUSTER_CONFIG_OPTION)
 @app.command_option(ENV_CONFIG_OPTION)
 @app.command_option(JSON_OPTION)
-@requires.exactly('job', 'config')
-def update(jobname, config_file):
-  """usage: update job config
+@requires.exactly('cluster/role/env/job', 'config')
+def update(job_spec, config_file):
+  """usage: update cluster/role/env/job config
 
   Performs a rolling upgrade on a running job, using the update configuration
   within the config file as a control for update velocity and failure tolerance.
@@ -746,14 +745,7 @@ def update(jobname, config_file):
   to preview what changes will take effect.
   """
   options = app.get_options()
-  config = get_config(
-      jobname,
-      config_file,
-      options.json,
-      force_local=False,
-      bindings=options.bindings,
-      select_cluster=options.cluster.name if options.cluster else None,
-      select_env=options.env)
+  config = get_job_config(job_spec, config_file, options)
   api = make_client(config.cluster())
   resp = api.update_job(config, options.health_check_interval_seconds, options.shards)
   check_and_log_response(resp)

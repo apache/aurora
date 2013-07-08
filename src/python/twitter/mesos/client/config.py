@@ -10,7 +10,7 @@ import re
 import sys
 
 from twitter.common import app, log
-from twitter.mesos.client.base import die
+from twitter.mesos.client.base import deprecation_warning, die
 from twitter.mesos.client.build import BuildArtifactResolver
 from twitter.mesos.client.jenkins import JenkinsArtifactResolver
 from twitter.mesos.config import AuroraConfig
@@ -33,7 +33,7 @@ migrating your application away from app-app layouts to an alternative packaging
 
 def _warn_on_appapp_layouts(config):
   if config.raw().has_layout():
-    print(APPAPP_DEPRECATION_WARNING, file=sys.stderr)
+    deprecation_warning(APPAPP_DEPRECATION_WARNING)
 
 
 PACKAGE_DEPRECATION_WARNING = """
@@ -58,14 +58,13 @@ either as a process or into a process in your Task.
 def _warn_on_unspecified_package_bindings(config):
   if not config.package():
     return
-
-  print(PACKAGE_DEPRECATION_WARNING, file=sys.stderr)
+  deprecation_warning(PACKAGE_DEPRECATION_WARNING)
 
   _, refs = config.raw().interpolate()
   p_uri, p = Ref.from_address('mesos.package_uri'), Ref.from_address('mesos.package')
   if p not in refs and p_uri not in refs:
-    print(PACKAGE_UNDERSPECIFIED_WARNING % (
-        '{{packer[%s][%s][%s].copy_command}}' % tuple(config.package())), file=sys.stderr)
+    deprecation_warning(PACKAGE_UNDERSPECIFIED_WARNING % (
+        '{{packer[%s][%s][%s].copy_command}}' % tuple(config.package())))
 
 
 CRON_DEPRECATION_WARNING = """
@@ -76,7 +75,7 @@ Please update your Jobs accordingly.
 
 def _warn_on_deprecated_cron_policy(config):
   if config.raw().cron_policy() is not Empty:
-    print(CRON_DEPRECATION_WARNING, file=sys.stderr)
+    deprecation_warning(CRON_DEPRECATION_WARNING)
 
 
 DAEMON_DEPRECATION_WARNING = """
@@ -88,7 +87,7 @@ the top-level Service() instead of Job().
 
 def _warn_on_deprecated_daemon_job(config):
   if config.raw().daemon() is not Empty:
-    print(DAEMON_DEPRECATION_WARNING, file=sys.stderr)
+    deprecation_warning(DAEMON_DEPRECATION_WARNING)
 
 
 HEALTH_CHECK_INTERVAL_SECS_DEPRECATION_WARNING = """
@@ -103,7 +102,7 @@ http://go/auroraconfig/#Aurora%2BThermosConfigurationReference-HealthCheckConfig
 
 def _warn_on_deprecated_health_check_interval_secs(config):
   if config.raw().health_check_interval_secs() is not Empty:
-    print(HEALTH_CHECK_INTERVAL_SECS_DEPRECATION_WARNING, file=sys.stderr)
+    deprecation_warning(HEALTH_CHECK_INTERVAL_SECS_DEPRECATION_WARNING)
 
 
 ANNOUNCE_WARNING = """
