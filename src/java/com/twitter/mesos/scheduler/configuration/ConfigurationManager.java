@@ -485,15 +485,6 @@ public final class ConfigurationManager {
     }
   }
 
-  private static Optional<TwitterTaskInfo> getTemplateTaskInfo(JobConfiguration job) {
-    // If no taskConfig (template) is set use an arbitrary shard to fill in missing job fields.
-    if (job.isSetTaskConfig()) {
-      return Optional.of(job.getTaskConfig());
-    } else {
-      return Optional.fromNullable(Iterables.getFirst(job.getTaskConfigs(), null));
-    }
-  }
-
   /**
     * Fill in a missing job key from task fields.
     *
@@ -507,7 +498,13 @@ public final class ConfigurationManager {
       return;
     }
 
-    Optional<TwitterTaskInfo> template = getTemplateTaskInfo(job);
+    // If no taskConfig (template) is set use an arbitrary shard to fill in missing job fields.
+    Optional<TwitterTaskInfo> template;
+    if (job.isSetTaskConfig()) {
+      template = Optional.of(job.getTaskConfig());
+    } else {
+      template = Optional.fromNullable(Iterables.getFirst(job.getTaskConfigs(), null));
+    }
     if (!template.isPresent()) {
       throw new TaskDescriptionException("Job must have at least one task");
     }
