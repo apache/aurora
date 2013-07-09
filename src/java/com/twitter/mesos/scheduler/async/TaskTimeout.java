@@ -10,9 +10,9 @@ import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
+import com.google.common.base.Objects;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Ordering;
@@ -58,7 +58,37 @@ class TaskTimeout implements EventSubscriber {
   @VisibleForTesting
   static final Query.Builder TRANSIENT_QUERY = Query.unscoped().byStatus(TRANSIENT_STATES);
 
-  private final Map<String, Context> futures = Maps.newConcurrentMap();
+  private final Map<TimeoutKey, Context> futures = Maps.newConcurrentMap();
+
+  private static final class TimeoutKey {
+    final String taskId;
+    final ScheduleStatus status;
+
+    private TimeoutKey(String taskId, ScheduleStatus status) {
+      this.taskId = taskId;
+      this.status = status;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hashCode(taskId, status);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof TimeoutKey)) {
+        return false;
+      }
+      TimeoutKey key = (TimeoutKey) o;
+      return Objects.equal(taskId, key.taskId)
+          && (status == key.status);
+    }
+
+    @Override
+    public String toString() {
+      return taskId + ":" + status;
+    }
+  }
 
   private final Storage storage;
   private final ScheduledExecutorService executor;
@@ -83,26 +113,25 @@ class TaskTimeout implements EventSubscriber {
     exportStats();
   }
 
-  private void maybeCancel(String taskId) {
-    Context context = futures.remove(taskId);
-    if (context != null) {
-      LOG.fine("Canceling state timeout for task " + taskId);
-      context.future.cancel(false);
-    }
-  }
-
-  private void registerTimeout(String taskId, ScheduleStatus presentStatus, long timestampMillis) {
-    maybeCancel(taskId);
-
+  private void registerTimeout(TimeoutKey key, long timestampMillis) {
     long timeElapsed = Math.max(0, clock.nowMillis() - timestampMillis);
     long timeoutRemaining = Math.max(0, timeoutMillis - timeElapsed);
 
-    LOG.fine("Timing out task " + taskId + " in " + timeoutRemaining + " ms.");
-    Future<?> timeoutHandler = executor.schedule(
-        new TimedOutTaskHandler(taskId),
-        timeoutRemaining,
-        TimeUnit.MILLISECONDS);
-    futures.put(taskId, new Context(presentStatus, timestampMillis, timeoutHandler));
+    LOG.fine("Timing out task " + key.taskId + " in " + timeoutRemaining + " ms.");
+    // This is an obvious check-then-act, but:
+    //   - there isn't much of a better option, given that we have to get the Future before
+    //     inserting into the map
+    //   - a key collision only happens in practice if something is wrong externally to this class
+    //     (double event for the same state)
+    //   - the outcome is low-risk, we would wind up with a redundant Future that will eventually
+    //     no-op
+    if (!futures.containsKey(key)) {
+      Future<?> timeoutHandler = executor.schedule(
+          new TimedOutTaskHandler(key),
+          timeoutRemaining,
+          TimeUnit.MILLISECONDS);
+      futures.put(key, new Context(timestampMillis, timeoutHandler));
+    }
   }
 
   private static boolean isTransient(ScheduleStatus status) {
@@ -114,11 +143,16 @@ class TaskTimeout implements EventSubscriber {
     String taskId = change.getTaskId();
     ScheduleStatus newState = change.getNewState();
     if (isTransient(change.getOldState())) {
-      maybeCancel(taskId);
+      TimeoutKey oldKey = new TimeoutKey(taskId, change.getOldState());
+      Context context = futures.remove(oldKey);
+      if (context != null) {
+        LOG.fine("Canceling state timeout for task " + oldKey);
+        context.future.cancel(false);
+      }
     }
 
     if (isTransient(newState)) {
-      registerTimeout(taskId, newState, clock.nowMillis());
+      registerTimeout(new TimeoutKey(taskId, change.getNewState()), clock.nowMillis());
     }
   }
 
@@ -126,59 +160,49 @@ class TaskTimeout implements EventSubscriber {
   public void storageStarted(StorageStarted event) {
     for (ScheduledTask task : Storage.Util.consistentFetchTasks(storage, TRANSIENT_QUERY)) {
       registerTimeout(
-          Tasks.id(task),
-          task.getStatus(),
+          new TimeoutKey(Tasks.id(task), task.getStatus()),
           Iterables.getLast(task.getTaskEvents()).getTimestamp());
     }
   }
 
   private class TimedOutTaskHandler implements Runnable {
-    final String taskId;
+    final TimeoutKey key;
 
-    TimedOutTaskHandler(String taskId) {
-      this.taskId = taskId;
+    TimedOutTaskHandler(TimeoutKey key) {
+      this.key = key;
     }
 
     @Override public void run() {
-      Context context = futures.get(taskId);
+      Context context = futures.get(key);
       try {
         if (context == null) {
-          LOG.warning("Timeout context not found for " + taskId);
+          LOG.warning("Timeout context not found for " + key);
           return;
         }
 
-        LOG.info("Timeout reached for task " + taskId);
+        LOG.info("Timeout reached for task " + key);
         // This query acts as a CAS by including the state that we expect the task to be in if the
         // timeout is still valid.  Ideally, the future would have already been canceled, but in the
         // event of a state transition race, including transientState prevents an unintended
         // task timeout.
-        TaskQuery query = Query.taskScoped(taskId).byStatus(context.transientState).get();
+        TaskQuery query = Query.taskScoped(key.taskId).byStatus(key.status).get();
         // Note: This requires LOST transitions trigger Driver.killTask.
         stateManager.changeState(query, ScheduleStatus.LOST, TIMEOUT_MESSAGE);
       } finally {
-        futures.remove(taskId);
+        futures.remove(key);
       }
     }
   }
 
   private class Context {
-    final ScheduleStatus transientState;
     final long timestampMillis;
     final Future<?> future;
 
-    Context(ScheduleStatus transientState, long timestampMillis, Future<?> future) {
-      this.transientState = transientState;
+    Context(long timestampMillis, Future<?> future) {
       this.timestampMillis = timestampMillis;
       this.future = future;
     }
   }
-
-  private static final Function<Context, ScheduleStatus> CONTEXT_STATUS =
-      new Function<Context, ScheduleStatus>() {
-        @Override public ScheduleStatus apply(Context context) {
-          return context.transientState;
-        }
-      };
 
   private static final Function<Context, Long> CONTEXT_TIMESTAMP = new Function<Context, Long>() {
     @Override public Long apply(Context context) {
@@ -201,11 +225,14 @@ class TaskTimeout implements EventSubscriber {
     Stats.exportSize(TRANSIENT_COUNT_STAT_NAME, futures);
     for (final ScheduleStatus status : TRANSIENT_STATES) {
       Stats.export(new StatImpl<Long>(waitingTimeStatName(status)) {
-        final Predicate<Context> statusMatcher =
-            Predicates.compose(Predicates.equalTo(status), CONTEXT_STATUS);
+        final Predicate<TimeoutKey> statusMatcher = new Predicate<TimeoutKey>() {
+          @Override public boolean apply(TimeoutKey key) {
+            return key.status == status;
+          }
+        };
 
         @Override public Long read() {
-          Iterable<Context> matches = Iterables.filter(futures.values(), statusMatcher);
+          Iterable<Context> matches = Maps.filterKeys(futures, statusMatcher).values();
           if (Iterables.isEmpty(matches)) {
             return 0L;
           } else {

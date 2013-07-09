@@ -195,8 +195,6 @@ public class TaskTimeoutTest extends EasyMockTest {
     storageUtil.expectTaskFetch(TaskTimeout.TRANSIENT_QUERY, makeTask("a", ASSIGNED, 0)).times(2);
     expectTaskWatch();
     expectCancel();
-    expectTaskWatch();
-    expectCancel();
 
     control.replay();
 
