@@ -1,10 +1,14 @@
 package com.twitter.mesos.scheduler.configuration;
 
+import java.util.Set;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 
 /**
@@ -36,6 +40,21 @@ public final class ParsedConfiguration {
 
   public JobConfiguration get() {
     return parsed;
+  }
+
+  /**
+   * Generates tasks for the parsed configuration.
+   *
+   * @return A set of tasks with shardIds populated.
+   */
+  @VisibleForTesting
+  public Set<TwitterTaskInfo> generateTaskConfigs() {
+    // TODO(Sathya): Remove this after deploying MESOS-3048.
+    ImmutableSet.Builder<TwitterTaskInfo> builder = ImmutableSet.builder();
+    for (int i = 0; i < parsed.getShardCount(); i++) {
+      builder.add(parsed.getTaskConfig().deepCopy().setShardId(i));
+    }
+    return builder.build();
   }
 
   @Override

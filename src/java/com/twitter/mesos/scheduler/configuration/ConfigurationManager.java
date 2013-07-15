@@ -8,9 +8,11 @@ import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -241,7 +243,16 @@ public final class ConfigurationManager {
 
     Preconditions.checkNotNull(job);
 
-    if (job.getTaskConfigsSize() > MAX_TASKS_PER_JOB.get()) {
+    if (job.isSetTaskConfigs()) {
+      throw new TaskDescriptionException("Job configuration cannot have taskConfigs set. "
+          + "Please update your mesos client.");
+    }
+
+    if (!job.isSetShardCount()) {
+      throw new TaskDescriptionException("Job configuration does not have shardCount set.");
+    }
+
+    if (job.getShardCount() > MAX_TASKS_PER_JOB.get()) {
       throw new TaskDescriptionException("Job exceeds task limit of " + MAX_TASKS_PER_JOB.get());
     }
 
@@ -457,12 +468,17 @@ public final class ConfigurationManager {
    */
   @VisibleForTesting
   public static void applyDefaultsIfUnset(JobConfiguration job) {
-    for (TwitterTaskInfo task : job.getTaskConfigs()) {
-      ConfigurationManager.applyDefaultsIfUnset(task);
-    }
-    // While we support heterogeneous tasks we need to backfill both the template and the replicas.
     if (job.isSetTaskConfig()) {
       ConfigurationManager.applyDefaultsIfUnset(job.getTaskConfig());
+    } else {
+      // TODO(Sathya): Remove this after deploying MESOS-3048.
+      Optional<TwitterTaskInfo> template = getTemplateTaskIfExists(job.getTaskConfigs());
+      if (template.isPresent()) {
+        job.setTaskConfig(ConfigurationManager.applyDefaultsIfUnset(template.get()));
+        job.setShardCount(job.getTaskConfigsSize());
+      } else {
+        LOG.info("Unable to backfill taskConfig for job: " + Tasks.jobKey(job));
+      }
     }
 
     try {
@@ -470,6 +486,28 @@ public final class ConfigurationManager {
     } catch (TaskDescriptionException e) {
       LOG.warning("Failed to fill job key in " + job + " due to " + e);
     }
+  }
+
+  // TODO(Sathya): Remove this after deploying MESOS-3048.
+  private static Optional<TwitterTaskInfo> getTemplateTaskIfExists(Set<TwitterTaskInfo> tasks) {
+    if (tasks.size() == 0) {
+      return Optional.absent();
+    }
+
+    Function<TwitterTaskInfo, TwitterTaskInfo> scrubber =
+        new Function<TwitterTaskInfo, TwitterTaskInfo>() {
+          @Override public TwitterTaskInfo apply(TwitterTaskInfo task) {
+            return scrubNonUniqueTaskFields(task);
+          }
+        };
+
+    Set<TwitterTaskInfo> uniqueTasks = FluentIterable.from(tasks).transform(scrubber).toSet();
+
+    if (uniqueTasks.size() == 1) {
+      return Optional.of(Iterables.getOnlyElement(uniqueTasks));
+    }
+
+    return Optional.absent();
   }
 
   private static void maybeFillLinks(TwitterTaskInfo task) {

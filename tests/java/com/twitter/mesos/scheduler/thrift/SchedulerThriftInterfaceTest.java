@@ -1,6 +1,5 @@
 package com.twitter.mesos.scheduler.thrift;
 
-import java.util.Iterator;
 import java.util.Set;
 
 import com.google.common.base.Optional;
@@ -150,31 +149,14 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testCreateHomogeneousJobNoShards() throws Exception {
     JobConfiguration job = makeJob();
-    job.unsetTaskConfigs();
-    job.setTaskConfig(nonProductionTask());
+    job.setShardCount(0);
+    job.unsetShardCount();
     expectAuth(ROLE, true);
 
     control.replay();
 
     CreateJobResponse response = thrift.createJob(job, SESSION);
     assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
-  }
-
-  @Test
-  public void testCreateHomogeneousJob() throws Exception {
-    JobConfiguration job = makeJob();
-    job.unsetTaskConfigs();
-    job.setTaskConfig(nonProductionTask());
-    job.setShardCount(2);
-    expectAuth(ROLE, true);
-    ParsedConfiguration parsed = ParsedConfiguration.fromUnparsed(job);
-    assertEquals(2, parsed.get().getTaskConfigsSize());
-    scheduler.createJob(parsed);
-
-    control.replay();
-
-    CreateJobResponse response = thrift.createJob(job, SESSION);
-    assertEquals(ResponseCode.OK, response.getResponseCode());
   }
 
   @Test
@@ -510,26 +492,22 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, true);
 
     JobConfiguration parsed = job.deepCopy();
-    for (TwitterTaskInfo parsedTask : parsed.getTaskConfigs()) {
-      parsedTask.setHealthCheckIntervalSecs(30)
-          .setShardId(0)
-          .setNumCpus(1.0)
-          .setPriority(0)
-          .setRamMb(1024)
-          .setDiskMb(1024)
-          .setIsService(true)
-          .setProduction(true)
-          .setRequestedPorts(ImmutableSet.<String>of())
-          .setTaskLinks(ImmutableMap.<String, String>of())
-          .setConstraints(ImmutableSet.of(
-              ConfigurationManager.hostLimitConstraint(1),
-              ConfigurationManager.rackLimitConstraint(1)))
-          .setMaxTaskFailures(1)
-          .setEnvironment(DEFAULT_ENVIRONMENT);
-    }
-    // Task configs are placed in a HashSet after deepCopy, equals() does not play nicely between
-    // HashSet and ImmutableSet - dropping an ImmutableSet in place keeps equals() happy.
-    parsed.setTaskConfigs(ImmutableSet.copyOf(parsed.getTaskConfigs()));
+    parsed.getTaskConfig()
+        .setHealthCheckIntervalSecs(30)
+        .setNumCpus(1.0)
+        .setPriority(0)
+        .setRamMb(1024)
+        .setDiskMb(1024)
+        .setIsService(true)
+        .setProduction(true)
+        .setRequestedPorts(ImmutableSet.<String>of())
+        .setTaskLinks(ImmutableMap.<String, String>of())
+        .setConstraints(ImmutableSet.of(
+            ConfigurationManager.hostLimitConstraint(1),
+            ConfigurationManager.rackLimitConstraint(1)))
+        .setMaxTaskFailures(1)
+        .setEnvironment(DEFAULT_ENVIRONMENT);
+    parsed.setTaskConfigs(ImmutableSet.of(parsed.getTaskConfig()));
 
     scheduler.createJob(new ParsedConfiguration(parsed));
 
@@ -538,36 +516,27 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     assertEquals(ResponseCode.OK, thrift.createJob(job, SESSION).getResponseCode());
   }
 
-  private Set<TwitterTaskInfo> taskCopies(TwitterTaskInfo task, int copies) {
-    ImmutableSet.Builder<TwitterTaskInfo> tasks = ImmutableSet.builder();
-    for (int i = 0; i < copies; i++) {
-      tasks.add(task.deepCopy().setShardId(i));
-    }
-    return tasks.build();
-  }
-
   @Test
   public void testCreateJobExceedsTaskLimit() throws Exception {
     expectAuth(ROLE, true);
 
     control.replay();
 
-    JobConfiguration job = makeJob(taskCopies(nonProductionTask(), MAX_TASKS_PER_JOB.get() + 1));
+    JobConfiguration job = makeJob(nonProductionTask(), MAX_TASKS_PER_JOB.get() + 1);
     assertEquals(INVALID_REQUEST, thrift.createJob(job, SESSION).getResponseCode());
   }
 
   @Test
   public void testUpdateJobExceedsTaskLimit() throws Exception {
     expectAuth(ROLE, true);
-    JobConfiguration job = makeJob(taskCopies(nonProductionTask(), MAX_TASKS_PER_JOB.get()));
+    JobConfiguration job = makeJob(nonProductionTask(), MAX_TASKS_PER_JOB.get());
     scheduler.createJob(ParsedConfiguration.fromUnparsed(job));
     expectAuth(ROLE, true);
 
     control.replay();
 
     thrift.createJob(job, SESSION);
-    JobConfiguration updated =
-        makeJob(taskCopies(nonProductionTask(), MAX_TASKS_PER_JOB.get() + 1));
+    JobConfiguration updated = makeJob(nonProductionTask(), MAX_TASKS_PER_JOB.get() + 1);
     assertEquals(
         INVALID_REQUEST,
         thrift.startUpdate(updated, SESSION).getResponseCode());
@@ -581,8 +550,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     JobConfiguration job = new JobConfiguration()
         .setOwner(ROLE_IDENTITY)
-        .setName(JOB_NAME)
-        .setTaskConfigs(ImmutableSet.<TwitterTaskInfo>of());
+        .setName(JOB_NAME);
     assertEquals(
         INVALID_REQUEST,
         thrift.createJob(job, SESSION).getResponseCode());
@@ -625,60 +593,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     assertEquals(
         INVALID_REQUEST,
         thrift.createJob(makeJob(task), SESSION).getResponseCode());
-  }
-
-  @Test
-  public void testRejectsMixedProductionMode() throws Exception {
-    expectAuth(ROLE, true);
-
-    control.replay();
-
-    TwitterTaskInfo nonProduction = nonProductionTask();
-    TwitterTaskInfo production = productionTask();
-    assertEquals(
-        INVALID_REQUEST,
-        thrift
-            .createJob(makeJob(nonProduction, production), SESSION).getResponseCode());
-  }
-
-  @Test
-  public void testCreateJobMissingShardIds() throws Exception {
-    expectAuth(ROLE, true);
-
-    control.replay();
-
-    JobConfiguration job = makeJob(productionTask());
-    job.getTaskConfigs().iterator().next().unsetShardId();
-    assertEquals(INVALID_REQUEST, thrift.createJob(job, SESSION).getResponseCode());
-  }
-
-  @Test
-  public void testCreateJobDuplicateShardIds() throws Exception {
-    expectAuth(ROLE, true);
-
-    control.replay();
-
-    // Tasks are internally placed in a Set, so a differentiating value is needed to prevent
-    // them from colliding.
-    JobConfiguration job =
-        makeJob(productionTask().setNumCpus(1.0), productionTask().setNumCpus(2.0));
-    for (TwitterTaskInfo task : job.getTaskConfigs()) {
-      task.setShardId(0);
-    }
-    assertEquals(INVALID_REQUEST, thrift.createJob(job, SESSION).getResponseCode());
-  }
-
-  @Test
-  public void testCreateJobShardIdHole() throws Exception {
-    expectAuth(ROLE, true);
-
-    control.replay();
-
-    JobConfiguration job = makeJob(productionTask(), productionTask());
-    job.setTaskConfigs(ImmutableSet.of(
-        Iterables.get(job.getTaskConfigs(), 0).setShardId(0),
-        Iterables.get(job.getTaskConfigs(), 0).setShardId(2)));
-    assertEquals(INVALID_REQUEST, thrift.createJob(job, SESSION).getResponseCode());
   }
 
   @Test
@@ -728,7 +642,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setEnvironment(JobKeys.TO_ENVIRONMENT.apply(JOB_KEY));
     JobConfiguration ownedCronJob = makeJob()
         .setCronSchedule("0 * * * *")
-        .setTaskConfigs(ImmutableSet.of(ownedCronJobTask));
+        .setTaskConfig(ownedCronJobTask);
     ScheduledTask ownedCronJobScheduledTask = new ScheduledTask()
         .setAssignedTask(new AssignedTask().setTask(ownedCronJobTask));
     Identity otherOwner = new Identity("other", "other");
@@ -736,7 +650,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setOwner(otherOwner)
         .setCronSchedule("0 * * * *")
         .setKey(JOB_KEY.deepCopy().setRole("other"))
-        .setTaskConfigs(ImmutableSet.of(ownedCronJobTask.deepCopy().setOwner(otherOwner)));
+        .setTaskConfig(ownedCronJobTask.deepCopy().setOwner(otherOwner));
     TwitterTaskInfo ownedImmediateTaskInfo = defaultTask(false)
         .setJobName("immediate")
         .setOwner(ROLE_IDENTITY);
@@ -804,22 +718,19 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   private JobConfiguration makeJob() {
-    return makeJob(nonProductionTask());
+    return makeJob(nonProductionTask(), 1);
   }
 
-  private JobConfiguration makeJob(TwitterTaskInfo task, TwitterTaskInfo... tasks) {
-    return makeJob(ImmutableSet.<TwitterTaskInfo>builder().add(task).add(tasks).build());
+  private JobConfiguration makeJob(TwitterTaskInfo task) {
+    return makeJob(task, 1);
   }
 
-  private JobConfiguration makeJob(Set<TwitterTaskInfo> tasks) {
-    Iterator<TwitterTaskInfo> iterator = tasks.iterator();
-    for (int i = 0; i < tasks.size(); i++) {
-      iterator.next().setShardId(i);
-    }
+  private JobConfiguration makeJob(TwitterTaskInfo task, int numTasks) {
     return new JobConfiguration()
         .setName(JOB_NAME)
         .setOwner(ROLE_IDENTITY)
-        .setTaskConfigs(tasks)
+        .setTaskConfig(task)
+        .setShardCount(numTasks)
         .setKey(JOB_KEY);
   }
 

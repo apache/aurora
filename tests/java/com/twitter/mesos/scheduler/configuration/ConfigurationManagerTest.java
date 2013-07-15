@@ -1,5 +1,7 @@
 package com.twitter.mesos.scheduler.configuration;
 
+import java.util.Set;
+
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -27,6 +29,7 @@ import static com.twitter.mesos.gen.test.Constants.VALID_IDENTIFIERS;
 import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.isGoodIdentifier;
 
 public class ConfigurationManagerTest {
+  private static final String THERMOS_CONFIG = "config";
   private static final TwitterTaskInfo MINIMUM_VIABLE_TASK = new TwitterTaskInfo()
       .setNumCpus(1.0)
       .setRamMb(64)
@@ -45,7 +48,7 @@ public class ConfigurationManagerTest {
                   .setIsService(false)
                   .setHealthCheckIntervalSecs(0)
                   .setTaskLinks(ImmutableMap.<String, String>of())
-                  .setThermosConfig(new byte[] {})
+                  .setThermosConfig(THERMOS_CONFIG.getBytes())
                   .setEnvironment(DEFAULT_ENVIRONMENT)
                   .setRequestedPorts(ImmutableSet.<String>of())
                   .setJobName(null)
@@ -70,7 +73,7 @@ public class ConfigurationManagerTest {
                           new Constraint()
                               .setName("host")
                               .setConstraint(TaskConstraint.limit(new LimitConstraint()
-                                      .setLimit(1)))))))
+                                  .setLimit(1)))))))
       .setKey(null)
       .setTaskConfig(null)
       .setOwner(new Identity()
@@ -98,8 +101,6 @@ public class ConfigurationManagerTest {
     ConfigurationManager.applyDefaultsIfUnset(unclean);
     assertEquals(DEFAULT_ENVIRONMENT, unclean.getKey().getEnvironment());
     assertEquals(DEFAULT_ENVIRONMENT, unclean.getTaskConfig().getEnvironment());
-    assertEquals(
-        DEFAULT_ENVIRONMENT, Iterables.getOnlyElement(unclean.getTaskConfigs()).getEnvironment());
   }
 
   @Test
@@ -109,9 +110,9 @@ public class ConfigurationManagerTest {
         .setOwner(new Identity().setRole("role"))
         .setTaskConfigs(ImmutableSet.of(MINIMUM_VIABLE_TASK.deepCopy()));
     ConfigurationManager.applyDefaultsIfUnset(unclean);
-    assertEquals(DEFAULT_ENVIRONMENT,
-        Iterables.getOnlyElement(unclean.getTaskConfigs()).getEnvironment());
     assertEquals(DEFAULT_ENVIRONMENT, unclean.getKey().getEnvironment());
+    assertEquals(
+        ConfigurationManager.applyDefaultsIfUnset(MINIMUM_VIABLE_TASK), unclean.getTaskConfig());
   }
 
   @Test
@@ -123,6 +124,37 @@ public class ConfigurationManagerTest {
   }
 
   @Test
+  public void testTaskConfigBackfillEqualTasks() {
+    // TODO(Sathya): Remove this after deploying MESOS-3048.
+    TwitterTaskInfo commonTask = MINIMUM_VIABLE_TASK.deepCopy()
+        .setThermosConfig(THERMOS_CONFIG.getBytes());
+    Set<TwitterTaskInfo> tasks =
+        ImmutableSet.of(commonTask.setShardId(0), commonTask.deepCopy().setShardId(1));
+    JobConfiguration copy = UNSANITIZED_JOB_CONFIGURATION.deepCopy()
+        .setTaskConfigs(tasks);
+    ConfigurationManager.applyDefaultsIfUnset(copy);
+    assertTrue(copy.isSetTaskConfig());
+    assertEquals(ConfigurationManager.applyDefaultsIfUnset(commonTask), copy.getTaskConfig());
+    assertEquals(2, copy.getShardCount());
+  }
+
+  @Test
+  public void testTaskConfigBackfillUniqueTasks() {
+    // TODO(Sathya): Remove this after deploying MESOS-3048.
+    TwitterTaskInfo commonTask = MINIMUM_VIABLE_TASK.deepCopy()
+        .setThermosConfig(THERMOS_CONFIG.getBytes())
+        .setShardId(0);
+    TwitterTaskInfo uniqueTask = MINIMUM_VIABLE_TASK.deepCopy()
+        .setThermosConfig("new config".getBytes())
+        .setShardId(1);
+    JobConfiguration copy = UNSANITIZED_JOB_CONFIGURATION.deepCopy()
+        .setTaskConfigs(ImmutableSet.of(commonTask, uniqueTask));
+    ConfigurationManager.applyDefaultsIfUnset(copy);
+    assertFalse(copy.isSetTaskConfig());
+    assertEquals(0, copy.getShardCount());
+  }
+
+  @Test
   public void testFillsJobKeyFromConfig() throws Exception {
     JobConfiguration copy = UNSANITIZED_JOB_CONFIGURATION.deepCopy();
     copy.unsetKey();
@@ -130,16 +162,6 @@ public class ConfigurationManagerTest {
     copy.getTaskConfig().unsetShardId();
     copy.setShardCount(1);
     copy.unsetTaskConfigs();
-    ConfigurationManager.validateAndPopulate(copy);
-    assertEquals(
-        JobKeys.from(copy.getOwner().getRole(), DEFAULT_ENVIRONMENT, copy.getName()),
-        copy.getKey());
-  }
-
-  @Test
-  public void testFillsJobKeyFromConfigs() throws Exception {
-    JobConfiguration copy = UNSANITIZED_JOB_CONFIGURATION.deepCopy();
-    copy.unsetKey();
     ConfigurationManager.validateAndPopulate(copy);
     assertEquals(
         JobKeys.from(copy.getOwner().getRole(), DEFAULT_ENVIRONMENT, copy.getName()),
