@@ -43,7 +43,7 @@ import com.twitter.common_internal.zookeeper.TwitterServerSet.Service;
 import com.twitter.common_internal.zookeeper.TwitterServerSetModule;
 import com.twitter.common_internal.zookeeper.ZooKeeperModule;
 import com.twitter.common_internal.zookeeper.legacy.ServerSetMigrationModule.ServiceDiscovery;
-import com.twitter.mesos.auth.AuthModule;
+import com.twitter.mesos.internal.auth.AuthModule;
 import com.twitter.mesos.scheduler.DriverFactory;
 import com.twitter.mesos.scheduler.DriverFactory.DriverFactoryImpl;
 import com.twitter.mesos.scheduler.MesosTaskFactory.ExecutorConfig;
@@ -125,6 +125,8 @@ public class SchedulerMain extends AbstractApplication {
       }
     };
 
+    // TODO(Sathya): Accept a command line argument for additional modules to bind so that
+    // AuthModule can be referenced only at runtime.
     ImmutableList.Builder<Module> modules = ImmutableList.<Module>builder()
         .addAll(getSystemModules())
         .add(new AppModule(clusterName))
