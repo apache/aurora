@@ -77,10 +77,8 @@ class UpdaterTest(unittest.TestCase):
   def expect_update(self, shard_ids, shard_results=None):
     response = UpdateShardsResponse(responseCode=UpdateResponseCode.OK, message='test')
     response.shards = shard_results
-    # TODO(ksweeney): Remove Nones after JobKey migration is complete
-    self._scheduler.updateShards(
-        None, None, self._job_key, shard_ids,
-        self._update_token, self._session_key).AndReturn(response)
+    self._scheduler.updateShards(self._job_key, shard_ids, self._update_token, self._session_key
+        ).AndReturn(response)
 
   def expect_restart(self, shard_ids):
     response = RestartShardsResponse(responseCode=ResponseCode.OK, message='test')
@@ -89,10 +87,8 @@ class UpdaterTest(unittest.TestCase):
   def expect_rollback(self, shard_ids, shard_results=None):
     response = RollbackShardsResponse(responseCode=UpdateResponseCode.OK, message='test')
     response.shards = shard_results
-    # TODO(ksweeney): Remove Nones after JobKey migration is complete
-    self._scheduler.rollbackShards(
-        None, None, self._job_key, shard_ids,
-        self._update_token, self._session_key).AndReturn(response)
+    self._scheduler.rollbackShards(self._job_key, shard_ids, self._update_token, self._session_key
+        ).AndReturn(response)
 
   def expect_watch_shards(self, shard_ids, failed_shards=[]):
     self._shard_watcher.watch(shard_ids).AndReturn(set(failed_shards))

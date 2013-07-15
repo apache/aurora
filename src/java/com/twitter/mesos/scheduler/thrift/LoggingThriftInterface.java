@@ -8,8 +8,6 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.annotation.Nullable;
-
 import com.google.common.collect.ImmutableList;
 import com.google.inject.Binder;
 import com.google.inject.BindingAnnotation;
@@ -170,47 +168,35 @@ class LoggingThriftInterface implements MesosAdmin.Iface {
 
   @Override
   public UpdateShardsResponse updateShards(
-      @Nullable String ownerRole,
-      @Nullable String jobName,
-      @Nullable JobKey job,
+      JobKey jobKey,
       Set<Integer> shards,
       String updateToken,
       SessionKey session) throws TException {
 
-    logUserAction(session,
-        "updateJob|ownerRole: %s |jobName: %s |job: %s |shards: %s",
-        ownerRole, jobName, job, shards);
-    return delegate.updateShards(ownerRole, jobName, job, shards, updateToken, session);
+    logUserAction(session, "updateJob|jobKey: %s |shards: %s", jobKey, shards);
+    return delegate.updateShards(jobKey, shards, updateToken, session);
   }
 
   @Override
   public RollbackShardsResponse rollbackShards(
-      @Nullable String ownerRole,
-      @Nullable String jobName,
-      @Nullable JobKey job,
+      JobKey jobKey,
       Set<Integer> shards,
       String updateToken,
       SessionKey session) throws TException {
 
-    logUserAction(session,
-        "rollbackShards|ownerRole: %s |jobName: %s |job: %s |shards: %s",
-        ownerRole, jobName, job, shards);
-    return delegate.rollbackShards(ownerRole, jobName, job, shards, updateToken, session);
+    logUserAction(session, "rollbackShards|jobKey: %s |shards: %s", jobKey, shards);
+    return delegate.rollbackShards(jobKey, shards, updateToken, session);
   }
 
   @Override
   public FinishUpdateResponse finishUpdate(
-      @Nullable String ownerRole,
-      @Nullable String jobName,
-      @Nullable JobKey job,
+      JobKey jobKey,
       UpdateResult updateResult,
       String updateToken,
       SessionKey session) throws TException {
 
-    logUserAction(session,
-        "finishUpdate|ownerRole: %s |jobName: %s |job: %s |updateResult: %s",
-        ownerRole, jobName, job, updateResult);
-    return delegate.finishUpdate(ownerRole, jobName, job, updateResult, updateToken, session);
+    logUserAction(session, "finishUpdate|job: %s |updateResult: %s", jobKey, updateResult);
+    return delegate.finishUpdate(jobKey, updateResult, updateToken, session);
   }
 
   @Override

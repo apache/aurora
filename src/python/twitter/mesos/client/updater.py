@@ -59,8 +59,7 @@ class Updater(object):
          False if update failed
     """
 
-    # TODO(ksweeney): Remove Nones before resolving MESOS-2403.
-    resp = self._scheduler.finishUpdate(None, None, self._job_key,
+    resp = self._scheduler.finishUpdate(self._job_key,
         UpdateResult.FAILED if rollback else UpdateResult.SUCCESS,
         self._update_token)
 
@@ -76,8 +75,7 @@ class Updater(object):
   def cancel_update(cls, scheduler, role, env, jobname, token=None):
     job_key = JobKey(role=role, environment=env, name=jobname)
 
-    # TODO(ksweeney): Remove Nones before resolving MESOS-2403.
-    return scheduler.finishUpdate(None, None, job_key, UpdateResult.TERMINATE, token)
+    return scheduler.finishUpdate(job_key, UpdateResult.TERMINATE, token)
 
   def _get_shards_to_watch(self, shard_states, batch_shards):
     if shard_states:
@@ -161,9 +159,7 @@ class Updater(object):
       batch_shards = shards_to_rollback[0 : self._update_config.batch_size]
       shards_to_rollback = list(set(shards_to_rollback) - set(batch_shards))
 
-      # TODO(ksweeney): Remove Nones before resolving MESOS-2403.
-      resp = self._scheduler.rollbackShards(None, None, self._job_key, batch_shards,
-          self._update_token)
+      resp = self._scheduler.rollbackShards(self._job_key, batch_shards, self._update_token)
       log.log(debug_if(resp.responseCode == UpdateResponseCode.OK),
         'Response from scheduler: %s (message: %s)'
           % (UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
@@ -182,9 +178,7 @@ class Updater(object):
     Returns a map of the current status of the updated shards as returned by the scheduler.
     """
     log.info('Updating shards: %s' % shard_ids)
-    # TODO(ksweeney): Remove Nones before resolving MESOS-2403.
-    resp = self._scheduler.updateShards(
-        None, None, self._job_key, shard_ids, self._update_token)
+    resp = self._scheduler.updateShards(self._job_key, shard_ids, self._update_token)
     log.log(debug_if(resp.responseCode == UpdateResponseCode.OK),
         'Response from scheduler: %s (message: %s)' % (
           UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))

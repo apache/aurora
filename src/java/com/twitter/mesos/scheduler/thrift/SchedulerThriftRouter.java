@@ -2,8 +2,6 @@ package com.twitter.mesos.scheduler.thrift;
 
 import java.util.Set;
 
-import javax.annotation.Nullable;
-
 import com.google.inject.Inject;
 
 import com.twitter.mesos.gen.CommitRecoveryResponse;
@@ -42,7 +40,6 @@ import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.UnloadRecoveryResponse;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.UpdateShardsResponse;
-import com.twitter.mesos.scheduler.base.JobKeys;
 import com.twitter.mesos.scheduler.thrift.auth.CapabilityValidator.Capability;
 import com.twitter.mesos.scheduler.thrift.auth.Requires;
 
@@ -99,44 +96,32 @@ public class SchedulerThriftRouter implements MesosAdmin.Iface {
 
   @Override
   public UpdateShardsResponse updateShards(
-      @Nullable String role,
-      @Nullable String jobName,
-      @Nullable JobKey job,
+      JobKey jobKey,
       Set<Integer> shards,
       String updateToken,
       SessionKey session) {
 
-    JobKey sanitizedJob = JobKeys.fromRequestParameters(job, role, jobName);
-
-    return schedulerController.updateShards(sanitizedJob, shards, updateToken, session);
+    return schedulerController.updateShards(jobKey, shards, updateToken, session);
   }
 
   @Override
   public RollbackShardsResponse rollbackShards(
-      @Nullable String role,
-      @Nullable String jobName,
-      @Nullable JobKey job,
+      JobKey jobKey,
       Set<Integer> shards,
       String updateToken,
       SessionKey session) {
 
-    JobKey sanitizedJob = JobKeys.fromRequestParameters(job, role, jobName);
-
-    return schedulerController.rollbackShards(sanitizedJob, shards, updateToken, session);
+    return schedulerController.rollbackShards(jobKey, shards, updateToken, session);
   }
 
   @Override
   public FinishUpdateResponse finishUpdate(
-      @Nullable String role,
-      @Nullable String jobName,
-      @Nullable JobKey job,
+      JobKey jobKey,
       UpdateResult updateResult,
       String updateToken,
       SessionKey session) {
 
-    JobKey sanitizedJob = JobKeys.fromRequestParameters(job, role, jobName);
-
-    return schedulerController.finishUpdate(sanitizedJob, updateResult, updateToken, session);
+    return schedulerController.finishUpdate(jobKey, updateResult, updateToken, session);
   }
 
   @Override
