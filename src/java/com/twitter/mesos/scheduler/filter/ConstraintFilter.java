@@ -14,6 +14,7 @@ import com.google.common.collect.Iterables;
 
 import com.twitter.mesos.gen.Attribute;
 import com.twitter.mesos.gen.Constraint;
+import com.twitter.mesos.gen.JobKey;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskConstraint;
 import com.twitter.mesos.scheduler.base.SchedulerException;
@@ -22,8 +23,6 @@ import com.twitter.mesos.scheduler.filter.SchedulingFilterImpl.AttributeLoader;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import static com.twitter.common.base.MorePreconditions.checkNotBlank;
-
 /**
  * Filter that determines whether a task's constraints are satisfied.
  */
@@ -31,7 +30,7 @@ class ConstraintFilter implements Function<Constraint, Optional<Veto>> {
 
   private static final Logger LOG = Logger.getLogger(ConstraintFilter.class.getName());
 
-  private final String jobKey;
+  private final JobKey jobKey;
   private final Supplier<Collection<ScheduledTask>> activeTasksSupplier;
   private final AttributeLoader attributeLoader;
   private final Iterable<Attribute> hostAttributes;
@@ -45,12 +44,12 @@ class ConstraintFilter implements Function<Constraint, Optional<Veto>> {
    * @param hostAttributes The attributes of the host to test against.
    */
   ConstraintFilter(
-      String jobKey,
+      JobKey jobKey,
       Supplier<Collection<ScheduledTask>> activeTasksSupplier,
       AttributeLoader attributeLoader,
       Iterable<Attribute> hostAttributes) {
 
-    this.jobKey = checkNotBlank(jobKey);
+    this.jobKey = checkNotNull(jobKey);
     this.activeTasksSupplier = checkNotNull(activeTasksSupplier);
     this.attributeLoader = checkNotNull(attributeLoader);
     this.hostAttributes = checkNotNull(hostAttributes);

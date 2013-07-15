@@ -27,6 +27,7 @@ import com.twitter.common.util.testing.FakeClock;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Identity;
+import com.twitter.mesos.gen.JobKey;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.TaskEvent;
@@ -87,7 +88,7 @@ public class HistoryPrunerTest extends EasyMockTest {
   public void validateNoLeak() {
     synchronized (pruner.tasksByJob) {
       assertEquals(
-          ImmutableMultimap.<String, String>of(),
+          ImmutableMultimap.<JobKey, String>of(),
           ImmutableMultimap.copyOf(pruner.tasksByJob));
     }
   }
@@ -409,6 +410,7 @@ public class HistoryPrunerTest extends EasyMockTest {
         .setTaskId(taskId)
         .setTask(new TwitterTaskInfo()
             .setOwner(new Identity().setRole("role").setUser("user"))
+            .setEnvironment("staging45")
             .setJobName(job)
             .setThermosConfig(new byte[]{1, 2, 3}));
   }

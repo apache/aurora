@@ -28,6 +28,7 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Clock;
 import com.twitter.mesos.Tasks;
+import com.twitter.mesos.gen.JobKey;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.scheduler.base.Query;
 import com.twitter.mesos.scheduler.state.StateManager;
@@ -63,8 +64,8 @@ public class HistoryPruner implements EventSubscriber {
   static final Query.Builder INACTIVE_QUERY = Query.unscoped().terminal();
 
   @VisibleForTesting
-  final Multimap<String, String> tasksByJob =
-      Multimaps.synchronizedSetMultimap(LinkedHashMultimap.<String, String>create());
+  final Multimap<JobKey, String> tasksByJob =
+      Multimaps.synchronizedSetMultimap(LinkedHashMultimap.<JobKey, String>create());
 
   private final ScheduledExecutorService executor;
   private final Storage storage;
@@ -109,7 +110,9 @@ public class HistoryPruner implements EventSubscriber {
   public void recordStateChange(TaskStateChange change) {
     if (Tasks.isTerminated(change.getNewState())) {
       registerInactiveTask(
-          Tasks.jobKey(change.getTask()), change.getTaskId(), calculateTimeout(clock.nowMillis()));
+          Tasks.SCHEDULED_TO_JOB_KEY.apply(change.getTask()),
+          change.getTaskId(),
+          calculateTimeout(clock.nowMillis()));
     }
   }
 
@@ -125,7 +128,7 @@ public class HistoryPruner implements EventSubscriber {
         : LATEST_ACTIVITY.sortedCopy(Storage.Util.consistentFetchTasks(storage, INACTIVE_QUERY))) {
 
       registerInactiveTask(
-          Tasks.jobKey(task),
+          Tasks.SCHEDULED_TO_JOB_KEY.apply(task),
           Tasks.id(task),
           calculateTimeout(Iterables.getLast(task.getTaskEvents()).getTimestamp()));
     }
@@ -145,7 +148,7 @@ public class HistoryPruner implements EventSubscriber {
   public void tasksDeleted(final TasksDeleted event) {
     for (ScheduledTask task : event.getTasks()) {
       String id = Tasks.id(task);
-      tasksByJob.remove(Tasks.jobKey(task), id);
+      tasksByJob.remove(Tasks.SCHEDULED_TO_JOB_KEY.apply(task), id);
       Future<?> future = taskIdToFuture.remove(id);
       if (future != null) {
         future.cancel(false);
@@ -154,7 +157,7 @@ public class HistoryPruner implements EventSubscriber {
   }
 
   private void registerInactiveTask(
-      final String jobKey,
+      final JobKey jobKey,
       final String taskId,
       long timeRemaining) {
 

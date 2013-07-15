@@ -210,7 +210,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
                 });
 
             ConstraintFilter constraintFilter = new ConstraintFilter(
-                Tasks.jobKey(task),
+                Tasks.INFO_TO_JOB_KEY.apply(task),
                 activeTasksSupplier,
                 attributeLoader,
                 attributeLoader.apply(slaveHost));

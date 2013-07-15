@@ -10,6 +10,7 @@ import com.google.common.collect.Iterables;
 
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.Attribute;
+import com.twitter.mesos.gen.JobKey;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.gen.ValueConstraint;
 import com.twitter.mesos.scheduler.filter.SchedulingFilterImpl.AttributeLoader;
@@ -55,13 +56,13 @@ final class AttributeFilter {
    * @return {@code true} if the limit constraint is satisfied, {@code false} otherwise.
    */
   static boolean matches(final Set<Attribute> attributes,
-      final String jobKey,
+      final JobKey jobKey,
       int limit,
       Iterable<ScheduledTask> activeTasks,
       final AttributeLoader attributeFetcher) {
 
     Predicate<ScheduledTask> sameJob =
-        Predicates.compose(Predicates.equalTo(jobKey), Tasks.SCHEDULED_TO_STRING_JOB_KEY);
+        Predicates.compose(Predicates.equalTo(jobKey), Tasks.SCHEDULED_TO_JOB_KEY);
 
     Predicate<ScheduledTask> hasAttribute = new Predicate<ScheduledTask>() {
       @Override public boolean apply(ScheduledTask task) {
