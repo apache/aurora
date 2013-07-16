@@ -2,8 +2,6 @@ package com.twitter.mesos.scheduler.storage;
 
 import java.util.Set;
 
-import javax.annotation.Nullable;
-
 import com.google.common.base.Optional;
 
 import com.twitter.mesos.gen.JobConfiguration;
@@ -24,20 +22,6 @@ public interface JobStore {
    * @return the set of job configurations owned by the specififed job manager
    */
   Iterable<JobConfiguration> fetchJobs(String managerId);
-
-  /**
-   * Fetches the {@code JobConfiguration} for the specified {@code jobKey}; if there is none then
-   * {@code null} is returned.
-   *
-   * @deprecated Use {@link JobStore#fetchJob(String, JobKey)} instead.
-   * @param managerId The unique identifier of the {@link JobManager}
-   *     that accepted the job
-   * @param jobKey The jobKey identifying the job to be fetched.
-   * @return the job configuration for the given {@code jobKey} or else {@code null} if none is
-   *     found
-   */
-  @Deprecated
-  @Nullable JobConfiguration fetchJob(String managerId, String jobKey);
 
   /**
    * Fetches the {@code JobConfiguration} for the specified {@code jobKey} if it exists.

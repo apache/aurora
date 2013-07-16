@@ -111,12 +111,6 @@ public class ForwardingStore implements
   }
 
   @Override
-  @Nullable
-  public JobConfiguration fetchJob(String managerId, String jobKey) {
-    return jobStore.fetchJob(managerId, jobKey);
-  }
-
-  @Override
   public Optional<JobConfiguration> fetchJob(String managerId, JobKey jobKey) {
     return jobStore.fetchJob(managerId, jobKey);
   }

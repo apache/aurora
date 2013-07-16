@@ -80,8 +80,7 @@ class MemJobStore implements JobStore.Mutable {
   }
 
   @Nullable
-  @Override
-  public JobConfiguration fetchJob(String managerId, String jobKey) {
+  private JobConfiguration fetchJob(String managerId, String jobKey) {
     checkNotNull(managerId);
     checkNotNull(jobKey);
 

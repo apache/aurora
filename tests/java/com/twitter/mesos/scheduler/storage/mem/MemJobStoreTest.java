@@ -7,6 +7,8 @@ import org.junit.Test;
 
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.gen.JobKey;
+
 import com.twitter.mesos.scheduler.base.JobKeys;
 import com.twitter.mesos.scheduler.storage.JobStore;
 
@@ -21,6 +23,9 @@ public class MemJobStoreTest {
   private static final JobConfiguration JOB_A = makeJob("a");
   private static final JobConfiguration JOB_B = makeJob("b");
 
+  private static final JobKey KEY_A = JOB_A.getKey();
+  private static final JobKey KEY_B = JOB_B.getKey();
+
   private JobStore.Mutable store;
 
   @Before
@@ -30,21 +35,21 @@ public class MemJobStoreTest {
 
   @Test
   public void testJobStore() {
-    assertNull(store.fetchJob(MANAGER_1, "a"));
+    assertNull(store.fetchJob(MANAGER_1, JobKeys.from("nobody", "nowhere", "noname")).orNull());
     assertEquals(ImmutableSet.<JobConfiguration>of(), store.fetchJobs(MANAGER_1));
     assertEquals(ImmutableSet.<String>of(), store.fetchManagerIds());
 
     store.saveAcceptedJob(MANAGER_1, JOB_A);
-    assertEquals(JOB_A, store.fetchJob(MANAGER_1, "role-a/a"));
+    assertEquals(JOB_A, store.fetchJob(MANAGER_1, KEY_A).orNull());
     assertEquals(ImmutableSet.of(JOB_A), store.fetchJobs(MANAGER_1));
 
     store.saveAcceptedJob(MANAGER_1, JOB_B);
-    assertEquals(JOB_B, store.fetchJob(MANAGER_1, "role-b/b"));
+    assertEquals(JOB_B, store.fetchJob(MANAGER_1, KEY_B).orNull());
     assertEquals(ImmutableSet.of(JOB_A, JOB_B), store.fetchJobs(MANAGER_1));
     assertEquals(ImmutableSet.of(MANAGER_1), store.fetchManagerIds());
 
     store.saveAcceptedJob(MANAGER_2, JOB_B);
-    assertEquals(JOB_B, store.fetchJob(MANAGER_1, "role-b/b"));
+    assertEquals(JOB_B, store.fetchJob(MANAGER_1, KEY_B).orNull());
     assertEquals(ImmutableSet.of(JOB_B), store.fetchJobs(MANAGER_2));
     assertEquals(ImmutableSet.of(MANAGER_1, MANAGER_2), store.fetchManagerIds());
 
