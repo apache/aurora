@@ -1,6 +1,7 @@
 package com.twitter.aurora.scheduler.thrift;
 
 import java.util.Collection;
+
 import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
@@ -57,6 +58,8 @@ import com.twitter.mesos.gen.QueryRecoveryResponse;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.ResponseCode;
 import com.twitter.mesos.gen.RestartShardsResponse;
+import com.twitter.mesos.gen.RewriteConfigsRequest;
+import com.twitter.mesos.gen.RewriteConfigsResponse;
 import com.twitter.mesos.gen.RollbackShardsResponse;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduleStatusResponse;
@@ -712,6 +715,14 @@ class SchedulerThriftInterface implements SchedulerController {
       LOG.log(Level.WARNING, "Requested snapshot failed.", e);
       return response.setResponseCode(ERROR).setMessage(e.getMessage());
     }
+  }
+
+  @Override
+  public RewriteConfigsResponse rewriteConfigs(RewriteConfigsRequest request, SessionKey session) {
+    // TODO(William Farner): Implement this.
+    return new RewriteConfigsResponse()
+        .setMessage("Not implemented")
+        .setResponseCode(ResponseCode.ERROR);
   }
 
   @VisibleForTesting

@@ -248,3 +248,10 @@ class TestSchedulerProxyAdminInjection(TestSchedulerProxyInjection):
     self.mox.ReplayAll()
 
     self.make_scheduler_proxy().snapshot()
+
+  def test_rewriteConfigs(self):
+    self.mock_thrift_client.rewriteConfigs(IsA(RewriteConfigsRequest), IsA(SessionKey))
+
+    self.mox.ReplayAll()
+
+    self.make_scheduler_proxy().rewriteConfigs(RewriteConfigsRequest())

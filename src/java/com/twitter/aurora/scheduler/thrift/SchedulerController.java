@@ -23,6 +23,8 @@ import com.twitter.mesos.gen.PopulateJobResponse;
 import com.twitter.mesos.gen.QueryRecoveryResponse;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.RestartShardsResponse;
+import com.twitter.mesos.gen.RewriteConfigsRequest;
+import com.twitter.mesos.gen.RewriteConfigsResponse;
 import com.twitter.mesos.gen.RollbackShardsResponse;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduleStatusResponse;
@@ -114,4 +116,6 @@ interface SchedulerController {
   GetJobUpdatesResponse getJobUpdates(SessionKey session);
 
   SnapshotResponse snapshot(SessionKey session);
+
+  RewriteConfigsResponse rewriteConfigs(RewriteConfigsRequest request, SessionKey session);
 }

@@ -42,6 +42,8 @@ import com.twitter.mesos.gen.PopulateJobResponse;
 import com.twitter.mesos.gen.QueryRecoveryResponse;
 import com.twitter.mesos.gen.Quota;
 import com.twitter.mesos.gen.RestartShardsResponse;
+import com.twitter.mesos.gen.RewriteConfigsRequest;
+import com.twitter.mesos.gen.RewriteConfigsResponse;
 import com.twitter.mesos.gen.RollbackShardsResponse;
 import com.twitter.mesos.gen.ScheduleStatus;
 import com.twitter.mesos.gen.ScheduleStatusResponse;
@@ -323,5 +325,13 @@ class LoggingThriftInterface implements MesosAdmin.Iface {
   public SnapshotResponse snapshot(SessionKey session) throws TException {
     logUserAction(session, "snapshot");
     return delegate.snapshot(session);
+  }
+
+  @Override
+  public RewriteConfigsResponse rewriteConfigs(RewriteConfigsRequest request, SessionKey session)
+      throws TException {
+
+    logUserAction(session, "rewriteConfigs|request: %s", request);
+    return delegate.rewriteConfigs(request, session);
   }
 }
