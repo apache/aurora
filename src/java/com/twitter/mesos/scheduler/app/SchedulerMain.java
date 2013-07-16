@@ -20,6 +20,8 @@ import com.google.inject.Key;
 import com.google.inject.Module;
 import com.google.inject.Singleton;
 
+import com.twitter.aurora.scheduler.thrift.ThriftConfiguration;
+import com.twitter.aurora.scheduler.thrift.ThriftModule;
 import com.twitter.common.application.AbstractApplication;
 import com.twitter.common.application.AppLauncher;
 import com.twitter.common.application.modules.HttpModule;
@@ -56,8 +58,6 @@ import com.twitter.mesos.scheduler.storage.log.LogStorage;
 import com.twitter.mesos.scheduler.storage.log.LogStorageModule;
 import com.twitter.mesos.scheduler.storage.log.SnapshotStoreImpl;
 import com.twitter.mesos.scheduler.storage.mem.MemStorageModule;
-import com.twitter.mesos.scheduler.thrift.ThriftConfiguration;
-import com.twitter.mesos.scheduler.thrift.ThriftModule;
 
 /**
  * Launcher for the twitter mesos scheduler.

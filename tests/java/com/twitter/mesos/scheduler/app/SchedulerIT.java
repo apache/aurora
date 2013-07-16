@@ -41,6 +41,7 @@ import org.easymock.IMocksControl;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.twitter.aurora.scheduler.thrift.ThriftConfiguration;
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.application.StartupStage;
 import com.twitter.common.application.modules.AppLauncherModule;
@@ -81,7 +82,6 @@ import com.twitter.mesos.scheduler.storage.log.LogManager.StreamManager.EntrySer
 import com.twitter.mesos.scheduler.storage.log.LogStorageModule;
 import com.twitter.mesos.scheduler.storage.log.testing.LogOpMatcher;
 import com.twitter.mesos.scheduler.storage.log.testing.LogOpMatcher.StreamMatcher;
-import com.twitter.mesos.scheduler.thrift.ThriftConfiguration;
 import com.twitter.thrift.Endpoint;
 import com.twitter.thrift.ServiceInstance;
 

@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler.thrift;
+package com.twitter.aurora.scheduler.thrift;
 
 import java.util.Set;
 
@@ -16,6 +16,9 @@ import org.easymock.IExpectationSetters;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator;
+import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator.Capability;
+import com.twitter.aurora.scheduler.thrift.auth.ThriftAuthModule;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.common.util.Clock;
 import com.twitter.common.util.testing.FakeClock;
@@ -61,9 +64,6 @@ import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.backup.Recovery;
 import com.twitter.mesos.scheduler.storage.backup.StorageBackup;
 import com.twitter.mesos.scheduler.storage.testing.StorageTestUtil;
-import com.twitter.mesos.scheduler.thrift.auth.CapabilityValidator;
-import com.twitter.mesos.scheduler.thrift.auth.CapabilityValidator.Capability;
-import com.twitter.mesos.scheduler.thrift.auth.ThriftAuthModule;
 
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
@@ -71,6 +71,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import static com.twitter.aurora.scheduler.thrift.SchedulerThriftInterface.transitionMessage;
+import static com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator.Capability.ROOT;
 import static com.twitter.mesos.gen.Constants.DEFAULT_ENVIRONMENT;
 import static com.twitter.mesos.gen.MaintenanceMode.DRAINING;
 import static com.twitter.mesos.gen.MaintenanceMode.NONE;
@@ -79,8 +81,6 @@ import static com.twitter.mesos.gen.ResponseCode.INVALID_REQUEST;
 import static com.twitter.mesos.gen.ResponseCode.OK;
 import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static com.twitter.mesos.scheduler.configuration.ConfigurationManager.MAX_TASKS_PER_JOB;
-import static com.twitter.mesos.scheduler.thrift.SchedulerThriftInterface.transitionMessage;
-import static com.twitter.mesos.scheduler.thrift.auth.CapabilityValidator.Capability.ROOT;
 
 // TODO(ksweeney): Get role from JobKey instead of Identity everywhere in here.
 public class SchedulerThriftInterfaceTest extends EasyMockTest {

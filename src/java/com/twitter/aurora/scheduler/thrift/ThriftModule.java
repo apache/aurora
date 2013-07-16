@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler.thrift;
+package com.twitter.aurora.scheduler.thrift;
 
 import java.util.Map;
 
@@ -10,15 +10,15 @@ import com.google.inject.PrivateModule;
 import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 
+import com.twitter.aurora.scheduler.thrift.FeatureToggleSchedulerController.Delegate;
+import com.twitter.aurora.scheduler.thrift.FeatureToggleSchedulerController.EnableUpdates;
+import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator.Capability;
+import com.twitter.aurora.scheduler.thrift.auth.ThriftAuthModule;
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.NotEmpty;
 import com.twitter.common.thrift.ThriftServer;
-import com.twitter.mesos.scheduler.thrift.FeatureToggleSchedulerController.Delegate;
-import com.twitter.mesos.scheduler.thrift.FeatureToggleSchedulerController.EnableUpdates;
-import com.twitter.mesos.scheduler.thrift.auth.CapabilityValidator.Capability;
-import com.twitter.mesos.scheduler.thrift.auth.ThriftAuthModule;
 
 /**
  * Binding module to configure a thrift server.

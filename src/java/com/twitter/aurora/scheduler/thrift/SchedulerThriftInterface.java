@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler.thrift;
+package com.twitter.aurora.scheduler.thrift;
 
 import java.util.Collection;
 import java.util.Map;
@@ -23,6 +23,8 @@ import com.google.inject.Inject;
 
 import org.apache.commons.lang.StringUtils;
 
+import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator;
+import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator.Capability;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.base.MorePreconditions;
@@ -89,8 +91,6 @@ import com.twitter.mesos.scheduler.storage.UpdateStore;
 import com.twitter.mesos.scheduler.storage.backup.Recovery;
 import com.twitter.mesos.scheduler.storage.backup.Recovery.RecoveryException;
 import com.twitter.mesos.scheduler.storage.backup.StorageBackup;
-import com.twitter.mesos.scheduler.thrift.auth.CapabilityValidator;
-import com.twitter.mesos.scheduler.thrift.auth.CapabilityValidator.Capability;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 

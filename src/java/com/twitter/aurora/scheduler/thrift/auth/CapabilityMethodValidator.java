@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler.thrift.auth;
+package com.twitter.aurora.scheduler.thrift.auth;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -18,10 +18,10 @@ import com.google.inject.Inject;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 
+import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator.Capability;
 import com.twitter.mesos.auth.SessionValidator.AuthFailedException;
 import com.twitter.mesos.gen.ResponseCode;
 import com.twitter.mesos.gen.SessionKey;
-import com.twitter.mesos.scheduler.thrift.auth.CapabilityValidator.Capability;
 
 /**
  * A method interceptor that will authenticate users identified by a {@link SessionKey} argument

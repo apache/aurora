@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler.thrift;
+package com.twitter.aurora.scheduler.thrift;
 
 import java.util.Set;
 

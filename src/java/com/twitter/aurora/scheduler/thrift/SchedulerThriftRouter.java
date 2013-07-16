@@ -1,9 +1,11 @@
-package com.twitter.mesos.scheduler.thrift;
+package com.twitter.aurora.scheduler.thrift;
 
 import java.util.Set;
 
 import com.google.inject.Inject;
 
+import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator.Capability;
+import com.twitter.aurora.scheduler.thrift.auth.Requires;
 import com.twitter.mesos.gen.CommitRecoveryResponse;
 import com.twitter.mesos.gen.CreateJobResponse;
 import com.twitter.mesos.gen.DeleteRecoveryTasksResponse;
@@ -40,8 +42,6 @@ import com.twitter.mesos.gen.TaskQuery;
 import com.twitter.mesos.gen.UnloadRecoveryResponse;
 import com.twitter.mesos.gen.UpdateResult;
 import com.twitter.mesos.gen.UpdateShardsResponse;
-import com.twitter.mesos.scheduler.thrift.auth.CapabilityValidator.Capability;
-import com.twitter.mesos.scheduler.thrift.auth.Requires;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 

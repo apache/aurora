@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler.thrift;
+package com.twitter.aurora.scheduler.thrift;
 
 import java.util.Map;
 
@@ -10,6 +10,7 @@ import com.google.inject.Injector;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator.Capability;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.mesos.auth.SessionValidator;
 import com.twitter.mesos.gen.MesosAdmin;
@@ -22,7 +23,6 @@ import com.twitter.mesos.scheduler.state.SchedulerCore;
 import com.twitter.mesos.scheduler.storage.Storage;
 import com.twitter.mesos.scheduler.storage.backup.Recovery;
 import com.twitter.mesos.scheduler.storage.backup.StorageBackup;
-import com.twitter.mesos.scheduler.thrift.auth.CapabilityValidator.Capability;
 
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;

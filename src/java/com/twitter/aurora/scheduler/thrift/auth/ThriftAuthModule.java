@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler.thrift.auth;
+package com.twitter.aurora.scheduler.thrift.auth;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Module;
@@ -7,11 +7,11 @@ import com.google.inject.matcher.Matchers;
 
 import org.aopalliance.intercept.MethodInterceptor;
 
+import com.twitter.aurora.scheduler.thrift.SchedulerThriftRouter;
+import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator.CapabilityValidatorImpl;
 import com.twitter.mesos.GuiceUtils;
 import com.twitter.mesos.auth.SessionValidator;
 import com.twitter.mesos.gen.MesosAdmin;
-import com.twitter.mesos.scheduler.thrift.SchedulerThriftRouter;
-import com.twitter.mesos.scheduler.thrift.auth.CapabilityValidator.CapabilityValidatorImpl;
 
 /**
  * Binding module for authentication of users with special capabilities for admin functions.

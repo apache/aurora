@@ -1,4 +1,4 @@
-package com.twitter.mesos.scheduler.thrift.auth;
+package com.twitter.aurora.scheduler.thrift.auth;
 
 import java.util.Map;
 
