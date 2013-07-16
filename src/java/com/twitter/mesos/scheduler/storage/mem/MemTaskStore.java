@@ -148,7 +148,7 @@ class MemTaskStore implements TaskStore.Mutable {
     for (String id : taskIds) {
       ScheduledTask removed = tasks.remove(id);
       if (removed != null) {
-        tasksByJobKey.remove(Tasks.jobKey(removed), Tasks.id(removed));
+        tasksByJobKey.remove(Tasks.SCHEDULED_TO_JOB_KEY.apply(removed), Tasks.id(removed));
       }
     }
   }
