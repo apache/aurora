@@ -38,7 +38,6 @@ import com.twitter.mesos.scheduler.storage.Storage.MutateWork;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import static com.twitter.mesos.Tasks.ACTIVE_STATES;
-import static com.twitter.mesos.Tasks.jobKey;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
 import static com.twitter.mesos.gen.ScheduleStatus.RESTARTING;
 import static com.twitter.mesos.gen.ScheduleStatus.ROLLBACK;
@@ -111,7 +110,7 @@ class SchedulerCoreImpl implements SchedulerCore {
 
     JobConfiguration job = parsedConfiguration.get();
     if (hasActiveJob(job)) {
-      throw new ScheduleException("Job already exists: " + jobKey(job));
+      throw new ScheduleException("Job already exists: " + JobKeys.toPath(job));
     }
 
     ensureHasAdditionalQuota(job.getOwner().getRole(), Quotas.fromJob(job));

@@ -196,10 +196,11 @@ class SchedulerThriftInterface implements SchedulerController {
     checkNotNull(job);
     checkNotNull(session);
 
-    // TODO(ksweeney): check valid JobKey in job after deprecating non-environment version.
-
-    LOG.info("Received createJob request: " + Tasks.jobKey(job));
     CreateJobResponse response = new CreateJobResponse();
+    if (!JobKeys.isValid(job.getKey())) {
+      return response.setResponseCode(INVALID_REQUEST)
+          .setMessage("Invalid job key: " + job.getKey());
+    }
 
     if (!ENABLE_JOB_CREATION.get()) {
       return response.setResponseCode(INVALID_REQUEST)
@@ -209,8 +210,7 @@ class SchedulerThriftInterface implements SchedulerController {
     try {
       sessionValidator.checkAuthenticated(session, job.getOwner().getRole());
     } catch (AuthFailedException e) {
-      response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
-      return response;
+      return response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
     }
 
     try {

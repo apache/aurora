@@ -7,6 +7,7 @@ import org.junit.Test;
 
 import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
+import com.twitter.mesos.scheduler.base.JobKeys;
 import com.twitter.mesos.scheduler.storage.JobStore;
 
 import static org.junit.Assert.assertEquals;
@@ -59,6 +60,7 @@ public class MemJobStoreTest {
   private static JobConfiguration makeJob(String name) {
     return new JobConfiguration()
         .setName(name)
-        .setOwner(new Identity("role-" + name, "user-" + name));
+        .setOwner(new Identity("role-" + name, "user-" + name))
+        .setKey(JobKeys.from("role-" + name, "env-" + name, name));
   }
 }

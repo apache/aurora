@@ -12,6 +12,7 @@ import org.apache.mesos.Protos.TaskInfo;
 import com.twitter.mesos.Tasks;
 import com.twitter.mesos.gen.ScheduledTask;
 import com.twitter.mesos.scheduler.MesosTaskFactory;
+import com.twitter.mesos.scheduler.base.JobKeys;
 import com.twitter.mesos.scheduler.configuration.Resources;
 import com.twitter.mesos.scheduler.filter.SchedulingFilter;
 import com.twitter.mesos.scheduler.filter.SchedulingFilter.Veto;
@@ -58,7 +59,7 @@ public interface TaskAssigner {
       task.setAssignedTask(
           stateManager.assignTask(Tasks.id(task), host, offer.getSlaveId(), selectedPorts));
       LOG.info(String.format("Offer on slave %s (id %s) is being assigned task for %s.",
-          host, offer.getSlaveId(), Tasks.jobKey(task)));
+          host, offer.getSlaveId(), JobKeys.toPath(Tasks.SCHEDULED_TO_JOB_KEY.apply(task))));
       return taskFactory.createFrom(task.getAssignedTask(), offer.getSlaveId());
     }
 

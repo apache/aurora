@@ -15,7 +15,6 @@ import com.google.common.collect.Ordering;
 
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.Constants;
-import com.twitter.mesos.gen.Identity;
 import com.twitter.mesos.gen.JobConfiguration;
 import com.twitter.mesos.gen.JobKey;
 import com.twitter.mesos.gen.ScheduleStatus;
@@ -131,28 +130,12 @@ public final class Tasks {
     return TERMINAL_STATES.contains(status);
   }
 
-  public static String jobKey(Identity owner, String jobName) {
-    return jobKey(owner.getRole(), jobName);
-  }
-
   public static String jobKey(String role, String jobName) {
     return role + "/" + jobName;
   }
 
-  public static String jobKey(TwitterTaskInfo task) {
-    return jobKey(task.getOwner(), task.getJobName());
-  }
-
   public static String jobKey(JobConfiguration job) {
-    return jobKey(job.getOwner(), job.getName());
-  }
-
-  public static String jobKey(AssignedTask task) {
-    return jobKey(task.getTask());
-  }
-
-  public static String jobKey(ScheduledTask task) {
-    return jobKey(task.getAssignedTask());
+    return jobKey(job.getKey());
   }
 
   public static String jobKey(JobKey jobKey) {

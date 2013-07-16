@@ -477,11 +477,11 @@ public final class ConfigurationManager {
         job.setTaskConfig(ConfigurationManager.applyDefaultsIfUnset(template.get()));
         job.setShardCount(job.getTaskConfigsSize());
       } else {
-        LOG.info("Unable to backfill taskConfig for job: " + Tasks.jobKey(job));
+        LOG.warning("Unable to backfill taskConfig for job: " + job);
       }
     }
 
-    try {
+   try {
       maybeFillJobKey(job);
     } catch (TaskDescriptionException e) {
       LOG.warning("Failed to fill job key in " + job + " due to " + e);

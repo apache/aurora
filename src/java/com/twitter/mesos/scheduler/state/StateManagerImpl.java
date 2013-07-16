@@ -64,7 +64,6 @@ import static com.google.common.collect.Iterables.transform;
 
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.mesos.Tasks.SCHEDULED_TO_SHARD_ID;
-import static com.twitter.mesos.Tasks.jobKey;
 import static com.twitter.mesos.gen.ScheduleStatus.INIT;
 import static com.twitter.mesos.gen.ScheduleStatus.KILLING;
 import static com.twitter.mesos.gen.ScheduleStatus.PENDING;
@@ -794,7 +793,8 @@ public class StateManagerImpl implements StateManager {
     //     before ROLLBACK
 
     if (!optional.isPresent()) {
-      LOG.warning("No update configuration found for key " + Tasks.jobKey(oldConfig)
+      LOG.warning("No update configuration found for key "
+          + JobKeys.toPath(Tasks.INFO_TO_JOB_KEY.apply(oldConfig))
           + " shard " + oldConfig.getShardId() + " : Assuming update has finished.");
       return;
     }

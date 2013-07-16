@@ -549,6 +549,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     JobConfiguration job = new JobConfiguration()
+        .setKey(JOB_KEY)
         .setOwner(ROLE_IDENTITY)
         .setName(JOB_NAME);
     assertEquals(

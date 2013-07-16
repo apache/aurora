@@ -27,6 +27,7 @@ public class MesosTaskFactoryImplTest {
       .setTaskId("task-id")
       .setTask(new TwitterTaskInfo()
           .setOwner(new Identity("role", "user"))
+          .setEnvironment("environment")
           .setJobName("job-name")
           .setShardId(2)
           .setDiskMb(10)

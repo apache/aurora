@@ -26,6 +26,7 @@ import com.twitter.mesos.codec.ThriftBinaryCodec;
 import com.twitter.mesos.gen.AssignedTask;
 import com.twitter.mesos.gen.TwitterTaskInfo;
 import com.twitter.mesos.scheduler.base.CommandUtil;
+import com.twitter.mesos.scheduler.base.JobKeys;
 import com.twitter.mesos.scheduler.base.SchedulerException;
 import com.twitter.mesos.scheduler.configuration.Resources;
 
@@ -152,7 +153,7 @@ public interface MesosTaskFactory {
             + Iterables.transform(resources, Protobufs.SHORT_TOSTRING));
       }
       TaskInfo.Builder taskBuilder =
-          TaskInfo.newBuilder().setName(Tasks.jobKey(task))
+          TaskInfo.newBuilder().setName(JobKeys.toPath(Tasks.ASSIGNED_TO_JOB_KEY.apply(task)))
               .setTaskId(TaskID.newBuilder().setValue(task.getTaskId()))
               .setSlaveId(slaveId)
               .addAllResources(resources)
