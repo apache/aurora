@@ -79,25 +79,18 @@ class MemJobStore implements JobStore.Mutable {
         .toSet();
   }
 
-  @Nullable
-  private JobConfiguration fetchJob(String managerId, String jobKey) {
+  @Override
+  public Optional<JobConfiguration> fetchJob(String managerId, JobKey jobKey) {
     checkNotNull(managerId);
     checkNotNull(jobKey);
 
-    @Nullable Manager manager = managers.getIfPresent(managerId);
-    if (manager == null) {
-      return null;
+    Optional<Manager> manager = Optional.fromNullable(managers.getIfPresent(managerId));
+    if (!manager.isPresent()) {
+      return Optional.absent();
+    } else {
+      return Optional.fromNullable(manager.get().jobs.get(Tasks.jobKey(jobKey)))
+          .transform(DEEP_COPY);
     }
-
-    return DEEP_COPY.apply(manager.jobs.get(jobKey));
-  }
-
-  @Override
-  public Optional<JobConfiguration> fetchJob(String managerId, JobKey jobKey) {
-    checkNotNull(jobKey);
-
-    // TODO(ksweeney): Remove this delegation as part of MESOS-2403.
-    return Optional.fromNullable(fetchJob(managerId, Tasks.jobKey(jobKey)));
   }
 
   @Override
