@@ -7,7 +7,6 @@ import com.google.common.testing.TearDown;
 
 import org.easymock.Capture;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import com.twitter.aurora.gen.AssignedTask;
@@ -43,16 +42,12 @@ import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
-@Ignore("TODO(William Farner): Fix and restore this test with MESOS-3344")
 public class RecoveryTest extends EasyMockTest {
 
   private static final Amount<Long, Time> INTERVAL = Amount.of(1L, Time.HOURS);
   private static final ScheduledTask TASK1 = makeTask("task1");
   private static final ScheduledTask TASK2 = makeTask("task2");
-  private static final ScheduledTask TASK3 = makeTask("task3");
   private static final Snapshot SNAPSHOT1 = makeSnapshot(TASK1, TASK2);
-  private static final Snapshot SNAPSHOT2 = makeSnapshot(TASK2, TASK3);
-  private static final Snapshot SNAPSHOT3 = makeSnapshot(TASK3);
 
   private SnapshotStore<Snapshot> snapshotStore;
   private DistributedSnapshotStore distributedStore;
@@ -155,6 +150,8 @@ public class RecoveryTest extends EasyMockTest {
         new AssignedTask()
             .setTaskId(taskId)
             .setTask(new TwitterTaskInfo()
+                .setJobName("job-" + taskId)
+                .setEnvironment("test")
                 .setOwner(new Identity().setRole("role-" + taskId).setUser("user-" + taskId))));
   }
 }
