@@ -318,7 +318,7 @@ def main(_, options):
 
   leading_scheduler = manager.find_leader()
   if not leading_scheduler or not manager.is_up(leading_scheduler, sha=builder.sha):
-    log.info('Leading scheduler %s is not healthy' % scheduler)
+    log.info('Leading scheduler %s is not healthy' % leading_scheduler)
     manager.rollback(rollback_build=current_build)
     log.info('!!!!!!!!!!!!!!!!!!!!')
     log.info('Release rolled back.')
