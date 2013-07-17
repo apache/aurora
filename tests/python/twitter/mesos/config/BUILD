@@ -38,6 +38,6 @@ python_tests(name = 'test_thrift',
   sources = ['test_thrift.py'],
   dependencies = [
     pants('src/python/twitter/mesos/config'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift-test'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift-test'),
   ]
 )

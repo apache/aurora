@@ -19,7 +19,7 @@ python_tests(name = 'gc_executor',
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/quantity'),
     pants('src/python/twitter/mesos/executor:gc_executor_lib'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
     pants('src/thrift/com/twitter/thermos:py-thrift'),
   ],
   coverage = 'twitter.mesos.executor.gc_executor'
@@ -86,7 +86,7 @@ python_tests(name = 'thermos_executor',
     pants('src/python/twitter/thermos/monitoring:monitor'),
     pants('src/python/twitter/mesos/config:schema'),
     pants('src/python/twitter/mesos/executor:thermos_executor_lib'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
     pants('src/thrift/com/twitter/thermos:py-thrift'),
   ]
 )

@@ -7,11 +7,11 @@ import com.google.inject.matcher.Matchers;
 
 import org.aopalliance.intercept.MethodInterceptor;
 
+import com.twitter.aurora.GuiceUtils;
+import com.twitter.aurora.auth.SessionValidator;
+import com.twitter.aurora.gen.MesosAdmin;
 import com.twitter.aurora.scheduler.thrift.SchedulerThriftRouter;
 import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator.CapabilityValidatorImpl;
-import com.twitter.mesos.GuiceUtils;
-import com.twitter.mesos.auth.SessionValidator;
-import com.twitter.mesos.gen.MesosAdmin;
 
 /**
  * Binding module for authentication of users with special capabilities for admin functions.

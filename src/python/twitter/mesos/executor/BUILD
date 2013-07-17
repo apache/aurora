@@ -98,7 +98,7 @@ python_library(
     pants('src/python/twitter/common/quantity'),
     pants('src/python/twitter/thermos/monitoring:disk'),
     pants('src/python/twitter/thermos/monitoring:resource'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )
 
@@ -111,7 +111,7 @@ python_library(
     pants('src/python/twitter/common/exceptions'),
     pants('src/python/twitter/common/quantity'),
     pants('src/python/twitter/common/recordio:recordio-thrift'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )
 
@@ -149,7 +149,7 @@ python_library(
     pants('src/python/twitter/common_internal/app/modules:chickadee_handler'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/mesos:mesos-core'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
     pants('src/thrift/com/twitter/thermos:py-thrift'),
   ]
 )

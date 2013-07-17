@@ -3,11 +3,11 @@ package com.twitter.aurora.scheduler.thrift;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.twitter.aurora.gen.JobConfiguration;
+import com.twitter.aurora.gen.ResponseCode;
+import com.twitter.aurora.gen.SessionKey;
+import com.twitter.aurora.gen.StartUpdateResponse;
 import com.twitter.common.testing.EasyMockTest;
-import com.twitter.mesos.gen.JobConfiguration;
-import com.twitter.mesos.gen.ResponseCode;
-import com.twitter.mesos.gen.SessionKey;
-import com.twitter.mesos.gen.StartUpdateResponse;
 
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;

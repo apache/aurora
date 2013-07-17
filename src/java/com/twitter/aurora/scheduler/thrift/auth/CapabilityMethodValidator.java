@@ -18,10 +18,10 @@ import com.google.inject.Inject;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 
+import com.twitter.aurora.auth.SessionValidator.AuthFailedException;
+import com.twitter.aurora.gen.ResponseCode;
+import com.twitter.aurora.gen.SessionKey;
 import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator.Capability;
-import com.twitter.mesos.auth.SessionValidator.AuthFailedException;
-import com.twitter.mesos.gen.ResponseCode;
-import com.twitter.mesos.gen.SessionKey;
 
 /**
  * A method interceptor that will authenticate users identified by a {@link SessionKey} argument

@@ -15,7 +15,7 @@ python_library(
   sources = ['aurora_job_key.py'],
   dependencies = [
     pants('src/python/twitter/common/lang'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )
 

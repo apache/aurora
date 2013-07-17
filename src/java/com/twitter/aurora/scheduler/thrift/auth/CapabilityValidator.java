@@ -6,8 +6,8 @@ import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
 
-import com.twitter.mesos.auth.SessionValidator;
-import com.twitter.mesos.gen.SessionKey;
+import com.twitter.aurora.auth.SessionValidator;
+import com.twitter.aurora.gen.SessionKey;
 
 /**
  * A session validator that supports user capability matching.

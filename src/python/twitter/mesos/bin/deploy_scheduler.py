@@ -30,9 +30,9 @@ class SchedulerManager(object):
   RELEASES_DIR = '%s/releases' % MESOS_HOME
 
   STAGE_DIR = '~/release_staging'
-  SCHEDULER_PACKAGE = 'mesos-scheduler.zip'
+  SCHEDULER_PACKAGE = 'aurora-scheduler.zip'
   BUILD_SCHEDULER_PACKAGE_PATH = 'dist/%s' % SCHEDULER_PACKAGE
-  BUILD_SCHEDULER_JAR_PATH = 'dist/mesos-scheduler-bundle/mesos-scheduler.jar'
+  BUILD_SCHEDULER_JAR_PATH = 'dist/aurora-scheduler-bundle/aurora-scheduler.jar'
   STAGED_PACKAGE_PATH = '%s/%s' % (STAGE_DIR, SCHEDULER_PACKAGE)
 
   UPTIME_WAIT_SECS = 180
@@ -250,7 +250,7 @@ class AuroraBuilder(Builder):
 
   @property
   def test_commands(self):
-    return ['./pants goal clean-all test tests/java/com/twitter/mesos::']
+    return ['./pants goal clean-all test tests/java/com/twitter/aurora::']
 
   @property
   def commands(self):

@@ -12,13 +12,13 @@ import javax.net.ssl.SSLServerSocketFactory;
 
 import com.google.inject.Inject;
 
+import com.twitter.aurora.gen.MesosAdmin;
+import com.twitter.aurora.gen.MesosAdmin.Iface;
 import com.twitter.common.application.modules.LifecycleModule.ServiceRunner;
 import com.twitter.common.application.modules.LocalServiceRegistry.LocalService;
 import com.twitter.common.base.Command;
 import com.twitter.common.thrift.ThriftServer;
 import com.twitter.common.thrift.ThriftServer.ServerSetup;
-import com.twitter.mesos.gen.MesosAdmin;
-import com.twitter.mesos.gen.MesosAdmin.Iface;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 

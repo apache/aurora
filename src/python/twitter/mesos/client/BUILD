@@ -8,7 +8,7 @@ python_library(
     pants('src/python/twitter/common/lang'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/mesos/common'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )
 
@@ -36,7 +36,7 @@ python_library(
   sources = ['base.py'],
   dependencies = [
     pants('src/python/twitter/common/log'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )
 
@@ -53,7 +53,7 @@ python_library(
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/mesos/config'),
     pants('src/python/twitter/mesos/packer'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )
 
@@ -66,7 +66,7 @@ python_library(
     pants('src/python/twitter/mesos/common:cluster'),
     pants('src/python/twitter/mesos/config:schema'),
     pants('src/python/twitter/thermos/config:schema'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )
 
@@ -86,7 +86,7 @@ python_library(
   sources = ['job_monitor.py'],
   dependencies = [
     pants('src/python/twitter/common/quantity'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )
 
@@ -100,7 +100,7 @@ python_library(
     pants('src/python/twitter/mesos/config'),
     pants('src/python/twitter/mesos/common:aurora_job_key'),
     pants('src/python/twitter/mesos/packer'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )
 
@@ -111,7 +111,7 @@ python_library(
     pants(':shard_watcher'),
     pants(':updater_util'),
     pants('src/python/twitter/common/log'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )
 
@@ -126,7 +126,7 @@ python_library(
     pants('src/python/twitter/common_internal/location'),
     pants('src/python/twitter/common_internal/zookeeper:tunneler'),
     pants('src/python/twitter/mesos/common:cluster'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )
 
@@ -158,7 +158,7 @@ python_library(
     pants('src/python/twitter/common/lang'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/mesos/common:http_signaler'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )
 
@@ -170,7 +170,7 @@ python_library(
     pants(':shard_watcher'),
     pants(':updater_util'),
     pants('src/python/twitter/common/log'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )
 

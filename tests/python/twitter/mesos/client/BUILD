@@ -32,7 +32,7 @@ python_tests(name = 'health_check',
   sources = ['test_health_check.py'],
   dependencies = [
     pants('src/python/twitter/mesos:mesos-lib'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
     pants('3rdparty/python:mox'),
   ],
 )
@@ -49,7 +49,7 @@ python_tests(name = 'restarter',
   sources = ['test_restarter.py'],
   dependencies = [
     pants('src/python/twitter/mesos:mesos-lib'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
     pants('3rdparty/python:mox'),
   ],
 )
@@ -59,7 +59,7 @@ python_tests(name = 'scheduler_client',
   dependencies = [
     pants('src/python/twitter/common'),
     pants('src/python/twitter/mesos:mesos-lib'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
     pants('3rdparty/python:mox'),
   ]
 )
@@ -68,7 +68,7 @@ python_tests(name = 'shard_watcher',
   sources = ['test_shard_watcher.py'],
   dependencies = [
     pants('src/python/twitter/mesos:mesos-lib'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
     pants('3rdparty/python:mox'),
   ]
 )
@@ -78,7 +78,7 @@ python_tests(name = 'updater',
   dependencies = [
     pants('src/python/twitter/common'),
     pants('src/python/twitter/mesos:mesos-lib'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
     pants('3rdparty/python:mox'),
   ]
 )

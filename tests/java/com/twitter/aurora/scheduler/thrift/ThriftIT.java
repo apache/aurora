@@ -10,25 +10,25 @@ import com.google.inject.Injector;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.twitter.aurora.auth.SessionValidator;
+import com.twitter.aurora.gen.MesosAdmin;
+import com.twitter.aurora.gen.Quota;
+import com.twitter.aurora.gen.SessionKey;
+import com.twitter.aurora.scheduler.quota.QuotaManager;
+import com.twitter.aurora.scheduler.state.CronJobManager.CronScheduler;
+import com.twitter.aurora.scheduler.state.MaintenanceController;
+import com.twitter.aurora.scheduler.state.SchedulerCore;
+import com.twitter.aurora.scheduler.storage.Storage;
+import com.twitter.aurora.scheduler.storage.backup.Recovery;
+import com.twitter.aurora.scheduler.storage.backup.StorageBackup;
 import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator.Capability;
 import com.twitter.common.testing.EasyMockTest;
-import com.twitter.mesos.auth.SessionValidator;
-import com.twitter.mesos.gen.MesosAdmin;
-import com.twitter.mesos.gen.Quota;
-import com.twitter.mesos.gen.SessionKey;
-import com.twitter.mesos.scheduler.quota.QuotaManager;
-import com.twitter.mesos.scheduler.state.CronJobManager.CronScheduler;
-import com.twitter.mesos.scheduler.state.MaintenanceController;
-import com.twitter.mesos.scheduler.state.SchedulerCore;
-import com.twitter.mesos.scheduler.storage.Storage;
-import com.twitter.mesos.scheduler.storage.backup.Recovery;
-import com.twitter.mesos.scheduler.storage.backup.StorageBackup;
 
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
 
-import static com.twitter.mesos.gen.ResponseCode.AUTH_FAILED;
-import static com.twitter.mesos.gen.ResponseCode.OK;
+import static com.twitter.aurora.gen.ResponseCode.AUTH_FAILED;
+import static com.twitter.aurora.gen.ResponseCode.OK;
 
 public class ThriftIT extends EasyMockTest {
 

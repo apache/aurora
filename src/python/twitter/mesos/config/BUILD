@@ -5,7 +5,7 @@ python_library(
     pants(':schema'),
     pants('3rdparty/python:pystachio'),
     pants('src/python/twitter/common/lang'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )
 
@@ -16,7 +16,7 @@ python_library(
     pants('3rdparty/python:pystachio'),
     pants('src/python/twitter/thermos/config:schema'),
     pants('src/python/twitter/vert:schema'),
-    pants('src/thrift/com/twitter/mesos/gen:py-thrift'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )
 

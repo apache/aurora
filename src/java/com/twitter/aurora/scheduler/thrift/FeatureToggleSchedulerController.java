@@ -6,10 +6,10 @@ import java.lang.annotation.Target;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
 
-import com.twitter.mesos.gen.JobConfiguration;
-import com.twitter.mesos.gen.ResponseCode;
-import com.twitter.mesos.gen.SessionKey;
-import com.twitter.mesos.gen.StartUpdateResponse;
+import com.twitter.aurora.gen.JobConfiguration;
+import com.twitter.aurora.gen.ResponseCode;
+import com.twitter.aurora.gen.SessionKey;
+import com.twitter.aurora.gen.StartUpdateResponse;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
