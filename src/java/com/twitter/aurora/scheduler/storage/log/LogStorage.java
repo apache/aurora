@@ -11,6 +11,7 @@ import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -66,6 +67,7 @@ import com.twitter.common.base.Closure;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.common.stats.Stats;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -260,6 +262,19 @@ public class LogStorage extends ForwardingStore
     this.snapshotInterval = checkNotNull(snapshotInterval);
   }
 
+  private final AtomicLong removeJobUpdateStringOpsReplayed =
+      Stats.exportLong("scheduler_log_removejobupdate_string_ops_replayed");
+  private final AtomicLong removeJobUpdateJobKeyOpsReplayed =
+      Stats.exportLong("scheduler_log_removejobupdate_jobkey_ops_replayed");
+  private final AtomicLong saveJobUpdateStringOpsReplayed =
+      Stats.exportLong("scheduler_log_savejobupdate_string_ops_replayed");
+  private final AtomicLong saveJobUpdateJobKeyOpsReplayed =
+      Stats.exportLong("scheduler_log_savejobupdate_jobkey_ops_replayed");
+  private final AtomicLong removeJobStringOpsReplayed =
+      Stats.exportLong("scheduler_log_removejob_jobkey_ops_replayed");
+  private final AtomicLong removeJobJobKeyOpsReplayed =
+      Stats.exportLong("scheduler_log_removejob_string_ops_replayed");
+
   @Override
   public synchronized void prepare() {
     // Open the log to make a log replica available to the scheduler group.
@@ -361,22 +376,55 @@ public class LogStorage extends ForwardingStore
         break;
 
       case SAVE_JOB_UPDATE:
-        SaveJobUpdate jobUpdate = op.getSaveJobUpdate();
-        saveJobUpdateConfig(new JobUpdateConfiguration(
-            jobUpdate.getRole(),
-            jobUpdate.getJob(),
-            jobUpdate.getUpdateToken(),
-            jobUpdate.getConfigs()
-        ));
+        SaveJobUpdate saveJobUpdate = op.getSaveJobUpdate();
+        JobUpdateConfiguration jobUpdateConfiguration = new JobUpdateConfiguration()
+            .setUpdateToken(saveJobUpdate.getUpdateToken())
+            .setConfigs(saveJobUpdate.getConfigs());
+
+        // TODO(ksweeney): Remove conditional as part of MESOS-2403.
+        if (saveJobUpdate.isSetJobKey()) {
+          saveJobUpdateJobKeyOpsReplayed.incrementAndGet();
+          saveJobUpdateConfig(jobUpdateConfiguration.setJobKey(saveJobUpdate.getJobKey()));
+        } else {
+          saveJobUpdateStringOpsReplayed.incrementAndGet();
+          LOG.info(String.format("Read deprecated record: SaveJobUpdate|role: %s |job:%s",
+              jobUpdateConfiguration.getRoleDeprecated(),
+              jobUpdateConfiguration.getJobDeprecated()));
+          saveJobUpdateConfig(jobUpdateConfiguration
+              .setRoleDeprecated(saveJobUpdate.getRoleDeprecated())
+              .setJobDeprecated(saveJobUpdate.getJobDeprecated()));
+        }
         break;
 
       case REMOVE_JOB_UPDATE:
-        RemoveJobUpdate removeJob = op.getRemoveJobUpdate();
-        removeShardUpdateConfigs(removeJob.getRole(), removeJob.getJob());
+        RemoveJobUpdate removeJobUpdate = op.getRemoveJobUpdate();
+        // TODO(ksweeney): Remove conditional as part of MESOS-2403.
+        if (removeJobUpdate.isSetJobKey()) {
+          removeJobUpdateJobKeyOpsReplayed.incrementAndGet();
+          removeShardUpdateConfigs(removeJobUpdate.getJobKey());
+        } else {
+          removeJobUpdateStringOpsReplayed.incrementAndGet();
+          LOG.info(String.format("Read deprecated record: RemoveJobUpdate|role: %s |job: %s",
+              removeJobUpdate.getRoleDeprecated(),
+              removeJobUpdate.getJobDeprecated()));
+          removeShardUpdateConfigs(
+              removeJobUpdate.getRoleDeprecated(),
+              removeJobUpdate.getJobDeprecated());
+        }
         break;
 
       case REMOVE_JOB:
-        removeJob(op.getRemoveJob().getJobKey());
+        RemoveJob removeJob = op.getRemoveJob();
+        // TODO(ksweeney): Remove conditional as part of MESOS-2403.
+        if (removeJob.isSetJobKey()) {
+          removeJobJobKeyOpsReplayed.incrementAndGet();
+          removeJob(removeJob.getJobKey());
+        } else {
+          removeJobStringOpsReplayed.incrementAndGet();
+          LOG.info(String.format("Read deprecated record: RemoveJob|jobKey: %s",
+              removeJob.getJobKeyDeprecated()));
+          removeJob(removeJob.getJobKeyDeprecated());
+        }
         break;
 
       case SAVE_TASKS:
@@ -513,21 +561,28 @@ public class LogStorage extends ForwardingStore
     });
   }
 
-  @Timed("scheduler_log_job_remove")
+  @Timed("scheduler_log_job_remove_deprecated")
   @Override
   public void removeJob(final String jobKey) {
     write(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider unused) {
-        log(Op.removeJob(new RemoveJob(jobKey)));
+        log(Op.removeJob(new RemoveJob().setJobKeyDeprecated(jobKey)));
         LogStorage.super.removeJob(jobKey);
       }
     });
   }
 
+  @Timed("scheduler_log_job_remove")
   @Override
-  public void removeJob(JobKey jobKey) {
-    // TODO(ksweeney): Remove this delegation as part of MESOS-2403.
-    removeJob(Tasks.jobKey(jobKey));
+  public void removeJob(final JobKey jobKey) {
+    checkNotNull(jobKey);
+
+    write(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider unused) {
+        log(Op.removeJob(new RemoveJob().setJobKey(jobKey)));
+        LogStorage.super.removeJob(jobKey);
+      }
+    });
   }
 
   @Timed("scheduler_log_tasks_save")
@@ -587,31 +642,46 @@ public class LogStorage extends ForwardingStore
   public void saveJobUpdateConfig(final JobUpdateConfiguration configs) {
     write(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider unused) {
-        log(Op.saveJobUpdate(new SaveJobUpdate(
-            configs.getRole(),
-            configs.getJob(),
-            configs.getUpdateToken(),
-            configs.getConfigs())));
+        // TODO(ksweeney): Remove branch as part of MESOS-2403.
+        SaveJobUpdate saveJobUpdate = new SaveJobUpdate()
+            .setUpdateToken(configs.getUpdateToken())
+            .setConfigs(configs.getConfigs());
+
+        if (configs.isSetJobKey()) {
+          log(Op.saveJobUpdate(saveJobUpdate.setJobKey(configs.getJobKey())));
+        } else {
+          log(Op.saveJobUpdate(saveJobUpdate
+              .setRoleDeprecated(configs.getRoleDeprecated())
+              .setJobDeprecated(configs.getJobDeprecated())));
+        }
         LogStorage.super.saveJobUpdateConfig(configs);
+      }
+    });
+  }
+
+  @Timed("scheduler_log_jobupdate_remove_deprecated")
+  @Override
+  public void removeShardUpdateConfigs(final String role, final String job) {
+    write(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider unused) {
+        log(Op.removeJobUpdate(
+            new RemoveJobUpdate().setRoleDeprecated(role).setJobDeprecated(job)));
+        LogStorage.super.removeShardUpdateConfigs(role, job);
       }
     });
   }
 
   @Timed("scheduler_log_jobupdate_remove")
   @Override
-  public void removeShardUpdateConfigs(final String role, final String job) {
+  public void removeShardUpdateConfigs(final JobKey jobKey) {
+    checkNotNull(jobKey);
+
     write(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider unused) {
-        log(Op.removeJobUpdate(new RemoveJobUpdate(role, job)));
-        LogStorage.super.removeShardUpdateConfigs(role, job);
+        log(Op.removeJobUpdate(new RemoveJobUpdate().setJobKey(jobKey)));
+        LogStorage.super.removeShardUpdateConfigs(jobKey);
       }
     });
-  }
-
-  @Override
-  public void removeShardUpdateConfigs(JobKey jobKey) {
-    // TODO(ksweeney): Remove this delegation as part of MESOS-2403.
-    removeShardUpdateConfigs(jobKey.getRole(), jobKey.getName());
   }
 
   @Timed("scheduler_log_quota_remove")

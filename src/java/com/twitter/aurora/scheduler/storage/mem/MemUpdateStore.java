@@ -34,10 +34,20 @@ class MemUpdateStore implements UpdateStore.Mutable {
     return Tasks.jobKey(role, job);
   }
 
+  private String key(JobKey jobKey) {
+    checkNotNull(jobKey);
+
+    return key(jobKey.getRole(), jobKey.getName());
+  }
+
   private String key(JobUpdateConfiguration config) {
     checkNotNull(config);
 
-    return key(config.getRole(),  config.getJob());
+    if (config.isSetJobKey()) {
+      return key(config.getJobKey());
+    } else {
+      return key(config.getRoleDeprecated(), config.getJobDeprecated());
+    }
   }
 
   @Override
@@ -52,8 +62,7 @@ class MemUpdateStore implements UpdateStore.Mutable {
 
   @Override
   public void removeShardUpdateConfigs(JobKey jobKey) {
-    // TODO(ksweeney): Remove this delegation as part of MESOS-2403.
-    removeShardUpdateConfigs(jobKey.getRole(), jobKey.getName());
+    configs.remove(key(jobKey));
   }
 
   @Override
@@ -86,7 +95,11 @@ class MemUpdateStore implements UpdateStore.Mutable {
   private static final Function<JobUpdateConfiguration, String> GET_ROLE =
       new Function<JobUpdateConfiguration, String>() {
         @Override public String apply(JobUpdateConfiguration config) {
-          return config.getRole();
+          if (config.isSetJobKey()) {
+            return config.getJobKey().getRole();
+          } else {
+            return config.getRoleDeprecated();
+          }
         }
       };
 

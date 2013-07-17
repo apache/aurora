@@ -53,8 +53,11 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     HostAttributes attribute = new HostAttributes("host",
         ImmutableSet.of(new Attribute("attr", ImmutableSet.of("value"))));
     StoredJob job = new StoredJob("jobManager", new JobConfiguration().setName("name"));
-    JobUpdateConfiguration update = new JobUpdateConfiguration("role", "job", "token",
-        ImmutableSet.<TaskUpdateConfiguration>of());
+    JobUpdateConfiguration update = new JobUpdateConfiguration()
+        .setUpdateToken("token")
+        .setConfigs(ImmutableSet.<TaskUpdateConfiguration>of())
+        .setRoleDeprecated("role")
+        .setJobDeprecated("job");
     String frameworkId = "framework_id";
 
     storageUtil.expectOperations();

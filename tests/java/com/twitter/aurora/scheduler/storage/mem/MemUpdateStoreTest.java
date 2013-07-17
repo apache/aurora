@@ -71,8 +71,8 @@ public class MemUpdateStoreTest {
         .setJobName(id);
 
     return new JobUpdateConfiguration()
-        .setJob(id)
-        .setRole("role-" + id)
+        .setJobDeprecated(id)
+        .setRoleDeprecated("role-" + id)
         .setConfigs(ImmutableSet.of(
             new TaskUpdateConfiguration(
                 template.deepCopy().setRequestedPorts(ImmutableSet.of("old")),

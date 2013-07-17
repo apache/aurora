@@ -5,8 +5,6 @@ namespace py gen.twitter.mesos_storage
 include "mesos_twitter.thrift"
 
 // Thrift object definitions for messages used for mesos storage.
-//
-// @author John Sirois
 
 
 // The valid set of keys used in the DbStorage scheduler_state kv store
@@ -32,20 +30,26 @@ struct SaveAcceptedJob {
   2: mesos_twitter.JobConfiguration jobConfig
 }
 
+// TODO(ksweeney): Remove roleDeprecated and jobDeprecated as part of MESOS-2403.
 struct SaveJobUpdate {
-  1: string role
-  2: string job
+  5: optional mesos_twitter.JobKey jobKey
   3: string updateToken
   4: set<mesos_twitter.TaskUpdateConfiguration> configs
+  1: optional string roleDeprecated
+  2: optional string jobDeprecated
 }
 
+// TODO(ksweeney): Remove roleDeprecated and jobDeprecated as part of MESOS-2403.
 struct RemoveJobUpdate {
-  1: string role
-  2: string job
+  3: optional mesos_twitter.JobKey jobKey
+  1: optional string roleDeprecated
+  2: optional string jobDeprecated
 }
 
+// TODO(ksweeney): Remove jobKeyDeprecated as part of MESOS-2403.
 struct RemoveJob {
-  1: string jobKey
+  2: optional mesos_twitter.JobKey jobKey
+  1: optional string jobKeyDeprecated
 }
 
 struct SaveTasks {

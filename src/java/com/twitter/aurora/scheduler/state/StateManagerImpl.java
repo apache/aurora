@@ -260,10 +260,11 @@ public class StateManagerImpl implements StateManager {
         }
 
         String updateToken = UUID.randomUUID().toString();
-        // TODO(ksweeney): Change this to use JobKey as part of MESOS-2403.
         updateStore.saveJobUpdateConfig(
-            new JobUpdateConfiguration(
-                jobKey.getRole(), jobKey.getName(), updateToken, shardConfigBuilder.build()));
+            new JobUpdateConfiguration()
+                .setJobKey(jobKey)
+                .setUpdateToken(updateToken)
+                .setConfigs(shardConfigBuilder.build()));
         return updateToken;
       }
     });

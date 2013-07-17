@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 """Command-line client for managing admin-only interactions with the aurora scheduler.
 """
 
@@ -116,7 +118,7 @@ def query(args, options):
   try:
     for task in query_info.tasks:
       d = flatten_task(task)
-      print listformat % map_values(d)
+      print(listformat % map_values(d))
   except KeyError:
     msg = "Unknown key in format string.  Valid keys are:\n"
     msg += ','.join(d.keys())
@@ -364,10 +366,12 @@ def scheduler_list_job_updates():
   options = app.get_options()
   resp = MesosClientAPI(options.cluster, options.verbosity).get_job_updates()
   check_and_log_response(resp)
-  # TODO(wfarner): Print env as well once it's available.
-  log.info('Role\tJob')
+  print('Role\tEnv\tJob')
   for update in resp.jobUpdates:
-    log.info('\t'.join((update.role, update.job)))
+    print('%s\t%s\t%s' % (
+      update.jobKey.role if update.jobKey else update.roleDeprecated,
+      update.jobKey.environment if update.jobKey else None,
+      update.jobKey.name if update.jobKey else update.jobDeprecated))
 
 
 @app.command
@@ -427,7 +431,7 @@ def help(args):
   Displays help for using mesos admin, or a specific subcommand.
   """
   if not args:
-    print generate_full_usage()
+    print(generate_full_usage())
     sys.exit(0)
 
   if len(args) > 1:
@@ -437,7 +441,7 @@ def help(args):
   if subcmd in globals():
     app.command_parser(subcmd).print_help()
   else:
-    print 'Subcommand %s not found.' % subcmd
+    print('Subcommand %s not found.' % subcmd)
     sys.exit(1)
 
 

@@ -131,7 +131,8 @@ public class LogManagerTest extends EasyMockTest {
 
   @Test
   public void testStreamManagerReadFromUnknownSome() throws CodingException {
-    LogEntry transaction1 = createLogEntry(Op.removeJob(new RemoveJob("job1")));
+    LogEntry transaction1 =
+        createLogEntry(Op.removeJob(new RemoveJob().setJobKeyDeprecated("job1")));
     Entry entry1 = createMock(Entry.class);
     expect(entry1.contents()).andReturn(encode(transaction1));
     expect(stream.readAll()).andReturn(Iterators.singletonIterator(entry1));
@@ -249,7 +250,7 @@ public class LogManagerTest extends EasyMockTest {
   @Test
   public void testTransactionOps() throws CodingException {
     Op saveFrameworkId = Op.saveFrameworkId(new SaveFrameworkId("jake"));
-    Op deleteJob = Op.removeJob(new RemoveJob("jane"));
+    Op deleteJob = Op.removeJob(new RemoveJob().setJobKeyDeprecated("jane"));
     expectTransaction(position1, saveFrameworkId, deleteJob);
 
     control.replay();
@@ -322,8 +323,8 @@ public class LogManagerTest extends EasyMockTest {
   public void testConcurrentWrites() throws Exception {
     control.replay(); // No easymock expectations used here
 
-    Op op1 = Op.removeJob(new RemoveJob("job1"));
-    final Op op2 = Op.removeJob(new RemoveJob("job2"));
+    Op op1 = Op.removeJob(new RemoveJob().setJobKeyDeprecated("job1"));
+    final Op op2 = Op.removeJob(new RemoveJob().setJobKeyDeprecated("job2"));
 
     LogEntry transaction1 = createLogEntry(op1);
     LogEntry transaction2 = createLogEntry(op2);
@@ -408,8 +409,10 @@ public class LogManagerTest extends EasyMockTest {
 
   @Test
   public void testStreamManagerReadFrames() throws Exception {
-    LogEntry transaction1 = createLogEntry(Op.removeJob(new RemoveJob("job1")));
-    LogEntry transaction2 = createLogEntry(Op.removeJob(new RemoveJob("job2")));
+    LogEntry transaction1 = createLogEntry(
+        Op.removeJob(new RemoveJob().setJobKeyDeprecated("job1")));
+    LogEntry transaction2 = createLogEntry(
+        Op.removeJob(new RemoveJob().setJobKeyDeprecated("job2")));
 
     Message message = frame(transaction1);
 

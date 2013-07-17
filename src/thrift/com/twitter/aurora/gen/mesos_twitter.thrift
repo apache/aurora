@@ -356,11 +356,13 @@ struct TaskUpdateConfiguration {
 }
 
 // Configuration for an update to an entire job.
+// TODO(ksweeney): Remove strings as part of MESOS-2403.
 struct JobUpdateConfiguration {
-  1: string role
-  2: string job
+  5: optional JobKey jobKey
   3: string updateToken
   4: set<TaskUpdateConfiguration> configs
+  1: optional string roleDeprecated
+  2: optional string jobDeprecated
 }
 
 struct ScheduleStatusResponse {

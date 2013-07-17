@@ -22,6 +22,7 @@ import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.Attribute;
 import com.twitter.aurora.gen.HostAttributes;
 import com.twitter.aurora.gen.JobConfiguration;
+import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.ScheduleStatus;
@@ -43,6 +44,7 @@ import com.twitter.aurora.gen.storage.SaveQuota;
 import com.twitter.aurora.gen.storage.SaveTasks;
 import com.twitter.aurora.gen.storage.Snapshot;
 import com.twitter.aurora.gen.storage.Transaction;
+import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.log.Log;
 import com.twitter.aurora.scheduler.log.Log.Entry;
@@ -317,13 +319,31 @@ public class LogStorageTest extends EasyMockTest {
   }
 
   @Test
-  public void testRemoveJob() throws Exception {
+  public void testRemoveJobDeprecated() throws Exception {
     final String jobKey = "job/key";
     new MutationFixture() {
       @Override protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
         storageUtil.jobStore.removeJob(jobKey);
-        streamMatcher.expectTransaction(Op.removeJob(new RemoveJob(jobKey))).andReturn(position);
+        streamMatcher.expectTransaction(Op.removeJob(new RemoveJob().setJobKeyDeprecated(jobKey)))
+            .andReturn(position);
+      }
+
+      @Override protected void performMutations() {
+        logStorage.removeJob(jobKey);
+      }
+    }.run();
+  }
+
+  @Test
+  public void testRemoveJob() throws Exception {
+    final JobKey jobKey = JobKeys.from("role", "env", "name");
+    new MutationFixture() {
+      @Override protected void setupExpectations() throws Exception {
+        storageUtil.expectOperations();
+        storageUtil.jobStore.removeJob(jobKey);
+        streamMatcher.expectTransaction(Op.removeJob(new RemoveJob().setJobKey(jobKey)))
+            .andReturn(position);
       }
 
       @Override protected void performMutations() {
@@ -505,22 +525,37 @@ public class LogStorageTest extends EasyMockTest {
     final String role = "role";
     final String job = "job";
     final String updateToken = "update-ok";
+    final JobKey jobKey = JobKeys.from("other-role", "env", job);
     final ImmutableSet<TaskUpdateConfiguration> updateConfiguration =
         ImmutableSet.of(
             new TaskUpdateConfiguration().setNewConfig(new TwitterTaskInfo().setShardId(42)));
+    final JobUpdateConfiguration config = new JobUpdateConfiguration()
+        .setUpdateToken(updateToken)
+        .setConfigs(updateConfiguration);
+    final SaveJobUpdate saveOp = new SaveJobUpdate()
+        .setUpdateToken(config.getUpdateToken())
+        .setConfigs(config.getConfigs());
+
     new MutationFixture() {
       @Override protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
-        storageUtil.updateStore.saveJobUpdateConfig(
-            new JobUpdateConfiguration(role, job, updateToken, updateConfiguration));
+        storageUtil.updateStore.saveJobUpdateConfig(config.deepCopy()
+            .setRoleDeprecated(role)
+            .setJobDeprecated(job));
         streamMatcher.expectTransaction(
-            Op.saveJobUpdate(new SaveJobUpdate(role, job, updateToken, updateConfiguration)))
+            Op.saveJobUpdate(saveOp.deepCopy().setRoleDeprecated(role).setJobDeprecated(job)))
+                .andReturn(position);
+
+        storageUtil.updateStore.saveJobUpdateConfig(config.deepCopy().setJobKey(jobKey));
+        streamMatcher.expectTransaction(Op.saveJobUpdate(saveOp.deepCopy().setJobKey(jobKey)))
             .andReturn(position);
       }
 
       @Override protected void performMutations() {
-        logStorage.saveJobUpdateConfig(
-            new JobUpdateConfiguration(role, job, updateToken, updateConfiguration));
+        logStorage.saveJobUpdateConfig(config.deepCopy()
+            .setRoleDeprecated(role)
+            .setJobDeprecated(job));
+        logStorage.saveJobUpdateConfig(config.deepCopy().setJobKey(jobKey));
       }
     }.run();
   }
@@ -529,16 +564,23 @@ public class LogStorageTest extends EasyMockTest {
   public void testRemoveShardUpdateConfigs() throws Exception {
     final String role = "role";
     final String job = "job";
+    final JobKey jobKey = JobKeys.from("other-role", "env", job);
     new MutationFixture() {
       @Override protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
         storageUtil.updateStore.removeShardUpdateConfigs(role, job);
-        streamMatcher.expectTransaction(Op.removeJobUpdate(new RemoveJobUpdate(role, job)))
+        streamMatcher.expectTransaction(Op.removeJobUpdate(
+            new RemoveJobUpdate().setRoleDeprecated(role).setJobDeprecated(job)))
             .andReturn(position);
+
+        storageUtil.updateStore.removeShardUpdateConfigs(jobKey);
+        streamMatcher.expectTransaction(Op.removeJobUpdate(new RemoveJobUpdate()
+            .setJobKey(jobKey))).andReturn(position);
       }
 
       @Override protected void performMutations() {
         logStorage.removeShardUpdateConfigs(role, job);
+        logStorage.removeShardUpdateConfigs(jobKey);
       }
     }.run();
   }
