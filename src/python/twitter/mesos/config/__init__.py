@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 from twitter.common.lang import Compatibility
 from twitter.thermos.config.loader import PortExtractor, ThermosTaskWrapper
 from twitter.thermos.config.schema import ThermosContext
