@@ -21,6 +21,7 @@ from urlparse import urljoin
 from twitter.common import app, log
 from twitter.common.dirutil import Fileset
 from twitter.common.log.options import LogOptions
+from twitter.common.net.tunnel import TunnelHelper
 from twitter.common.quantity import Amount, Data
 from twitter.common.quantity.parse_simple import parse_data_into
 from twitter.mesos.client.api import MesosClientAPI
@@ -1175,4 +1176,8 @@ if __name__ == '__main__':
   LogOptions.disable_disk_logging()
   app.set_name('mesos-client')
   app.set_usage(DEFAULT_USAGE_BANNER + generate_terse_usage())
-  app.main()
+  try:
+    app.main()
+  except TunnelHelper.TunnelError as e:
+    log.error(str(e))
+    log.error('Try passing --tunnel_host=<host> to specify a different tunnel host')
