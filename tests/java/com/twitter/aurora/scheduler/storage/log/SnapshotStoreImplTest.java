@@ -19,6 +19,7 @@ import com.twitter.aurora.gen.storage.QuotaConfiguration;
 import com.twitter.aurora.gen.storage.SchedulerMetadata;
 import com.twitter.aurora.gen.storage.Snapshot;
 import com.twitter.aurora.gen.storage.StoredJob;
+import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.quota.Quotas;
 import com.twitter.aurora.scheduler.storage.SnapshotStore;
@@ -53,11 +54,8 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     HostAttributes attribute = new HostAttributes("host",
         ImmutableSet.of(new Attribute("attr", ImmutableSet.of("value"))));
     StoredJob job = new StoredJob("jobManager", new JobConfiguration().setName("name"));
-    JobUpdateConfiguration update = new JobUpdateConfiguration()
-        .setUpdateToken("token")
-        .setConfigs(ImmutableSet.<TaskUpdateConfiguration>of())
-        .setRoleDeprecated("role")
-        .setJobDeprecated("job");
+    JobUpdateConfiguration update = new JobUpdateConfiguration(
+        JobKeys.from("role", "env", "job"), "token", ImmutableSet.<TaskUpdateConfiguration>of());
     String frameworkId = "framework_id";
 
     storageUtil.expectOperations();

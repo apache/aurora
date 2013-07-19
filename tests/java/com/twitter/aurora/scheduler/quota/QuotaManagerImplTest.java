@@ -18,6 +18,7 @@ import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.gen.TaskUpdateConfiguration;
 import com.twitter.aurora.gen.TwitterTaskInfo;
+import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.quota.QuotaManager.QuotaManagerImpl;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
@@ -171,11 +172,10 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     // Simulate a job update that increases the job quota consumption.
     expectUpdateQuery().andReturn(
-        ImmutableSet.of(new JobUpdateConfiguration()
-            .setRoleDeprecated(ROLE)
-            .setJobDeprecated("foo")
-            .setUpdateToken("token")
-            .setConfigs(ImmutableSet.of(new TaskUpdateConfiguration(
+        ImmutableSet.of(new JobUpdateConfiguration(
+            JobKeys.from(ROLE, "env", "foo"),
+            "token",
+            ImmutableSet.of(new TaskUpdateConfiguration(
                 updatingTask.getAssignedTask().getTask(),
                 createTaskConfig("foo", 2, 2, 2)))))).anyTimes();
 

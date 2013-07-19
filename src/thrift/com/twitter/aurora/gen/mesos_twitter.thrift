@@ -98,12 +98,10 @@ struct ShardKey {
 }
 
 // Description of the tasks contained within a job.
-// Clients should only populate the configuration field, while the scheduling side is responsible
-// for parsing the configuration and populating any corresponding typed fields (while setting the
-// configParsed flag).  This allows for a much slower release schedule on clients while the server
-// components can change rapidly.
 struct TwitterTaskInfo {
-  3: optional string jobName                 // TODO(ksweeney): deprecate, use key
+ 17: Identity owner                          // contains the role component of JobKey
+ 26: string environment                      // contains the environment component of JobKey
+  3: string jobName                          // contains the name component of JobKey
   7: bool isService
   8: double numCpus
   9: i64 ramMb
@@ -115,7 +113,6 @@ struct TwitterTaskInfo {
                                              // Shard IDs must be unique and contiguous within a
                                              // job, and will be in the range [0, N-1] (inclusive)
                                              // for a job that has N instances.
- 17: Identity owner
  18: optional bool production                // Whether this is a production task, which can preempt
                                              // non-production tasks.
  19: binary thermosConfig
@@ -129,8 +126,6 @@ struct TwitterTaskInfo {
  23: optional string contactEmail
  24: optional set<Package> packages          // Used only to display package information in the
                                              // scheduler UI.
- 26: optional string environment             // TODO(ksweeney): Remove this once JobKey is present
-                                             // and backfilled.
 
 }
 
@@ -356,13 +351,10 @@ struct TaskUpdateConfiguration {
 }
 
 // Configuration for an update to an entire job.
-// TODO(ksweeney): Remove strings as part of MESOS-2403.
 struct JobUpdateConfiguration {
-  5: optional JobKey jobKey
+  5: JobKey jobKey
   3: string updateToken
   4: set<TaskUpdateConfiguration> configs
-  1: optional string roleDeprecated
-  2: optional string jobDeprecated
 }
 
 struct ScheduleStatusResponse {

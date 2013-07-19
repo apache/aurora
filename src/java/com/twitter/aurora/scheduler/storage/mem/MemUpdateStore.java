@@ -12,7 +12,7 @@ import com.google.common.collect.Maps;
 
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
-import com.twitter.aurora.scheduler.base.Tasks;
+import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.storage.UpdateStore;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -25,29 +25,16 @@ class MemUpdateStore implements UpdateStore.Mutable {
   private static final Function<JobUpdateConfiguration, JobUpdateConfiguration> DEEP_COPY =
       Util.deepCopier();
 
-  private final Map<String, JobUpdateConfiguration> configs = Maps.newConcurrentMap();
+  private final Map<JobKey, JobUpdateConfiguration> configs = Maps.newConcurrentMap();
 
-  private String key(String role, String job) {
-    checkNotNull(role);
-    checkNotNull(job);
-
-    return Tasks.jobKey(role, job);
+  private JobKey key(JobKey jobKey) {
+    return JobKeys.assertValid(jobKey).deepCopy();
   }
 
-  private String key(JobKey jobKey) {
-    checkNotNull(jobKey);
-
-    return key(jobKey.getRole(), jobKey.getName());
-  }
-
-  private String key(JobUpdateConfiguration config) {
+  private JobKey key(JobUpdateConfiguration config) {
     checkNotNull(config);
 
-    if (config.isSetJobKey()) {
-      return key(config.getJobKey());
-    } else {
-      return key(config.getRoleDeprecated(), config.getJobDeprecated());
-    }
+    return key(config.getJobKey());
   }
 
   @Override
@@ -56,13 +43,8 @@ class MemUpdateStore implements UpdateStore.Mutable {
   }
 
   @Override
-  public void removeShardUpdateConfigs(String role, String job) {
-    configs.remove(key(role, job));
-  }
-
-  @Override
   public void removeShardUpdateConfigs(JobKey jobKey) {
-    configs.remove(key(jobKey));
+    configs.remove(jobKey);
   }
 
   @Override
@@ -72,9 +54,8 @@ class MemUpdateStore implements UpdateStore.Mutable {
 
   @Override
   public Optional<JobUpdateConfiguration> fetchJobUpdateConfig(JobKey jobKey) {
-    // TODO(ksweeney): Stop ignoring environment here as part of MESOS-2403.
-    return Optional.fromNullable(
-        configs.get(key(jobKey.getRole(), jobKey.getName()))).transform(DEEP_COPY);
+    return Optional.fromNullable(configs.get(key(jobKey)))
+        .transform(DEEP_COPY);
   }
 
   @Override
@@ -95,11 +76,7 @@ class MemUpdateStore implements UpdateStore.Mutable {
   private static final Function<JobUpdateConfiguration, String> GET_ROLE =
       new Function<JobUpdateConfiguration, String>() {
         @Override public String apply(JobUpdateConfiguration config) {
-          if (config.isSetJobKey()) {
-            return config.getJobKey().getRole();
-          } else {
-            return config.getRoleDeprecated();
-          }
+          return config.getJobKey().getRole();
         }
       };
 

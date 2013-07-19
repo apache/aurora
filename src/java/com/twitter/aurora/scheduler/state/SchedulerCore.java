@@ -78,7 +78,6 @@ public interface SchedulerCore {
    * @throws ScheduleException If there was an error in updating the state to UPDATING.
    * @return The action taken on each of the shards.
    */
-  // TODO(ksweeney): Refactor this to take a JobKey
   Map<Integer, ShardUpdateResult> updateShards(
       JobKey jobKey,
       String invokingUser,
@@ -115,7 +114,6 @@ public interface SchedulerCore {
    * @throws ScheduleException If an update for the job does not exist or if the update token is
    *                           invalid.
    */
-  // TODO(ksweeney): Refactor this to take a JobKey
   void finishUpdate(
       JobKey jobKey,
       String invokingUser,

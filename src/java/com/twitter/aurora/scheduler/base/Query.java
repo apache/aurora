@@ -65,6 +65,7 @@ public final class Query {
   public static boolean isJobScoped(TaskQuery query) {
     return (query.getOwner() != null)
         && !isEmpty(query.getOwner().getRole())
+        && !isEmpty(query.getEnvironment())
         && !isEmpty(query.getJobName());
   }
 
@@ -80,57 +81,12 @@ public final class Query {
     return unscoped().byEnv(role, environment);
   }
 
-  /**
-   * Returns a new Builder scoped to the given job. A builder can only be scoped to a job, a set
-   * of shards, or a role once.
-   *
-   * @deprecated Use {@link #jobScoped(com.twitter.aurora.gen.JobKey)}
-   * @param role The role of the job to scope the query to.
-   * @param jobName The name of the job to scope the query to.
-   * @return A new Builder scoped to the given job.
-   */
-  @Deprecated
-  public static Builder jobScoped(String role, String jobName) {
-    return unscoped().byJob(role, jobName);
-  }
-
   public static Builder jobScoped(JobKey jobKey) {
     return unscoped().byJob(jobKey);
   }
 
-  /**
-   * Returns a new Builder scoped to the given shardIds of the given job. A builder can only
-   * be scoped to a set of shards, a job, or a role once.
-   *
-   * @deprecated Use {@link #shardScoped(com.twitter.aurora.gen.JobKey, int, int...)}.
-   * @param role The role of the job of the shardIds.
-   * @param jobName The name of the job of the shardIds.
-   * @param shardId A shardId of the target job.
-   * @param shardIds Additional shardsIds of the target job.
-   * @return A new Builder scoped to the given shardIds.
-   */
-  @Deprecated
-  public static Builder shardScoped(String role, String jobName, int shardId, int... shardIds) {
-    return unscoped().byShards(role, jobName, shardId, shardIds);
-  }
-
   public static Builder shardScoped(JobKey jobKey, int shardId, int... shardIds) {
     return unscoped().byShards(jobKey, shardId, shardIds);
-  }
-
-  /**
-   * Returns a new Builder scoped to the given shardIds of the given job. A builder can only
-   * be scoped to a set of shards, a job, or a role once.
-   *
-   * @deprecated Use {@link #shardScoped(com.twitter.aurora.gen.JobKey, Iterable)}.
-   * @param role The role of the job of the shardIds.
-   * @param jobName The name of the job of the shardIds.
-   * @param shardIds Shard Ids of the target job.
-   * @return A new Builder scoped to the given shardIds.
-   */
-  @Deprecated
-  public static Builder shardScoped(String role, String jobName, Iterable<Integer> shardIds) {
-    return unscoped().byShards(role, jobName, shardIds);
   }
 
   public static Builder shardScoped(JobKey jobKey, Iterable<Integer> shardIds) {
@@ -175,8 +131,8 @@ public final class Query {
 
     /**
      * Build a query that is the combination of all the filters applied to a Builder. Mutating the
-     * returned object will not affect the state of the builder. {@link #get()} can be called any
-     * number of times and will return a new {@code TaskQuery} each time.
+     * returned object will not affect the state of the builder. Can be called any number of times
+     * and will return a new {@code TaskQuery} each time.
      *
      * @return A new TaskQuery satisfying this builder's constraints.
      */
@@ -266,24 +222,6 @@ public final class Query {
     }
 
     /**
-     * Creates a builder scoped to the job identified by (role, name). A job scope
-     * conflicts with role and shards scopes.
-     *
-     * @deprecated Use {@link #byJob(JobKey)} instead.
-     * @param role The role of the job to scope the query to.
-     * @param name The name of the job to scope the query to.
-     * @return A new Builder scoped to the given job.
-     */
-    @Deprecated
-    public Builder byJob(String role, String name) {
-      checkNotNull(role);
-      checkNotNull(name);
-
-      return new Builder(
-          query.deepCopy().setOwner(new Identity().setRole(role)).setJobName(name));
-    }
-
-    /**
      * Returns a new builder scoped to the job uniquely identified by the given key. A job scope
      * conflicts with role and shards scopes.
      *
@@ -345,32 +283,6 @@ public final class Query {
     }
 
     /**
-     * Returns a new Builder scoped to the given shardIds of the given job. A builder can only
-     * be scoped to a set of shards, a job, or a role once.
-     *
-     * @deprecated Use {@link Builder#byShards(com.twitter.aurora.gen.JobKey, int, int...)}
-     * @param role The role of the job of the shardIds.
-     * @param jobName The name of the job of the shardIds.
-     * @param shardId A shardId of the target job.
-     * @param shardIds Additional shardsIds of the target job.
-     * @return A new Builder scoped to the given shardIds.
-     */
-    @Deprecated
-    public Builder byShards(String role, String jobName, int shardId, int... shardIds) {
-      checkNotNull(role);
-      checkNotNull(jobName);
-
-      return new Builder(
-          query.deepCopy()
-              .setOwner(new Identity().setRole(role))
-              .setJobName(jobName)
-              .setShardIds(ImmutableSet.<Integer>builder()
-                  .add(shardId)
-                  .addAll(Ints.asList(shardIds))
-                  .build()));
-    }
-
-    /**
      * Returns a new Builder scoped to the given shards of the given job. A builder can only
      * be scoped to a set of shards, a job, or a role once.
      *
@@ -391,30 +303,6 @@ public final class Query {
                   .add(shardId)
                   .addAll(Ints.asList(shardIds))
                   .build()));
-    }
-
-    /**
-     * Create a new Builder scoped to shards.
-     *
-     * @see Builder#byShards(String, String, int, int...)
-     *
-     * @deprecated Use {@link Builder#byShards(com.twitter.aurora.gen.JobKey, Iterable)}
-     * @param role The role of the job of the shardIds.
-     * @param jobName The name of the job of the shardIds.
-     * @param shardIds  ShardIds of the target job.
-     * @return A new Builder scoped to the given shardIds.
-     */
-    @Deprecated
-    public Builder byShards(String role, String jobName, Iterable<Integer> shardIds) {
-      checkNotNull(role);
-      checkNotNull(jobName);
-      checkNotNull(shardIds);
-
-      return new Builder(
-          query.deepCopy()
-              .setOwner(new Identity().setRole(role))
-              .setJobName(jobName)
-              .setShardIds(ImmutableSet.copyOf(shardIds)));
     }
 
     /**

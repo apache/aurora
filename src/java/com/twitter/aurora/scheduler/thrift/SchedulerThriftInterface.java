@@ -217,7 +217,7 @@ class SchedulerThriftInterface implements SchedulerController {
       schedulerCore.createJob(parsed);
       response.setResponseCode(OK)
           .setMessage(String.format("%d new tasks pending for job %s",
-              parsed.get().getTaskConfigsSize(), Tasks.jobKey(job)));
+              parsed.get().getTaskConfigsSize(), JobKeys.toPath(job)));
     } catch (ConfigurationManager.TaskDescriptionException e) {
       response.setResponseCode(INVALID_REQUEST)
           .setMessage("Invalid task description: " + e.getMessage());
@@ -419,13 +419,17 @@ class SchedulerThriftInterface implements SchedulerController {
     checkNotNull(job);
     checkNotNull(session);
 
-    // TODO(ksweeney): check valid JobKey in job after deprecating non-environment version.
     StartUpdateResponse response = new StartUpdateResponse();
+    if (!JobKeys.isValid(job.getKey())) {
+      return response.setResponseCode(INVALID_REQUEST)
+          .setMessage("Invalid job key: " + job.getKey());
+    }
+
+    LOG.info("Received update request for job: " + JobKeys.toPath(job));
     try {
       sessionValidator.checkAuthenticated(session, job.getOwner().getRole());
     } catch (AuthFailedException e) {
-      response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
-      return response;
+      return response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
     }
 
     try {

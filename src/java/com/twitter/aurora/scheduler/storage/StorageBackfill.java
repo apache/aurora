@@ -8,6 +8,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 
 import com.twitter.aurora.gen.JobConfiguration;
+import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskEvent;
@@ -62,8 +63,7 @@ public final class StorageBackfill {
       // Perform a sanity check on the number of active shards.
       Set<String> activeTasksInShard = activeShards(
           taskStore,
-          Tasks.getRole(task),
-          Tasks.getJob(task),
+          Tasks.SCHEDULED_TO_JOB_KEY.apply(task),
           Tasks.SCHEDULED_TO_SHARD_ID.apply(task));
 
       if (activeTasksInShard.size() > 1) {
@@ -111,12 +111,8 @@ public final class StorageBackfill {
     });
   }
 
-  private static Set<String> activeShards(
-      TaskStore taskStore,
-      String role,
-      String job,
-      int shardId) {
+  private static Set<String> activeShards(TaskStore taskStore, JobKey jobKey, int shardId) {
 
-    return taskStore.fetchTaskIds(Query.shardScoped(role, job, shardId).active().get());
+    return taskStore.fetchTaskIds(Query.shardScoped(jobKey, shardId).active());
   }
 }

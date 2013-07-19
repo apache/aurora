@@ -16,7 +16,7 @@ import com.google.common.collect.Maps;
 
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
-import com.twitter.aurora.scheduler.base.Tasks;
+import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.storage.JobStore;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -40,24 +40,17 @@ class MemJobStore implements JobStore.Mutable {
     checkNotNull(managerId);
     checkNotNull(jobConfig);
 
-    managers.getUnchecked(managerId).jobs.put(Tasks.jobKey(jobConfig), DEEP_COPY.apply(jobConfig));
-  }
-
-  @Override
-  public void removeJob(String jobKey) {
-    checkNotNull(jobKey);
-
-    for (Manager manager : managers.asMap().values()) {
-      manager.jobs.remove(jobKey);
-    }
+    JobKey key = JobKeys.assertValid(jobConfig.getKey()).deepCopy();
+    managers.getUnchecked(managerId).jobs.put(key, DEEP_COPY.apply(jobConfig));
   }
 
   @Override
   public void removeJob(JobKey jobKey) {
     checkNotNull(jobKey);
 
-    // TODO(ksweeney): Remove this delegation as part of MESOS-2403.
-    removeJob(Tasks.jobKey(jobKey));
+    for (Manager manager : managers.asMap().values()) {
+      manager.jobs.remove(jobKey);
+    }
   }
 
   @Override
@@ -74,9 +67,7 @@ class MemJobStore implements JobStore.Mutable {
       return ImmutableSet.of();
     }
 
-    return FluentIterable.from(manager.jobs.values())
-        .transform(DEEP_COPY)
-        .toSet();
+    return FluentIterable.from(manager.jobs.values()).transform(DEEP_COPY).toSet();
   }
 
   @Override
@@ -88,8 +79,7 @@ class MemJobStore implements JobStore.Mutable {
     if (!manager.isPresent()) {
       return Optional.absent();
     } else {
-      return Optional.fromNullable(manager.get().jobs.get(Tasks.jobKey(jobKey)))
-          .transform(DEEP_COPY);
+      return Optional.fromNullable(manager.get().jobs.get(jobKey)).transform(DEEP_COPY);
     }
   }
 
@@ -99,6 +89,6 @@ class MemJobStore implements JobStore.Mutable {
   }
 
   private static class Manager {
-    private final Map<String, JobConfiguration> jobs = Maps.newConcurrentMap();
+    private final Map<JobKey, JobConfiguration> jobs = Maps.newConcurrentMap();
   }
 }

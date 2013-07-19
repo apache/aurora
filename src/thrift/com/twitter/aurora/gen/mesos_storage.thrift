@@ -30,26 +30,18 @@ struct SaveAcceptedJob {
   2: mesos_twitter.JobConfiguration jobConfig
 }
 
-// TODO(ksweeney): Remove roleDeprecated and jobDeprecated as part of MESOS-2403.
 struct SaveJobUpdate {
-  5: optional mesos_twitter.JobKey jobKey
+  5: mesos_twitter.JobKey jobKey
   3: string updateToken
   4: set<mesos_twitter.TaskUpdateConfiguration> configs
-  1: optional string roleDeprecated
-  2: optional string jobDeprecated
 }
 
-// TODO(ksweeney): Remove roleDeprecated and jobDeprecated as part of MESOS-2403.
 struct RemoveJobUpdate {
-  3: optional mesos_twitter.JobKey jobKey
-  1: optional string roleDeprecated
-  2: optional string jobDeprecated
+  3: mesos_twitter.JobKey jobKey
 }
 
-// TODO(ksweeney): Remove jobKeyDeprecated as part of MESOS-2403.
 struct RemoveJob {
-  2: optional mesos_twitter.JobKey jobKey
-  1: optional string jobKeyDeprecated
+  2: mesos_twitter.JobKey jobKey
 }
 
 struct SaveTasks {

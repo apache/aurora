@@ -271,7 +271,18 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     buildScheduler();
 
     TwitterTaskInfo newTask = nonProductionTask();
-    newTask.addToConstraints(dedicatedConstraint(ImmutableSet.of(Tasks.jobKey(KEY_A))));
+    newTask.addToConstraints(dedicatedConstraint(ImmutableSet.of(JobKeys.toPath(KEY_A))));
+    scheduler.createJob(makeJob(KEY_A, newTask, 1));
+    assertEquals(PENDING, getOnlyTask(Query.jobScoped(KEY_A)).getStatus());
+  }
+
+  @Test
+  public void testDedicatedArbitrarySuffix() throws Exception {
+    control.replay();
+    buildScheduler();
+
+    TwitterTaskInfo newTask = nonProductionTask();
+    newTask.addToConstraints(dedicatedConstraint(ImmutableSet.of(ROLE_A + "/arbitrary")));
     scheduler.createJob(makeJob(KEY_A, newTask, 1));
     assertEquals(PENDING, getOnlyTask(Query.jobScoped(KEY_A)).getStatus());
   }
@@ -1849,14 +1860,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   private Set<ScheduledTask> getTasksOwnedBy(Identity owner) {
     return Storage.Util.consistentFetchTasks(storage, query(owner, null, null));
-  }
-
-  private TaskQuery query(Iterable<String> taskIds) {
-    return query(null, null, taskIds);
-  }
-
-  private TaskQuery query(String... taskIds) {
-    return query(null, null, ImmutableList.copyOf(taskIds));
   }
 
   private TaskQuery queryJob(Identity owner, String jobName) {

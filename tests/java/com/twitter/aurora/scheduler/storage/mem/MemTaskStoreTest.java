@@ -60,17 +60,14 @@ public class MemTaskStoreTest {
     assertQueryResults(Query.taskScoped("b"), TASK_B);
     assertQueryResults(Query.taskScoped("a", "d"), TASK_A, TASK_D);
     assertQueryResults(Query.roleScoped("role-c"), TASK_C);
-    assertQueryResults(Query.envScoped("role-c", "test"), TASK_C);
+    assertQueryResults(Query.envScoped("role-c", "env-c"), TASK_C);
     assertQueryResults(Query.envScoped("role-c", "devel"));
     assertQueryResults(
         Query.unscoped().byStatus(ScheduleStatus.PENDING),
         TASK_A, TASK_B, TASK_C, TASK_D);
-    assertQueryResults(Query.shardScoped("role-a", "job-a", 0).active(), TASK_A);
     assertQueryResults(
-        Query.shardScoped(JobKeys.from("role-a", "test", "job-a"), 0).active(),
-        TASK_A);
-    assertQueryResults(Query.jobScoped("role-b", "job-b").active(), TASK_B);
-    assertQueryResults(Query.jobScoped(JobKeys.from("role-b", "test", "job-b")).active(), TASK_B);
+        Query.shardScoped(JobKeys.from("role-a", "env-a", "job-a"), 0).active(), TASK_A);
+    assertQueryResults(Query.jobScoped(JobKeys.from("role-b", "env-b", "job-b")).active(), TASK_B);
     assertQueryResults(Query.jobScoped(JobKeys.from("role-b", "devel", "job-b")).active());
 
     // Explicitly call out the current differing behaviors for types of empty query conditions.
@@ -158,15 +155,17 @@ public class MemTaskStoreTest {
 
   @Test
   public void testConsistentJobIndex() {
-    final ScheduledTask a = makeTask("a", "jim", "job");
-    final ScheduledTask b = makeTask("b", "jim", "job");
-    final ScheduledTask c = makeTask("c", "jim", "job2");
-    final ScheduledTask d = makeTask("d", "joe", "job");
+    final ScheduledTask a = makeTask("a", "jim", "test", "job");
+    final ScheduledTask b = makeTask("b", "jim", "test", "job");
+    final ScheduledTask c = makeTask("c", "jim", "test", "job2");
+    final ScheduledTask d = makeTask("d", "joe", "test", "job");
+    final ScheduledTask e = makeTask("e", "jim", "prod", "job");
     final Query.Builder jimsJob = Query.jobScoped(JobKeys.from("jim", "test", "job"));
     final Query.Builder jimsJob2 = Query.jobScoped(JobKeys.from("jim", "test", "job2"));
     final Query.Builder joesJob = Query.jobScoped(JobKeys.from("joe", "test", "job"));
+    final Query.Builder jimsProdJob = Query.jobScoped(JobKeys.from("jim", "prod", "job"));
 
-    store.saveTasks(ImmutableSet.of(a, b, c, d));
+    store.saveTasks(ImmutableSet.of(a, b, c, d, e));
     assertQueryResults(jimsJob, a, b);
     assertQueryResults(jimsJob2, c);
     assertQueryResults(joesJob, d);
@@ -215,7 +214,7 @@ public class MemTaskStoreTest {
         store.fetchTasks(query));
   }
 
-  private static ScheduledTask makeTask(String id, String role, String jobName) {
+  private static ScheduledTask makeTask(String id, String role, String env, String jobName) {
     return new ScheduledTask()
         .setStatus(ScheduleStatus.PENDING)
         .setAssignedTask(new AssignedTask()
@@ -223,11 +222,11 @@ public class MemTaskStoreTest {
             .setTask(new TwitterTaskInfo()
                 .setShardId(0)
                 .setJobName(jobName)
-                .setEnvironment("test")
+                .setEnvironment(env)
                 .setOwner(new Identity(role, role))));
   }
 
   private static ScheduledTask makeTask(String id) {
-    return makeTask(id, "role-" + id, "job-" + id);
+    return makeTask(id, "role-" + id, "env-" + id, "job-" + id);
   }
 }

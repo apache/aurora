@@ -42,7 +42,6 @@ import static com.twitter.aurora.gen.ScheduleStatus.RESTARTING;
 import static com.twitter.aurora.gen.ScheduleStatus.ROLLBACK;
 import static com.twitter.aurora.gen.ScheduleStatus.UPDATING;
 import static com.twitter.aurora.scheduler.base.Tasks.ACTIVE_STATES;
-import static com.twitter.aurora.scheduler.base.Tasks.jobKey;
 
 /**
  * Implementation of the scheduler core.
@@ -111,7 +110,7 @@ class SchedulerCoreImpl implements SchedulerCore {
 
     JobConfiguration job = parsedConfiguration.get();
     if (hasActiveJob(job)) {
-      throw new ScheduleException("Job already exists: " + jobKey(job));
+      throw new ScheduleException("Job already exists: " + JobKeys.toPath(job));
     }
 
     ensureHasAdditionalQuota(job.getOwner().getRole(), Quotas.fromJob(job));
@@ -302,7 +301,7 @@ class SchedulerCoreImpl implements SchedulerCore {
         // Reject if any existing task for the job is in UPDATING/ROLLBACK
         if (Iterables.any(existingTasks, IS_UPDATING)) {
           throw new ScheduleException("Update/Rollback already in progress for "
-              + Tasks.jobKey(job));
+              + JobKeys.toPath(job));
         }
 
         if (!existingTasks.isEmpty()) {

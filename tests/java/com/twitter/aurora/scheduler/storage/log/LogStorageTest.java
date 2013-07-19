@@ -319,23 +319,6 @@ public class LogStorageTest extends EasyMockTest {
   }
 
   @Test
-  public void testRemoveJobDeprecated() throws Exception {
-    final String jobKey = "job/key";
-    new MutationFixture() {
-      @Override protected void setupExpectations() throws Exception {
-        storageUtil.expectOperations();
-        storageUtil.jobStore.removeJob(jobKey);
-        streamMatcher.expectTransaction(Op.removeJob(new RemoveJob().setJobKeyDeprecated(jobKey)))
-            .andReturn(position);
-      }
-
-      @Override protected void performMutations() {
-        logStorage.removeJob(jobKey);
-      }
-    }.run();
-  }
-
-  @Test
   public void testRemoveJob() throws Exception {
     final JobKey jobKey = JobKeys.from("role", "env", "name");
     new MutationFixture() {
@@ -522,64 +505,40 @@ public class LogStorageTest extends EasyMockTest {
 
   @Test
   public void testSaveShardUpdateConfigs() throws Exception {
-    final String role = "role";
-    final String job = "job";
+    final JobKey jobKey = JobKeys.from("role", "env", "job");
     final String updateToken = "update-ok";
-    final JobKey jobKey = JobKeys.from("other-role", "env", job);
     final ImmutableSet<TaskUpdateConfiguration> updateConfiguration =
         ImmutableSet.of(
             new TaskUpdateConfiguration().setNewConfig(new TwitterTaskInfo().setShardId(42)));
-    final JobUpdateConfiguration config = new JobUpdateConfiguration()
-        .setUpdateToken(updateToken)
-        .setConfigs(updateConfiguration);
-    final SaveJobUpdate saveOp = new SaveJobUpdate()
-        .setUpdateToken(config.getUpdateToken())
-        .setConfigs(config.getConfigs());
+    final JobUpdateConfiguration config =
+        new JobUpdateConfiguration(jobKey, updateToken, updateConfiguration);
+    final SaveJobUpdate saveOp = new SaveJobUpdate(jobKey, updateToken, updateConfiguration);
 
     new MutationFixture() {
       @Override protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
-        storageUtil.updateStore.saveJobUpdateConfig(config.deepCopy()
-            .setRoleDeprecated(role)
-            .setJobDeprecated(job));
-        streamMatcher.expectTransaction(
-            Op.saveJobUpdate(saveOp.deepCopy().setRoleDeprecated(role).setJobDeprecated(job)))
-                .andReturn(position);
-
-        storageUtil.updateStore.saveJobUpdateConfig(config.deepCopy().setJobKey(jobKey));
-        streamMatcher.expectTransaction(Op.saveJobUpdate(saveOp.deepCopy().setJobKey(jobKey)))
-            .andReturn(position);
+        storageUtil.updateStore.saveJobUpdateConfig(config);
+        streamMatcher.expectTransaction(Op.saveJobUpdate(saveOp)).andReturn(position);
       }
 
       @Override protected void performMutations() {
-        logStorage.saveJobUpdateConfig(config.deepCopy()
-            .setRoleDeprecated(role)
-            .setJobDeprecated(job));
-        logStorage.saveJobUpdateConfig(config.deepCopy().setJobKey(jobKey));
+        logStorage.saveJobUpdateConfig(config);
       }
     }.run();
   }
 
   @Test
   public void testRemoveShardUpdateConfigs() throws Exception {
-    final String role = "role";
-    final String job = "job";
-    final JobKey jobKey = JobKeys.from("other-role", "env", job);
+    final JobKey jobKey = JobKeys.from("role", "env", "job");
     new MutationFixture() {
       @Override protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
-        storageUtil.updateStore.removeShardUpdateConfigs(role, job);
-        streamMatcher.expectTransaction(Op.removeJobUpdate(
-            new RemoveJobUpdate().setRoleDeprecated(role).setJobDeprecated(job)))
-            .andReturn(position);
-
         storageUtil.updateStore.removeShardUpdateConfigs(jobKey);
-        streamMatcher.expectTransaction(Op.removeJobUpdate(new RemoveJobUpdate()
-            .setJobKey(jobKey))).andReturn(position);
+        streamMatcher.expectTransaction(Op.removeJobUpdate(new RemoveJobUpdate(jobKey)))
+            .andReturn(position);
       }
 
       @Override protected void performMutations() {
-        logStorage.removeShardUpdateConfigs(role, job);
         logStorage.removeShardUpdateConfigs(jobKey);
       }
     }.run();

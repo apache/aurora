@@ -40,6 +40,7 @@ import com.twitter.aurora.gen.storage.SaveFrameworkId;
 import com.twitter.aurora.gen.storage.SaveTasks;
 import com.twitter.aurora.gen.storage.Snapshot;
 import com.twitter.aurora.gen.storage.Transaction;
+import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.log.Log;
 import com.twitter.aurora.scheduler.log.Log.Entry;
 import com.twitter.aurora.scheduler.log.Log.Position;
@@ -132,7 +133,7 @@ public class LogManagerTest extends EasyMockTest {
   @Test
   public void testStreamManagerReadFromUnknownSome() throws CodingException {
     LogEntry transaction1 =
-        createLogEntry(Op.removeJob(new RemoveJob().setJobKeyDeprecated("job1")));
+        createLogEntry(Op.removeJob(new RemoveJob(JobKeys.from("role", "env", "job"))));
     Entry entry1 = createMock(Entry.class);
     expect(entry1.contents()).andReturn(encode(transaction1));
     expect(stream.readAll()).andReturn(Iterators.singletonIterator(entry1));
@@ -250,7 +251,7 @@ public class LogManagerTest extends EasyMockTest {
   @Test
   public void testTransactionOps() throws CodingException {
     Op saveFrameworkId = Op.saveFrameworkId(new SaveFrameworkId("jake"));
-    Op deleteJob = Op.removeJob(new RemoveJob().setJobKeyDeprecated("jane"));
+    Op deleteJob = Op.removeJob(new RemoveJob(JobKeys.from("role", "env", "name")));
     expectTransaction(position1, saveFrameworkId, deleteJob);
 
     control.replay();
@@ -323,8 +324,8 @@ public class LogManagerTest extends EasyMockTest {
   public void testConcurrentWrites() throws Exception {
     control.replay(); // No easymock expectations used here
 
-    Op op1 = Op.removeJob(new RemoveJob().setJobKeyDeprecated("job1"));
-    final Op op2 = Op.removeJob(new RemoveJob().setJobKeyDeprecated("job2"));
+    Op op1 = Op.removeJob(new RemoveJob(JobKeys.from("r1", "env", "name")));
+    final Op op2 = Op.removeJob(new RemoveJob(JobKeys.from("r2", "env", "name")));
 
     LogEntry transaction1 = createLogEntry(op1);
     LogEntry transaction2 = createLogEntry(op2);
@@ -410,9 +411,9 @@ public class LogManagerTest extends EasyMockTest {
   @Test
   public void testStreamManagerReadFrames() throws Exception {
     LogEntry transaction1 = createLogEntry(
-        Op.removeJob(new RemoveJob().setJobKeyDeprecated("job1")));
+        Op.removeJob(new RemoveJob(JobKeys.from("r1", "env", "name"))));
     LogEntry transaction2 = createLogEntry(
-        Op.removeJob(new RemoveJob().setJobKeyDeprecated("job2")));
+        Op.removeJob(new RemoveJob(JobKeys.from("r2", "env", "name"))));
 
     Message message = frame(transaction1);
 

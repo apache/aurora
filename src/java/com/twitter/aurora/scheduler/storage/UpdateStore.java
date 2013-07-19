@@ -48,16 +48,6 @@ public interface UpdateStore {
     /**
      * Removes the update configuration for the job.
      *
-     * @param role Owner role of the job.
-     * @param job Name of the job.
-     * @deprecated Use {@link #removeShardUpdateConfigs(com.twitter.aurora.gen.JobKey)}.
-     */
-    @Deprecated
-    void removeShardUpdateConfigs(String role, String job);
-
-    /**
-     * Removes the update configuration for the job.
-     *
      * @param jobKey Key of the job.
      */
     void removeShardUpdateConfigs(JobKey jobKey);

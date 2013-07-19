@@ -33,8 +33,6 @@ class ImmediateJobManager extends JobManager {
 
   @Override
   public boolean hasJob(final JobKey jobKey) {
-    // TODO(ksweeney): Stop ignoring environment as part of MESOS-2403.
-    return !Storage.Util.consistentFetchTasks(storage,
-        Query.jobScoped(jobKey.getRole(), jobKey.getName()).active()).isEmpty();
+    return !Storage.Util.consistentFetchTasks(storage, Query.jobScoped(jobKey).active()).isEmpty();
   }
 }

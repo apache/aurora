@@ -121,11 +121,6 @@ public class ForwardingStore implements
   }
 
   @Override
-  public void removeJob(String jobKey) {
-    jobStore.removeJob(jobKey);
-  }
-
-  @Override
   public void removeJob(JobKey jobKey) {
     jobStore.removeJob(jobKey);
   }
@@ -203,11 +198,6 @@ public class ForwardingStore implements
   @Override
   public void deleteShardUpdateConfigs() {
     updateStore.deleteShardUpdateConfigs();
-  }
-
-  @Override
-  public void removeShardUpdateConfigs(String role, String job) {
-    updateStore.removeShardUpdateConfigs(role, job);
   }
 
   @Override

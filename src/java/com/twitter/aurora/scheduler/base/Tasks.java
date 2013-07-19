@@ -15,7 +15,6 @@ import com.google.common.collect.Ordering;
 
 import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.Constants;
-import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
@@ -127,19 +126,6 @@ public final class Tasks {
 
   public static boolean isTerminated(ScheduleStatus status) {
     return TERMINAL_STATES.contains(status);
-  }
-
-  public static String jobKey(String role, String jobName) {
-    return role + "/" + jobName;
-  }
-
-  public static String jobKey(JobConfiguration job) {
-    return jobKey(job.getKey());
-  }
-
-  public static String jobKey(JobKey jobKey) {
-    // TODO(ksweeney): Stop ignoring environment here as part of MESOS-2403.
-    return jobKey(jobKey.getRole(), jobKey.getName());
   }
 
   public static String id(ScheduledTask task) {
