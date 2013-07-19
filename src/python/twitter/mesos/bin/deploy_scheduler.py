@@ -36,7 +36,7 @@ class SchedulerManager(object):
   STAGED_PACKAGE_PATH = '%s/%s' % (STAGE_DIR, SCHEDULER_PACKAGE)
 
   UPTIME_WAIT_SECS = 180
-  LEADER_ELECTION_WAIT_SECS = 300
+  LEADER_ELECTION_WAIT_SECS = 600
 
   def __init__(self, cluster, dry_run=False, verbose=False, ignore_conflicting_schedulers=False):
     self._really_deploy = not dry_run
