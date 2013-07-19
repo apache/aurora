@@ -29,8 +29,7 @@ class Updater(object):
   def __init__(self, config, scheduler=None):
     self._config = config
     self._job_key = JobKey(role=config.role(), environment=config.environment(), name=config.name())
-    self._cluster = config.cluster()
-    self._scheduler = scheduler or SchedulerProxy(self._cluster)
+    self._scheduler = scheduler or SchedulerProxy(config.cluster())
     try:
       self._update_config = UpdaterConfig(**config.update_config().get())
     except ValueError as e:

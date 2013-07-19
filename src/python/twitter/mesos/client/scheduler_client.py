@@ -7,16 +7,15 @@ from twitter.common import log
 from twitter.common.net.tunnel import TunnelHelper
 from twitter.common.quantity import Amount, Time
 from twitter.common.zookeeper.serverset import ServerSet
-from twitter.common_internal.auth.ssh import SSHAgentAuthenticator
 from twitter.common_internal.location import Location
 from twitter.common_internal.zookeeper.tunneler import TunneledZookeeper
+from twitter.mesos.common.auth import make_session_key, SessionKeyError
 from twitter.mesos.common.cluster import Cluster
+
+from gen.twitter.mesos import MesosAdmin
 
 from thrift.protocol import TBinaryProtocol
 from thrift.transport import TSocket, TSSLSocket, TTransport
-
-from gen.twitter.mesos import MesosAdmin
-from gen.twitter.mesos.ttypes import SessionKey
 
 from pystachio import Default, Integer, String
 
@@ -166,28 +165,17 @@ class SchedulerProxy(object):
     'getQuota'
   ])
 
-  class TimeoutError(Exception): pass
+  class Error(Exception): pass
+  class TimeoutError(Error): pass
+  class AuthenticationError(Error): pass
 
-  @classmethod
-  def create_anonymous_session(cls, user):
-    return SessionKey(user=user, nonce=SSHAgentAuthenticator.get_timestamp(),
-        nonceSig='UNAUTHENTICATED')
-
-  @classmethod
-  def create_session(cls, user, agent_key=None):
-    if agent_key is None:
-      return cls.create_anonymous_session(user)
-    try:
-      nonce, nonce_sig = SSHAgentAuthenticator.create_session_from_key(agent_key)
-      return SessionKey(user=user, nonce=nonce, nonceSig=nonce_sig)
-    except SSHAgentAuthenticator.AuthorizationError as e:
-      log.warning('Could not authenticate: %s' % e)
-      log.warning('Attempting unauthenticated communication.')
-      return cls.create_anonymous_session(user)
-
-  def __init__(self, cluster, verbose=False):
+  def __init__(self, cluster, verbose=False, session_key_factory=make_session_key):
+    """A callable session_key_factory should be provided for authentication"""
     self.cluster = cluster
-    self._agent_key = self._client = self._scheduler = None
+    # TODO(Sathya): Make this a part of cluster trait when authentication is pushed to the transport
+    # layer.
+    self._session_key_factory = session_key_factory
+    self._client = self._scheduler = None
     self.verbose = verbose
 
   def with_scheduler(method):
@@ -199,31 +187,21 @@ class SchedulerProxy(object):
     return _wrapper
 
   def invalidate(self):
-    self._agent_key = self._client = self._scheduler = None
-
-  def requires_auth(method):
-    def _wrapper(self, *args, **kwargs):
-      if not self._agent_key:
-        user = getpass.getuser()
-        try:
-          self._agent_key = (user, SSHAgentAuthenticator.get_ods_key(user))
-        except SSHAgentAuthenticator.AgentError as e:
-          log.warning('Could not acquire key: %s' % e)
-          self._agent_key = (user, None)
-      return method(self, *args, **kwargs)
-    return _wrapper
+    self._client = self._scheduler = None
 
   @with_scheduler
   def client(self):
     return self._client
 
-  @requires_auth
-  def session_key(self):
-    return self.create_session(*self._agent_key)
-
   @with_scheduler
   def scheduler(self):
     return self._scheduler
+
+  def session_key(self):
+    try:
+      return self._session_key_factory()
+    except SessionKeyError as e:
+      raise self.AuthenticationError('Unable to create session key %s' % e)
 
   def _construct_scheduler(self):
     """

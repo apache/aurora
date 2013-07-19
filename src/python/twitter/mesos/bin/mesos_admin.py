@@ -26,6 +26,9 @@ from gen.twitter.mesos.ttypes import (
     TaskQuery)
 
 
+app.configure(module="twitter.mesos.common_internal.app.aurora")
+
+
 DEFAULT_USAGE_BANNER = """
 mesos admin, used for admin-only commands, to interact with the aurora scheduler.
 

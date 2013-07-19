@@ -1,7 +1,6 @@
 import copy
 import unittest
 
-from twitter.mesos.client.scheduler_client import SchedulerProxy
 from twitter.mesos.client.updater import Updater
 from twitter.mesos.client.shard_watcher import ShardWatcher
 

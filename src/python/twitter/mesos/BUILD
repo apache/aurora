@@ -20,8 +20,7 @@ python_binary(
   dependencies = [
     python_requirement('argparse'), # this is a legacy dependency required for macaw deploy_mesos
     pants(':mesos-lib'),
-    pants('src/python/twitter/common/app'),
-    pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/mesos/common_internal:app'),
     pants('src/python/twitter/thermos/base:options')
   ],
   platforms = (
@@ -35,8 +34,7 @@ python_binary(
   source = 'bin/mesos_client.py',
   dependencies = [
     pants(':mesos-lib'),
-    pants('src/python/twitter/common/app'),
-    pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/mesos/common_internal:app'),
     pants('src/python/twitter/thermos/base:options'),
     pants('src/python/twitter/mesos/client:spawn_local'),
   ],
@@ -47,8 +45,7 @@ python_binary(
   source = 'bin/mesos_admin.py',
   dependencies = [
     pants(':mesos-lib'),
-    pants('src/python/twitter/common/app'),
-    pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/mesos/common_internal:app'),
     pants('src/python/twitter/mesos/admin:mesos_maintenance'),
     pants('src/python/twitter/mesos/common:cluster_option'),
     pants('src/python/twitter/mesos/common_internal:clusters'),

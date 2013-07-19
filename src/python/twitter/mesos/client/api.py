@@ -1,5 +1,6 @@
 from twitter.common import log
 from twitter.mesos.common import AuroraJobKey
+from twitter.mesos.common.auth import make_session_key
 from twitter.mesos.common.cluster import Cluster
 
 from gen.twitter.mesos.constants import LIVE_STATES
@@ -32,11 +33,12 @@ invoking cancel_update.
   class TypeError(Error, TypeError): pass
   class ClusterMismatch(Error, ValueError): pass
 
-  def __init__(self, cluster, verbose=False):
+  def __init__(self, cluster, verbose=False, session_key_factory=make_session_key):
     if not isinstance(cluster, Cluster):
       raise TypeError('MesosClientAPI expects instance of Cluster for "cluster", got %s' %
           type(cluster))
-    self._scheduler = SchedulerProxy(cluster, verbose=verbose)
+    self._scheduler = SchedulerProxy(
+        cluster, verbose=verbose, session_key_factory=session_key_factory)
     self._cluster = cluster
 
   @property

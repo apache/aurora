@@ -1,15 +1,14 @@
 import inspect
 import unittest
 
-from mox import IsA, IgnoreArg, Mox
-from thrift.protocol import TBinaryProtocol
-
 import twitter.mesos.client.scheduler_client as scheduler_client
 
 import gen.twitter.mesos.MesosAdmin as MesosAdmin
 import gen.twitter.mesos.MesosSchedulerManager as MesosSchedulerManager
 from gen.twitter.mesos.constants import DEFAULT_ENVIRONMENT
 from gen.twitter.mesos.ttypes import *
+
+from mox import IgnoreArg, IsA, Mox
 
 
 ROLE = 'foorole'
@@ -28,8 +27,6 @@ def test_testCoverage():
 
 class TestSchedulerProxy(scheduler_client.SchedulerProxy):
   """In testing we shouldn't use the real SSHAgentAuthenticator."""
-  # The real session_key() is decorated with requires_auth, which interacts with
-  # SSHAgentAuthenticator, so we need to undecorate it
   def session_key(self):
     return self.create_session('SOME_USER')
   @classmethod

@@ -54,6 +54,9 @@ except ImportError:
     die('Local spawning not supported in this version of mesos client.')
 
 
+app.configure(module="twitter.mesos.common_internal.app.aurora")
+
+
 DEFAULT_USAGE_BANNER = """
 mesos client, used to interact with the aurora scheduler.
 
