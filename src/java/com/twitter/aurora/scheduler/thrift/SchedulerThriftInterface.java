@@ -362,7 +362,6 @@ class SchedulerThriftInterface implements SchedulerController {
     checkNotNull(session);
     checkNotNull(session.getUser());
 
-    LOG.info("Received kill request from " + session.getUser() + "for tasks: " + query);
     KillResponse response = new KillResponse();
 
     if (query.getJobName() != null && StringUtils.isBlank(query.getJobName())) {
@@ -421,8 +420,6 @@ class SchedulerThriftInterface implements SchedulerController {
     checkNotNull(session);
 
     // TODO(ksweeney): check valid JobKey in job after deprecating non-environment version.
-
-    LOG.info("Received update request for tasks: " + Tasks.jobKey(job));
     StartUpdateResponse response = new StartUpdateResponse();
     try {
       sessionValidator.checkAuthenticated(session, job.getOwner().getRole());

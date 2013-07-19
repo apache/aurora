@@ -10,8 +10,10 @@ import com.google.inject.PrivateModule;
 import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 
+import com.twitter.aurora.gen.MesosAdmin;
 import com.twitter.aurora.scheduler.thrift.FeatureToggleSchedulerController.Delegate;
 import com.twitter.aurora.scheduler.thrift.FeatureToggleSchedulerController.EnableUpdates;
+import com.twitter.aurora.scheduler.thrift.aop.AopModule;
 import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator.Capability;
 import com.twitter.aurora.scheduler.thrift.auth.ThriftAuthModule;
 import com.twitter.common.application.modules.LifecycleModule;
@@ -50,6 +52,7 @@ public class ThriftModule extends AbstractModule {
 
   @Override
   protected void configure() {
+    install(new AopModule());
     install(new PrivateModule() {
       @Override protected void configure() {
         bind(SchedulerController.class).annotatedWith(Delegate.class)
@@ -67,8 +70,7 @@ public class ThriftModule extends AbstractModule {
         "A ROOT capability must be provided with --user_capabilities");
     bind(new TypeLiteral<Map<Capability, String>>() { }).toInstance(capabilities);
 
-    // TODO(ksweeney): Refactor LoggingThriftInterface to LoggingSchedulerController
-    LoggingThriftInterface.bind(binder(), SchedulerThriftRouter.class);
+    bind(MesosAdmin.Iface.class).to(SchedulerThriftRouter.class);
     bind(SchedulerThriftRouter.class).in(Singleton.class);
     bind(ThriftServer.class).to(SchedulerThriftServer.class).in(Singleton.class);
     LifecycleModule.bindServiceRunner(binder(), ThriftServerLauncher.class);
