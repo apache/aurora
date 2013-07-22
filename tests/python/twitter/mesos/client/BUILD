@@ -1,5 +1,6 @@
 python_test_suite(name = 'all',
   dependencies = [
+    pants(':stage_api'),
     pants(':config'),
     pants(':disambiguator'),
     pants(':health_check'),
@@ -71,6 +72,15 @@ python_tests(name = 'shard_watcher',
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
     pants('3rdparty/python:mox'),
   ]
+)
+
+python_tests(name = 'stage_api',
+  sources = ['test_stage_api.py'],
+  dependencies = [
+    pants('src/python/twitter/mesos:mesos-lib'),
+    pants('src/python/twitter/mesos/packer:packer'),
+    python_requirement('mox'),
+  ],
 )
 
 python_tests(name = 'updater',

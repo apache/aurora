@@ -13,6 +13,15 @@ python_library(
 )
 
 python_library(
+  name = 'stage_api',
+  sources = ['stage_api.py'],
+  dependencies = [
+    pants(':api'),
+    pants('src/python/twitter/mesos/packer'),
+  ]
+)
+
+python_library(
   name = 'client',
   dependencies = [
     pants(':api'),
@@ -21,6 +30,7 @@ python_library(
     pants(':config'),
     pants(':disambiguator'),
     pants(':quickrun'),
+    pants(':stage_api'),
   ]
 )
 

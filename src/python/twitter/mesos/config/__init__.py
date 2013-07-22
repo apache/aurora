@@ -4,6 +4,7 @@ from twitter.common.lang import Compatibility
 from twitter.thermos.config.loader import PortExtractor, ThermosTaskWrapper
 from twitter.thermos.config.schema import ThermosContext
 
+from .loader import AuroraConfigLoader
 from .thrift import convert as convert_thrift, InvalidConfig as InvalidThriftConfig
 
 from pystachio import Empty, Environment, Ref
@@ -122,14 +123,17 @@ class AuroraConfig(object):
 
   @classmethod
   def load(cls, filename, name=None, bindings=None, select_cluster=None, select_env=None):
-    from .loader import AuroraConfigLoader
     env = AuroraConfigLoader.load(filename)
     return cls.apply_plugins(cls(cls.pick(env, name, bindings, select_cluster, select_env)), env)
 
   @classmethod
   def load_json(cls, filename, name=None, bindings=None, select_cluster=None, select_env=None):
-    from .loader import AuroraConfigLoader
     job = AuroraConfigLoader.load_json(filename)
+    return cls.apply_plugins(cls(job.bind(*bindings) if bindings else job))
+
+  @classmethod
+  def loads_json(cls, string, name=None, bindings=None, select_cluster=None, select_env=None):
+    job = AuroraConfigLoader.loads_json(string)
     return cls.apply_plugins(cls(job.bind(*bindings) if bindings else job))
 
   def __init__(self, job):

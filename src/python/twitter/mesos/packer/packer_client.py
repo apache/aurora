@@ -6,16 +6,18 @@ import httplib
 import json
 import os
 import socket
+import subprocess
 import sys
 import time
 import urllib
 import urllib2
 
-from poster.encode import multipart_encode
-from poster.streaminghttp import StreamingHTTPHandler
-
 from twitter.common import log
 from twitter.common_internal.auth.ssh import SSHAgentAuthenticator
+from twitter.common_internal.location import Location
+
+from poster.encode import multipart_encode
+from poster.streaminghttp import StreamingHTTPHandler
 
 
 class Progress(object):
@@ -177,6 +179,23 @@ class Packer(object):
       raise Packer.Error('HTTP %s: %s' % (e.code, e.msg))
     except urllib2.URLError as e:
       raise Packer.Error('Failed to upload to packer: %s' % e)
+
+  def fetch(self, role, package, version, proxy_host, local_file_obj=None):
+    pkg = self.get_version(role, package, version)
+    uri = pkg['uri']
+    filename = pkg.get('filename', os.path.basename(uri))
+    if local_file_obj:
+      self._fetch_into(uri, local_file_obj, proxy_host)
+    else:
+      with open(filename, 'wb') as fp:
+        self._fetch_into(uri, fp)
+
+  def _fetch_into(self, uri, fp, proxy_host):
+    cmd = ["hadoop", "fs", "-cat", uri]
+    if Location.is_corp():
+      cmd = ["ssh", "-o", "BatchMode yes", proxy_host] + cmd
+    with open(os.devnull) as devnull:
+      subprocess.check_call(cmd, stdin=devnull, stdout=fp)
 
   def unlock(self, role, package):
     return self._api('%s/unlock' % Packer._pkg_url(role, package), auth=True, method='POST')

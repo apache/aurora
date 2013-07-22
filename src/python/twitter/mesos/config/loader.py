@@ -1,3 +1,4 @@
+import json
 import textwrap
 
 from .schema import Job
@@ -23,3 +24,7 @@ class AuroraConfigLoader(Config):
   def load_json(cls, filename):
     with open(filename) as fp:
       return Job.json_load(fp)
+
+  @classmethod
+  def loads_json(cls, string):
+    return Job(json.loads(string))

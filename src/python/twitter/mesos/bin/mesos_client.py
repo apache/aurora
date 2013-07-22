@@ -25,6 +25,7 @@ from twitter.common.net.tunnel import TunnelHelper
 from twitter.common.quantity import Amount, Data
 from twitter.common.quantity.parse_simple import parse_data_into
 from twitter.mesos.client.api import MesosClientAPI
+from twitter.mesos.client.stage_api import AuroraStageAPI
 from twitter.mesos.client.base import check_and_log_response, deprecation_warning, die, requires
 from twitter.mesos.client.command_runner import DistributedCommandRunner
 from twitter.mesos.client.config import get_config
@@ -339,6 +340,74 @@ def create(job_spec, config_file):
     monitor.wait_until(monitor.running_or_finished)
   elif options.wait_until == 'FINISHED':
     monitor.wait_until(monitor.terminal)
+
+
+HEALTH_CHECK_INTERVAL_SECONDS = optparse.Option(
+    '--updater_health_check_interval_seconds',
+    dest='health_check_interval_seconds',
+    type=int,
+    default=3,
+    help='Time interval between subsequent shard status checks.')
+
+
+@app.command
+@app.command_option(
+  '-r', '--release', action='store_true', dest='release',
+  help='Create or update the job after uploading a new configuration file'
+)
+@app.command_option(JSON_OPTION)
+@app.command_option(HEALTH_CHECK_INTERVAL_SECONDS)
+@app.command_option(OPEN_BROWSER_OPTION)
+def stage(args, options):
+  """usage: stage cluster/role/env/jobname config
+                  [--release [--updater_health_check_interval_seconds=HEALTH_CHECK_INTERVAL]]
+
+  Upload a job configuration to packer. At the point it's uploaded all
+  strings in the job are fully interpolated and it's ready to be sent
+  to the scheduler.
+  """
+
+  if len(args) != 2:
+    die('usage: stage cluster/role/env/jobname config')
+
+  job_key = AuroraJobKey.from_path(args[0])
+  config_file = args[1]
+  packer = _get_packer(MESOS_CLIENT_CLUSTER_SET[job_key.cluster])
+  api = make_client(job_key.cluster)
+  stage_api = AuroraStageAPI(api, packer)
+
+  stage_api.stage(job_key, config_file)
+
+  if options.release:
+    resp = stage_api.release(job_key, options.health_check_interval_seconds, options.tunnel_host)
+    check_and_log_response(resp)
+    handle_open(api.scheduler.scheduler(), job_key.role, job_key.env, job_key.name)
+
+
+@app.command
+@app.command_option(HEALTH_CHECK_INTERVAL_SECONDS)
+@app.command_option(OPEN_BROWSER_OPTION)
+def release(args, options):
+  """usage: release cluster/role/env/job
+                    [--updater_health_check_interval_seconds=HEALTH_CHECK_INTERVAL_SECONDS]
+  """
+
+  if len(args) != 1:
+    die('usage: release cluster/role/env/jobname')
+
+  job_key = AuroraJobKey.from_path(args[0])
+
+  api = make_client(job_key.cluster)
+  packer = _get_packer(MESOS_CLIENT_CLUSTER_SET[job_key.cluster])
+  stage_api = AuroraStageAPI(api, packer)
+
+  resp = stage_api.release(
+      job_key,
+      options.health_check_interval_seconds,
+      options.tunnel_host)
+
+  check_and_log_response(resp)
+  handle_open(api.scheduler.scheduler(), job_key.role, job_key.env, job_key.name)
 
 
 @app.command
@@ -720,11 +789,6 @@ def status(args, options):
 
 
 @app.command
-@app.command_option('--updater_health_check_interval_seconds',
-                    dest='health_check_interval_seconds',
-                    type=int,
-                    default=3,
-                    help='Time interval between subsequent shard status checks.')
 @app.command_option(SHARDS_OPTION)
 @app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(CLUSTER_CONFIG_OPTION)
@@ -757,6 +821,7 @@ def update(job_spec, config_file):
 
 @app.command
 @app.command_option(CLUSTER_INVOKE_OPTION)
+@app.command_option(HEALTH_CHECK_INTERVAL_SECONDS)
 @app.command_option(OPEN_BROWSER_OPTION)
 @app.command_option(SHARDS_OPTION)
 @app.command_option(
@@ -765,12 +830,6 @@ def update(job_spec, config_file):
     type=int,
     default=1,
     help='Number of shards to be restarted in one iteration.')
-@app.command_option(
-    '--health_check_interval_seconds',
-    dest='health_check_interval_seconds',
-    type=int,
-    default=3,
-    help='Time interval between subsequent shard status checks.')
 @app.command_option(
     '--max_per_shard_failures',
     dest='max_per_shard_failures',
@@ -800,7 +859,7 @@ def update(job_spec, config_file):
          'success.')
 def restart(args, options):
   """usage: restart cluster/role/env/job [--shards=SHARDS] [--batch_size=BATCH_SIZE]
-               [--health_check_interval_seconds=HEALTH_CHECK_INTERVAL_SECONDS]
+               [--updater_health_check_interval_seconds=HEALTH_CHECK_INTERVAL_SECONDS]
                [--max_per_shard_failures=MAX_PER_SHARD_FAILURES]
                [--max_total_failures=MAX_TOTAL_FAILURES]
                [--restart_threshold=RESTART_THRESHOLD] [--watch_secs=WATCH_SECS]
