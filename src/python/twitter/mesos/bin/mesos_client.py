@@ -794,6 +794,7 @@ def status(args, options):
 @app.command_option(CLUSTER_CONFIG_OPTION)
 @app.command_option(ENV_CONFIG_OPTION)
 @app.command_option(JSON_OPTION)
+@app.command_option(HEALTH_CHECK_INTERVAL_SECONDS)
 @requires.exactly('cluster/role/env/job', 'config')
 def update(job_spec, config_file):
   """usage: update cluster/role/env/job config
