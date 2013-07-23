@@ -6,14 +6,13 @@ import java.util.Set;
 import com.google.common.base.Optional;
 
 import com.twitter.aurora.gen.AssignedTask;
-import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ShardUpdateResult;
 import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.gen.UpdateResult;
 import com.twitter.aurora.scheduler.base.ScheduleException;
-import com.twitter.aurora.scheduler.configuration.ConfigurationManager;
+import com.twitter.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
 
 /**
@@ -32,25 +31,19 @@ public interface SchedulerCore {
    *
    * @param parsedConfiguration The configuration of the job to create tasks for.
    * @throws ScheduleException If there was an error scheduling a cron job.
-   * @throws ConfigurationManager.TaskDescriptionException If an invalid task description was given.
+   * @throws TaskDescriptionException If an invalid task description was given.
    */
   void createJob(ParsedConfiguration parsedConfiguration)
-      throws ScheduleException, ConfigurationManager.TaskDescriptionException;
+      throws ScheduleException, TaskDescriptionException;
 
   /**
    * Starts a cron job immediately.
    *
    * @param jobKey Job key.
    * @throws ScheduleException If the specified job does not exist, or is not a cron job.
+   * @throws TaskDescriptionException If the parsing of the job failed.
    */
-  void startCronJob(JobKey jobKey) throws ScheduleException;
-
-  /**
-   * Triggers execution of a job.  This should only be called by job managers.
-   *
-   * @param job Job to run.
-   */
-  void runJob(JobConfiguration job);
+  void startCronJob(JobKey jobKey) throws ScheduleException, TaskDescriptionException;
 
   /**
    * Registers an update for a job.

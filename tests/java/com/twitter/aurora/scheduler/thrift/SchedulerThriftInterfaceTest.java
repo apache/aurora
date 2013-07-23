@@ -160,6 +160,21 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testCreateHomogeneousJob() throws Exception {
+    JobConfiguration job = makeJob();
+    job.setShardCount(2);
+    expectAuth(ROLE, true);
+    ParsedConfiguration parsed = ParsedConfiguration.fromUnparsed(job);
+    assertEquals(2, parsed.getTaskConfigs().size());
+    scheduler.createJob(parsed);
+
+    control.replay();
+
+    CreateJobResponse response = thrift.createJob(job, SESSION);
+    assertEquals(ResponseCode.OK, response.getResponseCode());
+  }
+
+  @Test
   public void testCreateJobBadRequest() throws Exception {
     JobConfiguration job = makeJob();
     expectAuth(ROLE, true);
@@ -494,6 +509,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     JobConfiguration parsed = job.deepCopy();
     parsed.getTaskConfig()
         .setHealthCheckIntervalSecs(30)
+        .setShardId(0)
         .setNumCpus(1.0)
         .setPriority(0)
         .setRamMb(1024)
@@ -507,7 +523,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
             ConfigurationManager.rackLimitConstraint(1)))
         .setMaxTaskFailures(1)
         .setEnvironment(DEFAULT_ENVIRONMENT);
-    parsed.setTaskConfigs(ImmutableSet.of(parsed.getTaskConfig()));
 
     scheduler.createJob(new ParsedConfiguration(parsed));
 
@@ -726,12 +741,12 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     return makeJob(task, 1);
   }
 
-  private JobConfiguration makeJob(TwitterTaskInfo task, int numTasks) {
+  private JobConfiguration makeJob(TwitterTaskInfo task, int shardCount) {
     return new JobConfiguration()
         .setName(JOB_NAME)
         .setOwner(ROLE_IDENTITY)
+        .setShardCount(shardCount)
         .setTaskConfig(task)
-        .setShardCount(numTasks)
         .setKey(JOB_KEY);
   }
 

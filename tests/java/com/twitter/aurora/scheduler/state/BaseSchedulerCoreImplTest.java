@@ -14,6 +14,7 @@ import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
+import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
 import com.google.common.base.Throwables;
 import com.google.common.collect.FluentIterable;
@@ -177,17 +178,16 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       }
     });
 
-    ImmediateJobManager immediateManager = new ImmediateJobManager(storage);
-    cron = new CronJobManager(storage, cronScheduler);
     stateManager = new StateManagerImpl(storage, clock, driver, taskIdGenerator, eventSink);
+    ImmediateJobManager immediateManager = new ImmediateJobManager(stateManager, storage);
     quotaManager = new QuotaManagerImpl(storage);
+    cron = new CronJobManager(stateManager, storage, cronScheduler);
     scheduler = new SchedulerCoreImpl(
         storage,
         cron,
         immediateManager,
         stateManager,
         quotaManager);
-
     cron.schedulerCore = scheduler;
     immediateManager.schedulerCore = scheduler;
 
@@ -239,13 +239,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       assertEquals(PENDING, state.getStatus());
       assertTrue(state.getAssignedTask().isSetTaskId());
       assertFalse(state.getAssignedTask().isSetSlaveId());
-      // Need to clear shard ID since that was assigned in our makeJob function.
-      assertEquals(
-          populateFields(
-              job.get(),
-              productionTask().setShardId(0),
-              ConfigurationManager.ShardIdState.PRESENT),
-          state.getAssignedTask().getTask().setShardId(0));
+      // Need to clear shard ID since that was assigned when the job is scheduled.
+      state.getAssignedTask().getTask().setShardId(0);
+      assertEquals(populateFields(job.getJobConfig()), state.getAssignedTask().getTask());
     }
   }
 
@@ -261,7 +257,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     TwitterTaskInfo newTask = nonProductionTask();
     newTask.addToConstraints(dedicatedConstraint(ImmutableSet.of(ROLE_A)));
-    scheduler.createJob(makeJob(KEY_A, newTask, 1));
+    scheduler.createJob(makeJob(KEY_A, newTask));
     assertEquals(PENDING, getOnlyTask(Query.jobScoped(KEY_A)).getStatus());
   }
 
@@ -272,7 +268,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     TwitterTaskInfo newTask = nonProductionTask();
     newTask.addToConstraints(dedicatedConstraint(ImmutableSet.of(JobKeys.toPath(KEY_A))));
-    scheduler.createJob(makeJob(KEY_A, newTask, 1));
+    scheduler.createJob(makeJob(KEY_A, newTask));
     assertEquals(PENDING, getOnlyTask(Query.jobScoped(KEY_A)).getStatus());
   }
 
@@ -358,7 +354,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     ParsedConfiguration job = makeJob(KEY_A, 10);
     final Set<ScheduledTask> badTasks = ImmutableSet.copyOf(Iterables
-        .transform(job.generateTaskConfigs(),
+        .transform(job.getTaskConfigs(),
             new Function<TwitterTaskInfo, ScheduledTask>() {
               @Override public ScheduledTask apply(TwitterTaskInfo task) {
                 return new ScheduledTask()
@@ -419,36 +415,12 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   private void expectRejected(Identity identity, JobKey jobKey) throws ScheduleException {
     try {
-      JobConfiguration job = makeJob(jobKey, 1).get().setOwner(identity);
-      scheduler.createJob(ParsedConfiguration.fromUnparsed(job));
+      scheduler.createJob(
+          ParsedConfiguration.fromUnparsed(makeJob(jobKey, 1).getJobConfig().setOwner(identity)));
       fail("Job owner/name should have been rejected.");
     } catch (TaskDescriptionException e) {
       // Expected.
     }
-  }
-
-  private void expectRejected(ParsedConfiguration job) throws Exception {
-    try {
-      scheduler.createJob(job);
-      fail("Job should have been rejected.");
-    } catch (TaskDescriptionException e) {
-      // Expected.
-    }
-  }
-
-  @Test(expected = TaskDescriptionException.class)
-  public void testRequiresContactEmail() throws Exception {
-    control.replay();
-    buildScheduler();
-
-    TwitterTaskInfo task = defaultTask(false);
-    task.unsetContactEmail();
-
-    expectRejected(makeJob(KEY_A, task, 1));
-    task.setContactEmail("invalid");
-    expectRejected(makeJob(KEY_A, task, 1));
-    task.setContactEmail("steve@aol.com");
-    expectRejected(makeJob(KEY_A, task, 1));
   }
 
   @Test
@@ -474,8 +446,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   @Test(expected = ScheduleException.class)
   public void testCreateDuplicateCronJob() throws Exception {
-    ParsedConfiguration job = makeCronJob(KEY_A, 1, "1 1 1 1 1");
-    expect(cronScheduler.schedule(eq(job.get().getCronSchedule()), EasyMock.<Runnable>anyObject()))
+    ParsedConfiguration parsedConfiguration = makeCronJob(KEY_A, 1, "1 1 1 1 1");
+    JobConfiguration job = parsedConfiguration.getJobConfig();
+    expect(cronScheduler.schedule(eq(job.getCronSchedule()), EasyMock.<Runnable>anyObject()))
         .andReturn("key");
 
     control.replay();
@@ -483,7 +456,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     // Cron jobs are scheduled on a delay, so this job's tasks will not be scheduled immediately,
     // but duplicate jobs should still be rejected.
-    scheduler.createJob(job);
+    scheduler.createJob(parsedConfiguration);
     assertTaskCount(0);
 
     scheduler.createJob(makeJob(KEY_A, 1));
@@ -494,18 +467,19 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     // Create a cron job, ask the scheduler to start it, and ensure that the tasks exist
     // in the PENDING state.
 
-    ParsedConfiguration job = makeCronJob(KEY_A, 1, "1 1 1 1 1");
-    expect(cronScheduler.schedule(eq(job.get().getCronSchedule()), EasyMock.<Runnable>anyObject()))
+    ParsedConfiguration parsedConfiguration = makeCronJob(KEY_A, 1, "1 1 1 1 1");
+    JobConfiguration job = parsedConfiguration.getJobConfig();
+    expect(cronScheduler.schedule(eq(job.getCronSchedule()), EasyMock.<Runnable>anyObject()))
         .andReturn("key");
 
     control.replay();
     buildScheduler();
 
-    scheduler.createJob(job);
+    scheduler.createJob(parsedConfiguration);
     assertTaskCount(0);
 
-    scheduler.startCronJob(job.get().getKey());
-    assertEquals(PENDING, getOnlyTask(Query.jobScoped(job.get().getKey())).getStatus());
+    scheduler.startCronJob(job.getKey());
+    assertEquals(PENDING, getOnlyTask(Query.jobScoped(job.getKey())).getStatus());
   }
 
   @Test(expected = ScheduleException.class)
@@ -543,14 +517,15 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     // Try to start a cron job that is not owned by us.
     // Should throw an exception.
 
-    ParsedConfiguration job = makeCronJob(KEY_A, 1, "1 1 1 1 1");
-    expect(cronScheduler.schedule(eq(job.get().getCronSchedule()), EasyMock.<Runnable>anyObject()))
+    ParsedConfiguration parsedConfiguration = makeCronJob(KEY_A, 1, "1 1 1 1 1");
+    JobConfiguration job = parsedConfiguration.getJobConfig();
+    expect(cronScheduler.schedule(eq(job.getCronSchedule()), EasyMock.<Runnable>anyObject()))
         .andReturn("key");
 
     control.replay();
     buildScheduler();
 
-    scheduler.createJob(job);
+    scheduler.createJob(parsedConfiguration);
     assertTaskCount(0);
 
     scheduler.startCronJob(KEY_B);
@@ -560,15 +535,16 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   public void testStartRunningCronJob() throws Exception {
     // Start a cron job that is already started by an earlier
     // call and is PENDING. Make sure it follows the cron collision policy.
-    ParsedConfiguration job = makeCronJob(KEY_A, 1, "1 1 1 1 1");
-    job.get().setCronCollisionPolicy(CronCollisionPolicy.KILL_EXISTING);
-    expect(cronScheduler.schedule(eq(job.get().getCronSchedule()), EasyMock.<Runnable>anyObject()))
+    ParsedConfiguration parsedConfiguration = makeCronJob(KEY_A, 1, "1 1 1 1 1");
+    JobConfiguration job = parsedConfiguration.getJobConfig();
+    job.setCronCollisionPolicy(CronCollisionPolicy.KILL_EXISTING);
+    expect(cronScheduler.schedule(eq(job.getCronSchedule()), EasyMock.<Runnable>anyObject()))
         .andReturn("key");
 
     control.replay();
     buildScheduler();
 
-    scheduler.createJob(job);
+    scheduler.createJob(parsedConfiguration);
     assertTaskCount(0);
     assertTrue(cron.hasJob(KEY_A));
 
@@ -591,15 +567,16 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   public void testStartRunningOverlapCronJob() throws Exception {
     // Start a cron job that is already started by an earlier
     // call and is PENDING. Make sure it follows the cron collision policy.
-    ParsedConfiguration job = makeCronJob(KEY_A, 1, "1 1 1 1 1");
-    job.get().setCronCollisionPolicy(CronCollisionPolicy.RUN_OVERLAP);
-    expect(cronScheduler.schedule(eq(job.get().getCronSchedule()), EasyMock.<Runnable>anyObject()))
+    ParsedConfiguration parsedConfiguration = makeCronJob(KEY_A, 1, "1 1 1 1 1");
+    JobConfiguration job = parsedConfiguration.getJobConfig();
+    parsedConfiguration.getJobConfig().setCronCollisionPolicy(CronCollisionPolicy.RUN_OVERLAP);
+    expect(cronScheduler.schedule(eq(job.getCronSchedule()), EasyMock.<Runnable>anyObject()))
         .andReturn("key");
 
     control.replay();
     buildScheduler();
 
-    scheduler.createJob(job);
+    scheduler.createJob(parsedConfiguration);
     assertTaskCount(0);
     assertTrue(cron.hasJob(KEY_A));
 
@@ -626,27 +603,28 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testKillCreateCronJob() throws Exception {
-    ParsedConfiguration job = makeCronJob(KEY_A, 1, "1 1 1 1 1");
-    expect(cronScheduler.schedule(eq(job.get().getCronSchedule()), EasyMock.<Runnable>anyObject()))
+    ParsedConfiguration parsedConfiguration = makeCronJob(KEY_A, 1, "1 1 1 1 1");
+    JobConfiguration job = parsedConfiguration.getJobConfig();
+    expect(cronScheduler.schedule(eq(job.getCronSchedule()), EasyMock.<Runnable>anyObject()))
         .andReturn("key");
     cronScheduler.deschedule("key");
 
     ParsedConfiguration updated = makeCronJob(KEY_A, 1, "1 2 3 4 5");
-    expect(
-        cronScheduler.schedule(eq(updated.get().getCronSchedule()), EasyMock.<Runnable>anyObject()))
+    JobConfiguration updatedJob = updated.getJobConfig();
+    expect(cronScheduler.schedule(eq(updatedJob.getCronSchedule()), EasyMock.<Runnable>anyObject()))
         .andReturn("key2");
 
     control.replay();
     buildScheduler();
 
-    scheduler.createJob(job);
+    scheduler.createJob(parsedConfiguration);
     assertTrue(cron.hasJob(KEY_A));
 
     scheduler.killTasks(Query.jobScoped(KEY_A).get(), OWNER_A.getUser());
     scheduler.createJob(updated);
 
     JobConfiguration stored = Iterables.getOnlyElement(cron.getJobs());
-    assertEquals(updated.get().getCronSchedule(), stored.getCronSchedule());
+    assertEquals(updatedJob.getCronSchedule(), stored.getCronSchedule());
   }
 
   @Test
@@ -834,14 +812,15 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testCronJobLifeCycle() throws Exception {
-    ParsedConfiguration job = makeCronJob(KEY_A, 10, "1 1 1 1 1");
-    expect(cronScheduler.schedule(eq(job.get().getCronSchedule()), EasyMock.<Runnable>anyObject()))
+    ParsedConfiguration parsedConfiguration = makeCronJob(KEY_A, 10, "1 1 1 1 1");
+    JobConfiguration job = parsedConfiguration.getJobConfig();
+    expect(cronScheduler.schedule(eq(job.getCronSchedule()), EasyMock.<Runnable>anyObject()))
         .andReturn("key");
 
     control.replay();
     buildScheduler();
 
-    scheduler.createJob(job);
+    scheduler.createJob(parsedConfiguration);
     assertTaskCount(0);
     assertTrue(cron.hasJob(KEY_A));
 
@@ -863,19 +842,20 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testCronNoSuicide() throws Exception {
-    ParsedConfiguration job = makeCronJob(KEY_A, 10, "1 1 1 1 1");
-    job.get().setCronCollisionPolicy(CronCollisionPolicy.KILL_EXISTING);
-    expect(cronScheduler.schedule(eq(job.get().getCronSchedule()), EasyMock.<Runnable>anyObject()))
+    ParsedConfiguration parsedConfiguration = makeCronJob(KEY_A, 10, "1 1 1 1 1");
+    JobConfiguration job = parsedConfiguration.getJobConfig();
+    job.setCronCollisionPolicy(CronCollisionPolicy.KILL_EXISTING);
+    expect(cronScheduler.schedule(eq(job.getCronSchedule()), EasyMock.<Runnable>anyObject()))
         .andReturn("key");
 
     control.replay();
     buildScheduler();
 
-    scheduler.createJob(job);
+    scheduler.createJob(parsedConfiguration);
     assertTaskCount(0);
 
     try {
-      scheduler.createJob(job);
+      scheduler.createJob(parsedConfiguration);
       fail();
     } catch (ScheduleException e) {
       // Expected.
@@ -894,7 +874,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     assertTrue(Sets.intersection(taskIds, Tasks.ids(getTasksOwnedBy(OWNER_A))).isEmpty());
 
     try {
-      scheduler.createJob(job);
+      scheduler.createJob(parsedConfiguration);
       fail();
     } catch (ScheduleException e) {
       // Expected.
@@ -940,9 +920,10 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testKillCronTask() throws Exception {
-    ParsedConfiguration job = makeCronJob(KEY_A, 1, "1 1 1 1 1");
-    job.get().setCronCollisionPolicy(CronCollisionPolicy.KILL_EXISTING);
-    expect(cronScheduler.schedule(eq(job.get().getCronSchedule()), EasyMock.<Runnable>anyObject()))
+    ParsedConfiguration parsedConfiguration = makeCronJob(KEY_A, 1, "1 1 1 1 1");
+    JobConfiguration job = parsedConfiguration.getJobConfig();
+    job.setCronCollisionPolicy(CronCollisionPolicy.KILL_EXISTING);
+    expect(cronScheduler.schedule(eq(job.getCronSchedule()), EasyMock.<Runnable>anyObject()))
         .andReturn("key");
     cronScheduler.deschedule("key");
 
@@ -1060,20 +1041,21 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testUpdateCronJob() throws Exception {
-    ParsedConfiguration job = makeCronJob(KEY_A, 1, "1 1 1 1 1");
-    expect(cronScheduler.schedule(eq(job.get().getCronSchedule()), EasyMock.<Runnable>anyObject()))
+    ParsedConfiguration parsedConfiguration = makeCronJob(KEY_A, 1, "1 1 1 1 1");
+    JobConfiguration job = parsedConfiguration.getJobConfig();
+    expect(cronScheduler.schedule(eq(job.getCronSchedule()), EasyMock.<Runnable>anyObject()))
         .andReturn("key");
     cronScheduler.deschedule("key");
 
     ParsedConfiguration updated = makeCronJob(KEY_A, 5, "1 2 3 4 5");
-    expect(
-        cronScheduler.schedule(eq(updated.get().getCronSchedule()), EasyMock.<Runnable>anyObject()))
+    JobConfiguration updatedJob = updated.getJobConfig();
+    expect(cronScheduler.schedule(eq(updatedJob.getCronSchedule()), EasyMock.<Runnable>anyObject()))
         .andReturn("key2");
 
     control.replay();
     buildScheduler();
 
-    scheduler.createJob(job);
+    scheduler.createJob(parsedConfiguration);
     assertFalse(scheduler.initiateJobUpdate(updated).isPresent());
     scheduler.startCronJob(KEY_A);
     assertTaskCount(5);
@@ -1156,12 +1138,15 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.finishUpdate(KEY_A, USER_A, token, SUCCESS);
   }
 
-  private void verifyUpdate(Set<ScheduledTask> tasks, ParsedConfiguration job,
+  private void verifyUpdate(
+      Set<ScheduledTask> tasks,
+      ParsedConfiguration job,
       Closure<ScheduledTask> updatedTaskChecker) {
+
     Map<Integer, ScheduledTask> fetchedShards =
         Maps.uniqueIndex(tasks, Tasks.SCHEDULED_TO_SHARD_ID);
     Map<Integer, TwitterTaskInfo> originalConfigsByShard =
-        Maps.uniqueIndex(job.generateTaskConfigs(), Tasks.INFO_TO_SHARD_ID);
+        Maps.uniqueIndex(job.getTaskConfigs(), Tasks.INFO_TO_SHARD_ID);
     assertEquals(originalConfigsByShard.keySet(), fetchedShards.keySet());
     for (ScheduledTask task : tasks) {
       updatedTaskChecker.execute(task);
@@ -1177,19 +1162,24 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       control.replay();
       buildScheduler();
 
-      TwitterTaskInfo task = productionTask().deepCopy().setRequestedPorts(OLD_PORTS);
-      ParsedConfiguration job = makeJob(KEY_A, task, numTasks);
+      ParsedConfiguration job = makeJob(KEY_A, productionTask().deepCopy(), numTasks);
+      for (TwitterTaskInfo config : job.getTaskConfigs()) {
+        config.setRequestedPorts(OLD_PORTS);
+      }
       scheduler.createJob(job);
 
-      task = productionTask().deepCopy().setRequestedPorts(NEW_PORTS);
-      ParsedConfiguration updatedJob = makeJob(KEY_A, task, numTasks + additionalTasks);
+      ParsedConfiguration updatedJob =
+          makeJob(KEY_A, productionTask().deepCopy(), numTasks + additionalTasks);
+      for (TwitterTaskInfo config : updatedJob.getTaskConfigs()) {
+        config.setRequestedPorts(NEW_PORTS);
+      }
       Optional<String> updateToken = scheduler.initiateJobUpdate(updatedJob);
 
-      Set<Integer> jobShards = FluentIterable.from(updatedJob.generateTaskConfigs())
+      Set<Integer> jobShards = FluentIterable.from(updatedJob.getTaskConfigs())
           .transform(Tasks.INFO_TO_SHARD_ID).toSet();
 
       UpdateResult result = performRegisteredUpdate(
-          updatedJob.get(),
+          updatedJob.getJobConfig(),
           updateToken.get(),
           jobShards,
           numTasks,
@@ -1203,8 +1193,12 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       scheduler.initiateJobUpdate(job);
     }
 
-    abstract UpdateResult performRegisteredUpdate(JobConfiguration job, String updateToken,
-        Set<Integer> jobShards, int numTasks, int additionalTasks) throws Exception;
+    abstract UpdateResult performRegisteredUpdate(
+        JobConfiguration job,
+        String updateToken,
+        Set<Integer> jobShards,
+        int numTasks,
+        int additionalTasks) throws Exception;
 
     void postUpdate() {
       // Default no-op.
@@ -1273,6 +1267,13 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     changeStatus(Query.roleScoped(ROLE_A), RUNNING);
 
     ParsedConfiguration updatedJob = makeJob(KEY_A, task, 10);
+    Set<String> differentPorts = ImmutableSet.of("different");
+    // Change the requested ports on shard 1 to ensure that it (and only it) gets restarted as a
+    // part of the update.
+    Iterables.getOnlyElement(Iterables.filter(updatedJob.getTaskConfigs(),
+        Predicates.compose(Predicates.equalTo(1), Tasks.INFO_TO_SHARD_ID)))
+        .setRequestedPorts(differentPorts);
+
     Optional<String> updateToken = scheduler.initiateJobUpdate(updatedJob);
 
     ImmutableMap.Builder<Integer, ShardUpdateResult> expected = ImmutableMap.builder();
@@ -1595,12 +1596,17 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    TwitterTaskInfo task = productionTask().deepCopy().setRequestedPorts(OLD_PORTS);
-    ParsedConfiguration job = makeJob(KEY_A, task, numTasks);
+    ParsedConfiguration job = makeJob(KEY_A, productionTask().deepCopy(), numTasks);
+    for (TwitterTaskInfo config : job.getTaskConfigs()) {
+      config.setRequestedPorts(OLD_PORTS);
+    }
     scheduler.createJob(job);
 
-    task = productionTask().deepCopy().setRequestedPorts(NEW_PORTS);
-    ParsedConfiguration updatedJob = makeJob(KEY_A, task, numTasks + additionalTasks);
+    ParsedConfiguration updatedJob =
+        makeJob(KEY_A, productionTask().deepCopy(), numTasks + additionalTasks);
+    for (TwitterTaskInfo config : updatedJob.getTaskConfigs()) {
+      config.setRequestedPorts(NEW_PORTS);
+    }
     scheduler.initiateJobUpdate(updatedJob);
   }
 
@@ -1795,7 +1801,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       String cronSchedule) throws TaskDescriptionException {
 
     ParsedConfiguration job = makeJob(jobKey, numDefaultTasks);
-    job.get().setCronSchedule(cronSchedule);
+    job.getJobConfig().setCronSchedule(cronSchedule);
     return job;
   }
 
@@ -1803,6 +1809,12 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       throws TaskDescriptionException  {
 
     return makeJob(jobKey, productionTask(), numDefaultTasks);
+  }
+
+  private static ParsedConfiguration makeJob(JobKey jobKey, TwitterTaskInfo task)
+      throws TaskDescriptionException {
+
+    return makeJob(jobKey, task, 1);
   }
 
   private static ParsedConfiguration makeJob(
@@ -1816,9 +1828,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setKey(jobKey)
         .setShardCount(numTasks)
         .setTaskConfig(new TwitterTaskInfo(task)
-            .setOwner(makeIdentity(jobKey))
-            .setEnvironment(jobKey.getEnvironment())
-            .setJobName(jobKey.getName()));
+          .setOwner(makeIdentity(jobKey))
+          .setEnvironment(jobKey.getEnvironment())
+          .setJobName(jobKey.getName()));
     return ParsedConfiguration.fromUnparsed(job);
   }
 

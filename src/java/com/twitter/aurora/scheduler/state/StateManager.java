@@ -9,6 +9,7 @@ import org.apache.mesos.Protos.SlaveID;
 import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.TaskQuery;
+import com.twitter.aurora.gen.TwitterTaskInfo;
 
 /**
  * Thin interface for the state manager.
@@ -45,6 +46,14 @@ public interface StateManager {
       String slaveHost,
       SlaveID slaveId,
       Set<Integer> assignedPorts);
+
+  /**
+   * Inserts new tasks into the store. Tasks will immediately move into PENDING and will be eligible
+   * for scheduling.
+   *
+   * @param tasks Tasks to insert.
+   */
+  void insertPendingTasks(Set<TwitterTaskInfo> tasks);
 
   /**
    * Deletes records of tasks from the task store.

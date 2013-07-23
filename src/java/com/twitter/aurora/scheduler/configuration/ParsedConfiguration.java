@@ -18,10 +18,22 @@ import com.twitter.aurora.scheduler.configuration.ConfigurationManager.TaskDescr
 public final class ParsedConfiguration {
 
   private final JobConfiguration parsed;
+  private final Set<TwitterTaskInfo> tasks;
 
+  /**
+   * Constructs a ParsedConfiguration object and populates the set of {@link TwitterTaskInfo}s for
+   * the provided config.
+   *
+   * @param parsed A parsed {@link JobConfiguration}.
+   */
   @VisibleForTesting
-  public ParsedConfiguration(JobConfiguration parsed) throws TaskDescriptionException {
+  public ParsedConfiguration(JobConfiguration parsed) {
     this.parsed = parsed;
+    ImmutableSet.Builder<TwitterTaskInfo> builder = ImmutableSet.builder();
+    for (int i = 0; i < parsed.getShardCount(); i++) {
+      builder.add(parsed.getTaskConfig().deepCopy().setShardId(i));
+    }
+    this.tasks = builder.build();
   }
 
   /**
@@ -38,23 +50,12 @@ public final class ParsedConfiguration {
     return new ParsedConfiguration(ConfigurationManager.validateAndPopulate(unparsed));
   }
 
-  public JobConfiguration get() {
+  public JobConfiguration getJobConfig() {
     return parsed;
   }
 
-  /**
-   * Generates tasks for the parsed configuration.
-   *
-   * @return A set of tasks with shardIds populated.
-   */
-  @VisibleForTesting
-  public Set<TwitterTaskInfo> generateTaskConfigs() {
-    // TODO(Sathya): Remove this after deploying MESOS-3048.
-    ImmutableSet.Builder<TwitterTaskInfo> builder = ImmutableSet.builder();
-    for (int i = 0; i < parsed.getShardCount(); i++) {
-      builder.add(parsed.getTaskConfig().deepCopy().setShardId(i));
-    }
-    return builder.build();
+  public Set<TwitterTaskInfo> getTaskConfigs() {
+    return tasks;
   }
 
   @Override

@@ -7,6 +7,7 @@ import com.google.inject.Inject;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.scheduler.base.ScheduleException;
+import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
 
 /**
  * Interface for a job manager.  A job manager is responsible for deciding whether and when to
@@ -14,6 +15,8 @@ import com.twitter.aurora.scheduler.base.ScheduleException;
  */
 public abstract class JobManager {
 
+  // TODO(Bill Farner): Remove this. It is only used since the CronJobManager and SchedulerCoreImpl
+  // have a circular dependency.
   @Inject
   protected SchedulerCore schedulerCore;
 
@@ -30,11 +33,11 @@ public abstract class JobManager {
    * returns or at any point in the future.  This method will return false if the manager will not
    * execute the job.
    *
-   * @param job The job to schedule.
+   * @param config The job to schedule.
    * @return {@code true} If the manager accepted the job, {@code false} otherwise.
    * @throws ScheduleException If there is a problem with scheduling the job.
    */
-  public abstract boolean receiveJob(JobConfiguration job) throws ScheduleException;
+  public abstract boolean receiveJob(ParsedConfiguration config) throws ScheduleException;
 
   /**
    * Fetches the configured jobs that this manager is storing.

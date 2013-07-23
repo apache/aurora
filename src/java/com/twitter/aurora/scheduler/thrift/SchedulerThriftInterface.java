@@ -217,7 +217,7 @@ class SchedulerThriftInterface implements SchedulerController {
       schedulerCore.createJob(parsed);
       response.setResponseCode(OK)
           .setMessage(String.format("%d new tasks pending for job %s",
-              parsed.get().getTaskConfigsSize(), JobKeys.toPath(job)));
+              parsed.getJobConfig().getShardCount(), JobKeys.toPath(job)));
     } catch (ConfigurationManager.TaskDescriptionException e) {
       response.setResponseCode(INVALID_REQUEST)
           .setMessage("Invalid task description: " + e.getMessage());
@@ -237,7 +237,7 @@ class SchedulerThriftInterface implements SchedulerController {
 
     PopulateJobResponse response = new PopulateJobResponse();
     try {
-      response.setPopulated(ConfigurationManager.validateAndPopulate(description).getTaskConfigs())
+      response.setPopulated(ParsedConfiguration.fromUnparsed(description).getTaskConfigs())
           .setResponseCode(OK)
           .setMessage("Tasks populated");
     } catch (TaskDescriptionException e) {
@@ -266,6 +266,8 @@ class SchedulerThriftInterface implements SchedulerController {
     } catch (ScheduleException e) {
       response.setResponseCode(INVALID_REQUEST)
           .setMessage("Failed to start cron job - " + e.getMessage());
+    } catch (TaskDescriptionException e) {
+      response.setResponseCode(ERROR).setMessage("Invalid task description: " + e.getMessage());
     }
 
     return response;

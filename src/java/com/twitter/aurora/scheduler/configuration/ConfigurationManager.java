@@ -1,23 +1,17 @@
 package com.twitter.aurora.scheduler.configuration;
 
-import java.util.List;
-import java.util.Set;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
 import javax.annotation.Nullable;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
-import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
@@ -33,7 +27,6 @@ import com.twitter.aurora.gen.TwitterTaskInfo;
 import com.twitter.aurora.gen.TwitterTaskInfo._Fields;
 import com.twitter.aurora.gen.ValueConstraint;
 import com.twitter.aurora.scheduler.base.JobKeys;
-import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.Positive;
@@ -161,9 +154,6 @@ public final class ConfigurationManager {
           new RequiredFieldValidator<Number>(_Fields.RAM_MB, new GreaterThan(0.0, "ram_mb")),
           new RequiredFieldValidator<Number>(_Fields.DISK_MB, new GreaterThan(0.0, "disk_mb")));
 
-  @VisibleForTesting
-  public static enum ShardIdState { PRESENT, ABSENT };
-
   private ConfigurationManager() {
     // Utility class.
   }
@@ -243,13 +233,16 @@ public final class ConfigurationManager {
 
     Preconditions.checkNotNull(job);
 
-    if (job.isSetTaskConfigs()) {
-      throw new TaskDescriptionException("Job configuration cannot have taskConfigs set. "
-          + "Please update your mesos client.");
+    if (!job.isSetTaskConfig()) {
+      throw new TaskDescriptionException("Job configuration must have taskConfig set.");
     }
 
     if (!job.isSetShardCount()) {
       throw new TaskDescriptionException("Job configuration does not have shardCount set.");
+    }
+
+    if (job.getShardCount() <= 0) {
+      throw new TaskDescriptionException("Shard count must be positive.");
     }
 
     if (job.getShardCount() > MAX_TASKS_PER_JOB.get()) {
@@ -264,52 +257,18 @@ public final class ConfigurationManager {
       throw new TaskDescriptionException("Job name contains illegal characters: " + copy.getName());
     }
 
-    // Temporarily support JobConfiguration objects that are 'heterogeneous'.  This allows the
-    // client to begin sending homogeneous jobs before the scheduler uses them internally.
-    if (copy.isSetTaskConfig()) {
-      if (copy.getShardCount() <= 0) {
-        throw new TaskDescriptionException("Shard count must be positive.");
-      }
-      if (copy.isSetTaskConfigs()) {
-        throw new TaskDescriptionException(
-            "'taskConfigs' and 'taskConfig' fields may not be used together.");
-      }
-      // TODO(William Farner): Eliminate this once JobConfigurations are used all the way into
-      // the storage layer.  When eliminating this, also remove scrubNonUniqueTaskFields() and check
-      // its call path.
-      for (int i = 0; i < copy.getShardCount(); i++) {
-        copy.addToTaskConfigs(copy.getTaskConfig().deepCopy().setShardId(i));
-      }
-    } else if (copy.getTaskConfigsSize() == 0) {
-      throw new TaskDescriptionException("No tasks specified.");
+    populateFields(copy);
+    TwitterTaskInfo config = copy.getTaskConfig();
+
+    if (REQUIRE_CONTACT_EMAIL.get()
+        && (!config.isSetContactEmail()
+            || !config.getContactEmail().matches("[^@]+@twitter.com"))) {
+      throw new TaskDescriptionException(
+          "A valid twitter.com contact email address is required.");
     }
 
-    Set<Integer> shardIds = Sets.newHashSet();
-
-    // We need to fill in defaults on the template if one is present.
-    if (copy.isSetTaskConfig()) {
-      populateFields(copy, copy.getTaskConfig(), ShardIdState.ABSENT);
-    }
-
-    List<TwitterTaskInfo> configsCopy = Lists.newArrayList(copy.getTaskConfigs());
-    for (TwitterTaskInfo config : configsCopy) {
-      populateFields(copy, config, ShardIdState.PRESENT);
-      if (!shardIds.add(config.getShardId())) {
-        throw new TaskDescriptionException("Duplicate shard ID " + config.getShardId());
-      }
-
-      if (REQUIRE_CONTACT_EMAIL.get()
-          && (!config.isSetContactEmail()
-              || !config.getContactEmail().matches("[^@]+@twitter.com"))) {
-        throw new TaskDescriptionException(
-            "A valid twitter.com contact email address is required.");
-      }
-
-      Constraint constraint = getDedicatedConstraint(config);
-      if (constraint == null) {
-        continue;
-      }
-
+    Constraint constraint = getDedicatedConstraint(config);
+    if (constraint != null) {
       if (!isValueConstraint(constraint.getConstraint())) {
         throw new TaskDescriptionException("A dedicated constraint must be of value type.");
       }
@@ -327,27 +286,7 @@ public final class ConfigurationManager {
       }
     }
 
-    Set<TwitterTaskInfo> modifiedConfigs = ImmutableSet.copyOf(configsCopy);
-    Preconditions.checkState(modifiedConfigs.size() == configsCopy.size(),
-        "Task count changed after populating fields.");
-
-    // Ensure that all production flags are equal.
-    int numProductionTasks = Iterables.size(Iterables.filter(modifiedConfigs, Tasks.IS_PRODUCTION));
-    if ((numProductionTasks != 0) && (numProductionTasks != modifiedConfigs.size())) {
-      throw new TaskDescriptionException("Tasks within a job must use the same production flag.");
-    }
-
-    // The configs were mutated, so we need to refresh the Set.
-    copy.setTaskConfigs(modifiedConfigs);
-
     maybeFillJobKey(job);
-
-    // Check for contiguous shard IDs.
-    for (int i = 0; i < copy.getTaskConfigsSize(); i++) {
-      if (!shardIds.contains(i)) {
-        throw new TaskDescriptionException("Shard ID " + i + " is missing.");
-      }
-    }
 
     return copy;
   }
@@ -356,29 +295,20 @@ public final class ConfigurationManager {
    * Populates fields in an individual task configuration, using the job as context.
    *
    * @param job The job that the task is a member of.
-   * @param config Task to populate.
-   * @param shardIdState Whether the task should have a shard ID or not.
    * @return A reference to the modified {@code config} (for chaining).
    * @throws TaskDescriptionException If the task is invalid.
    */
   @VisibleForTesting
-  public static TwitterTaskInfo populateFields(
-      JobConfiguration job,
-      TwitterTaskInfo config,
-      ShardIdState shardIdState)
+  public static TwitterTaskInfo populateFields(JobConfiguration job)
       throws TaskDescriptionException {
+
+    TwitterTaskInfo config = job.getTaskConfig();
     if (config == null) {
       throw new TaskDescriptionException("Task may not be null.");
     }
 
-    if (shardIdState == ShardIdState.PRESENT) {
-      if (!config.isSetShardId()) {
-        throw new TaskDescriptionException("Tasks must have a shard ID.");
-      }
-    } else if (shardIdState == ShardIdState.ABSENT) {
-      if (config.isSetShardId()) {
-        throw new TaskDescriptionException("Template tasks must not have a shard ID.");
-      }
+    if (config.isSetShardId()) {
+      throw new TaskDescriptionException("Template tasks must not have a shard ID.");
     }
 
     if (!config.isSetRequestedPorts()) {
@@ -468,46 +398,14 @@ public final class ConfigurationManager {
    */
   @VisibleForTesting
   public static void applyDefaultsIfUnset(JobConfiguration job) {
-    if (job.isSetTaskConfig()) {
-      ConfigurationManager.applyDefaultsIfUnset(job.getTaskConfig());
-    } else {
-      // TODO(Sathya): Remove this after deploying MESOS-3048.
-      Optional<TwitterTaskInfo> template = getTemplateTaskIfExists(job.getTaskConfigs());
-      if (template.isPresent()) {
-        job.setTaskConfig(ConfigurationManager.applyDefaultsIfUnset(template.get()));
-        job.setShardCount(job.getTaskConfigsSize());
-      } else {
-        LOG.warning("Unable to backfill taskConfig for job: " + job);
-      }
-    }
+   ConfigurationManager.applyDefaultsIfUnset(job.getTaskConfig());
 
    try {
+      // TODO(Bill Farner): Get rid of this since we should be out of backfill phase.
       maybeFillJobKey(job);
     } catch (TaskDescriptionException e) {
       LOG.warning("Failed to fill job key in " + job + " due to " + e);
     }
-  }
-
-  // TODO(Sathya): Remove this after deploying MESOS-3048.
-  private static Optional<TwitterTaskInfo> getTemplateTaskIfExists(Set<TwitterTaskInfo> tasks) {
-    if (tasks.size() == 0) {
-      return Optional.absent();
-    }
-
-    Function<TwitterTaskInfo, TwitterTaskInfo> scrubber =
-        new Function<TwitterTaskInfo, TwitterTaskInfo>() {
-          @Override public TwitterTaskInfo apply(TwitterTaskInfo task) {
-            return scrubNonUniqueTaskFields(task);
-          }
-        };
-
-    Set<TwitterTaskInfo> uniqueTasks = FluentIterable.from(tasks).transform(scrubber).toSet();
-
-    if (uniqueTasks.size() == 1) {
-      return Optional.of(Iterables.getOnlyElement(uniqueTasks));
-    }
-
-    return Optional.absent();
   }
 
   private static void maybeFillLinks(TwitterTaskInfo task) {
@@ -536,21 +434,12 @@ public final class ConfigurationManager {
       return;
     }
 
-    // If no taskConfig (template) is set use an arbitrary shard to fill in missing job fields.
-    Optional<TwitterTaskInfo> template;
-    if (job.isSetTaskConfig()) {
-      template = Optional.of(job.getTaskConfig());
-    } else {
-      template = Optional.fromNullable(Iterables.getFirst(job.getTaskConfigs(), null));
-    }
-    if (!template.isPresent()) {
-      throw new TaskDescriptionException("Job must have at least one task");
-    }
+    TwitterTaskInfo template = job.getTaskConfig();
 
     LOG.info("Attempting to synthesize key for job " + job + " using template task " + template);
     JobKey synthesizedJobKey = new JobKey()
         .setRole(job.getOwner().getRole())
-        .setEnvironment(template.get().getEnvironment())
+        .setEnvironment(template.getEnvironment())
         .setName(job.getName());
 
     if (!JobKeys.isValid(synthesizedJobKey)) {

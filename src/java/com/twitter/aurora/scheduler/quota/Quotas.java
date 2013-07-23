@@ -1,5 +1,6 @@
 package com.twitter.aurora.scheduler.quota;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
 import com.twitter.aurora.gen.JobConfiguration;
@@ -28,7 +29,11 @@ public final class Quotas {
    */
   public static Quota fromJob(JobConfiguration job) {
     checkNotNull(job);
-    return fromTasks(job.getTaskConfigs());
+    Quota quota = fromTasks(ImmutableSet.of(job.getTaskConfig()));
+    quota.setNumCpus(quota.getNumCpus() * job.getShardCount());
+    quota.setRamMb(quota.getRamMb() * job.getShardCount());
+    quota.setDiskMb(quota.getDiskMb() * job.getShardCount());
+    return quota;
   }
 
   /**

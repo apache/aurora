@@ -12,7 +12,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.aurora.gen.AssignedTask;
-import com.twitter.aurora.gen.CronCollisionPolicy;
+import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
@@ -21,6 +21,7 @@ import com.twitter.aurora.gen.TwitterTaskInfo;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.ScheduleException;
+import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
 import com.twitter.aurora.scheduler.state.CronJobManager.CronScheduler;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.common.testing.EasyMockTest;
@@ -32,6 +33,9 @@ import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.fail;
 
+import static com.twitter.aurora.gen.Constants.DEFAULT_ENVIRONMENT;
+import static com.twitter.aurora.gen.CronCollisionPolicy.RUN_OVERLAP;
+
 public class CronJobManagerTest extends EasyMockTest {
 
   private static final String OWNER = "owner";
@@ -39,6 +43,7 @@ public class CronJobManagerTest extends EasyMockTest {
   private static final String JOB_NAME = "jobName";
 
   private SchedulerCore scheduler;
+  private StateManagerImpl stateManager;
   private Executor delayExecutor;
   private Capture<Runnable> delayLaunchCapture;
   private StorageTestUtil storageUtil;
@@ -46,18 +51,21 @@ public class CronJobManagerTest extends EasyMockTest {
   private CronScheduler cronScheduler;
   private CronJobManager cron;
   private JobConfiguration job;
+  private ParsedConfiguration parsedConfiguration;
 
   @Before
   public void setUp() throws Exception {
     scheduler = createMock(SchedulerCore.class);
+    stateManager = createMock(StateManagerImpl.class);
     delayExecutor = createMock(Executor.class);
     delayLaunchCapture = createCapture();
     storageUtil = new StorageTestUtil(this);
     storageUtil.expectOperations();
     cronScheduler = createMock(CronScheduler.class);
-    cron = new CronJobManager(storageUtil.storage, cronScheduler, delayExecutor);
+    cron = new CronJobManager(stateManager, storageUtil.storage, cronScheduler, delayExecutor);
     cron.schedulerCore = scheduler;
     job = makeJob();
+    parsedConfiguration = ParsedConfiguration.fromUnparsed(job);
   }
 
   private void expectJobAccepted(JobConfiguration savedJob) {
@@ -67,12 +75,12 @@ public class CronJobManagerTest extends EasyMockTest {
   }
 
   private void expectJobAccepted() {
-    expectJobAccepted(job);
+    expectJobAccepted(parsedConfiguration.getJobConfig());
   }
 
   private IExpectationSetters<?> expectJobFetch() {
     return expect(storageUtil.jobStore.fetchJob(CronJobManager.MANAGER_KEY, job.getKey()))
-        .andReturn(Optional.of(job));
+        .andReturn(Optional.of(parsedConfiguration.getJobConfig()));
   }
 
   private IExpectationSetters<?> expectActiveTaskFetch(ScheduledTask... activeTasks) {
@@ -86,11 +94,11 @@ public class CronJobManagerTest extends EasyMockTest {
     expectActiveTaskFetch();
 
     // Job is executed immediately since there are no existing tasks to kill.
-    scheduler.runJob(job);
+    stateManager.insertPendingTasks(parsedConfiguration.getTaskConfigs());
 
     control.replay();
 
-    cron.receiveJob(job);
+    cron.receiveJob(parsedConfiguration);
     cron.startJobNow(job.getKey());
   }
 
@@ -114,11 +122,11 @@ public class CronJobManagerTest extends EasyMockTest {
     // Simulate the live task disappearing.
     expectActiveTaskFetch();
 
-    scheduler.runJob(job);
+    stateManager.insertPendingTasks(parsedConfiguration.getTaskConfigs());
 
     control.replay();
 
-    cron.receiveJob(job);
+    cron.receiveJob(parsedConfiguration);
     cron.startJobNow(job.getKey());
     delayLaunchCapture.getValue().run();
   }
@@ -151,12 +159,12 @@ public class CronJobManagerTest extends EasyMockTest {
     expectActiveTaskFetch(new ScheduledTask()).times(2);
     expectActiveTaskFetch();
 
-    scheduler.runJob(job);
+    stateManager.insertPendingTasks(parsedConfiguration.getTaskConfigs());
     expectLastCall().times(2);
 
     control.replay();
 
-    cron.receiveJob(job);
+    cron.receiveJob(parsedConfiguration);
     cron.startJobNow(job.getKey());
     delayLaunchCapture.getValue().run();
 
@@ -188,11 +196,11 @@ public class CronJobManagerTest extends EasyMockTest {
     // Simulate the live task disappearing.
     expectActiveTaskFetch();
 
-    scheduler.runJob(job);
+    stateManager.insertPendingTasks(parsedConfiguration.getTaskConfigs());
 
     control.replay();
 
-    cron.receiveJob(job);
+    cron.receiveJob(parsedConfiguration);
 
     // Attempt to trick the cron manager into launching multiple times, or launching multiple
     // pollers.
@@ -204,39 +212,35 @@ public class CronJobManagerTest extends EasyMockTest {
 
   @Test
   public void testUpdate() throws Exception {
-    JobConfiguration updated = makeJob().setCronSchedule("1 2 3 4 5");
+    ParsedConfiguration updated = new ParsedConfiguration(job.setCronSchedule("1 2 3 4 5"));
 
     expectJobAccepted();
     cronScheduler.deschedule("key");
-    expectJobAccepted(updated);
+    expectJobAccepted(updated.getJobConfig());
 
     control.replay();
 
-    cron.receiveJob(job);
+    cron.receiveJob(parsedConfiguration);
     cron.updateJob(updated);
   }
 
   @Test
   public void testRunOverlapNoShardCollision() throws Exception {
-    TwitterTaskInfo task = new TwitterTaskInfo().setShardId(0);
     ScheduledTask scheduledTask = new ScheduledTask()
         .setStatus(ScheduleStatus.RUNNING)
-        .setAssignedTask(new AssignedTask().setTask(task));
-
-    job = makeJob()
-        .setTaskConfigs(ImmutableSet.of(task))
-        .setCronCollisionPolicy(CronCollisionPolicy.RUN_OVERLAP);
+        .setAssignedTask(new AssignedTask().setTask(defaultTask()));
+    parsedConfiguration =
+        ParsedConfiguration.fromUnparsed(job.deepCopy().setCronCollisionPolicy(RUN_OVERLAP));
     expectJobAccepted();
     expectJobFetch();
     expectActiveTaskFetch(scheduledTask);
 
-    JobConfiguration shardAdjusted = job.deepCopy()
-        .setTaskConfigs(ImmutableSet.of(task.deepCopy().setShardId(1)));
-    scheduler.runJob(shardAdjusted);
+    stateManager.insertPendingTasks(ImmutableSet.of(
+        parsedConfiguration.getJobConfig().getTaskConfig().deepCopy().setShardId(1)));
 
     control.replay();
 
-    cron.receiveJob(job);
+    cron.receiveJob(parsedConfiguration);
     cron.startJobNow(job.getKey());
   }
 
@@ -250,23 +254,37 @@ public class CronJobManagerTest extends EasyMockTest {
 
     control.replay();
 
-    cron.receiveJob(job);
+    cron.receiveJob(parsedConfiguration);
 
     JobConfiguration failedUpdate = updated.deepCopy();
     failedUpdate.unsetCronSchedule();
     try {
-      cron.updateJob(failedUpdate);
+      cron.updateJob(new ParsedConfiguration(failedUpdate));
       fail();
     } catch (ScheduleException e) {
       // Expected.
     }
 
-    cron.updateJob(updated);
+    cron.updateJob(new ParsedConfiguration(updated));
   }
 
   private JobConfiguration makeJob() {
     return new JobConfiguration()
+        .setName(JOB_NAME)
+        .setOwner(new Identity(OWNER, OWNER))
         .setKey(JobKeys.from(OWNER, ENVIRONMENT, JOB_NAME))
-        .setCronSchedule("1 1 1 1 1");
+        .setCronSchedule("1 1 1 1 1")
+        .setTaskConfig(defaultTask())
+        .setShardCount(1);
+  }
+
+  private static TwitterTaskInfo defaultTask() {
+    return new TwitterTaskInfo()
+        .setContactEmail("testing@twitter.com")
+        .setThermosConfig("data".getBytes())
+        .setNumCpus(1)
+        .setRamMb(1024)
+        .setDiskMb(1024)
+        .setEnvironment(DEFAULT_ENVIRONMENT);
   }
 }

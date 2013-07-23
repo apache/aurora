@@ -1,23 +1,30 @@
 package com.twitter.aurora.scheduler.state;
 
-import com.google.common.base.Preconditions;
+import java.util.logging.Logger;
+
 import com.google.inject.Inject;
 
-import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.scheduler.base.Query;
+import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
 import com.twitter.aurora.scheduler.storage.Storage;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Job scheduler that accepts any job and executes it immediately.
  */
 class ImmediateJobManager extends JobManager {
 
+  private static final Logger LOG = Logger.getLogger(ImmediateJobManager.class.getName());
+
+  private final StateManager stateManager;
   private final Storage storage;
 
   @Inject
-  ImmediateJobManager(Storage storage) {
-    this.storage = Preconditions.checkNotNull(storage);
+  ImmediateJobManager(StateManager stateManager, Storage storage) {
+    this.stateManager = checkNotNull(stateManager);
+    this.storage = checkNotNull(storage);
   }
 
   @Override
@@ -26,8 +33,9 @@ class ImmediateJobManager extends JobManager {
   }
 
   @Override
-  public boolean receiveJob(JobConfiguration job) {
-    schedulerCore.runJob(job);
+  public boolean receiveJob(ParsedConfiguration config) {
+    LOG.info("Launching " + config.getTaskConfigs().size() + " tasks.");
+    stateManager.insertPendingTasks(config.getTaskConfigs());
     return true;
   }
 

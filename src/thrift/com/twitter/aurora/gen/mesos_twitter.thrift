@@ -109,7 +109,8 @@ struct TwitterTaskInfo {
  11: i32 priority
  12: i32 healthCheckIntervalSecs
  13: i32 maxTaskFailures
- 14: i32 shardId                             // The shard ID for this task.
+ 14: i32 shardId                             // TODO(Sathya): Deprecate. Push to AssignedTask.
+                                             // The shard ID for this task.
                                              // Shard IDs must be unique and contiguous within a
                                              // job, and will be in the range [0, N-1] (inclusive)
                                              // for a job that has N instances.
@@ -144,7 +145,6 @@ struct JobConfiguration {
   1: optional string name                    // Name for this job, must be unique for an owner.
                                              // DEPRECATED, use key
   7: Identity owner                          // Owner of this job.
-  3: set<TwitterTaskInfo> taskConfigs        // Soon to be deprecated in favor of taskConfig.
   4: string cronSchedule                     // If present, the job will be handled as a cron job
                                              // with this crontab-syntax schedule.
   5: CronCollisionPolicy cronCollisionPolicy // Collision policy to use when handling overlapping

@@ -180,15 +180,11 @@ public class StateManagerImpl implements StateManager {
     Stats.exportSize("work_queue_depth", workQueue);
   }
 
-  /**
-   * Inserts new tasks into the store.
-   *
-   * @param tasks Tasks to insert.
-   * @return Generated task IDs for the tasks inserted.
-   */
-  Set<String> insertTasks(Set<TwitterTaskInfo> tasks) {
+  @Override
+  public void insertPendingTasks(final Set<TwitterTaskInfo> tasks) {
     checkNotNull(tasks);
 
+    // Done outside the write transaction to minimize the work done inside a transaction.
     final Set<ScheduledTask> scheduledTasks = ImmutableSet.copyOf(transform(tasks, taskCreator));
 
     storage.write(storage.new NoResultSideEffectWork() {
@@ -200,8 +196,6 @@ public class StateManagerImpl implements StateManager {
         }
       }
     });
-
-    return Tasks.ids(scheduledTasks);
   }
 
   /**
@@ -493,7 +487,7 @@ public class StateManagerImpl implements StateManager {
               }
 
               // Create new tasks, so they will be moved into the PENDING state.
-              insertTasks(newTasks);
+              insertPendingTasks(newTasks);
               putResults(result, ShardUpdateResult.ADDED, newShardIds);
             }
 

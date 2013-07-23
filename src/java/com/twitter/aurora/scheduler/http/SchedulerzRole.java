@@ -174,7 +174,7 @@ public class SchedulerzRole extends JerseyTemplateServlet {
               @Override public Map<?, ?> apply(JobConfiguration job) {
                 return ImmutableMap.<Object, Object>builder()
                     .put("name", job.getName())
-                    .put("pendingTaskCount", job.getTaskConfigsSize())
+                    .put("pendingTaskCount", job.getShardCount())
                     .put("cronSchedule", job.getCronSchedule())
                     .put("nextRun", CronJobManager.predictNextRun(job.cronSchedule).getTime())
                     .put("cronCollisionPolicy",
@@ -195,12 +195,10 @@ public class SchedulerzRole extends JerseyTemplateServlet {
     Set<String> packages = Sets.newHashSet();
 
     // Insert all packages for all tasks in the set to eliminate duplicates
-    for (TwitterTaskInfo task : job.getTaskConfigs()) {
-      if (task.getPackagesSize() > 0) {
-        packages.addAll(
-            Lists.newArrayList(Iterables.transform(task.getPackages(),
-                                                   TransformationUtils.PACKAGE_TOSTRING)));
-      }
+    TwitterTaskInfo task = job.getTaskConfig();
+    if (task.getPackagesSize() > 0) {
+      packages.addAll(Lists.newArrayList(
+          Iterables.transform(task.getPackages(), TransformationUtils.PACKAGE_TOSTRING)));
     }
     return Joiner.on(',').join(packages);
   }

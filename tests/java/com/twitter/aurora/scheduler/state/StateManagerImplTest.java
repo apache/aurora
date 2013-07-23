@@ -443,8 +443,8 @@ public class StateManagerImplTest extends EasyMockTest {
     }
   }
 
-  private Set<String> insertTasks(TwitterTaskInfo... tasks) {
-    return stateManager.insertTasks(ImmutableSet.copyOf(tasks));
+  private void insertTasks(TwitterTaskInfo... tasks) {
+    stateManager.insertPendingTasks(ImmutableSet.copyOf(tasks));
   }
 
   private int changeState(String taskId, ScheduleStatus status) {
