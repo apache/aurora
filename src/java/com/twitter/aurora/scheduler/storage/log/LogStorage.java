@@ -30,12 +30,14 @@ import com.twitter.aurora.gen.MaintenanceMode;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskQuery;
+import com.twitter.aurora.gen.TwitterTaskInfo;
 import com.twitter.aurora.gen.storage.LogEntry;
 import com.twitter.aurora.gen.storage.Op;
 import com.twitter.aurora.gen.storage.RemoveJob;
 import com.twitter.aurora.gen.storage.RemoveJobUpdate;
 import com.twitter.aurora.gen.storage.RemoveQuota;
 import com.twitter.aurora.gen.storage.RemoveTasks;
+import com.twitter.aurora.gen.storage.RewriteTask;
 import com.twitter.aurora.gen.storage.SaveAcceptedJob;
 import com.twitter.aurora.gen.storage.SaveFrameworkId;
 import com.twitter.aurora.gen.storage.SaveHostAttributes;
@@ -380,6 +382,11 @@ public class LogStorage extends ForwardingStore
         saveTasks(op.getSaveTasks().getTasks());
         break;
 
+      case REWRITE_TASK:
+        RewriteTask rewriteTask = op.getRewriteTask();
+        unsafeModifyInPlace(rewriteTask.getTaskId(), rewriteTask.getTask());
+        break;
+
       case REMOVE_TASKS:
         deleteTasks(op.getRemoveTasks().getTaskIds());
         break;
@@ -556,8 +563,10 @@ public class LogStorage extends ForwardingStore
 
   @Timed("scheduler_log_tasks_mutate")
   @Override
-  public ImmutableSet<ScheduledTask> mutateTasks(final TaskQuery query,
+  public ImmutableSet<ScheduledTask> mutateTasks(
+      final TaskQuery query,
       final Closure<ScheduledTask> mutator) {
+
     return write(new MutateWork.Quiet<ImmutableSet<ScheduledTask>>() {
       @Override public ImmutableSet<ScheduledTask> apply(MutableStoreProvider unused) {
         ImmutableSet<ScheduledTask> mutated = LogStorage.super.mutateTasks(query, mutator);
@@ -570,6 +579,20 @@ public class LogStorage extends ForwardingStore
 
         // TODO(William Farner): Avoid writing an op when mutated is empty.
         log(Op.saveTasks(new SaveTasks(mutated)));
+        return mutated;
+      }
+    });
+  }
+
+  @Timed("scheduler_log_unsafe_modify_in_place")
+  @Override
+  public boolean unsafeModifyInPlace(final String taskId, final TwitterTaskInfo taskConfiguration) {
+    return write(new MutateWork.Quiet<Boolean>() {
+      @Override public Boolean apply(MutableStoreProvider storeProvider) {
+        boolean mutated = LogStorage.super.unsafeModifyInPlace(taskId, taskConfiguration);
+        if (mutated) {
+          log(Op.rewriteTask(new RewriteTask(taskId, taskConfiguration)));
+        }
         return mutated;
       }
     });

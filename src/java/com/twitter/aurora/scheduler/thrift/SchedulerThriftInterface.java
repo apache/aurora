@@ -1,6 +1,7 @@
 package com.twitter.aurora.scheduler.thrift;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
@@ -9,12 +10,14 @@ import java.util.logging.Logger;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
+import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicates;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
@@ -24,7 +27,9 @@ import com.google.inject.Inject;
 import org.apache.commons.lang.StringUtils;
 
 import com.twitter.aurora.auth.SessionValidator.AuthFailedException;
+import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.CommitRecoveryResponse;
+import com.twitter.aurora.gen.ConfigRewrite;
 import com.twitter.aurora.gen.CreateJobResponse;
 import com.twitter.aurora.gen.DeleteRecoveryTasksResponse;
 import com.twitter.aurora.gen.DrainHostsResponse;
@@ -55,6 +60,8 @@ import com.twitter.aurora.gen.ScheduleStatusResponse;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.SessionKey;
 import com.twitter.aurora.gen.SetQuotaResponse;
+import com.twitter.aurora.gen.ShardConfigRewrite;
+import com.twitter.aurora.gen.ShardKey;
 import com.twitter.aurora.gen.SnapshotResponse;
 import com.twitter.aurora.gen.StageRecoveryResponse;
 import com.twitter.aurora.gen.StartCronResponse;
@@ -78,6 +85,8 @@ import com.twitter.aurora.scheduler.state.CronJobManager;
 import com.twitter.aurora.scheduler.state.MaintenanceController;
 import com.twitter.aurora.scheduler.state.SchedulerCore;
 import com.twitter.aurora.scheduler.storage.Storage;
+import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
+import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
 import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.Work;
 import com.twitter.aurora.scheduler.storage.UpdateStore;
@@ -719,12 +728,66 @@ class SchedulerThriftInterface implements SchedulerController {
     }
   }
 
+  @VisibleForTesting
+  static final String JOB_REWRITE_NOT_IMPLEMENTED = "JobRewrite not yet implemented.";
+
   @Override
-  public RewriteConfigsResponse rewriteConfigs(RewriteConfigsRequest request, SessionKey session) {
-    // TODO(William Farner): Implement this.
-    return new RewriteConfigsResponse()
-        .setMessage("Not implemented")
-        .setResponseCode(ResponseCode.ERROR);
+  public RewriteConfigsResponse rewriteConfigs(
+      final RewriteConfigsRequest request,
+      SessionKey session) {
+
+    if (request.getRewriteCommandsSize() == 0) {
+      return new RewriteConfigsResponse(ResponseCode.ERROR, "No rewrite commands provided.");
+    }
+
+    return storage.write(new MutateWork.Quiet<RewriteConfigsResponse>() {
+      @Override public RewriteConfigsResponse apply(MutableStoreProvider storeProvider) {
+        List<String> errors = Lists.newArrayList();
+
+        for (ConfigRewrite command : request.getRewriteCommands()) {
+          switch (command.getSetField()) {
+            case JOB_REWRITE:
+              // TODO(William Farner): Implement.
+              errors.add(JOB_REWRITE_NOT_IMPLEMENTED);
+              break;
+
+            case SHARD_REWRITE:
+              ShardConfigRewrite shardRewrite = command.getShardRewrite();
+              ShardKey shardKey = shardRewrite.getShardKey();
+              Iterable<ScheduledTask> tasks = storeProvider.getTaskStore().fetchTasks(
+                  Query.shardScoped(shardKey.getJobKey(), shardKey.getShardId()).active());
+              Optional<AssignedTask> task =
+                  Optional.fromNullable(Iterables.getOnlyElement(tasks, null))
+                      .transform(Tasks.SCHEDULED_TO_ASSIGNED);
+              if (!task.isPresent()) {
+                errors.add("No active task found for " + shardKey);
+              } else if (!task.get().getTask().equals(shardRewrite.getOldTask())) {
+                errors.add("CAS compare failed for " + shardKey);
+              } else {
+                TwitterTaskInfo newConfiguration =
+                    ConfigurationManager.applyDefaultsIfUnset(shardRewrite.getRewrittenTask());
+                boolean changed = storeProvider.getUnsafeTaskStore().unsafeModifyInPlace(
+                    task.get().getTaskId(), newConfiguration);
+                if (!changed) {
+                  errors.add("Did not change " + task.get().getTaskId());
+                }
+              }
+              break;
+
+            default:
+              throw new IllegalArgumentException("Unhandled command type " + command.getSetField());
+          }
+        }
+
+        RewriteConfigsResponse resp = new RewriteConfigsResponse();
+        if (!errors.isEmpty()) {
+          resp.setResponseCode(ResponseCode.WARNING).setMessage(Joiner.on(", ").join(errors));
+        } else {
+          resp.setResponseCode(OK).setMessage("All rewrites completed successfully.");
+        }
+        return resp;
+      }
+    });
   }
 
   @VisibleForTesting

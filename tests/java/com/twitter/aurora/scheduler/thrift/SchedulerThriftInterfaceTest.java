@@ -18,6 +18,7 @@ import org.junit.Test;
 
 import com.twitter.aurora.auth.SessionValidator.AuthFailedException;
 import com.twitter.aurora.gen.AssignedTask;
+import com.twitter.aurora.gen.ConfigRewrite;
 import com.twitter.aurora.gen.Constraint;
 import com.twitter.aurora.gen.CreateJobResponse;
 import com.twitter.aurora.gen.DrainHostsResponse;
@@ -26,6 +27,7 @@ import com.twitter.aurora.gen.ForceTaskStateResponse;
 import com.twitter.aurora.gen.HostStatus;
 import com.twitter.aurora.gen.Hosts;
 import com.twitter.aurora.gen.Identity;
+import com.twitter.aurora.gen.JobConfigRewrite;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.KillResponse;
@@ -35,10 +37,14 @@ import com.twitter.aurora.gen.MesosAdmin;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.ResponseCode;
 import com.twitter.aurora.gen.RestartShardsResponse;
+import com.twitter.aurora.gen.RewriteConfigsRequest;
+import com.twitter.aurora.gen.RewriteConfigsResponse;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.SessionKey;
 import com.twitter.aurora.gen.SetQuotaResponse;
+import com.twitter.aurora.gen.ShardConfigRewrite;
+import com.twitter.aurora.gen.ShardKey;
 import com.twitter.aurora.gen.StartMaintenanceResponse;
 import com.twitter.aurora.gen.StartUpdateResponse;
 import com.twitter.aurora.gen.TaskConstraint;
@@ -77,6 +83,7 @@ import static com.twitter.aurora.gen.MaintenanceMode.NONE;
 import static com.twitter.aurora.gen.MaintenanceMode.SCHEDULED;
 import static com.twitter.aurora.gen.ResponseCode.INVALID_REQUEST;
 import static com.twitter.aurora.gen.ResponseCode.OK;
+import static com.twitter.aurora.gen.ResponseCode.WARNING;
 import static com.twitter.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static com.twitter.aurora.scheduler.configuration.ConfigurationManager.MAX_TASKS_PER_JOB;
 import static com.twitter.aurora.scheduler.thrift.SchedulerThriftInterface.transitionMessage;
@@ -542,6 +549,93 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testRewriteJobUnsupported() throws Exception {
+    expectAuth(ROOT, true);
+
+    control.replay();
+
+    RewriteConfigsRequest request = new RewriteConfigsRequest(
+        ImmutableList.of(ConfigRewrite.jobRewrite(new JobConfigRewrite(makeJob(), makeJob()))));
+    RewriteConfigsResponse expectedResponse =
+        new RewriteConfigsResponse(WARNING, SchedulerThriftInterface.JOB_REWRITE_NOT_IMPLEMENTED);
+    assertEquals(expectedResponse, thrift.rewriteConfigs(request, SESSION));
+  }
+
+  @Test
+  public void testRewriteShardTaskMissing() throws Exception {
+    ShardKey shardKey = new ShardKey(JobKeys.from("foo", "bar", "baz"), 0);
+
+    expectAuth(ROOT, true);
+    storageUtil.expectTaskFetch(
+        Query.shardScoped(shardKey.getJobKey(), shardKey.getShardId()).active());
+
+    control.replay();
+
+    RewriteConfigsRequest request = new RewriteConfigsRequest(
+        ImmutableList.of(ConfigRewrite.shardRewrite(
+            new ShardConfigRewrite(shardKey, productionTask(), productionTask()))));
+    assertEquals(WARNING, thrift.rewriteConfigs(request, SESSION).getResponseCode());
+  }
+
+  @Test
+  public void testRewriteShardCasMismatch() throws Exception {
+    TwitterTaskInfo storedConfig = productionTask();
+    TwitterTaskInfo modifiedConfig =
+        storedConfig.deepCopy().setThermosConfig("rewritten".getBytes());
+    ScheduledTask storedTask =
+        new ScheduledTask().setAssignedTask(new AssignedTask().setTask(storedConfig));
+    ShardKey shardKey = new ShardKey(
+        JobKeys.from(
+            storedConfig.getOwner().getRole(),
+            storedConfig.getEnvironment(),
+            storedConfig.getJobName()),
+        0);
+
+    expectAuth(ROOT, true);
+    storageUtil.expectTaskFetch(
+        Query.shardScoped(shardKey.getJobKey(), shardKey.getShardId()).active(), storedTask);
+
+    control.replay();
+
+    RewriteConfigsRequest request = new RewriteConfigsRequest(
+        ImmutableList.of(ConfigRewrite.shardRewrite(
+            new ShardConfigRewrite(shardKey, modifiedConfig, modifiedConfig))));
+    assertEquals(WARNING, thrift.rewriteConfigs(request, SESSION).getResponseCode());
+  }
+
+  @Test
+  public void testRewriteShard() throws Exception {
+    TwitterTaskInfo storedConfig = productionTask();
+    TwitterTaskInfo modifiedConfig =
+        storedConfig.deepCopy().setThermosConfig("rewritten".getBytes());
+    String taskId = "task_id";
+    ScheduledTask storedTask = new ScheduledTask().setAssignedTask(
+        new AssignedTask()
+            .setTaskId(taskId)
+            .setTask(storedConfig));
+    ShardKey shardKey = new ShardKey(
+        JobKeys.from(
+            storedConfig.getOwner().getRole(),
+            storedConfig.getEnvironment(),
+            storedConfig.getJobName()),
+        0);
+
+    expectAuth(ROOT, true);
+    storageUtil.expectTaskFetch(
+        Query.shardScoped(shardKey.getJobKey(), shardKey.getShardId()).active(), storedTask);
+    expect(storageUtil.taskStore.unsafeModifyInPlace(
+        taskId,
+        ConfigurationManager.applyDefaultsIfUnset(modifiedConfig))).andReturn(true);
+
+    control.replay();
+
+    RewriteConfigsRequest request = new RewriteConfigsRequest(
+        ImmutableList.of(ConfigRewrite.shardRewrite(
+            new ShardConfigRewrite(shardKey, storedConfig, modifiedConfig))));
+    assertEquals(OK, thrift.rewriteConfigs(request, SESSION).getResponseCode());
+  }
+
+  @Test
   public void testUpdateJobExceedsTaskLimit() throws Exception {
     expectAuth(ROLE, true);
     JobConfiguration job = makeJob(nonProductionTask(), MAX_TASKS_PER_JOB.get());
@@ -774,13 +868,15 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   private static TwitterTaskInfo defaultTask(boolean production) {
     return new TwitterTaskInfo()
+        .setOwner(new Identity("role", "user"))
+        .setEnvironment(DEFAULT_ENVIRONMENT)
+        .setJobName(JOB_NAME)
         .setContactEmail("testing@twitter.com")
         .setThermosConfig("data".getBytes())
         .setNumCpus(1)
         .setRamMb(1024)
         .setDiskMb(1024)
-        .setProduction(production)
-        .setEnvironment(DEFAULT_ENVIRONMENT);
+        .setProduction(production);
   }
 
   private static TwitterTaskInfo productionTask() {

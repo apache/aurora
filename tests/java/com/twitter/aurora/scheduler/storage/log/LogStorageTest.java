@@ -36,6 +36,7 @@ import com.twitter.aurora.gen.storage.RemoveJob;
 import com.twitter.aurora.gen.storage.RemoveJobUpdate;
 import com.twitter.aurora.gen.storage.RemoveQuota;
 import com.twitter.aurora.gen.storage.RemoveTasks;
+import com.twitter.aurora.gen.storage.RewriteTask;
 import com.twitter.aurora.gen.storage.SaveAcceptedJob;
 import com.twitter.aurora.gen.storage.SaveFrameworkId;
 import com.twitter.aurora.gen.storage.SaveHostAttributes;
@@ -365,6 +366,28 @@ public class LogStorageTest extends EasyMockTest {
 
       @Override protected void performMutations() {
         assertEquals(mutated, logStorage.mutateTasks(query, mutation));
+      }
+    }.run();
+  }
+
+  @Test
+  public void testUnsafeModifyInPlace() throws Exception {
+    final String taskId = "wilma";
+    final String taskId2 = "barney";
+    final TwitterTaskInfo updatedConfig =
+        task(taskId, ScheduleStatus.RUNNING).getAssignedTask().getTask();
+    new MutationFixture() {
+      @Override protected void setupExpectations() throws Exception {
+        storageUtil.expectOperations();
+        expect(storageUtil.taskStore.unsafeModifyInPlace(taskId2, updatedConfig)).andReturn(false);
+        expect(storageUtil.taskStore.unsafeModifyInPlace(taskId, updatedConfig)).andReturn(true);
+        streamMatcher.expectTransaction(Op.rewriteTask(new RewriteTask(taskId, updatedConfig)))
+            .andReturn(position);
+      }
+
+      @Override protected void performMutations() {
+        logStorage.unsafeModifyInPlace(taskId2, updatedConfig);
+        logStorage.unsafeModifyInPlace(taskId, updatedConfig);
       }
     }.run();
   }

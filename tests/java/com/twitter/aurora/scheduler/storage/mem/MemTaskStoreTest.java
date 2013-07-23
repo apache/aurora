@@ -23,6 +23,8 @@ import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.common.base.Closure;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 public class MemTaskStoreTest {
 
@@ -108,6 +110,24 @@ public class MemTaskStoreTest {
         TASK_B.deepCopy().setStatus(ScheduleStatus.ASSIGNED),
         TASK_C.deepCopy().setStatus(ScheduleStatus.ASSIGNED),
         TASK_D.deepCopy().setStatus(ScheduleStatus.ASSIGNED));
+  }
+
+  @Test
+  public void testUnsafeModifyInPlace() {
+    TwitterTaskInfo updated =
+        TASK_A.getAssignedTask().getTask().deepCopy().setThermosConfig("new_config".getBytes());
+
+    String taskId = Tasks.id(TASK_A);
+    assertFalse(store.unsafeModifyInPlace(taskId, updated.deepCopy()));
+
+    store.saveTasks(ImmutableSet.of(TASK_A));
+    assertTrue(store.unsafeModifyInPlace(taskId, updated.deepCopy()));
+    TwitterTaskInfo stored =
+        Iterables.getOnlyElement(store.fetchTasks(Query.byId(taskId))).getAssignedTask().getTask();
+    assertEquals(updated, stored);
+
+    store.deleteTasks(ImmutableSet.of(taskId));
+    assertFalse(store.unsafeModifyInPlace(taskId, updated.deepCopy()));
   }
 
   @Test

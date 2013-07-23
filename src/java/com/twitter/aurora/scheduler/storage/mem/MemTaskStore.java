@@ -32,6 +32,7 @@ import com.twitter.aurora.scheduler.storage.TaskStore;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.base.Closure;
+import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -177,6 +178,21 @@ class MemTaskStore implements TaskStore.Mutable {
     }
 
     return mutated.build();
+  }
+
+  @Timed("mem_storage_unsafe_modify_in_place")
+  @Override
+  public boolean unsafeModifyInPlace(String taskId, TwitterTaskInfo taskConfiguration) {
+    MorePreconditions.checkNotBlank(taskId);
+    checkNotNull(taskConfiguration);
+
+    ScheduledTask stored = tasks.get(taskId);
+    if (stored == null) {
+      return false;
+    } else {
+      stored.getAssignedTask().setTask(Util.<TwitterTaskInfo>deepCopier().apply(taskConfiguration));
+      return true;
+    }
   }
 
   private static Predicate<ScheduledTask> queryFilter(final TaskQuery query) {

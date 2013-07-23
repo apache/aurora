@@ -48,6 +48,11 @@ struct SaveTasks {
   1: set<mesos_twitter.ScheduledTask> tasks
 }
 
+struct RewriteTask {
+  1: string taskId
+  2: mesos_twitter.TwitterTaskInfo task
+}
+
 struct RemoveTasks {
   1: set<string> taskIds
 }
@@ -76,6 +81,7 @@ union Op {
   8: SaveQuota saveQuota
   9: RemoveQuota removeQuota
   10: SaveHostAttributes saveHostAttributes
+  11: RewriteTask rewriteTask
 }
 
 // Represents a series of local storage mutations that should be applied in a single atomic

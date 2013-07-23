@@ -7,6 +7,7 @@ import com.google.common.collect.ImmutableSet;
 
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskQuery;
+import com.twitter.aurora.gen.TwitterTaskInfo;
 import com.twitter.common.base.Closure;
 
 /**
@@ -83,5 +84,20 @@ public interface TaskStore {
      * @return Immutable copies of only the tasks that were mutated.
      */
     ImmutableSet<ScheduledTask> mutateTasks(TaskQuery query, Closure<ScheduledTask> mutator);
+
+    /**
+     * Rewrites a task's configuration in-place.
+     * <p>
+     * <b>WARNING</b>: this is a dangerous operation, and should not be used without exercising
+     * great care.  This feature should be used as a last-ditch effort to rewrite things that
+     * the scheduler otherwise can't (e.g. {@link TwitterTaskInfo#thermosConfig}) rewrite in a
+     * controlled/tested backfill operation.
+     *
+     * @param taskId ID of the task to alter.
+     * @param taskConfiguration Configuration object to swap with the existing task's configuration.
+     * @return {@code true} if the modification took effect, or {@code false} if the task does not
+     *         exist in the store.
+     */
+    boolean unsafeModifyInPlace(String taskId, TwitterTaskInfo taskConfiguration);
   }
 }
