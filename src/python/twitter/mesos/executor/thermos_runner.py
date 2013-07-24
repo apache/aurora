@@ -4,7 +4,7 @@ import signal
 import sys
 import traceback
 
-from twitter.common import app, options, log
+from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 
 from twitter.thermos.base.options import add_port_to
