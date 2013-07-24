@@ -226,11 +226,17 @@ public class CronJobManager extends JobManager implements EventSubscriber {
     for (JobConfiguration job : crons) {
       try {
         mapScheduledJob(job, scheduleJob(ParsedConfiguration.fromUnparsed(job)));
-      } catch (ScheduleException|TaskDescriptionException e) {
-        cronJobLaunchFailures.incrementAndGet();
-        LOG.log(Level.SEVERE, "Scheduling failed for recovered job " + job, e);
+      } catch (ScheduleException e) {
+        logLaunchFailure(job, e);
+      } catch (TaskDescriptionException e) {
+        logLaunchFailure(job, e);
       }
     }
+  }
+
+  private void logLaunchFailure(JobConfiguration job, Exception e) {
+    cronJobLaunchFailures.incrementAndGet();
+    LOG.log(Level.SEVERE, "Scheduling failed for recovered job " + job, e);
   }
 
   /**
