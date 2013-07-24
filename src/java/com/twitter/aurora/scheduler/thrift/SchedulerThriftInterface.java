@@ -46,6 +46,7 @@ import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.KillResponse;
 import com.twitter.aurora.gen.ListBackupsResponse;
 import com.twitter.aurora.gen.MaintenanceStatusResponse;
+import com.twitter.aurora.gen.MesosAdmin;
 import com.twitter.aurora.gen.PerformBackupResponse;
 import com.twitter.aurora.gen.PopulateJobResponse;
 import com.twitter.aurora.gen.QueryRecoveryResponse;
@@ -95,6 +96,8 @@ import com.twitter.aurora.scheduler.storage.backup.Recovery.RecoveryException;
 import com.twitter.aurora.scheduler.storage.backup.StorageBackup;
 import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator;
 import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator.Capability;
+import com.twitter.aurora.scheduler.thrift.auth.DecoratedThrift;
+import com.twitter.aurora.scheduler.thrift.auth.Requires;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.base.MorePreconditions;
@@ -115,7 +118,8 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
  * Mesos scheduler thrift server implementation.
  * Interfaces between mesos users and the scheduler core to perform cluster administration tasks.
  */
-class SchedulerThriftInterface implements SchedulerController {
+@DecoratedThrift
+class SchedulerThriftInterface implements MesosAdmin.Iface {
   private static final Logger LOG = Logger.getLogger(SchedulerThriftInterface.class.getName());
 
   @CmdLine(name = "kill_task_initial_backoff",
@@ -127,10 +131,6 @@ class SchedulerThriftInterface implements SchedulerController {
       help = "Max backoff delay while waiting for the tasks to transition to KILLED.")
   private static final Arg<Amount<Long, Time>> KILL_TASK_MAX_BACKOFF =
       Arg.create(Amount.of(30L, Time.SECONDS));
-
-  @CmdLine(name = "enable_job_creation",
-      help = "Allow new jobs to be created, if false all job creation requests will be denied.")
-  private static final Arg<Boolean> ENABLE_JOB_CREATION = Arg.create(true);
 
   private static final Function<ScheduledTask, String> GET_ROLE = Functions.compose(
       new Function<TwitterTaskInfo, String>() {
@@ -208,11 +208,6 @@ class SchedulerThriftInterface implements SchedulerController {
     if (!JobKeys.isValid(job.getKey())) {
       return response.setResponseCode(INVALID_REQUEST)
           .setMessage("Invalid job key: " + job.getKey());
-    }
-
-    if (!ENABLE_JOB_CREATION.get()) {
-      return response.setResponseCode(INVALID_REQUEST)
-          .setMessage("Job creation is disabled on this cluster.");
     }
 
     try {
@@ -436,7 +431,6 @@ class SchedulerThriftInterface implements SchedulerController {
           .setMessage("Invalid job key: " + job.getKey());
     }
 
-    LOG.info("Received update request for job: " + JobKeys.toPath(job));
     try {
       sessionValidator.checkAuthenticated(session, job.getOwner().getRole());
     } catch (AuthFailedException e) {
@@ -604,6 +598,7 @@ class SchedulerThriftInterface implements SchedulerController {
         .setResponseCode(OK);
   }
 
+  @Requires(whitelist = Capability.PROVISIONER)
   @Override
   public SetQuotaResponse setQuota(String ownerRole, Quota quota, SessionKey session) {
     checkNotBlank(ownerRole);

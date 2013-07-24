@@ -1,6 +1,5 @@
-package com.twitter.aurora.scheduler.thrift.auth;
+package com.twitter.aurora.scheduler.thrift.aop;
 
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
@@ -10,7 +9,6 @@ import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
-import com.google.common.base.Throwables;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
@@ -21,7 +19,9 @@ import org.aopalliance.intercept.MethodInvocation;
 import com.twitter.aurora.auth.SessionValidator.AuthFailedException;
 import com.twitter.aurora.gen.ResponseCode;
 import com.twitter.aurora.gen.SessionKey;
+import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator;
 import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator.Capability;
+import com.twitter.aurora.scheduler.thrift.auth.Requires;
 
 /**
  * A method interceptor that will authenticate users identified by a {@link SessionKey} argument
@@ -30,8 +30,8 @@ import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator.Capability;
  * Intercepted methods will require {@link Capability#ROOT}, but additional capabilities
  * may be specified by annotating methods with {@link Requires} and supplying a whitelist.
  */
-class CapabilityMethodValidator implements MethodInterceptor {
-  private static final Logger LOG = Logger.getLogger(CapabilityMethodValidator.class.getName());
+class UserCapabilityInterceptor implements MethodInterceptor {
+  private static final Logger LOG = Logger.getLogger(UserCapabilityInterceptor.class.getName());
 
   @Inject private CapabilityValidator capabilityValidator;
 
@@ -78,37 +78,10 @@ class CapabilityMethodValidator implements MethodInterceptor {
     }
 
     // User is not permitted to perform this operation.
-    Class<?> returnType = method.getReturnType();
-    Object response = returnType.newInstance();
-    invoke(returnType, response, "setResponseCode", ResponseCode.class, ResponseCode.AUTH_FAILED);
-    invoke(returnType, response, "setMessage", String.class,
+    return Interceptors.properlyTypedResponse(
+        method,
+        ResponseCode.AUTH_FAILED,
         "Your user '" + key.get().getUser()
             + "' does not have the required capability to perform this action: " + whitelist);
-    return response;
-  }
-
-  private static <T> void invoke(
-      Class<?> type,
-      Object obj,
-      String name,
-      Class<T> parameterType,
-      T argument) {
-
-    Method method;
-    try {
-      method = type.getMethod(name, parameterType);
-    } catch (NoSuchMethodException e) {
-      LOG.severe(type + " does not support " + name);
-      throw Throwables.propagate(e);
-    }
-    try {
-      method.invoke(obj, argument);
-    } catch (IllegalAccessException e) {
-      LOG.severe("Method " + name + " is not accessible in " + type);
-      throw Throwables.propagate(e);
-    } catch (InvocationTargetException e) {
-      LOG.severe("Failed to invoke " + name + " on " + type);
-      throw Throwables.propagate(e);
-    }
   }
 }

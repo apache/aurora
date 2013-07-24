@@ -35,6 +35,7 @@ import com.twitter.aurora.scheduler.storage.log.SnapshotStoreImpl;
 import com.twitter.aurora.scheduler.storage.mem.MemStorageModule;
 import com.twitter.aurora.scheduler.thrift.ThriftConfiguration;
 import com.twitter.aurora.scheduler.thrift.ThriftModule;
+import com.twitter.aurora.scheduler.thrift.auth.ThriftAuthModule;
 import com.twitter.common.application.AbstractApplication;
 import com.twitter.common.application.AppLauncher;
 import com.twitter.common.application.modules.HttpModule;
@@ -132,6 +133,7 @@ public class SchedulerMain extends AbstractApplication {
         .add(new AppModule(clusterName))
         .add(new AuthModule())
         .add(new ThriftModule())
+        .add(new ThriftAuthModule())
         .add(serviceBinder)
         .add(additionalModules);
 

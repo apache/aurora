@@ -23,6 +23,7 @@ import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.backup.Recovery;
 import com.twitter.aurora.scheduler.storage.backup.StorageBackup;
 import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator.Capability;
+import com.twitter.aurora.scheduler.thrift.auth.ThriftAuthModule;
 import com.twitter.common.testing.EasyMockTest;
 
 import static org.easymock.EasyMock.expectLastCall;
@@ -61,7 +62,8 @@ public class ThriftIT extends EasyMockTest {
 
   private void createThrift(Map<Capability, String> capabilities) {
     Injector injector = Guice.createInjector(
-        new ThriftModule(capabilities),
+        new ThriftModule(),
+        new ThriftAuthModule(capabilities),
         new AbstractModule() {
           private <T> T bindMock(Class<T> clazz) {
             T mock = createMock(clazz);

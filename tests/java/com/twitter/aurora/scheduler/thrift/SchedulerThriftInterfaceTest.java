@@ -64,9 +64,9 @@ import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.backup.Recovery;
 import com.twitter.aurora.scheduler.storage.backup.StorageBackup;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
+import com.twitter.aurora.scheduler.thrift.aop.AopModule;
 import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator;
 import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator.Capability;
-import com.twitter.aurora.scheduler.thrift.auth.ThriftAuthModule;
 import com.twitter.common.testing.EasyMockTest;
 import com.twitter.common.util.Clock;
 import com.twitter.common.util.testing.FakeClock;
@@ -133,11 +133,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         bind(Recovery.class).toInstance(recovery);
         bind(MaintenanceController.class).toInstance(maintenance);
         bind(CronJobManager.class).toInstance(cronJobManager);
-        bind(SchedulerController.class).to(SchedulerThriftInterface.class);
-        bind(MesosAdmin.Iface.class).to(SchedulerThriftRouter.class);
+        bind(MesosAdmin.Iface.class).to(SchedulerThriftInterface.class);
       }
     };
-    Injector injector = Guice.createInjector(testModule, new ThriftAuthModule());
+    Injector injector = Guice.createInjector(testModule, new AopModule());
     thrift = injector.getInstance(MesosAdmin.Iface.class);
   }
 

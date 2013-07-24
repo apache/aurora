@@ -1,6 +1,8 @@
-package com.twitter.aurora.scheduler.thrift;
+package com.twitter.aurora.scheduler.thrift.aop;
 
 import java.util.Set;
+
+import org.apache.thrift.TException;
 
 import com.twitter.aurora.gen.CommitRecoveryResponse;
 import com.twitter.aurora.gen.CreateJobResponse;
@@ -18,6 +20,7 @@ import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.KillResponse;
 import com.twitter.aurora.gen.ListBackupsResponse;
 import com.twitter.aurora.gen.MaintenanceStatusResponse;
+import com.twitter.aurora.gen.MesosAdmin;
 import com.twitter.aurora.gen.PerformBackupResponse;
 import com.twitter.aurora.gen.PopulateJobResponse;
 import com.twitter.aurora.gen.QueryRecoveryResponse;
@@ -46,16 +49,18 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * A forwarding scheduler controller to make it easy to override specific behavior in an
  * implementation class.
  */
-abstract class ForwardingSchedulerController implements SchedulerController {
+abstract class ForwardingThrift implements MesosAdmin.Iface {
 
-  private final SchedulerController delegate;
+  private final MesosAdmin.Iface delegate;
 
-  ForwardingSchedulerController(SchedulerController delegate) {
+  ForwardingThrift(MesosAdmin.Iface delegate) {
     this.delegate = checkNotNull(delegate);
   }
 
   @Override
-  public SetQuotaResponse setQuota(String ownerRole, Quota quota, SessionKey session) {
+  public SetQuotaResponse setQuota(String ownerRole, Quota quota, SessionKey session)
+      throws TException {
+
     return delegate.setQuota(ownerRole, quota, session);
   }
 
@@ -63,63 +68,73 @@ abstract class ForwardingSchedulerController implements SchedulerController {
   public ForceTaskStateResponse forceTaskState(
       String taskId,
       ScheduleStatus status,
-      SessionKey session) {
+      SessionKey session) throws TException {
 
     return delegate.forceTaskState(taskId, status, session);
   }
 
   @Override
-  public PerformBackupResponse performBackup(SessionKey session) {
+  public PerformBackupResponse performBackup(SessionKey session) throws TException {
     return delegate.performBackup(session);
   }
 
   @Override
-  public ListBackupsResponse listBackups(SessionKey session) {
+  public ListBackupsResponse listBackups(SessionKey session) throws TException {
     return delegate.listBackups(session);
   }
 
   @Override
-  public StageRecoveryResponse stageRecovery(String backupId, SessionKey session) {
+  public StageRecoveryResponse stageRecovery(String backupId, SessionKey session)
+      throws TException {
+
     return delegate.stageRecovery(backupId, session);
   }
 
   @Override
-  public QueryRecoveryResponse queryRecovery(TaskQuery query, SessionKey session) {
+  public QueryRecoveryResponse queryRecovery(TaskQuery query, SessionKey session)
+      throws TException {
+
     return delegate.queryRecovery(query, session);
   }
 
   @Override
-  public DeleteRecoveryTasksResponse deleteRecoveryTasks(TaskQuery query, SessionKey session) {
+  public DeleteRecoveryTasksResponse deleteRecoveryTasks(TaskQuery query, SessionKey session)
+      throws TException {
+
     return delegate.deleteRecoveryTasks(query, session);
   }
 
   @Override
-  public CommitRecoveryResponse commitRecovery(SessionKey session) {
+  public CommitRecoveryResponse commitRecovery(SessionKey session) throws TException {
     return delegate.commitRecovery(session);
   }
 
   @Override
-  public UnloadRecoveryResponse unloadRecovery(SessionKey session) {
+  public UnloadRecoveryResponse unloadRecovery(SessionKey session) throws TException {
     return delegate.unloadRecovery(session);
   }
 
   @Override
-  public CreateJobResponse createJob(JobConfiguration description, SessionKey session) {
+  public CreateJobResponse createJob(JobConfiguration description, SessionKey session)
+      throws TException {
+
     return delegate.createJob(description, session);
   }
 
   @Override
-  public PopulateJobResponse populateJobConfig(JobConfiguration description) {
+  public PopulateJobResponse populateJobConfig(JobConfiguration description) throws TException {
     return delegate.populateJobConfig(description);
   }
 
   @Override
-  public StartCronResponse startCronJob(JobKey job, SessionKey session) {
+  public StartCronResponse startCronJob(JobKey job, SessionKey session) throws TException {
     return delegate.startCronJob(job, session);
   }
 
   @Override
-  public StartUpdateResponse startUpdate(JobConfiguration updatedConfig, SessionKey session) {
+  public StartUpdateResponse startUpdate(JobConfiguration updatedConfig, SessionKey session)
+      throws TException {
+
     return delegate.startUpdate(updatedConfig, session);
   }
 
@@ -128,7 +143,7 @@ abstract class ForwardingSchedulerController implements SchedulerController {
       JobKey job,
       Set<Integer> shardIds,
       String updateToken,
-      SessionKey session) {
+      SessionKey session) throws TException {
 
     return delegate.updateShards(job, shardIds, updateToken, session);
   }
@@ -138,7 +153,7 @@ abstract class ForwardingSchedulerController implements SchedulerController {
       JobKey job,
       Set<Integer> shardIds,
       String updateToken,
-      SessionKey session) {
+      SessionKey session) throws TException {
 
     return delegate.rollbackShards(job, shardIds, updateToken, session);
   }
@@ -148,7 +163,7 @@ abstract class ForwardingSchedulerController implements SchedulerController {
       JobKey job,
       UpdateResult updateResult,
       String updateToken,
-      SessionKey session) {
+      SessionKey session) throws TException {
 
     return delegate.finishUpdate(job, updateResult, updateToken, session);
   }
@@ -157,63 +172,69 @@ abstract class ForwardingSchedulerController implements SchedulerController {
   public RestartShardsResponse restartShards(
       JobKey job,
       Set<Integer> shardIds,
-      SessionKey session) {
+      SessionKey session) throws TException {
 
     return delegate.restartShards(job, shardIds, session);
   }
 
   @Override
-  public ScheduleStatusResponse getTasksStatus(TaskQuery query) {
+  public ScheduleStatusResponse getTasksStatus(TaskQuery query) throws TException {
     return delegate.getTasksStatus(query);
   }
 
   @Override
-  public GetJobsResponse getJobs(String ownerRole) {
+  public GetJobsResponse getJobs(String ownerRole) throws TException {
     return delegate.getJobs(ownerRole);
   }
 
   @Override
-  public KillResponse killTasks(TaskQuery query, SessionKey session) {
+  public KillResponse killTasks(TaskQuery query, SessionKey session) throws TException {
     return delegate.killTasks(query, session);
   }
 
   @Override
-  public GetQuotaResponse getQuota(String ownerRole) {
+  public GetQuotaResponse getQuota(String ownerRole) throws TException {
     return delegate.getQuota(ownerRole);
   }
 
   @Override
-  public StartMaintenanceResponse startMaintenance(Hosts hosts, SessionKey session) {
+  public StartMaintenanceResponse startMaintenance(Hosts hosts, SessionKey session)
+      throws TException {
+
     return delegate.startMaintenance(hosts, session);
   }
 
   @Override
-  public DrainHostsResponse drainHosts(Hosts hosts, SessionKey session) {
+  public DrainHostsResponse drainHosts(Hosts hosts, SessionKey session) throws TException {
     return delegate.drainHosts(hosts, session);
   }
 
   @Override
-  public MaintenanceStatusResponse maintenanceStatus(Hosts hosts, SessionKey session) {
+  public MaintenanceStatusResponse maintenanceStatus(Hosts hosts, SessionKey session)
+      throws TException {
+
     return delegate.maintenanceStatus(hosts, session);
   }
 
   @Override
-  public EndMaintenanceResponse endMaintenance(Hosts hosts, SessionKey session) {
+  public EndMaintenanceResponse endMaintenance(Hosts hosts, SessionKey session) throws TException {
     return delegate.endMaintenance(hosts, session);
   }
 
   @Override
-  public GetJobUpdatesResponse getJobUpdates(SessionKey session) {
+  public GetJobUpdatesResponse getJobUpdates(SessionKey session) throws TException {
     return delegate.getJobUpdates(session);
   }
 
   @Override
-  public SnapshotResponse snapshot(SessionKey session) {
+  public SnapshotResponse snapshot(SessionKey session) throws TException {
     return delegate.snapshot(session);
   }
 
   @Override
-  public RewriteConfigsResponse rewriteConfigs(RewriteConfigsRequest request, SessionKey session) {
+  public RewriteConfigsResponse rewriteConfigs(RewriteConfigsRequest request, SessionKey session)
+      throws TException {
+
     return delegate.rewriteConfigs(request, session);
   }
 }
