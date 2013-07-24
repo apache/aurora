@@ -307,10 +307,6 @@ public final class ConfigurationManager {
       throw new TaskDescriptionException("Task may not be null.");
     }
 
-    if (config.isSetShardId()) {
-      throw new TaskDescriptionException("Template tasks must not have a shard ID.");
-    }
-
     if (!config.isSetRequestedPorts()) {
       config.setRequestedPorts(ImmutableSet.<String>of());
     }

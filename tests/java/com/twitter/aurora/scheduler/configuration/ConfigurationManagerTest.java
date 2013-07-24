@@ -106,13 +106,6 @@ public class ConfigurationManagerTest {
     assertEquals(DEFAULT_ENVIRONMENT, copy.getKey().getEnvironment());
   }
 
-  @Test (expected = ConfigurationManager.TaskDescriptionException.class)
-  public void testSetShardId() throws Exception {
-    JobConfiguration copy = UNSANITIZED_JOB_CONFIGURATION.deepCopy();
-    copy.getTaskConfig().setShardId(0);
-    ConfigurationManager.validateAndPopulate(copy);
-  }
-
   @Test
   public void testRequiresContactEmail() throws Exception {
     JobConfiguration copy = UNSANITIZED_JOB_CONFIGURATION.deepCopy();
