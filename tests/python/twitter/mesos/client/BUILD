@@ -1,6 +1,5 @@
 python_test_suite(name = 'all',
   dependencies = [
-    pants(':stage_api'),
     pants(':config'),
     pants(':disambiguator'),
     pants(':health_check'),
@@ -9,6 +8,8 @@ python_test_suite(name = 'all',
     pants(':restarter'),
     pants(':scheduler_client'),
     pants(':shard_watcher'),
+    pants(':stage_api'),
+    pants(':stage_cli'),
     pants(':updater'),
   ],
 )
@@ -24,6 +25,7 @@ python_tests(name = 'config',
 python_tests(name = 'disambiguator',
   sources = ['test_disambiguator.py'],
   dependencies = [
+    pants('src/python/twitter/common/app'),
     pants('src/python/twitter/mesos/client:disambiguator'),
     pants('3rdparty/python:mox'),
   ],
@@ -79,7 +81,15 @@ python_tests(name = 'stage_api',
   dependencies = [
     pants('src/python/twitter/mesos:mesos-lib'),
     pants('src/python/twitter/mesos/packer:packer'),
-    python_requirement('mox'),
+    pants('3rdparty/python:mox'),
+  ],
+)
+
+python_tests(name = 'stage_cli',
+  sources = ['test_stage_cli.py'],
+  dependencies = [
+    pants('src/python/twitter/mesos:mesos-lib'),
+    pants('3rdparty/python:mox'),
   ],
 )
 

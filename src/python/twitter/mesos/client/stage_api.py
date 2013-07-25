@@ -15,14 +15,14 @@ class AuroraStageAPI(object):
 
   class NotStagedError(Exception): pass
 
-  def __init__(self, api, packer, verbose=False):
+  def __init__(self, api, packer):
     self._api = api
     self._packer = packer
 
   def _config_package_name(self, job_key):
     return '__job_%s_%s_%s' % (job_key.cluster, job_key.env, job_key.name)
 
-  def stage(self, job_key, config_filename):
+  def create(self, job_key, config_filename):
     log.info('Staging job configuration: %s' % job_key)
     pkg_name = self._config_package_name(job_key)
 
@@ -55,7 +55,8 @@ class AuroraStageAPI(object):
     with NamedTemporaryFile(prefix='job_configuration_') as job_file:
       try:
         pkg = self._packer.get_version(job_key.role, config_pkg_name, 'latest')
-        self._packer.fetch(job_key.role, config_pkg_name, str(pkg['id']), proxy_host, job_file)
+        self._packer.fetch(
+            job_key.role, config_pkg_name, str(pkg['id']), proxy_host, job_file)
       except Packer.Error as e:
         if 'Requested package or version not found' in str(e):
           raise self.NotStagedError(

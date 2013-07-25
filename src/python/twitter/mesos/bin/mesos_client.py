@@ -16,7 +16,6 @@ import subprocess
 import sys
 from tempfile import NamedTemporaryFile
 from time import gmtime, strftime
-from urlparse import urljoin
 
 from twitter.common import app, log
 from twitter.common.dirutil import Fileset
@@ -25,8 +24,14 @@ from twitter.common.net.tunnel import TunnelHelper
 from twitter.common.quantity import Amount, Data
 from twitter.common.quantity.parse_simple import parse_data_into
 from twitter.mesos.client.api import MesosClientAPI
-from twitter.mesos.client.stage_api import AuroraStageAPI
-from twitter.mesos.client.base import check_and_log_response, deprecation_warning, die, requires
+from twitter.mesos.client.stage_cli import AuroraStageCLI
+from twitter.mesos.client.base import (
+    check_and_log_response,
+    deprecation_warning,
+    die,
+    handle_open,
+    requires,
+    synthesize_url)
 from twitter.mesos.client.command_runner import DistributedCommandRunner
 from twitter.mesos.client.config import get_config
 from twitter.mesos.client.disambiguator import LiveJobDisambiguator
@@ -127,36 +132,6 @@ def make_client_factory():
 def make_client(cluster):
   factory = make_client_factory()
   return factory(cluster.name if isinstance(cluster, Cluster) else cluster)
-
-
-def synthesize_url(scheduler_client, role=None, env=None, job=None):
-  scheduler_url = scheduler_client.url
-  if not scheduler_url:
-    log.warning("Unable to find scheduler web UI!")
-    return None
-
-  if env and not role:
-    die('If env specified, must specify role')
-  if job and not (role and env):
-    die('If job specified, must specify role and env')
-
-  scheduler_url = urljoin(scheduler_url, 'scheduler')
-  if role:
-    scheduler_url += '/' + role
-    if env:
-      scheduler_url += '/' + env
-      if job:
-        scheduler_url += '/' + job
-  return scheduler_url
-
-
-def handle_open(scheduler_client, role, env, job):
-  url = synthesize_url(scheduler_client, role, env, job)
-  if url:
-    log.info('Job url: %s' % url)
-    if app.get_options().open_browser:
-      import webbrowser
-      webbrowser.open_new_tab(url)
 
 
 OPEN_BROWSER_OPTION = optparse.Option(
@@ -334,7 +309,7 @@ def create(job_spec, config_file):
   monitor = JobMonitor(api, config.role(), config.environment(), config.name())
   resp = api.create_job(config)
   check_and_log_response(resp)
-  handle_open(api.scheduler.scheduler(), config.role(), config.environment(), config.name())
+  handle_open(api.scheduler.scheduler().url, config.role(), config.environment(), config.name())
 
   if options.wait_until == 'RUNNING':
     monitor.wait_until(monitor.running_or_finished)
@@ -351,63 +326,11 @@ HEALTH_CHECK_INTERVAL_SECONDS = optparse.Option(
 
 
 @app.command
-@app.command_option(
-  '-r', '--release', action='store_true', dest='release',
-  help='Create or update the job after uploading a new configuration file'
-)
-@app.command_option(JSON_OPTION)
-@app.command_option(HEALTH_CHECK_INTERVAL_SECONDS)
 @app.command_option(OPEN_BROWSER_OPTION)
 def stage(args, options):
-  """usage: stage cluster/role/env/jobname config
-                  [--release [--updater_health_check_interval_seconds=HEALTH_CHECK_INTERVAL]]
-
-  Upload a job configuration to packer. At the point it's uploaded all
-  strings in the job are fully interpolated and it's ready to be sent
-  to the scheduler.
+  """usage: stage [-h] subcommand args
   """
-
-  if len(args) != 2:
-    die('usage: stage cluster/role/env/jobname config')
-
-  job_key = AuroraJobKey.from_path(args[0])
-  config_file = args[1]
-  packer = _get_packer(MESOS_CLIENT_CLUSTER_SET[job_key.cluster])
-  api = make_client(job_key.cluster)
-  stage_api = AuroraStageAPI(api, packer)
-
-  stage_api.stage(job_key, config_file)
-
-  if options.release:
-    resp = stage_api.release(job_key, options.health_check_interval_seconds, options.tunnel_host)
-    check_and_log_response(resp)
-    handle_open(api.scheduler.scheduler(), job_key.role, job_key.env, job_key.name)
-
-
-@app.command
-@app.command_option(HEALTH_CHECK_INTERVAL_SECONDS)
-@app.command_option(OPEN_BROWSER_OPTION)
-def release(args, options):
-  """usage: release cluster/role/env/job
-                    [--updater_health_check_interval_seconds=HEALTH_CHECK_INTERVAL_SECONDS]
-  """
-
-  if len(args) != 1:
-    die('usage: release cluster/role/env/jobname')
-
-  job_key = AuroraJobKey.from_path(args[0])
-
-  api = make_client(job_key.cluster)
-  packer = _get_packer(MESOS_CLIENT_CLUSTER_SET[job_key.cluster])
-  stage_api = AuroraStageAPI(api, packer)
-
-  resp = stage_api.release(
-      job_key,
-      options.health_check_interval_seconds,
-      options.tunnel_host)
-
-  check_and_log_response(resp)
-  handle_open(api.scheduler.scheduler(), job_key.role, job_key.env, job_key.name)
+  AuroraStageCLI(MESOS_CLIENT_CLUSTER_SET).dispatch(args, options)
 
 
 @app.command
@@ -568,7 +491,8 @@ def diff(job_spec, config_file):
   options = app.get_options()
   config = get_job_config(job_spec, config_file, options)
   api = make_client(config.cluster())
-  resp = api.query(api.build_query(config.role(), config.name(), statuses=ACTIVE_STATES, env=options.env))
+  resp = api.query(
+      api.build_query(config.role(), config.name(), statuses=ACTIVE_STATES, env=options.env))
   if not resp.responseCode:
     die('Request failed, server responded with "%s"' % resp.message)
   remote_tasks = [t.assignedTask.task for t in resp.tasks]
@@ -627,7 +551,7 @@ def do_open(args, _):
   api = make_client(cluster_name)
 
   import webbrowser
-  webbrowser.open_new_tab(synthesize_url(api.scheduler.scheduler(), role, env, job))
+  webbrowser.open_new_tab(synthesize_url(api.scheduler.scheduler().url, role, env, job))
 
 
 @app.command
@@ -710,7 +634,7 @@ def start_cron(args, options):
   api, job_key = LiveJobDisambiguator.disambiguate_args_or_die(args, options, make_client_factory())
   resp = api.start_cronjob(job_key)
   check_and_log_response(resp)
-  handle_open(api.scheduler.scheduler(), job_key.role, job_key.env, job_key.name)
+  handle_open(api.scheduler.scheduler().url, job_key.role, job_key.env, job_key.name)
 
 
 @app.command
@@ -728,7 +652,7 @@ def kill(args, options):
   api, job_key = LiveJobDisambiguator.disambiguate_args_or_die(args, options, make_client_factory())
   resp = api.kill_job(job_key, options.shards)
   check_and_log_response(resp)
-  handle_open(api.scheduler.scheduler(), job_key.role, job_key.env, job_key.name)
+  handle_open(api.scheduler.scheduler().url, job_key.role, job_key.env, job_key.name)
 
 
 @app.command
@@ -878,7 +802,7 @@ def restart(args, options):
       options.max_total_failures)
   resp = api.restart(job_key, options.shards, updater_config, options.health_check_interval_seconds)
   check_and_log_response(resp)
-  handle_open(api.scheduler.scheduler(), job_key.role, job_key.env, job_key.name)
+  handle_open(api.scheduler.scheduler().url, job_key.role, job_key.env, job_key.name)
 
 
 @app.command
@@ -1234,7 +1158,8 @@ def main():
 
 
 if __name__ == '__main__':
-  app.interspersed_args(True)
+  if len(sys.argv) > 1 and sys.argv[1] != 'stage':
+    app.interspersed_args(True)
   LogOptions.set_stderr_log_level('INFO')
   LogOptions.disable_disk_logging()
   app.set_name('mesos-client')

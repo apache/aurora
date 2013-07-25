@@ -1,7 +1,9 @@
 import functools
 import sys
+from urlparse import urljoin
 
-from twitter.common import log
+from twitter.common import app, log
+
 from gen.twitter.mesos.ttypes import ResponseCode
 
 
@@ -58,3 +60,32 @@ class requires(object):
     def real_fn(line):
       return fn(*line)
     return real_fn
+
+
+def synthesize_url(scheduler_url, role=None, env=None, job=None):
+  if not scheduler_url:
+    log.warning("Unable to find scheduler web UI!")
+    return None
+
+  if env and not role:
+    die('If env specified, must specify role')
+  if job and not (role and env):
+    die('If job specified, must specify role and env')
+
+  scheduler_url = urljoin(scheduler_url, 'scheduler')
+  if role:
+    scheduler_url += '/' + role
+    if env:
+      scheduler_url += '/' + env
+      if job:
+        scheduler_url += '/' + job
+  return scheduler_url
+
+
+def handle_open(scheduler_url, role, env, job):
+  url = synthesize_url(scheduler_url, role, env, job)
+  if url:
+    log.info('Job url: %s' % url)
+    if app.get_options().open_browser:
+      import webbrowser
+      webbrowser.open_new_tab(url)

@@ -1,0 +1,93 @@
+from twitter.common import app
+from twitter.mesos.client.api import MesosClientAPI
+from twitter.mesos.client.base import check_and_log_response, handle_open
+from twitter.mesos.client.stage_api import AuroraStageAPI
+from twitter.mesos.common import AuroraJobKey
+from twitter.mesos.packer import sd_packer_client
+
+import argparse
+
+
+class JobKeyAction(argparse.Action):
+  def __call__(self, parser, namespace, values, option_string=None):
+    setattr(namespace, self.dest, AuroraJobKey.from_path(values))
+
+
+class AuroraStageCLI(object):
+  """Parses subcommands to the stage command and defer to the appropriate API calls
+  """
+
+  class CommandLineError(Exception): pass
+
+  def __init__(self, clusters, stage_api=None):
+    self._stage_api = stage_api
+    self._clusters = clusters
+    self._scheduler_url = None
+
+  def dispatch(self, args, options):
+    parser = argparse.ArgumentParser(description="Manipulate staged configuration")
+    verbs = parser.add_subparsers()
+
+    self._add_create(verbs)
+    self._add_release(verbs)
+
+    parsed_args = parser.parse_args(args)
+
+    self._set_stage_api(parsed_args, options.verbosity == 'verbose')
+
+    # Call function bound with the parsed command (_create, _release, etc.)
+    parsed_args.func(parsed_args)
+
+  def _add_create(self, parser):
+    create = parser.add_parser('create')
+    create.set_defaults(func=self._create)
+    create.add_argument('job_key', action=JobKeyAction)
+    create.add_argument('config_file', type=argparse.FileType('r'))
+    release_group = create.add_argument_group('release')
+    release_group.add_argument(
+        '-r', '--release', default=False, action='store_true',
+        help='Create or update the job after uploading a new configuration file')
+    self._add_release_options(release_group)
+
+  def _add_release(self, parser):
+    release = parser.add_parser('release')
+    release.set_defaults(func=self._release)
+    release.add_argument('job_key', action=JobKeyAction)
+    self._add_release_options(release)
+
+  def _add_release_options(self, parser):
+    kwargs = {
+        'default': 3, 'type': int, 'help': 'Time interval between subsequent shard status checks.'}
+    parser.add_argument('--updater_health_check_interval_seconds', **kwargs)
+
+  def _set_stage_api(self, parsed_args, verbosity):
+    cluster_name = parsed_args.job_key.cluster
+    if cluster_name not in self._clusters:
+      raise self.CommandLineError('No cluster named ' + cluster_name)
+
+    if self._stage_api is None:
+      api = MesosClientAPI(self._clusters[cluster_name], verbose=verbosity)
+      packer = sd_packer_client.create_packer(cluster_name, verbose=verbosity)
+      self._stage_api = AuroraStageAPI(api, packer)
+      self._scheduler_url = api.scheduler.scheduler().url
+
+  def _create(self, args):
+    job_key = args.job_key
+    config_filename = args.config_file.name
+
+    self._stage_api.create(job_key, config_filename)
+    if args.release:
+      self._release(args)
+
+  def _release(self, args):
+    job_key = args.job_key
+    updater_health_check_interval_seconds = args.updater_health_check_interval_seconds
+    proxy_host = app.get_options().tunnel_host
+
+    resp = self._stage_api.release(job_key, updater_health_check_interval_seconds, proxy_host)
+    check_and_log_response(resp)
+    handle_open(
+        self._scheduler_url,
+        job_key.role,
+        job_key.env,
+        job_key.name)
