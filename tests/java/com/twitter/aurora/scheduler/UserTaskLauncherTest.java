@@ -121,7 +121,7 @@ public class UserTaskLauncherTest extends EasyMockTest {
     expect(stateManager.changeState(
         Query.byId(TASK_ID_A),
         FAILED,
-        Optional.of(UserTaskLauncher.MEMORY_LIMIT_EXCEEDED)))
+        Optional.of(UserTaskLauncher.MEMORY_LIMIT_DISPLAY)))
         .andReturn(0);
 
     control.replay();

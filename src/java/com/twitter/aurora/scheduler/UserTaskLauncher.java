@@ -31,7 +31,10 @@ class UserTaskLauncher implements TaskLauncher {
   private static final Logger LOG = Logger.getLogger(UserTaskLauncher.class.getName());
 
   @VisibleForTesting
-  static final String MEMORY_LIMIT_EXCEEDED = "Memory limit exceeded";
+  static final String MEMORY_LIMIT_EXCEEDED = "MEMORY STATISTICS";
+
+  @VisibleForTesting
+  static final String MEMORY_LIMIT_DISPLAY = "Task used more memory than requested.";
 
   private final OfferQueue offerQueue;
   private final StateManager stateManager;
@@ -63,7 +66,7 @@ class UserTaskLauncher implements TaskLauncher {
       if ((translatedState == ScheduleStatus.FAILED)
           && (message != null)
           && (message.contains(MEMORY_LIMIT_EXCEEDED))) {
-        message = MEMORY_LIMIT_EXCEEDED;
+        message = MEMORY_LIMIT_DISPLAY;
       }
 
       stateManager.changeState(
