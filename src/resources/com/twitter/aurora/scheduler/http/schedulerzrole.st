@@ -113,7 +113,7 @@
             <tbody>
               $cronJobs:{ job |
               <tr>
-                <td>$job.name$
+                <td>$job.environment$/$job.name$
                 <td>$job.pendingTaskCount$
                 <td>$job.cronSchedule$
                 <td><script>document.write(printDate($job.nextRun$));</script>

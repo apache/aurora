@@ -173,7 +173,8 @@ public class SchedulerzRole extends JerseyTemplateServlet {
             new Function<JobConfiguration, Map<?, ?>>() {
               @Override public Map<?, ?> apply(JobConfiguration job) {
                 return ImmutableMap.<Object, Object>builder()
-                    .put("name", job.getName())
+                    .put("name", job.getKey().getName())
+                    .put("environment", job.getKey().getEnvironment())
                     .put("pendingTaskCount", job.getShardCount())
                     .put("cronSchedule", job.getCronSchedule())
                     .put("nextRun", CronJobManager.predictNextRun(job.cronSchedule).getTime())
