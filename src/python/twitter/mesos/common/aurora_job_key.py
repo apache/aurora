@@ -31,7 +31,7 @@ class AuroraJobKey(object):
       cluster, role, env, name = path.split('/', 4)
     except ValueError:
       raise cls.ParseError(
-          "Invalid path. path should be a string in the form CLUSTER/ROLE/ENV/NAME")
+          "Invalid path '%s'. path should be a string in the form CLUSTER/ROLE/ENV/NAME" % path)
     return cls(cluster, role, env, name)
 
   @classmethod
