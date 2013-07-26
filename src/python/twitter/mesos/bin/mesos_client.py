@@ -930,8 +930,9 @@ def run(args, options):
 
 def _get_packer(cluster, verbosity='normal'):
   # TODO(wickman) sd_packer_client(cluster.name) => TwitterPacker(cluster)
-  return sd_packer_client.create_packer(cluster.name, verbose=verbosity in ('normal', 'verbose'))
-
+  return sd_packer_client.create_packer(cluster.name,
+                                        verbose=verbosity in ('normal', 'verbose'),
+                                        clusters=MESOS_CLIENT_CLUSTER_SET)
 
 def trap_packer_error(fn):
   @functools.wraps(fn)

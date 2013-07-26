@@ -5,7 +5,7 @@ python_test_suite(name = 'all',
 )
 
 python_tests(name = 'packer_client',
-  sources = ['test_packer_client.py'],
+  sources = ['test_packer_client.py', 'test_sd_packer_client.py'],
   soft_dependencies = True,
   dependencies = [
     pants('src/python/twitter/mesos/packer:packer'),
