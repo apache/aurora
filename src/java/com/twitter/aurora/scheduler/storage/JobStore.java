@@ -41,6 +41,8 @@ public interface JobStore {
     /**
      * Saves the job configuration for a job that has been accepted by the scheduler. Acts as an
      * update if the managerId already exists.
+     * TODO(William Farner): Consider accepting ParsedConfiguration here to require that validation
+     * always happens for things entering storage.
      *
      * @param managerId The unique id of the manager that accepted the job.
      * @param jobConfig The configuration of the accepted job.

@@ -13,8 +13,10 @@ import com.google.common.base.Functions;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicates;
+import com.google.common.base.Throwables;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -40,6 +42,7 @@ import com.twitter.aurora.gen.GetJobUpdatesResponse;
 import com.twitter.aurora.gen.GetJobsResponse;
 import com.twitter.aurora.gen.GetQuotaResponse;
 import com.twitter.aurora.gen.Hosts;
+import com.twitter.aurora.gen.JobConfigRewrite;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
@@ -85,6 +88,7 @@ import com.twitter.aurora.scheduler.quota.QuotaManager;
 import com.twitter.aurora.scheduler.state.CronJobManager;
 import com.twitter.aurora.scheduler.state.MaintenanceController;
 import com.twitter.aurora.scheduler.state.SchedulerCore;
+import com.twitter.aurora.scheduler.storage.JobStore;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
@@ -723,8 +727,17 @@ class SchedulerThriftInterface implements MesosAdmin.Iface {
     }
   }
 
-  @VisibleForTesting
-  static final String JOB_REWRITE_NOT_IMPLEMENTED = "JobRewrite not yet implemented.";
+  private static Multimap<String, JobConfiguration> jobsByKey(JobStore jobStore, JobKey jobKey) {
+    ImmutableMultimap.Builder<String, JobConfiguration> matches = ImmutableMultimap.builder();
+    for (String managerId : jobStore.fetchManagerIds()) {
+      for (JobConfiguration job : jobStore.fetchJobs(managerId)) {
+        if (job.getKey().equals(jobKey)) {
+          matches.put(managerId, job);
+        }
+      }
+    }
+    return matches.build();
+  }
 
   @Override
   public RewriteConfigsResponse rewriteConfigs(
@@ -742,8 +755,47 @@ class SchedulerThriftInterface implements MesosAdmin.Iface {
         for (ConfigRewrite command : request.getRewriteCommands()) {
           switch (command.getSetField()) {
             case JOB_REWRITE:
-              // TODO(William Farner): Implement.
-              errors.add(JOB_REWRITE_NOT_IMPLEMENTED);
+              JobConfigRewrite jobRewrite = command.getJobRewrite();
+              JobConfiguration existingJob = jobRewrite.getOldJob();
+              JobConfiguration rewrittenJob;
+              try {
+                rewrittenJob =
+                    ConfigurationManager.validateAndPopulate(jobRewrite.getRewrittenJob());
+              } catch (TaskDescriptionException e) {
+                // We could add an error here, but this is probably a hint of something wrong in
+                // the client that's causing a bad configuration to be applied.
+                throw Throwables.propagate(e);
+              }
+              if (!existingJob.getKey().equals(rewrittenJob.getKey())) {
+                errors.add("Disallowing rewrite attempting to change job key.");
+              } else if (!existingJob.getName().equals(rewrittenJob.getName())) {
+                errors.add("Disallowing rewrite attempting to change job name.");
+              } else if (!existingJob.getOwner().equals(rewrittenJob.getOwner())) {
+                errors.add("Disallowing rewrite attempting to change job owner.");
+              } else {
+                JobStore.Mutable jobStore = storeProvider.getJobStore();
+                Multimap<String, JobConfiguration> matches =
+                    jobsByKey(jobStore, existingJob.getKey());
+                switch (matches.size()) {
+                  case 0:
+                    errors.add("No jobs found for key " + JobKeys.toPath(existingJob));
+                    break;
+
+                  case 1:
+                    Map.Entry<String, JobConfiguration> match =
+                        Iterables.getOnlyElement(matches.entries());
+                    JobConfiguration storedJob = match.getValue();
+                    if (!storedJob.equals(existingJob)) {
+                      errors.add("CAS compare failed for " + JobKeys.toPath(storedJob));
+                    } else {
+                      jobStore.saveAcceptedJob(match.getKey(), rewrittenJob);
+                    }
+                    break;
+
+                  default:
+                    errors.add("Multiple jobs found for key " + JobKeys.toPath(existingJob));
+                }
+              }
               break;
 
             case SHARD_REWRITE:

@@ -38,7 +38,6 @@ import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.ResponseCode;
 import com.twitter.aurora.gen.RestartShardsResponse;
 import com.twitter.aurora.gen.RewriteConfigsRequest;
-import com.twitter.aurora.gen.RewriteConfigsResponse;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.SessionKey;
@@ -548,19 +547,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
-  public void testRewriteJobUnsupported() throws Exception {
-    expectAuth(ROOT, true);
-
-    control.replay();
-
-    RewriteConfigsRequest request = new RewriteConfigsRequest(
-        ImmutableList.of(ConfigRewrite.jobRewrite(new JobConfigRewrite(makeJob(), makeJob()))));
-    RewriteConfigsResponse expectedResponse =
-        new RewriteConfigsResponse(WARNING, SchedulerThriftInterface.JOB_REWRITE_NOT_IMPLEMENTED);
-    assertEquals(expectedResponse, thrift.rewriteConfigs(request, SESSION));
-  }
-
-  @Test
   public void testRewriteShardTaskMissing() throws Exception {
     ShardKey shardKey = new ShardKey(JobKeys.from("foo", "bar", "baz"), 0);
 
@@ -631,6 +617,79 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     RewriteConfigsRequest request = new RewriteConfigsRequest(
         ImmutableList.of(ConfigRewrite.shardRewrite(
             new ShardConfigRewrite(shardKey, storedConfig, modifiedConfig))));
+    assertEquals(OK, thrift.rewriteConfigs(request, SESSION).getResponseCode());
+  }
+
+  @Test
+  public void testRewriteJobCasMismatch() throws Exception {
+    JobConfiguration oldJob = makeJob(productionTask());
+    JobConfiguration newJob = oldJob.deepCopy();
+    newJob.getTaskConfig().setThermosConfig("rewritten".getBytes());
+    String manager = "manager_key";
+    expectAuth(ROOT, true);
+    expect(storageUtil.jobStore.fetchManagerIds()).andReturn(ImmutableSet.of(manager));
+    expect(storageUtil.jobStore.fetchJobs(manager)).andReturn(ImmutableList.of(oldJob));
+
+    control.replay();
+
+    RewriteConfigsRequest request = new RewriteConfigsRequest(
+        ImmutableList.of(ConfigRewrite.jobRewrite(
+            new JobConfigRewrite(newJob, newJob))));
+    assertEquals(WARNING, thrift.rewriteConfigs(request, SESSION).getResponseCode());
+  }
+
+  @Test
+  public void testRewriteJobNotFound() throws Exception {
+    JobConfiguration oldJob = makeJob(productionTask());
+    JobConfiguration newJob = oldJob.deepCopy();
+    newJob.getTaskConfig().setThermosConfig("rewritten".getBytes());
+    String manager = "manager_key";
+    expectAuth(ROOT, true);
+    expect(storageUtil.jobStore.fetchManagerIds()).andReturn(ImmutableSet.of(manager));
+    expect(storageUtil.jobStore.fetchJobs(manager)).andReturn(ImmutableList.<JobConfiguration>of());
+
+    control.replay();
+
+    RewriteConfigsRequest request = new RewriteConfigsRequest(
+        ImmutableList.of(ConfigRewrite.jobRewrite(
+            new JobConfigRewrite(oldJob, newJob))));
+    assertEquals(WARNING, thrift.rewriteConfigs(request, SESSION).getResponseCode());
+  }
+
+  @Test
+  public void testRewriteJobMultipleMatches() throws Exception {
+    JobConfiguration oldJob = makeJob(productionTask());
+    JobConfiguration newJob = oldJob.deepCopy();
+    newJob.getTaskConfig().setThermosConfig("rewritten".getBytes());
+    String manager = "manager_key";
+    expectAuth(ROOT, true);
+    expect(storageUtil.jobStore.fetchManagerIds()).andReturn(ImmutableSet.of(manager));
+    expect(storageUtil.jobStore.fetchJobs(manager)).andReturn(ImmutableList.of(oldJob, makeJob()));
+
+    control.replay();
+
+    RewriteConfigsRequest request = new RewriteConfigsRequest(
+        ImmutableList.of(ConfigRewrite.jobRewrite(
+            new JobConfigRewrite(oldJob, newJob))));
+    assertEquals(WARNING, thrift.rewriteConfigs(request, SESSION).getResponseCode());
+  }
+
+  @Test
+  public void testRewriteJob() throws Exception {
+    JobConfiguration oldJob = makeJob(productionTask());
+    JobConfiguration newJob = oldJob.deepCopy();
+    newJob.getTaskConfig().setThermosConfig("rewritten".getBytes());
+    String manager = "manager_key";
+    expectAuth(ROOT, true);
+    expect(storageUtil.jobStore.fetchManagerIds()).andReturn(ImmutableSet.of(manager));
+    expect(storageUtil.jobStore.fetchJobs(manager)).andReturn(ImmutableList.of(oldJob));
+    storageUtil.jobStore.saveAcceptedJob(manager, ConfigurationManager.validateAndPopulate(newJob));
+
+    control.replay();
+
+    RewriteConfigsRequest request = new RewriteConfigsRequest(
+        ImmutableList.of(ConfigRewrite.jobRewrite(
+            new JobConfigRewrite(oldJob, newJob))));
     assertEquals(OK, thrift.rewriteConfigs(request, SESSION).getResponseCode());
   }
 
