@@ -28,6 +28,7 @@ import org.apache.mesos.Protos.TaskInfo;
 import com.twitter.aurora.gen.HostStatus;
 import com.twitter.aurora.gen.MaintenanceMode;
 import com.twitter.aurora.scheduler.Driver;
+import com.twitter.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import com.twitter.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import com.twitter.aurora.scheduler.events.PubsubEvent.HostMaintenanceStateChange;
 import com.twitter.aurora.scheduler.state.MaintenanceController;
@@ -234,6 +235,20 @@ public interface OfferQueue extends EventSubscriber {
                 }
               })
               .toSet());
+    }
+
+    /**
+     * Notifies the queue that the driver is disconnected, and all the stored offers are now
+     * invalid.
+     * <p>
+     * The queue takes this as a signal to flush its queue.
+     *
+     * @param event Disconnected event.
+     */
+    @Subscribe
+    public void driverDisconnected(DriverDisconnected event) {
+      LOG.info("Clearing stale offers since the driver is disconnected.");
+      hostOffers.clear();
     }
 
     /**

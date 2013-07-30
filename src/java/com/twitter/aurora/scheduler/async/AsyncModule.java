@@ -14,7 +14,7 @@ import com.twitter.aurora.scheduler.async.OfferQueue.OfferQueueImpl;
 import com.twitter.aurora.scheduler.async.OfferQueue.OfferReturnDelay;
 import com.twitter.aurora.scheduler.async.TaskGroups.SchedulingAction;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager;
-import com.twitter.aurora.scheduler.events.TaskEventModule;
+import com.twitter.aurora.scheduler.events.PubsubEventModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.quantity.Amount;
@@ -90,7 +90,7 @@ public class AsyncModule extends AbstractModule {
         expose(TaskTimeout.class);
       }
     });
-    TaskEventModule.bindSubscriber(binder(), TaskTimeout.class);
+    PubsubEventModule.bindSubscriber(binder(), TaskTimeout.class);
 
     binder().install(new PrivateModule() {
       @Override protected void configure() {
@@ -103,7 +103,7 @@ public class AsyncModule extends AbstractModule {
         expose(TaskGroups.class);
       }
     });
-    TaskEventModule.bindSubscriber(binder(), TaskGroups.class);
+    PubsubEventModule.bindSubscriber(binder(), TaskGroups.class);
 
     binder().install(new PrivateModule() {
       @Override protected void configure() {
@@ -114,7 +114,7 @@ public class AsyncModule extends AbstractModule {
         expose(OfferQueue.class);
       }
     });
-    TaskEventModule.bindSubscriber(binder(), OfferQueue.class);
+    PubsubEventModule.bindSubscriber(binder(), OfferQueue.class);
 
     binder().install(new PrivateModule() {
       @Override protected void configure() {
@@ -129,7 +129,7 @@ public class AsyncModule extends AbstractModule {
         expose(HistoryPruner.class);
       }
     });
-    TaskEventModule.bindSubscriber(binder(), HistoryPruner.class);
+    PubsubEventModule.bindSubscriber(binder(), HistoryPruner.class);
   }
 
   /**

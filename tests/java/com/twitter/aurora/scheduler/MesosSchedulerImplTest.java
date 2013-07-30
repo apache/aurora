@@ -2,9 +2,16 @@ package com.twitter.aurora.scheduler;
 
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
+import com.google.common.testing.TearDown;
+import com.google.inject.AbstractModule;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.google.inject.TypeLiteral;
 
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.MasterInfo;
@@ -22,15 +29,22 @@ import org.junit.Test;
 import com.twitter.aurora.scheduler.base.Conversions;
 import com.twitter.aurora.scheduler.base.SchedulerException;
 import com.twitter.aurora.scheduler.configuration.Resources;
+import com.twitter.aurora.scheduler.events.PubsubEvent;
+import com.twitter.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
+import com.twitter.aurora.scheduler.events.PubsubEvent.DriverRegistered;
+import com.twitter.aurora.scheduler.events.PubsubEventModule;
 import com.twitter.aurora.scheduler.state.SchedulerCore;
+import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.StorageException;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.common.application.Lifecycle;
+import com.twitter.common.base.Closure;
 import com.twitter.common.base.Command;
 import com.twitter.common.testing.EasyMockTest;
 
 import static org.apache.mesos.Protos.Status.DRIVER_RUNNING;
 import static org.easymock.EasyMock.expect;
+import static org.junit.Assert.assertTrue;
 
 public class MesosSchedulerImplTest extends EasyMockTest {
 
@@ -80,21 +94,31 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   private TaskLauncher systemLauncher;
   private TaskLauncher userLauncher;
   private SchedulerDriver driver;
+  private Closure<PubsubEvent> eventBus;
 
   private MesosSchedulerImpl scheduler;
 
   @Before
   public void setUp() {
     storageUtil = new StorageTestUtil(this);
-    Lifecycle lifecycle =
+    final Lifecycle lifecycle =
         new Lifecycle(createMock(Command.class), createMock(UncaughtExceptionHandler.class));
     systemLauncher = createMock(TaskLauncher.class);
     userLauncher = createMock(TaskLauncher.class);
-    scheduler = new MesosSchedulerImpl(
-        storageUtil.storage,
-        createMock(SchedulerCore.class),
-        lifecycle,
-        Arrays.asList(systemLauncher, userLauncher));
+    eventBus = createMock(new Clazz<Closure<PubsubEvent>>() { });
+
+    Injector injector = Guice.createInjector(new AbstractModule() {
+      @Override protected void configure() {
+        bind(Storage.class).toInstance(storageUtil.storage);
+        bind(SchedulerCore.class).toInstance(createMock(SchedulerCore.class));
+        bind(Lifecycle.class).toInstance(lifecycle);
+        bind(new TypeLiteral<List<TaskLauncher>>() { })
+            .toInstance(Arrays.asList(systemLauncher, userLauncher));
+        bind(new TypeLiteral<Closure<PubsubEvent>>() { }).toInstance(eventBus);
+        PubsubEventModule.bindNotifyingInterceptor(binder());
+      }
+    });
+    scheduler = injector.getInstance(MesosSchedulerImpl.class);
     driver = createMock(SchedulerDriver.class);
   }
 
@@ -108,13 +132,11 @@ public class MesosSchedulerImplTest extends EasyMockTest {
 
   @Test
   public void testNoOffers() throws Exception {
-    storageUtil.expectOperations();
-    storageUtil.schedulerStore.saveFrameworkId(FRAMEWORK_ID);
-
-    control.replay();
-
-    scheduler.registered(driver, FRAMEWORK, MasterInfo.getDefaultInstance());
-    scheduler.resourceOffers(driver, ImmutableList.<Offer>of());
+    new RegisteredFixture() {
+      @Override void test() {
+        scheduler.resourceOffers(driver, ImmutableList.<Offer>of());
+      }
+    }.run();
   }
 
   @Test
@@ -125,7 +147,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
         expect(systemLauncher.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
         expect(userLauncher.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
       }
-    };
+    }.run();
   }
 
   @Test
@@ -136,7 +158,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
         expect(systemLauncher.createTask(OFFER)).andReturn(Optional.of(TASK));
         expectLaunch(TASK);
       }
-    };
+    }.run();
   }
 
   @Test
@@ -148,7 +170,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
         expect(userLauncher.createTask(OFFER)).andReturn(Optional.of(TASK));
         expectLaunch(TASK);
       }
-    };
+    }.run();
   }
 
   @Test
@@ -159,7 +181,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
         expect(systemLauncher.createTask(OFFER)).andReturn(Optional.of(BIGGER_TASK));
         expect(userLauncher.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
       }
-    };
+    }.run();
   }
 
   @Test
@@ -169,7 +191,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
         expect(systemLauncher.statusUpdate(STATUS)).andReturn(false);
         expect(userLauncher.statusUpdate(STATUS)).andReturn(false);
       }
-    };
+    }.run();
   }
 
   @Test
@@ -178,7 +200,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
       @Override void expectations() throws Exception {
         expect(systemLauncher.statusUpdate(STATUS)).andReturn(true);
       }
-    };
+    }.run();
   }
 
   @Test
@@ -188,7 +210,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
         expect(systemLauncher.statusUpdate(STATUS)).andReturn(false);
         expect(userLauncher.statusUpdate(STATUS)).andReturn(true);
       }
-    };
+    }.run();
   }
 
   @Test(expected = SchedulerException.class)
@@ -198,7 +220,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
         expect(systemLauncher.statusUpdate(STATUS)).andReturn(false);
         expect(userLauncher.statusUpdate(STATUS)).andThrow(new StorageException("Injected."));
       }
-    };
+    }.run();
   }
 
   @Test
@@ -217,7 +239,20 @@ public class MesosSchedulerImplTest extends EasyMockTest {
       @Override void test() {
         scheduler.resourceOffers(driver, ImmutableList.of(OFFER, OFFER_2));
       }
-    };
+    }.run();
+  }
+
+  @Test
+  public void testDisconnected() throws Exception {
+    new RegisteredFixture() {
+      @Override void expectations() throws Exception {
+        eventBus.execute(new DriverDisconnected());
+      }
+
+      @Override void test() {
+        scheduler.disconnected(driver);
+      }
+    }.run();
   }
 
   private void expectOfferAttributesSaved(Offer offer) {
@@ -225,7 +260,20 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   }
 
   private abstract class RegisteredFixture {
+    private final AtomicBoolean runCalled = new AtomicBoolean(false);
+
     RegisteredFixture() throws Exception {
+      // Prevent otherwise silent noop tests that forget to call run().
+      addTearDown(new TearDown() {
+        @Override public void tearDown() {
+          assertTrue(runCalled.get());
+        }
+      });
+    }
+
+    void run() throws Exception {
+      runCalled.set(true);
+      eventBus.execute(new DriverRegistered());
       storageUtil.expectOperations();
       storageUtil.schedulerStore.saveFrameworkId(FRAMEWORK_ID);
       expectations();
@@ -240,7 +288,9 @@ public class MesosSchedulerImplTest extends EasyMockTest {
       expect(driver.launchTasks(OFFER_ID, ImmutableList.of(task))).andReturn(DRIVER_RUNNING);
     }
 
-    abstract void expectations() throws Exception;
+    void expectations() throws Exception {
+      // Default no-op, subclasses may override.
+    }
 
     abstract void test();
   }

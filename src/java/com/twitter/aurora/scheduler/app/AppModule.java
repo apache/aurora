@@ -19,7 +19,7 @@ import org.apache.zookeeper.data.ACL;
 import com.twitter.aurora.GuiceUtils;
 import com.twitter.aurora.scheduler.SchedulerModule;
 import com.twitter.aurora.scheduler.async.AsyncModule;
-import com.twitter.aurora.scheduler.events.TaskEventModule;
+import com.twitter.aurora.scheduler.events.PubsubEventModule;
 import com.twitter.aurora.scheduler.filter.SchedulingFilterImpl;
 import com.twitter.aurora.scheduler.http.ClusterName;
 import com.twitter.aurora.scheduler.http.ServletModule;
@@ -69,7 +69,7 @@ class AppModule extends AbstractModule {
     bind(Key.get(String.class, ClusterName.class)).toInstance(clusterName);
 
     // Filter layering: notifier filter -> base impl
-    TaskEventModule.bind(binder(), SchedulingFilterImpl.class);
+    PubsubEventModule.bind(binder(), SchedulingFilterImpl.class);
     bind(SchedulingFilterImpl.class).in(Singleton.class);
 
     LifecycleModule.bindStartupAction(binder(), RegisterShutdownStackPrinter.class);

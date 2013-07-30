@@ -103,6 +103,7 @@ class MesosSchedulerImpl implements Scheduler {
     registered = true;
   }
 
+  @SendNotification(after = Event.DriverDisconnected)
   @Override
   public void disconnected(SchedulerDriver schedulerDriver) {
     LOG.warning("Framework disconnected.");

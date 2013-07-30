@@ -56,7 +56,7 @@ import com.twitter.aurora.scheduler.configuration.Resources;
 import com.twitter.aurora.scheduler.events.PubsubEvent.DriverRegistered;
 import com.twitter.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import com.twitter.aurora.scheduler.events.PubsubEvent.TaskStateChange;
-import com.twitter.aurora.scheduler.events.TaskEventModule;
+import com.twitter.aurora.scheduler.events.PubsubEventModule;
 import com.twitter.aurora.scheduler.local.FakeDriverFactory.FakeSchedulerDriver;
 import com.twitter.aurora.scheduler.log.testing.FileLogStreamModule;
 import com.twitter.common.application.ShutdownRegistry;
@@ -82,7 +82,7 @@ public class IsolatedSchedulerModule extends AbstractModule {
   protected void configure() {
     bind(DriverFactory.class).to(FakeDriverFactory.class);
     bind(FakeDriverFactory.class).in(Singleton.class);
-    TaskEventModule.bindSubscriber(binder(), FakeClusterRunner.class);
+    PubsubEventModule.bindSubscriber(binder(), FakeClusterRunner.class);
     install(new FileLogStreamModule());
   }
 

@@ -23,6 +23,7 @@ import com.twitter.aurora.scheduler.Driver;
 import com.twitter.aurora.scheduler.async.OfferQueue.LaunchException;
 import com.twitter.aurora.scheduler.async.OfferQueue.OfferQueueImpl;
 import com.twitter.aurora.scheduler.async.OfferQueue.OfferReturnDelay;
+import com.twitter.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import com.twitter.aurora.scheduler.state.MaintenanceController;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -47,7 +48,7 @@ public class OfferQueueImplTest extends EasyMockTest {
   private ExecutorService testExecutor;
   private MaintenanceController maintenanceController;
   private Function<Offer, Optional<TaskInfo>> offerAcceptor;
-  private OfferQueue offerQueue;
+  private OfferQueueImpl offerQueue;
 
   @Before
   public void setUp() {
@@ -121,6 +122,19 @@ public class OfferQueueImplTest extends EasyMockTest {
     offerQueue.addOffer(OFFER_A);
     offerQueue.addOffer(OFFER_B);
     offerQueue.addOffer(OFFER_C);
+    assertFalse(offerQueue.launchFirst(offerAcceptor));
+  }
+
+  @Test
+  public void testFlushOffers() throws Exception {
+    expect(maintenanceController.getMode(HOST_A)).andReturn(MaintenanceMode.NONE);
+    expect(maintenanceController.getMode(HOST_B)).andReturn(MaintenanceMode.NONE);
+
+    control.replay();
+
+    offerQueue.addOffer(OFFER_A);
+    offerQueue.addOffer(OFFER_B);
+    offerQueue.driverDisconnected(new DriverDisconnected());
     assertFalse(offerQueue.launchFirst(offerAcceptor));
   }
 }

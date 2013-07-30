@@ -15,6 +15,8 @@ import com.google.inject.TypeLiteral;
 import com.google.inject.matcher.Matchers;
 import com.google.inject.multibindings.Multibinder;
 
+import org.aopalliance.intercept.MethodInterceptor;
+
 import com.twitter.aurora.scheduler.events.NotifyingSchedulingFilter.NotifyDelegate;
 import com.twitter.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import com.twitter.aurora.scheduler.events.PubsubEvent.Interceptors.SendNotification;
@@ -28,12 +30,12 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * Binding module for plumbing event notifications.
  */
-public final class TaskEventModule extends AbstractModule {
+public final class PubsubEventModule extends AbstractModule {
 
-  private static final Logger LOG = Logger.getLogger(TaskEventModule.class.getName());
+  private static final Logger LOG = Logger.getLogger(PubsubEventModule.class.getName());
 
   @VisibleForTesting
-  TaskEventModule() {
+  PubsubEventModule() {
     // Must be constructed through factory.
   }
 
@@ -58,8 +60,7 @@ public final class TaskEventModule extends AbstractModule {
     // Ensure at least an empty binding is present.
     getSubscriberBinder(binder());
     LifecycleModule.bindStartupAction(binder(), RegisterSubscribers.class);
-    bindInterceptor(Matchers.any(), Matchers.annotatedWith(SendNotification.class),
-        new NotifyingMethodInterceptor(eventPoster));
+    bindNotifyingInterceptor(binder());
   }
 
   static class RegisterSubscribers implements Command {
@@ -90,7 +91,7 @@ public final class TaskEventModule extends AbstractModule {
     binder.bind(SchedulingFilter.class).annotatedWith(NotifyDelegate.class).to(filterClass);
     binder.bind(SchedulingFilter.class).to(NotifyingSchedulingFilter.class);
     binder.bind(NotifyingSchedulingFilter.class).in(Singleton.class);
-    binder.install(new TaskEventModule());
+    binder.install(new PubsubEventModule());
   }
 
   private static Multibinder<EventSubscriber> getSubscriberBinder(Binder binder) {
@@ -105,5 +106,22 @@ public final class TaskEventModule extends AbstractModule {
    */
   public static void bindSubscriber(Binder binder, Class<? extends EventSubscriber> subscriber) {
     getSubscriberBinder(binder).addBinding().to(subscriber);
+  }
+
+  /**
+   * Binds a method interceptor to all methods annotated with {@link SendNotification}.
+   * <p>
+   * The interceptor will send notifications before and/or after the wrapped method invocation.
+   *
+   * @param binder Guice binder.
+   */
+  @VisibleForTesting
+  public static void bindNotifyingInterceptor(Binder binder) {
+    MethodInterceptor interceptor = new NotifyingMethodInterceptor();
+    binder.requestInjection(interceptor);
+    binder.bindInterceptor(
+        Matchers.any(),
+        Matchers.annotatedWith(SendNotification.class),
+        interceptor);
   }
 }

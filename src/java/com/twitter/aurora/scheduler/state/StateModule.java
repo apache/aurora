@@ -5,7 +5,7 @@ import com.google.inject.Singleton;
 
 import com.twitter.aurora.scheduler.MesosTaskFactory;
 import com.twitter.aurora.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
-import com.twitter.aurora.scheduler.events.TaskEventModule;
+import com.twitter.aurora.scheduler.events.PubsubEventModule;
 import com.twitter.aurora.scheduler.state.CronJobManager.CronScheduler;
 import com.twitter.aurora.scheduler.state.CronJobManager.CronScheduler.Cron4jScheduler;
 import com.twitter.aurora.scheduler.state.MaintenanceController.MaintenanceControllerImpl;
@@ -31,7 +31,7 @@ public class StateModule extends AbstractModule {
 
     bind(CronJobManager.class).in(Singleton.class);
     // TODO(William Farner): Add a test that fails if CronJobManager is not wired for events.
-    TaskEventModule.bindSubscriber(binder(), CronJobManager.class);
+    PubsubEventModule.bindSubscriber(binder(), CronJobManager.class);
     bind(ImmediateJobManager.class).in(Singleton.class);
 
     bind(MaintenanceController.class).to(MaintenanceControllerImpl.class);

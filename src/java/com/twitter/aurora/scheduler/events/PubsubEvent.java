@@ -251,6 +251,18 @@ public interface PubsubEvent {
     }
   }
 
+  public static class DriverDisconnected implements PubsubEvent {
+    @Override
+    public boolean equals(Object o) {
+      return (o != null) && getClass().equals(o.getClass());
+    }
+
+    @Override
+    public int hashCode() {
+      return getClass().hashCode();
+    }
+  }
+
   public static final class Interceptors {
     private Interceptors() {
       // Utility class.
@@ -259,7 +271,8 @@ public interface PubsubEvent {
     public enum Event {
       None(null),
       StorageStarted(new StorageStarted()),
-      DriverRegistered(new DriverRegistered());
+      DriverRegistered(new DriverRegistered()),
+      DriverDisconnected(new DriverDisconnected());
 
       private final PubsubEvent event;
       private Event(PubsubEvent event) {

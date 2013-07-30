@@ -4,6 +4,7 @@ import java.lang.reflect.Method;
 import java.util.logging.Logger;
 
 import com.google.common.base.Preconditions;
+import com.google.inject.Inject;
 
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
@@ -20,11 +21,8 @@ import com.twitter.common.base.Closure;
 class NotifyingMethodInterceptor implements MethodInterceptor {
   private static final Logger LOG = Logger.getLogger(NotifyingMethodInterceptor.class.getName());
 
-  private final Closure<PubsubEvent> eventSink;
-
-  NotifyingMethodInterceptor(Closure<PubsubEvent> eventSink) {
-    this.eventSink = Preconditions.checkNotNull(eventSink);
-  }
+  @Inject
+  private Closure<PubsubEvent> eventSink;
 
   private void maybeFire(Event event) {
     if (event != Event.None) {
@@ -34,6 +32,8 @@ class NotifyingMethodInterceptor implements MethodInterceptor {
 
   @Override
   public Object invoke(MethodInvocation invocation) throws Throwable {
+    Preconditions.checkNotNull(eventSink, "Event sink has not yet been set.");
+
     Method method = invocation.getMethod();
     SendNotification sendNotification = method.getAnnotation(SendNotification.class);
     if (sendNotification == null) {

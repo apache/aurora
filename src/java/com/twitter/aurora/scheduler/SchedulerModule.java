@@ -18,7 +18,7 @@ import com.twitter.aurora.gen.TwitterTaskInfo;
 import com.twitter.aurora.scheduler.Driver.DriverImpl;
 import com.twitter.aurora.scheduler.PulseMonitor.PulseMonitorImpl;
 import com.twitter.aurora.scheduler.SchedulerLifecycle.DriverReference;
-import com.twitter.aurora.scheduler.events.TaskEventModule;
+import com.twitter.aurora.scheduler.events.PubsubEventModule;
 import com.twitter.aurora.scheduler.periodic.GcExecutorLauncher;
 import com.twitter.aurora.scheduler.periodic.GcExecutorLauncher.GcExecutor;
 import com.twitter.common.args.Arg;
@@ -61,8 +61,8 @@ public class SchedulerModule extends AbstractModule {
     bind(UserTaskLauncher.class).in(Singleton.class);
 
     bind(SchedulerLifecycle.class).in(Singleton.class);
-    TaskEventModule.bindSubscriber(binder(), SchedulerLifecycle.class);
-    TaskEventModule.bindSubscriber(binder(), TaskVars.class);
+    PubsubEventModule.bindSubscriber(binder(), SchedulerLifecycle.class);
+    PubsubEventModule.bindSubscriber(binder(), TaskVars.class);
   }
 
   @Provides

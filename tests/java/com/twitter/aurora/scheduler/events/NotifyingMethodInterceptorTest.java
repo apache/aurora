@@ -4,6 +4,7 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Singleton;
+import com.google.inject.TypeLiteral;
 import com.google.inject.matcher.Matchers;
 
 import org.junit.Before;
@@ -26,7 +27,15 @@ public class NotifyingMethodInterceptorTest extends EasyMockTest {
   @Before
   public void setUp() throws Exception {
     eventSink = createMock(new Clazz<Closure<PubsubEvent>>() { });
-    interceptor = new NotifyingMethodInterceptor(eventSink);
+    Injector injector = Guice.createInjector(new AbstractModule() {
+      @Override protected void configure() {
+        bind(new TypeLiteral<Closure<PubsubEvent>>() { }).toInstance(eventSink);
+        NotifyingMethodInterceptor bound = new NotifyingMethodInterceptor();
+        bind(NotifyingMethodInterceptor.class).toInstance(bound);
+        requestInjection(bound);
+      }
+    });
+    interceptor = injector.getInstance(NotifyingMethodInterceptor.class);
   }
 
   @Test
