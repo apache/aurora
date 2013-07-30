@@ -19,6 +19,8 @@ from gen.twitter.thermos.ttypes import (
   TaskState,
   TaskStatus)
 
+import psutil
+
 
 class TaskKiller(object):
   """
@@ -53,7 +55,6 @@ class TaskRunnerHelper(object):
   """
   class Error(Exception): pass
   class PermissionError(Error): pass
-  PS = ProcessProviderFactory.get()
 
   # Maximum drift between when the system says a task was forked and when we checkpointed
   # its fork_time (used as a heuristic to determine a forked task is really ours instead of
@@ -84,52 +85,58 @@ class TaskRunnerHelper(object):
       because of pid-space wrapping.  We don't want to go and kill processes we don't own,
       especially if the killer is running as root.
     """
-    if process_handle.user() != current_user:
+    if process_handle.username != current_user:
       log.info("Expected pid %s to be ours but the pid user is %s and we're %s" % (
-        process_handle.pid(), process_handle.user(), current_user))
+        process_handle.pid, process_handle.username, current_user))
       return False
 
-    estimated_start_time = clock.time() - process_handle.wall_time()
+    estimated_start_time = process_handle.create_time
     if abs(start_time - estimated_start_time) >= cls.MAX_START_TIME_DRIFT.as_(Time.SECONDS):
-      log.info("Time drift from the start of %s is %s, real: %s, pid wall: %s, estimated: %s" % (
-        process_handle.pid(), abs(start_time - estimated_start_time), start_time,
-        process_handle.wall_time(), estimated_start_time))
       return False
 
     return True
 
   @classmethod
-  def scan_process(cls, state, process_name, clock=time, ps=None):
+  def scan_process(cls, state, process_name, clock=time):
     """
-      Given a process_run and its owner, return the following:
+      Given a process_name, return the following:
         (coordinator pid, process pid, process tree)
+        (int or None, int or None, set)
+
     """
     process_run = state.processes[process_name][-1]
     process_owner = state.header.user
 
-    if ps is None:
-      ps = cls.PS
-      ps.collect_all()
-
     coordinator_pid, pid, tree = None, None, set()
 
     if process_run.coordinator_pid:
-      if process_run.coordinator_pid in ps.pids() and cls.this_is_really_our_pid(
-          ps.get_handle(process_run.coordinator_pid), process_owner, process_run.fork_time):
-        coordinator_pid = process_run.coordinator_pid
+      try:
+        coordinator_process = psutil.Process(process_run.coordinator_pid)
+      except psutil.NoSuchProcess:
+        pass
       else:
-        log.info('  Coordinator %s [pid: %s] completed.' % (process_run.process,
-            process_run.coordinator_pid))
+        if cls.this_is_really_our_pid(coordinator_process, process_owner, process_run.fork_time):
+          coordinator_pid = process_run.coordinator_pid
+      finally:
+        if coordinator_pid is None:
+          log.info('  Coordinator %s [pid: %s] completed.' % (process_run.process,
+              process_run.coordinator_pid))
 
     if process_run.pid:
-      if process_run.pid in ps.pids() and cls.this_is_really_our_pid(
-          ps.get_handle(process_run.pid), process_owner, process_run.start_time, clock=clock):
-        pid = process_run.pid
-        subtree = ps.children_of(process_run.pid, all=True)
-        if subtree:
-          tree = set(subtree)
+      try:
+        process = psutil.Process(process_run.pid)
+      except psutil.NoSuchProcess:
+        pass
       else:
-        log.info('  Process %s [pid: %s] completed.' % (process_run.process, process_run.pid))
+        if cls.this_is_really_our_pid(process, process_owner, process_run.start_time):
+          pid = process.pid
+          try:
+            tree = set(proc.pid for proc in process.get_children(recursive=True))
+          except psutil.Error:
+            log.warning('  Error gathering information on children of pid %s' % pid)
+      finally:
+        if pid is None:
+          log.info('  Process %s [pid: %s] completed.' % (process_run.process, process_run.pid))
 
     return (coordinator_pid, pid, tree)
 
@@ -143,9 +150,9 @@ class TaskRunnerHelper(object):
       forked process is no longer active, pid will be None and its children will be
       an empty set.
     """
-    cls.PS.collect_all()
-    return dict((process_name, cls.scan_process(state, process_name, ps=cls.PS, clock=clock)) for
+    result = dict((process_name, cls.scan_process(state, process_name, clock=clock)) for
                  process_name in state.processes)
+    return result
 
   @classmethod
   def safe_signal(cls, pid, sig=signal.SIGTERM):
@@ -172,8 +179,7 @@ class TaskRunnerHelper(object):
   @classmethod
   def _get_process_tuple(cls, state, process_name):
     assert process_name in state.processes and len(state.processes[process_name]) > 0
-    cls.PS.collect_all()
-    return cls.scan_process(state, process_name, ps=cls.PS)
+    return cls.scan_process(state, process_name, None)
 
   @classmethod
   def _get_coordinator_group(cls, state, process_name):
@@ -195,7 +201,7 @@ class TaskRunnerHelper(object):
     coordinator_pgid = cls._get_coordinator_group(state, process_name)
     coordinator_pid, pid, tree = cls._get_process_tuple(state, process_name)
     # This is super dangerous.  TODO(wickman)  Add a heuristic that determines
-    # that 1) there processes that currently belong to this process group
+    # that 1) there are processes that currently belong to this process group
     #  and 2) those processes have inherited the coordinator checkpoint filehandle
     # This way we validate that it is in fact the process group we expect.
     if coordinator_pgid:

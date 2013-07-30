@@ -7,6 +7,7 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 
+import org.apache.mesos.Protos.ExecutorInfo;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
@@ -94,11 +95,15 @@ public class GcExecutorLauncherTest extends EasyMockTest {
     taskInfo = gcExecutorLauncher.createTask(OFFER);
     assertTrue(taskInfo.isPresent());
     assertRetainedTasks(taskInfo.get(), thermosPrunedTask, thermosTask, nonThermosTask);
+    ExecutorInfo executor1 = taskInfo.get().getExecutor();
 
     // Third call - two tasks pruned.
     taskInfo = gcExecutorLauncher.createTask(OFFER);
     assertTrue(taskInfo.isPresent());
     assertRetainedTasks(taskInfo.get(), thermosPrunedTask);
+
+    // Same executor should be re-used for both tasks
+    assertEquals(executor1, taskInfo.get().getExecutor());
   }
 
   private static void assertRetainedTasks(TaskInfo taskInfo, ScheduledTask... tasks)

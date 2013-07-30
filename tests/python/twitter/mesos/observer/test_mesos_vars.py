@@ -1,15 +1,13 @@
 from collections import namedtuple
 
 from twitter.common.contextutil import temporary_file, open_zip
+from twitter.mesos.executor.executor_detector import ExecutorDetector
 from twitter.mesos.observer.mesos_vars import (
-    ExecutorVars,
-    MesosObserverVars)
+    ThermosExecutorVars as EV,
+    MesosObserverVars as MOV)
 
 import mox
 import psutil
-
-EV = ExecutorVars
-MOV = MesosObserverVars
 
 
 def test_release_from_tag():
@@ -39,62 +37,78 @@ def test_extract_pexinfo():
 
 class FakeProcess(object):
   def __init__(self, cwd, cmdline, raises=None):
-    self._cwd = cwd
+    self.cwd = cwd
     self._cmdline = cmdline
-    self._raise = raises
+    self.raises = raises
 
   def getcwd(self):
-    if self._raise:
-      raise self._raise
-    return self._cwd
+    if self.raises:
+      raise self.raises
+    return self.cwd
 
   @property
   def cmdline(self):
-    if self._raise:
-      raise self._raise
+    if self.raises:
+      raise self.raises
     return self._cmdline
 
 
 NON_EXECUTORS = [
-    FakeProcess(None, []),
-    FakeProcess(None, ['too short']),
-    FakeProcess(None, ['too short']),
-    FakeProcess(None, ['just', 'wrong']),
-    FakeProcess(None, ['python', './gc_executor']),
-]
-
-EXECUTORS = [
-    FakeProcess(None, ['python', './thermos_executor']),
-    FakeProcess(None, ['python', './thermos_executor.pex']),
-    FakeProcess(None, ['python2', './thermos_executor']),
-    FakeProcess(None, ['python2.6', './thermos_executor.pex']),
+    FakeProcess(True, []),
+    FakeProcess(True, ['too short']),
+    FakeProcess(True, ['too short']),
+    FakeProcess(True, ['just', 'wrong']),
+    FakeProcess(True, ['python', './gc_executor']),
 ]
 
 BAD_EXECUTORS = [
-    FakeProcess(None, [], raises=psutil.error.Error('No such process')),
-    FakeProcess(None, ['python', './thermos_executor.pex'], raises=psutil.error.Error('Lulz')),
+    FakeProcess(True, [], raises=psutil.Error('No such process')),
+    FakeProcess(True, ['python', './thermos_executor.pex'], raises=psutil.Error('Lulz')),
 ]
 
-def test_iter_executors():
+GOOD_EXECUTORS = [
+    FakeProcess(True, ['python', './thermos_executor']),
+    FakeProcess(True, ['python', './thermos_executor.pex']),
+    FakeProcess(True, ['python2', './thermos_executor']),
+    FakeProcess(True, ['python2.6', './thermos_executor.pex']),
+]
+
+SANDBOXLESS_EXECUTORS = [
+    FakeProcess(None, ['python', './thermos_executor']),
+    FakeProcess(None, ['python', './thermos_executor.pex'])
+]
+
+def test_iter_executors_psutil_fail():
   m = mox.Mox()
   m.StubOutWithMock(psutil, 'process_iter')
-  psutil.process_iter().AndRaise(psutil.error.Error('derp'))
+  psutil.process_iter().AndRaise(psutil.Error('derp'))
   m.ReplayAll()
   assert list(MOV.iter_executors()) == []
   m.UnsetStubs()
   m.VerifyAll()
 
+def test_iter_executors():
   m = mox.Mox()
   m.StubOutWithMock(psutil, 'process_iter')
-  psutil.process_iter().AndReturn(iter(EXECUTORS))
-  psutil.process_iter().AndReturn(iter(NON_EXECUTORS + EXECUTORS))
-  psutil.process_iter().AndReturn(iter(BAD_EXECUTORS + EXECUTORS))
-  psutil.process_iter().AndReturn(iter(EXECUTORS + NON_EXECUTORS))
-  psutil.process_iter().AndReturn(iter(EXECUTORS + BAD_EXECUTORS))
-  psutil.process_iter().AndReturn(iter(NON_EXECUTORS + EXECUTORS + NON_EXECUTORS))
-  psutil.process_iter().AndReturn(iter(BAD_EXECUTORS + EXECUTORS + BAD_EXECUTORS))
+  m.StubOutWithMock(ExecutorDetector, 'match')
+
+  def mock_executor_set(execs):
+    psutil.process_iter().AndReturn(iter(execs))
+    for e in execs:
+      if e in GOOD_EXECUTORS + SANDBOXLESS_EXECUTORS:
+        ExecutorDetector.match(e.cwd).AndReturn(e.cwd)
+
+  mock_executor_set(GOOD_EXECUTORS)
+  mock_executor_set(NON_EXECUTORS + GOOD_EXECUTORS)
+  mock_executor_set(BAD_EXECUTORS + GOOD_EXECUTORS)
+  mock_executor_set(GOOD_EXECUTORS + NON_EXECUTORS)
+  mock_executor_set(GOOD_EXECUTORS + BAD_EXECUTORS)
+  mock_executor_set(NON_EXECUTORS + GOOD_EXECUTORS + NON_EXECUTORS)
+  mock_executor_set(BAD_EXECUTORS + GOOD_EXECUTORS + BAD_EXECUTORS)
+
   m.ReplayAll()
+
   for _ in range(7):
-    assert list(MOV.iter_executors()) == EXECUTORS
+    assert list(p for p, _ in MOV.iter_executors()) == GOOD_EXECUTORS
   m.UnsetStubs()
   m.VerifyAll()

@@ -6,6 +6,7 @@ import time
 from twitter.common import log
 from twitter.common.exceptions import ExceptionalThread
 from twitter.common.metrics import (
+    AtomicGauge,
     Label,
     LambdaGauge,
     CompoundMetrics,
@@ -24,7 +25,7 @@ from gen.twitter.thermos.ttypes import TaskState
 import psutil
 
 
-class ExecutorVars(Observable):
+class ThermosExecutorVars(Observable):
   """
     Per-executor exported vars.
   """
@@ -118,16 +119,16 @@ class ExecutorVars(Observable):
         try:
           for grandchild in child.get_children():
             yield grandchild  # thermos_coordinator
-        except psutil.error.Error:
+        except psutil.Error:
           continue
-    except psutil.error.Error:
+    except psutil.Error:
       return
 
   @classmethod
   def aggregate_memory(cls, process, attribute='pss'):
     try:
       return sum(getattr(mmap, attribute) for mmap in process.get_memory_maps())
-    except psutil.error.Error:
+    except psutil.Error:
       return 0
 
   @classmethod
@@ -142,14 +143,14 @@ class ExecutorVars(Observable):
       self.write_metric('cpu', executor_cpu)
       self.write_metric('rss', executor_rss)
       self.orphan = self._process.ppid == 1
-    except psutil.error.Error:
+    except psutil.Error:
       return False
 
     try:
       child_stats = map(self.cpu_rss_pss, self.thermos_children(self._process))
       self.write_metric('thermos_cpu', sum(stat[0] for stat in child_stats))
       self.write_metric('thermos_pss', sum(stat[2] for stat in child_stats))
-    except psutil.error.Error:
+    except psutil.Error:
       pass
 
     return True
@@ -158,14 +159,27 @@ class ExecutorVars(Observable):
     self._external_metrics.stop()
 
 
+class GCExecutorVars(Observable):
+  def __init__(self, process, executor_id):
+    self._process = process
+    self._observable_metrics = DiskMetricReader(
+      os.path.join(process.getcwd(), ExecutorDetector.VARS_PATH))
+    self._observable_metrics.start()
+
+  def stop(self):
+    self._observable_metrics.stop()
+
+
 class MesosObserverVars(Observable, ExceptionalThread):
   COLLECTION_INTERVAL = Amount(30, Time.SECONDS)
   EXECUTOR_BINARIES = ('./thermos_executor', './thermos_executor.pex')
+  GC_EXECUTOR_BINARIES = ('./gc_executor',)
   OBSERVER_STATS = ('active_tasks',
                     'announcers',               # TODO(wickman) Remove once resolved:
                     'connection_losses',        # https://issues.apache.org/jira/browse/MESOS-433
                     'disconnected_announcers',  # Remove
                     'finished_tasks',
+                    'gc_executors',
                     'max_disconnected_time',    # Remove
                     'max_metrics_age',
                     'observer_cpu',
@@ -177,11 +191,13 @@ class MesosObserverVars(Observable, ExceptionalThread):
 
   def __init__(self, observer, mesos_root):
     self._mesos_root = mesos_root
-    self._detector = ExecutorDetector()
     self._observer = observer
     self._executor_metrics = self.metrics.scope('executor')
-    self._executors = {}
-    self._executor_releases = {}
+    self._executors = {}          # executor_id => ThermosExecutorVars
+    self._executor_releases = {}  # executor_version => count
+    self._gc_executor = (None, None) # (executor_id, GcExecutorVars)
+    self._gc_executor_count = AtomicGauge('gc_executor_count', 0)
+    self.metrics.register(self._gc_executor_count)
     self._self = psutil.Process(os.getpid())
     for stat in self.OBSERVER_STATS:
       setattr(self, stat, self.metrics.register(MutatorGauge(stat, 0)))
@@ -228,19 +244,36 @@ class MesosObserverVars(Observable, ExceptionalThread):
     self.finished_tasks.write(counts['finished'])
 
   @classmethod
-  def is_executor(cls, proc):
-    try:
-      return len(proc.cmdline) >= 2 and proc.cmdline[0].startswith('python') and (
-          proc.cmdline[1] in cls.EXECUTOR_BINARIES)
-    except psutil.error.Error:
-      return False
+  def iter_executors(cls, binaries=EXECUTOR_BINARIES):
+    """Iterate over the executors present on the system.
 
-  @classmethod
-  def iter_executors(cls):
+    For an executor to be considered present it must have a current process matching the set of
+    specified binaries, and a corresponding sandbox (as detected by the ExecutorDetector).
+
+    Yields:
+      (psutil.Process, twitter.common.string.ScanfResult)
+
+    """
+    def is_executor(proc):
+      try:
+        return (len(proc.cmdline) >= 2 and
+                proc.cmdline[0].startswith('python') and
+                proc.cmdline[1] in binaries)
+      except psutil.Error:
+        return False
+
     try:
-      for proc in filter(cls.is_executor, psutil.process_iter()):
-        yield proc
-    except psutil.error.Error as e:
+      for proc in filter(is_executor, psutil.process_iter()):
+        try:
+          cwd = proc.getcwd()
+        except psutil.Error as e:
+          continue
+        executor = ExecutorDetector.match(cwd)
+        if not executor:
+          log.warning('Found an executor not running in expected sandbox: %s' % cwd)
+          continue
+        yield proc, executor
+    except psutil.Error as e:
       log.error("Failed to iterate over processes: %s" % e)
 
   @classmethod
@@ -252,21 +285,14 @@ class MesosObserverVars(Observable, ExceptionalThread):
   def collect_executors(self):
     self.sample_executors()
     self.index_executors()
+    self.sample_gc_executors()
 
   def sample_executors(self):
-    for proc in self.iter_executors():
-      try:
-        cwd = proc.getcwd()
-      except psutil.error.Error as e:
-        continue
-      executor = self._detector.match(cwd)
-      if not executor:
-        log.warning('Found an executor not running in expected sandbox: %s' % cwd)
-        continue
+    for proc, executor in self.iter_executors():
       if executor.executor_id not in self._executors:
         try:
-          executor_vars = ExecutorVars(proc)
-        except psutil.error.Error:
+          executor_vars = ThermosExecutorVars(proc)
+        except psutil.Error:
           continue
         self._executors[executor.executor_id] = executor_vars
         if not self.executor_filter(executor):
@@ -323,6 +349,35 @@ class MesosObserverVars(Observable, ExceptionalThread):
         sum(executor.connection_losses for executor in self._executors.values()))
     self.session_expirations.write(
         sum(executor.session_expirations for executor in self._executors.values()))
+
+  def sample_gc_executors(self):
+
+    def clear_gc_executor_vars():
+      if self._gc_executor[1]:
+        self._gc_executor[1].stop()
+      self.metrics.unregister_observable('gc_executor')
+
+    log.debug('Collecting GC executor metrics')
+    execs = []
+    gc_execs = list(self.iter_executors(self.GC_EXECUTOR_BINARIES))
+    self._gc_executor_count.write(len(gc_execs))
+    log.debug('=> Found %s GC executors' % len(gc_execs))
+    if not gc_execs:
+      log.debug('=> No GC executor running on the system!')
+      clear_gc_executor_vars()
+      return
+    elif len(gc_execs) > 1:
+      log.debug('=> Multiple GC executors detected - sample may be inaccurate!')
+    proc, executor = gc_execs[0]
+    eid = executor.executor_id
+    if eid != self._gc_executor[0]:
+      clear_gc_executor_vars()
+      if self._gc_executor[1]:
+        self._gc_executor[1].stop()
+      self.metrics.unregister_observable('gc_executor')
+      gc_vars = GCExecutorVars(proc)
+      self.metrics.register_observable('gc_executor', gc_vars)
+      self._gc_executor = (eid, gc_vars)
 
   def collect_observer_resource_usage(self):
     self.observer_cpu.write(self._self.get_cpu_percent(interval=0))

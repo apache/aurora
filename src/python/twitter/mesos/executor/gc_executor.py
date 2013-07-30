@@ -6,13 +6,18 @@ slaves utilising the Thermos executor.
 
 """
 
+from functools import wraps
 import os
 import pwd
 import threading
 import time
 
 from twitter.common import log
+from twitter.common.collections import OrderedDict
 from twitter.common.concurrent import defer
+from twitter.common.exceptions import ExceptionalThread
+from twitter.common.metrics import Observable
+from twitter.common.metrics.gauge import AtomicGauge
 from twitter.common.quantity import Amount, Time, Data
 from twitter.mesos.common_internal.clusters import TwitterCluster
 from twitter.thermos.base.ckpt import CheckpointDispatcher
@@ -38,7 +43,7 @@ from thrift.TSerialization import serialize as thrift_serialize
 import psutil
 
 
-class ThermosGCExecutor(ThermosExecutorBase):
+class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
   """
     Thermos GC Executor, responsible for:
       - garbage collecting old tasks to make sure they don't clutter up the system
@@ -47,13 +52,15 @@ class ThermosGCExecutor(ThermosExecutorBase):
   """
   MAX_PID_TIME_DRIFT = Amount(10, Time.SECONDS)
   MAX_CHECKPOINT_TIME_DRIFT = Amount(1, Time.HOURS)  # maximum runner disconnection time
-  PERSISTENCE_WAIT = Amount(5, Time.SECONDS)
 
   # how old a task must be before we're willing to kill it, assuming that there could be
   # slight races in the following scenario:
   #    launch gc with retained_tasks={t1, t2, t3}
   #    launch task t4
   MINIMUM_KILL_AGE = Amount(10, Time.MINUTES)
+
+  # wait time between checking for new GC events from the slave and/or cleaning orphaned tasks
+  POLL_WAIT = Amount(5, Time.MINUTES)
 
   def __init__(self,
                checkpoint_root,
@@ -64,22 +71,34 @@ class ThermosGCExecutor(ThermosExecutorBase):
                task_garbage_collector=TaskGarbageCollector,
                clock=time):
     ThermosExecutorBase.__init__(self)
-    self._slave_id = None
+    ExceptionalThread.__init__(self)
+    self.daemon = True
+    self._stop_event = threading.Event()
+    self._gc_task_queue = OrderedDict() # mapping of task_id => (TaskInfo, AdjustRetainedTasks), in
+                                        # the order in which they were received via a launchTask.
+    self._driver = None   # cache the ExecutorDriver provided by the slave, so we can use it
+                          # out of band from slave-initiated callbacks. This should be supplied by
+                          # ThermosExecutorBase.registered() when the executor first registers with
+                          # the slave.
+    self._slave_id = None # cache the slave ID provided by the slave
+    self._task_id = None  # the task_id currently being executed by the ThermosGCExecutor, if any
+    self._start_time = None # the start time of a task currently being executed, if any
     self._mesos_root = mesos_root or TwitterCluster.DEFAULT_MESOS_ROOT
     self._detector = executor_detector()
     self._collector = task_garbage_collector(root=checkpoint_root)
     self._clock = clock
-    self._start_time = clock.time()
     self._task_killer = task_killer
     self._checkpoint_root = checkpoint_root
     if 'ANGRYBIRD_THERMOS' in os.environ:
       self._checkpoint_root = os.path.join(os.environ['ANGRYBIRD_THERMOS'], 'thermos', 'run')
+    self._dropped_tasks = AtomicGauge('dropped_tasks')
+    self.metrics.register(self._dropped_tasks)
 
   def _runner_ckpt(self, task_id):
-    """Return the runner checkpoint file for a given task_id"""
+    """Return the runner checkpoint file for a given task_id."""
     return TaskPath(root=self._checkpoint_root, task_id=task_id).getpath('runner_checkpoint')
 
-  def terminate_task(self, task_id, kill=True):
+  def _terminate_task(self, task_id, kill=True):
     """Terminate a task using the associated task killer. Returns a boolean indicating success."""
     killer = self._task_killer(task_id, self._checkpoint_root)
     self.log('Terminating %s...' % task_id)
@@ -129,7 +148,7 @@ class ThermosGCExecutor(ThermosExecutorBase):
     if states:
       task_start_time, _ = states[0]
       if self._start_time - task_start_time > self.MINIMUM_KILL_AGE.as_(Time.SECONDS):
-        return self.terminate_task(task_id)
+        return self._terminate_task(task_id)
     return False
 
   def should_gc_task(self, task_id):
@@ -260,6 +279,9 @@ class ThermosGCExecutor(ThermosExecutorBase):
     for task_id in active_tasks:
       log.info('Inspecting running task: %s' % task_id)
       inspection = inspector.inspect(task_id)
+      if not inspection:
+        log.warning('  - Error inspecting task runner')
+        continue
       latest_runner = inspection.runner_processes[-1]
       # Assume that it has not yet started?
       if not latest_runner:
@@ -275,15 +297,19 @@ class ThermosGCExecutor(ThermosExecutorBase):
         # Runner is dead
         pass
       except psutil.Error as err:
-        log.error("  - Error sampling runner process: %s" % (runner_pid, err))
+        log.error('  - Error sampling runner process [pid=%s]: %s' % (runner_pid, err))
         continue
-      latest_update = os.path.getmtime(self._runner_ckpt(task_id))
+      try:
+        latest_update = os.path.getmtime(self._runner_ckpt(task_id))
+      except (IOError, OSError) as err:
+        log.debug('  - Error accessing runner ckpt: %s' % err)
+        continue
       if self._clock.time() - latest_update < self.MAX_CHECKPOINT_TIME_DRIFT.as_(Time.SECONDS):
         log.info('  - Runner is dead but under LOST threshold.')
         continue
       log.info('  - Runner is dead but beyond LOST threshold: %.1fs' % (
           self._clock.time() - latest_update))
-      if self.terminate_task(task_id, kill=False):
+      if self._terminate_task(task_id, kill=False):
         updates[task_id] = ScheduleStatus.LOST
         self.send_update(driver, task_id, 'LOST', 'GC executor detected failed task runner.')
 
@@ -296,7 +322,7 @@ class ThermosGCExecutor(ThermosExecutorBase):
       try:
         appapp_sandbox.destroy()
       except SandboxBase.DeletionError as err:
-        self.log('Error destroying AppAppSandbox: %s!' % err)
+        self.log('Error destroying AppAppSandbox: %s' % err)
     else:
       header_sandbox = self.get_sandbox(task_id)
       directory_sandbox = DirectorySandbox(header_sandbox) if header_sandbox else None
@@ -307,6 +333,7 @@ class ThermosGCExecutor(ThermosExecutorBase):
         self.log('Found no sandboxes for %s' % task_id)
 
   def _gc(self, task_id):
+    """Erase the sandbox, logs and metadata of the given task."""
     self.log('Erasing sandbox for %s' % task_id)
     self._erase_sandbox(task_id)
     self.log('Erasing logs for %s' % task_id)
@@ -315,22 +342,28 @@ class ThermosGCExecutor(ThermosExecutorBase):
     self._collector.erase_metadata(task_id)
 
   def garbage_collect(self, force_delete=frozenset()):
+    """Garbage collect tasks on the system no longer active or in the supplied force_delete.
+
+    Return a set of task_ids representing the tasks that were garbage collected.
+    """
     active_tasks, finished_tasks = self.partition_tasks()
     retained_executors = set(iter(self.linked_executors))
     self.log('Executor sandboxes retained by Mesos:')
-    for r_e in sorted(retained_executors):
-      self.log('  %s' % r_e)
+    if retained_executors:
+      for r_e in sorted(retained_executors):
+        self.log('  %s' % r_e)
     else:
       self.log('  None')
-    for task_id in active_tasks - retained_executors:
+    for task_id in (active_tasks - retained_executors):
       self.log('ERROR: Active task %s had its executor sandbox pulled.' % task_id)
-    gc_tasks = finished_tasks - retained_executors
-    for gc_task in (gc_tasks | force_delete):
+    gc_tasks = (finished_tasks - retained_executors) | force_delete
+    for gc_task in gc_tasks:
       self._gc(gc_task)
     return gc_tasks
 
   @property
   def linked_executors(self):
+    """Generator yielding the executor sandboxes detected on the system."""
     thermos_executor_prefix = 'thermos-'
     for executor in self._detector.find(root=self._mesos_root):
       # It's possible for just the 'latest' symlink to be present but no run directories.
@@ -338,28 +371,103 @@ class ThermosGCExecutor(ThermosExecutorBase):
       if executor.executor_id.startswith(thermos_executor_prefix) and executor.run != 'latest':
         yield executor.executor_id[len(thermos_executor_prefix):]
 
-  def run(self, driver, task, retain_tasks):
+  def _run_gc(self, task, retain_tasks):
     """
-      retain_tasks: mapping of task_id => ScheduleStatus
+      Reconcile the set of tasks to retain (provided by the scheduler) with the current state of
+      executors on this system. Garbage collect tasks/executors as appropriate.
+
+      Not re-entrant! Previous executions must complete (and clear self._task_id) before this can be
+      invoked.
+
+      Potentially blocking (e.g. on I/O) in self.garbage_collect()
+
+      Args:
+        task: TaskInfo provided by the slave
+        retain_tasks: mapping of task_id => ScheduleStatus, describing what the scheduler thinks is
+                      running on this system
     """
-    local_gc, remote_gc, _ = self.reconcile_states(driver, retain_tasks)
-    self.clean_orphans(driver)
-    delete_tasks = set(retain_tasks).intersection(self.garbage_collect(local_gc)) | remote_gc
-    if delete_tasks:
-      driver.sendFrameworkMessage(thrift_serialize(
-          SchedulerMessage(deletedTasks=DeletedTasks(taskIds=delete_tasks))))
-    self.send_update(driver, task.task_id.value, 'FINISHED', 'Garbage collection finished.')
-    defer(driver.stop, clock=self._clock, delay=self.PERSISTENCE_WAIT)
+    task_id = task.task_id.value
+    if self._task_id is not None:
+      raise RuntimeError('_run_gc() called [task_id=%s], but already running [task_id=%s]'
+                         % (task_id, self._task_id))
+    self._task_id = task_id
+    self.log('Launching garbage collection [task_id=%s]' % task_id)
+    self._start_time = self._clock.time()
+    local_gc, remote_gc, _ = self.reconcile_states(self._driver, retain_tasks)
+    deleted_tasks = set(retain_tasks).intersection(self.garbage_collect(local_gc)) | remote_gc
+    if deleted_tasks:
+      self._driver.sendFrameworkMessage(thrift_serialize(
+          SchedulerMessage(deletedTasks=DeletedTasks(taskIds=deleted_tasks))))
+    self.send_update(self._driver, task.task_id.value, 'FINISHED', 'Garbage collection finished.')
+    self.log('Garbage collection complete [task_id=%s]' % task_id)
+    self._task_id = self._start_time = None
+
+  def run(self):
+    """Main GC executor event loop.
+
+      Periodically perform state reconciliation with the set of tasks provided
+      by the slave, and garbage collect orphaned tasks on the system.
+    """
+    while not self._stop_event.is_set():
+      try:
+        _, (task, retain_tasks) = self._gc_task_queue.popitem(0)
+        self._run_gc(task, retain_tasks)
+      except KeyError: # no enqueued GC tasks
+        pass
+      if self._driver is not None:
+        self.clean_orphans(self._driver)
+      self._stop_event.wait(self.POLL_WAIT.as_(Time.SECONDS))
+    # shutdown called
+    if self._driver is not None:
+      self._driver.stop()
+
+
+  """ Mesos Executor API methods follow """
 
   def launchTask(self, driver, task):
-    self._slave_id = task.slave_id.value
-    self.log('launchTask called.')
-    retain_tasks = AdjustRetainedTasks()
-    thrift_deserialize(retain_tasks, task.data)
-    defer(lambda: self.run(driver, task, retain_tasks.retainedTasks))
+    """Queue a new garbage collection run, and drop any currently-enqueued runs."""
+    if self._slave_id is None:
+      self._slave_id = task.slave_id.value
+    task_id = task.task_id.value
+    self.log('launchTask() got task_id: %s' % task_id)
+    if task_id == self._task_id:
+      self.log('=> GC with task_id %s currently running - ignoring' % task_id)
+      return
+    elif task_id in self._gc_task_queue:
+      self.log('=> Already have task_id %s queued - ignoring' % task_id)
+      return
+    try:
+      art = thrift_deserialize(AdjustRetainedTasks(), task.data)
+    except Exception as err:
+      self.log('Error deserializing task: %s' % err)
+      self.send_update(self._driver, task_id, 'FAILED', 'Deserialization of GC task failed')
+      return
+    try:
+      prev_task_id, _ = self._gc_task_queue.popitem(0)
+    except KeyError: # no enqueued GC tasks - reset counter
+      self._dropped_tasks.write(0)
+    else:
+      self.log('=> Dropping previously queued GC with task_id %s' % prev_task_id)
+      self._dropped_tasks.increment(1)
+      self.log('=> Updating scheduler')
+      self.send_update(self._driver, prev_task_id, 'FINISHED',
+                       'Garbage collection skipped - GC executor received another task')
+    self.log('=> Adding %s to GC queue' % task_id)
+    self._gc_task_queue[task_id] = (task, art.retainedTasks)
 
   def killTask(self, driver, task_id):
-    self.log('killTask() got task_id: %s, ignoring.' % task_id)
+    """Remove the specified task from the queue, if it's not yet run. Otherwise, no-op."""
+    self.log('killTask() got task_id: %s' % task_id)
+    print task_id, self._gc_task_queue
+    task = self._gc_task_queue.pop(task_id, None)
+    if task is not None:
+      self.log('=> Removed %s from queued GC tasks' % task_id)
+    elif task_id == self._task_id:
+      self.log('=> GC with task_id %s currently running - ignoring' % task_id)
+    else:
+      self.log('=> Unknown task_id %s - ignoring' % task_id)
 
   def shutdown(self, driver):
-    self.log('shutdown() called, ignoring.')
+    """Trigger the Executor to shut down as soon as the current GC run is finished."""
+    self.log('shutdown() called - setting stop event')
+    self._stop_event.set()

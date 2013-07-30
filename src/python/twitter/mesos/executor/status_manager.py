@@ -48,7 +48,7 @@ class StatusManager(ExceptionalThread):
 
   def run(self):
     for checker in self._health_checkers:
-      log.debug("Starting checker: %s" % checker)
+      log.debug("Starting checker: %s" % checker.__class__.__name__)
       checker.start()
 
     failure_reason = None

@@ -1,8 +1,11 @@
-import mesos
-import mesos_pb2 as mesos_pb
 from twitter.common import log
+
 from gen.twitter.mesos.ttypes import ScheduleStatus
 from gen.twitter.thermos.ttypes import TaskState
+
+import mesos
+import mesos_pb2 as mesos_pb
+
 
 class ThermosExecutorBase(mesos.Executor):
   MESOS_STATES = {
@@ -57,6 +60,7 @@ class ThermosExecutorBase(mesos.Executor):
     self.log('   ExecutorInfo:  %s' % executor_info)
     self.log('   FrameworkInfo: %s' % framework_info)
     self.log('   SlaveInfo:     %s' % slave_info)
+    self._driver = driver
     self._executor_info = executor_info
     self._framework_info = framework_info
     self._slave_info = slave_info
@@ -71,11 +75,15 @@ class ThermosExecutorBase(mesos.Executor):
   def send_update(self, driver, task_id, state, message=None):
     update = mesos_pb.TaskStatus()
     if isinstance(state, str):
-      assert state in self.MESOS_STATES
+      if state not in self.MESOS_STATES:
+        raise ValueError("Invalid state: %s" % state)
       update.state = self.MESOS_STATES[state]
     elif isinstance(state, int):
-      assert state in self.THERMOS_TO_MESOS_STATES
+      if state not in self.THERMOS_TO_MESOS_STATES:
+        raise ValueError("Invalid state: %d" % state)
       update.state = self.THERMOS_TO_MESOS_STATES[state]
+    else:
+      raise ValueError("Invalid state: %s" % str(state))
     update.task_id.value = task_id
     if message:
       update.message = str(message)

@@ -4,7 +4,7 @@ from operator import attrgetter
 from time import time
 
 from psutil import Process
-from psutil.error import NoSuchProcess, AccessDenied, Error as PsutilError
+from psutil import NoSuchProcess, AccessDenied, Error as PsutilError
 
 from twitter.common import log
 

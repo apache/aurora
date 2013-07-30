@@ -1,3 +1,10 @@
+"""Command-line entry point to the Thermos Executor
+
+This module wraps the Thermos Executor into an executable suitable for launching by a Mesos
+slave.
+
+"""
+
 import os
 
 from twitter.common import app, log
@@ -5,14 +12,9 @@ from twitter.common.log.options import LogOptions
 from twitter.common.metrics import CompoundMetrics
 from twitter.common.metrics.sampler import DiskMetricWriter
 
-from twitter.mesos.executor.executor_detector import ExecutorDetector
-from twitter.mesos.executor.executor_vars import ExecutorVars
-from twitter.mesos.executor.task_runner_wrapper import (
-    ProductionTaskRunner,
-    AngrybirdTaskRunner)
-from twitter.mesos.executor.thermos_executor import (
-    ThermosExecutor,
-    ThermosExecutorTimer)
+from .executor_detector import ExecutorDetector
+from .executor_vars import ExecutorVars
+from .thermos_executor import ThermosExecutor, ThermosExecutorTimer
 
 import mesos
 
@@ -20,7 +22,6 @@ import mesos
 app.configure(module='twitter.common_internal.app.modules.chickadee_handler',
     service_name='thermos_executor')
 app.configure(debug=True)
-
 
 LogOptions.set_simple(True)
 LogOptions.set_disk_log_level('DEBUG')
@@ -51,7 +52,7 @@ def main():
   # time period
   ThermosExecutorTimer(thermos_executor, driver).start()
 
-  # Start executor.
+  # Start executor
   driver.run()
 
   log.info('MesosExecutorDriver.run() has finished.')

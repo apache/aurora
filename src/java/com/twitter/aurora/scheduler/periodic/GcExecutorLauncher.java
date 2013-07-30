@@ -43,7 +43,8 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
- * A task launcher that periodically initiates a garbage-collecting executor on a host.
+ * A task launcher that periodically initiates garbage collection on a host, re-using a single
+ * garbage collection executor
  */
 public class GcExecutorLauncher implements TaskLauncher {
   private static final Logger LOG = Logger.getLogger(GcExecutorLauncher.class.getName());
@@ -79,10 +80,6 @@ public class GcExecutorLauncher implements TaskLauncher {
     this.storage = checkNotNull(storage);
   }
 
-  static String getSourceName(String hostname, String uuid) {
-    return String.format("%s.%s", EXECUTOR_NAME, hostname);
-  }
-
   @Override
   public Optional<TaskInfo> createTask(Offer offer) {
     if (!gcExecutorPath.isPresent() || pulseMonitor.isAlive(offer.getHostname())) {
@@ -103,16 +100,15 @@ public class GcExecutorLauncher implements TaskLauncher {
 
     pulseMonitor.pulse(offer.getHostname());
 
-    String uuid = UUID.randomUUID().toString();
     ExecutorInfo.Builder executor = ExecutorInfo.newBuilder()
-        .setExecutorId(ExecutorID.newBuilder().setValue(EXECUTOR_PREFIX + uuid))
+        .setExecutorId(ExecutorID.newBuilder().setValue(EXECUTOR_PREFIX))
         .setName(EXECUTOR_NAME)
-        .setSource(getSourceName(offer.getHostname(), uuid))
+        .setSource(offer.getHostname())
         .addAllResources(GC_EXECUTOR_RESOURCES.toResourceList())
         .setCommand(CommandUtil.create(gcExecutorPath.get()));
 
     return Optional.of(TaskInfo.newBuilder().setName("system-gc")
-        .setTaskId(TaskID.newBuilder().setValue(SYSTEM_TASK_PREFIX + uuid))
+        .setTaskId(TaskID.newBuilder().setValue(SYSTEM_TASK_PREFIX + UUID.randomUUID().toString()))
         .setSlaveId(offer.getSlaveId())
         .setData(ByteString.copyFrom(data))
         .setExecutor(executor)

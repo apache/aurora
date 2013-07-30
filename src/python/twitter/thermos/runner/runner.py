@@ -38,7 +38,6 @@ from pystachio import Environment
 
 from twitter.common import log
 from twitter.common.dirutil import safe_mkdir
-from twitter.common.process import ProcessProviderFactory
 from twitter.common.quantity import Amount, Time
 from twitter.common.recordio import ThriftRecordReader
 
@@ -478,7 +477,6 @@ class TaskRunner(object):
     self._process_map = dict((p.name().get(), p) for p in self._task.processes())
     self._task_processes = {}
     self._stages = dict((state, stage(self)) for state, stage in self.STAGES.items())
-    self._ps = ProcessProviderFactory.get()
     self._finalization_start = None
     self._preemption_deadline = None
     self._watcher = ProcessMuxer(self._pathspec)

@@ -2,9 +2,8 @@ from collections import namedtuple
 from contextlib import closing
 import pwd
 
-# from twitter.common.process import ProcessProviderFactory
 from twitter.common import log
-from twitter.common.recordio import ThriftRecordReader
+from twitter.common.recordio import RecordIO, ThriftRecordReader
 
 from twitter.thermos.base.ckpt import CheckpointDispatcher
 from twitter.thermos.base.path import TaskPath
@@ -68,21 +67,25 @@ class CheckpointInspector(object):
     # replay runner checkpoint
     runner_pid = None
     runner_latest_update = 0
-    with open(self._path.given(task_id=task_id).getpath('runner_checkpoint')) as fp:
-      with closing(ThriftRecordReader(fp, RunnerCkpt)) as ckpt:
-        for record in ckpt:
-          dispatcher.dispatch(state, record)
-          runner_latest_update = max(runner_latest_update,
-              self.get_timestamp(record.process_status))
-          # collect all bound runners
-          if record.task_status:
-            if record.task_status.runner_pid != runner_pid:
-              runner_processes.append((record.task_status.runner_pid,
-                                       record.task_status.runner_uid or 0,
-                                       record.task_status.timestamp_ms))
-              runner_pid = record.task_status.runner_pid
-          elif record.process_status:
-            consume_process_record(record)
+    try:
+      with open(self._path.given(task_id=task_id).getpath('runner_checkpoint')) as fp:
+        with closing(ThriftRecordReader(fp, RunnerCkpt)) as ckpt:
+          for record in ckpt:
+            dispatcher.dispatch(state, record)
+            runner_latest_update = max(runner_latest_update,
+                self.get_timestamp(record.process_status))
+            # collect all bound runners
+            if record.task_status:
+              if record.task_status.runner_pid != runner_pid:
+                runner_processes.append((record.task_status.runner_pid,
+                                         record.task_status.runner_uid or 0,
+                                         record.task_status.timestamp_ms))
+                runner_pid = record.task_status.runner_pid
+            elif record.process_status:
+              consume_process_record(record)
+    except (IOError, OSError, RecordIO.Error) as err:
+      log.debug('Error inspecting task runner checkpoint: %s' % err)
+      return
 
     # register existing processes in muxer
     for process_name in state.processes:

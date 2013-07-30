@@ -16,7 +16,7 @@ from .health_interface import (
     HealthInterface)
 
 import mesos_pb2 as mesos_pb
-import psutil as ps
+import psutil
 
 
 class ResourceEnforcer(object):
@@ -39,8 +39,8 @@ class ResourceEnforcer(object):
     """ List the current constituent Processes of the task (which may have child processes) """
     for process in self._task_monitor.get_active_processes():
       try:
-        yield ps.Process(process[0].pid)
-      except ps.error.Error as e:
+        yield psutil.Process(process[0].pid)
+      except psutil.Error as e:
         log.error('Error when collecting process %d: %s' % (process[0].pid, e))
 
   def walk(self):
@@ -50,7 +50,7 @@ class ResourceEnforcer(object):
       try:
         for child in parent.get_children(recursive=True):
           yield child
-      except ps.error.Error as e:
+      except psutil.Error as e:
         log.debug('Error when collecting process information: %s' % e)
 
   def _enforce_ram(self, sample):
@@ -75,7 +75,7 @@ class ResourceEnforcer(object):
           if connection.status == 'LISTEN':
             _, port = connection.local_address
             yield port
-      except ps.error.Error as e:
+      except psutil.Error as e:
         log.debug('Unable to collect information about %s: %s' % (process, e))
 
   def _enforce_ports(self, _):
@@ -97,7 +97,7 @@ class ResourceEnforcer(object):
     # TODO(wickman) Due to MESOS-1585, port enforcement has been unwired.  If you would like to
     # add it back, simply add self._enforce_ports into the list of enforcers.
     for enforcer in (self._enforce_ram, self._enforce_disk):
-      log.debug("Running enforcer: %s" % enforcer)
+      log.debug("Running enforcer: %s" % enforcer.__class__.__name__)
       kill_reason = enforcer(sample)
       if kill_reason:
         return kill_reason

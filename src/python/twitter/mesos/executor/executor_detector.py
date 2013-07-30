@@ -21,24 +21,27 @@ class ExecutorDetector(object):
       'runs',
       '%(run)s']
 
-  def __init__(self):
-    self._extractor = ScanfParser(os.path.join(*self.PATTERN))
+  EXTRACTOR = ScanfParser(os.path.join(*PATTERN))
 
-  def __iter__(self):
-    for extraction in self.find():
+  @classmethod
+  def __iter__(cls):
+    for extraction in cls.find():
       yield extraction
 
-  def match(self, path):
+  @classmethod
+  def match(cls, path):
     try:
-      return self._extractor.parse(path)
+      return cls._extractor.parse(path)
     except ScanfParser.ParseError:
       return None
 
-  def path(self, result):
-    return os.path.join(*self.PATTERN) % result.groups()
+  @classmethod
+  def path(cls, result):
+    return os.path.join(*cls.PATTERN) % result.groups()
 
-  def find(self, root=TwitterCluster.DEFAULT_MESOS_ROOT,
+  @classmethod
+  def find(cls, root=TwitterCluster.DEFAULT_MESOS_ROOT,
            slave_id='*', framework_id='*', executor_id='*', run='*'):
     mixins = dict(
         root=root, slave_id=slave_id, framework_id=framework_id, executor_id=executor_id, run=run)
-    return filter(None, map(self.match, glob(os.path.join(*self.PATTERN) % mixins)))
+    return filter(None, map(cls.match, glob(os.path.join(*cls.PATTERN) % mixins)))

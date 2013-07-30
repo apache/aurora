@@ -259,8 +259,6 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
 
     self._manager.start()
 
-  """ Mesos Executor API methods follow """
-
   @classmethod
   def resolve_ports(cls, mesos_task, portmap):
     """Given a mesos task and the portmap of resolved ports from the scheduler,
@@ -275,6 +273,8 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
         log.warning('Task has unmapped port: %s => %s' % (name, port))
 
     return dict((name, port) for (name, port) in task_portmap.items() if isinstance(port, int))
+
+  """ Mesos Executor API methods follow """
 
   def launchTask(self, driver, task):
     """

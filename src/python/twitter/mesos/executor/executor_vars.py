@@ -80,16 +80,16 @@ class ExecutorVars(Observable, ExceptionalThread):
         try:
           for grandchild in child.get_children():
             yield grandchild  # thermos_coordinator
-        except psutil.error.Error:
+        except psutil.Error:
           continue
-    except psutil.error.Error:
+    except psutil.Error:
       return
 
   @classmethod
   def aggregate_memory(cls, process, attribute='pss'):
     try:
       return sum(getattr(mmap, attribute) for mmap in process.get_memory_maps())
-    except (psutil.error.Error, AttributeError):
+    except (psutil.Error, AttributeError):
       # psutil on OS X does not support get_memory_maps
       return 0
 
@@ -110,14 +110,14 @@ class ExecutorVars(Observable, ExceptionalThread):
       self.write_metric('cpu', executor_cpu)
       self.write_metric('rss', executor_rss)
       self._orphan = self._self.ppid == 1
-    except psutil.error.Error:
+    except psutil.Error:
       return False
 
     try:
       child_stats = map(self.cpu_rss_pss, self.thermos_children(self._self))
       self.write_metric('thermos_cpu', sum(stat[0] for stat in child_stats))
       self.write_metric('thermos_pss', sum(stat[2] for stat in child_stats))
-    except psutil.error.Error:
+    except psutil.Error:
       pass
 
     return True

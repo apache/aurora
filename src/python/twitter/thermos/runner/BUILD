@@ -48,6 +48,7 @@ python_library(
   sources = ['__init__.py', 'runner.py'],
   dependencies = [
     python_requirement('thrift'),
+    pants('3rdparty/python:psutil'),
     pants('3rdparty/python:pystachio'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/dirutil'),
