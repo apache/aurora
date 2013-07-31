@@ -2,6 +2,7 @@ python_test_suite(name = 'all',
   dependencies = [
     pants(':test_base'),
     pants(':test_constraint_parsing'),
+    pants(':test_jvm'),
     pants(':test_loader'),
     pants(':test_thrift'),
   ]
@@ -29,6 +30,13 @@ python_tests(name = 'test_loader',
 
 python_tests(name = 'test_constraint_parsing',
   sources = ['test_constraint_parsing.py'],
+  dependencies = [
+    pants('src/python/twitter/mesos/config'),
+  ]
+)
+
+python_tests(name = 'test_jvm',
+  sources = ['test_jvm.py'],
   dependencies = [
     pants('src/python/twitter/mesos/config'),
   ]
