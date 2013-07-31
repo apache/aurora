@@ -73,7 +73,7 @@ public class AopModule extends AbstractModule {
     requireBinding(CapabilityValidator.class);
 
     // Layer ordering:
-    // Log -> CapabilityValidator -> FeatureToggle -> SchedulerThriftInterface
+    // Log -> CapabilityValidator -> FeatureToggle -> StatsExporter -> SchedulerThriftInterface
 
     bindThriftDecorator(new LoggingInterceptor());
 
@@ -107,6 +107,7 @@ public class AopModule extends AbstractModule {
       }
     });
     bindThriftDecorator(new FeatureToggleInterceptor());
+    bindThriftDecorator(new ThriftStatsExporterInterceptor());
   }
 
   private void bindThriftDecorator(MethodInterceptor interceptor) {
