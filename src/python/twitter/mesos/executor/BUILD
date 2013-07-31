@@ -178,6 +178,7 @@ python_binary(
   name = 'thermos_executor',
   source = 'thermos_executor_main.py',
   ignore_errors = True,
+  always_write_cache = True,
   dependencies = [
     pants(':executor_vars'),
     pants(':thermos_executor_lib')
