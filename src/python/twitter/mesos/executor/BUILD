@@ -225,6 +225,7 @@ python_binary(
   entry_point = 'twitter.mesos.executor.gc_executor_main',
   ignore_errors = True,
   dependencies = [
+    pants(':executor_vars'),
     pants(':gc_executor_lib'),
     pants('src/python/twitter/common/app'),
   ]

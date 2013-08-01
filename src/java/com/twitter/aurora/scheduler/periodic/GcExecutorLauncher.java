@@ -63,7 +63,6 @@ public class GcExecutorLauncher implements TaskLauncher {
 
   private static final String SYSTEM_TASK_PREFIX = "system-gc-";
   private static final String EXECUTOR_NAME = "aurora.gc";
-  private static final String EXECUTOR_PREFIX = "gc-";
 
   private final PulseMonitor<String> pulseMonitor;
   private final Optional<String> gcExecutorPath;
@@ -101,7 +100,7 @@ public class GcExecutorLauncher implements TaskLauncher {
     pulseMonitor.pulse(offer.getHostname());
 
     ExecutorInfo.Builder executor = ExecutorInfo.newBuilder()
-        .setExecutorId(ExecutorID.newBuilder().setValue(EXECUTOR_PREFIX))
+        .setExecutorId(ExecutorID.newBuilder().setValue(EXECUTOR_NAME))
         .setName(EXECUTOR_NAME)
         .setSource(offer.getHostname())
         .addAllResources(GC_EXECUTOR_RESOURCES.toResourceList())
