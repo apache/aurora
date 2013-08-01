@@ -176,9 +176,17 @@ class Packer(object):
                                   params=query_params,
                                   method='POST'))
     except urllib2.HTTPError as e:
-      raise Packer.Error('HTTP %s: %s' % (e.code, e.msg))
+      entity = e.read()
+      if entity:
+        try:
+          message = json.loads(entity)['message']
+        except ValueError:
+          message = entity
+      else:
+        message = e.msg
+      raise self.Error('HTTP %s: %s' % (e.code, message))
     except urllib2.URLError as e:
-      raise Packer.Error('Failed to upload to packer: %s' % e)
+      raise self.Error('Failed to upload to packer: %s' % e)
 
   def fetch(self, role, package, version, proxy_host, local_file_obj=None):
     pkg = self.get_version(role, package, version)
