@@ -7,6 +7,7 @@ python_test_suite(name = 'all',
     pants(':sandbox_manager'),
     pants(':status_manager'),
     pants(':thermos_executor'),
+    pants(':executor_builds'),
     pants(':executor_vars'),
   ]
 )
@@ -98,3 +99,6 @@ python_tests(name = 'executor_vars',
   ]
 )
 
+python_tests(name = 'executor_builds',
+  sources = ['test_executor_builds.py'],
+)
