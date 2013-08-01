@@ -11,10 +11,9 @@ from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 from twitter.common.metrics import CompoundMetrics
 from twitter.common.metrics.sampler import DiskMetricWriter
-
-from .executor_detector import ExecutorDetector
-from .executor_vars import ExecutorVars
-from .thermos_executor import ThermosExecutor, ThermosExecutorTimer
+from twitter.mesos.executor.executor_detector import ExecutorDetector
+from twitter.mesos.executor.executor_vars import ExecutorVars
+from twitter.mesos.executor.thermos_executor import ThermosExecutor, ThermosExecutorTimer
 
 import mesos
 
