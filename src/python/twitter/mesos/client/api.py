@@ -209,6 +209,11 @@ invoking cancel_update.
   def snapshot(self):
     return self._scheduler.snapshot()
 
+  def unsafe_rewrite_shard_config(self, shard_key, old_task, new_task):
+    rewrite = ShardConfigRewrite(shardKey=shard_key, oldTask=old_task, rewrittenTask=new_task)
+    request = RewriteConfigsRequest(rewriteCommands=[ConfigRewrite(shardRewrite=rewrite)])
+    return self._scheduler.rewriteConfigs(request)
+
   def _assert_valid_job_key(self, job_key):
     if not isinstance(job_key, AuroraJobKey):
       raise self.TypeError('Invalid job_key %r: expected %s but got %s'

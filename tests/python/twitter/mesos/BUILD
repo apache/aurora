@@ -6,6 +6,7 @@ python_test_suite(name = 'all',
     pants('tests/python/twitter/mesos/executor:all'),
     pants('tests/python/twitter/mesos/observer:all'),
     pants('tests/python/twitter/mesos/packer:all'),
+    pants('tests/python/twitter/mesos/tools:all'),
     # Commented out till we fix the zookeeper import problem
     #pants('tests/python/twitter/mesos/angrybird:tests'),
   ]
