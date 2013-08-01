@@ -22,7 +22,7 @@ class AuroraStageAPI(object):
   def _config_package_name(self, job_key):
     return '__job_%s_%s_%s' % (job_key.cluster, job_key.env, job_key.name)
 
-  def create(self, job_key, config_filename):
+  def create(self, job_key, config_filename, message=None):
     log.info('Staging job configuration: %s' % job_key)
     pkg_name = self._config_package_name(job_key)
 
@@ -39,12 +39,22 @@ class AuroraStageAPI(object):
         'loadables': AuroraConfigLoader(config_filename).loadables,
         'job': config.raw().json_dumps(),
     })
+    metadata = json.dumps({} if message is None else {'message': message})
 
     with NamedTemporaryFile(prefix='job_description_') as job_file:
       log.debug('Writing configuration loadables to temporary file: %s' % job_file.name)
       job_file.write(file_content)
       job_file.flush()
-      self._packer.add(job_key.role, pkg_name, job_file.name, {})
+      self._packer.add(job_key.role, pkg_name, job_file.name, metadata)
+
+  def log(self, job_key):
+    config_pkg_name = self._config_package_name(job_key)
+    try:
+      versions = self._packer.list_versions(job_key.role, config_pkg_name)
+    except Packer.Error as e:
+      self._handle_packer_error(e, job_key)
+
+    return StagedConfig.from_packer_list(versions)
 
   def _is_running(self, job_key):
     resp = self._api.check_status(job_key)
@@ -58,11 +68,7 @@ class AuroraStageAPI(object):
         self._packer.fetch(
             job_key.role, config_pkg_name, str(pkg['id']), proxy_host, job_file)
       except Packer.Error as e:
-        if 'Requested package or version not found' in str(e):
-          raise self.NotStagedError(
-              "Cannot find a staged configuration for job %s. Run 'mesos stage' first." % job_key)
-        else:
-          raise
+        self._handle_packer_error(e, job_key)
 
       job_file.seek(0)
       staged_json = json.load(job_file)
@@ -81,3 +87,50 @@ class AuroraStageAPI(object):
       resp = self._api.create_job(config)
     self._packer.set_live(job_key.role, config_pkg_name, str(pkg['id']))
     return resp
+
+  def _handle_packer_error(self, e, job_key):
+    if 'Requested package or version not found' in str(e):
+      raise self.NotStagedError(
+          "Cannot find a staged configuration for job %s. Run 'mesos stage' first." % job_key)
+    else:
+      raise
+
+
+class StagedConfig(object):
+  """Helper structure to work with staged configurations"""
+
+  @classmethod
+  def from_packer_list(cls, packer_versions):
+    """Returns a list of StagedConfig from a packer json structure"""
+    return [cls(
+        version['id'],
+        version['md5sum'],
+        version['auditLog'],
+        version['metadata'] or '')  # Metadata can be None
+        for version in packer_versions]
+
+  def __init__(self, version_id, md5, auditlog, metadata):
+    self.version_id = version_id
+    self.md5 = md5
+    self.auditlog = auditlog
+    self.message = ''
+    try:
+      loaded_metadata = json.loads(metadata)
+      if isinstance(loaded_metadata, dict):
+        self.message = loaded_metadata.get('message', '')
+      else:
+        raise ValueError
+    except ValueError:
+      log.warning('Unexpected value in staged config metadata: %s' % metadata)
+
+  def creation(self):
+    """Returns the creation event"""
+    return self.auditlog[0]
+
+  def releases(self):
+    """List of release events for this staged configuration"""
+    return [log for log in self.auditlog if log['state'] == 'LIVE']
+
+  def released(self):
+    """Return True iff this staged configuration is currently released"""
+    return self.auditlog[-1]['state'] == 'LIVE'

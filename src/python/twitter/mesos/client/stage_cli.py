@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from twitter.common import app
 from twitter.mesos.client.api import MesosClientAPI
 from twitter.mesos.client.base import check_and_log_response, handle_open
@@ -29,6 +31,7 @@ class AuroraStageCLI(object):
     verbs = parser.add_subparsers()
 
     self._add_create(verbs)
+    self._add_log(verbs)
     self._add_release(verbs)
 
     parsed_args = parser.parse_args(args)
@@ -43,11 +46,18 @@ class AuroraStageCLI(object):
     create.set_defaults(func=self._create)
     create.add_argument('job_key', action=JobKeyAction)
     create.add_argument('config_file', type=argparse.FileType('r'))
+    create.add_argument('--message', '-m', help='An optional message to add to this staged config')
     release_group = create.add_argument_group('release')
     release_group.add_argument(
         '-r', '--release', default=False, action='store_true',
         help='Create or update the job after uploading a new configuration file')
     self._add_release_options(release_group)
+
+  def _add_log(self, parser):
+    log = parser.add_parser('log')
+    log.set_defaults(func=self._log)
+    log.add_argument('job_key', action=JobKeyAction)
+    log.add_argument('--long', default=False, action='store_true', help="Show more details")
 
   def _add_release(self, parser):
     release = parser.add_parser('release')
@@ -74,10 +84,17 @@ class AuroraStageCLI(object):
   def _create(self, args):
     job_key = args.job_key
     config_filename = args.config_file.name
+    message = args.message
 
-    self._stage_api.create(job_key, config_filename)
+    self._stage_api.create(job_key, config_filename, message)
     if args.release:
       self._release(args)
+
+  def _log(self, args):
+    job_key = args.job_key
+    configs = self._stage_api.log(job_key)
+    printer = StagedConfigFormat.long_str if args.long else StagedConfigFormat.one_line_str
+    print('\n'.join(printer(config) for config in configs))
 
   def _release(self, args):
     job_key = args.job_key
@@ -91,3 +108,47 @@ class AuroraStageCLI(object):
         job_key.role,
         job_key.env,
         job_key.name)
+
+
+class StagedConfigFormat(object):
+  _EMPTY_MESSAGE = "<Empty message>"
+
+  @classmethod
+  def long_str(cls, config):
+    """Multi line representation of a staged config, with audit trail"""
+
+    released = ' (Currently released)' if config.released() else ''
+    desc = []
+    desc.append("Version: %s (md5: %s)%s" % (config.version_id, config.md5, released))
+    desc.append("Created by: %s" % config.creation()['user'])
+    desc.append("Date created: %s" % cls._timestamp_to_str(config.creation()['timestamp']))
+    for release in config.releases():
+      desc.append("Released by: %s" % release['user'])
+      desc.append("Date released: %s" % cls._timestamp_to_str(release['timestamp']))
+    desc.append(cls._indent_lines(cls._message(config), 4))
+    return '\n'.join(desc) + '\n'
+
+  @classmethod
+  def one_line_str(cls, config):
+    """One line representation of a staged config"""
+
+    desc = []
+    desc.append("%s" % config.version_id)
+    desc.append("- %s" % cls._message(config).splitlines()[0])
+    desc.append("(%s)" % cls._timestamp_to_str(config.creation()['timestamp']))
+    desc.append("<%s>" % config.auditlog[0]['user'])
+    if config.released():
+      desc.append('(RELEASED)')
+    return ' '.join(desc)
+
+  @classmethod
+  def _message(cls, config):
+    return config.message if config.message else cls._EMPTY_MESSAGE
+
+  @classmethod
+  def _timestamp_to_str(cls, timestamp):
+    return str(datetime.fromtimestamp(timestamp / 1000))
+
+  @classmethod
+  def _indent_lines(cls, s, n_spaces):
+    return '\n'.join(n_spaces * ' ' + i for i in s.splitlines())
