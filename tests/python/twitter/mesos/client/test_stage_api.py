@@ -22,24 +22,24 @@ class TestAuroraStageAPI(mox.MoxTestBase):
   CLUSTER = Cluster(name='smfd')
   CONFIG_PACKAGE_NAME = "__job_smfd_devel_hello_world"
   JOB_KEY = AuroraJobKey(CLUSTER.name, 'johndoe', 'devel', 'hello_world')
-  MESSAGE = 'test message'
+  MESSAGE = "testing\\nmessages"
   METADATA = json.dumps({'message': MESSAGE})
   PROXY_HOST = 'nest1.corp.twitter.com'
   SESSION_KEY = 'asdf'
-  STAGED_CONFIG = StagedConfig(1, '5be07da9642fb3ec5bc0df0c1290dada',
-                               [{u'timestamp': 1374779340660,
-                                 u'state': u'PRESENT',
-                                 u'user': u'johndoe'}],
-                               json.dumps({"message": "testing\nmessages"}))
-  PACKER_STAGED_CONFIG = [{u'md5sum': u'5be07da9642fb3ec5bc0df0c1290dada',
-                           u'uri': u'hftp://shortened',
-                           u'filename':
-                           u'job_description_eFA3CX',
-                           u'id': 1,
-                           u'auditLog': [{u'timestamp': 1374779340660,
-                                          u'state': u'PRESENT',
-                                          u'user': u'johndoe'}],
-                           u'metadata': u'{"message": "testing\\nmessages"}'}]
+  STAGED_CONFIG = StagedConfig(
+      1, '5be07da9642fb3ec5bc0df0c1290dada',
+      [{u'timestamp': 1374779340660,
+        u'state': u'PRESENT',
+        u'user': u'johndoe'}],
+      METADATA)
+  PACKER_STAGED_CONFIG = {
+      u'id': 1, u'md5sum': u'5be07da9642fb3ec5bc0df0c1290dada',
+      u'uri': u'hftp://shortened', u'filename': u'job_description_eFA3CX',
+      u'auditLog': [{
+          u'timestamp': 1374779340660,
+          u'state': u'PRESENT',
+          u'user': u'johndoe'}],
+      u'metadata': METADATA}
 
   CONFIG_CONTENT = dedent("""
     hello_world = Task(
@@ -109,7 +109,7 @@ class TestAuroraStageAPI(mox.MoxTestBase):
 
   def test_log(self):
     self.mock_packer.list_versions(
-        self.JOB_KEY.role, self.CONFIG_PACKAGE_NAME).AndReturn(self.PACKER_STAGED_CONFIG)
+        self.JOB_KEY.role, self.CONFIG_PACKAGE_NAME).AndReturn([self.PACKER_STAGED_CONFIG])
     self.mox.ReplayAll()
 
     assert self.stage_api.log(self.JOB_KEY)[0].__dict__ == self.STAGED_CONFIG.__dict__
@@ -167,3 +167,67 @@ class TestAuroraStageAPI(mox.MoxTestBase):
     self.mox.ReplayAll()
 
     assert self.stage_api.release(self.JOB_KEY, 15, self.PROXY_HOST) == update_response
+
+  def test_reset(self):
+    def write_file(_, _2, _3, _4, f):
+      f.write(self.CONFIG_CONTENT)
+
+    def is_config_file(filename):
+      with open(filename, 'r') as f:
+        f.seek(0)
+        assert f.read() == self.CONFIG_CONTENT
+      return True
+
+    reset_version = '15'
+    self.mock_packer.get_version(
+        self.JOB_KEY.role,
+        self.CONFIG_PACKAGE_NAME,
+        reset_version).AndReturn(
+            self.PACKER_STAGED_CONFIG)
+    self.mock_packer.fetch(
+        self.JOB_KEY.role,
+        self.CONFIG_PACKAGE_NAME,
+        reset_version,
+        self.PROXY_HOST,
+        mox.IgnoreArg()).WithSideEffects(write_file)
+    self.mock_packer.add(
+        self.JOB_KEY.role,
+        self.CONFIG_PACKAGE_NAME,
+        mox.Func(is_config_file),
+        self.METADATA)
+    self.mox.ReplayAll()
+
+    self.stage_api.reset(self.JOB_KEY, reset_version, self.PROXY_HOST)
+
+  def test_reset_not_staged(self):
+    reset_version = '15'
+    self.mock_packer.get_version(
+        self.JOB_KEY.role, self.CONFIG_PACKAGE_NAME, reset_version).AndRaise(
+            Packer.Error('Requested package or version not found'))
+    self.mock_packer.list_versions(
+        self.JOB_KEY.role, self.CONFIG_PACKAGE_NAME).AndRaise(
+            Packer.Error('Requested package or version not found'))
+    self.mox.ReplayAll()
+
+    self.assertRaises(
+        AuroraStageAPI.NotStagedError,
+        self.stage_api.reset,
+        self.JOB_KEY,
+        reset_version,
+        self.PROXY_HOST)
+
+  def test_reset_version_does_not_exist(self):
+    reset_version = '15'
+    self.mock_packer.get_version(
+        self.JOB_KEY.role, self.CONFIG_PACKAGE_NAME, reset_version).AndRaise(
+            Packer.Error('Requested package or version not found'))
+    self.mock_packer.list_versions(
+        self.JOB_KEY.role, self.CONFIG_PACKAGE_NAME)
+    self.mox.ReplayAll()
+
+    self.assertRaises(
+        AuroraStageAPI.NoSuchVersion,
+        self.stage_api.reset,
+        self.JOB_KEY,
+        reset_version,
+        self.PROXY_HOST)

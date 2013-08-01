@@ -13,7 +13,17 @@ class AuroraStageAPI(object):
   """API for manipulating staged configurations for the aurora scheduler.
   """
 
-  class NotStagedError(Exception): pass
+  class Error(Exception): pass
+
+  class NotStagedError(Error):
+    def __init__(self, job_key):
+      super(AuroraStageAPI.NotStagedError, self).__init__(
+          "Cannot find a staged configuration for job %s. Run 'mesos stage' first." % job_key)
+
+  class NoSuchVersion(Error):
+    def __init__(self, job_key, version):
+      super(AuroraStageAPI.NoSuchVersion, self).__init__(
+          "No staged version %s for job %s" % (version, job_key))
 
   def __init__(self, api, packer):
     self._api = api
@@ -52,7 +62,7 @@ class AuroraStageAPI(object):
     try:
       versions = self._packer.list_versions(job_key.role, config_pkg_name)
     except Packer.Error as e:
-      self._handle_packer_error(e, job_key)
+      self._handle_packer_fetch_error(e, job_key, 'latest')
 
     return StagedConfig.from_packer_list(versions)
 
@@ -68,7 +78,7 @@ class AuroraStageAPI(object):
         self._packer.fetch(
             job_key.role, config_pkg_name, str(pkg['id']), proxy_host, job_file)
       except Packer.Error as e:
-        self._handle_packer_error(e, job_key)
+        self._handle_packer_fetch_error(e, job_key, 'latest')
 
       job_file.seek(0)
       staged_json = json.load(job_file)
@@ -88,31 +98,61 @@ class AuroraStageAPI(object):
     self._packer.set_live(job_key.role, config_pkg_name, str(pkg['id']))
     return resp
 
-  def _handle_packer_error(self, e, job_key):
+  def reset(self, job_key, version_id, proxy_host):
+    log.info("Resetting staged configuration for job %s to version %s", job_key, version_id)
+
+    config_pkg_name = self._config_package_name(job_key)
+
+    with NamedTemporaryFile(prefix='job_configuration_') as job_file:
+      try:
+        old_config = StagedConfig.from_packer_get(
+            self._packer.get_version(job_key.role, config_pkg_name, str(version_id)))
+        self._packer.fetch(
+            job_key.role, config_pkg_name, str(version_id), proxy_host, job_file)
+        job_file.flush()
+      except Packer.Error as e:
+        self._handle_packer_fetch_error(e, job_key, version_id)
+      self._packer.add(job_key.role, config_pkg_name, job_file.name, old_config.metadata)
+
+  def _handle_packer_fetch_error(self, e, job_key, version):
+    # TODO(atollenaere): This is a hack around the fact the python packer client does not
+    #                    differentiate between 'no such package' and 'no such version'. We should
+    #                    revisit when implementing packer fetch in the packer client.
+    #                    see AWESOME-4623
     if 'Requested package or version not found' in str(e):
-      raise self.NotStagedError(
-          "Cannot find a staged configuration for job %s. Run 'mesos stage' first." % job_key)
+      if version == 'latest':
+        raise self.NotStagedError(job_key)
+      try:
+        self._packer.list_versions(job_key.role, self._config_package_name(job_key))
+        raise self.NoSuchVersion(job_key, version)
+      except Packer.Error as e:
+        raise self.NotStagedError(job_key)
     else:
-      raise
+      raise e
 
 
 class StagedConfig(object):
   """Helper structure to work with staged configurations"""
 
   @classmethod
-  def from_packer_list(cls, packer_versions):
-    """Returns a list of StagedConfig from a packer json structure"""
-    return [cls(
-        version['id'],
-        version['md5sum'],
-        version['auditLog'],
-        version['metadata'] or '')  # Metadata can be None
-        for version in packer_versions]
+  def from_packer_list(cls, packer_list_output):
+    """Returns a list of StagedConfig from a packer list_versions json structure"""
+    return [cls.from_packer_get(version) for version in packer_list_output]
+
+  @classmethod
+  def from_packer_get(cls, packer_get_output):
+    """Returns a StagedConfig from a packer get_version json structure"""
+    return cls(
+        packer_get_output['id'],
+        packer_get_output['md5sum'],
+        packer_get_output['auditLog'],
+        packer_get_output['metadata'] or '')  # Metadata can be None
 
   def __init__(self, version_id, md5, auditlog, metadata):
     self.version_id = version_id
     self.md5 = md5
     self.auditlog = auditlog
+    self.metadata = metadata
     self.message = ''
     try:
       loaded_metadata = json.loads(metadata)

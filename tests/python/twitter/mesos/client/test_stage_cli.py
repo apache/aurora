@@ -91,6 +91,15 @@ class TestStageCLI(mox.MoxTestBase):
 
     self.stage_cli.dispatch(args, self.OPTIONS)
 
+  def test_dispatch_reset(self):
+    version_id = '14'
+    args = ['reset', self.JOB_KEY, version_id]
+
+    self.stage_api.reset(self.AURORA_JOB_KEY, int(version_id), self.PROXY_HOST)
+    self.mox.ReplayAll()
+
+    self.stage_cli.dispatch(args, self.OPTIONS)
+
   def test_log_long(self):
     log = """Version: 1 (md5: 5be07da9642fb3ec5bc0df0c1290dada) (Currently released)
 Created by: johndoe

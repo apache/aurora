@@ -33,6 +33,7 @@ class AuroraStageCLI(object):
     self._add_create(verbs)
     self._add_log(verbs)
     self._add_release(verbs)
+    self._add_reset(verbs)
 
     parsed_args = parser.parse_args(args)
 
@@ -42,33 +43,49 @@ class AuroraStageCLI(object):
     parsed_args.func(parsed_args)
 
   def _add_create(self, parser):
-    create = parser.add_parser('create')
+    create = parser.add_parser(
+        'create', help='Stage a job configuration')
     create.set_defaults(func=self._create)
     create.add_argument('job_key', action=JobKeyAction)
     create.add_argument('config_file', type=argparse.FileType('r'))
     create.add_argument('--message', '-m', help='An optional message to add to this staged config')
-    release_group = create.add_argument_group('release')
-    release_group.add_argument(
-        '-r', '--release', default=False, action='store_true',
-        help='Create or update the job after uploading a new configuration file')
-    self._add_release_options(release_group)
+    self._add_release_flag(create)
 
   def _add_log(self, parser):
-    log = parser.add_parser('log')
+    log = parser.add_parser('log', help='Show the history of staged configurations')
     log.set_defaults(func=self._log)
     log.add_argument('job_key', action=JobKeyAction)
     log.add_argument('--long', default=False, action='store_true', help="Show more details")
 
   def _add_release(self, parser):
-    release = parser.add_parser('release')
+    release = parser.add_parser(
+        'release',
+        help='Create or update a job to the latest staged configuration')
     release.set_defaults(func=self._release)
     release.add_argument('job_key', action=JobKeyAction)
-    self._add_release_options(release)
+    self._add_release_argument_group(release)
 
-  def _add_release_options(self, parser):
+  def _add_reset(self, parser):
+    reset = parser.add_parser(
+        'reset',
+        help='Re-stage a job to a certain version (use that to rollback to a particular version)')
+    reset.set_defaults(func=self._reset)
+    reset.add_argument('job_key', action=JobKeyAction)
+    reset.add_argument('version_id', type=int)
+    self._add_release_flag(reset)
+
+  def _add_release_flag(self, parser):
+    parser.add_argument(
+        '-r', '--release', default=False, action='store_true',
+        help='Create or update the job after uploading a new configuration file')
+    parser.add_argument_group('release')
+    self._add_release_argument_group(parser)
+
+  def _add_release_argument_group(self, parser):
     kwargs = {
         'default': 3, 'type': int, 'help': 'Time interval between subsequent shard status checks.'}
-    parser.add_argument('--updater_health_check_interval_seconds', **kwargs)
+    release_group = parser.add_argument_group('release')
+    release_group.add_argument('--updater_health_check_interval_seconds', **kwargs)
 
   def _set_stage_api(self, parsed_args, verbosity):
     cluster_name = parsed_args.job_key.cluster
@@ -108,6 +125,15 @@ class AuroraStageCLI(object):
         job_key.role,
         job_key.env,
         job_key.name)
+
+  def _reset(self, args):
+    job_key = args.job_key
+    version_id = args.version_id
+    proxy_host = app.get_options().tunnel_host
+
+    self._stage_api.reset(job_key, version_id, proxy_host)
+    if args.release:
+      self._release(args)
 
 
 class StagedConfigFormat(object):
