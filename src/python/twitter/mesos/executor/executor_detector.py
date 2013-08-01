@@ -31,7 +31,7 @@ class ExecutorDetector(object):
   @classmethod
   def match(cls, path):
     try:
-      return cls._extractor.parse(path)
+      return cls.EXTRACTOR.parse(path)
     except ScanfParser.ParseError:
       return None
 
