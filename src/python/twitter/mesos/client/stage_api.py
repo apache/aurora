@@ -18,7 +18,8 @@ class AuroraStageAPI(object):
   class NotStagedError(Error):
     def __init__(self, job_key):
       super(AuroraStageAPI.NotStagedError, self).__init__(
-          "Cannot find a staged configuration for job %s. Run 'mesos stage' first." % job_key)
+          "Cannot find a staged configuration for job %s. Run 'mesos stage create' first." %
+          job_key)
 
   class NoSuchVersion(Error):
     def __init__(self, job_key, version):
