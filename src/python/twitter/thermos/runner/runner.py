@@ -778,7 +778,7 @@ class TaskRunner(object):
     """
       Returns True if any processes associated with this task have active pids.
     """
-    process_tree = TaskRunnerHelper.scantree(self.state, clock=self._clock)
+    process_tree = TaskRunnerHelper.scantree(self.state)
     return any(any(process_set) for process_set in process_tree.values())
 
   def has_active_processes(self):
@@ -882,7 +882,7 @@ class TaskRunner(object):
     self.kill(force, preemption_wait=Amount(0, Time.SECONDS), terminal_status=TaskState.LOST)
 
   def _kill(self):
-    processes = TaskRunnerHelper.scantree(self._state, clock=self._clock)
+    processes = TaskRunnerHelper.scantree(self._state)
     for process, pid_tuple in processes.items():
       current_run = self._current_process_run(process)
       coordinator_pid, pid, tree = pid_tuple

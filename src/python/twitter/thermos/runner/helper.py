@@ -39,8 +39,6 @@ class TaskKiller(object):
                           terminal_status=TaskState.LOST)
 
 
-# TODO(wickman) Clock is used haphazardly.
-#
 # TaskRunnerHelper is sort of a mishmash of "checkpoint-only" operations and
 # the "Process Platform" stuff that started to get pulled into process.py
 #
@@ -79,7 +77,7 @@ class TaskRunnerHelper(object):
     return None
 
   @classmethod
-  def this_is_really_our_pid(cls, process_handle, current_user, start_time, clock=time):
+  def this_is_really_our_pid(cls, process_handle, current_user, start_time):
     """
       A heuristic to make sure that this is likely the pid that we own/forked.  Necessary
       because of pid-space wrapping.  We don't want to go and kill processes we don't own,
@@ -97,7 +95,7 @@ class TaskRunnerHelper(object):
     return True
 
   @classmethod
-  def scan_process(cls, state, process_name, clock=time):
+  def scan_process(cls, state, process_name):
     """
       Given a process_name, return the following:
         (coordinator pid, process pid, process tree)
@@ -141,7 +139,7 @@ class TaskRunnerHelper(object):
     return (coordinator_pid, pid, tree)
 
   @classmethod
-  def scantree(cls, state, clock=time):
+  def scantree(cls, state):
     """
       Scan the process tree associated with the provided task state.
 
@@ -150,9 +148,8 @@ class TaskRunnerHelper(object):
       forked process is no longer active, pid will be None and its children will be
       an empty set.
     """
-    result = dict((process_name, cls.scan_process(state, process_name, clock=clock)) for
-                 process_name in state.processes)
-    return result
+    return dict((process_name, cls.scan_process(state, process_name))
+                for process_name in state.processes)
 
   @classmethod
   def safe_signal(cls, pid, sig=signal.SIGTERM):
@@ -179,7 +176,7 @@ class TaskRunnerHelper(object):
   @classmethod
   def _get_process_tuple(cls, state, process_name):
     assert process_name in state.processes and len(state.processes[process_name]) > 0
-    return cls.scan_process(state, process_name, None)
+    return cls.scan_process(state, process_name)
 
   @classmethod
   def _get_coordinator_group(cls, state, process_name):
@@ -268,9 +265,8 @@ class TaskRunnerHelper(object):
   def kill(cls, task_id, checkpoint_root, force=False,
            terminal_status=TaskState.KILLED, clock=time):
     """
-      An implementation of Task killing that doesn't require a fully
-      hydrated TaskRunner object.  Terminal status must be either
-      KILLED or LOST state.
+      An implementation of Task killing that doesn't require a fully hydrated TaskRunner object.
+      Terminal status must be either KILLED or LOST state.
     """
     if terminal_status not in (TaskState.KILLED, TaskState.LOST):
       raise cls.Error('terminal_status must be KILLED or LOST (got %s)' %
@@ -278,10 +274,17 @@ class TaskRunnerHelper(object):
     pathspec = TaskPath(root=checkpoint_root, task_id=task_id)
     checkpoint = pathspec.getpath('runner_checkpoint')
     state = CheckpointDispatcher.from_file(checkpoint)
-    ckpt = cls.open_checkpoint(checkpoint, force=force, state=state)
+
     if state is None or state.header is None or state.statuses is None:
-      log.error('Cannot update states in uninitialized TaskState!')
-      return
+      if force:
+        log.error('Task has uninitialized TaskState - forcibly finalizing')
+        cls.finalize_task(pathspec)
+        return
+      else:
+        log.error('Cannot update states in uninitialized TaskState!')
+        return
+
+    ckpt = cls.open_checkpoint(checkpoint, force=force, state=state)
 
     def write_task_state(state):
       update = TaskStatus(state=state, timestamp_ms=int(clock.time() * 1000),
@@ -351,23 +354,27 @@ class TaskRunnerHelper(object):
   def is_task_terminal(cls, task_status):
     return task_status in cls.TERMINAL_TASK_STATES
 
-  @staticmethod
-  def initialize_task(spec, task):
+  @classmethod
+  def initialize_task(cls, spec, task):
     active_task = spec.given(state='active').getpath('task_path')
     finished_task = spec.given(state='finished').getpath('task_path')
-    is_active, is_finished = map(os.path.exists, [active_task, finished_task])
-    assert not is_finished
+    is_active, is_finished = os.path.exists(active_task), os.path.exists(finished_task)
+    if is_finished:
+      raise cls.Error('Cannot initialize task with "finished" record!')
     if not is_active:
       safe_mkdir(os.path.dirname(active_task))
       with open(active_task, 'w') as fp:
         fp.write(task)
 
-  @staticmethod
-  def finalize_task(spec):
+  @classmethod
+  def finalize_task(cls, spec):
     active_task = spec.given(state='active').getpath('task_path')
     finished_task = spec.given(state='finished').getpath('task_path')
-    is_active, is_finished = map(os.path.exists, [active_task, finished_task])
-    assert is_active and not is_finished
+    is_active, is_finished = os.path.exists(active_task), os.path.exists(finished_task)
+    if not is_active:
+      raise cls.Error('Cannot finalize task with no "active" record!')
+    elif is_finished:
+      raise cls.Error('Cannot finalize task with "finished" record!')
     safe_mkdir(os.path.dirname(finished_task))
     os.rename(active_task, finished_task)
     os.utime(finished_task, None)
