@@ -12,7 +12,6 @@ import pwd
 import threading
 import time
 
-from twitter.common import log
 from twitter.common.collections import OrderedDict
 from twitter.common.concurrent import defer
 from twitter.common.exceptions import ExceptionalThread
@@ -265,6 +264,7 @@ class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
 
   def clean_orphans(self, driver):
     """Inspect checkpoints for trees that have been kill -9'ed but not properly cleaned up."""
+    self.log('Checking for orphaned tasks')
     active_tasks, _ = self.partition_tasks()
     updates = {}
 
@@ -277,37 +277,37 @@ class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
       return abs(timestamp - estimated_start_time) < self.MAX_PID_TIME_DRIFT.as_(Time.SECONDS)
 
     for task_id in active_tasks:
-      log.info('Inspecting running task: %s' % task_id)
+      self.log('Inspecting running task: %s' % task_id)
       inspection = inspector.inspect(task_id)
       if not inspection:
-        log.warning('  - Error inspecting task runner')
+        self.log('  - Error inspecting task runner')
         continue
       latest_runner = inspection.runner_processes[-1]
       # Assume that it has not yet started?
       if not latest_runner:
-        log.warning('  - Task has no registered runners.')
+        self.log('  - Task has no registered runners.')
         continue
       runner_pid, runner_uid, timestamp_ms = latest_runner
       try:
         runner_process = psutil.Process(runner_pid)
         if is_our_process(runner_process, runner_uid, timestamp_ms / 1000.0):
-          log.info('  - Runner appears healthy.')
+          self.log('  - Runner appears healthy.')
           continue
       except psutil.NoSuchProcess:
         # Runner is dead
         pass
       except psutil.Error as err:
-        log.error('  - Error sampling runner process [pid=%s]: %s' % (runner_pid, err))
+        self.log('  - Error sampling runner process [pid=%s]: %s' % (runner_pid, err))
         continue
       try:
         latest_update = os.path.getmtime(self._runner_ckpt(task_id))
       except (IOError, OSError) as err:
-        log.debug('  - Error accessing runner ckpt: %s' % err)
+        self.log('  - Error accessing runner ckpt: %s' % err)
         continue
       if self._clock.time() - latest_update < self.MAX_CHECKPOINT_TIME_DRIFT.as_(Time.SECONDS):
-        log.info('  - Runner is dead but under LOST threshold.')
+        self.log('  - Runner is dead but under LOST threshold.')
         continue
-      log.info('  - Runner is dead but beyond LOST threshold: %.1fs' % (
+      self.log('  - Runner is dead but beyond LOST threshold: %.1fs' % (
           self._clock.time() - latest_update))
       if self._terminate_task(task_id, kill=False):
         updates[task_id] = ScheduleStatus.LOST
@@ -458,7 +458,6 @@ class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
   def killTask(self, driver, task_id):
     """Remove the specified task from the queue, if it's not yet run. Otherwise, no-op."""
     self.log('killTask() got task_id: %s' % task_id)
-    print task_id, self._gc_task_queue
     task = self._gc_task_queue.pop(task_id, None)
     if task is not None:
       self.log('=> Removed %s from queued GC tasks' % task_id)
