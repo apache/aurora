@@ -154,6 +154,20 @@ def set_quota(role, cpu_str, ram_mb_str, disk_mb_str):
     help='Name of the file with hostnames')
 @app.command_option('--hosts', dest='hosts', default=None,
     help='Comma separated list of hosts')
+def end_maintenance_hosts():
+  """usage: end_maintenance_hosts --cluster=CLUSTER [--filename=filename]
+                                                    [--hosts=hosts]
+
+  """
+  options = app.get_options()
+  MesosMaintenance(options.cluster, options.verbosity).end_maintenance(parse_hosts(options))
+
+@app.command
+@app.command_option(CLUSTER_OPTION)
+@app.command_option('--filename', dest='filename', default=None,
+    help='Name of the file with hostnames')
+@app.command_option('--hosts', dest='hosts', default=None,
+    help='Comma separated list of hosts')
 @app.command_option('--batch_size', dest='batch_size', default=0,
     help='Number of machines to operate on.')
 @app.command_option('--post_drain_script', dest='post_drain_script', default=None,
