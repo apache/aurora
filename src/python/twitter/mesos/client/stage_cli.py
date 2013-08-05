@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 
 from twitter.common import app
 from twitter.mesos.client.api import MesosClientAPI
@@ -34,6 +35,7 @@ class AuroraStageCLI(object):
     self._add_log(verbs)
     self._add_release(verbs)
     self._add_reset(verbs)
+    self._add_show(verbs)
 
     parsed_args = parser.parse_args(args)
 
@@ -73,6 +75,14 @@ class AuroraStageCLI(object):
     reset.add_argument('job_key', action=JobKeyAction)
     reset.add_argument('version_id', type=int)
     self._add_release_flag(reset)
+
+  def _add_show(self, parser):
+    show = parser.add_parser(
+        'show',
+        help='Show details of the job that would be released by running "stage release"')
+    show.set_defaults(func=self._show)
+    show.add_argument('job_key', action=JobKeyAction)
+    show.add_argument('version_id', nargs='?', default='latest')
 
   def _add_release_flag(self, parser):
     parser.add_argument(
@@ -135,9 +145,34 @@ class AuroraStageCLI(object):
     if args.release:
       self._release(args)
 
+  def _show(self, args):
+    job_key = args.job_key
+    version_id = args.version_id
+    proxy_host = app.get_options().tunnel_host
+
+    (config, content) = self._stage_api.show(job_key, version_id, proxy_host)
+    print(StagedConfigFormat.full_str(config, content))
 
 class StagedConfigFormat(object):
   _EMPTY_MESSAGE = "<Empty message>"
+
+  @classmethod
+  def full_str(cls, config, content):
+    """Full representation of a staged config, with job content in JSON and raw pystachio template
+    used to create the job"""
+
+    parsed = json.loads(content)
+    desc = []
+    desc.append(cls.long_str(config))
+    desc.append('Scheduled job:')
+    desc.append('--')
+    desc.append(json.dumps(json.loads(parsed.get('job')), indent=2))
+    desc.append('--')
+    files = parsed.get('loadables')
+    for fname, content in files.items():
+      desc.append('Raw file: %s' % fname)
+      desc.append(content)
+    return '\n'.join(desc)
 
   @classmethod
   def long_str(cls, config):
@@ -151,6 +186,7 @@ class StagedConfigFormat(object):
     for release in config.releases():
       desc.append("Released by: %s" % release['user'])
       desc.append("Date released: %s" % cls._timestamp_to_str(release['timestamp']))
+    desc.append("")
     desc.append(cls._indent_lines(cls._message(config), 4))
     return '\n'.join(desc) + '\n'
 

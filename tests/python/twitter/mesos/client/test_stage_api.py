@@ -174,7 +174,6 @@ class TestAuroraStageAPI(mox.MoxTestBase):
 
     def is_config_file(filename):
       with open(filename, 'r') as f:
-        f.seek(0)
         assert f.read() == self.CONFIG_CONTENT
       return True
 

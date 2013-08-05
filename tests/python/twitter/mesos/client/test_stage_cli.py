@@ -32,6 +32,13 @@ class TestStageCLI(mox.MoxTestBase):
         u'state': u'LIVE',
         u'user': u'jane'}],
       json.dumps({"message": "testing\nmessages"}))
+  RAW_CONFIG = """config
+content
+"""
+  SCHEDULED_JOB = json.dumps({})
+  STAGED_CONFIG_CONTENT = json.dumps(
+      {"loadables": {"myfile.mesos": RAW_CONFIG}, "job": SCHEDULED_JOB})
+
 
   def setUp(self):
     super(TestStageCLI, self).setUp()
@@ -100,20 +107,51 @@ class TestStageCLI(mox.MoxTestBase):
 
     self.stage_cli.dispatch(args, self.OPTIONS)
 
-  def test_log_long(self):
-    log = """Version: 1 (md5: 5be07da9642fb3ec5bc0df0c1290dada) (Currently released)
+  def test_dispatch_show(self):
+    args = ['show', self.JOB_KEY]
+
+    self.stage_api.show(self.AURORA_JOB_KEY, 'latest', self.PROXY_HOST).AndReturn(
+        [self.STAGED_CONFIG, self.STAGED_CONFIG_CONTENT])
+    self.mox.ReplayAll()
+
+    self.stage_cli.dispatch(args, self.OPTIONS)
+
+  def test_dispatch_show_version(self):
+    version_id = '14'
+    args = ['show', self.JOB_KEY, version_id]
+
+    self.stage_api.show(self.AURORA_JOB_KEY, version_id, self.PROXY_HOST).AndReturn(
+        [self.STAGED_CONFIG, self.STAGED_CONFIG_CONTENT])
+    self.mox.ReplayAll()
+
+    self.stage_cli.dispatch(args, self.OPTIONS)
+
+  LONG_LOG = """Version: 1 (md5: 5be07da9642fb3ec5bc0df0c1290dada) (Currently released)
 Created by: johndoe
 Date created: %s
 Released by: jane
 Date released: %s
+
     testing
     messages
-""" % (str(datetime.fromtimestamp(self.STAGED_CONFIG_CREATE_TIMESTAMP / 1000)),
-       str(datetime.fromtimestamp(self.STAGED_CONFIG_RELEASE_TIMESTAMP / 1000)))
+""" % (str(datetime.fromtimestamp(STAGED_CONFIG_CREATE_TIMESTAMP / 1000)),
+       str(datetime.fromtimestamp(STAGED_CONFIG_RELEASE_TIMESTAMP / 1000)))
 
-    assert StagedConfigFormat.long_str(self.STAGED_CONFIG) == log
+  def test_format_full(self):
+    expected = self.LONG_LOG + """
+Scheduled job:
+--
+%s
+--
+Raw file: myfile.mesos
+%s""" % (self.SCHEDULED_JOB, self.RAW_CONFIG)
 
-  def test_log_one_line(self):
+    assert StagedConfigFormat.full_str(self.STAGED_CONFIG, self.STAGED_CONFIG_CONTENT) == expected
+
+  def test_format_long(self):
+    assert StagedConfigFormat.long_str(self.STAGED_CONFIG) == self.LONG_LOG
+
+  def test_format_one_line(self):
     log = "1 - testing (%s) <johndoe> (RELEASED)" % str(
         datetime.fromtimestamp(self.STAGED_CONFIG_CREATE_TIMESTAMP / 1000))
     assert StagedConfigFormat.one_line_str(self.STAGED_CONFIG) == log

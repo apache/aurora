@@ -102,18 +102,28 @@ class AuroraStageAPI(object):
   def reset(self, job_key, version_id, proxy_host):
     log.info("Resetting staged configuration for job %s to version %s", job_key, version_id)
 
-    config_pkg_name = self._config_package_name(job_key)
+    (config, content) = self._fetch_full_config(job_key, version_id, proxy_host)
+    with NamedTemporaryFile(prefix='job_configuration_') as f:
+      f.write(content)
+      f.flush()
+      self._packer.add(job_key.role, self._config_package_name(job_key), f.name, config.metadata)
 
-    with NamedTemporaryFile(prefix='job_configuration_') as job_file:
+  def show(self, job_key, version_id, proxy_host):
+    return self._fetch_full_config(job_key, version_id, proxy_host)
+
+  def _fetch_full_config(self, job_key, version_id, proxy_host):
+    pkg_name = self._config_package_name(job_key)
+    with NamedTemporaryFile(prefix='job_configuration_') as job_fp:
       try:
-        old_config = StagedConfig.from_packer_get(
-            self._packer.get_version(job_key.role, config_pkg_name, str(version_id)))
+        config = StagedConfig.from_packer_get(
+            self._packer.get_version(job_key.role, pkg_name, str(version_id)))
         self._packer.fetch(
-            job_key.role, config_pkg_name, str(version_id), proxy_host, job_file)
-        job_file.flush()
+            job_key.role, pkg_name, str(version_id), proxy_host, job_fp)
       except Packer.Error as e:
         self._handle_packer_fetch_error(e, job_key, version_id)
-      self._packer.add(job_key.role, config_pkg_name, job_file.name, old_config.metadata)
+
+      job_fp.seek(0)
+      return (config, job_fp.read())
 
   def _handle_packer_fetch_error(self, e, job_key, version):
     # TODO(atollenaere): This is a hack around the fact the python packer client does not
