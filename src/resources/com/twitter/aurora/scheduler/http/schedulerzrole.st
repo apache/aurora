@@ -193,13 +193,13 @@
           var jobStatus = tr.find('.job-status');
 
           if (recentlyFailedTasks >= (totalTasks / 2)) {
-            jobStatus.addClass('label-important').html('Unhealthy');
+            jobStatus.addClass('label-important').html('Unstable');
             jobStatus.attr('title', 'More than half of total tasks have failed in last 6 hours');
           } else if (recentlyFailedTasks > 0) {
             jobStatus.addClass('label-warning').html('Warning');
             jobStatus.attr('title', 'One or more tasks have failed in last 6 hours');
           } else {
-            jobStatus.addClass('label-success').html('Healthy');
+            jobStatus.addClass('label-success').html('Stable');
             jobStatus.attr('title', 'No failed tasks in last 6 hours');
           }
 
