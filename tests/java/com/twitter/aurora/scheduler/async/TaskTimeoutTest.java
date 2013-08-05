@@ -11,6 +11,7 @@ import org.easymock.EasyMock;
 import org.easymock.IExpectationSetters;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.twitter.aurora.gen.AssignedTask;
@@ -51,7 +52,9 @@ import static com.twitter.aurora.gen.ScheduleStatus.UPDATING;
 
 /**
  * TODO(wfarner): This test has become flaky around the time of the switch to a concurrent map. Fix.
+ * TODO(wfarner): Fix in MESOS-3433.
  */
+@Ignore
 public class TaskTimeoutTest extends EasyMockTest {
 
   private static final String TASK_ID = "task_id";
