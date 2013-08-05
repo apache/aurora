@@ -470,7 +470,7 @@ service MesosSchedulerManager {
   ScheduleStatusResponse getTasksStatus(1: TaskQuery query)
 
   // Fetches the status of jobs.
-  GetJobsResponse getJobs(1: string ownerRole)
+  GetJobsResponse getJobs(1: optional string ownerRole)
 
   // Initiates a kill on tasks.
   KillResponse killTasks(1: TaskQuery query, 2: SessionKey session)

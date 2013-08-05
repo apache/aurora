@@ -867,6 +867,40 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testGetAllJobs() throws Exception {
+    JobConfiguration cronJobOne = makeJob()
+        .setCronSchedule("1 * * * *")
+        .setKey(JOB_KEY)
+        .setTaskConfig(nonProductionTask());
+    JobKey jobKey2 = JOB_KEY.deepCopy().setRole("other_role");
+    JobConfiguration cronJobTwo = makeJob()
+        .setCronSchedule("2 * * * *")
+        .setKey(jobKey2)
+        .setTaskConfig(nonProductionTask());
+    TwitterTaskInfo immediateTaskConfig = defaultTask(false)
+        .setJobName("immediate")
+        .setOwner(ROLE_IDENTITY);
+    ScheduledTask immediateTask = new ScheduledTask()
+        .setAssignedTask(
+            new AssignedTask().setTask(immediateTaskConfig));
+    JobConfiguration immediateJob = new JobConfiguration()
+        .setKey(JOB_KEY.deepCopy().setName("immediate"))
+        .setOwner(ROLE_IDENTITY)
+        .setShardCount(1)
+        .setTaskConfig(immediateTaskConfig);
+
+    Set<JobConfiguration> crons = ImmutableSet.of(cronJobOne, cronJobTwo);
+    expect(cronJobManager.getJobs()).andReturn(crons);
+    storageUtil.expectTaskFetch(Query.unscoped().active(), immediateTask);
+
+    control.replay();
+
+    Set<JobConfiguration> allJobs =
+        ImmutableSet.<JobConfiguration>builder().addAll(crons).add(immediateJob).build();
+    assertEquals(allJobs, thrift.getJobs(null).getConfigs());
+  }
+
+  @Test
   public void testSnapshot() throws Exception {
     expectAuth(ROOT, false);
 

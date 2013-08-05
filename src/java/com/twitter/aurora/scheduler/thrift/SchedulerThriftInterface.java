@@ -7,11 +7,14 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.annotation.Nullable;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
+import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.base.Throwables;
 import com.google.common.collect.FluentIterable;
@@ -310,8 +313,9 @@ class SchedulerThriftInterface implements MesosAdmin.Iface {
   }
 
   @Override
-  public GetJobsResponse getJobs(String ownerRole) {
-    checkNotNull(ownerRole);
+  public GetJobsResponse getJobs(@Nullable String maybeNullRole) {
+    Optional<String> ownerRole = Optional.fromNullable(maybeNullRole);
+
 
     // Ensure we only return one JobConfiguration for each JobKey.
     Map<JobKey, JobConfiguration> jobs = Maps.newHashMap();
@@ -319,8 +323,11 @@ class SchedulerThriftInterface implements MesosAdmin.Iface {
     // Query the task store, find immediate jobs, and synthesize a JobConfiguration for them.
     // This is necessary because the ImmediateJobManager doesn't store jobs directly and
     // ImmediateJobManager#getJobs always returns an empty Collection.
+    Query.Builder scope = ownerRole.isPresent()
+        ? Query.roleScoped(ownerRole.get())
+        : Query.unscoped();
     Multimap<JobKey, ScheduledTask> tasks =  Multimaps.index(
-        Storage.Util.weaklyConsistentFetchTasks(storage, Query.roleScoped(ownerRole).active()),
+        Storage.Util.weaklyConsistentFetchTasks(storage, scope.active()),
         Tasks.SCHEDULED_TO_JOB_KEY);
 
     jobs.putAll(Maps.transformEntries(tasks.asMap(),
@@ -344,9 +351,11 @@ class SchedulerThriftInterface implements MesosAdmin.Iface {
     // Get cron jobs directly from the manager. Do this after querying the task store so the real
     // template JobConfiguration for a cron job will overwrite the synthesized one that could have
     // been created above.
+    Predicate<JobConfiguration> configFilter = ownerRole.isPresent()
+        ? Predicates.compose(Predicates.equalTo(ownerRole.get()), JobKeys.CONFIG_TO_ROLE)
+        : Predicates.<JobConfiguration>alwaysTrue();
     jobs.putAll(Maps.uniqueIndex(
-        FluentIterable.from(cronJobManager.getJobs())
-            .filter(Predicates.compose(Predicates.equalTo(ownerRole), JobKeys.CONFIG_TO_ROLE)),
+        FluentIterable.from(cronJobManager.getJobs()).filter(configFilter),
         JobKeys.FROM_CONFIG));
 
     return new GetJobsResponse()
