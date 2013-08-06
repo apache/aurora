@@ -28,30 +28,37 @@ class AuroraDeploymentCLI(object):
     self._scheduler_url = None
 
   def dispatch(self, args, options):
-    parser = argparse.ArgumentParser(description="Manipulate deployments")
+    parser = argparse.ArgumentParser(
+        prog='mesos deployment', description='Manipulate mesos deployments')
     verbs = parser.add_subparsers()
 
     self._add_create(verbs)
+    self._add_help(verbs)
     self._add_log(verbs)
     self._add_release(verbs)
     self._add_reset(verbs)
     self._add_show(verbs)
 
-    parsed_args = parser.parse_args(args)
+    if len(args) == 0 or args[0] == 'help':
+      # All commands need a jobkey, except help, so we treat it differently
+      parser.print_help()
+    else:
+      parsed_args = parser.parse_args(args)
+      self._set_deployment_api(parsed_args, options.verbosity == 'verbose')
 
-    self._set_deployment_api(parsed_args, options.verbosity == 'verbose')
-
-    # Call function bound with the parsed command (_create, _release, etc.)
-    parsed_args.func(parsed_args)
+      # Call function bound with the parsed command (_create, _release, etc.)
+      parsed_args.func(parsed_args)
 
   def _add_create(self, parser):
-    create = parser.add_parser(
-        'create', help='Create a job deployment')
+    create = parser.add_parser('create', help='Create a job deployment')
     create.set_defaults(func=self._create)
     create.add_argument('job_key', action=JobKeyAction)
     create.add_argument('config_file', type=argparse.FileType('r'))
     create.add_argument('--message', '-m', help='An optional message to add to this deployment')
     self._add_release_flag(create)
+
+  def _add_help(self, parser):
+    parser.add_parser('help', help='Shows deployment help')
 
   def _add_log(self, parser):
     log = parser.add_parser('log', help='Show the history of deployed configurations')

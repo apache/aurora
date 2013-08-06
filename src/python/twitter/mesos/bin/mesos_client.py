@@ -340,7 +340,7 @@ HEALTH_CHECK_INTERVAL_SECONDS = optparse.Option(
 @app.command
 @app.command_option(OPEN_BROWSER_OPTION)
 def deployment(args, options):
-  """usage: deployment [-h] subcommand args
+  """usage: deployment [-h] {create,help,log,release,reset,show} args
   """
   AuroraDeploymentCLI(MESOS_CLIENT_CLUSTER_SET).dispatch(args, options)
 
@@ -1178,8 +1178,14 @@ def main():
 
 
 if __name__ == '__main__':
+
   if len(sys.argv) > 1 and sys.argv[1] != 'deployment':
+    # There is a subparser for deployment subcommands, that's incompatible with interspersed args.
     app.interspersed_args(True)
+  elif len(sys.argv) > 2 and (sys.argv[2] == '-h' or sys.argv[2] == '--help'):
+    # Intercept -h and --help for deployment and pass it to the subparser
+    sys.argv[2] = 'help'
+
   LogOptions.set_stderr_log_level('INFO')
   LogOptions.disable_disk_logging()
   app.set_name('mesos-client')
