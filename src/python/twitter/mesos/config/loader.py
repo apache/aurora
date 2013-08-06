@@ -3,10 +3,10 @@ import textwrap
 
 from .schema import Job
 
-from pystachio.config import Config
+from pystachio.config import Config as PystachioConfig
 
 
-class AuroraConfigLoader(Config):
+class AuroraConfigLoader(PystachioConfig):
   DEFAULT_SCHEMA = textwrap.dedent("""
     from pystachio import *
     from twitter.mesos.config.schema import *

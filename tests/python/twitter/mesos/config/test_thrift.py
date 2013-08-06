@@ -1,31 +1,32 @@
 import getpass
 import re
 
-import pytest
+from twitter.mesos.config import AuroraConfig
+from twitter.mesos.config.schema import Job, SimpleTask
+from twitter.mesos.config.thrift import (
+    convert as convert_pystachio_to_thrift,
+    InvalidConfig,
+    task_instance_from_job)
+from twitter.thermos.config.schema import (
+    Process,
+    Resources,
+    Task,
+)
 
 from gen.twitter.mesos.constants import GOOD_IDENTIFIER_PATTERN_PYTHON
 from gen.twitter.mesos.test.constants import (
-  INVALID_IDENTIFIERS,
-  VALID_IDENTIFIERS,
+    INVALID_IDENTIFIERS,
+    VALID_IDENTIFIERS,
 )
 from gen.twitter.mesos.ttypes import (
-  CronCollisionPolicy,
-  JobKey,
-  Identity,
-)
-
-from twitter.mesos.config import AuroraConfig
-from twitter.mesos.config.schema import Job
-from twitter.mesos.config.thrift import convert as convert_pystachio_to_thrift
-from twitter.mesos.config.thrift import task_instance_from_job
-from twitter.thermos.config.schema import (
-  Process,
-  Resources,
-  Task,
+    CronCollisionPolicy,
+    JobKey,
+    Identity,
 )
 
 from pystachio import Map, String
 from pystachio.naming import frozendict
+import pytest
 
 
 HELLO_WORLD = Job(
@@ -150,6 +151,20 @@ def test_config_with_task_links():
   }
   with pytest.raises(AuroraConfig.InvalidConfig):
     AuroraConfig(HELLO_WORLD(task_links=tl(bad_tl))).job()
+
+
+def test_unbound_references():
+  def job_command(cmdline):
+    return AuroraConfig(HELLO_WORLD(task = SimpleTask('hello_world', cmdline))).raw()
+
+  # bindingless and bad => good bindings should work
+  convert_pystachio_to_thrift(job_command('echo hello world'))
+  convert_pystachio_to_thrift(job_command('echo {{mesos.user}}')
+      .bind(mesos = {'user': '{{mesos.role}}'}))
+
+  # unbound
+  with pytest.raises(InvalidConfig):
+    convert_pystachio_to_thrift(job_command('echo {{mesos.user}}'))
 
 
 def test_cron_policy_alias():

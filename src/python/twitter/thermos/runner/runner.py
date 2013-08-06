@@ -454,9 +454,10 @@ class TaskRunner(object):
       ThermosTaskValidator.assert_valid_ports(task, self._portmap)
     except ThermosTaskValidator.InvalidTaskError as e:
       raise self.InvalidTask('Invalid task: %s' % e)
-    context = ThermosContext(task_id=self._task_id,
-                             user=self._user,
-                             ports=self._portmap)
+    context = ThermosContext(
+        task_id=self._task_id,
+        ports=self._portmap,
+        user=self._user)
     self._task, uninterp = (task % Environment(thermos=context)).interpolate()
     if len(uninterp) > 0:
       raise self.InvalidTask('Failed to interpolate task, missing: %s' %

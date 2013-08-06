@@ -36,37 +36,6 @@ def _warn_on_appapp_layouts(config):
     deprecation_warning(APPAPP_DEPRECATION_WARNING)
 
 
-PACKAGE_DEPRECATION_WARNING = """
-Job.package is deprecated.  Instead use the {{packer}} namespace directly.
-
-See the packer section of the Configuration Reference page for more information:
-http://go/auroraconfig/#Aurora%2BThermosConfigurationReference-%7B%7Bpacker%7D%7Dnamespace
-"""
-
-
-PACKAGE_UNDERSPECIFIED_WARNING = """
-You've specified Job.package in your configuration but not referenced {{mesos.package}}
-or {{mesos.package_uri}}.  We no longer copy package artifacts directly into your
-sandbox prior to invocation, so you must copy them by adding:
-
-  %s
-
-either as a process or into a process in your Task.
-"""
-
-
-def _warn_on_unspecified_package_bindings(config):
-  if not config.package():
-    return
-  deprecation_warning(PACKAGE_DEPRECATION_WARNING)
-
-  _, refs = config.raw().interpolate()
-  p_uri, p = Ref.from_address('mesos.package_uri'), Ref.from_address('mesos.package')
-  if p not in refs and p_uri not in refs:
-    deprecation_warning(PACKAGE_UNDERSPECIFIED_WARNING % (
-        '{{packer[%s][%s][%s].copy_command}}' % tuple(config.package())))
-
-
 CRON_DEPRECATION_WARNING = """
 The "cron_policy" parameter to Jobs has been renamed to "cron_collision_policy".
 Please update your Jobs accordingly.
@@ -352,7 +321,6 @@ def populate_namespaces(config, env=None, force_local=False):
   _inject_packer_bindings(config, env, force_local)
   _inject_prebuilt_package_bindings(config, env, force_local)
   _inject_jenkins_bindings(config, env, force_local)
-  _warn_on_unspecified_package_bindings(config)
   _warn_on_deprecated_cron_policy(config)
   _warn_on_deprecated_daemon_job(config)
   _warn_on_deprecated_health_check_interval_secs(config)

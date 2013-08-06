@@ -6,7 +6,6 @@ from pystachio import (
   Integer,
   List,
   Map,
-  Provided,
   Required,
   String,
   Struct
@@ -22,8 +21,13 @@ TB = 1024 * GB
 
 
 class ThermosContext(Struct):
+  # TODO(wickman) Move the underlying replacement mechanism to %port% replacements
   ports   = Map(String, Integer)
+
+  # TODO(wickman) Move the underlying replacement mechanism to %task_id%
   task_id = String
+
+  # TODO(wickman) Move underlying mechanism to %user%
   user    = String
 
 
@@ -54,7 +58,6 @@ class Process(Struct):
                                            # that should always be run after regular processes
 
 
-@Provided(thermos = ThermosContext)
 class Task(Struct):
   name = Default(String, '{{processes[0].name}}')
   processes = List(Process)
@@ -67,4 +70,3 @@ class Task(Struct):
                                             # > 0 is max concurrent processes.
   finalization_wait = Default(Integer, 30)  # the amount of time in seconds we allocate to run the
                                             # finalization schedule.
-  user = Default(String, '{{thermos.user}}')

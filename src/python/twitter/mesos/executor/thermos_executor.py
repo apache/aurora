@@ -5,17 +5,12 @@ import sys
 import threading
 import time
 
-# mesos
-import mesos_pb2 as mesos_pb
-
 from twitter.common import log
 from twitter.common.concurrent import deadline, defer, Timeout
 from twitter.common.exceptions import ExceptionalThread
 from twitter.common.metrics import Observable
 from twitter.common.quantity import Amount, Time
-
-# thermos
-from twitter.mesos.common_internal.clusters import TwitterCluster, TWITTER_CLUSTERS
+from twitter.mesos.common_internal.clusters import TWITTER_CLUSTERS, TwitterCluster
 from twitter.mesos.common.http_signaler import HttpSignaler
 from twitter.mesos.config import PortResolver
 from twitter.mesos.config.schema import MesosJob, MesosTaskInstance
@@ -23,11 +18,8 @@ from twitter.mesos.config.thrift import task_instance_from_job
 from twitter.thermos.base.path import TaskPath
 from twitter.thermos.monitoring.monitor import TaskMonitor
 
-# thrifts
 from gen.twitter.mesos.constants import DEFAULT_ENVIRONMENT
 from gen.twitter.mesos.ttypes import AssignedTask
-from thrift.Thrift import TException
-from thrift.TSerialization import deserialize as thrift_deserialize
 
 from .discovery_manager import DiscoveryManager
 from .executor_base import ThermosExecutorBase
@@ -38,9 +30,13 @@ from .resource_checkpoints import ResourceCheckpointer
 from .resource_manager import ResourceManager
 from .status_manager import StatusManager
 from .task_runner_wrapper import (
-  AngrybirdTaskRunner,
-  ProductionTaskRunner)
+    AngrybirdTaskRunner,
+    ProductionTaskRunner)
 
+import mesos_pb2 as mesos_pb
+from pystachio import Ref
+from thrift.Thrift import TException
+from thrift.TSerialization import deserialize as thrift_deserialize
 
 
 if 'ANGRYBIRD_THERMOS' in os.environ:
@@ -87,9 +83,9 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
 
   @staticmethod
   def deserialize_assigned_task(task):
-    """
-      Deserialize task from a launchTask task protocol buffer.
-      Returns AssignedTask
+    """Deserialize task from a launchTask task protocol buffer.
+
+       Returns AssignedTask
     """
     try:
       assigned_task = thrift_deserialize(AssignedTask(), task.data)
@@ -99,11 +95,7 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
 
   @staticmethod
   def deserialize_thermos_task(assigned_task):
-    """
-      Deserialize MesosTaskInstance from a AssignedTask thrift.
-      Returns twitter.mesos.config.schema.MesosTaskInstance and the map of
-      ports assigned by the scheduler.
-    """
+    """Deserialize MesosTaskInstance from a AssignedTask thrift."""
     thermos_task = assigned_task.task.thermosConfig
     if not thermos_task:
       raise ValueError('Task did not have a thermosConfig!')
@@ -120,7 +112,18 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
     else:
       mti, refs = task_instance_from_job(MesosJob.json_loads(thermos_task),
           assigned_task.task.shardId)
-      if refs:
+      for ref in refs:
+        # If the ref is {{thermos.task_id}} or a subscope of
+        # {{thermos.ports}}, it currently gets bound by the Thermos Runner,
+        # so we must leave them unbound.
+        #
+        # TODO(wickman) These should be rewritten by the mesos client to use
+        # %%style%% replacements in order to allow us to better type-check configs
+        # client-side.
+        if ref == Ref.from_address('thermos.task_id'):
+          continue
+        elif Ref.subscope(Ref.from_address('thermos.ports'), ref):
+          continue
         raise ValueError('Unexpected unbound refs: %s' % ' '.join(map(str, refs)))
       return mti
 

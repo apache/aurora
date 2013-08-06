@@ -560,7 +560,7 @@ class TaskObserver(ExceptionalThread, Lockable):
        launch_timestamp = state.statuses[0].timestamp_ms / 1000,
        state = TaskState._VALUES_TO_NAMES[state.statuses[-1].state],
        state_timestamp = state_timestamp,
-       user = task.user().get(),
+       user = state.header.user,
        resource_consumption = self._sample(task_id),
        ports = state.header.ports,
        processes = self._task_processes(task_id),

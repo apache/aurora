@@ -24,7 +24,7 @@ from .schema import (
   MesosTaskInstance,
 )
 
-from pystachio import Empty
+from pystachio import Empty, Ref
 
 __all__ = (
   'InvalidConfig',
@@ -98,7 +98,8 @@ def fully_interpolated(pystachio_object, coerce_fn=lambda i: i):
   # unwrapped objects and fail when there are any unbound refs.
   if not pystachio_object.check().ok():
     raise InvalidConfig(pystachio_object.check().message())
-    # If an object type-checks it's okay to use the raw value from the wrapped object returned by
+
+  # If an object type-checks it's okay to use the raw value from the wrapped object returned by
   # interpolate. Without the previous check value.get() could return a string with mustaches
   # instead of an object of the expected type.
   value, _ = pystachio_object.interpolate()
@@ -160,6 +161,11 @@ def assert_valid_field(field, identifier):
   return identifier
 
 
+MESOS_INSTANCE_REF = Ref.from_address('mesos.instance')
+THERMOS_PORT_SCOPE_REF = Ref.from_address('thermos.ports')
+THERMOS_TASK_ID_REF = Ref.from_address('thermos.task_id')
+
+
 # TODO(wickman) Make this a method directly on an AuroraConfig so that we don't
 # need the packages/ports shenanigans.
 def convert(job, packages=frozenset(), ports=frozenset()):
@@ -217,7 +223,8 @@ def convert(job, packages=frozenset(), ports=frozenset()):
   task.taskLinks = not_empty_or(job.task_links(), {})
   task.constraints = constraints_to_thrift(not_empty_or(job.constraints(), {}))
 
-  underlying, _ = job.interpolate()
+  underlying, refs = job.interpolate()
+
   # need to fake an instance id for the sake of schema checking
   underlying_checked = underlying.bind(mesos = {'instance': 31337})
   try:
@@ -226,6 +233,16 @@ def convert(job, packages=frozenset(), ports=frozenset()):
     raise InvalidConfig('Task is invalid: %s' % e)
   if not underlying_checked.check().ok():
     raise InvalidConfig('Job not fully specified: %s' % underlying.check().message())
+
+  unbound = []
+  for ref in refs:
+    if ref == THERMOS_TASK_ID_REF or ref == MESOS_INSTANCE_REF or (
+        Ref.subscope(THERMOS_PORT_SCOPE_REF, ref)):
+      continue
+    unbound.append(ref)
+
+  if unbound:
+    raise InvalidConfig('Config contains unbound variables: %s' % ' '.join(map(str, unbound)))
 
   cron_schedule = not_empty_or(job.cron_schedule(), '')
   cron_policy = select_cron_policy(job.cron_policy(), job.cron_collision_policy())

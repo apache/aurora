@@ -55,10 +55,8 @@ class DistributedCommandRunner(object):
     prefix_command = 'cd %s;' % cls.thermos_sandbox(cluster, **kw)
     thermos_namespace = ThermosContext(
         task_id=task.assignedTask.taskId,
-        ports=task.assignedTask.assignedPorts,
-        user=task.assignedTask.task.owner.role)
+        ports=task.assignedTask.assignedPorts)
     mesos_namespace = MesosContext(
-        role=task.assignedTask.task.owner.role,
         instance=task.assignedTask.task.shardId)
     command = String(prefix_command + command) % Environment(
         thermos=thermos_namespace,

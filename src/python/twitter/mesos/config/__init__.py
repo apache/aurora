@@ -1,67 +1,15 @@
 from __future__ import absolute_import
 
-from twitter.common.lang import Compatibility
 from twitter.thermos.config.loader import PortExtractor, ThermosTaskWrapper
 from twitter.thermos.config.schema import ThermosContext
 
 from .loader import AuroraConfigLoader
+from .port_resolver import PortResolver
 from .thrift import convert as convert_thrift, InvalidConfig as InvalidThriftConfig
 
 from pystachio import Empty, Environment, Ref
 
-
-class PortResolver(object):
-  class CycleException(Exception): pass
-
-  @classmethod
-  def resolve(cls, portmap):
-    """
-        Given an announce-style portmap, return a fully dereferenced portmap.
-
-        For example, given the portmap:
-          {
-            'http': 80,
-            'aurora: 'http',
-            'https': 'aurora',
-            'thrift': 'service'
-          }
-
-        Returns {'http': 80, 'aurora': 80, 'https': 80, 'thrift': 'service'}
-    """
-    for (name, port) in portmap.items():
-      if not isinstance(name, Compatibility.string):
-        raise ValueError('All portmap keys must be strings!')
-      if not isinstance(port, (int, Compatibility.string)):
-        raise ValueError('All portmap values must be strings or integers!')
-
-    portmap = portmap.copy()
-    for port in list(portmap):
-      try:
-        portmap[port] = int(portmap[port])
-      except ValueError:
-        continue
-
-    def resolve_one(static_port):
-      visited = set()
-      root = portmap[static_port]
-      while root in portmap:
-        visited.add(root)
-        if portmap[root] in visited:
-          raise cls.CycleException('Found cycle in portmap!')
-        root = portmap[root]
-      return root
-
-    return dict((name, resolve_one(name)) for name in portmap)
-
-  @classmethod
-  def unallocated(cls, portmap):
-    """Given a resolved portmap, return the list of ports that need to be allocated."""
-    return set(port for port in portmap.values() if not isinstance(port, int))
-
-  @classmethod
-  def bound(cls, portmap):
-    """Given a resolved portmap, return the list of ports that have already been allocated."""
-    return set(portmap)
+__all__ = ('AuroraConfig', 'PortResolver')
 
 
 class AuroraConfig(object):
@@ -136,15 +84,8 @@ class AuroraConfig(object):
     job = AuroraConfigLoader.loads_json(string)
     return cls.apply_plugins(cls(job.bind(*bindings) if bindings else job))
 
-  def __init__(self, job):
-    self._job = self.sanitize_job(job)
-    self._packages = []
-
-  def __repr__(self):
-    return '%s(%r)' % (self.__class__.__name__, self._job)
-
   @classmethod
-  def sanitize_job(cls, job):
+  def validate_job(cls, job):
     """
       Validate and sanitize the input job
 
@@ -159,21 +100,33 @@ class AuroraConfig(object):
           '%s required for job "%s"' % (required.capitalize(), job.name()))
     if not has(job.task(), 'processes'):
       raise cls.InvalidConfig('Processes required for task on job "%s"' % job.name())
-    return job
+
+  @classmethod
+  def standard_bindings(cls, job):
+    # Rewrite now-deprecated bindings into their proper form.
+    return job.bind({
+      Ref.from_address('mesos.role'): '{{role}}',
+      Ref.from_address('mesos.cluster'): '{{cluster}}',
+      Ref.from_address('thermos.user'): '{{role}}',
+    })
+
+  def __init__(self, job):
+    self.validate_job(job)
+    self._job = self.standard_bindings(job)
+    self._packages = []
 
   def context(self, instance=None):
     from .schema import MesosContext
-    context = dict(
-      role=self.role(),
-      cluster=self.cluster(),
-      instance=instance
-    )
+    context = dict(instance=instance)
     # Filter unspecified values
     return Environment(mesos=MesosContext(dict((k, v) for k, v in context.items() if v)))
 
   def job(self):
     interpolated_job = self._job % self.context()
 
+    # TODO(wickman) Once thermos is onto thrift instead of pystachio, use
+    # %%replacements%% instead.
+    #
     # Typecheck against the Job, with the following free variables unwrapped at the Task level:
     #  - a dummy {{mesos.instance}}
     #  - dummy values for the {{thermos.ports}} context, to allow for their use in task_links
@@ -223,20 +176,26 @@ class AuroraConfig(object):
     return self._job.environment().get()
 
   def ports(self):
+    """Return the list of ports that need to be allocated by the scheduler."""
+
     # Strictly speaking this is wrong -- it is possible to do things like
     #   {{thermos.ports[instance_{{mesos.instance}}]}}
     # which can only be extracted post-unwrapping.  This means that validating
     # the state of the announce configuration could be problematic if people
     # try to do complicated things.
-    #
-    # This should only return the list of ports that need allocation.  In other words
-    # we take the ports referenced by processes (referenced_ports), remove the ones
-    # that have already been preallocated ("bound") by the portmap, then
-    # add the ones that need to be allocated to fulfill their duty in the portmap.
     referenced_ports = ThermosTaskWrapper(self._job.task(), strict=False).ports()
-    portmap = PortResolver.resolve(self._job.announce().portmap().get()
-                                   if self._job.has_announce() else {})
-    return PortResolver.unallocated(portmap) | (referenced_ports - PortResolver.bound(portmap))
+    resolved_portmap = PortResolver.resolve(self._job.announce().portmap().get()
+                                            if self._job.has_announce() else {})
+
+    # values of the portmap that are not integers => unallocated
+    unallocated = set(port for port in resolved_portmap.values() if not isinstance(port, int))
+
+    # find referenced {{thermos.portmap[ports]}} that are not resolved by the portmap
+    unresolved_references = set(
+      port for port in (resolved_portmap.get(port_ref, port_ref) for port_ref in referenced_ports)
+      if not isinstance(port, int))
+
+    return unallocated | unresolved_references
 
   def has_health_port(self):
     return "health" in ThermosTaskWrapper(self._job.task(), strict=False).ports()
@@ -264,10 +223,12 @@ class AuroraConfig(object):
   def add_package(self, package):
     self._packages.append(package)
 
+  # TODO(wickman) Kill package() once MESOS-3191 is in.
   def package(self):
-    if self._job.has_package() and self._job.package().check().ok():
-      package = self._job.package() % self.context()
-      return map(str, [package.role(), package.name(), package.version()])
+    pass
 
   def is_dedicated(self):
     return self._job.has_constraints() and 'dedicated' in self._job.constraints()
+
+  def __repr__(self):
+    return '%s(%r)' % (self.__class__.__name__, self._job)

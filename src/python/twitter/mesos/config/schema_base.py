@@ -2,23 +2,10 @@ from twitter.thermos.config.schema import *
 from gen.twitter.mesos.constants import DEFAULT_ENVIRONMENT
 
 
+# TODO(wickman) Bind {{mesos.instance}} to %shard_id%
 class MesosContext(Struct):
-  # The role running the job
-  role        = Required(String)
-
-  # The cluster in which the job is running
-  cluster     = Required(String)
-
   # The instance id (i.e. replica id, shard id) in the context of a task
   instance    = Required(Integer)
-
-  # The filename of the package associated with this job
-  # DEPRECATED in favor of using {{packer[role][package][version].package}}
-  package     = String
-
-  # The URI of the package associated with this job
-  # DEPRECATED in favor of using {{packer[role][package][version].package_uri}}
-  package_uri = String
 
 
 # AppApp layout setup
@@ -60,16 +47,6 @@ class PackerObject(Struct):
       'ssh {{tunnel_host}} hadoop fs -cat {{package_uri}} > {{package}}')
   remote_copy_command = Default(String,
       'hadoop fs -copyToLocal {{package_uri}} {{package}}')
-
-
-# Packer package information
-@Provided(mesos=MesosContext)
-class PackerPackage(Struct):
-  name = Required(String)
-  role = Default(String, '{{mesos.role}}')
-  version = Required(String)
-
-Package = PackerPackage
 
 
 class UpdateConfig(Struct):
@@ -144,7 +121,6 @@ class MesosJob(Struct):
   task_links                 = Map(String, String)
 
   layout        = AppLayout      # DEPRECATED in favor of directory sandboxes
-  package       = PackerPackage  # DEPRECATED in favor of {{packer}} namespaces.
 
 
 Job = MesosJob
