@@ -85,9 +85,12 @@ public class TaskTimeoutTest extends EasyMockTest {
 
   @After
   public void verifyTasksDepleted() {
-    // Verify there is no memory leak.
-    assertEquals(0, Stats.getVariable(TaskTimeout.TRANSIENT_COUNT_STAT_NAME).read());
-    Stats.flush();
+    try {
+      // Verify there is no memory leak.
+      assertEquals(0, Stats.getVariable(TaskTimeout.TRANSIENT_COUNT_STAT_NAME).read());
+    } finally {
+      Stats.flush();
+    }
   }
 
   private Capture<Runnable> expectTaskWatch(long expireMs) {
