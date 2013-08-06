@@ -170,6 +170,18 @@ SHARDS_OPTION = optparse.Option(
     'all shards will be acted on.')
 
 
+def parse_aurora_job_key_into(option, opt, value, parser):
+  try:
+    setattr(parser.values, option.dest, AuroraJobKey.from_path(value))
+  except AuroraJobKey.Error as e:
+    raise OptionValueError('Failed to parse: %s' % e)
+
+
+FROM_JOBKEY_OPTION = optparse.Option('--from', dest='rename_from', type='string', default=None,
+    metavar='CLUSTER/ROLE/ENV/JOB', action='callback', callback=parse_aurora_job_key_into,
+    help='Job key to diff against.')
+
+
 JSON_OPTION = optparse.Option(
     '-j',
     '--json',
@@ -481,6 +493,7 @@ def runtask(args, options):
 @app.command_option(CLUSTER_CONFIG_OPTION)
 @app.command_option(ENV_CONFIG_OPTION)
 @app.command_option(JSON_OPTION)
+@app.command_option(FROM_JOBKEY_OPTION)
 @requires.exactly('cluster/role/env/job', 'config')
 def diff(job_spec, config_file):
   """usage: diff cluster/role/env/job config
@@ -490,9 +503,15 @@ def diff(job_spec, config_file):
   diff program by specifying the DIFF_VIEWER environment variable."""
   options = app.get_options()
   config = get_job_config(job_spec, config_file, options)
-  api = make_client(config.cluster())
-  resp = api.query(
-      api.build_query(config.role(), config.name(), statuses=ACTIVE_STATES, env=options.env))
+  if options.rename_from:
+    cluster, role, env, name = options.rename_from
+  else:
+    cluster = config.cluster()
+    role = config.role()
+    env = config.environment()
+    name = config.name()
+  api = make_client(cluster)
+  resp = api.query(api.build_query(role, name, statuses=ACTIVE_STATES, env=env))
   if not resp.responseCode:
     die('Request failed, server responded with "%s"' % resp.message)
   remote_tasks = [t.assignedTask.task for t in resp.tasks]
