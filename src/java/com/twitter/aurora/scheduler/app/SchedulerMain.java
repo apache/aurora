@@ -6,6 +6,7 @@ import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.annotation.Nonnegative;
@@ -20,7 +21,7 @@ import com.google.inject.Key;
 import com.google.inject.Module;
 import com.google.inject.Singleton;
 
-import com.twitter.aurora.internal.auth.AuthModule;
+import com.twitter.aurora.auth.UnsecureAuthModule;
 import com.twitter.aurora.scheduler.DriverFactory;
 import com.twitter.aurora.scheduler.DriverFactory.DriverFactoryImpl;
 import com.twitter.aurora.scheduler.MesosTaskFactory.ExecutorConfig;
@@ -95,6 +96,11 @@ public class SchedulerMain extends AbstractApplication {
   @CmdLine(name = "backup_dir", help = "Directory to store backups under.")
   private static final Arg<File> BACKUP_DIR = Arg.create();
 
+  @CmdLine(name = "auth_module",
+      help = "A Guice module to provide auth bindings. NOTE: The default is unsecure.")
+  public static final  Arg<? extends Class<? extends AbstractModule>> AUTH_MODULE =
+      Arg.create(UnsecureAuthModule.class);
+
   @Inject private SingletonService schedulerService;
   @Inject private LocalServiceRegistry serviceRegistry;
   @Inject private SchedulerLifecycle schedulerLifecycle;
@@ -126,16 +132,25 @@ public class SchedulerMain extends AbstractApplication {
       }
     };
 
-    // TODO(Sathya): Accept a command line argument for additional modules to bind so that
-    // AuthModule can be referenced only at runtime.
     ImmutableList.Builder<Module> modules = ImmutableList.<Module>builder()
         .addAll(getSystemModules())
         .add(new AppModule(clusterName))
-        .add(new AuthModule())
         .add(new ThriftModule())
         .add(new ThriftAuthModule())
         .add(serviceBinder)
         .add(additionalModules);
+
+    Class<? extends AbstractModule> authModule = AUTH_MODULE.get();
+    try {
+      // If installation fails, no SessionValidator will be bound and app will fail to startup.
+      modules.add(authModule.newInstance());
+    } catch (InstantiationException e) {
+      LOG.log(Level.WARNING, "Failed to instantiate auth module: " + authModule.getName(), e);
+      throw new IllegalArgumentException(e);
+    } catch (IllegalAccessException e) {
+      LOG.log(Level.WARNING, "Failed to instantiate auth module: " + authModule.getName(), e);
+      throw new IllegalArgumentException(e);
+    }
 
     KeyFactory zkClientKeyFactory = Bindings.annotatedKeyFactory(ServiceDiscovery.class);
     if (zkHost.isPresent()) {
