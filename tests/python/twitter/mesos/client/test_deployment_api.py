@@ -3,7 +3,7 @@ import tempfile
 from textwrap import dedent
 
 from twitter.mesos.client.api import MesosClientAPI
-from twitter.mesos.client.stage_api import AuroraStageAPI, StagedConfig
+from twitter.mesos.client.deployment_api import AuroraDeploymentAPI, DeploymentConfig
 from twitter.mesos.common import AuroraJobKey, Cluster
 from twitter.mesos.config import AuroraConfig, AuroraConfigLoader
 from twitter.mesos.packer.packer_client import Packer
@@ -16,7 +16,7 @@ from .helper import FakeSchedulerProxy
 import mox
 
 
-class TestAuroraStageAPI(mox.MoxTestBase):
+class TestAuroraDeploymentAPI(mox.MoxTestBase):
 
   RAW_CONFIG = 'file_content'
   CLUSTER = Cluster(name='smfd')
@@ -26,13 +26,13 @@ class TestAuroraStageAPI(mox.MoxTestBase):
   METADATA = json.dumps({'message': MESSAGE})
   PROXY_HOST = 'nest1.corp.twitter.com'
   SESSION_KEY = 'asdf'
-  STAGED_CONFIG = StagedConfig(
+  DEPLOYMENT_CONFIG = DeploymentConfig(
       1, '5be07da9642fb3ec5bc0df0c1290dada',
       [{u'timestamp': 1374779340660,
         u'state': u'PRESENT',
         u'user': u'johndoe'}],
       METADATA)
-  PACKER_STAGED_CONFIG = {
+  PACKER_DEPLOYMENT_CONFIG = {
       u'id': 1, u'md5sum': u'5be07da9642fb3ec5bc0df0c1290dada',
       u'uri': u'hftp://shortened', u'filename': u'job_description_eFA3CX',
       u'auditLog': [{
@@ -58,13 +58,13 @@ class TestAuroraStageAPI(mox.MoxTestBase):
   """)
 
   def setUp(self):
-    super(TestAuroraStageAPI, self).setUp()
+    super(TestAuroraDeploymentAPI, self).setUp()
     self.write_config_file()
     self.mock_packer = self.mox.CreateMock(Packer)
     self.mock_scheduler = self.mox.CreateMock(scheduler_client)
     self.api = MesosClientAPI(self.CLUSTER)
     self.api._scheduler = FakeSchedulerProxy(self.CLUSTER, self.mock_scheduler, self.SESSION_KEY)
-    self.stage_api = AuroraStageAPI(self.api, self.mock_packer)
+    self.deployment_api = AuroraDeploymentAPI(self.api, self.mock_packer)
 
   def write_config_file(self):
     self.config_file = tempfile.NamedTemporaryFile()
@@ -84,18 +84,18 @@ class TestAuroraStageAPI(mox.MoxTestBase):
   def test_create(self):
     self.mock_packer.add(
         self.JOB_KEY.role, self.CONFIG_PACKAGE_NAME,
-        mox.Func(self.is_stage_file), self.METADATA)
+        mox.Func(self.is_deployment_file), self.METADATA)
 
     self.mox.ReplayAll()
 
-    self.stage_api.create(self.JOB_KEY, self.config_file.name, self.MESSAGE)
+    self.deployment_api.create(self.JOB_KEY, self.config_file.name, self.MESSAGE)
 
-  def is_stage_file(self, filename):
+  def is_deployment_file(self, filename):
     with open(filename) as f:
-      staged = json.load(f)
-    config = AuroraConfig.loads_json(staged['job'])
+      deployment = json.load(f)
+    config = AuroraConfig.loads_json(deployment['job'])
     assert(config.job() == self.config.job())
-    assert(staged['loadables']['\x00' + self.config_file.name] == self.CONFIG_CONTENT)
+    assert(deployment['loadables']['\x00' + self.config_file.name] == self.CONFIG_CONTENT)
     return True
 
   def test_create_no_job(self):
@@ -105,22 +105,22 @@ class TestAuroraStageAPI(mox.MoxTestBase):
         env=self.JOB_KEY.env,
         name='nope'
     )
-    self.assertRaises(ValueError, self.stage_api.create, job_key, self.config_file, self.MESSAGE)
+    self.assertRaises(ValueError, self.deployment_api.create, job_key, self.config_file, self.MESSAGE)
 
   def test_log(self):
     self.mock_packer.list_versions(
-        self.JOB_KEY.role, self.CONFIG_PACKAGE_NAME).AndReturn([self.PACKER_STAGED_CONFIG])
+        self.JOB_KEY.role, self.CONFIG_PACKAGE_NAME).AndReturn([self.PACKER_DEPLOYMENT_CONFIG])
     self.mox.ReplayAll()
 
-    assert self.stage_api.log(self.JOB_KEY)[0].__dict__ == self.STAGED_CONFIG.__dict__
+    assert self.deployment_api.log(self.JOB_KEY)[0].__dict__ == self.DEPLOYMENT_CONFIG.__dict__
 
-  def test_log_not_staged(self):
+  def test_log_no_deployment(self):
     self.mock_packer.list_versions(
         self.JOB_KEY.role,
         self.CONFIG_PACKAGE_NAME).AndRaise(Packer.Error('Requested package or version not found'))
     self.mox.ReplayAll()
 
-    self.assertRaises(AuroraStageAPI.NotStagedError, self.stage_api.log, self.JOB_KEY)
+    self.assertRaises(AuroraDeploymentAPI.NoDeploymentError, self.deployment_api.log, self.JOB_KEY)
 
   def mock_fetch(self, pkg, version, contents):
     def write_package_file(role, pkg, version, proxy_host, pkg_file):
@@ -150,7 +150,7 @@ class TestAuroraStageAPI(mox.MoxTestBase):
 
     self.mox.ReplayAll()
 
-    assert self.stage_api.release(self.JOB_KEY, 15, self.PROXY_HOST) == create_response
+    assert self.deployment_api.release(self.JOB_KEY, 15, self.PROXY_HOST) == create_response
 
   def test_release_existing_job(self):
     self.mock_packer_release()
@@ -166,7 +166,7 @@ class TestAuroraStageAPI(mox.MoxTestBase):
 
     self.mox.ReplayAll()
 
-    assert self.stage_api.release(self.JOB_KEY, 15, self.PROXY_HOST) == update_response
+    assert self.deployment_api.release(self.JOB_KEY, 15, self.PROXY_HOST) == update_response
 
   def test_reset(self):
     def write_file(_, _2, _3, _4, f):
@@ -182,7 +182,7 @@ class TestAuroraStageAPI(mox.MoxTestBase):
         self.JOB_KEY.role,
         self.CONFIG_PACKAGE_NAME,
         reset_version).AndReturn(
-            self.PACKER_STAGED_CONFIG)
+            self.PACKER_DEPLOYMENT_CONFIG)
     self.mock_packer.fetch(
         self.JOB_KEY.role,
         self.CONFIG_PACKAGE_NAME,
@@ -196,9 +196,9 @@ class TestAuroraStageAPI(mox.MoxTestBase):
         self.METADATA)
     self.mox.ReplayAll()
 
-    self.stage_api.reset(self.JOB_KEY, reset_version, self.PROXY_HOST)
+    self.deployment_api.reset(self.JOB_KEY, reset_version, self.PROXY_HOST)
 
-  def test_reset_not_staged(self):
+  def test_reset_no_deployment(self):
     reset_version = '15'
     self.mock_packer.get_version(
         self.JOB_KEY.role, self.CONFIG_PACKAGE_NAME, reset_version).AndRaise(
@@ -209,8 +209,8 @@ class TestAuroraStageAPI(mox.MoxTestBase):
     self.mox.ReplayAll()
 
     self.assertRaises(
-        AuroraStageAPI.NotStagedError,
-        self.stage_api.reset,
+        AuroraDeploymentAPI.NoDeploymentError,
+        self.deployment_api.reset,
         self.JOB_KEY,
         reset_version,
         self.PROXY_HOST)
@@ -225,8 +225,8 @@ class TestAuroraStageAPI(mox.MoxTestBase):
     self.mox.ReplayAll()
 
     self.assertRaises(
-        AuroraStageAPI.NoSuchVersion,
-        self.stage_api.reset,
+        AuroraDeploymentAPI.NoSuchVersion,
+        self.deployment_api.reset,
         self.JOB_KEY,
         reset_version,
         self.PROXY_HOST)

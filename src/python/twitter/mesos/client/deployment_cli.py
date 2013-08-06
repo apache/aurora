@@ -4,7 +4,7 @@ import json
 from twitter.common import app
 from twitter.mesos.client.api import MesosClientAPI
 from twitter.mesos.client.base import check_and_log_response, handle_open
-from twitter.mesos.client.stage_api import AuroraStageAPI
+from twitter.mesos.client.deployment_api import AuroraDeploymentAPI
 from twitter.mesos.common import AuroraJobKey
 from twitter.mesos.packer import sd_packer_client
 
@@ -16,19 +16,19 @@ class JobKeyAction(argparse.Action):
     setattr(namespace, self.dest, AuroraJobKey.from_path(values))
 
 
-class AuroraStageCLI(object):
-  """Parses subcommands to the stage command and defer to the appropriate API calls
+class AuroraDeploymentCLI(object):
+  """Parses subcommands to the deployment command and defer to the appropriate API calls
   """
 
   class CommandLineError(Exception): pass
 
-  def __init__(self, clusters, stage_api=None):
-    self._stage_api = stage_api
+  def __init__(self, clusters, deployment_api=None):
+    self._deployment_api = deployment_api
     self._clusters = clusters
     self._scheduler_url = None
 
   def dispatch(self, args, options):
-    parser = argparse.ArgumentParser(description="Manipulate staged configuration")
+    parser = argparse.ArgumentParser(description="Manipulate deployments")
     verbs = parser.add_subparsers()
 
     self._add_create(verbs)
@@ -39,22 +39,22 @@ class AuroraStageCLI(object):
 
     parsed_args = parser.parse_args(args)
 
-    self._set_stage_api(parsed_args, options.verbosity == 'verbose')
+    self._set_deployment_api(parsed_args, options.verbosity == 'verbose')
 
     # Call function bound with the parsed command (_create, _release, etc.)
     parsed_args.func(parsed_args)
 
   def _add_create(self, parser):
     create = parser.add_parser(
-        'create', help='Stage a job configuration')
+        'create', help='Create a job deployment')
     create.set_defaults(func=self._create)
     create.add_argument('job_key', action=JobKeyAction)
     create.add_argument('config_file', type=argparse.FileType('r'))
-    create.add_argument('--message', '-m', help='An optional message to add to this staged config')
+    create.add_argument('--message', '-m', help='An optional message to add to this deployment')
     self._add_release_flag(create)
 
   def _add_log(self, parser):
-    log = parser.add_parser('log', help='Show the history of staged configurations')
+    log = parser.add_parser('log', help='Show the history of deployed configurations')
     log.set_defaults(func=self._log)
     log.add_argument('job_key', action=JobKeyAction)
     log.add_argument('--long', default=False, action='store_true', help="Show more details")
@@ -62,7 +62,7 @@ class AuroraStageCLI(object):
   def _add_release(self, parser):
     release = parser.add_parser(
         'release',
-        help='Create or update a job to the latest staged configuration')
+        help='Create or update a job to the latest created deployment')
     release.set_defaults(func=self._release)
     release.add_argument('job_key', action=JobKeyAction)
     self._add_release_argument_group(release)
@@ -70,7 +70,7 @@ class AuroraStageCLI(object):
   def _add_reset(self, parser):
     reset = parser.add_parser(
         'reset',
-        help='Re-stage a job to a certain version (use that to rollback to a particular version)')
+        help='Reset a deployment to an older version (use that to rollback to a particular version)')
     reset.set_defaults(func=self._reset)
     reset.add_argument('job_key', action=JobKeyAction)
     reset.add_argument('version_id', type=int)
@@ -79,7 +79,7 @@ class AuroraStageCLI(object):
   def _add_show(self, parser):
     show = parser.add_parser(
         'show',
-        help='Show details of the job that would be released by running "stage release"')
+        help='Show details of the job that would be released by running "deployment release"')
     show.set_defaults(func=self._show)
     show.add_argument('job_key', action=JobKeyAction)
     show.add_argument('version_id', nargs='?', default='latest')
@@ -97,15 +97,15 @@ class AuroraStageCLI(object):
     release_group = parser.add_argument_group('release')
     release_group.add_argument('--updater_health_check_interval_seconds', **kwargs)
 
-  def _set_stage_api(self, parsed_args, verbosity):
+  def _set_deployment_api(self, parsed_args, verbosity):
     cluster_name = parsed_args.job_key.cluster
     if cluster_name not in self._clusters:
       raise self.CommandLineError('No cluster named ' + cluster_name)
 
-    if self._stage_api is None:
+    if self._deployment_api is None:
       api = MesosClientAPI(self._clusters[cluster_name], verbose=verbosity)
       packer = sd_packer_client.create_packer(cluster_name, verbose=verbosity)
-      self._stage_api = AuroraStageAPI(api, packer)
+      self._deployment_api = AuroraDeploymentAPI(api, packer)
       self._scheduler_url = api.scheduler.scheduler().url
 
   def _create(self, args):
@@ -113,14 +113,14 @@ class AuroraStageCLI(object):
     config_filename = args.config_file.name
     message = args.message
 
-    self._stage_api.create(job_key, config_filename, message)
+    self._deployment_api.create(job_key, config_filename, message)
     if args.release:
       self._release(args)
 
   def _log(self, args):
     job_key = args.job_key
-    configs = self._stage_api.log(job_key)
-    printer = StagedConfigFormat.long_str if args.long else StagedConfigFormat.one_line_str
+    configs = self._deployment_api.log(job_key)
+    printer = DeploymentConfigFormat.long_str if args.long else DeploymentConfigFormat.one_line_str
     print('\n'.join(printer(config) for config in configs))
 
   def _release(self, args):
@@ -128,7 +128,7 @@ class AuroraStageCLI(object):
     updater_health_check_interval_seconds = args.updater_health_check_interval_seconds
     proxy_host = app.get_options().tunnel_host
 
-    resp = self._stage_api.release(job_key, updater_health_check_interval_seconds, proxy_host)
+    resp = self._deployment_api.release(job_key, updater_health_check_interval_seconds, proxy_host)
     check_and_log_response(resp)
     handle_open(
         self._scheduler_url,
@@ -141,7 +141,7 @@ class AuroraStageCLI(object):
     version_id = args.version_id
     proxy_host = app.get_options().tunnel_host
 
-    self._stage_api.reset(job_key, version_id, proxy_host)
+    self._deployment_api.reset(job_key, version_id, proxy_host)
     if args.release:
       self._release(args)
 
@@ -150,16 +150,16 @@ class AuroraStageCLI(object):
     version_id = args.version_id
     proxy_host = app.get_options().tunnel_host
 
-    (config, content) = self._stage_api.show(job_key, version_id, proxy_host)
-    print(StagedConfigFormat.full_str(config, content))
+    (config, content) = self._deployment_api.show(job_key, version_id, proxy_host)
+    print(DeploymentConfigFormat.full_str(config, content))
 
-class StagedConfigFormat(object):
+class DeploymentConfigFormat(object):
   _EMPTY_MESSAGE = "<Empty message>"
 
   @classmethod
   def full_str(cls, config, content):
-    """Full representation of a staged config, with job content in JSON and raw pystachio template
-    used to create the job"""
+    """Full representation of a deployment, with job content in JSON and raw pystachio template used
+    to create the job"""
 
     parsed = json.loads(content)
     desc = []
@@ -176,7 +176,7 @@ class StagedConfigFormat(object):
 
   @classmethod
   def long_str(cls, config):
-    """Multi line representation of a staged config, with audit trail"""
+    """Multi line representation of a deployment, with audit trail"""
 
     released = ' (Currently released)' if config.released() else ''
     desc = []
@@ -192,7 +192,7 @@ class StagedConfigFormat(object):
 
   @classmethod
   def one_line_str(cls, config):
-    """One line representation of a staged config"""
+    """One line representation of a deployment"""
 
     desc = []
     desc.append("%s" % config.version_id)

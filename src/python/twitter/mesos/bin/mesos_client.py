@@ -24,7 +24,7 @@ from twitter.common.net.tunnel import TunnelHelper
 from twitter.common.quantity import Amount, Data
 from twitter.common.quantity.parse_simple import parse_data_into
 from twitter.mesos.client.api import MesosClientAPI
-from twitter.mesos.client.stage_cli import AuroraStageCLI
+from twitter.mesos.client.deployment_cli import AuroraDeploymentCLI
 from twitter.mesos.client.base import (
     check_and_log_response,
     deprecation_warning,
@@ -339,10 +339,10 @@ HEALTH_CHECK_INTERVAL_SECONDS = optparse.Option(
 
 @app.command
 @app.command_option(OPEN_BROWSER_OPTION)
-def stage(args, options):
-  """usage: stage [-h] subcommand args
+def deployment(args, options):
+  """usage: deployment [-h] subcommand args
   """
-  AuroraStageCLI(MESOS_CLIENT_CLUSTER_SET).dispatch(args, options)
+  AuroraDeploymentCLI(MESOS_CLIENT_CLUSTER_SET).dispatch(args, options)
 
 
 @app.command
@@ -1178,7 +1178,7 @@ def main():
 
 
 if __name__ == '__main__':
-  if len(sys.argv) > 1 and sys.argv[1] != 'stage':
+  if len(sys.argv) > 1 and sys.argv[1] != 'deployment':
     app.interspersed_args(True)
   LogOptions.set_stderr_log_level('INFO')
   LogOptions.disable_disk_logging()

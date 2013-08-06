@@ -13,8 +13,8 @@ python_library(
 )
 
 python_library(
-  name = 'stage_api',
-  sources = ['stage_api.py'],
+  name = 'deployment_api',
+  sources = ['deployment_api.py'],
   dependencies = [
     pants(':config'),
     pants('src/python/twitter/common/log'),
@@ -23,12 +23,12 @@ python_library(
 )
 
 python_library(
-  name = 'stage_cli',
-  sources = ['stage_cli.py'],
+  name = 'deployment_cli',
+  sources = ['deployment_cli.py'],
   dependencies = [
     pants(':api'),
     pants(':base'),
-    pants(':stage_api'),
+    pants(':deployment_api'),
     pants('3rdparty/python:argparse'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/mesos/common:aurora_job_key'),
@@ -43,10 +43,10 @@ python_library(
     pants(':base'),
     pants(':command_runner'),
     pants(':config'),
+    pants(':deployment_api'),
+    pants(':deployment_cli'),
     pants(':disambiguator'),
     pants(':quickrun'),
-    pants(':stage_api'),
-    pants(':stage_cli'),
   ]
 )
 

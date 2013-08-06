@@ -9,22 +9,22 @@ from twitter.mesos.packer.packer_client import Packer
 from gen.twitter.mesos.constants import ACTIVE_STATES
 
 
-class AuroraStageAPI(object):
-  """API for manipulating staged configurations for the aurora scheduler.
+class AuroraDeploymentAPI(object):
+  """API for manipulating deployments for the aurora scheduler.
   """
 
   class Error(Exception): pass
 
-  class NotStagedError(Error):
+  class NoDeploymentError(Error):
     def __init__(self, job_key):
-      super(AuroraStageAPI.NotStagedError, self).__init__(
-          "Cannot find a staged configuration for job %s. Run 'mesos stage create' first." %
+      super(AuroraDeploymentAPI.NoDeploymentError, self).__init__(
+          'Cannot find a deployment configuration for job %s. Run "mesos deployment create" first.' %
           job_key)
 
   class NoSuchVersion(Error):
     def __init__(self, job_key, version):
-      super(AuroraStageAPI.NoSuchVersion, self).__init__(
-          "No staged version %s for job %s" % (version, job_key))
+      super(AuroraDeploymentAPI.NoSuchVersion, self).__init__(
+          "No deployment version %s for job %s" % (version, job_key))
 
   def __init__(self, api, packer):
     self._api = api
@@ -34,7 +34,7 @@ class AuroraStageAPI(object):
     return '__job_%s_%s_%s' % (job_key.cluster, job_key.env, job_key.name)
 
   def create(self, job_key, config_filename, message=None):
-    log.info('Staging job configuration: %s' % job_key)
+    log.info('Creating deployment configuration: %s' % job_key)
     pkg_name = self._config_package_name(job_key)
 
     config = get_config(
@@ -65,7 +65,7 @@ class AuroraStageAPI(object):
     except Packer.Error as e:
       self._handle_packer_fetch_error(e, job_key, 'latest')
 
-    return StagedConfig.from_packer_list(versions)
+    return DeploymentConfig.from_packer_list(versions)
 
   def _is_running(self, job_key):
     resp = self._api.check_status(job_key)
@@ -82,10 +82,10 @@ class AuroraStageAPI(object):
         self._handle_packer_fetch_error(e, job_key, 'latest')
 
       job_file.seek(0)
-      staged_json = json.load(job_file)
+      deployment_json = json.load(job_file)
 
       config = AuroraConfig.loads_json(
-          staged_json['job'],
+          deployment_json['job'],
           select_cluster=job_key.cluster,
           select_env=job_key.env)
 
@@ -100,7 +100,7 @@ class AuroraStageAPI(object):
     return resp
 
   def reset(self, job_key, version_id, proxy_host):
-    log.info("Resetting staged configuration for job %s to version %s", job_key, version_id)
+    log.info("Resetting deployment for job %s to version %s", job_key, version_id)
 
     (config, content) = self._fetch_full_config(job_key, version_id, proxy_host)
     with NamedTemporaryFile(prefix='job_configuration_') as f:
@@ -115,7 +115,7 @@ class AuroraStageAPI(object):
     pkg_name = self._config_package_name(job_key)
     with NamedTemporaryFile(prefix='job_configuration_') as job_fp:
       try:
-        config = StagedConfig.from_packer_get(
+        config = DeploymentConfig.from_packer_get(
             self._packer.get_version(job_key.role, pkg_name, str(version_id)))
         self._packer.fetch(
             job_key.role, pkg_name, str(version_id), proxy_host, job_fp)
@@ -132,27 +132,27 @@ class AuroraStageAPI(object):
     #                    see AWESOME-4623
     if 'Requested package or version not found' in str(e):
       if version == 'latest':
-        raise self.NotStagedError(job_key)
+        raise self.NoDeploymentError(job_key)
       try:
         self._packer.list_versions(job_key.role, self._config_package_name(job_key))
         raise self.NoSuchVersion(job_key, version)
       except Packer.Error as e:
-        raise self.NotStagedError(job_key)
+        raise self.NoDeploymentError(job_key)
     else:
       raise e
 
 
-class StagedConfig(object):
-  """Helper structure to work with staged configurations"""
+class DeploymentConfig(object):
+  """Helper structure to work with deployments"""
 
   @classmethod
   def from_packer_list(cls, packer_list_output):
-    """Returns a list of StagedConfig from a packer list_versions json structure"""
+    """Returns a list of DeploymentConfig from a packer list_versions json structure"""
     return [cls.from_packer_get(version) for version in packer_list_output]
 
   @classmethod
   def from_packer_get(cls, packer_get_output):
-    """Returns a StagedConfig from a packer get_version json structure"""
+    """Returns a DeploymentConfig from a packer get_version json structure"""
     return cls(
         packer_get_output['id'],
         packer_get_output['md5sum'],
@@ -172,16 +172,16 @@ class StagedConfig(object):
       else:
         raise ValueError
     except ValueError:
-      log.warning('Unexpected value in staged config metadata: %s' % metadata)
+      log.warning('Unexpected value in deployment metadata: %s' % metadata)
 
   def creation(self):
     """Returns the creation event"""
     return self.auditlog[0]
 
   def releases(self):
-    """List of release events for this staged configuration"""
+    """List of release events for this deployment"""
     return [log for log in self.auditlog if log['state'] == 'LIVE']
 
   def released(self):
-    """Return True iff this staged configuration is currently released"""
+    """Return True iff this deployment is currently released"""
     return self.auditlog[-1]['state'] == 'LIVE'
