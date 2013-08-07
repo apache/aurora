@@ -235,7 +235,7 @@ public class SchedulerLifecycle implements EventSubscriber {
             onDefeated(null);
           } catch (InterruptedException e) {
             LOG.warning("Leader assassin thread interrupted.");
-            Thread.interrupted();
+            Thread.currentThread().interrupt();
           }
         }
       });
