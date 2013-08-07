@@ -56,7 +56,7 @@ final class Entries {
       deflater.flush();
       deflater.close();
       byte[] deflatedData = deflated.toByteArray();
-      int bytesSaved = deflatedData.length - initialLength;
+      int bytesSaved = initialLength - deflatedData.length;
       if (bytesSaved < 0) {
         LOG.warning("Deflated entry is larger than original by " + (bytesSaved * -1) + " bytes");
       } else {
