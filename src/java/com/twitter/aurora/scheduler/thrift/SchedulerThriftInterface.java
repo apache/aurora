@@ -33,6 +33,7 @@ import org.apache.commons.lang.StringUtils;
 
 import com.twitter.aurora.auth.SessionValidator.AuthFailedException;
 import com.twitter.aurora.gen.AssignedTask;
+import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.gen.CommitRecoveryResponse;
 import com.twitter.aurora.gen.ConfigRewrite;
 import com.twitter.aurora.gen.CreateJobResponse;
@@ -52,7 +53,6 @@ import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.KillResponse;
 import com.twitter.aurora.gen.ListBackupsResponse;
 import com.twitter.aurora.gen.MaintenanceStatusResponse;
-import com.twitter.aurora.gen.MesosAdmin;
 import com.twitter.aurora.gen.PerformBackupResponse;
 import com.twitter.aurora.gen.PopulateJobResponse;
 import com.twitter.aurora.gen.QueryRecoveryResponse;
@@ -122,11 +122,13 @@ import static com.twitter.aurora.gen.ResponseCode.OK;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**
- * Mesos scheduler thrift server implementation.
- * Interfaces between mesos users and the scheduler core to perform cluster administration tasks.
+ * Aurora scheduler thrift server implementation.
+ * <p>
+ * Interfaces between users and the scheduler to access/modify jobs and perform cluster
+ * administration tasks.
  */
 @DecoratedThrift
-class SchedulerThriftInterface implements MesosAdmin.Iface {
+class SchedulerThriftInterface implements AuroraAdmin.Iface {
   private static final Logger LOG = Logger.getLogger(SchedulerThriftInterface.class.getName());
 
   @CmdLine(name = "kill_task_initial_backoff",

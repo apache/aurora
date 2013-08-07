@@ -4,6 +4,7 @@ import java.util.Set;
 
 import org.apache.thrift.TException;
 
+import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.gen.CommitRecoveryResponse;
 import com.twitter.aurora.gen.CreateJobResponse;
 import com.twitter.aurora.gen.DeleteRecoveryTasksResponse;
@@ -20,7 +21,6 @@ import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.KillResponse;
 import com.twitter.aurora.gen.ListBackupsResponse;
 import com.twitter.aurora.gen.MaintenanceStatusResponse;
-import com.twitter.aurora.gen.MesosAdmin;
 import com.twitter.aurora.gen.PerformBackupResponse;
 import com.twitter.aurora.gen.PopulateJobResponse;
 import com.twitter.aurora.gen.QueryRecoveryResponse;
@@ -49,11 +49,11 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * A forwarding scheduler controller to make it easy to override specific behavior in an
  * implementation class.
  */
-abstract class ForwardingThrift implements MesosAdmin.Iface {
+abstract class ForwardingThrift implements AuroraAdmin.Iface {
 
-  private final MesosAdmin.Iface delegate;
+  private final AuroraAdmin.Iface delegate;
 
-  ForwardingThrift(MesosAdmin.Iface delegate) {
+  ForwardingThrift(AuroraAdmin.Iface delegate) {
     this.delegate = checkNotNull(delegate);
   }
 

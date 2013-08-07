@@ -62,7 +62,7 @@ import com.twitter.common_internal.zookeeper.ZooKeeperModule;
 import com.twitter.common_internal.zookeeper.legacy.ServerSetMigrationModule.ServiceDiscovery;
 
 /**
- * Launcher for the twitter mesos scheduler.
+ * Launcher for the aurora scheduler.
  */
 public class SchedulerMain extends AbstractApplication {
 

@@ -3,7 +3,7 @@ from twitter.mesos.client.shard_watcher import ShardWatcher
 from twitter.mesos.client.updater_util import UpdaterConfig
 from twitter.mesos.common import AuroraJobKey
 
-from gen.twitter.mesos.MesosSchedulerManager import Client as scheduler_client
+from gen.twitter.mesos.AuroraSchedulerManager import Client as scheduler_client
 from gen.twitter.mesos.ttypes import *
 
 from mox import IgnoreArg, MoxTestBase

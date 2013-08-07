@@ -31,7 +31,7 @@ public interface DriverFactory extends Function<String, SchedulerDriver> {
 
     @NotNull
     @CmdLine(name = "mesos_master_address",
-            help = "Mesos address for the master, can be a mesos address or zookeeper path.")
+            help = "Address for the mesos master, can be a socket address or zookeeper path.")
     private static final Arg<String> MESOS_MASTER_ADDRESS = Arg.create();
 
     @CmdLine(name = "framework_failover_timeout",

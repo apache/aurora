@@ -11,7 +11,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.aurora.auth.SessionValidator;
-import com.twitter.aurora.gen.MesosAdmin;
+import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.SessionKey;
 import com.twitter.aurora.scheduler.quota.QuotaManager;
@@ -42,7 +42,7 @@ public class ThriftIT extends EasyMockTest {
   private static final Map<Capability, String> CAPABILITIES =
       ImmutableMap.of(Capability.ROOT, ROOT_USER, Capability.PROVISIONER, PROVISIONER_USER);
 
-  private MesosAdmin.Iface thrift;
+  private AuroraAdmin.Iface thrift;
   private QuotaManager quotaManager;
 
   private static final SessionValidator VALIDATOR = new SessionValidator() {
@@ -85,7 +85,7 @@ public class ThriftIT extends EasyMockTest {
           }
         }
     );
-    thrift = injector.getInstance(MesosAdmin.Iface.class);
+    thrift = injector.getInstance(AuroraAdmin.Iface.class);
   }
 
   private static SessionKey key(String user) {

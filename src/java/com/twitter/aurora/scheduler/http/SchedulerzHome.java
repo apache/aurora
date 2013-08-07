@@ -32,7 +32,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**
- * HTTP interface to serve as a HUD for the mesos scheduler.
+ * HTTP interface to serve as a HUD for the aurora scheduler.
  */
 @Path("/scheduler")
 public class SchedulerzHome extends JerseyTemplateServlet {

@@ -19,7 +19,7 @@ import com.twitter.common.util.StateMachine;
 import static org.apache.mesos.Protos.Status.DRIVER_RUNNING;
 
 /**
- * Wraps the mesos core Scheduler driver to ensure its used in a valid lifecycle; namely:
+ * Wraps the mesos Scheduler driver to ensure its used in a valid lifecycle; namely:
  * <pre>
  *   (run -> kill*)? -> stop*
  * </pre>

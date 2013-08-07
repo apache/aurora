@@ -32,11 +32,12 @@ import com.twitter.common.util.StateMachine.Transition;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
- * State machine for a mesos task.
+ * State machine for a task.
+ * <p>
  * This enforces the lifecycle of a task, and triggers the actions that should be taken in response
  * to different state transitions.  These responses are externally communicated by populating a
  * provided work queue.
- *
+ * <p>
  * TODO(William Farner): Introduce an interface to allow state machines to be dealt with
  *     abstractly from the consumption side.
  */

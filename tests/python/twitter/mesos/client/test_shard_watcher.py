@@ -5,7 +5,7 @@ from twitter.mesos.client.health_check import HealthCheck
 from twitter.mesos.client.shard_watcher import ShardWatcher
 
 from gen.twitter.mesos.ttypes import *
-from gen.twitter.mesos.MesosSchedulerManager import Client as scheduler_client
+from gen.twitter.mesos.AuroraSchedulerManager import Client as scheduler_client
 
 import mox
 import pytest

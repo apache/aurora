@@ -32,7 +32,7 @@ import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * Utilities for guice configuration in mesos.
+ * Utilities for guice configuration in aurora.
  */
 public final class GuiceUtils {
 
@@ -86,7 +86,7 @@ public final class GuiceUtils {
 
   /**
    * Binds an interceptor that ensures the main ClassLoader is bound as the thread context
-   * {@link ClassLoader} during JNI callbacks from the mesos core.  Some libraries require a thread
+   * {@link ClassLoader} during JNI callbacks from mesos.  Some libraries require a thread
    * context ClassLoader be set and this ensures those libraries work properly.
    *
    * @param binder The binder to use to register an interceptor with.

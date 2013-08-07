@@ -2,7 +2,7 @@
 namespace java com.twitter.aurora.gen
 namespace py gen.twitter.mesos
 
-// Thrift interface definition for the Twitter Mesos Scheduler.
+// Thrift interface definition for the aurora scheduler.
 
 enum ResponseCode {
   INVALID_REQUEST = 0,
@@ -137,7 +137,7 @@ enum CronCollisionPolicy {
   RUN_OVERLAP   = 2   // Runs both jobs, effectively adding more tasks to the existing job.
 }
 
-// Description of a mesos job.
+// Description of an aurora job.
 // A list of task descriptions must be specified, which may be
 // heterogeneous.  One task will be scheduled for each task description.
 // The tuple (name, environment, owner.role) must be unique.
@@ -422,7 +422,7 @@ struct EndMaintenanceResponse {
 // Due to assumptions in the client all authenticated RPCs must have a SessionKey as their
 // last argument. Note that the order in this file is what matters, and message numbers should still
 // never be reused.
-service MesosSchedulerManager {
+service AuroraSchedulerManager {
   // Creates a new job.  The request will be denied if a job with the provided
   // name already exists in the cluster.
   CreateJobResponse createJob(1: JobConfiguration description, 2: SessionKey session)
@@ -564,7 +564,7 @@ struct RewriteConfigsResponse {
 
 // It would be great to compose these services rather than extend, but that won't be possible until
 // https://issues.apache.org/jira/browse/THRIFT-66 is resolved.
-service MesosAdmin extends MesosSchedulerManager {
+service AuroraAdmin extends AuroraSchedulerManager {
   // Assign quota to a user.  This will overwrite any pre-existing quota for the user.
   SetQuotaResponse setQuota(1: string ownerRole, 2: Quota quota, 3: SessionKey session)
 

@@ -40,7 +40,7 @@ import com.twitter.common.stats.Stats;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
- * Location for communication with the mesos core.
+ * Location for communication with mesos.
  */
 class MesosSchedulerImpl implements Scheduler {
   private static final Logger LOG = Logger.getLogger(MesosSchedulerImpl.class.getName());
@@ -62,7 +62,7 @@ class MesosSchedulerImpl implements Scheduler {
   private volatile boolean registered = false;
 
   /**
-   * Creates a new mesos scheduler.
+   * Creates a new scheduler.
    *
    * @param schedulerCore Core scheduler.
    * @param lifecycle Application lifecycle manager.

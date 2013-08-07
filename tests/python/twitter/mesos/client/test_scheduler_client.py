@@ -3,8 +3,8 @@ import unittest
 
 import twitter.mesos.client.scheduler_client as scheduler_client
 
-import gen.twitter.mesos.MesosAdmin as MesosAdmin
-import gen.twitter.mesos.MesosSchedulerManager as MesosSchedulerManager
+import gen.twitter.mesos.AuroraAdmin as AuroraAdmin
+import gen.twitter.mesos.AuroraSchedulerManager as AuroraSchedulerManager
 from gen.twitter.mesos.constants import DEFAULT_ENVIRONMENT
 from gen.twitter.mesos.ttypes import *
 
@@ -18,7 +18,7 @@ JOB_KEY = JobKey(role=ROLE, environment=DEFAULT_ENVIRONMENT, name=JOB_NAME)
 
 def test_testCoverage():
   """Make sure a new thrift RPC doesn't get added without minimal test coverage."""
-  for name, klass in inspect.getmembers(MesosAdmin) + inspect.getmembers(MesosSchedulerManager):
+  for name, klass in inspect.getmembers(AuroraAdmin) + inspect.getmembers(AuroraSchedulerManager):
     if name.endswith('_args'):
       rpc_name = name[:-len('_args')]
       assert hasattr(TestSchedulerProxyAdminInjection, 'test_%s' % rpc_name), (
@@ -38,11 +38,11 @@ class TestSchedulerProxyInjection(unittest.TestCase):
   def setUp(self):
     self.mox = Mox()
 
-    self.mox.StubOutClassWithMocks(MesosAdmin, 'Client')
+    self.mox.StubOutClassWithMocks(AuroraAdmin, 'Client')
     self.mox.StubOutClassWithMocks(scheduler_client, 'SchedulerClient')
 
     self.mock_scheduler_client = self.mox.CreateMock(scheduler_client.SchedulerClient)
-    self.mock_thrift_client = self.mox.CreateMock(MesosAdmin.Client)
+    self.mock_thrift_client = self.mox.CreateMock(AuroraAdmin.Client)
 
     scheduler_client.SchedulerClient.get(IgnoreArg(), verbose=IgnoreArg()).AndReturn(
         self.mock_scheduler_client)

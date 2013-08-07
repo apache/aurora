@@ -65,7 +65,7 @@ import static com.twitter.aurora.gen.ScheduleStatus.STARTING;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**
- * HTTP interface to view information about a job in the mesos scheduler.
+ * HTTP interface to view information about a job in the aurora scheduler.
  */
 @Path("/scheduler/{role}{environment:(/.*)?}/{job}")
 public class SchedulerzJob extends JerseyTemplateServlet {

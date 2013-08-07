@@ -18,6 +18,7 @@ import org.junit.Test;
 
 import com.twitter.aurora.auth.SessionValidator.AuthFailedException;
 import com.twitter.aurora.gen.AssignedTask;
+import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.gen.ConfigRewrite;
 import com.twitter.aurora.gen.Constraint;
 import com.twitter.aurora.gen.CreateJobResponse;
@@ -33,7 +34,6 @@ import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.KillResponse;
 import com.twitter.aurora.gen.LimitConstraint;
 import com.twitter.aurora.gen.MaintenanceStatusResponse;
-import com.twitter.aurora.gen.MesosAdmin;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.ResponseCode;
 import com.twitter.aurora.gen.RestartShardsResponse;
@@ -105,7 +105,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private StorageBackup backup;
   private Recovery recovery;
   private MaintenanceController maintenance;
-  private MesosAdmin.Iface thrift;
+  private AuroraAdmin.Iface thrift;
   private CronJobManager cronJobManager;
 
   @Before
@@ -132,11 +132,11 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         bind(Recovery.class).toInstance(recovery);
         bind(MaintenanceController.class).toInstance(maintenance);
         bind(CronJobManager.class).toInstance(cronJobManager);
-        bind(MesosAdmin.Iface.class).to(SchedulerThriftInterface.class);
+        bind(AuroraAdmin.Iface.class).to(SchedulerThriftInterface.class);
       }
     };
     Injector injector = Guice.createInjector(testModule, new AopModule());
-    thrift = injector.getInstance(MesosAdmin.Iface.class);
+    thrift = injector.getInstance(AuroraAdmin.Iface.class);
   }
 
   @Test

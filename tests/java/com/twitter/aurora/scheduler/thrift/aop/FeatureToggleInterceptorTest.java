@@ -13,7 +13,7 @@ import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.twitter.aurora.gen.MesosAdmin;
+import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.gen.ResponseCode;
 import com.twitter.aurora.gen.ScheduleStatusResponse;
 import com.twitter.aurora.gen.TaskQuery;
@@ -25,13 +25,13 @@ import static org.junit.Assert.assertSame;
 
 public class FeatureToggleInterceptorTest extends EasyMockTest {
 
-  private MesosAdmin.Iface realThrift;
-  private MesosAdmin.Iface decoratedThrift;
+  private AuroraAdmin.Iface realThrift;
+  private AuroraAdmin.Iface decoratedThrift;
   private Predicate<Method> predicate;
 
   @Before
   public void setUp() {
-    realThrift = createMock(MesosAdmin.Iface.class);
+    realThrift = createMock(AuroraAdmin.Iface.class);
     predicate = createMock(new Clazz<Predicate<Method>>() { });
     Injector injector = Guice.createInjector(new AbstractModule() {
       @Override protected void configure() {
@@ -43,7 +43,7 @@ public class FeatureToggleInterceptorTest extends EasyMockTest {
             new FeatureToggleInterceptor());
       }
     });
-    decoratedThrift = injector.getInstance(MesosAdmin.Iface.class);
+    decoratedThrift = injector.getInstance(AuroraAdmin.Iface.class);
   }
 
   @Test

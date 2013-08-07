@@ -12,8 +12,8 @@ import javax.net.ssl.SSLServerSocketFactory;
 
 import com.google.inject.Inject;
 
-import com.twitter.aurora.gen.MesosAdmin;
-import com.twitter.aurora.gen.MesosAdmin.Iface;
+import com.twitter.aurora.gen.AuroraAdmin;
+import com.twitter.aurora.gen.AuroraAdmin.Iface;
 import com.twitter.common.application.modules.LifecycleModule.ServiceRunner;
 import com.twitter.common.application.modules.LocalServiceRegistry.LocalService;
 import com.twitter.common.base.Command;
@@ -75,7 +75,7 @@ class ThriftServerLauncher implements ServiceRunner {
 
     ServerSetup setup = new ServerSetup(
         0,  // TODO(John Sirois): unused, fix ServerSetup constructors
-        new MesosAdmin.Processor(schedulerThriftInterface),
+        new AuroraAdmin.Processor(schedulerThriftInterface),
         ThriftServer.BINARY_PROTOCOL.get());
     setup.setSocket(serverSocket);
     schedulerThriftServer.start(setup);

@@ -46,7 +46,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**
- * HTTP interface to provide information about jobs for a specific mesos role.
+ * HTTP interface to provide information about jobs for a specific role.
  */
 @Path("/scheduler/{role}")
 public class SchedulerzRole extends JerseyTemplateServlet {

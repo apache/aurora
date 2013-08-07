@@ -12,7 +12,7 @@ from twitter.common_internal.zookeeper.tunneler import TunneledZookeeper
 from twitter.mesos.common.auth import make_session_key, SessionKeyError
 from twitter.mesos.common.cluster import Cluster
 
-from gen.twitter.mesos import MesosAdmin
+from gen.twitter.mesos import AuroraAdmin
 
 from thrift.protocol import TBinaryProtocol
 from thrift.transport import TSocket, TSSLSocket, TTransport
@@ -74,7 +74,7 @@ class SchedulerClient(object):
       socket = TSocket.TSocket(host, port)
     transport = TTransport.TBufferedTransport(socket)
     protocol = TBinaryProtocol.TBinaryProtocol(transport)
-    schedulerClient = MesosAdmin.Client(protocol)
+    schedulerClient = AuroraAdmin.Client(protocol)
     for _ in range(SchedulerClient.THRIFT_RETRIES):
       try:
         transport.open()
@@ -223,7 +223,7 @@ class SchedulerProxy(object):
 
   def __getattr__(self, method_name):
     # If the method does not exist, getattr will return AttributeError for us.
-    method = getattr(MesosAdmin.Client, method_name)
+    method = getattr(AuroraAdmin.Client, method_name)
     if not callable(method):
       return method
 

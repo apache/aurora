@@ -9,7 +9,7 @@ import com.google.inject.Binder;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
 
-import com.twitter.aurora.gen.MesosAdmin;
+import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.scheduler.thrift.auth.DecoratedThrift;
 
 /**
@@ -27,12 +27,12 @@ class MockDecoratedThrift extends ForwardingThrift {
   private @interface MockThrift { }
 
   @Inject
-  MockDecoratedThrift(@MockThrift MesosAdmin.Iface delegate) {
+  MockDecoratedThrift(@MockThrift AuroraAdmin.Iface delegate) {
     super(delegate);
   }
 
-  static void bindForwardedMock(Binder binder, MesosAdmin.Iface mockThrift) {
-    binder.bind(MesosAdmin.Iface.class).annotatedWith(MockThrift.class).toInstance(mockThrift);
-    binder.bind(MesosAdmin.Iface.class).to(MockDecoratedThrift.class);
+  static void bindForwardedMock(Binder binder, AuroraAdmin.Iface mockThrift) {
+    binder.bind(AuroraAdmin.Iface.class).annotatedWith(MockThrift.class).toInstance(mockThrift);
+    binder.bind(AuroraAdmin.Iface.class).to(MockDecoratedThrift.class);
   }
 }

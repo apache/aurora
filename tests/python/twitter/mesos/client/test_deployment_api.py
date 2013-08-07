@@ -8,7 +8,7 @@ from twitter.mesos.common import AuroraJobKey, Cluster
 from twitter.mesos.config import AuroraConfig, AuroraConfigLoader
 from twitter.mesos.packer.packer_client import Packer
 
-from gen.twitter.mesos.MesosSchedulerManager import Client as scheduler_client
+from gen.twitter.mesos.AuroraSchedulerManager import Client as scheduler_client
 import gen.twitter.mesos.ttypes as ttypes
 
 from .helper import FakeSchedulerProxy

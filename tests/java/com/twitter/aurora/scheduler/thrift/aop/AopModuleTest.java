@@ -11,9 +11,9 @@ import com.google.inject.Injector;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.twitter.aurora.gen.AuroraAdmin.Iface;
 import com.twitter.aurora.gen.CreateJobResponse;
 import com.twitter.aurora.gen.JobConfiguration;
-import com.twitter.aurora.gen.MesosAdmin.Iface;
 import com.twitter.aurora.gen.ResponseCode;
 import com.twitter.aurora.gen.SessionKey;
 import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator;

@@ -25,8 +25,8 @@ import com.google.inject.matcher.Matchers;
 import org.aopalliance.intercept.MethodInterceptor;
 
 import com.twitter.aurora.GuiceUtils;
-import com.twitter.aurora.gen.MesosAdmin;
-import com.twitter.aurora.gen.MesosSchedulerManager;
+import com.twitter.aurora.gen.AuroraAdmin;
+import com.twitter.aurora.gen.AuroraSchedulerManager;
 import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator;
 import com.twitter.aurora.scheduler.thrift.auth.DecoratedThrift;
 import com.twitter.common.args.Arg;
@@ -77,26 +77,27 @@ public class AopModule extends AbstractModule {
 
     bindThriftDecorator(new LoggingInterceptor());
 
-    // Note: it's important that the capability interceptor is only applied to MesosAdmin.Iface
-    // methods, and does not pick up methods on MesosSchedulerManager.Iface.
+    // Note: it's important that the capability interceptor is only applied to AuroraAdmin.Iface
+    // methods, and does not pick up methods on AuroraSchedulerManager.Iface.
     MethodInterceptor authInterceptor = new UserCapabilityInterceptor();
     requestInjection(authInterceptor);
     bindInterceptor(
         THRIFT_IFACE_MATCHER,
-        GuiceUtils.interfaceMatcher(MesosAdmin.Iface.class, true),
+        GuiceUtils.interfaceMatcher(AuroraAdmin.Iface.class, true),
         authInterceptor);
 
     install(new PrivateModule() {
       @Override protected void configure() {
         // Ensure that the provided methods exist on the decorated interface.
-        List<Method> methods = ImmutableList.copyOf(MesosSchedulerManager.Iface.class.getMethods());
+        List<Method> methods =
+            ImmutableList.copyOf(AuroraSchedulerManager.Iface.class.getMethods());
         for (String toggledMethod : toggledMethods.keySet()) {
           Preconditions.checkArgument(
               Iterables.any(methods,
                   Predicates.compose(Predicates.equalTo(toggledMethod), GET_NAME)),
               String.format("Method %s was not found in class %s",
                   toggledMethod,
-                  MesosSchedulerManager.Iface.class));
+                  AuroraSchedulerManager.Iface.class));
         }
 
         bind(new TypeLiteral<Map<String, Boolean>>() { }).toInstance(toggledMethods);

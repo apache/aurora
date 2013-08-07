@@ -46,7 +46,7 @@ import com.twitter.common_internal.zookeeper.legacy.ServerSetMigrationModule.Ser
 import com.twitter.thrift.ServiceInstance;
 
 /**
- * Binding module for the twitter mesos scheduler application.
+ * Binding module for the aurora scheduler application.
  */
 class AppModule extends AbstractModule {
   private static final Logger LOG = Logger.getLogger(AppModule.class.getName());

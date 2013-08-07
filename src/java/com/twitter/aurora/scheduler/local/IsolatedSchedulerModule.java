@@ -41,10 +41,10 @@ import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
 import org.apache.thrift.TException;
 
+import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.gen.CreateJobResponse;
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.JobConfiguration;
-import com.twitter.aurora.gen.MesosAdmin;
 import com.twitter.aurora.gen.Package;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.SessionKey;
@@ -102,14 +102,14 @@ public class IsolatedSchedulerModule extends AbstractModule {
     };
 
     private final Provider<Scheduler> scheduler;
-    private final MesosAdmin.Iface thrift;
+    private final AuroraAdmin.Iface thrift;
     private final ScheduledExecutorService executor;
     private final SchedulerDriver driver;
 
     @Inject
     FakeClusterRunner(
         Provider<Scheduler> scheduler,
-        MesosAdmin.Iface thrift,
+        AuroraAdmin.Iface thrift,
         ShutdownRegistry shutdownRegistry) {
 
       this.scheduler = scheduler;

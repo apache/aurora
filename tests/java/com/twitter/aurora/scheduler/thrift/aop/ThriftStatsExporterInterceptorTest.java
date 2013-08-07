@@ -9,9 +9,9 @@ import com.google.inject.matcher.Matchers;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.gen.GetJobsResponse;
 import com.twitter.aurora.gen.JobConfiguration;
-import com.twitter.aurora.gen.MesosAdmin;
 import com.twitter.aurora.scheduler.thrift.auth.DecoratedThrift;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.testing.EasyMockTest;
@@ -26,14 +26,14 @@ public class ThriftStatsExporterInterceptorTest extends EasyMockTest {
 
   private static final String ROLE = "bob";
 
-  private MesosAdmin.Iface realThrift;
-  private MesosAdmin.Iface decoratedThrift;
+  private AuroraAdmin.Iface realThrift;
+  private AuroraAdmin.Iface decoratedThrift;
   private ThriftStatsExporterInterceptor statsInterceptor;
 
   @Before
   public void setUp() {
     statsInterceptor = new ThriftStatsExporterInterceptor();
-    realThrift = createMock(MesosAdmin.Iface.class);
+    realThrift = createMock(AuroraAdmin.Iface.class);
     Injector injector = Guice.createInjector(new AbstractModule() {
       @Override protected void configure() {
         MockDecoratedThrift.bindForwardedMock(binder(), realThrift);
@@ -43,7 +43,7 @@ public class ThriftStatsExporterInterceptorTest extends EasyMockTest {
             statsInterceptor);
       }
     });
-    decoratedThrift = injector.getInstance(MesosAdmin.Iface.class);
+    decoratedThrift = injector.getInstance(AuroraAdmin.Iface.class);
   }
 
   @Test
