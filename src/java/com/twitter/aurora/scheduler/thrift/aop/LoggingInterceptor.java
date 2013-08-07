@@ -14,7 +14,10 @@ import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 
 import com.twitter.aurora.gen.JobConfiguration;
+import com.twitter.aurora.gen.ResponseCode;
 import com.twitter.aurora.gen.SessionKey;
+
+import static com.twitter.aurora.scheduler.thrift.aop.Interceptors.properlyTypedResponse;
 
 /**
  * A method interceptor that logs all invocations as well as any unchecked exceptions thrown from
@@ -64,7 +67,7 @@ class LoggingInterceptor implements MethodInterceptor {
       return invocation.proceed();
     } catch (RuntimeException e) {
       LOG.log(Level.WARNING, "Uncaught exception while handling " + message, e);
-      throw e;
+      return properlyTypedResponse(invocation.getMethod(), ResponseCode.ERROR, e.getMessage());
     }
   }
 }
