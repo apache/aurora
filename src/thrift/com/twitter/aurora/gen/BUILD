@@ -1,4 +1,4 @@
-TEST_DATA = globs('*_test.thrift')
+TEST_DATA = globs('*test.thrift')
 
 java_thrift_library(
   name = 'thrift',
@@ -13,8 +13,8 @@ java_thrift_library(
 python_thrift_library(
   name = 'py-thrift',
   sources = [
-    'mesos_comm.thrift',
-    'mesos_twitter.thrift',
+    'api.thrift',
+    'internal_rpc.thrift',
   ],
 )
 
@@ -25,5 +25,5 @@ python_thrift_library(
 
 python_thrift_library(
   name = 'py-thrift-storage',
-  sources = ['mesos_storage.thrift'],
+  sources = ['storage.thrift'],
 )

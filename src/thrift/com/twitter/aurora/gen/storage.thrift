@@ -1,8 +1,8 @@
 // Copyright 2011 Twitter, Inc.
 namespace java com.twitter.aurora.gen.storage
-namespace py gen.twitter.mesos_storage
+namespace py gen.twitter.storage
 
-include "mesos_twitter.thrift"
+include "api.thrift"
 
 // Thrift object definitions for messages used for mesos storage.
 
@@ -27,30 +27,30 @@ struct SaveFrameworkId {
 
 struct SaveAcceptedJob {
   1: string managerId
-  2: mesos_twitter.JobConfiguration jobConfig
+  2: api.JobConfiguration jobConfig
 }
 
 struct SaveJobUpdate {
-  5: mesos_twitter.JobKey jobKey
+  5: api.JobKey jobKey
   3: string updateToken
-  4: set<mesos_twitter.TaskUpdateConfiguration> configs
+  4: set<api.TaskUpdateConfiguration> configs
 }
 
 struct RemoveJobUpdate {
-  3: mesos_twitter.JobKey jobKey
+  3: api.JobKey jobKey
 }
 
 struct RemoveJob {
-  2: mesos_twitter.JobKey jobKey
+  2: api.JobKey jobKey
 }
 
 struct SaveTasks {
-  1: set<mesos_twitter.ScheduledTask> tasks
+  1: set<api.ScheduledTask> tasks
 }
 
 struct RewriteTask {
   1: string taskId
-  2: mesos_twitter.TwitterTaskInfo task
+  2: api.TwitterTaskInfo task
 }
 
 struct RemoveTasks {
@@ -59,7 +59,7 @@ struct RemoveTasks {
 
 struct SaveQuota {
   1: string role
-  2: mesos_twitter.Quota quota
+  2: api.Quota quota
 }
 
 struct RemoveQuota {
@@ -67,7 +67,7 @@ struct RemoveQuota {
 }
 
 struct SaveHostAttributes {
-  1: mesos_twitter.HostAttributes hostAttributes
+  1: api.HostAttributes hostAttributes
 }
 
 union Op {
@@ -92,7 +92,7 @@ struct Transaction {
 
 struct StoredJob {
   1: string jobManagerId
-  3: mesos_twitter.JobConfiguration jobConfiguration
+  3: api.JobConfiguration jobConfiguration
 }
 
 struct SchedulerMetadata {
@@ -101,7 +101,7 @@ struct SchedulerMetadata {
 
 struct QuotaConfiguration {
   1: string role
-  2: mesos_twitter.Quota quota
+  2: api.Quota quota
 }
 
 // Represents a complete snapshot of local storage data suitable for restoring the local storage
@@ -111,11 +111,11 @@ struct Snapshot {
   // The timestamp when the snapshot was made in milliseconds since the epoch.
   1: i64 timestamp
 
-  3: set<mesos_twitter.HostAttributes> hostAttributes
-  4: set<mesos_twitter.ScheduledTask> tasks
+  3: set<api.HostAttributes> hostAttributes
+  4: set<api.ScheduledTask> tasks
   5: set<StoredJob> jobs
   6: SchedulerMetadata schedulerMetadata
-  7: set<mesos_twitter.JobUpdateConfiguration> updateConfigurations
+  7: set<api.JobUpdateConfiguration> updateConfigurations
   8: set<QuotaConfiguration> quotaConfigurations
 }
 

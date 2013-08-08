@@ -2,7 +2,7 @@
 namespace java com.twitter.aurora.gen.comm
 namespace py gen.twitter.mesos.comm
 
-include "mesos_twitter.thrift"
+include "api.thrift"
 
 // Thrift interface to define the communication between the scheduler and executor.
 
@@ -23,7 +23,7 @@ union SchedulerMessage {
 // executor should only retain tasks associated with the provided tasks IDs.
 struct AdjustRetainedTasks {
   1: set<string> retainedTaskIds  // DEPRECATED - All task IDs that the executor should retain.
-  2: map<string, mesos_twitter.ScheduleStatus> retainedTasks  // All tasks that the executor should
+  2: map<string, api.ScheduleStatus> retainedTasks  // All tasks that the executor should
                                                               // retain, and their statuses.
 }
 
